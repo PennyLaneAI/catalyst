@@ -133,7 +133,9 @@ def _get_device_kwargs(device) -> dict:
 
 # code example has long lines
 # pylint: disable=line-too-long
-def from_plxpr(plxpr: ClosedJaxpr, skip_preprocess: bool = False) -> Callable[..., Jaxpr]:
+def from_plxpr(
+    plxpr: ClosedJaxpr, skip_preprocess: bool = False, _preprocess_warn: bool = True
+) -> Callable[..., Jaxpr]:
     """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
     Args:
@@ -199,7 +201,11 @@ def from_plxpr(plxpr: ClosedJaxpr, skip_preprocess: bool = False) -> Callable[..
     """
 
     original_fn = partial(
-        WorkflowInterpreter(skip_preprocess=skip_preprocess).eval, plxpr.jaxpr, plxpr.consts
+        WorkflowInterpreter(
+            skip_preprocess=skip_preprocess, _preprocess_warn=_preprocess_warn
+        ).eval,
+        plxpr.jaxpr,
+        plxpr.consts,
     )
 
     # pylint: disable=import-outside-toplevel
@@ -218,17 +224,20 @@ class WorkflowInterpreter(PlxprInterpreter):
     """An interpreter that converts a qnode primitive from a plxpr variant to a catalyst jaxpr variant."""
 
     def __copy__(self):
-        new_version = WorkflowInterpreter(skip_preprocess=self._skip_preprocess)
+        new_version = WorkflowInterpreter(
+            skip_preprocess=self._skip_preprocess, _preprocess_warn=self._preprocess_warn
+        )
         new_version._pass_pipeline = copy(self._pass_pipeline)
         new_version.init_qreg = self.init_qreg
         new_version.requires_decompose_lowering = self.requires_decompose_lowering
         new_version.decompose_tkwargs = copy(self.decompose_tkwargs)
         return new_version
 
-    def __init__(self, skip_preprocess=False):
+    def __init__(self, skip_preprocess=False, _preprocess_warn=True):
         self._pass_pipeline = []
         self.init_qreg = None
         self._skip_preprocess = skip_preprocess
+        self._preprocess_warn = _preprocess_warn
 
         # Compiler options for the new decomposition system
         self.requires_decompose_lowering = False
@@ -370,7 +379,7 @@ def handle_qnode(
     pipelines = [("main", tuple(self._pass_pipeline))]
     if not self._skip_preprocess:
         pipelines.append(
-            ("device", create_device_preprocessing_pipeline(qnode.device, execution_config, shots))
+            ("device", create_device_preprocessing_pipeline(qnode.device, execution_config, shots, warn=self._preprocess_warn))
         )
 
     return quantum_kernel_p.bind(
@@ -393,11 +402,6 @@ transforms_to_passes = {
     pl_unitary_to_rot: (None, False),
     pl_gridsynth: ("gridsynth", False),
 }
-
-
-def register_transform(pl_transform, pass_name, decomposition):
-    """Register pennylane transforms and their conversion to Catalyst transforms"""
-    transforms_to_passes[pl_transform] = (pass_name, decomposition)
 
 
 def _set_decompose_lowering_state(self):
