@@ -19,6 +19,7 @@ Bytecode.
 
 import inspect
 import warnings
+from textwrap import indent
 
 import jax
 import pennylane as qp
@@ -96,7 +97,8 @@ def get_func_from_circuit(module) -> str | None:
         return ir.WalkResult.ADVANCE
 
     module.operation.walk(find_condition)
-    return str(decompFuncOp) if decompFuncOp else ""
+
+    return "builtin.module {\n" + indent(str(decompFuncOp), "  ") + "\n}\n" if decompFuncOp else ""
 
 
 def compile_decomps_via_dummy_circuit(op_class: Operation) -> dict[str, str] | None:
@@ -105,8 +107,6 @@ def compile_decomps_via_dummy_circuit(op_class: Operation) -> dict[str, str] | N
     to compiled mlir modules.
 
     Note: the modules include the full circuit IR.
-
-    TODO: remove circuit IR, return only the func.func decomposition rules.
     """
     op_decomp_rules = qp.decomposition.decomposition_graph.list_decomps(op_class)
 
@@ -177,4 +177,3 @@ if __name__ == "__main__":
             if results:
                 for name, circuit_mlir in results.items():
                     mlir_file.write(circuit_mlir.replace("rule_wrapper", name))
-                    mlir_file.write("\n// -----\n")  # for splitting input file to quantum-opt
