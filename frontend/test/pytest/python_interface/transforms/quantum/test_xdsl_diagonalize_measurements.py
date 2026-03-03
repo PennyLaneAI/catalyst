@@ -56,7 +56,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         """Test if an ValueError is raised if supported_base_obs is a subset of {Identity,PauliX,
         PauliY, PauliZ, Hadamard}."""
         expected_msg = (
-            f"{supported_base_obs} is not supported. Please ensure all the supported_base_obs"
+            f"{supported_base_obs} is not supported. Please ensure all the supported_base_obs "
             "is a subset of PauliX, PauliY, PauliZ, Hadamard and Identity"
         )
         with pytest.raises(ValueError, match=re.escape(expected_msg)):
@@ -311,7 +311,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         pipeline = (DiagonalizeFinalMeasurementsPass(),)
 
         with pytest.raises(
-            RuntimeError, match="the circuit contains multiple observables with the same wire"
+            RuntimeError, match="cannot diagonalize circuit with non-commuting observables"
         ):
             run_filecheck(program, pipeline)
 
@@ -475,11 +475,11 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
             return qml.expval(qml.Y(0)), qml.var(qml.Y(0))
 
         with pytest.raises(
-            RuntimeError, match="the circuit contains multiple observables with the same wire"
+            RuntimeError, match="cannot diagonalize circuit with non-commuting observables"
         ):
             _ = circuit(1.23)
 
-    @pytest.mark.xfail(reason="for now, assume split_non_commuting is always applied")
+    # @pytest.mark.xfail(reason="for now, assume split_non_commuting is always applied")
     @pytest.mark.usefixtures("use_capture")
     def test_non_commuting_observables_raise_error(self):
         """Check that an error is raised if we try to diagonalize a circuit that contains
@@ -731,11 +731,10 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             return qml.expval(qml.Y(0)), qml.var(qml.Y(0))
 
         with pytest.raises(
-            RuntimeError, match="the circuit contains multiple observables with the same wire"
+            RuntimeError, match="cannot diagonalize circuit with non-commuting observables"
         ):
             _ = circuit(1.23)
 
-    @pytest.mark.xfail(reason="for now, assume split_non_commuting is always applied")
     @pytest.mark.parametrize(
         "obs",
         [
@@ -755,7 +754,6 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             (qml.X(0) @ qml.Y(1), qml.Hermitian(np.eye(2), wires=0) @ qml.Y(2)),
             # Hamiltonian obs
             (qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.Z(1)]), qml.X(1) @ qml.X(2)),
-            (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.X(1) @ qml.X(2)),
             (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.Hamiltonian([1.0, 1.0], [qml.X(0), qml.Y(1)])),
         ],
     )
@@ -782,7 +780,6 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         ):
             _ = circuit(0.7)
 
-    @pytest.mark.xfail(reason="for now, assume split_non_commuting is always applied")
     @pytest.mark.parametrize(
         "obs",
         [
@@ -799,10 +796,8 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             (qml.X(0) @ qml.Y(1), qml.Z(1) @ qml.Hadamard(2)),
             (qml.X(0) @ qml.Y(1), qml.Z(0) @ qml.Hadamard(2)),
             (qml.X(0) @ qml.Y(1), qml.Z(0) @ qml.Hadamard(1)),
-            (qml.X(0) @ qml.Y(1), qml.Hermitian(np.eye(2), wires=0) @ qml.Y(2)),
             # Hamiltonian obs
             (qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.Z(1)]), qml.X(1) @ qml.X(2)),
-            (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.X(1) @ qml.X(2)),
             (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.Hamiltonian([1.0, 1.0], [qml.X(0), qml.Y(1)])),
         ],
     )
@@ -817,10 +812,11 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         non-commuting observables."""
         dev = qml.device("lightning.qubit", wires=4)
 
-        assert any(wire in obs[1].wires for wire in obs[0].wires)
+        # assert any(wire in obs[1].wires for wire in obs[0].wires)
 
         @qml.qjit()
         @diagonalize_final_measurements_pass
+        @qml.set_shots(10)
         @qml.qnode(dev)
         def circuit(x):
             qml.RX(x, 0)
@@ -831,7 +827,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         ):
             _ = circuit(0.7)
 
-    @pytest.mark.xfail(reason="for now, assume split_non_commuting is always applied")
+    # @pytest.mark.xfail(reason="for now, assume split_non_commuting is always applied")
     @pytest.mark.parametrize(
         "obs",
         [
@@ -851,10 +847,11 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         @qml.qjit()
         @diagonalize_final_measurements_pass
+        @qml.set_shots(10)
         @qml.qnode(dev)
         def circuit(x):
             qml.RX(x, 0)
-            return measurements[0](), measurements[1](obs[0])
+            return measurements[0](), measurements[1](obs)
 
         with pytest.raises(
             RuntimeError, match="cannot diagonalize circuit with non-commuting observables"

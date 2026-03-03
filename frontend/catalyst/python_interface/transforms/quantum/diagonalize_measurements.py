@@ -34,8 +34,10 @@ from xdsl.dialects import arith, builtin
 from xdsl.rewriter import InsertPoint
 
 from catalyst.python_interface.dialects.quantum import (
+    ComputationalBasisOp,
     CustomOp,
     GlobalPhaseOp,
+    HermitianOp,
     MultiRZOp,
     NamedObservable,
     NamedObservableAttr,
@@ -78,6 +80,55 @@ def _diagonalize(obs: NamedObsOp, supported_base_obs) -> bool:
     )  # pragma: no cover
 
 
+class CheckSplitNonCommutingPattern(
+    pattern_rewriter.RewritePattern
+):  # pylint: disable=too-few-public-methods
+    """RewritePattern for diagonalizing final measurements."""
+
+    def __init__(self):
+        self._visited_obs_qubits = set()
+        self._visited_obs_qreg = False
+
+    @pattern_rewriter.op_type_rewrite_pattern
+    def match_and_rewrite(
+        self,
+        observable: NamedObsOp | ComputationalBasisOp | HermitianOp,
+        rewriter: pattern_rewriter.PatternRewriter,
+        /,
+    ):
+        """Replace non-diagonalized observables with their diagonalizing gates and supported
+        observables."""
+        # Check the used by the basic Observables
+        if isinstance(observable, NamedObsOp):
+            in_qubit = observable.operands[0]
+            if (in_qubit not in self._visited_obs_qubits) and (self._visited_obs_qreg is False):
+                self._visited_obs_qubits.add(in_qubit)
+            else:
+                print(in_qubit, self._visited_obs_qubits)
+                raise RuntimeError("cannot diagonalize circuit with non-commuting observables")
+        if isinstance(observable, HermitianOp):
+            for qubit in observable.qubits:
+                if qubit not in self._visited_obs_qubits and self._visited_obs_qreg is False:
+                    self._visited_obs_qubits.add(qubit)
+                else:
+                    raise RuntimeError("cannot diagonalize circuit with non-commuting observables")
+        if isinstance(observable, ComputationalBasisOp):
+            if observable.qreg is not None and (self._visited_obs_qreg or self._visited_obs_qubits):
+                raise RuntimeError("cannot diagonalize circuit with non-commuting observables")
+
+            if observable.qreg is not None:
+                self._visited_obs_qreg = True
+
+            if observable.qubits is not None:
+                for qubit in observable.qubits:
+                    if qubit not in self._visited_obs_qubits and self._visited_obs_qreg is False:
+                        self._visited_obs_qubits.add(qubit)
+                    else:
+                        raise RuntimeError(
+                            "cannot diagonalize circuit with non-commuting observables"
+                        )
+
+
 class DiagonalizeFinalMeasurementsPattern(
     pattern_rewriter.RewritePattern
 ):  # pylint: disable=too-few-public-methods
@@ -89,12 +140,15 @@ class DiagonalizeFinalMeasurementsPattern(
 
     @pattern_rewriter.op_type_rewrite_pattern
     def match_and_rewrite(
-        self, observable: NamedObsOp, rewriter: pattern_rewriter.PatternRewriter, /
+        self,
+        observable: NamedObsOp | ComputationalBasisOp | HermitianOp,
+        rewriter: pattern_rewriter.PatternRewriter,
+        /,
     ):
         """Replace non-diagonalized observables with their diagonalizing gates and supported
         observables."""
-
-        if _diagonalize(observable, self.supported_base_obs):
+        # Diagonalize branch
+        if isinstance(observable, NamedObsOp) and _diagonalize(observable, self.supported_base_obs):
 
             diagonalizing_gates = _gate_map[observable.type.data]
             params = _params_map[observable.type.data]
@@ -131,15 +185,6 @@ class DiagonalizeFinalMeasurementsPattern(
                     use.operation, (CustomOp, GlobalPhaseOp, MultiRZOp, QubitUnitaryOp)
                 )
             ]
-            num_observables = len(
-                [use for use in uses_to_change if isinstance(use.operation, NamedObsOp)]
-            )
-
-            if num_observables > 1:
-                raise RuntimeError(
-                    "Each wire can only have one set of diagonalizing gates applied, but the "
-                    "circuit contains multiple observables with the same wire."
-                )
 
             observable.qubit.replace_by_if(qubit, lambda use: use in uses_to_change)
             for use in uses_to_change:
@@ -186,6 +231,10 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the diagonalize final measurements pass."""
+        pattern_rewriter.PatternRewriteWalker(
+            CheckSplitNonCommutingPattern(), apply_recursively=False
+        ).rewrite_module(op)
+
         pattern_rewriter.PatternRewriteWalker(
             DiagonalizeFinalMeasurementsPattern(self.supported_base_obs, self.to_eigvals)
         ).rewrite_module(op)
