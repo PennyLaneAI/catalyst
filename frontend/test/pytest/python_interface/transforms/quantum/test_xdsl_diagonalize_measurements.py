@@ -569,6 +569,62 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         )
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
+    
+    def test_with_split_non_commuting(self):
+        def diagonalize_measurements_setup_inputs(to_eigvals: bool = False, supported_base_obs: list[str] = "PauliZ"):
+            "Docstring for my_transform."
+            return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
+
+        diagonalize_measurements = qml.transform(
+            pass_name="diagonalize-final-measurements", setup_inputs=diagonalize_measurements_setup_inputs
+        )
+
+        dev = qml.device("lightning.qubit", wires=10)
+
+        @qml.for_loop(0, 10, 1)
+        def for_fn(i):
+            qml.H(i)
+            qml.S(i)
+            qml.RZ(phi=0.1, wires=[i])
+
+        @qml.while_loop(lambda i: i < 10)
+        def while_fn(i):
+            qml.H(i)
+            qml.S(i)
+            qml.RZ(phi=0.1, wires=[i])
+            i = i + 1
+            return i
+
+        @qml.qjit
+        @diagonalize_measurements(supported_base_obs=("PauliX", "PauliY", "PauliZ"), to_eigvals=False)
+        @qml.transform(pass_name="split-non-commuting")
+        @qml.qnode(dev)
+        def circuit():
+            for_fn()  # pylint: disable=no-value-for-parameter
+            while_fn(0)
+            qml.CNOT(wires=[0, 1])
+            return (
+                qml.expval(qml.Z(wires=0)),
+                qml.expval(qml.Y(wires=1)),
+                qml.expval(qml.X(wires=0)),
+            )
+
+        res = circuit()
+
+        @qml.qjit
+        @qml.qnode(dev)
+        def circuit_ref():
+            for_fn()  # pylint: disable=no-value-for-parameter
+            while_fn(0)
+            qml.CNOT(wires=[0, 1])
+            return (
+                qml.expval(qml.Z(wires=0)),
+                qml.expval(qml.Y(wires=1)),
+                qml.expval(qml.X(wires=0)),
+            )
+
+        res_ref = circuit_ref()
+        assert res == res_ref
 
     def test_with_multiple_measurements(self):
         """Test that the transform runs and returns the expected results for
