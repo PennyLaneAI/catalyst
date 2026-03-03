@@ -570,11 +570,15 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
-    def test_with_split_non_commuting(self):
+    def test_with_split_non_commuting_mlir(self, run_filecheck_qjit):
+        """Test if the mlir file can be correctly lowered when applying both the
+        diagonalize-final-measurements pass works with the split-non-commuting
+        pass"""
+
         def diagonalize_measurements_setup_inputs(
             to_eigvals: bool = False, supported_base_obs: list[str] = "PauliZ"
         ):
-            "Docstring for my_transform."
+            "Return the options for the diagonalize-final-measurements pass."
             return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
 
         diagonalize_measurements = qml.transform(
@@ -598,7 +602,58 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             i = i + 1
             return i
 
-        @qml.qjit(keep_intermediate=True)
+        @qml.qjit(target="mlir")
+        @diagonalize_measurements(supported_base_obs=("PauliX"), to_eigvals=False)
+        @qml.transform(pass_name="split-non-commuting")
+        @qml.qnode(dev)
+        def circuit():
+            for_fn()  # pylint: disable=no-value-for-parameter
+            while_fn(0)
+            qml.CNOT(wires=[0, 1])
+            # CHECK-NOT: quantum.namedobs [[qubit:%]][PauliY] : !quantum.obs
+            return (
+                qml.expval(qml.Z(wires=0)),
+                qml.expval(qml.Y(wires=1)),
+                qml.expval(qml.X(wires=0)),
+            )
+
+        run_filecheck_qjit(circuit)
+
+    @pytest.mark.xfail(
+        reason="for now, this test would failed due to the supported_base_obs is converted from tuple to list hence unhashable after transfroms."
+    )
+    def test_with_split_non_commuting(self):
+        """Test if the executable file can be correctly generated when applying both the
+        diagonalize-final-measurements pass works with the split-non-commuting pass"""
+
+        def diagonalize_measurements_setup_inputs(
+            to_eigvals: bool = False, supported_base_obs: list[str] = "PauliZ"
+        ):
+            "Return the options for the diagonalize-final-measurements pass."
+            return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
+
+        diagonalize_measurements = qml.transform(
+            pass_name="diagonalize-final-measurements",
+            setup_inputs=diagonalize_measurements_setup_inputs,
+        )
+
+        dev = qml.device("lightning.qubit", wires=10)
+
+        @qml.for_loop(0, 10, 1)
+        def for_fn(i):
+            qml.H(i)
+            qml.S(i)
+            qml.RZ(phi=0.1, wires=[i])
+
+        @qml.while_loop(lambda i: i < 10)
+        def while_fn(i):
+            qml.H(i)
+            qml.S(i)
+            qml.RZ(phi=0.1, wires=[i])
+            i = i + 1
+            return i
+
+        @qml.qjit
         @diagonalize_measurements(supported_base_obs=("PauliX", "PauliY"), to_eigvals=False)
         @qml.transform(pass_name="split-non-commuting")
         @qml.qnode(dev)
