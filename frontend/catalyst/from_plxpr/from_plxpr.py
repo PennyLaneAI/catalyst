@@ -92,6 +92,7 @@ def _tuple_to_dict(t):
     Returns:
         The converted dict, list, or the original scalar value.
     """
+    # pylint: disable=too-many-return-statements
 
     if not isinstance(t, (dict, tuple, list)):
         return t
