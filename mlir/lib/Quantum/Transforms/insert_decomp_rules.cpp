@@ -30,7 +30,7 @@ namespace quantum {
 #define GEN_PASS_DECL_INSERTDECOMPRULESPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-static constexpr std::string_view AOT_RULES_FILE = "./aot_rule_cache.mlirbc";
+static constexpr std::string_view AOT_RULES_FILE = "./decomposition-rules/decompositions.mlirbc";
 
 mlir::OwningOpRef<mlir::func::FuncOp> readMLIRBCFunc(mlir::MLIRContext *context)
 {
@@ -46,10 +46,12 @@ mlir::OwningOpRef<mlir::func::FuncOp> readMLIRBCFunc(mlir::MLIRContext *context)
 
     auto funcOps = moduleOp->getOps<mlir::func::FuncOp>();
 
+    // maybe raise an error here?
     if (funcOps.empty()) {
         return nullptr;
     }
 
+    // TODO grab all of the functions
     mlir::func::FuncOp funcOp = *funcOps.begin();
 
     if (!funcOp) {
@@ -58,9 +60,11 @@ mlir::OwningOpRef<mlir::func::FuncOp> readMLIRBCFunc(mlir::MLIRContext *context)
 
     funcOp->remove();
 
+    // TODO return a list? vector?
     return mlir::OwningOpRef<mlir::func::FuncOp>(funcOp);
 }
 
+// TODO accept a function name arg? list of function names? Pointers?
 struct InsertDecompRulesPass : public impl::InsertDecompRulesPassBase<InsertDecompRulesPass> {
     using InsertDecompRulesPassBase::InsertDecompRulesPassBase;
 
