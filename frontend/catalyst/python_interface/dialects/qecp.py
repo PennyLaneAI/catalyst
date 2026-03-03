@@ -263,9 +263,14 @@ class ExtractCodeblockOp(IRDLOperation):
             operands = (hyper_reg, idx)
             properties = {}
 
+        if isinstance(hyper_reg, PhysicalHyperRegisterType):
+            result_type = PhysicalCodeblockType(k=hyper_reg.k, n=hyper_reg.n)
+        else:
+            result_type = PhysicalCodeblockType(k=hyper_reg.type.k, n=hyper_reg.type.n)
+
         super().__init__(
             operands=operands,
-            result_types=(PhysicalCodeblockType(k=hyper_reg.k, n=hyper_reg.n),),
+            result_types=(result_type,),
             properties=properties,
         )
 

@@ -15,7 +15,8 @@
 """Unit tests for the xDSL QecPhysical dialect."""
 
 import pytest
-from xdsl.dialects.test import TestOp
+from xdsl.dialects import test
+from xdsl.dialects.builtin import IntegerAttr, IntegerType
 from xdsl.ir import AttributeCovT, OpResult
 
 from catalyst.python_interface.dialects import qecp
@@ -26,7 +27,7 @@ pytestmark = pytest.mark.xdsl
 # Test function taken from xdsl/utils/test_value.py
 def create_ssa_value(t: AttributeCovT) -> OpResult[AttributeCovT]:
     """Create a single SSA value with the given type for testing purposes."""
-    op = TestOp(result_types=(t,))
+    op = test.TestOp(result_types=(t,))
     return op.results[0]
 
 
@@ -48,12 +49,6 @@ expected_attrs_names = {
     "PhysicalCodeblockType": "qecp.codeblock",
     "PhysicalHyperRegisterType": "qecp.hyperreg",
 }
-
-
-q_data = create_ssa_value(qecp.QecPhysicalQubitType("data"))
-q_aux = create_ssa_value(qecp.QecPhysicalQubitType("aux"))
-codeblock = create_ssa_value(qecp.PhysicalCodeblockType(1, 7))
-hyperreg = create_ssa_value(qecp.PhysicalHyperRegisterType(3, 1, 7))
 
 
 def test_qecp_dialect_name():
@@ -81,6 +76,61 @@ def test_all_attributes_names(attr):
         expected_name is not None
     ), f"Unexpected attribute {attr_class_name} found in QecPhysical dialect"
     assert attr.name == expected_name
+
+
+def test_type_constructors():
+    """Test the constructors of each type defined in the qecp dialect work as expected."""
+
+    q_data = qecp.QecPhysicalQubitType("data")
+    assert isinstance(q_data.role, qecp.QecPhysicalQubitRoleAttr)
+    assert q_data.role.data == str(qecp.QecPhysicalQubitRole.Data)
+
+    q_aux = qecp.QecPhysicalQubitType("aux")
+    assert isinstance(q_aux.role, qecp.QecPhysicalQubitRoleAttr)
+    assert q_aux.role.data == str(qecp.QecPhysicalQubitRole.Aux)
+
+    codeblock = qecp.PhysicalCodeblockType(1, 7)
+    assert isinstance(codeblock.k, IntegerAttr)
+    assert codeblock.k.value.data == 1
+    assert codeblock.k.type == IntegerType(64)
+    assert codeblock.n.value.data == 7
+    assert codeblock.n.type == IntegerType(64)
+
+    hyper_reg = qecp.PhysicalHyperRegisterType(3, 1, 7)
+    assert isinstance(hyper_reg.width, IntegerAttr)
+    assert hyper_reg.width.value.data == 3
+    assert hyper_reg.width.type == IntegerType(64)
+    assert isinstance(hyper_reg.k, IntegerAttr)
+    assert hyper_reg.k.value.data == 1
+    assert hyper_reg.k.type == IntegerType(64)
+    assert isinstance(hyper_reg.n, IntegerAttr)
+    assert hyper_reg.n.value.data == 7
+    assert hyper_reg.n.type == IntegerType(64)
+
+
+def test_op_constructors():
+    """Test the constructors of each op defined in the qecp dialect work as expected."""
+    hyper_reg = create_ssa_value(qecp.PhysicalHyperRegisterType(3, 1, 7))
+    codeblock = create_ssa_value(qecp.PhysicalCodeblockType(1, 7))
+
+    # alloc
+    alloc_op = qecp.AllocOp(result_types=(qecp.PhysicalHyperRegisterType(3, 1, 7),))
+    assert len(alloc_op.result_types) == 1
+    assert isinstance(alloc_op.result_types[0], qecp.PhysicalHyperRegisterType)
+
+    # dealloc
+    dealloc_op = qecp.DeallocOp(operands=(hyper_reg,))
+    assert len(dealloc_op.result_types) == 0
+
+    # extract_block
+    extract_block_op = qecp.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=0)
+    assert len(extract_block_op.result_types) == 1
+    assert isinstance(extract_block_op.result_types[0], qecp.PhysicalCodeblockType)
+
+    # insert_block
+    insert_block_op = qecp.InsertCodeblockOp(in_hyper_reg=hyper_reg, idx=0, codeblock=codeblock)
+    assert len(insert_block_op.result_types) == 1
+    assert isinstance(insert_block_op.result_types[0], qecp.PhysicalHyperRegisterType)
 
 
 @pytest.mark.parametrize(
