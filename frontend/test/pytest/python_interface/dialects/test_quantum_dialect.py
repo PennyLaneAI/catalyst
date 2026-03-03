@@ -61,6 +61,7 @@ expected_ops_names = {
     "HermitianOp": "quantum.hermitian",
     "InitializeOp": "quantum.init",
     "InsertOp": "quantum.insert",
+    "MCMObsOp": "quantum.mcmobs",
     "MeasureOp": "quantum.measure",
     "MultiRZOp": "quantum.multirz",
     "NamedObsOp": "quantum.namedobs",
@@ -176,6 +177,10 @@ expected_ops_init_kwargs = {
         {"in_qreg": qreg, "idx": int_ssa, "qubit": q1},
         {"in_qreg": qreg, "idx": int_attr, "qubit": q1},
         {"in_qreg": qreg, "idx": 0, "qubit": q1},
+    ],
+    "MCMObsOp": [
+        {"operands": (bool_ssa,), "result_types": (obs,)},
+        {"operands": ((bool_ssa, bool_ssa, bool_ssa),), "result_types": (obs,)},
     ],
     "MeasureOp": [
         {"in_qubit": q0, "postselect": int_ssa},
@@ -639,6 +644,18 @@ class TestAssemblyFormat:
         // CHECK: {{%.+}} = quantum.compbasis qreg [[QREG]] : !quantum.obs
         %cb_01 = quantum.compbasis qubits %q0, %q1 : !quantum.obs
         %cb_all = quantum.compbasis qreg %qreg : !quantum.obs
+
+        //////////// **MCMObsOp** ////////////
+        // create booleans for the mcms
+        // CHECK: [[MCM1:%.+]] = "test.op"() : () -> i1
+        // CHECK: [[MCM2:%.+]] = "test.op"() : () -> i1
+        %mcm1 = "test.op"() : () -> i1
+        %mcm2 = "test.op"() : () -> i1
+
+        // CHECK: {{%.+}} = quantum.mcmobs [[MCM1]] : !quantum.obs
+        // CHECK: {{%.+}} = quantum.mcmobs [[MCM1]], [[MCM2]] : !quantum.obs
+        %mcm_obs1 = quantum.mcmobs %mcm1 : !quantum.obs
+        %mcm_obs2 = quantum.mcmobs %mcm1, %mcm2 : !quantum.obs
         """
 
         run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
