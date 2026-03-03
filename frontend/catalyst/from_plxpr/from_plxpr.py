@@ -110,7 +110,7 @@ def _tuple_to_dict(t):
             return {key: _tuple_to_dict(value) for key, value in t}
 
         elif all(not isinstance(item, (tuple, list, dict)) for item in t):
-            # This branch maintains the integrity of tuple values within kwargs, 
+            # This branch maintains the integrity of tuple values within kwargs,
             # preventing unintended conversion to lists.
             return t
 
