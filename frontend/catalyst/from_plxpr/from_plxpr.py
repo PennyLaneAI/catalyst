@@ -379,7 +379,12 @@ def handle_qnode(
     pipelines = [("main", tuple(self._pass_pipeline))]
     if not self._skip_preprocess:
         pipelines.append(
-            ("device", create_device_preprocessing_pipeline(qnode.device, execution_config, shots, warn=self._preprocess_warn))
+            (
+                "device",
+                create_device_preprocessing_pipeline(
+                    qnode.device, execution_config, shots, warn=self._preprocess_warn
+                ),
+            )
         )
 
     return quantum_kernel_p.bind(
