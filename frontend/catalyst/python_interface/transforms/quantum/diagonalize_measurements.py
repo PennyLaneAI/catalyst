@@ -81,7 +81,8 @@ class DiagonalizeFinalMeasurementsPattern(
 ):  # pylint: disable=too-few-public-methods
     """RewritePattern for diagonalizing final measurements."""
 
-    def __init__(self, supported_base_obs, to_eigvals):
+    def __init__(self, supported_base_obs: set[str], to_eigvals: bool = False):
+        """Initializes the RewritePattern."""
         self.supported_base_obs = supported_base_obs
         self.to_eigvals = to_eigvals
 
@@ -192,8 +193,9 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
 
         if not set(self.supported_base_obs).issubset(_obs_allowed_diagonalization):
             msg = (
-                "Supported base observables must be a subset of [PauliX, PauliY, PauliZ, Hadamard, "
-                f"and Identity] but received {list(self.supported_base_obs)}"
+                "Supported base observables must be a subset of (PauliX, PauliY, PauliZ, Hadamard, "
+                "and Identity) passed as a tuple[str] or str, but received "
+                f"{self.supported_base_obs}"
             )
             raise ValueError(msg)
         self.to_eigvals = options.get("to_eigvals", False)

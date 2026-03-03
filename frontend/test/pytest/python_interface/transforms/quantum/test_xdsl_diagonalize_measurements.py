@@ -53,11 +53,11 @@ class TestDiagonalizeFinalMeasurementsPass:
     )
     @pytest.mark.parametrize("to_eigvals", [1, 0, True, "False"])
     def test_with_supported_base_obs_raise_errors(self, supported_base_obs, to_eigvals):
-        """Test a ValueError is raised if supported_base_obs is not a subset of [PauliX, 
+        """Test a ValueError is raised if supported_base_obs is not a subset of [PauliX,
         PauliY, PauliZ, Hadamard, and Identity]."""
         expected_msg = (
-            "Supported base observables must be a subset of [PauliX, PauliY, PauliZ, Hadamard, "
-            f"and Identity] but received {list(supported_base_obs)}"
+            "Supported base observables must be a subset of (PauliX, PauliY, PauliZ, Hadamard, "
+            f"and Identity) passed as a tuple[str] or str, but received {supported_base_obs}"
         )
         with pytest.raises(ValueError, match=re.escape(expected_msg)):
             _ = DiagonalizeFinalMeasurementsPass(
