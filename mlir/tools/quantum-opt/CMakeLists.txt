@@ -10,10 +10,12 @@ set(LIBS
     MLIRRegisterAllDialects
     MLIRRegisterAllPasses
     MLIRCatalyst
+    catalyst-analysis
     catalyst-transforms
     catalyst-stablehlo-transforms
     MLIRQuantum
     quantum-transforms
+    MLIRQRef
     MLIRPBC
     pbc-transforms
     MLIRGradient

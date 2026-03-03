@@ -21,7 +21,6 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.passes import apply_pass
 
 
 @pytest.mark.parametrize(
@@ -46,7 +45,7 @@ def test_split_to_single_terms_integration(hamiltonian):
     # Circuit with Hamiltonian observable
     # Expected: split into individual terms with coefficients
     @qjit
-    @apply_pass("split-to-single-terms")
+    @qml.transform(pass_name="split-to-single-terms")
     @qml.qnode(dev)
     def circ1():
         qml.Rot(0.3, 0.5, 0.7, wires=0)
@@ -75,7 +74,7 @@ def test_split_to_single_terms_integration(hamiltonian):
 
     # Validate that the pass was applied
     assert "hamiltonian" in circ1.mlir
-    assert "hamiltonian" not in circ1.mlir_opt
+    assert "Hamiltonian" not in circ1.mlir_opt
 
     # Compare results
     result1 = circ1()
@@ -91,7 +90,7 @@ def test_split_to_single_terms_with_tensor_product():
     dev = qml.device("lightning.qubit", wires=3)
 
     @qjit
-    @apply_pass("split-to-single-terms")
+    @qml.transform(pass_name="split-to-single-terms")
     @qml.qnode(dev)
     def circ1():
         qml.Rot(0.4, 0.3, 0.2, wires=0)
@@ -112,7 +111,7 @@ def test_split_to_single_terms_with_tensor_product():
         return 2 * term1 + 3 * term2, term3
 
     assert "hamiltonian" in circ1.mlir
-    assert "hamiltonian" not in circ1.mlir_opt
+    assert "Hamiltonian" not in circ1.mlir_opt
 
     result1 = circ1()
     result2 = post_processing()
@@ -131,7 +130,7 @@ def test_split_to_single_terms_with_Identity():
     dev = qml.device("lightning.qubit", wires=3)
 
     @qjit
-    @apply_pass("split-to-single-terms")
+    @qml.transform(pass_name="split-to-single-terms")
     @qml.qnode(dev)
     def circ1():
         qml.Rot(0.5, 0.3, 0.2, wires=0)
@@ -151,7 +150,7 @@ def test_split_to_single_terms_with_Identity():
         return term1 + 2 * term2 + 0.7
 
     assert "hamiltonian" in circ1.mlir
-    assert "hamiltonian" not in circ1.mlir_opt
+    assert "Hamiltonian" not in circ1.mlir_opt
 
     result1 = circ1()
     result2 = post_processing()

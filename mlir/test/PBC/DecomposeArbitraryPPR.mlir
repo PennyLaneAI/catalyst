@@ -20,8 +20,7 @@ func.func @test_arb_ppr_to_arb_z_0(%q1 : !quantum.bit, %q2 : !quantum.bit){
     // CHECK: ([[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit)
 
     // CHECK: [[C:%.+]] = arith.constant 1.230000e-01 : f64
-    // CHECK: [[A0:%.+]] = quantum.alloc_qb
-    // CHECK: [[A0_1:%.+]] = pbc.prepare  plus [[A0]]
+    // CHECK: [[A0_1:%.+]] = pbc.prepare  plus
     // CHECK: [[M0:%.+]], [[Q_3:%.+]]:3 = pbc.ppm ["X", "Z", "Z"] [[Q0]], [[Q1]], [[A0_1]]
     // CHECK: [[A0_2:%.+]] = pbc.ppr ["X"](2) [[Q_3]]#2 cond([[M0]])
     // CHECK: [[A0_3:%.+]] = pbc.ppr.arbitrary ["Z"]([[C]]) [[A0_2]]
@@ -40,8 +39,7 @@ func.func @test_arb_ppr_to_arb_z_1(%q1 : !quantum.bit, %q2 : !quantum.bit, %angl
 
     // CHECK-LABEL: @test_arb_ppr_to_arb_z_1
     // CHECK: ({{.*}} [[ANGLE:%.+]]: f64)
-    
-    // CHECK: quantum.alloc_qb
+
     // CHECK: pbc.prepare  plus
     // CHECK: [[M0:%.+]], {{.*}} = pbc.ppm ["X", "Z"]
     // CHECK: pbc.ppr ["X"](2) {{.*}} cond([[M0]])
@@ -51,7 +49,6 @@ func.func @test_arb_ppr_to_arb_z_1(%q1 : !quantum.bit, %q2 : !quantum.bit, %angl
     // CHECK: quantum.dealloc_qb
     %Q1 = pbc.ppr.arbitrary ["X"](%angle) %q1 : !quantum.bit
 
-    // CHECK: quantum.alloc_qb
     // CHECK: pbc.prepare  plus
     // CHECK: [[M2:%.+]], {{.*}} = pbc.ppm ["Y", "Z"]
     // CHECK: pbc.ppr ["X"](2) {{.*}} cond([[M2]])
@@ -65,7 +62,7 @@ func.func @test_arb_ppr_to_arb_z_1(%q1 : !quantum.bit, %q2 : !quantum.bit, %angl
 }
 
 
-// ----- 
+// -----
 
 // Single-qubit Pauli-Z PPR should not be decomposed.
 func.func @test_arb_ppr_to_arb_z_2(%q1: !quantum.bit, %angle : f64){
