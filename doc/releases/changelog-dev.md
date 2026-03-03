@@ -573,6 +573,10 @@
   }
   ```
 
+  * A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in 
+    measurement processes. It is also registered in xDSL.
+    [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
+    [(#2536)](https://github.com/PennyLaneAI/catalyst/pull/2536)
 
 <h3>Documentation 📝</h3>
 
