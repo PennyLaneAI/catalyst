@@ -12,12 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/ADT/SmallVector.h>
-#include <llvm/Support/LogicalResult.h>
-#include <mlir/IR/Location.h>
-#include <mlir/IR/MLIRContext.h>
-#include <mlir/IR/Region.h>
-#include <mlir/Support/LLVM.h>
 #define DEBUG_TYPE "value-semantics-conversion"
 
 #include <cstdint>
@@ -31,8 +25,8 @@
 #include "mlir/IR/TypeRange.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"  // for PassManager
-#include "mlir/Transforms/Passes.h" // for createCSEPass
+#include "mlir/Pass/PassManager.h" // for PassManager
+// #include "mlir/Transforms/Passes.h" // for createCSEPass
 
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
@@ -289,7 +283,11 @@ struct QubitValueTracker {
  * getQRegResultIndices(): [2, 6]
  * getRootQubitResultIndices(): [3, 4]
  * getNonRootQubitResultIndices(): [5, 7]
-
+ *
+ * This struct can also be used with a single-block region. In this case, the "operands" of the
+ * region are considered to be the list of the existing arguments to the block in the region, with
+ * any rValues needed by the region from above appended to the end.
+ *
  * @param rOp
  * @param tracker
  * @param builder
@@ -511,10 +509,6 @@ struct TransientQubitExtractor {
 
 void handleRegion(IRRewriter &builder, Region &r);
 
-//
-// Misc helpers
-//
-
 /**
  * @brief Given a reference semantics operation instance, migrate it to value semantics.
  *
@@ -613,12 +607,6 @@ DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumGate r
     return builder.getDenseI32ArrayAttr({non_ctrl_len, ctrl_len});
 }
 
-//
-// Handlers for each op
-//
-
-// Memory ops
-
 void handleAlloc(IRRewriter &builder, qref::AllocOp rAllocOp, QubitValueTracker &tracker)
 {
     OpBuilder::InsertionGuard guard(builder);
@@ -651,8 +639,6 @@ void handleDealloc(IRRewriter &builder, qref::DeallocOp rDeallocOp, QubitValueTr
 
     builder.eraseOp(rDeallocOp);
 }
-
-// Gate Ops
 
 void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, QubitValueTracker &tracker)
 {
@@ -707,8 +693,6 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, QubitValueT
     builder.eraseOp(rGateOp);
 }
 
-// Observable Ops
-
 void handleCompbasis(IRRewriter &builder, qref::ComputationalBasisOp rCompbasisOp,
                      QubitValueTracker &tracker)
 {
@@ -738,96 +722,85 @@ void handleHermitian(IRRewriter &builder, qref::HermitianOp rHermitianOp,
     builder.replaceOp(rHermitianOp, vHermitianOp);
 }
 
-// Control flow
-
 void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker)
 {
     OpBuilder::InsertionGuard guard(builder);
-    Location loc = forOp->getLoc();
-    // MLIRContext *ctx = forOp.getContext();
-
-    TransientQubitExtractor extractor(forOp->getRegion(0), tracker, builder);
-
-    // 1. Append the rQuantum values needed by the loop to the loop arguments
-    SetVector<Value> rValuesUsedByRegion;
-    getNecessaryRegionRValues(forOp->getRegion(0), rValuesUsedByRegion);
-
-    SmallVector<Value> newIterArgs(forOp.getInitArgs());
     builder.setInsertionPoint(forOp);
-    for (Value v : rValuesUsedByRegion) {
-        newIterArgs.push_back(v);
+    Location loc = forOp->getLoc();
+
+    SetVector<Value> rValuesUsedByRegion;
+    getNecessaryRegionRValues(forOp.getRegion(), rValuesUsedByRegion);
+
+    scf::ForOp newLoop;
+    {
+        // 1. Send in the vValues from above as arguments
+        // This handles the flow from outside the new loop into the new loop
+        // i.e. the extract op results are sent in as operands to the new for loop
+        // Note that in this step the old loop is not edited at all
+        TransientQubitExtractor extractor(forOp.getRegion(), tracker, builder);
+        SmallVector<Value> newIterArgs(forOp.getInitArgs());
+
+        for (Value rValue : rValuesUsedByRegion) {
+            if (isa<qref::QubitType>(rValue.getType()) && isRootRQubit(rValue)) {
+                newIterArgs.push_back(tracker.getCurrentVQubit(rValue));
+            }
+            else if (isa<qref::QuregType>(rValue.getType())) {
+                newIterArgs.push_back(tracker.getCurrentVQreg(rValue));
+            }
+            else {
+                newIterArgs.push_back(rValue);
+            }
+        }
+
+        for (auto [vQubit, idx] : llvm::zip_equal(extractor.getExtractedVQubits(),
+                                                  extractor.getNonRootQubitOperandIndices())) {
+            // The loop's block always takes in the iteration variable (the `i`) as a block argument
+            newIterArgs[idx - 1] = vQubit;
+        }
+
+        newLoop = scf::ForOp::create(builder, loc, forOp.getLowerBound(), forOp.getUpperBound(),
+                                     forOp.getStep(), newIterArgs);
+
+        // 2. Move operations from old body to new body
+        // The new loop has !quantum.bit/reg as input types now on the region's block
+        // We need to overwrite it with the block from the old loop, so it can
+        // see !qref.bit/reg types on the block
+        builder.eraseBlock(newLoop.getBody());
+        builder.inlineRegionBefore(forOp.getRegion(), newLoop.getRegion(),
+                                   newLoop.getRegion().end());
+
+        // 3. Massage the "subroutine region block" of the new for op to take in all closure Values
+        // as args, so we can handle the region as a standalone subroutine
+        // The block moved over from the old loop will not have any quantum arguments yet, neither
+        // !qref nor !quantum.
+        for (auto rValue : rValuesUsedByRegion) {
+            Value newArg = newLoop.getRegion().front().addArgument(rValue.getType(), loc);
+            builder.replaceUsesWithIf(rValue, newArg, [&](OpOperand &use) {
+                return newLoop.getRegion().isAncestor(use.getOwner()->getParentRegion());
+            });
+        }
+
+        handleRegion(builder, newLoop.getRegion());
+
+        // Update tracker with results
+        // Again, The loop's block always takes in the iteration variable (the `i`) as a block
+        // argument
+        for (auto [i, j] :
+             llvm::zip_equal(extractor.getQRegOperandIndices(), extractor.getQRegResultIndices())) {
+            tracker.setCurrentVQreg(rValuesUsedByRegion[i - 1], newLoop->getResult(j));
+        }
+
+        for (auto [i, j] : llvm::zip_equal(extractor.getRootQubitOperandIndices(),
+                                           extractor.getRootQubitResultIndices())) {
+            tracker.setCurrentVQubit(rValuesUsedByRegion[i - 1], newLoop->getResult(j));
+        }
     }
 
-    for (auto [vQubit, idx] : llvm::zip_equal(extractor.getExtractedVQubits(),
-                                              extractor.getNonRootQubitOperandIndices())) {
-        // The body block of the for loop region always has the loop index as the first argument
-        newIterArgs[idx - 1] = vQubit;
+    for (auto [i, v] : llvm::enumerate(forOp->getResults())) {
+        builder.replaceAllUsesWith(v, newLoop->getResult(i));
     }
-    auto newLoop = scf::ForOp::create(builder, loc, forOp.getLowerBound(), forOp.getUpperBound(),
-                                      forOp.getStep(), newIterArgs);
 
-    // 2. Move operations from old body to new body
-    // Map any root values to the new loop arguments
-    // builder.inlineRegionBefore(forOp.getRegion(), newLoop.getRegion(),
-    // newLoop.getRegion().end()); for (auto rValue : rValuesUsedByRegion) {
-    //     // assert(isa<qref::QuregType, qref:QubitType>(rValue.getType()) &&
-    //     //     "Expected the only extra loop arguments in value semantics to be quantum registers
-    //     and qubits");
-    //     // Value vNewArg =
-    //     //     newLoop.getRegion().getBlocks().front().addArgument(quantum::QuregType::get(ctx),
-    //     //     loc);
-    //     //qubitValueTrackers.at(rQreg)->setCurrentVQreg(vQregNewArg);
-    //     if (isa<qref::QuregType>(rValue.getType())){
-    //         tracker.setCurrentVQreg(, );
-    //     }
-    // }
-
-    // 3. Replace the
-
-    // llvm::errs() << "dumping: " << newLoop << "\n";
-    llvm::errs() << "dumping: " << newLoop->getParentOfType<func::FuncOp>() << "\n";
-
-    // // 2. The new forOp iteration args must take in the registers
-    // // Remove the default empty block, it doesn't have the new block arg signature
-    // auto newLoop = scf::ForOp::create(builder, loc, forOp.getLowerBound(), forOp.getUpperBound(),
-    //                                   forOp.getStep(), newInitArgs);
-    // builder.eraseBlock(newLoop.getBody());
-
-    // // 3. Move operations from old body to new body
-    // // The old loop body still refers to the old block arguments.
-    // // We must map them to the new ones.
-    // builder.inlineRegionBefore(forOp.getRegion(), newLoop.getRegion(),
-    // newLoop.getRegion().end()); for (auto rQreg : rQregsUsedByRegion) {
-    //     assert(isa<qref::QuregType>(rQreg.getType()) &&
-    //            "Expected the only extra loop arguments in value semantics to be quantum
-    //            registers");
-    //     Value vQregNewArg =
-    //         newLoop.getRegion().getBlocks().front().addArgument(quantum::QuregType::get(ctx),
-    //         loc);
-    //     qubitValueTrackers.at(rQreg)->setCurrentVQreg(vQregNewArg);
-    // }
-
-    // handleRegion(builder, newLoop.getRegion(), qubitValueTrackers);
-
-    // // 4. Insert loop region registers and Yield
-    // // builder.setInsertionPoint(newLoop.getRegion().getBlocks().back().getTerminator());
-    // auto yieldOp = cast<scf::YieldOp>(newLoop.getBody()->getTerminator());
-    // size_t numOldYields = yieldOp->getNumResults();
-    // SmallVector<Value> yieldOperands(yieldOp.getOperands());
-    // for (Value rQreg : rQregsUsedByRegion) {
-    //     Value insertedQreg = qubitValueTrackers.at(rQreg)->insertAllDanglingQubits(yieldOp);
-    //     yieldOperands.push_back(insertedQreg);
-    // }
-    // builder.setInsertionPoint(yieldOp);
-    // scf::YieldOp::create(builder, loc, yieldOperands);
-    // builder.eraseOp(yieldOp);
-
-    // // 5. New for loop's returned qreg is the new value semantics qreg value in the outer scope
-    // for (auto [i, rQreg] : llvm::enumerate(rQregsUsedByRegion)) {
-    //     qubitValueTrackers.at(rQreg)->setCurrentVQreg(newLoop->getResult(numOldYields + i));
-    // }
-
-    // builder.eraseOp(forOp);
+    builder.eraseOp(forOp);
 }
 
 // Driver
@@ -891,36 +864,40 @@ void handleRegion(IRRewriter &builder, Region &r)
         builder.eraseOp(getOp);
     });
 
+    Operation *retOp;
+    if (auto funcOp = dyn_cast<func::FuncOp>(r.getParentOp())) {
+        retOp = funcOp.getBody().back().getTerminator();
+    }
+    else if (auto forOp = dyn_cast<scf::ForOp>(r.getParentOp())) {
+        retOp = forOp.getRegion().front().getTerminator();
+    }
+    else {
+        retOp = nullptr;
+    }
+    SmallVector<Value> retVals(retOp->getOperands());
+    for (auto arg : block.getArguments()) {
+        if (isa<qref::QubitType>(arg.getType())) {
+            retVals.push_back(tracker.getCurrentVQubit(arg));
+        }
+        else if (isa<qref::QuregType>(arg.getType())) {
+            retVals.push_back(tracker.getCurrentVQreg(arg));
+        }
+    }
+    retOp->setOperands(retVals);
+
+    for (unsigned i : llvm::reverse(rArgsErasureIndices)) {
+        // A note on the reverse: if we want to erase args at indices 0 and 1, and the original
+        // args are [a, b, c, d], we need to erase 1 (b) first, then 0 (a). Because if we erase
+        // arg0 (a) first, then after that erasure iteration, the 3 new args are [b, c, d], and
+        // the arg now at index 1 was the original arg2 (c)!
+        r.front().eraseArgument(i);
+    }
+
     // Special: Need to edit function type and return vQubits if the region comes from a funcop
     // Since we don't do a designated handler for func ops, unlike the other control flow ops
     if (auto funcOp = dyn_cast<func::FuncOp>(r.getParentOp())) {
-        auto retOp = cast<func::ReturnOp>(funcOp.getBody().back().getTerminator());
-        SmallVector<Value> retVals(retOp.getOperands());
-        for (auto arg : block.getArguments()) {
-            if (isa<qref::QubitType>(arg.getType())) {
-                retVals.push_back(tracker.getCurrentVQubit(arg));
-            }
-            else if (isa<qref::QuregType>(arg.getType())) {
-                retVals.push_back(tracker.getCurrentVQreg(arg));
-            }
-        }
-        retOp->setOperands(retVals);
-
-        for (unsigned i : llvm::reverse(rArgsErasureIndices)) {
-            // A note on the reverse: if we want to erase args at indices 0 and 1, and the original
-            // args are [a, b, c, d], we need to erase 1 (b) first, then 0 (a). Because if we erase
-            // arg0 (a) first, then after that erasure iteration, the 3 new args are [b, c, d], and
-            // the arg now at index 1 was the original arg2 (c)!
-            r.front().eraseArgument(i);
-        }
         funcOp.setFunctionType(
             FunctionType::get(ctx, block.getArgumentTypes(), TypeRange(retVals)));
-    }
-    else {
-        // Not a function, just delete qref args, no need to set function type
-        for (unsigned i : llvm::reverse(rArgsErasureIndices)) {
-            r.front().eraseArgument(i);
-        }
     }
 }
 
@@ -943,10 +920,6 @@ struct ValueSemanticsConversionPass
         MLIRContext *ctx = mod->getContext();
         auto *qrefDialect = ctx->getLoadedDialect<qref::QRefDialect>();
         IRRewriter builder(ctx);
-
-        // // CSE potential duplicated getOps
-        // PassManager pm(ctx);
-        // pm.addPass(createCSEPass());
 
         // Collect all qnode functions.
         SetVector<func::FuncOp> qnodeFuncs;

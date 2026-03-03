@@ -86,3 +86,26 @@ func.func @test_qreg_and_qubit_args(%arg0: f64, %r0: !qref.reg<2>, %q0: !qref.bi
     // CHECK: return [[insert]], [[ROT]]#1, [[ROT]]#2 : !quantum.reg, !quantum.bit, !quantum.bit
     return
 }
+
+
+// -----
+
+
+// CHECK: func.func @test_qubit_args_with_loop(%arg0: !quantum.bit) -> !quantum.bit
+func.func @test_qubit_args_with_loop(%q: !qref.bit) attributes {quantum.node} {
+    %start = arith.constant 0 : index
+    %step = arith.constant 1 : index
+    %stop = arith.constant 37 : index
+
+    scf.for %i = %start to %stop step %step {
+        qref.custom "Hadamard"() %q : !qref.bit
+        scf.yield
+    }
+    return
+
+    // CHECK: [[loopOut:%.+]] = scf.for %arg1 = {{%.+}} to {{%.+}} step {{%.+}} iter_args(%arg2 = %arg0) -> (!quantum.bit) {
+    // CHECK:   [[out_qubits:%.+]] = quantum.custom "Hadamard"() %arg2 : !quantum.bit
+    // CHECK:   scf.yield [[out_qubits]] : !quantum.bit
+    // CHECK: }
+    // CHECK: return [[loopOut]] : !quantum.bit
+}
