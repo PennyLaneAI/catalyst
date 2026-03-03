@@ -84,7 +84,6 @@ class DiagonalizeFinalMeasurementsPattern(
     """RewritePattern for diagonalizing final measurements."""
 
     def __init__(self, supported_base_obs, to_eigvals):
-        """"""
         self.supported_base_obs = supported_base_obs
         self.to_eigvals = to_eigvals
 
