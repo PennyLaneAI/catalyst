@@ -20,7 +20,8 @@ Bytecode.
 import inspect
 import warnings
 from textwrap import indent
-from typing import Callable, get_args
+from types import UnionType
+from typing import Callable, Union, get_args, get_origin
 
 import jax
 import pennylane as qp
@@ -77,25 +78,33 @@ def get_dummy_args(func: Callable) -> list:
     dummy_args = []
     for param in func_sig.parameters.values():
         type_annotation = param.annotation
-        annotation_args = get_args(type_annotation)
+        if get_origin(type_annotation) in (Union, UnionType):
+            type_annotation = get_args(type_annotation)
+        else:
+            type_annotation = (type_annotation,)
+
         if param.default is not inspect.Parameter.empty:  # use defaults whenever possible
             continue
-        elif param.name == "wires" or annotation_args is WiresLike:  # wires are handled separately
+        if param.name == "wires" or WiresLike in type_annotation:  # wires are handled separately
             continue
-        elif param.kind == inspect.Parameter.VAR_POSITIONAL:
+        if param.kind == inspect.Parameter.VAR_POSITIONAL:
             continue
-        elif param.kind == inspect.Parameter.VAR_KEYWORD:
+        if param.kind == inspect.Parameter.VAR_KEYWORD:
             continue
-        elif type_annotation is inspect.Parameter.empty:
-            print(f"no annotation for parameter {param} from function {func} with sig {func_sig}")
-            dummy_args.append(0)  # use 0, works for the most types
-        elif str in annotation_args:
+
+        if str in type_annotation:
             dummy_args.append("XX")  # we default to two wires
-        elif float in annotation_args or TensorLike in annotation_args:
-            dummy_args.append(0.1)  # float for angles
-        elif int in annotation_args:
+        elif float in type_annotation or TensorLike in type_annotation:
+            dummy_args.append(0.1)
+        elif int in type_annotation:
             dummy_args.append(0)
-    print(f"got args {dummy_args} from signature {func_sig}")
+        elif param.name in ["pauli_word", "pauli_string"]:
+            dummy_args.append("XX")
+        elif param.name in ["theta", "phi", "omega"]:
+            dummy_args.append(0.1)
+        else:
+            dummy_args.append(0)  # guess int
+    # print(f"got args {dummy_args} from signature {func_sig}")
     return dummy_args
 
 
@@ -141,8 +150,8 @@ def compile_decomps_via_dummy_circuit(
         )
         op_wires = list(range(op_num_wires))
         dev = qp.device("lightning.qubit", wires=op_num_wires)
-    except Exception:
-        print(f"failed to compile {len(op_decomp_rules)} rules")
+    except Exception as e:
+        warnings.warn(f"failed to compile rules for {op_class}: {e}")
         return {}, 0, len(op_decomp_rules)
 
     op_args = get_dummy_args(op_class)
@@ -171,11 +180,11 @@ def compile_decomps_via_dummy_circuit(
                 op_class(*op_args, wires=op_wires)
                 return qp.probs()
 
-            circuit()
             mlir_modules[rule_name] = get_func_from_circuit(circuit.mlir_module)
             num_successes += 1
         except TypeError as e:
-            warnings.warn(str(e))
+            warnings.warn(f"dummy args failed to compile {rule_name}: {str(e)}")
+            num_failures += 1
         except CompileError as e:
             warnings.warn(f"failed to compile {rule_name}: {e}")
             num_failures += 1
@@ -188,10 +197,10 @@ def compile_decomps_via_dummy_circuit(
     return (mlir_modules, num_successes, num_failures)
 
 
-if __name__ == "__main__":
+def main():
     target_ops, num_ops_missed = get_compiler_ops()
     if num_ops_missed:
-        print(f"failed to collect {num_ops_missed} op(s) from PennyLane")
+        warnings.warn(f"failed to collect {num_ops_missed} op(s) from PennyLane")
 
     num_successes = 0
     num_failures = 0
@@ -205,6 +214,12 @@ if __name__ == "__main__":
                     if circuit_mlir:
                         mlir_file.write(circuit_mlir.replace("rule_wrapper", name))
     if num_failures:
-        print(f"compiled {num_successes} / {num_failures + num_successes} decomposition rules")
+        warnings.warn(
+            f"compiled {num_successes} / {num_failures + num_successes} decomposition rules"
+        )
     else:
         print("successfully compiled decomposition rules")
+
+
+if __name__ == "__main__":
+    main()
