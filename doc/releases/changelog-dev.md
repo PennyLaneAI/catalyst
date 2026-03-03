@@ -201,6 +201,9 @@
 
 <h3>Breaking changes 💔</h3>
 
+* `catalyst.from_plxpr.register_transforms` as a way to access MLIR passes from Python has been removed in favour of the new unified transforms API. MLIR passes can be accessed from Python using `qml.transform(pass_name="some-pass-name")`.
+  [(#2509)](https://github.com/PennyLaneAI/catalyst/pull/2509)
+
 * `catalyst.jax_primitives.subroutine` has been moved to `qml.capture.subroutine`.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
 
@@ -231,6 +234,9 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fixed a bug where the unified compiler would trigger a passed callback function 1 extra time for the initial pass level.
+  [(#2528)](https://github.com/PennyLaneAI/catalyst/pull/2528)
 
 * Fix a bug in the bind call function for `PCPhase` where the signature did not match what was
   expected in `jax_primitives`. `ctrl_qubits` was missing from positional arguments in previous signature.
@@ -276,6 +282,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `prepare` operation from the PBC dialect in MLIR now implicitly allocates new qubits
+  rather than requiring existing ones. This better suits our purposes for further lowering
+  the PBC dialect.
+  [(#2520)](https://github.com/PennyLaneAI/catalyst/pull/2520)
 * Standardized the `QJITDevice.preprocess` signature to align with the base PennyLane Device API.
   * Removed the redundant `ctx` (EvaluationContext) argument from the preprocessing and decomposition pipelines. The parameter was unused and its removal simplifies the tracing data flow.
   * Decoupled `shots` from the `QJITDevice.preprocess` signature. Catalyst-specific shot configurations are now handled via `execution_config.device_options` to maintain API compatibility.
