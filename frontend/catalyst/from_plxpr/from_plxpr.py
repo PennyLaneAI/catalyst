@@ -109,6 +109,11 @@ def _tuple_to_dict(t):
             # This handles the main (key, value) pair structure
             return {key: _tuple_to_dict(value) for key, value in t}
 
+        elif all(not isinstance(item, (tuple, list, dict)) for item in t):
+            # This branch maintains the integrity of tuple values within kwargs, 
+            # preventing unintended conversion to lists.
+            return t
+
         # B. List-like tuple: Convert to list, then recurse on elements
         else:
             return [_tuple_to_dict(item) for item in t]
@@ -271,7 +276,6 @@ def handle_qnode(
     self, *args, qnode, device, shots_len, execution_config, qfunc_jaxpr, n_consts, batch_dims=None
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
-
     self.qubit_index_recorder = QubitIndexRecorder()
 
     if shots_len > 1:
