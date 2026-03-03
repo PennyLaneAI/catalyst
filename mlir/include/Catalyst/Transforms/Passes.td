@@ -239,19 +239,29 @@ def BufferDeallocationPass : Pass<"buffer-deallocation", "func::FuncOp"> {
 }
 
 def ResourceTrackerPass : Pass<"resource-tracker"> {
-    let summary = "Track and report quantum resource usage.";
+    let summary = "Track and report resource usage.";
     let description = [{
-        This pass computes resource counts (gates, measurements, qubits, etc.)
-        for quantum, pbc, and mbqc dialect operations. It queries the
-        ResourceAnalysis to obtain cached results and reports them via
-        MLIR's pass statistics mechanism.
+        This pass computes comprehensive resource metrics, including gate counts,
+        measurements, qubit allocations, device name, as well as structured classical ops.
+        For operations within the `Quantum`, `PBC`, and `MBQC` dialects,
+        It leverages `ResourceAnalysis` to retrieve cached results and integrates directly
+        with the MLIR Pass Statistics mechanism for reporting.
 
-        Optionally, it can output the results as JSON to stdout for
-        consumption by the PennyLane frontend.
+        Optionally, the following output formats are supported:
+            - `output-json`: Serializes the resource data into a structured JSON file.
+            - `update-attr`: Injects a `DictionaryAttr` named `resources` into the attributes
+                of analyzed `func.func` operations.
+
+        There is one more option that is specificlly designed for the graph
+        decomposition system in MLIR. When `decomp-attr` enabled, the pass
+        restricts its annotations solely to functions marked with the `target_gate`
+        attribute, effectively filtering for decomposition rules.
 
         Usage:
-          quantum-opt input.mlir -resource-tracker -mlir-pass-statistics
-          quantum-opt input.mlir -resource-tracker -resource-tracker-output-json=true
+            quantum-opt input.mlir -resource-tracker -mlir-pass-statistics
+            quantum-opt input.mlir -resource-tracker -resource-tracker-output-json=true
+            quantum-opt input.mlir -resource-tracker -resource-tracker-update-attr=true
+            quantum-opt input.mlir -resource-tracker -resource-tracker-decomp-attr=true
     }];
 
     let options = [
@@ -261,6 +271,20 @@ def ResourceTrackerPass : Pass<"resource-tracker"> {
             /*type=*/"bool",
             /*default=*/"false",
             /*description=*/"Print resource counts as JSON to stdout"
+        >,
+        Option<
+            /*C++ var name=*/"updateAttr",
+            /*CLI arg name=*/"update-attr",
+            /*type=*/"bool",
+            /*default=*/"false",
+            /*description=*/"Annotate the entry of every FuncOp with the resources attribute"
+        >,
+        Option<
+            /*C++ var name=*/"decompAttr",
+            /*CLI arg name=*/"decomp-attr",
+            /*type=*/"bool",
+            /*default=*/"false",
+            /*description=*/"Annotate the entry of decomposition rules with the resources attribute"
         >
     ];
 }
