@@ -11,4 +11,5 @@ add_mlir_library(MLIRQuantum
     MLIRQuantumAttrDefsIncGen
     MLIRQuantumInterfacesIncGen
     MLIRQuantumOpsIncGen
+    MLIRQRefOpsIncGen
 )
