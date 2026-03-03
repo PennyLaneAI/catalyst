@@ -245,26 +245,26 @@ class TestPassByPassSpecs:
             level=dict(
                 enumerate(
                     (
-                        "Before MLIR Passes (MLIR-0)",
-                        "cancel-inverses (MLIR-1)",
-                        "merge-rotations (MLIR-2)",
+                        "Before MLIR Passes",
+                        "cancel-inverses",
+                        "merge-rotations",
                     )
                 )
             ),
             resources={
-                "Before MLIR Passes (MLIR-0)": SpecsResources(
+                "Before MLIR Passes": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     gate_sizes={1: 6, 2: 2},
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "cancel-inverses (MLIR-1)": SpecsResources(
+                "cancel-inverses": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2},
                     gate_sizes={1: 4},
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "merge-rotations (MLIR-2)": SpecsResources(
+                "merge-rotations": SpecsResources(
                     gate_types={"RX": 1, "RZ": 1},
                     gate_sizes={1: 2},
                     measurements={"probs(all wires)": 1},
@@ -305,9 +305,9 @@ class TestPassByPassSpecs:
                         "Before transforms",
                         "dummy_transform",
                         "dummy_transform-2",
-                        "Before MLIR Passes (MLIR-0)",
-                        "cancel-inverses (MLIR-1)",
-                        "merge-rotations (MLIR-2)",
+                        "Before MLIR Passes",
+                        "cancel-inverses",
+                        "merge-rotations",
                     )
                 )
             },
@@ -330,19 +330,19 @@ class TestPassByPassSpecs:
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "Before MLIR Passes (MLIR-0)": SpecsResources(
+                "Before MLIR Passes": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     gate_sizes={1: 6, 2: 2},
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "cancel-inverses (MLIR-1)": SpecsResources(
+                "cancel-inverses": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2},
                     gate_sizes={1: 4},
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "merge-rotations (MLIR-2)": SpecsResources(
+                "merge-rotations": SpecsResources(
                     gate_types={"RX": 1, "RZ": 1},
                     gate_sizes={1: 2},
                     measurements={"probs(all wires)": 1},
@@ -385,8 +385,8 @@ class TestPassByPassSpecs:
                         "Before transforms",
                         "cancel_inverses",
                         "dummy_transform",
-                        "Before MLIR Passes (MLIR-0)",
-                        "merge-rotations (MLIR-1)",
+                        "Before MLIR Passes",
+                        "merge-rotations",
                     )
                 )
             ),
@@ -409,13 +409,13 @@ class TestPassByPassSpecs:
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "Before MLIR Passes (MLIR-0)": SpecsResources(
+                "Before MLIR Passes": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2},
                     gate_sizes={1: 4},
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "merge-rotations (MLIR-1)": SpecsResources(
+                "merge-rotations": SpecsResources(
                     gate_types={"RX": 1, "RZ": 1},
                     gate_sizes={1: 2},
                     measurements={"probs(all wires)": 1},
@@ -445,17 +445,17 @@ class TestPassByPassSpecs:
             num_device_wires=2,
             shots=Shots(None),
             level={
-                2: "Before MLIR Passes (MLIR-0)",
-                3: "merge-rotations (MLIR-1)",
+                2: "Before MLIR Passes",
+                3: "merge-rotations",
             },
             resources={
-                "Before MLIR Passes (MLIR-0)": SpecsResources(
+                "Before MLIR Passes": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2},
                     gate_sizes={1: 4},
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "merge-rotations (MLIR-1)": SpecsResources(
+                "merge-rotations": SpecsResources(
                     gate_types={"RX": 1, "RZ": 1},
                     gate_sizes={1: 2},
                     measurements={"probs(all wires)": 1},
@@ -559,7 +559,7 @@ class TestPassByPassSpecs:
             device_name="lightning.qubit",
             num_device_wires=3,
             shots=Shots(None),
-            level="Before MLIR Passes (MLIR-0)",
+            level="Before MLIR Passes",
             resources=SpecsResources(
                 gate_types={"Hadamard": 3},
                 gate_sizes={1: 3},
@@ -586,7 +586,7 @@ class TestPassByPassSpecs:
             device_name="null.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level="to-ppr (MLIR-1)",
+            level="to-ppr",
             resources=SpecsResources(
                 gate_types={"GlobalPhase": 2, "PPR-pi/4-w1": 3, "PPR-pi/8-w1": 1},
                 gate_sizes={0: 2, 1: 4},
@@ -613,7 +613,7 @@ class TestPassByPassSpecs:
             device_name="null.qubit",
             num_device_wires=3,
             shots=Shots(None),
-            level="decompose-arbitrary-ppr (MLIR-2)",
+            level="decompose-arbitrary-ppr",
             resources=SpecsResources(
                 gate_types={
                     "pbc.prepare": 1,
@@ -727,8 +727,8 @@ class TestMarkerIntegration:
                         "before-transforms",
                         "dummy_transform",
                         "after-tape",
-                        "Before MLIR Passes (MLIR-0)",
-                        "cancel-inverses (MLIR-1)",
+                        "Before MLIR Passes",
+                        "cancel-inverses",
                         "after-mlir",
                     )
                 )
@@ -752,13 +752,13 @@ class TestMarkerIntegration:
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "Before MLIR Passes (MLIR-0)": SpecsResources(
+                "Before MLIR Passes": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     gate_sizes={1: 6, 2: 2},
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "cancel-inverses (MLIR-1)": SpecsResources(
+                "cancel-inverses": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2},
                     gate_sizes={1: 4},
                     measurements={"probs(all wires)": 1},

@@ -84,12 +84,12 @@ def mlir_specs(
         pass_instance = previous_pass if previous_pass else next_pass
         result = specs_collect(module)
 
-        pass_name = str(pass_instance) + f" (MLIR-{pass_level})"
+        pass_name = str(pass_instance)
         # Always prioritize marker label if it exists
         if m := level_to_markers.get(pass_level):
             pass_name = ", ".join(m if not isinstance(m, str) else [m])
         elif pass_level == 0:
-            pass_name = "Before MLIR Passes (MLIR-0)"
+            pass_name = "Before MLIR Passes"
 
         cache[pass_level] = (result, pass_name)
 
