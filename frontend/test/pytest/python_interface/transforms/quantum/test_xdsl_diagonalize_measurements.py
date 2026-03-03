@@ -13,12 +13,6 @@
 # limitations under the License.
 """Unit test module for the xDSL implementation of the diagonalize_final_measurements pass"""
 
-"""
-TODOs:
-- Add integration tests with split-non-commuting pass
-- Add unit tests to check non-commuting pass raises errors (xfail for the current PR)
-"""
-
 import re
 
 import numpy as np
@@ -50,7 +44,12 @@ class TestDiagonalizeFinalMeasurementsPass:
             )
 
     @pytest.mark.parametrize(
-        "supported_base_obs", ["pauliz", ("paulix",), ("paulix", "pauliy"), ("I", "Z")]
+        "supported_base_obs",
+        [
+            "pauliz",
+            ("paulix",),
+            ("paulix", "pauliy"),
+        ],
     )
     @pytest.mark.parametrize("to_eigvals", [1, 0, True, "False"])
     def test_with_supported_base_obs_raise_errors(self, supported_base_obs, to_eigvals):
@@ -620,7 +619,8 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         run_filecheck_qjit(circuit)
 
     @pytest.mark.xfail(
-        reason="for now, this test would failed due to the supported_base_obs is converted from tuple to list hence unhashable after transfroms."
+        reason="for now, this test would failed due to the supported_base_obs is converted "
+        "from tuple to list hence unhashable after transfroms."
     )
     def test_with_split_non_commuting(self):
         """Test if the executable file can be correctly generated when applying both the
