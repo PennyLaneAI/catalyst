@@ -53,8 +53,12 @@ class TestDiagonalizeFinalMeasurementsPass:
     )
     @pytest.mark.parametrize("to_eigvals", [1, 0, True, "False"])
     def test_with_supported_base_obs_raise_errors(self, supported_base_obs, to_eigvals):
-        """Test if an ValueError is raised if supported_base_obs is a subset of {Identity,PauliX, PauliY, PauliZ, Hadamard}."""
-        expected_msg = f"{supported_base_obs} is not supported. Please ensure all the supported_base_obs is a subset of PauliX, PauliY, PauliZ, Hadamard and Identity"
+        """Test if an ValueError is raised if supported_base_obs is a subset of {Identity,PauliX,
+        PauliY, PauliZ, Hadamard}."""
+        expected_msg = (
+            f"{supported_base_obs} is not supported. Please ensure all the supported_base_obs"
+            "is a subset of PauliX, PauliY, PauliZ, Hadamard and Identity"
+        )
         with pytest.raises(ValueError, match=re.escape(expected_msg)):
             _ = DiagonalizeFinalMeasurementsPass(
                 supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
@@ -84,6 +88,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         ["PauliX", ("PauliX",), ("PauliX", "PauliY")],
     )
     def test_with_supported_base_obs(self, supported_base_obs, run_filecheck):
+        """Check if supported_base_obs would be diagonalized or not."""
         program = """
             func.func @test_func() {
                 // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit

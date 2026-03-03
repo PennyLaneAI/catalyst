@@ -84,6 +84,7 @@ class DiagonalizeFinalMeasurementsPattern(
     """RewritePattern for diagonalizing final measurements."""
 
     def __init__(self, supported_base_obs, to_eigvals):
+        """"""
         self.supported_base_obs = supported_base_obs
         self.to_eigvals = to_eigvals
 
@@ -91,7 +92,8 @@ class DiagonalizeFinalMeasurementsPattern(
     def match_and_rewrite(
         self, observable: NamedObsOp, rewriter: pattern_rewriter.PatternRewriter, /
     ):
-        """Replace non-diagonalized observables with their diagonalizing gates and supported observables."""
+        """Replace non-diagonalized observables with their diagonalizing gates and supported
+        observables."""
 
         if _diagonalize(observable, self.supported_base_obs):
 
@@ -173,10 +175,11 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
         ):
             self.supported_base_obs = _default_supported_obs + self.supported_base_obs
         else:
-            raise ValueError(
-                f"{self.supported_base_obs} is not supported. Please ensure all the supported_base_obs"
-                "is a subset of PauliX, PauliY, PauliZ, Hadamard and Identity"
+            msg = (
+                f"{self.supported_base_obs} is not supported. Please ensure all the "
+                "supported_base_obs is a subset of PauliX, PauliY, PauliZ, Hadamard and Identity."
             )
+            raise ValueError(msg)
         if options.get("to_eigvals", False) is not False:
             raise ValueError("Only to_eigvals = False is supported.")
 
