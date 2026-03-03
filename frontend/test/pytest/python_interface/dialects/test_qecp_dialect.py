@@ -112,6 +112,7 @@ def test_op_constructors():
     """Test the constructors of each op defined in the qecp dialect work as expected."""
     hyper_reg = create_ssa_value(qecp.PhysicalHyperRegisterType(3, 1, 7))
     codeblock = create_ssa_value(qecp.PhysicalCodeblockType(1, 7))
+    q_aux = create_ssa_value(qecp.QecPhysicalQubitType("aux"))
 
     # alloc
     alloc_op = qecp.AllocOp(result_types=(qecp.PhysicalHyperRegisterType(3, 1, 7),))
@@ -131,6 +132,15 @@ def test_op_constructors():
     insert_block_op = qecp.InsertCodeblockOp(in_hyper_reg=hyper_reg, idx=0, codeblock=codeblock)
     assert len(insert_block_op.result_types) == 1
     assert isinstance(insert_block_op.result_types[0], qecp.PhysicalHyperRegisterType)
+
+    # alloc_aux
+    alloc_aux_op = qecp.AllocAuxQubitOp(result_types=(qecp.QecPhysicalQubitType("aux"),))
+    assert len(alloc_aux_op.result_types) == 1
+    assert isinstance(alloc_aux_op.result_types[0], qecp.QecPhysicalQubitType)
+
+    # dealloc_aux
+    dealloc_aux_op = qecp.DeallocAuxQubitOp(operands=(q_aux,))
+    assert len(dealloc_aux_op.result_types) == 0
 
 
 @pytest.mark.parametrize(
