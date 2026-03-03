@@ -745,9 +745,9 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             return i
 
         @qml.qjit(target="mlir")
-        @diagonalize_measurements(supported_base_obs=("PauliX",), to_eigvals=False)
+        @diagonalize_measurements(supported_base_obs=("PauliX", "PauliY"))
         @qml.transform(pass_name="split-non-commuting")
-        @qml.qnode(dev)
+        @qml.qnode(dev, shots=1000)
         def circuit():
             for_fn()  # pylint: disable=no-value-for-parameter
             while_fn(0)
@@ -761,10 +761,6 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.xfail(
-        reason="for now, this test would failed due to the supported_base_obs is converted "
-        "from tuple to list hence unhashable after transfroms."
-    )
     def test_with_split_non_commuting(self):
         """Test the executable file can be generated and ran with lightning.qubit when applying
         both the diagonalize-final-measurements and the split-non-commuting passes"""
