@@ -22,6 +22,7 @@ Known Limitations
     Quantum dialect as NamedObservable).
   * Unlike the current tape-based implementation of the transform, conversion to measurements
     based on eigvals and wires (rather than the PauliZ observable) is not currently supported.
+    If `eigvals=True` is passed to the current pass, an error will be raised.
   * Unlike the tape-based implementation, this pass will NOT raise an error if given a circuit
     that is invalid because it contains non-commuting measurements. It should be assumed that
     this transform results in incorrect outputs unless split_non_commuting is applied to break
@@ -44,8 +45,8 @@ from catalyst.python_interface.dialects.quantum import (
 )
 from catalyst.python_interface.pass_api import compiler_transform
 
-_default_supported_obs = ("PauliZ", "Identity")
-_obs_allowed_diagonalization = ("PauliX", "PauliY", "PauliZ", "Hadamard", "Identity")
+_default_supported_obs = {"PauliZ", "Identity"}
+_obs_allowed_diagonalization = {"PauliX", "PauliY", "PauliZ", "Hadamard", "Identity"}
 
 
 def _generate_mapping():
@@ -66,12 +67,9 @@ _gate_map, _params_map = _generate_mapping()
 
 def _diagonalize(obs: NamedObsOp, supported_base_obs) -> bool:
     """Whether to diagonalize a given observable."""
-    _obs_set_to_diagonalize = (
-        obs for obs in _obs_allowed_diagonalization if obs not in supported_base_obs
-    )
     if obs.type.data in supported_base_obs:
         return False
-    if obs.type.data in _obs_set_to_diagonalize:
+    if obs.type.data in _gate_map:
         return True
     raise NotImplementedError(
         f"Observable {obs.type.data} is not supported for diagonalization"
@@ -92,7 +90,7 @@ class DiagonalizeFinalMeasurementsPattern(
         self, observable: NamedObsOp, rewriter: pattern_rewriter.PatternRewriter, /
     ):
         """Replace non-diagonalized observables with their diagonalizing gates and supported
-        observables."""
+        base observables."""
 
         if _diagonalize(observable, self.supported_base_obs):
 
@@ -159,30 +157,48 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
     name = "diagonalize-final-measurements"
 
     def __init__(self, **options):
+        """Initializes the class with supported base observable names and .
 
-        self.supported_base_obs = options.get("supported_base_obs")
+        Args:
+            **options: Arbitrary keyword arguments.
+                supported_base_obs (str or tuple[str], optional): The observable bases
+                    to support. Must be a subset of the allowed base observables
+                    (e.g., 'PauliX', 'PauliY', 'PauliZ', 'Hadamard', 'Identity').
+                    Defaults to `_default_supported_obs`.
+                to_eigvals (bool, optional): Whether to convert to eigenvalues.
+                    Currently, only `False` is supported. Defaults to `False`.
 
-        if self.supported_base_obs is None:
-            self.supported_base_obs = _default_supported_obs
+        Raises:
+            ValueError: If `supported_base_obs` contains observables not found in
+                `_obs_allowed_diagonalization`.
+            ValueError: If `to_eigvals` is set to `True`.
+        """
+
+        self.supported_base_obs = options.get("supported_base_obs", _default_supported_obs)
+
         if (
             isinstance(self.supported_base_obs, str)
             and self.supported_base_obs in _obs_allowed_diagonalization
         ):
-            self.supported_base_obs = _default_supported_obs + (self.supported_base_obs,)
-        elif isinstance(self.supported_base_obs, tuple) and all(
-            x in _obs_allowed_diagonalization for x in self.supported_base_obs
+            self.supported_base_obs = _default_supported_obs | set(
+                [
+                    self.supported_base_obs,
+                ]
+            )
+        if isinstance(self.supported_base_obs, tuple) and set(self.supported_base_obs).issubset(
+            _obs_allowed_diagonalization
         ):
-            self.supported_base_obs = _default_supported_obs + self.supported_base_obs
-        else:
+            self.supported_base_obs = _default_supported_obs | set(self.supported_base_obs)
+
+        if not set(self.supported_base_obs).issubset(_obs_allowed_diagonalization):
             msg = (
-                f"{self.supported_base_obs} is not supported. Please ensure all the "
-                "supported_base_obs is a subset of PauliX, PauliY, PauliZ, Hadamard and Identity."
+                "Supported base observables must be a subset of [PauliX, PauliY, PauliZ, Hadamard, "
+                f"and Identity] but received {list(self.supported_base_obs)}"
             )
             raise ValueError(msg)
-        if options.get("to_eigvals", False) is not False:
-            raise ValueError("Only to_eigvals = False is supported.")
-
         self.to_eigvals = options.get("to_eigvals", False)
+        if self.to_eigvals is not False:
+            raise ValueError("Only to_eigvals = False is supported.")
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the diagonalize final measurements pass."""

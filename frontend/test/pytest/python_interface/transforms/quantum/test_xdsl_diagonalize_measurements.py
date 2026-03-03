@@ -36,7 +36,7 @@ class TestDiagonalizeFinalMeasurementsPass:
     )
     @pytest.mark.parametrize("to_eigvals", [1, 0, True, "False"])
     def test_with_to_eigvals_raise_errors(self, supported_base_obs, to_eigvals):
-        """Test if an ValueError is raised if to_eigvals is not set as False."""
+        """Test a ValueError is raised if to_eigvals is not set as False."""
         expected_msg = "Only to_eigvals = False is supported."
         with pytest.raises(ValueError, match=expected_msg):
             _ = DiagonalizeFinalMeasurementsPass(
@@ -53,11 +53,11 @@ class TestDiagonalizeFinalMeasurementsPass:
     )
     @pytest.mark.parametrize("to_eigvals", [1, 0, True, "False"])
     def test_with_supported_base_obs_raise_errors(self, supported_base_obs, to_eigvals):
-        """Test if an ValueError is raised if supported_base_obs is a subset of {Identity,PauliX,
-        PauliY, PauliZ, Hadamard}."""
+        """Test a ValueError is raised if supported_base_obs is not a subset of [PauliX, 
+        PauliY, PauliZ, Hadamard, and Identity]."""
         expected_msg = (
-            f"{supported_base_obs} is not supported. Please ensure all the supported_base_obs "
-            "is a subset of PauliX, PauliY, PauliZ, Hadamard and Identity"
+            "Supported base observables must be a subset of [PauliX, PauliY, PauliZ, Hadamard, "
+            f"and Identity] but received {list(supported_base_obs)}"
         )
         with pytest.raises(ValueError, match=re.escape(expected_msg)):
             _ = DiagonalizeFinalMeasurementsPass(
@@ -88,7 +88,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         ["PauliX", ("PauliX",), ("PauliX", "PauliY")],
     )
     def test_with_supported_base_obs(self, supported_base_obs, run_filecheck):
-        """Check if supported_base_obs would be diagonalized or not."""
+        """Check observables in the supported_base_obs would not be diagonalized."""
         program = """
             func.func @test_func() {
                 // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
@@ -575,12 +575,11 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
     def test_with_split_non_commuting_mlir(self, run_filecheck_qjit):
-        """Test if the mlir file can be correctly lowered when applying both the
-        diagonalize-final-measurements pass works with the split-non-commuting
-        pass"""
+        """Test the target mlir file is correctly lowered when applying both the
+        diagonalize-final-measurements and the split-non-commuting pass."""
 
         def diagonalize_measurements_setup_inputs(
-            to_eigvals: bool = False, supported_base_obs: list[str] = "PauliZ"
+            to_eigvals: bool = False, supported_base_obs: tuple[str] | str = "PauliZ"
         ):
             "Return the options for the diagonalize-final-measurements pass."
             return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
@@ -607,14 +606,14 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             return i
 
         @qml.qjit(target="mlir")
-        @diagonalize_measurements(supported_base_obs=("PauliX"), to_eigvals=False)
+        @diagonalize_measurements(supported_base_obs=("PauliX",), to_eigvals=False)
         @qml.transform(pass_name="split-non-commuting")
         @qml.qnode(dev)
         def circuit():
             for_fn()  # pylint: disable=no-value-for-parameter
             while_fn(0)
             qml.CNOT(wires=[0, 1])
-            # CHECK-NOT: quantum.namedobs [[qubit:%]][PauliY] : !quantum.obs
+            # CHECK-NOT: quantum.namedobs [[qubit0:%]][PauliY] : !quantum.obs
             return (
                 qml.expval(qml.Z(wires=0)),
                 qml.expval(qml.Y(wires=1)),
@@ -628,11 +627,11 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         "from tuple to list hence unhashable after transfroms."
     )
     def test_with_split_non_commuting(self):
-        """Test if the executable file can be correctly generated when applying both the
-        diagonalize-final-measurements pass works with the split-non-commuting pass"""
+        """Test the executable file can be generated and ran with lightning.qubit when applying
+        both the diagonalize-final-measurements and the split-non-commuting passes"""
 
         def diagonalize_measurements_setup_inputs(
-            to_eigvals: bool = False, supported_base_obs: list[str] = "PauliZ"
+            to_eigvals: bool = False, supported_base_obs: tuple[str] | str = "PauliZ"
         ):
             "Return the options for the diagonalize-final-measurements pass."
             return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
