@@ -646,16 +646,15 @@ class TestAssemblyFormat:
         %cb_all = quantum.compbasis qreg %qreg : !quantum.obs
 
         //////////// **MCMObsOp** ////////////
-        // create mcms
+        // create booleans for the mcms
         // CHECK: [[MCM1:%.+]] = "test.op"() : () -> i1
         // CHECK: [[MCM2:%.+]] = "test.op"() : () -> i1
         %mcm1 = "test.op"() : () -> i1
         %mcm2 = "test.op"() : () -> i1
 
         // CHECK: {{%.+}} = quantum.mcmobs [[MCM1]] : !quantum.obs
-        %mcm_obs1 = quantum.mcmobs %mcm1 : !quantum.obs
-
         // CHECK: {{%.+}} = quantum.mcmobs [[MCM1]], [[MCM2]] : !quantum.obs
+        %mcm_obs1 = quantum.mcmobs %mcm1 : !quantum.obs
         %mcm_obs2 = quantum.mcmobs %mcm1, %mcm2 : !quantum.obs
         """
 
