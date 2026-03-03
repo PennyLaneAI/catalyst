@@ -15,7 +15,8 @@
 """Unit tests for the xDSL QecLogical dialect."""
 
 import pytest
-from xdsl.dialects.test import TestOp
+from xdsl.dialects import test
+from xdsl.dialects.builtin import IntegerAttr, IntegerType
 from xdsl.ir import AttributeCovT, OpResult
 
 from catalyst.python_interface.dialects import qecl
@@ -26,7 +27,7 @@ pytestmark = pytest.mark.xdsl
 # Test function taken from xdsl/utils/test_value.py
 def create_ssa_value(t: AttributeCovT) -> OpResult[AttributeCovT]:
     """Create a single SSA value with the given type for testing purposes."""
-    op = TestOp(result_types=(t,))
+    op = test.TestOp(result_types=(t,))
     return op.results[0]
 
 
@@ -44,10 +45,6 @@ expected_attrs_names = {
     "LogicalCodeblockType": "qecl.codeblock",
     "LogicalHyperRegisterType": "qecl.hyperreg",
 }
-
-
-codeblock = create_ssa_value(qecl.LogicalCodeblockType(1))
-hyperreg = create_ssa_value(qecl.LogicalHyperRegisterType(3, 1))
 
 
 def test_qecl_dialect_name():
@@ -75,6 +72,49 @@ def test_all_attributes_names(attr):
         expected_name is not None
     ), f"Unexpected attribute {attr_class_name} found in QecLogical dialect"
     assert attr.name == expected_name
+
+
+def test_type_constructors():
+    """Test the constructors of each type defined in the qecl dialect work as expected."""
+    codeblock = qecl.LogicalCodeblockType(1)
+    assert isinstance(codeblock.k, IntegerAttr)
+    assert codeblock.k.value.data == 1
+    assert codeblock.k.type == IntegerType(64)
+
+    hyper_reg = qecl.LogicalHyperRegisterType(3, 1)
+    assert isinstance(hyper_reg.width, IntegerAttr)
+    assert hyper_reg.width.value.data == 3
+    assert hyper_reg.width.type == IntegerType(64)
+    assert isinstance(hyper_reg.k, IntegerAttr)
+    assert hyper_reg.k.value.data == 1
+    assert hyper_reg.k.type == IntegerType(64)
+
+
+def test_op_constructors():
+    """Test the constructors of each op defined in the qecl dialect work as expected."""
+    hyper_reg = create_ssa_value(qecl.LogicalHyperRegisterType(3, 1))
+    codeblock = create_ssa_value(qecl.LogicalCodeblockType(1))
+
+    breakpoint()
+
+    # alloc
+    alloc_op = qecl.AllocOp(result_types=(qecl.LogicalHyperRegisterType(3, 1),))
+    assert len(alloc_op.result_types) == 1
+    assert isinstance(alloc_op.result_types[0], qecl.LogicalHyperRegisterType)
+
+    # dealloc
+    dealloc_op = qecl.DeallocOp(operands=(hyper_reg,))
+    assert len(dealloc_op.result_types) == 0
+
+    # extract_block
+    extract_block_op = qecl.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=0)
+    assert len(extract_block_op.result_types) == 1
+    assert isinstance(extract_block_op.result_types[0], qecl.LogicalCodeblockType)
+
+    # insert_block
+    insert_block_op = qecl.InsertCodeblockOp(in_hyper_reg=hyper_reg, idx=0, codeblock=codeblock)
+    assert len(insert_block_op.result_types) == 1
+    assert isinstance(insert_block_op.result_types[0], qecl.LogicalHyperRegisterType)
 
 
 @pytest.mark.parametrize(
