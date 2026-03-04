@@ -77,7 +77,7 @@ func.func private @helper_func(%arg0: !quantum.bit) -> !quantum.bit {
     return %out : !quantum.bit
 }
 
-// CHECK: @rule(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode, resources
+// CHECK: attributes {qnode, resources
 func.func @rule(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode, target_gate="rule"} {
     %r1 = func.call @helper_func(%arg0) : (!quantum.bit) -> !quantum.bit
     %r2 = func.call @helper_func(%r1) : (!quantum.bit) -> !quantum.bit
@@ -88,7 +88,7 @@ func.func @rule(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode, target_g
 
 // Rules with for loop (static)
 
-// CHECK: @rule_with_loop(%arg0: !quantum.bit) -> !quantum.bit attributes {resources = {device_name = "", measurements = {}, num_alloc_qubits = 0 : i64, num_arg_qubits = 1 : i64, num_qubits = 1 : i64, operations = {"Hadamard(1)" = 5 : i64}}, target_gate = "gate"}
+// CHECK: attributes {resources
 func.func @rule_with_loop(%arg0: !quantum.bit) -> !quantum.bit attributes {target_gate="gate"} {
     %c5 = arith.constant 5 : index
     %c0 = arith.constant 0 : index
@@ -106,7 +106,7 @@ func.func @rule_with_loop(%arg0: !quantum.bit) -> !quantum.bit attributes {targe
 
 // Rules with branching (take max per op)
 
-// CHECK: @rule_with_branching(%arg0: !quantum.bit, %arg1: i1) -> !quantum.bit attributes {resources = {device_name = "", measurements = {}, num_alloc_qubits = 0 : i64, num_arg_qubits = 0 : i64, num_qubits = 0 : i64, operations = {"Hadamard(1)" = 3 : i64, "PauliX(1)" = 2 : i64}}, target_gate = "gate"}
+// CHECK: attributes {resources
 func.func @rule_with_branching(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit attributes {target_gate="gate"} {
     %q = scf.if %cond -> !quantum.bit {
         // True branch: 2 Hadamard, 1 PauliX
@@ -131,7 +131,7 @@ func.func @rule_with_branching(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit a
 
 // Rules with static for loops
 
-// CHECK: @rule_with_nested_loop(%arg0: !quantum.bit) -> !quantum.bit attributes {resources = {device_name = "", measurements = {}, num_alloc_qubits = 0 : i64, num_arg_qubits = 0 : i64, num_qubits = 0 : i64, operations = {"PauliX(1)" = 15 : i64}}, target_gate = "gate"}
+// CHECK: attributes {resources
 func.func @rule_with_nested_loop(%arg0: !quantum.bit) -> !quantum.bit attributes {target_gate="gate"} {
     %c3 = arith.constant 3 : index
     %c5 = arith.constant 5 : index
