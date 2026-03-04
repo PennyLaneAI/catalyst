@@ -984,9 +984,20 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         @diagonalize_final_measurements_pass
         @qml.set_shots(10)
         @qml.qnode(dev)
-        def circuit(x):
+        def circuit0(x):
             qml.RX(x, 0)
-            return measurements[0](), measurements[1](obs)
+            return measurements[0](), measurements[1](obs), qml.sample()
 
         with pytest.raises(RuntimeError, match=f"{_non_commuting_err_msg}"):
-            _ = circuit(0.7)
+            _ = circuit0(0.7)
+
+        @qml.qjit()
+        @diagonalize_final_measurements_pass
+        @qml.set_shots(10)
+        @qml.qnode(dev)
+        def circuit1(x):
+            qml.RX(x, 0)
+            return qml.sample(wires=[0]), measurements[1](obs)
+
+        with pytest.raises(RuntimeError, match=f"{_non_commuting_err_msg}"):
+            _ = circuit1(0.7)
