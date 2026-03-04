@@ -92,7 +92,6 @@ def _tuple_to_dict(t):
     Returns:
         The converted dict, list, or the original scalar value.
     """
-    # pylint: disable=too-many-return-statements
 
     if not isinstance(t, (dict, tuple, list)):
         return t
@@ -109,11 +108,6 @@ def _tuple_to_dict(t):
         if _is_dict_like_tuple(t):
             # This handles the main (key, value) pair structure
             return {key: _tuple_to_dict(value) for key, value in t}
-
-        elif all(not isinstance(item, (tuple, list, dict)) for item in t):
-            # This branch maintains the integrity of tuple values within kwargs,
-            # preventing unintended conversion to lists.
-            return t
 
         # B. List-like tuple: Convert to list, then recurse on elements
         else:
@@ -452,6 +446,10 @@ def handle_transform(
     non_const_args = args[_tuple_to_slice(args_slice)]
     targs = args[_tuple_to_slice(targs_slice)]
     tkwargs = _tuple_to_dict(tkwargs)
+
+    # FIXME: A hot-fix for the diagonalize_measurement pass
+    if "supported_base_obs" in tkwargs:
+        tkwargs["supported_base_obs"] = tuple(tkwargs["supported_base_obs"])
 
     # If the transform is a decomposition transform
     # and the graph-based decomposition is enabled
