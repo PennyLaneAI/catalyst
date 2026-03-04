@@ -329,7 +329,8 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     if isinstance(level, int):
         max_level = level
 
-    if not isinstance(qnode, QJIT) or (not isinstance(qnode.original_function, QNode)):
+    is_valid_qjit_qnode = isinstance(qnode, QJIT) and isinstance(qnode.original_function, QNode)
+    if not is_valid_qjit_qnode:
         raise TypeError(
             "The circuit must be a qjit-compiled qnode. "
             "Please apply the 'qml.qjit' function to your qnode."
