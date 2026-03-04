@@ -43,23 +43,23 @@ DECOMPS_FILE_PATH = DECOMP_DIR_PATH / Path("decompositions.mlir")
 MLIRBC_FILE_PATH = DECOMP_DIR_PATH / Path("decompositions.mlirbc")
 
 
-def get_compiler_ops() -> tuple[list[Operation], int]:
+def get_compiler_ops() -> tuple[set[Operation], int]:
     """
     Extracts all ops from pennylane that have decompositions in catalyst
     """
     num_failures = 0
 
-    pl_op_classes = [
+    pl_op_classes = set(
         obj
         for _, obj in inspect.getmembers(qp)
         if inspect.isclass(obj) and issubclass(obj, Operation)
-    ]
+    )
 
-    compiler_op_classes = [
+    compiler_op_classes = set(
         op_class
         for op_class in pl_op_classes
         if op_class.__name__ in COMPILER_OPS_FOR_DECOMPOSITION
-    ]
+    )
 
     compiler_op_class_names = [op_class.__name__ for op_class in compiler_op_classes]
 
