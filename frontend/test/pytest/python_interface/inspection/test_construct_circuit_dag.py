@@ -1046,7 +1046,7 @@ class TestCreateStaticOperatorNodes:
             return (
                 qml.expval(ham),
                 qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)),
-                qml.expval(2 * qml.X(0))
+                qml.expval(2 * qml.X(0)),
             )
 
         module = my_workflow()
