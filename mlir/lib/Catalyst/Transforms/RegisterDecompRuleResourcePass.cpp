@@ -119,8 +119,6 @@ struct RegisterDecompRuleResourcePass
         entries.push_back(
             NamedAttribute(StringAttr::get(ctx, "num_arg_qubits"),
                            IntegerAttr::get(IntegerType::get(ctx, 64), result.numArgQubits)));
-        entries.push_back(NamedAttribute(StringAttr::get(ctx, "device_name"),
-                                         StringAttr::get(ctx, result.deviceName)));
         entries.push_back(
             NamedAttribute(StringAttr::get(ctx, "num_alloc_qubits"),
                            IntegerAttr::get(IntegerType::get(ctx, 64), result.numAllocQubits)));
