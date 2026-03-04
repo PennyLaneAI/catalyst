@@ -74,6 +74,8 @@ def get_dummy_args(func: Callable) -> list:
     """
     Return a list of dummy args to allow compilation of op_class
     """
+    # pylint: disable=too-many-branches
+
     func_sig = inspect.signature(func)
     dummy_args = []
     for param in func_sig.parameters.values():
@@ -113,19 +115,55 @@ def get_func_from_circuit(module) -> str | None:
     Return the string representation of FuncOp named `rule_wrapper` from mlir_circuit.
     """
 
-    decompFuncOp = None
+    decomp_func_op = None
 
     def find_condition(op):
-        nonlocal decompFuncOp
+        nonlocal decomp_func_op
         if op.name == "func.func":
             if ir.StringAttr(op.attributes["sym_name"]).value == "rule_wrapper":
-                decompFuncOp = op
+                decomp_func_op = op
                 return ir.WalkResult.INTERRUPT
         return ir.WalkResult.ADVANCE
 
     module.operation.walk(find_condition)
 
-    return "builtin.module {\n" + indent(str(decompFuncOp), "  ") + "\n}\n" if decompFuncOp else ""
+    return (
+        "builtin.module {\n" + indent(str(decomp_func_op), "  ") + "\n}\n" if decomp_func_op else ""
+    )
+
+
+def compile_rule(
+    op_class,
+    op_args,
+    op_num_wires,
+    rule,
+    dev,
+):
+    """
+    Get the compiled rule from a python decomposition rule.
+    """
+    abstract_args = [
+        type(arg) for arg in get_dummy_args(rule._impl)  # pylint: disable=protected-access
+    ]
+
+    qp.capture.enable()
+    qp.decomposition.enable_graph()
+
+    # WARNING: do not rename this function, we use it to extract the rule from the compiled
+    # circuit
+    @decomposition_rule(is_qreg=True, op_type=op_class.__name__)
+    def rule_wrapper(*args, wires, **_):
+        return rule(*args, wires=wires, **_)
+
+    @qp.qjit(target="mlir")
+    @qp.transform(pass_name="decompose-lowering")
+    @qp.qnode(dev)
+    def circuit():
+        rule_wrapper(*abstract_args, wires=jax.core.ShapedArray((op_num_wires,), int))
+        op_class(*op_args, wires=list(range(op_num_wires)))
+        return qp.probs()
+
+    return get_func_from_circuit(circuit.mlir_module)
 
 
 def compile_decomps_via_dummy_circuit(
@@ -148,39 +186,16 @@ def compile_decomps_via_dummy_circuit(
         op_num_wires = (
             op_class.num_wires if op_class.num_wires and isinstance(op_class.num_wires, int) else 2
         )
-        op_wires = list(range(op_num_wires))
+        op_args = get_dummy_args(op_class)
         dev = qp.device("lightning.qubit", wires=op_num_wires)
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         warnings.warn(f"failed to compile rules for {op_class}: {e}")
         return {}, 0, len(op_decomp_rules)
 
-    op_args = get_dummy_args(op_class)
-
     for rule in op_decomp_rules:
-        rule_name = rule._impl.__name__  # pylint: disable=protected-access
-        abstract_args = [
-            type(arg) for arg in get_dummy_args(rule._impl)
-        ]  # pylint: disable=protected-access
-
         try:
-            qp.capture.enable()
-            qp.decomposition.enable_graph()
-
-            # WARNING: do not rename this function, we use it to extract the rule from the compiled
-            # circuit
-            @decomposition_rule(is_qreg=True, op_type=op_class.__name__)
-            def rule_wrapper(*args, wires, **_):
-                return rule(*args, wires=wires, **_)
-
-            @qp.qjit(target="mlir")
-            @qp.transform(pass_name="decompose-lowering")
-            @qp.qnode(dev)
-            def circuit():
-                rule_wrapper(*abstract_args, wires=jax.core.ShapedArray((op_num_wires,), int))
-                op_class(*op_args, wires=op_wires)
-                return qp.probs()
-
-            mlir_modules[rule_name] = get_func_from_circuit(circuit.mlir_module)
+            rule_name = rule._impl.__name__  # pylint: disable=protected-access
+            mlir_modules[rule_name] = compile_rule(op_class, op_args, op_num_wires, rule, dev)
             num_successes += 1
         except TypeError as e:
             warnings.warn(f"dummy args failed to compile {rule_name}: {str(e)}")
@@ -188,7 +203,7 @@ def compile_decomps_via_dummy_circuit(
         except CompileError as e:
             warnings.warn(f"failed to compile {rule_name}: {e}")
             num_failures += 1
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             warnings.warn(f"Unexpected error while trying to compile {rule_name}: {e}")
             num_failures += 1
         finally:
@@ -198,13 +213,20 @@ def compile_decomps_via_dummy_circuit(
 
 
 def main():
+    """
+    filters compiler ops from PennyLane, grabs their associated decomposition rules, and compiles
+    them via a wrapper function with qjit to mlir. Intended for use with `make decomp-rules` in
+    catalyst/mlir.
+    """
     target_ops, num_ops_missed = get_compiler_ops()
     if num_ops_missed:
         warnings.warn(f"failed to collect {num_ops_missed} op(s) from PennyLane")
 
     num_successes = 0
     num_failures = 0
-    with open(DECOMPS_FILE, "w") as mlir_file:
+    with open(
+        DECOMPS_FILE, "w", encoding="utf-8"
+    ) as mlir_file:  # TODO probably set this as an environment variable
         for func in target_ops:
             results, num_new_successes, num_new_failures = compile_decomps_via_dummy_circuit(func)
             num_successes += num_new_successes
