@@ -309,7 +309,11 @@ class PassPlugin(Pass):
     """
 
     def __init__(
-        self, path: Path, name: str, *options: list[str], **valued_options: dict[str, str]
+        self,
+        path: Path,
+        name: str,
+        *options: list[str],
+        **valued_options: dict[str, str],
     ):
         assert EvaluationContext.is_tracing()
         EvaluationContext.add_plugin(path)
@@ -336,7 +340,8 @@ def dict_to_compile_pipeline(
     """Convert dictionary of passes or single pass name into a compilation pipeline.
 
     Args:
-        pass_pipeline (dict | str | None): Either a dictionary of pass configurations or a single pass name.
+        pass_pipeline (dict | str | None): Either a dictionary of pass configurations
+            or a single pass name.
         *flags: Optional flags for single pass
         **valued_options: Optional valued options for single pass
     """

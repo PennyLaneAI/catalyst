@@ -23,7 +23,6 @@ from catalyst.passes.pass_api import (
     dict_to_compile_pipeline,
     pipeline,
 )
-from catalyst.python_interface.transforms.quantum import cancel_inverses
 
 
 class TestDictToCompilePipeline:
@@ -34,9 +33,9 @@ class TestDictToCompilePipeline:
 
         flags = ()
         valued_options = {}
-        pipeline = dict_to_compile_pipeline(None, *flags, **valued_options)
+        cp = dict_to_compile_pipeline(None, *flags, **valued_options)
 
-        assert pipeline == CompilePipeline()
+        assert cp == CompilePipeline()
 
     @pytest.mark.parametrize("pass_name", ["merge_rotations", "merge-rotations"])
     def test_input_is_str(self, pass_name):
@@ -44,9 +43,9 @@ class TestDictToCompilePipeline:
 
         flags = ()
         valued_options = {}
-        pipeline = dict_to_compile_pipeline(pass_name, *flags, **valued_options)
+        cp = dict_to_compile_pipeline(pass_name, *flags, **valued_options)
 
-        assert pipeline == CompilePipeline(qml.transform(pass_name="merge-rotations"))
+        assert cp == CompilePipeline(qml.transform(pass_name="merge-rotations"))
 
     def test_input_is_dict(self):
         """Tests that a dict of passes gets processed properly."""
@@ -57,12 +56,12 @@ class TestDictToCompilePipeline:
             "cancel_inverses": {},
             "gridsynth": {"epsilon": 42},
         }
-        pipeline = dict_to_compile_pipeline(pass_pipeline_dict, *flags, **valued_options)
+        cp = dict_to_compile_pipeline(pass_pipeline_dict, *flags, **valued_options)
         t1 = BoundTransform(qml.transform(pass_name="cancel-inverses"))
         t2 = BoundTransform(qml.transform(pass_name="gridsynth"), kwargs={"epsilon": 42})
         exp_pipeline = CompilePipeline(t1, t2)
 
-        assert pipeline == exp_pipeline
+        assert cp == exp_pipeline
 
     @pytest.mark.parametrize("pass_name", ["disentangle_cnot", "disentangle_swap"])
     def test_mixed_case_passes(self, pass_name):
@@ -70,11 +69,11 @@ class TestDictToCompilePipeline:
 
         flags = ()
         valued_options = {}
-        pipeline = dict_to_compile_pipeline(pass_name, *flags, **valued_options)
+        cp = dict_to_compile_pipeline(pass_name, *flags, **valued_options)
 
         test_map = {"disentangle_cnot": "disentangle-CNOT", "disentangle_swap": "disentangle-SWAP"}
 
-        assert pipeline == CompilePipeline(qml.transform(pass_name=test_map[pass_name]))
+        assert cp == CompilePipeline(qml.transform(pass_name=test_map[pass_name]))
 
 
 class TestPipeline:
