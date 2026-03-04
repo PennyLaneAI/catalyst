@@ -35,9 +35,10 @@ from pennylane.measurements import (
     SampleMP,
     VarianceMP,
 )
+from pennylane.ops import Adjoint
 from pennylane.transforms.decompose import _resolve_gate_set
 
-from catalyst.api_extensions import HybridCtrl
+from catalyst.api_extensions import HybridCtrl, Cond
 from catalyst.device.op_support import (
     is_active,
     is_controllable,
@@ -161,6 +162,25 @@ def catalyst_decompose(
 
     new_ops = []
     for op in toplevel_tape.operations:
+        if isinstance(op, Adjoint):
+            print(f"{has_nested_tapes(op.base)} and {isinstance(op.base, Cond)}, {op}")
+            if has_nested_tapes(op.base) and isinstance(op.base, Cond):
+                print("doing the new branch")
+                new_regions = []
+                for region in op.base.regions:
+                    if region.quantum_tape is None:
+                        new_tape = None
+                    else:
+                        new_tape = qml.tape.QuantumTape([qml.adjoint(_op) for _op in region.quantum_tape.operations[::-1]])
+
+                    new_regions.append(
+                        HybridOpRegion(
+                            region.trace, new_tape, region.arg_classical_tracers, region.res_classical_tracers
+                        )
+                    )
+                op = copy.copy(op.base)
+                op.regions = new_regions
+
         if has_nested_tapes(op):
             op = _decompose_nested_tapes(op, capabilities, **decompose_kwargs)
         new_ops.append(op)
