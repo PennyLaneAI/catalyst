@@ -99,6 +99,14 @@ class CommutingObservableValidator:
         for op in ops.walk():
             self._check_op(op)
 
+    @property
+    def _err_msg(self):
+        """Error message to be raised"""
+        return (
+            "Only observables that are qubit-wise commuting can be diagonalized. "
+            "Please apply the `split-non-commuting` pass first."
+        )
+
     def _check_op(self, observable):
         """Dispatches the observable to the correct qubit/qreg tracking logic."""
         if isinstance(observable, NamedObsOp):
@@ -119,7 +127,7 @@ class CommutingObservableValidator:
         """
         for qubit in qubits:
             if self.visited_qreg or qubit in self.visited_qubits:
-                raise RuntimeError("cannot diagonalize circuit with non-commuting observables")
+                raise RuntimeError(f"{self._err_msg}")
             self.visited_qubits.add(qubit)
 
     def _update_visited_qreg(self):
@@ -127,7 +135,7 @@ class CommutingObservableValidator:
         another register have already been visited."""
 
         if self.visited_qreg or self.visited_qubits:
-            raise RuntimeError("cannot diagonalize circuit with non-commuting observables")
+            raise RuntimeError(f"{self._err_msg}")
         self.visited_qreg = True
 
 
