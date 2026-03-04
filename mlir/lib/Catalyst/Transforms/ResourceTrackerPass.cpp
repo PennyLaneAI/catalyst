@@ -16,8 +16,6 @@
 
 #include "llvm/Support/JSON.h"
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
@@ -76,28 +74,6 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
             printJsonOutput(results);
         }
 
-        if (updateAttr || decompAttr) {
-            auto module = llvm::cast<mlir::ModuleOp>(getOperation());
-            MLIRContext *ctx = &getContext();
-            OpBuilder builder(ctx);
-
-            for (auto func : module.getOps<mlir::func::FuncOp>()) {
-                if (decompAttr && !func->hasAttr("target_gate")) {
-                    // Only annotate functions that are decomposition rules
-                    // i.e., marked with "target_gate" attribute.
-                    continue;
-                }
-
-                StringRef funcName = func.getName();
-                if (results.count(funcName)) {
-                    const ResourceResult &result = results.lookup(funcName);
-                    // add a test attr with value name of funcName
-                    func->setAttr("resources",
-                                  buildResourceDict(ctx, result, /*isDecompAttr*/ decompAttr));
-                }
-            }
-        }
-
         markAllAnalysesPreserved();
     }
 
@@ -136,9 +112,6 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
 
     /**
      * @brief Print the resource results as JSON to stdout.
-     *
-     * The structure of the JSON will mirror the DictionaryAttr built in buildResourceDict(),
-     * but with JSON objects and values.
      *
      * @param results The map of function names to ResourceResults to print.
      */
@@ -195,93 +168,6 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
         // TODO: write to file, when called from frontend. Then, frontend read and delete the file.
         llvm::json::Value jsonValue(std::move(root));
         llvm::outs() << llvm::formatv("{0:2}", jsonValue) << "\n";
-    }
-
-    /**
-     * @brief Build a DictionaryAttr from a ResourceResult for annotating functions.
-     *
-     * The structure of the DictionaryAttr will mirror the JSON output,
-     * but with MLIR attributes.
-     *
-     * If isDecompAttr is true, we omit classical instructionsand function calls
-     * from the attributes, as well as the total qubits, since these are not relevant
-     * for decomposition rules and would add unnecessary clutter.
-     * Decomposition functions are typically focused on the specific gate, mid-circuit
-     * measurements and allocated auxiliary qubits.
-     *
-     * @param ctx MLIRContext for creating attributes
-     * @param result The ResourceResult to convert into attributes
-     * @param isDecompAttr Whether this is for a decomposition function
-     * @return DictionaryAttr representing the resource counts
-     *
-     */
-    DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result,
-                                     bool isDecompAttr) const
-    {
-        SmallVector<NamedAttribute> entries;
-
-        // operations
-        SmallVector<NamedAttribute> opsEntries;
-        for (const auto &opEntry : result.operations) {
-            llvm::StringRef opName = opEntry.getKey();
-            for (const auto &sizeEntry : opEntry.getValue()) {
-                int nQubits = sizeEntry.first;
-                int64_t count = sizeEntry.second;
-                std::string key = (opName + "(" + std::to_string(nQubits) + ")").str();
-                opsEntries.push_back(NamedAttribute(
-                    StringAttr::get(ctx, key), IntegerAttr::get(IntegerType::get(ctx, 64), count)));
-            }
-        }
-        entries.push_back(NamedAttribute(StringAttr::get(ctx, "operations"),
-                                         DictionaryAttr::get(ctx, opsEntries)));
-
-        // measurements
-        SmallVector<NamedAttribute> measEntries;
-        for (const auto &entry : result.measurements) {
-            measEntries.push_back(
-                NamedAttribute(StringAttr::get(ctx, entry.getKey()),
-                               IntegerAttr::get(IntegerType::get(ctx, 64), entry.getValue())));
-        }
-        entries.push_back(NamedAttribute(StringAttr::get(ctx, "measurements"),
-                                         DictionaryAttr::get(ctx, measEntries)));
-
-        if (!decompAttr) {
-            // classical instructions
-            SmallVector<NamedAttribute> classEntries;
-            for (const auto &entry : result.classicalInstructions) {
-                classEntries.push_back(
-                    NamedAttribute(StringAttr::get(ctx, entry.getKey()),
-                                   IntegerAttr::get(IntegerType::get(ctx, 64), entry.getValue())));
-            }
-            entries.push_back(NamedAttribute(StringAttr::get(ctx, "classical_instructions"),
-                                             DictionaryAttr::get(ctx, classEntries)));
-
-            // function calls
-            SmallVector<NamedAttribute> fcEntries;
-            for (const auto &entry : result.functionCalls) {
-                fcEntries.push_back(
-                    NamedAttribute(StringAttr::get(ctx, entry.getKey()),
-                                   IntegerAttr::get(IntegerType::get(ctx, 64), entry.getValue())));
-            }
-            entries.push_back(NamedAttribute(StringAttr::get(ctx, "function_calls"),
-                                             DictionaryAttr::get(ctx, fcEntries)));
-
-            // scalars
-            entries.push_back(
-                NamedAttribute(StringAttr::get(ctx, "num_qubits"),
-                               IntegerAttr::get(IntegerType::get(ctx, 64), result.numQubits())));
-            entries.push_back(
-                NamedAttribute(StringAttr::get(ctx, "num_arg_qubits"),
-                               IntegerAttr::get(IntegerType::get(ctx, 64), result.numArgQubits)));
-            entries.push_back(NamedAttribute(StringAttr::get(ctx, "device_name"),
-                                             StringAttr::get(ctx, result.deviceName)));
-        }
-
-        entries.push_back(
-            NamedAttribute(StringAttr::get(ctx, "num_alloc_qubits"),
-                           IntegerAttr::get(IntegerType::get(ctx, 64), result.numAllocQubits)));
-
-        return DictionaryAttr::get(ctx, entries);
     }
 };
 

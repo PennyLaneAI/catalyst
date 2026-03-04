@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline="builtin.module(resource-tracker{decomp-attr=true})" --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --pass-pipeline="builtin.module(register-decomp-rule-resource)" --split-input-file %s | FileCheck %s
 
 // Basic decomposition rule
 
-// CHECK: attributes {resources = {measurements = {}, num_alloc_qubits = 2 : i64, operations = {"CNOT(2)" = 1 : i64, "Hadamard(1)" = 1 : i64, "S(1)" = 1 : i64, "T(1)" = 1 : i64}}, target_gate = "basic"}
+// CHECK: attributes {resources = {classical_instructions = {func.return = 1 : i64}, device_name = "", function_calls = {}, measurements = {}, num_alloc_qubits = 2 : i64, num_arg_qubits = 0 : i64, num_qubits = 2 : i64, operations = {"CNOT(2)" = 1 : i64, "Hadamard(1)" = 1 : i64, "S(1)" = 1 : i64, "T(1)" = 1 : i64}}, target_gate = "basic"}
 func.func @basic_gates() attributes {target_gate="basic"}  {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -35,7 +35,7 @@ func.func @basic_gates() attributes {target_gate="basic"}  {
 
 // Rule with PBC ops
 
-// CHECK: attributes {resources = {measurements = {}, num_alloc_qubits = 2 : i64, operations = {"PPM(1)" = 2 : i64, "PPR-pi/4(1)" = 3 : i64, "PPR-pi/8(1)" = 1 : i64}}, target_gate = "pbc"}
+// CHECK: attributes {resources = {classical_instructions = {func.return = 1 : i64}, device_name = "", function_calls = {}, measurements = {}, num_alloc_qubits = 2 : i64, num_arg_qubits = 0 : i64, num_qubits = 2 : i64, operations = {"PPM(1)" = 2 : i64, "PPR-pi/4(1)" = 3 : i64, "PPR-pi/8(1)" = 1 : i64}}, target_gate = "pbc"}
 func.func @pbc_operations() attributes {target_gate="pbc"} {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -56,7 +56,7 @@ func.func @pbc_operations() attributes {target_gate="pbc"} {
 
 // Rule with measure
 
-// CHECK: attributes {resources = {measurements = {MidCircuitMeasure = 1 : i64}, num_alloc_qubits = 1 : i64, operations = {"Hadamard(1)" = 1 : i64}}, target_gate = "gate"}
+// CHECK: attributes {resources = {classical_instructions = {func.return = 1 : i64}, device_name = "", function_calls = {}, measurements = {MidCircuitMeasure = 1 : i64},
 func.func @rule_mcm() attributes {target_gate="gate"} {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -77,7 +77,7 @@ func.func private @helper_func(%arg0: !quantum.bit) -> !quantum.bit {
     return %out : !quantum.bit
 }
 
-// CHECK: rule(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode, resources =
+// CHECK: attributes {qnode, resources
 func.func @rule(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode, target_gate="rule"} {
     %r1 = func.call @helper_func(%arg0) : (!quantum.bit) -> !quantum.bit
     %r2 = func.call @helper_func(%r1) : (!quantum.bit) -> !quantum.bit
@@ -88,8 +88,9 @@ func.func @rule(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode, target_g
 // -----
 
 // CNOT Decomposition Rule
+// TODO: remove this after integrating rules with this pass
 
-// CHECK: resources = {measurements = {}, num_alloc_qubits = 0 : i64, operations = {"CZ(2)" = 1 : i64, "Hadamard(1)" = 2 : i64}}, target_gate = "CNOT"}
+// CHECK: attributes {num_wires = 2 : i64, resources = {classical_instructions = {func.return = 1 : i64, stablehlo.reshape = 4 : i64, stablehlo.slice = 4 : i64, tensor.extract = 8 : i64}, device_name = "", function_calls = {}, measurements = {}, num_alloc_qubits = 0 : i64, num_arg_qubits = 0 : i64, num_qubits = 0 : i64, operations = {"CZ(2)" = 1 : i64, "Hadamard(1)" = 2 : i64}}, target_gate = "CNOT"}
 func.func public @_cnot_to_cz_h(%arg0: !quantum.reg, %arg1: tensor<2xi64>) -> !quantum.reg attributes {num_wires = 2 : i64, target_gate = "CNOT"} {
     %0 = stablehlo.slice %arg1 [1:2] : (tensor<2xi64>) -> tensor<1xi64>
     %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
@@ -124,8 +125,9 @@ func.func public @_cnot_to_cz_h(%arg0: !quantum.reg, %arg1: tensor<2xi64>) -> !q
 // -----
 
 // CZ to PPR Decomposition Rule
+// TODO: remove this after integrating rules with this pass
 
-// CHECK: resources = {measurements = {}, num_alloc_qubits = 0 : i64, operations = {"GlobalPhase(0)" = 1 : i64, "PauliRot(1)" = 2 : i64, "PauliRot(2)" = 1 : i64}}
+// CHECK: attributes {num_wires = 2 : i64, resources = {classical_instructions = {arith.constant = 3 : i64, func.return = 1 : i64, stablehlo.reshape = 4 : i64, stablehlo.slice = 4 : i64, tensor.extract = 8 : i64}, device_name = "", function_calls = {}, measurements = {}, num_alloc_qubits = 0 : i64, num_arg_qubits = 0 : i64, num_qubits = 0 : i64, operations = {"GlobalPhase(0)" = 1 : i64, "PauliRot(1)" = 2 : i64, "PauliRot(2)" = 1 : i64}}, target_gate = "CZ"}
 func.func public @_cz_to_ppr(%arg0: !quantum.reg, %arg1: tensor<2xi64>) -> !quantum.reg attributes {num_wires = 2 : i64, target_gate = "CZ"} {
     %cst = arith.constant 0.78539816339744828 : f64
     %cst_0 = arith.constant 1.5707963267948966 : f64
@@ -164,9 +166,9 @@ func.func public @_cz_to_ppr(%arg0: !quantum.reg, %arg1: tensor<2xi64>) -> !quan
 // -----
 
 // MultiRZ Decomposition Rule
-// TODO: Update resource-tracking to return parametric resources with loops
+// TODO: remove this after integrating rules with this pass
 
-// CHECK: resources = {measurements = {}, num_alloc_qubits = 0 : i64, operations = {"CNOT(2)" = 4 : i64, "RZ(1)" = 1 : i64}}
+// CHECK: attributes {resources = {classical_instructions = {arith.constant = 4 : i64, arith.index_cast = 4 : i64, arith.subi = 2 : i64, func.return = 1 : i64, scf.for = 2 : i64, scf.yield = 4 : i64, stablehlo.add = 8 : i64, stablehlo.compare = 8 : i64, stablehlo.constant = 3 : i64, stablehlo.convert = 8 : i64, stablehlo.dynamic_slice = 8 : i64, stablehlo.reshape = 9 : i64, stablehlo.select = 8 : i64, stablehlo.slice = 1 : i64, stablehlo.subtract = 4 : i64, tensor.extract = 19 : i64, tensor.from_elements = 4 : i64}, device_name = "", function_calls = {}, measurements = {}, num_alloc_qubits = 0 : i64, num_arg_qubits = 0 : i64, num_qubits = 0 : i64, operations = {"CNOT(2)" = 4 : i64, "RZ(1)" = 1 : i64}}, target_gate = "MultiRZ"}
 func.func public @_multi_rz_decomposition(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<3xi64>) -> !quantum.reg attributes {target_gate = "MultiRZ"} {
     %c3 = arith.constant 3 : index
     %c0 = arith.constant 0 : index
