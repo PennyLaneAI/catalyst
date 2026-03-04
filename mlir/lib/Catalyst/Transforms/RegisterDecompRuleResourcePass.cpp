@@ -45,10 +45,13 @@ struct RegisterDecompRuleResourcePass
         MLIRContext *ctx = &getContext();
         OpBuilder builder(ctx);
 
+        // Annotate decomposition rule functions with their resource counts, so that
+        // the resources can be queried by other passes include graph-decomposition.
+        // Note this pass only annotates functions that are marked with "target_gate"
+        // attribute, which is how we identify decomposition rules in the main module.
+        // Regular or nested functions will not be annotated.
         for (auto func : module.getOps<mlir::func::FuncOp>()) {
             if (!func->hasAttr("target_gate")) {
-                // Only annotate functions that are decomposition rules
-                // i.e., marked with "target_gate" attribute.
                 continue;
             }
 
@@ -68,6 +71,12 @@ struct RegisterDecompRuleResourcePass
      *
      * The structure of the DictionaryAttr will mirror the JSON output,
      * but with MLIR attributes.
+     *
+     * Note that this is a simplified version of the ResourceResult
+     * only including operations, measurements, and num_qubits,
+     * but it can be extended to include more fields such as
+     * classical instructions and function calls as needed
+     * for the decomposition framework.
      *
      * @param ctx MLIRContext for creating attributes
      * @param result The ResourceResult to convert into attributes
@@ -103,26 +112,6 @@ struct RegisterDecompRuleResourcePass
         entries.push_back(NamedAttribute(StringAttr::get(ctx, "measurements"),
                                          DictionaryAttr::get(ctx, measEntries)));
 
-        // classical instructions
-        SmallVector<NamedAttribute> classEntries;
-        for (const auto &entry : result.classicalInstructions) {
-            classEntries.push_back(
-                NamedAttribute(StringAttr::get(ctx, entry.getKey()),
-                               IntegerAttr::get(IntegerType::get(ctx, 64), entry.getValue())));
-        }
-        entries.push_back(NamedAttribute(StringAttr::get(ctx, "classical_instructions"),
-                                         DictionaryAttr::get(ctx, classEntries)));
-
-        // function calls
-        SmallVector<NamedAttribute> fcEntries;
-        for (const auto &entry : result.functionCalls) {
-            fcEntries.push_back(
-                NamedAttribute(StringAttr::get(ctx, entry.getKey()),
-                               IntegerAttr::get(IntegerType::get(ctx, 64), entry.getValue())));
-        }
-        entries.push_back(NamedAttribute(StringAttr::get(ctx, "function_calls"),
-                                         DictionaryAttr::get(ctx, fcEntries)));
-
         // scalars
         entries.push_back(
             NamedAttribute(StringAttr::get(ctx, "num_qubits"),
@@ -132,7 +121,6 @@ struct RegisterDecompRuleResourcePass
                            IntegerAttr::get(IntegerType::get(ctx, 64), result.numArgQubits)));
         entries.push_back(NamedAttribute(StringAttr::get(ctx, "device_name"),
                                          StringAttr::get(ctx, result.deviceName)));
-
         entries.push_back(
             NamedAttribute(StringAttr::get(ctx, "num_alloc_qubits"),
                            IntegerAttr::get(IntegerType::get(ctx, 64), result.numAllocQubits)));
