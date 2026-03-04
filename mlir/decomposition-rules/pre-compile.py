@@ -19,6 +19,7 @@ Bytecode.
 
 import inspect
 import warnings
+from pathlib import Path
 from textwrap import indent
 from types import UnionType
 from typing import Callable, Union, get_args, get_origin
@@ -37,9 +38,9 @@ from catalyst.utils.exceptions import CompileError
 # TODO document this directory + functionality
 
 # NOTE: paths are relative to catalyst root, not mlir directory
-DECOMP_RULE_DIR = "./decomposition-rules/"
-DECOMPS_FILE = DECOMP_RULE_DIR + "decompositions.mlir"
-MLIRBC_DECOMPS_FILE = DECOMP_RULE_DIR + "decompositions.mlirbc"
+DECOMP_DIR_PATH = Path("./decomposition-rules/")
+DECOMPS_FILE_PATH = DECOMP_DIR_PATH / Path("decompositions.mlir")
+MLIRBC_FILE_PATH = DECOMP_DIR_PATH / Path("decompositions.mlirbc")
 
 
 def get_compiler_ops() -> tuple[list[Operation], int]:
@@ -224,8 +225,9 @@ def main():
 
     num_successes = 0
     num_failures = 0
+
     with open(
-        DECOMPS_FILE, "w", encoding="utf-8"
+        DECOMPS_FILE_PATH, "w", encoding="utf-8"
     ) as mlir_file:  # TODO probably set this as an environment variable
         for func in target_ops:
             results, num_new_successes, num_new_failures = compile_decomps_via_dummy_circuit(func)
@@ -235,6 +237,7 @@ def main():
                 for name, circuit_mlir in results.items():
                     if circuit_mlir:
                         mlir_file.write(circuit_mlir.replace("rule_wrapper", name))
+
     if num_failures:
         warnings.warn(
             f"compiled {num_successes} / {num_failures + num_successes} decomposition rules"
