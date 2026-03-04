@@ -381,11 +381,6 @@ transforms_to_passes = {
 }
 
 
-def register_transform(pl_transform, pass_name, decomposition):
-    """Register pennylane transforms and their conversion to Catalyst transforms"""
-    transforms_to_passes[pl_transform] = (pass_name, decomposition)
-
-
 def _set_decompose_lowering_state(self):
     """Set requires_decompose_lowering and decompose_tkwargs; raise if already set."""
     if not self.requires_decompose_lowering:
