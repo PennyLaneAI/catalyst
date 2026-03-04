@@ -108,7 +108,7 @@ def InsertCodeblockOp : QecLogical_Op<"insert_block", [AllTypesMatch<["in_hyper_
 }
 
 def EncodeOp : QecLogical_Op<"encode", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
-    let summary = "";
+    let summary = "Encode a logical codeblock to the specified logical state.";
 
     let arguments = (ins
         LogicalCodeblockType:$in_codeblock,
