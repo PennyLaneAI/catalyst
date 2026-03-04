@@ -74,30 +74,18 @@ def _diagonalize(obs: NamedObsOp, supported_base_obs) -> bool:
     )  # pragma: no cover
 
 
-class CommutingObservableValidator:
+class NonCommutingObservableValidator:
     """
-    Validates that a set of quantum observables commute by ensuring they
-    act on disjoint qubit sets.
-
-    This validator tracks visited qubits and registers to detect overlaps
-    that would prevent simultaneous diagonalization of the circuit.
+    Validates if all quantum observables in a builtin.ModuleOp object act on
+    disjoint qubit sets.
     """
 
-    def __init__(self):
+    def __init__(self, ops: builtin.ModuleOp):
         self.visited_qubits = set()
         self.visited_qreg = False
-
-    def validate(self, ops):
-        """Traverses the operation and validates qubit commutation.
-
-        Args:
-            ops: An builtin.ModuleOp object.
-
-        Raises:
-            RuntimeError: If non-commuting observables (overlapping qubits) are detected.
-        """
+        # Ensure base observables act on disjoint qubits
         for op in ops.walk():
-            self._check_op(op)
+            self._check_obs_wire_disjoint(op)
 
     @property
     def _err_msg(self):
@@ -107,17 +95,17 @@ class CommutingObservableValidator:
             "Please apply the `split-non-commuting` pass first."
         )
 
-    def _check_op(self, observable):
+    def _check_obs_wire_disjoint(self, op):
         """Dispatches the observable to the correct qubit/qreg tracking logic."""
-        if isinstance(observable, NamedObsOp):
-            self._update_visited_qubits([observable.operands[0]])
-        elif isinstance(observable, HermitianOp):
-            self._update_visited_qubits(observable.qubits)
-        elif isinstance(observable, ComputationalBasisOp):
-            if observable.qreg is not None:
+        if isinstance(op, NamedObsOp):
+            self._update_visited_qubits([op.qubit])
+        elif isinstance(op, HermitianOp):
+            self._update_visited_qubits(op.qubits)
+        elif isinstance(op, ComputationalBasisOp):
+            if op.qreg is not None:
                 self._update_visited_qreg()
-            if observable.qubits is not None:
-                self._update_visited_qubits(observable.qubits)
+            if op.qubits is not None:
+                self._update_visited_qubits(op.qubits)
 
     def _update_visited_qubits(self, qubits):
         """Checks if the specific qubits have already been acted upon.
@@ -260,7 +248,7 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
         """Apply the diagonalize final measurements pass."""
         # Validate if the circuit in the module is commuting and an error
         # will raise if not.
-        CommutingObservableValidator().validate(op)
+        NonCommutingObservableValidator(op)
 
         pattern_rewriter.PatternRewriteWalker(
             DiagonalizeFinalMeasurementsPattern(self.supported_base_obs, self.to_eigvals)
