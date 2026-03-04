@@ -118,7 +118,14 @@ void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValu
                 else {
                     Value rQreg = getRSourceRegisterValue(v);
                     if (rQreg.getParentRegion()->isProperAncestor(&r)) {
-                        necessaryRegionRValues.insert(v);
+                        auto getOp = cast<qref::GetOp>(v.getDefiningOp());
+                        if (getOp.getIdx() && getOp.getIdx().getParentRegion() == &r) {
+                            // extract index is from within the region, must take in the reg
+                            necessaryRegionRValues.insert(rQreg);
+                        }
+                        else {
+                            necessaryRegionRValues.insert(v);
+                        }
                     }
                 }
             }

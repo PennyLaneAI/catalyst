@@ -117,6 +117,48 @@ func.func @test_for_loop_root() attributes {quantum.node} {
 // -----
 
 
+// CHECK-LABEL: test_for_loop_dynamic_index
+func.func @test_for_loop_dynamic_index(%nqubits: i64) attributes {quantum.node} {
+    %start = arith.constant 0 : index
+    %step = arith.constant 1 : index
+    %stop = index.casts %nqubits : i64 to index
+
+    // CHECK: [[qreg:%.+]] = quantum.alloc(%arg0) : !quantum.reg
+    %a = qref.alloc(%nqubits) : !qref.reg<?>
+    %q0 = qref.get %a[0] : !qref.reg<?> -> !qref.bit
+
+    // CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[loopOut:%.+]]:2 = scf.for %arg1 = {{%.+}} to {{%.+}} step {{%.+}} iter_args(%arg2 = [[qreg]], %arg3 = [[q0]])
+    // CHECK-SAME:     -> (!quantum.reg, !quantum.bit) {
+    scf.for %i = %start to %stop step %step {
+
+        // CHECK: [[i:%.+]] = index.casts %arg1 : index to i64
+        %int = index.casts %i : index to i64
+
+        %this_q = qref.get %a[%int] : !qref.reg<?>, i64 -> !qref.bit
+
+        // CHECK: [[this_q:%.+]] = quantum.extract %arg2[[[i]]] : !quantum.reg -> !quantum.bit
+        // CHECK: [[HADAMARD:%.+]] = quantum.custom "Hadamard"() [[this_q]] : !quantum.bit
+        qref.custom "Hadamard"() %this_q : !qref.bit
+
+        // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[HADAMARD]], %arg3 : !quantum.bit, !quantum.bit
+        // CHECK: [[insertCNOT:%.+]] = quantum.insert %arg2[[[i]]], [[CNOT]]#0 : !quantum.reg, !quantum.bit
+        qref.custom "CNOT"() %this_q, %q0 : !qref.bit, !qref.bit
+
+        // CHECK: scf.yield [[insertCNOT]], [[CNOT]]#1 : !quantum.reg, !quantum.bit
+        scf.yield
+    }
+    // CHECK: [[insertLoop:%.+]] = quantum.insert [[loopOut]]#0[ 0], [[loopOut]]#1 : !quantum.reg, !quantum.bit
+
+    // CHECK: quantum.dealloc [[insertLoop]] : !quantum.reg
+    qref.dealloc %a : !qref.reg<?>
+    return
+}
+
+
+// -----
+
+
 // CHECK-LABEL: test_for_loop_with_existing_args
 func.func @test_for_loop_with_existing_args(%nqubits: i64) -> (f64, f32) attributes {quantum.node} {
     // CHECK: [[sum_step:%.+]] = arith.constant 3.742000e+01 : f32
