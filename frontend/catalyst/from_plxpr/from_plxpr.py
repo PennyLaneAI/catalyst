@@ -479,7 +479,7 @@ def handle_transform(
 
     # FIXME: A fix for the diagonalize_measurement pass
     if catalyst_pass_name == "diagonalize-final-measurements" and isinstance(
-        tkwargs["supported_base_obs"], list
+        tkwargs.get("supported_base_obs", None), list
     ):
         tkwargs["supported_base_obs"] = tuple(tkwargs["supported_base_obs"])
 
