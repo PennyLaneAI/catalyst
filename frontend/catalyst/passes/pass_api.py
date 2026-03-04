@@ -319,14 +319,16 @@ class PassPlugin(Pass):
 
 _PASS_NAME_OVERRIDES = {
     "disentangle-cnot": "disentangle-CNOT",
-    "disentangle-swap": "disentangle-SWAP"
+    "disentangle-swap": "disentangle-SWAP",
 }
 """These passes don't follow the lower kebab-case convention."""
+
 
 def _get_pass_name(name: str) -> str:
     """Converts snake case to kebab case."""
     kebab_name = name.replace("_", "-")
     return _PASS_NAME_OVERRIDES.get(kebab_name, kebab_name)
+
 
 def dict_to_compile_pipeline(
     pass_pipeline: PipelineDict | str | CompilePipeline | None, *flags, **valued_options
@@ -352,10 +354,9 @@ def dict_to_compile_pipeline(
         for name, pass_options in filtered_pass_pipeline.items():
             t = transform(pass_name=name)
             # Pass options must be snake-case
-            pass_options = {k.replace("-","_"): v for k, v in pass_options.items()}
+            pass_options = {k.replace("-", "_"): v for k, v in pass_options.items()}
             bound_t = BoundTransform(t, **pass_options)
             passes.append(bound_t)
         return CompilePipeline(passes)
 
     return pass_pipeline
-
