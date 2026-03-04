@@ -298,9 +298,8 @@ class TestPassByPassSpecs:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level={
-                i: pass_name
-                for i, pass_name in enumerate(
+            level=dict(
+                enumerate(
                     (
                         "Before transforms",
                         "dummy_transform",
@@ -310,7 +309,7 @@ class TestPassByPassSpecs:
                         "merge-rotations",
                     )
                 )
-            },
+            ),
             resources={
                 "Before transforms": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
