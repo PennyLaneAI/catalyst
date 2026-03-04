@@ -66,3 +66,10 @@ func.func @test_insert_block_dyn_idx(%arg0 : !qecl.hyperreg<3 x 1>, %arg1 : inde
     %0 = qecl.insert_block %arg0[ %arg1], %arg2 : !qecl.hyperreg<3 x 1>, !qecl.codeblock<1>
     func.return
 }
+
+// -----
+
+func.func @test_encode_block(%arg0 : !qecl.codeblock<1>) {
+    %0 = qecl.encode [zero] %arg0 : !qecl.codeblock<1>
+    func.return
+}

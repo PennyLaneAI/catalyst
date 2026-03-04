@@ -17,6 +17,7 @@
 
 include "mlir/IR/OpBase.td"
 
+include "QecLogical/IR/QecLogicalAttrDefs.td"
 include "QecLogical/IR/QecLogicalDialect.td"
 include "QecLogical/IR/QecLogicalTypes.td"
 
@@ -104,6 +105,23 @@ def InsertCodeblockOp : QecLogical_Op<"insert_block", [AllTypesMatch<["in_hyper_
     let hasVerifier = 1;
     let hasCanonicalizeMethod = 1;
     let hasFolder = 1;
+}
+
+def EncodeOp : QecLogical_Op<"encode", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
+    let summary = "";
+
+    let arguments = (ins
+        LogicalCodeblockType:$in_codeblock,
+        LogicalCodeblockInitStateAttr:$init_state
+    );
+
+    let results = (outs
+        LogicalCodeblockType:$out_codeblock
+    );
+
+    let assemblyFormat = [{
+        `[` $init_state `]` $in_codeblock attr-dict `:` qualified(type($in_codeblock))
+    }];
 }
 
 
