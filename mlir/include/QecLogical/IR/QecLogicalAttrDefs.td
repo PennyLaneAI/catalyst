@@ -34,6 +34,6 @@ def LogicalCodeblockInitState : I32EnumAttr<"LogicalCodeblockInitState",
 }
 
 def LogicalCodeblockInitStateAttr : EnumAttr<
-    QecLogical_Dialect, LogicalCodeblockInitState, "codeblock_init">;
+    QecLogical_Dialect, LogicalCodeblockInitState, "codeblock_init_state">;
 
 #endif // QEC_LOGICAL_ATTR_DEFS
