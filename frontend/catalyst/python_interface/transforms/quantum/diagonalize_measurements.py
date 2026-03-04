@@ -74,46 +74,61 @@ def _diagonalize(obs: NamedObsOp, supported_base_obs) -> bool:
     )  # pragma: no cover
 
 
-class CheckSplitNonCommutingPattern(
-    pattern_rewriter.RewritePattern
-):  # pylint: disable=too-few-public-methods
-    """RewritePattern for diagonalizing final measurements."""
+class CommutingObservableValidator:
+    """
+    Validates that a set of quantum observables commute by ensuring they
+    act on disjoint qubit sets.
+
+    This validator tracks visited qubits and registers to detect overlaps
+    that would prevent simultaneous diagonalization of the circuit.
+    """
 
     def __init__(self):
-        self._visited_obs_qubits = set()
-        self._visited_obs_qreg = False
+        self.visited_qubits = set()
+        self.visited_qreg = False
 
-    def _update_visited_qubits(self, qubits):
-        for qubit in qubits:
-            if self._visited_obs_qreg or qubit in self._visited_obs_qubits:
-                raise RuntimeError("cannot diagonalize circuit with non-commuting observables")
-            self._visited_obs_qubits.add(qubit)
+    def validate(self, ops):
+        """Traverses the operation and validates qubit commutation.
 
-    def _update_visited_qreg(self):
-        if self._visited_obs_qreg or self._visited_obs_qubits:
-            raise RuntimeError("cannot diagonalize circuit with non-commuting observables")
-        self._visited_obs_qreg = True
+        Args:
+            ops: An builtin.ModuleOp object.
 
-    @pattern_rewriter.op_type_rewrite_pattern
-    def match_and_rewrite(
-        self,
-        observable: NamedObsOp | ComputationalBasisOp | HermitianOp,
-        rewriter: pattern_rewriter.PatternRewriter,
-        /,
-    ):
-        """Check if the circuit is commuting or not."""
+        Raises:
+            RuntimeError: If non-commuting observables (overlapping qubits) are detected.
+        """
+        for op in ops.walk():
+            self._check_op(op)
+
+    def _check_op(self, observable):
+        """Dispatches the observable to the correct qubit/qreg tracking logic."""
         if isinstance(observable, NamedObsOp):
             self._update_visited_qubits([observable.operands[0]])
-
         elif isinstance(observable, HermitianOp):
             self._update_visited_qubits(observable.qubits)
-
         elif isinstance(observable, ComputationalBasisOp):
             if observable.qreg is not None:
                 self._update_visited_qreg()
-
             if observable.qubits is not None:
                 self._update_visited_qubits(observable.qubits)
+
+    def _update_visited_qubits(self, qubits):
+        """Checks if the specific qubits have already been acted upon.
+
+        Args:
+            qubits: An iterable of qubit SSAValue.
+        """
+        for qubit in qubits:
+            if self.visited_qreg or qubit in self.visited_qubits:
+                raise RuntimeError("cannot diagonalize circuit with non-commuting observables")
+            self.visited_qubits.add(qubit)
+
+    def _update_visited_qreg(self):
+        """Checks if the qreg can be visited. Fails if any individual qubits or
+        another register have already been visited."""
+
+        if self.visited_qreg or self.visited_qubits:
+            raise RuntimeError("cannot diagonalize circuit with non-commuting observables")
+        self.visited_qreg = True
 
 
 class DiagonalizeFinalMeasurementsPattern(
@@ -235,9 +250,9 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the diagonalize final measurements pass."""
-        pattern_rewriter.PatternRewriteWalker(
-            CheckSplitNonCommutingPattern(), apply_recursively=False
-        ).rewrite_module(op)
+        # Validate if the circuit in the module is commuting and an error
+        # will raise if not.
+        CommutingObservableValidator().validate(op)
 
         pattern_rewriter.PatternRewriteWalker(
             DiagonalizeFinalMeasurementsPattern(self.supported_base_obs, self.to_eigvals)
