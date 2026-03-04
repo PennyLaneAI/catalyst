@@ -140,7 +140,7 @@ def test_apply_pass():
 def test_apply_pass_plugin(tmp_path):
     """Tests that a pass plugin can be used."""
 
-    # Use pytest's https://docs.pytest.org/en/stable/how-to/tmp_path.html to 
+    # Use pytest's https://docs.pytest.org/en/stable/how-to/tmp_path.html to
     # by pass the check for existence
     fake_plugin = tmp_path / "fake_plugin.so"
     fake_plugin.touch()
