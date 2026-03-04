@@ -163,9 +163,7 @@ def catalyst_decompose(
     new_ops = []
     for op in toplevel_tape.operations:
         if isinstance(op, Adjoint):
-            print(f"{has_nested_tapes(op.base)} and {isinstance(op.base, Cond)}, {op}")
             if has_nested_tapes(op.base) and isinstance(op.base, Cond):
-                print("doing the new branch")
                 new_regions = []
                 for region in op.base.regions:
                     if region.quantum_tape is None:
