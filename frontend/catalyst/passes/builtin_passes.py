@@ -47,14 +47,11 @@ def disentangle_cnot(qnode):
     .. code-block:: python
 
         import pennylane as qml
-        from catalyst import qjit
-        from catalyst.debug import get_compilation_stage
-        from catalyst.passes import disentangle_cnot
 
         dev = qml.device("lightning.qubit", wires=2)
 
-        @qjit(keep_intermediate=True)
-        @disentangle_cnot
+        @qml.qjit(capture=True)
+        @qml.transforms.disentangle_cnot
         @qml.qnode(dev)
         def circuit():
             # first qubit in |1>
@@ -63,6 +60,8 @@ def disentangle_cnot(qnode):
             # current state : |10>
             qml.CNOT([0,1]) # state after CNOT : |11>
             return qml.state()
+
+        qml.specs(circuit, level=2)()
 
     >>> circuit()
     [0.+0.j  0.+0.j  0.+0.j  1.+0.j]
@@ -116,7 +115,7 @@ def disentangle_cnot(qnode):
         %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
         %out_qubits_0 = quantum.custom "PauliX"() %2 : !quantum.bit
     """
-    return PassPipelineWrapper(qnode, "disentangle-CNOT")
+    return PassPipelineWrapper(qnode, "disentangle-cnot")
 
 
 def disentangle_swap(qnode):
@@ -216,7 +215,7 @@ def disentangle_swap(qnode):
         %out_qubits_2:2 = quantum.custom "CNOT"() %out_qubits_1, %out_qubits : !quantum.bit, !quantum.bit
         %out_qubits_3:2 = quantum.custom "CNOT"() %out_qubits_2#1, %out_qubits_2#0 : !quantum.bit, !quantum.bit
     """
-    return PassPipelineWrapper(qnode, "disentangle-SWAP")
+    return PassPipelineWrapper(qnode, "disentangle-swap")
 
 
 def merge_rotations(qnode):
