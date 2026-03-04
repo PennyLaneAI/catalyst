@@ -1046,6 +1046,7 @@ class TestCreateStaticOperatorNodes:
             return (
                 qml.expval(ham),
                 qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)),
+                qml.expval(2 * qml.X(0))
             )
 
         module = my_workflow()
@@ -1059,6 +1060,7 @@ class TestCreateStaticOperatorNodes:
 
         assert nodes["node1"]["label"] == "<name> LinearCombination|<wire> [0, 1, 2]"
         assert nodes["node2"]["label"] == "<name> Prod|<wire> [0, 1]"
+        assert nodes["node1"]["label"] == "<name> SProd|<wire> [0]"
 
     @pytest.mark.parametrize(
         "param, wires",
