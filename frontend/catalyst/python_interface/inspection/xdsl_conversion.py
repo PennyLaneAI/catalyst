@@ -34,7 +34,7 @@ from xdsl.dialects.scf import ForOp
 from xdsl.dialects.tensor import ExtractOp as TensorExtractOp
 from xdsl.ir import Block, SSAValue
 
-from catalyst.jit import QJIT, qjit
+from catalyst.jit import QJIT
 from catalyst.python_interface.dialects.pbc import (
     PPMeasurementOp,
     PPRotationArbitraryOp,
