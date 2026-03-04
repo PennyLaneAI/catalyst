@@ -343,6 +343,34 @@ class EncodeOp(IRDLOperation):
         )
 
 
+@irdl_op_definition
+class QecCycleOp(IRDLOperation):
+    """Perform a single cycle of a quantum error-correction protocol."""
+
+    name = "qecl.qec"
+
+    in_codeblock = operand_def(LogicalCodeblockConstraint())
+
+    out_codeblock = result_def(LogicalCodeblockConstraint())
+
+    assembly_format = """
+            $in_codeblock attr-dict `:` type($in_codeblock)
+        """
+
+    def __init__(
+        self,
+        in_codeblock: LogicalCodeblockType | Operation,
+    ):
+        operands = (in_codeblock,)
+
+        if isinstance(in_codeblock, LogicalCodeblockType):
+            result_type = LogicalCodeblockType(k=in_codeblock.k)
+        else:
+            result_type = LogicalCodeblockType(k=in_codeblock.type.k)
+
+        super().__init__(operands=operands, result_types=(result_type,))
+
+
 QecLogical = Dialect(
     "qecl",
     [
@@ -351,6 +379,7 @@ QecLogical = Dialect(
         ExtractCodeblockOp,
         InsertCodeblockOp,
         EncodeOp,
+        QecCycleOp,
     ],
     [
         LogicalCodeblockInitStateAttr,
