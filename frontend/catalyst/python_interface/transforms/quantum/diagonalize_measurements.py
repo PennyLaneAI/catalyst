@@ -129,7 +129,7 @@ class DiagonalizeFinalMeasurementsPattern(
     @pattern_rewriter.op_type_rewrite_pattern
     def match_and_rewrite(
         self, observable: NamedObsOp, rewriter: pattern_rewriter.PatternRewriter, /
-        ):
+    ):
         """Replace non-diagonalized observables with their diagonalizing gates and supported
         base observables."""
 
