@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Test conversion to value semantics quantum dialect for flat circuits with only classical arguments.
-//
+
 // RUN: quantum-opt --convert-to-value-semantics --canonicalize --split-input-file --verify-diagnostics %s | FileCheck %s
 
 
@@ -413,4 +413,22 @@ func.func @test_dynamic_wire_index(%arg0: i64) -> f64 attributes {quantum.node} 
     // CHECK: quantum.dealloc [[insert_dealloc]] : !quantum.reg
     qref.dealloc %a : !qref.reg<2>
     return %expval : f64
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_alloc_qb
+func.func @test_alloc_qb() attributes {quantum.node} {
+
+    // CHECK: [[qubit:%.+]] = quantum.alloc_qb : !quantum.bit
+    %q = qref.alloc_qb : !qref.bit
+
+    // CHECK: [[X:%.+]] = quantum.custom "X"() [[qubit]] : !quantum.bit
+    qref.custom "X"() %q : !qref.bit
+
+    // CHECK: quantum.dealloc_qb [[X]] : !quantum.bit
+    qref.dealloc_qb %q : !qref.bit
+    return
 }

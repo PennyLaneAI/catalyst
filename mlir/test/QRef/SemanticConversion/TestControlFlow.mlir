@@ -12,33 +12,62 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Test conversion to value semantics quantum dialect.
-//
+// Test conversion to value semantics quantum dialect where control flow is present.
+// For each control flow construct, the following cases are tested:
+// 1. Purely classical: no transform should happen
+// 2. Root qref values, aka qref.bit/reg values that are a result of an allocation or an argument:
+// the current value semantics value needs to be taken in by the control flow op, and new values
+// returned.
+// 3. Non-root qref values: a value semantics qubit value needs to be extracted, then taken in and
+// returned by the control flow op.
+
 // RUN: quantum-opt --convert-to-value-semantics --canonicalize --split-input-file --verify-diagnostics %s | FileCheck %s
 
 
-// CHECK-LABEL: test_for_loop
-func.func @test_for_loop(%nqubits: i64) -> f64 attributes {quantum.node} {
+// CHECK-LABEL: test_for_loop_no_qref
+func.func @test_for_loop_no_qref() -> f32 attributes {quantum.node} {
     %start = arith.constant 0 : index
     %step = arith.constant 1 : index
-    %stop = index.casts %nqubits : i64 to index
+    %stop = arith.constant 37 : index
 
-    // CHECK: [[qreg:%.+]] = quantum.alloc(%arg0) : !quantum.reg
-    %a = qref.alloc(%nqubits) : !qref.reg<?>
-    %q0 = qref.get %a[0] : !qref.reg<?> -> !qref.bit
+    %sum_init = arith.constant 0.0 : f32
+    %t = arith.constant 37.42 : f32
+    %sum = scf.for %i = %start to %stop step %step iter_args(%sum_iter = %sum_init) -> (f32) {
+        %sum_next = arith.addf %sum_iter, %t : f32
+        scf.yield %sum_next : f32
+    }
 
-    // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[X:%.+]] = quantum.custom "PauliX"() [[bit0]] : !quantum.bit
-    qref.custom "PauliX"() %q0 : !qref.bit
+    return %sum : f32
+}
+
+// CHECK:     {{%.+}} = scf.for {{%.+}} = {{%.+}} to {{%.+}} step {{%.+}} iter_args([[sum_iter:%.+]] = {{%.+}}) -> (f32) {
+// CHECK:         [[sum:%.+]] = arith.addf [[sum_iter]], {{%.+}} : f32
+// CHECK:         scf.yield [[sum]] : f32
+// CHECK:     }
+
+
+// -----
+
+
+// CHECK-LABEL: test_for_loop_non_root
+func.func @test_for_loop_non_root() attributes {quantum.node} {
+    %start = arith.constant 0 : index
+    %step = arith.constant 1 : index
+    %stop = arith.constant 37 : index
+
+    // CHECK: [[qreg:%.+]] = quantum.alloc( 3) : !quantum.reg
+    %a = qref.alloc(3) : !qref.reg<3>
+    %q0 = qref.get %a[0] : !qref.reg<3> -> !qref.bit
 
     // CHECK: [[bit1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
-    // CHECK: [[loopOut:%.+]]:2 = scf.for %arg1 = {{%.+}} to {{%.+}} step {{%.+}} iter_args(%arg2 = [[bit1]], %arg3 = [[X]]) ->
+    // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[loopOut:%.+]]:2 = scf.for %arg0 = {{%.+}} to {{%.+}} step {{%.+}} iter_args(%arg1 = [[bit1]], %arg2 = [[bit0]]) ->
     // CHECK-SAME:     (!quantum.bit, !quantum.bit) {
     scf.for %i = %start to %stop step %step {
-        %q1 = qref.get %a[1] : !qref.reg<?> -> !qref.bit
+        %q1 = qref.get %a[1] : !qref.reg<3> -> !qref.bit
 
-        // CHECK: [[HADAMARD:%.+]] = quantum.custom "Hadamard"() %arg2 : !quantum.bit
-        // CHECK: [[Z:%.+]] = quantum.custom "PauliZ"() %arg3 : !quantum.bit
+        // CHECK: [[HADAMARD:%.+]] = quantum.custom "Hadamard"() %arg1 : !quantum.bit
+        // CHECK: [[Z:%.+]] = quantum.custom "PauliZ"() %arg2 : !quantum.bit
         // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[Z]], [[HADAMARD]] : !quantum.bit, !quantum.bit
         qref.custom "Hadamard"() %q1 : !qref.bit
         qref.custom "PauliZ"() %q0 : !qref.bit
@@ -48,17 +77,11 @@ func.func @test_for_loop(%nqubits: i64) -> f64 attributes {quantum.node} {
         scf.yield
     }
     // CHECK: [[insert1:%.+]] = quantum.insert [[qreg]][ 1], [[loopOut]]#0 : !quantum.reg, !quantum.bit
-
-    // CHECK: [[obs:%.+]] = quantum.namedobs [[loopOut]]#1[ PauliX] : !quantum.obs
     // CHECK: [[insert0:%.+]] = quantum.insert [[insert1]][ 0], [[loopOut]]#1 : !quantum.reg, !quantum.bit
-    %obs = qref.namedobs %q0 [ PauliX] : !quantum.obs
 
     // CHECK: quantum.dealloc [[insert0]] : !quantum.reg
-    qref.dealloc %a : !qref.reg<?>
-
-    // CHECK: quantum.expval [[obs]]
-    %expval = quantum.expval %obs : f64
-    return %expval : f64
+    qref.dealloc %a : !qref.reg<3>
+    return
 }
 
 

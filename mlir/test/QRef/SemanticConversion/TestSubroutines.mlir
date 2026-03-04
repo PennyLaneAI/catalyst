@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Test conversion to value semantics quantum dialect for subroutines.
-//
+
 // RUN: quantum-opt --convert-to-value-semantics --canonicalize --split-input-file --verify-diagnostics %s | FileCheck %s
 
 

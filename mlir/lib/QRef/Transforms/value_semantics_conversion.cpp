@@ -640,6 +640,30 @@ void handleDealloc(IRRewriter &builder, qref::DeallocOp rDeallocOp, QubitValueTr
     builder.eraseOp(rDeallocOp);
 }
 
+void handleAllocQubit(IRRewriter &builder, qref::AllocQubitOp rAllocQbOp,
+                      QubitValueTracker &tracker)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(rAllocQbOp);
+    Location loc = rAllocQbOp.getLoc();
+
+    auto vAllocQbOp = quantum::AllocQubitOp::create(builder, loc);
+    tracker.setCurrentVQubit(rAllocQbOp.getQubit(), vAllocQbOp.getQubit());
+}
+
+void handleDeallocQubit(IRRewriter &builder, qref::DeallocQubitOp rDeallocQbOp,
+                        QubitValueTracker &tracker)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(rDeallocQbOp);
+    Location loc = rDeallocQbOp.getLoc();
+
+    quantum::DeallocQubitOp::create(builder, loc,
+                                    tracker.getCurrentVQubit(rDeallocQbOp.getQubit()));
+
+    builder.eraseOp(rDeallocQbOp);
+}
+
 void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, QubitValueTracker &tracker)
 {
     OpBuilder::InsertionGuard guard(builder);
@@ -730,6 +754,10 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
 
     SetVector<Value> rValuesUsedByRegion;
     getNecessaryRegionRValues(forOp.getRegion(), rValuesUsedByRegion);
+
+    if (rValuesUsedByRegion.size() == 0) {
+        return;
+    }
 
     scf::ForOp newLoop;
     {
@@ -840,6 +868,15 @@ void handleRegion(IRRewriter &builder, Region &r)
         if (auto rAllocOp = dyn_cast<qref::AllocOp>(op)) {
             handleAlloc(builder, rAllocOp, tracker);
         }
+        else if (auto rDeallocOp = dyn_cast<qref::DeallocOp>(op)) {
+            handleDealloc(builder, rDeallocOp, tracker);
+        }
+        else if (auto rAllocQbOp = dyn_cast<qref::AllocQubitOp>(op)) {
+            handleAllocQubit(builder, rAllocQbOp, tracker);
+        }
+        else if (auto rDeallocQbOp = dyn_cast<qref::DeallocQubitOp>(op)) {
+            handleDeallocQubit(builder, rDeallocQbOp, tracker);
+        }
         else if (auto rGateOp = dyn_cast<qref::QuantumOperation>(op)) {
             handleGate(builder, rGateOp, tracker);
         }
@@ -851,9 +888,6 @@ void handleRegion(IRRewriter &builder, Region &r)
         }
         else if (auto rHermitianOp = dyn_cast<qref::HermitianOp>(op)) {
             handleHermitian(builder, rHermitianOp, tracker);
-        }
-        else if (auto rDeallocOp = dyn_cast<qref::DeallocOp>(op)) {
-            handleDealloc(builder, rDeallocOp, tracker);
         }
         else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
             handleFor(builder, forOp, tracker);
@@ -874,7 +908,7 @@ void handleRegion(IRRewriter &builder, Region &r)
         retOp = forOp.getRegion().front().getTerminator();
     }
     else {
-        retOp = nullptr;
+        assert(false && "Bad region!");
     }
     SmallVector<Value> retVals(retOp->getOperands());
     for (auto arg : block.getArguments()) {
