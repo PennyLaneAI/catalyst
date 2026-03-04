@@ -270,7 +270,12 @@ def ResourceTrackerPass : Pass<"resource-tracker"> {
 def RegisterDecompRuleResourcePass : Pass<"register-decomp-rule-resource"> {
     let summary = "Register the resource of decomposition rules.";
     let description = [{
+        This pass uses `ResourceTrackerPass` to compute resource metrics of
+        functions marked with the `target_gate` attribute,
+        effectively filtering for decomposition rules.
 
+        Usage:
+            quantum-opt input.mlir -register-decomp-rule-resource
     }];
 }
 

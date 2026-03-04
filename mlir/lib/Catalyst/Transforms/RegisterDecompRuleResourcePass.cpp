@@ -32,7 +32,8 @@ namespace catalyst {
 #define GEN_PASS_DEF_REGISTERDECOMPRULERESOURCEPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
-struct RegisterDecompRuleResourcePass : public impl::RegisterDecompRuleResourcePassBase<RegisterDecompRuleResourcePass> {
+struct RegisterDecompRuleResourcePass
+    : public impl::RegisterDecompRuleResourcePassBase<RegisterDecompRuleResourcePass> {
     using RegisterDecompRuleResourcePassBase::RegisterDecompRuleResourcePassBase;
 
     void runOnOperation() final
@@ -54,8 +55,7 @@ struct RegisterDecompRuleResourcePass : public impl::RegisterDecompRuleResourceP
             StringRef funcName = func.getName();
             if (results.count(funcName)) {
                 const ResourceResult &result = results.lookup(funcName);
-                func->setAttr("resources",
-                                buildResourceDict(ctx, result));
+                func->setAttr("resources", buildResourceDict(ctx, result));
             }
         }
 
@@ -63,7 +63,6 @@ struct RegisterDecompRuleResourcePass : public impl::RegisterDecompRuleResourceP
     }
 
   private:
-
     /**
      * @brief Build a DictionaryAttr from a ResourceResult for annotating functions.
      *
@@ -109,30 +108,30 @@ struct RegisterDecompRuleResourcePass : public impl::RegisterDecompRuleResourceP
         for (const auto &entry : result.classicalInstructions) {
             classEntries.push_back(
                 NamedAttribute(StringAttr::get(ctx, entry.getKey()),
-                                IntegerAttr::get(IntegerType::get(ctx, 64), entry.getValue())));
+                               IntegerAttr::get(IntegerType::get(ctx, 64), entry.getValue())));
         }
         entries.push_back(NamedAttribute(StringAttr::get(ctx, "classical_instructions"),
-                                            DictionaryAttr::get(ctx, classEntries)));
+                                         DictionaryAttr::get(ctx, classEntries)));
 
         // function calls
         SmallVector<NamedAttribute> fcEntries;
         for (const auto &entry : result.functionCalls) {
             fcEntries.push_back(
                 NamedAttribute(StringAttr::get(ctx, entry.getKey()),
-                                IntegerAttr::get(IntegerType::get(ctx, 64), entry.getValue())));
+                               IntegerAttr::get(IntegerType::get(ctx, 64), entry.getValue())));
         }
         entries.push_back(NamedAttribute(StringAttr::get(ctx, "function_calls"),
-                                            DictionaryAttr::get(ctx, fcEntries)));
+                                         DictionaryAttr::get(ctx, fcEntries)));
 
         // scalars
         entries.push_back(
             NamedAttribute(StringAttr::get(ctx, "num_qubits"),
-                            IntegerAttr::get(IntegerType::get(ctx, 64), result.numQubits())));
+                           IntegerAttr::get(IntegerType::get(ctx, 64), result.numQubits())));
         entries.push_back(
             NamedAttribute(StringAttr::get(ctx, "num_arg_qubits"),
-                            IntegerAttr::get(IntegerType::get(ctx, 64), result.numArgQubits)));
+                           IntegerAttr::get(IntegerType::get(ctx, 64), result.numArgQubits)));
         entries.push_back(NamedAttribute(StringAttr::get(ctx, "device_name"),
-                                            StringAttr::get(ctx, result.deviceName)));
+                                         StringAttr::get(ctx, result.deviceName)));
 
         entries.push_back(
             NamedAttribute(StringAttr::get(ctx, "num_alloc_qubits"),
