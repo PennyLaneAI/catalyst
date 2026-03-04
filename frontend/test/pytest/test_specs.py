@@ -283,6 +283,66 @@ class TestPassByPassSpecs:
             check_specs_header_same(actual, single_level_specs, skip_level=True)
             check_specs_resources_same(res, single_level_specs["resources"])
 
+    def test_duplicate_level_names(self, simple_circuit):
+        """Test that duplicate pass names are handled gracefully."""
+
+        # TODO: At some point the names for the tape transform and MLIR pass will be unified
+        # Once this happens, this test will need to be updated
+        simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
+        simple_circuit = dummy_transform(simple_circuit)
+        simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
+        simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
+
+        simple_circuit = qjit(simple_circuit)
+
+        canceled_res = SpecsResources(
+            gate_types={"RX": 2, "RZ": 2},
+            gate_sizes={1: 4},
+            measurements={"probs(all wires)": 1},
+            num_allocs=2,
+        )
+
+        expected = CircuitSpecs(
+            device_name="lightning.qubit",
+            num_device_wires=2,
+            shots=Shots(None),
+            level=dict(
+                enumerate(
+                    (
+                        "Before Tape Transforms",
+                        "cancel_inverses",
+                        "dummy_transform",
+                        "Before MLIR Passes",
+                        "cancel-inverses",
+                        "cancel-inverses-2",
+                    )
+                )
+            ),
+            resources={
+                "Before Tape Transforms": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    gate_sizes={1: 6, 2: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "cancel_inverses": canceled_res,
+                "dummy_transform": canceled_res,
+                "Before MLIR Passes": canceled_res,
+                "cancel-inverses": canceled_res,
+                "cancel-inverses-2": canceled_res,
+            },
+        )
+
+        actual = qml.specs(simple_circuit, level="all")()
+
+        check_specs_same(actual, expected)
+
+        # Test resources at each level match individual specs calls
+        for i, res in enumerate(actual["resources"].values()):
+            single_level_specs = qml.specs(simple_circuit, level=i)()
+            check_specs_header_same(actual, single_level_specs, skip_level=True)
+            check_specs_resources_same(res, single_level_specs["resources"])
+
     def test_basic_passes_multi_level_with_tapes(self, simple_circuit):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
 
@@ -301,7 +361,7 @@ class TestPassByPassSpecs:
             level=dict(
                 enumerate(
                     (
-                        "Before transforms",
+                        "Before Tape Transforms",
                         "dummy_transform",
                         "dummy_transform-2",
                         "Before MLIR Passes",
@@ -311,7 +371,7 @@ class TestPassByPassSpecs:
                 )
             ),
             resources={
-                "Before transforms": SpecsResources(
+                "Before Tape Transforms": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     gate_sizes={1: 6, 2: 2},
                     measurements={"probs(all wires)": 1},
@@ -381,7 +441,7 @@ class TestPassByPassSpecs:
             level=dict(
                 enumerate(
                     (
-                        "Before transforms",
+                        "Before Tape Transforms",
                         "cancel_inverses",
                         "dummy_transform",
                         "Before MLIR Passes",
@@ -390,7 +450,7 @@ class TestPassByPassSpecs:
                 )
             ),
             resources={
-                "Before transforms": SpecsResources(
+                "Before Tape Transforms": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     gate_sizes={1: 6, 2: 2},
                     measurements={"probs(all wires)": 1},
