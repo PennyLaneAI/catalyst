@@ -32,7 +32,7 @@ namespace quantum {
 
 static constexpr std::string_view AOT_RULES_FILE = "./decomposition-rules/decompositions.mlirbc";
 
-mlir::OwningOpRef<mlir::func::FuncOp> readMLIRBCFunc(mlir::MLIRContext *context)
+std::vector<mlir::OwningOpRef<mlir::func::FuncOp>> readMLIRBCFunc(mlir::MLIRContext *context)
 {
     llvm::StringRef fileRef(AOT_RULES_FILE.data(), AOT_RULES_FILE.size());
 
@@ -40,28 +40,20 @@ mlir::OwningOpRef<mlir::func::FuncOp> readMLIRBCFunc(mlir::MLIRContext *context)
     mlir::OwningOpRef<mlir::ModuleOp> moduleOp =
         mlir::parseSourceFile<mlir::ModuleOp>(fileRef, config);
 
+    std::vector<mlir::OwningOpRef<mlir::func::FuncOp>> funcOps;
+
     if (!moduleOp) {
-        return nullptr;
+        return funcOps;
     }
 
-    auto funcOps = moduleOp->getOps<mlir::func::FuncOp>();
-
-    // maybe raise an error here?
-    if (funcOps.empty()) {
-        return nullptr;
+    for (mlir::ModuleOp module : moduleOp->getOps<mlir::ModuleOp>()) {
+        for (auto func : module.getOps<mlir::func::FuncOp>()) {
+            func->remove();
+            funcOps.push_back(mlir::OwningOpRef<mlir::func::FuncOp>(func));
+        }
     }
 
-    // TODO grab all of the functions
-    mlir::func::FuncOp funcOp = *funcOps.begin();
-
-    if (!funcOp) {
-        return nullptr;
-    }
-
-    funcOp->remove();
-
-    // TODO return a list? vector?
-    return mlir::OwningOpRef<mlir::func::FuncOp>(funcOp);
+    return funcOps;
 }
 
 // TODO accept a function name arg? list of function names? Pointers?
@@ -73,14 +65,27 @@ struct InsertDecompRulesPass : public impl::InsertDecompRulesPassBase<InsertDeco
         LLVM_DEBUG(llvm::dbgs() << "insert decomposition rules"
                                 << "\n");
 
+        llvm::errs() << "running insert-decomp-rules\n";
+
         mlir::ModuleOp module = getOperation();
 
-        mlir::OwningOpRef<mlir::func::FuncOp> funcOpRef = readMLIRBCFunc(module.getContext());
-        if (!funcOpRef) {
+        std::vector<mlir::OwningOpRef<mlir::func::FuncOp>> funcOps =
+            readMLIRBCFunc(module.getContext());
+
+        if (funcOps.empty()) {
+            llvm::errs() << "failed to find funcOp\n";
             return signalPassFailure();
         }
 
-        module.getBody()->push_back(funcOpRef.release());
+        llvm::errs() << "got funcop\n";
+
+        // TODO get the desired op(s)
+        mlir::func::FuncOp funcOp = funcOps[0].release();
+        llvm::errs() << "got decomp rule " << funcOp.getSymNameAttr() << "\n";
+
+        module.push_back(funcOp);
+
+        llvm::errs() << "success\n";
     }
 };
 
