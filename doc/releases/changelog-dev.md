@@ -148,6 +148,35 @@
   quantum-opt --resource-tracker -mlir-pass-statistics input.mlir
   ```
 
+* The `diagonalize-final-measurements` xDSL pass now accepts the optional keyword arguments ``to_eigvals`` and ``supported_base_obs``.
+  [(#2517)](https://github.com/PennyLaneAI/catalyst/pull/2517)
+
+  Consider the following example:
+
+  ```python
+  import pennylane as qp
+
+  def diagonalize_measurements_setup_inputs(
+      to_eigvals: bool = False, supported_base_obs: list[str] = "PauliX"
+  ):
+      return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
+
+  diagonalize_measurements = qp.transform(
+      pass_name="diagonalize-final-measurements", setup_inputs=diagonalize_measurements_setup_inputs
+  )
+
+  dev = qp.device("null.qubit", wires=4)
+  @qp.qjit(target="mlir", keep_intermediate=True)
+  @diagonalize_measurements(supported_base_obs=('PauliX',))
+  @qp.qnode(dev, shots=1000)
+  def circuit():
+      qp.CRX(0.1, wires=[0, 1])
+      return qp.expval(qp.X(0))
+
+  circuit()
+  ```
+
+
 <h3>Improvements 🛠</h3>
 
 * The tape transform :func:`~.device.decomposition.catalyst_decompose` now accepts the optional
@@ -200,6 +229,9 @@
   [(#2486)](https://github.com/PennyLaneAI/catalyst/pull/2486)
 
 <h3>Breaking changes 💔</h3>
+
+* `catalyst.from_plxpr.register_transforms` as a way to access MLIR passes from Python has been removed in favour of the new unified transforms API. MLIR passes can be accessed from Python using `qml.transform(pass_name="some-pass-name")`.
+  [(#2509)](https://github.com/PennyLaneAI/catalyst/pull/2509)
 
 * `catalyst.jax_primitives.subroutine` has been moved to `qml.capture.subroutine`.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
@@ -541,6 +573,10 @@
   }
   ```
 
+  * A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in 
+    measurement processes. It is also registered in xDSL.
+    [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
+    [(#2536)](https://github.com/PennyLaneAI/catalyst/pull/2536)
 
 <h3>Documentation 📝</h3>
 
@@ -566,6 +602,7 @@ River McCubbin,
 Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
+Shuli, Shu,
 Paul Haochen Wang,
 David Wierichs,
 Jake Zaia,

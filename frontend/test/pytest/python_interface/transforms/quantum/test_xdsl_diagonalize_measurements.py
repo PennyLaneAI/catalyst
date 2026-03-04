@@ -36,7 +36,7 @@ class TestDiagonalizeFinalMeasurementsPass:
     )
     @pytest.mark.parametrize("to_eigvals", [1, 0, True, "False"])
     def test_with_to_eigvals_raise_errors(self, supported_base_obs, to_eigvals):
-        """Test if an ValueError is raised if to_eigvals is not set as False."""
+        """Test a ValueError is raised if to_eigvals is not set as False."""
         expected_msg = "Only to_eigvals = False is supported."
         with pytest.raises(ValueError, match=expected_msg):
             _ = DiagonalizeFinalMeasurementsPass(
@@ -53,11 +53,11 @@ class TestDiagonalizeFinalMeasurementsPass:
     )
     @pytest.mark.parametrize("to_eigvals", [1, 0, True, "False"])
     def test_with_supported_base_obs_raise_errors(self, supported_base_obs, to_eigvals):
-        """Test if an ValueError is raised if supported_base_obs is a subset of {Identity,PauliX,
-        PauliY, PauliZ, Hadamard}."""
+        """Test a ValueError is raised if supported_base_obs is not a subset of [PauliX,
+        PauliY, PauliZ, Hadamard, and Identity]."""
         expected_msg = (
-            f"{supported_base_obs} is not supported. Please ensure all the supported_base_obs "
-            "is a subset of PauliX, PauliY, PauliZ, Hadamard and Identity"
+            "Supported base observables must be a subset of (PauliX, PauliY, PauliZ, Hadamard, "
+            f"and Identity) passed as a tuple[str] or str, but received {supported_base_obs}"
         )
         with pytest.raises(ValueError, match=re.escape(expected_msg)):
             _ = DiagonalizeFinalMeasurementsPass(
@@ -88,7 +88,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         ["PauliX", ("PauliX",), ("PauliX", "PauliY")],
     )
     def test_with_supported_base_obs(self, supported_base_obs, run_filecheck):
-        """Check if supported_base_obs would be diagonalized or not."""
+        """Check observables in the supported_base_obs would not be diagonalized."""
         program = """
             func.func @test_func() {
                 // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
@@ -124,6 +124,25 @@ class TestDiagonalizeFinalMeasurementsPass:
         pipeline = (DiagonalizeFinalMeasurementsPass(),)
         run_filecheck(program, pipeline)
 
+    def test_with_pauli_x_base_obs(self, run_filecheck):
+        """Test that when a PauliX observable diagonalization is not expected."""
+
+        program = """
+            func.func @test_func() {
+                // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
+                %0 = "test.op"() : () -> !quantum.bit
+
+                // CHECK-NEXT: [[obs:%.*]] = quantum.namedobs [[q0]][PauliX] : !quantum.obs
+                %1 = quantum.namedobs %0[PauliX] : !quantum.obs
+
+                // CHECK: quantum.expval [[obs]]
+                %2 = quantum.expval %1 : f64
+            }
+            """
+
+        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs="PauliX"),)
+        run_filecheck(program, pipeline)
+
     def test_with_pauli_x(self, run_filecheck):
         """Test that when diagonalizing a PauliX observable, the expected diagonalizing
         gates are inserted and the observable becomes PauliZ."""
@@ -145,6 +164,25 @@ class TestDiagonalizeFinalMeasurementsPass:
             """
 
         pipeline = (DiagonalizeFinalMeasurementsPass(),)
+        run_filecheck(program, pipeline)
+
+    def test_with_pauli_y_base_obs(self, run_filecheck):
+        """Test that when a PauliY observable diagonalization is not expected."""
+
+        program = """
+            func.func @test_func() {
+                // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
+                %0 = "test.op"() : () -> !quantum.bit
+
+                // CHECK-NEXT: [[obs:%.*]] = quantum.namedobs [[q0]][PauliY] : !quantum.obs
+                %1 = quantum.namedobs %0[PauliY] : !quantum.obs
+
+                // CHECK: quantum.expval [[obs]]
+                %2 = quantum.expval %1 : f64
+            }
+            """
+
+        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs="PauliY"),)
         run_filecheck(program, pipeline)
 
     def test_with_pauli_y(self, run_filecheck):
@@ -172,6 +210,25 @@ class TestDiagonalizeFinalMeasurementsPass:
         pipeline = (DiagonalizeFinalMeasurementsPass(),)
         run_filecheck(program, pipeline)
 
+    def test_with_hadamard_base_obs(self, run_filecheck):
+        """Test that when a Hadamard observable diagonalization is not expected."""
+
+        program = """
+            func.func @test_func() {
+                // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
+                %0 = "test.op"() : () -> !quantum.bit
+
+                // CHECK-NEXT: [[obs:%.*]] = quantum.namedobs [[q0]][Hadamard] : !quantum.obs
+                %1 = quantum.namedobs %0[Hadamard] : !quantum.obs
+
+                // CHECK: quantum.expval [[obs]]
+                %2 = quantum.expval %1 : f64
+            }
+            """
+
+        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs="Hadamard"),)
+        run_filecheck(program, pipeline)
+
     def test_with_hadamard(self, run_filecheck):
         """Test that when diagonalizing a Hadamard observable, the expected diagonalizing
         gates are inserted and the observable becomes PauliZ."""
@@ -193,6 +250,52 @@ class TestDiagonalizeFinalMeasurementsPass:
             """
 
         pipeline = (DiagonalizeFinalMeasurementsPass(),)
+        run_filecheck(program, pipeline)
+
+    def test_with_composite_observable_with_supported_base(self, run_filecheck):
+        """Test transform on a measurement process with a tuple of base observable. In this
+        case, the simplified program is based on the MLIR generated by the circuit
+
+        @qml.qjit(target="mlir")
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            return qml.expval(qml.Y(0)@qml.X(1) + qml.Z(2))
+        """
+
+        program = """
+            func.func @test_func() {
+                // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
+                // CHECK: [[q1:%.*]] = "test.op"() : () -> !quantum.bit
+                // CHECK: [[q2:%.*]] = "test.op"() : () -> !quantum.bit
+                %0 = "test.op"() : () -> !quantum.bit
+                %1 = "test.op"() : () -> !quantum.bit
+                %2 = "test.op"() : () -> !quantum.bit
+
+                // CHECK: [[q_y:%.*]] = quantum.namedobs [[q0]][PauliY]
+                %3 = quantum.namedobs %0[PauliY] : !quantum.obs
+
+                // CHECK: [[q_x:%.*]] = quantum.namedobs [[q1]][PauliX]
+                %4 = quantum.namedobs %1[PauliX] : !quantum.obs
+
+                // CHECK: [[tensor0:%.*]] = quantum.tensor [[q_y]], [[q_x]] : !quantum.obs
+                %5 = quantum.tensor %3, %4 : !quantum.obs
+
+                // CHECK: [[q_z:%.*]] = quantum.namedobs [[q2]][PauliZ] : !quantum.obs
+                %6 = quantum.namedobs %2[PauliZ] : !quantum.obs
+
+                // CHECK: [[size:%.*]] = "test.op"() : () -> tensor<2xf64>
+                %size_info = "test.op"() : () -> tensor<2xf64>
+
+                // CHECK: quantum.hamiltonian([[size]] : tensor<2xf64>) [[tensor0]], [[q_z]] : !quantum.obs
+                %7 = quantum.hamiltonian(%size_info : tensor<2xf64>) %5, %6 : !quantum.obs
+
+                // CHECK: quantum.expval
+                %8 = quantum.expval %7 : f64
+                return
+            }
+            """
+
+        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs=("PauliX", "PauliY")),)
         run_filecheck(program, pipeline)
 
     def test_with_composite_observable(self, run_filecheck):
@@ -245,6 +348,42 @@ class TestDiagonalizeFinalMeasurementsPass:
             """
 
         pipeline = (DiagonalizeFinalMeasurementsPass(),)
+        run_filecheck(program, pipeline)
+
+    def test_with_multiple_measurements_supported_base_obs(self, run_filecheck):
+        """Test a circuit with multiple measurements and all obs are supported. The
+        simplified program for this test is based on the circuit
+
+        @qml.qjit(target="mlir")
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            return qml.var(qml.Y(0)), qml.var(qml.X(1))
+        """
+
+        program = """
+            func.func @test_func() {
+                // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
+                // CHECK-NEXT: [[q1:%.*]] = "test.op"() : () -> !quantum.bit
+                %0 = "test.op"() : () -> !quantum.bit
+                %1 = "test.op"() : () -> !quantum.bit
+
+
+                // CHECK-NEXT: quantum.namedobs [[q0:%.+]][PauliY]
+                %2 = quantum.namedobs %0[PauliY] : !quantum.obs
+                // CHECK: quantum.var
+                %3 = quantum.var %2 : f64
+
+
+                // CHECK-NEXT: quantum.namedobs [[q1:%.+]][PauliX]
+                %4 = quantum.namedobs %1[PauliX] : !quantum.obs
+
+                // CHECK: quantum.expval
+                %5 = quantum.expval %4 : f64
+                return
+            }
+            """
+
+        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs=("PauliX", "PauliY")),)
         run_filecheck(program, pipeline)
 
     def test_with_multiple_measurements(self, run_filecheck):
@@ -575,12 +714,11 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
     def test_with_split_non_commuting_mlir(self, run_filecheck_qjit):
-        """Test if the mlir file can be correctly lowered when applying both the
-        diagonalize-final-measurements pass works with the split-non-commuting
-        pass"""
+        """Test the target mlir file is correctly lowered when applying both the
+        diagonalize-final-measurements and the split-non-commuting pass."""
 
         def diagonalize_measurements_setup_inputs(
-            to_eigvals: bool = False, supported_base_obs: list[str] = "PauliZ"
+            to_eigvals: bool = False, supported_base_obs: tuple[str] | str = "PauliZ"
         ):
             "Return the options for the diagonalize-final-measurements pass."
             return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
@@ -607,14 +745,14 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             return i
 
         @qml.qjit(target="mlir")
-        @diagonalize_measurements(supported_base_obs=("PauliX"), to_eigvals=False)
+        @diagonalize_measurements(supported_base_obs=("PauliX", "PauliY"))
         @qml.transform(pass_name="split-non-commuting")
-        @qml.qnode(dev)
+        @qml.qnode(dev, shots=1000)
         def circuit():
             for_fn()  # pylint: disable=no-value-for-parameter
             while_fn(0)
             qml.CNOT(wires=[0, 1])
-            # CHECK-NOT: quantum.namedobs [[qubit:%]][PauliY] : !quantum.obs
+            # CHECK-NOT: quantum.namedobs [[qubit0:%]][PauliY] : !quantum.obs
             return (
                 qml.expval(qml.Z(wires=0)),
                 qml.expval(qml.Y(wires=1)),
@@ -623,16 +761,12 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.xfail(
-        reason="for now, this test would failed due to the supported_base_obs is converted "
-        "from tuple to list hence unhashable after transfroms."
-    )
     def test_with_split_non_commuting(self):
-        """Test if the executable file can be correctly generated when applying both the
-        diagonalize-final-measurements pass works with the split-non-commuting pass"""
+        """Test the executable file can be generated and ran with lightning.qubit when applying
+        both the diagonalize-final-measurements and the split-non-commuting passes"""
 
         def diagonalize_measurements_setup_inputs(
-            to_eigvals: bool = False, supported_base_obs: list[str] = "PauliZ"
+            to_eigvals: bool = False, supported_base_obs: tuple[str] | str = "PauliZ"
         ):
             "Return the options for the diagonalize-final-measurements pass."
             return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
@@ -811,8 +945,6 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         """Check that an error is raised if we try to diagonalize a circuit that contains
         non-commuting observables."""
         dev = qml.device("lightning.qubit", wires=4)
-
-        # assert any(wire in obs[1].wires for wire in obs[0].wires)
 
         @qml.qjit()
         @diagonalize_final_measurements_pass

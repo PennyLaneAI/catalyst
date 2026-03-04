@@ -22,10 +22,7 @@ Known Limitations
     Quantum dialect as NamedObservable).
   * Unlike the current tape-based implementation of the transform, conversion to measurements
     based on eigvals and wires (rather than the PauliZ observable) is not currently supported.
-  * Unlike the tape-based implementation, this pass will NOT raise an error if given a circuit
-    that is invalid because it contains non-commuting measurements. It should be assumed that
-    this transform results in incorrect outputs unless split_non_commuting is applied to break
-    non-commuting measurements into separate tapes.
+    If `eigvals=True` is passed to the current pass, an error will be raised.
 """
 
 from pennylane.ops import Hadamard, PauliX, PauliY
@@ -46,8 +43,8 @@ from catalyst.python_interface.dialects.quantum import (
 )
 from catalyst.python_interface.pass_api import compiler_transform
 
-_default_supported_obs = ("PauliZ", "Identity")
-_obs_allowed_diagonalization = ("PauliX", "PauliY", "PauliZ", "Hadamard", "Identity")
+_default_supported_obs = {"PauliZ", "Identity"}
+_obs_allowed_diagonalization = {"PauliX", "PauliY", "PauliZ", "Hadamard", "Identity"}
 
 
 def _generate_mapping():
@@ -68,12 +65,9 @@ _gate_map, _params_map = _generate_mapping()
 
 def _diagonalize(obs: NamedObsOp, supported_base_obs) -> bool:
     """Whether to diagonalize a given observable."""
-    _obs_set_to_diagonalize = (
-        obs for obs in _obs_allowed_diagonalization if obs not in supported_base_obs
-    )
     if obs.type.data in supported_base_obs:
         return False
-    if obs.type.data in _obs_set_to_diagonalize:
+    if obs.type.data in _gate_map:
         return True
     raise NotImplementedError(
         f"Observable {obs.type.data} is not supported for diagonalization"
@@ -89,6 +83,17 @@ class CheckSplitNonCommutingPattern(
         self._visited_obs_qubits = set()
         self._visited_obs_qreg = False
 
+    def _update_visited_qubits(self, qubits):
+        for qubit in qubits:
+            if self._visited_obs_qreg or qubit in self._visited_obs_qubits:
+                raise RuntimeError("cannot diagonalize circuit with non-commuting observables")
+            self._visited_obs_qubits.add(qubit)
+
+    def _update_visited_qreg(self):
+        if self._visited_obs_qreg or self._visited_obs_qubits:
+            raise RuntimeError("cannot diagonalize circuit with non-commuting observables")
+        self._visited_obs_qreg = True
+
     @pattern_rewriter.op_type_rewrite_pattern
     def match_and_rewrite(
         self,
@@ -96,37 +101,19 @@ class CheckSplitNonCommutingPattern(
         rewriter: pattern_rewriter.PatternRewriter,
         /,
     ):
-        """Replace non-diagonalized observables with their diagonalizing gates and supported
-        observables."""
-        # Check the used by the basic Observables
+        """Check if the circuit is commuting or not."""
         if isinstance(observable, NamedObsOp):
-            in_qubit = observable.operands[0]
-            if (in_qubit not in self._visited_obs_qubits) and (self._visited_obs_qreg is False):
-                self._visited_obs_qubits.add(in_qubit)
-            else:
-                print(in_qubit, self._visited_obs_qubits)
-                raise RuntimeError("cannot diagonalize circuit with non-commuting observables")
-        if isinstance(observable, HermitianOp):
-            for qubit in observable.qubits:
-                if qubit not in self._visited_obs_qubits and self._visited_obs_qreg is False:
-                    self._visited_obs_qubits.add(qubit)
-                else:
-                    raise RuntimeError("cannot diagonalize circuit with non-commuting observables")
-        if isinstance(observable, ComputationalBasisOp):
-            if observable.qreg is not None and (self._visited_obs_qreg or self._visited_obs_qubits):
-                raise RuntimeError("cannot diagonalize circuit with non-commuting observables")
+            self._update_visited_qubits([observable.operands[0]])
 
+        elif isinstance(observable, HermitianOp):
+            self._update_visited_qubits(observable.qubits)
+
+        elif isinstance(observable, ComputationalBasisOp):
             if observable.qreg is not None:
-                self._visited_obs_qreg = True
+                self._update_visited_qreg()
 
             if observable.qubits is not None:
-                for qubit in observable.qubits:
-                    if qubit not in self._visited_obs_qubits and self._visited_obs_qreg is False:
-                        self._visited_obs_qubits.add(qubit)
-                    else:
-                        raise RuntimeError(
-                            "cannot diagonalize circuit with non-commuting observables"
-                        )
+                self._update_visited_qubits(observable.qubits)
 
 
 class DiagonalizeFinalMeasurementsPattern(
@@ -134,21 +121,19 @@ class DiagonalizeFinalMeasurementsPattern(
 ):  # pylint: disable=too-few-public-methods
     """RewritePattern for diagonalizing final measurements."""
 
-    def __init__(self, supported_base_obs, to_eigvals):
+    def __init__(self, supported_base_obs: set[str], to_eigvals: bool = False):
+        """Initializes the RewritePattern."""
         self.supported_base_obs = supported_base_obs
         self.to_eigvals = to_eigvals
 
     @pattern_rewriter.op_type_rewrite_pattern
     def match_and_rewrite(
-        self,
-        observable: NamedObsOp | ComputationalBasisOp | HermitianOp,
-        rewriter: pattern_rewriter.PatternRewriter,
-        /,
-    ):
+        self, observable: NamedObsOp, rewriter: pattern_rewriter.PatternRewriter, /
+        ):
         """Replace non-diagonalized observables with their diagonalizing gates and supported
-        observables."""
-        # Diagonalize branch
-        if isinstance(observable, NamedObsOp) and _diagonalize(observable, self.supported_base_obs):
+        base observables."""
+
+        if _diagonalize(observable, self.supported_base_obs):
 
             diagonalizing_gates = _gate_map[observable.type.data]
             params = _params_map[observable.type.data]
@@ -204,30 +189,49 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
     name = "diagonalize-final-measurements"
 
     def __init__(self, **options):
+        """Initializes the class with supported base observable names and .
 
-        self.supported_base_obs = options.get("supported_base_obs")
+        Args:
+            **options: Arbitrary keyword arguments.
+                supported_base_obs (str or tuple[str], optional): The observable bases
+                    to support. Must be a subset of the allowed base observables
+                    (e.g., 'PauliX', 'PauliY', 'PauliZ', 'Hadamard', 'Identity').
+                    Defaults to `_default_supported_obs`.
+                to_eigvals (bool, optional): Whether to convert to eigenvalues.
+                    Currently, only `False` is supported. Defaults to `False`.
 
-        if self.supported_base_obs is None:
-            self.supported_base_obs = _default_supported_obs
+        Raises:
+            ValueError: If `supported_base_obs` contains observables not found in
+                `_obs_allowed_diagonalization`.
+            ValueError: If `to_eigvals` is set to `True`.
+        """
+
+        self.supported_base_obs = options.get("supported_base_obs", _default_supported_obs)
+
         if (
             isinstance(self.supported_base_obs, str)
             and self.supported_base_obs in _obs_allowed_diagonalization
         ):
-            self.supported_base_obs = _default_supported_obs + (self.supported_base_obs,)
-        elif isinstance(self.supported_base_obs, tuple) and all(
-            x in _obs_allowed_diagonalization for x in self.supported_base_obs
+            self.supported_base_obs = _default_supported_obs | set(
+                [
+                    self.supported_base_obs,
+                ]
+            )
+        if isinstance(self.supported_base_obs, tuple) and set(self.supported_base_obs).issubset(
+            _obs_allowed_diagonalization
         ):
-            self.supported_base_obs = _default_supported_obs + self.supported_base_obs
-        else:
+            self.supported_base_obs = _default_supported_obs | set(self.supported_base_obs)
+
+        if not set(self.supported_base_obs).issubset(_obs_allowed_diagonalization):
             msg = (
-                f"{self.supported_base_obs} is not supported. Please ensure all the "
-                "supported_base_obs is a subset of PauliX, PauliY, PauliZ, Hadamard and Identity."
+                "Supported base observables must be a subset of (PauliX, PauliY, PauliZ, Hadamard, "
+                "and Identity) passed as a tuple[str] or str, but received "
+                f"{self.supported_base_obs}"
             )
             raise ValueError(msg)
-        if options.get("to_eigvals", False) is not False:
-            raise ValueError("Only to_eigvals = False is supported.")
-
         self.to_eigvals = options.get("to_eigvals", False)
+        if self.to_eigvals is not False:
+            raise ValueError("Only to_eigvals = False is supported.")
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the diagonalize final measurements pass."""

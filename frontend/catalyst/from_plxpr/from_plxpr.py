@@ -271,7 +271,6 @@ def handle_qnode(
     self, *args, qnode, device, shots_len, execution_config, qfunc_jaxpr, n_consts, batch_dims=None
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
-
     self.qubit_index_recorder = QubitIndexRecorder()
 
     if shots_len > 1:
@@ -381,11 +380,6 @@ transforms_to_passes = {
 }
 
 
-def register_transform(pl_transform, pass_name, decomposition):
-    """Register pennylane transforms and their conversion to Catalyst transforms"""
-    transforms_to_passes[pl_transform] = (pass_name, decomposition)
-
-
 def _set_decompose_lowering_state(self):
     """Set requires_decompose_lowering and decompose_tkwargs; raise if already set."""
     if not self.requires_decompose_lowering:
@@ -481,8 +475,13 @@ def handle_transform(
             final_jaxpr = pl_decompose._plxpr_transform(
                 final_jaxpr.jaxpr, final_jaxpr.consts, targs, tkwargs, *non_const_args
             )
-
         return copy(self).eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
+
+    # FIXME: A fix for the diagonalize_measurement pass
+    if catalyst_pass_name == "diagonalize-final-measurements" and isinstance(
+        tkwargs.get("supported_base_obs", None), list
+    ):
+        tkwargs["supported_base_obs"] = tuple(tkwargs["supported_base_obs"])
 
     # Apply the corresponding Catalyst pass counterpart
     next_eval = copy(self)
