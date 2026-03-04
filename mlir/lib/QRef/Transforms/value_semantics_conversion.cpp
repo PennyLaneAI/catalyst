@@ -746,6 +746,17 @@ void handleHermitian(IRRewriter &builder, qref::HermitianOp rHermitianOp,
     builder.replaceOp(rHermitianOp, vHermitianOp);
 }
 
+void handleMeasure(IRRewriter &builder, qref::MeasureOp rMeasureOp, QubitValueTracker &tracker)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    MLIRContext *ctx = rMeasureOp.getContext();
+
+    auto vMeasureOp = migrateOpToValueSemantics<quantum::MeasureOp>(builder, rMeasureOp, tracker,
+                                                                    {quantum::QubitType::get(ctx)});
+    builder.replaceAllUsesWith(rMeasureOp.getMres(), vMeasureOp.getMres());
+    builder.eraseOp(rMeasureOp);
+}
+
 void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker)
 {
     OpBuilder::InsertionGuard guard(builder);
@@ -888,6 +899,9 @@ void handleRegion(IRRewriter &builder, Region &r)
         }
         else if (auto rHermitianOp = dyn_cast<qref::HermitianOp>(op)) {
             handleHermitian(builder, rHermitianOp, tracker);
+        }
+        else if (auto rMeasureOp = dyn_cast<qref::MeasureOp>(op)) {
+            handleMeasure(builder, rMeasureOp, tracker);
         }
         else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
             handleFor(builder, forOp, tracker);

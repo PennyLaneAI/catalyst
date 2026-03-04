@@ -88,6 +88,35 @@ func.func @test_for_loop_non_root() attributes {quantum.node} {
 // -----
 
 
+// CHECK-LABEL: test_for_loop_root
+func.func @test_for_loop_root() attributes {quantum.node} {
+    %start = arith.constant 0 : index
+    %step = arith.constant 1 : index
+    %stop = arith.constant 37 : index
+
+    // CHECK: [[qubit:%.+]] = quantum.alloc_qb : !quantum.bit
+    %q = qref.alloc_qb : !qref.bit
+
+    // CHECK: [[loopOut:%.+]] = scf.for %arg0 = {{%.+}} to {{%.+}} step {{%.+}} iter_args(%arg1 = [[qubit]]) ->
+    // CHECK-SAME:     (!quantum.bit) {
+    scf.for %i = %start to %stop step %step {
+
+        // CHECK: [[HADAMARD:%.+]] = quantum.custom "Hadamard"() %arg1 : !quantum.bit
+        qref.custom "Hadamard"() %q : !qref.bit
+
+        // CHECK: scf.yield [[HADAMARD]] : !quantum.bit
+        scf.yield
+    }
+
+    // CHECK: quantum.dealloc_qb [[loopOut]] : !quantum.bit
+    qref.dealloc_qb %q : !qref.bit
+    return
+}
+
+
+// -----
+
+
 // CHECK-LABEL: test_for_loop_with_existing_args
 func.func @test_for_loop_with_existing_args(%nqubits: i64) -> (f64, f32) attributes {quantum.node} {
     // CHECK: [[sum_step:%.+]] = arith.constant 3.742000e+01 : f32
