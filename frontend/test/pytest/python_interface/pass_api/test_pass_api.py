@@ -116,6 +116,7 @@ def test_apply_pass():
     """Test that 'apply_pass' correctly adds the transform to the transform sequence."""
 
     @apply_pass("cancel-inverses")
+    @apply_pass("gridsynth", epsilon=42)
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def qnode():
         qml.X(0)
@@ -127,3 +128,5 @@ def test_apply_pass():
         return qnode()
 
     assert "cancel-inverses" in module.mlir
+    assert "gridsynth" in module.mlir
+    assert '"epsilon" = 42' in module.mlir
