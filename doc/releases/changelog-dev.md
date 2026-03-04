@@ -150,9 +150,13 @@
 
 <h3>Improvements 🛠</h3>
 
+* `catalyst.python_interface.utils.get_constant_from_ssa` can now extract constant values cast using
+  `arith.index_cast`.
+  [(#2542)](https://github.com/PennyLaneAI/catalyst/pull/2542)
+
 * The tape transform :func:`~.device.decomposition.catalyst_decompose` now accepts the optional
   keyword arguments ``target_gates``, ``num_work_wires``, ``fixed_decomps``, and ``alt_decomps``,
-  which all are passed to the used PennyLane decomposition function 
+  which all are passed to the used PennyLane decomposition function
   ``qml.devices.preprocess.decompose`` and used if the graph-based decomposition system is enabled.
   [(#2501)](https://github.com/PennyLaneAI/catalyst/pull/2501)
 
@@ -200,6 +204,10 @@
   [(#2486)](https://github.com/PennyLaneAI/catalyst/pull/2486)
 
 <h3>Breaking changes 💔</h3>
+
+* `catalyst.python_interface.inspection.draw` and `catalyst.python_interface.inspection.generate_mlir_graph` no longer
+  accept QNodes as the input. Now, the input must always be a :class:`~.QJIT` object.
+  [(#2542)](https://github.com/PennyLaneAI/catalyst/pull/2542)
 
 * `catalyst.from_plxpr.register_transforms` as a way to access MLIR passes from Python has been removed in favour of the new unified transforms API. MLIR passes can be accessed from Python using `qml.transform(pass_name="some-pass-name")`.
   [(#2509)](https://github.com/PennyLaneAI/catalyst/pull/2509)
@@ -549,7 +557,7 @@
   }
   ```
 
-  * A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in 
+  * A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in
     measurement processes. It is also registered in xDSL.
     [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
     [(#2536)](https://github.com/PennyLaneAI/catalyst/pull/2536)
