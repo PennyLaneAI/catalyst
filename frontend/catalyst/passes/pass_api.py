@@ -344,7 +344,7 @@ def dict_to_compile_pipeline(
         return CompilePipeline()
 
     if isinstance(pass_pipeline, str):
-        t = transform(pass_name=pass_pipeline)
+        t = transform(pass_name=_get_pass_name(pass_pipeline))
         bound_t = BoundTransform(t, *flags, **valued_options)
         return CompilePipeline(bound_t)
 
@@ -355,7 +355,7 @@ def dict_to_compile_pipeline(
             t = transform(pass_name=name)
             # Pass options must be snake-case
             pass_options = {k.replace("-", "_"): v for k, v in pass_options.items()}
-            bound_t = BoundTransform(t, **pass_options)
+            bound_t = BoundTransform(t, kwargs=pass_options)
             passes.append(bound_t)
         return CompilePipeline(passes)
 
