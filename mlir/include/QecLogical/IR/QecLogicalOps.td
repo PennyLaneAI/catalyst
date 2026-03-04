@@ -140,5 +140,75 @@ def QecCycleOp : QecLogical_Op<"qec", [AllTypesMatch<["in_codeblock", "out_codeb
     }];
 }
 
+def HadamardOp : QecLogical_Op<"hadamard", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
+    let summary = "A logical Hadamard gate operation.";
+
+    let arguments = (ins
+        LogicalCodeblockType:$in_codeblock,
+        Optional<Index>:$idx,
+        OptionalAttr<ConfinedAttr<IndexAttr, [IntNonNegative]>>:$idx_attr
+    );
+
+    let results = (outs
+        LogicalCodeblockType:$out_codeblock
+    );
+
+    let assemblyFormat = [{
+        $in_codeblock `[` ($idx^):($idx_attr)? `]` attr-dict `:` qualified(type($in_codeblock))
+    }];
+
+    let hasVerifier = 1;
+}
+
+def SOp : QecLogical_Op<"s", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
+    let summary = "A logical S (π/2 phase) gate operation.";
+
+    let arguments = (ins
+        LogicalCodeblockType:$in_codeblock,
+        Optional<Index>:$idx,
+        OptionalAttr<ConfinedAttr<IndexAttr, [IntNonNegative]>>:$idx_attr,
+        UnitAttr:$adjoint
+    );
+
+    let results = (outs
+        LogicalCodeblockType:$out_codeblock
+    );
+
+    let assemblyFormat = [{
+        $in_codeblock `[` ($idx^):($idx_attr)? `]` (`adj` $adjoint^)? attr-dict `:` qualified(type($in_codeblock))
+    }];
+
+    let hasVerifier = 1;
+}
+
+def CnotOp : QecLogical_Op<"cnot", [
+    AttrSizedOperandSegments,
+    AllTypesMatch<["in_ctrl_codeblock", "out_ctrl_codeblock", "in_trgt_codeblock", "out_trgt_codeblock"]>
+]> {
+    let summary = "A logical inter-codeblock CNOT gate operation.";
+
+    let arguments = (ins
+        LogicalCodeblockType:$in_ctrl_codeblock,
+        Optional<Index>:$idx_ctrl,
+        OptionalAttr<ConfinedAttr<IndexAttr, [IntNonNegative]>>:$idx_ctrl_attr,
+        LogicalCodeblockType:$in_trgt_codeblock,
+        Optional<Index>:$idx_trgt,
+        OptionalAttr<ConfinedAttr<IndexAttr, [IntNonNegative]>>:$idx_trgt_attr
+    );
+
+    let results = (outs
+        LogicalCodeblockType:$out_ctrl_codeblock,
+        LogicalCodeblockType:$out_trgt_codeblock
+    );
+
+    let assemblyFormat = [{
+        $in_ctrl_codeblock `[` ($idx_ctrl^):($idx_ctrl_attr)? `]` `,`
+        $in_trgt_codeblock `[` ($idx_trgt^):($idx_trgt_attr)? `]`
+        attr-dict `:` qualified(type($in_ctrl_codeblock)) `,` qualified(type($in_trgt_codeblock))
+    }];
+
+    let hasVerifier = 1;
+}
+
 
 #endif // QEC_LOGICAL_OPS
