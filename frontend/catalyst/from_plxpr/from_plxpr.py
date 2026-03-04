@@ -271,6 +271,7 @@ def handle_qnode(
     self, *args, qnode, device, shots_len, execution_config, qfunc_jaxpr, n_consts, batch_dims=None
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
+
     self.qubit_index_recorder = QubitIndexRecorder()
 
     if shots_len > 1:
@@ -477,7 +478,7 @@ def handle_transform(
             )
         return copy(self).eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
 
-    # FIXME: A fix for the diagonalize_measurement pass
+    # Convert list back to JAX-hashable tuple for kwargs passed to the diagonalize_measurement pass
     if catalyst_pass_name == "diagonalize-final-measurements" and isinstance(
         tkwargs.get("supported_base_obs", None), list
     ):
