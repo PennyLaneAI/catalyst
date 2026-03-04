@@ -55,6 +55,22 @@ def assert_files(tmp_path: Path, expected: set[str]):
 class TestMLIRGraph:
     """Test the MLIR graph generation"""
 
+    def test_no_qjit_error(self):
+        """Test that an error is raised if trying to use anything other than QJIT as
+        an input."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f():
+            qml.RX(0.1, 0)
+            qml.RX(2.0, 0)
+            qml.CNOT([0, 2])
+            qml.CNOT([0, 2])
+            return qml.state()
+
+        gen = generate_mlir_graph(f)
+        with pytest.raises(TypeError, match="Cannot generate MLIR module"):
+            gen()
+
     def test_no_transforms(self, tmp_path: Path):
         """Test the MLIR graph is still generated when no transforms are applied"""
 

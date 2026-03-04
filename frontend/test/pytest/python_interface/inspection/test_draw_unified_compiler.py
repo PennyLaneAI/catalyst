@@ -71,6 +71,22 @@ class TestDraw:
 
         return circ
 
+    def test_no_qjit_error(self):
+        """Test that an error is raised if trying to use anything other than QJIT as
+        an input."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f():
+            qml.RX(0.1, 0)
+            qml.RX(2.0, 0)
+            qml.CNOT([0, 2])
+            qml.CNOT([0, 2])
+            return qml.state()
+
+        gen = draw(f)
+        with pytest.raises(TypeError, match="Cannot generate MLIR module"):
+            gen()
+
     @pytest.mark.parametrize(
         "level, expected",
         [
