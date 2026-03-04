@@ -128,9 +128,7 @@ def get_func_from_circuit(module) -> str | None:
 
     module.operation.walk(find_condition)
 
-    return (
-        "builtin.module {\n" + indent(str(decomp_func_op), "  ") + "\n}\n" if decomp_func_op else ""
-    )
+    return indent(str(decomp_func_op), "  ")
 
 
 def compile_rule(
