@@ -150,6 +150,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Catalyst internally uses the new unified transforms API rather than `PassPipelineWrapper`.
+  [(#2525)](https://github.com/PennyLaneAI/catalyst/pull/2525)
+
 * The tape transform :func:`~.device.decomposition.catalyst_decompose` now accepts the optional
   keyword arguments ``target_gates``, ``num_work_wires``, ``fixed_decomps``, and ``alt_decomps``,
   which all are passed to the used PennyLane decomposition function 
