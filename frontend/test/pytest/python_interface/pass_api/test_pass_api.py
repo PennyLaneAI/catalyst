@@ -17,7 +17,12 @@ import pennylane as qml
 import pytest
 from pennylane.transforms.core import BoundTransform, CompilePipeline
 
-from catalyst.passes.pass_api import apply_pass, dict_to_compile_pipeline, pipeline
+from catalyst.passes.pass_api import (
+    apply_pass,
+    apply_pass_plugin,
+    dict_to_compile_pipeline,
+    pipeline,
+)
 from catalyst.python_interface.transforms.quantum import cancel_inverses
 
 
@@ -106,8 +111,8 @@ class TestPipeline:
         )
 
         new_new_qn = pipeline("cancel_inverses")(new_qn)
-        assert len(new_qn.compile_pipeline) == 2
-        assert new_qn.compile_pipeline == CompilePipeline(
+        assert len(new_new_qn.compile_pipeline) == 2
+        assert new_new_qn.compile_pipeline == CompilePipeline(
             qml.transform(pass_name="merge-rotations"), qml.transform(pass_name="cancel-inverses")
         )
 
@@ -130,3 +135,21 @@ def test_apply_pass():
     assert "cancel-inverses" in module.mlir
     assert "gridsynth" in module.mlir
     assert '"epsilon" = 42' in module.mlir
+
+
+def test_apply_pass_plugin(tmp_path):
+    """Tests that a pass plugin can be used."""
+
+    # Use pytest's https://docs.pytest.org/en/stable/how-to/tmp_path.html to 
+    # by pass the check for existence
+    fake_plugin = tmp_path / "fake_plugin.so"
+    fake_plugin.touch()
+
+    @qml.qjit(target="mlir")
+    @apply_pass_plugin(str(fake_plugin), "my-custom-pass")
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
+        return qml.state()
+
+    mlir = circuit.mlir
+    assert 'transform.apply_registered_pass "my-custom-pass"' in mlir
