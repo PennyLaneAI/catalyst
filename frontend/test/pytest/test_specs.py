@@ -236,12 +236,16 @@ class TestPassByPassSpecs:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=[
-                "Before transforms",
-                "Before MLIR Passes (MLIR-0)",
-                "cancel-inverses (MLIR-1)",
-                "merge-rotations (MLIR-2)",
-            ],
+            level=dict(
+                enumerate(
+                    (
+                        "Before transforms",
+                        "Before MLIR Passes (MLIR-0)",
+                        "cancel-inverses (MLIR-1)",
+                        "merge-rotations (MLIR-2)",
+                    )
+                )
+            ),
             resources={
                 "Before transforms": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
@@ -300,13 +304,17 @@ class TestPassByPassSpecs:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=[
-                "Before transforms",
-                "cancel_inverses",
-                "undo_swaps",
-                "Before MLIR Passes (MLIR-0)",
-                "merge-rotations (MLIR-1)",
-            ],
+            level=dict(
+                enumerate(
+                    (
+                        "Before transforms",
+                        "cancel_inverses",
+                        "undo_swaps",
+                        "Before MLIR Passes (MLIR-0)",
+                        "merge-rotations (MLIR-1)",
+                    )
+                )
+            ),
             resources={
                 "Before transforms": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
@@ -431,7 +439,7 @@ class TestPassByPassSpecs:
             device_name="null.qubit",
             num_device_wires=3,
             shots=Shots(None),
-            level=1,
+            level="split_non_commuting",
             resources=[
                 SpecsResources(
                     gate_types={"Hadamard": 1, "PauliX": 2},
@@ -478,7 +486,7 @@ class TestPassByPassSpecs:
             device_name="lightning.qubit",
             num_device_wires=3,
             shots=Shots(None),
-            level=1,
+            level="Before MLIR Passes (MLIR-0)",
             resources=SpecsResources(
                 gate_types={"Hadamard": 3},
                 gate_sizes={1: 3},
@@ -505,7 +513,7 @@ class TestPassByPassSpecs:
             device_name="null.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=2,
+            level="to-ppr (MLIR-1)",
             resources=SpecsResources(
                 gate_types={"GlobalPhase": 2, "PPR-pi/4-w1": 3, "PPR-pi/8-w1": 1},
                 gate_sizes={0: 2, 1: 4},
@@ -532,7 +540,7 @@ class TestPassByPassSpecs:
             device_name="null.qubit",
             num_device_wires=3,
             shots=Shots(None),
-            level=3,
+            level="decompose-arbitrary-ppr (MLIR-2)",
             resources=SpecsResources(
                 gate_types={
                     "pbc.prepare": 1,
@@ -597,7 +605,7 @@ class TestMarkerIntegration:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=["before-transforms", "after-tape", "after-mlir"],
+            level={0: "before-transforms", 2: "after-tape", 5: "after-mlir"},
             resources={
                 "before-transforms": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
@@ -648,14 +656,18 @@ class TestMarkerIntegration:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=[
-                "before-transforms",
-                "dummy_transform",
-                "after-tape",
-                "Before MLIR Passes (MLIR-0)",
-                "cancel-inverses (MLIR-1)",
-                "after-mlir",
-            ],
+            level=dict(
+                enumerate(
+                    (
+                        "before-transforms",
+                        "dummy_transform",
+                        "after-tape",
+                        "Before MLIR Passes (MLIR-0)",
+                        "cancel-inverses (MLIR-1)",
+                        "after-mlir",
+                    )
+                )
+            ),
             resources={
                 "before-transforms": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
@@ -714,7 +726,7 @@ class TestMarkerIntegration:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=["m0", "m1, m1-duplicate"],
+            level={0: "m0", 2: "m1, m1-duplicate"},
             resources={
                 "m0": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
@@ -731,7 +743,12 @@ class TestMarkerIntegration:
             },
         )
 
-        actual = qml.specs(simple_circuit, level=["m0", "m1", "m1-duplicate"])()
+        with pytest.warns(
+            UserWarning,
+            match="The 'level' argument to qml.specs for QJIT'd QNodes has been sorted to be "
+            "in ascending order with no duplicate levels.",
+        ):
+            actual = qml.specs(simple_circuit, level=["m0", "m1", "m1-duplicate"])()
 
         check_specs_same(actual, expected)
 
@@ -750,7 +767,7 @@ class TestMarkerIntegration:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=["m0", "m1", "m2"],
+            level={0: "m0", 2: "m1", 3: "m2"},
             resources={
                 "m0": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},

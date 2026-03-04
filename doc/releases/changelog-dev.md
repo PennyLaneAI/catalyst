@@ -282,10 +282,14 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Updated integration tests to match changes to the PennyLane `qml.specs` frontend made in https://github.com/PennyLaneAI/pennylane/pull/9088.
+  [(#2513)](https://github.com/PennyLaneAI/catalyst/pull/2513)
+
 * The `prepare` operation from the PBC dialect in MLIR now implicitly allocates new qubits
   rather than requiring existing ones. This better suits our purposes for further lowering
   the PBC dialect.
   [(#2520)](https://github.com/PennyLaneAI/catalyst/pull/2520)
+
 * Standardized the `QJITDevice.preprocess` signature to align with the base PennyLane Device API.
   * Removed the redundant `ctx` (EvaluationContext) argument from the preprocessing and decomposition pipelines. The parameter was unused and its removal simplifies the tracing data flow.
   * Decoupled `shots` from the `QJITDevice.preprocess` signature. Catalyst-specific shot configurations are now handled via `execution_config.device_options` to maintain API compatibility.
@@ -327,6 +331,7 @@
   measurement logic inside an `scf.if` region rather than propagating the condition
   to inner PPM ops.
   [(#2511)](https://github.com/PennyLaneAI/catalyst/pull/2511)
+
 
 * Update `mlir_specs` to account for new `marker` functionality in PennyLane.
   [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
