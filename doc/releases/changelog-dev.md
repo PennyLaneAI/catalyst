@@ -282,6 +282,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The ``-disentangle-CNOT`` and ``-disentangle-SWAP`` Catalyst CLI commands have been renamed to 
+  ``-disentangle-cnot`` and ``disentangle-swap`` (all lower-case). 
+  [(#2546)](https://github.com/PennyLaneAI/catalyst/pull/2546)
+
 * The `prepare` operation from the PBC dialect in MLIR now implicitly allocates new qubits
   rather than requiring existing ones. This better suits our purposes for further lowering
   the PBC dialect.
@@ -550,6 +554,10 @@
     [(#2536)](https://github.com/PennyLaneAI/catalyst/pull/2536)
 
 <h3>Documentation 📝</h3>
+
+* Docstrings for :func:`~.passes.disentangle_cnot` and :func:`~.passes.disentangle_swap` have been improved
+  by using updated features for inspection and by calling them from the PennyLane frontend.
+  [(#2546)](https://github.com/PennyLaneAI/catalyst/pull/2546)
 
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
   [(#2406)](https://github.com/PennyLaneAI/catalyst/pull/2406)
