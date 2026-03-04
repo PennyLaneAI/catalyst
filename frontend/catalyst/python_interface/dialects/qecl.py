@@ -27,9 +27,12 @@ from xdsl.dialects.builtin import I64, ContainerOf, IndexType, IntegerAttr
 from xdsl.ir import (
     Attribute,
     Dialect,
+    EnumAttribute,
     Operation,
     ParametrizedAttribute,
+    SpacedOpaqueSyntaxAttribute,
     SSAValue,
+    StrEnum,
     TypeAttribute,
 )
 from xdsl.irdl import (
@@ -42,10 +45,27 @@ from xdsl.irdl import (
     operand_def,
     opt_operand_def,
     opt_prop_def,
+    prop_def,
     result_def,
 )
 from xdsl.parser import AttrParser
 from xdsl.printer import Printer
+
+
+class LogicalCodeblockInitState(StrEnum):
+    """Enum for logical codeblock initial state"""
+
+    Zero = "zero"
+    # Add other supported codeblock initial states here
+
+
+@irdl_attr_definition
+class LogicalCodeblockInitStateAttr(
+    EnumAttribute[LogicalCodeblockInitState], SpacedOpaqueSyntaxAttribute
+):
+    """Role specialization of QEC physical qubits"""
+
+    name = "qecl.codeblock_init_state"
 
 
 @irdl_attr_definition
@@ -147,6 +167,82 @@ def get_logical_hyper_reg_type(
 ) -> LogicalHyperRegisterType:
     """Helper function to return the logical hyper-register type given an SSA value or operation."""
     return _get_type_from_ssa_value_or_operation(hyper_reg, LogicalHyperRegisterType)
+
+
+class LogicalHyperRegisterTypeConstraint(AttrConstraint):
+    """Constraint to make LogicalHyperRegisterType inferrable during IRDL declaration."""
+
+    # This is a bit of a hack for ops that both consume and return a LogicalHyperRegisterType.
+    # Here's what's happening. In the op's assembly format, we typically specify the input
+    # hyper-register operand with `type($in_hyper_reg)`, but we don't do the same for the
+    # `$out_hyper_reg` result, since we implicitly constrain it to be the same type as the input.
+    # When xDSL parses the op's assembly format, in FormatProgram.parse(), it calls a function
+    # resolve_constraint_variables(). This function runs the verify() method of every constrained
+    # operand, result, attribute, etc. in the op. From these verify() methods, it is possible to
+    # update a ConstraintContext variable with data relating to the constraints needed for other
+    # operands/results/attributes/etc. When it calls verify() on the input hyper-register operand,
+    # we store its type in the context variable. Then, when the assembly parser attempts to resolve
+    # the result types, it calls the infer() method, which looks up the hyper-register type in the
+    # context variable and uses the same type for the returned hyper-register.
+
+    def verify(self, attr: Attribute, constraint_context: ConstraintContext) -> None:
+        """Verify the constraint and add resolved values to the ConstraintContext."""
+        constraint_context.set_attr_variable("hyper_reg_type", attr)
+
+    # pylint: disable=unused-argument
+    def can_infer(self, var_constraint_names: Set[str]) -> bool:
+        """Check if there is enough information to infer the attribute given the constraint
+        variables that are already set.
+        """
+        # Assume we can always infer
+        return True
+
+    def infer(self, context: ConstraintContext) -> LogicalHyperRegisterType:
+        """Infer the attribute given the the values for all variables."""
+        hyper_reg_type = context.get_variable("hyper_reg_type")
+        assert isinstance(
+            hyper_reg_type, LogicalHyperRegisterType
+        ), f"Expected a LogicalHyperRegisterType from constraint context, but got {hyper_reg_type}"
+        return hyper_reg_type
+
+    # pylint: disable=unused-argument
+    def mapping_type_vars(self, type_var_mapping):
+        """A helper function to make type vars used in attribute definitions concrete when creating
+        constraints for new attributes or operations.
+        """
+        return self  # pragma: nocover
+
+
+class LogicalCodeblockConstraint(AttrConstraint):
+    """Constraint to make LogicalCodeblock inferrable during IRDL declaration."""
+
+    # See comment in LogicalHyperRegisterTypeConstraint above for description of what's happening
+    # here.
+
+    def verify(self, attr: Attribute, constraint_context: ConstraintContext) -> None:
+        """Verify the constraint and add resolved values to the ConstraintContext."""
+        constraint_context.set_attr_variable("codeblock_type", attr)
+
+    def can_infer(self, var_constraint_names: AbstractSet[str]) -> bool:
+        """Check if there is enough information to infer the attribute given the constraint
+        variables that are already set.
+        """
+        # Assume we can always infer
+        return True
+
+    def infer(self, context: ConstraintContext) -> LogicalCodeblockType:
+        """Infer the attribute given the the values for all variables."""
+        codeblock_type = context.get_variable("codeblock_type")
+        assert isinstance(
+            codeblock_type, LogicalCodeblockType
+        ), f"Expected a LogicalCodeblockType from constraint context, but got {codeblock_type}"
+        return codeblock_type
+
+    def mapping_type_vars(self, type_var_mapping):
+        """A helper function to make type vars used in attribute definitions concrete when creating
+        constraints for new attributes or operations.
+        """
+        return self
 
 
 @irdl_op_definition
@@ -269,6 +365,44 @@ class InsertCodeblockOp(IRDLOperation):
         )
 
 
+@irdl_op_definition
+class EncodeOp(IRDLOperation):
+    """Encode a logical codeblock to the specified logical state."""
+
+    name = "qecl.encode"
+
+    in_codeblock = operand_def(LogicalCodeblockConstraint())
+
+    init_state = prop_def(LogicalCodeblockInitStateAttr)
+
+    out_codeblock = result_def(LogicalCodeblockConstraint())
+
+    assembly_format = """
+            `[` $init_state `]` $in_codeblock attr-dict `:` type($in_codeblock)
+        """
+
+    def __init__(
+        self,
+        in_codeblock: LogicalCodeblockType | Operation,
+        init_state: str | LogicalCodeblockInitStateAttr,
+    ):
+        operands = (in_codeblock,)
+
+        init_state_attr = (
+            init_state
+            if isinstance(init_state, LogicalCodeblockInitStateAttr)
+            else LogicalCodeblockInitStateAttr(init_state)
+        )
+        properties = {"init_state": init_state_attr}
+
+        if isinstance(in_codeblock, LogicalCodeblockType):
+            result_type = LogicalCodeblockType(k=in_codeblock.k)
+        else:
+            result_type = LogicalCodeblockType(k=in_codeblock.type.k)
+
+        super().__init__(operands=operands, result_types=(result_type,), properties=properties)
+
+
 QecLogical = Dialect(
     "qecl",
     [
@@ -276,8 +410,10 @@ QecLogical = Dialect(
         DeallocOp,
         ExtractCodeblockOp,
         InsertCodeblockOp,
+        EncodeOp,
     ],
     [
+        LogicalCodeblockInitStateAttr,
         LogicalCodeblockType,
         LogicalHyperRegisterType,
     ],

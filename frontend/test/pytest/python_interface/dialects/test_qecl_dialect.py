@@ -41,9 +41,11 @@ expected_ops_names = {
     "DeallocOp": "qecl.dealloc",
     "ExtractCodeblockOp": "qecl.extract_block",
     "InsertCodeblockOp": "qecl.insert_block",
+    "EncodeOp": "qecl.encode",
 }
 
 expected_attrs_names = {
+    "LogicalCodeblockInitStateAttr": "qecl.codeblock_init_state",
     "LogicalCodeblockType": "qecl.codeblock",
     "LogicalHyperRegisterType": "qecl.hyperreg",
 }
@@ -152,6 +154,11 @@ class TestQecLogicalOps:
         assert insert_block_op.result_types[0].width == self.width
         assert insert_block_op.result_types[0].k == self.k
 
+    # encode
+    encode_op = qecl.EncodeOp(in_codeblock=codeblock, init_state="zero")
+    assert len(encode_op.result_types) == 1
+    assert isinstance(encode_op.result_types[0], qecl.LogicalCodeblockType)
+
 
 @pytest.mark.parametrize(
     "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
@@ -176,6 +183,9 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     // CHECK: qecl.insert_block [[hyperreg]][{{\s*}}0], [[block0]] : !qecl.hyperreg<3 x 1>, !qecl.codeblock<1>
     %hreg1 = qecl.insert_block %hyperreg[ 0], %block0 : !qecl.hyperreg<3 x 1>, !qecl.codeblock<1>
+
+    // CHECK: [[block1:%.+]] = qecl.encode{{\s*}}[zero] [[block0]] : !qecl.codeblock<1>
+    %block1 = qecl.encode [zero] %block0 : !qecl.codeblock<1>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
