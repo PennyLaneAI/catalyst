@@ -217,9 +217,6 @@ def resolve_constant_params(ssa: SSAValue) -> float | int | str:
         case "arith.constant":
             return op.value.value.data  # Catalyst
 
-        case "arith.index_cast":
-            return resolve_constant_params(op.input)
-
         case "stablehlo.add":
             x, y = (
                 resolve_constant_params(op.operands[0]),
