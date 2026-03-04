@@ -60,7 +60,7 @@ all: llvm stablehlo enzyme dialects dialect-docs plugin decomp-rules
 decomp-rules:
 	@echo "compile decomposition rules"
 	$(PYTHON) decomposition-rules/pre-compile.py
-	quantum-opt --emit-bytecode decomposition-rules/decompositions.mlir -o decomposition-rules/decompositions.mlirbc
+	quantum-opt --register-decomp-rule-resource --emit-bytecode decomposition-rules/decompositions.mlir -o decomposition-rules/decompositions.mlirbc
 
 .PHONY: llvm
 llvm:

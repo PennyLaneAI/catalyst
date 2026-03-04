@@ -19,6 +19,7 @@ Bytecode.
 
 import inspect
 import warnings
+from pathlib import Path
 from textwrap import indent
 from types import UnionType
 from typing import Callable, Union, get_args, get_origin
@@ -37,28 +38,28 @@ from catalyst.utils.exceptions import CompileError
 # TODO document this directory + functionality
 
 # NOTE: paths are relative to catalyst root, not mlir directory
-DECOMP_RULE_DIR = "./decomposition-rules/"
-DECOMPS_FILE = DECOMP_RULE_DIR + "decompositions.mlir"
-MLIRBC_DECOMPS_FILE = DECOMP_RULE_DIR + "decompositions.mlirbc"
+DECOMP_DIR_PATH = Path("./decomposition-rules/")
+DECOMPS_FILE_PATH = DECOMP_DIR_PATH / Path("decompositions.mlir")
+MLIRBC_FILE_PATH = DECOMP_DIR_PATH / Path("decompositions.mlirbc")
 
 
-def get_compiler_ops() -> tuple[list[Operation], int]:
+def get_compiler_ops() -> tuple[set[Operation], int]:
     """
     Extracts all ops from pennylane that have decompositions in catalyst
     """
     num_failures = 0
 
-    pl_op_classes = [
+    pl_op_classes = set(
         obj
         for _, obj in inspect.getmembers(qp)
         if inspect.isclass(obj) and issubclass(obj, Operation)
-    ]
+    )
 
-    compiler_op_classes = [
+    compiler_op_classes = set(
         op_class
         for op_class in pl_op_classes
         if op_class.__name__ in COMPILER_OPS_FOR_DECOMPOSITION
-    ]
+    )
 
     compiler_op_class_names = [op_class.__name__ for op_class in compiler_op_classes]
 
@@ -127,9 +128,7 @@ def get_func_from_circuit(module) -> str | None:
 
     module.operation.walk(find_condition)
 
-    return (
-        "builtin.module {\n" + indent(str(decomp_func_op), "  ") + "\n}\n" if decomp_func_op else ""
-    )
+    return indent(str(decomp_func_op), "  ")
 
 
 def compile_rule(
@@ -224,8 +223,9 @@ def main():
 
     num_successes = 0
     num_failures = 0
+
     with open(
-        DECOMPS_FILE, "w", encoding="utf-8"
+        DECOMPS_FILE_PATH, "w", encoding="utf-8"
     ) as mlir_file:  # TODO probably set this as an environment variable
         for func in target_ops:
             results, num_new_successes, num_new_failures = compile_decomps_via_dummy_circuit(func)
@@ -235,6 +235,7 @@ def main():
                 for name, circuit_mlir in results.items():
                     if circuit_mlir:
                         mlir_file.write(circuit_mlir.replace("rule_wrapper", name))
+
     if num_failures:
         warnings.warn(
             f"compiled {num_successes} / {num_failures + num_successes} decomposition rules"
