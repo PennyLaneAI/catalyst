@@ -447,10 +447,6 @@ def handle_transform(
     targs = args[_tuple_to_slice(targs_slice)]
     tkwargs = _tuple_to_dict(tkwargs)
 
-    # FIXME: A hot-fix for the diagonalize_measurement pass
-    if "supported_base_obs" in tkwargs:
-        tkwargs["supported_base_obs"] = tuple(tkwargs["supported_base_obs"])
-
     # If the transform is a decomposition transform
     # and the graph-based decomposition is enabled
     transform_name = getattr(transform._plxpr_transform, "__name__", None)
@@ -479,8 +475,13 @@ def handle_transform(
             final_jaxpr = pl_decompose._plxpr_transform(
                 final_jaxpr.jaxpr, final_jaxpr.consts, targs, tkwargs, *non_const_args
             )
-
         return copy(self).eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
+
+    # FIXME: A fix for the diagonalize_measurement pass
+    if catalyst_pass_name == "diagonalize-final-measurements" and isinstance(
+        tkwargs["supported_base_obs"], list
+    ):
+        tkwargs["supported_base_obs"] = tuple(tkwargs["supported_base_obs"])
 
     # Apply the corresponding Catalyst pass counterpart
     next_eval = copy(self)
