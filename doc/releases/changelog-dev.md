@@ -150,6 +150,7 @@
 
 * The `diagonalize-final-measurements` xDSL pass now accepts the optional keyword arguments ``to_eigvals`` and ``supported_base_obs``.
   [(#2517)](https://github.com/PennyLaneAI/catalyst/pull/2517)
+  [(#2538)](https://github.com/PennyLaneAI/catalyst/pull/2538)
 
   Consider the following example:
 
