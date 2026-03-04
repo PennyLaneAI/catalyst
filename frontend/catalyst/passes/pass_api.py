@@ -355,9 +355,8 @@ def dict_to_compile_pipeline(
 
     if isinstance(pass_pipeline, dict):
         passes = []
-        filtered_pass_pipeline = {_get_pass_name(k): v for k, v in pass_pipeline.items()}
-        for name, pass_options in filtered_pass_pipeline.items():
-            t = transform(pass_name=name)
+        for name, pass_options in pass_pipeline.items():
+            t = transform(pass_name=_get_pass_name(name))
             # Pass options must be snake_case
             pass_options = {k.replace("-", "_"): v for k, v in pass_options.items()}
             bound_t = BoundTransform(t, kwargs=pass_options)
