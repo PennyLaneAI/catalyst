@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from xdsl.dialects.builtin import TensorType, VectorType
-from xdsl.ir import Attribute, Operation, SSAValue, SSAValues
+from xdsl.ir import Attribute, Operation
 from xdsl.traits import OpTrait
 from xdsl.utils.exceptions import VerifyException
 from xdsl.utils.type import get_element_type_or_self, have_compatible_shape
