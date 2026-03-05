@@ -119,13 +119,9 @@ class ApplyTransformSequencePattern(RewritePattern):
 
             for pass_op in ns.body.walk():
                 if isinstance(pass_op, transform.ApplyRegisteredPassOp):
-                    next_payload = self.interpret_apply_registered_pass_op(
+                    cur_payload = self.interpret_apply_registered_pass_op(
                         pass_op, cur_payload, rewriter
                     )
-
-                    if next_payload != cur_payload:
-                        rewriter.replace_op(cur_payload, next_payload)
-                    cur_payload = next_payload
 
     def _pre_pass_callback(self, compilation_pass, module):
         """Callback wrapper to run the callback function before a pass."""
@@ -173,6 +169,7 @@ class ApplyTransformSequencePattern(RewritePattern):
         modified = _quantum_opt(*schedule, "-mlir-print-op-generic", stdin=buffer.getvalue())
 
         data = Parser(self.ctx, modified).parse_module()
+        rewriter.replace_op(module, data)
         self._post_pass_callback(pass_name, data)
         return data
 
