@@ -17,6 +17,7 @@ This module provides the utilities necessary to AOT compile PennyLane's decompos
 Bytecode.
 """
 
+import argparse
 import inspect
 import warnings
 from pathlib import Path
@@ -33,11 +34,6 @@ from pennylane.wires import WiresLike
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION
 from catalyst.jax_primitives import decomposition_rule
 from catalyst.utils.exceptions import CompileError
-
-# NOTE: paths are relative to catalyst root, not mlir directory
-DECOMP_DIR_PATH = Path("./decomposition-rules/")
-DECOMPS_FILE_PATH = DECOMP_DIR_PATH / Path("decompositions.mlir")
-MLIRBC_FILE_PATH = DECOMP_DIR_PATH / Path("decompositions.mlirbc")
 
 
 def get_compiler_ops() -> tuple[set[Operation], int]:
@@ -214,6 +210,13 @@ def main():
     them via a wrapper function with qjit to mlir. Intended for use with `make decomp-rules` in
     catalyst/mlir.
     """
+
+    parser = argparse.ArgumentParser(prog="decomposition rule pre-compiler")
+    parser.add_argument("-d", "--dir", default="./decomposition-rules")
+
+    DECOMP_DIR_PATH = Path(parser.parse_args().dir)
+    DECOMPS_FILE_PATH = DECOMP_DIR_PATH / Path("decompositions.mlir")
+
     target_ops, num_ops_missed = get_compiler_ops()
     if num_ops_missed:
         warnings.warn(f"failed to collect {num_ops_missed} op(s) from PennyLane")
