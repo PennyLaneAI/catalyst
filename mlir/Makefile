@@ -46,6 +46,7 @@ help:
 	@echo "  llvm               to build MLIR enabling Python bindings"
 	@echo "  stablehlo          to build stablehlo"
 	@echo "  enzyme             to build Enzyme"
+	@echo "  decomp-rules       to compile decomposition rules"
 	@echo "  dialects           to build custom Catalyst MLIR dialects"
 	@echo "  dialect-docs       to build custom Catalyst MLIR dialect documentation"
 	@echo "  test               to run the Catalyst MLIR dialects test suite"
