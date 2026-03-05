@@ -937,9 +937,20 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         [
             lambda m, obs: (m[0](obs[0]), m[1](obs[1])),  # Overlapping qubits
             lambda m, obs: (m[0](obs[0]), m[1](obs[0])),  # Same observable
-            lambda m, obs: (qml.sample(wires=obs[0].wires), m[1](obs[1])),  # Compbasis on wires
-            lambda m, obs: (qml.sample(), m[1](obs[1])),  # Compbasis all wires
-            lambda m, obs: (m[1](obs[1]), qml.sample()),  # Compbasis all wires (swapped)
+            lambda m, obs: (
+                qml.sample(wires=obs[0].wires),
+                m[1](obs[1]),
+            ),  # Compbasis/other obs on qubits
+            lambda m, obs: (
+                qml.sample(wires=obs[0].wires),
+                qml.sample(),
+            ),  # Compbasis (qreg vs qubits)
+            lambda m, obs: (
+                qml.sample(),
+                qml.sample(wires=obs[0].wires),
+            ),  # Compbasis (qreg vs qubits)
+            lambda m, obs: (qml.sample(), m[1](obs[1])),  # Compbasis with qreg vs other obs qubits
+            lambda m, obs: (m[1](obs[1]), qml.sample()),  # Compbasis with qreg vs other obs qubits
         ],
     )
     def test_qwc_non_commuting_observables_raise_error_multiple_measurements(
