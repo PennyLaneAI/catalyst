@@ -990,10 +990,9 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
             ppr_to_ppm, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure
         )
 
-    def setup_inputs(decompose_method=decompose_method, avoid_y_measure=avoid_y_measure):
-        return (), {"decompose_method": decompose_method, "avoid_y_measure": avoid_y_measure}
-
-    return qml.transform(pass_name="ppr-to-ppm", setup_inputs=setup_inputs)(qnode)
+    return qml.transform(pass_name="ppr-to-ppm")(
+        qnode, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure
+    )
 
 
 def ppm_compilation(
@@ -1138,18 +1137,12 @@ def ppm_compilation(
             max_pauli_size=max_pauli_size,
         )
 
-    def setup_inputs(
+    return qml.transform(pass_name="ppm-compilation")(
+        qnode,
         decompose_method=decompose_method,
         avoid_y_measure=avoid_y_measure,
         max_pauli_size=max_pauli_size,
-    ):
-        return (), {
-            "decompose_method": decompose_method,
-            "avoid_y_measure": avoid_y_measure,
-            "max_pauli_size": max_pauli_size,
-        }
-
-    return qml.transform(pass_name="ppm-compilation", setup_inputs=setup_inputs)(qnode)
+    )
 
 
 def ppm_specs(fn):
