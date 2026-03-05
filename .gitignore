@@ -7,7 +7,6 @@ pennylane_catalyst.egg-info
 .dylibs
 mlir/decomposition-rules/decompositions.mlir
 mlir/decomposition-rules/decompositions.mlirbc
-mlir/decomposition-rules/compiled-decomp-rules
 
 # Testing files and directories
 .lit

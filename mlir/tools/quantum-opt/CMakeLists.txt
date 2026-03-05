@@ -15,6 +15,7 @@ set(LIBS
     catalyst-stablehlo-transforms
     MLIRQuantum
     quantum-transforms
+    MLIRQRef
     MLIRPBC
     pbc-transforms
     MLIRGradient
