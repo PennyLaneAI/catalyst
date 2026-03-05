@@ -48,10 +48,14 @@ def get_compiler_ops() -> tuple[set[Operator], int]:
     num_failures = 0
 
     pl_op_classes = set(
-        obj
-        for _, obj in inspect.getmembers(qp)
-        if inspect.isclass(obj) and issubclass(obj, Operator)
+        value
+        for _, value in inspect.getmembers(
+            qp, lambda obj: inspect.isclass(obj) and issubclass(obj, Operator)
+        )
     )
+
+    # FIXME: manual override for PauliMeasure
+    pl_op_classes.add(qp.ops.PauliMeasure)
 
     compiler_op_classes = set(
         op_class
@@ -72,7 +76,7 @@ def get_compiler_ops() -> tuple[set[Operator], int]:
 def get_dummy_args(func: Callable) -> list[str | float | int]:
     """
     Returns:
-        List: dummy args matching the (positional) signature of func.
+        list: dummy args matching the (positional) signature of func.
     """
     # pylint: disable=too-many-branches
 
@@ -141,7 +145,7 @@ def compile_rule(
     op_num_wires,
     rule,
     dev,
-):
+) -> str | None:
     """
     Get the compiled rule from a python decomposition rule.
 
@@ -151,10 +155,17 @@ def compile_rule(
         op_num_wires: the number of wires used by op_class
         rule (DecompositionRule): the decomposition rule to be compiled
         dev (Device): a device for qjit
+
+    Returns:
+        str: string representation of the mlir of the decomposition rule.
     """
     abstract_args = [
         type(arg) for arg in get_dummy_args(rule._impl)  # pylint: disable=protected-access
     ]
+
+    # TODO add support for strings
+    if str in abstract_args:
+        return None
 
     qp.capture.enable()
     qp.decomposition.enable_graph()

@@ -30,11 +30,9 @@ def test_get_compiler_ops():
     """
     ops, failures = get_compiler_ops()
 
-    assert (
-        len(ops) == len(COMPILER_OPS_FOR_DECOMPOSITION) - 1
-    )  # FIXME: these should be equal once PauliMeasure is supported
+    assert len(ops) == len(COMPILER_OPS_FOR_DECOMPOSITION)
 
-    assert failures == 1  # FIXME: this should be 0 once PauliMeasure
+    assert failures == 0
 
 
 class TestGetDummyArgs:
