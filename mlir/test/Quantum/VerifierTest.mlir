@@ -496,6 +496,15 @@ func.func @measurement_without_qnode(%q : !quantum.bit) {
 
 // -----
 
+module {
+    %q = quantum.alloc_qb : !quantum.bit
+    %obs = quantum.namedobs %q[PauliZ] : !quantum.obs
+    // expected-error@+1 {{'quantum.expval' op must be nested inside a 'func.func' operation}}
+    quantum.expval %obs : f64
+}
+
+// -----
+
 // COM: e.xpected-error @below {{attribute 'quantum.node' requires at least one measurement process operation in the function body}}
 func.func @qnode_without_measurement(%q : !quantum.bit) attributes {quantum.node} {
     %obs = quantum.namedobs %q[PauliZ] : !quantum.obs
@@ -506,3 +515,8 @@ func.func @qnode_without_measurement(%q : !quantum.bit) attributes {quantum.node
 
 // expected-error @below {{attribute 'quantum.node' is only valid on 'func.func'}}
 %c0 = "arith.constant"() {value = 0 : i64, quantum.node} : () -> i64
+
+// -----
+
+// expected-error@+1 {{'quantum.node' must be a unit attribute}}
+func.func private @wrong_attribute_value() attributes {quantum.node = "wrong"}
