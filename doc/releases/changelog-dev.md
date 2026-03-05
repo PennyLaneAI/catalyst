@@ -152,7 +152,7 @@
 
 * The tape transform :func:`~.device.decomposition.catalyst_decompose` now accepts the optional
   keyword arguments ``target_gates``, ``num_work_wires``, ``fixed_decomps``, and ``alt_decomps``,
-  which all are passed to the used PennyLane decomposition function 
+  which all are passed to the used PennyLane decomposition function
   ``qml.devices.preprocess.decompose`` and used if the graph-based decomposition system is enabled.
   [(#2501)](https://github.com/PennyLaneAI/catalyst/pull/2501)
 
@@ -200,6 +200,10 @@
   [(#2486)](https://github.com/PennyLaneAI/catalyst/pull/2486)
 
 <h3>Breaking changes 💔</h3>
+
+* The ``-disentangle-CNOT`` and ``-disentangle-SWAP`` Catalyst CLI commands have been renamed to
+  ``-disentangle-cnot`` and ``-disentangle-swap`` (all lower-case).
+  [(#2546)](https://github.com/PennyLaneAI/catalyst/pull/2546)
 
 * `catalyst.from_plxpr.register_transforms` as a way to access MLIR passes from Python has been removed in favour of the new unified transforms API. MLIR passes can be accessed from Python using `qml.transform(pass_name="some-pass-name")`.
   [(#2509)](https://github.com/PennyLaneAI/catalyst/pull/2509)
@@ -544,12 +548,16 @@
   }
   ```
 
-  * A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in 
+  * A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in
     measurement processes. It is also registered in xDSL.
     [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
     [(#2536)](https://github.com/PennyLaneAI/catalyst/pull/2536)
 
 <h3>Documentation 📝</h3>
+
+* Docstrings for :func:`~.passes.disentangle_cnot` and :func:`~.passes.disentangle_swap` have been improved
+  by using updated features for inspection and by calling them from the PennyLane frontend.
+  [(#2546)](https://github.com/PennyLaneAI/catalyst/pull/2546)
 
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
   [(#2406)](https://github.com/PennyLaneAI/catalyst/pull/2406)
@@ -557,19 +565,19 @@
 * Updated the changelog and builtin_passes.py to link to <https://pennylane.ai/compilation/pauli-based-computation> instead.
   [(#2409)](https://github.com/PennyLaneAI/catalyst/pull/2409)
 
-* Infrastructure has been put in place for features that are accessible from both PennyLane and 
+* Infrastructure has been put in place for features that are accessible from both PennyLane and
   Catalyst to have a single source of truth for documentation, which will provide a better overall
   experience when consulting our documentation.
   [(#2481)](https://github.com/PennyLaneAI/catalyst/pull/2481)
 
   Several entry-points were added to ``setup.py`` for the Pauli-based computation compilation passes
-  and the :func:`~.draw_graph` function. This allows for the ability to use Catalyst features from 
-  PennyLane directly (related: [(#9020)](https://github.com/PennyLaneAI/pennylane/pull/9020)) and 
+  and the :func:`~.draw_graph` function. This allows for the ability to use Catalyst features from
+  PennyLane directly (related: [(#9020)](https://github.com/PennyLaneAI/pennylane/pull/9020)) and
   for the documentation of those features to be accessible to both Catalyst and PennyLane, creating
   a single source of truth for such features.
 
-  In addition, the documentation for all Pauli-based computation transforms has been updated to be 
-  more user-focused by showing examples with :func:`~.specs` and by calling the transforms from the 
+  In addition, the documentation for all Pauli-based computation transforms has been updated to be
+  more user-focused by showing examples with :func:`~.specs` and by calling the transforms from the
   PennyLane frontend.
 
 <h3>Contributors ✍️</h3>
