@@ -167,6 +167,28 @@ LogicalResult CnotOp::verify()
     return success();
 }
 
+LogicalResult MeasureOp::verify()
+{
+    if (!(getIdx() || getIdxAttr().has_value())) {
+        return emitOpError() << "expected to have a non-null index";
+    }
+
+    // In and out codeblocks types are already constrained to be the same
+    const auto codeblockType = getInCodeblock().getType();
+
+    if (getIdxAttr().has_value()) {
+        auto idx = getIdxAttr()->getSExtValue();
+        if (idx < 0 || idx >= codeblockType.getK()) {
+            return emitOpError()
+                   << "has out-of-bounds index attribute: applying measurement to logical qubit at "
+                      "index "
+                   << idx << " in codeblock with k = " << codeblockType.getK();
+        }
+    }
+
+    return success();
+}
+
 //===----------------------------------------------------------------------===//
 // QecLogical op canonicalizers.
 //===----------------------------------------------------------------------===//
