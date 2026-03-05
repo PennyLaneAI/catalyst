@@ -68,8 +68,6 @@ def PhysicalCodeblockType : QecPhysical_Type<"Codeblock", "codeblock"> {
     );
 
     let assemblyFormat = "`<` $k `x` $n `>`";
-
-    // let genVerifyDecl = 1;
 }
 
 def PhysicalHyperRegisterType : QecPhysical_Type<"HyperRegister", "hyperreg"> {
@@ -102,8 +100,6 @@ def PhysicalHyperRegisterType : QecPhysical_Type<"HyperRegister", "hyperreg"> {
     // TODO: By default, this assembly format expects whitespace before and after the 'x's.
     //       We could write custom printers/parsers as a workaround.
     let assemblyFormat = "`<` $width `x` $k `x` $n `>`";
-
-    // let genVerifyDecl = 1;
 }
 
 
