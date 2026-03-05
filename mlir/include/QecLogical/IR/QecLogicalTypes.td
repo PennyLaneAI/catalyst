@@ -61,8 +61,6 @@ def LogicalCodeblockType : QecLogical_Type<"Codeblock", "codeblock"> {
     );
 
     let assemblyFormat = "`<` $k `>`";
-
-    // let genVerifyDecl = 1;
 }
 
 def LogicalHyperRegisterType : QecLogical_Type<"HyperRegister", "hyperreg"> {
@@ -92,8 +90,6 @@ def LogicalHyperRegisterType : QecLogical_Type<"HyperRegister", "hyperreg"> {
     // TODO: By default, this assembly format expects whitespace before and after the 'x'.
     //       We could write custom printers/parsers as a workaround.
     let assemblyFormat = "`<` $width `x` $k `>`";
-
-    // let genVerifyDecl = 1;
 }
 
 
