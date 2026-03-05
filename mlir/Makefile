@@ -60,7 +60,7 @@ all: llvm stablehlo enzyme dialects dialect-docs plugin decomp-rules
 .PHONY: decomp-rules
 decomp-rules:
 	@echo "compile decomposition rules"
-	$(PYTHON) decomposition-rules/pre-compile.py
+	$(PYTHON) decomposition-rules/precompile.py
 	quantum-opt --register-decomp-rule-resource --emit-bytecode decomposition-rules/decompositions.mlir -o decomposition-rules/decompositions.mlirbc
 
 .PHONY: llvm
@@ -223,9 +223,10 @@ dialect-docs:
 	cmake --build $(DIALECTS_DOCS_BUILD_DIR) --target mlir-doc
 
 .PHONY: test
-test:
+test: decomp-rules
 	@echo "test the Catalyst MLIR dialects test suite"
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects
+	$(PYTHON) -m pytest decomposition-rules/test_precompile.py
 
 .PHONY: clean clean-dialects clean-enzyme clean-stablehlo clean-plugin clean-dialect-docs
 clean: clean-dialects clean-llvm clean-stablehlo clean-enzyme clean-plugin clean-dialect-docs
