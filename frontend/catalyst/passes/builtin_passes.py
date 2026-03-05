@@ -1079,29 +1079,61 @@ def ppm_compilation(
         . . .
         %3 = pbc.fabricate  magic : !quantum.bit
         %mres, %out_qubits:3 = pbc.ppm ["Z", "Z", "Z"] %1, %2, %3 : i1, !quantum.bit, !quantum.bit, !quantum.bit
-        %4 = quantum.alloc_qb : !quantum.bit
-        %mres_0, %out_qubits_1:3 = pbc.ppm ["Z", "Z", "Y"](-1) %out_qubits#0, %out_qubits#1, %4 cond(%mres) : i1, !quantum.bit, !quantum.bit, !quantum.bit
-        %mres_2, %out_qubits_3 = pbc.ppm ["X"] %out_qubits_1#2 cond(%mres) : i1, !quantum.bit
-        %5 = arith.xori %mres_0, %mres_2 : i1
-        %6:2 = pbc.ppr ["Z", "Z"](2) %out_qubits_1#0, %out_qubits_1#1 cond(%5) : !quantum.bit, !quantum.bit
-        quantum.dealloc_qb %out_qubits_3 : !quantum.bit
-        %mres_4, %out_qubits_5 = pbc.ppm ["X"] %out_qubits#2 : i1, !quantum.bit
-        %7:2 = pbc.ppr ["Z", "Z"](2) %6#0, %6#1 cond(%mres_4) : !quantum.bit, !quantum.bit
-        quantum.dealloc_qb %out_qubits_5 : !quantum.bit
-        %8 = pbc.fabricate  magic_conj : !quantum.bit
-        %mres_6, %out_qubits_7:2 = pbc.ppm ["Z", "Z"] %7#1, %8 : i1, !quantum.bit, !quantum.bit
-        %9 = quantum.alloc_qb : !quantum.bit
-        %mres_8, %out_qubits_9:2 = pbc.ppm ["Z", "Y"](-1) %out_qubits_7#0, %9 cond(%mres_6) : i1, !quantum.bit, !quantum.bit
-        %mres_10, %out_qubits_11 = pbc.ppm ["X"] %out_qubits_9#1 cond(%mres_6) : i1, !quantum.bit
-        %10 = arith.xori %mres_8, %mres_10 : i1
-        %11 = pbc.ppr ["Z"](2) %out_qubits_9#0 cond(%10) : !quantum.bit
-        quantum.dealloc_qb %out_qubits_11 : !quantum.bit
-        %mres_12, %out_qubits_13 = pbc.ppm ["X"] %out_qubits_7#1 : i1, !quantum.bit
-        %12 = pbc.ppr ["Z"](2) %11 cond(%mres_12) : !quantum.bit
-        quantum.dealloc_qb %out_qubits_13 : !quantum.bit
-        %mres_14, %out_qubits_15:2 = pbc.ppm ["Z", "Z"] %7#0, %12 : i1, !quantum.bit, !quantum.bit
-        %mres_16, %out_qubits_17 = pbc.ppm ["Z"] %out_qubits_15#1 : i1, !quantum.bit
-        . . .
+        %4:2 = scf.if %mres -> (!quantum.bit, !quantum.bit) {
+        %11 = quantum.alloc_qb : !quantum.bit
+        %mres_16, %out_qubits_17:3 = pbc.ppm ["Z", "Z", "Y"](-1) %out_qubits_2#0, %out_qubits_2#1, %11 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+        %mres_18, %out_qubits_19 = pbc.ppm ["X"] %out_qubits_17#2 : i1, !quantum.bit
+        %12 = arith.xori %mres_16, %mres_18 : i1
+        %13:2 = scf.if %12 -> (!quantum.bit, !quantum.bit) {
+            %14:2 = pbc.ppr ["Z", "Z"](2) %out_qubits_17#0, %out_qubits_17#1 : !quantum.bit, !quantum.bit
+            scf.yield %14#0, %14#1 : !quantum.bit, !quantum.bit
+        } else {
+            scf.yield %out_qubits_17#0, %out_qubits_17#1 : !quantum.bit, !quantum.bit
+        }
+        quantum.dealloc_qb %out_qubits_19 : !quantum.bit
+        scf.yield %13#0, %13#1 : !quantum.bit, !quantum.bit
+        } else {
+        scf.yield %out_qubits_2#0, %out_qubits_2#1 : !quantum.bit, !quantum.bit
+        }
+        %mres_3, %out_qubits_4 = pbc.ppm ["X"] %out_qubits_2#2 : i1, !quantum.bit
+        %5:2 = scf.if %mres_3 -> (!quantum.bit, !quantum.bit) {
+        %11:2 = pbc.ppr ["Z", "Z"](2) %4#0, %4#1 : !quantum.bit, !quantum.bit
+        scf.yield %11#0, %11#1 : !quantum.bit, !quantum.bit
+        } else {
+        scf.yield %4#0, %4#1 : !quantum.bit, !quantum.bit
+        }
+        quantum.dealloc_qb %out_qubits_4 : !quantum.bit
+        %6 = quantum.alloc_qb : !quantum.bit
+        %out_qubits_5 = quantum.custom "Hadamard"() %6 : !quantum.bit
+        %out_qubits_6 = quantum.custom "T"() %out_qubits_5 adj : !quantum.bit
+        %mres_7, %out_qubits_8:2 = pbc.ppm ["Z", "Z"] %5#1, %out_qubits_6 : i1, !quantum.bit, !quantum.bit
+        %7 = scf.if %mres_7 -> (!quantum.bit) {
+        %11 = quantum.alloc_qb : !quantum.bit
+        %mres_16, %out_qubits_17:2 = pbc.ppm ["Z", "Y"](-1) %out_qubits_8#0, %11 : i1, !quantum.bit, !quantum.bit
+        %mres_18, %out_qubits_19 = pbc.ppm ["X"] %out_qubits_17#1 : i1, !quantum.bit
+        %12 = arith.xori %mres_16, %mres_18 : i1
+        %13 = scf.if %12 -> (!quantum.bit) {
+            %14 = pbc.ppr ["Z"](2) %out_qubits_17#0 : !quantum.bit
+            scf.yield %14 : !quantum.bit
+        } else {
+            scf.yield %out_qubits_17#0 : !quantum.bit
+        }
+        quantum.dealloc_qb %out_qubits_19 : !quantum.bit
+        scf.yield %13 : !quantum.bit
+        } else {
+        scf.yield %out_qubits_8#0 : !quantum.bit
+        }
+        %mres_9, %out_qubits_10 = pbc.ppm ["X"] %out_qubits_8#1 : i1, !quantum.bit
+        %8 = scf.if %mres_9 -> (!quantum.bit) {
+        %11 = pbc.ppr ["Z"](2) %7 : !quantum.bit
+        scf.yield %11 : !quantum.bit
+        } else {
+        scf.yield %7 : !quantum.bit
+        }
+        quantum.dealloc_qb %out_qubits_10 : !quantum.bit
+        %mres_11, %out_qubits_12:2 = pbc.ppm ["Z", "Z"] %5#0, %8 : i1, !quantum.bit, !quantum.bit
+        %mres_13, %out_qubits_14 = pbc.ppm ["Z"] %out_qubits_12#1 : i1, !quantum.bit
+    . . .
 
     """
     passes = {

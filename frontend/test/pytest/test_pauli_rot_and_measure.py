@@ -1,4 +1,4 @@
-# Copyright 2025 Xanadu Quantum Technologies Inc.
+# Copyright 2025-2026 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 import numpy as np
 import pennylane as qml
 import pytest
-from pennylane.ftqc.catalyst_pass_aliases import to_ppr
+from pennylane.transforms.decompositions import to_ppr
 
 from catalyst import qjit
 
@@ -42,7 +42,7 @@ def test_pauli_rot_lowering():
 
 @pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_lowering_with_ctrl_qubits():
-    """Test that Pauli rotation with control qubits is converted to pbc.ppr.
+    """Test that Pauli rotation with control qubits is converted to quantum.paulirot.
     Note that control PauliRot is currently not supported by the to_ppr pass.
     """
     pipe = [("pipe", ["quantum-compilation-stage"])]

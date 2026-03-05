@@ -48,6 +48,7 @@ from .observable_ops import (
     ComputationalBasisOp,
     HamiltonianOp,
     HermitianOp,
+    MCMObsOp,
     NamedObsOp,
     ObservableOp,
     TensorOp,
@@ -75,6 +76,7 @@ __all__ = [
     "HermitianOp",
     "NamedObsOp",
     "TensorOp",
+    "MCMObsOp",
     # Mid-circuit measurements
     "MeasureOp",
     # Terminal measurements
