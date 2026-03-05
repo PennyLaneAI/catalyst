@@ -174,7 +174,6 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
         _obs_allowed_diagonalization = {"PauliX", "PauliY", "PauliZ", "Hadamard", "Identity"}
 
         self.supported_base_obs = options.get("supported_base_obs", tuple(_default_supported_obs))
-        print(self.supported_base_obs)
 
         if isinstance(self.supported_base_obs, tuple) and set(self.supported_base_obs).issubset(
             _obs_allowed_diagonalization
