@@ -168,6 +168,7 @@ class PhysicalHyperRegisterType(ParametrizedAttribute, TypeAttribute):
         return [IntegerAttr(width, 64), IntegerAttr(k, 64), IntegerAttr(n, 64)]
 
 
+QecPhysicalQubitSSAValue: TypeAlias = SSAValue[QecPhysicalQubitType]
 PhysicalCodeBlockSSAValue: TypeAlias = SSAValue[PhysicalCodeblockType]
 PhysicalHyperRegisterSSAValue: TypeAlias = SSAValue[PhysicalHyperRegisterType]
 
@@ -216,6 +217,9 @@ class AllocOp(IRDLOperation):
 
     hyper_reg = result_def(PhysicalHyperRegisterType)
 
+    def __init__(self, hyper_reg: PhysicalHyperRegisterType):
+        super().__init__(result_types=(hyper_reg,))
+
 
 @irdl_op_definition
 class DeallocOp(IRDLOperation):
@@ -228,6 +232,9 @@ class DeallocOp(IRDLOperation):
         """
 
     hyper_reg = operand_def(PhysicalHyperRegisterType)
+
+    def __init__(self, hyper_reg: PhysicalHyperRegisterSSAValue | Operation):
+        super().__init__(operands=(hyper_reg,))
 
 
 @irdl_op_definition
@@ -250,7 +257,7 @@ class ExtractCodeblockOp(IRDLOperation):
 
     def __init__(
         self,
-        hyper_reg: PhysicalHyperRegisterType | Operation,
+        hyper_reg: PhysicalHyperRegisterSSAValue | Operation,
         idx: int | SSAValue[IntegerType] | Operation | IntegerAttr,
     ):
         if isinstance(idx, int):
@@ -263,10 +270,7 @@ class ExtractCodeblockOp(IRDLOperation):
             operands = (hyper_reg, idx)
             properties = {}
 
-        if isinstance(hyper_reg, PhysicalHyperRegisterType):
-            result_type = PhysicalCodeblockType(k=hyper_reg.k, n=hyper_reg.n)
-        else:
-            result_type = PhysicalCodeblockType(k=hyper_reg.type.k, n=hyper_reg.type.n)
+        result_type = PhysicalCodeblockType(k=hyper_reg.type.k, n=hyper_reg.type.n)
 
         super().__init__(
             operands=operands,
@@ -328,6 +332,9 @@ class AllocAuxQubitOp(IRDLOperation):
 
     qubit = result_def(QecPhysicalQubitType(role=QecPhysicalQubitRole.Aux))
 
+    def __init__(self):
+        super().__init__(result_types=(QecPhysicalQubitType(role=QecPhysicalQubitRole.Aux),))
+
 
 @irdl_op_definition
 class DeallocAuxQubitOp(IRDLOperation):
@@ -340,6 +347,15 @@ class DeallocAuxQubitOp(IRDLOperation):
         """
 
     qubit = operand_def(QecPhysicalQubitType(role=QecPhysicalQubitRole.Aux))
+
+    def __init__(self, qubit: QecPhysicalQubitSSAValue | Operation):
+        if qubit.type.role.data != str(QecPhysicalQubitRole.Aux):
+            raise ValueError(
+                f"{self.name} op expected a qubit with role '{str(QecPhysicalQubitRole.Aux)}', "
+                f"but got '{qubit.type.role.data}'"
+            )
+
+        super().__init__(operands=(qubit,))
 
 
 QecPhysical = Dialect(

@@ -110,36 +110,49 @@ def test_type_constructors():
 
 def test_op_constructors():
     """Test the constructors of each op defined in the qecp dialect work as expected."""
-    hyper_reg = create_ssa_value(qecp.PhysicalHyperRegisterType(3, 1, 7))
-    codeblock = create_ssa_value(qecp.PhysicalCodeblockType(1, 7))
+    width = 3
+    k = 1
+    n = 7
+
+    hyper_reg = create_ssa_value(qecp.PhysicalHyperRegisterType(width, k, n))
+    codeblock = create_ssa_value(qecp.PhysicalCodeblockType(k, n))
     q_aux = create_ssa_value(qecp.QecPhysicalQubitType("aux"))
 
     # alloc
-    alloc_op = qecp.AllocOp(result_types=(qecp.PhysicalHyperRegisterType(3, 1, 7),))
+    alloc_op = qecp.AllocOp(qecp.PhysicalHyperRegisterType(width, k, n))
     assert len(alloc_op.result_types) == 1
     assert isinstance(alloc_op.result_types[0], qecp.PhysicalHyperRegisterType)
+    assert alloc_op.result_types[0].width.value.data == width
+    assert alloc_op.result_types[0].k.value.data == k
+    assert alloc_op.result_types[0].n.value.data == n
 
     # dealloc
-    dealloc_op = qecp.DeallocOp(operands=(hyper_reg,))
+    dealloc_op = qecp.DeallocOp(hyper_reg)
     assert len(dealloc_op.result_types) == 0
 
     # extract_block
     extract_block_op = qecp.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=0)
     assert len(extract_block_op.result_types) == 1
     assert isinstance(extract_block_op.result_types[0], qecp.PhysicalCodeblockType)
+    assert extract_block_op.result_types[0].k.value.data == k
+    assert extract_block_op.result_types[0].n.value.data == n
 
     # insert_block
     insert_block_op = qecp.InsertCodeblockOp(in_hyper_reg=hyper_reg, idx=0, codeblock=codeblock)
     assert len(insert_block_op.result_types) == 1
     assert isinstance(insert_block_op.result_types[0], qecp.PhysicalHyperRegisterType)
+    assert insert_block_op.result_types[0].width.value.data == width
+    assert insert_block_op.result_types[0].k.value.data == k
+    assert insert_block_op.result_types[0].n.value.data == n
 
     # alloc_aux
-    alloc_aux_op = qecp.AllocAuxQubitOp(result_types=(qecp.QecPhysicalQubitType("aux"),))
+    alloc_aux_op = qecp.AllocAuxQubitOp()
     assert len(alloc_aux_op.result_types) == 1
     assert isinstance(alloc_aux_op.result_types[0], qecp.QecPhysicalQubitType)
+    assert alloc_aux_op.result_types[0].role.data == qecp.QecPhysicalQubitRole.Aux
 
     # dealloc_aux
-    dealloc_aux_op = qecp.DeallocAuxQubitOp(operands=(q_aux,))
+    dealloc_aux_op = qecp.DeallocAuxQubitOp(q_aux)
     assert len(dealloc_aux_op.result_types) == 0
 
 
