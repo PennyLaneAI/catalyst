@@ -869,87 +869,27 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
     @pytest.mark.parametrize(
         "obs",
         [
-            # non-commuting NamedObs
-            (qml.X(0), qml.Y(0)),
-            (qml.X(1), qml.Z(1)),
-            (qml.Z(2), qml.H(2)),
-            (qml.X(0), qml.Identity(0)),
-            # non-commuting NamedObs + Hermitian
-            (qml.X(0), qml.Hermitian(np.eye(2), wires=0)),
-            (qml.X(0), qml.Hermitian(np.eye(4), wires=[0, 1])),
-            # non-commuting tensorobs
-            (qml.X(0) @ qml.Y(1), qml.Z(1)),
-            (qml.X(0) @ qml.Y(1), qml.Z(1) @ qml.Hadamard(2)),
-            (qml.X(0) @ qml.Y(1), qml.Z(0) @ qml.Hadamard(2)),
-            (qml.X(0) @ qml.Y(1), qml.Z(0) @ qml.Hadamard(1)),
-            (qml.X(0) @ qml.Y(1), qml.Hermitian(np.eye(2), wires=0) @ qml.Y(2)),
             # Hamiltonian obs
-            (qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.Z(1)]), qml.X(1) @ qml.X(2)),
-            (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.Hamiltonian([1.0, 1.0], [qml.X(0), qml.Y(1)])),
+            qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.X(0)]),
+            qml.Hamiltonian([1.0, 1.0], [qml.Z(1), qml.Y(1)]),
+            qml.Hamiltonian([1.0, 1.0], [qml.Z(2), qml.Hadamard(2)]),
+            qml.Hamiltonian([1.0, 1.0], [qml.Z(3), qml.Identity(3)]),
+            qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.Hermitian(np.eye(2), wires=0)]),
+            qml.Hamiltonian([1.0, 1.0], [qml.Z(1), qml.X(0) @ qml.Hermitian(np.eye(2), wires=1)]),
+            qml.Hamiltonian([1.0, 1.0], [qml.Z(2), qml.X(0) @ qml.X(2)]),
         ],
     )
     @pytest.mark.parametrize(
         "measurements",
         [
-            (qml.expval, qml.var),
+            qml.expval,
+            qml.var,
+            qml.sample,
         ],
     )
-    def test_qwc_non_commuting_observables_raise_error_non_compbasis(self, obs, measurements):
+    def test_qwc_non_commuting_observables_raise_error_single_measurement(self, obs, measurements):
         """Check that an error is raised if we try to diagonalize a circuit that contains
-        non-commuting observables."""
-        dev = qml.device("lightning.qubit", wires=4)
-
-        @qml.qjit()
-        @diagonalize_final_measurements_pass
-        @qml.qnode(dev)
-        def circuit0(x):
-            qml.RX(x, 0)
-            return measurements[0](obs[0]), measurements[1](obs[1])
-
-        with pytest.raises(RuntimeError, match=f"{_non_commuting_err_msg}"):
-            _ = circuit0(0.7)
-
-        @qml.qjit()
-        @diagonalize_final_measurements_pass
-        @qml.qnode(dev)
-        def circuit1(x):
-            qml.RX(x, 0)
-            return measurements[0](obs[0]), measurements[1](obs[0])
-
-        with pytest.raises(RuntimeError, match=f"{_non_commuting_err_msg}"):
-            _ = circuit1(0.7)
-
-    @pytest.mark.parametrize(
-        "obs",
-        [
-            # non-commuting NamedObs
-            (qml.X(0), qml.Y(0)),
-            (qml.X(1), qml.Z(1)),
-            (qml.Z(2), qml.H(2)),
-            (qml.X(0), qml.Identity(0)),
-            # non-commuting NamedObs + Hermitian
-            (qml.X(0), qml.Hermitian(np.eye(2), wires=0)),
-            (qml.X(0), qml.Hermitian(np.eye(4), wires=[0, 1])),
-            # non-commuting tensorobs
-            (qml.X(0) @ qml.Y(1), qml.Z(1)),
-            (qml.X(0) @ qml.Y(1), qml.Z(1) @ qml.Hadamard(2)),
-            (qml.X(0) @ qml.Y(1), qml.Z(0) @ qml.Hadamard(2)),
-            (qml.X(0) @ qml.Y(1), qml.Z(0) @ qml.Hadamard(1)),
-            (qml.X(0) @ qml.Y(1), qml.Hermitian(np.eye(2), wires=0) @ qml.Y(2)),
-            # Hamiltonian obs
-            (qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.Z(1)]), qml.X(1) @ qml.X(2)),
-            (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.Hamiltonian([1.0, 1.0], [qml.X(0), qml.Y(1)])),
-        ],
-    )
-    @pytest.mark.parametrize(
-        "measurements",
-        [
-            (qml.sample, qml.var),
-        ],
-    )
-    def test_qwc_non_commuting_observables_raise_error_with_compbasis(self, obs, measurements):
-        """Check that an error is raised if we try to diagonalize a circuit that contains
-        non-commuting observables."""
+        non-commuting observables and a single measurement."""
         dev = qml.device("lightning.qubit", wires=4)
 
         @qml.qjit()
@@ -958,7 +898,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         @qml.qnode(dev)
         def circuit(x):
             qml.RX(x, 0)
-            return measurements[0](wires=obs[0].wires), measurements[1](obs[1])
+            return measurements(obs)
 
         with pytest.raises(RuntimeError, match=f"{_non_commuting_err_msg}"):
             _ = circuit(0.7)
@@ -967,37 +907,55 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         "obs",
         [
             # non-commuting NamedObs
-            (qml.Y(0)),
+            (qml.X(0), qml.Y(0)),
+            (qml.X(1), qml.Z(1)),
+            (qml.Z(2), qml.H(2)),
+            (qml.X(0), qml.Identity(0)),
+            # non-commuting NamedObs + Hermitian
+            (qml.X(0), qml.Hermitian(np.eye(2), wires=0)),
+            (qml.X(0), qml.Hermitian(np.eye(4), wires=[0, 1])),
+            # non-commuting tensorobs
+            (qml.X(0) @ qml.Y(1), qml.Z(1)),
+            (qml.X(0) @ qml.Y(1), qml.Z(1) @ qml.Hadamard(2)),
+            (qml.X(0) @ qml.Y(1), qml.Z(0) @ qml.Hadamard(2)),
+            (qml.X(0) @ qml.Y(1), qml.Z(0) @ qml.Hadamard(1)),
+            (qml.X(0) @ qml.Y(1), qml.Hermitian(np.eye(2), wires=0) @ qml.Y(2)),
+            # Hamiltonian obs
+            (qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.Z(1)]), qml.X(1) @ qml.X(2)),
+            (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.Hamiltonian([1.0, 1.0], [qml.X(0), qml.Y(1)])),
         ],
     )
     @pytest.mark.parametrize(
-        "measurements", [(qml.sample, qml.expval), (qml.counts, qml.var), (qml.probs, qml.var)]
+        "m",
+        [
+            (qml.expval, qml.var),
+            (qml.expval, qml.sample),
+        ],
     )
-    def test_qreg_non_commuting_observables_raise_error(self, obs, measurements):
+    @pytest.mark.parametrize(
+        "return_measurements",
+        [
+            lambda m, obs: (m[0](obs[0]), m[1](obs[1])),  # Overlapping qubits
+            lambda m, obs: (m[0](obs[0]), m[1](obs[0])),  # Same observable
+            lambda m, obs: (qml.sample(wires=obs[0].wires), m[1](obs[1])),  # Compbasis on wires
+            lambda m, obs: (qml.sample(), m[1](obs[1])),  # Compbasis all wires
+            lambda m, obs: (m[1](obs[1]), qml.sample()),  # Compbasis all wires (swapped)
+        ],
+    )
+    def test_qwc_non_commuting_observables_raise_error_multiple_measurements(
+        self, obs, m, return_measurements
+    ):
         """Check that an error is raised if we try to diagonalize a circuit that contains
-        non-commuting observables.
-        qml.counts, qml.sample, qml.probs
-        """
-        dev = qml.device("lightning.qubit", wires=1)
+        non-commuting observables and multiple measurements."""
+        dev = qml.device("lightning.qubit", wires=4)
 
         @qml.qjit()
         @diagonalize_final_measurements_pass
         @qml.set_shots(10)
         @qml.qnode(dev)
-        def circuit0(x):
+        def circuit(x):
             qml.RX(x, 0)
-            return measurements[0](), measurements[1](obs)
+            return return_measurements(m, obs)
 
         with pytest.raises(RuntimeError, match=f"{_non_commuting_err_msg}"):
-            _ = circuit0(0.7)
-
-        @qml.qjit()
-        @diagonalize_final_measurements_pass
-        @qml.set_shots(10)
-        @qml.qnode(dev)
-        def circuit1(x):
-            qml.RX(x, 0)
-            return qml.sample(wires=[0]), qml.sample(), measurements[1](obs)
-
-        with pytest.raises(RuntimeError, match=f"{_non_commuting_err_msg}"):
-            _ = circuit1(0.7)
+            _ = circuit(0.7)
