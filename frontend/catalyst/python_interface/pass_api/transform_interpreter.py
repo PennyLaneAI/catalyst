@@ -142,7 +142,8 @@ class TransformInterpreterPass(ModulePass):
         interpreter = Interpreter(op)
         interpreter.register_implementations(TransformFunctionsExt(ctx, self.passes, self.callback))
         schedule.parent_op().detach()
-        if self.callback:
+        if self.callback and len(schedule.body.ops) == 1:
+            # If there are no passes to apply, we still want to call the callback once with the original module
             self.callback(None, op, None, pass_level=0)
         interpreter.call_op(schedule, (op,))
 

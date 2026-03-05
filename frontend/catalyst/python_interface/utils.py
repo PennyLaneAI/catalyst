@@ -18,6 +18,7 @@ from numbers import Number
 from typing import Any
 
 from xdsl.dialects.arith import ConstantOp as arithConstantOp
+from xdsl.dialects.arith import IndexCastOp
 from xdsl.dialects.builtin import (
     ArrayAttr,
     ComplexType,
@@ -83,6 +84,9 @@ def get_constant_from_ssa(value: SSAValue) -> Number | None:
                     val = val[0] + 1j * val[1]
 
                 return val
+
+        if isinstance(owner, IndexCastOp):
+            return get_constant_from_ssa(owner.operands[0])
 
     return None
 

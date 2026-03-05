@@ -253,8 +253,11 @@ def test_ppr_to_ppm():
 # CHECK: quantum.custom "Hadamard"
 # CHECK: quantum.custom "T"
 # CHECK: pbc.ppm ["Z", "Z"] {{.+}}, {{.+}}
-# CHECK: pbc.ppm ["Z", "Z"] {{.+}}, {{.+}} cond({{.+}})
-# CHECK: pbc.ppm ["X"] {{.+}} cond({{.+}})
+# CHECK: scf.if
+# CHECK: pbc.ppm ["Z", "Z"] {{.+}}, {{.+}}
+# CHECK: scf.if
+# CHECK: pbc.ppm ["X"] {{.+}}
+# CHECK: }
 
 # FOR CNOT gate
 # CHECK: quantum.custom "Hadamard"
