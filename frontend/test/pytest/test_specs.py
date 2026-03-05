@@ -86,6 +86,7 @@ def check_specs_same(actual: CircuitSpecs, expected: CircuitSpecs):
 class TestDeviceLevelSpecs:
     """Test qml.specs() at device level"""
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_with_passes(self):
         """Test that device-level specs count resources *after* all passes are applied"""
 
