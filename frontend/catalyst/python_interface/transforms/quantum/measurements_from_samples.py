@@ -43,9 +43,13 @@ from xdsl.dialects import arith, builtin, func, tensor
 from xdsl.pattern_rewriter import PatternRewriter, RewritePattern
 from xdsl.rewriter import InsertPoint
 
+import catalyst
 from catalyst.python_interface.conversion import xdsl_module
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.pass_api import compiler_transform
+from catalyst.python_interface.transforms.quantum.diagonalize_measurements import (
+    DiagonalizeFinalMeasurementsPass,
+)
 
 
 @dataclass(frozen=True)
@@ -60,6 +64,9 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the measurements-from-samples pass."""
         shots = _get_static_shots_value_from_first_device_op(op)
+
+        # diagonalize measurements before converting to samples
+        DiagonalizeFinalMeasurementsPass().apply(_ctx, op)
 
         greedy_applier = pattern_rewriter.GreedyRewritePatternApplier(
             [
@@ -117,7 +124,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         return observable_op
 
     @staticmethod
-    def _validate_observable_op(op: quantum.NamedObsOp):
+    def _validate_observable_op(op: quantum.NamedObsOp | quantum.TensorOp | quantum.MCMObsOp):
         """Validate the observable op.
 
         Assert that the op is a quantum.NamedObsOp and check if it is supported in the current
@@ -126,15 +133,22 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         Raises:
             NotImplementedError: If the observable is anything but a PauliZ quantum.NamedObsOp.
         """
-        assert isinstance(
-            op, quantum.NamedObsOp
-        ), f"Expected `op` to be a quantum.NamedObsOp, but got {type(op).__name__}"
+        if isinstance(op, quantum.NamedObsOp):
+            if op.type.data != "PauliZ":
+                raise NotImplementedError(
+                    f"Expected all observables to be diagonalized before application of rewrite pattern, but received '{op.type.data}'"
+                )
+            return [1.0, -1.0]
 
-        if op.type.data != "PauliZ":
-            raise NotImplementedError(
-                f"Observable '{op.type.data}' used as input to measurement operation is not "
-                f"supported for the measurements_from_samples transform; currently only the "
-                f"PauliZ observable is permitted"
+        elif isinstance(op, quantum.TensorOp):
+            pass
+
+        elif iinstance(op, quantum.HamiltonianOp):
+            pass
+
+        else:
+            raise NotImpelmentedError(
+                f"Supported observable types for measurements-from-samples are quantum.NamedObsOp, quantum.TensorOp and quantum.HamiltonianOp, but received {type(op).__name__}"
             )
 
     @staticmethod
@@ -511,7 +525,7 @@ class CountsPattern(MeasurementsFromSamplesPattern):
     @pattern_rewriter.op_type_rewrite_pattern
     def match_and_rewrite(self, counts_op: quantum.CountsOp, rewriter: PatternRewriter, /):
         """Match and rewrite for quantum.CountsOp."""
-        raise NotImplementedError("qml.counts() operations are not supported.")
+        raise NotImplementedError("qml.counts() is not implemented with measurements_from_samples.")
 
 
 class StatePattern(MeasurementsFromSamplesPattern):
