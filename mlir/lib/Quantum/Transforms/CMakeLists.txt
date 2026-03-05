@@ -18,6 +18,7 @@ file(GLOB SRC
     decompose_lowering.cpp
     DecomposeLoweringPatterns.cpp
     dynamic_one_shot.cpp
+    graph_decomposition.cpp
     gridsynth.cpp
     GridsynthPatterns.cpp
     DisentangleSWAP.cpp
