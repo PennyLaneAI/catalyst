@@ -13,15 +13,22 @@
 # limitations under the License.
 """This file contains the pass that applies all passes present in the program representation."""
 
-
+import io
+from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from pennylane.typing import Callable
 from xdsl.context import Context
-from xdsl.dialects import builtin
+from xdsl.dialects import builtin, transform
+from xdsl.ir import Attribute
+from xdsl.parser import Parser
 from xdsl.passes import ModulePass, PassPipeline
+from xdsl.pattern_rewriter import PatternRewriter, RewritePattern, op_type_rewrite_pattern
+from xdsl.printer import Printer
 
-from .transform_interpreter import TransformInterpreterPass
+from catalyst.compiler import _quantum_opt
+from catalyst.python_interface.utils import get_pyval_from_xdsl_attr
 
 available_passes = {}
 
@@ -43,6 +50,12 @@ def is_xdsl_pass(pass_name: str) -> bool:
     Returns:
         bool: True if this is an xDSL compiler pass
     """
+    # catalyst.python_interface.xdsl_universe collects all transforms in
+    # catalyst.python_interface.transforms, so importing from that file
+    # updates the global xDSL transforms registry.
+    # pylint: disable=import-outside-toplevel
+    from catalyst.python_interface.xdsl_universe import CATALYST_XDSL_UNIVERSE as _
+
     return pass_name in available_passes
 
 
@@ -62,23 +75,176 @@ class ApplyTransformSequence(ModulePass):
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         """Applies the transformation"""
         nested_modules = []
-        for region in op.regions:
-            for block in region.blocks:
-                for operation in block.ops:
-                    if isinstance(operation, builtin.ModuleOp):
-                        nested_modules.append(operation)
-
-        pipeline = PassPipeline(
-            (TransformInterpreterPass(passes=available_passes, callback=self.callback),)
-        )
-        for operation in nested_modules:
-            pipeline.apply(ctx, operation)
+        for _op in op.ops:
+            if isinstance(_op, builtin.ModuleOp):
+                nested_modules.append(_op)
 
         for mod in nested_modules:
-            for region in mod.regions:
-                for block in region.blocks:
-                    for operation in block.ops:
-                        if isinstance(operation, builtin.ModuleOp) and operation.get_attr_or_prop(
-                            "transform.with_named_sequence"
-                        ):
-                            block.erase_op(operation)  # pragma: no cover
+            pattern = ApplyTransformSequencePattern(ctx, available_passes, self.callback)
+            transformer = next(_op for _op in mod.ops if isinstance(_op, builtin.ModuleOp))
+            rewriter = PatternRewriter(transformer)
+            pattern.match_and_rewrite(transformer, rewriter)
+
+
+class ApplyTransformSequencePattern(RewritePattern):
+    """RewritePattern for applying transform sequences."""
+
+    def __init__(
+        self,
+        ctx: Context,
+        passes: dict[str, Callable[[], type[ModulePass]]],
+        callback: Callable | None = None,
+    ):
+        self.ctx = ctx
+        self.passes = passes
+        self.callback = callback
+        self.pass_level = 0
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, transformer: builtin.ModuleOp, rewriter: PatternRewriter):
+        """Rewrite modules containing transform.named_sequences."""
+        if not transformer.get_attr_or_prop("transform.with_named_sequence"):
+            return
+
+        payload: builtin.ModuleOp = transformer.parent_op()
+        cur_payload = payload
+        rewriter.erase_op(transformer)
+
+        for i, ns in enumerate(transformer.ops):
+            if len(ns.body.ops) == 1:
+                if i == 0:
+                    self._pre_pass_callback(None, cur_payload)
+                    self.pass_level += 1
+                continue
+
+            for pass_op in ns.body.walk():
+                if isinstance(pass_op, transform.ApplyRegisteredPassOp):
+                    next_payload = self.interpret_apply_registered_pass_op(
+                        pass_op, cur_payload, rewriter
+                    )
+
+                    if next_payload != cur_payload:
+                        rewriter.replace_op(cur_payload, next_payload)
+                    cur_payload = next_payload
+
+    def _pre_pass_callback(self, compilation_pass, module):
+        """Callback wrapper to run the callback function before a pass."""
+        if not self.callback:
+            return
+        if self.pass_level == 0:
+            # Since this is the first pass, there is no previous pass
+            self.callback(None, module, compilation_pass, pass_level=0)
+
+    def _post_pass_callback(self, compilation_pass, module):
+        """Increment level and run callback if defined."""
+        if not self.callback:
+            return
+        self.pass_level += 1
+        self.callback(compilation_pass, module, None, pass_level=self.pass_level)
+
+    def interpret_apply_registered_pass_op(
+        self,
+        op: transform.ApplyRegisteredPassOp,
+        module: builtin.ModuleOp,
+        rewriter: PatternRewriter,
+    ):
+        """Interpret the transform.apply_registered_pass."""
+
+        pass_name = op.pass_name.data
+
+        # ---- xDSL path ----
+        if pass_name in self.passes:
+            pass_class = self.passes[pass_name]()
+            options = {
+                k.replace("-", "_"): v for k, v in get_pyval_from_xdsl_attr(op.options).items()
+            }
+            pass_instance = pass_class(**options)
+            pipeline = PassPipeline((pass_instance,))
+            self._pre_pass_callback(pass_instance, module)
+            pipeline.apply(self.ctx, module)
+            self._post_pass_callback(pass_instance, module)
+            return module
+
+        # ---- Catalyst path ----
+        buffer = io.StringIO()
+        Printer(stream=buffer, print_generic_format=True).print_op(module)
+        schedule = _create_mlir_schedule([op])
+        self._pre_pass_callback(pass_name, module)
+        modified = _quantum_opt(*schedule, "-mlir-print-op-generic", stdin=buffer.getvalue())
+
+        data = Parser(self.ctx, modified).parse_module()
+        self._post_pass_callback(pass_name, data)
+        return data
+
+
+def _create_mlir_schedule(pass_ops: Sequence[transform.ApplyRegisteredPassOp]) -> list[str]:
+    """Create a pass schedule for applying MLIR pass via CLI flags.
+
+    For a pass with options, the corresponding CLI flag will be the following:
+
+    .. code-block::
+
+        "--my-pass=arg1=val1 arg2=val2 ..."
+
+    Args:
+        pass_ops (Sequence[xdsl.dialects.transform.ApplyRegisteredPassOp]): The
+            passes to schedule
+
+    Returns:
+        list[str]: A list containing strings that correspond to the CLI flags
+        for the specified passes
+    """
+    schedule: list[str] = []
+
+    for op in pass_ops:
+        pass_name = op.pass_name.data
+        pass_options = op.options.data
+
+        if not pass_options:
+            schedule.append(f"--{pass_name}")
+            continue
+
+        cli_options = []
+        for opt, val in pass_options.items():
+            cli_options.append(f"{opt}={_get_cli_option_from_attr(val)}")
+        cli_options = " ".join(cli_options)
+
+        cli_pass = f"--{pass_name}={cli_options}"
+        schedule.append(cli_pass)
+
+    return schedule
+
+
+def _get_cli_option_from_attr(attr: Attribute) -> Any:
+    """Convert an xDSL attribute corresponding to a pass option value into a valid
+    CLI option value."""
+    cli_val = None
+
+    match attr:
+        case builtin.IntegerAttr():
+            # Booleans are represented as integer attributes with a bitwidth of 1
+            if isinstance(attr.type, builtin.IntegerType) and attr.type.width.data == 1:
+                # Python boolean's repr is capitalized so we use strings
+                cli_val = "true" if attr.value.data else "false"
+            else:
+                cli_val = attr.value.data
+
+        case builtin.FloatAttr():
+            cli_val = attr.value.data
+
+        case builtin.StringAttr():
+            cli_val = f"'{attr.data}'"
+
+        case builtin.ArrayAttr():
+            cli_val = ",".join([str(_get_cli_option_from_attr(attr)) for attr in attr.data])
+
+        case builtin.DictionaryAttr():
+            mapping = []
+            for k, v in attr.data.items():
+                mapping.append(f"{k}={_get_cli_option_from_attr(v)}")
+            cli_val = f"{{{' '.join(mapping)}}}"
+
+        case _:  # pragma: no cover
+            raise ValueError(f"Unsupported option type {attr}.")
+
+    return cli_val
