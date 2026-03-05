@@ -626,10 +626,7 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
     if qnode is None:
         return functools.partial(gridsynth, epsilon=epsilon, ppr_basis=ppr_basis)
 
-    def setup_inputs(epsilon=epsilon, ppr_basis=ppr_basis):
-        return (), {"epsilon": epsilon, "ppr_basis": ppr_basis}
-
-    return qml.transform(pass_name="gridsynth", setup_inputs=setup_inputs)(qnode)
+    return qml.transform(pass_name="gridsynth")(qnode, epsilon=epsilon, ppr_basis=ppr_basis)
 
 
 def to_ppr(qnode):
