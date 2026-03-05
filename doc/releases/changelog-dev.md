@@ -151,13 +151,13 @@
 * The `diagonalize-final-measurements` xDSL pass now accepts the optional keyword arguments ``to_eigvals`` and ``supported_base_obs``.
   [(#2517)](https://github.com/PennyLaneAI/catalyst/pull/2517)
 
-  Consider the following example:
+  These pass options can be applied as follows in the example below:
 
   ```python
   import pennylane as qp
 
   def diagonalize_measurements_setup_inputs(
-      to_eigvals: bool = False, supported_base_obs: list[str] = "PauliX"
+      to_eigvals: bool = False, supported_base_obs: tuple[str] = ("PauliX",)
   ):
       return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
 
@@ -602,7 +602,7 @@ River McCubbin,
 Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
-Shuli, Shu,
+Shuli Shu,
 Paul Haochen Wang,
 David Wierichs,
 Jake Zaia,

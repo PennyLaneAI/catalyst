@@ -45,9 +45,6 @@ from catalyst.python_interface.dialects.quantum import (
 )
 from catalyst.python_interface.pass_api import compiler_transform
 
-_default_supported_obs = {"PauliZ", "Identity"}
-_obs_allowed_diagonalization = {"PauliX", "PauliY", "PauliZ", "Hadamard", "Identity"}
-
 
 def _generate_mapping():
     _gate_map = {}
@@ -174,6 +171,8 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
                 `_obs_allowed_diagonalization`.
             ValueError: If `to_eigvals` is set to `True`.
         """
+        _default_supported_obs = {"PauliZ", "Identity"}
+        _obs_allowed_diagonalization = {"PauliX", "PauliY", "PauliZ", "Hadamard", "Identity"}
 
         self.supported_base_obs = options.get("supported_base_obs", _default_supported_obs)
 
