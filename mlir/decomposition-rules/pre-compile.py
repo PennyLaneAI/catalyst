@@ -20,7 +20,6 @@ Bytecode.
 import inspect
 import warnings
 from pathlib import Path
-from textwrap import indent
 from types import UnionType
 from typing import Callable, Union, get_args, get_origin
 
@@ -128,7 +127,7 @@ def get_func_from_circuit(module) -> str | None:
 
     module.operation.walk(find_condition)
 
-    return indent(str(decomp_func_op), "  ")
+    return str(decomp_func_op) + "\n"
 
 
 def compile_rule(
