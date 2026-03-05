@@ -816,10 +816,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
     if qnode is None:
         return functools.partial(commute_ppr, max_pauli_size=max_pauli_size)
 
-    def setup_inputs(max_pauli_size=max_pauli_size):
-        return (), {"max_pauli_size": max_pauli_size}
-
-    return qml.transform(pass_name="commute-ppr", setup_inputs=setup_inputs)(qnode)
+    return qml.transform(pass_name="commute-ppr")(qnode, max_pauli_size=max_pauli_size)
 
 
 def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
