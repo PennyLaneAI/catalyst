@@ -23,7 +23,7 @@ For a complete description of this dialect, please see
 from collections.abc import Sequence
 from typing import ClassVar, TypeAlias
 
-from xdsl.dialects.builtin import I64, ContainerOf, IndexType, IntegerAttr
+from xdsl.dialects.builtin import I64, ContainerOf, IndexType, IntegerAttr, UnitAttr
 from xdsl.ir import (
     Attribute,
     Dialect,
@@ -37,6 +37,7 @@ from xdsl.ir import (
 )
 from xdsl.irdl import (
     AtLeast,
+    AttrSizedOperandSegments,
     IRDLOperation,
     TypeAttributeInvT,
     VarConstraint,
@@ -370,6 +371,161 @@ class QecCycleOp(IRDLOperation):
         super().__init__(operands=operands, result_types=(in_codeblock_type,))
 
 
+@irdl_op_definition
+class HadamardOp(IRDLOperation):
+    """A logical Hadamard gate operation."""
+
+    T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
+
+    name = "qecl.hadamard"
+
+    assembly_format = """
+            $in_codeblock `[` ($idx^):($idx_attr)? `]` attr-dict `:` type($in_codeblock)
+        """
+
+    in_codeblock = operand_def(T)
+
+    idx = opt_operand_def(IndexType)
+
+    idx_attr = opt_prop_def(IntegerAttr.constr(type=IndexType, value=AtLeast(0)))
+
+    out_codeblock = result_def(T)
+
+    def __init__(
+        self,
+        in_codeblock: LogicalCodeBlockSSAValue | Operation,
+        idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
+    ):
+        if isinstance(idx, int):
+            idx = IntegerAttr.from_int_and_width(idx, 64)
+
+        if isinstance(idx, IntegerAttr):
+            operands = (in_codeblock, None)
+            properties = {"idx_attr": idx}
+        else:
+            operands = (in_codeblock, idx)
+            properties = {}
+
+        in_codeblock_type = get_logical_codeblock_type(in_codeblock)
+
+        super().__init__(
+            operands=operands,
+            result_types=(in_codeblock_type,),
+            properties=properties,
+        )
+
+
+@irdl_op_definition
+class SOp(IRDLOperation):
+    """A logical S (π/2 phase) gate operation."""
+
+    T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
+
+    name = "qecl.s"
+
+    assembly_format = """
+            $in_codeblock `[` ($idx^):($idx_attr)? `]` (`adj` $adjoint^)? attr-dict `:` type($in_codeblock)
+        """
+
+    in_codeblock = operand_def(T)
+
+    idx = opt_operand_def(IndexType)
+
+    idx_attr = opt_prop_def(IntegerAttr.constr(type=IndexType, value=AtLeast(0)))
+
+    adjoint = opt_prop_def(UnitAttr)
+
+    out_codeblock = result_def(T)
+
+    def __init__(
+        self,
+        in_codeblock: LogicalCodeBlockSSAValue | Operation,
+        idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
+        adjoint: UnitAttr | bool = False,
+    ):
+        if isinstance(idx, int):
+            idx = IntegerAttr.from_int_and_width(idx, 64)
+
+        if isinstance(idx, IntegerAttr):
+            operands = (in_codeblock, None)
+            properties = {"idx_attr": idx}
+        else:
+            operands = (in_codeblock, idx)
+            properties = {}
+
+        in_codeblock_type = get_logical_codeblock_type(in_codeblock)
+
+        if adjoint:
+            properties["adjoint"] = UnitAttr()
+
+        super().__init__(
+            operands=operands,
+            result_types=(in_codeblock_type,),
+            properties=properties,
+        )
+
+
+@irdl_op_definition
+class CnotOp(IRDLOperation):
+    """A logical inter-codeblock CNOT gate operation."""
+
+    T_CTRL: ClassVar = VarConstraint("T_CTRL", anyLogicalCodeblock)
+    T_TRGT: ClassVar = VarConstraint("T_TRGT", anyLogicalCodeblock)
+
+    name = "qecl.cnot"
+
+    assembly_format = """
+            $in_ctrl_codeblock `[` ($idx_ctrl^):($idx_ctrl_attr)? `]` `,`
+            $in_trgt_codeblock `[` ($idx_trgt^):($idx_trgt_attr)? `]`
+            attr-dict `:` type($in_ctrl_codeblock) `,` type($in_trgt_codeblock)
+        """
+
+    irdl_options = (AttrSizedOperandSegments(as_property=True),)
+
+    in_ctrl_codeblock = operand_def(T_CTRL)
+
+    idx_ctrl = opt_operand_def(IndexType)
+
+    idx_ctrl_attr = opt_prop_def(IntegerAttr.constr(type=IndexType, value=AtLeast(0)))
+
+    in_trgt_codeblock = operand_def(T_TRGT)
+
+    idx_trgt = opt_operand_def(IndexType)
+
+    idx_trgt_attr = opt_prop_def(IntegerAttr.constr(type=IndexType, value=AtLeast(0)))
+
+    out_ctrl_codeblock = result_def(T_CTRL)
+
+    out_trgt_codeblock = result_def(T_TRGT)
+
+    def __init__(
+        self,
+        in_ctrl_codeblock: LogicalCodeBlockSSAValue | Operation,
+        idx_ctrl: int | IntegerAttr | SSAValue[IndexType] | Operation,
+        in_trgt_codeblock: LogicalCodeBlockSSAValue | Operation,
+        idx_trgt: int | IntegerAttr | SSAValue[IndexType] | Operation,
+    ):
+        if isinstance(idx_ctrl, int) and isinstance(idx_trgt, int):
+            idx_ctrl = IntegerAttr.from_int_and_width(idx_ctrl, 64)
+            idx_trgt = IntegerAttr.from_int_and_width(idx_trgt, 64)
+
+        if isinstance(idx_ctrl, IntegerAttr) and isinstance(idx_trgt, IntegerAttr):
+            operands = (in_ctrl_codeblock, None, in_trgt_codeblock, None)
+            properties = {"idx_ctrl_attr": idx_ctrl, "idx_trgt_attr": idx_trgt}
+        else:
+            operands = (in_ctrl_codeblock, idx_ctrl, in_trgt_codeblock, idx_trgt)
+            properties = {}
+
+        in_ctrl_codeblock_type = get_logical_codeblock_type(in_ctrl_codeblock)
+        in_trgt_codeblock_type = get_logical_codeblock_type(in_trgt_codeblock)
+
+        super().__init__(
+            operands=operands,
+            result_types=(in_ctrl_codeblock_type, in_trgt_codeblock_type),
+            properties=properties,
+        )
+
+
 QecLogical = Dialect(
     "qecl",
     [
@@ -379,6 +535,9 @@ QecLogical = Dialect(
         InsertCodeblockOp,
         EncodeOp,
         QecCycleOp,
+        HadamardOp,
+        SOp,
+        CnotOp,
     ],
     [
         LogicalCodeblockInitStateAttr,

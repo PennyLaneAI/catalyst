@@ -43,6 +43,9 @@ expected_ops_names = {
     "InsertCodeblockOp": "qecl.insert_block",
     "EncodeOp": "qecl.encode",
     "QecCycleOp": "qecl.qec",
+    "HadamardOp": "qecl.hadamard",
+    "SOp": "qecl.s",
+    "CnotOp": "qecl.cnot",
 }
 
 expected_attrs_names = {
@@ -169,6 +172,25 @@ class TestQecLogicalOps:
         assert isinstance(qec_op.result_types[0], qecl.LogicalCodeblockType)
         assert qec_op.result_types[0].k == self.k
 
+    # hadamard
+    hadamard_op = qecl.HadamardOp(in_codeblock=codeblock, idx=0)
+    assert len(hadamard_op.result_types) == 1
+    assert isinstance(hadamard_op.result_types[0], qecl.LogicalCodeblockType)
+
+    # s
+    s_op = qecl.SOp(in_codeblock=codeblock, idx=0)
+    assert len(s_op.result_types) == 1
+    assert isinstance(s_op.result_types[0], qecl.LogicalCodeblockType)
+
+    # cnot
+    codeblock_ctrl = create_ssa_value(qecl.LogicalCodeblockType(1))
+    cnot_op = qecl.CnotOp(
+        in_ctrl_codeblock=codeblock_ctrl, idx_ctrl=0, in_trgt_codeblock=codeblock, idx_trgt=0
+    )
+    assert len(cnot_op.result_types) == 2
+    assert isinstance(cnot_op.result_types[0], qecl.LogicalCodeblockType)
+    assert isinstance(cnot_op.result_types[1], qecl.LogicalCodeblockType)
+
 
 @pytest.mark.parametrize(
     "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
@@ -199,6 +221,20 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     // CHECK: [[block2:%.+]] = qecl.qec [[block1]] : !qecl.codeblock<1>
     %block2 = qecl.qec %block1 : !qecl.codeblock<1>
+
+    // CHECK: [[block3:%.+]] = qecl.hadamard [[block2]][{{\s*}}0] : !qecl.codeblock<1>
+    %block3 = qecl.hadamard %block2[0] : !qecl.codeblock<1>
+
+    // CHECK: [[block4:%.+]] = qecl.s [[block3]][{{\s*}}0] : !qecl.codeblock<1>
+    %block4 = qecl.s %block3[0] : !qecl.codeblock<1>
+
+    // CHECK: [[block5:%.+]] = qecl.s [[block4]][{{\s*}}0] adj : !qecl.codeblock<1>
+    %block5 = qecl.s %block4[0] adj : !qecl.codeblock<1>
+
+    // CHECK: [[block_ctrl:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+    // CHECK: [[block6:%.+]], [[block7:%.+]] = qecl.cnot [[block_ctrl]][{{\s*}}0], [[block5]][{{\s*}}0]
+    %block_ctrl = "test.op"() : () -> !qecl.codeblock<1>
+    %block6, %block7 = qecl.cnot %block_ctrl[0], %block5[0] : !qecl.codeblock<1>, !qecl.codeblock<1>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
