@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <mlir/Support/WalkResult.h>
 #define DEBUG_TYPE "value-semantics-conversion"
 
 #include <cstdint>
@@ -724,6 +725,31 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, QubitValueT
     builder.eraseOp(rGateOp);
 }
 
+void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    MLIRContext *ctx = callOp.getContext();
+
+    SmallVector<Type> newResultTypes;
+    for (auto callArg : callOp.getOperands()) {
+        if (isa<qref::QuregType>(callArg.getType())) {
+            newResultTypes.push_back(quantum::QuregType::get(ctx));
+        }
+        else if (isa<qref::QubitType>(callArg.getType())) {
+            newResultTypes.push_back(quantum::QubitType::get(ctx));
+        }
+    }
+
+    auto newCallOp =
+        migrateOpToValueSemantics<func::CallOp>(builder, callOp, tracker, newResultTypes);
+
+    for (auto [i, v] : llvm::enumerate(callOp->getResults())) {
+        builder.replaceAllUsesWith(v, newCallOp->getResult(i));
+    }
+
+    builder.eraseOp(callOp);
+}
+
 void handleCompbasis(IRRewriter &builder, qref::ComputationalBasisOp rCompbasisOp,
                      QubitValueTracker &tracker)
 {
@@ -851,6 +877,33 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
     builder.eraseOp(forOp);
 }
 
+Operation *addRootVValuesToRetOp(Region &r, QubitValueTracker &tracker)
+{
+    Block &block = r.front();
+    Operation *retOp;
+    if (auto funcOp = dyn_cast<func::FuncOp>(r.getParentOp())) {
+        retOp = funcOp.getBody().back().getTerminator();
+    }
+    else if (auto forOp = dyn_cast<scf::ForOp>(r.getParentOp())) {
+        retOp = forOp.getRegion().front().getTerminator();
+    }
+    else {
+        assert(false && "Bad region!");
+    }
+    SmallVector<Value> retVals(retOp->getOperands());
+    for (auto arg : block.getArguments()) {
+        if (isa<qref::QubitType>(arg.getType())) {
+            retVals.push_back(tracker.getCurrentVQubit(arg));
+        }
+        else if (isa<qref::QuregType>(arg.getType())) {
+            retVals.push_back(tracker.getCurrentVQreg(arg));
+        }
+    }
+    retOp->setOperands(retVals);
+
+    return retOp;
+}
+
 // Driver
 
 void handleRegion(IRRewriter &builder, Region &r)
@@ -898,6 +951,9 @@ void handleRegion(IRRewriter &builder, Region &r)
         else if (auto rGateOp = dyn_cast<qref::QuantumOperation>(op)) {
             handleGate(builder, rGateOp, tracker);
         }
+        else if (auto callOp = dyn_cast<func::CallOp>(op)) {
+            handleCall(builder, callOp, tracker);
+        }
         else if (auto rCompbasisOp = dyn_cast<qref::ComputationalBasisOp>(op)) {
             handleCompbasis(builder, rCompbasisOp, tracker);
         }
@@ -921,26 +977,7 @@ void handleRegion(IRRewriter &builder, Region &r)
         builder.eraseOp(getOp);
     });
 
-    Operation *retOp;
-    if (auto funcOp = dyn_cast<func::FuncOp>(r.getParentOp())) {
-        retOp = funcOp.getBody().back().getTerminator();
-    }
-    else if (auto forOp = dyn_cast<scf::ForOp>(r.getParentOp())) {
-        retOp = forOp.getRegion().front().getTerminator();
-    }
-    else {
-        assert(false && "Bad region!");
-    }
-    SmallVector<Value> retVals(retOp->getOperands());
-    for (auto arg : block.getArguments()) {
-        if (isa<qref::QubitType>(arg.getType())) {
-            retVals.push_back(tracker.getCurrentVQubit(arg));
-        }
-        else if (isa<qref::QuregType>(arg.getType())) {
-            retVals.push_back(tracker.getCurrentVQreg(arg));
-        }
-    }
-    retOp->setOperands(retVals);
+    Operation *retOp = addRootVValuesToRetOp(r, tracker);
 
     for (unsigned i : llvm::reverse(rArgsErasureIndices)) {
         // A note on the reverse: if we want to erase args at indices 0 and 1, and the original
@@ -954,7 +991,7 @@ void handleRegion(IRRewriter &builder, Region &r)
     // Since we don't do a designated handler for func ops, unlike the other control flow ops
     if (auto funcOp = dyn_cast<func::FuncOp>(r.getParentOp())) {
         funcOp.setFunctionType(
-            FunctionType::get(ctx, block.getArgumentTypes(), TypeRange(retVals)));
+            FunctionType::get(r.getContext(), block.getArgumentTypes(), retOp->getOperandTypes()));
     }
 }
 
@@ -978,22 +1015,36 @@ struct ValueSemanticsConversionPass
         auto *qrefDialect = ctx->getLoadedDialect<qref::QRefDialect>();
         IRRewriter builder(ctx);
 
-        // Collect all qnode functions.
-        SetVector<func::FuncOp> qnodeFuncs;
+        // Collect all functions that need to be converted
+        // This includes qnode functions, and any subroutine functions
+        SetVector<func::FuncOp> targetFuncs;
         mod->walk([&](func::FuncOp f) {
             if (f->hasAttrOfType<UnitAttr>("quantum.node")) {
-                qnodeFuncs.insert(f);
+                targetFuncs.insert(f);
+                return WalkResult::advance();
             }
+
+            WalkResult wr_subroutine = f.walk([qrefDialect](Operation *op) {
+                if (op->getDialect() == qrefDialect) {
+                    return WalkResult::interrupt();
+                }
+                return WalkResult::advance();
+            });
+            if (wr_subroutine.wasInterrupted()) {
+                targetFuncs.insert(f);
+            }
+
+            return WalkResult::advance();
         });
 
-        for (auto qnodeFunc : qnodeFuncs) {
-            handleRegion(builder, qnodeFunc.getBody());
+        for (auto targetFunc : targetFuncs) {
+            handleRegion(builder, targetFunc.getBody());
 
             // Clean up: erase remaining qref dialect ops
             // Due to the nature of the reference semantics dialect, qref ops all have full side
             // effects, and will not delete themselves.
             SmallVector<Operation *> toErase;
-            qnodeFunc->walk([&](Operation *op) {
+            targetFunc->walk([&](Operation *op) {
                 if (op->getDialect() == qrefDialect) {
                     toErase.push_back(op);
                 }

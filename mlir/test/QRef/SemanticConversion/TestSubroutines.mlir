@@ -109,3 +109,51 @@ func.func @test_qubit_args_with_loop(%q: !qref.bit) attributes {quantum.node} {
     // CHECK: }
     // CHECK: return [[loopOut]] : !quantum.bit
 }
+
+
+// -----
+
+
+// CHECK: func.func @test_call(%arg0: f64) -> (i1, !quantum.obs, !quantum.obs) attributes {quantum.node}
+func.func @test_call(%arg0: f64) -> (i1, !quantum.obs, !quantum.obs) attributes {quantum.node} {
+    // CHECK: [[r2:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[r3:%.+]] = quantum.alloc( 3) : !quantum.reg
+    %r2 = qref.alloc(2) : !qref.reg<2>
+    %r3 = qref.alloc(3) : !qref.reg<3>
+    %q20 = qref.get %r2[0] : !qref.reg<2> -> !qref.bit
+
+    // CHECK: [[q20:%.+]] = quantum.extract [[r2]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[callOut:%.+]]:3 = call @subroutine([[r3]], [[q20]], %arg0) : (!quantum.reg, !quantum.bit, f64) -> (i1, !quantum.reg, !quantum.bit)
+    %0 = func.call @subroutine(%r3, %q20, %arg0) : (!qref.reg<3>, !qref.bit, f64) -> (i1)
+
+    // CHECK: [[obs_q:%.+]] = quantum.compbasis qubits [[callOut]]#2 : !quantum.obs
+    // CHECK: [[insert_r2:%.+]] = quantum.insert [[r2]][ 0], [[callOut]]#2 : !quantum.reg, !quantum.bit
+    %obs_q = qref.compbasis qubits %q20 : !quantum.obs
+
+    // CHECK: [[obs_r:%.+]] = quantum.compbasis qreg [[callOut]]#1 : !quantum.obs
+    %obs_r = qref.compbasis (qreg %r3 : !qref.reg<3>) : !quantum.obs
+
+    // CHECK: quantum.dealloc [[insert_r2]] : !quantum.reg
+    // CHECK: quantum.dealloc [[callOut]]#1 : !quantum.reg
+    qref.dealloc %r2 : !qref.reg<2>
+    qref.dealloc %r3 : !qref.reg<3>
+
+    // CHECK: return [[callOut]]#0, [[obs_q]], [[obs_r]] : i1, !quantum.obs, !quantum.obs
+    return %0, %obs_q, %obs_r : i1, !quantum.obs, !quantum.obs
+}
+
+// func.func @subroutine(%arg0: !quantum.reg, %arg1: !quantum.bit, %arg2: f64) -> (i1, !quantum.reg, !quantum.bit)
+func.func @subroutine(%r: !qref.reg<3>, %q: !qref.bit, %param: f64) -> (i1) {
+    %q0 = qref.get %r[0] : !qref.reg<3> -> !qref.bit
+
+    // CHECK: [[q_extract:%.+]] = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[GATE:%.+]]:2 = quantum.custom "gate"(%arg2) [[q_extract]], %arg1 : !quantum.bit, !quantum.bit
+    qref.custom "gate"(%param) %q0, %q : !qref.bit, !qref.bit
+
+    // CHECK: [[mres:%.+]], [[MEASURE:%.+]] = quantum.measure [[GATE]]#0 : i1, !quantum.bit
+    // CHECK: [[insert:%.+]] = quantum.insert %arg0[ 0], [[MEASURE]] : !quantum.reg, !quantum.bit
+    %mres = qref.measure %q0 : i1
+
+    // CHECK: return [[mres]], [[insert]], [[GATE]]#1 : i1, !quantum.reg, !quantum.bit
+    return %mres : i1
+}
