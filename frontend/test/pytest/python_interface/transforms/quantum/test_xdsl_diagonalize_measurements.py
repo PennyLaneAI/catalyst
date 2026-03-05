@@ -40,6 +40,7 @@ class TestDiagonalizeFinalMeasurementsPass:
     @pytest.mark.parametrize(
         "supported_base_obs",
         [
+            "PauliX",
             "pauliz",
             ("paulix",),
             ("paulix", "pauliy"),
@@ -50,7 +51,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         PauliY, PauliZ, Hadamard, and Identity]."""
         expected_msg = (
             "Supported base observables must be a subset of (PauliX, PauliY, PauliZ, Hadamard, "
-            f"and Identity) passed as a tuple[str] or str, but received {supported_base_obs}"
+            f"and Identity) passed as a tuple[str], but received {supported_base_obs}"
         )
         with pytest.raises(ValueError, match=re.escape(expected_msg)):
             _ = DiagonalizeFinalMeasurementsPass(supported_base_obs=supported_base_obs)
@@ -76,7 +77,7 @@ class TestDiagonalizeFinalMeasurementsPass:
 
     @pytest.mark.parametrize(
         "supported_base_obs",
-        ["PauliX", ("PauliX",), ("PauliX", "PauliY")],
+        [("PauliX",), ("PauliX", "PauliY")],
     )
     def test_with_supported_base_obs(self, supported_base_obs, run_filecheck):
         """Check observables in the supported_base_obs would not be diagonalized."""
@@ -131,7 +132,7 @@ class TestDiagonalizeFinalMeasurementsPass:
             }
             """
 
-        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs="PauliX"),)
+        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs=("PauliX",)),)
         run_filecheck(program, pipeline)
 
     def test_with_pauli_x(self, run_filecheck):
@@ -173,7 +174,7 @@ class TestDiagonalizeFinalMeasurementsPass:
             }
             """
 
-        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs="PauliY"),)
+        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs=("PauliY",)),)
         run_filecheck(program, pipeline)
 
     def test_with_pauli_y(self, run_filecheck):
@@ -217,7 +218,7 @@ class TestDiagonalizeFinalMeasurementsPass:
             }
             """
 
-        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs="Hadamard"),)
+        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs=("Hadamard",)),)
         run_filecheck(program, pipeline)
 
     def test_with_hadamard(self, run_filecheck):
