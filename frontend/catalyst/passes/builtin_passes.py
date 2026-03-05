@@ -909,10 +909,7 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     if qnode is None:
         return functools.partial(merge_ppr_ppm, max_pauli_size=max_pauli_size)
 
-    def setup_inputs(max_pauli_size=max_pauli_size):
-        return (), {"max_pauli_size": max_pauli_size}
-
-    return qml.transform(pass_name="merge-ppr-ppm", setup_inputs=setup_inputs)(qnode)
+    return qml.transform(pass_name="merge-ppr-ppm")(qnode, max_pauli_size=max_pauli_size)
 
 
 def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measure=False):
