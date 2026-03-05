@@ -14,8 +14,6 @@
 
 #define DEBUG_TYPE "register-decomp-rule-resource"
 
-#include "llvm/Support/JSON.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/Pass.h"

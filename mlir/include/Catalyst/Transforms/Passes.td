@@ -247,8 +247,8 @@ def ResourceTrackerPass : Pass<"resource-tracker"> {
         It leverages `ResourceAnalysis` to retrieve cached results and integrates directly
         with the MLIR Pass Statistics mechanism for reporting.
 
-        Optionally, the following output formats are supported:
-            - `output-json`: Serializes the resource data into a structured JSON file.
+        Optionally, it can output the results as JSON to stdout for
+        consumption by the PennyLane frontend.
 
         Usage:
             quantum-opt input.mlir -resource-tracker -mlir-pass-statistics
@@ -262,7 +262,7 @@ def ResourceTrackerPass : Pass<"resource-tracker"> {
             /*type=*/"bool",
             /*default=*/"false",
             /*description=*/"Print resource counts as JSON to stdout"
-        >,
+        >
     ];
 }
 
