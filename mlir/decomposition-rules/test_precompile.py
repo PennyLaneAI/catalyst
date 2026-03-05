@@ -1,3 +1,21 @@
+# Copyright 2026 Xanadu Quantum Technologies Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Tests for the decomposition rule precompilation utilities.
+"""
+
 import pennylane as qp
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
@@ -20,6 +38,10 @@ def test_get_compiler_ops():
 
 
 class TestGetDummyArgs:
+    """
+    Tests for get_dummy_args.
+    """
+
     def test_empty_func(self):
         """
         Test that get_dummy_args correctly handles funcs with no args.
@@ -28,7 +50,7 @@ class TestGetDummyArgs:
         def empty():
             return
 
-        assert get_dummy_args(empty) == []
+        assert not get_dummy_args(empty)
 
     def test_int_param(self):
         """
@@ -56,7 +78,7 @@ class TestGetDummyArgs:
         """
 
         def tensorlike_param(a: TensorLike):
-            return 3
+            return 3 + a
 
         assert get_dummy_args(tensorlike_param) == [0.0]
 
@@ -78,7 +100,7 @@ class TestGetDummyArgs:
         def wire_param(wires: WiresLike):
             return wires
 
-        assert get_dummy_args(wire_param) == []
+        assert not get_dummy_args(wire_param)
 
     def test_mixed_params(self):
         """
@@ -96,17 +118,21 @@ class TestGetDummyArgs:
         """
 
         def pauli_names(pauli_word, pauli_string):
-            return 5
+            return pauli_word + " and " + pauli_string
 
         assert get_dummy_args(pauli_names) == ["XX", "XX"]
 
         def angle_names(theta, phi, omega):
-            return "hello"
+            return theta + phi + omega
 
         assert get_dummy_args(angle_names) == [0.0, 0.0, 0.0]
 
 
 class TestCompileOpDecompRules:
+    """
+    Tests for compile_op_decomp_rules.
+    """
+
     def test_hadamard(self):
         """
         Test that compile_op_decomp_rules successfully compiles each decomp rule for Hadamards
@@ -141,7 +167,7 @@ def test_mlir_output():
     """
 
     rules = ""
-    with open("./decomposition-rules/decompositions.mlir") as mlir_file:
+    with open("./decomposition-rules/decompositions.mlir", encoding="utf-8") as mlir_file:
         rules = mlir_file.read()
 
     assert "_rx_to_rot" in rules

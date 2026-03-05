@@ -22,7 +22,7 @@ import inspect
 import warnings
 from pathlib import Path
 from types import UnionType
-from typing import Any, Callable, Union, get_args, get_origin
+from typing import Callable, Union, get_args, get_origin
 
 import jax
 import pennylane as qp
