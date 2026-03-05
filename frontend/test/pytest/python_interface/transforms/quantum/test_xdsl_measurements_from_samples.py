@@ -443,10 +443,8 @@ class TestMeasurementsFromSamplesPass:
 
 
 @pytest.mark.usefixtures("use_capture")
-class TestMeasurementsFromSamplesIntegration:
-    """Tests of the execution of simple workloads with the xDSL-based MeasurementsFromSamplesPass
-    transform.
-    """
+class TestItegrationUsefulErrors:
+    """Test that useful error messages are raised in the frontend for unsupported behaviour"""
 
     def test_no_shots_raises_error(self):
         """Test that when no shots are provided, the pass raises an error"""
@@ -463,111 +461,166 @@ class TestMeasurementsFromSamplesIntegration:
         ):
             circuit(1.2)
 
+    def test_dynamic_shots_raises_useful_error(self):
+        """Test that when dynamic shots are provided, the pass raises an error"""
+
+        @qml.qjit
+        @measurements_from_samples_pass
+        def workflow(a, shots):
+            
+            @qml.set_shots(shots)
+            @qml.qnode(qml.device("lightning.qubit", wires=1))
+            def circuit(x):
+                qml.RX(x, 0)
+                return qml.expval(qml.Z(0))
+            
+            circuit(a)
+
+        with pytest.raises(
+            ValueError, match="measurements_from_samples pass requires non-zero shots"
+        ):
+            workflow(1.2, 100)
+
+    def test_counts_raises_not_implemented(self):
+        """Test that a circuit with counts causes measurements_from_samples_pass 
+        to raise a NotImplementedError"""
+
+        dev = qml.device("lightning.qubit", wires=4)
+
+        with pytest.raises(
+            NotImplementedError, match="not implemented with measurements_from_samples"
+        ):
+            @qml.qjit
+            @measurements_from_samples_pass
+            @qml.set_shots(1000)
+            @qml.qnode(dev)
+            def circuit(theta: float):
+                qml.RX(theta, 0)
+                return qml.counts()
+
+    @pytest.mark.xfail(reason="Dynamic shots not supported")
+    def test_exec_expval_dynamic_shots(self):
+        """Test the measurements_from_samples transform where the number of shots is dynamic.
+
+        This use case is not currently supported.
+        """
+
+        @qml.qjit
+        def workload(shots):
+            dev = qml.device("lightning.qubit", wires=1)
+
+            @measurements_from_samples_pass
+            @qml.qnode(dev, shots=shots)
+            def circuit():
+                return qml.expval(qml.Z(wires=0))
+
+            return circuit()
+
+        result = workload(2)
+        assert result == 1.0
+
+    # TODO: not sure what this raises yet, depends on behaviour of diagonalize and whether 
+    # this is already caught there. Placeholder for now.
+    @pytest.mark.parametrize("mp", (qml.expval, qml.var))
+    def test_overlapping_tensor(self, mp):
+                
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            return mp(qml.Z(0) @ qml.X(0))
+
+
+@pytest.mark.usefixtures("use_capture")
+class TestIntegrationWithOtherPasses:
+    """Tests the integration of the xDSL-based MeasurementsFromSamplesPass transform with 
+    other key passes.
+    """
+
+    def test_integrate_with_decompose(self):
+        """Test that the measurements_from_samples pass works correctly when used in combination
+        with the decompose pass."""
+        dev = qml.device("null.qubit", wires=4)
+
+        @qml.qjit(target="mlir")
+        @measurements_from_samples_pass
+        @partial(
+            qml.transforms.decompose,
+            gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "RY", "GlobalPhase"},
+        )
+        @qml.qnode(dev, shots=1000)
+        def circuit():
+            qml.CRX(0.1, wires=[0, 1])
+            return qml.expval(qml.Z(0))
+
+        res = circuit()
+        assert res == 1.0
+
+@pytest.mark.usefixtures("use_capture")
+class TestIntegrationWithExecution:
+    """Tests of the execution of simple workloads with the xDSL-based MeasurementsFromSamplesPass
+    transform and compare to expected results.
+    """
+
+    @pytest.mark.parametrize("transform", [measurements_from_samples_pass, qml.transform(pass_name="measurements-from-samples")])
+    def test_qjit_filecheck(self, transform, run_filecheck_qjit):
+        """Test that the measurements_from_samples_pass works correctly with qjit when 
+        applied directly and as a qml.transform."""
+
+        dev = qml.device("lightning.qubit", wires=2)
+    
+        @qml.qjit(target="mlir")
+        @transform
+        @qml.qnode(dev, shots=25)
+        def circuit():
+            # CHECK-NOT: quantum.namedobs
+            # CHECK: [[obs:%.+]] = quantum.compbasis
+            # CHECK: [[samples:%.+]] = quantum.sample [[obs]] : tensor<25x1xf64>
+            # CHECK: [[c0:%.+]] = arith.constant dense<0> : tensor<i64>
+            # CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.25x1xf64([[samples]], [[c0]]) :
+            # CHECK-SAME: (tensor<25x1xf64>, tensor<i64>) -> tensor<f64>
+            # CHECK-NOT: quantum.expval
+            return qml.expval(qml.Z(wires=0))
+
+        run_filecheck_qjit(circuit)
+
+    # ---- Test circuits returning expectation values -------------------------------------------- #
     @pytest.mark.parametrize("shots", [1, 2])
     @pytest.mark.parametrize(
-        "initial_op, mp, obs, expected_res",
+        "initial_op, obs, expected_res",
         [
             # PauliZ observables
-            (qml.I, qml.expval, qml.Z, 1.0),
-            (qml.X, qml.expval, qml.Z, -1.0),
-            (qml.I, qml.var, qml.Z, 0.0),
-            (qml.X, qml.var, qml.Z, 0.0),
+            (qml.I, qml.Z, 1.0),
+            (qml.X, qml.Z, -1.0),
             # PauliX observables
             pytest.param(
                 partial(qml.RY, phi=np.pi / 2),
-                qml.expval,
                 qml.X,
                 1.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
             pytest.param(
                 partial(qml.RY, phi=-np.pi / 2),
-                qml.expval,
                 qml.X,
                 -1.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
-            ),
-            pytest.param(
-                partial(qml.RY, phi=np.pi / 2),
-                qml.var,
-                qml.X,
-                0.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
-            ),
-            pytest.param(
-                partial(qml.RY, phi=-np.pi / 2),
-                qml.var,
-                qml.X,
-                0.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
             # PauliY observables
             pytest.param(
                 partial(qml.RX, phi=-np.pi / 2),
-                qml.expval,
                 qml.Y,
                 1.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
             pytest.param(
                 partial(qml.RX, phi=np.pi / 2),
-                qml.expval,
                 qml.Y,
                 -1.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
-            ),
-            pytest.param(
-                partial(qml.RX, phi=-np.pi / 2),
-                qml.var,
-                qml.Y,
-                0.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
-            ),
-            pytest.param(
-                partial(qml.RX, phi=np.pi / 2),
-                qml.var,
-                qml.Y,
-                0.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
         ],
     )
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
-    def test_exec_1_wire_mp_with_obs(self, shots, initial_op, mp, obs, expected_res):
-        """Test the measurements_from_samples transform on a device with a single wire and terminal
-        measurements that require an observable (i.e. expval and var).
+    def test_expval_single_wire(self, shots, initial_op, obs, expected_res):
+        """Test the measurements_from_samples transform on a circuit that measures an 
+        expval of an observable on the single wire.
         """
 
         dev = qml.device("lightning.qubit", wires=1)
@@ -575,7 +628,7 @@ class TestMeasurementsFromSamplesIntegration:
         @qml.qnode(dev, shots=shots)
         def circuit_ref():
             initial_op(wires=0)
-            return mp(obs(wires=0))
+            return qml.expval(obs(wires=0))
 
         assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
         circuit_compiled = qml.qjit(
@@ -584,8 +637,307 @@ class TestMeasurementsFromSamplesIntegration:
 
         assert expected_res == circuit_compiled()
 
-    # -------------------------------------------------------------------------------------------- #
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, obs, expected_res",
+        [
+            ((qml.I, qml.I), qml.Z, (1.0, 1.0)),
+            ((qml.I, qml.X), qml.Z, (1.0, -1.0)),
+            ((qml.X, qml.I), qml.Z, (-1.0, 1.0)),
+            ((qml.X, qml.X), qml.Z, (-1.0, -1.0)),
+        ],
+    )
+    def test_expval_2_mps(self, shots, initial_ops, obs, expected_res):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
 
+        In this test, the terminal measurements are performed separately per wire.
+        """
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            return qml.expval(obs(wires=0)), qml.expval(obs(wires=1))
+
+        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
+        circuit_compiled = qml.qjit(
+            measurements_from_samples_pass(circuit_ref),
+        )
+
+        assert expected_res == circuit_compiled()
+
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), 1.0),
+            ((qml.I, qml.X), -1.0),
+            ((qml.X, qml.I), -1.0),
+            ((qml.X, qml.X), 1.0),
+        ],
+    )
+    def test_expval_tensor(self, shots, initial_ops, expected_res):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed on the combination of both wires.
+        """
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            return qml.expval(qml.Z(wires=0) @ qml.Z(wires=1))
+
+        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
+
+        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
+
+        assert expected_res == circuit_compiled()
+
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), 1.0),
+            ((qml.I, qml.X), -1.0),
+            ((qml.X, qml.I), -1.0),
+            ((qml.X, qml.X), 1.0),
+        ],
+    )
+    def test_expval_sprod(self, shots, initial_ops, expected_res):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed on the combination of both wires.
+        """
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit
+        @qml.transform(pass_name="measurements-from-samples")
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            return qml.expval(2* qml.Z(wires=0))
+
+        assert expected_res == circuit_compiled()
+
+    @pytest.mark.parametrize("shots", [1000, 2000])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), 2.0),
+            # ((qml.I, qml.X), -1.0),
+            # ((qml.X, qml.I), -1.0),
+            # ((qml.X, qml.X), 1.0),
+        ],
+    )
+    def test_expval_sum(self, shots, initial_ops, expected_res):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed on the combination of both wires.
+        """
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit
+        @qml.transform(pass_name="measurements-from-samples")
+        @qml.qnode(dev, shots=shots)
+        def circuit():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            return qml.expval(2*qml.Z(wires=0) + qml.X(1))
+
+        assert np.isclose(circuit(), expected_res, atol=0.05)
+
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), 1.0),
+            ((qml.I, qml.X), -1.0),
+            ((qml.X, qml.I), -1.0),
+            ((qml.X, qml.X), 1.0),
+        ],
+    )
+    def test_expval_mcm(self, shots, initial_ops, expected_res):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements provide statistics on an MCM.
+        """
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit
+        @qml.transform(pass_name="measurements-from-samples")
+        @qml.qnode(dev, shots=shots)
+        def circuit():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            m = qml.measure(0)
+            return qml.expval(m)
+
+        assert np.allclose(expected_res, circuit(), atol=0.05)
+
+
+    # ---- Test circuits returning variance ------------------------------------------------------ #
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_op, obs, expected_res",
+        [
+            # PauliZ observables
+            (qml.I, qml.Z, 0.0),
+            (qml.X, qml.Z, 0.0),
+            # PauliX observables
+            pytest.param(
+                partial(qml.RY, phi=np.pi / 2),
+                qml.X,
+                0.0,
+            ),
+            pytest.param(
+                partial(qml.RY, phi=-np.pi / 2),
+                qml.X,
+                0.0,
+            ),
+            # PauliY observables
+            pytest.param(
+                partial(qml.RX, phi=-np.pi / 2),
+                qml.Y,
+                0.0,
+            ),
+            pytest.param(
+                partial(qml.RX, phi=np.pi / 2),
+                qml.Y,
+                0.0,
+            ),
+        ],
+    )
+    def test_single_wire_var(self, shots, initial_op, obs, expected_res):
+        """Test the measurements_from_samples transform on a circuit that measures an 
+        variance of an observable on the single wire.
+        """
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_op(wires=0)
+            return qml.var(obs(wires=0))
+
+        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
+        circuit_compiled = qml.qjit(
+            measurements_from_samples_pass(circuit_ref),
+        )
+
+        assert expected_res == circuit_compiled()
+
+
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, obs, expected_res",
+        [
+            ((qml.I, qml.I), qml.Z, (0.0, 0.0)),
+            ((qml.I, qml.X), qml.Z, (0.0, 0.0)),
+            ((qml.X, qml.I), qml.Z, (0.0, 0.0)),
+            ((qml.X, qml.X), qml.Z, (0.0, 0.0)),
+        ],
+    )
+    def test_2_variance_mps(self, shots, initial_ops, obs, expected_res):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed separately per wire.
+        """
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            return qml.var(obs(wires=0)), qml.var(obs(wires=1))
+
+        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
+        circuit_compiled = qml.qjit(
+            measurements_from_samples_pass(circuit_ref),
+        )
+
+        assert expected_res == circuit_compiled()
+
+
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), 0.0),
+            ((qml.I, qml.X), 0.0),
+            ((qml.X, qml.I), 0.0),
+            ((qml.X, qml.X), 0.0),
+        ],
+    )
+    def test_var_tensor(self, shots, initial_ops, expected_res):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed on the combination of both wires.
+        """
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            return qml.var(qml.Z(wires=0) @ qml.Z(wires=1))
+
+        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
+
+        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
+
+        assert expected_res == circuit_compiled()
+
+
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), 0.0),
+            ((qml.I, qml.X), 0.0),
+            ((qml.X, qml.I), 0.0),
+            ((qml.X, qml.X), 0.0),
+        ],
+    )
+    def test_var_sprod(self, shots, initial_ops, expected_res):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed on the combination of both wires.
+        """
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            return qml.var(qml.Z(wires=0) @ qml.Z(wires=1))
+
+        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
+
+        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
+
+        assert expected_res == circuit_compiled()
+
+    # ---- Test circuits returning probability --------------------------------------------------- #
     @pytest.mark.parametrize("shots", [1, 2])
     @pytest.mark.parametrize(
         "initial_op, expected_res",
@@ -615,45 +967,65 @@ class TestMeasurementsFromSamplesIntegration:
 
         assert np.array_equal(expected_res, circuit_compiled())
 
-    # -------------------------------------------------------------------------------------------- #
-
-    @pytest.mark.xfail(
-        reason="Counts not supported in Catalyst with program capture",
-        strict=True,
-        raises=NotImplementedError,
-    )
     @pytest.mark.parametrize("shots", [1, 2])
     @pytest.mark.parametrize(
-        "initial_op, expected_res",
+        "initial_ops, expected_res",
         [
-            (qml.I, {"0": 10, "1": 0}),
-            (qml.X, {"0": 0, "1": 10}),
+            ((qml.I, qml.I), [1.0, 0.0, 0.0, 0.0]),
+            ((qml.I, qml.X), [0.0, 1.0, 0.0, 0.0]),
+            ((qml.X, qml.I), [0.0, 0.0, 1.0, 0.0]),
+            ((qml.X, qml.X), [0.0, 0.0, 0.0, 1.0]),
         ],
     )
-    def test_exec_1_wire_counts(self, shots, initial_op, expected_res):
-        """Test the measurements_from_samples transform on a device with a single wire and terminal
-        counts measurements.
+    def test_exec_2_wire_probs_global(self, shots, initial_ops, expected_res):
+        """Test the measurements_from_samples transform on a device with two wires and a terminal,
+        "global" probs measurements (one that implicitly acts on all wires).
         """
-
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qml.device("lightning.qubit", wires=2)
 
         @qml.qnode(dev, shots=shots)
         def circuit_ref():
-            initial_op(wires=0)
-            return qml.counts(wires=0, all_outcomes=True)
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            return qml.probs()
 
         assert np.array_equal(
             expected_res, circuit_ref()
         ), "Sanity check failed, is expected_res correct?"
+        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
 
-        circuit_compiled = qml.qjit(
-            measurements_from_samples_pass(circuit_ref),
-        )
+        assert np.array_equal(expected_res, circuit_compiled())
 
-        assert np.array_equal(expected_res, _counts_catalyst_to_pl(*circuit_compiled()))
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), ([1.0, 0.0], [1.0, 0.0])),
+            ((qml.I, qml.X), ([1.0, 0.0], [0.0, 1.0])),
+            ((qml.X, qml.I), ([0.0, 1.0], [1.0, 0.0])),
+            ((qml.X, qml.X), ([0.0, 1.0], [0.0, 1.0])),
+        ],
+    )
+    def test_exec_2_wire_probs_per_wire(self, shots, initial_ops, expected_res):
+        """Test the measurements_from_samples transform on a device with two wires and a terminal,
+        "global" probs measurements (one that implicitly acts on all wires).
+        """
+        dev = qml.device("lightning.qubit", wires=2)
 
-    # -------------------------------------------------------------------------------------------- #
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            return qml.probs(wires=0), qml.probs(wires=1)
 
+        assert np.array_equal(
+            expected_res, circuit_ref()
+        ), "Sanity check failed, is expected_res correct?"
+        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
+
+        assert np.array_equal(expected_res, circuit_compiled())
+
+    # ---- Test circuits returning samples ------------------------------------------------------- #
     @pytest.mark.parametrize("shots", [1, 2])
     @pytest.mark.parametrize(
         "initial_op, expected_res_base",
@@ -685,206 +1057,50 @@ class TestMeasurementsFromSamplesIntegration:
 
     # -------------------------------------------------------------------------------------------- #
 
-    @pytest.mark.parametrize("shots", [1, 2])
-    @pytest.mark.parametrize(
-        "initial_ops, mp, obs, expected_res",
-        [
-            ((qml.I, qml.I), qml.expval, qml.Z, (1.0, 1.0)),
-            ((qml.I, qml.X), qml.expval, qml.Z, (1.0, -1.0)),
-            ((qml.X, qml.I), qml.expval, qml.Z, (-1.0, 1.0)),
-            ((qml.X, qml.X), qml.expval, qml.Z, (-1.0, -1.0)),
-            ((qml.I, qml.I), qml.var, qml.Z, (0.0, 0.0)),
-            ((qml.I, qml.X), qml.var, qml.Z, (0.0, 0.0)),
-            ((qml.X, qml.I), qml.var, qml.Z, (0.0, 0.0)),
-            ((qml.X, qml.X), qml.var, qml.Z, (0.0, 0.0)),
-        ],
-    )
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
-    def test_exec_2_wire_with_obs_separate(self, shots, initial_ops, mp, obs, expected_res):
-        """Test the measurements_from_samples transform on a device with two wires and terminal
-        measurements that require an observable (i.e. expval and var).
+    def test_measurements_from_samples_multiple_measurements(self):
+        """Test the transform measurements_from_samples with multiple measurement types
+        as part of the Catalyst pipeline."""
 
-        In this test, the terminal measurements are performed separately per wire.
-        """
+        dev = qml.device("lightning.qubit", wires=4)
 
-        dev = qml.device("lightning.qubit", wires=2)
+        @qml.set_shots(5000)
+        @qml.qnode(dev)
+        def basic_circuit(theta: float):
+            qml.RY(theta, 0)
+            qml.RY(theta / 2, 1)
+            qml.RY(2 * theta, 2)
+            qml.RY(theta, 3)
+            return (
+                qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
+                qml.var(qml.PauliX(wires=2)),
+                qml.sample(qml.PauliX(wires=0) @ qml.PauliX(wires=1) @ qml.PauliX(wires=2)),
+                qml.probs(wires=[3]),
+            )
 
-        @qml.qnode(dev, shots=shots)
-        def circuit_ref():
-            initial_ops[0](wires=0)
-            initial_ops[1](wires=1)
-            return mp(obs(wires=0)), mp(obs(wires=1))
+        transformed_circuit = qml.qjit(measurements_from_samples_pass(basic_circuit), seed=37)
 
-        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
-        circuit_compiled = qml.qjit(
-            measurements_from_samples_pass(circuit_ref),
-        )
+        # mlir = transformed_circuit.mlir
+        # assert "expval" not in mlir
+        # assert "quantum.var" not in mlir
+        # assert "sample" in mlir
 
-        assert expected_res == circuit_compiled()
+        theta = 1.9
 
-    # -------------------------------------------------------------------------------------------- #
+        expval_res, var_res, sample_res, probs_res = qjit(transformed_circuit, seed=37)(theta)
 
-    @pytest.mark.xfail(
-        reason="Operator arithmetic not yet supported with capture enabled", strict=True
-    )
-    @pytest.mark.parametrize("shots", [1, 2])
-    @pytest.mark.parametrize(
-        "initial_ops, mp, expected_res",
-        [
-            ((qml.I, qml.I), qml.expval, 1.0),
-            ((qml.I, qml.X), qml.expval, -1.0),
-            ((qml.X, qml.I), qml.expval, -1.0),
-            ((qml.X, qml.X), qml.expval, 1.0),
-            ((qml.I, qml.I), qml.var, 0.0),
-            ((qml.I, qml.X), qml.var, 0.0),
-            ((qml.X, qml.I), qml.var, 0.0),
-            ((qml.X, qml.X), qml.var, 0.0),
-        ],
-    )
-    def test_exec_2_wire_with_obs_combined(self, shots, initial_ops, mp, expected_res):
-        """Test the measurements_from_samples transform on a device with two wires and terminal
-        measurements that require an observable (i.e. expval and var).
+        expval_expected = np.sin(theta) * np.sin(theta / 2)
+        var_expected = 1 - np.sin(2 * theta) ** 2
+        sample_expected = basic_circuit(theta)[2]
+        probs_expected = [np.cos(theta / 2) ** 2, np.sin(theta / 2) ** 2]
 
-        In this test, the terminal measurements are performed on the combination of both wires.
-        """
+        assert np.isclose(expval_res, expval_expected, atol=0.05)
+        assert np.isclose(var_res, var_expected, atol=0.05)
+        assert np.allclose(probs_res, probs_expected, atol=0.05)
 
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qnode(dev, shots=shots)
-        def circuit_ref():
-            initial_ops[0](wires=0)
-            initial_ops[1](wires=1)
-            return mp(qml.Z(wires=0) @ qml.Z(wires=1))
-
-        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
-
-        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
-
-        assert expected_res == circuit_compiled()
-
-    # -------------------------------------------------------------------------------------------- #
-
-    @pytest.mark.parametrize("shots", [1, 2])
-    @pytest.mark.parametrize(
-        "initial_ops, expected_res",
-        [
-            ((qml.I, qml.I), [1.0, 0.0, 0.0, 0.0]),
-            ((qml.I, qml.X), [0.0, 1.0, 0.0, 0.0]),
-            ((qml.X, qml.I), [0.0, 0.0, 1.0, 0.0]),
-            ((qml.X, qml.X), [0.0, 0.0, 0.0, 1.0]),
-        ],
-    )
-    def test_exec_2_wire_probs_global(self, shots, initial_ops, expected_res):
-        """Test the measurements_from_samples transform on a device with two wires and a terminal,
-        "global" probs measurements (one that implicitly acts on all wires).
-        """
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qnode(dev, shots=shots)
-        def circuit_ref():
-            initial_ops[0](wires=0)
-            initial_ops[1](wires=1)
-            return qml.probs()
-
-        assert np.array_equal(
-            expected_res, circuit_ref()
-        ), "Sanity check failed, is expected_res correct?"
-        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
-
-        assert np.array_equal(expected_res, circuit_compiled())
-
-    # -------------------------------------------------------------------------------------------- #
-
-    @pytest.mark.parametrize("shots", [1, 2])
-    @pytest.mark.parametrize(
-        "initial_ops, expected_res",
-        [
-            ((qml.I, qml.I), ([1.0, 0.0], [1.0, 0.0])),
-            ((qml.I, qml.X), ([1.0, 0.0], [0.0, 1.0])),
-            ((qml.X, qml.I), ([0.0, 1.0], [1.0, 0.0])),
-            ((qml.X, qml.X), ([0.0, 1.0], [0.0, 1.0])),
-        ],
-    )
-    def test_exec_2_wire_probs_per_wire(self, shots, initial_ops, expected_res):
-        """Test the measurements_from_samples transform on a device with two wires and a terminal,
-        "global" probs measurements (one that implicitly acts on all wires).
-        """
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qnode(dev, shots=shots)
-        def circuit_ref():
-            initial_ops[0](wires=0)
-            initial_ops[1](wires=1)
-            return qml.probs(wires=0), qml.probs(wires=1)
-
-        assert np.array_equal(
-            expected_res, circuit_ref()
-        ), "Sanity check failed, is expected_res correct?"
-        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
-
-        assert np.array_equal(expected_res, circuit_compiled())
-
-    # -------------------------------------------------------------------------------------------- #
-
-    @pytest.mark.xfail(reason="Dynamic shots not supported")
-    def test_exec_expval_dynamic_shots(self):
-        """Test the measurements_from_samples transform where the number of shots is dynamic.
-
-        This use case is not currently supported.
-        """
-
-        @qml.qjit
-        def workload(shots):
-            dev = qml.device("lightning.qubit", wires=1)
-
-            @measurements_from_samples_pass
-            @qml.qnode(dev, shots=shots)
-            def circuit():
-                return qml.expval(qml.Z(wires=0))
-
-            return circuit()
-
-        result = workload(2)
-        assert result == 1.0
-
-    def test_qjit_filecheck(self, run_filecheck_qjit):
-        """Test that the measurements_from_samples_pass works correctly with qjit."""
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qjit(target="mlir")
-        @measurements_from_samples_pass
-        @qml.qnode(dev, shots=25)
-        def circuit():
-            # CHECK-NOT: quantum.namedobs
-            # CHECK: [[obs:%.+]] = quantum.compbasis
-            # CHECK: [[samples:%.+]] = quantum.sample [[obs]] : tensor<25x1xf64>
-            # CHECK: [[c0:%.+]] = arith.constant dense<0> : tensor<i64>
-            # CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.25x1xf64([[samples]], [[c0]]) :
-            # CHECK-SAME: (tensor<25x1xf64>, tensor<i64>) -> tensor<f64>
-            # CHECK-NOT: quantum.expval
-            return qml.expval(qml.Z(wires=0))
-
-        run_filecheck_qjit(circuit)
-
-    @pytest.mark.usefixtures("use_capture")
-    def test_integrate_with_decompose(self):
-        """Test that the measurements_from_samples pass works correctly when used in combination
-        with the decompose pass."""
-        dev = qml.device("null.qubit", wires=4)
-
-        @qml.qjit(target="mlir")
-        @measurements_from_samples_pass
-        @partial(
-            qml.transforms.decompose,
-            gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "RY", "GlobalPhase"},
-        )
-        @qml.qnode(dev, shots=1000)
-        def circuit():
-            qml.CRX(0.1, wires=[0, 1])
-            return qml.expval(qml.Z(0))
-
-        res = circuit()
-        assert res == 1.0
+        # sample comparison
+        assert np.isclose(np.mean(sample_res), np.mean(sample_expected), atol=0.05)
+        assert len(sample_res) == len(sample_expected)
+        assert set(np.array(sample_res)) == set(sample_expected)
 
 
 def _counts_catalyst_to_pl(basis_states, counts):
