@@ -608,11 +608,6 @@
   [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
   [(#2536)](https://github.com/PennyLaneAI/catalyst/pull/2536)
 
-* A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in
-  measurement processes. It is also registered in xDSL.
-  [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
-  [(#2536)](https://github.com/PennyLaneAI/catalyst/pull/2536)
-
 * An experimental *QEC Physical* MLIR dialect has been added. An equivalent xDSL dialect has also
   been added for compatibility with the Python interface to Catalyst.
   [(#2519)](https://github.com/PennyLaneAI/catalyst/pull/2519)
