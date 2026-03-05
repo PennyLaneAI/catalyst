@@ -35,7 +35,7 @@ def disentangle_cnot(qnode):
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`@qml.qjit <pennylane.qjit>`.
+        This transform requires decorating the workflow with :func:`pennylane.qjit`.
 
     Args:
         fn (QNode): the QNode to apply the pass to.
@@ -90,7 +90,7 @@ def disentangle_swap(qnode):
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`@qml.qjit <pennylane.qjit>`.
+        This transform requires decorating the workflow with :func:`pennylane.qjit`.
 
     Args:
         fn (QNode): the QNode to apply the pass to.
