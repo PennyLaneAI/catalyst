@@ -107,21 +107,18 @@ class ApplyTransformSequencePattern(RewritePattern):
             return
 
         payload: builtin.ModuleOp = transformer.parent_op()
-        cur_payload = payload
         rewriter.erase_op(transformer)
 
         for i, ns in enumerate(transformer.ops):
             if len(ns.body.ops) == 1:
                 if i == 0:
-                    self._pre_pass_callback(None, cur_payload)
+                    self._pre_pass_callback(None, payload)
                     self.pass_level += 1
                 continue
 
             for pass_op in ns.body.walk():
                 if isinstance(pass_op, transform.ApplyRegisteredPassOp):
-                    cur_payload = self.interpret_apply_registered_pass_op(
-                        pass_op, cur_payload, rewriter
-                    )
+                    payload = self.interpret_apply_registered_pass_op(pass_op, payload, rewriter)
 
     def _pre_pass_callback(self, compilation_pass, module):
         """Callback wrapper to run the callback function before a pass."""
