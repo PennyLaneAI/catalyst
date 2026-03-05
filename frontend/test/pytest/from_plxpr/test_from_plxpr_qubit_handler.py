@@ -348,7 +348,7 @@ class TestQubitValues:
             # So let's just check the string...
             # pytest context messes with jax's debug info, ignore warning
             with pytest.warns(DeprecationWarning, match="core.Jaxpr is missing a DebugInfo object"):
-                observed_jaxpr = str(trace.to_jaxpr([], None, None)[0])
+                observed_jaxpr = trace.to_jaxpr([], None, None)[0].pretty_print(use_color=False)
             expected = """\
             { lambda ; . let
                 a:AbstractQreg() = qalloc 42:i64[]
@@ -435,7 +435,7 @@ class TestQregAndQubit:
         with take_current_trace() as trace:
             # pytest context messes with jax's debug info, ignore warning
             with pytest.warns(DeprecationWarning, match="core.Jaxpr is missing a DebugInfo object"):
-                observed_jaxpr = str(trace.to_jaxpr([], None, None)[0])
+                observed_jaxpr = trace.to_jaxpr([], None, None)[0].pretty_print(use_color=False)
             expected = """\
             { lambda ; . let
                 a:AbstractQreg() = qalloc 42:i64[]

@@ -42,6 +42,7 @@ IsingXY                = { properties = [ "invertible", "controllable", "differe
 IsingYY                = { properties = [ "invertible", "controllable", "differentiable" ] }
 IsingZZ                = { properties = [ "invertible", "controllable", "differentiable" ] }
 MultiRZ                = { properties = [ "invertible", "controllable", "differentiable" ] }
+PauliRot               = { properties = [ "invertible",                                  ] }
 PauliX                 = { properties = [ "invertible", "controllable", "differentiable" ] }
 PauliY                 = { properties = [ "invertible", "controllable", "differentiable" ] }
 PauliZ                 = { properties = [ "invertible", "controllable", "differentiable" ] }

@@ -31,7 +31,7 @@ from catalyst.python_interface.compiler import Compiler
 from .xdsl_conversion import get_mlir_module
 
 if TYPE_CHECKING:  # pragma: no cover
-    from pennylane import QNode
+    from catalyst.jit import QJIT
 
 try:
     from graphviz import Source as GraphSource
@@ -82,19 +82,18 @@ def _mlir_graph_callback(previous_pass, module, next_pass, pass_level=0):
         f.write(graph.pipe(format="svg"))
 
 
-def generate_mlir_graph(qnode: QNode) -> Callable:
+def generate_mlir_graph(qnode: QJIT) -> Callable:
     """
     Generate an MLIR graph for the given QNode and saves it to a file.
 
     This function uses the callback mechanism of the unified compiler framework to generate
     the MLIR graph in between compilation passes. The provided QNode is assumed to be decorated
-    with xDSL compilation passes. The ``qjit`` decorator is used to recompile the QNode with the
-    passes and the provided arguments.
+    with xDSL compilation passes.
 
     If no passes are applied, the original QNode is visualized.
 
     Args:
-        qnode (.QNode): the input QNode that is to be visualized.
+        qnode (.QJIT): the input QNode that is to be visualized.
 
 
     Returns:
