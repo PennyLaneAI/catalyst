@@ -1043,10 +1043,10 @@ class TestCondPredicateConversion:
 
         assert workflow(3) == 9
 
-    def test_conversion_int_autograph(self):
+    def test_conversion_int_autograph(self, capture_mode):
         """Test entry predicate conversion from integer to bool using Autograph."""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=capture_mode)
         def workflow(x):
             n = 1
 
@@ -1059,10 +1059,10 @@ class TestCondPredicateConversion:
 
         assert workflow(3) == 9
 
-    def test_conversion_int_autograph_elif(self):
+    def test_conversion_int_autograph_elif(self, capture_mode):
         """Test elif predicate conversion from integer to bool using Autograph."""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=capture_mode)
         def workflow(x):
             n = 1
 
@@ -1077,13 +1077,13 @@ class TestCondPredicateConversion:
 
         assert workflow(3) == 9
 
-    def test_string_conversion_failed(self):
+    def test_string_conversion_failed(self, capture_mode):
         """Test failure at converting string to bool using Autograph."""
 
-        if qml.capture.enabled():
+        if capture_mode:
             pytest.skip("works with program capture.")
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=capture_mode)
         def workflow(x):
             n = "fail"
 
@@ -1100,13 +1100,13 @@ class TestCondPredicateConversion:
         ):
             workflow(3)
 
-    def test_string_conversion_capture_works(self):
+    def test_string_conversion_capture_works(self, capture_mode):
         """Test that truthy values in conditionals work when capture is enabled."""
 
-        if not qml.capture.enabled():
+        if not capture_mode:
             pytest.skip("only works with program capture.")
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=capture_mode)
         def workflow(x):
             n = "fail"
 
@@ -1120,10 +1120,10 @@ class TestCondPredicateConversion:
         out = workflow(0.5)
         assert qml.math.allclose(out, 0.25)
 
-    def test_array_conversion_failed(self):
+    def test_array_conversion_failed(self, capture_mode):
         """Test failure at converting array to bool using Autograph."""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=capture_mode)
         def workflow(x):
             n = jnp.array([[1], [2]])
 
@@ -1134,7 +1134,7 @@ class TestCondPredicateConversion:
 
             return y
 
-        if qml.capture.enabled():
+        if capture_mode:
             with pytest.raises(ValueError, match="Condition predicate must be a scalar"):
                 workflow(3)
         else:

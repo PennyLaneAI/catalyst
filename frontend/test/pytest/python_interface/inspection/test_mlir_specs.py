@@ -311,7 +311,7 @@ class TestMLIRSpecs:
             (False, 10, True),
         ],
     )
-    def test_fixed_loop(self, pl_ctrl_flow, iters, autograph):
+    def test_fixed_loop(self, pl_ctrl_flow, iters, autograph, capture_mode):
         """Test that loop resources are counted correctly."""
 
         if pl_ctrl_flow:
@@ -340,7 +340,7 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        circ = qml.qjit(autograph=autograph)(circ)
+        circ = qml.qjit(autograph=autograph, capture=capture_mode)(circ)
         res = mlir_specs(circ, level=0)
         assert resources_equal(res, expected)
 
@@ -351,7 +351,7 @@ class TestMLIRSpecs:
             (False, 2),
         ],
     )
-    def test_dynamic_for_loop(self, pl_ctrl_flow, iters):
+    def test_dynamic_for_loop(self, pl_ctrl_flow, iters, capture_mode):
         """Test that dynamic for loops emit a warning."""
 
         if pl_ctrl_flow:
@@ -380,7 +380,7 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        circ = qml.qjit(autograph=True)(circ)
+        circ = qml.qjit(autograph=True, capture=capture_mode)(circ)
 
         with pytest.warns(
             UserWarning,
@@ -400,7 +400,7 @@ class TestMLIRSpecs:
             (False, 2),
         ],
     )
-    def test_while_loop(self, pl_ctrl_flow, iters):
+    def test_while_loop(self, pl_ctrl_flow, iters, capture_mode):
         """Test that dynamic while loops emit a warning."""
 
         if pl_ctrl_flow:
@@ -435,7 +435,7 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        circ = qml.qjit(autograph=True)(circ)
+        circ = qml.qjit(autograph=True, capture=capture_mode)(circ)
 
         with pytest.warns(
             UserWarning,
@@ -455,7 +455,7 @@ class TestMLIRSpecs:
             (False),
         ],
     )
-    def test_cond(self, pl_ctrl_flow):
+    def test_cond(self, pl_ctrl_flow, capture_mode):
         """Test that conditions emit a warning."""
 
         if pl_ctrl_flow:
@@ -482,7 +482,7 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        circ = qml.qjit(autograph=True)(circ)
+        circ = qml.qjit(autograph=True, capture=capture_mode)(circ)
 
         with pytest.warns(
             UserWarning,
@@ -626,17 +626,17 @@ class TestMLIRSpecs:
         res = mlir_specs(circ, level=1)
         assert resources_equal(res, expected)
 
-    def test_subroutine(self):
+    def test_subroutine(self, capture_mode):
         """Test that subroutines are handled correctly."""
 
-        if not qml.capture.enabled():
+        if not capture_mode:
             pytest.xfail("Subroutine requires plxpr to be enabled.")
 
         @qml.capture.subroutine
         def extra_function():
             qml.Hadamard(wires=0)
 
-        @qml.qjit(autograph=True)
+        @qml.qjit(autograph=True, capture=capture_mode)
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circ():
             extra_function()

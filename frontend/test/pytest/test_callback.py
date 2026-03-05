@@ -549,14 +549,14 @@ def test_accelerate_no_device_inside(arg):
     "arg",
     [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
 )
-def test_accelerate_no_device_autograph(arg):
+def test_accelerate_no_device_autograph(arg, capture_mode):
     """Test with no device parameter"""
 
     @accelerate
     def identity(x):
         return x
 
-    @qjit(autograph=True)
+    @qjit(autograph=True, capture=capture_mode)
     def qjitted_fn(x):
         return identity(x)
 

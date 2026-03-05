@@ -57,7 +57,7 @@ class TestCompilerOptions:
     @pytest.mark.parametrize(
         "logfile,keep_intermediate", [("stdout", True), ("stderr", False), (None, False)]
     )
-    def test_verbose_compilation(self, logfile, keep_intermediate, capsys, backend, capture_mode):
+    def test_verbose_compilation(self, logfile, keep_intermediate, capsys, backend):
         """Test verbose compilation mode"""
 
         if logfile is not None:
@@ -65,7 +65,7 @@ class TestCompilerOptions:
 
         verbose = logfile is not None
 
-        @qjit(verbose=verbose, logfile=logfile, keep_intermediate=keep_intermediate, capture=capture_mode)
+        @qjit(verbose=verbose, logfile=logfile, keep_intermediate=keep_intermediate)
         @qml.qnode(qml.device(backend, wires=1))
         def workflow(x):
             qml.RX(x, wires=0)
@@ -82,7 +82,7 @@ class TestCompilerOptions:
         assert ("Dumping" in capture) if (verbose and keep_intermediate) else True
         workflow.workspace.cleanup()
 
-    def test_compilation_with_instrumentation(self, capsys, backend, capture_mode):
+    def test_compilation_with_instrumentation(self, capsys, backend):
         """Test compilation with instrumentation"""
 
         @qml.qnode(qml.device(backend, wires=1))
@@ -90,7 +90,7 @@ class TestCompilerOptions:
             return qml.state()
 
         with instrumentation(circuit.__name__, filename=None, detailed=True):
-            qjit(circuit, capture=capture_mode)()
+            qjit(circuit)()
 
         capture_result = capsys.readouterr()
         capture = capture_result.out + capture_result.err
@@ -199,7 +199,7 @@ class TestCompilerErrors:
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             compiler.get_output_of("inexistent-file", ".")
 
-    def test_runtime_error(self, backend, capture_mode):
+    def test_runtime_error(self, backend):
         """Test with non-default flags."""
         contents = """
 #include <stdexcept>
@@ -238,7 +238,7 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
                         "<FAKE_IR>",
                     )
 
-        @qjit(target="mlir", capture=capture_mode)
+        @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=1))
         def cpp_exception_test():
             return None
@@ -270,7 +270,7 @@ class TestCompilerState:
         assert f.llvmir is None
         assert f.compiled_function is None
 
-    def test_callable_without_name(self, capture_mode):
+    def test_callable_without_name(self):
         """Test that a callable without __name__ property can be compiled, if it is otherwise
         traceable."""
 
@@ -278,12 +278,12 @@ class TestCompilerState:
             def __call__(self, x):
                 return x
 
-        f = qjit(NoNameClass(), capture=capture_mode)
+        f = qjit(NoNameClass())
 
         assert f(3) == 3
         assert f.__name__ == "unknown"
 
-    def test_print_stages(self, backend, capture_mode):
+    def test_print_stages(self, backend):
         """Test that after compiling the intermediate files exist."""
 
         options = CompileOptions()
@@ -292,7 +292,6 @@ class TestCompilerState:
         @qjit(
             keep_intermediate=True,
             pipelines=[("EmptyPipeline1", [])] + pipelines + [("EmptyPipeline2", [])],
-            capture=capture_mode,
         )
         @qml.qnode(qml.device(backend, wires=1))
         def workflow(x):
@@ -316,10 +315,10 @@ class TestCompilerState:
             compiler.get_output_of("None-existing-pipeline", workflow.workspace)
         workflow.workspace.cleanup()
 
-    def test_print_nonexistent_stages(self, backend, capture_mode):
+    def test_print_nonexistent_stages(self, backend):
         """What happens if we attempt to print something that doesn't exist?"""
 
-        @qjit(keep_intermediate=True, capture=capture_mode)
+        @qjit(keep_intermediate=True)
         @qml.qnode(qml.device(backend, wires=1))
         def workflow(x):
             qml.RX(x, wires=0)
@@ -362,7 +361,7 @@ class TestCompilerState:
             assert observed_outfilename == expected_outfilename
             assert os.path.exists(observed_outfilename)
 
-    def test_pipeline_error(self, capture_mode):
+    def test_pipeline_error(self):
         """Test pipeline error handling."""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -372,8 +371,7 @@ class TestCompilerState:
         test_pipelines = [("PipelineA", ["canonicalize"]), ("PipelineB", ["test"])]
         with pytest.raises(CompileError) as e:
             compiled = qjit(
-                circuit, pipelines=test_pipelines, target="mlir", keep_intermediate=True,
-                capture=capture_mode,
+                circuit, pipelines=test_pipelines, target="mlir", keep_intermediate=True
             )
             compiled.compile()
 
@@ -386,7 +384,7 @@ class TestCompilerState:
         compiled.workspace.cleanup()
 
         with pytest.raises(CompileError) as e:
-            qjit(circuit, pipelines=test_pipelines, verbose=True, capture=capture_mode)()
+            qjit(circuit, pipelines=test_pipelines, verbose=True)()
 
         assert stack_trace_pattern in e.value.args[0]
 
@@ -394,7 +392,7 @@ class TestCompilerState:
 class TestCustomCall:
     """Test compilation of `lapack_dsyevd` via lowering to `stablehlo.custom_call`."""
 
-    def test_dsyevd(self, capture_mode):
+    def test_dsyevd(self):
         """Test the support of `lapack_dsyevd` in one single `stablehlo.custom_call` call."""
 
         A = np.array([[4, 9], [9, 4]])
@@ -403,11 +401,11 @@ class TestCustomCall:
             B = qml.math.sqrt_matrix(A)
             return B @ A
 
-        qjit_result = qjit(workflow, capture=capture_mode)(A)
+        qjit_result = qjit(workflow)(A)
         pl_result = workflow(A)
         assert np.allclose(qjit_result, pl_result)
 
-    def test_dsyevd_multiple_calls(self, capture_mode):
+    def test_dsyevd_multiple_calls(self):
         """Test the support of `lapack_dsyevd` in multiple `stablehlo.custom_call` calls."""
 
         A = np.array([[4, 9], [9, 4]])
@@ -416,7 +414,7 @@ class TestCustomCall:
             B = qml.math.sqrt_matrix(A) @ qml.math.sqrt_matrix(A)
             return B @ A
 
-        qjit_result = qjit(workflow, capture=capture_mode)(A)
+        qjit_result = qjit(workflow)(A)
         pl_result = workflow(A)
         assert np.allclose(qjit_result, pl_result)
 

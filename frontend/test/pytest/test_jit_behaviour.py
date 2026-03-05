@@ -1004,14 +1004,14 @@ class TestTwoQJITsOneName:
 class TestQJITUsagePatterns:
     """Test usage patterns of catalyst.qjit."""
 
-    def test_usage_patterns(self):
+    def test_usage_patterns(self, capture_mode):
         """Test two usage patterns of catalyst.qjit."""
 
         def fn(x, y):
             return x * y
 
-        res_pattern_fn_as_argument = qjit(fn, autograph=False)(5, 6)
-        res_pattern_partial = qjit(autograph=False)(fn)(5, 6)
+        res_pattern_fn_as_argument = qjit(fn, autograph=False, capture=capture_mode)(5, 6)
+        res_pattern_partial = qjit(autograph=False, capture=capture_mode)(fn)(5, 6)
 
         expected = 30
         assert res_pattern_fn_as_argument == expected

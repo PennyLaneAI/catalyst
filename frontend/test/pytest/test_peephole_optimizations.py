@@ -42,9 +42,7 @@ from catalyst.utils.exceptions import CompileError
 @pytest.mark.parametrize(
     "cancel_inverses_version", (cancel_inverses, qml.transforms.cancel_inverses)
 )
-# Capture gap: peephole pass decorators not yet supported with capture=True
-@pytest.mark.capture_todo
-def test_cancel_inverses_functionality(theta, backend, cancel_inverses_version, capture_mode):
+def test_cancel_inverses_functionality(theta, backend, cancel_inverses_version):
 
     def circuit(x):
         qml.RX(x, wires=0)
@@ -55,8 +53,8 @@ def test_cancel_inverses_functionality(theta, backend, cancel_inverses_version, 
     reference_workflow = qml.QNode(circuit, qml.device("default.qubit", wires=1))
 
     customized_device = qml.device(backend, wires=1)
-    qjitted_workflow = qjit(qml.QNode(circuit, customized_device), capture=capture_mode)
-    optimized_workflow = qjit(cancel_inverses_version(qml.QNode(circuit, customized_device)), capture=capture_mode)
+    qjitted_workflow = qjit(qml.QNode(circuit, customized_device))
+    optimized_workflow = qjit(cancel_inverses_version(qml.QNode(circuit, customized_device)))
 
     assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
     assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
@@ -66,9 +64,7 @@ def test_cancel_inverses_functionality(theta, backend, cancel_inverses_version, 
 @pytest.mark.parametrize(
     "merge_rotations_version", (merge_rotations, qml.transforms.merge_rotations)
 )
-# Capture gap: peephole pass decorators not yet supported with capture=True
-@pytest.mark.capture_todo
-def test_merge_rotation_functionality(theta, backend, merge_rotations_version, capture_mode):
+def test_merge_rotation_functionality(theta, backend, merge_rotations_version):
 
     def circuit(x):
         qml.RX(x, wires=0)
@@ -86,17 +82,15 @@ def test_merge_rotation_functionality(theta, backend, merge_rotations_version, c
     reference_workflow = qml.QNode(circuit, qml.device("default.qubit", wires=1))
 
     customized_device = qml.device(backend, wires=1)
-    qjitted_workflow = qjit(qml.QNode(circuit, customized_device), capture=capture_mode)
-    optimized_workflow = qjit(merge_rotations_version(qml.QNode(circuit, customized_device)), capture=capture_mode)
+    qjitted_workflow = qjit(qml.QNode(circuit, customized_device))
+    optimized_workflow = qjit(merge_rotations_version(qml.QNode(circuit, customized_device)))
 
     assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
     assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
 
 
 @pytest.mark.parametrize("theta", [42.42])
-# Capture gap: peephole pass decorators not yet supported with capture=True
-@pytest.mark.capture_todo
-def test_cancel_inverses_functionality_outside_qjit(theta, backend, capture_mode):
+def test_cancel_inverses_functionality_outside_qjit(theta, backend):
 
     @cancel_inverses
     @qml.qnode(qml.device(backend, wires=1))
@@ -106,7 +100,7 @@ def test_cancel_inverses_functionality_outside_qjit(theta, backend, capture_mode
         qml.Hadamard(wires=0)
         return qml.probs()
 
-    @qjit(capture=capture_mode)
+    @qjit
     def workflow():
         @cancel_inverses
         @qml.qnode(qml.device(backend, wires=1))
@@ -124,9 +118,7 @@ def test_cancel_inverses_functionality_outside_qjit(theta, backend, capture_mode
 
 
 @pytest.mark.parametrize("theta", [42.42])
-# Capture gap: pipeline decorator not yet supported with capture=True
-@pytest.mark.capture_todo
-def test_pipeline_functionality(theta, backend, capture_mode):
+def test_pipeline_functionality(theta, backend):
     """
     Test that the @pipeline decorator does not change functionality
     when all the passes in the pipeline does not change functionality.
@@ -136,7 +128,7 @@ def test_pipeline_functionality(theta, backend, capture_mode):
         "merge_rotations": {},
     }
 
-    @qjit(capture=capture_mode)
+    @qjit
     def workflow():
         @qml.qnode(qml.device(backend, wires=2))
         def f(x):
@@ -198,14 +190,12 @@ def test_passes_bad_usages():
     test_passes_not_on_qnode()
 
 
-# Capture gap: chained peephole pass decorators not yet supported with capture=True
-@pytest.mark.capture_todo
-def test_chained_passes(capture_mode):
+def test_chained_passes():
     """
     Test that chained passes are present in the transform passes.
     """
 
-    @qjit(capture=capture_mode)
+    @qjit
     @merge_rotations
     @cancel_inverses
     @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -221,15 +211,13 @@ def test_chained_passes(capture_mode):
     assert "merge-rotations" in mlir
 
 
-# Capture gap: disentangle pass decorators not yet supported with capture=True
-@pytest.mark.capture_todo
-def test_disentangle_passes(capture_mode):
+def test_disentangle_passes():
     """
     Test that disentangle passes are present in the transform passes
     and are applied correctly.
     """
 
-    @qjit(capture=capture_mode)
+    @qjit
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def circuit_with_no_disentangle_passes():
         # first qubit in |1>
@@ -239,7 +227,7 @@ def test_disentangle_passes(capture_mode):
         qml.SWAP(wires=[0, 1])  # state after SWAP |11>
         return qml.state()
 
-    @qjit(capture=capture_mode)
+    @qjit
     @disentangle_cnot
     @disentangle_swap
     @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -263,13 +251,11 @@ def test_disentangle_passes(capture_mode):
     assert np.allclose(circuit_with_no_disentangle_passes(), circuit_with_disentangle_passes())
 
 
-# Capture gap: to_ppr pass decorator not yet supported with capture=True
-@pytest.mark.capture_todo
-def test_convert_clifford_to_ppr(capture_mode):
+def test_convert_clifford_to_ppr():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=capture_mode)
+    @qjit(pipelines=pipe, target="mlir")
     def test_convert_clifford_to_ppr_workflow():
 
         @to_ppr
@@ -295,13 +281,11 @@ def test_convert_clifford_to_ppr(capture_mode):
     assert ppm_specs_output["f_0"]["max_weight_pi8"] == 1
 
 
-# Capture gap: commute_ppr pass decorator not yet supported with capture=True
-@pytest.mark.capture_todo
-def test_commute_ppr(capture_mode):
+def test_commute_ppr():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=capture_mode)
+    @qjit(pipelines=pipe, target="mlir")
     def test_commute_ppr_workflow():
 
         @commute_ppr
@@ -331,13 +315,11 @@ def test_commute_ppr(capture_mode):
     assert ppm_specs_output["f_0"]["max_weight_pi8"] == 1
 
 
-# Capture gap: merge_ppr_ppm pass decorator not yet supported with capture=True
-@pytest.mark.capture_todo
-def test_merge_ppr_ppm(capture_mode):
+def test_merge_ppr_ppm():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=capture_mode)
+    @qjit(pipelines=pipe, target="mlir")
     def test_merge_ppr_ppm_workflow():
 
         @merge_ppr_ppm
@@ -362,13 +344,11 @@ def test_merge_ppr_ppm(capture_mode):
     assert ppm_specs_output["f_0"]["logical_qubits"] == 2
 
 
-# Capture gap: ppr_to_ppm pass decorator not yet supported with capture=True
-@pytest.mark.capture_todo
-def test_ppr_to_ppm_auto_corrected(capture_mode):
+def test_ppr_to_ppm_auto_corrected():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=capture_mode)
+    @qjit(pipelines=pipe, target="mlir")
     @ppr_to_ppm(decompose_method="auto-corrected")
     @to_ppr
     @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -392,13 +372,11 @@ def test_ppr_to_ppm_auto_corrected(capture_mode):
     assert gate_types["PPR-pi/8-w1"] == 1
 
 
-# Capture gap: ppr_to_ppm pass decorator not yet supported with capture=True
-@pytest.mark.capture_todo
-def test_ppr_to_ppm_inject_magic_state(capture_mode):
+def test_ppr_to_ppm_inject_magic_state():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=capture_mode)
+    @qjit(pipelines=pipe, target="mlir")
     @ppr_to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True)
     @to_ppr
     @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -421,13 +399,11 @@ def test_ppr_to_ppm_inject_magic_state(capture_mode):
     assert gate_types["PPM-w1"] == 2
 
 
-# Capture gap: ppr_to_ppm pass decorator not yet supported with capture=True
-@pytest.mark.capture_todo
-def test_ppr_to_ppm_pauli_corrected(capture_mode):
+def test_ppr_to_ppm_pauli_corrected():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=capture_mode)
+    @qjit(pipelines=pipe, target="mlir")
     @ppr_to_ppm(decompose_method="pauli-corrected")
     @to_ppr
     @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -450,13 +426,11 @@ def test_ppr_to_ppm_pauli_corrected(capture_mode):
     assert gate_types["PPM-w1"] == 2
 
 
-# Capture gap: commute_ppr/merge_ppr_ppm pass decorators not yet supported with capture=True
-@pytest.mark.capture_todo
-def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size(capture_mode):
+def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=capture_mode)
+    @qjit(pipelines=pipe, target="mlir")
     def test_convert_clifford_to_ppr_workflow():
 
         device = qml.device("lightning.qubit", wires=2)
@@ -564,7 +538,7 @@ def test_merge_rotation_arbitrary_angle_ppr():
     assert ir_opt.count('pbc.ppr.arbitrary ["Z", "Y"]') == 1
 
 
-@pytest.mark.xfail(reason="PPM execution with ppr-to-ppm pass is not fully supported yet.", strict=False)
+@pytest.mark.xfail(reason="PPM execution with ppr-to-ppm pass is not fully supported yet.")
 @pytest.mark.usefixtures("use_capture")
 def test_clifford_to_ppm():
 
@@ -677,9 +651,7 @@ class TestLowerPBCInitOps:
 class TestPPMSpecsErrors:
     """Test if errors are caught when calling ppm_specs"""
 
-    # Capture gap: ppm_specs errors not yet tested with capture=True
-    @pytest.mark.capture_todo
-    def test_jit_mode_error(self, capture_mode):
+    def test_jit_mode_error(self):
         """Make sure ppm_specs only works in AOT (Ahead of Time) compilation"""
         with pytest.raises(
             NotImplementedError,
@@ -687,7 +659,7 @@ class TestPPMSpecsErrors:
         ):
             dev = qml.device("lightning.qubit", wires=2)
 
-            @qjit(target="mlir", capture=capture_mode)
+            @qjit(target="mlir")
             @qml.qnode(dev)
             def jit_circuit(x):  # JIT mode since x is unknown
                 qml.H(x)
@@ -696,14 +668,12 @@ class TestPPMSpecsErrors:
 
             ppm_specs(jit_circuit)
 
-    # Capture gap: ppm_specs errors not yet tested with capture=True
-    @pytest.mark.capture_todo
-    def test_no_pipeline_error(self, capture_mode):
+    def test_no_pipeline_error(self):
         """Make sure ppm_specs only works when pipeline is present"""
         with pytest.raises(CompileError, match=r"No pipeline found"):
             dev = qml.device("lightning.qubit", wires=2)
 
-            @qjit(target="mlir", capture=capture_mode)
+            @qjit(target="mlir")
             @qml.qnode(dev)
             def circuit_with_no_pipeline():  # JIT mode since x is unknown
                 qml.H(0)

@@ -531,10 +531,10 @@ class TestDraw:
         with pytest.raises(NotImplementedError, match="not yet supported"):
             print(draw(circuit)())
 
-    def test_for_loop_not_implemented(self):
+    def test_for_loop_not_implemented(self, capture_mode):
         """Test that NotImplementedError is raised when for loop is used."""
 
-        @qml.qjit(autograph=True)
+        @qml.qjit(autograph=True, capture=capture_mode)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
             for _ in range(3):
@@ -544,10 +544,10 @@ class TestDraw:
         with pytest.raises(NotImplementedError, match="not yet supported"):
             print(draw(circuit)())
 
-    def test_while_loop_not_implemented(self):
+    def test_while_loop_not_implemented(self, capture_mode):
         """Test that NotImplementedError is raised when while loop is used."""
 
-        @qml.qjit(autograph=True)
+        @qml.qjit(autograph=True, capture=capture_mode)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
             i = 0
@@ -575,10 +575,10 @@ class TestDrawGraph:
             "cancel-inverses",
         ),
     )
-    def test_unsupported_levels(self, unsupported_level):
+    def test_unsupported_levels(self, unsupported_level, capture_mode):
         """Tests proper handling of the level argument."""
 
-        @qml.qjit(autograph=True, target="mlir")
+        @qml.qjit(autograph=True, target="mlir", capture=capture_mode)
         @qml.qnode(qml.device("null.qubit", wires=2))
         def qjit_qnode():
             qml.H(0)
@@ -587,10 +587,10 @@ class TestDrawGraph:
         with pytest.raises(TypeError, match="The 'level' argument must be an integer or 'None'"):
             _ = draw_graph(qjit_qnode, level=unsupported_level)()
 
-    def test_negative_level_integer(self):
+    def test_negative_level_integer(self, capture_mode):
         """Tests that a negative integer for a level is unsupported."""
 
-        @qml.qjit(autograph=True, target="mlir")
+        @qml.qjit(autograph=True, target="mlir", capture=capture_mode)
         @qml.qnode(qml.device("null.qubit", wires=2))
         def qjit_qnode():
             qml.H(0)
@@ -632,12 +632,12 @@ class TestDrawGraph:
         with pytest.raises(TypeError, match="The circuit must be a qjit-compiled qnode"):
             _ = draw_graph(qnode)()
 
-    def test_return_types(self):
+    def test_return_types(self, capture_mode):
         """Tests the return types of the function without crashing CI."""
         # pylint: disable=import-outside-toplevel
         import matplotlib
 
-        @qml.qjit(autograph=True, target="mlir")
+        @qml.qjit(autograph=True, target="mlir", capture=capture_mode)
         @qml.qnode(qml.device("null.qubit", wires=2))
         def qjit_qnode():
             qml.H(0)

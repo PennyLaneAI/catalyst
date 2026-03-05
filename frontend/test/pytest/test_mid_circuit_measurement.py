@@ -827,10 +827,11 @@ class TestDynamicOneShotIntegration:
         result = circuit()
         assert result.shape == (10,)
 
-    def test_dynamic_one_shot_classical_return_values_with_mcm(self):
+    @pytest.mark.capture_todo
+    def test_dynamic_one_shot_classical_return_values_with_mcm(self, capture_mode):
         """Test classical return value with one-shot"""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=capture_mode)
         @qml.set_shots(10)
         @qml.qnode(qml.device("lightning.qubit", wires=1), mcm_method="one-shot")
         def circuit():

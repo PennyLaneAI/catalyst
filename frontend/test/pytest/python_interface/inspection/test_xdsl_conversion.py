@@ -63,11 +63,11 @@ class TestGetMLIRModule:
         module = get_mlir_module(my_workflow, (1,), {})
         assert isinstance(module, Module)
 
-    def test_compile_options_not_mutated(self):
+    def test_compile_options_not_mutated(self, capture_mode):
         """Ensures that the QJIT'd qnode's compile options are not mutable."""
         dev = qml.device("lightning.qubit", wires=1)
 
-        @qml.qjit(autograph=True)
+        @qml.qjit(autograph=True, capture=capture_mode)
         @qml.qnode(dev)
         def my_workflow(angle, wires=None):
             qml.RX(angle, wires)
