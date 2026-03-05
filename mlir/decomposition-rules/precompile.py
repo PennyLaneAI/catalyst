@@ -214,8 +214,8 @@ def main():
     parser = argparse.ArgumentParser(prog="decomposition rule pre-compiler")
     parser.add_argument("-d", "--dir", default="./decomposition-rules")
 
-    DECOMP_DIR_PATH = Path(parser.parse_args().dir)
-    DECOMPS_FILE_PATH = DECOMP_DIR_PATH / Path("decompositions.mlir")
+    decomp_dir_path = Path(parser.parse_args().dir)
+    decomps_file_path = decomp_dir_path / Path("decompositions.mlir")
 
     target_ops, num_ops_missed = get_compiler_ops()
     if num_ops_missed:
@@ -224,9 +224,7 @@ def main():
     num_successes = 0
     num_failures = 0
 
-    with open(
-        DECOMPS_FILE_PATH, "w", encoding="utf-8"
-    ) as mlir_file:  # TODO probably set this as an environment variable
+    with open(decomps_file_path, "w", encoding="utf-8") as mlir_file:
         for func in target_ops:
             results, num_new_successes, num_new_failures = compile_decomps_via_dummy_circuit(func)
             num_successes += num_new_successes
