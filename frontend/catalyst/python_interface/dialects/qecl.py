@@ -166,6 +166,9 @@ class AllocOp(IRDLOperation):
 
     hyper_reg = result_def(LogicalHyperRegisterType)
 
+    def __init__(self, hyper_reg: LogicalHyperRegisterType):
+        super().__init__(result_types=(hyper_reg,))
+
 
 @irdl_op_definition
 class DeallocOp(IRDLOperation):
@@ -178,6 +181,9 @@ class DeallocOp(IRDLOperation):
         """
 
     hyper_reg = operand_def(LogicalHyperRegisterType)
+
+    def __init__(self, hyper_reg: LogicalHyperRegisterSSAValue | Operation):
+        super().__init__(operands=(hyper_reg,))
 
 
 @irdl_op_definition
@@ -200,7 +206,7 @@ class ExtractCodeblockOp(IRDLOperation):
 
     def __init__(
         self,
-        hyper_reg: LogicalHyperRegisterType | Operation,
+        hyper_reg: LogicalHyperRegisterSSAValue | Operation,
         idx: int | SSAValue[IntegerType] | Operation | IntegerAttr,
     ):
         if isinstance(idx, int):
@@ -213,10 +219,7 @@ class ExtractCodeblockOp(IRDLOperation):
             operands = (hyper_reg, idx)
             properties = {}
 
-        if isinstance(hyper_reg, LogicalHyperRegisterType):
-            result_type = LogicalCodeblockType(k=hyper_reg.k)
-        else:
-            result_type = LogicalCodeblockType(k=hyper_reg.type.k)
+        result_type = LogicalCodeblockType(k=hyper_reg.type.k)
 
         super().__init__(
             operands=operands,

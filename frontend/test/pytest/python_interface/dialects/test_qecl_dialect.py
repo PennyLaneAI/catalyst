@@ -92,27 +92,35 @@ def test_type_constructors():
 
 def test_op_constructors():
     """Test the constructors of each op defined in the qecl dialect work as expected."""
-    hyper_reg = create_ssa_value(qecl.LogicalHyperRegisterType(3, 1))
-    codeblock = create_ssa_value(qecl.LogicalCodeblockType(1))
+    width = 3
+    k = 1
+
+    hyper_reg = create_ssa_value(qecl.LogicalHyperRegisterType(width, k))
+    codeblock = create_ssa_value(qecl.LogicalCodeblockType(k))
 
     # alloc
-    alloc_op = qecl.AllocOp(result_types=(qecl.LogicalHyperRegisterType(3, 1),))
+    alloc_op = qecl.AllocOp(qecl.LogicalHyperRegisterType(width, k))
     assert len(alloc_op.result_types) == 1
     assert isinstance(alloc_op.result_types[0], qecl.LogicalHyperRegisterType)
+    assert alloc_op.result_types[0].width.value.data == width
+    assert alloc_op.result_types[0].k.value.data == k
 
     # dealloc
-    dealloc_op = qecl.DeallocOp(operands=(hyper_reg,))
+    dealloc_op = qecl.DeallocOp(hyper_reg)
     assert len(dealloc_op.result_types) == 0
 
     # extract_block
     extract_block_op = qecl.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=0)
     assert len(extract_block_op.result_types) == 1
     assert isinstance(extract_block_op.result_types[0], qecl.LogicalCodeblockType)
+    assert extract_block_op.result_types[0].k.value.data == k
 
     # insert_block
     insert_block_op = qecl.InsertCodeblockOp(in_hyper_reg=hyper_reg, idx=0, codeblock=codeblock)
     assert len(insert_block_op.result_types) == 1
     assert isinstance(insert_block_op.result_types[0], qecl.LogicalHyperRegisterType)
+    assert insert_block_op.result_types[0].width.value.data == width
+    assert insert_block_op.result_types[0].k.value.data == k
 
 
 @pytest.mark.parametrize(
