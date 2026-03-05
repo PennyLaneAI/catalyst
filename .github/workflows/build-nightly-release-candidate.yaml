@@ -55,7 +55,7 @@ jobs:
 
   linux-x86:
     name: Build on Linux x86-64
-    if: ${{ needs.setup.check_rc.outputs.branch_exists == 'true' }}
+    if: ${{ needs.setup.outputs.branch_exists == 'true' }}
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
     with:
@@ -63,24 +63,24 @@ jobs:
 
   linux-aarch:
     name: Build on Linux aarch64
-    if: ${{ needs.setup.check_rc.outputs.branch_exists == 'true' }}
+    if: ${{ needs.setup.outputs.branch_exists == 'true' }}
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-arm64.yaml
     with:
-      branch: ${{ needs.setup.outputs.branch }}
+      branch: ${{ needs.setup.outputs.rc_branch }}
 
   macos-arm:
     name: Build on macOS arm64
-    if: ${{ needs.setup.check_rc.outputs.branch_exists == 'true' }}
+    if: ${{ needs.setup.outputs.branch_exists == 'true' }}
     needs: [setup]
     uses: ./.github/workflows/build-wheel-macos-arm64.yaml
     with:
-      branch: ${{ needs.setup.outputs.branch }}
+      branch: ${{ needs.setup.outputs.rc_branch }}
 
   upload:
     name: Prepare & Upload wheels to TestPyPI
-    if: ${{ needs.setup.check_rc.outputs.branch_exists == 'true' }}
-    needs: [linux-x86, macos-arm, linux-aarch]
+    if: ${{ needs.setup.outputs.branch_exists == 'true' }}
+    needs: [linux-x86, macos-arm, linux-aarch, setup]
     runs-on: ubuntu-24.04
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
@@ -111,7 +111,6 @@ jobs:
 
   trigger-pennylane-rc-release:
     name: Trigger PennyLane RC release workflow
-    if: ${{ steps.check_rc.outputs.branch_exists == 'true' }}
     needs: [upload]
     runs-on: ubuntu-24.04
 
