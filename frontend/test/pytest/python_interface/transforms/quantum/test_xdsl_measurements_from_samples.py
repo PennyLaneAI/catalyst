@@ -498,40 +498,79 @@ class TestItegrationUsefulErrors:
                 qml.RX(theta, 0)
                 return qml.counts()
 
-    @pytest.mark.xfail(reason="Dynamic shots not supported")
-    def test_exec_expval_dynamic_shots(self):
-        """Test the measurements_from_samples transform where the number of shots is dynamic.
-
-        This use case is not currently supported.
-        """
-
-        @qml.qjit
-        def workload(shots):
-            dev = qml.device("lightning.qubit", wires=1)
-
-            @measurements_from_samples_pass
-            @qml.qnode(dev, shots=shots)
-            def circuit():
-                return qml.expval(qml.Z(wires=0))
-
-            return circuit()
-
-        result = workload(2)
-        assert result == 1.0
-
-    # TODO: not sure what this raises yet, depends on behaviour of diagonalize and whether 
-    # this is already caught there. Placeholder for now.
     @pytest.mark.parametrize("mp", (qml.expval, qml.var))
     def test_overlapping_tensor(self, mp):
+        """Check that an error is raised if the circuit returns a tensor with overlapping wires."""
+        
+        # Note: This error is raised by the diagonalize pass that measurements_from_samples calls, not 
+        # by measurements_from_samples directly. However, the logic in this pass relies on the 
+        # validation being performed, so its tested here. If this test ever breaks because of changes in 
+        # diagonalize_measurements, the logic in measurements_from_samples should be re-evaluated.
                 
         dev = qml.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev, shots=shots)
-        def circuit_ref():
-            initial_ops[0](wires=0)
-            initial_ops[1](wires=1)
-            return mp(qml.Z(0) @ qml.X(0))
+        with pytest.raises(RuntimeError):
+            @qml.qjit
+            @measurements_from_samples_pass
+            @qml.qnode(dev, shots=1000)
+            def circuit():
+                return mp(qml.Z(0) @ qml.X(0))
+            
+    @pytest.mark.parametrize("mp", (qml.expval, qml.var))
+    def test_overlapping_sum(self, mp):
+        """Check that an error is raised if the circuit returns a sum with overlapping wires."""
+        
+        # Note: This error is raised by the diagonalize pass that measurements_from_samples calls, not 
+        # by measurements_from_samples directly. However, the logic in this pass relies on the 
+        # validation being performed, so its tested here. If this test ever breaks because of changes in 
+        # diagonalize_measurements, the logic in measurements_from_samples should be re-evaluated.
+                     
+        dev = qml.device("lightning.qubit", wires=2)
 
+        with pytest.raises(RuntimeError):
+            @qml.qjit
+            @measurements_from_samples_pass
+            @qml.qnode(dev, shots=1000)
+            def circuit():
+                return mp(2*qml.Z(0) + qml.X(0))
+
+    @pytest.mark.parametrize("mp", (qml.expval, qml.var))
+    def test_overlapping_mps(self, mp):
+        """Check that an error is raised if the circuit returns different mps 
+        containing observables with overlapping wires."""
+        
+        # Note: This error is raised by the diagonalize pass that measurements_from_samples calls, not 
+        # by measurements_from_samples directly. However, the logic in this pass relies on the 
+        # validation being performed, so its tested here. If this test ever breaks because of changes in 
+        # diagonalize_measurements, the logic in measurements_from_samples should be re-evaluated.
+                
+        dev = qml.device("lightning.qubit", wires=2)
+
+        with pytest.raises(RuntimeError):
+            @qml.qjit
+            @measurements_from_samples_pass
+            @qml.qnode(dev, shots=1000)
+            def circuit():
+                return mp(qml.Z(0)), mp(qml.X(0))
+
+    def test_overlapping_obs_and_sample(self):
+        """Check that an error is raised if the circuit returns an mp with an observable that
+        overlaps with an mp in the computational basis."""
+        
+        # Note: This error is raised by the diagonalize pass that measurements_from_samples 
+        # calls, not by measurements_from_samples directly. However, the logic in this pass 
+        # relies on the validation being performed, so its tested here. If this test ever breaks 
+        # because of changes in diagonalize_measurements, the logic in measurements_from_samples 
+        # should be re-evaluated.        
+                
+        dev = qml.device("lightning.qubit", wires=2)
+
+        with pytest.raises(RuntimeError):
+            @qml.qjit
+            @measurements_from_samples_pass
+            @qml.qnode(dev, shots=1000)
+            def circuit():
+                return qml.sample(wires=[0]), qml.expval(qml.X(0))
 
 @pytest.mark.usefixtures("use_capture")
 class TestIntegrationWithOtherPasses:
@@ -787,7 +826,6 @@ class TestIntegrationWithExecution:
             return qml.expval(m)
 
         assert np.allclose(expected_res, circuit(), atol=0.05)
-
 
     # ---- Test circuits returning variance ------------------------------------------------------ #
     @pytest.mark.parametrize("shots", [1, 2])

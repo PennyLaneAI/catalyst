@@ -43,13 +43,14 @@ from xdsl.dialects import arith, builtin, func, tensor
 from xdsl.pattern_rewriter import PatternRewriter, RewritePattern
 from xdsl.rewriter import InsertPoint
 
-import catalyst
 from catalyst.python_interface.conversion import xdsl_module
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.pass_api import compiler_transform
 from catalyst.python_interface.transforms.quantum.diagonalize_measurements import (
     DiagonalizeFinalMeasurementsPass,
 )
+
+import pennylane as qp
 
 
 @dataclass(frozen=True)
@@ -119,41 +120,123 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             quantum.NamedObsOp: The observable op.
         """
         observable_op = op.operands[0].owner
-        cls._validate_observable_op(observable_op)
+
+        supported_obs_types = (
+            quantum.NamedObsOp,
+            quantum.TensorOp,
+            quantum.HamiltonianOp,
+            quantum.MCMObsOp,
+        )
+        if not isinstance(observable_op, supported_obs_types):
+            raise NotImplementedError(
+                "Supported observable types for measurements-from-samples are quantum.NamedObsOp, "
+                "quantum.TensorOp, quantum.HamiltonianOp, and quantum.MCMObsOp, but received "
+                f"{type(op).__name__}"
+            )
 
         return observable_op
 
-    @staticmethod
-    def _validate_observable_op(op: quantum.NamedObsOp | quantum.TensorOp | quantum.MCMObsOp):
-        """Validate the observable op.
-
-        Assert that the op is a quantum.NamedObsOp and check if it is supported in the current
-        implementation of the measurements-from-samples transform.
-
-        Raises:
-            NotImplementedError: If the observable is anything but a PauliZ quantum.NamedObsOp.
-        """
+    @classmethod
+    def get_eigvals_and_qubits(
+        cls, op: quantum.NamedObsOp | quantum.TensorOp | quantum.HamiltonianOp | quantum.MCMObsOp
+    ):
+        """Get relevant qubits and eigvals based on the observable. We access the eigvals by 
+        reconstructing an equivalent PL operation for now, so we can re-use the functionality that's
+        already implemented. Note that it doesn't matter what the wire labels are in the operator, just 
+        what order the operations are in. We assume that there are no overlapping wires in the input op, 
+        because that would """
         if isinstance(op, quantum.NamedObsOp):
             if op.type.data != "PauliZ":
                 raise NotImplementedError(
-                    f"Expected all observables to be diagonalized before application of rewrite pattern, but received '{op.type.data}'"
+                    "Expected all observables to be diagonalized before application of rewrite" 
+                    f"pattern, but received '{op.type.data}'"
                 )
-            return [1.0, -1.0]
+            pl_op_equivalent = qp.Z(0)
+            in_qubits = [
+                op.operands[0],
+            ]
 
         elif isinstance(op, quantum.TensorOp):
-            pass
+            all_obs = [obs.owner for obs in op.operands]
 
-        elif iinstance(op, quantum.HamiltonianOp):
-            pass
+            for obs in all_obs:
+                if obs.type.data != "PauliZ":
+                    raise NotImplementedError(
+                        "Expected all observables to be diagonalized before application of" 
+                        f"rewrite pattern, but received '{op.type.data}'"
+                    )
+
+            # pl_op_equivalent = cls.get_pl_op_equivalent(op)
+            pl_op_equivalent = qp.prod(*[qp.Z(i) for i, _ in enumerate(all_obs)])
+            in_qubits = [obs.operands[0] for obs in all_obs]
+
+        elif isinstance(op, quantum.HamiltonianOp):
+            coeffs = op.operands[0]
+            obs = op.operands[1:]
+            print(f"coeffs: {coeffs}")
+            print(f"obs: {obs}")
+
+            all_obs = [obs.owner for obs in op.operands]
+            print(len(all_obs))
+            print(all_obs)
+
+            print([obs.type.data for obs in all_obs[1:]])
+
+            raise NotImplementedError("you haven't added Hamiltonian support yet")
+
+        elif isinstance(op, quantum.MCMObsOp):
+            raise NotImplementedError("you haven't added MCMObsOp support yet")
 
         else:
             raise NotImpelmentedError(
-                f"Supported observable types for measurements-from-samples are quantum.NamedObsOp, quantum.TensorOp and quantum.HamiltonianOp, but received {type(op).__name__}"
+                f"Supported observable types for measurements-from-samples are quantum.NamedObsOp, quantum.TensorOp, quantum.HamiltonianOp, and quantum.MCMObsOp, but received {type(op).__name__}"
+            )
+
+        return pl_op_equivalent.eigvals(), in_qubits
+
+    @classmethod
+    def get_pl_op_equivalent(cls, op):
+        """Generate an operator with the equivalent eigvals based on the structure of 
+        the input observable"""
+
+        if isinstance(op, quantum.NamedObsOp):
+            if op.type.data != "PauliZ":
+                raise NotImplementedError(
+                    "Expected all observables to be diagonalized before application of rewrite" 
+                    f"pattern, but received '{op.type.data}'"
+                )
+            return qp.Z(0)
+
+        elif isinstance(op, quantum.TensorOp):
+            all_obs = [cls.get_pl_op_equivalent(obs.owner) for obs in op.operands]
+            pl_op_equivalent = qp.prod(*all_obs)
+            return pl_op_equivalent
+
+        elif isinstance(op, quantum.HamiltonianOp):
+            coeffs = op.operands[0]
+            obs = op.operands[1:]
+            print(f"coeffs: {coeffs}")
+            print(f"obs: {obs}")
+
+            all_obs = [obs.owner for obs in op.operands]
+            print(len(all_obs))
+            print(all_obs)
+
+            print([obs.type.data for obs in all_obs[1:]])
+
+            raise NotImplementedError("you haven't added Hamiltonian support yet")
+
+        elif isinstance(op, quantum.MCMObsOp):
+            raise NotImplementedError("you haven't added MCMObsOp support yet")
+
+        else:
+            raise NotImplementedError(
+                f"Supported observable types for measurements-from-samples are quantum.NamedObsOp, quantum.TensorOp, quantum.HamiltonianOp, and quantum.MCMObsOp, but received {type(op).__name__}"
             )
 
     @staticmethod
     def insert_compbasis_op(
-        in_qubit: ir.SSAValue, ref_op: ir.Operation, rewriter: PatternRewriter
+        in_qubits: ir.SSAValue, ref_op: ir.Operation, rewriter: PatternRewriter
     ) -> quantum.ComputationalBasisOp:
         """Create and insert a computational-basis op (quantum.ComputationalBasisOp).
 
@@ -161,7 +244,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         given reference operation, `ref_op`, using the supplied `rewriter`.
 
         Args:
-            in_qubit (SSAValue): The SSA value used as input to the computational-basis op.
+            in_qubits (List[SSAValue]): The SSA value used as input to the computational-basis op.
             ref_op (Operation): The reference op before which the quantum.ComputationalBasisOp is
                 inserted.
             rewriter (PatternRewriter): The xDSL pattern rewriter.
@@ -169,14 +252,15 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         Returns:
             quantum.ComputationalBasisOp: The inserted computation-basis op.
         """
-        assert isinstance(in_qubit, ir.SSAValue) and isinstance(in_qubit.type, quantum.QubitType), (
-            f"Expected `in_qubit` to be an SSAValue with type quantum.QubitType, but got "
-            f"{type(in_qubit).__name__}"
-        )
+        for qubit in in_qubits:
+            assert isinstance(qubit, ir.SSAValue) and isinstance(qubit.type, quantum.QubitType), (
+                f"Expected `in_qubits` to be a list of SSAValue with type quantum.QubitType, but got "
+                f"{type(in_qubit).__name__}"
+            )
 
         # The input operands are [[qubit, ...], qreg]
         compbasis_op = quantum.ComputationalBasisOp(
-            operands=[in_qubit, None], result_types=[quantum.ObservableType()]
+            operands=[in_qubits, None], result_types=[quantum.ObservableType()]
         )
         rewriter.insert_op(compbasis_op, insertion_point=InsertPoint.before(ref_op))
 
@@ -392,18 +476,23 @@ class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
     ):
         """Match and rewrite for quantum.ExpvalOp."""
         observable_op = self.get_observable_op(matched_op)
-        in_qubit = observable_op.operands[0]
-        compbasis_op = self.insert_compbasis_op(in_qubit, observable_op, rewriter)
-        sample_op = self.insert_sample_op(compbasis_op, self._shots, 1, rewriter)
+        # in_qubit = observable_op.operands[0]
+        eigvals, in_qubits = self.get_eigvals_and_qubits(observable_op)
+        compbasis_op = self.insert_compbasis_op(in_qubits, observable_op, rewriter)
+        sample_op = self.insert_sample_op(compbasis_op, self._shots, len(in_qubits), rewriter)
 
         # Insert the post-processing function into current module or get handle to it if already
         # inserted
         match matched_op:
             case quantum.ExpvalOp():
-                postprocessing_func_name = f"expval_from_samples.tensor.{self._shots}x1xf64"
-                postprocessing_jit_func = _postprocessing_expval
+                postprocessing_func_name = (
+                    f"expval_from_samples.tensor.{self._shots}x{len(in_qubits)}xf64"
+                )
+                postprocessing_jit_func = get_postprocessing_expval(eigvals, len(in_qubits))
             case quantum.VarianceOp():
-                postprocessing_func_name = f"var_from_samples.tensor.{self._shots}x1xf64"
+                postprocessing_func_name = (
+                    f"var_from_samples.tensor.{self._shots}x{len(in_qubits)}xf64"
+                )
                 postprocessing_jit_func = _postprocessing_var
             case _:
                 assert False, (
@@ -420,7 +509,7 @@ class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
             # shape (shots, wire) be dynamic and given as SSA values?
             # Same goes for the column/wire indices (the second argument).
             postprocessing_module = postprocessing_jit_func(
-                jax.core.ShapedArray([self._shots, 1], float), 0
+                jax.core.ShapedArray([self._shots, len(in_qubits)], float), 0
             )
 
             postprocessing_func_op = self.get_postprocessing_funcs_from_module_and_insert(
@@ -606,24 +695,34 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
     )
 
 
-@xdsl_module
-@jax.jit
-def _postprocessing_expval(samples, column):
-    """Post-processing to recover the expectation value from the given `samples` array for each
-    requested `column` in the array.
+def get_postprocessing_expval(eigvals, num_wires):
 
-    This function assumes that the samples are in the computational basis (0s and 1s) and that the
-    observable operand of the expectation value has eigenvalues +1 and -1.
+    @xdsl_module
+    @jax.jit
+    def _postprocessing_expval(samples, column):
+        """Post-processing to recover the expectation value from the given `samples` array for each
+        requested `column` in the array.
 
-    Args:
-        samples (jax.core.ShapedArray): Array of samples, with shape (shots, wires).
-        column (int, jax.core.ShapedArray): Column index (or indices) of the `samples` array over
-            which the expectation value is computed.
+        This function assumes that the samples are in the computational basis (0s and 1s) and that the
+        observable operand of the expectation value has eigenvalues +1 and -1.
 
-    Returns:
-        jax.core.ShapedArray: The expectation value for each requested column.
-    """
-    return jnp.mean(1.0 - 2.0 * samples[:, column], axis=0)
+        Args:
+            samples (jax.core.ShapedArray): Array of samples, with shape (shots, wires).
+            column (int, jax.core.ShapedArray): Column index (or indices) of the `samples` array over
+                which the expectation value is computed.
+
+        Returns:
+            jax.core.ShapedArray: The expectation value for each requested column.
+        """
+        powers_of_two = 2 ** jnp.arange(num_wires)[::-1]
+        indices = samples @ powers_of_two
+        eigval_samples = jnp.take(eigvals, indices.astype(int))
+
+        # return jnp.mean(1.0 - 2.0 * samples[:, column], axis=0)
+
+        return jnp.mean(eigval_samples, axis=0) + column  #ToDo: remove column argument
+
+    return _postprocessing_expval
 
 
 @xdsl_module
