@@ -57,24 +57,28 @@ def get_compiler_ops() -> tuple[set[Operator], int]:
     # FIXME: manual override for PauliMeasure
     pl_op_classes.add(qp.ops.PauliMeasure)
 
+    supported_compiler_op_names = set(COMPILER_OPS_FOR_DECOMPOSITION)
+
     compiler_op_classes = set(
-        op_class
-        for op_class in pl_op_classes
-        if op_class.__name__ in COMPILER_OPS_FOR_DECOMPOSITION
+        op_class for op_class in pl_op_classes if op_class.__name__ in supported_compiler_op_names
     )
 
-    compiler_op_class_names = [op_class.__name__ for op_class in compiler_op_classes]
+    compiler_op_class_names = set(op_class.__name__ for op_class in compiler_op_classes)
 
-    for class_name in COMPILER_OPS_FOR_DECOMPOSITION:
-        if class_name not in compiler_op_class_names:
-            warnings.warn(f"failed to collect pennylane op with name {class_name}")
-            num_failures += 1
+    for class_name in supported_compiler_op_names.difference(compiler_op_class_names):
+        warnings.warn(f"failed to collect pennylane op with name {class_name}")
+        num_failures += 1
 
     return compiler_op_classes, num_failures
 
 
 def get_dummy_args(func: Callable) -> list[str | float | int]:
     """
+    Create dummy args for a callable.
+
+    Args:
+        func: callable to create args for
+
     Returns:
         list: dummy args matching the (positional) signature of func.
     """
@@ -109,13 +113,15 @@ def get_dummy_args(func: Callable) -> list[str | float | int]:
         elif param.name in ["theta", "phi", "omega"]:
             dummy_args.append(0.0)
         else:
-            dummy_args.append(0)  # guess int
+            dummy_args.append(0)  # guess int for unknown args
 
     return dummy_args
 
 
 def get_func_from_circuit(module) -> str | None:
     """
+    Get the string representation of `rule_wrapper` from module, if it exists.
+
     Args:
         module: an MLIR module object containing a FuncOp named `rule_wrapper` to be extracted
 
@@ -147,7 +153,9 @@ def compile_rule(
     dev,
 ) -> str | None:
     """
-    Get the compiled rule from a python decomposition rule.
+    Get the string representation of a compiled rule from a python decomposition rule, if possible.
+
+    NOTE: rules with string params are not currently supported.
 
     Args:
         op_class: A PennyLane class subclassing Operation
@@ -223,7 +231,7 @@ def compile_op_decomp_rules(
             mlir_modules[rule_name] = compile_rule(op_class, op_args, op_num_wires, rule, dev)
             num_successes += 1
         except TypeError as e:
-            warnings.warn(f"dummy args failed to compile {rule_name}: {str(e)}")
+            warnings.warn(f"dummy args failed to compile {rule_name}: {e}")
             num_failures += 1
         except CompileError as e:
             warnings.warn(f"failed to compile {rule_name}: {e}")
@@ -239,9 +247,9 @@ def compile_op_decomp_rules(
 
 def main():
     """
-    filters compiler ops from PennyLane, grabs their associated decomposition rules, and compiles
-    them via a wrapper function with qjit to mlir. Intended for use with `make decomp-rules` in
-    catalyst/mlir.
+    filters compiler-compatible decomposition ops from PennyLane, grabs their associated
+    decomposition rules, and compiles them via a wrapper function with qjit to mlir.
+    Intended for use with `make decomp-rules` in catalyst/mlir.
     """
 
     parser = argparse.ArgumentParser(prog="decomposition rule pre-compiler")
