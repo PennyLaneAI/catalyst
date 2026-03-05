@@ -34,8 +34,6 @@ from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION
 from catalyst.jax_primitives import decomposition_rule
 from catalyst.utils.exceptions import CompileError
 
-# TODO document this directory + functionality
-
 # NOTE: paths are relative to catalyst root, not mlir directory
 DECOMP_DIR_PATH = Path("./decomposition-rules/")
 DECOMPS_FILE_PATH = DECOMP_DIR_PATH / Path("decompositions.mlir")
