@@ -2,11 +2,6 @@ name: Build Release Branch Nightly for TestPyPI
 
 on:
   workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Branch to build from'
-        required: true
-        default: 'v0.14.0-rc'
 
 jobs:
   setup:
