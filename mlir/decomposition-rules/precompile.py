@@ -36,6 +36,9 @@ from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION
 from catalyst.jax_primitives import decomposition_rule
 from catalyst.utils.exceptions import CompileError
 
+DEFAULT_DECOMP_DIR = Path("./decomposition-rules/")
+DECOMP_FILE_NAME = Path("decompositions.mlir")
+
 
 @lru_cache
 def get_compiler_ops() -> tuple[set[type[Operator]], int]:
@@ -256,10 +259,10 @@ def main():
     """
 
     parser = argparse.ArgumentParser(prog="decomposition rule pre-compiler")
-    parser.add_argument("-d", "--dir", default="./decomposition-rules")
+    parser.add_argument("-d", "--dir", default=DEFAULT_DECOMP_DIR)
 
     decomp_dir_path = Path(parser.parse_args().dir)
-    decomps_file_path = decomp_dir_path / Path("decompositions.mlir")
+    decomps_file_path = decomp_dir_path / DECOMP_FILE_NAME
 
     target_ops, num_ops_missed = get_compiler_ops()
     if num_ops_missed:
