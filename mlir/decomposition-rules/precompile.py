@@ -36,7 +36,7 @@ from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION
 from catalyst.jax_primitives import decomposition_rule
 from catalyst.utils.exceptions import CompileError
 
-DEFAULT_RULE_DIR = Path("./decomposition-rules/cached_rules")
+DEFAULT_RULE_DIR = Path("./decomposition-rules/cached-rules")
 DECOMP_FILE_NAME = Path("decompositions.mlir")
 
 
