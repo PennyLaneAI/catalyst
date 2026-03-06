@@ -22,8 +22,7 @@ import pennylane as qml
 import pytest
 from xdsl.context import Context
 from xdsl.dialects import builtin, func, test, transform
-from xdsl.interpreter import Interpreter
-from xdsl.ir import Attribute, Block, Region, SSAValue
+from xdsl.ir import Attribute, SSAValue
 from xdsl.passes import ModulePass
 
 from catalyst import qjit
@@ -322,7 +321,7 @@ class TestApplyTransformSequencePass:
         # Should be 2 calls, 1 for init pass, 1 for "options-pass"
         assert num_calls == 2
 
-    def test_callback_count_with_passes(self):
+    def test_callback_count_no_passes(self):
         """Test that the apply function calls the callback the correct number of times."""
 
         num_calls = 0
