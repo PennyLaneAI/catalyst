@@ -20,6 +20,7 @@ Bytecode.
 import argparse
 import inspect
 import warnings
+from functools import lru_cache
 from pathlib import Path
 from types import UnionType
 from typing import Callable, Union, get_args, get_origin
