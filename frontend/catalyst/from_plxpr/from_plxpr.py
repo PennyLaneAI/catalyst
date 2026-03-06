@@ -476,13 +476,8 @@ def handle_transform(
             final_jaxpr = pl_decompose._plxpr_transform(
                 final_jaxpr.jaxpr, final_jaxpr.consts, targs, pl_tkwargs, *non_const_args
             )
-        return copy(self).eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
 
-    # Convert list back to JAX-hashable tuple for kwargs passed to the diagonalize_measurement pass
-    if catalyst_pass_name == "diagonalize-final-measurements" and isinstance(
-        tkwargs.get("supported_base_obs", None), list
-    ):
-        tkwargs["supported_base_obs"] = tuple(tkwargs["supported_base_obs"])
+        return copy(self).eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
 
     # Apply the corresponding Catalyst pass counterpart
     next_eval = copy(self)
