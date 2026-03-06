@@ -89,8 +89,131 @@ _combine_global_phases = compiler_transform(CombineGlobalPhasesPass)
 
 
 def combine_global_phases(qnode):
-    """TEST!!!"""
+    """Combine all ``GlobalPhase`` operations into a single ``GlobalPhase`` operation.
 
+    Args:
+        fn (QNode): QNode to apply the pass to
+
+    Returns:
+        :class:`QNode <pennylane.QNode>`
+
+    .. note::
+
+        It is recommended to enable PennyLane program capture when using ``combine_global_phases``
+        via ``qjit(capture=True)``.
+
+    **Example**
+
+    The ``combine_global_phases`` compilation pass merges :class:`pennylane.GlobalPhase` operators
+    together into one :class:`pennylane.GlobalPhase` operator.
+
+    .. code-block:: python
+
+    import pennylane as qml
+    import catalyst
+
+    @qml.qjit(capture=True)
+    @catalyst.passes.combine_global_phases
+    @qml.qnode(qml.device("lightning.qubit", wires=5))
+    def circuit():
+        qml.GlobalPhase(0)
+        qml.GlobalPhase(1)
+        qml.GlobalPhase(2)
+        qml.GlobalPhase(3)
+        qml.GlobalPhase(4)
+        return qml.state()
+
+    >>> print(qml.specs(circuit, level=2)())
+    Device: lightning.qubit
+    Device wires: 5
+    Shots: Shots(total=None)
+    Level: combine-global-phases (MLIR-1)
+    <BLANKLINE>
+    Wire allocations: 5
+    Total gates: 1
+    Gate counts:
+    - GlobalPhase: 1
+    Measurements:
+    - state(all wires): 1
+    Depth: Not computed
+
+    .. details::
+        :title: Usage details
+
+        The ``combine_global_phases`` pass does not support optimization around structured
+        control flow. Consider the following circuit.
+
+        .. code-block:: python
+
+            import pennylane as qml
+            import catalyst
+
+            @qml.qjit(capture=True, autograph=True)
+            @catalyst.passes.combine_global_phases
+            @qml.qnode(qml.device("lightning.qubit", wires=5))
+            def circuit():
+                qml.GlobalPhase(0)
+                qml.GlobalPhase(1)
+                qml.GlobalPhase(2)
+                qml.GlobalPhase(3)
+                qml.GlobalPhase(4)
+
+                for i in range(3):
+                    qml.GlobalPhase(i)
+                    qml.GlobalPhase(i + 1)
+
+                return qml.state()
+
+        >>> print(qml.specs(circuit, level=2)())
+        Device: lightning.qubit
+        Device wires: 5
+        Shots: Shots(total=None)
+        Level: combine-global-phases (MLIR-1)
+        <BLANKLINE>
+        Wire allocations: 5
+        Total gates: 4
+        Gate counts:
+        - GlobalPhase: 4
+        Measurements:
+        - state(all wires): 1
+        Depth: Not computed
+
+        The resulting circuit contains 4 ``GlobalPhase`` operations: one from the 5 ``GlobalPhase``s
+        merged outside of the ``for`` loop, and three ``GlobalPhase``s total from the entire ``for``
+        loop (the two within the body of the ``for`` loop are merged).
+
+        Lastly, ``GlobalPhase`` operations can be merged together when nested in symbolic operations
+        like ``ctrl`` or ``adjoint``:
+
+        .. code-block:: python
+
+            import pennylane as qml
+            import catalyst
+
+            @qml.qjit(capture=True, autograph=True)
+            @catalyst.passes.combine_global_phases
+            @qml.qnode(qml.device("lightning.qubit", wires=5))
+            def circuit():
+
+                qml.ctrl(qml.GlobalPhase, control=(0, 1, 2))(3)
+                qml.ctrl(qml.GlobalPhase, control=(0, 1, 2))(4)
+
+                return qml.state()
+
+        >>> print(qml.specs(circuit, level=2)())
+        Device: lightning.qubit
+        Device wires: 5
+        Shots: Shots(total=None)
+        Level: combine-global-phases (MLIR-1)
+        <BLANKLINE>
+        Wire allocations: 5
+        Total gates: 1
+        Gate counts:
+        - 3C(GlobalPhase): 1
+        Measurements:
+        - state(all wires): 1
+        Depth: Not computed
+    """
     return _combine_global_phases(qnode)
 
 
