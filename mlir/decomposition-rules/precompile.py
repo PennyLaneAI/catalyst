@@ -274,7 +274,7 @@ def main():
             if results:
                 for name, circuit_mlir in results.items():
                     if circuit_mlir:
-                        mlir_file.write(circuit_mlir.replace("rule_wrapper", name))
+                        mlir_file.write(circuit_mlir.replace("@rule_wrapper", "@" + name))
 
     if num_failures:
         warnings.warn(
