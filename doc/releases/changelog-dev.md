@@ -149,7 +149,7 @@
   quantum-opt --resource-tracker -mlir-pass-statistics input.mlir
   ```
 
-* The `diagonalize-final-measurements` xDSL pass now accepts the optional keyword arguments ``to_eigvals`` and ``supported_base_obs``.
+* The `diagonalize-final-measurements` xDSL pass now accepts the optional keyword argument ``supported_base_obs``. The kwarg``to_eigvals`` is now also included in the call signature for compatibility with the tape transform, but this kwarg is unused and can only take its default value, `False`.
   [(#2517)](https://github.com/PennyLaneAI/catalyst/pull/2517)
   [(#2538)](https://github.com/PennyLaneAI/catalyst/pull/2538)
 
