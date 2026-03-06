@@ -15,27 +15,21 @@
 
 import io
 from collections.abc import Sequence
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Callable
 
-from pennylane.typing import Callable
 from xdsl.context import Context
 from xdsl.dialects import builtin, transform
 from xdsl.ir import Attribute
 from xdsl.parser import Parser
-from xdsl.passes import ModulePass, PassPipeline
-from xdsl.pattern_rewriter import (
-    PatternRewriter,
-    PatternRewriteWalker,
-    RewritePattern,
-    op_type_rewrite_pattern,
-)
+from xdsl.passes import ModulePass
+from xdsl.pattern_rewriter import PatternRewriter, RewritePattern, op_type_rewrite_pattern
 from xdsl.printer import Printer
 
 from catalyst.compiler import _quantum_opt
 from catalyst.python_interface.utils import get_pyval_from_xdsl_attr
 
-available_passes = {}
+available_passes: dict[str, Callable[[], type[ModulePass]]] = {}
 
 
 def register_pass(name, _callable):
@@ -75,7 +69,18 @@ class ApplyTransformSequencePass(ModulePass):
     """
 
     name = "apply-transform-sequence"
-    callback: Callable[[ModulePass, builtin.ModuleOp, ModulePass], None] | None = None
+
+    passes: dict[str, Callable[[], type[ModulePass]]] = field(
+        default_factory=dict[str, Callable[[], type[ModulePass]]]
+    )
+
+    callback: (
+        Callable[[ModulePass | None, builtin.ModuleOp, ModulePass | None, int], None] | None
+    ) = None
+
+    def __post_init__(self):
+        """Update passes to include global pass registry."""
+        self.passes.update(available_passes)
 
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         """Applies the transformation"""
@@ -95,7 +100,7 @@ class ApplyTransformSequencePass(ModulePass):
                 continue
 
             # Need to create a new pattern for each nested module to properly handle callbacks
-            pattern = ApplyTransformSequencePattern(ctx, available_passes, self.callback)
+            pattern = ApplyTransformSequencePattern(ctx, self.passes, self.callback)
             rewriter = PatternRewriter(transformer)
             pattern.match_and_rewrite(transformer, rewriter)
 
