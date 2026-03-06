@@ -5,8 +5,7 @@ pennylane_catalyst.egg-info
 *.so
 *.dylib
 .dylibs
-mlir/decomposition-rules/decompositions.mlir
-mlir/decomposition-rules/decompositions.mlirbc
+mlir/decomposition-rules/cached_rules
 
 # Testing files and directories
 .lit
