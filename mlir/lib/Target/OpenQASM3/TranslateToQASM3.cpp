@@ -180,7 +180,7 @@ private:
              }
         }
         
-        os << "qubit " << name << "[" << n << "];\n";
+        os << "qubit[" << n << "] " << name << ";\n";
         
         // Map the result (register) to this name
         qubitMap[op.getResult()] = name;
@@ -223,7 +223,12 @@ private:
     LogicalResult emitCustomGate(CustomOp op) {
         // quantum.custom "name" (q1, q2)
         // or quantum.custom "name"(p1) (q1)
-        os << op.getGateName();
+        llvm::StringRef gateName = op.getGateName();
+        if (gateName == "cnot") {
+            os << "cx";
+        } else {
+            os << gateName;
+        }
         
         auto params = op.getParams();
         if (!params.empty()) {
@@ -280,7 +285,7 @@ private:
 
     LogicalResult emitMeasure(MeasureOp op) {
         // quantum.measure(q) -> (bit, q_out)
-        // In QASM: bit c = measure q;
+        // In QASM: bit c = measure q; -> bit c; c = measure q;
         
         Value measureQubit = op.getInQubit();
         std::string qName = "unknown_q";
@@ -293,7 +298,7 @@ private:
         // Let's use "m" prefix for measurement results
         cName = "m_" + std::to_string(qubitCounter++);
 
-        os << "bit " << cName << " = measure " << qName << ";\n";
+        os << "bit " << cName << ";\n" << cName << " = measure " << qName << ";\n";
         
         // Update map for the qubit OUT state 
         // In Catalyst, measure returns the qubit state as well.
