@@ -172,13 +172,13 @@ def _measurements_preprocessing(
         if "SampleMP" in capabilities.measurement_processes:
             pipeline.append(
                 _safe_create_bound_transform(
-                    measurements_from_samples, unsupported_transforms, (device.wires,)
+                    measurements_from_samples, unsupported_transforms, args=(device.wires,)
                 )
             )
         elif "CountsMP" in capabilities.measurement_processes:
             pipeline.append(
                 _safe_create_bound_transform(
-                    measurements_from_counts, unsupported_transforms, (device.wires,)
+                    measurements_from_counts, unsupported_transforms, args=(device.wires,)
                 )
             )
         else:
@@ -192,7 +192,7 @@ def _measurements_preprocessing(
                 _safe_create_bound_transform(
                     diagonalize_measurements,
                     unsupported_transforms,
-                    {"supported_base_obs": supported_base_obs},
+                    kwargs={"supported_base_obs": supported_base_obs},
                 )
             )
 
@@ -206,11 +206,10 @@ def _operations_preprocessing(
     capabilities: DeviceCapabilities,
 ) -> None:
     """Preprocess operations."""
-    # pipeline.append(
-    #     _safe_create_bound_transform(
-    #         Transform(pass_name="decompose-lowering"), unsupported_transforms
-    #     )
-    # )
+    # Currently, decomposition is not added to the pipeline. That will be addressed in the future.
+    # Note that the below transforms, while not having native MLIR/xDSL implementations, will NOT
+    # cause a warning to be triggered. This is because these are added unconditionally, and we do
+    # not care that much about validation/verification transforms that much anyway.
     pipeline.append(
         _safe_create_bound_transform(
             verify_operations,
@@ -254,8 +253,8 @@ def _gradient_preprocessing(
             _safe_create_bound_transform(
                 validate_observables_adjoint_diff,
                 unsupported_transforms,
-                (),
-                {"qjit_device": device},
+                args=(),
+                kwargs={"qjit_device": device},
             )
         )
     elif execution_config.gradient_method == "parameter-shift":
