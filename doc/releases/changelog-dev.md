@@ -364,7 +364,7 @@
 <h3>Internal changes ⚙️</h3>
 
 * The QNode lowering to MLIR now supports providing multiple named transform pipelines.
-  [(#2___)](https://github.com/PennyLaneAI/catalyst/pull/2___)
+  [(#2556)](https://github.com/PennyLaneAI/catalyst/pull/2556)
 
 * Both the MLIR and xDSL `ApplyTransformSequencePass` implementations have been updated to support interpreting multiple
   `transform.named_sequence` operations for a single transformer module.
