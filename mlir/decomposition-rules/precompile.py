@@ -221,9 +221,7 @@ def compile_op_decomp_rules(
     mlir_modules = {}
 
     try:
-        op_num_wires = (
-            op_class.num_wires if op_class.num_wires and isinstance(op_class.num_wires, int) else 2
-        )
+        op_num_wires = op_class.num_wires if op_class.num_wires else 2
         op_args = get_dummy_args(op_class)
         dev = qp.device("lightning.qubit", wires=op_num_wires)
     except Exception as e:  # pylint: disable=broad-exception-caught
