@@ -364,6 +364,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update nightly RC builds to be triggered by Lightning. 
+  [(#2491)](https://github.com/PennyLaneAI/catalyst/pull/2491)
+  
 * Updated integration tests to match changes to the PennyLane `qml.specs` frontend made in https://github.com/PennyLaneAI/pennylane/pull/9088.
   [(#2513)](https://github.com/PennyLaneAI/catalyst/pull/2513)
 
