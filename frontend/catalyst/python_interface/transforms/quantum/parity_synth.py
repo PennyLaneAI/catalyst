@@ -18,8 +18,7 @@ an xDSL-agnostic synthesis functionality and an integration thereof into xDSL.""
 
 from dataclasses import dataclass
 from itertools import product
-from functools import wraps
-
+from inspect import signature
 
 try:
     import networkx as nx
@@ -399,8 +398,6 @@ class ParitySynthPass(passes.ModulePass):
 
 _parity_synth_func = compiler_transform(ParitySynthPass)
 
-import inspect
-
 
 def parity_synth(qnode):
     r"""
@@ -544,6 +541,4 @@ def parity_synth(qnode):
     return _parity_synth_func(qnode)
 
 
-_parity_synth_func.__signature__ = "(qnode)"
-
-parity_synth.__signature__ = inspect.signature(_parity_synth_func)
+parity_synth.__signature__ = signature(_parity_synth_func)

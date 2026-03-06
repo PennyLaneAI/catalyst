@@ -16,6 +16,7 @@
 written using xDSL."""
 
 from dataclasses import dataclass
+from inspect import signature
 
 from xdsl import context, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin, func
@@ -91,3 +92,6 @@ def combine_global_phases(*args, **kwargs):
     """TEST!!!"""
 
     return _combine_global_phases(*args, **kwargs)
+
+
+combine_global_phases.__signature__ = signature(_combine_global_phases)
