@@ -77,6 +77,7 @@
 #include "Mitigation/IR/MitigationDialect.h"
 #include "PBC/IR/PBCDialect.h"
 #include "PauliFrame/IR/PauliFrameDialect.h"
+#include "QecLogical/IR/QecLogicalDialect.h"
 #include "QecPhysical/IR/QecPhysicalDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
@@ -395,6 +396,7 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     registry.insert<gradient::GradientDialect>();
     registry.insert<mitigation::MitigationDialect>();
     registry.insert<pauli_frame::PauliFrameDialect>();
+    registry.insert<qecl::QecLogicalDialect>();
     registry.insert<qecp::QecPhysicalDialect>();
 }
 } // namespace

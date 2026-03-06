@@ -16,6 +16,7 @@ set(LIBS
     MLIRPauliFrame
     MLIRIon
     MLIRRTIO
+    MLIRQecLogical
     MLIRQecPhysical
 )
 
