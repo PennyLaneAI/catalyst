@@ -43,9 +43,6 @@ from catalyst.python_interface.dialects.quantum import (
 )
 from catalyst.python_interface.pass_api import compiler_transform
 
-_default_supported_obs = {"PauliZ", "Identity"}
-_obs_allowed_diagonalization = {"PauliX", "PauliY", "PauliZ", "Hadamard", "Identity"}
-
 
 def _generate_mapping():
     _gate_map = {}
@@ -132,10 +129,9 @@ class DiagonalizeFinalMeasurementsPattern(
 ):  # pylint: disable=too-few-public-methods
     """RewritePattern for diagonalizing final measurements."""
 
-    def __init__(self, supported_base_obs: set[str], to_eigvals: bool = False):
+    def __init__(self, supported_base_obs: set[str]):
         """Initializes the RewritePattern."""
         self.supported_base_obs = supported_base_obs
-        self.to_eigvals = to_eigvals
 
     @pattern_rewriter.op_type_rewrite_pattern
     def match_and_rewrite(
@@ -204,7 +200,7 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
 
         Args:
             **options: Arbitrary keyword arguments.
-                supported_base_obs (str or tuple[str], optional): The observable bases
+                supported_base_obs (tuple[str], optional): The observable bases
                     to support. Must be a subset of the allowed base observables
                     (e.g., 'PauliX', 'PauliY', 'PauliZ', 'Hadamard', 'Identity').
                     Defaults to `_default_supported_obs`.
@@ -216,32 +212,23 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
                 `_obs_allowed_diagonalization`.
             ValueError: If `to_eigvals` is set to `True`.
         """
+        _default_supported_obs = {"PauliZ", "Identity"}
+        _obs_allowed_diagonalization = {"PauliX", "PauliY", "PauliZ", "Hadamard", "Identity"}
 
-        self.supported_base_obs = options.get("supported_base_obs", _default_supported_obs)
+        self.supported_base_obs = options.get("supported_base_obs", tuple(_default_supported_obs))
 
-        if (
-            isinstance(self.supported_base_obs, str)
-            and self.supported_base_obs in _obs_allowed_diagonalization
-        ):
-            self.supported_base_obs = _default_supported_obs | set(
-                [
-                    self.supported_base_obs,
-                ]
-            )
         if isinstance(self.supported_base_obs, tuple) and set(self.supported_base_obs).issubset(
             _obs_allowed_diagonalization
         ):
             self.supported_base_obs = _default_supported_obs | set(self.supported_base_obs)
-
-        if not set(self.supported_base_obs).issubset(_obs_allowed_diagonalization):
+        else:
             msg = (
                 "Supported base observables must be a subset of (PauliX, PauliY, PauliZ, Hadamard, "
-                "and Identity) passed as a tuple[str] or str, but received "
+                "and Identity) passed as a tuple[str], but received "
                 f"{self.supported_base_obs}"
             )
             raise ValueError(msg)
-        self.to_eigvals = options.get("to_eigvals", False)
-        if self.to_eigvals is not False:
+        if options.get("to_eigvals", False) is not False:
             raise ValueError("Only to_eigvals = False is supported.")
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
@@ -251,7 +238,7 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
         NonCommutingObservableValidator(op)
 
         pattern_rewriter.PatternRewriteWalker(
-            DiagonalizeFinalMeasurementsPattern(self.supported_base_obs, self.to_eigvals)
+            DiagonalizeFinalMeasurementsPattern(self.supported_base_obs)
         ).rewrite_module(op)
 
 

@@ -36,39 +36,31 @@ _non_commuting_err_msg = (
 class TestDiagonalizeFinalMeasurementsPass:
     """Unit tests for the diagonalize-final-measurements pass."""
 
-    @pytest.mark.parametrize(
-        "supported_base_obs",
-        ["PauliX", ("PauliX",), ("PauliX", "PauliY"), ("Identity", "Hadamard")],
-    )
     @pytest.mark.parametrize("to_eigvals", [1, 0, True, "False"])
-    def test_with_to_eigvals_raise_errors(self, supported_base_obs, to_eigvals):
+    def test_with_to_eigvals_raise_errors(self, to_eigvals):
         """Test a ValueError is raised if to_eigvals is not set as False."""
         expected_msg = "Only to_eigvals = False is supported."
         with pytest.raises(ValueError, match=expected_msg):
-            _ = DiagonalizeFinalMeasurementsPass(
-                supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
-            )
+            _ = DiagonalizeFinalMeasurementsPass(to_eigvals=to_eigvals)
 
     @pytest.mark.parametrize(
         "supported_base_obs",
         [
+            "PauliX",
             "pauliz",
             ("paulix",),
             ("paulix", "pauliy"),
         ],
     )
-    @pytest.mark.parametrize("to_eigvals", [1, 0, True, "False"])
-    def test_with_supported_base_obs_raise_errors(self, supported_base_obs, to_eigvals):
+    def test_with_supported_base_obs_raise_errors(self, supported_base_obs):
         """Test a ValueError is raised if supported_base_obs is not a subset of [PauliX,
         PauliY, PauliZ, Hadamard, and Identity]."""
         expected_msg = (
             "Supported base observables must be a subset of (PauliX, PauliY, PauliZ, Hadamard, "
-            f"and Identity) passed as a tuple[str] or str, but received {supported_base_obs}"
+            f"and Identity) passed as a tuple[str], but received {supported_base_obs}"
         )
         with pytest.raises(ValueError, match=re.escape(expected_msg)):
-            _ = DiagonalizeFinalMeasurementsPass(
-                supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
-            )
+            _ = DiagonalizeFinalMeasurementsPass(supported_base_obs=supported_base_obs)
 
     def test_with_pauli_z(self, run_filecheck):
         """Test that a PauliZ observable is not affected by diagonalization"""
@@ -91,7 +83,7 @@ class TestDiagonalizeFinalMeasurementsPass:
 
     @pytest.mark.parametrize(
         "supported_base_obs",
-        ["PauliX", ("PauliX",), ("PauliX", "PauliY")],
+        [("PauliX",), ("PauliX", "PauliY")],
     )
     def test_with_supported_base_obs(self, supported_base_obs, run_filecheck):
         """Check observables in the supported_base_obs would not be diagonalized."""
@@ -100,7 +92,7 @@ class TestDiagonalizeFinalMeasurementsPass:
                 // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
                 %0 = "test.op"() : () -> !quantum.bit
 
-                // CHECK: quantum.namedobs %0[PauliX] : !quantum.obs
+                // CHECK-NEXT: quantum.namedobs %0[PauliX] : !quantum.obs
                 %1 = quantum.namedobs %0[PauliX] : !quantum.obs
 
                 // CHECK: quantum.var %1 : f64
@@ -146,7 +138,7 @@ class TestDiagonalizeFinalMeasurementsPass:
             }
             """
 
-        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs="PauliX"),)
+        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs=("PauliX",)),)
         run_filecheck(program, pipeline)
 
     def test_with_pauli_x(self, run_filecheck):
@@ -188,7 +180,7 @@ class TestDiagonalizeFinalMeasurementsPass:
             }
             """
 
-        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs="PauliY"),)
+        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs=("PauliY",)),)
         run_filecheck(program, pipeline)
 
     def test_with_pauli_y(self, run_filecheck):
@@ -232,7 +224,7 @@ class TestDiagonalizeFinalMeasurementsPass:
             }
             """
 
-        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs="Hadamard"),)
+        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs=("Hadamard",)),)
         run_filecheck(program, pipeline)
 
     def test_with_hadamard(self, run_filecheck):
@@ -713,7 +705,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
     def test_with_split_non_commuting_mlir(self, run_filecheck_qjit):
-        """Test the target mlir file is correctly lowered when applying both the
+        """Test the target program is correctly lowered when applying both the
         diagonalize-final-measurements and the split-non-commuting pass."""
 
         def diagonalize_measurements_setup_inputs(
@@ -761,7 +753,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         run_filecheck_qjit(circuit)
 
     def test_with_split_non_commuting(self):
-        """Test the executable file can be generated and ran with lightning.qubit when applying
+        """Test the executable file can be generated and run with lightning.qubit when applying
         both the diagonalize-final-measurements and the split-non-commuting passes"""
 
         def diagonalize_measurements_setup_inputs(
