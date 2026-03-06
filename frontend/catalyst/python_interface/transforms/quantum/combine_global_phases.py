@@ -88,10 +88,10 @@ class CombineGlobalPhasesPass(passes.ModulePass):
 _combine_global_phases = compiler_transform(CombineGlobalPhasesPass)
 
 
-def combine_global_phases(*args, **kwargs):
+def combine_global_phases(qnode):
     """TEST!!!"""
 
-    return _combine_global_phases(*args, **kwargs)
+    return _combine_global_phases(qnode)
 
 
 combine_global_phases.__signature__ = signature(_combine_global_phases)
