@@ -1480,3 +1480,32 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
         ...
     """
     return PassPipelineWrapper(qnode, "decompose-arbitrary-ppr")
+
+
+def graph_decomposition(qnode):
+    R"""
+    Specify that the ``-graph-decomposition`` MLIR compiler pass for applying optimal gate
+    decompositions should be applied to the decorated QNode during :func:`~.qjit` compilation.
+
+    .. note::
+
+        The QNode itself will not be changed or transformed by applying these decorators.
+
+        As a result, circuit inspection tools such as :func:`~.draw` will continue
+        to display the circuit as written in Python.
+
+        To instead view the optimized circuit, the MLIR must be viewed
+        after the ``"QuantumCompilationStage"`` stage via the
+        :func:`~.get_compilation_stage` function.
+
+    Args:
+        fn (QNode): the QNode to apply the graph decomposition compiler pass to.
+
+    Returns:
+        ~.QNode:
+
+    **Example**
+
+    TODO add an example once the implementation is complete.
+    """
+    return PassPipelineWrapper(qnode, "graph-decomposition")
