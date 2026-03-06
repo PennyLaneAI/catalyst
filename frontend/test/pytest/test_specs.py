@@ -290,8 +290,8 @@ class TestPassByPassSpecs:
         # Once this happens, this test will need to be updated
         simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
         simple_circuit = dummy_transform(simple_circuit)
-        simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
-        simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
+        simple_circuit = qml.transform(pass_name="cancel-inverses")(simple_circuit)
+        simple_circuit = qml.transform(pass_name="cancel-inverses")(simple_circuit)
 
         simple_circuit = qjit(simple_circuit)
 
