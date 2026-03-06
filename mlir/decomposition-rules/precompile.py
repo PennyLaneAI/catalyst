@@ -241,6 +241,7 @@ def compile_op_decomp_rules(
             num_failures += 1
         finally:
             qp.capture.disable()
+            qp.decomposition.disable_graph()
 
     return (mlir_modules, num_successes, num_failures)
 
