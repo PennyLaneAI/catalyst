@@ -38,7 +38,6 @@ from catalyst.python_interface.dialects.quantum import (
     GlobalPhaseOp,
     HamiltonianOp,
     HermitianOp,
-    InsertOp,
     MultiRZOp,
     NamedObservable,
     NamedObservableAttr,
@@ -85,9 +84,8 @@ class NonCommutingObservableValidator:
 
     def __init__(self, ops: builtin.ModuleOp):
         self._ops = ops
-        try:
-            self._check_obs_commuting()
-        except RuntimeError:
+        is_commute_rule = self._check_obs_commuting()
+        if not is_commute_rule:
             self._check_obs_wire_overlapping()
 
     @property
@@ -108,13 +106,14 @@ class NonCommutingObservableValidator:
 
     def _walk_ssa_to_pauliword_op(self, original_ssa, pauli_obs, ssa, final_obs):
         for use in ssa.uses:
-            if pauli_obs is None and isinstance(use, NamedObservable):
-                pauli_obs = use
-                self._walk_ssa_to_pauliword_op(original_ssa, pauli_obs, use, final_obs)
-            elif isinstance(use, TerminalMeasurementOp):
+            current_op = use.operation
+            if isinstance(current_op, NamedObsOp) and pauli_obs is not current_op.type.data.value:
+                pauli_obs = current_op.type.data.value
+                self._walk_ssa_to_pauliword_op(original_ssa, pauli_obs, current_op.obs, final_obs)
+            elif isinstance(current_op, TerminalMeasurementOp):
                 final_obs[ssa][original_ssa] = pauli_obs
-            elif isinstance(use, TensorOp):
-                self._walk_ssa_to_pauliword_op(original_ssa, pauli_obs, use, final_obs)
+            elif isinstance(current_op, TensorOp):
+                self._walk_ssa_to_pauliword_op(original_ssa, pauli_obs, current_op.obs, final_obs)
 
     def _check_obs_commuting(self):
         is_commute_rule = True
@@ -158,8 +157,6 @@ class NonCommutingObservableValidator:
             for qubit in _overlapped_qubits:
                 self._walk_ssa_to_pauliword_op(qubit, None, qubit, final_obs_dict)
 
-            print(len(final_obs_dict))
-
             # Check any pair of the final_obs
             for obs0 in final_obs_dict:
                 for obs1 in final_obs_dict:
@@ -171,15 +168,17 @@ class NonCommutingObservableValidator:
                             if qubit in overlapped_wire_obs_dict1:
                                 pauli0 = overlapped_wire_obs_dict0[qubit]
                                 pauli1 = overlapped_wire_obs_dict1[qubit]
+                                print(pauli0, pauli1)
                                 if (
-                                    pauli0.type.value.data != "Identity"
-                                    and pauli1.type.value.data != "Identity"
-                                    and pauli0.type.value.data != pauli1.type.value.data
+                                    (pauli0 != "Identity")
+                                    and (pauli1 != "Identity")
+                                    and (pauli0 != pauli1)
                                 ):
                                     raise RuntimeError("QWC does not meet")
             if _visited_qreg:
                 for qubit in _visited_qubits:
                     self._walk_ssa_to_pauliword_op(qubit, None, qubit, final_obs_dict)
+        return is_commute_rule
 
     def _check_obs_wire_overlapping(self):
         """Dispatches the observable to the correct qubit/qreg tracking logic."""
