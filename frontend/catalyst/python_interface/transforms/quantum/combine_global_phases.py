@@ -178,12 +178,12 @@ def combine_global_phases(qnode):
         - state(all wires): 1
         Depth: Not computed
 
-        The resulting circuit contains 4 ``GlobalPhase`` operations: one from the 5 ``GlobalPhase``s
-        merged outside of the ``for`` loop, and three ``GlobalPhase``s total from the entire ``for``
-        loop (the two within the body of the ``for`` loop are merged).
+        The resulting circuit contains four ``GlobalPhase`` operations, one from the five merged
+        outside of the ``for`` loop, and three total from the entire ``for`` loop (the two within
+        the body of the ``for`` loop are merged).
 
         Lastly, ``GlobalPhase`` operations can be merged together when nested in symbolic operations
-        like ``ctrl`` or ``adjoint``:
+        like ``ctrl`` or ``adjoint``.
 
         .. code-block:: python
 
@@ -194,10 +194,8 @@ def combine_global_phases(qnode):
             @catalyst.passes.combine_global_phases
             @qml.qnode(qml.device("lightning.qubit", wires=5))
             def circuit():
-
                 qml.ctrl(qml.GlobalPhase, control=(0, 1, 2))(3)
                 qml.ctrl(qml.GlobalPhase, control=(0, 1, 2))(4)
-
                 return qml.state()
 
         >>> print(qml.specs(circuit, level=2)())
