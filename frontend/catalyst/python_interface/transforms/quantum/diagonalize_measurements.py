@@ -25,6 +25,8 @@ Known Limitations
     If `eigvals=True` is passed to the current pass, an error will be raised.
 """
 
+from collections import defaultdict
+
 from pennylane.ops import Hadamard, PauliX, PauliY
 from xdsl import context, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin
@@ -34,12 +36,16 @@ from catalyst.python_interface.dialects.quantum import (
     ComputationalBasisOp,
     CustomOp,
     GlobalPhaseOp,
+    HamiltonianOp,
     HermitianOp,
+    InsertOp,
     MultiRZOp,
     NamedObservable,
     NamedObservableAttr,
     NamedObsOp,
     QubitUnitaryOp,
+    TensorOp,
+    TerminalMeasurementOp,
 )
 from catalyst.python_interface.pass_api import compiler_transform
 
@@ -78,50 +84,137 @@ class NonCommutingObservableValidator:
     """
 
     def __init__(self, ops: builtin.ModuleOp):
-        self.visited_qubits = set()
-        self.visited_qreg = False
-        # Ensure base observables act on disjoint qubits
-        for op in ops.walk():
-            self._check_obs_wire_disjoint(op)
+        self._ops = ops
+        try:
+            self._check_obs_commuting()
+        except RuntimeError:
+            self._check_obs_wire_overlapping()
 
     @property
-    def _err_msg(self):
-        """Error message to be raised"""
+    def _err_overlapping_msg(self):
+        """Error message to be raised for"""
         return (
-            "Only observables that are qubit-wise commuting can be diagonalized. "
+            "Only observables that act on non-overlapping qubits can be diagonalized. "
             "Please apply the `split-non-commuting` pass first."
         )
 
-    def _check_obs_wire_disjoint(self, op):
-        """Dispatches the observable to the correct qubit/qreg tracking logic."""
-        if isinstance(op, NamedObsOp):
-            self._update_visited_qubits([op.qubit])
-        elif isinstance(op, HermitianOp):
-            self._update_visited_qubits(op.qubits)
-        elif isinstance(op, ComputationalBasisOp):
-            if op.qreg is not None:
-                self._update_visited_qreg()
-            if op.qubits is not None:
-                self._update_visited_qubits(op.qubits)
+    @property
+    def _err_qwc_msg(self):
+        """Error message to be raised for"""
+        return (
+            "Only observables are not commuting can be diagonalized. "
+            "Please apply the `split-non-commuting` pass first."
+        )
 
-    def _update_visited_qubits(self, qubits):
+    def _walk_ssa_to_pauliword_op(self, original_ssa, pauli_obs, ssa, final_obs):
+        for use in ssa.uses:
+            if pauli_obs is None and isinstance(use, NamedObservable):
+                pauli_obs = use
+                self._walk_ssa_to_pauliword_op(original_ssa, pauli_obs, use, final_obs)
+            elif isinstance(use, TerminalMeasurementOp):
+                final_obs[ssa][original_ssa] = pauli_obs
+            elif isinstance(use, TensorOp):
+                self._walk_ssa_to_pauliword_op(original_ssa, pauli_obs, use, final_obs)
+
+    def _check_obs_commuting(self):
+        is_commute_rule = True
+        _visited_qubits = set()
+        _overlapped_qubits = set()
+        _visited_qreg = False
+        # Follow the diagonalize_qwc_pauli_words implementation, it only detects commutative
+        # Pauli words. If there is a non-Pauli word obserable in the module, we do the qubit-overlapping
+        # check instead. The following block also check if there is qubit overlapping in the observables
+        for op in self._ops.walk():
+            if isinstance(op, NamedObsOp):
+                if op.qubit not in _visited_qubits:
+                    _visited_qubits.add(op.qubit)
+                else:
+                    _overlapped_qubits.add(op.qubit)
+            elif isinstance(op, HermitianOp):
+                is_commute_rule = False
+                break
+            elif isinstance(op, HamiltonianOp) and len(op.terms) > 1:
+                is_commute_rule = False
+                break
+            elif isinstance(op, ComputationalBasisOp):
+                if op.qreg is not None:
+                    _visited_qreg = True
+                if op.qubits is not None:
+                    for qubit in op.qubits:
+                        if qubit not in _visited_qubits:
+                            _visited_qubits.add(qubit)
+                        else:
+                            _overlapped_qubits.add(qubit)
+
+        if is_commute_rule:
+            if not _visited_qreg and len(_overlapped_qubits) == 0:
+                is_commute_rule = False
+            if _visited_qreg and len(_visited_qubits) == 0:
+                is_commute_rule = False
+
+        # Get measurements with obs sharing wires
+        if is_commute_rule:
+            final_obs_dict = defaultdict(defaultdict)
+            for qubit in _overlapped_qubits:
+                self._walk_ssa_to_pauliword_op(qubit, None, qubit, final_obs_dict)
+
+            print(len(final_obs_dict))
+
+            # Check any pair of the final_obs
+            for obs0 in final_obs_dict:
+                for obs1 in final_obs_dict:
+                    if obs0 is not obs1:
+                        overlapped_wire_obs_dict0 = final_obs_dict[obs0]
+                        overlapped_wire_obs_dict1 = final_obs_dict[obs1]
+
+                        for qubit in overlapped_wire_obs_dict0:
+                            if qubit in overlapped_wire_obs_dict1:
+                                pauli0 = overlapped_wire_obs_dict0[qubit]
+                                pauli1 = overlapped_wire_obs_dict1[qubit]
+                                if (
+                                    pauli0.type.value.data != "Identity"
+                                    and pauli1.type.value.data != "Identity"
+                                    and pauli0.type.value.data != pauli1.type.value.data
+                                ):
+                                    raise RuntimeError("QWC does not meet")
+            if _visited_qreg:
+                for qubit in _visited_qubits:
+                    self._walk_ssa_to_pauliword_op(qubit, None, qubit, final_obs_dict)
+
+    def _check_obs_wire_overlapping(self):
+        """Dispatches the observable to the correct qubit/qreg tracking logic."""
+        _visited_qubits = set()
+        _visited_qreg = False
+
+        for op in self._ops.walk():
+            if isinstance(op, NamedObsOp):
+                self._update_visited_qubits([op.qubit], _visited_qubits, _visited_qreg)
+            elif isinstance(op, HermitianOp):
+                self._update_visited_qubits(op.qubits, _visited_qubits, _visited_qreg)
+            elif isinstance(op, ComputationalBasisOp):
+                if op.qreg is not None:
+                    self._update_visited_qreg(_visited_qubits, _visited_qreg)
+                if op.qubits is not None:
+                    self._update_visited_qubits(op.qubits, _visited_qubits, _visited_qreg)
+
+    def _update_visited_qubits(self, qubits, _visited_qubits, _visited_qreg):
         """Checks if the specific qubits have already been acted upon.
 
         Args:
             qubits: An iterable of qubit SSAValue.
         """
         for qubit in qubits:
-            if self.visited_qreg or qubit in self.visited_qubits:
-                raise RuntimeError(f"{self._err_msg}")
-            self.visited_qubits.add(qubit)
+            if _visited_qreg or qubit in _visited_qubits:
+                raise RuntimeError(f"{self._err_overlapping_msg}")
+            _visited_qubits.add(qubit)
 
-    def _update_visited_qreg(self):
+    def _update_visited_qreg(self, _visited_qubits, _visited_qreg):
         """Checks if the qreg can be visited. Fails if any individual qubits or
         another register have already been visited."""
 
-        if self.visited_qreg or self.visited_qubits:
-            raise RuntimeError(f"{self._err_msg}")
-        self.visited_qreg = True
+        if _visited_qreg or _visited_qubits:
+            raise RuntimeError(f"{self._err_overlapping_msg}")
+        _visited_qreg = True
 
 
 class DiagonalizeFinalMeasurementsPattern(
