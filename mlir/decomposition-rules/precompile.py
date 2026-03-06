@@ -36,7 +36,7 @@ from catalyst.jax_primitives import decomposition_rule
 from catalyst.utils.exceptions import CompileError
 
 
-def get_compiler_ops() -> tuple[set[Operator], int]:
+def get_compiler_ops() -> tuple[set[type[Operator]], int]:
     """
     Extracts all ops from pennylane that have decompositions in catalyst
 
@@ -142,7 +142,7 @@ def get_func_from_circuit(module) -> str | None:
 
     module.operation.walk(find_condition)
 
-    return str(decomp_func_op) + "\n"
+    return str(decomp_func_op) + "\n" if decomp_func_op else None
 
 
 def compile_rule(
@@ -241,6 +241,7 @@ def compile_op_decomp_rules(
             num_failures += 1
         finally:
             qp.capture.disable()
+            qp.decomposition.disable_graph()
 
     return (mlir_modules, num_successes, num_failures)
 
@@ -273,7 +274,7 @@ def main():
             if results:
                 for name, circuit_mlir in results.items():
                     if circuit_mlir:
-                        mlir_file.write(circuit_mlir.replace("rule_wrapper", name))
+                        mlir_file.write(circuit_mlir.replace("@rule_wrapper", "@" + name))
 
     if num_failures:
         warnings.warn(
