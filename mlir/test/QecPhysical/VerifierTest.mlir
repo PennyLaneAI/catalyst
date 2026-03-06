@@ -107,3 +107,51 @@ func.func @test_insert_block_type_mismatch_n(%r : !qecp.hyperreg<3 x 1 x 7>, %b 
     %b1 = qecp.insert_block %r[0], %b : !qecp.hyperreg<3 x 1 x 7>, !qecp.codeblock<1 x 5>
     return
 }
+
+// -----
+
+func.func @test_extract_qubit_no_idx(%r : !qecp.codeblock<1 x 7>) {
+    // expected-error@below {{expected to have a non-null index}}
+    %b = "qecp.extract"(%r) <{}> : (!qecp.codeblock<1 x 7>) -> !qecp.qubit<data>
+    return
+}
+
+// -----
+
+func.func @test_insert_qubit_no_idx(%r : !qecp.codeblock<1 x 7>, %b : !qecp.qubit<data>) {
+    // expected-error@below {{expected to have a non-null index}}
+    %r1 = "qecp.insert"(%r, %b) <{}> : (!qecp.codeblock<1 x 7>, !qecp.qubit<data>) -> !qecp.codeblock<1 x 7>
+    return
+}
+
+// -----
+
+func.func @test_extract_qubit_negative_index(%r : !qecp.codeblock<1 x 7>) {
+    // expected-error@below {{attribute 'idx_attr' failed to satisfy constraint}}
+    %b = qecp.extract %r[-1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+    return
+}
+
+// -----
+
+func.func @test_insert_qubit_negative_index(%r : !qecp.codeblock<1 x 7>, %b : !qecp.qubit<data>) {
+    // expected-error@below {{attribute 'idx_attr' failed to satisfy constraint}}
+    %r1 = qecp.insert %r[-1], %b : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+    return
+}
+
+// -----
+
+func.func @test_extract_qubit_index_out_of_bounds(%r : !qecp.codeblock<1 x 7>) {
+    // expected-error@below {{out-of-bounds index attribute}}
+    %b = qecp.extract %r[8] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+    return
+}
+
+// -----
+
+func.func @test_insert_qubit_index_out_of_bounds(%r : !qecp.codeblock<1 x 7>, %b : !qecp.qubit<data>) {
+    // expected-error@below {{out-of-bounds index attribute}}
+    %r1 = qecp.insert %r[8], %b : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+    return
+}
