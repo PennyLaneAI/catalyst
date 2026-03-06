@@ -41,7 +41,7 @@ struct GraphDecompositionPass : impl::GraphDecompositionPassBase<GraphDecomposit
 
         ///////////////////////////
         // Step 1: annotate the user-defined (custom) rules with resources
-        // and register them for later use in the graph decomposition. 
+        // and register them for later use in the graph decomposition.
         registerCustomDecompositionRules(module, customRules);
 
         ///////////////////////////
@@ -63,7 +63,7 @@ struct GraphDecompositionPass : impl::GraphDecompositionPassBase<GraphDecomposit
 
         ///////////////////////////
         // Step 6: Insert decomposition rules picked by the graph solver (solution) into the module
-        // and then run the decompose-lowering patterns to apply the decomposition rules and 
+        // and then run the decompose-lowering patterns to apply the decomposition rules and
         // rewrite the quantum operations.
 
         ///////////////////////////
@@ -71,27 +71,25 @@ struct GraphDecompositionPass : impl::GraphDecompositionPassBase<GraphDecomposit
         // TODO TODO
     }
 
-    private:
-
-    // Registry of custom decomposition rules defined in the main module, mapping from target gate name to the corresponding function.
+  private:
+    // Registry of custom decomposition rules defined in the main module, mapping from target gate
+    // name to the corresponding function.
     llvm::StringMap<func::FuncOp> customRules;
 
-    // TODO: update it to a list of targetGateset to support multiple qp.decompose
-    llvm::StringSet<llvm::MallocAllocator> targetGateset;
-    
+    // To sync with the graph solver branch, targetGateset should be DictionaryAttr
+    // TODO: it requires updates to the frontend.
+    DictionaryAttr targetGateset;
+
     // List of operators
-    std::vector<OperatorNode> setOfOps;
+    std::vector<OperatorNode> setOfOps = {};
 
     // List of all resources both built-in and custom rules
-    std::vector<RuleNode> setOfResources;
+    std::vector<RuleNode> setOfResources = {};
 
+    void loadBuiltInDecompositionRules([[maybe_unused]] ModuleOp module /*, ...*/) { return; }
 
-    void loadBuiltInDecompositionRules([[maybe_unused]] ModuleOp module /*, ...*/)
-    {
-        return;
-    }
-
-    void registerCustomDecompositionRules(ModuleOp module, llvm::StringMap<func::FuncOp> &custom_rules)
+    void registerCustomDecompositionRules(ModuleOp module,
+                                          llvm::StringMap<func::FuncOp> &custom_rules)
     {
         PassManager pm(&getContext());
         pm.addPass(createRegisterDecompRuleResourcePass());
@@ -100,50 +98,50 @@ struct GraphDecompositionPass : impl::GraphDecompositionPassBase<GraphDecomposit
         }
 
         module.walk([&](func::FuncOp func) {
-            if (StringRef funcName = func.getName(); func->getAttrOfType<StringAttr>("target_gate")) {
-                // TODO: Update this to only register rules that are customly defined for this specific qp.decompose
-                // HOW? it requires updates to the lowering patterns from the frontend ...
+            if (StringRef funcName = func.getName();
+                func->getAttrOfType<StringAttr>("target_gate")) {
+                // TODO: Update this to only register rules that are customly defined for this
+                // specific qp.decompose HOW? it requires updates to the lowering patterns from the
+                // frontend ...
+
                 custom_rules[funcName] = func;
             }
             return WalkResult::skip();
         });
     }
 
-    void getDecompGateset(ModuleOp module, llvm::StringSet<llvm::MallocAllocator> &gateset)
+    void getDecompGateset(ModuleOp module, DictionaryAttr &gateset)
     {
-        module.walk([&](func::FuncOp func) {
-            if (auto gate_set_attr =
-                    func->getAttrOfType<ArrayAttr>("decomp_gateset")) {
-                for (auto gate : gate_set_attr.getValue()) {
-                    StringRef gate_name = cast<StringAttr>(gate).getValue();
-                    gateset.insert(gate_name);
-                }
-                return WalkResult::interrupt();
-            }
-            return WalkResult::skip();
+        // module.walk([&](func::FuncOp func) {
+        //     if (auto gate_set_attr =
+        //             func->getAttrOfType<ArrayAttr>("decomp_gateset")) {
+        //         for (auto gate : gate_set_attr.getValue()) {
+        //             StringRef gate_name = cast<StringAttr>(gate).getValue();
+        //             gateset.insert(gate_name);
+        //         }
+        //         return WalkResult::interrupt();
+        //     }
+        //     return WalkResult::skip();
+        // });
+        return;
+    }
+
+    void getOperators([[maybe_unused]] ModuleOp module,
+                      [[maybe_unused]] std::vector<OperatorNode> &operators)
+    {
+
+        module.walk([&](CustomOp op) {
+            OperatorNode node;
+            node.op = op;
+            node.name = op->getName().getStringRef();
+            node.weight = 1.0; // TODO: gates could be lowered by some weights
+            operators.push_back(node);
         });
     }
 
-    void getOperators([[maybe_unused]] ModuleOp module, [[maybe_unused]] std::vector<OperatorNode> &operators)
-    {
-        module.walk([&](Operation *op) {
-            if (skipDecompRules && func->hasAttr("target_gate")) {
-                return mlir::WalkResult::skip();
-            } }
-            if (auto qOp = dyn_cast<quantum::QuantumOperatorInterface>(op)) {
-                OperatorNode node;
-                node.gateName = qOp.getGateName().str();
-                node.adjoint = qOp.isAdjoint();
-                node.numQubits = qOp.getInQubits().size() + qOp.getOutQubits().size();
-                node.numCtrlQubits = qOp.getInCtrlQubits().size() + qOp.getOutCtrlQubits().size();
-                node.numParams = qOp.getParamOperands().size();
-                operators.push_back(node);
-            }
-            return WalkResult::advance();
-        });
-    }
-
-    void getRuleNodes([[maybe_unused]] ModuleOp module, [[maybe_unused]] const llvm::StringMap<func::FuncOp> &custom_rules, [[maybe_unused]] std::vector<RuleNode> &rules)
+    void getRuleNodes([[maybe_unused]] ModuleOp module,
+                      [[maybe_unused]] const llvm::StringMap<func::FuncOp> &custom_rules,
+                      [[maybe_unused]] std::vector<RuleNode> &rules)
     {
         return;
     }
