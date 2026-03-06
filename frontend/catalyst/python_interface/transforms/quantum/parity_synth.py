@@ -18,6 +18,8 @@ an xDSL-agnostic synthesis functionality and an integration thereof into xDSL.""
 
 from dataclasses import dataclass
 from itertools import product
+from functools import wraps
+
 
 try:
     import networkx as nx
@@ -395,8 +397,13 @@ class ParitySynthPass(passes.ModulePass):
         walker.rewrite_module(module)
 
 
-parity_synth = compiler_transform(ParitySynthPass)
-parity_synth.__doc__ = r"""
+_parity_synth_func = compiler_transform(ParitySynthPass)
+
+import inspect
+
+
+def parity_synth(qnode):
+    r"""
     Pass for applying ParitySynth to phase polynomials in a circuit.
 
     ParitySynth has been proposed by Vandaele et al. in `arXiv:2104.00934
@@ -412,6 +419,12 @@ parity_synth.__doc__ = r"""
 
         This pass requires the ``networkx`` package, which can be installed via
         ``pip install networkx``.
+
+    Args:
+        fn (QNode): QNode to apply the pass to
+
+    Returns:
+        :class:`QNode <pennylane.QNode>`
 
     This pass walks over the input circuit and aggregates all ``CNOT`` and ``RZ`` operators
     into a subcircuit that describes a phase polyonomial. Other gates form the boundaries of
@@ -527,3 +540,8 @@ parity_synth.__doc__ = r"""
     }
 
     """
+
+    return _parity_synth_func(qnode)
+
+
+parity_synth.__signature__ = inspect.signature(_parity_synth_func)
