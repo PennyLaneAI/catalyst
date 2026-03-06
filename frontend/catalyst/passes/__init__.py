@@ -51,7 +51,7 @@ from catalyst.passes.builtin_passes import (
     to_ppr,
 )
 from catalyst.passes.pass_api import Pass, PassPlugin, apply_pass, apply_pass_plugin
-from catalyst.python_interface.transforms.quantum import parity_synth, combine_global_phases
+from catalyst.python_interface.transforms.quantum import combine_global_phases, parity_synth
 
 __all__ = (
     "gridsynth",

@@ -17,8 +17,8 @@ operates on the phase polynomial representation of subcircuits, the implementati
 an xDSL-agnostic synthesis functionality and an integration thereof into xDSL."""
 
 from dataclasses import dataclass
-from itertools import product
 from inspect import signature
+from itertools import product
 
 try:
     import networkx as nx
@@ -433,8 +433,8 @@ def parity_synth(qnode):
     re-ordering of commuting gates.
     Note that nested regions, such as nested functions and control flow function bodies, are
     synthesized independently, i.e., region boundaries are always treated as boundaries of phase
-    polynomial subcircuits. Similarly, dynamic wires create boundaries around the operations using them, causing separation
-    of phase polynomial operations into multiple subcircuits.
+    polynomial subcircuits. Similarly, dynamic wires create boundaries around the operations using
+    them, causing separation of phase polynomial operations into multiple subcircuits.
 
     **Example**
 
