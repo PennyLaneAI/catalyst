@@ -109,19 +109,19 @@ def combine_global_phases(qnode):
 
     .. code-block:: python
 
-    import pennylane as qml
-    import catalyst
+        import pennylane as qml
+        import catalyst
 
-    @qml.qjit(capture=True)
-    @catalyst.passes.combine_global_phases
-    @qml.qnode(qml.device("lightning.qubit", wires=5))
-    def circuit():
-        qml.GlobalPhase(0)
-        qml.GlobalPhase(1)
-        qml.GlobalPhase(2)
-        qml.GlobalPhase(3)
-        qml.GlobalPhase(4)
-        return qml.state()
+        @qml.qjit(capture=True)
+        @catalyst.passes.combine_global_phases
+        @qml.qnode(qml.device("lightning.qubit", wires=5))
+        def circuit():
+            qml.GlobalPhase(0)
+            qml.GlobalPhase(1)
+            qml.GlobalPhase(2)
+            qml.GlobalPhase(3)
+            qml.GlobalPhase(4)
+            return qml.state()
 
     >>> print(qml.specs(circuit, level=2)())
     Device: lightning.qubit
