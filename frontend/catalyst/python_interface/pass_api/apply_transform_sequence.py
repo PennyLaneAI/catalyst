@@ -24,7 +24,12 @@ from xdsl.dialects import builtin, transform
 from xdsl.ir import Attribute
 from xdsl.parser import Parser
 from xdsl.passes import ModulePass, PassPipeline
-from xdsl.pattern_rewriter import PatternRewriter, RewritePattern, op_type_rewrite_pattern
+from xdsl.pattern_rewriter import (
+    PatternRewriter,
+    PatternRewriteWalker,
+    RewritePattern,
+    op_type_rewrite_pattern,
+)
 from xdsl.printer import Printer
 
 from catalyst.compiler import _quantum_opt
@@ -60,11 +65,11 @@ def is_xdsl_pass(pass_name: str) -> bool:
 
 
 @dataclass(frozen=True)
-class ApplyTransformSequence(ModulePass):
+class ApplyTransformSequencePass(ModulePass):
     """
     Looks for nested modules. Nested modules in this context are guaranteed to correspond
     to qnodes. These modules are already annotated with which passes are to be executed.
-    The pass ApplyTransformSequence will run passes annotated in the qnode modules.
+    The pass ApplyTransformSequencePass will run passes annotated in the qnode modules.
 
     At the end, we delete the list of passes as they have already been applied.
     """
@@ -80,8 +85,17 @@ class ApplyTransformSequence(ModulePass):
                 nested_modules.append(_op)
 
         for mod in nested_modules:
+            transformer = None
+            for _op in mod.ops:
+                if isinstance(_op, builtin.ModuleOp):
+                    transformer = _op
+                    break
+
+            if transformer is None:
+                continue
+
+            # Need to create a new pattern for each nested module to properly handle callbacks
             pattern = ApplyTransformSequencePattern(ctx, available_passes, self.callback)
-            transformer = next(_op for _op in mod.ops if isinstance(_op, builtin.ModuleOp))
             rewriter = PatternRewriter(transformer)
             pattern.match_and_rewrite(transformer, rewriter)
 
@@ -103,7 +117,7 @@ class ApplyTransformSequencePattern(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, transformer: builtin.ModuleOp, rewriter: PatternRewriter):
         """Rewrite modules containing transform.named_sequences."""
-        if not transformer.get_attr_or_prop("transform.with_named_sequence"):
+        if not isinstance(next(iter(transformer.body.ops), None), transform.NamedSequenceOp):
             return
 
         payload: builtin.ModuleOp = transformer.parent_op()
@@ -152,9 +166,8 @@ class ApplyTransformSequencePattern(RewritePattern):
                 k.replace("-", "_"): v for k, v in get_pyval_from_xdsl_attr(op.options).items()
             }
             pass_instance = pass_class(**options)
-            pipeline = PassPipeline((pass_instance,))
             self._pre_pass_callback(pass_instance, module)
-            pipeline.apply(self.ctx, module)
+            pass_instance.apply(self.ctx, module)
             self._post_pass_callback(pass_instance, module)
             return module
 

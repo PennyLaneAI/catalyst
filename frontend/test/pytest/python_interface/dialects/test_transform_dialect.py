@@ -28,7 +28,7 @@ from xdsl.utils.test_value import create_ssa_value
 
 from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
 from catalyst.python_interface.pass_api import (
-    ApplyTransformSequence,
+    ApplyTransformSequencePass,
     compiler_transform,
 )
 
@@ -126,12 +126,14 @@ def test_integration_for_transform_interpreter(capsys):
 
     program = """
         builtin.module {
-          builtin.module {
-            transform.named_sequence @__transform_main(%arg0 : !transform.op<"builtin.module">) {
-              %0 = "transform.apply_registered_pass"(%arg0) <{options = {"custom_print" = "Hello from custom option!"}, pass_name = "test-hello-world"}> : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
-              transform.yield
+            builtin.module {
+                builtin.module {
+                    transform.named_sequence @__transform_main(%arg0 : !transform.op<"builtin.module">) {
+                    %0 = "transform.apply_registered_pass"(%arg0) <{options = {"custom_print" = "Hello from custom option!"}, pass_name = "test-hello-world"}> : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                    transform.yield
+                    }
+                }
             }
-          }
         }
         """
 
@@ -140,7 +142,11 @@ def test_integration_for_transform_interpreter(capsys):
     ctx.load_dialect(transform.Transform)
 
     mod = parse_generic_to_xdsl_module(program)
-    pipeline = PassPipeline((ApplyTransformSequence(),))
+    pipeline = PassPipeline((ApplyTransformSequencePass(),))
     pipeline.apply(ctx, mod)
 
     assert "Hello from custom option!" in capsys.readouterr().out
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

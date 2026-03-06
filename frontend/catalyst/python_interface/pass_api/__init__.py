@@ -14,7 +14,7 @@
 """xDSL transforms core API."""
 
 from .apply_transform_sequence import (
-    ApplyTransformSequence,
+    ApplyTransformSequencePass,
     available_passes,
     is_xdsl_pass,
     register_pass,
@@ -22,7 +22,7 @@ from .apply_transform_sequence import (
 from .compiler_transform import PassDispatcher, compiler_transform
 
 __all__ = [
-    "ApplyTransformSequence",
+    "ApplyTransformSequencePass",
     "available_passes",
     "is_xdsl_pass",
     "PassDispatcher",
