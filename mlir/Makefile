@@ -226,7 +226,7 @@ dialect-docs:
 test: decomp-rules
 	@echo "test the Catalyst MLIR dialects test suite"
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects
-	$(PYTHON) -m pytest decomposition-rules/test_precompile.py
+	$(ASAN_COMMAND) $(PYTHON) -m pytest decomposition-rules/test_precompile.py
 
 .PHONY: clean clean-dialects clean-enzyme clean-stablehlo clean-plugin clean-dialect-docs
 clean: clean-dialects clean-llvm clean-stablehlo clean-enzyme clean-plugin clean-dialect-docs
