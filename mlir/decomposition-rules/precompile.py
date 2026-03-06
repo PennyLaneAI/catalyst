@@ -142,7 +142,7 @@ def get_func_from_circuit(module) -> str | None:
 
     module.operation.walk(find_condition)
 
-    return str(decomp_func_op) + "\n"
+    return str(decomp_func_op) + "\n" if decomp_func_op else None
 
 
 def compile_rule(
