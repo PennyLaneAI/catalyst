@@ -37,10 +37,12 @@ all_attrs = list(qecp.QecPhysical.attributes)
 expected_ops_names = {
     "AllocOp": "qecp.alloc",
     "DeallocOp": "qecp.dealloc",
-    "ExtractCodeblockOp": "qecp.extract_block",
-    "InsertCodeblockOp": "qecp.insert_block",
     "AllocAuxQubitOp": "qecp.alloc_aux",
     "DeallocAuxQubitOp": "qecp.dealloc_aux",
+    "ExtractCodeblockOp": "qecp.extract_block",
+    "InsertCodeblockOp": "qecp.insert_block",
+    "ExtractQubitOp": "qecp.extract",
+    "InsertQubitOp": "qecp.insert",
 }
 
 expected_attrs_names = {
@@ -180,17 +182,23 @@ def test_assembly_format(run_filecheck, pretty_print):
     // CHECK: qecp.dealloc [[hreg0]] : !qecp.hyperreg<3 x 1 x 7>
     qecp.dealloc %hreg0 : !qecp.hyperreg<3 x 1 x 7>
 
-    // CHECK: [[block0:%.+]] = qecp.extract_block [[hyperreg]][{{\s*}}0] : !qecp.hyperreg<3 x 1 x 7> -> !qecp.codeblock<1 x 7>
-    %block0 = qecp.extract_block %hyperreg[ 0] : !qecp.hyperreg<3 x 1 x 7> -> !qecp.codeblock<1 x 7>
-
-    // CHECK: qecp.insert_block [[hyperreg]][{{\s*}}0], [[block0]] : !qecp.hyperreg<3 x 1 x 7>, !qecp.codeblock<1 x 7>
-    %hreg1 = qecp.insert_block %hyperreg[ 0], %block0 : !qecp.hyperreg<3 x 1 x 7>, !qecp.codeblock<1 x 7>
-
     // CHECK: [[q_aux1:%.+]] = qecp.alloc_aux : !qecp.qubit<aux>
     %q_aux1 = qecp.alloc_aux : !qecp.qubit<aux>
 
     // CHECK: qecp.dealloc_aux [[q_aux1]] : !qecp.qubit<aux>
     qecp.dealloc_aux %q_aux1 : !qecp.qubit<aux>
+
+    // CHECK: [[block0:%.+]] = qecp.extract_block [[hyperreg]][{{\s*}}0] : !qecp.hyperreg<3 x 1 x 7> -> !qecp.codeblock<1 x 7>
+    %block0 = qecp.extract_block %hyperreg[ 0] : !qecp.hyperreg<3 x 1 x 7> -> !qecp.codeblock<1 x 7>
+
+    // CHECK: qecp.insert_block [[hyperreg]][{{\s*}}0], [[block0]] : !qecp.hyperreg<3 x 1 x 7>, !qecp.codeblock<1 x 7>
+    %hreg1 = qecp.insert_block %hyperreg[ 0], %block0 : !qecp.hyperreg<3 x 1 x 7>, !qecp.codeblock<1 x 7>
+    
+    // CHECK: [[q0:%.+]] = qecp.extract [[block0]][{{\s*}}0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+    %q0 = qecp.extract %block0[ 0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+
+    // CHECK: [[block1:%.+]] = qecp.insert [[block0]][{{\s*}}0], [[q0]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+    %block1 = qecp.insert %block0[ 0], %q0 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
