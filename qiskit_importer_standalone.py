@@ -87,6 +87,19 @@ class QiskitToCatalystImporter:
                 self._emit_measure(qubits, instruction.clbits, loc)
             elif op.name == "if_else":
                 self._emit_if_else(op, qubits, instruction.clbits, loc)
+            elif type(op).__name__ == "IfElseOp":
+                # Some Qiskit versions denote it directly by type, with condition in properties
+                condition = getattr(op, 'condition', None)
+                if condition:
+                     # Usually (clbit, value)
+                     clbits = [condition[0]]
+                elif instruction.clbits:
+                     clbits = instruction.clbits
+                else:
+                     clbits = []
+                # In Qiskit, if_else touches all qubits in its body potentially, 
+                # but instruction.qubits will contain them.
+                self._emit_if_else(op, qubits, clbits, loc)
             else:
                  self._emit_gate(op.name, qubits, op.params, loc)
 

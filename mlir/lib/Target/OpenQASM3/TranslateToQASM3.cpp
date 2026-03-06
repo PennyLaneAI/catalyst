@@ -55,6 +55,7 @@ private:
             // Add other quantum ops like Alloc, Measure here
             .Case<AllocOp>([&](AllocOp op) { return emitAlloc(op); })
             .Case<ExtractOp>([&](ExtractOp op) { return emitExtract(op); })
+            .Case<InsertOp>([&](InsertOp op) { return emitInsert(op); })
             .Case<MeasureOp>([&](MeasureOp op) { return emitMeasure(op); })
             .Case<scf::YieldOp>([&](scf::YieldOp op) { return success(); }) // Handled by parent
             .Case<func::ReturnOp>([&](func::ReturnOp op) { return success(); })
@@ -197,15 +198,25 @@ private:
         
         int64_t i = 0;
 
-        if (auto cOp = idx.getDefiningOp<arith::ConstantOp>()) {
-             if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
-                 i = intAttr.getInt();
-             }
+        if (idx) {
+            if (auto cOp = idx.getDefiningOp<arith::ConstantOp>()) {
+                 if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
+                     i = intAttr.getInt();
+                 }
+            }
+        } else if (op.getIdxAttr().has_value()) {
+            i = op.getIdxAttr().value();
         }
         
         std::string qName = regName + "[" + std::to_string(i) + "]";
         qubitMap[op.getResult()] = qName;
         
+        return success();
+    }
+
+    LogicalResult emitInsert(InsertOp op) {
+        // quantum.insert just maintains SSA, OpenQASM modifies in place.
+        qubitMap[op.getResult()] = qubitMap[op.getInQreg()];
         return success();
     }
 

@@ -6,7 +6,7 @@ import unittest.mock
 if sys.version_info < (3, 13):
     print("WARNING: This script requires Python 3.13 to match the compiled MLIR bindings.")
     print(f"Current version: {sys.version}")
-    print("Please run with: /Users/sangsokea/miniconda3/bin/python3")
+    print("Please run with: /Users/user_name/miniconda3/bin/python3")
     # We don't exit, just warn, in case they magically have compatible bindings? 
     # But usually it fails.
 
