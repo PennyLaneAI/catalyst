@@ -25,7 +25,7 @@
 // CHECK: return %[[CALL0]], %[[CALL1]], %[[CALL2]]
 
 // CHECK-LABEL: func.func private @circ.group.0
-// CHECK-SAME: () -> f64 attributes {qnode}
+// CHECK-SAME: () -> f64 attributes {quantum.node}
 // CHECK: %[[SHOTS:.*]] = arith.constant 33
 // CHECK: quantum.device shots(%[[SHOTS]])
 // CHECK: quantum.alloc
@@ -36,7 +36,7 @@
 // CHECK: return %[[EXPVAL_Z0]]
 
 // CHECK-LABEL: func.func private @circ.group.1
-// CHECK-SAME: () -> f64 attributes {qnode}
+// CHECK-SAME: () -> f64 attributes {quantum.node}
 // CHECK: %[[SHOTS:.*]] = arith.constant 33
 // CHECK: quantum.device shots(%[[SHOTS]])
 // CHECK: quantum.alloc
@@ -47,7 +47,7 @@
 // CHECK: return %[[EXPVAL_X1]]
 
 // CHECK-LABEL: func.func private @circ.group.2
-// CHECK-SAME: () -> f64 attributes {qnode}
+// CHECK-SAME: () -> f64 attributes {quantum.node}
 // CHECK: %[[SHOTS:.*]] = arith.constant 33
 // CHECK: quantum.device shots(%[[SHOTS]])
 // CHECK: quantum.alloc
@@ -58,7 +58,7 @@
 // CHECK: return %[[EXPVAL_Y2]]
 
 module {
-  func.func public @circ() -> (f64, f64, f64) attributes {qnode} {
+  func.func public @circ() -> (f64, f64, f64) attributes {quantum.node} {
     %shots = arith.constant 100 : i64
     quantum.device shots(%shots) ["", "", ""]
     %reg = quantum.alloc(3) : !quantum.reg
@@ -87,7 +87,7 @@ module {
 // CHECK: return %[[CALL0]]#0, %[[CALL1]], %[[CALL2]], %[[CALL0]]#1
 
 // CHECK-LABEL: func.func private @circ.group.0
-// CHECK-SAME: () -> (f64, f64) attributes {qnode}
+// CHECK-SAME: () -> (f64, f64) attributes {quantum.node}
 // CHECK: %[[SHOTS:.*]] = arith.constant 33
 // CHECK: quantum.device shots(%[[SHOTS]])
 // CHECK: quantum.alloc
@@ -99,7 +99,7 @@ module {
 // CHECK: return %[[EXPVAL_Z0]], %[[ONE]]
 
 // CHECK-LABEL: func.func private @circ.group.1
-// CHECK-SAME: () -> f64 attributes {qnode}
+// CHECK-SAME: () -> f64 attributes {quantum.node}
 // CHECK: %[[SHOTS:.*]] = arith.constant 33
 // CHECK: quantum.device shots(%[[SHOTS]])
 // CHECK: quantum.alloc
@@ -110,7 +110,7 @@ module {
 // CHECK: return %[[EXPVAL_X1]]
 
 // CHECK-LABEL: func.func private @circ.group.2
-// CHECK-SAME: () -> f64 attributes {qnode}
+// CHECK-SAME: () -> f64 attributes {quantum.node}
 // CHECK: %[[SHOTS:.*]] = arith.constant 33
 // CHECK: quantum.device shots(%[[SHOTS]])
 // CHECK: quantum.alloc
@@ -120,7 +120,7 @@ module {
 // CHECK: quantum.device_release
 // CHECK: return %[[EXPVAL_Y2]]
 module {
-  func.func public @circ() -> (f64, f64, f64, f64) attributes {qnode} {
+  func.func public @circ() -> (f64, f64, f64, f64) attributes {quantum.node} {
     %shots = arith.constant 100 : i64
     quantum.device shots(%shots) ["", "", ""]
     %reg = quantum.alloc(3) : !quantum.reg
@@ -160,7 +160,7 @@ module {
 // CHECK: stablehlo.reduce
 
 // CHECK-LABEL: func.func private @circ.single_terms.group.0
-// CHECK-SAME: () -> tensor<f64> attributes {qnode}
+// CHECK-SAME: () -> tensor<f64> attributes {quantum.node}
 // CHECK: %[[SHOTS0:.*]] = arith.constant 33
 // CHECK: quantum.device shots(%[[SHOTS0]])
 // CHECK: quantum.alloc
@@ -171,7 +171,7 @@ module {
 // CHECK: return
 
 // CHECK-LABEL: func.func private @circ.single_terms.group.1
-// CHECK-SAME: () -> tensor<f64> attributes {qnode}
+// CHECK-SAME: () -> tensor<f64> attributes {quantum.node}
 // CHECK: %[[SHOTS1:.*]] = arith.constant 33
 // CHECK: quantum.device shots(%[[SHOTS1]])
 // CHECK: quantum.alloc
@@ -182,7 +182,7 @@ module {
 // CHECK: return
 
 // CHECK-LABEL: func.func private @circ.single_terms.group.2
-// CHECK-SAME: () -> tensor<f64> attributes {qnode}
+// CHECK-SAME: () -> tensor<f64> attributes {quantum.node}
 // CHECK: %[[SHOTS2:.*]] = arith.constant 33
 // CHECK: quantum.device shots(%[[SHOTS2]])
 // CHECK: quantum.alloc
@@ -193,7 +193,7 @@ module {
 // CHECK: return
 
 module {
-  func.func public @circ() -> tensor<f64> attributes {qnode} {
+  func.func public @circ() -> tensor<f64> attributes {quantum.node} {
     %shots = arith.constant 99 : i64
     quantum.device shots(%shots) ["", "", ""]
     %reg = quantum.alloc(3) : !quantum.reg
@@ -221,7 +221,7 @@ module {
 
 // expected-error @below {{split-to-single-terms pass failed}}
 module {
-  func.func public @circ() -> tensor<4xf64> attributes {qnode} {
+  func.func public @circ() -> tensor<4xf64> attributes {quantum.node} {
     %shots = arith.constant 0 : i64
     quantum.device shots(%shots) ["", "", ""]
     %reg = quantum.alloc(2) : !quantum.reg
