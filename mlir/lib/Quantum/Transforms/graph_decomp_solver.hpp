@@ -14,14 +14,14 @@
 
 #pragma once
 
-#include <vector>
 #include <string>
+#include <vector>
 
 #include "llvm/Support/Debug.h"
 
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinOps.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -33,11 +33,9 @@ namespace catalyst {
 namespace quantum {
 
 struct OperatorNode {
-    std::string gateName;
-    bool adjoint = false;
-    size_t numQubits = 0;
-    size_t numCtrlQubits = 0;
-    size_t numParams = 0;
+    CustomOp op;
+    StringRef name;
+    float weight;
 };
 
 struct RuleNode {
@@ -47,12 +45,23 @@ struct RuleNode {
 };
 
 struct GraphDecompositionSolver {
-    
-    /** 
-     * @brief Solve the graph decomposition problem given the operators, resources, and target gateset.
-     * 
+
+    /**
+     * @brief Solve the graph decomposition problem given the operators, resources, and target
+     * gateset.
+     *
+     * This is a placeholder for the actual graph decomposition solver implemented in gdecomp_cpp.
+     *
+     * @param operators The list of operator nodes representing the operations in the graph.
+     * @param rules The list of rule nodes representing the decomposition rules and their resources.
+     * @param gateset The target gateset for decomposition, represented as a DictionaryAttr.
+     * @return A list of RuleNodes representing the selected decomposition rules to apply for the
+     * graph decomposition.
+     *
      */
-    static std::vector<RuleNode> Solve(const std::vector<OperatorNode> &operators, const std::vector<RuleNode> &rules, const llvm::StringSet<llvm::MallocAllocator> &gateset)
+    static std::vector<RuleNode> Solve(const std::vector<OperatorNode> &operators,
+                                       const std::vector<RuleNode> &rules,
+                                       const DictionaryAttr &gateset)
     {
         return {};
     }
