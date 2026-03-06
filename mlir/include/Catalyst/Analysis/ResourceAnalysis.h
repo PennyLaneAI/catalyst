@@ -42,7 +42,7 @@ class ResourceAnalysis {
         return &it->second;
     }
 
-    // get the entry function name (the function marked with "qnode")
+    // get the entry function name (first function the pass detects)
     // returns empty string if no entry function was found
     llvm::StringRef getEntryFunc() const { return entryFuncName; }
 
@@ -50,7 +50,7 @@ class ResourceAnalysis {
     // per-function resource counts
     llvm::StringMap<ResourceResult> funcResults;
 
-    // name of the entry function (marked with "qnode"), empty if none
+    // name of the entry function (first function pass detects), empty if none
     std::string entryFuncName;
 
     // analyze a region and accumulate results
