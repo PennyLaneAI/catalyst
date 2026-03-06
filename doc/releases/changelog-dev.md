@@ -149,6 +149,33 @@
   quantum-opt --resource-tracker -mlir-pass-statistics input.mlir
   ```
 
+* The `diagonalize-final-measurements` xDSL pass now accepts the optional keyword argument ``supported_base_obs``. The kwarg``to_eigvals`` is now also included in the call signature for compatibility with the tape transform, but this kwarg is unused and can only take its default value, `False`.
+  [(#2517)](https://github.com/PennyLaneAI/catalyst/pull/2517)
+
+  These pass options can be applied as follows in the example below:
+
+  ```python
+  import pennylane as qp
+
+  def diagonalize_measurements_setup_inputs(
+      to_eigvals: bool = False, supported_base_obs: tuple[str] = ("PauliX",)
+  ):
+      return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
+
+  diagonalize_measurements = qp.transform(
+      pass_name="diagonalize-final-measurements", setup_inputs=diagonalize_measurements_setup_inputs
+  )
+
+  dev = qp.device("null.qubit", wires=4)
+  @qp.qjit(target="mlir", keep_intermediate=True)
+  @diagonalize_measurements(supported_base_obs=('PauliX',))
+  @qp.qnode(dev, shots=1000)
+  def circuit():
+      qp.CRX(0.1, wires=[0, 1])
+      return qp.expval(qp.X(0))
+
+  circuit()
+
 * Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
   effectively filtering for decomposition rules in the MLIR-native decomposition framework.
   [(#2539)](https://github.com/PennyLaneAI/catalyst/pull/2539)
@@ -642,6 +669,7 @@ River McCubbin,
 Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
+Shuli Shu,
 Paul Haochen Wang,
 David Wierichs,
 Jake Zaia,
