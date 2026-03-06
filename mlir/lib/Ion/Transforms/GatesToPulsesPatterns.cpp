@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <optional>
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -176,6 +177,21 @@ mlir::Value CreateNormalizedAngle(mlir::PatternRewriter &rewriter, mlir::Locatio
     constexpr double PI = llvm::numbers::pi;
     constexpr double FOUR_PI = 4.0 * PI;
 
+    // Fast path: if the angle is a compile-time constant, fold the normalisation and return a
+    // single arith.constant
+    if (auto constOp = angle.getDefiningOp<arith::ConstantOp>()) {
+        if (auto floatAttr = llvm::dyn_cast<mlir::FloatAttr>(constOp.getValue())) {
+            double val = floatAttr.getValueAsDouble();
+            double rem = std::fmod(val, FOUR_PI);
+            if (rem < 0.0) {
+                rem += FOUR_PI;
+            }
+            return arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(rem))
+                .getResult();
+        }
+    }
+
+    // General path: emit runtime normalisation for dynamic angles.
     auto four_pi_attr = rewriter.getF64FloatAttr(FOUR_PI);
     auto four_pi_const = arith::ConstantOp::create(rewriter, loc, angle.getType(), four_pi_attr);
 
