@@ -427,6 +427,10 @@ jobs:
         mkdir -p $(pwd)/quantum-build/lib
         mv mlir/standalone/build/lib/StandalonePlugin.so "$(pwd)/quantum-build/lib"
 
+    - name: Precompile Decomposition Rules
+      run: |
+        make decomp-rules
+
     - name: Upload Quantum Build Artifact
       uses: actions/upload-artifact@v4
       with:
