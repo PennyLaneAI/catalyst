@@ -61,6 +61,36 @@ def DeallocOp : QecPhysical_Op<"dealloc"> {
     let hasCanonicalizeMethod = 1;
 }
 
+def AllocAuxQubitOp : QecPhysical_Op<"alloc_aux"> {
+    let summary = "Allocate a single auxiliary QEC physical qubit.";
+
+    let results = (outs
+        QecPhysicalQubitType:$qubit
+    );
+
+    let assemblyFormat = [{
+        attr-dict `:` qualified(type($qubit))
+    }];
+
+    let hasVerifier = 1;
+    let hasCanonicalizeMethod = 1;
+}
+
+def DeallocAuxQubitOp : QecPhysical_Op<"dealloc_aux"> {
+    let summary = "Deallocate a single auxiliary QEC physical qubit.";
+
+    let arguments = (ins
+        QecPhysicalQubitType:$qubit
+    );
+
+    let assemblyFormat = [{
+        $qubit attr-dict `:` qualified(type($qubit))
+    }];
+
+    let hasVerifier = 1;
+    let hasCanonicalizeMethod = 1;
+}
+
 def ExtractCodeblockOp : QecPhysical_Op<"extract_block"> {
     let summary = "Extract a physical codeblock value from a hyper-register.";
 
@@ -149,36 +179,6 @@ def InsertQubitOp : QecPhysical_Op<"insert", [AllTypesMatch<["in_codeblock", "ou
     let hasVerifier = 1;
     let hasCanonicalizeMethod = 1;
     let hasFolder = 1;
-}
-
-def AllocAuxQubitOp : QecPhysical_Op<"alloc_aux"> {
-    let summary = "Allocate a single auxiliary QEC physical qubit.";
-
-    let results = (outs
-        QecPhysicalQubitType:$qubit
-    );
-
-    let assemblyFormat = [{
-        attr-dict `:` qualified(type($qubit))
-    }];
-
-    let hasVerifier = 1;
-    let hasCanonicalizeMethod = 1;
-}
-
-def DeallocAuxQubitOp : QecPhysical_Op<"dealloc_aux"> {
-    let summary = "Deallocate a single auxiliary QEC physical qubit.";
-
-    let arguments = (ins
-        QecPhysicalQubitType:$qubit
-    );
-
-    let assemblyFormat = [{
-        $qubit attr-dict `:` qualified(type($qubit))
-    }];
-
-    let hasVerifier = 1;
-    let hasCanonicalizeMethod = 1;
 }
 
 

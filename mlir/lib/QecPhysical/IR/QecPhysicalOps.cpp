@@ -33,6 +33,28 @@ using namespace catalyst::qecp;
 // QecPhysical op verifiers.
 //===----------------------------------------------------------------------===//
 
+LogicalResult AllocAuxQubitOp::verify()
+{
+    const auto qubitRole = getQubit().getType().getRole();
+    if (qubitRole != QecPhysicalQubitRole::Auxiliary) {
+        return emitOpError() << "expected a QEC physical qubit with role '"
+                             << stringifyQecPhysicalQubitRole(QecPhysicalQubitRole::Auxiliary)
+                             << "', but got '" << stringifyQecPhysicalQubitRole(qubitRole) << "'";
+    }
+    return success();
+}
+
+LogicalResult DeallocAuxQubitOp::verify()
+{
+    const auto qubitRole = getQubit().getType().getRole();
+    if (qubitRole != QecPhysicalQubitRole::Auxiliary) {
+        return emitOpError() << "expected a QEC physical qubit with role '"
+                             << stringifyQecPhysicalQubitRole(QecPhysicalQubitRole::Auxiliary)
+                             << "', but got '" << stringifyQecPhysicalQubitRole(qubitRole) << "'";
+    }
+    return success();
+}
+
 LogicalResult ExtractCodeblockOp::verify()
 {
     if (!(getIdx() || getIdxAttr().has_value())) {
@@ -146,28 +168,6 @@ LogicalResult InsertQubitOp::verify()
     return success();
 }
 
-LogicalResult AllocAuxQubitOp::verify()
-{
-    const auto qubitRole = getQubit().getType().getRole();
-    if (qubitRole != QecPhysicalQubitRole::Auxiliary) {
-        return emitOpError() << "expected a QEC physical qubit with role '"
-                             << stringifyQecPhysicalQubitRole(QecPhysicalQubitRole::Auxiliary)
-                             << "', but got '" << stringifyQecPhysicalQubitRole(qubitRole) << "'";
-    }
-    return success();
-}
-
-LogicalResult DeallocAuxQubitOp::verify()
-{
-    const auto qubitRole = getQubit().getType().getRole();
-    if (qubitRole != QecPhysicalQubitRole::Auxiliary) {
-        return emitOpError() << "expected a QEC physical qubit with role '"
-                             << stringifyQecPhysicalQubitRole(QecPhysicalQubitRole::Auxiliary)
-                             << "', but got '" << stringifyQecPhysicalQubitRole(qubitRole) << "'";
-    }
-    return success();
-}
-
 //===----------------------------------------------------------------------===//
 // QecPhysical op canonicalizers.
 //===----------------------------------------------------------------------===//
@@ -197,6 +197,41 @@ LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &
     const auto hyperReg = dealloc.getHyperReg();
     if (auto alloc = dyn_cast_if_present<AllocOp>(hyperReg.getDefiningOp())) {
         if (hyperReg.hasOneUse()) {
+            rewriter.eraseOp(dealloc);
+            rewriter.eraseOp(alloc);
+            return success();
+        }
+    }
+
+    return failure();
+}
+
+/**
+ * @brief Canonicalize aux qubit allocation op.
+ *
+ * Erase alloc_aux op if it has no uses.
+ */
+LogicalResult AllocAuxQubitOp::canonicalize(AllocAuxQubitOp alloc, mlir::PatternRewriter &rewriter)
+{
+    if (alloc->use_empty()) {
+        rewriter.eraseOp(alloc);
+        return success();
+    }
+
+    return failure();
+}
+
+/**
+ * @brief Canonicalize aux qubit deallocation op.
+ *
+ * Erase alloc/dealloc op pairs if allocated aux qubit is immediately deallocated.
+ */
+LogicalResult DeallocAuxQubitOp::canonicalize(DeallocAuxQubitOp dealloc,
+                                              mlir::PatternRewriter &rewriter)
+{
+    const auto qubit = dealloc.getQubit();
+    if (auto alloc = dyn_cast_if_present<AllocAuxQubitOp>(qubit.getDefiningOp())) {
+        if (qubit.hasOneUse()) {
             rewriter.eraseOp(dealloc);
             rewriter.eraseOp(alloc);
             return success();
@@ -331,41 +366,6 @@ LogicalResult InsertQubitOp::canonicalize(InsertQubitOp insert, mlir::PatternRew
         if ((staticallyEqual || dynamicallyEqual) && oneUse && sameHyperReg) {
             rewriter.replaceOp(insert, insert.getInCodeblock());
             rewriter.eraseOp(extract);
-            return success();
-        }
-    }
-
-    return failure();
-}
-
-/**
- * @brief Canonicalize aux qubit allocation op.
- *
- * Erase alloc_aux op if it has no uses.
- */
-LogicalResult AllocAuxQubitOp::canonicalize(AllocAuxQubitOp alloc, mlir::PatternRewriter &rewriter)
-{
-    if (alloc->use_empty()) {
-        rewriter.eraseOp(alloc);
-        return success();
-    }
-
-    return failure();
-}
-
-/**
- * @brief Canonicalize aux qubit deallocation op.
- *
- * Erase alloc/dealloc op pairs if allocated aux qubit is immediately deallocated.
- */
-LogicalResult DeallocAuxQubitOp::canonicalize(DeallocAuxQubitOp dealloc,
-                                              mlir::PatternRewriter &rewriter)
-{
-    const auto qubit = dealloc.getQubit();
-    if (auto alloc = dyn_cast_if_present<AllocAuxQubitOp>(qubit.getDefiningOp())) {
-        if (qubit.hasOneUse()) {
-            rewriter.eraseOp(dealloc);
-            rewriter.eraseOp(alloc);
             return success();
         }
     }
