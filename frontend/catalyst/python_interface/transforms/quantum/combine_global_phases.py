@@ -94,4 +94,4 @@ def combine_global_phases(qnode):
     return _combine_global_phases(qnode)
 
 
-combine_global_phases.__signature__ = signature(_combine_global_phases)
+# combine_global_phases.__signature__ = signature(_combine_global_phases)
