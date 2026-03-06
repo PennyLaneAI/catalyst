@@ -201,7 +201,7 @@ class TestSourceCodeInfo:
 class TestIntegration:
     """Test that the autograph transformations trigger correctly in different settings."""
 
-    def test_unsupported_object(self, capture_mode):
+    def test_unsupported_object(self):
         """Check the error produced when attempting to convert an unsupported object (neither of
         QNode, function, method or callable)."""
 
