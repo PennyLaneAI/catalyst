@@ -300,8 +300,7 @@
   Depth: 5
   ```
 
-  Note as well that these compilation passes used to be named ``parity_synth_pass`` and
-  ``combine_global_phases_pass``, respectively.
+  Note as well that this compilation pass used to be named ``parity_synth_pass``.
 
 * `catalyst.python_interface.utils.get_constant_from_ssa` can now extract constant values cast using
   `arith.index_cast`.
