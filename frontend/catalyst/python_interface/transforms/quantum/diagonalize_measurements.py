@@ -110,25 +110,31 @@ class NonCommutingObservableValidator:
             if isinstance(current_op, NamedObsOp) and pauli_obs is not current_op.type.data.value:
                 pauli_obs = current_op.type.data.value
                 self._walk_ssa_to_pauliword_op(original_ssa, pauli_obs, current_op.obs, final_obs)
+            elif isinstance(current_op, ComputationalBasisOp):
+                pauli_obs = "PauliZ"
+                self._walk_ssa_to_pauliword_op(original_ssa, pauli_obs, current_op.obs, final_obs)
             elif isinstance(current_op, TerminalMeasurementOp):
                 final_obs[ssa][original_ssa] = pauli_obs
             elif isinstance(current_op, TensorOp):
                 self._walk_ssa_to_pauliword_op(original_ssa, pauli_obs, current_op.obs, final_obs)
 
-    def _check_obs_commuting(self):
-        is_commute_rule = True
-        _visited_qubits = set()
-        _overlapped_qubits = set()
-        _visited_qreg = False
+    def _is_qwc_required(
+        self,
+    ):
         # Follow the diagonalize_qwc_pauli_words implementation, it only detects commutative
-        # Pauli words. If there is a non-Pauli word obserable in the module, we do the qubit-overlapping
-        # check instead. The following block also check if there is qubit overlapping in the observables
+        # Pauli words. If there is a non-Pauli word obserable in the module, we do the qubit-
+        # overlapping check instead. The following block also check if there is qubit-overlapping
+        # in the observables
+        is_commute_rule = True
+        visited_qubits = set()
+        overlapped_qubits = set()
+        visited_qreg = False
         for op in self._ops.walk():
             if isinstance(op, NamedObsOp):
-                if op.qubit not in _visited_qubits:
-                    _visited_qubits.add(op.qubit)
+                if op.qubit not in visited_qubits:
+                    visited_qubits.add(op.qubit)
                 else:
-                    _overlapped_qubits.add(op.qubit)
+                    overlapped_qubits.add(op.qubit)
             elif isinstance(op, HermitianOp):
                 is_commute_rule = False
                 break
@@ -137,47 +143,55 @@ class NonCommutingObservableValidator:
                 break
             elif isinstance(op, ComputationalBasisOp):
                 if op.qreg is not None:
-                    _visited_qreg = True
+                    visited_qreg = True
                 if op.qubits is not None:
                     for qubit in op.qubits:
-                        if qubit not in _visited_qubits:
-                            _visited_qubits.add(qubit)
+                        if qubit not in visited_qubits:
+                            visited_qubits.add(qubit)
                         else:
-                            _overlapped_qubits.add(qubit)
+                            overlapped_qubits.add(qubit)
 
         if is_commute_rule:
-            if not _visited_qreg and len(_overlapped_qubits) == 0:
+            if not visited_qreg and len(overlapped_qubits) == 0:
                 is_commute_rule = False
-            if _visited_qreg and len(_visited_qubits) == 0:
+            if visited_qreg and len(visited_qubits) == 0:
                 is_commute_rule = False
 
+        return is_commute_rule, overlapped_qubits, visited_qreg, visited_qubits
+
+    def _collect_obs_with_overlapping_qubit(self, overlapped_qubits):
+        final_obs_dict = defaultdict(defaultdict)
+        for qubit in overlapped_qubits:
+            self._walk_ssa_to_pauliword_op(qubit, None, qubit, final_obs_dict)
+        return final_obs_dict
+
+    def _validate_qwc_obs_with_overlapping_qubit(self, obs_dict):
+        for obs0 in obs_dict:
+            for obs1 in obs_dict:
+                if obs0 is not obs1:
+                    for qubit in obs_dict[obs0]:
+                        pauli0 = obs_dict[obs0][qubit]
+                        pauli1 = obs_dict[obs1].get(qubit, "Identity")
+                        if "Identity" not in (pauli0, pauli1) and pauli0 != pauli1:
+                            raise RuntimeError(self._err_qwc_msg)
+
+    def _validate_qwc_obs_with_qreg(self, obs_dict):
+        for obs in obs_dict.values():
+            for obs_name in obs.values():
+                if obs_name not in ("PauliZ", "Identity"):
+                    raise RuntimeError(self._err_qwc_msg)
+
+    def _check_obs_commuting(self):
         # Get measurements with obs sharing wires
+        is_commute_rule, overlapped_qubits, visited_qreg, visited_qubits = self._is_qwc_required()
         if is_commute_rule:
-            final_obs_dict = defaultdict(defaultdict)
-            for qubit in _overlapped_qubits:
-                self._walk_ssa_to_pauliword_op(qubit, None, qubit, final_obs_dict)
+            obs_dict = self._collect_obs_with_overlapping_qubit(overlapped_qubits)
+            self._validate_qwc_obs_with_overlapping_qubit(obs_dict)
 
-            # Check any pair of the final_obs
-            for obs0 in final_obs_dict:
-                for obs1 in final_obs_dict:
-                    if obs0 is not obs1:
-                        overlapped_wire_obs_dict0 = final_obs_dict[obs0]
-                        overlapped_wire_obs_dict1 = final_obs_dict[obs1]
+            if visited_qreg:
+                obs_dict = self._collect_obs_with_overlapping_qubit(visited_qubits)
+                self._validate_qwc_obs_with_qreg(obs_dict)
 
-                        for qubit in overlapped_wire_obs_dict0:
-                            if qubit in overlapped_wire_obs_dict1:
-                                pauli0 = overlapped_wire_obs_dict0[qubit]
-                                pauli1 = overlapped_wire_obs_dict1[qubit]
-                                print(pauli0, pauli1)
-                                if (
-                                    (pauli0 != "Identity")
-                                    and (pauli1 != "Identity")
-                                    and (pauli0 != pauli1)
-                                ):
-                                    raise RuntimeError("QWC does not meet")
-            if _visited_qreg:
-                for qubit in _visited_qubits:
-                    self._walk_ssa_to_pauliword_op(qubit, None, qubit, final_obs_dict)
         return is_commute_rule
 
     def _check_obs_wire_overlapping(self):
