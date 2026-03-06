@@ -544,4 +544,6 @@ def parity_synth(qnode):
     return _parity_synth_func(qnode)
 
 
+_parity_synth_func.__signature__ = "(qnode)"
+
 parity_synth.__signature__ = inspect.signature(_parity_synth_func)
