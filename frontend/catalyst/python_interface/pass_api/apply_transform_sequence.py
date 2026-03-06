@@ -97,7 +97,7 @@ class ApplyTransformSequencePass(ModulePass):
                     break
 
             if transformer is None:
-                continue
+                continue  # pragma: no cover
 
             # Need to create a new pattern for each nested module to properly handle callbacks
             pattern = ApplyTransformSequencePattern(ctx, self.passes, self.callback)
@@ -123,7 +123,7 @@ class ApplyTransformSequencePattern(RewritePattern):
     def match_and_rewrite(self, transformer: builtin.ModuleOp, rewriter: PatternRewriter):
         """Rewrite modules containing transform.named_sequences."""
         if not isinstance(next(iter(transformer.body.ops), None), transform.NamedSequenceOp):
-            return
+            return  # pragma: no cover
 
         payload: builtin.ModuleOp = transformer.parent_op()
         rewriter.erase_op(transformer)
