@@ -76,7 +76,7 @@ def test_all_attributes_names(attr):
     "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
 )
 def test_assembly_format(run_filecheck, pretty_print):
-    """Test the assembly format of the mbqc ops."""
+    """Test the assembly format of the qecl ops."""
     program = r"""
     // CHECK: [[codeblock:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
     %codeblock = "test.op"() : () -> !qecl.codeblock<1>
