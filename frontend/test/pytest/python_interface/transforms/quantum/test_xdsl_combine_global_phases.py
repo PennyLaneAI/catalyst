@@ -18,7 +18,7 @@ import pytest
 
 from catalyst.python_interface.transforms import (
     CombineGlobalPhasesPass,
-    combine_global_phases_pass,
+    combine_global_phases,
 )
 
 pytestmark = pytest.mark.xdsl
@@ -224,7 +224,7 @@ class TestCombineGlobalPhasesIntegration:
         dev = qml.device("lightning.qubit", wires=2)
 
         @qml.qjit(target="mlir")
-        @combine_global_phases_pass
+        @combine_global_phases
         @qml.qnode(dev)
         def circuit(x: float, y: float):
             # CHECK: [[phi:%.+]] = arith.addf

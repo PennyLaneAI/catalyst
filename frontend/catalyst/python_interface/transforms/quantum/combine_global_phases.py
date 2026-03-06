@@ -84,4 +84,5 @@ class CombineGlobalPhasesPass(passes.ModulePass):
         ).rewrite_module(op)
 
 
-combine_global_phases_pass = compiler_transform(CombineGlobalPhasesPass)
+combine_global_phases = compiler_transform(CombineGlobalPhasesPass)
+combine_global_phases.__doc__ = """TEST!!!"""
