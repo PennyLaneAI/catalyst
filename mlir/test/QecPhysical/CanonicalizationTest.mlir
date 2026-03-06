@@ -100,8 +100,8 @@ func.func @test_alloc_dealloc_aux_no_fold() {
 
 // -----
 
-// CHECK-LABEL: test_extract_insert_dce
-func.func @test_extract_insert_dce(%i : index) -> !qecp.hyperreg<3 x 1 x 7> {
+// CHECK-LABEL: test_extract_insert_block_dce
+func.func @test_extract_insert_block_dce(%i : index) -> !qecp.hyperreg<3 x 1 x 7> {
     // CHECK: [[r0:%.+]] = "test.op"() : () -> !qecp.hyperreg<3 x 1 x 7>
     %r0 = "test.op"() : () -> !qecp.hyperreg<3 x 1 x 7>
 
@@ -121,8 +121,8 @@ func.func @test_extract_insert_dce(%i : index) -> !qecp.hyperreg<3 x 1 x 7> {
 
 // -----
 
-// CHECK-LABEL: test_extract_insert_no_dce
-func.func @test_extract_insert_no_dce(%i0 : index, %i1 : index) -> !qecp.hyperreg<3 x 1 x 7> {
+// CHECK-LABEL: test_extract_insert_block_no_dce
+func.func @test_extract_insert_block_no_dce(%i0 : index, %i1 : index) -> !qecp.hyperreg<3 x 1 x 7> {
     %r0 = "test.op"() : () -> !qecp.hyperreg<3 x 1 x 7>
 
     // CHECK: qecp.extract_block
@@ -141,8 +141,8 @@ func.func @test_extract_insert_no_dce(%i0 : index, %i1 : index) -> !qecp.hyperre
 
 // -----
 
-// CHECK-LABEL: test_insert_extract_dce
-func.func @test_insert_extract_dce(%i : index) -> !qecp.codeblock<1 x 7> {
+// CHECK-LABEL: test_insert_extract_block_dce
+func.func @test_insert_extract_block_dce(%i : index) -> !qecp.codeblock<1 x 7> {
     // CHECK: [[r0:%.+]] = "test.op"() : () -> !qecp.hyperreg<3 x 1 x 7>
     // CHECK: [[b0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
     %r0 = "test.op"() : () -> !qecp.hyperreg<3 x 1 x 7>
@@ -164,8 +164,8 @@ func.func @test_insert_extract_dce(%i : index) -> !qecp.codeblock<1 x 7> {
 
 // -----
 
-// CHECK-LABEL: test_insert_extract_no_dce
-func.func @test_insert_extract_no_dce(%i0 : index, %i1 : index) -> !qecp.codeblock<1 x 7> {
+// CHECK-LABEL: test_insert_extract_block_no_dce
+func.func @test_insert_extract_block_no_dce(%i0 : index, %i1 : index) -> !qecp.codeblock<1 x 7> {
     %r0 = "test.op"() : () -> !qecp.hyperreg<3 x 1 x 7>
     %b0 = "test.op"() : () -> !qecp.codeblock<1 x 7>
 
@@ -181,6 +181,91 @@ func.func @test_insert_extract_no_dce(%i0 : index, %i1 : index) -> !qecp.codeblo
 
     // CHECK: return [[b2]]
     return %b2 : !qecp.codeblock<1 x 7>
+}
+
+// -----
+
+// CHECK-LABEL: test_extract_insert_qubit_dce
+func.func @test_extract_insert_qubit_dce(%i : index) -> !qecp.codeblock<1 x 7> {
+    // CHECK: [[r0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
+    %r0 = "test.op"() : () -> !qecp.codeblock<1 x 7>
+
+    // CHECK-NOT: qecp.extract
+    // CHECK-NOT: qecp.insert_block
+    %b0 = qecp.extract %r0[0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+    %r1 = qecp.insert %r0[0], %b0 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+
+    // CHECK-NOT: qecp.extract
+    // CHECK-NOT: qecp.insert
+    %b2 = qecp.extract %r1[%i] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+    %r2 = qecp.insert %r1[%i], %b2 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+
+    // CHECK: return [[r0]]
+    return %r2 : !qecp.codeblock<1 x 7>
+}
+
+// -----
+
+// CHECK-LABEL: test_extract_insert_qubit_no_dce
+func.func @test_extract_insert_qubit_no_dce(%i0 : index, %i1 : index) -> !qecp.codeblock<1 x 7> {
+    %r0 = "test.op"() : () -> !qecp.codeblock<1 x 7>
+
+    // CHECK: qecp.extract
+    // CHECK: qecp.insert
+    %b0 = qecp.extract %r0[0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+    %r1 = qecp.insert %r0[1], %b0 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+
+    // CHECK: qecp.extract
+    // CHECK: [[r2:%.+]] = qecp.insert
+    %b2 = qecp.extract %r1[%i0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+    %r2 = qecp.insert %r1[%i1], %b2 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+
+    // CHECK: return [[r2]]
+    return %r2 : !qecp.codeblock<1 x 7>
+}
+
+// -----
+
+// CHECK-LABEL: test_insert_extract_qubit_dce
+func.func @test_insert_extract_qubit_dce(%i : index) -> !qecp.qubit<data> {
+    // CHECK: [[r0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
+    // CHECK: [[b0:%.+]] = "test.op"() : () -> !qecp.qubit<data>
+    %r0 = "test.op"() : () -> !qecp.codeblock<1 x 7>
+    %b0 = "test.op"() : () -> !qecp.qubit<data>
+
+    // CHECK-NOT: qecp.insert
+    // CHECK-NOT: qecp.extract
+    %r1 = qecp.insert %r0[0], %b0 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+    %b1 = qecp.extract %r1[0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+
+    // CHECK-NOT: qecp.insert
+    // CHECK-NOT: qecp.extract
+    %r2 = qecp.insert %r1[%i], %b1 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+    %b2 = qecp.extract %r2[%i] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+
+    // CHECK: return [[b0]]
+    return %b2 : !qecp.qubit<data>
+}
+
+// -----
+
+// CHECK-LABEL: test_insert_extract_qubit_no_dce
+func.func @test_insert_extract_qubit_no_dce(%i0 : index, %i1 : index) -> !qecp.qubit<data> {
+    %r0 = "test.op"() : () -> !qecp.codeblock<1 x 7>
+    %b0 = "test.op"() : () -> !qecp.qubit<data>
+
+    // CHECK: qecp.insert
+    // CHECK: qecp.extract
+    %r1 = qecp.insert %r0[0], %b0 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+    %b1 = qecp.extract %r1[1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+
+    // CHECK: qecp.insert
+    // CHECK: [[b2:%.+]] = qecp.extract
+    %r2 = qecp.insert %r1[%i0], %b1 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+    %b2 = qecp.extract %r2[%i1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+
+    // CHECK: return [[b2]]
+    return %b2 : !qecp.qubit<data>
 }
 
 // -----
