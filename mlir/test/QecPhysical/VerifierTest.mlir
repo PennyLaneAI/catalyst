@@ -110,48 +110,64 @@ func.func @test_insert_block_type_mismatch_n(%r : !qecp.hyperreg<3 x 1 x 7>, %b 
 
 // -----
 
-func.func @test_extract_qubit_no_idx(%r : !qecp.codeblock<1 x 7>) {
+func.func @test_extract_qubit_no_idx(%b : !qecp.codeblock<1 x 7>) {
     // expected-error@below {{expected to have a non-null index}}
-    %b = "qecp.extract"(%r) <{}> : (!qecp.codeblock<1 x 7>) -> !qecp.qubit<data>
+    %q = "qecp.extract"(%b) <{}> : (!qecp.codeblock<1 x 7>) -> !qecp.qubit<data>
     return
 }
 
 // -----
 
-func.func @test_insert_qubit_no_idx(%r : !qecp.codeblock<1 x 7>, %b : !qecp.qubit<data>) {
+func.func @test_insert_qubit_no_idx(%b : !qecp.codeblock<1 x 7>, %q : !qecp.qubit<data>) {
     // expected-error@below {{expected to have a non-null index}}
-    %r1 = "qecp.insert"(%r, %b) <{}> : (!qecp.codeblock<1 x 7>, !qecp.qubit<data>) -> !qecp.codeblock<1 x 7>
+    %b1 = "qecp.insert"(%b, %q) <{}> : (!qecp.codeblock<1 x 7>, !qecp.qubit<data>) -> !qecp.codeblock<1 x 7>
     return
 }
 
 // -----
 
-func.func @test_extract_qubit_negative_index(%r : !qecp.codeblock<1 x 7>) {
+func.func @test_extract_qubit_negative_index(%b : !qecp.codeblock<1 x 7>) {
     // expected-error@below {{attribute 'idx_attr' failed to satisfy constraint}}
-    %b = qecp.extract %r[-1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+    %q = qecp.extract %b[-1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
     return
 }
 
 // -----
 
-func.func @test_insert_qubit_negative_index(%r : !qecp.codeblock<1 x 7>, %b : !qecp.qubit<data>) {
+func.func @test_insert_qubit_negative_index(%b : !qecp.codeblock<1 x 7>, %q : !qecp.qubit<data>) {
     // expected-error@below {{attribute 'idx_attr' failed to satisfy constraint}}
-    %r1 = qecp.insert %r[-1], %b : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+    %b1 = qecp.insert %b[-1], %q : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
     return
 }
 
 // -----
 
-func.func @test_extract_qubit_index_out_of_bounds(%r : !qecp.codeblock<1 x 7>) {
+func.func @test_extract_qubit_index_out_of_bounds(%b : !qecp.codeblock<1 x 7>) {
     // expected-error@below {{out-of-bounds index attribute}}
-    %b = qecp.extract %r[8] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+    %q = qecp.extract %b[8] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
     return
 }
 
 // -----
 
-func.func @test_insert_qubit_index_out_of_bounds(%r : !qecp.codeblock<1 x 7>, %b : !qecp.qubit<data>) {
+func.func @test_insert_qubit_index_out_of_bounds(%b : !qecp.codeblock<1 x 7>, %q : !qecp.qubit<data>) {
     // expected-error@below {{out-of-bounds index attribute}}
-    %r1 = qecp.insert %r[8], %b : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+    %b1 = qecp.insert %b[8], %q : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+    return
+}
+
+// -----
+
+func.func @test_extract_block_with_aux_qubit(%b : !qecp.codeblock<1 x 7>) {
+    // expected-warning@below {{only physical qubits with role 'data' should be extracted}}
+    %q = qecp.extract %b[0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<aux>
+    return
+}
+
+// -----
+
+func.func @test_insert_block_with_aux_qubit(%b : !qecp.codeblock<1 x 7>, %q : !qecp.qubit<aux>) {
+    // expected-warning@below {{only physical qubits with role 'data' should be inserted}}
+    %q1 = qecp.insert %b[0], %q : !qecp.codeblock<1 x 7>, !qecp.qubit<aux>
     return
 }

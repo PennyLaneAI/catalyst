@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/PatternMatch.h"
 
 #include "QecPhysical/IR/QecPhysicalAttrDefs.h"
@@ -141,7 +142,14 @@ LogicalResult ExtractQubitOp::verify()
         }
     }
 
-    // Emit remark if extracting aux qubit from codeblock?
+    const auto qubitTypeRole = getQubit().getType().getRole();
+
+    if (qubitTypeRole != QecPhysicalQubitRole::Data) {
+        return emitWarning() << "only physical qubits with role '"
+                             << stringifyQecPhysicalQubitRole(QecPhysicalQubitRole::Data)
+                             << "' should be extracted from a physical codeblock, but got '"
+                             << stringifyQecPhysicalQubitRole(qubitTypeRole) << "'";
+    }
 
     return success();
 }
@@ -163,7 +171,14 @@ LogicalResult InsertQubitOp::verify()
         }
     }
 
-    // Emit remark if inserting aux qubit from codeblock?
+    const auto qubitTypeRole = getQubit().getType().getRole();
+
+    if (qubitTypeRole != QecPhysicalQubitRole::Data) {
+        return emitWarning() << "only physical qubits with role '"
+                             << stringifyQecPhysicalQubitRole(QecPhysicalQubitRole::Data)
+                             << "' should be inserted into a physical codeblock, but got '"
+                             << stringifyQecPhysicalQubitRole(qubitTypeRole) << "'";
+    }
 
     return success();
 }
