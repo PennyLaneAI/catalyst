@@ -463,3 +463,33 @@ func.func @test_alloc_qb() attributes {quantum.node} {
     qref.dealloc_qb %q : !qref.bit
     return
 }
+
+
+// -----
+
+
+// CHECK-LABEL: test_aliasing_getops
+func.func @test_aliasing_getops() attributes {quantum.node} {
+
+    // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    %a = qref.alloc(2) : !qref.reg<2>
+    %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit
+    %q1 = qref.get %a[1] : !qref.reg<2> -> !qref.bit
+
+    // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[bit1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
+    // CHECK: [[CNOT1:%.+]]:2 = quantum.custom "CNOT"() [[bit0]], [[bit1]] : !quantum.bit, !quantum.bit
+    qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+
+    %q0_again = qref.get %a[0] : !qref.reg<2> -> !qref.bit
+    %q1_again = qref.get %a[1] : !qref.reg<2> -> !qref.bit
+
+    // CHECK: [[CNOT2:%.+]]:2 = quantum.custom "CNOT"() [[CNOT1]]#0, [[CNOT1]]#1 : !quantum.bit, !quantum.bit
+    qref.custom "CNOT"() %q0_again, %q1_again : !qref.bit, !qref.bit
+
+    // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[CNOT2]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[CNOT2]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
+    qref.dealloc %a : !qref.reg<2>
+    return
+}
