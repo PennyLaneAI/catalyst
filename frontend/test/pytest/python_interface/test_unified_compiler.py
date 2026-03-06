@@ -24,7 +24,6 @@ from pennylane.capture import enabled as capture_enabled
 from xdsl import passes
 from xdsl.context import Context
 from xdsl.dialects import builtin, transform
-from xdsl.interpreters import Interpreter
 from xdsl.passes import PassPipeline
 
 from catalyst import CompileError, qjit
