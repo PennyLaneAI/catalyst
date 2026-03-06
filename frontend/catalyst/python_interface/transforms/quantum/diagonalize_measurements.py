@@ -76,6 +76,9 @@ def _diagonalize(obs: NamedObsOp, supported_base_obs) -> bool:
     )  # pragma: no cover
 
 
+from collections import defaultdict
+
+
 class NonCommutingObservableValidator:
     """
     Validates if all quantum observables in a builtin.ModuleOp object act on
