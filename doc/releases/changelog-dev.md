@@ -150,15 +150,6 @@
   ```
 
 * Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
-  effectively filtering for decomposition rules.
-  [(#2539)](https://github.com/PennyLaneAI/catalyst/pull/2539)
-
-  ```bash
-  quantum-opt input.mlir -register-decomp-rule-resource
-  ```
-
-
-* Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
   effectively filtering for decomposition rules in the MLIR-native decomposition framework.
   [(#2539)](https://github.com/PennyLaneAI/catalyst/pull/2539)
 
@@ -205,6 +196,9 @@
 * Added a cache of pre-compiled decomposition rules for use with the upcoming C++ graph
   decomposition system.
   [(#2531)](https://github.com/PennyLaneAI/catalyst/pull/2531)
+
+* Added the `graph-decomposition` pass to orchestrate the new MLIR-native graph-based decomposition system.
+  [(#2552)](https://github.com/PennyLaneAI/catalyst/pull/2552)
 
 
 <h3>Improvements 🛠</h3>
