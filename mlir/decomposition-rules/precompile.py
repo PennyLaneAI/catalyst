@@ -36,6 +36,7 @@ from catalyst.jax_primitives import decomposition_rule
 from catalyst.utils.exceptions import CompileError
 
 
+@lru_cache
 def get_compiler_ops() -> tuple[set[type[Operator]], int]:
     """
     Extracts all ops from pennylane that have decompositions in catalyst
