@@ -142,13 +142,63 @@
   operations across the `quantum`, `qec`, and `mbqc` dialects. The analysis is implemented as a
   cacheable MLIR analysis class (`ResourceAnalysis`) that other transformation passes can query
   via `getAnalysis<ResourceAnalysis>()`, avoiding redundant recomputation.
+  [(#2479)](https://github.com/PennyLaneAI/catalyst/pull/2479)
 
   ```bash
   quantum-opt --resource-tracker='output-json=true' input.mlir
   quantum-opt --resource-tracker -mlir-pass-statistics input.mlir
   ```
 
+* Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
+  effectively filtering for decomposition rules in the MLIR-native decomposition framework.
+  [(#2539)](https://github.com/PennyLaneAI/catalyst/pull/2539)
+
+  ```bash
+  quantum-opt input.mlir -register-decomp-rule-resource
+  ```
+
+  Input:
+
+  ```mlir
+  func.func @decomp_rule() attributes {target_gate="CustomGate"}  {
+      %0 = quantum.alloc( 2) : !quantum.reg
+      %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+      %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+      %3 = quantum.custom "Hadamard"() %1 : !quantum.bit
+      %4 = quantum.custom "T"() %3 : !quantum.bit
+      %5 = quantum.custom "S"() %2 : !quantum.bit
+      %6:2 = quantum.custom "CNOT"() %4, %5 : !quantum.bit, !quantum.bit
+      %7 = quantum.insert %0[ 0], %6#0 : !quantum.reg, !quantum.bit
+      %8 = quantum.insert %7[ 1], %6#1 : !quantum.reg, !quantum.bit
+      quantum.dealloc %8 : !quantum.reg
+      return
+  }
+  ```
+
+  Output:
+
+  ```mlir
+  func.func @decomp_rule() attributes {resources = {measurements = {}, num_alloc_qubits = 2 : i64, num_arg_qubits = 0 : i64, num_qubits = 2 : i64, operations = {"CNOT(2)" = 1 : i64, "Hadamard(1)" = 1 : i64, "S(1)" = 1 : i64, "T(1)" = 1 : i64}}, target_gate = "CustomGate"}  {
+      %0 = quantum.alloc( 2) : !quantum.reg
+      %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+      %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+      %3 = quantum.custom "Hadamard"() %1 : !quantum.bit
+      %4 = quantum.custom "T"() %3 : !quantum.bit
+      %5 = quantum.custom "S"() %2 : !quantum.bit
+      %6:2 = quantum.custom "CNOT"() %4, %5 : !quantum.bit, !quantum.bit
+      %7 = quantum.insert %0[ 0], %6#0 : !quantum.reg, !quantum.bit
+      %8 = quantum.insert %7[ 1], %6#1 : !quantum.reg, !quantum.bit
+      quantum.dealloc %8 : !quantum.reg
+      return
+  }
+  ```
+
+
 <h3>Improvements 🛠</h3>
+
+* `catalyst.python_interface.utils.get_constant_from_ssa` can now extract constant values cast using
+  `arith.index_cast`.
+  [(#2542)](https://github.com/PennyLaneAI/catalyst/pull/2542)
 
 * The tape transform :func:`~.device.decomposition.catalyst_decompose` now accepts the optional
   keyword arguments ``target_gates``, ``num_work_wires``, ``fixed_decomps``, and ``alt_decomps``,
@@ -200,6 +250,10 @@
   [(#2486)](https://github.com/PennyLaneAI/catalyst/pull/2486)
 
 <h3>Breaking changes 💔</h3>
+
+* `catalyst.python_interface.inspection.draw` and `catalyst.python_interface.inspection.generate_mlir_graph` no longer
+  accept QNodes as the input. Now, the input must always be a :class:`~.QJIT` object.
+  [(#2542)](https://github.com/PennyLaneAI/catalyst/pull/2542)
 
 * `catalyst.from_plxpr.register_transforms` as a way to access MLIR passes from Python has been removed in favour of the new unified transforms API. MLIR passes can be accessed from Python using `qml.transform(pass_name="some-pass-name")`.
   [(#2509)](https://github.com/PennyLaneAI/catalyst/pull/2509)
@@ -550,7 +604,7 @@
   }
   ```
 
-  * A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in 
+  * A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in
     measurement processes. It is also registered in xDSL.
     [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
     [(#2536)](https://github.com/PennyLaneAI/catalyst/pull/2536)
