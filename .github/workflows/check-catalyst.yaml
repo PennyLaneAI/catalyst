@@ -436,7 +436,6 @@ jobs:
         STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
-        make frontend \
         make decomp-rules
 
     - name: Upload Quantum Build Artifact
