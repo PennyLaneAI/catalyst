@@ -81,6 +81,34 @@ func.func @test_insert_block_dyn_idx(%arg0 : !qecp.hyperreg<3 x 1 x 7>, %arg1 : 
 
 // -----
 
+func.func @test_extract_qubit_static_idx(%arg0 : !qecp.codeblock<1 x 7>) {
+    %0 = qecp.extract %arg0[ 0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+    func.return
+}
+
+// -----
+
+func.func @test_extract_qubit_dyn_idx(%arg0 : !qecp.codeblock<1 x 7>, %arg1 : index) {
+    %0 = qecp.extract %arg0[ %arg1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+    func.return
+}
+
+// -----
+
+func.func @test_insert_qubit_static_idx(%arg0 : !qecp.codeblock<1 x 7>, %arg1 : !qecp.qubit<data>) {
+    %0 = qecp.insert %arg0[ 0], %arg1 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+    func.return
+}
+
+// -----
+
+func.func @test_insert_qubit_dyn_idx(%arg0 : !qecp.codeblock<1 x 7>, %arg1 : index, %arg2 : !qecp.qubit<data>) {
+    %0 = qecp.insert %arg0[ %arg1], %arg2 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+    func.return
+}
+
+// -----
+
 func.func @test_alloc_aux() {
     %0 = qecp.alloc_aux : !qecp.qubit<aux>
     func.return

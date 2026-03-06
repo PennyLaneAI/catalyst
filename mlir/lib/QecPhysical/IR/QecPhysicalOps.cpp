@@ -103,6 +103,49 @@ LogicalResult InsertCodeblockOp::verify()
     return success();
 }
 
+LogicalResult ExtractQubitOp::verify()
+{
+    if (!(getIdx() || getIdxAttr().has_value())) {
+        return emitOpError() << "expected to have a non-null index";
+    }
+
+    const auto codeblockType = getCodeblock().getType();
+
+    if (getIdxAttr().has_value()) {
+        auto idx = getIdxAttr()->getSExtValue();
+        if (idx < 0 || idx >= codeblockType.getN()) {
+            return emitOpError() << "has out-of-bounds index attribute: extracting from index "
+                                 << idx << " but codeblock has n = " << codeblockType.getN();
+        }
+    }
+
+    // Emit remark if extracting aux qubit from codeblock?
+
+    return success();
+}
+
+LogicalResult InsertQubitOp::verify()
+{
+    if (!(getIdx() || getIdxAttr().has_value())) {
+        return emitOpError() << "expected to have a non-null index";
+    }
+
+    // In and out codeblock types are already constrained to be the same
+    const auto codeblockType = getInCodeblock().getType();
+
+    if (getIdxAttr().has_value()) {
+        auto idx = getIdxAttr()->getSExtValue();
+        if (idx < 0 || idx >= codeblockType.getN()) {
+            return emitOpError() << "has out-of-bounds index attribute: inserting at index " << idx
+                                 << " but codeblock has n = " << codeblockType.getN();
+        }
+    }
+
+    // Emit remark if inserting aux qubit from codeblock?
+
+    return success();
+}
+
 LogicalResult AllocAuxQubitOp::verify()
 {
     const auto qubitRole = getQubit().getType().getRole();
@@ -244,6 +287,58 @@ LogicalResult InsertCodeblockOp::canonicalize(InsertCodeblockOp insert,
 }
 
 /**
+ * @brief Canonicalize extract-qubit op.
+ *
+ * Analogous to ExtractCodeblockOp::canonicalize() above.
+ */
+LogicalResult ExtractQubitOp::canonicalize(ExtractQubitOp extract, mlir::PatternRewriter &rewriter)
+{
+    if (auto insert = dyn_cast_if_present<InsertQubitOp>(extract.getCodeblock().getDefiningOp())) {
+        bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
+        bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
+
+        bool staticallyEqual = bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
+        bool dynamicallyEqual = bothDynamic && extract.getIdx() == insert.getIdx();
+
+        bool inSameBlock = extract->getBlock() == insert->getBlock();
+
+        if ((staticallyEqual || dynamicallyEqual) && inSameBlock) {
+            rewriter.replaceOp(extract, insert.getQubit());
+            rewriter.replaceOp(insert, insert.getInCodeblock());
+            return success();
+        }
+    }
+    return failure();
+}
+
+/**
+ * @brief Canonicalize insert-qubit op.
+ *
+ * Analogous to InsertCodeblockOp::canonicalize() above
+ */
+LogicalResult InsertQubitOp::canonicalize(InsertQubitOp insert, mlir::PatternRewriter &rewriter)
+{
+    if (auto extract = dyn_cast_if_present<ExtractCodeblockOp>(insert.getQubit().getDefiningOp())) {
+        bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
+        bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
+
+        bool staticallyEqual = bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
+        bool dynamicallyEqual = bothDynamic && extract.getIdx() == insert.getIdx();
+
+        bool sameHyperReg = extract.getHyperReg() == insert.getInCodeblock();
+        bool oneUse = extract.getResult().hasOneUse();
+
+        if ((staticallyEqual || dynamicallyEqual) && oneUse && sameHyperReg) {
+            rewriter.replaceOp(insert, insert.getInCodeblock());
+            rewriter.eraseOp(extract);
+            return success();
+        }
+    }
+
+    return failure();
+}
+
+/**
  * @brief Canonicalize aux qubit allocation op.
  *
  * Erase alloc_aux op if it has no uses.
@@ -316,6 +411,30 @@ OpFoldResult ExtractCodeblockOp::fold(FoldAdaptor adaptor)
  * @brief Fold method for insert-codeblock op.
  */
 OpFoldResult InsertCodeblockOp::fold(FoldAdaptor adaptor)
+{
+    if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
+        return getResult();
+    }
+    // Returning nullptr tells the caller the op was unchanged.
+    return nullptr;
+}
+
+/**
+ * @brief Fold method for extract-qubit op.
+ */
+OpFoldResult ExtractQubitOp::fold(FoldAdaptor adaptor)
+{
+    if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
+        return getResult();
+    }
+    // Returning nullptr tells the caller the op was unchanged.
+    return nullptr;
+}
+
+/**
+ * @brief Fold method for insert-qubit op.
+ */
+OpFoldResult InsertQubitOp::fold(FoldAdaptor adaptor)
 {
     if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
         return getResult();

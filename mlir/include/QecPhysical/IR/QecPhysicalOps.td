@@ -106,6 +106,51 @@ def InsertCodeblockOp : QecPhysical_Op<"insert_block", [AllTypesMatch<["in_hyper
     let hasFolder = 1;
 }
 
+def ExtractQubitOp : QecPhysical_Op<"extract"> {
+    let summary = "Extract a physical qubit value from a codeblock.";
+
+    let arguments = (ins
+        PhysicalCodeblockType:$codeblock,
+        Optional<Index>:$idx,
+        OptionalAttr<ConfinedAttr<IndexAttr, [IntNonNegative]>>:$idx_attr
+    );
+
+    let results = (outs
+        QecPhysicalQubitType:$qubit
+    );
+
+    let assemblyFormat = [{
+        $codeblock `[` ($idx^):($idx_attr)? `]` attr-dict `:` qualified(type($codeblock)) `->` qualified(type($qubit))
+    }];
+
+    let hasVerifier = 1;
+    let hasCanonicalizeMethod = 1;
+    let hasFolder = 1;
+}
+
+def InsertQubitOp : QecPhysical_Op<"insert", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
+    let summary = "Update the physical qubit value of a codeblock.";
+
+    let arguments = (ins
+        PhysicalCodeblockType:$in_codeblock,
+        Optional<Index>:$idx,
+        OptionalAttr<ConfinedAttr<IndexAttr, [IntNonNegative]>>:$idx_attr,
+        QecPhysicalQubitType:$qubit
+    );
+
+    let results = (outs
+        PhysicalCodeblockType:$out_codeblock
+    );
+
+    let assemblyFormat = [{
+        $in_codeblock `[` ($idx^):($idx_attr)? `]` `,` $qubit attr-dict `:` qualified(type($in_codeblock)) `,` qualified(type($qubit))
+    }];
+
+    let hasVerifier = 1;
+    let hasCanonicalizeMethod = 1;
+    let hasFolder = 1;
+}
+
 def AllocAuxQubitOp : QecPhysical_Op<"alloc_aux"> {
     let summary = "Allocate a single auxiliary QEC physical qubit.";
 

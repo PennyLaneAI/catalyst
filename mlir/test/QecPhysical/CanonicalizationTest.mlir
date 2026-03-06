@@ -139,8 +139,8 @@ func.func @test_insert_extract_no_dce(
 
 // -----
 
-// CHECK-LABEL: test_extract_const_idx_fold
-func.func @test_extract_const_idx_fold() -> !qecp.codeblock<1 x 7> {
+// CHECK-LABEL: test_extract_block_const_idx_fold
+func.func @test_extract_block_const_idx_fold() -> !qecp.codeblock<1 x 7> {
     // CHECK-NOT: arith.constant
     // CHECK: [[hreg:%.+]] = qecp.alloc
     // CHECK: qecp.extract_block [[hreg]][ 0]
@@ -153,8 +153,8 @@ func.func @test_extract_const_idx_fold() -> !qecp.codeblock<1 x 7> {
 
 // -----
 
-// CHECK-LABEL: test_insert_const_idx_fold
-func.func @test_insert_const_idx_fold(%b : !qecp.codeblock<1 x 7>) -> !qecp.hyperreg<3 x 1 x 7>{
+// CHECK-LABEL: test_insert_block_const_idx_fold
+func.func @test_insert_block_const_idx_fold(%b : !qecp.codeblock<1 x 7>) -> !qecp.hyperreg<3 x 1 x 7> {
     // CHECK-NOT: arith.constant
     // CHECK: [[hreg:%.+]] = qecp.alloc
     // CHECK: qecp.insert_block [[hreg]][ 0]
@@ -163,6 +163,36 @@ func.func @test_insert_const_idx_fold(%b : !qecp.codeblock<1 x 7>) -> !qecp.hype
     %r1 = qecp.insert_block %r0[%0], %b : !qecp.hyperreg<3 x 1 x 7>, !qecp.codeblock<1 x 7>
 
     return %r1 : !qecp.hyperreg<3 x 1 x 7>
+}
+
+// -----
+
+// CHECK-LABEL: test_extract_qubit_const_idx_fold
+func.func @test_extract_qubit_const_idx_fold() -> !qecp.qubit<data> {
+    // CHECK-NOT: arith.constant
+    // CHECK: [[block:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
+    // CHECK: qecp.extract [[block]][ 0]
+    %0 = arith.constant 0 : index
+    %b = "test.op"() : () -> !qecp.codeblock<1 x 7>
+    %q = qecp.extract %b[%0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+
+    return %q : !qecp.qubit<data>
+}
+
+// -----
+
+// CHECK-LABEL: test_insert_qubit_const_idx_fold
+func.func @test_insert_qubit_const_idx_fold() -> !qecp.codeblock<1 x 7> {
+    // CHECK-NOT: arith.constant
+    // CHECK: [[qubit:%.+]] = "test.op"() : () -> !qecp.qubit<data>
+    // CHECK: [[block:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
+    // CHECK: qecp.insert [[block]][ 0], [[qubit]]
+    %0 = arith.constant 0 : index
+    %q = "test.op"() : () -> !qecp.qubit<data>
+    %b = "test.op"() : () -> !qecp.codeblock<1 x 7>
+    %b1 = qecp.insert %b[%0], %q : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+
+    return %b1 : !qecp.codeblock<1 x 7>
 }
 
 // -----
