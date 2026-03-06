@@ -447,11 +447,11 @@ def parity_synth(qnode):
         import pennylane as qml
         from catalyst.python_interface import Compiler
         from catalyst.python_interface.transforms import parity_synth
+        import catalyst
 
-        qml.capture.enable()
         dev = qml.device("lightning.qubit", wires=2)
 
-        @qml.qjit(target="mlir")
+        @qml.qjit(capture=True)
         @parity_synth
         @qml.qnode(dev)
         def circuit(x: float, y: float, z: float):
@@ -467,18 +467,17 @@ def parity_synth(qnode):
     We can draw the circuit and observe the last ``RZ`` gate to be wrapped in a pair of ``CNOT``
     gates that commute with it:
 
-    >>> print(qml.draw(circuit)(0.52, 0.12, 0.2))
-    0: ─╭●───────────╭●───────────╭X───────────╭X─┤  State
-    1: ─╰X──RZ(0.52)─╰X──RX(0.12)─╰●──RZ(0.20)─╰●─┤  State
+    >>> print(catalyst.draw_graph(circuit)(0.52, 0.12, 0.2))
 
-    Now we apply the ``parity_synth`` to the circuit and quantum just-in-time (qjit) compile
-    the circuit into a reduced MLIR module:
+    .. figure:: /_static/parity-synth-example.png
+        :width: 35%
+        :alt: Example using ``parity_synth``
+        :align: left
 
     .. code-block:: python
 
-        circuit_qjit = qml.qjit(parity_synth(circuit), autograph=True, target="mlir")
         compiler = Compiler()
-        mlir_module = compiler.run(circuit_qjit.mlir_module)
+        mlir_module = compiler.run(circuit.mlir_module)
 
     Looking at the compiled module below, we find only five gates left in the program (note that
     we reduced the output for the purpose of this example); the ``CNOT``\ s

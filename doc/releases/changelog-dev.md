@@ -2,6 +2,42 @@
 
 <h3>New features since last release</h3>
 
+* Combining ``GlobalPhase`` operations into one single operation is now possible with the
+  :func:`catalyst.passes.combine_global_phases` pass.
+  [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
+
+  ```python
+  import pennylane as qml
+  import catalyst
+
+  @qml.qjit(capture=True)
+  @catalyst.passes.combine_global_phases
+  @qml.qnode(qml.device("lightning.qubit", wires=5))
+  def circuit():
+      qml.GlobalPhase(0)
+      qml.GlobalPhase(1)
+      qml.GlobalPhase(2)
+      qml.GlobalPhase(3)
+      qml.GlobalPhase(4)
+      return qml.state()
+  ```
+
+  ```pycon
+  >>> print(qml.specs(circuit, level=2)())
+  Device: lightning.qubit
+  Device wires: 5
+  Shots: Shots(total=None)
+  Level: combine-global-phases (MLIR-1)
+  <BLANKLINE>
+  Wire allocations: 5
+  Total gates: 1
+  Gate counts:
+  - GlobalPhase: 1
+  Measurements:
+  - state(all wires): 1
+  Depth: Not computed
+  ```
+
 * A new MLIR transformation pass `--dynamic-one-shot` is available.
   Devices that natively support mid-circuit measurements can evaluate dynamic circuits by executing
   them one shot at a time, sampling a dynamic execution path for each shot. The `--dynamic-one-shot`
@@ -223,6 +259,50 @@
 
 <h3>Improvements 🛠</h3>
 
+* The :func:`~.passes.parity_synth` can now be invoked from the ``passes`` module.
+  [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
+
+  ```python
+  import pennylane as qml
+  import catalyst
+
+  dev = qml.device("lightning.qubit", wires=2)
+
+  @qml.qjit(capture=True)
+  @catalyst.passes.parity_synth
+  @qml.qnode(dev)
+  def circuit(x: float, y: float, z: float):
+      qml.CNOT((0, 1))
+      qml.RZ(x, 1)
+      qml.CNOT((0, 1))
+      qml.RX(y, 1)
+      qml.CNOT((1, 0))
+      qml.RZ(z, 1)
+      qml.CNOT((1, 0))
+      return qml.state()
+  ```
+
+  ```pycon
+  >>> print(qml.specs(circuit)(0.52, 0.12, 0.2))
+  Device: lightning.qubit
+  Device wires: 2
+  Shots: Shots(total=None)
+  Level: device
+
+  Wire allocations: 2
+  Total gates: 5
+  Gate counts:
+  - RX: 1
+  - RZ: 2
+  - CNOT: 2
+  Measurements:
+  - state(all wires): 1
+  Depth: 5
+  ```
+
+  Note as well that these compilation passes used to be named ``parity_synth_pass`` and
+  ``combine_global_phases_pass``, respectively.
+
 * `catalyst.python_interface.utils.get_constant_from_ssa` can now extract constant values cast using
   `arith.index_cast`.
   [(#2542)](https://github.com/PennyLaneAI/catalyst/pull/2542)
@@ -277,6 +357,16 @@
   [(#2486)](https://github.com/PennyLaneAI/catalyst/pull/2486)
 
 <h3>Breaking changes 💔</h3>
+
+* The ``catalyst.python_interface.transforms.parity_synth_pass`` and
+  ``catalyst.python_interface.transforms.combine_global_phases_pass`` transforms have been renamed
+  to ``catalyst.python_interface.transforms.parity_synth`` and
+  ``catalyst.python_interface.transforms.combine_global_phases``, respectively.
+  [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
+
+A new experimental ``parity_synth_pass`` compiler pass has been added to
+    ``catalyst.python_interface.transforms``. This pass groups ``CNOT`` and ``RZ`` operators
+    into phase polynomials and re-synthesizes them into ``CNOT`` and ``RZ`` operators again.
 
 * `catalyst.python_interface.inspection.draw` and `catalyst.python_interface.inspection.generate_mlir_graph` no longer
   accept QNodes as the input. Now, the input must always be a :class:`~.QJIT` object.
@@ -363,9 +453,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Update nightly RC builds to be triggered by Lightning. 
+* Update nightly RC builds to be triggered by Lightning.
   [(#2491)](https://github.com/PennyLaneAI/catalyst/pull/2491)
-  
+
 * Updated integration tests to match changes to the PennyLane `qml.specs` frontend made in https://github.com/PennyLaneAI/pennylane/pull/9088.
   [(#2513)](https://github.com/PennyLaneAI/catalyst/pull/2513)
 
@@ -633,7 +723,7 @@
   }
   ```
 
-* A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in 
+* A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in
   measurement processes. It is also registered in xDSL.
   [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
   [(#2536)](https://github.com/PennyLaneAI/catalyst/pull/2536)
