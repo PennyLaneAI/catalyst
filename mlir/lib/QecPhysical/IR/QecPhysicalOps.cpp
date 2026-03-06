@@ -353,17 +353,17 @@ LogicalResult ExtractQubitOp::canonicalize(ExtractQubitOp extract, mlir::Pattern
  */
 LogicalResult InsertQubitOp::canonicalize(InsertQubitOp insert, mlir::PatternRewriter &rewriter)
 {
-    if (auto extract = dyn_cast_if_present<ExtractCodeblockOp>(insert.getQubit().getDefiningOp())) {
+    if (auto extract = dyn_cast_if_present<ExtractQubitOp>(insert.getQubit().getDefiningOp())) {
         bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
         bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
 
         bool staticallyEqual = bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
         bool dynamicallyEqual = bothDynamic && extract.getIdx() == insert.getIdx();
 
-        bool sameHyperReg = extract.getHyperReg() == insert.getInCodeblock();
+        bool sameCodeblock = extract.getCodeblock() == insert.getInCodeblock();
         bool oneUse = extract.getResult().hasOneUse();
 
-        if ((staticallyEqual || dynamicallyEqual) && oneUse && sameHyperReg) {
+        if ((staticallyEqual || dynamicallyEqual) && oneUse && sameCodeblock) {
             rewriter.replaceOp(insert, insert.getInCodeblock());
             rewriter.eraseOp(extract);
             return success();
