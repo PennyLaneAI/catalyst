@@ -140,7 +140,7 @@ enzyme:
 dialects:
 	$(MAKE) -C mlir dialects
 
-decomp-rules:
+decomp-rules: dialects
 	$(MAKE) -C mlir decomp-rules
 
 .PHONY: dialect-docs
