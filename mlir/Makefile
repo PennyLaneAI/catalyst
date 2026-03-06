@@ -62,7 +62,7 @@ all: llvm stablehlo enzyme dialects dialect-docs plugin decomp-rules
 .PHONY: decomp-rules
 decomp-rules: dialects
 	@echo "compile decomposition rules"
-	$(PYTHON) -m pip install -e ..
+	$(MAKE) -C .. frontend
 	$(PYTHON) $(DECOMPOSITION_DIR)/precompile.py --dir $(CACHED_RULE_DIR)
 	$(DIALECTS_BUILD_DIR)/bin/quantum-opt --register-decomp-rule-resource --emit-bytecode $(CACHED_RULE_DIR)/decompositions.mlir -o $(CACHED_RULE_DIR)/decompositions.mlirbc
 	$(ASAN_COMMAND) $(PYTHON) -m pytest $(DECOMPOSITION_DIR)/test_precompile.py
