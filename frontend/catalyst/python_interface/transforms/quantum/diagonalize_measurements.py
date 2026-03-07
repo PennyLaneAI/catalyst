@@ -277,7 +277,7 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
 
         pattern_rewriter.PatternRewriteWalker(
             DiagonalizeFinalMeasurementsPattern(self.supported_base_obs)
-        ).rewrite_module(op)
+        )
 
 
 diagonalize_final_measurements_pass = compiler_transform(DiagonalizeFinalMeasurementsPass)

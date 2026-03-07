@@ -889,7 +889,6 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         @qml.set_shots(10)
         @qml.qnode(dev)
         def circuit(x):
-            qml.RX(x, 0)
             return measurements(obs)
 
         with pytest.raises(RuntimeError, match=f"{_non_commuting_err_msg}"):
