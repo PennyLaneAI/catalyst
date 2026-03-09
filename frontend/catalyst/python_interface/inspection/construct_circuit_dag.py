@@ -146,7 +146,7 @@ class ConstructCircuitDAG:
             self._visualize_operation(operation)
         except NotImplementedError as e:
             _ERROR_MSG = (
-                f"'draw_graph' is unable to visualize the operation {operation.name}: {str(e)}."
+                f"'draw_graph' is unable to visualize the operation {operation.name}: {str(e)}"
             )
             raise VisualizationError(_ERROR_MSG) from e
 
