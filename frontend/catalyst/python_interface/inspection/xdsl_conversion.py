@@ -517,6 +517,8 @@ def xdsl_to_qml_measurement(op, *args, **kwargs) -> MeasurementProcess | Operato
             case "quantum.hamiltonian":
                 coeffs = _extract(op, "coeffs", resolve_constant_params, single=True)
                 ops_list = [xdsl_to_qml_measurement(term.owner) for term in op.terms]
+                if len(ops_list) == 1:
+                    return ops_list[0] * coeffs
                 return ops.LinearCombination(coeffs, ops_list)
             case "quantum.compbasis":
                 return _extract(op, "qubits", resolve_constant_wire)
