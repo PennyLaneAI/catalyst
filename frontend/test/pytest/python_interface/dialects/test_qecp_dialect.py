@@ -119,6 +119,7 @@ def test_op_constructors():
     hyper_reg = create_ssa_value(qecp.PhysicalHyperRegisterType(width, k, n))
     codeblock = create_ssa_value(qecp.PhysicalCodeblockType(k, n))
     q_aux = create_ssa_value(qecp.QecPhysicalQubitType("aux"))
+    q_data = create_ssa_value(qecp.QecPhysicalQubitType("data"))
 
     # alloc
     alloc_op = qecp.AllocOp(qecp.PhysicalHyperRegisterType(width, k, n))
@@ -131,6 +132,16 @@ def test_op_constructors():
     # dealloc
     dealloc_op = qecp.DeallocOp(hyper_reg)
     assert len(dealloc_op.result_types) == 0
+
+    # alloc_aux
+    alloc_aux_op = qecp.AllocAuxQubitOp()
+    assert len(alloc_aux_op.result_types) == 1
+    assert isinstance(alloc_aux_op.result_types[0], qecp.QecPhysicalQubitType)
+    assert alloc_aux_op.result_types[0].role.data == qecp.QecPhysicalQubitRole.Aux
+
+    # dealloc_aux
+    dealloc_aux_op = qecp.DeallocAuxQubitOp(q_aux)
+    assert len(dealloc_aux_op.result_types) == 0
 
     # extract_block
     extract_block_op = qecp.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=0)
@@ -147,15 +158,18 @@ def test_op_constructors():
     assert insert_block_op.result_types[0].k.value.data == k
     assert insert_block_op.result_types[0].n.value.data == n
 
-    # alloc_aux
-    alloc_aux_op = qecp.AllocAuxQubitOp()
-    assert len(alloc_aux_op.result_types) == 1
-    assert isinstance(alloc_aux_op.result_types[0], qecp.QecPhysicalQubitType)
-    assert alloc_aux_op.result_types[0].role.data == qecp.QecPhysicalQubitRole.Aux
+    # extract
+    extract_op = qecp.ExtractQubitOp(codeblock=codeblock, idx=0)
+    assert len(extract_op.result_types) == 1
+    assert isinstance(extract_op.result_types[0], qecp.QecPhysicalQubitType)
+    assert extract_op.result_types[0].role.data == qecp.QecPhysicalQubitRole.Data
 
-    # dealloc_aux
-    dealloc_aux_op = qecp.DeallocAuxQubitOp(q_aux)
-    assert len(dealloc_aux_op.result_types) == 0
+    # insert
+    insert_op = qecp.InsertQubitOp(in_codeblock=codeblock, idx=0, qubit=q_data)
+    assert len(insert_op.result_types) == 1
+    assert isinstance(insert_op.result_types[0], qecp.PhysicalCodeblockType)
+    assert insert_op.result_types[0].k.value.data == k
+    assert insert_op.result_types[0].n.value.data == n
 
 
 @pytest.mark.parametrize(
