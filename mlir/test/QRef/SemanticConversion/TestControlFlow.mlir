@@ -92,6 +92,47 @@ func.func @test_for_loop_non_root() attributes {quantum.node} {
 // -----
 
 
+// CHECK-LABEL: test_for_loop_alias
+func.func @test_for_loop_alias() attributes {quantum.node} {
+    %start = arith.constant 0 : index
+    %step = arith.constant 1 : index
+    %stop = arith.constant 37 : index
+
+    // CHECK: [[qreg:%.+]] = quantum.alloc( 3) : !quantum.reg
+    %a = qref.alloc(3) : !qref.reg<3>
+    %q0 = qref.get %a[0] : !qref.reg<3> -> !qref.bit
+    %q0_again = qref.get %a[0] : !qref.reg<3> -> !qref.bit
+
+    // CHECK: [[bit1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
+    // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[loopOut:%.+]]:2 = scf.for %arg0 = {{%.+}} to {{%.+}} step {{%.+}} iter_args(%arg1 = [[bit1]], %arg2 = [[bit0]]) ->
+    // CHECK-SAME:     (!quantum.bit, !quantum.bit) {
+    scf.for %i = %start to %stop step %step {
+        %q0_again_again = qref.get %a[0] : !qref.reg<3> -> !qref.bit
+        %q1 = qref.get %a[1] : !qref.reg<3> -> !qref.bit
+
+        // CHECK: [[HADAMARD:%.+]] = quantum.custom "Hadamard"() %arg1 : !quantum.bit
+        // CHECK: [[Z:%.+]] = quantum.custom "PauliZ"() %arg2 : !quantum.bit
+        // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[Z]], [[HADAMARD]] : !quantum.bit, !quantum.bit
+        qref.custom "Hadamard"() %q1 : !qref.bit
+        qref.custom "PauliZ"() %q0_again : !qref.bit
+        qref.custom "CNOT"() %q0_again_again, %q1 : !qref.bit, !qref.bit
+
+        // CHECK: scf.yield [[CNOT]]#1, [[CNOT]]#0 : !quantum.bit, !quantum.bit
+        scf.yield
+    }
+    // CHECK: [[insert1:%.+]] = quantum.insert [[qreg]][ 1], [[loopOut]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert0:%.+]] = quantum.insert [[insert1]][ 0], [[loopOut]]#1 : !quantum.reg, !quantum.bit
+
+    // CHECK: quantum.dealloc [[insert0]] : !quantum.reg
+    qref.dealloc %a : !qref.reg<3>
+    return
+}
+
+
+// -----
+
+
 // CHECK-LABEL: test_for_loop_root
 func.func @test_for_loop_root() attributes {quantum.node} {
     %start = arith.constant 0 : index
@@ -445,3 +486,185 @@ func.func @test_while_dynamic_index(%arg0: i1, %arg1: i64) -> i64 attributes {qu
 //
 // if statements
 //
+
+// CHECK-LABEL: test_if_no_qref
+func.func @test_if_no_qref(%cond : i1) -> memref<1xi64> attributes {quantum.node} {
+    %if = scf.if %cond -> (memref<1xi64>) {
+        %0 = memref.alloc() : memref<1xi64>
+        scf.yield %0 : memref<1xi64>
+    } else {
+        %1 = memref.alloc() : memref<1xi64>
+        scf.yield %1 : memref<1xi64>
+    }
+
+    return %if : memref<1xi64>
+}
+
+// CHECK:    {{%.+}} = scf.if %arg0 -> (memref<1xi64>) {
+// CHECK:      [[alloc_t:%.+]] = memref.alloc() : memref<1xi64>
+// CHECK:      scf.yield [[alloc_t]] : memref<1xi64>
+// CHECK:    } else {
+// CHECK:      [[alloc_f:%.+]] = memref.alloc() : memref<1xi64>
+// CHECK:      scf.yield [[alloc_f]] : memref<1xi64>
+// CHECK:    }
+
+
+
+// -----
+
+
+// CHECK-LABEL: test_if_non_root_no_else
+func.func @test_if_non_root_no_else(%arg0: i1) attributes {quantum.node} {
+    // CHECK: [[qreg:%.+]] = quantum.alloc( 3) : !quantum.reg
+    %a = qref.alloc(3) : !qref.reg<3>
+    %q0 = qref.get %a[0] : !qref.reg<3> -> !qref.bit
+
+    // CHECK: [[extracted:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[ifOut:%.+]] = scf.if %arg0 -> (!quantum.bit) {
+    scf.if %arg0 {
+
+        // CHECK: [[HADAMARD:%.+]] = quantum.custom "Hadamard"() [[extracted]] : !quantum.bit
+        // CHECK: [[X:%.+]] = quantum.custom "X"() [[HADAMARD]] : !quantum.bit
+        // CHECK: scf.yield [[X]] : !quantum.bit
+
+        %q0_alias = qref.get %a[0] : !qref.reg<3> -> !qref.bit
+        qref.custom "Hadamard"() %q0_alias : !qref.bit
+        qref.custom "X"() %q0 : !qref.bit
+    }
+
+    // CHECK: else {
+    // CHECK:   scf.yield [[extracted]] : !quantum.bit
+    // CHECK: }
+    // CHECK: [[insert:%.+]] = quantum.insert [[qreg]][ 0], [[ifOut]] : !quantum.reg, !quantum.bit
+
+    // CHECK: quantum.dealloc [[insert]] : !quantum.reg
+    qref.dealloc %a : !qref.reg<3>
+    return
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_if_non_root_with_else
+func.func @test_if_non_root_with_else(%arg0: i1) attributes {quantum.node} {
+    // CHECK: [[qreg:%.+]] = quantum.alloc( 3) : !quantum.reg
+    %a = qref.alloc(3) : !qref.reg<3>
+    %q0 = qref.get %a[0] : !qref.reg<3> -> !qref.bit
+
+    // CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[q1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
+    // CHECK: [[ifOut:%.+]]:2 = scf.if %arg0 -> (!quantum.bit, !quantum.bit) {
+    scf.if %arg0 {
+
+        // CHECK: [[HADAMARD:%.+]] = quantum.custom "Hadamard"() [[q0]] : !quantum.bit
+        // CHECK: scf.yield [[HADAMARD]], [[q1]] : !quantum.bit, !quantum.bit
+        qref.custom "Hadamard"() %q0 : !qref.bit
+
+    // CHECK: else
+    } else {
+        %q1 = qref.get %a[1] : !qref.reg<3> -> !qref.bit
+
+        // CHECK: [[Y:%.+]] = quantum.custom "Y"() [[q1]] : !quantum.bit
+        // CHECK: scf.yield [[q0]], [[Y]] : !quantum.bit, !quantum.bit
+        qref.custom "Y"() %q1 : !qref.bit
+    }
+    // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[ifOut]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[ifOut]]#1 : !quantum.reg, !quantum.bit
+
+    // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
+    qref.dealloc %a : !qref.reg<3>
+    return
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_if_root_no_else
+func.func @test_if_root_no_else(%arg0: i1) attributes {quantum.node} {
+    // CHECK: [[q:%.+]] = quantum.alloc_qb : !quantum.bit
+    %q = qref.alloc_qb : !qref.bit
+
+    // CHECK: [[ifOut:%.+]] = scf.if %arg0 -> (!quantum.bit) {
+    scf.if %arg0 {
+
+        // CHECK: [[HADAMARD:%.+]] = quantum.custom "Hadamard"() [[q]] : !quantum.bit
+        // CHECK: scf.yield [[HADAMARD]] : !quantum.bit
+        qref.custom "Hadamard"() %q : !qref.bit
+    }
+
+    // CHECK: else {
+    // CHECK:   scf.yield [[q]] : !quantum.bit
+    // CHECK: }
+
+    // CHECK: quantum.dealloc_qb [[ifOut]] : !quantum.bit
+    qref.dealloc_qb %q : !qref.bit
+    return
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_if_root_with_else
+func.func @test_if_root_with_else(%arg0: i1, %arg1: f64) attributes {quantum.node} {
+    // CHECK: [[q:%.+]] = quantum.alloc_qb : !quantum.bit
+    %q = qref.alloc_qb : !qref.bit
+
+    // CHECK: [[ifOut:%.+]] = scf.if %arg0 -> (!quantum.bit) {
+    scf.if %arg0 {
+
+        // CHECK: [[HADAMARD:%.+]] = quantum.custom "Hadamard"() [[q]] : !quantum.bit
+        // CHECK: scf.yield [[HADAMARD]] : !quantum.bit
+        qref.custom "Hadamard"() %q : !qref.bit
+
+    // CHECK: else
+    } else {
+
+        // CHECK: [[RX:%.+]] = quantum.custom "RX"(%arg1) [[q]] : !quantum.bit
+        // CHECK: scf.yield [[RX]] : !quantum.bit
+        qref.custom "RX"(%arg1) %q : !qref.bit
+    }
+
+    // CHECK: quantum.dealloc_qb [[ifOut]] : !quantum.bit
+    qref.dealloc_qb %q : !qref.bit
+    return
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_if_with_existing_results
+func.func @test_if_with_existing_results(%arg0: i1, %arg1: f64) -> i1 attributes {quantum.node} {
+    // CHECK: [[q:%.+]] = quantum.alloc_qb : !quantum.bit
+    %q = qref.alloc_qb : !qref.bit
+
+    // CHECK: [[ifOut:%.+]]:2 = scf.if %arg0 -> (i1, !quantum.bit) {
+    %mres = scf.if %arg0 -> (i1) {
+
+        // CHECK: [[HADAMARD:%.+]] = quantum.custom "Hadamard"() [[q]] : !quantum.bit
+        // CHECK: [[mres_t:%.+]], [[MEASURE_t:%.+]] = quantum.measure [[HADAMARD]] : i1, !quantum.bit
+        // CHECK: scf.yield [[mres_t]], [[MEASURE_t]] : i1, !quantum.bit
+        qref.custom "Hadamard"() %q : !qref.bit
+        %mres_t = qref.measure %q : i1
+        scf.yield %mres_t : i1
+
+    // CHECK: else
+    } else {
+
+        // CHECK: [[RX:%.+]] = quantum.custom "RX"(%arg1) [[q]] : !quantum.bit
+        // CHECK: [[mres_f:%.+]], [[MEASURE_f:%.+]] = quantum.measure [[RX]] : i1, !quantum.bit
+        // CHECK: scf.yield [[mres_f]], [[MEASURE_f]] : i1, !quantum.bit
+        qref.custom "RX"(%arg1) %q : !qref.bit
+        %mres_f = qref.measure %q : i1
+        scf.yield %mres_f : i1
+    }
+
+    // CHECK: quantum.dealloc_qb [[ifOut]]#1 : !quantum.bit
+    qref.dealloc_qb %q : !qref.bit
+
+    // CHECK: return [[ifOut]]#0 : i1
+    return %mres : i1
+}

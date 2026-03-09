@@ -91,8 +91,8 @@ func.func @test_qreg_and_qubit_args(%arg0: f64, %r0: !qref.reg<2>, %q0: !qref.bi
 // -----
 
 
-// CHECK: func.func @test_qubit_args_with_loop(%arg0: !quantum.bit) -> !quantum.bit
-func.func @test_qubit_args_with_loop(%q: !qref.bit) attributes {quantum.node} {
+// CHECK: func.func @test_with_loop(%arg0: !quantum.bit) -> !quantum.bit
+func.func @test_with_loop(%q: !qref.bit) attributes {quantum.node} {
     %start = arith.constant 0 : index
     %step = arith.constant 1 : index
     %stop = arith.constant 37 : index
@@ -102,13 +102,33 @@ func.func @test_qubit_args_with_loop(%q: !qref.bit) attributes {quantum.node} {
         scf.yield
     }
     return
+}
 
     // CHECK: [[loopOut:%.+]] = scf.for %arg1 = {{%.+}} to {{%.+}} step {{%.+}} iter_args(%arg2 = %arg0) -> (!quantum.bit) {
     // CHECK:   [[out_qubits:%.+]] = quantum.custom "Hadamard"() %arg2 : !quantum.bit
     // CHECK:   scf.yield [[out_qubits]] : !quantum.bit
     // CHECK: }
     // CHECK: return [[loopOut]] : !quantum.bit
+
+
+// -----
+
+
+// CHECK: func.func @test_with_if(%arg0: !quantum.bit, %arg1: i1) -> !quantum.bit
+func.func @test_with_if(%q: !qref.bit, %cond: i1) attributes {quantum.node} {
+    scf.if %cond {
+        qref.custom "Hadamard"() %q : !qref.bit
+    }
+    return
 }
+
+    // CHECK: [[ifOut:%.+]] = scf.if %arg1 -> (!quantum.bit) {
+    // CHECK:   [[Hadamard:%.+]] = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+    // CHECK:   scf.yield [[Hadamard]] : !quantum.bit
+    // CHECK: } else {
+    // CHECK:   scf.yield %arg0 : !quantum.bit
+    // CHECK: }
+    // CHECK: return [[ifOut]] : !quantum.bit
 
 
 // -----
