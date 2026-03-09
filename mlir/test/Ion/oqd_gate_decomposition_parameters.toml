@@ -6,6 +6,15 @@
 
 oqd_config_schema = "v0.1"
 
+measurement_duration = 1e-4
+
+[[detection_beam]]
+rabi = 1.5
+transition = "downstate_estate"
+detuning = 2.5
+polarization = [1, 0, 0]
+wavevector = [0, 1, 0]
+
 
 # Beams
 # A beam contains 4 properties that will be calibrated:

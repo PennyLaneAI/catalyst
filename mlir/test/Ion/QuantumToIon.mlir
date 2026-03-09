@@ -547,3 +547,37 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     %7:2 = quantum.custom "MS"(%arg0) %5#1, %6#1 : !quantum.bit, !quantum.bit
     return %6#0, %7#0, %7#1: !quantum.bit, !quantum.bit, !quantum.bit
 }
+
+
+// -----
+
+
+// CHECK-LABEL: example_measure
+func.func @example_measure() -> (i1, !quantum.bit) attributes {qnode} {
+
+    // CHECK: [[duration:%.+]] = arith.constant 1.000000e-04 : f64
+    // CHECK: {{%.+}} = ion.ion
+
+    %1 = quantum.alloc( 1) : !quantum.reg
+
+    // CHECK: [[qubit0:%.+]] = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
+
+    // CHECK-NEXT: [[ion_q0:%.+]] = builtin.unrealized_conversion_cast [[qubit0]] : !quantum.bit to !ion.qubit
+    // CHECK-NEXT: [[pp_out:%.+]] = ion.parallelprotocol([[ion_q0]]) : !ion.qubit {
+    // CHECK-NEXT: ^{{.*}}(%arg0: !ion.qubit):
+    // CHECK-NEXT: ion.measure_pulse([[duration]] : f64) %arg0 {
+    // CHECK-SAME:     beam = #ion.beam<
+    // CHECK-SAME:         transition_index = 0 : i64,
+    // CHECK-SAME:         rabi = 1.500000e+00 : f64,
+    // CHECK-SAME:         detuning = 2.500000e+00 : f64,
+    // CHECK-SAME:         polarization = [1, 0, 0],
+    // CHECK-SAME:         wavevector = [0, 1, 0]>,
+    // CHECK-SAME:     phase = 0.000000e+00 : f64}
+    // CHECK-NEXT:   ion.yield %arg0 : !ion.qubit
+    // CHECK-NEXT: }
+    // CHECK-NEXT: [[mres:%.+]], [[out_ion:%.+]] = ion.readout_bit [[pp_out]] : i1, !ion.qubit
+    // CHECK-NEXT: [[out_qubit:%.+]] = builtin.unrealized_conversion_cast [[out_ion]] : !ion.qubit to !quantum.bit
+    %mres, %q_out = quantum.measure %2 : i1, !quantum.bit
+    return %mres, %q_out : i1, !quantum.bit
+}
