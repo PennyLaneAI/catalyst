@@ -31,7 +31,6 @@ from malt.impl.api import PyToPy
 
 import catalyst
 from catalyst.autograph import ag_primitives, operator_update
-from catalyst.passes.pass_api import QNodeWrapper
 from catalyst.utils.exceptions import AutoGraphError
 from catalyst.utils.patching import Patcher
 
@@ -56,13 +55,6 @@ class CatalystTransformer(PyToPy):
         fn = obj
         if isinstance(obj, qml.QNode):
             fn = obj.func
-        elif isinstance(obj, QNodeWrapper):
-            fn = obj
-            data = []
-            while isinstance(fn, QNodeWrapper):
-                data.append((fn.pass_name_or_pipeline, fn.flags, fn.valued_options))
-                fn = fn.qnode
-            fn = obj.original_qnode.func
         elif inspect.isfunction(fn) or inspect.ismethod(fn):
             pass
         elif callable(obj):
@@ -228,8 +220,6 @@ def autograph_source(fn):
         fn = fn.original_function
     if isinstance(fn, qml.QNode):
         fn = fn.func
-    if isinstance(fn, QNodeWrapper):
-        fn = fn.original_qnode
 
     if TRANSFORMER.has_cache(fn):
         new_fn = TRANSFORMER.get_cached_function(fn)

@@ -28,36 +28,6 @@ PipelineDict: TypeAlias = dict[str, dict[str, str]]
 
 
 ## API ##
-class QNodeWrapper:
-    """A wrapper class for QNodes that preserves the pass pipeline when called.
-
-    This class is used internally by pass decorators to ensure that compiler passes
-    are properly applied when the QNode is called.
-
-    Args:
-        qnode (QNode or callable): The QNode or wrapped QNode function to call
-    """
-
-    def __init__(self, qnode):
-        self.qnode = qnode
-        if isinstance(qnode, QNodeWrapper):
-            self.original_qnode = qnode.original_qnode
-            self.func = qnode.func
-        elif isinstance(qnode, qml.QNode):
-            self.original_qnode = qnode
-            self.func = qnode.func
-        else:
-            raise TypeError(f"A QNode is expected, got the classical function {qnode}")
-
-        # Update the wrapper to preserve the original function's metadata (signature, annotations,
-        # etc.) This is crucial for qjit to properly inspect the function signature and make
-        # compilation decisions.
-        functools.update_wrapper(self, self.func)
-
-    def __call__(self, *args, **kwargs):
-        return self.qnode(*args, **kwargs)
-
-
 def pipeline(pass_pipeline: PipelineDict):
     """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode
     within a qjit-compiled program.
