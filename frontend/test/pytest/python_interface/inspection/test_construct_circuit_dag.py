@@ -1029,14 +1029,13 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node1"]["label"] == "<name> PauliRot|<wire> [0]"
         assert nodes["node2"]["label"] == "<name> PauliRot|<wire> [0, 1, 2]"
 
-    @pytest.mark.skipif(not qml.capture.enabled(), reason="Only works with capture enabled.")
     def test_complex_measurements(self):
         """Tests that complex measurements can be created."""
 
         dev = qml.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True)
+        @qml.qjit(autograph=True, capture=True)
         @qml.qnode(dev)
         def my_workflow():
             coeffs = [0.2, -0.543]
@@ -1056,11 +1055,11 @@ class TestCreateStaticOperatorNodes:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
-        assert len(nodes) == 3  # Device node + measurements
+        assert len(nodes) == 4  # Device node + measurements
 
-        assert nodes["node1"]["label"] == "<name> LinearCombination|<wire> [0, 1, 2]"
-        assert nodes["node2"]["label"] == "<name> Prod|<wire> [0, 1]"
-        assert nodes["node1"]["label"] == "<name> SProd|<wire> [0]"
+        assert nodes["node1"]["label"] == "<name> expval(LinearCombination)|<wire> [0, 1, 2]"
+        assert nodes["node2"]["label"] == "<name> expval(Prod)|<wire> [0, 1]"
+        assert nodes["node3"]["label"] == "<name> expval(SProd)|<wire> [0]"
 
     @pytest.mark.parametrize(
         "param, wires",
