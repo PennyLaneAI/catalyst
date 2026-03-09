@@ -363,10 +363,6 @@
   ``catalyst.python_interface.transforms.combine_global_phases``, respectively.
   [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
 
-A new experimental ``parity_synth_pass`` compiler pass has been added to
-    ``catalyst.python_interface.transforms``. This pass groups ``CNOT`` and ``RZ`` operators
-    into phase polynomials and re-synthesizes them into ``CNOT`` and ``RZ`` operators again.
-
 * `catalyst.python_interface.inspection.draw` and `catalyst.python_interface.inspection.generate_mlir_graph` no longer
   accept QNodes as the input. Now, the input must always be a :class:`~.QJIT` object.
   [(#2542)](https://github.com/PennyLaneAI/catalyst/pull/2542)

@@ -97,11 +97,6 @@ def combine_global_phases(qnode):
     Returns:
         :class:`QNode <pennylane.QNode>`
 
-    .. note::
-
-        It is recommended to enable PennyLane program capture when using ``combine_global_phases``
-        via ``qjit(capture=True)``.
-
     **Example**
 
     The ``combine_global_phases`` compilation pass merges :class:`pennylane.GlobalPhase` operators

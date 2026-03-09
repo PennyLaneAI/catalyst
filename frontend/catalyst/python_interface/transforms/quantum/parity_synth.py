@@ -417,9 +417,6 @@ def parity_synth(qnode):
         This pass requires the ``networkx`` package, which can be installed via
         ``pip install networkx``.
 
-        Additionally, it is recommended to use this compilation pass with PennyLane program capture
-        via ``qjit(capture=True)``.
-
     Args:
         fn (QNode): QNode to apply the pass to
 
