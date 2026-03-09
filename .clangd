@@ -41,3 +41,9 @@ If:
 CompileFlags:
   CompilationDatabase: runtime/build
 
+---
+
+If:
+  PathMatch: .*.h
+CompileFlags:
+  Add: [ -xc++, -std=c++20 ]
