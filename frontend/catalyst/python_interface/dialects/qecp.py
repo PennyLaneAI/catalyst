@@ -22,7 +22,7 @@ For a complete description of this dialect, please see
     mlir/include/QecPhysical/IR/QecPhysicalDialect.td
 """
 
-from collections.abc import Set as AbstractSet
+from collections.abc import Sequence, Set
 from typing import TypeAlias
 
 from xdsl.dialects.builtin import I64, IndexType, IntegerAttr, IntegerType
@@ -41,6 +41,7 @@ from xdsl.irdl import (
     AtLeast,
     AttrConstraint,
     IRDLOperation,
+    TypeAttributeInvT,
     irdl_attr_definition,
     irdl_op_definition,
     operand_def,
@@ -49,7 +50,7 @@ from xdsl.irdl import (
     result_def,
 )
 from xdsl.irdl.constraints import ConstraintContext
-from xdsl.parser import Parser
+from xdsl.parser import AttrParser
 from xdsl.printer import Printer
 
 
@@ -66,6 +67,10 @@ class QecPhysicalQubitRoleAttr(EnumAttribute[QecPhysicalQubitRole], SpacedOpaque
 
     name = "qecp.qubit_role"
 
+    def __init__(self, role: str | QecPhysicalQubitRole):
+        role_enum = role if isinstance(role, QecPhysicalQubitRole) else QecPhysicalQubitRole(role)
+        super().__init__(role_enum)
+
 
 @irdl_attr_definition
 class QecPhysicalQubitType(ParametrizedAttribute, TypeAttribute):
@@ -75,7 +80,7 @@ class QecPhysicalQubitType(ParametrizedAttribute, TypeAttribute):
 
     role: QecPhysicalQubitRoleAttr
 
-    def __init__(self, role: str | QecPhysicalQubitRoleAttr):
+    def __init__(self, role: str | QecPhysicalQubitRole | QecPhysicalQubitRoleAttr):
         role_attr = (
             role if isinstance(role, QecPhysicalQubitRoleAttr) else QecPhysicalQubitRoleAttr(role)
         )
@@ -87,7 +92,7 @@ class QecPhysicalQubitType(ParametrizedAttribute, TypeAttribute):
             printer.print_string(self.role.data)
 
     @classmethod
-    def parse_parameters(cls, parser: Parser) -> list[QecPhysicalQubitRoleAttr]:
+    def parse_parameters(cls, parser: AttrParser) -> Sequence[QecPhysicalQubitRoleAttr]:
         """Parse the attribute parameters."""
         with parser.in_angle_brackets():
             role = parser.parse_identifier_or_str_literal()
@@ -117,7 +122,7 @@ class PhysicalCodeblockType(ParametrizedAttribute, TypeAttribute):
             printer.print_int(self.n.value.data)
 
     @classmethod
-    def parse_parameters(cls, parser: Parser) -> list[IntegerAttr]:
+    def parse_parameters(cls, parser: AttrParser) -> Sequence[IntegerAttr]:
         """Parse the attribute parameters."""
         with parser.in_angle_brackets():
             k = parser.parse_integer()
@@ -156,7 +161,7 @@ class PhysicalHyperRegisterType(ParametrizedAttribute, TypeAttribute):
             printer.print_int(self.n.value.data)
 
     @classmethod
-    def parse_parameters(cls, parser: Parser) -> list[IntegerAttr]:
+    def parse_parameters(cls, parser: AttrParser) -> Sequence[Attribute]:
         """Parse the attribute parameters."""
         with parser.in_angle_brackets():
             width = parser.parse_integer()
@@ -173,6 +178,55 @@ PhysicalCodeBlockSSAValue: TypeAlias = SSAValue[PhysicalCodeblockType]
 PhysicalHyperRegisterSSAValue: TypeAlias = SSAValue[PhysicalHyperRegisterType]
 
 
+def _get_type_from_ssa_value_or_operation(
+    arg: SSAValue | Operation, expected_type: TypeAttributeInvT
+):
+    """Helper function that returns the type of an SSA value or of an operation's returned value.
+
+    Args:
+        arg (SSAValue | Operation): An SSA value or an operation that returns exactly one SSA value.
+
+    Returns:
+        TypeAttribute: The type.
+    """
+    if isinstance(arg, Operation):
+        arg_types = arg.result_types
+        assert len(arg_types) == 1, f"Expected operation '{arg}' to have exactly one result type"
+        arg_type = arg_types[0]
+        assert isinstance(
+            arg_type, expected_type
+        ), f"Expected operation '{arg}' to have result type '{expected_type.name}'"
+
+    else:
+        arg_type = arg.type
+        assert isinstance(
+            arg_type, expected_type
+        ), f"Expected value '{arg}' to have type '{expected_type.name}'"
+
+    return arg_type
+
+
+def get_physical_hyper_reg_type(
+    hyper_reg: PhysicalHyperRegisterSSAValue | Operation,
+) -> PhysicalHyperRegisterType:
+    """Helper function to return the physical hyper-register type given an SSA value or operation."""
+    return _get_type_from_ssa_value_or_operation(hyper_reg, PhysicalHyperRegisterType)
+
+
+def get_physical_codeblock_type(
+    codeblock: PhysicalCodeBlockSSAValue | Operation,
+) -> PhysicalCodeblockType:
+    """Helper function to return the physical codeblock type given an SSA value or operation."""
+    return _get_type_from_ssa_value_or_operation(codeblock, PhysicalCodeblockType)
+
+
+def get_physical_qubit_type(
+    qubit: QecPhysicalQubitSSAValue | Operation,
+) -> QecPhysicalQubitType:
+    """Helper function to return the physical qubit type given an SSA value or operation."""
+    return _get_type_from_ssa_value_or_operation(qubit, QecPhysicalQubitType)
+
+
 class PhysicalHyperRegisterTypeConstraint(AttrConstraint):
     """Constraint to make PhysicalHyperRegisterType inferrable during IRDL declaration."""
 
@@ -183,7 +237,8 @@ class PhysicalHyperRegisterTypeConstraint(AttrConstraint):
         """Verify the constraint and add resolved values to the ConstraintContext."""
         constraint_context.set_attr_variable("hyper_reg_type", attr)
 
-    def can_infer(self, var_constraint_names: AbstractSet[str]) -> bool:
+    # pylint: disable=unused-argument
+    def can_infer(self, var_constraint_names: Set[str]) -> bool:
         """Check if there is enough information to infer the attribute given the constraint
         variables that are already set.
         """
@@ -198,6 +253,7 @@ class PhysicalHyperRegisterTypeConstraint(AttrConstraint):
         ), f"Expected a PhysicalHyperRegisterType from constraint context, but got {hyper_reg_type}"
         return hyper_reg_type
 
+    # pylint: disable=unused-argument
     def mapping_type_vars(self, type_var_mapping):
         """A helper function to make type vars used in attribute definitions concrete when creating
         constraints for new attributes or operations.
@@ -215,7 +271,8 @@ class PhysicalCodeblockTypeConstraint(AttrConstraint):
         """Verify the constraint and add resolved values to the ConstraintContext."""
         constraint_context.set_attr_variable("codeblock_type", attr)
 
-    def can_infer(self, var_constraint_names: AbstractSet[str]) -> bool:
+    # pylint: disable=unused-argument
+    def can_infer(self, var_constraint_names: Set[str]) -> bool:
         """Check if there is enough information to infer the attribute given the constraint
         variables that are already set.
         """
@@ -230,6 +287,7 @@ class PhysicalCodeblockTypeConstraint(AttrConstraint):
         ), f"Expected a PhysicalCodeblockType from constraint context, but got {codeblock_type}"
         return codeblock_type
 
+    # pylint: disable=unused-argument
     def mapping_type_vars(self, type_var_mapping):
         """A helper function to make type vars used in attribute definitions concrete when creating
         constraints for new attributes or operations.
@@ -298,10 +356,11 @@ class DeallocAuxQubitOp(IRDLOperation):
     qubit = operand_def(QecPhysicalQubitType(role=QecPhysicalQubitRole.Aux))
 
     def __init__(self, qubit: QecPhysicalQubitSSAValue | Operation):
-        if qubit.type.role.data != str(QecPhysicalQubitRole.Aux):
+        qubit_type = get_physical_qubit_type(qubit)
+        if qubit_type.role.data != str(QecPhysicalQubitRole.Aux):
             raise ValueError(
                 f"{self.name} op expected a qubit with role '{str(QecPhysicalQubitRole.Aux)}', "
-                f"but got '{qubit.type.role.data}'"
+                f"but got '{qubit_type.role.data}'"
             )
 
         super().__init__(operands=(qubit,))
@@ -340,7 +399,8 @@ class ExtractCodeblockOp(IRDLOperation):
             operands = (hyper_reg, idx)
             properties = {}
 
-        result_type = PhysicalCodeblockType(k=hyper_reg.type.k, n=hyper_reg.type.n)
+        hyper_reg_type = get_physical_hyper_reg_type(hyper_reg)
+        result_type = PhysicalCodeblockType(k=hyper_reg_type.k, n=hyper_reg_type.n)
 
         super().__init__(
             operands=operands,
@@ -371,7 +431,7 @@ class InsertCodeblockOp(IRDLOperation):
 
     def __init__(
         self,
-        in_hyper_reg: PhysicalCodeBlockSSAValue | Operation,
+        in_hyper_reg: PhysicalHyperRegisterSSAValue | Operation,
         idx: SSAValue[IntegerType] | Operation | int | IntegerAttr,
         codeblock: PhysicalCodeBlockSSAValue | Operation,
     ):
@@ -385,8 +445,10 @@ class InsertCodeblockOp(IRDLOperation):
             operands = (in_hyper_reg, idx, codeblock)
             properties = {}
 
+        in_hyper_reg_type = get_physical_hyper_reg_type(in_hyper_reg)
+
         super().__init__(
-            operands=operands, properties=properties, result_types=(in_hyper_reg.type,)
+            operands=operands, properties=properties, result_types=(in_hyper_reg_type,)
         )
 
 
@@ -468,8 +530,10 @@ class InsertQubitOp(IRDLOperation):
             operands = (in_codeblock, idx, qubit)
             properties = {}
 
+        in_codeblock_type = get_physical_codeblock_type(in_codeblock)
+
         super().__init__(
-            operands=operands, properties=properties, result_types=(in_codeblock.type,)
+            operands=operands, properties=properties, result_types=(in_codeblock_type,)
         )
 
 
