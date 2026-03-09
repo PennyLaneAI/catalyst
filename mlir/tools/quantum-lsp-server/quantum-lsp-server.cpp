@@ -25,6 +25,7 @@
 #include "PauliFrame/IR/PauliFrameDialect.h"
 #include "QRef/IR/QRefDialect.h"
 #include "QecLogical/IR/QecLogicalDialect.h"
+#include "QecPhysical/IR/QecPhysicalDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "RTIO/IR/RTIODialect.h"
 
@@ -45,6 +46,7 @@ int main(int argc, char **argv)
     registry.insert<catalyst::ion::IonDialect>();
     registry.insert<catalyst::rtio::RTIODialect>();
     registry.insert<catalyst::qecl::QecLogicalDialect>();
+    registry.insert<catalyst::qecp::QecPhysicalDialect>();
 
     mlir::stablehlo::registerAllDialects(registry);
 
