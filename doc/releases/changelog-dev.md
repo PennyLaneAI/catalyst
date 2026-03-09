@@ -85,6 +85,45 @@
   (force capture off). This enables safe testing and gradual migration to the capture system.
   [(#2457)](https://github.com/PennyLaneAI/catalyst/pull/2457)
 
+* Mid-circuit measurements (`qml.measure`) are now supported on the OQD backend.
+  A `qml.measure` call is lowered to an OpenAPL's `MeasurePulse` for fluorescence detection,
+  which is executed by the trapped-ion hardware at runtime.
+  [(#2508)](https://github.com/PennyLaneAI/catalyst/pull/2508)
+
+  To enable mid-circuit measurement, add a `[[detection_beam]]` section and a
+  `measurement_duration` field to the `gate.toml` calibration file:
+
+  For example:
+  ```toml
+  measurement_duration = 1e-4  # seconds
+
+  [[detection_beam]]
+  rabi       = 62831853071.79586
+  transition = "downstate_estate"
+  detuning   = 0.0
+  polarization = [1, 0, 0]
+  wavevector   = [0, 1, 0]
+  ```
+
+  The following circuit will produce an OpenAPL program with a `MeasurePulse`:
+
+  ```python
+  oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name="out.json")
+
+  @qjit(pipelines=OQD_PIPELINES)
+  @qml.set_shots(10)
+  @qml.qnode(oqd_dev)
+  def circuit():
+      qml.measure(wires=0)
+      return qml.counts(wires=0)
+
+  circuit()
+  ```
+
+  In addition, the MS gate beam lookup for this measurement testbench was redesigned:
+  sideband beam parameters are now read directly from the calibration database instead of being
+  computed from per-qubit phonon offsets.
+
 * OQD (Open Quantum Design) end-to-end pipeline is added to Catalyst.
   The pipeline supports compilation to LLVM IR using the `QJIT` constructor with `link=False`, enabling integration with ARTIQ's cross-compilation toolchain. The generated LLVM IR can be used with the internal `compile_to_artiq()` function from the third-party OQD repository to produce ARTIQ binaries.
   [(#2299)](https://github.com/PennyLaneAI/catalyst/pull/2299)
@@ -363,9 +402,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Update nightly RC builds to be triggered by Lightning. 
+* Update nightly RC builds to be triggered by Lightning.
   [(#2491)](https://github.com/PennyLaneAI/catalyst/pull/2491)
-  
+
 * Updated integration tests to match changes to the PennyLane `qml.specs` frontend made in https://github.com/PennyLaneAI/pennylane/pull/9088.
   [(#2513)](https://github.com/PennyLaneAI/catalyst/pull/2513)
 
@@ -633,7 +672,7 @@
   }
   ```
 
-* A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in 
+* A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in
   measurement processes. It is also registered in xDSL.
   [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
   [(#2536)](https://github.com/PennyLaneAI/catalyst/pull/2536)
