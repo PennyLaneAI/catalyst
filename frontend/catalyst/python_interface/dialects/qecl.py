@@ -183,7 +183,7 @@ class LogicalHyperRegisterTypeConstraint(AttrConstraint):
         """A helper function to make type vars used in attribute definitions concrete when creating
         constraints for new attributes or operations.
         """
-        return self
+        return self  # pragma: nocover
 
 
 @irdl_op_definition
