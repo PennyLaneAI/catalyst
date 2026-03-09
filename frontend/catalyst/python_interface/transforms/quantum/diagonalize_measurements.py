@@ -83,18 +83,18 @@ class NonCommutingObservableValidator:
 
     def __init__(self, ops: builtin.ModuleOp):
         self._ops = ops
-        qwc, visited_qreg, obs_on_overlapped_qubits, obs_on_visited_qubits = (
+        qwc, visited_qreg, overlapped_qubits, obs_on_overlapped_qubits, obs_on_visited_qubits = (
             self._get_check_strategy0()
         )
-        if qwc:
-            if visited_qreg:
-                for obs in obs_on_visited_qubits.values():
-                    if not all(ob in ("PauliZ", "Identity") for ob in obs):
-                        raise RuntimeError(f"{self._err_qwc_msg}")
-            else:
-                for obs in obs_on_overlapped_qubits.values():
-                    if len(obs) > 2 or (len(obs) == 2 and "Identity" not in obs):
-                        raise RuntimeError(f"{self._err_qwc_msg}")
+        if visited_qreg:
+            for obs in obs_on_visited_qubits.values():
+                if not all(ob in ("PauliZ", "Identity") for ob in obs):
+                    raise RuntimeError(f"{self._err_qwc_msg}")
+        else:
+            for qubit in overlapped_qubits:
+                obs = obs_on_overlapped_qubits[qubit]
+                if (len(obs) == 2 and "Identity" not in obs):
+                    raise RuntimeError(f"{self._err_qwc_msg}")
 
     @property
     def _err_qwc_msg(self):
@@ -138,8 +138,7 @@ class NonCommutingObservableValidator:
                     [op.qubit], visited_qubits, overlapped_qubits
                 )
                 obs_on_visited_qubits[op.qubit].add(op.type.data.value)
-                if op.qubit in overlapped_qubits:
-                    obs_on_overlapped_qubits[op.qubit].add(op.type.data.value)
+                obs_on_overlapped_qubits[op.qubit].add(op.type.data.value)
                 if op.type.data.value == "Hadamard":
                     qwc = False
             elif isinstance(op, HermitianOp):
@@ -155,11 +154,10 @@ class NonCommutingObservableValidator:
                         op.qubits, visited_qubits, overlapped_qubits
                     )
                     for qubit in op.qubits:
-                        if qubit in overlapped_qubits:
-                            obs_on_overlapped_qubits[qubit].add("PauliZ")
-                        obs_on_visited_qubits[qubit].add(op.type.data.value)
+                        obs_on_overlapped_qubits[qubit].add("PauliZ")
+                        obs_on_visited_qubits[qubit].add("PauliZ")
 
-        return qwc, visited_qreg, obs_on_overlapped_qubits, obs_on_visited_qubits
+        return qwc, visited_qreg, overlapped_qubits, obs_on_overlapped_qubits, obs_on_visited_qubits
 
 
 class DiagonalizeFinalMeasurementsPattern(
