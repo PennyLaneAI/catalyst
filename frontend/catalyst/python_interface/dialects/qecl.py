@@ -162,6 +162,7 @@ class LogicalHyperRegisterTypeConstraint(AttrConstraint):
         """Verify the constraint and add resolved values to the ConstraintContext."""
         constraint_context.set_attr_variable("hyper_reg_type", attr)
 
+    # pylint: disable=unused-argument
     def can_infer(self, var_constraint_names: Set[str]) -> bool:
         """Check if there is enough information to infer the attribute given the constraint
         variables that are already set.
@@ -177,6 +178,7 @@ class LogicalHyperRegisterTypeConstraint(AttrConstraint):
         ), f"Expected a LogicalHyperRegisterType from constraint context, but got {hyper_reg_type}"
         return hyper_reg_type
 
+    # pylint: disable=unused-argument
     def mapping_type_vars(self, type_var_mapping):
         """A helper function to make type vars used in attribute definitions concrete when creating
         constraints for new attributes or operations.
