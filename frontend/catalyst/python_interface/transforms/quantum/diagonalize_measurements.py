@@ -48,6 +48,8 @@ from catalyst.python_interface.dialects.quantum import (
 )
 from catalyst.python_interface.pass_api import compiler_transform
 
+_default_supported_obs = {"PauliZ", "Identity"}
+
 
 def _generate_mapping():
     _gate_map = {}
@@ -81,11 +83,28 @@ class NonCommutingObservableValidator:
     Validates if all quantum observables in a builtin.ModuleOp object commutes or not.
     """
 
-    def __init__(self, ops: builtin.ModuleOp):
+    def __init__(self, ops: builtin.ModuleOp, supported_base_obs: tuple[str]):
         self._ops = ops
+
+        diagonalize_all = set(supported_base_obs).issubset(set(_default_supported_obs))
+
         qwc, visited_qreg, overlapped_qubits, obs_on_overlapped_qubits, obs_on_visited_qubits = (
-            self._get_check_strategy0()
+            self._get_check_strategy()
         )
+        if qwc and diagonalize_all:
+            try:
+                self._qwc_check(
+                    visited_qreg, overlapped_qubits, obs_on_overlapped_qubits, obs_on_visited_qubits
+                )
+            except RuntimeError:
+                self._non_overlapping_check(visited_qreg, overlapped_qubits, obs_on_visited_qubits)
+
+        else:
+            self._non_overlapping_check(visited_qreg, overlapped_qubits, obs_on_visited_qubits)
+
+    def _qwc_check(
+        self, visited_qreg, overlapped_qubits, obs_on_overlapped_qubits, obs_on_visited_qubits
+    ):
         if visited_qreg:
             for obs in obs_on_visited_qubits.values():
                 if not all(ob in ("PauliZ", "Identity") for ob in obs):
@@ -93,8 +112,14 @@ class NonCommutingObservableValidator:
         else:
             for qubit in overlapped_qubits:
                 obs = obs_on_overlapped_qubits[qubit]
-                if (len(obs) == 2 and "Identity" not in obs):
+                if len(obs) == 2 and "Identity" not in obs:
                     raise RuntimeError(f"{self._err_qwc_msg}")
+
+    def _non_overlapping_check(self, visited_qreg, overlapped_qubits, obs_on_visited_qubits):
+        if len(overlapped_qubits) > 0:
+            raise RuntimeError(f"{self._err_qwc_msg}")
+        if visited_qreg and len(obs_on_visited_qubits) > 0:
+            raise RuntimeError(f"{self._err_qwc_msg}")
 
     @property
     def _err_qwc_msg(self):
@@ -119,7 +144,7 @@ class NonCommutingObservableValidator:
         visited_qreg = True
         return visited_qreg
 
-    def _get_check_strategy0(
+    def _get_check_strategy(
         self,
     ):
         # Follow the diagonalize_qwc_pauli_words implementation, it only detects commutative
@@ -138,7 +163,6 @@ class NonCommutingObservableValidator:
                     [op.qubit], visited_qubits, overlapped_qubits
                 )
                 obs_on_visited_qubits[op.qubit].add(op.type.data.value)
-                obs_on_overlapped_qubits[op.qubit].add(op.type.data.value)
                 if op.type.data.value == "Hadamard":
                     qwc = False
             elif isinstance(op, HermitianOp):
@@ -146,6 +170,8 @@ class NonCommutingObservableValidator:
                 visited_qubits, overlapped_qubits = self._update_obs_qubits_set(
                     op.qubits, visited_qubits, overlapped_qubits
                 )
+                for qubit in op.qubits:
+                    obs_on_visited_qubits[qubit].add("Hermitian")
             elif isinstance(op, ComputationalBasisOp):
                 if op.qreg is not None:
                     visited_qreg = True
@@ -154,8 +180,10 @@ class NonCommutingObservableValidator:
                         op.qubits, visited_qubits, overlapped_qubits
                     )
                     for qubit in op.qubits:
-                        obs_on_overlapped_qubits[qubit].add("PauliZ")
                         obs_on_visited_qubits[qubit].add("PauliZ")
+
+        for qubit in overlapped_qubits:
+            obs_on_overlapped_qubits[qubit] = obs_on_visited_qubits[qubit]
 
         return qwc, visited_qreg, overlapped_qubits, obs_on_overlapped_qubits, obs_on_visited_qubits
 
@@ -183,7 +211,13 @@ class DiagonalizeFinalMeasurementsPattern(
 
             qubit = observable.qubit
 
-            insert_point = InsertPoint.before(observable)
+            insert_point = InsertPoint.after(qubit.owner)
+
+            commute_obs = [
+                use.operation
+                for use in observable.qubit.uses
+                if isinstance(use.operation, (NamedObsOp)) and use.operation is not observable
+            ]
 
             for name, op_data in zip(diagonalizing_gates, params):
                 if op_data:
@@ -225,6 +259,13 @@ class DiagonalizeFinalMeasurementsPattern(
             )
             rewriter.replace_op(observable, diag_obs)
 
+            for ob in commute_obs:
+                if ob.type.data.value == observable.type.data.value:
+                    diag_obs = NamedObsOp(
+                        qubit=qubit, obs_type=NamedObservableAttr(NamedObservable("PauliZ"))
+                    )
+                    rewriter.replace_op(ob, diag_obs)
+
 
 class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
     """Pass for diagonalizing final measurements."""
@@ -248,7 +289,6 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
                 `_obs_allowed_diagonalization`.
             ValueError: If `to_eigvals` is set to `True`.
         """
-        _default_supported_obs = {"PauliZ", "Identity"}
         _obs_allowed_diagonalization = {"PauliX", "PauliY", "PauliZ", "Hadamard", "Identity"}
 
         self.supported_base_obs = options.get("supported_base_obs", tuple(_default_supported_obs))
@@ -271,11 +311,11 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
         """Apply the diagonalize final measurements pass."""
         # Validate if the circuit in the module is commuting and an error
         # will raise if not.
-        NonCommutingObservableValidator(op)
+        NonCommutingObservableValidator(op, self.supported_base_obs)
 
         pattern_rewriter.PatternRewriteWalker(
             DiagonalizeFinalMeasurementsPattern(self.supported_base_obs)
-        )
+        ).rewrite_module(op)
 
 
 diagonalize_final_measurements_pass = compiler_transform(DiagonalizeFinalMeasurementsPass)
