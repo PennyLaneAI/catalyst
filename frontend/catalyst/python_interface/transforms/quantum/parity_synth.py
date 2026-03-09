@@ -434,6 +434,7 @@ def parity_synth(qnode):
     subcircuits that represent phase polynomials (i.e. consist of ``CNOT`` and ``RZ`` gates) to
     enhance the effectiveness of the pass. This might be possible through decomposition or
     re-ordering of commuting gates.
+
     Note that nested regions, such as nested functions and control flow function bodies, are
     synthesized independently, i.e., region boundaries are always treated as boundaries of phase
     polynomial subcircuits. Similarly, dynamic wires create boundaries around the operations using
@@ -449,13 +450,12 @@ def parity_synth(qnode):
 
         import pennylane as qml
         from catalyst.python_interface import Compiler
-        from catalyst.python_interface.transforms import parity_synth
         import catalyst
 
         dev = qml.device("lightning.qubit", wires=2)
 
         @qml.qjit(capture=True)
-        @parity_synth
+        @catalyst.passes.parity_synth
         @qml.qnode(dev)
         def circuit(x: float, y: float, z: float):
             qml.CNOT((0, 1))
@@ -468,76 +468,24 @@ def parity_synth(qnode):
             return qml.state()
 
     We can draw the circuit and observe the last ``RZ`` gate to be wrapped in a pair of ``CNOT``
-    gates that commute with it:
+    gates that commute with it. Before the pass is applied:
 
-    >>> print(catalyst.draw_graph(circuit)(0.52, 0.12, 0.2))
+    >>> print(catalyst.draw_graph(circuit, level=0)(0.52, 0.12, 0.2))
 
-    .. figure:: /_static/parity-synth-example.png
+    .. figure:: /_static/parity-synth-example-before.png
         :width: 35%
         :alt: Example using ``parity_synth``
         :align: left
 
-    .. code-block:: python
+    After the pass is applied:
 
-        compiler = Compiler()
-        mlir_module = compiler.run(circuit.mlir_module)
+    >>> print(catalyst.draw_graph(circuit, level=1)(0.52, 0.12, 0.2))
 
-    Looking at the compiled module below, we find only five gates left in the program (note that
-    we reduced the output for the purpose of this example); the ``CNOT``\ s
-    have been cancelled successfully. Note that for this circuit, ParitySynth is run twice; once
-    for the first three gates and once for the last three gates. This is because ``RX`` is not
-    a phase polynomial operation, so that it forms a boundary for the phase polynomial subcircuits
-    that are re-synthesized by the pass.
 
-    >>> print(mlir_module) # The following output has manually been reduced for readability
-    module @circuit {
-    func.func public @jit_circuit([...]) -> tensor<4xcomplex<f64>> {
-        %0 = "catalyst.launch_kernel"(%arg0, %arg1, %arg2) <[...]> :
-            (tensor<f64>, tensor<f64>, tensor<f64>) -> tensor<4xcomplex<f64>>
-        return %0 : tensor<4xcomplex<f64>>
-    }
-    module @module_circuit {
-        func.func public @circuit(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) ->
-            tensor<4xcomplex<f64>> attributes [...] {
-        %c = stablehlo.constant dense<0> : tensor<i64>
-        %0 = "tensor.extract"(%c) : (tensor<i64>) -> i64
-        "quantum.device"(%0) <[...]> : (i64) -> ()
-        %c_0 = stablehlo.constant dense<2> : tensor<i64>
-        %1 = "quantum.alloc"() <{nqubits_attr = 2 : i64}> : () -> !quantum.reg
-        %2 = "tensor.extract"(%c) : (tensor<i64>) -> i64
-        %3 = "quantum.extract"(%1, %2) : (!quantum.reg, i64) -> !quantum.bit
-        %c_1 = stablehlo.constant dense<1> : tensor<i64>
-        %4 = "tensor.extract"(%c_1) : (tensor<i64>) -> i64
-        %5 = "quantum.extract"(%1, %4) : (!quantum.reg, i64) -> !quantum.bit
-        %6 = "tensor.extract"(%arg0) : (tensor<f64>) -> f64
-        %7:2 = "quantum.custom"(%5, %3) <{gate_name = "CNOT", [...]> :[...]
-        %8 = "quantum.custom"(%6, %7#1) <{gate_name = "RZ", [...]> :[...]
-        %9:2 = "quantum.custom"(%7#0, %8) <{gate_name = "CNOT", [...]> : [...]
-        %10 = "tensor.extract"(%arg1) : (tensor<f64>) -> f64
-        %11 = "quantum.custom"(%10, %9#0) <{gate_name = "RX", [...]> : [...]
-        %12 = "tensor.extract"(%arg2) : (tensor<f64>) -> f64
-        %13 = "quantum.custom"(%12, %11) <{gate_name = "RZ", [...]> : [...]
-        %14 = "tensor.extract"(%c) : (tensor<i64>) -> i64
-        %15 = "quantum.insert"(%1, %14, %9#1) : (!quantum.reg, i64, !quantum.bit) -> !quantum.reg
-        %16 = "tensor.extract"(%c_1) : (tensor<i64>) -> i64
-        %17 = "quantum.insert"(%15, %16, %13) : (!quantum.reg, i64, !quantum.bit) -> !quantum.reg
-        %18 = "quantum.compbasis"(%17) <[...]> : (!quantum.reg) -> !quantum.obs
-        %19 = "quantum.state"(%18) <[...]> : (!quantum.obs) -> tensor<4xcomplex<f64>>
-        "quantum.dealloc"(%17) : (!quantum.reg) -> ()
-        "quantum.device_release"() : () -> ()
-        return %19 : tensor<4xcomplex<f64>>
-        }
-    }
-    func.func @setup() {
-        "quantum.init"() : () -> ()
-        return
-    }
-    func.func @teardown() {
-        "quantum.finalize"() : () -> ()
-        return
-    }
-    }
-
+    .. figure:: /_static/parity-synth-example-pass-applied.png
+        :width: 35%
+        :alt: Example using ``parity_synth``
+        :align: left
     """
 
     return _parity_synth_func(qnode)
