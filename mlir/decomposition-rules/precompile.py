@@ -152,7 +152,6 @@ def get_func_from_circuit(module) -> str | None:
 
 def compile_rule(
     op_class,
-    op_args,
     op_num_wires,
     rule,
     dev,
@@ -190,11 +189,9 @@ def compile_rule(
         return rule(*args, wires=wires, **_)
 
     @qp.qjit(target="mlir")
-    @qp.transform(pass_name="decompose-lowering")
     @qp.qnode(dev)
     def circuit():
         rule_wrapper(*abstract_args, wires=jax.core.ShapedArray((op_num_wires,), int))
-        op_class(*op_args, wires=list(range(op_num_wires)))
         return qp.probs()
 
     return get_func_from_circuit(circuit.mlir_module)
@@ -220,18 +217,13 @@ def compile_op_decomp_rules(
 
     mlir_modules = {}
 
-    try:
-        op_num_wires = op_class.num_wires if op_class.num_wires else 2
-        op_args = get_dummy_args(op_class)
-        dev = qp.device("lightning.qubit", wires=op_num_wires)
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        warnings.warn(f"failed to compile rules for {op_class}: {e}")
-        return {}, 0, len(op_decomp_rules)
+    op_num_wires = op_class.num_wires if op_class.num_wires else 2
+    dev = qp.device("lightning.qubit", wires=op_num_wires)
 
     for rule in op_decomp_rules:
         try:
             rule_name = rule._impl.__name__  # pylint: disable=protected-access
-            mlir_modules[rule_name] = compile_rule(op_class, op_args, op_num_wires, rule, dev)
+            mlir_modules[rule_name] = compile_rule(op_class, op_num_wires, rule, dev)
             num_successes += 1
         except TypeError as e:
             warnings.warn(f"dummy args failed to compile {rule_name}: {e}")
