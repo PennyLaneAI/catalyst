@@ -95,3 +95,42 @@ def test_one_shot_with_passes():
 
 
 print(test_one_shot_with_passes.mlir)
+
+
+@qjit(capture=True, target="mlir")
+def test_mcm_obs():
+    """
+    Test generation of mcm observale operation.
+    """
+
+    # CHECK:  [[m0:%.+]], {{%.+}} = quantum.measure
+    # CHECK:  [[m1:%.+]], {{%.+}} = quantum.measure
+    # CHECK:  [[expvalObs:%.+]] = quantum.mcmobs [[m0]] : !quantum.obs
+    # CHECK:  [[expval:%.+]] = quantum.expval [[expvalObs]] : f64
+    # CHECK:  [[sampleObs:%.+]] = quantum.mcmobs [[m0]], [[m1]] : !quantum.obs
+    # CHECK:  [[sample:%.+]] = quantum.sample [[sampleObs]] : tensor<1000x2xf64>
+    # CHECK:  [[probsObs:%.+]] = quantum.mcmobs [[m0]], [[m1]] : !quantum.obs
+    # CHECK:  [[probs:%.+]] = quantum.probs [[probsObs]] : tensor<4xf64>
+    # CHECK:  [[varObs:%.+]] = quantum.mcmobs [[m0]] : !quantum.obs
+    # CHECK:  [[var:%.+]] = quantum.var [[varObs]] : f64
+    # CHECK:  [[countsObs:%.+]] = quantum.mcmobs [[m0]], [[m1]] : !quantum.obs
+    # CHECK:  [[counts:%.+]] = quantum.counts [[countsObs]] : tensor<4xf64>, tensor<4xi64>
+
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qml.qnode(dev, shots=1000)
+    def circ():
+        m0 = qml.measure(0)
+        m1 = qml.measure(1)
+        return (
+            qml.expval(m0),
+            qml.sample([m0, m1]),
+            qml.probs(op=[m0, m1]),
+            qml.var(m0),
+            qml.counts([m0, m1]),
+        )
+
+    return circ()
+
+
+print(test_mcm_obs.mlir)

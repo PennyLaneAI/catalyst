@@ -34,7 +34,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/IR/CatalystOps.h"
-#include "QEC/IR/QECOps.h"
+#include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
@@ -117,7 +117,7 @@ class AdjointGenerator {
             else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
                 visitOperation(gate, builder);
             }
-            else if (auto ppr = dyn_cast<qec::PPRotationOp>(op)) {
+            else if (auto ppr = dyn_cast<pbc::PPRotationOp>(op)) {
                 visitOperation(ppr, builder);
             }
             else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(&op)) {
@@ -278,14 +278,14 @@ class AdjointGenerator {
         }
     }
 
-    void visitOperation(qec::PPRotationOp ppr, OpBuilder &builder)
+    void visitOperation(pbc::PPRotationOp ppr, OpBuilder &builder)
     {
         for (const auto &[qubitResult, qubitOperand] :
              llvm::zip(ppr.getOutQubits(), ppr.getInQubits())) {
             remappedValues.map(qubitOperand, remappedValues.lookup(qubitResult));
         }
 
-        auto clone = cast<qec::PPRotationOp>(builder.clone(*ppr, remappedValues));
+        auto clone = cast<pbc::PPRotationOp>(builder.clone(*ppr, remappedValues));
         clone.setRotationKind(ppr.getRotationKind() * (-1));
 
         for (const auto &[qubitResult, qubitOperand] :

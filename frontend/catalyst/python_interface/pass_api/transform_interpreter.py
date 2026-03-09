@@ -92,7 +92,9 @@ class TransformFunctionsExt(TransformFunctions):
         # ---- xDSL path ----
         if pass_name in self.passes:
             pass_class = self.passes[pass_name]()
-            options = get_pyval_from_xdsl_attr(op.options)
+            options = {
+                k.replace("-", "_"): v for k, v in get_pyval_from_xdsl_attr(op.options).items()
+            }
             pass_instance = pass_class(**options)
             pipeline = PassPipeline((pass_instance,))
             self._pre_pass_callback(pass_instance, module)
@@ -142,7 +144,8 @@ class TransformInterpreterPass(ModulePass):
         interpreter = Interpreter(op)
         interpreter.register_implementations(TransformFunctionsExt(ctx, self.passes, self.callback))
         schedule.parent_op().detach()
-        if self.callback:
+        if self.callback and len(schedule.body.ops) == 1:
+            # If there are no passes to apply, we still want to call the callback once with the original module
             self.callback(None, op, None, pass_level=0)
         interpreter.call_op(schedule, (op,))
 

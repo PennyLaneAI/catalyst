@@ -20,6 +20,7 @@ set(DIALECT_TESTS_DEPEND
 
 set(TEST_SUITES
     Quantum
+    QRef
     Gradient
     Mitigation
     Catalyst
@@ -27,8 +28,9 @@ set(TEST_SUITES
     MBQC
     PauliFrame
     cli
-    QEC
+    PBC
     RTIO
+    QecLogical
     )
 
 

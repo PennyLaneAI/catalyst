@@ -26,7 +26,7 @@ set(llvm_cmake_builddir "${LLVM_BINARY_DIR}/${LLVM_INSTALL_PACKAGE_DIR}")
 
 # Targets with third party dependencies are not exported.
 get_property(MLIR_EXPORTS GLOBAL PROPERTY MLIR_EXPORTS)
-set(TARGETS_TO_REMOVE nlohmann_json tomlplusplus_tomlplusplus ion-transforms CatalystCompilerDriver QECUtils QuantumCAPI qec-transforms)
+set(TARGETS_TO_REMOVE nlohmann_json tomlplusplus_tomlplusplus ion-transforms CatalystCompilerDriver PBCUtils QuantumCAPI pbc-transforms)
 list(REMOVE_ITEM MLIR_EXPORTS ${TARGETS_TO_REMOVE})
 export(TARGETS ${MLIR_EXPORTS} ExternalStablehloLib FILE ${catalyst_cmake_builddir}/CatalystTargets.cmake)
 

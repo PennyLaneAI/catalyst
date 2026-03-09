@@ -546,8 +546,6 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
         operator to the state-vector.
         The arguments are the rotation angle `angle`, a string representing the
         Pauli product operator, and a set of qubits the operation acts on.
-        Note that this operation is currently not excutable. There isn't a valid
-        lowering path to the LLVM IR.
     }];
 
     let arguments = (ins
@@ -867,6 +865,38 @@ def NamedObsOp : Observable_Op<"namedobs"> {
     }];
 }
 
+def MCMObsOp : Observable_Op<"mcmobs"> {
+    let summary = "Define a pseudo-observable of mid-circuit measurements for use in measurement processes";
+    let description = [{
+        The `quantum.mcmobs` operation defines a quantum observable from mid-circuit measurements,
+        to be used by other operations such as measurement processes.
+
+        The only argument is a sequence of boolean result values of mid-circuit measurements.
+
+        Example:
+
+        ```mlir
+        func.func @foo(%mcm: i1)
+        {
+            %obs = quantum.mcmobs %mcm : !quantum.obs
+            func.return
+        }
+        ```
+    }];
+
+    let arguments = (ins
+        Variadic<I1>:$mcms
+    );
+
+    let results = (outs
+        ObservableType:$obs
+    );
+
+    let assemblyFormat = [{
+        $mcms attr-dict `:` type(results)
+    }];
+}
+
 def HermitianOp : Observable_Op<"hermitian"> {
     let summary = "Define a Hermitian observable for use in measurements";
     let description = [{
@@ -1160,6 +1190,8 @@ def ExpvalOp : Measurement_Op<"expval"> {
     let assemblyFormat = [{
         $obs attr-dict `:` type(results)
     }];
+
+    let hasVerifier = 1;
 }
 
 def VarianceOp : Measurement_Op<"var"> {
@@ -1196,6 +1228,8 @@ def VarianceOp : Measurement_Op<"var"> {
     let assemblyFormat = [{
         $obs attr-dict `:` type(results)
     }];
+
+    let hasVerifier = 1;
 }
 
 def ProbsOp : Measurement_Op<"probs", [AttrSizedOperandSegments]> {

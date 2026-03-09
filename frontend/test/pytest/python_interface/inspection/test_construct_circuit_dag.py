@@ -986,7 +986,7 @@ class TestCreateStaticOperatorNodes:
         @qml.qnode(qml.device("null.qubit", wires=3))
         def cir():
             # NOTE: use angle != pi / <something>
-            # to get an qec.ppr.arbitary in the IR
+            # to get an pbc.ppr.arbitary in the IR
             qml.PauliRot(1.0, pauli_word="X", wires=[0])
             qml.PauliRot(1.0, pauli_word="XYZ", wires=[0, 1, 2])
 

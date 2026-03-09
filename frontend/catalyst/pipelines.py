@@ -245,7 +245,7 @@ def get_quantum_compilation_stage(_options: CompileOptions) -> List[str]:
         "lower-mitigation",
         "adjoint-lowering",
         # TODO: We can remove 2 passes below once PBC has its own pipeline.
-        "lower-qec-init-ops",
+        "lower-pbc-init-ops",
         "unroll-conditional-ppr-ppm",
         "disable-assertion" if _options.disable_assertions else None,
     ]
@@ -299,7 +299,6 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         bufferization_options += " copy-before-write"
 
     bufferization = [
-        "inline",
         "convert-tensor-to-linalg",  # tensor.pad
         "convert-elementwise-to-linalg",  # Must be run before --one-shot-bufferize
         "gradient-preprocess",
@@ -363,7 +362,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
         "finalize-memref-to-llvm{use-generic-functions}",
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",
-        "convert-qec-to-llvm",  # TODO: Remove this once PBC has its own pipeline
+        "convert-pbc-to-llvm",  # TODO: Remove this once PBC has its own pipeline
         "convert-quantum-to-llvm",
         # There should be no identical code folding
         # (`mergeIdenticalBlocks` in the MLIR source code)

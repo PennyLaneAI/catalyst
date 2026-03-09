@@ -26,12 +26,14 @@ set(LIBS
     ExternalStablehloLib
     MLIROptLib
     MLIRCatalyst
+    catalyst-analysis
     catalyst-transforms
     catalyst-stablehlo-transforms
     MLIRQuantum
     quantum-transforms
-    MLIRQEC
-    qec-transforms
+    MLIRQRef
+    MLIRPBC
+    pbc-transforms
     MLIRGradient
     gradient-transforms
     MLIRMBQC
@@ -44,6 +46,7 @@ set(LIBS
     ion-transforms
     MLIRRTIO
     rtio-transforms
+    MLIRQecLogical
     MLIRCatalystTest
     ${ENZYME_LIB}
     CatalystCompilerDriver

@@ -97,6 +97,7 @@ COMPILER_OPS_FOR_DECOMPOSITION: dict[str, tuple[int, int]] = {
 }
 
 
+# pylint: disable=too-many-instance-attributes
 class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
     """Interpreter for getting the decomposition graph solution
     from a jaxpr when program capture is enabled.
@@ -131,6 +132,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
         gate_set=None,
         fixed_decomps=None,
         alt_decomps=None,
+        num_work_wires=0,
     ):
 
         if not qml.decomposition.enabled_graph():  # pragma: no cover
@@ -142,10 +144,13 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
         self._gate_set = gate_set
         self._fixed_decomps = fixed_decomps
         self._alt_decomps = alt_decomps
+        self._num_work_wires = num_work_wires
 
         self._captured = False
         self._operations = set()
         self._decomp_graph_solution = {}
+        self.subroutine_cache = {}
+        # This will be consumed by _quantum_subroutine inherited from PlxprInterpreter
 
     def interpret_operation(self, op: "qml.operation.Operator"):
         """Interpret a PennyLane operation instance.
@@ -184,6 +189,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
             self._gate_set,
             fixed_decomps=self._fixed_decomps,
             alt_decomps=self._alt_decomps,
+            num_work_wires=self._num_work_wires,
         )
 
         # Create decomposition rules for each operation in the solution
@@ -224,7 +230,6 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                     num_wires = len(pauli_word)
                 elif num_wires == -1 and op_num_wires is not None:
                     num_wires = op_num_wires
-
                 _create_decomposition_rule(
                     rule,
                     op_name=op.op.name,
@@ -349,7 +354,7 @@ def _create_decomposition_rule(
 
 
 # pylint: disable=protected-access
-def _solve_decomposition_graph(operations, gate_set, fixed_decomps, alt_decomps):
+def _solve_decomposition_graph(operations, gate_set, fixed_decomps, alt_decomps, num_work_wires):
     """Get the decomposition graph solution for the given operations and gate set.
 
     TODO: Extend `DecompGraphSolution` API and avoid accessing protected members
@@ -379,7 +384,7 @@ def _solve_decomposition_graph(operations, gate_set, fixed_decomps, alt_decomps)
 
     with warnings.catch_warnings(record=True) as captured_warnings:
         warnings.simplefilter("always", UserWarning)
-        solutions = decomp_graph.solve()
+        solutions = decomp_graph.solve(num_work_wires=num_work_wires)
 
     # Check if the graph-based decomposition failed for any operation
     # We shall do the check after the context manager of warnings.catch_warnings

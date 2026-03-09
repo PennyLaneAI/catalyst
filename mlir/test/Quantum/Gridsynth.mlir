@@ -95,75 +95,75 @@
 // PPR:         scf.yield [[LOOP_QBIT]]
 // PPR:       }
 // PPR:       case 1 {
-// PPR:         [[RES:%.+]] = qec.ppr ["X"](2) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["X"](2) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       case 2 {
-// PPR:         [[RES:%.+]] = qec.ppr ["X"](4) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["X"](4) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       case 3 {
-// PPR:         [[RES:%.+]] = qec.ppr ["X"](8) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["X"](8) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       case 4 {
-// PPR:         [[RES:%.+]] = qec.ppr ["X"](-2) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["X"](-2) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       case 5 {
-// PPR:         [[RES:%.+]] = qec.ppr ["X"](-4) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["X"](-4) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       case 6 {
-// PPR:         [[RES:%.+]] = qec.ppr ["X"](-8) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["X"](-8) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       case 7 {
-// PPR:         [[RES:%.+]] = qec.ppr ["Y"](2) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["Y"](2) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       case 8 {
-// PPR:         [[RES:%.+]] = qec.ppr ["Y"](4) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["Y"](4) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       case 9 {
-// PPR:         [[RES:%.+]] = qec.ppr ["Y"](8) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["Y"](8) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       case 10 {
-// PPR:         [[RES:%.+]] = qec.ppr ["Y"](-2) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["Y"](-2) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       case 11 {
-// PPR:         [[RES:%.+]] = qec.ppr ["Y"](-4) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["Y"](-4) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       case 12 {
-// PPR:         [[RES:%.+]] = qec.ppr ["Y"](-8) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["Y"](-8) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       case 13 {
-// PPR:         [[RES:%.+]] = qec.ppr ["Z"](2) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["Z"](2) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       case 14 {
-// PPR:         [[RES:%.+]] = qec.ppr ["Z"](4) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["Z"](4) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       case 15 {
-// PPR:         [[RES:%.+]] = qec.ppr ["Z"](8) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["Z"](8) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       case 16 {
-// PPR:         [[RES:%.+]] = qec.ppr ["Z"](-2) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["Z"](-2) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       case 17 {
-// PPR:         [[RES:%.+]] = qec.ppr ["Z"](-4) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["Z"](-4) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       case 18 {
-// PPR:         [[RES:%.+]] = qec.ppr ["Z"](-8) [[LOOP_QBIT]]
+// PPR:         [[RES:%.+]] = pbc.ppr ["Z"](-8) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
 // PPR:       memref.dealloc [[MEM]]
@@ -258,7 +258,7 @@ func.func @test_ppr_arbitrary_z_decomposition(%arg0: !quantum.bit, %theta: f64) 
     
     // CHECK: return [[RES]]#0 : !quantum.bit
 
-    %q_out = qec.ppr.arbitrary ["Z"](%theta) %arg0 : !quantum.bit
+    %q_out = pbc.ppr.arbitrary ["Z"](%theta) %arg0 : !quantum.bit
     return %q_out : !quantum.bit
 }
 
@@ -270,17 +270,17 @@ func.func @test_ppr_arbitrary_ignored(%arg0: !quantum.bit, %theta: f64) -> (!qua
     
     %c_true = arith.constant true
 
-    // CHECK: qec.ppr.arbitrary ["X"]
-    %q1 = qec.ppr.arbitrary ["X"](%theta) %arg0 : !quantum.bit
+    // CHECK: pbc.ppr.arbitrary ["X"]
+    %q1 = pbc.ppr.arbitrary ["X"](%theta) %arg0 : !quantum.bit
 
-    // CHECK: qec.ppr.arbitrary ["Y"]
-    %q2 = qec.ppr.arbitrary ["Y"](%theta) %arg0 : !quantum.bit
+    // CHECK: pbc.ppr.arbitrary ["Y"]
+    %q2 = pbc.ppr.arbitrary ["Y"](%theta) %arg0 : !quantum.bit
 
-    // CHECK: qec.ppr.arbitrary ["Z", "Z"]
-    %q3:2 = qec.ppr.arbitrary ["Z", "Z"](%theta) %q1, %q2 : !quantum.bit, !quantum.bit
+    // CHECK: pbc.ppr.arbitrary ["Z", "Z"]
+    %q3:2 = pbc.ppr.arbitrary ["Z", "Z"](%theta) %q1, %q2 : !quantum.bit, !quantum.bit
 
-    // CHECK: qec.ppr.arbitrary ["Z"]{{.*}} cond
-    %q4 = qec.ppr.arbitrary ["Z"](%theta) %q3#0 cond(%c_true) : !quantum.bit
+    // CHECK: pbc.ppr.arbitrary ["Z"]{{.*}} cond
+    %q4 = pbc.ppr.arbitrary ["Z"](%theta) %q3#0 cond(%c_true) : !quantum.bit
 
     return %q1, %q3#1, %q4 : !quantum.bit, !quantum.bit, !quantum.bit
 }

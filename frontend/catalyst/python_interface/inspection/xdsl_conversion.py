@@ -34,8 +34,8 @@ from xdsl.dialects.scf import ForOp
 from xdsl.dialects.tensor import ExtractOp as TensorExtractOp
 from xdsl.ir import Block, SSAValue
 
-from catalyst.jit import QJIT, qjit
-from catalyst.python_interface.dialects.qec import (
+from catalyst.jit import QJIT
+from catalyst.python_interface.dialects.pbc import (
     PPMeasurementOp,
     PPRotationArbitraryOp,
     PPRotationOp,
@@ -77,19 +77,19 @@ def conditional_pause(pause):
     return dont_do_anything()
 
 
-def get_mlir_module(qnode: QNode | QJIT, args, kwargs) -> Module:
-    """Ensure the QNode is compiled and return its MLIR module."""
-    if hasattr(qnode, "mlir_module") and qnode.mlir_module is not None:
-        return qnode.mlir_module
+def get_mlir_module(workflow: QJIT, args, kwargs) -> Module:
+    """Ensure the workflow is compiled and return its MLIR module."""
+    if not isinstance(workflow, QJIT):
+        raise TypeError(f"Cannot generate MLIR module for non-QJIT objects. Got {workflow}.")
 
-    if isinstance(qnode, QJIT):
-        # Deep copy as to not mutate compile_options
-        compile_options = deepcopy(qnode.compile_options)
-        compile_options.autograph = False  # Autograph has already been applied for `user_function`
+    if (mlir_module := getattr(workflow, "mlir_module", None)) is not None:
+        return mlir_module
 
-        jitted_qnode = QJIT(qnode.user_function, compile_options)
-    else:
-        jitted_qnode = qjit(qnode)
+    # Deep copy as to not mutate compile_options
+    compile_options = deepcopy(workflow.compile_options)
+    compile_options.autograph = False  # Autograph has already been applied for `user_function`
+
+    jitted_qnode = QJIT(workflow.user_function, compile_options)
 
     jitted_qnode.jit_compile(args, **kwargs)
     return jitted_qnode.mlir_module
@@ -216,9 +216,6 @@ def resolve_constant_params(ssa: SSAValue) -> float | int | str:
 
         case "arith.constant":
             return op.value.value.data  # Catalyst
-
-        case "arith.index_cast":
-            return resolve_constant_params(op.input)
 
         case "stablehlo.add":
             x, y = (
@@ -353,7 +350,7 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
         case PPMeasurementOp():
             # NOTE: This branch is needed to cover two PPMs in a row
             # subtract one as the first ssa index is the result,
-            # %res, %q0, ... = qec.ppm [PAULI_WORD] %q0, ...
+            # %res, %q0, ... = pbc.ppm [PAULI_WORD] %q0, ...
             return resolve_constant_wire(op.operands[ssa.index - 1])
         case _:
             raise NotImplementedError(f"Cannot resolve wire for op: {op}")

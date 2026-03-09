@@ -129,6 +129,23 @@ class TestGetConstantFromSSA:
 
         assert get_constant_from_ssa(val) is None
 
+    @pytest.mark.parametrize(
+        "const, attr_type, dtype",
+        [
+            (11, builtin.IntegerAttr, builtin.IntegerType(64)),
+            (5, builtin.IntegerAttr, builtin.IndexType()),
+            (2.5, builtin.FloatAttr, builtin.Float64Type()),
+        ],
+    )
+    def test_index_cast(self, const, attr_type, dtype):
+        """Test that a constant value cast into an IndexType using arith.index_cast can be
+        extracted."""
+        const_attr = attr_type(const, dtype)
+        val = arith.ConstantOp(value=const_attr).results[0]
+        cast_val = arith.IndexCastOp(val, builtin.IndexType()).results[0]
+
+        assert get_constant_from_ssa(cast_val) == const
+
 
 class TestGetPyvalFromXdslAttr:
     """Unit tests for ``get_pyval_from_xdsl_attr``."""
@@ -367,8 +384,8 @@ class TestConversionUtils:
                 funcs.append(op)
 
         assert len(funcs) == 1
-        # All qnodes have a UnitAttr attribute called qnode
-        assert funcs[0].attributes.get("qnode", None) is not None
+        # All qnodes have a UnitAttr attribute called quantum.node
+        assert funcs[0].attributes.get("quantum.node", None) is not None
 
 
 class TestInliningUtils:

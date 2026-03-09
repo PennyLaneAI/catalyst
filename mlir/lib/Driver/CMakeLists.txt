@@ -32,10 +32,11 @@ set(LIBS
     MLIRRegisterAllExtensions
     MLIRCatalyst
     catalyst-transforms
+    MLIRQRef
     MLIRQuantum
     quantum-transforms
-    MLIRQEC
-    qec-transforms
+    MLIRPBC
+    pbc-transforms
     MLIRGradient
     gradient-transforms
     MLIRMBQC

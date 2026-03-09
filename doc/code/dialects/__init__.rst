@@ -20,7 +20,7 @@ This document contains the respective Catalyst-defined MLIR dialects, and their 
 :doc:`ion`
    Special-purpose dialect for trapped ion quantum computers
 
-:doc:`qec`
+:doc:`pbc`
    Special-purpose dialect for Pauli-based computation (PBC) and error correction
 
 :doc:`mbqc`
@@ -35,5 +35,5 @@ This document contains the respective Catalyst-defined MLIR dialects, and their 
    mitigation
    catalyst
    ion
-   qec
+   pbc
    mbqc

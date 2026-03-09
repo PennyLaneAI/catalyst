@@ -2,6 +2,82 @@
 
 <h3>New features since last release</h3>
 
+* A new MLIR transformation pass `--dynamic-one-shot` is available.
+  Devices that natively support mid-circuit measurements can evaluate dynamic circuits by executing
+  them one shot at a time, sampling a dynamic execution path for each shot. The `--dynamic-one-shot`
+  pass first transforms the circuit so that each circuit execution only contains a singular shot,
+  then performs the appropriate classical statistical postprocessing across the execution results
+  from all shots.
+  [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
+
+  With this new MLIR pass, one shot execution mode is now available when capture is enabled.
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=2)
+
+  @qjit(capture=True)
+  @qml.transform(pass_name="dynamic-one-shot")
+  @qml.qnode(dev, shots=10)
+  def circuit():
+      qml.Hadamard(wires=0)
+      m_0 = qml.measure(0)
+      m_1 = qml.measure(1)
+      return qml.sample([m_0, m_1]), qml.expval(m_0), qml.probs(op=[m_0,m_1]), qml.counts(wires=0)
+  ```
+
+  ```pycon
+  >>> circuit()
+  (Array([[1, 0],
+         [0, 0],
+         [1, 0],
+         [1, 0],
+         [0, 0],
+         [0, 0],
+         [1, 0],
+         [1, 0],
+         [1, 0],
+         [0, 0]], dtype=int64), Array(0.6, dtype=float64), Array([0.4, 0. , 0.6, 0. ], dtype=float64),
+         (Array([0, 1], dtype=int64), Array([4, 6], dtype=int64)))
+  ```
+
+  Note that although the one-shot transform is motivated from the context of mid-circuit measurements,
+  this pass also supports terminal measurement processes that are performed on wires, instead of
+  mid-circuit measurement results.
+
+* Executing circuits that are compiled with :func:`pennylane.transforms.to_ppr`,
+  :func:`pennylane.transforms.commute_ppr`, :func:`pennylane.transforms.ppr_to_ppm`,
+  :func:`pennylane.transforms.merge_ppr_ppm`, :func:`pennylane.transforms.reduce_t_depth`,
+  and :func:`pennylane.transforms.decompose_arbitrary_ppr` is now possible with the `lightning.qubit` device and
+  with program capture enabled (:func:`pennylane.capture.enable`).
+  [(#2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
+  [(#2389)](https://github.com/PennyLaneAI/catalyst/pull/2389)
+  [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
+  [(#2413)](https://github.com/PennyLaneAI/catalyst/pull/2413)
+  [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
+  [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
+  [(#2443)](https://github.com/PennyLaneAI/catalyst/pull/2443)
+
+  Previously, circuits compiled with these transforms were only inspectable via
+  :func:`pennylane.specs` and :func:`catalyst.draw`. Now, such circuits can be executed:
+
+  ```python
+  import pennylane as qml
+
+  @qml.qjit(capture=True)
+  @qml.transforms.decompose_arbitrary_ppr
+  @qml.transforms.to_ppr
+  @qml.qnode(qml.device("lightning.qubit", wires=3))
+  def circuit():
+      qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
+      qml.pauli_measure("XYZ", wires=[0, 1, 2])
+      return qml.probs([0, 1])
+  ```
+
+  ```
+  >>> print(circuit())
+  [0.5 0.  0.  0.5]
+  ```
+
 * Added `capture` keyword argument to the `@qjit` decorator for per-function control over
   PennyLane's program capture frontend. This allows selective use of the new capture-based
   compilation pathway without affecting the global `qml.capture.enabled()` state. The parameter
@@ -17,6 +93,7 @@
   Note: This PR only covers LLVM IR generation; the `compile_to_artiq` function itself is not included.
 
   For example:
+
   ```python
   import os
   import numpy as np
@@ -61,9 +138,107 @@
   # [ARTIQ] Generated ELF: /path/to/circuit.elf
   ```
 
+* Added a scalable MLIR resource tracker analysis pass (`resource-tracker`) that counts quantum
+  operations across the `quantum`, `qec`, and `mbqc` dialects. The analysis is implemented as a
+  cacheable MLIR analysis class (`ResourceAnalysis`) that other transformation passes can query
+  via `getAnalysis<ResourceAnalysis>()`, avoiding redundant recomputation.
+  [(#2479)](https://github.com/PennyLaneAI/catalyst/pull/2479)
+
+  ```bash
+  quantum-opt --resource-tracker='output-json=true' input.mlir
+  quantum-opt --resource-tracker -mlir-pass-statistics input.mlir
+  ```
+
+* The `diagonalize-final-measurements` xDSL pass now accepts the optional keyword argument ``supported_base_obs``. The kwarg``to_eigvals`` is now also included in the call signature for compatibility with the tape transform, but this kwarg is unused and can only take its default value, `False`.
+  [(#2517)](https://github.com/PennyLaneAI/catalyst/pull/2517)
+
+  These pass options can be applied as follows in the example below:
+
+  ```python
+  import pennylane as qp
+
+  def diagonalize_measurements_setup_inputs(
+      to_eigvals: bool = False, supported_base_obs: tuple[str] = ("PauliX",)
+  ):
+      return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
+
+  diagonalize_measurements = qp.transform(
+      pass_name="diagonalize-final-measurements", setup_inputs=diagonalize_measurements_setup_inputs
+  )
+
+  dev = qp.device("null.qubit", wires=4)
+  @qp.qjit(target="mlir", keep_intermediate=True)
+  @diagonalize_measurements(supported_base_obs=('PauliX',))
+  @qp.qnode(dev, shots=1000)
+  def circuit():
+      qp.CRX(0.1, wires=[0, 1])
+      return qp.expval(qp.X(0))
+
+  circuit()
+
+* Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
+  effectively filtering for decomposition rules in the MLIR-native decomposition framework.
+  [(#2539)](https://github.com/PennyLaneAI/catalyst/pull/2539)
+
+  ```bash
+  quantum-opt input.mlir -register-decomp-rule-resource
+  ```
+
+  Input:
+
+  ```mlir
+  func.func @decomp_rule() attributes {target_gate="CustomGate"}  {
+      %0 = quantum.alloc( 2) : !quantum.reg
+      %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+      %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+      %3 = quantum.custom "Hadamard"() %1 : !quantum.bit
+      %4 = quantum.custom "T"() %3 : !quantum.bit
+      %5 = quantum.custom "S"() %2 : !quantum.bit
+      %6:2 = quantum.custom "CNOT"() %4, %5 : !quantum.bit, !quantum.bit
+      %7 = quantum.insert %0[ 0], %6#0 : !quantum.reg, !quantum.bit
+      %8 = quantum.insert %7[ 1], %6#1 : !quantum.reg, !quantum.bit
+      quantum.dealloc %8 : !quantum.reg
+      return
+  }
+  ```
+
+  Output:
+
+  ```mlir
+  func.func @decomp_rule() attributes {resources = {measurements = {}, num_alloc_qubits = 2 : i64, num_arg_qubits = 0 : i64, num_qubits = 2 : i64, operations = {"CNOT(2)" = 1 : i64, "Hadamard(1)" = 1 : i64, "S(1)" = 1 : i64, "T(1)" = 1 : i64}}, target_gate = "CustomGate"}  {
+      %0 = quantum.alloc( 2) : !quantum.reg
+      %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+      %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+      %3 = quantum.custom "Hadamard"() %1 : !quantum.bit
+      %4 = quantum.custom "T"() %3 : !quantum.bit
+      %5 = quantum.custom "S"() %2 : !quantum.bit
+      %6:2 = quantum.custom "CNOT"() %4, %5 : !quantum.bit, !quantum.bit
+      %7 = quantum.insert %0[ 0], %6#0 : !quantum.reg, !quantum.bit
+      %8 = quantum.insert %7[ 1], %6#1 : !quantum.reg, !quantum.bit
+      quantum.dealloc %8 : !quantum.reg
+      return
+  }
+  ```
+
+
 <h3>Improvements 🛠</h3>
 
-* The PPR/PPM lowering passes (`lower-qec-init-ops`, `unroll-conditional-ppr-ppm`) are now run
+* `catalyst.python_interface.utils.get_constant_from_ssa` can now extract constant values cast using
+  `arith.index_cast`.
+  [(#2542)](https://github.com/PennyLaneAI/catalyst/pull/2542)
+
+* The tape transform :func:`~.device.decomposition.catalyst_decompose` now accepts the optional
+  keyword arguments ``target_gates``, ``num_work_wires``, ``fixed_decomps``, and ``alt_decomps``,
+  which all are passed to the used PennyLane decomposition function
+  ``qml.devices.preprocess.decompose`` and used if the graph-based decomposition system is enabled.
+  [(#2501)](https://github.com/PennyLaneAI/catalyst/pull/2501)
+
+* Catalyst with program capture can now be used with the new `qml.templates.Subroutine` class and the associated
+  `qml.capture.subroutine` upstreamed from `catalyst.jax_primitives.subroutine`.
+  [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
+  [(#2493)](https://github.com/PennyLaneAI/catalyst/pull/2493)
+
+* The PPR/PPM lowering passes (`lower-pbc-init-ops`, `unroll-conditional-ppr-ppm`) are now run
   as part of the main quantum compilation pipeline. When using `to-ppr` and `ppr-to-ppm` transforms,
   these passes are applied automatically during compilation; we no longer need to stack them
   explicitly.
@@ -94,7 +269,24 @@
   `shots` aren't set. Instead, an informative error message is raised.
   [(#2456)](https://github.com/PennyLaneAI/catalyst/pull/2456)
 
+* Graph decomposition with qjit now accepts `num_work_wires`, and lowers and decomposes correctly
+  with the `decompose-lowering` pass and with `qp.transforms.decompose`.
+  [(#2470)](https://github.com/PennyLaneAI/catalyst/pull/2470)
+
+* Added support for `stopping_condition` in user-defined `qp.decompose` when capture is enabled with both graph enabled and disabled.
+  [(#2486)](https://github.com/PennyLaneAI/catalyst/pull/2486)
+
 <h3>Breaking changes 💔</h3>
+
+* `catalyst.python_interface.inspection.draw` and `catalyst.python_interface.inspection.generate_mlir_graph` no longer
+  accept QNodes as the input. Now, the input must always be a :class:`~.QJIT` object.
+  [(#2542)](https://github.com/PennyLaneAI/catalyst/pull/2542)
+
+* `catalyst.from_plxpr.register_transforms` as a way to access MLIR passes from Python has been removed in favour of the new unified transforms API. MLIR passes can be accessed from Python using `qml.transform(pass_name="some-pass-name")`.
+  [(#2509)](https://github.com/PennyLaneAI/catalyst/pull/2509)
+
+* `catalyst.jax_primitives.subroutine` has been moved to `qml.capture.subroutine`.
+  [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
 
 * (Compiler integrators only) The versions of StableHLO/LLVM/Enzyme used by Catalyst have been updated.
   [(#2415)](https://github.com/PennyLaneAI/catalyst/pull/2415)
@@ -103,11 +295,11 @@
   [(#2445)](https://github.com/PennyLaneAI/catalyst/pull/2445)
   [(#2478)](https://github.com/PennyLaneAI/catalyst/pull/2478)
 
-  - The StableHLO version has been updated to
+  * The StableHLO version has been updated to
   [v1.13.7](https://github.com/openxla/stablehlo/tree/v1.13.7).
-  - The LLVM version has been updated to
+  * The LLVM version has been updated to
   [commit 8f26458](https://github.com/llvm/llvm-project/tree/8f264586d7521b0e305ca7bb78825aa3382ffef7).
-  - The Enzyme version has been updated to
+  * The Enzyme version has been updated to
   [v0.0.238](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.238).
 
 * When an integer argnums is provided to `catalyst.vjp`, a singleton dimension is now squeezed
@@ -117,14 +309,23 @@
 * Dropped support for NumPy 1.x following its end-of-life. NumPy 2.0 or higher is now required.
   [(#2407)](https://github.com/PennyLaneAI/catalyst/pull/2407)
 
+* The inlining pass has been removed from the default compilation pipeline.
+  [(#2473)](https://github.com/PennyLaneAI/catalyst/pull/2473)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where the unified compiler would trigger a passed callback function 1 extra time for the initial pass level.
+  [(#2528)](https://github.com/PennyLaneAI/catalyst/pull/2528)
+
+* Fix a bug in the bind call function for `PCPhase` where the signature did not match what was
+  expected in `jax_primitives`. `ctrl_qubits` was missing from positional arguments in previous signature.
+  [(#2467)](https://github.com/PennyLaneAI/catalyst/pull/2467)
+
 * Fix `CATALYST_XDSL_UNIVERSE` to correctly define the available dialects and transforms, allowing
   tools like `xdsl-opt` to work with Catalyst's custom Python dialects.
   [(#2471)](https://github.com/PennyLaneAI/catalyst/pull/2471)
-
 
 * Fix a bug with the xDSL `ParitySynth` pass that caused failure when the QNode being transformed
   contained operations with regions.
@@ -137,7 +338,7 @@
   adjoint-differentiation method.
   [(#2428)](https://github.com/PennyLaneAI/catalyst/pull/2428)
 
-* Fixed the angle conversion when lowering `qec.ppr` and `qec.ppr.arbitrary` operations to
+* Fixed the angle conversion when lowering `pbc.ppr` and `pbc.ppr.arbitrary` operations to
   `__catalyst__qis__PauliRot` runtime calls. The PPR rotation angle is now correctly multiplied
   by 2 to match the PauliRot convention (`PauliRot(φ) == PPR(φ/2)`).
   [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
@@ -162,6 +363,73 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update nightly RC builds to be triggered by Lightning. 
+  [(#2491)](https://github.com/PennyLaneAI/catalyst/pull/2491)
+  
+* Updated integration tests to match changes to the PennyLane `qml.specs` frontend made in https://github.com/PennyLaneAI/pennylane/pull/9088.
+  [(#2513)](https://github.com/PennyLaneAI/catalyst/pull/2513)
+
+* The `prepare` operation from the PBC dialect in MLIR now implicitly allocates new qubits
+  rather than requiring existing ones. This better suits our purposes for further lowering
+  the PBC dialect.
+  [(#2520)](https://github.com/PennyLaneAI/catalyst/pull/2520)
+
+* Standardized the `QJITDevice.preprocess` signature to align with the base PennyLane Device API.
+  * Removed the redundant `ctx` (EvaluationContext) argument from the preprocessing and decomposition pipelines. The parameter was unused and its removal simplifies the tracing data flow.
+  * Decoupled `shots` from the `QJITDevice.preprocess` signature. Catalyst-specific shot configurations are now handled via `execution_config.device_options` to maintain API compatibility.
+  [(#2524)](https://github.com/PennyLaneAI/catalyst/pull/2524)
+
+* A new AI policy document is now applied across the PennyLaneAI organization for all AI contributions.
+  [(#2488)](https://github.com/PennyLaneAI/catalyst/pull/2488)
+
+* A new dialect `QRef` was created. This dialect is very similar to the existing `Quantum` dialect,
+  but it is in reference semantics, whereas the existing `Quantum` dialect is in value semantics.
+  [(#2320)](https://github.com/PennyLaneAI/catalyst/pull/2320)
+
+  Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
+  in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
+  will be these qubit (or qreg) reference values.
+
+  For example, in the following circuit, gates and observable ops take in the qubit reference
+  they're acting on, and do not produce new qubit values.
+
+  ```mlir
+  func.func @expval_circuit() -> f64 {
+      %a = qref.alloc(2) : !qref.reg<2>
+      %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit
+      %q1 = qref.get %a[1] : !qref.reg<2> -> !qref.bit
+      qref.custom "Hadamard"() %q0 : !qref.bit
+      qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+      qref.custom "Hadamard"() %q0 : !qref.bit
+      %obs = qref.namedobs %q1 [ PauliX] : !quantum.obs
+      %expval = quantum.expval %obs : f64
+      qref.dealloc %a : !qref.reg<2>
+      return %expval : f64
+  }
+  ```
+
+  Notice that qubit reference values are reusable.
+
+* Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
+  Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
+  measurement logic inside an `scf.if` region rather than propagating the condition
+  to inner PPM ops.
+  [(#2511)](https://github.com/PennyLaneAI/catalyst/pull/2511)
+
+
+* Update `mlir_specs` to account for new `marker` functionality in PennyLane.
+  [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
+
+* The QEC (Quantum Error Correction) dialect has been renamed to PBC (Pauli-Based Computation)
+  across the entire codebase. This includes the MLIR dialect (`pbc.*` -> `pbc.*`), C++ namespaces
+  (`catalyst::pbc` -> `catalyst::pbc`), Python bindings, compiler passes (e.g.,
+  `lower-pbc-init-ops` -> `lower-pbc-init-ops`, `convert-pbc-to-llvm` -> `convert-pbc-to-llvm`),
+  qubit type (`!quantum.bit<pbc>` -> `!quantum.bit<pbc>`), and all associated file and directory
+  names. The rename better reflects the dialect's purpose as a representation for Pauli-Based
+  Computation rather than general quantum error correction.
+  [(#2482)](https://github.com/PennyLaneAI/catalyst/pull/2482)
+  [(#2485)](https://github.com/PennyLaneAI/catalyst/pull/2485)
+
 * Updated the integration tests for `qp.specs` to get coverage for new features
   [(#2448)](https://github.com/PennyLaneAI/catalyst/pull/2448)
 
@@ -185,14 +453,14 @@
   definitions in separate file scopes.
   [(#2329)](https://github.com/PennyLaneAI/catalyst/pull/2329)
 
-* Added lowering of `qec.ppm`, `qec.ppr`, and `quantum.paulirot` to the runtime CAPI and QuantumDevice C++ API.
+* Added lowering of `pbc.ppm`, `pbc.ppr`, and `quantum.paulirot` to the runtime CAPI and QuantumDevice C++ API.
   [(#2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
   [(#2413)](https://github.com/PennyLaneAI/catalyst/pull/2413)
 
-* Added LLVM conversion patterns to lower QEC dialect operations to their corresponding runtime
+* Added LLVM conversion patterns to lower PBC dialect operations to their corresponding runtime
   CAPI calls.
-  This includes `qec.ppr` and `qec.ppr.arbitrary` (lowered to `__catalyst__qis__PauliRot`),
-  `qec.ppm` (lowered to `__catalyst__qis__PauliMeasure`). This enables device execution of QEC
+  This includes `pbc.ppr` and `pbc.ppr.arbitrary` (lowered to `__catalyst__qis__PauliRot`),
+  `pbc.ppm` (lowered to `__catalyst__qis__PauliMeasure`). This enables device execution of PBC
   operations through the Catalyst runtime.
   [(#2389)](https://github.com/PennyLaneAI/catalyst/pull/2389)
 
@@ -209,7 +477,7 @@
   [(#2419)](https://github.com/PennyLaneAI/catalyst/pull/2419)
 
 * New qubit-type specializations have been added to Catalyst's MLIR type system. These new qubit
-  types include `!quantum.bit<logical>`, `!quantum.bit<qec>` and `!quantum.bit<physical>`. The
+  types include `!quantum.bit<logical>`, `!quantum.bit<pbc>` and `!quantum.bit<physical>`. The
   original `!quantum.bit` type continues to be supported and used as the default qubit type.
   [(#2369)](https://github.com/PennyLaneAI/catalyst/pull/2369)
 
@@ -219,10 +487,14 @@
 * The upstream MLIR `Test` dialect is now available via the `catalyst` command line tool.
   [(#2417)](https://github.com/PennyLaneAI/catalyst/pull/2417)
 
-* A new compiler pass `lower-qec-init-ops` has been added to lower QEC initialization operations
-  to Quantum dialect operations. This pass converts `qec.prepare` to `quantum.custom` and
-  `qec.fabricate` to `quantum.alloc_qb` + `quantum.custom`, enabling runtime execution of
-  QEC state preparation operations.
+* Removing some previously added guardrails that were in place due to a bug in dynamic allocation
+  that is now fixed.
+  [(#2427)](https://github.com/PennyLaneAI/catalyst/pull/2427)
+
+* A new compiler pass `lower-pbc-init-ops` has been added to lower PBC initialization operations
+  to Quantum dialect operations. This pass converts `pbc.prepare` to `quantum.custom` and
+  `pbc.fabricate` to `quantum.alloc_qb` + `quantum.custom`, enabling runtime execution of
+  PBC state preparation operations.
   [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
 
 * A new compiler pass `split-to-single-terms` has been added for QNode functions containing
@@ -230,6 +502,7 @@
   [(#2441)](https://github.com/PennyLaneAI/catalyst/pull/2441)
 
   Consider the following example:
+
   ```python
   import pennylane as qml
   from catalyst import qjit
@@ -246,6 +519,7 @@
   The pass transforms the function by splitting the Hamiltonian into individual observables:
 
   **Before:**
+
   ```mlir
   func @circ1(%arg0) -> (tensor<f64>) {qnode} {
       // ... quantum ops ...
@@ -268,6 +542,7 @@
   ```
 
   **After:**
+
   ```mlir
   func @circ1.quantum() -> (tensor<f64>, tensor<f64>) {qnode} {
       // ... quantum ops ...
@@ -289,12 +564,91 @@
   }
   ```
 
+* A new compiler pass `split-non-commuting` has been added for QNode functions that measure
+  non-commuting observables. It facilitates execution on devices that don't natively support
+  measuring multiple non-commuting observables simultaneously by splitting them into separate
+  circuit executions, one group per observable for now.
+  [(#2437)](https://github.com/PennyLaneAI/catalyst/pull/2437)
+
+  **Relationship to `split-to-single-terms`:** The `split-non-commuting` pass internally runs
+  `split-to-single-terms` first when processing Hamiltonian expectation values. The
+  `split-to-single-terms` pass decomposes a Hamiltonian (sum of observables) into individual
+  leaf observables and computes the weighted sum in post-processing by running the circuit
+  once. By contrast, `split-non-commuting` goes further: it splits non-commuting observables
+  into multiple groups and runs the circuit once per group
+
+  Consider the following example:
+  ```python
+  import pennylane as qml
+  from catalyst import qjit
+
+  @qjit
+  @qml.transform(pass_name="split-non-commuting")
+  @qml.qnode(qml.device("lightning.qubit", wires=3))
+  def circuit():
+      # Hamiltonian H = Z(0) + 2 * X(0) + 3 * Identity
+      return qml.expval(qml.Z(0) + 2 * qml.X(0) + 3 * qml.Identity(2))
+  ```
+
+  The pass first runs `split-to-single-terms` to decompose the Hamiltonian, then splits
+  non-commuting observables into separate groups. Shots are distributed among groups using
+  integer division (rounded down); e.g., 100 shots with 3 groups yields 33 shots per group.
+
+  **Before:**
+  ```mlir
+  func @circ1(%arg0) -> (tensor<f64>) {qnode} {
+      %shots = arith.constant 100
+      quantum.device shots(%shots)
+      // ... quantum ops ...
+      %H = quantum.hamiltonian(%coeffs) %T0, %obs2 : !quantum.obs
+      %result = quantum.expval %H : f64
+      return %tensor_result
+  }
+  ```
+
+  **After:**
+  ```mlir
+  func @circ1() -> (tensor<f64>) {
+      %r0, %r1 = call @circ1.quantum.group.0()  // expval(Z), 1.0
+      %r2 = call @circ1.quantum.group.1()  // expval(X)
+      // Weighted sum: 1 * r0 + 3 * r1 + 2 * r2
+      return %result
+  }
+  func @circ1.quantum.group.0() -> (tensor<f64>, tensor<f64>) {qnode} {
+      // ... quantum ops ...
+      %shots = arith.constant 100
+      %num_group = arith.constant 3 : i64
+      // Shots are divided among groups via integer division (rounded down)
+      %new_shots = arith.divsi %shots, %num_group
+      quantum.device shots(%new_shots)
+      %obs = quantum.namedobs %out_qubits[ PauliZ] : !quantum.obs
+      %r0 = quantum.expval %obs
+
+      // expval(Identity) be simplified to one
+      %one = arith.constant dense<1.000000e+00>
+      return %r0, %one
+  }
+  func @circ1.quantum.group.1() -> tensor<f64> {qnode} {
+      // ... quantum ops, single expval ...
+  }
+  ```
+
+* A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in 
+  measurement processes. It is also registered in xDSL.
+  [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
+  [(#2536)](https://github.com/PennyLaneAI/catalyst/pull/2536)
+
+* An experimental *QEC Logical* MLIR dialect has been added. An equivalent xDSL dialect has also
+  been added for compatibility with the Python interface to Catalyst.
+  [(#2512)](https://github.com/PennyLaneAI/catalyst/pull/2512)
+
+
 <h3>Documentation 📝</h3>
 
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
   [(#2406)](https://github.com/PennyLaneAI/catalyst/pull/2406)
 
-* Updated the changelog and builtin_passes.py to link to https://pennylane.ai/compilation/pauli-based-computation instead.
+* Updated the changelog and builtin_passes.py to link to <https://pennylane.ai/compilation/pauli-based-computation> instead.
   [(#2409)](https://github.com/PennyLaneAI/catalyst/pull/2409)
 
 <h3>Contributors ✍️</h3>
@@ -303,6 +657,7 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
+Marcus Edwards,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
@@ -312,6 +667,8 @@ River McCubbin,
 Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
+Shuli Shu,
 Paul Haochen Wang,
+David Wierichs,
 Jake Zaia,
 Hongsheng Zheng.
