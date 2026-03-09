@@ -1425,7 +1425,9 @@ class TestWhileLoops:
     @pytest.mark.parametrize(
         "init,inc,expected", [(0, 1, 3), (0.0, 1.0, 3.0), (0.0 + 0j, 1.0 + 0j, 3.0 + 0j)]
     )
-    def test_whileloop_basic(self, capture_mode, monkeypatch, init, inc, expected):
+    def test_whileloop_basic(
+        self, capture_mode, monkeypatch, init, inc, expected
+    ):  # pylint: disable=too-many-arguments,too-many-positional-arguments
         """Test basic while-loop functionality"""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
 
