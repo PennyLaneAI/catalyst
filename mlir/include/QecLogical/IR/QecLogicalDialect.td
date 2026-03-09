@@ -53,7 +53,13 @@ def QecLogical_Dialect : Dialect {
 
         #### Example
 
-        [TODO: Fill in example once the basic ops are defined (future PR)]
+        ```mlir
+        %0 = qecl.alloc() : !qecl.hyperreg<3 x 1>
+        %1 = qecl.extract_block %0[0] : !qecl.hyperreg<3 x 1> -> !qecl.codeblock<1>
+        %2 = ... %1 : !qecl.codeblock<1>  // Ops on codeblock
+        %3 = qecl.insert_block %0[0], %2 : !qecl.hyperreg<3 x 1>, !qecl.codeblock<1>
+        qecl.dealloc %3 : !qecl.hyperreg<3 x 1>
+        ```
     }];
 
     /// This is the namespace of the dialect in MLIR, which is used as a prefix for types and ops.
