@@ -14,13 +14,12 @@
 
 #define DEBUG_TYPE "graph-decomposition"
 
-#include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Transforms/Passes.h"
 
 #include "Catalyst/Transforms/Passes.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Patterns.h"
+#include "Quantum/Transforms/Passes.h"
+#include "Quantum/Utils/Decomp.h"
 
 #include "graph_decomp_solver.hpp"
 
@@ -33,10 +32,23 @@ namespace quantum {
 #define GEN_PASS_DECL_GRAPHDECOMPOSITIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct GraphDecompositionPass : impl::GraphDecompositionPassBase<GraphDecompositionPass> {
+struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDecompositionPass> {
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
     void runOnOperation() final
     {
+        // Registry of custom decomposition rules defined in the main module, mapping from target
+        // gate name to the corresponding function.
+        llvm::StringMap<func::FuncOp> customRules;
+
+        // To sync with the graph solver branch, targetGateset should be DictionaryAttr
+        // TODO: it requires updates to the frontend.
+        DictionaryAttr targetGateset;
+
+        // List of operators
+        std::vector<OperatorNode> setOfOps = {};
+
+        // List of all resources both built-in and custom rules
+        std::vector<RuleNode> setOfResources = {};
         ModuleOp module = cast<ModuleOp>(getOperation());
 
         ///////////////////////////
@@ -55,6 +67,7 @@ struct GraphDecompositionPass : impl::GraphDecompositionPassBase<GraphDecomposit
         ///////////////////////////
         // Step 4: Get the resources for all the rules (both built-in and custom)
         // and convert them to RuleNodes for later use in the graph decomposition
+        // TODO get nodes from user rules
         getRuleNodes(module, customRules, setOfResources);
 
         ///////////////////////////
@@ -65,27 +78,15 @@ struct GraphDecompositionPass : impl::GraphDecompositionPassBase<GraphDecomposit
         // Step 6: Insert decomposition rules picked by the graph solver (solution) into the module
         // and then run the decompose-lowering patterns to apply the decomposition rules and
         // rewrite the quantum operations.
+        insertChosenRules(solution, module);
 
         ///////////////////////////
         // Step 7: Run decompose-lowering patterns to apply the decomposition rules
-        // TODO TODO
+        PassManager pm(&getContext());
+        pm.addPass(createDecomposeLoweringPass());
     }
 
   private:
-    // Registry of custom decomposition rules defined in the main module, mapping from target gate
-    // name to the corresponding function.
-    llvm::StringMap<func::FuncOp> customRules;
-
-    // To sync with the graph solver branch, targetGateset should be DictionaryAttr
-    // TODO: it requires updates to the frontend.
-    DictionaryAttr targetGateset;
-
-    // List of operators
-    std::vector<OperatorNode> setOfOps = {};
-
-    // List of all resources both built-in and custom rules
-    std::vector<RuleNode> setOfResources = {};
-
     void loadBuiltInDecompositionRules([[maybe_unused]] ModuleOp module /*, ...*/) { return; }
 
     void registerCustomDecompositionRules(ModuleOp module,
@@ -143,8 +144,37 @@ struct GraphDecompositionPass : impl::GraphDecompositionPassBase<GraphDecomposit
                       [[maybe_unused]] const llvm::StringMap<func::FuncOp> &custom_rules,
                       [[maybe_unused]] std::vector<RuleNode> &rules)
     {
+
+        // TODO user nodes
+
+        // TODO builtin nodes
+        llvm::StringRef filename =
+            "./decomposition-rules/cached-rules/decompositions.mlirbc"; // TODO make this a
+                                                                        // param/default param?
+
+        std::vector<mlir::OwningOpRef<mlir::func::FuncOp>> builtinRules =
+            getRulesFromBytecode(filename, module.getContext());
+
+        for (auto &ruleOpRef : builtinRules) {
+            RuleNode ruleNode;
+            mlir::func::FuncOp func = ruleOpRef.get(); // access the op
+
+            ruleNode.name = func.getName();
+            ruleNode.funcOp = std::move(ruleOpRef);
+            ruleNode.resource = func->getAttrOfType<DictionaryAttr>("Resources");
+
+            rules.push_back(std::move(ruleNode));
+        }
+
         return;
     }
+
+    void insertChosenRules(std::vector<RuleNode> &solution, mlir::ModuleOp module)
+    {
+        for (RuleNode &ruleNode : solution) {
+            module.push_back(ruleNode.funcOp.release());
+        }
+    };
 };
 
 } // namespace quantum

@@ -14,16 +14,11 @@
 
 #pragma once
 
-#include <string>
 #include <vector>
-
-#include "llvm/Support/Debug.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinOps.h"
 
-#include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
@@ -40,7 +35,7 @@ struct OperatorNode {
 
 struct RuleNode {
     StringRef name;
-    func::FuncOp funcOp;
+    mlir::OwningOpRef<func::FuncOp> funcOp;
     DictionaryAttr resource;
 };
 
