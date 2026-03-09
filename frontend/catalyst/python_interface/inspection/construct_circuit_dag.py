@@ -145,7 +145,9 @@ class ConstructCircuitDAG:
         try:
             self._visualize_operation(operation)
         except NotImplementedError as e:
-            _ERROR_MSG = f"'draw_graph' is unable to visualize operation {operation.name}: {str(e)}."
+            _ERROR_MSG = (
+                f"'draw_graph' is unable to visualize operation {operation.name}: {str(e)}."
+            )
             raise VisualizationError(_ERROR_MSG) from e
 
         for region in operation.regions:
@@ -580,7 +582,9 @@ class ConstructCircuitDAG:
     def _func_op(self, operation: func.FuncOp) -> None:
         """Visit a FuncOp Operation."""
 
-        label: str = "qjit" if operation.sym_name.data.startswith("jit_") else operation.sym_name.data
+        label: str = (
+            "qjit" if operation.sym_name.data.startswith("jit_") else operation.sym_name.data
+        )
 
         # Create cluster representing the func
         uid = f"cluster{self._cluster_uid_counter}"
