@@ -415,7 +415,7 @@ class EncodeOp(IRDLOperation):
         in_codeblock_type = get_logical_codeblock_type(in_codeblock)
 
         super().__init__(
-            operands=operands, result_types=(in_codeblock_type.k,), properties=properties
+            operands=operands, result_types=(in_codeblock_type,), properties=properties
         )
 
 

@@ -158,6 +158,7 @@ class TestQecLogicalOps:
     encode_op = qecl.EncodeOp(in_codeblock=codeblock, init_state="zero")
     assert len(encode_op.result_types) == 1
     assert isinstance(encode_op.result_types[0], qecl.LogicalCodeblockType)
+    assert encode_op.result_types[0].k.value.data == k
 
 
 @pytest.mark.parametrize(
