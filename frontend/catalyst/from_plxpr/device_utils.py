@@ -241,8 +241,13 @@ def _gradient_preprocessing(
 ) -> None:
     """Preprocess gradients."""
     if execution_config.gradient_method is not None:
+        # Note that the below transform, while not having a native MLIR/xDSL implementation, will NOT
+        # cause a warning to be triggered. This is because it added **most of the time**, and we do
+        # not care that much about validation/verification transforms that much anyway.
         pipeline.append(
-            _safe_create_bound_transform(verify_no_state_variance_returns, unsupported_transforms)
+            _safe_create_bound_transform(
+                verify_no_state_variance_returns, unsupported_transforms, warn=False
+            )
         )
     if execution_config.gradient_method == "adjoint":
         if shots:
@@ -294,9 +299,9 @@ def _get_dummy_xdsl_transform(
         """Empty ModulePass to handle transforms with no MLIR/xDSL implementations."""
 
         name = pass_name
-        dummy_transform: bool
+        dummy_transform: bool = True
 
-        def __init__(self, dummy_transform):
+        def __init__(self, *_, dummy_transform=True, **__):
             self.dummy_transform = dummy_transform
 
         # pylint: disable=unused-argument
