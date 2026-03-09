@@ -359,16 +359,13 @@ class QecCycleOp(IRDLOperation):
 
     def __init__(
         self,
-        in_codeblock: LogicalCodeblockType | Operation,
+        in_codeblock: LogicalCodeBlockSSAValue | Operation,
     ):
         operands = (in_codeblock,)
 
-        if isinstance(in_codeblock, LogicalCodeblockType):
-            result_type = LogicalCodeblockType(k=in_codeblock.k)
-        else:
-            result_type = LogicalCodeblockType(k=in_codeblock.type.k)
+        in_codeblock_type = get_logical_codeblock_type(in_codeblock)
 
-        super().__init__(operands=operands, result_types=(result_type,))
+        super().__init__(operands=operands, result_types=(in_codeblock_type,))
 
 
 QecLogical = Dialect(

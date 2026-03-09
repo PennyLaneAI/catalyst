@@ -167,6 +167,7 @@ class TestQecLogicalOps:
     qec_op = qecl.QecCycleOp(in_codeblock=codeblock)
     assert len(encode_op.result_types) == 1
     assert isinstance(qec_op.result_types[0], qecl.LogicalCodeblockType)
+    assert qec_op.result_types[0].k.value.data == k
 
 
 @pytest.mark.parametrize(
