@@ -20,17 +20,14 @@ Known Limitations
   * Only observables PauliX, PauliY, PauliZ, Hadamard and Identity are currently supported when
     using this transform (but these are also the only observables currently supported in the
     Quantum dialect as NamedObservable).
-  * Unlike the current tape-based implementation of the transform, it doesn't allow for
-    diagonalization of a subset of observables.
   * Unlike the current tape-based implementation of the transform, conversion to measurements
     based on eigvals and wires (rather than the PauliZ observable) is not currently supported.
+    If `eigvals=True` is passed to the current pass, an error will be raised.
   * Unlike the tape-based implementation, this pass will NOT raise an error if given a circuit
     that is invalid because it contains non-commuting measurements. It should be assumed that
     this transform results in incorrect outputs unless split_non_commuting is applied to break
     non-commuting measurements into separate tapes.
 """
-
-from dataclasses import dataclass
 
 from pennylane.ops import Hadamard, PauliX, PauliY
 from xdsl import context, passes, pattern_rewriter
@@ -65,9 +62,9 @@ def _generate_mapping():
 _gate_map, _params_map = _generate_mapping()
 
 
-def _diagonalize(obs: NamedObsOp) -> bool:
+def _diagonalize(obs: NamedObsOp, supported_base_obs) -> bool:
     """Whether to diagonalize a given observable."""
-    if obs.type.data in {"PauliZ", "Identity"}:
+    if obs.type.data in supported_base_obs:
         return False
     if obs.type.data in _gate_map:
         return True
@@ -81,13 +78,18 @@ class DiagonalizeFinalMeasurementsPattern(
 ):  # pylint: disable=too-few-public-methods
     """RewritePattern for diagonalizing final measurements."""
 
+    def __init__(self, supported_base_obs: set[str]):
+        """Initializes the RewritePattern."""
+        self.supported_base_obs = supported_base_obs
+
     @pattern_rewriter.op_type_rewrite_pattern
     def match_and_rewrite(
         self, observable: NamedObsOp, rewriter: pattern_rewriter.PatternRewriter, /
     ):
-        """Replace non-diagonalized observables with their diagonalizing gates and PauliZ."""
+        """Replace non-diagonalized observables with their diagonalizing gates and supported
+        base observables."""
 
-        if _diagonalize(observable):
+        if _diagonalize(observable, self.supported_base_obs):
 
             diagonalizing_gates = _gate_map[observable.type.data]
             params = _params_map[observable.type.data]
@@ -146,17 +148,52 @@ class DiagonalizeFinalMeasurementsPattern(
             rewriter.replace_op(observable, diag_obs)
 
 
-@dataclass(frozen=True)
 class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
     """Pass for diagonalizing final measurements."""
 
     name = "diagonalize-final-measurements"
 
+    def __init__(self, **options):
+        """Initializes the class with supported base observable names and .
+
+        Args:
+            **options: Arbitrary keyword arguments.
+                supported_base_obs (tuple[str], optional): The observable bases
+                    to support. Must be a subset of the allowed base observables
+                    (e.g., 'PauliX', 'PauliY', 'PauliZ', 'Hadamard', 'Identity').
+                    Defaults to `_default_supported_obs`.
+                to_eigvals (bool, optional): Whether to convert to eigenvalues.
+                    Currently, only `False` is supported. Defaults to `False`.
+
+        Raises:
+            ValueError: If `supported_base_obs` contains observables not found in
+                `_obs_allowed_diagonalization`.
+            ValueError: If `to_eigvals` is set to `True`.
+        """
+        _default_supported_obs = {"PauliZ", "Identity"}
+        _obs_allowed_diagonalization = {"PauliX", "PauliY", "PauliZ", "Hadamard", "Identity"}
+
+        self.supported_base_obs = options.get("supported_base_obs", tuple(_default_supported_obs))
+
+        if isinstance(self.supported_base_obs, tuple) and set(self.supported_base_obs).issubset(
+            _obs_allowed_diagonalization
+        ):
+            self.supported_base_obs = _default_supported_obs | set(self.supported_base_obs)
+        else:
+            msg = (
+                "Supported base observables must be a subset of (PauliX, PauliY, PauliZ, Hadamard, "
+                "and Identity) passed as a tuple[str], but received "
+                f"{self.supported_base_obs}"
+            )
+            raise ValueError(msg)
+        if options.get("to_eigvals", False) is not False:
+            raise ValueError("Only to_eigvals = False is supported.")
+
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the diagonalize final measurements pass."""
-        pattern_rewriter.PatternRewriteWalker(DiagonalizeFinalMeasurementsPattern()).rewrite_module(
-            op
-        )
+        pattern_rewriter.PatternRewriteWalker(
+            DiagonalizeFinalMeasurementsPattern(self.supported_base_obs)
+        ).rewrite_module(op)
 
 
 diagonalize_final_measurements_pass = compiler_transform(DiagonalizeFinalMeasurementsPass)
