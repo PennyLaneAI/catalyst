@@ -232,7 +232,8 @@ print(counts3.mlir)
 
 
 # CHECK-LABEL: public @jit_test_counts_static(
-@qjit
+@qjit(target="mlir")
+@qml.qnode(qml.device("null.qubit", wires=0))
 def test_counts_static():
     """Test that the counts primitive can be correctly compiled to mlir."""
     obs = compbasis_p.bind()

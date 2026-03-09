@@ -576,8 +576,8 @@ def specs_collect(module: ModuleOp) -> ResourcesResult:
         resources = _collect_region(func_op.body)
         func_to_resources[func_op.sym_name.data] = resources
 
-        if "qnode" in func_op.attributes:
-            # The main entrypoint for a qnode is always marked by the `qnode` attribute
+        if "quantum.node" in func_op.attributes:
+            # The main entrypoint for a qnode is always marked by the `quantum.node` attribute
             entry_func = func_op.sym_name.data
 
     if entry_func not in func_to_resources:
