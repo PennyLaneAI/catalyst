@@ -36,6 +36,7 @@ from xdsl.irdl import (
     AtLeast,
     AttrConstraint,
     IRDLOperation,
+    TypeAttributeInvT,
     irdl_attr_definition,
     irdl_op_definition,
     operand_def,
@@ -111,35 +112,39 @@ LogicalCodeBlockSSAValue: TypeAlias = SSAValue[LogicalCodeblockType]
 LogicalHyperRegisterSSAValue: TypeAlias = SSAValue[LogicalHyperRegisterType]
 
 
-def _get_logical_hyper_reg_type(
-    hyper_reg: LogicalHyperRegisterSSAValue | Operation,
-) -> LogicalHyperRegisterType:
-    """Helper function to return the logical hyper-register type given an SSA value or operation.
+def _get_type_from_ssa_value_or_operation(
+    arg: SSAValue | Operation, expected_type: TypeAttributeInvT
+):
+    """Helper function that returns the type of an SSA value or of an operation's returned value.
 
     Args:
-        hyper_reg (LogicalHyperRegisterSSAValue | Operation): A logical hyper-register SSA value or
-            an operation that returns exactly one logical hyper-register SSA value.
+        arg (SSAValue | Operation): An SSA value or an operation that returns exactly one SSA value.
 
     Returns:
-        LogicalHyperRegisterType: The logical hyper-register type.
+        TypeAttribute: The type.
     """
-    if isinstance(hyper_reg, Operation):
-        hyper_reg_types = hyper_reg.result_types
-        assert (
-            len(hyper_reg_types) == 1
-        ), f"Expected operation '{hyper_reg}' to have exactly one result type"
-        hyper_reg_type = hyper_reg_types[0]
+    if isinstance(arg, Operation):
+        arg_types = arg.result_types
+        assert len(arg_types) == 1, f"Expected operation '{arg}' to have exactly one result type"
+        arg_type = arg_types[0]
         assert isinstance(
-            hyper_reg_type, LogicalHyperRegisterType
-        ), f"Expected operation '{hyper_reg}' to have result type '{LogicalHyperRegisterType.name}'"
+            arg_type, expected_type
+        ), f"Expected operation '{arg}' to have result type '{expected_type.name}'"
 
     else:
-        hyper_reg_type = hyper_reg.type
+        arg_type = arg.type
         assert isinstance(
-            hyper_reg_type, LogicalHyperRegisterType
-        ), f"Expected value '{hyper_reg}' to have type '{LogicalHyperRegisterType.name}'"
+            arg_type, expected_type
+        ), f"Expected value '{arg}' to have type '{expected_type.name}'"
 
-    return hyper_reg_type
+    return arg_type
+
+
+def get_logical_hyper_reg_type(
+    hyper_reg: LogicalHyperRegisterSSAValue | Operation,
+) -> LogicalHyperRegisterType:
+    """Helper function to return the logical hyper-register type given an SSA value or operation."""
+    return _get_type_from_ssa_value_or_operation(hyper_reg, LogicalHyperRegisterType)
 
 
 class LogicalHyperRegisterTypeConstraint(AttrConstraint):
@@ -251,7 +256,7 @@ class ExtractCodeblockOp(IRDLOperation):
             operands = (hyper_reg, idx)
             properties = {}
 
-        hyper_reg_type = _get_logical_hyper_reg_type(hyper_reg)
+        hyper_reg_type = get_logical_hyper_reg_type(hyper_reg)
         result_type = LogicalCodeblockType(k=hyper_reg_type.k)
 
         super().__init__(
@@ -297,7 +302,7 @@ class InsertCodeblockOp(IRDLOperation):
             operands = (in_hyper_reg, idx, codeblock)
             properties = {}
 
-        in_hyper_reg_type = _get_logical_hyper_reg_type(in_hyper_reg)
+        in_hyper_reg_type = get_logical_hyper_reg_type(in_hyper_reg)
 
         super().__init__(
             operands=operands, properties=properties, result_types=(in_hyper_reg_type,)
