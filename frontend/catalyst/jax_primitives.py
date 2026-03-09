@@ -580,8 +580,7 @@ def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode, pipelines=None):
       List[mlir.Value] corresponding
     """
     assert isinstance(qnode, qml.QNode), "This function expects qnodes"
-    if pipelines is None:
-        pipelines = tuple()
+    pipelines = pipelines or ()
 
     func_op = lower_callable(ctx, qnode, call_jaxpr, pipelines)
     call_op = create_call_op(ctx, func_op, *args)
