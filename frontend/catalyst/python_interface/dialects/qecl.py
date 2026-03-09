@@ -67,6 +67,14 @@ class LogicalCodeblockInitStateAttr(
 
     name = "qecl.codeblock_init_state"
 
+    def __init__(self, init_state: str | LogicalCodeblockInitState):
+        init_state_enum = (
+            init_state
+            if isinstance(init_state, LogicalCodeblockInitState)
+            else LogicalCodeblockInitState(init_state)
+        )
+        super().__init__(init_state_enum)
+
 
 @irdl_attr_definition
 class LogicalCodeblockType(ParametrizedAttribute, TypeAttribute):
@@ -169,6 +177,13 @@ def get_logical_hyper_reg_type(
     return _get_type_from_ssa_value_or_operation(hyper_reg, LogicalHyperRegisterType)
 
 
+def get_logical_codeblock_type(
+    hyper_reg: LogicalCodeBlockSSAValue | Operation,
+) -> LogicalCodeblockType:
+    """Helper function to return the logical codeblock type given an SSA value or operation."""
+    return _get_type_from_ssa_value_or_operation(hyper_reg, LogicalCodeblockType)
+
+
 class LogicalHyperRegisterTypeConstraint(AttrConstraint):
     """Constraint to make LogicalHyperRegisterType inferrable during IRDL declaration."""
 
@@ -223,7 +238,8 @@ class LogicalCodeblockConstraint(AttrConstraint):
         """Verify the constraint and add resolved values to the ConstraintContext."""
         constraint_context.set_attr_variable("codeblock_type", attr)
 
-    def can_infer(self, var_constraint_names: AbstractSet[str]) -> bool:
+    # pylint: disable=unused-argument
+    def can_infer(self, var_constraint_names: Set[str]) -> bool:
         """Check if there is enough information to infer the attribute given the constraint
         variables that are already set.
         """
@@ -238,6 +254,7 @@ class LogicalCodeblockConstraint(AttrConstraint):
         ), f"Expected a LogicalCodeblockType from constraint context, but got {codeblock_type}"
         return codeblock_type
 
+    # pylint: disable=unused-argument
     def mapping_type_vars(self, type_var_mapping):
         """A helper function to make type vars used in attribute definitions concrete when creating
         constraints for new attributes or operations.
@@ -383,7 +400,7 @@ class EncodeOp(IRDLOperation):
 
     def __init__(
         self,
-        in_codeblock: LogicalCodeblockType | Operation,
+        in_codeblock: LogicalCodeBlockSSAValue | Operation,
         init_state: str | LogicalCodeblockInitStateAttr,
     ):
         operands = (in_codeblock,)
@@ -395,12 +412,11 @@ class EncodeOp(IRDLOperation):
         )
         properties = {"init_state": init_state_attr}
 
-        if isinstance(in_codeblock, LogicalCodeblockType):
-            result_type = LogicalCodeblockType(k=in_codeblock.k)
-        else:
-            result_type = LogicalCodeblockType(k=in_codeblock.type.k)
+        in_codeblock_type = get_logical_codeblock_type(in_codeblock)
 
-        super().__init__(operands=operands, result_types=(result_type,), properties=properties)
+        super().__init__(
+            operands=operands, result_types=(in_codeblock_type.k,), properties=properties
+        )
 
 
 QecLogical = Dialect(
