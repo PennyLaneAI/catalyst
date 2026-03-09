@@ -31,6 +31,7 @@ set(LIBS
     MLIRRTIO
     rtio-transforms
     MLIRQecLogical
+    MLIRQecPhysical
     MLIRCatalystTest
     MLIRCatalystUtils
     MLIRTestDialect
