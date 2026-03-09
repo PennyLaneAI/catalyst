@@ -101,7 +101,7 @@ def create_device_preprocessing_pipeline(
             UserWarning,
         )
 
-    return pipeline
+    return tuple(pipeline)
 
 
 # pylint: disable=unused-argument
