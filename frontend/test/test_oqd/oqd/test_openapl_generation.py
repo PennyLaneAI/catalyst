@@ -32,46 +32,48 @@ OQD_PIPELINES = OQDDevicePipeline(
 )
 
 
-# pylint: disable=too-many-branches
+def _count_system_stats(data):
+    """Return (num_ions, num_levels, num_transitions) from the system section."""
+    ions = data.get("system", {}).get("ions", [])
+    num_levels = sum(len(ion.get("levels", [])) for ion in ions)
+    num_transitions = sum(len(ion.get("transitions", [])) for ion in ions)
+    return len(ions), num_levels, num_transitions
+
+
+def _count_pulse_stats(parallel_protocols):
+    """Return (num_beams, num_measure_pulses) across all ParallelProtocol entries."""
+    pulses = [p for pp in parallel_protocols for p in pp.get("sequence", [])]
+    num_measure_pulses = sum(1 for p in pulses if p.get("class_") == "MeasurePulse")
+    num_beams = sum(
+        1
+        for p in pulses
+        if p.get("beam", {}).get("class_") == "Beam" and p.get("class_") != "MeasurePulse"
+    )
+    return num_beams, num_measure_pulses
+
+
 def profile_openapl(file_path):
     """Parses an OpenAPL JSON file and extracts statistics."""
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    num_parallel_protocols = 0
-    num_beams = 0
-    num_measure_pulses = 0
-    num_transitions = 0
-    num_levels = 0
-    num_ions = 0
-    if "system" in data and "ions" in data["system"]:
-        for ion in data["system"]["ions"]:
-            if "levels" in ion:
-                for _ in ion["levels"]:
-                    num_levels += 1
-            if "transitions" in ion:
-                for _ in ion["transitions"]:
-                    num_transitions += 1
-            num_ions += 1
-    if "protocol" in data and "sequence" in data["protocol"]:
-        for item in data["protocol"]["sequence"]:
-            if item.get("class_") == "ParallelProtocol":
-                num_parallel_protocols += 1
-                if "sequence" in item:
-                    for sub_item in item["sequence"]:
-                        if sub_item.get("class_") == "MeasurePulse":
-                            num_measure_pulses += 1
-                        elif "beam" in sub_item and sub_item["beam"].get("class_") == "Beam":
-                            num_beams += 1
-    stats = {
-        "num_parallel_protocols": num_parallel_protocols,
+    num_ions, num_levels, num_transitions = _count_system_stats(data)
+
+    parallel_protocols = [
+        item
+        for item in data.get("protocol", {}).get("sequence", [])
+        if item.get("class_") == "ParallelProtocol"
+    ]
+    num_beams, num_measure_pulses = _count_pulse_stats(parallel_protocols)
+
+    return {
+        "num_parallel_protocols": len(parallel_protocols),
         "num_beams": num_beams,
         "num_measure_pulses": num_measure_pulses,
         "num_transitions": num_transitions,
         "num_levels": num_levels,
         "num_ions": num_ions,
     }
-    return stats
 
 
 def verify_json(correct_file_name, expected_file_name):
