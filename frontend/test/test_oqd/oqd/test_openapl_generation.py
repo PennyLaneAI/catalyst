@@ -39,6 +39,7 @@ def profile_openapl(file_path):
 
     num_parallel_protocols = 0
     num_beams = 0
+    num_measure_pulses = 0
     num_transitions = 0
     num_levels = 0
     num_ions = 0
@@ -57,11 +58,14 @@ def profile_openapl(file_path):
                 num_parallel_protocols += 1
                 if "sequence" in item:
                     for sub_item in item["sequence"]:
-                        if "beam" in sub_item and sub_item["beam"].get("class_") == "Beam":
+                        if sub_item.get("class_") == "MeasurePulse":
+                            num_measure_pulses += 1
+                        elif "beam" in sub_item and sub_item["beam"].get("class_") == "Beam":
                             num_beams += 1
     stats = {
         "num_parallel_protocols": num_parallel_protocols,
         "num_beams": num_beams,
+        "num_measure_pulses": num_measure_pulses,
         "num_transitions": num_transitions,
         "num_levels": num_levels,
         "num_ions": num_ions,
@@ -319,6 +323,33 @@ class TestComplexCircuits:
         assert stats["num_beams"] == 128
         assert stats["num_transitions"] == 8
         assert stats["num_levels"] == 8
+
+
+class TestMeasurement:
+    """Test OQD device OpenAPL generation for measurement."""
+
+    def test_measurement(self, tmp_openapl_file_name):
+        """Test OpenAPL generation for a mid-circuit measurement."""
+
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
+
+        @qjit(pipelines=OQD_PIPELINES)
+        @qml.set_shots(4)
+        @qml.qnode(oqd_dev)
+        def circuit():
+            qml.RX(np.pi / 2, wires=0)
+            qml.measure(wires=0)
+            return qml.counts(wires=0)
+
+        circuit()
+
+        stats = profile_openapl(oqd_dev.openapl_file_name)
+        assert stats["num_ions"] == 1
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
+        assert stats["num_parallel_protocols"] == 2
+        assert stats["num_beams"] == 2
+        assert stats["num_measure_pulses"] == 1
 
 
 if __name__ == "__main__":
