@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functools
 from copy import copy
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import TypeAlias
 
-import pennylane as qml
 from pennylane.transforms.core import BoundTransform, CompilePipeline, transform
 
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
