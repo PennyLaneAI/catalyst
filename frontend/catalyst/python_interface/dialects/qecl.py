@@ -121,7 +121,7 @@ def _get_logical_hyper_reg_type(
             an operation that returns exactly one logical hyper-register SSA value.
 
     Returns:
-        _type_: _description_
+        LogicalHyperRegisterType: The logical hyper-register type.
     """
     if isinstance(hyper_reg, Operation):
         hyper_reg_types = hyper_reg.result_types
