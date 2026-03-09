@@ -184,7 +184,7 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
         func_op.attributes["sym_visibility"] = ir.StringAttr.get("public")
 
     if isinstance(callable_, qml.QNode):
-        func_op.attributes["qnode"] = ir.UnitAttr.get()
+        func_op.attributes["quantum.node"] = ir.UnitAttr.get()
 
         diff_method = _calculate_diff_method(callable_, call_jaxpr)
 
