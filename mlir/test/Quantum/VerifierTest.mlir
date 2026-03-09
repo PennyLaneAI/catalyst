@@ -514,9 +514,32 @@ func.func @qnode_without_measurement(%q : !quantum.bit) attributes {quantum.node
 // -----
 
 // expected-error @below {{attribute 'quantum.node' is only valid on 'func.func'}}
-%c0 = "arith.constant"() {value = 0 : i64, quantum.node} : () -> i64
+%c0 = arith.constant {quantum.node} 0 : i64
 
 // -----
 
 // expected-error@+1 {{'quantum.node' must be a unit attribute}}
 func.func private @wrong_attribute_value() attributes {quantum.node = "wrong"}
+
+// -----
+
+module @outer {
+    func.func private @f() attributes {quantum.kernel_entry_point}
+}
+
+// -----
+
+// expected-error @+1 {{'quantum.kernel_entry_point' is only valid on 'func.func'}}
+%c0 = arith.constant {quantum.kernel_entry_point} 0 : i64
+
+// -----
+
+// expected-error @+2 {{'quantum.kernel_entry_point' must be a unit attribute}}
+module @outer {
+    func.func private @f() attributes {quantum.kernel_entry_point = "wrong"}
+}
+
+// -----
+
+// expected-error @+1 {{'quantum.kernel_entry_point' is only valid in a quantum kernel}}
+func.func private @f() attributes {quantum.kernel_entry_point}

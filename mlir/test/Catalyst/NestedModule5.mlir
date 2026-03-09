@@ -21,7 +21,7 @@
 // CHECK-NOT: catalyst
 module @outer {
   module @inner {
-    func.func @f() {
+    func.func @f() attributes {quantum.kernel_entry_point} {
       return
     }
   }

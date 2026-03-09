@@ -155,6 +155,7 @@ SymbolRefAttr getFullyQualifiedNameUntil(SymbolOpInterface symbol, const Operati
 }
 
 static constexpr llvm::StringRef fullyQualifiedNameAttr = "catalyst.fully_qualified_name";
+static constexpr llvm::StringRef kernelEntryPointAttr = "quantum.kernel_entry_point";
 static constexpr llvm::StringRef quantumNodeAttr = "quantum.node";
 static constexpr llvm::StringRef legacyQNodeAttr = "qnode";
 
@@ -417,18 +418,22 @@ struct CleanupPattern : public RewritePattern {
     LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) const override
     {
         bool hasQualifiedName = op->hasAttr(fullyQualifiedNameAttr);
-        bool hasQNodeAttr = op->hasAttr(quantumNodeAttr);
-        if (!hasQualifiedName && !hasQNodeAttr) {
+        bool isEntryPoint = op->hasAttr(kernelEntryPointAttr);
+        bool isQNode = op->hasAttr(quantumNodeAttr);
+        if (!hasQualifiedName && !isEntryPoint && !isQNode) {
             return failure();
         }
 
         rewriter.modifyOpInPlace(op, [&] {
-            if (hasQNodeAttr) {
-                op->removeAttr(quantumNodeAttr);
-                op->setAttr(legacyQNodeAttr, UnitAttr::get(op->getContext()));
-            }
             if (hasQualifiedName) {
                 op->removeAttr(fullyQualifiedNameAttr);
+            }
+            if (isEntryPoint) {
+                op->removeAttr(kernelEntryPointAttr);
+            }
+            if (isQNode) {
+                op->removeAttr(quantumNodeAttr);
+                op->setAttr(legacyQNodeAttr, UnitAttr::get(op->getContext()));
             }
         });
 

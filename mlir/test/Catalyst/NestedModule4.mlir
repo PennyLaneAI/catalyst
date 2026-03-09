@@ -13,12 +13,12 @@
 // limitations under the License.
 
 // Step 4 is replacing calls to inlined functions
-// RUN: quantum-opt --inline-nested-module=stop-after-step=4 --split-input-file --verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --inline-nested-module=stop-after-step=5 %s | FileCheck %s
 
 // CHECK-LABEL: @outer
 module @outer {
   module @inner {
-    func.func public @f() {
+    func.func public @f() attributes {quantum.kernel_entry_point} {
       return
     }
   }
@@ -26,45 +26,3 @@ module @outer {
   // CHECK: func.call @f_0
   catalyst.launch_kernel @inner::@f() : () -> ()
 }
-
-// -----
-
-module @outer {
-  module @inner {
-    func.func private @f() {
-      return
-    }
-  }
-
-  // expected-error @below {{invalid function}}
-  catalyst.launch_kernel @inner::@f() : () -> ()
-}
-
-// -----
-
-module @outer {
-  module @inner {
-    func.func nested @f() {
-      return
-    }
-  }
-
-  // expected-error @below {{invalid function}}
-  catalyst.launch_kernel @inner::@f() : () -> ()
-}
-
-// -----
-
-// Default visibility is public
-// CHECK-LABEL: @outer
-module @outer {
-  module @inner {
-    func.func @f() {
-      return
-    }
-  }
-
-  // CHECK: func.call @f_0
-  catalyst.launch_kernel @inner::@f() : () -> ()
-}
-

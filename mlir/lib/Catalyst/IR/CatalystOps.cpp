@@ -63,9 +63,17 @@ LogicalResult LaunchKernelOp::verifySymbolUses(SymbolTableCollection &symbolTabl
     auto callee = this->getCalleeAttr();
     SymbolOpInterface sym =
         symbolTable.lookupNearestSymbolFrom<SymbolOpInterface>(this->getOperation(), callee);
-    if (sym && sym.getVisibility() == mlir::SymbolTable::Visibility::Public) {
-        return success();
+    if (!sym) {
+        return this->emitOpError("could not find kernel function definition: ") << callee;
     }
-    this->emitOpError("invalid function:") << callee;
-    return failure();
+
+    if (sym.getVisibility() != mlir::SymbolTable::Visibility::Public) {
+        return this->emitOpError("kernel function needs to have public visibility: ") << callee;
+    }
+
+    if (!sym->hasAttrOfType<UnitAttr>("quantum.kernel_entry_point")) {
+        return this->emitOpError("kernel function requires entry point attribute: ") << callee;
+    }
+
+    return success();
 }
