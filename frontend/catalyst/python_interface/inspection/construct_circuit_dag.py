@@ -576,10 +576,9 @@ class ConstructCircuitDAG:
     def _func_op(self, operation: func.FuncOp) -> None:
         """Visit a FuncOp Operation."""
 
-        label = operation.sym_name.data
-        if "jit_" in operation.sym_name.data:
-            label = "qjit"
+        label: str = "qjit" if operation.sym_name.data.startswith("jit_") else operation.sym_name.data
 
+        # Create cluster representing the func
         uid = f"cluster{self._cluster_uid_counter}"
         parent_cluster_uid = None if not self._cluster_uid_stack else self._cluster_uid_stack[-1]
         self.dag_builder.add_cluster(
@@ -590,7 +589,8 @@ class ConstructCircuitDAG:
         self._cluster_uid_counter += 1
         self._cluster_uid_stack.append(uid)
 
-        self._visit_block(operation.regions[0].blocks[0])
+        if blocks := operation.regions[0].blocks:
+            self._visit_block(blocks[0])
 
     # pylint: disable=unused-argument
     @_visit_operation.register
