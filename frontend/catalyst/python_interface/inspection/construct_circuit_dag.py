@@ -142,7 +142,11 @@ class ConstructCircuitDAG:
     @singledispatchmethod
     def _visit_operation(self, operation: Operation) -> None:
         """Visit an xDSL Operation. Default to visiting each region contained in the operation."""
-        self._visualize_operation(operation)
+        try:
+            self._visualize_operation(operation)
+        except NotImplementedError as e:
+            _ERROR_MSG = f"'draw_graph' is unable to visualize operation {operation.name}: {str(e)}."
+            raise VisualizationError(_ERROR_MSG) from e
 
         for region in operation.regions:
             self._visit_region(region)
@@ -589,6 +593,7 @@ class ConstructCircuitDAG:
         self._cluster_uid_counter += 1
         self._cluster_uid_stack.append(uid)
 
+        # NOTE: Don't visit empty external functions
         if blocks := operation.regions[0].blocks:
             self._visit_block(blocks[0])
 
