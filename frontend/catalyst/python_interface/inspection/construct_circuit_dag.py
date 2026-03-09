@@ -27,6 +27,7 @@ from pennylane.measurements import (
 from pennylane.operation import Operator
 from pennylane.ops import GlobalPhase
 from xdsl.dialects import builtin, func, scf
+from xdsl.traits import SymbolTable
 from xdsl.ir import Block, Operation, Region
 
 from catalyst.python_interface.dialects import pbc, quantum
@@ -451,6 +452,107 @@ class ConstructCircuitDAG:
         self._cluster_uid_stack.pop()
 
     @_visit_operation.register
+    def _index_switch_op(self, operation: scf.IndexSwitchOp):
+        """Handles the scf.IndexSwitchOp operation."""
+
+        uid = f"switch_cluster{self._cluster_uid_counter}"
+        self.dag_builder.add_cluster(
+            uid,
+            label="switch",
+            labeljust="l",
+            cluster_uid=self._cluster_uid_stack[-1],
+        )
+        self._cluster_uid_stack.append(uid)
+        self._cluster_uid_counter += 1
+
+        # Save wires state before all of the branches
+        wire_map_before = deepcopy(self._wire_to_node_uids)
+
+        region_wire_maps: list[dict[int | str, set[str]]] = []
+
+        # Loop through each branch and visualize as a cluster
+        for i, region in enumerate(operation.regions):
+
+            if i > 9:
+                break
+            cluster_label = f"case {i}"
+
+            uid = f"cluster{self._cluster_uid_counter}"
+            self.dag_builder.add_cluster(
+                uid,
+                label=cluster_label,
+                labeljust="l",
+                style="dashed",
+                cluster_uid=self._cluster_uid_stack[-1],
+            )
+            self._cluster_uid_stack.append(uid)
+            self._cluster_uid_counter += 1
+
+            # Make fresh wire map before going into region
+            self._wire_to_node_uids = deepcopy(wire_map_before)
+
+            # Go recursively into the branch to process internals
+            self._visit_region(region)
+
+            # Update branch wire maps
+            if self._wire_to_node_uids != wire_map_before:
+                # If the dynamic wire seen in this branch is different from the
+                # one seen before the conditional *and* we have other static wires
+                # clear the dyn_wires as the conditional becomes a blocking cluster.
+                #
+                # For example,
+                #
+                #    qml.H(x)
+                #    if x == 2:
+                #        qml.Y(x)
+                #        qml.X(0)
+                #    qml.Z(x)
+                #
+                before_dyn_node_uid: set[str] = wire_map_before.get("dyn_wire", set())
+                current_dyn_node_uid: set[str] = self._wire_to_node_uids["dyn_wire"]
+                if current_dyn_node_uid != before_dyn_node_uid and len(self._wire_to_node_uids) > 1:
+                    self._wire_to_node_uids["dyn_wire"] = set()
+                region_wire_maps.append(self._wire_to_node_uids)
+
+            # Pop branch cluster after processing to ensure
+            # logical branches are treated as 'parallel'
+            self._cluster_uid_stack.pop()
+
+        # Update affected wires with specific wires seen during branches
+        affected_wires: set[str | int] = set()
+        for region_wire_map in region_wire_maps:
+            affected_wires.update(region_wire_map.keys())
+
+        # Update state to be the union of all branch wire maps
+        final_wire_map: dict[str | int, set[str]] = defaultdict(set)
+        for wire in affected_wires:
+            all_nodes: set[str] = set()
+            for region_wire_map in region_wire_maps:
+                all_nodes.update(region_wire_map.get(wire, set()))
+            final_wire_map[wire] = all_nodes
+
+        # If new dynamic wires are encountered during the conditional
+        # the old ones from before are useless
+        before_dyn_node_uid: set[str] = wire_map_before.get("dyn_wire", set())
+        current_dyn_node_uid: set[str] = final_wire_map["dyn_wire"]
+        if before_dyn_node_uid and before_dyn_node_uid < current_dyn_node_uid:
+            final_wire_map["dyn_wire"] -= before_dyn_node_uid
+
+        # If we went through a single conditional and no dynamic wires were
+        # encountered, clear the dynamic wires from before as the cluster should be
+        # blocking
+        if (
+            before_dyn_node_uid == current_dyn_node_uid
+            and sum(1 for s in self._cluster_uid_stack if "conditional" in s) == 1
+        ):
+            final_wire_map["dyn_wire"] = set()
+
+        # Pop IfOp cluster before leaving this handler
+        self._last_cluster_uid = self._cluster_uid_stack.pop()
+
+        self._wire_to_node_uids = final_wire_map
+
+    @_visit_operation.register
     def _if_op(self, operation: scf.IfOp):
         """Handles the scf.IfOp operation."""
 
@@ -579,6 +681,27 @@ class ConstructCircuitDAG:
     # =======================
 
     @_visit_operation.register
+    def _call_op(self, operation: func.CallOp) -> None:
+        callee_name = operation.callee.root_reference.data
+        callee_func = SymbolTable.lookup_symbol(operation, operation.callee)
+
+        # Don't visualize calls to external functions without a body
+        if callee_func is None or not callee_func.regions[0].blocks:
+            return
+
+        uid = f"cluster{self._cluster_uid_counter}"
+        self.dag_builder.add_cluster(
+            uid,
+            label=callee_name,
+            labeljust="l",
+            cluster_uid=self._cluster_uid_stack[-1],
+        )
+        self._cluster_uid_stack.append(uid)
+        self._cluster_uid_counter += 1
+
+        self._visit_block(callee_func.regions[0].blocks[0])
+
+    @_visit_operation.register
     def _func_op(self, operation: func.FuncOp) -> None:
         """Visit a FuncOp Operation."""
 
@@ -586,35 +709,37 @@ class ConstructCircuitDAG:
             "qjit" if operation.sym_name.data.startswith("jit_") else operation.sym_name.data
         )
 
-        # Create cluster representing the func
-        uid = f"cluster{self._cluster_uid_counter}"
-        parent_cluster_uid = None if not self._cluster_uid_stack else self._cluster_uid_stack[-1]
-        self.dag_builder.add_cluster(
-            uid,
-            label=label,
-            cluster_uid=parent_cluster_uid,
-        )
-        self._cluster_uid_counter += 1
-        self._cluster_uid_stack.append(uid)
+        is_external_function = len(operation.regions[0].blocks) == 0
+        qjit = operation.sym_name.data.startswith("jit_")
+        qnode = operation.attributes.get("quantum.node", None) is not None
 
-        # NOTE: Don't visit empty external functions
-        if blocks := operation.regions[0].blocks:
-            self._visit_block(blocks[0])
+        # Create cluster representing the func
+        if not is_external_function and (qjit or qnode):
+            uid = f"cluster{self._cluster_uid_counter}"
+            parent_cluster_uid = (
+                None if not self._cluster_uid_stack else self._cluster_uid_stack[-1]
+            )
+            self.dag_builder.add_cluster(
+                uid,
+                label=label,
+                cluster_uid=parent_cluster_uid,
+            )
+            self._cluster_uid_counter += 1
+            self._cluster_uid_stack.append(uid)
+
+            self._visit_block(operation.regions[0].blocks[0])
 
     # pylint: disable=unused-argument
     @_visit_operation.register
     def _func_return(self, operation: func.ReturnOp) -> None:
         """Handle func.return to exit FuncOp's cluster scope."""
 
-        # NOTE: Skip first cluster as it is the "base" of the graph diagram.
-        # In our case, it is the `qjit` bounding box.
-        if len(self._cluster_uid_stack) > 1:
-            # If we hit a func.return operation we know we are leaving
-            # the FuncOp's scope and so we can pop the ID off the stack.
-            self._cluster_uid_stack.pop()
+        self._cluster_uid_stack.pop()
 
-        # Clear seen wires as we are exiting a FuncOp (qnode)
-        self._wire_to_node_uids = defaultdict(set)
+        # Clear seen wires as we are exiting a QNode
+        if parent_op := operation.parent_op():
+            if parent_op.attributes.get("quantum.node", None) is not None:
+                self._wire_to_node_uids = defaultdict(set)
 
     # =======================
     # NODE CONNECTIVITY
