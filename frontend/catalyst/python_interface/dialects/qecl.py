@@ -20,8 +20,7 @@ For a complete description of this dialect, please see
 
     mlir/include/QecLogical/IR/QecLogicalDialect.td
 """
-
-from collections.abc import Set as AbstractSet
+from collections.abc import Sequence, Set
 from typing import TypeAlias
 
 from xdsl.dialects.builtin import I64, IndexType, IntegerAttr, IntegerType
@@ -45,7 +44,7 @@ from xdsl.irdl import (
     result_def,
 )
 from xdsl.irdl.constraints import ConstraintContext
-from xdsl.parser import Parser
+from xdsl.parser import AttrParser
 from xdsl.printer import Printer
 
 
@@ -67,7 +66,7 @@ class LogicalCodeblockType(ParametrizedAttribute, TypeAttribute):
             printer.print_int(self.k.value.data)
 
     @classmethod
-    def parse_parameters(cls, parser: Parser) -> list[IntegerAttr]:
+    def parse_parameters(cls, parser: AttrParser) -> Sequence[Attribute]:
         """Parse the attribute parameters."""
         with parser.in_angle_brackets():
             k = parser.parse_integer()
@@ -98,7 +97,7 @@ class LogicalHyperRegisterType(ParametrizedAttribute, TypeAttribute):
             printer.print_int(self.k.value.data)
 
     @classmethod
-    def parse_parameters(cls, parser: Parser) -> list[IntegerAttr]:
+    def parse_parameters(cls, parser: AttrParser) -> Sequence[Attribute]:
         """Parse the attribute parameters."""
         with parser.in_angle_brackets():
             width = parser.parse_integer()
@@ -110,6 +109,37 @@ class LogicalHyperRegisterType(ParametrizedAttribute, TypeAttribute):
 
 LogicalCodeBlockSSAValue: TypeAlias = SSAValue[LogicalCodeblockType]
 LogicalHyperRegisterSSAValue: TypeAlias = SSAValue[LogicalHyperRegisterType]
+
+
+def _get_logical_hyper_reg_type(
+    hyper_reg: LogicalHyperRegisterSSAValue | Operation,
+) -> LogicalHyperRegisterType:
+    """Helper function to return the logical hyper-register type given an SSA value or operation.
+
+    Args:
+        hyper_reg (LogicalHyperRegisterSSAValue | Operation): A logical hyper-register SSA value or
+            an operation that returns exactly one logical hyper-register SSA value.
+
+    Returns:
+        _type_: _description_
+    """
+    if isinstance(hyper_reg, Operation):
+        hyper_reg_types = hyper_reg.result_types
+        assert (
+            len(hyper_reg_types) == 1
+        ), f"Expected operation '{hyper_reg}' to have exactly one result type"
+        hyper_reg_type = hyper_reg_types[0]
+        assert isinstance(
+            hyper_reg_type, LogicalHyperRegisterType
+        ), f"Expected operation '{hyper_reg}' to have result type '{LogicalHyperRegisterType.name}'"
+
+    else:
+        hyper_reg_type = hyper_reg.type
+        assert isinstance(
+            hyper_reg_type, LogicalHyperRegisterType
+        ), f"Expected value '{hyper_reg}' to have type '{LogicalHyperRegisterType.name}'"
+
+    return hyper_reg_type
 
 
 class LogicalHyperRegisterTypeConstraint(AttrConstraint):
@@ -132,7 +162,7 @@ class LogicalHyperRegisterTypeConstraint(AttrConstraint):
         """Verify the constraint and add resolved values to the ConstraintContext."""
         constraint_context.set_attr_variable("hyper_reg_type", attr)
 
-    def can_infer(self, var_constraint_names: AbstractSet[str]) -> bool:
+    def can_infer(self, var_constraint_names: Set[str]) -> bool:
         """Check if there is enough information to infer the attribute given the constraint
         variables that are already set.
         """
@@ -219,7 +249,8 @@ class ExtractCodeblockOp(IRDLOperation):
             operands = (hyper_reg, idx)
             properties = {}
 
-        result_type = LogicalCodeblockType(k=hyper_reg.type.k)
+        hyper_reg_type = _get_logical_hyper_reg_type(hyper_reg)
+        result_type = LogicalCodeblockType(k=hyper_reg_type.k)
 
         super().__init__(
             operands=operands,
@@ -250,7 +281,7 @@ class InsertCodeblockOp(IRDLOperation):
 
     def __init__(
         self,
-        in_hyper_reg: LogicalCodeBlockSSAValue | Operation,
+        in_hyper_reg: LogicalHyperRegisterSSAValue | Operation,
         idx: SSAValue[IntegerType] | Operation | int | IntegerAttr,
         codeblock: LogicalCodeBlockSSAValue | Operation,
     ):
@@ -264,8 +295,10 @@ class InsertCodeblockOp(IRDLOperation):
             operands = (in_hyper_reg, idx, codeblock)
             properties = {}
 
+        in_hyper_reg_type = _get_logical_hyper_reg_type(in_hyper_reg)
+
         super().__init__(
-            operands=operands, properties=properties, result_types=(in_hyper_reg.type,)
+            operands=operands, properties=properties, result_types=(in_hyper_reg_type,)
         )
 
 
