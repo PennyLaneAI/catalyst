@@ -418,6 +418,7 @@ jobs:
 
     - name: Build MLIR Dialect Docs
       run: |
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         DIALECTS_DOCS_BUILD_DIR="$(pwd)/quantum-build-docs" \
         make dialect-docs
 
