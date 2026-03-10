@@ -754,7 +754,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             return qml.expval(obs)
 
         res_ref = circuit_ref()
-        assert res == res_ref
+        assert np.allclose(res, res_ref)
 
     def test_with_multiple_measurements(self):
         """Test that the transform runs and returns the expected results for
