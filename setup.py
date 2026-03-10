@@ -129,7 +129,7 @@ requirements = [
     f"jaxlib=={jax_version}",
     "numpy>2.0.0",
     "scipy-openblas32>=0.3.26",  # symbol and library name
-    "diastatic-malt>=2.15.3",
+    "diastatic-malt==2.15.3",
     "xdsl==0.56.1",
     "xdsl-jax==0.2.0",
 ]
