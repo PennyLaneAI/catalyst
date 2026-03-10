@@ -71,7 +71,22 @@ class TestDraw:
 
         return circ
 
-    @pytest.mark.parametrize("qjit", [True, False])
+    def test_no_qjit_error(self):
+        """Test that an error is raised if trying to use anything other than QJIT as
+        an input."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f():
+            qml.RX(0.1, 0)
+            qml.RX(2.0, 0)
+            qml.CNOT([0, 2])
+            qml.CNOT([0, 2])
+            return qml.state()
+
+        gen = draw(f)
+        with pytest.raises(TypeError, match="Cannot generate MLIR module"):
+            gen()
+
     @pytest.mark.parametrize(
         "level, expected",
         [
@@ -92,20 +107,16 @@ class TestDraw:
             (50, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
         ],
     )
-    def test_multiple_levels_xdsl(self, transforms_circuit, level, qjit, expected):
+    def test_multiple_levels_xdsl(self, transforms_circuit, level, expected):
         """Test that multiple levels of transformation are applied correctly with xDSL
         compilation passes."""
 
-        transforms_circuit = iterative_cancel_inverses_pass(
-            merge_rotations_pass(transforms_circuit)
+        transforms_circuit = qml.qjit(
+            iterative_cancel_inverses_pass(merge_rotations_pass(transforms_circuit))
         )
-
-        if qjit:
-            transforms_circuit = qml.qjit(transforms_circuit)
 
         assert draw(transforms_circuit, level=level)() == expected
 
-    @pytest.mark.parametrize("qjit", [True, False])
     @pytest.mark.parametrize(
         "level, expected",
         [
@@ -126,20 +137,16 @@ class TestDraw:
             (50, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
         ],
     )
-    def test_multiple_levels_catalyst(self, transforms_circuit, level, qjit, expected):
+    def test_multiple_levels_catalyst(self, transforms_circuit, level, expected):
         """Test that multiple levels of transformation are applied correctly with Catalyst
         compilation passes."""
 
-        transforms_circuit = qml.transforms.cancel_inverses(
-            qml.transforms.merge_rotations(transforms_circuit)
+        transforms_circuit = qml.qjit(
+            qml.transforms.cancel_inverses(qml.transforms.merge_rotations(transforms_circuit))
         )
-
-        if qjit:
-            transforms_circuit = qml.qjit(transforms_circuit)
 
         assert draw(transforms_circuit, level=level)() == expected
 
-    @pytest.mark.parametrize("qjit", [True, False])
     @pytest.mark.parametrize(
         "level, expected",
         [
@@ -160,19 +167,16 @@ class TestDraw:
             (50, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
         ],
     )
-    def test_multiple_levels_xdsl_catalyst(self, transforms_circuit, level, qjit, expected):
+    def test_multiple_levels_xdsl_catalyst(self, transforms_circuit, level, expected):
         """Test that multiple levels of transformation are applied correctly with xDSL and
         Catalyst compilation passes."""
 
-        transforms_circuit = iterative_cancel_inverses_pass(
-            qml.transforms.merge_rotations(transforms_circuit)
+        transforms_circuit = qml.qjit(
+            iterative_cancel_inverses_pass(qml.transforms.merge_rotations(transforms_circuit))
         )
-        if qjit:
-            transforms_circuit = qml.qjit(transforms_circuit)
 
         assert draw(transforms_circuit, level=level)() == expected
 
-    @pytest.mark.parametrize("qjit", [True, False])
     @pytest.mark.parametrize(
         "level, expected",
         [
@@ -208,11 +212,9 @@ class TestDraw:
             ),
         ],
     )
-    def test_no_passes(self, transforms_circuit, level, qjit, expected):
+    def test_no_passes(self, transforms_circuit, level, expected):
         """Test that if no passes are applied, the circuit is still visualized."""
-
-        if qjit:
-            transforms_circuit = qml.qjit(transforms_circuit)
+        transforms_circuit = qml.qjit(transforms_circuit)
 
         assert draw(transforms_circuit, level=level)() == expected
 
@@ -242,6 +244,7 @@ class TestDraw:
         Test the visualization of control and adjoint variants.
         """
 
+        @qml.qjit
         @qml.qnode(qml.device("lightning.qubit", wires=3))
         def circuit():
             op()
@@ -254,6 +257,7 @@ class TestDraw:
         Test the visualization of control operations before custom ops.
         """
 
+        @qml.qjit
         @qml.qnode(qml.device("lightning.qubit", wires=3))
         def circuit():
             qml.ctrl(qml.X(3), control=[0, 1, 2], control_values=[1, 0, 1])
@@ -330,22 +334,26 @@ class TestDraw:
         """
         Test the visualization of measurements.
         """
+        shots = (
+            10
+            if isinstance(measurement(), (qml.measurements.SampleMP, qml.measurements.CountsMP))
+            else None
+        )
 
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qml.qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=3), shots=shots)
         def circuit():
             qml.RX(0.1, 0)
             qml.RY(0.2, 1)
             qml.RZ(0.3, 2)
             return measurement()
 
-        if isinstance(measurement(), qml.measurements.SampleMP):
-            circuit = qml.set_shots(10)(circuit)
-
         assert draw(circuit)() == expected
 
     def test_global_phase(self):
         """Test the visualization of global phase shifts."""
 
+        @qml.qjit
         @qml.qnode(qml.device("lightning.qubit", wires=3))
         def circuit():
             qml.H(0)
@@ -371,6 +379,7 @@ class TestDraw:
     def test_draw_mid_circuit_measurement_postselect(self, postselect, mid_measure_label):
         """Test that mid-circuit measurements are drawn correctly."""
 
+        @qml.qjit
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
             qml.Hadamard(0)
@@ -453,6 +462,7 @@ class TestDraw:
         Test the visualization of the quantum operations defined in the unified compiler dialect.
         """
 
+        @qml.qjit
         @qml.qnode(qml.device("lightning.qubit", wires=3))
         def circuit():
             for op, param, wires in ops:
@@ -468,6 +478,7 @@ class TestDraw:
         two_dim = jax.numpy.array([[0, 1], [1, 0]])
         eight_dim = jax.numpy.zeros((8, 8))
 
+        @qml.qjit
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
             qml.RX(one_dim[0], wires=0)
@@ -486,6 +497,7 @@ class TestDraw:
         """Test that a warning is raised when dynamic arguments are used."""
 
         # pylint: disable=unused-argument
+        @qml.qjit
         @qml.qnode(qml.device("lightning.qubit", wires=3))
         def circ(arg):
             qml.RX(0.1, wires=0)

@@ -55,42 +55,52 @@ def assert_files(tmp_path: Path, expected: set[str]):
 class TestMLIRGraph:
     """Test the MLIR graph generation"""
 
-    @pytest.mark.parametrize("qjit", [True, False])
-    def test_no_transforms(self, tmp_path: Path, qjit: bool):
-        """Test the MLIR graph is still generated when no transforms are applied"""
+    def test_no_qjit_error(self):
+        """Test that an error is raised if trying to use anything other than QJIT as
+        an input."""
 
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _():
+        def f():
             qml.RX(0.1, 0)
             qml.RX(2.0, 0)
             qml.CNOT([0, 2])
             qml.CNOT([0, 2])
             return qml.state()
 
-        if qjit:
-            _ = qml.qjit(_)
+        gen = generate_mlir_graph(f)
+        with pytest.raises(TypeError, match="Cannot generate MLIR module"):
+            gen()
 
-        generate_mlir_graph(_)()
+    def test_no_transforms(self, tmp_path: Path):
+        """Test the MLIR graph is still generated when no transforms are applied"""
+
+        @qml.qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f():
+            qml.RX(0.1, 0)
+            qml.RX(2.0, 0)
+            qml.CNOT([0, 2])
+            qml.CNOT([0, 2])
+            return qml.state()
+
+        generate_mlir_graph(f)()
         assert collect_files(tmp_path) == {"QNode_level_0_no_transforms.svg"}
 
-    @pytest.mark.parametrize("qjit", [True, False])
-    def test_xdsl_transforms_no_args(self, tmp_path: Path, qjit: bool):
+    def test_xdsl_transforms_no_args(self, tmp_path: Path):
         """Test the MLIR graph generation with no arguments to the QNode with and without qjit"""
 
+        @qml.qjit
         @merge_rotations_pass
         @iterative_cancel_inverses_pass
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _():
+        def f():
             qml.RX(0.1, 0)
             qml.RX(2.0, 0)
             qml.CNOT([0, 2])
             qml.CNOT([0, 2])
             return qml.state()
 
-        if qjit:
-            _ = qml.qjit(_)
-
-        generate_mlir_graph(_)()
+        generate_mlir_graph(f)()
         assert_files(
             tmp_path,
             {
@@ -100,22 +110,19 @@ class TestMLIRGraph:
             },
         )
 
-    @pytest.mark.parametrize("qjit", [True, False])
-    def test_xdsl_transforms_args(self, tmp_path: Path, qjit: bool):
+    def test_xdsl_transforms_args(self, tmp_path: Path):
         """Test the MLIR graph generation with arguments to the QNode for xDSL transforms"""
 
+        @qml.qjit
         @merge_rotations_pass
         @iterative_cancel_inverses_pass
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _(x, y, w1, w2):
+        def f(x, y, w1, w2):
             qml.RX(x, w1)
             qml.RX(y, w2)
             return qml.state()
 
-        if qjit:
-            _ = qml.qjit(_)
-
-        generate_mlir_graph(_)(0.1, 0.2, 0, 1)
+        generate_mlir_graph(f)(0.1, 0.2, 0, 1)
         assert_files(
             tmp_path,
             {
@@ -125,22 +132,19 @@ class TestMLIRGraph:
             },
         )
 
-    @pytest.mark.parametrize("qjit", [True, False])
-    def test_catalyst_transforms_args(self, tmp_path: Path, qjit: bool):
+    def test_catalyst_transforms_args(self, tmp_path: Path):
         """Test the MLIR graph generation with arguments to the QNode for catalyst transforms"""
 
+        @qml.qjit
         @qml.transforms.merge_rotations
         @qml.transforms.cancel_inverses
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _(x, y, w1, w2):
+        def f(x, y, w1, w2):
             qml.RX(x, w1)
             qml.RX(y, w2)
             return qml.state()
 
-        if qjit:
-            _ = qml.qjit(_)
-
-        generate_mlir_graph(_)(0.1, 0.2, 0, 1)
+        generate_mlir_graph(f)(0.1, 0.2, 0, 1)
         assert_files(
             tmp_path,
             {
@@ -150,23 +154,20 @@ class TestMLIRGraph:
             },
         )
 
-    @pytest.mark.parametrize("qjit", [True, False])
-    def test_catalyst_xdsl_transforms_args(self, tmp_path: Path, qjit: bool):
+    def test_catalyst_xdsl_transforms_args(self, tmp_path: Path):
         """Test the MLIR graph generation with arguments to the QNode for catalyst and xDSL
         transforms"""
 
+        @qml.qjit
         @qml.transforms.merge_rotations
         @iterative_cancel_inverses_pass
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _(x, y, w1, w2):
+        def f(x, y, w1, w2):
             qml.RX(x, w1)
             qml.RX(y, w2)
             return qml.state()
 
-        if qjit:
-            _ = qml.qjit(_)
-
-        generate_mlir_graph(_)(0.1, 0.2, 0, 1)
+        generate_mlir_graph(f)(0.1, 0.2, 0, 1)
         assert_files(
             tmp_path,
             {
@@ -179,9 +180,10 @@ class TestMLIRGraph:
     def test_cond(self, tmp_path: Path):
         """Test the MLIR graph generation for a conditional"""
 
+        @qml.qjit
         @merge_rotations_pass
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _(pred, arg1, arg2):
+        def f(pred, arg1, arg2):
             """Quantum circuit with conditional branches."""
 
             qml.RX(0.10, wires=0)
@@ -199,7 +201,7 @@ class TestMLIRGraph:
             qml.RX(0.10, wires=0)
             return qml.expval(qml.Z(wires=0))
 
-        generate_mlir_graph(_)(0.5, 0.1, 0.2)
+        generate_mlir_graph(f)(0.5, 0.1, 0.2)
         assert_files(
             tmp_path,
             {
@@ -217,9 +219,10 @@ class TestMLIRGraph:
         def false_fn(arg):
             qml.RY(3 * arg, 0)
 
+        @qml.qjit
         @merge_rotations_pass
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _(x, y):
+        def f(x, y):
             """Quantum circuit with conditional branches."""
 
             qml.RX(x, 0)
@@ -228,7 +231,7 @@ class TestMLIRGraph:
             qml.cond(m, true_fn, false_fn)(y)
             return qml.expval(qml.Z(0))
 
-        generate_mlir_graph(_)(0.5, 0.1)
+        generate_mlir_graph(f)(0.5, 0.1)
         assert_files(
             tmp_path,
             {
@@ -240,9 +243,10 @@ class TestMLIRGraph:
     def test_for_loop(self, tmp_path: Path):
         """Test the MLIR graph generation for a for loop"""
 
+        @qml.qjit
         @merge_rotations_pass
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _():
+        def f():
             @qml.for_loop(0, 100)
             def loop(_):
                 qml.RX(0.1, 0)
@@ -252,7 +256,7 @@ class TestMLIRGraph:
             loop()
             return qml.state()
 
-        generate_mlir_graph(_)()
+        generate_mlir_graph(f)()
         assert_files(
             tmp_path,
             {
@@ -264,9 +268,10 @@ class TestMLIRGraph:
     def test_while_loop(self, tmp_path: Path):
         """Test the MLIR graph generation for a while loop"""
 
+        @qml.qjit
         @merge_rotations_pass
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _(x):
+        def f(x):
             def cond_fn(x):
                 return x < 2
 
@@ -277,7 +282,7 @@ class TestMLIRGraph:
             loop(x)
             return qml.expval(qml.PauliZ(0))
 
-        generate_mlir_graph(_)(0.5)
+        generate_mlir_graph(f)(0.5)
         assert_files(
             tmp_path,
             {
