@@ -211,7 +211,7 @@ class DiagonalizeFinalMeasurementsPattern(
 
             qubit = observable.qubit
 
-            insert_point = InsertPoint.after(qubit.owner)
+            insert_point = InsertPoint.before(observable)
 
             commute_obs = [
                 use.operation

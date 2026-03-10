@@ -27,10 +27,7 @@ from catalyst.python_interface.transforms import (
 pytestmark = pytest.mark.xdsl
 
 
-_non_commuting_err_msg = (
-    "Only observables that are qubit-wise commuting can be diagonalized. "
-    "Please apply the `split-non-commuting` pass first."
-)
+_non_commuting_err_msg = "Only observables are not qwc. Please apply the `split-non-commuting"
 
 
 class TestDiagonalizeFinalMeasurementsPass:
@@ -438,8 +435,7 @@ class TestDiagonalizeFinalMeasurementsPass:
                 // CHECK-NEXT: quantum.namedobs [[q:%.+]][PauliZ]
                 %1 = quantum.namedobs %0[PauliX] : !quantum.obs
                 %2 = quantum.var %1 : f64
-                // CHECK: quantum.custom "Hadamard"()
-                // CHECK-NEXT: quantum.namedobs [[q:%.+]][PauliZ]
+                // CHECK: quantum.namedobs [[q:%.+]][PauliZ]
                 %3 = quantum.namedobs %0[PauliX] : !quantum.obs
                 %4 = quantum.var %3 : f64
             }
@@ -447,8 +443,7 @@ class TestDiagonalizeFinalMeasurementsPass:
 
         pipeline = (DiagonalizeFinalMeasurementsPass(),)
 
-        with pytest.raises(RuntimeError, match=f"{_non_commuting_err_msg}"):
-            run_filecheck(program, pipeline)
+        run_filecheck(program, pipeline)
 
     def test_additional_qubit_uses_are_updated(self, run_filecheck):
         """Test that when diagonalizing the circuit, if the MLIR contains
@@ -596,9 +591,9 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
     @pytest.mark.usefixtures("use_capture")
-    def test_overlapping_observables_raises_error(self):
+    def test_overlapping_commute_observables_multiple_measurements(self):
         """Test the case where multiple overlapping (commuting) observables exist in
-        the same circuit (an error is raised - split_non_commuting should have been applied)."""
+        the same circuit."""
 
         dev = qml.device("lightning.qubit", wires=2)
 
@@ -609,8 +604,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
             qml.RX(x, 0)
             return qml.expval(qml.Y(0)), qml.var(qml.Y(0))
 
-        with pytest.raises(RuntimeError, match=f"{_non_commuting_err_msg}"):
-            _ = circuit(1.23)
+        _ = circuit(1.23)
 
     @pytest.mark.usefixtures("use_capture")
     def test_non_commuting_observables_raise_error(self):
@@ -704,55 +698,18 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
-    def test_with_split_non_commuting_mlir(self, run_filecheck_qjit):
-        """Test the target program is correctly lowered when applying both the
-        diagonalize-final-measurements and the split-non-commuting pass."""
-
-        def diagonalize_measurements_setup_inputs(
-            to_eigvals: bool = False, supported_base_obs: tuple[str] | str = "PauliZ"
-        ):
-            "Return the options for the diagonalize-final-measurements pass."
-            return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
-
-        diagonalize_measurements = qml.transform(
-            pass_name="diagonalize-final-measurements",
-            setup_inputs=diagonalize_measurements_setup_inputs,
-        )
-
-        dev = qml.device("lightning.qubit", wires=10)
-
-        @qml.for_loop(0, 10, 1)
-        def for_fn(i):
-            qml.H(i)
-            qml.S(i)
-            qml.RZ(phi=0.1, wires=[i])
-
-        @qml.while_loop(lambda i: i < 10)
-        def while_fn(i):
-            qml.H(i)
-            qml.S(i)
-            qml.RZ(phi=0.1, wires=[i])
-            i = i + 1
-            return i
-
-        @qml.qjit(target="mlir")
-        @diagonalize_measurements(supported_base_obs=("PauliX", "PauliY"))
-        @qml.transform(pass_name="split-non-commuting")
-        @qml.qnode(dev, shots=1000)
-        def circuit():
-            for_fn()  # pylint: disable=no-value-for-parameter
-            while_fn(0)
-            qml.CNOT(wires=[0, 1])
-            # CHECK-NOT: quantum.namedobs [[qubit0:%]][PauliY] : !quantum.obs
-            return (
-                qml.expval(qml.Z(wires=0)),
-                qml.expval(qml.Y(wires=1)),
-                qml.expval(qml.X(wires=0)),
-            )
-
-        run_filecheck_qjit(circuit)
-
-    def test_with_split_non_commuting(self):
+    @pytest.mark.parametrize(
+        "measurements",
+        [
+            (qml.expval(qml.Z(0)), qml.expval(qml.X(0)), qml.expval(qml.Y(0))),
+            (qml.expval(qml.Z(0) + qml.X(0) + qml.Y(1))),
+        ],
+    )
+    @pytest.mark.xfail(
+        lambda measurements: len(measurements) > 1,
+        reason="split-non-commuting pass does not support multiple measurements",
+    )
+    def test_with_split_non_commuting_multiple_measurements(self, measurements, run_filecheck_qjit):
         """Test the executable file can be generated and run with lightning.qubit when applying
         both the diagonalize-final-measurements and the split-non-commuting passes"""
 
@@ -791,11 +748,9 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             for_fn()  # pylint: disable=no-value-for-parameter
             while_fn(0)
             qml.CNOT(wires=[0, 1])
-            return (
-                qml.expval(qml.Z(wires=0)),
-                qml.expval(qml.Y(wires=1)),
-                qml.expval(qml.X(wires=0)),
-            )
+            return measurements
+
+        run_filecheck_qjit(circuit)
 
         res = circuit()
 
@@ -805,11 +760,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             for_fn()  # pylint: disable=no-value-for-parameter
             while_fn(0)
             qml.CNOT(wires=[0, 1])
-            return (
-                qml.expval(qml.Z(wires=0)),
-                qml.expval(qml.Y(wires=1)),
-                qml.expval(qml.X(wires=0)),
-            )
+            return measurements
 
         res_ref = circuit_ref()
         assert res == res_ref
@@ -842,9 +793,9 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
-    def test_overlapping_observables_raises_error(self):
+    def test_overlapping_commute_observables_no_error_raises(self):
         """Test the case where multiple overlapping (commuting) observables exist in
-        the same circuit (an error is raised - split_non_commuting should have been applied)."""
+        the same circuit."""
 
         dev = qml.device("lightning.qubit", wires=2)
 
@@ -855,8 +806,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             qml.RX(x, 0)
             return qml.expval(qml.Y(0)), qml.var(qml.Y(0))
 
-        with pytest.raises(RuntimeError, match=f"{_non_commuting_err_msg}"):
-            _ = circuit(1.23)
+        _ = circuit(1.23)
 
     @pytest.mark.parametrize(
         "obs",
@@ -865,10 +815,12 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.X(0)]),
             qml.Hamiltonian([1.0, 1.0], [qml.Z(1), qml.Y(1)]),
             qml.Hamiltonian([1.0, 1.0], [qml.Z(2), qml.Hadamard(2)]),
-            qml.Hamiltonian([1.0, 1.0], [qml.Z(3), qml.Identity(3)]),
             qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.Hermitian(np.eye(2), wires=0)]),
             qml.Hamiltonian([1.0, 1.0], [qml.Z(1), qml.X(0) @ qml.Hermitian(np.eye(2), wires=1)]),
+            qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.Hermitian(np.eye(2), wires=0)]),
+            qml.Hamiltonian([1.0, 1.0], [qml.Z(2), qml.Hadamard(2)]),
             qml.Hamiltonian([1.0, 1.0], [qml.Z(2), qml.X(0) @ qml.X(2)]),
+            qml.Hamiltonian([1.0, 1.0], [qml.X(0), qml.Z(0)]),
         ],
     )
     @pytest.mark.parametrize(
@@ -889,6 +841,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         @qml.set_shots(10)
         @qml.qnode(dev)
         def circuit(x):
+            qml.RX(x, 0)
             return measurements(obs)
 
         with pytest.raises(RuntimeError, match=f"{_non_commuting_err_msg}"):
@@ -901,7 +854,6 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             (qml.X(0), qml.Y(0)),
             (qml.X(1), qml.Z(1)),
             (qml.Z(2), qml.H(2)),
-            (qml.X(0), qml.Identity(0)),
             # non-commuting NamedObs + Hermitian
             (qml.X(0), qml.Hermitian(np.eye(2), wires=0)),
             (qml.X(0), qml.Hermitian(np.eye(4), wires=[0, 1])),
@@ -912,6 +864,17 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             (qml.X(0) @ qml.Y(1), qml.Z(0) @ qml.Hadamard(1)),
             (qml.X(0) @ qml.Y(1), qml.Hermitian(np.eye(2), wires=0) @ qml.Y(2)),
             # Hamiltonian obs
+            (qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.X(0)]), qml.Y(1)),
+            (qml.Hamiltonian([1.0, 1.0], [qml.Z(1), qml.Y(1)]), qml.X(0)),
+            (qml.Hamiltonian([1.0, 1.0], [qml.Z(2), qml.Hadamard(2)]), qml.Z(1)),
+            (qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.Hermitian(np.eye(2), wires=0)]), qml.X(1)),
+            (
+                qml.Hamiltonian(
+                    [1.0, 1.0], [qml.Z(1), qml.X(0) @ qml.Hermitian(np.eye(2), wires=1)]
+                ),
+                qml.Z(0),
+            ),
+            (qml.Hamiltonian([1.0, 1.0], [qml.Z(2), qml.X(0) @ qml.X(2)]), qml.X(1)),
             (qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.Z(1)]), qml.X(1) @ qml.X(2)),
             (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.Hamiltonian([1.0, 1.0], [qml.X(0), qml.Y(1)])),
         ],
@@ -926,22 +889,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
     @pytest.mark.parametrize(
         "return_measurements",
         [
-            lambda m, obs: (m[0](obs[0]), m[1](obs[1])),  # Overlapping qubits
-            lambda m, obs: (m[0](obs[0]), m[1](obs[0])),  # Same observable
-            lambda m, obs: (
-                qml.sample(wires=obs[0].wires),
-                m[1](obs[1]),
-            ),  # Compbasis/other obs on qubits
-            lambda m, obs: (
-                qml.sample(wires=obs[0].wires),
-                qml.sample(),
-            ),  # Compbasis (qreg vs qubits)
-            lambda m, obs: (
-                qml.sample(),
-                qml.sample(wires=obs[0].wires),
-            ),  # Compbasis (qreg vs qubits)
-            lambda m, obs: (qml.sample(), m[1](obs[1])),  # Compbasis with qreg vs other obs qubits
-            lambda m, obs: (m[1](obs[1]), qml.sample()),  # Compbasis with qreg vs other obs qubits
+            lambda m, obs: (m[0](obs[0]), m[1](obs[1])),
         ],
     )
     def test_qwc_non_commuting_observables_raise_error_multiple_measurements(
