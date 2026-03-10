@@ -103,7 +103,7 @@ void createBufferizationStage(OpPassManager &pm)
     pm.addPass(mlir::createConvertElementwiseToLinalgPass());
     pm.addPass(catalyst::gradient::createGradientPreprocessingPass());
     pm.addPass(mlir::bufferization::createEmptyTensorEliminationPass());
-    pm.addPass(catalyst::quantum::createMarkEntryPointArgsNonWritablePass());
+    pm.addPass(catalyst::createMarkEntryPointArgsNonWritablePass());
     ///////////
     mlir::bufferization::OneShotBufferizePassOptions options;
     options.bufferizeFunctionBoundaries = true;

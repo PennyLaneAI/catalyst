@@ -17,15 +17,14 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/BuiltinTypes.h"
 
-#include "Quantum/Transforms/Passes.h"
+#include "Catalyst/Transforms/Passes.h"
 
 namespace catalyst {
-namespace quantum {
 
 using namespace mlir;
 
 #define GEN_PASS_DEF_MARKENTRYPOINTARGSNONWRITABLEPASS
-#include "Quantum/Transforms/Passes.h.inc"
+#include "Catalyst/Transforms/Passes.h.inc"
 
 struct MarkEntryPointArgsNonWritablePass
     : impl::MarkEntryPointArgsNonWritablePassBase<MarkEntryPointArgsNonWritablePass> {
@@ -52,5 +51,4 @@ struct MarkEntryPointArgsNonWritablePass
     }
 };
 
-} // namespace quantum
 } // namespace catalyst

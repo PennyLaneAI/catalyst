@@ -50,15 +50,6 @@ def CopyGlobalMemRefPass : Pass<"cp-global-memref"> {
     ];
 }
 
-def MarkEntryPointArgsNonWritablePass : Pass<"mark-entry-point-args-non-writable", "mlir::ModuleOp"> {
-    let summary = "Mark entry-point arguments as non-writable for bufferization.";
-
-    let dependentDialects = [
-        "bufferization::BufferizationDialect",
-        "func::FuncDialect"
-    ];
-}
-
 def AdjointLoweringPass : Pass<"adjoint-lowering"> {
     let summary = "Lower adjoint regions containing a single quantum operations.";
 
