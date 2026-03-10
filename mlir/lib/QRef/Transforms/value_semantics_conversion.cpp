@@ -68,6 +68,16 @@ namespace ReferenceToValueSemanticsConversion {
  * corresponding rQubit Value (from a qref.get operation) will extract the vQubit Values before the
  * use, and insert the vQubit Values after the use.
  *
+ * Note that the above distinction of root and non-root values is not universal. Some rQubits from
+ * qref.get ops can also be considered root. For example, since scf.if operations do not take in
+ * actual operands, the "argument rQubits" (which are supposed to be root from the above guidelines,
+ * since it is a scope argument in spirit) must be taken in via closure, regardless of whether these
+ * rQubits came from qref.get or allocation/arguments in the parent scope.
+ *
+ * The actual source of truth for the distinction is, if an rValue is recorded in the Tracker's
+ * maps, then it is considered root.
+ * It is up to the callers of this Tracker class to decide which rValues are root in their specific
+ * circumstances.
  */
 struct QubitValueTracker {
   public:
@@ -115,7 +125,7 @@ struct QubitValueTracker {
     const Value getCurrentVQubit(Value rQubit)
     {
         assert(isa<qref::QubitType>(rQubit.getType()) && "Expected qref.bit type");
-        assert(this->isRootRQubit(rQubit) && "rQubit Values indexed from a rQreg are not tracked");
+        assert(this->isRootRQubit(rQubit) && "The provided qref.bit value is not root");
 
         Value vQubit = this->qubit_map.at(rQubit);
         assert(isa<quantum::QubitType>(vQubit.getType()) && "Expected quantum.bit type");
@@ -175,11 +185,11 @@ struct QubitValueTracker {
  * and inserted back immediately after the use. They are not tracked globally across uses, unlike
  * the root Values.
  *
- * If the user op consumes the extracted vQubits but does not return vQubit results (e.g. observable
- * ops), the extracted vQubits are inserted.
+ * If the given user op consumes the extracted vQubits but does not return vQubit results (e.g.
+ * observable ops), the extracted vQubits are inserted.
  *
  * The order of the extract and insert operations created are in the order that the non-root
- * rQubit Values appear in the given operation.
+ * rQubit Values appear in the user operation.
  *
  * When an operation (rOp) using non-root rQubit Values is interfacing with this struct, it must
  * guarantee the following are true on the new operation (vOp) it creates in the value semantics
@@ -434,21 +444,24 @@ struct TransientQubitExtractor {
  */
 Value getRSourceRegisterValue(Value rQubit)
 {
-    assert(isa<qref::QubitType>(rQubit.getType()) && "Can only query qref.bit types");
+    assert(isa<qref::QubitType>(rQubit.getType()) &&
+           "Can only query qref.bit types for source qref.reg values");
     auto getOp = dyn_cast<qref::GetOp>(rQubit.getDefiningOp());
     assert(getOp && "Expected a non-root rQubit coming from a qref.get op");
     return getOp.getQreg();
 }
 
 /**
-Collect the rQreg and rQubit Values that are captured into a region from above via closure.
-This includes any rQregs that produce rQubits that the region captures from above via closure.
-
-Reference semantics dialect operations do not take in or produce qreg Values, which means all
-qreg Values are taken in via closure from above.
-
-When converting to value semantics, the vQregs and vQubits need to be taken in by the region-ed
-operations explicitly.
+ * @brief Collect the rQreg and rQubit Values that are captured into a region from above by closure.
+ *
+ * Reference semantics dialect operations do not take in or produce qreg Values, which means all
+ * qreg Values are taken in via closure from above.
+ *
+ * When converting to value semantics, the vQregs and vQubits need to be taken in by the region-ed
+ * operations explicitly.
+ *
+ * @param r
+ * @param necessaryRegionRValues
  */
 void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValues)
 {
@@ -472,7 +485,7 @@ void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValu
                 }
             }
             else if (isa<qref::QubitType>(v.getType())) {
-                if (isa<BlockArgument>(v) || isa<qref::AllocQubitOp>(v.getDefiningOp())) {
+                if (isa<BlockArgument>(v) || !isa<qref::GetOp>(v.getDefiningOp())) {
                     // Ignore allocations from inside the region itself
                     if (v.getParentRegion()->isProperAncestor(&r)) {
                         necessaryRegionRValues.insert(v);
@@ -483,7 +496,7 @@ void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValu
                     if (rQreg.getParentRegion()->isProperAncestor(&r)) {
                         auto getOp = cast<qref::GetOp>(v.getDefiningOp());
                         if (getOp.getIdx() && getOp.getIdx().getParentRegion() == &r) {
-                            // extract index is from within the region, must take in the reg
+                            // dynamic extract index is from within the region, must take in the reg
                             necessaryRegionRValues.insert(rQreg);
                         }
                         else {
@@ -497,12 +510,16 @@ void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValu
 }
 
 /**
-Given a qref gate operation, compute the result segment sizes for the corresponding value semantics
-gate operation.
-
-The reference semantics gates do not produce results.
-Therefore, we need to manually set the result segment sizes for the corresponding
-value semantics gate.
+ * @brief Given a qref gate operation, compute the result segment sizes for the corresponding value
+ * semantics gate operation.
+ *
+ * The reference semantics gates do not produce results.
+ * Therefore, we need to manually set the result segment sizes for the corresponding value semantics
+ * gate,
+ *
+ * @param builder
+ * @param rGateOp
+ * @return DenseI32ArrayAttr
  */
 DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumGate rGateOp)
 {
@@ -511,6 +528,17 @@ DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumGate r
     return builder.getDenseI32ArrayAttr({non_ctrl_len, ctrl_len});
 }
 
+/**
+ * @brief Append the current root vQreg and vQubit values to the terminator operation of a region,
+ * assuming the root rQreg and rQubit values are the arguments to the (unique) block in the region.
+ * Returns the new terminator operation, with the newly added returns.
+ *
+ * This is necessary since qref operations do not return quantum values.
+ *
+ * @param r
+ * @param tracker
+ * @return Operation*
+ */
 Operation *addRootVValuesToRetOp(Region &r, QubitValueTracker &tracker)
 {
     Block &block = r.front();
@@ -532,6 +560,7 @@ Operation *addRootVValuesToRetOp(Region &r, QubitValueTracker &tracker)
     else {
         assert(false && "Unexpected region!");
     }
+
     SmallVector<Value> retVals(retOp->getOperands());
     for (auto arg : block.getArguments()) {
         if (isa<qref::QubitType>(arg.getType())) {
@@ -594,6 +623,7 @@ OpTy migrateOpToValueSemantics(IRRewriter &builder, Operation *qrefOp, QubitValu
             vOperands.push_back(tracker.getCurrentVQreg(v));
         }
         else {
+            // This branch includes classical operands and non-root rQubit operands
             vOperands.push_back(v);
         }
     }
@@ -826,7 +856,11 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
 
     scf::IfOp newIfOp;
     {
-        // 1. <Add comment>
+        // 1. Send in the vValues from above as arguments
+        // This handles the flow from outside the new if op into the new if op
+        // i.e. the extract op results are viewed as the new if op's "operands"
+        // Note that since scf.if cannot formally take operands, we need to pretend the
+        // extracted vQubits are "root".
         SmallVector<Value> regionOperands;
         regionOperands.append(rValuesUsedByRegion.begin(), rValuesUsedByRegion.end());
         TransientQubitExtractor extractor(ifOp, regionOperands, tracker, builder);
@@ -841,15 +875,19 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
             }
         }
 
+        // scf.if op always requires an else block if returning any results
         newIfOp = scf::IfOp::create(builder, loc, newResultTypes, ifOp.getCondition(),
                                     /*withElseRegion=*/true);
 
+        // 2. Handle the "then" region
+        // We are effectively treating the region as a subroutine, so all input rValues are root
+        // The subroutine needs its own tracker with its own root values
         builder.eraseBlock(newIfOp.thenBlock());
         builder.inlineRegionBefore(ifOp.getThenRegion(), newIfOp.getThenRegion(),
                                    newIfOp.getThenRegion().end());
 
-        // "then" region
-        QubitValueTracker thenRegionTracker = tracker; // copy over all the existing root Value maps
+        // Copy over all the existing root Value maps in the outer scope
+        QubitValueTracker thenRegionTracker = tracker;
 
         // newly extracted qubits, though non-root outside, are considered root inside!
         for (auto [vQubit, idx] : llvm::zip_equal(extractor.getExtractedVQubits(),
@@ -859,7 +897,7 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
 
         walkRegionAndHandle(builder, newIfOp.getThenRegion(), thenRegionTracker);
 
-        // yield all
+        // Yield the new quantum results
         scf::YieldOp thenYieldOp = newIfOp.thenYield();
         SmallVector<Value> thenYieldVals(thenYieldOp->getOperands());
         for (Value v : rValuesUsedByRegion) {
@@ -872,16 +910,15 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
         }
         thenYieldOp->setOperands(thenYieldVals);
 
-        // "else" region
+        // 3. Handle "else" region
+        // If none existed before, we need to create an empty "else" region, just for the yield
+        // structure demanded by scf.if op
         if (hasElseRegion) {
             builder.eraseBlock(newIfOp.elseBlock());
             builder.inlineRegionBefore(ifOp.getElseRegion(), newIfOp.getElseRegion(),
                                        newIfOp.getElseRegion().end());
 
-            QubitValueTracker elseRegionTracker =
-                tracker; // copy over all the existing root Value maps
-
-            // newly extracted qubits, though non-root outside, are considered root inside!
+            QubitValueTracker elseRegionTracker = tracker;
             for (auto [vQubit, idx] : llvm::zip_equal(extractor.getExtractedVQubits(),
                                                       extractor.getNonRootQubitOperandIndices())) {
                 elseRegionTracker.setCurrentVQubit(rValuesUsedByRegion[idx], vQubit);
@@ -889,7 +926,6 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
 
             walkRegionAndHandle(builder, newIfOp.getElseRegion(), elseRegionTracker);
 
-            // yield all
             scf::YieldOp elseYieldOp = newIfOp.elseYield();
             SmallVector<Value> elseYieldVals(elseYieldOp->getOperands());
             for (Value v : rValuesUsedByRegion) {
@@ -984,6 +1020,7 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
                 newIterArgs.push_back(tracker.getCurrentVQreg(rValue));
             }
             else {
+                // To be replaced with extracted vQubits
                 newIterArgs.push_back(rValue);
             }
         }
@@ -1080,6 +1117,7 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
                     newIterArgs.push_back(tracker.getCurrentVQubit(rValue));
                 }
                 else {
+                    // To be replaced with extracted vQubits
                     newIterArgs.push_back(rValue);
                 }
             }
@@ -1099,9 +1137,6 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
         // The new loop has !quantum.bit/reg as input types now on the region's block
         // We need to overwrite it with the block from the old loop, so it can
         // see !qref.bit/reg types on the block
-        // builder.eraseBlock(newLoop.getBeforeBody());
-        // builder.eraseBlock(newLoop.getAfterBody());
-
         builder.inlineRegionBefore(whileOp.getBefore(), newLoop.getBefore(),
                                    newLoop.getBefore().end());
         builder.inlineRegionBefore(whileOp.getAfter(), newLoop.getAfter(),
