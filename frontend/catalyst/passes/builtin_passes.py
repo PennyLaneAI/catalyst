@@ -1482,7 +1482,13 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
     return PassPipelineWrapper(qnode, "decompose-arbitrary-ppr")
 
 
-def graph_decomposition(qnode):
+def graph_decompose(
+    qnode=None,
+    *,
+    gateset: dict,
+    fixed_decomps: dict | None = None,
+    alt_decomps: dict | None = None,
+):
     R"""
     Specify that the ``-graph-decomposition`` MLIR compiler pass for applying optimal gate
     decompositions should be applied to the decorated QNode during :func:`~.qjit` compilation.
@@ -1508,4 +1514,20 @@ def graph_decomposition(qnode):
 
     TODO add an example once the implementation is complete.
     """
-    return PassPipelineWrapper(qnode, "graph-decomposition")
+
+    if qnode is None:
+        return functools.partial(
+            graph_decompose,
+            gateset=gateset,
+            fixed_decomps=fixed_decomps,
+            alt_decomps=alt_decomps,
+        )
+
+    graph_decompose_pass = {
+        "graph-decompose": {
+            "fixed_decomps": fixed_decomps,
+            "alt_decomps": alt_decomps,
+        }
+    }
+
+    return PassPipelineWrapper(qnode, graph_decompose_pass)
