@@ -121,6 +121,9 @@ class CompilationPass(ModulePass):
     """
 
     def __init_subclass__(cls: type["CompilationPass"]) -> None:
+        if not hasattr(cls, "name"):
+            raise TypeError("All CompilationPasses must have a name.")
+
         cls._rewrite_patterns = []
 
         if cls.action is not CompilationPass.action:

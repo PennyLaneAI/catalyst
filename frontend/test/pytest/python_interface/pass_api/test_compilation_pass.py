@@ -132,6 +132,14 @@ class TestCompilationPass:
 
     # pylint: disable=too-many-arguments,too-many-positional-arguments,redefined-outer-name
 
+    def test_no_name_error(self):
+        """Test that an error is raised if trying to create a pass that doesn't have a name."""
+
+        with pytest.raises(TypeError, match="All CompilationPasses must have a name"):
+
+            class _Pass(CompilationPass):
+                """Test pass."""
+
     @pytest.mark.parametrize(
         "greedy,recursive,expected_op_types,expected_counts",
         [
