@@ -320,7 +320,6 @@
   erasing composite obs (`TensorOp`, `HamiltonianOp`).
   [(#2567)](https://github.com/PennyLaneAI/catalyst/pull/2567)
 
-
 * Fix a bug where `draw_graph` failed at rendering measurements containing scalar products of observables.
   [(#2545)](https://github.com/PennyLaneAI/catalyst/pull/2545)
 
