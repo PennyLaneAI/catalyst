@@ -241,8 +241,8 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
                 continue;
             }
 
-            // Queue operand producers before erasing. And skip for observable ops
-            if (!isObservableOp(op)) {
+            // Queue operand producers before erasing.
+            if (!isa<NamedObsOp, ComputationalBasisOp, HermitianOp>(op)) {
                 for (Value operand : op->getOperands()) {
                     if (auto *defOp = operand.getDefiningOp()) {
                         removeOps.push_back(defOp);
