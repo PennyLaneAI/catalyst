@@ -280,7 +280,7 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
         NonCommutingObservableValidator(op, self.supported_base_obs)
 
         pattern_rewriter.PatternRewriteWalker(
-            DiagonalizeFinalMeasurementsPattern(self.supported_base_obs),
+            DiagonalizeFinalMeasurementsPattern(self.supported_base_obs)
         ).rewrite_module(op)
 
 
