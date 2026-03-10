@@ -1,0 +1,57 @@
+// Copyright 2026 Xanadu Quantum Technologies Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/BuiltinTypes.h"
+
+#include "Quantum/Transforms/Passes.h"
+
+namespace catalyst {
+namespace quantum {
+
+using namespace mlir;
+
+#define GEN_PASS_DEF_MARKENTRYPOINTARGSNONWRITABLEPASS
+#include "Quantum/Transforms/Passes.h.inc"
+
+struct MarkEntryPointArgsNonWritablePass
+    : impl::MarkEntryPointArgsNonWritablePassBase<MarkEntryPointArgsNonWritablePass> {
+    using MarkEntryPointArgsNonWritablePassBase::MarkEntryPointArgsNonWritablePassBase;
+
+    void runOnOperation() final
+    {
+        auto module = getOperation();
+        auto nonWritable = BoolAttr::get(&getContext(), false);
+
+        for (auto funcOp : module.getOps<func::FuncOp>()) {
+            if (!funcOp->hasAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName())) {
+                continue;
+            }
+
+            for (auto [index, arg] : llvm::enumerate(funcOp.getArguments())) {
+                if (!isa<TensorType, MemRefType>(arg.getType())) {
+                    continue;
+                }
+                funcOp.setArgAttr(index, bufferization::BufferizationDialect::kWritableAttrName,
+                                  nonWritable);
+            }
+        }
+    }
+};
+
+} // namespace quantum
+} // namespace catalyst
