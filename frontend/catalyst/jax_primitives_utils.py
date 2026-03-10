@@ -410,7 +410,7 @@ def transform_named_sequence_lowering(pipeline, sym_name):
                     ir.UnitAttr.get()
                 )
 
-        _ = YieldOp(operands_=[])
+        YieldOp(operands_=[])
 
     # Set an attribute on the transformer module if we created any xDSL pass operations
     if uses_xdsl_passes:
