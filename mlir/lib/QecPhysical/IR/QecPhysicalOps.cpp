@@ -145,7 +145,7 @@ LogicalResult ExtractQubitOp::verify()
     const auto qubitTypeRole = getQubit().getType().getRole();
 
     if (qubitTypeRole != QecPhysicalQubitRole::Data) {
-        return emitWarning() << "only physical qubits with role '"
+        return emitOpError() << "only physical qubits with role '"
                              << stringifyQecPhysicalQubitRole(QecPhysicalQubitRole::Data)
                              << "' should be extracted from a physical codeblock, but got '"
                              << stringifyQecPhysicalQubitRole(qubitTypeRole) << "'";
@@ -174,7 +174,7 @@ LogicalResult InsertQubitOp::verify()
     const auto qubitTypeRole = getQubit().getType().getRole();
 
     if (qubitTypeRole != QecPhysicalQubitRole::Data) {
-        return emitWarning() << "only physical qubits with role '"
+        return emitOpError() << "only physical qubits with role '"
                              << stringifyQecPhysicalQubitRole(QecPhysicalQubitRole::Data)
                              << "' should be inserted into a physical codeblock, but got '"
                              << stringifyQecPhysicalQubitRole(qubitTypeRole) << "'";

@@ -159,7 +159,7 @@ func.func @test_insert_qubit_index_out_of_bounds(%b : !qecp.codeblock<1 x 7>, %q
 // -----
 
 func.func @test_extract_block_with_aux_qubit(%b : !qecp.codeblock<1 x 7>) {
-    // expected-warning@below {{only physical qubits with role 'data' should be extracted}}
+    // expected-error@below {{only physical qubits with role 'data' should be extracted}}
     %q = qecp.extract %b[0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<aux>
     return
 }
@@ -167,7 +167,7 @@ func.func @test_extract_block_with_aux_qubit(%b : !qecp.codeblock<1 x 7>) {
 // -----
 
 func.func @test_insert_block_with_aux_qubit(%b : !qecp.codeblock<1 x 7>, %q : !qecp.qubit<aux>) {
-    // expected-warning@below {{only physical qubits with role 'data' should be inserted}}
+    // expected-error@below {{only physical qubits with role 'data' should be inserted}}
     %q1 = qecp.insert %b[0], %q : !qecp.codeblock<1 x 7>, !qecp.qubit<aux>
     return
 }
