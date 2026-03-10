@@ -108,7 +108,7 @@ pl_version = dep_versions.get("pennylane")
 lq_version = dep_versions.get("lightning")
 
 pl_min_release = "0.44.1"
-lq_min_release = pl_min_release
+lq_min_release = "0.44.0"
 
 if pl_version is not None:
     pennylane_dep = f"pennylane=={pl_version}"  # use TestPyPI wheels, git is not allowed on PyPI
