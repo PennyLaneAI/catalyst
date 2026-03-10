@@ -1515,6 +1515,20 @@ def graph_decompose(
     TODO add an example once the implementation is complete.
     """
 
+    graph_decompose_pass = {
+        "graph-decompose": {}
+        | (
+            {"fixed_decomps": {str(op): rule.__name__ for op, rule in fixed_decomps.items()}}
+            if fixed_decomps
+            else {}
+        )
+        | (
+            {"alt_decomps": {str(op): rule.__name__ for op, rule in alt_decomps.items()}}
+            if alt_decomps
+            else {}
+        )
+    }
+
     if qnode is None:
         return functools.partial(
             graph_decompose,
@@ -1522,12 +1536,5 @@ def graph_decompose(
             fixed_decomps=fixed_decomps,
             alt_decomps=alt_decomps,
         )
-
-    graph_decompose_pass = {
-        "graph-decompose": {
-            "fixed_decomps": fixed_decomps,
-            "alt_decomps": alt_decomps,
-        }
-    }
 
     return PassPipelineWrapper(qnode, graph_decompose_pass)
