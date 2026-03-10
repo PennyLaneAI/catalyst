@@ -741,6 +741,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             qml.CNOT(wires=[0, 1])
             # CHECK: quantum.namedobs [[q:%.+]][PauliZ]
             return qml.expval(obs)
+
         run_filecheck_qjit(circuit)
 
         res = circuit()
