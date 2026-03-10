@@ -176,11 +176,11 @@ def disentangle_cnot(qnode):
 
     When inspecting the circuit resources, only ``PauliX`` gates are present.
 
-    >>> qml.specs(circuit, level=2)()
+    >>> print(qml.specs(circuit, level=1)())
     Device: lightning.qubit
     Device wires: 2
     Shots: Shots(total=None)
-    Level: disentangle-cnot (MLIR-1)
+    Level: disentangle-cnot
     <BLANKLINE>
     Wire allocations: 2
     Total gates: 2
@@ -229,15 +229,13 @@ def disentangle_swap(qnode):
             qml.SWAP([0, 1])
             return qml.state()
 
-        qml.specs(circuit, level=2)()
-
     When inspecting the circuit resources, the ``SWAP`` gate is no longer present.
 
-    >>> qml.specs(circuit, level=2)()
+    >>> print(qml.specs(circuit, level=1)())
     Device: lightning.qubit
     Device wires: 2
     Shots: Shots(total=None)
-    Level: disentangle-swap (MLIR-1)
+    Level: disentangle-swap
     <BLANKLINE>
     Wire allocations: 2
     Total gates: 5
@@ -619,26 +617,23 @@ def to_ppr(qnode):
 
     >>> circuit()
     Array(-1., dtype=float64)
-    >>> print(qml.specs(circuit, level=2)())
+    >>> print(qml.specs(circuit, level=1)())
     Device: lightning.qubit
     Device wires: 2
     Shots: Shots(total=None)
-    Level: 2
+    Level: to-ppr
     <BLANKLINE>
-    Resource specifications:
-        Total wire allocations: 2
-        Total gates: 11
-        Circuit depth: Not computed
-    <BLANKLINE>
-        Gate types:
-            GlobalPhase: 3
-            PPR-pi/4-w1: 5
-            PPR-pi/4-w2: 1
-            PPM-w1: 1
-            PPR-pi/8-w1: 1
-    <BLANKLINE>
-        Measurements:
-            expval(PauliZ): 1
+    Wire allocations: 2
+    Total gates: 11
+    Gate counts:
+    - GlobalPhase: 3
+    - PPR-pi/4-w1: 5
+    - PPR-pi/4-w2: 1
+    - PPM-w1: 1
+    - PPR-pi/8-w1: 1
+    Measurements:
+    - expval(PauliZ): 1
+    Depth: Not computed
 
     In the above output, ``PPR-theta-w<int>`` denotes the type of PPR present in the circuit, where
     ``theta`` is the PPR angle (:math:`\theta`) and ``w<int>`` denotes the PPR weight (the number of
@@ -720,24 +715,21 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
 
         >>> circuit()
         Array(-1.11022302e-16, dtype=float64)
-        >>> print(qml.specs(circuit, level=3)())
-        Device: null.qubit
+        >>> print(qml.specs(circuit, level=2)())
+        Device: lightning.qubit
         Device wires: 2
         Shots: Shots(total=None)
-        Level: 3
+        Level: commute-ppr
         <BLANKLINE>
-        Resource specifications:
-            Total wire allocations: 2
-            Total gates: 7
-            Circuit depth: Not computed
-        <BLANKLINE>
-            Gate types:
-                PPR-pi/8-w1: 1
-                PPR-pi/4-w1: 5
-                PPR-pi/4-w2: 1
-        <BLANKLINE>
-            Measurements:
-                expval(PauliZ): 1
+        Wire allocations: 2
+        Total gates: 7
+        Gate counts:
+        - PPR-pi/8-w1: 1
+        - PPR-pi/4-w1: 5
+        - PPR-pi/4-w2: 1
+        Measurements:
+        - expval(PauliZ): 1
+        Depth: Not computed
 
         In the example above, the Clifford PPRs (:class:`~.PauliRot` instances with an angle of rotation
         of :math:`\tfrac{\pi}{2}`) will be commuted past the non-Clifford PPR (:class:`~.PauliRot`
@@ -821,23 +813,20 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
 
     >>> circuit()
     Array([0.5, 0.5, 0. , 0. ], dtype=float64)
-    >>> print(qml.specs(circuit, level=3)())
-    Device: null.qubit
+    >>> print(qml.specs(circuit, level=2)())
+    Device: lightning.qubit
     Device wires: 2
     Shots: Shots(total=None)
-    Level: 3
+    Level: merge-ppr-ppm
     <BLANKLINE>
-    Resource specifications:
-        Total wire allocations: 2
-        Total gates: 3
-        Circuit depth: Not computed
-    <BLANKLINE>
-        Gate types:
-            PPM-w2: 1
-            PPR-pi/4-w1: 2
-    <BLANKLINE>
-        Measurements:
-            probs(all wires): 1
+    Wire allocations: 2
+    Total gates: 3
+    Gate counts:
+    - PPM-w2: 1
+    - PPR-pi/4-w1: 2
+    Measurements:
+    - probs(all wires): 1
+    Depth: Not computed
 
     If a merging resulted in a PPM acting on more than ``max_pauli_size`` qubits, that merging
     operation would be skipped. In the above output, ``PPM-w<int>`` denotes the PPM weight (the
@@ -932,27 +921,24 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
 
             return qml.expval(qml.Z(0))
 
-    >>> print(qml.specs(circuit, level=3)())
+    >>> print(qml.specs(circuit, level=2)())
     Device: null.qubit
     Device wires: 2
     Shots: Shots(total=None)
-    Level: 3
+    Level: ppr-to-ppm
     <BLANKLINE>
-    Resource specifications:
-        Total wire allocations: 8
-        Total gates: 22
-        Circuit depth: Not computed
-    <BLANKLINE>
-        Gate types:
-            PPM-w2: 6
-            PPM-w1: 7
-            PPM-w3: 1
-            PPR-pi/2-w1: 6
-            PPR-pi/2-w2: 1
-            pbc.fabricate: 1
-    <BLANKLINE>
-        Measurements:
-            expval(PauliZ): 1
+    Wire allocations: 8
+    Total gates: 22
+    Gate counts:
+    - PPM-w2: 6
+    - PPM-w1: 7
+    - PPM-w3: 1
+    - PPR-pi/2-w1: 6
+    - PPR-pi/2-w2: 1
+    - pbc.fabricate: 1
+    Measurements:
+    - expval(PauliZ): 1
+    Depth: Not computed
 
     In the above output, ``PPR-theta-w<int>`` denotes the type of PPR present in the circuit, where
     ``theta`` is the PPR angle (:math:`\theta`) and ``w<int>`` denotes the PPR weight (the number of
@@ -1050,28 +1036,25 @@ def ppm_compilation(
             qml.T(0)
             return qml.expval(qml.Z(0))
 
-    >>> print(qml.specs(circuit, level=2)())
+    >>> print(qml.specs(circuit, level=1)())
     Device: null.qubit
     Device wires: 2
     Shots: Shots(total=None)
-    Level: 2
+    Level: ppm-compilation
     <BLANKLINE>
-    Resource specifications:
-        Total wire allocations: 8
-        Total gates: 25
-        Circuit depth: Not computed
-    <BLANKLINE>
-        Gate types:
-            GlobalPhase: 3
-            pbc.fabricate: 1
-            PPM-w2: 6
-            PPM-w1: 7
-            PPM-w3: 1
-            PPR-pi/2-w1: 6
-            PPR-pi/2-w2: 1
-    <BLANKLINE>
-        Measurements:
-            expval(PauliZ): 1
+    Wire allocations: 8
+    Total gates: 25
+    Gate counts:
+    - GlobalPhase: 3
+    - pbc.fabricate: 1
+    - PPM-w2: 6
+    - PPM-w1: 7
+    - PPM-w3: 1
+    - PPR-pi/2-w1: 6
+    - PPR-pi/2-w2: 1
+    Measurements:
+    - expval(PauliZ): 1
+    Depth: Not computed
 
     In the above output, ``PPR-theta-w<int>`` denotes the type of PPR present in the circuit, where
     ``theta`` is the PPR angle (:math:`\theta`) and ``w<int>`` denotes the PPR weight (the number of
@@ -1433,7 +1416,7 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
 
         import pennylane as qml
 
-        @qml.qjit(target="mlir", capture=True)
+        @qml.qjit(capture=True)
         @qml.transforms.decompose_arbitrary_ppr
         @qml.transforms.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=3))
@@ -1441,27 +1424,24 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
             qml.PauliRot(0.1, pauli_word="XY", wires=[0, 1])
             return qml.expval(qml.Z(0))
 
-    >>> print(qml.specs(circuit, level=3)())
+    >>> print(qml.specs(circuit, level=2)())
     Device: null.qubit
     Device wires: 3
     Shots: Shots(total=None)
-    Level: 3
+    Level: decompose-arbitrary-ppr
     <BLANKLINE>
-    Resource specifications:
-        Total wire allocations: 3
-        Total gates: 6
-        Circuit depth: Not computed
-    <BLANKLINE>
-        Gate types:
-            pbc.prepare: 1
-            PPM-w3: 1
-            PPM-w1: 1
-            PPR-pi/2-w1: 1
-            PPR-pi/2-w2: 1
-            PPR-Phi-w1: 1
-    <BLANKLINE>
-        Measurements:
-            expval(PauliZ): 1
+    Wire allocations: 3
+    Total gates: 6
+    Gate counts:
+    - pbc.prepare: 1
+    - PPM-w3: 1
+    - PPM-w1: 1
+    - PPR-pi/2-w1: 1
+    - PPR-pi/2-w2: 1
+    - PPR-Phi-w1: 1
+    Measurements:
+    - expval(PauliZ): 1
+    Depth: Not computed
 
     In the above output, ``PPR-theta-w<int>`` denotes the type of PPR present in the circuit, where
     ``theta`` is the PPR angle (:math:`\theta`) and ``w<int>`` denotes the PPR weight (the number of
