@@ -166,21 +166,12 @@ class MeasurementsFromSamplesPattern(RewritePattern):
                         f"rewrite pattern, but received '{op.type.data}'"
                     )
 
-            # pl_op_equivalent = cls.get_pl_op_equivalent(op)
             pl_op_equivalent = qp.prod(*[qp.Z(i) for i, _ in enumerate(all_obs)])
             in_qubits = [obs.operands[0] for obs in all_obs]
 
         elif isinstance(op, quantum.HamiltonianOp):
-            coeffs = op.operands[0]
-            obs = op.operands[1:]
-            print(f"coeffs: {coeffs}")
-            print(f"obs: {obs}")
-
-            all_obs = [obs.owner for obs in op.operands]
-            print(len(all_obs))
-            print(all_obs)
-
-            print([obs.type.data for obs in all_obs[1:]])
+            coeffs = op.operands[0].owner.operands[0].owner.operands[0].owner.value # ahhhhhhhh
+            observables = op.operands[1:]
 
             raise NotImplementedError("you haven't added Hamiltonian support yet")
 
@@ -774,3 +765,98 @@ def _postprocessing_probs(samples):
         counts = counts.at[i].add(1)
 
     return counts / n_samples
+
+
+
+
+#######################################################################################
+
+from dataclasses import dataclass
+
+from xdsl import context, passes, pattern_rewriter
+from xdsl.dialects import builtin, func
+from xdsl.ir import Operation, SSAValue
+from xdsl.rewriter import InsertPoint
+
+from catalyst.python_interface.dialects import quantum
+from catalyst.python_interface.pass_api import compiler_transform
+
+
+@dataclass(frozen=True)
+class TemporaryPass(passes.ModulePass):
+    """Pass that puts gate operations into an outline_state_evolution callable."""
+
+    name = "temp-pass"
+
+    def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
+        """Apply temporary pass."""
+        for op_ in op.ops:
+            if isinstance(op_, func.FuncOp) and "qnode" in op_.attributes:
+                rewriter = pattern_rewriter.PatternRewriter(op_)
+                AddSingleQnodePostProcessing().match_and_rewrite(op_, rewriter)
+
+
+temporary_pass = compiler_transform(TemporaryPass)
+
+
+class AddSingleQnodePostProcessing(pattern_rewriter.RewritePattern):
+    """RewritePattern for making each Qnode intro a classical function that 
+    calls the QNode and performs post-processing."""
+
+    # pylint: disable=too-few-public-methods
+    def _get_parent_module(self, op: func.FuncOp) -> builtin.ModuleOp:
+        """Get the first ancestral builtin.ModuleOp op of a given func.func op."""
+        while (op := op.parent_op()) and not isinstance(op, builtin.ModuleOp):
+            pass  # pragma: no cover
+        if op is None:
+            raise RuntimeError(  # pragma: no cover
+                "The given qnode func is not nested within a builtin.module. Please ensure the "
+                "qnode func is defined in a builtin.module."
+            )
+        return op
+
+    def __init__(self):
+        self.module: builtin.ModuleOp = None
+        self.original_func_op: func.FuncOp = None
+
+    def match_and_rewrite(
+        self, func_op: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter, /
+    ):
+        """Transform a quantum function (qnode) to outline state evolution regions.
+        This implementation assumes that there is only one `quantum.alloc` operation in
+        the func operations with a "qnode" attribute and all quantum operations are between
+        the unique `quantum.alloc` operation and the terminal_boundary_op. All operations in between
+        are to be moved to the newly created outline-state-evolution function operation."""
+        if "qnode" not in func_op.attributes:
+            return
+
+        self.original_func = func_op
+        self.module = self._get_parent_module(func_op)
+
+        self._wrap_qnode_in_classical_post_processing(rewriter)
+
+    def _wrap_qnode_in_classical_post_processing(self, rewriter):
+        """Clones some qnode FuncOp (circ_name) as circ_name.from_samples 
+        and inserts it, then replaces circ_name with a FuncOp of the same name 
+        that calls circ_name.from_samples."""
+
+        # probably we don't actually want to start inserting things until we have 
+        # a more complete version of them, but we'll do this for now to make
+        # it easier to inspect as I go along
+
+        qnode = self.original_func.clone()
+        qnode_name = qnode.sym_name.data + ".from_samples"
+        qnode.sym_name = builtin.StringAttr(qnode_name)
+        rewriter.insert_op(qnode, InsertPoint.at_end(self.module.body.block))
+
+        call_args = self.original_func.args
+        result_types = self.original_func.result_types
+        func_type = self.original_func.function_type
+
+        post_processing_fn = func.FuncOp(
+            self.original_func.sym_name.data, func_type, visibility="public"
+        )
+        rewriter.replace_op(self.original_func, post_processing_fn)
+
+        call_op = func.CallOp(qnode_name, call_args, result_types)
+        post_processing_fn.body.block.add_op(call_op)
