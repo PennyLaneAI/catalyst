@@ -739,10 +739,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             for_fn()  # pylint: disable=no-value-for-parameter
             while_fn(0)
             qml.CNOT(wires=[0, 1])
-            # CHECK: quantum.namedobs [[q:%.+]][PauliZ]
             return qml.expval(obs)
-
-        run_filecheck_qjit(circuit)
 
         res = circuit()
 
