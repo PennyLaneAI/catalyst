@@ -51,6 +51,7 @@ from catalyst.passes.builtin_passes import (
     to_ppr,
 )
 from catalyst.passes.pass_api import Pass, PassPlugin, apply_pass, apply_pass_plugin
+from catalyst.python_interface.transforms.quantum import combine_global_phases, parity_synth
 
 __all__ = (
     "gridsynth",
@@ -64,6 +65,8 @@ __all__ = (
     "decompose_arbitrary_ppr",
     "cancel_inverses",
     "merge_rotations",
+    "parity_synth",
+    "combine_global_phases",
     "disentangle_cnot",
     "disentangle_swap",
     "ions_decomposition",

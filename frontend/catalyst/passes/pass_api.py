@@ -375,6 +375,8 @@ def _API_name_to_pass_name():
     return {
         "gridsynth": "gridsynth",
         "cancel_inverses": "cancel-inverses",
+        "parity_synth": "parity-synth",
+        "combine_global_phases": "combine-global-phases",
         "decompose_lowering": "decompose-lowering",
         "disentangle_cnot": "disentangle-CNOT",
         "disentangle_swap": "disentangle-SWAP",
