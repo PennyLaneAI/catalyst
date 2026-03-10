@@ -36,15 +36,12 @@ from catalyst.python_interface.dialects.quantum import (
     ComputationalBasisOp,
     CustomOp,
     GlobalPhaseOp,
-    HamiltonianOp,
     HermitianOp,
     MultiRZOp,
     NamedObservable,
     NamedObservableAttr,
     NamedObsOp,
     QubitUnitaryOp,
-    TensorOp,
-    TerminalMeasurementOp,
 )
 from catalyst.python_interface.pass_api import compiler_transform
 
@@ -154,7 +151,7 @@ class NonCommutingObservableValidator:
     def _run_non_overlapping_validation(self):
         """Strictest check: no two observables can share a qubit."""
         if self.overlapped_qubits or (self.visited_qreg and self.obs_on_qubits):
-            raise RuntimeError(self.ERROR_MSG)
+            raise RuntimeError(self._error_msg)
 
 
 class DiagonalizeFinalMeasurementsPattern(
