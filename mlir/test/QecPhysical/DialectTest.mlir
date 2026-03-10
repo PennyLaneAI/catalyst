@@ -120,3 +120,9 @@ func.func @test_dealloc_aux(%arg0 : !qecp.qubit<aux>) {
     qecp.dealloc_aux %arg0 : !qecp.qubit<aux>
     func.return
 }
+
+// -----
+
+func.func @test_tanner_graph(%arg0 : !qecp.tanner_graph<8, 6, i32>) {
+    func.return
+}
