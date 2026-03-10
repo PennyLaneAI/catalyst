@@ -18,10 +18,10 @@ import copy
 import functools
 import json
 
+from pennylane.transforms.core import Transform
+
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.passes.pass_api import PassPipelineWrapper
-from catalyst.python_interface.transforms import combine_global_phases as xcombine_global_phases
-from catalyst.python_interface.transforms import parity_synth as xparity_synth
 from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=line-too-long, too-many-lines
@@ -515,7 +515,7 @@ def combine_global_phases(qnode):
         - state(all wires): 1
         Depth: Not computed
     """
-    return xcombine_global_phases(qnode)
+    return Transform(pass_name="combine-global-phases")(qnode)
 
 
 def parity_synth(qnode):
@@ -604,7 +604,7 @@ def parity_synth(qnode):
         :align: left
     """
 
-    return xparity_synth(qnode)
+    return Transform(pass_name="parity-synth")(qnode)
 
 
 def decompose_lowering(qnode):
