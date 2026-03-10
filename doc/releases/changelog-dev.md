@@ -321,6 +321,9 @@
   preserving the expected immutability of user inputs.
   [(#2562)](https://github.com/PennyLaneAI/catalyst/pull/2562)
 
+* Fix a bug where `draw_graph` failed at rendering measurements containing scalar products of observables. 
+  [(#2545)](https://github.com/PennyLaneAI/catalyst/pull/2545)
+
 * Fixed a bug where the unified compiler would trigger a passed callback function 1 extra time for the initial pass level.
   [(#2528)](https://github.com/PennyLaneAI/catalyst/pull/2528)
 
