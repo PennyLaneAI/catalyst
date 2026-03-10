@@ -419,7 +419,7 @@ jobs:
     - name: Build MLIR Dialect Docs
       run: |
         DIALECTS_DOCS_BUILD_DIR="$(pwd)/quantum-build-docs" \
-        make dialects-docs
+        make dialect-docs
 
     - name: Build Standalone Plugin
       run: |
