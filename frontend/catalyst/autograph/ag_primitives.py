@@ -660,11 +660,11 @@ def set_item(target, i, x):
 
 
 def update_item_with_op(target, index, x, op):
-    """An implementation of the 'update_item_with_op' function from operator_update. The interface
-    is defined in operator_update.SingleIndexArrayOperatorUpdateTransformer, here we provide an
-    implementation in terms of Catalyst primitives. The idea is to accept an operator assignment
-    syntax for Jax arrays, to subsequently transform it under the hood into the set of 'at' and
-    operator calls that Autograph supports. E.g.:
+    """An implementation of the 'update_item_with_op' function for augmented assignments. Here we
+    provide an implementation in terms of Catalyst primitives. The idea is to accept an operator
+    assignment syntax for Jax arrays, to subsequently transform it under the hood into the set of
+    'at' and operator calls that Autograph supports. E.g.:
+
         target[i] **= x -> target = target.at[i].power(x)
 
     .. note::
@@ -673,9 +673,9 @@ def update_item_with_op(target, index, x, op):
         Autograph transformer. If you create a new transformer and want to support this feature,
         make sure you enable such option there as well.
     """
-    # Mapping of the gast attributes to the corresponding JAX operation
-    gast_op_map = {"mult": "multiply", "div": "divide", "add": "add", "sub": "add", "pow": "power"}
-    # Mapping of the gast attributes to the corresponding in-place operation
+    # Mapping of the ast attributes to the corresponding JAX operation
+    ast_op_map = {"mult": "multiply", "div": "divide", "add": "add", "sub": "add", "pow": "power"}
+    # Mapping of the ast attributes to the corresponding in-place operation
     inplace_operation_map = {
         "mult": "mul",
         "div": "truediv",
@@ -691,9 +691,9 @@ def update_item_with_op(target, index, x, op):
     # Otherwise, fallback to Python's default syntax.
     if isinstance(target, DynamicJaxprTracer):
         if isinstance(index, slice):
-            target = getattr(target.at[index.start : index.stop : index.step], gast_op_map[op])(x)
+            target = getattr(target.at[index.start : index.stop : index.step], ast_op_map[op])(x)
         else:
-            target = getattr(target.at[index], gast_op_map[op])(x)
+            target = getattr(target.at[index], ast_op_map[op])(x)
     else:
         # Use Python's in-place operator
         target[index] = getattr(operator, f"__i{inplace_operation_map[op]}__")(target[index], x)

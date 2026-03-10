@@ -129,16 +129,19 @@ class ApplyTransformSequencePattern(RewritePattern):
         payload: builtin.ModuleOp = transformer.parent_op()
         rewriter.erase_op(transformer)
 
-        for i, ns in enumerate(transformer.ops):
-            if len(ns.body.ops) == 1:
-                if i == 0:
-                    self._pre_pass_callback(None, payload)
-                    self.pass_level += 1
-                continue
+        pass_ops = []
+        for ns in transformer.ops:
+            assert isinstance(ns, transform.NamedSequenceOp)
+            pass_ops.extend(
+                op for op in ns.body.ops if isinstance(op, transform.ApplyRegisteredPassOp)
+            )
 
-            for pass_op in ns.body.walk():
-                if isinstance(pass_op, transform.ApplyRegisteredPassOp):
-                    payload = self.interpret_apply_registered_pass_op(pass_op, payload, rewriter)
+        if len(pass_ops) == 0:
+            self._pre_pass_callback(None, payload)
+            return
+
+        for pass_op in pass_ops:
+            payload = self.interpret_apply_registered_pass_op(pass_op, payload, rewriter)
 
     def _pre_pass_callback(self, compilation_pass, module):
         """Callback wrapper to run the callback function before a pass."""
