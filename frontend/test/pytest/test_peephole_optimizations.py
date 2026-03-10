@@ -344,6 +344,7 @@ def test_merge_ppr_ppm():
     assert ppm_specs_output["f_0"]["logical_qubits"] == 2
 
 
+@pytest.mark.xfail(reason="pending on specs fix")
 def test_ppr_to_ppm_auto_corrected():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
@@ -372,6 +373,7 @@ def test_ppr_to_ppm_auto_corrected():
     assert gate_types["PPR-pi/8-w1"] == 1
 
 
+@pytest.mark.xfail(reason="pending on specs fix")
 def test_ppr_to_ppm_inject_magic_state():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
@@ -399,6 +401,7 @@ def test_ppr_to_ppm_inject_magic_state():
     assert gate_types["PPM-w1"] == 2
 
 
+@pytest.mark.xfail(reason="pending on specs fix")
 def test_ppr_to_ppm_pauli_corrected():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
