@@ -127,7 +127,7 @@ def test_integration_for_transform_interpreter(capsys):
     program = """
         builtin.module {
             builtin.module {
-                builtin.module {
+                builtin.module attributes {transform.with_named_sequence} {
                     transform.named_sequence @__transform_main(%arg0 : !transform.op<"builtin.module">) {
                     %0 = "transform.apply_registered_pass"(%arg0) <{options = {"custom_print" = "Hello from custom option!"}, pass_name = "test-hello-world"}> : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
                     transform.yield

@@ -177,20 +177,25 @@ struct ApplyTransformSequencePass
         // a valid transform with the transform dialect
         // We need to extract the transform.named_sequence in the
         // transformer module.
-        transformer->walk([&](transform::NamedSequenceOp op) {
+        WalkResult transformResult = transformer->walk([&](transform::NamedSequenceOp op) {
             if (PassInstrumentor *passInstrumentor = getAnalysisManager().getPassInstrumentor()) {
                 // Manually execute the transform sequence with individual subpass tracking
                 if (failed(applyTransformsWithSubpassTracking(payload, op, passInstrumentor))) {
-                    return signalPassFailure();
+                    return WalkResult::interrupt();
                 }
             }
             else {
                 if (failed(transform::applyTransforms(payload, op, {},
                                                       transform::TransformOptions(), false))) {
-                    return signalPassFailure();
+                    return WalkResult::interrupt();
                 }
             }
+            return WalkResult::advance();
         });
+
+        if (transformResult.wasInterrupted()) {
+            return signalPassFailure();
+        }
 
         transformer.erase();
     }
