@@ -316,6 +316,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where input array arguments could be mutated during execution when copied inputs
+  were updated in-place. Entry-point arguments are now treated as non-writable during bufferization,
+  preserving the expected immutability of user inputs.
+  [(#2562)](https://github.com/PennyLaneAI/catalyst/pull/2562)
+
 * Fixed a bug where the unified compiler would trigger a passed callback function 1 extra time for the initial pass level.
   [(#2528)](https://github.com/PennyLaneAI/catalyst/pull/2528)
 
