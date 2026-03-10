@@ -19,7 +19,13 @@ Tests for the decomposition rule precompilation utilities.
 import pennylane as qp
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
-from precompile import compile_op_decomp_rules, get_compiler_ops, get_dummy_args
+from precompile import (
+    DECOMP_FILE_NAME,
+    DEFAULT_RULE_DIR,
+    compile_op_decomp_rules,
+    get_compiler_ops,
+    get_dummy_args,
+)
 
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION
 
@@ -165,7 +171,7 @@ def test_mlir_output():
     """
 
     rules = ""
-    with open("./decomposition-rules/decompositions.mlir", encoding="utf-8") as mlir_file:
+    with open(DEFAULT_RULE_DIR / DECOMP_FILE_NAME, encoding="utf-8") as mlir_file:
         rules = mlir_file.read()
 
     assert "_rx_to_rot" in rules

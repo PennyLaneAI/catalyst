@@ -11,6 +11,8 @@ LLVM_BUILD_DIR ?= $(MK_DIR)/llvm-project/build
 STABLEHLO_BUILD_DIR ?= $(MK_DIR)/stablehlo/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/Enzyme/build
 RT_BUILD_DIR ?= $(MK_DIR)/../runtime/build
+DECOMPOSITION_DIR ?= $(MK_DIR)/decomposition-rules
+CACHED_RULE_DIR ?= $(DECOMPOSITION_DIR)/cached-rules
 ENABLE_ASAN ?= OFF
 STRICT_WARNINGS ?= ON
 BUILD_TYPE ?= Release
@@ -57,11 +59,15 @@ help:
 .PHONY: all
 all: llvm stablehlo enzyme dialects dialect-docs plugin decomp-rules
 
-.PHONY: decomp-rules
-decomp-rules: dialects
+.PHONY: decomp-rules frontend
+frontend:
+	$(MAKE) -C .. frontend
+
+decomp-rules: dialects frontend
 	@echo "compile decomposition rules"
-	$(PYTHON) decomposition-rules/precompile.py
-	$(DIALECTS_BUILD_DIR)/bin/quantum-opt --register-decomp-rule-resource --emit-bytecode decomposition-rules/decompositions.mlir -o decomposition-rules/decompositions.mlirbc
+	$(PYTHON) $(DECOMPOSITION_DIR)/precompile.py --dir $(CACHED_RULE_DIR)
+	$(DIALECTS_BUILD_DIR)/bin/quantum-opt --register-decomp-rule-resource --emit-bytecode $(CACHED_RULE_DIR)/decompositions.mlir -o $(CACHED_RULE_DIR)/decompositions.mlirbc
+	$(ASAN_COMMAND) $(PYTHON) -m pytest $(DECOMPOSITION_DIR)/test_precompile.py
 
 .PHONY: llvm
 llvm:
@@ -223,13 +229,13 @@ dialect-docs:
 	cmake --build $(DIALECTS_DOCS_BUILD_DIR) --target mlir-doc
 
 .PHONY: test
-test: decomp-rules
+test:
 	@echo "test the Catalyst MLIR dialects test suite"
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects
 	$(ASAN_COMMAND) $(PYTHON) -m pytest decomposition-rules/test_precompile.py
 
-.PHONY: clean clean-dialects clean-enzyme clean-stablehlo clean-plugin clean-dialect-docs
-clean: clean-dialects clean-llvm clean-stablehlo clean-enzyme clean-plugin clean-dialect-docs
+.PHONY: clean clean-dialects clean-enzyme clean-stablehlo clean-plugin clean-dialect-docs clean-decomp-rules
+clean: clean-dialects clean-llvm clean-stablehlo clean-enzyme clean-plugin clean-dialect-docs clean-decomp-rules
 
 clean-dialects:
 	@echo "clean catalyst dialect build files"
@@ -263,6 +269,10 @@ clean-plugin:
 clean-dialect-docs:
 	@echo "clean dialect docs"
 	rm -rf $(DIALECTS_DOCS_BUILD_DIR)
+
+clean-decomp-rules:
+	@echo "clean decomposition rules"
+	rm -rf $(CACHED_RULE_DIR)
 
 .PHONY: format
 format:
