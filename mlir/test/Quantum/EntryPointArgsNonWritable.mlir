@@ -34,7 +34,7 @@ func.func private @helper(%arg0: tensor<4xf32>) -> tensor<4xf32> {
 // BUFFERIZE-SAME: %[[ARG0:.*]]: memref<4xf32>
 // BUFFERIZE: %[[ALLOC:.*]] = memref.alloc() {{.*}} : memref<4xf32>
 // BUFFERIZE: memref.copy %[[ARG0]], %[[ALLOC]] : memref<4xf32> to memref<4xf32>
-// BUFFERIZE: memref.store %{{.*}}, %[[ALLOC]]{{\[}}%{{.*}}{{\]}} : memref<4xf32>
+// BUFFERIZE: memref.store %{{.*}}, %[[ALLOC]][{{%.*}}] : memref<4xf32>
 // BUFFERIZE: return %[[ALLOC]] : memref<4xf32>
 func.func public @entry(%arg0: tensor<4xf32>) -> tensor<4xf32> attributes {llvm.emit_c_interface} {
   %c0 = arith.constant 0 : index
