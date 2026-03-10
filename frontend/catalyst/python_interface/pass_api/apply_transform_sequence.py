@@ -85,7 +85,7 @@ class ApplyTransformSequencePass(ModulePass):
     @staticmethod
     def find_transform_entry_point(mod: builtin.ModuleOp) -> builtin.ModuleOp | None:
         """Find the transform entry point inside a module."""
-        for op in mod.ops:
+        for op in mod.body.walk():
             if op.get_attr_or_prop("transform.with_named_sequence") is not None:
                 return op
 
@@ -126,9 +126,6 @@ class ApplyTransformSequencePattern(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, transformer: builtin.ModuleOp, rewriter: PatternRewriter):
         """Rewrite modules containing transform.named_sequences."""
-        if not isinstance(next(iter(transformer.body.ops), None), transform.NamedSequenceOp):
-            return  # pragma: no cover
-
         payload: builtin.ModuleOp = transformer.parent_op()
         rewriter.erase_op(transformer)
 
