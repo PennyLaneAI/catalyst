@@ -82,6 +82,15 @@ class ApplyTransformSequencePass(ModulePass):
         """Update passes to include global pass registry."""
         self.passes.update(available_passes)
 
+    @staticmethod
+    def find_transform_entry_point(mod: builtin.ModuleOp) -> builtin.ModuleOp | None:
+        """Find the transform entry point inside a module."""
+        for op in mod.body.walk():
+            if op.get_attr_or_prop("transform.with_named_sequence") is not None:
+                return op
+
+        return None
+
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         """Applies the transformation"""
         nested_modules = []
@@ -90,12 +99,7 @@ class ApplyTransformSequencePass(ModulePass):
                 nested_modules.append(_op)
 
         for mod in nested_modules:
-            transformer = None
-            for _op in mod.ops:
-                if isinstance(_op, builtin.ModuleOp):
-                    transformer = _op
-                    break
-
+            transformer = self.find_transform_entry_point(mod)
             if transformer is None:
                 continue  # pragma: no cover
 
@@ -122,9 +126,6 @@ class ApplyTransformSequencePattern(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, transformer: builtin.ModuleOp, rewriter: PatternRewriter):
         """Rewrite modules containing transform.named_sequences."""
-        if not isinstance(next(iter(transformer.body.ops), None), transform.NamedSequenceOp):
-            return  # pragma: no cover
-
         payload: builtin.ModuleOp = transformer.parent_op()
         rewriter.erase_op(transformer)
 

@@ -147,7 +147,7 @@ def test_raises_error_when_pass_does_not_exists():
     module_string = """
         builtin.module {
             builtin.module {
-                builtin.module {
+                builtin.module attributes {transform.with_named_sequence} {
                     transform.named_sequence @__transform_main(%arg0 : !transform.op<"builtin.module">) {
                     %0 = transform.apply_registered_pass "this-pass-does-not-exists" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
                     transform.yield
@@ -180,7 +180,7 @@ def test_integration_for_transform_interpreter(capsys):
     program = """
         builtin.module {
             builtin.module {
-                builtin.module {
+                builtin.module attributes {transform.with_named_sequence} {
                     transform.named_sequence @__transform_main(%arg0 : !transform.op<"builtin.module">) {
                         %0 = transform.apply_registered_pass "hello-world" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
                         transform.yield
@@ -346,7 +346,7 @@ class TestCallbackIntegration:
         program = """
             builtin.module {
                 builtin.module {
-                    builtin.module {
+                    builtin.module attributes {transform.with_named_sequence} {
                         transform.named_sequence @__transform_main(%arg0 : !transform.op<"builtin.module">) {
                         %0 = transform.apply_registered_pass "none-pass" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
                         transform.yield
@@ -376,7 +376,7 @@ class TestCallbackIntegration:
         program_2_passes = """
             builtin.module {
                 builtin.module {
-                    builtin.module @module_foo {
+                    builtin.module @module_foo attributes {transform.with_named_sequence} {
                         transform.named_sequence @__transform_main(%arg0 : !transform.op<"builtin.module">) {
                             %0 = transform.apply_registered_pass "xdsl-cancel-inverses" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
                             %1 = transform.apply_registered_pass "xdsl-merge-rotations" to %0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
