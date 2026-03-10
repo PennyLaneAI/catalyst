@@ -197,6 +197,8 @@ def AssembleTannerGraphOp : QecPhysical_Op<"assemble_tanner"> {
     let assemblyFormat = [{
         $row_idx `,` $col_ptr attr-dict `:` type($row_idx) `,` type($col_ptr) `->` qualified(type($tanner_graph))
     }];
+
+    let hasVerifier = 1;
 }
 
 
