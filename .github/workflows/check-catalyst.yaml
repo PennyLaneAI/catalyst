@@ -484,7 +484,7 @@ jobs:
 
     - name: Verify Graphviz installation
       run: |
-        dot -V 
+        dot -V
         dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
 
     - name: Get Cached LLVM Build
