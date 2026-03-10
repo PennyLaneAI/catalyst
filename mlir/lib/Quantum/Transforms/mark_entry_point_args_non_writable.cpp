@@ -33,10 +33,10 @@ struct MarkEntryPointArgsNonWritablePass
 
     void runOnOperation() final
     {
-        auto module = getOperation();
+        auto mod = getOperation();
         auto nonWritable = BoolAttr::get(&getContext(), false);
 
-        for (auto funcOp : module.getOps<func::FuncOp>()) {
+        for (auto funcOp : mod.getOps<func::FuncOp>()) {
             if (!funcOp->hasAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName())) {
                 continue;
             }
