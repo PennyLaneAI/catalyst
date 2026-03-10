@@ -170,7 +170,7 @@ jobs:
     - name: Install PennyLane (latest)
       if: ${{ inputs.pennylane == 'latest' }}
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@master
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@main
 
     - name: Install PennyLane (stable)
       if: ${{ inputs.pennylane == 'stable' }}

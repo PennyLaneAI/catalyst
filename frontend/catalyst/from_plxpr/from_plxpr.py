@@ -373,17 +373,24 @@ def handle_qnode(
         setattr(qnode, "decompose_gatesets", [gateset])
 
     pipelines = (("main", tuple(self._pass_pipeline)),)
+<<<<<<< capture-device-preprocessing
     if not self._skip_preprocess:
         device_pipeline = create_device_preprocessing_pipeline(
             qnode.device, execution_config, shots, warn=self._preprocess_warn
         )
         pipelines += (("device", device_pipeline),)
 
+=======
+>>>>>>> main
     return quantum_kernel_p.bind(
         wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
         *non_const_args,
         qnode=qnode,
+<<<<<<< capture-device-preprocessing
         pipelines=tuple(pipelines),
+=======
+        pipelines=pipelines,
+>>>>>>> main
     )
 
 

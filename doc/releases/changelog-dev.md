@@ -376,8 +376,9 @@
 * Update nightly RC builds to be triggered by Lightning.
   [(#2491)](https://github.com/PennyLaneAI/catalyst/pull/2491)
 
-* Updated integration tests to match changes to the PennyLane `qml.specs` frontend made in https://github.com/PennyLaneAI/pennylane/pull/9088.
+* Updated integration tests to match changes to the PennyLane `qml.specs` frontend made in https://github.com/PennyLaneAI/pennylane/pull/9088 and https://github.com/PennyLaneAI/pennylane/pull/9091.
   [(#2513)](https://github.com/PennyLaneAI/catalyst/pull/2513)
+  [(#2533)](https://github.com/PennyLaneAI/catalyst/pull/2533)
 
 * The `prepare` operation from the PBC dialect in MLIR now implicitly allocates new qubits
   rather than requiring existing ones. This better suits our purposes for further lowering
