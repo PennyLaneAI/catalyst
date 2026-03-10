@@ -70,7 +70,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     /// Check if an operation is an observable operation.
     static bool isObservableOp(Operation *op)
     {
-        return isa<NamedObsOp, ComputationalBasisOp, HamiltonianOp, TensorOp, HermitianOp>(op);
+        return isa<NamedObsOp, ComputationalBasisOp, HermitianOp>(op);
     }
 
     /// Calculate the number of groups: one group per observable
@@ -241,7 +241,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
                 continue;
             }
 
-            // Queue operand producers before erasing. And skip for observable ops
+            // Queue operand producers before erasing.
             if (!isObservableOp(op)) {
                 for (Value operand : op->getOperands()) {
                     if (auto *defOp = operand.getDefiningOp()) {
