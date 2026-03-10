@@ -505,7 +505,7 @@ jobs:
     - name: Install Catalyst
       run: |
         # TODO: --- remove workaround before merging to main ----------------- #
-        pip install git+https://github.com/PennyLaneAI/pennylane@v0.44.1-rc0
+        pip install PennyLane==0.44.1
         pip install PennyLane-Lightning==0.44.0
         pip install PennyLane-Lightning-Kokkos==0.44.0
         # -------------------------------------------------------------------- #
