@@ -25,9 +25,10 @@ For a complete description of this dialect, please see
 from collections.abc import Sequence
 from typing import ClassVar, TypeAlias
 
-from xdsl.dialects.builtin import I64, ContainerOf, IndexType, IntegerAttr
+from xdsl.dialects.builtin import I64, ContainerOf, IndexType, IntegerAttr, ContainerType, IntegerType
 from xdsl.ir import (
     Attribute,
+    AttributeCovT,
     Dialect,
     EnumAttribute,
     Operation,
@@ -39,6 +40,7 @@ from xdsl.ir import (
 )
 from xdsl.irdl import (
     AtLeast,
+    BaseAttr,
     IRDLOperation,
     TypeAttributeInvT,
     VarConstraint,
@@ -51,6 +53,8 @@ from xdsl.irdl import (
 )
 from xdsl.parser import AttrParser
 from xdsl.printer import Printer
+
+from catalyst.python_interface.xdsl_extras import MemRefConstraint, TensorConstraint
 
 
 class QecPhysicalQubitRole(StrEnum):
@@ -172,9 +176,59 @@ class PhysicalHyperRegisterType(ParametrizedAttribute, TypeAttribute):
         return [IntegerAttr(width, 64), IntegerAttr(k, 64), IntegerAttr(n, 64)]
 
 
+@irdl_attr_definition
+class TannerGraphType(ParametrizedAttribute, TypeAttribute, ContainerType[AttributeCovT]):
+    """A Tanner graph represented by its adjacency matrix in CSC form"""
+
+    name = "qecp.tanner_graph"
+
+    row_idx_size: IntegerAttr[I64]
+    col_ptr_size: IntegerAttr[I64]
+    element_type: AttributeCovT
+
+    def __init__(
+        self,
+        row_idx_size: int | IntegerAttr[I64],
+        col_ptr_size: int | IntegerAttr[I64],
+        element_type: AttributeCovT,
+    ):
+        row_idx_size_attr = (
+            IntegerAttr(row_idx_size, 64) if isinstance(row_idx_size, int) else row_idx_size
+        )
+        col_ptr_size_attr = (
+            IntegerAttr(col_ptr_size, 64) if isinstance(col_ptr_size, int) else col_ptr_size
+        )
+        super().__init__(row_idx_size_attr, col_ptr_size_attr, element_type)
+
+    def get_element_type(self) -> AttributeCovT:
+        return self.element_type
+
+    def print_parameters(self, printer: Printer) -> None:
+        """Print the attribute parameters."""
+        with printer.in_angle_brackets():
+            printer.print_int(self.row_idx_size.value.data)
+            printer.print_string(", ")
+            printer.print_int(self.col_ptr_size.value.data)
+            printer.print_string(", ")
+            printer.print_attribute(self.element_type)
+
+    @classmethod
+    def parse_parameters(cls, parser: AttrParser) -> Sequence[Attribute]:
+        """Parse the attribute parameters."""
+        with parser.in_angle_brackets():
+            row_idx_size = parser.parse_integer()
+            parser.parse_characters(",")
+            col_idx_size = parser.parse_integer()
+            parser.parse_characters(",")
+            element_type = parser.parse_attribute()
+
+        return [IntegerAttr(row_idx_size, 64), IntegerAttr(col_idx_size, 64), element_type]
+
+
 QecPhysicalQubitSSAValue: TypeAlias = SSAValue[QecPhysicalQubitType]
 PhysicalCodeBlockSSAValue: TypeAlias = SSAValue[PhysicalCodeblockType]
 PhysicalHyperRegisterSSAValue: TypeAlias = SSAValue[PhysicalHyperRegisterType]
+TannerGraphSSAValue: TypeAlias = SSAValue[TannerGraphType]
 
 anyPhysicalQubit = ContainerOf(QecPhysicalQubitType)
 anyPhysicalCodeblock = ContainerOf(PhysicalCodeblockType)
@@ -476,6 +530,38 @@ class InsertQubitOp(IRDLOperation):
         )
 
 
+@irdl_op_definition
+class AssembleTannerGraphOp(IRDLOperation):
+    """Assemble a Tanner graph in CSC form from the given input arrays."""
+
+    name = "qecp.assemble_tanner"
+
+    assembly_format = """
+            $row_idx `,` $col_ptr attr-dict `:` type($row_idx) `,` type($col_ptr) `->` type($tanner_graph)
+        """
+
+    row_idx = operand_def(
+        TensorConstraint(element_type=BaseAttr(IntegerType), rank=1)
+        | (MemRefConstraint(element_type=BaseAttr(IntegerType), rank=1))
+    )
+
+    col_ptr = operand_def(
+        TensorConstraint(element_type=BaseAttr(IntegerType), rank=1)
+        | (MemRefConstraint(element_type=BaseAttr(IntegerType), rank=1))
+    )
+
+    tanner_graph = result_def(TannerGraphType)
+
+    def __init__(
+        self,
+        row_idx: SSAValue | Operation,
+        col_ptr: SSAValue | Operation,
+        tanner_graph_type: TannerGraphType,
+    ):
+        operands = (row_idx, col_ptr)
+        super().__init__(operands=operands, result_types=(tanner_graph_type,))
+
+
 QecPhysical = Dialect(
     "qecp",
     [
@@ -487,11 +573,13 @@ QecPhysical = Dialect(
         InsertCodeblockOp,
         ExtractQubitOp,
         InsertQubitOp,
+        AssembleTannerGraphOp,
     ],
     [
         QecPhysicalQubitRoleAttr,
         QecPhysicalQubitType,
         PhysicalCodeblockType,
         PhysicalHyperRegisterType,
+        TannerGraphType,
     ],
 )

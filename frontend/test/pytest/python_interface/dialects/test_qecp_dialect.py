@@ -18,7 +18,7 @@ from typing import cast
 
 import pytest
 from xdsl.dialects import test
-from xdsl.dialects.builtin import IndexType, IntegerAttr
+from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType, TensorType, i32
 from xdsl.ir import AttributeCovT, OpResult
 
 from catalyst.python_interface.dialects import qecp
@@ -45,6 +45,7 @@ expected_ops_names = {
     "InsertCodeblockOp": "qecp.insert_block",
     "ExtractQubitOp": "qecp.extract",
     "InsertQubitOp": "qecp.insert",
+    "AssembleTannerGraphOp": "qecp.assemble_tanner",
 }
 
 expected_attrs_names = {
@@ -52,6 +53,7 @@ expected_attrs_names = {
     "QecPhysicalQubitType": "qecp.qubit",
     "PhysicalCodeblockType": "qecp.codeblock",
     "PhysicalHyperRegisterType": "qecp.hyperreg",
+    "TannerGraphType": "qecp.tanner_graph",
 }
 
 
@@ -118,6 +120,16 @@ class TestQecPhysicalTypes:
         assert hyper_reg.width == expected_width
         assert hyper_reg.k == expected_k
         assert hyper_reg.n == expected_n
+
+    tanner_graph = qecp.TannerGraphType(8, 6, i32)
+    assert isinstance(tanner_graph.row_idx_size, IntegerAttr)
+    assert tanner_graph.row_idx_size.value.data == 8
+    assert tanner_graph.row_idx_size.type == IntegerType(64)
+    assert isinstance(tanner_graph.col_ptr_size, IntegerAttr)
+    assert tanner_graph.col_ptr_size.value.data == 6
+    assert tanner_graph.col_ptr_size.type == IntegerType(64)
+    assert isinstance(tanner_graph.element_type, IntegerType)
+    assert tanner_graph.element_type.width.data == 32
 
 
 class TestQecPhysicalOps:
@@ -214,6 +226,15 @@ class TestQecPhysicalOps:
         assert insert_op.result_types[0].k == self.k
         assert insert_op.result_types[0].n == self.n
 
+    row_idx_val = create_ssa_value(TensorType(i32, (8,)))
+    col_ptr_val = create_ssa_value(TensorType(i32, (6,)))
+    assemble_tanner_op = qecp.AssembleTannerGraphOp(
+        row_idx=row_idx_val, col_ptr=col_ptr_val, tanner_graph_type=qecp.TannerGraphType(8, 6, i32)
+    )
+    assert len(assemble_tanner_op.operands) == 2
+    assert len(assemble_tanner_op.result_types) == 1
+    assert isinstance(assemble_tanner_op.result_types[0], qecp.TannerGraphType)
+
 
 @pytest.mark.parametrize(
     "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
@@ -256,6 +277,14 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     // CHECK: [[block1:%.+]] = qecp.insert [[block0]][{{\s*}}0], [[q0]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
     %block1 = qecp.insert %block0[ 0], %q0 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+
+    // CHECK: [[row_idx:%.+]] = "test.op"() : () -> tensor<8xi32>
+    // CHECK: [[col_ptr:%.+]] = "test.op"() : () -> tensor<6xi32>
+    %row_idx = "test.op"() : () -> tensor<8xi32>
+    %col_ptr = "test.op"() : () -> tensor<6xi32>
+
+    // CHECK: [[tgraph:%.+]] = qecp.assemble_tanner [[row_idx]], [[col_ptr]] : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
+    %tgraph = qecp.assemble_tanner %row_idx, %col_ptr : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
