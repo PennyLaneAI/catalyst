@@ -23,9 +23,10 @@ from .compiler_transform import CompilationPass, CompilerTransform, compiler_tra
 
 __all__ = [
     "ApplyTransformSequencePass",
+    "CompilationPass",
+    "CompilerTransform",
     "available_passes",
     "is_xdsl_pass",
-    "PassDispatcher",
     "register_pass",
     "compiler_transform",
     "is_xdsl_pass",
