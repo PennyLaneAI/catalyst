@@ -205,7 +205,7 @@ func.func @measurement_ops() {
 // CHECK-LABEL: "caller_func"
 // CHECK: "operations"
 // CHECK-DAG: "Hadamard(1)": 2
-func.func @caller_func(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode} {
+func.func @caller_func(%arg0: !quantum.bit) -> !quantum.bit {
     %r1 = func.call @helper_func(%arg0) : (!quantum.bit) -> !quantum.bit
     %r2 = func.call @helper_func(%r1) : (!quantum.bit) -> !quantum.bit
     return %r2 : !quantum.bit
@@ -225,7 +225,7 @@ func.func private @helper_func(%arg0: !quantum.bit) -> !quantum.bit {
 // CHECK: "operations"
 // CHECK-DAG: "PauliX(1)": 60
 
-func.func @nested_caller_func(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode} {
+func.func @nested_caller_func(%arg0: !quantum.bit) -> !quantum.bit {
     %r1 = func.call @nested_helper_func(%arg0) : (!quantum.bit) -> !quantum.bit
     %r2 = func.call @nested_helper_func(%r1) : (!quantum.bit) -> !quantum.bit
     return %r2 : !quantum.bit
@@ -354,7 +354,7 @@ func.func @stats_test() {
 // STATS: 4 total-function-calls
 // STATS: 4 total-gates
 // STATS: 1 total-qubits
-func.func @first_qnode(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode} {
+func.func @first_qnode(%arg0: !quantum.bit) -> !quantum.bit {
     %r1 = func.call @shared_helper(%arg0) : (!quantum.bit) -> !quantum.bit
     %r2 = func.call @shared_helper(%r1) : (!quantum.bit) -> !quantum.bit
     %r3 = func.call @second_qnode(%r2) : (!quantum.bit) -> !quantum.bit
@@ -367,7 +367,7 @@ func.func private @shared_helper(%arg0: !quantum.bit) -> !quantum.bit {
 }
 
 
-func.func @second_qnode(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode} {
+func.func @second_qnode(%arg0: !quantum.bit) -> !quantum.bit {
     %r1 = func.call @shared_helper(%arg0) : (!quantum.bit) -> !quantum.bit
     %out = quantum.custom "PauliX"() %r1 : !quantum.bit
     return %out : !quantum.bit

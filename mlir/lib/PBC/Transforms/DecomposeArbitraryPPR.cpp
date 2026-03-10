@@ -51,9 +51,9 @@ LogicalResult convertArbitraryPPRToArbitraryZ(PPRotationArbitraryOp &op, Pattern
     auto loc = op.getLoc();
 
     /// |+⟩──
-    auto allocateQubit = AllocQubitOp::create(rewriter, loc);
+    auto qubitType = QubitType::get(rewriter.getContext());
     auto plus = LogicalInitKind::plus;
-    auto plusQubit = PrepareStateOp::create(rewriter, loc, plus, allocateQubit.getOutQubit());
+    auto plusQubit = PrepareStateOp::create(rewriter, loc, {qubitType}, plus);
 
     // ┌───┐──
     // | P |──

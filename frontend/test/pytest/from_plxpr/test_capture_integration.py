@@ -23,7 +23,6 @@ from jax.core import ShapedArray
 
 import catalyst
 from catalyst import qjit
-from catalyst.from_plxpr import register_transform
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
@@ -122,6 +121,7 @@ class TestCapture:
             qml.RZ(x, wires=0)
             qml.CNOT(wires=[1, 0])
             qml.Hadamard(wires=1)
+            qml.PCPhase(x, 2, wires=[0])
             return qml.expval(qml.PauliY(wires=0))
 
         captured_result = circuit_aot_builder(dev)(theta)
@@ -321,6 +321,7 @@ class TestCapture:
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_ctrl(self, backend, theta):
         """Test the integration for a circuit with control."""
+
         device = qml.device(backend, wires=3)
 
         # Capture enabled
@@ -345,6 +346,31 @@ class TestCapture:
             qml.ctrl(qml.RX(theta, wires=0), control=[1], control_values=[False])
             qml.ctrl(qml.RX, control=[1], control_values=[False])(theta, wires=[0])
             return qml.state()
+
+        assert jnp.allclose(capture_result, circuit(theta))
+
+    @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
+    def test_ctrl_pcphase(self, backend, theta):
+        """Test the integration for a PCPhase circuit with control."""
+        if backend == "lightning.kokkos":
+            pytest.xfail(reason="Controlled PCPhase not yet implemented on Kokkos.")
+
+        device = qml.device(backend, wires=3)
+
+        # Capture enabled
+
+        qml.capture.enable()
+
+        @qml.qnode(device)
+        def circuit(theta):
+            qml.ctrl(qml.PCPhase, control=[1], control_values=[False])(theta, 2, wires=[0])
+            return qml.state()
+
+        capture_result = qjit(circuit)(theta)
+
+        # Capture disabled
+
+        qml.capture.disable()
 
         assert jnp.allclose(capture_result, circuit(theta))
 
@@ -1048,15 +1074,13 @@ class TestCapture:
         assert jnp.allclose(circuit(0.1), capture_result)
 
     @pytest.mark.usefixtures("use_capture")
-    def test_pass_with_options_patch(self, backend):
+    def test_pass_with_setup_input_options(self, backend):
         """Test the integration for a circuit with a pass that takes in options."""
 
-        @qml.transform
-        def my_pass(_tape, my_option=None, my_other_option=None):  # pylint: disable=unused-argument
-            """A dummy qml.transform."""
-            return
+        def my_pass_setup_inputs(my_option=None, my_other_option=None):
+            return (), {"my_option": my_option, "my_other_option": my_other_option}
 
-        register_transform(my_pass, "my-pass", False)
+        my_pass = qml.transform(pass_name="my-pass", setup_inputs=my_pass_setup_inputs)
 
         @qjit(target="mlir")
         @partial(my_pass, my_option="my_option_value", my_other_option=False)
