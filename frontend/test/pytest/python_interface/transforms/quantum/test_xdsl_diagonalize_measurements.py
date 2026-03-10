@@ -698,18 +698,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
-    @pytest.mark.parametrize(
-        "measurements",
-        [
-            (qml.expval(qml.Z(0)), qml.expval(qml.X(0)), qml.expval(qml.Y(0))),
-            (qml.expval(qml.Z(0) + qml.X(0) + qml.Y(1))),
-        ],
-    )
-    @pytest.mark.xfail(
-        lambda measurements: len(measurements) > 1,
-        reason="split-non-commuting pass does not support multiple measurements",
-    )
-    def test_with_split_non_commuting_multiple_measurements(self, measurements, run_filecheck_qjit):
+    def test_with_split_non_commuting_multiple_measurements(self, run_filecheck_qjit):
         """Test the executable file can be generated and run with lightning.qubit when applying
         both the diagonalize-final-measurements and the split-non-commuting passes"""
 
@@ -726,6 +715,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         dev = qml.device("lightning.qubit", wires=10)
 
+        obs = qml.Hamiltonian([1.0,2.0,3.0],[qml.X(0), qml.Z(0), qml.I(2)])
         @qml.for_loop(0, 10, 1)
         def for_fn(i):
             qml.H(i)
@@ -748,8 +738,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             for_fn()  # pylint: disable=no-value-for-parameter
             while_fn(0)
             qml.CNOT(wires=[0, 1])
-            return measurements
-
+            return qml.expval(obs)
         run_filecheck_qjit(circuit)
 
         res = circuit()
@@ -760,7 +749,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             for_fn()  # pylint: disable=no-value-for-parameter
             while_fn(0)
             qml.CNOT(wires=[0, 1])
-            return measurements
+            return qml.expval(obs)
 
         res_ref = circuit_ref()
         assert res == res_ref
