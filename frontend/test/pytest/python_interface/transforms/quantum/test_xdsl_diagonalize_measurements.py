@@ -715,7 +715,8 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         dev = qml.device("lightning.qubit", wires=10)
 
-        obs = qml.Hamiltonian([1.0,2.0,3.0],[qml.X(0), qml.Z(0), qml.I(2)])
+        obs = qml.Hamiltonian([1.0, 2.0, 3.0], [qml.X(0), qml.Z(0), qml.I(2)])
+
         @qml.for_loop(0, 10, 1)
         def for_fn(i):
             qml.H(i)
@@ -739,6 +740,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             while_fn(0)
             qml.CNOT(wires=[0, 1])
             return qml.expval(obs)
+
         run_filecheck_qjit(circuit)
 
         res = circuit()
