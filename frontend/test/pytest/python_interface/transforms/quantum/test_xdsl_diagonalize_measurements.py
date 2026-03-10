@@ -703,7 +703,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         both the diagonalize-final-measurements and the split-non-commuting passes"""
 
         def diagonalize_measurements_setup_inputs(
-            to_eigvals: bool = False, supported_base_obs: tuple[str] | str = "PauliZ"
+            to_eigvals: bool = False, supported_base_obs: tuple[str] | str = ("PauliZ",)
         ):
             "Return the options for the diagonalize-final-measurements pass."
             return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
@@ -739,6 +739,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             for_fn()  # pylint: disable=no-value-for-parameter
             while_fn(0)
             qml.CNOT(wires=[0, 1])
+            # CHECK: quantum.namedobs [[q:%.+]][PauliY]
             return qml.expval(obs)
 
         res = circuit()
