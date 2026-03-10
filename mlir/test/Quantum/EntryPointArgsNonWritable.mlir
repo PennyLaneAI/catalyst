@@ -23,7 +23,7 @@ func.func public @entry(%arg0: tensor<4xf32>, %arg1: index) -> tensor<4xf32> att
 }
 
 // ATTR-LABEL: func.func private @helper(
-// ATTR-SAME: %[[ARG0:.*]]: tensor<4xf32>
+// ATTR-SAME: %[[ARG0:.*]]: tensor<4xf32>)
 func.func private @helper(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   return %arg0 : tensor<4xf32>
 }
