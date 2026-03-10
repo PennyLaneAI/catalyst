@@ -79,18 +79,28 @@ func.func @test_ppr_to_ppm_with_condition(%q0 : !quantum.bit, %q1 : !quantum.bit
     return
 
     // CHECK-Z: [[m0:%.+]], {{.*}} = pbc.ppm ["Z"]
-    // CHECK-Z: quantum.alloc_qb : !quantum.bit
-    // CHECK-Z: [[m1:%.+]], [[q1:%.+]]:4 = pbc.ppm ["X", "Y", "Z", "Y"](-1) {{.*}} cond([[m0]])
-    // CHECK-Z: [[m2:%.+]], {{.*}} = pbc.ppm ["X"] [[q1]]#3 cond([[m0]])
-    // CHECK-Z: [[q_1:%.+]] = arith.xori [[m1]], [[m2]] : i1
-    // CHECK-Z: {{.*}} = pbc.ppr ["X", "Y", "Z"](2) {{.*}} cond([[q_1]]) : !quantum.bit
+    // CHECK-Z: [[if:%.+]]:3 = scf.if [[m0]]
+    // CHECK-Z:   [[q_0:%.+]] = quantum.alloc_qb : !quantum.bit
+    // CHECK-Z:   [[m1:%.+]], [[o1:%.+]]:4 = pbc.ppm ["X", "Y", "Z", "Y"](-1)
+    // CHECK-Z:   [[m2:%.+]], {{.*}} = pbc.ppm ["X"] [[o1]]#3
+    // CHECK-Z:   [[q_1:%.+]] = arith.xori [[m1]], [[m2]] : i1
+    // CHECK-Z:   {{.*}} = pbc.ppr ["X", "Y", "Z"](2) {{.*}} cond([[q_1]])
+    // CHECK-Z:   scf.yield
+    // CHECK-Z: } else {
+    // CHECK-Z:   scf.yield
+    // CHECK-Z: }
 
     // CHECK-Y: [[m0:%.+]], {{.*}} = pbc.ppm ["Z"]
-    // CHECK-Y: pbc.fabricate  plus_i : !quantum.bit
-    // CHECK-Y: [[m1:%.+]], [[q1:%.+]]:4 = pbc.ppm ["X", "Y", "Z", "Z"] {{.*}} cond([[m0]])
-    // CHECK-Y: [[m2:%.+]], {{.*}} = pbc.ppm ["X"] [[q1]]#3 cond([[m0]])
-    // CHECK-Y: [[q_1:%.+]] = arith.xori [[m1]], [[m2]] : i1
-    // CHECK-Y: {{.*}} = pbc.ppr ["X", "Y", "Z"](2) {{.*}} cond([[q_1]]) : !quantum.bit
+    // CHECK-Y: [[if:%.+]]:3 = scf.if [[m0]]
+    // CHECK-Y:   pbc.fabricate  plus_i : !quantum.bit
+    // CHECK-Y:   [[m1:%.+]], [[o1:%.+]]:4 = pbc.ppm ["X", "Y", "Z", "Z"]
+    // CHECK-Y:   [[m2:%.+]], {{.*}} = pbc.ppm ["X"] [[o1]]#3
+    // CHECK-Y:   [[q_1:%.+]] = arith.xori [[m1]], [[m2]] : i1
+    // CHECK-Y:   {{.*}} = pbc.ppr ["X", "Y", "Z"](2) {{.*}} cond([[q_1]])
+    // CHECK-Y:   scf.yield
+    // CHECK-Y: } else {
+    // CHECK-Y:   scf.yield
+    // CHECK-Y: }
 }
 
 // -----
