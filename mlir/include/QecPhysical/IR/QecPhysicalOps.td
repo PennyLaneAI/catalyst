@@ -242,7 +242,7 @@ def DecodeEsmCssOp : QecPhysical_Op<"decode_esm_css"> {
     );
 
     let results = (outs
-        AnyTypeOf<[1DTensorOf<[Index]>, MemRefRankOf<[Index], [1]>]>:$err_idx
+        1DTensorOf<[Index]>:$err_idx
     );
 
     let assemblyFormat = [{
