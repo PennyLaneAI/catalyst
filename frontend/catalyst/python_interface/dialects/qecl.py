@@ -202,7 +202,7 @@ class ExtractCodeblockOp(IRDLOperation):
     def __init__(
         self,
         hyper_reg: LogicalHyperRegisterSSAValue | Operation,
-        idx: int | SSAValue[IntegerType] | Operation | IntegerAttr,
+        idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
     ):
         if isinstance(idx, int):
             idx = IntegerAttr.from_int_and_width(idx, 64)
@@ -249,7 +249,7 @@ class InsertCodeblockOp(IRDLOperation):
     def __init__(
         self,
         in_hyper_reg: LogicalHyperRegisterSSAValue | Operation,
-        idx: SSAValue[IntegerType] | Operation | int | IntegerAttr,
+        idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
         codeblock: LogicalCodeBlockSSAValue | Operation,
     ):
         if isinstance(idx, int):
