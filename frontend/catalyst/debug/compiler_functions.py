@@ -237,7 +237,7 @@ def compile_executable(fn, *args):
 
     # if fn is not compiled, compile it first.
     if not fn.compiled_function:
-        fn(*args)
+        fn.jit_compile(args)
 
     f_name = str(fn.__name__)
     workspace = str(fn.workspace) if fn.compile_options.keep_intermediate else os.getcwd()

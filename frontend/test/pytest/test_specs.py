@@ -27,6 +27,12 @@ from catalyst import qjit
 # pylint:disable = protected-access,attribute-defined-outside-init
 
 
+@qml.transform
+def dummy_transform(tape):
+    """Returns a tape-only transform that can be used for testing"""
+    return (tape,), lambda res: res[0]
+
+
 def check_specs_header_same(
     actual: CircuitSpecs, expected: CircuitSpecs, skip_level: bool = False
 ) -> None:
@@ -236,32 +242,166 @@ class TestPassByPassSpecs:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=[
-                "Before transforms",
-                "Before MLIR Passes (MLIR-0)",
-                "cancel-inverses (MLIR-1)",
-                "merge-rotations (MLIR-2)",
-            ],
+            level=dict(
+                enumerate(
+                    (
+                        "Before MLIR Passes",
+                        "cancel-inverses",
+                        "merge-rotations",
+                    )
+                )
+            ),
             resources={
-                "Before transforms": SpecsResources(
+                "Before MLIR Passes": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     gate_sizes={1: 6, 2: 2},
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "Before MLIR Passes (MLIR-0)": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
-                    num_allocs=2,
-                ),
-                "cancel-inverses (MLIR-1)": SpecsResources(
+                "cancel-inverses": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2},
                     gate_sizes={1: 4},
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "merge-rotations (MLIR-2)": SpecsResources(
+                "merge-rotations": SpecsResources(
+                    gate_types={"RX": 1, "RZ": 1},
+                    gate_sizes={1: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+            },
+        )
+
+        actual = qml.specs(simple_circuit, level="all")()
+
+        check_specs_same(actual, expected)
+
+        # Test resources at each level match individual specs calls
+        for i, res in enumerate(actual["resources"].values()):
+            single_level_specs = qml.specs(simple_circuit, level=i)()
+            check_specs_header_same(actual, single_level_specs, skip_level=True)
+            check_specs_resources_same(res, single_level_specs["resources"])
+
+    def test_duplicate_level_names(self, simple_circuit):
+        """Test that duplicate pass names are handled gracefully."""
+
+        # TODO: At some point the names for the tape transform and MLIR pass will be unified
+        # Once this happens, this test will need to be updated
+        simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
+        simple_circuit = dummy_transform(simple_circuit)
+        simple_circuit = qml.transform(pass_name="cancel-inverses")(simple_circuit)
+        simple_circuit = qml.transform(pass_name="cancel-inverses")(simple_circuit)
+
+        simple_circuit = qjit(simple_circuit)
+
+        canceled_res = SpecsResources(
+            gate_types={"RX": 2, "RZ": 2},
+            gate_sizes={1: 4},
+            measurements={"probs(all wires)": 1},
+            num_allocs=2,
+        )
+
+        expected = CircuitSpecs(
+            device_name="lightning.qubit",
+            num_device_wires=2,
+            shots=Shots(None),
+            level=dict(
+                enumerate(
+                    (
+                        "Before Tape Transforms",
+                        "cancel_inverses",
+                        "dummy_transform",
+                        "Before MLIR Passes",
+                        "cancel-inverses",
+                        "cancel-inverses-2",
+                    )
+                )
+            ),
+            resources={
+                "Before Tape Transforms": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    gate_sizes={1: 6, 2: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "cancel_inverses": canceled_res,
+                "dummy_transform": canceled_res,
+                "Before MLIR Passes": canceled_res,
+                "cancel-inverses": canceled_res,
+                "cancel-inverses-2": canceled_res,
+            },
+        )
+
+        actual = qml.specs(simple_circuit, level="all")()
+
+        check_specs_same(actual, expected)
+
+        # Test resources at each level match individual specs calls
+        for i, res in enumerate(actual["resources"].values()):
+            single_level_specs = qml.specs(simple_circuit, level=i)()
+            check_specs_header_same(actual, single_level_specs, skip_level=True)
+            check_specs_resources_same(res, single_level_specs["resources"])
+
+    def test_basic_passes_multi_level_with_tapes(self, simple_circuit):
+        """Test that when passes are applied, the circuit resources are updated accordingly."""
+
+        simple_circuit = dummy_transform(simple_circuit)
+        simple_circuit = dummy_transform(simple_circuit)
+
+        simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
+        simple_circuit = qml.transforms.merge_rotations(simple_circuit)
+
+        simple_circuit = qjit(simple_circuit)
+
+        expected = CircuitSpecs(
+            device_name="lightning.qubit",
+            num_device_wires=2,
+            shots=Shots(None),
+            level=dict(
+                enumerate(
+                    (
+                        "Before Tape Transforms",
+                        "dummy_transform",
+                        "dummy_transform-2",
+                        "Before MLIR Passes",
+                        "cancel-inverses",
+                        "merge-rotations",
+                    )
+                )
+            ),
+            resources={
+                "Before Tape Transforms": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    gate_sizes={1: 6, 2: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "dummy_transform": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    gate_sizes={1: 6, 2: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "dummy_transform-2": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    gate_sizes={1: 6, 2: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "Before MLIR Passes": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    gate_sizes={1: 6, 2: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "cancel-inverses": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "merge-rotations": SpecsResources(
                     gate_types={"RX": 1, "RZ": 1},
                     gate_sizes={1: 2},
                     measurements={"probs(all wires)": 1},
@@ -285,10 +425,8 @@ class TestPassByPassSpecs:
 
         simple_circuit = qml.transforms.cancel_inverses(
             simple_circuit
-        )  # Has to be applied as a tape transform
-        simple_circuit = qml.transforms.undo_swaps(
-            simple_circuit
-        )  # No actual swaps to undo, but forces normal tape transform
+        )  # Has to be applied as a tape transform because of the next transform
+        simple_circuit = dummy_transform(simple_circuit)  # Forces normal tape transform
         simple_circuit = qml.transforms.merge_rotations(
             simple_circuit
         )  # Can be applied as an MLIR pass
@@ -300,15 +438,19 @@ class TestPassByPassSpecs:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=[
-                "Before transforms",
-                "cancel_inverses",
-                "undo_swaps",
-                "Before MLIR Passes (MLIR-0)",
-                "merge-rotations (MLIR-1)",
-            ],
+            level=dict(
+                enumerate(
+                    (
+                        "Before Tape Transforms",
+                        "cancel_inverses",
+                        "dummy_transform",
+                        "Before MLIR Passes",
+                        "merge-rotations",
+                    )
+                )
+            ),
             resources={
-                "Before transforms": SpecsResources(
+                "Before Tape Transforms": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     gate_sizes={1: 6, 2: 2},
                     measurements={"probs(all wires)": 1},
@@ -320,19 +462,19 @@ class TestPassByPassSpecs:
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "undo_swaps": SpecsResources(
+                "dummy_transform": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2},
                     gate_sizes={1: 4},
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "Before MLIR Passes (MLIR-0)": SpecsResources(
+                "Before MLIR Passes": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2},
                     gate_sizes={1: 4},
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "merge-rotations (MLIR-1)": SpecsResources(
+                "merge-rotations": SpecsResources(
                     gate_types={"RX": 1, "RZ": 1},
                     gate_sizes={1: 2},
                     measurements={"probs(all wires)": 1},
@@ -343,47 +485,45 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_reprs_match(self):
-        """Test that when no transforms are applied to a typical circuit, the "Before Transform"
-        and "Before MLIR Passes" representations match."""
+    def test_all_mlir(self, simple_circuit):
+        """Test using "all-mlir" level"""
 
-        dev = qml.device("lightning.qubit", wires=7)
+        simple_circuit = qml.transforms.cancel_inverses(
+            simple_circuit
+        )  # Has to be applied as a tape transform because of the next transform
+        simple_circuit = dummy_transform(simple_circuit)  # Forces normal tape transform
+        simple_circuit = qml.transforms.merge_rotations(
+            simple_circuit
+        )  # Can be applied as an MLIR pass
 
-        @qml.qnode(dev)
-        def circuit():
-            qml.StatePrep(jnp.array([0, 1]), wires=0)
+        simple_circuit = qjit(simple_circuit)
 
-            qml.Hadamard(wires=0)
-            qml.CNOT(wires=[0, 1])
+        actual = qml.specs(simple_circuit, level="all-mlir")()
+        expected = CircuitSpecs(
+            device_name="lightning.qubit",
+            num_device_wires=2,
+            shots=Shots(None),
+            level={
+                2: "Before MLIR Passes",
+                3: "merge-rotations",
+            },
+            resources={
+                "Before MLIR Passes": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "merge-rotations": SpecsResources(
+                    gate_types={"RX": 1, "RZ": 1},
+                    gate_sizes={1: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+            },
+        )
 
-            qml.GlobalPhase(jnp.pi / 4)
-            qml.MultiRZ(jnp.pi / 2, wires=[1, 2, 3])
-            qml.ctrl(qml.T, control=0)(wires=3)
-            qml.ctrl(
-                op=qml.IsingXX(0.5, wires=[5, 6]),
-                control=range(5),
-                control_values=[1] * 5,
-            )
-
-            qml.QubitUnitary(jnp.array([[1, 0], [0, 1j]]), wires=2)
-
-            return (
-                qml.expval(qml.PauliZ(0)),
-                qml.probs(wires=[0, 1]),
-                qml.probs(),
-                qml.state(),
-            )
-
-        specs_device = qml.specs(circuit, level=0, compute_depth=False)()
-        specs_all = qml.specs(qjit(circuit), level="all", compute_depth=False)()
-
-        regular_pl = specs_device["resources"]
-        before_transforms = specs_all["resources"]["Before transforms"]
-        before_mlir = specs_all["resources"]["Before MLIR Passes (MLIR-0)"]
-
-        check_specs_resources_same(regular_pl, before_transforms)
-        check_specs_resources_same(before_transforms, before_mlir)
+        check_specs_same(actual, expected)
 
     @pytest.mark.usefixtures("use_both_frontend")
     def test_advanced_measurements(self):
@@ -405,7 +545,7 @@ class TestPassByPassSpecs:
             )
 
         # Representations are slightly different from plain PL -- wire counts are missing
-        info = qml.specs(qjit(circ), level=1, compute_depth=False)()
+        info = qml.specs(qjit(circ), level=0, compute_depth=False)()
 
         assert info.resources.measurements == {
             "expval(Hamiltonian(num_terms=2))": 1,
@@ -431,7 +571,7 @@ class TestPassByPassSpecs:
             device_name="null.qubit",
             num_device_wires=3,
             shots=Shots(None),
-            level=1,
+            level="split_non_commuting",
             resources=[
                 SpecsResources(
                     gate_types={"Hadamard": 1, "PauliX": 2},
@@ -473,12 +613,12 @@ class TestPassByPassSpecs:
 
             return qml.probs()
 
-        actual = qml.specs(circuit, level=1)()
+        actual = qml.specs(circuit, level=0)()
         expected = CircuitSpecs(
             device_name="lightning.qubit",
             num_device_wires=3,
             shots=Shots(None),
-            level=1,
+            level="Before MLIR Passes",
             resources=SpecsResources(
                 gate_types={"Hadamard": 3},
                 gate_sizes={1: 3},
@@ -505,7 +645,7 @@ class TestPassByPassSpecs:
             device_name="null.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=2,
+            level="to-ppr",
             resources=SpecsResources(
                 gate_types={"GlobalPhase": 2, "PPR-pi/4-w1": 3, "PPR-pi/8-w1": 1},
                 gate_sizes={0: 2, 1: 4},
@@ -514,7 +654,7 @@ class TestPassByPassSpecs:
             ),
         )
 
-        actual = qml.specs(circ, level=2)()
+        actual = qml.specs(circ, level=1)()
         check_specs_same(actual, expected)
 
     @pytest.mark.usefixtures("use_capture")
@@ -532,7 +672,7 @@ class TestPassByPassSpecs:
             device_name="null.qubit",
             num_device_wires=3,
             shots=Shots(None),
-            level=3,
+            level="decompose-arbitrary-ppr",
             resources=SpecsResources(
                 gate_types={
                     "pbc.prepare": 1,
@@ -542,13 +682,13 @@ class TestPassByPassSpecs:
                     "PPR-pi/2-w2": 1,
                     "PPR-Phi-w1": 1,
                 },
-                gate_sizes={1: 4, 2: 1, 3: 1},
+                gate_sizes={0: 1, 1: 3, 2: 1, 3: 1},
                 measurements={},
-                num_allocs=4,
+                num_allocs=3,
             ),
         )
 
-        actual = qml.specs(circ, level=3)()
+        actual = qml.specs(circ, level=2)()
         check_specs_same(actual, expected)
 
 
@@ -576,10 +716,6 @@ class TestMarkerIntegration:
     def test_marker_with_tape_and_mlir_transforms(self, simple_circuit):
         """Tests that markers can work with both tape and mlir transforms."""
 
-        @qml.transform
-        def dummy_transform(tape):
-            return (tape,), lambda res: res[0]
-
         simple_circuit = qml.marker(simple_circuit, "before-transforms")
         simple_circuit = dummy_transform(simple_circuit)
         simple_circuit = dummy_transform(simple_circuit)
@@ -597,7 +733,7 @@ class TestMarkerIntegration:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=["before-transforms", "after-tape", "after-mlir"],
+            level={0: "before-transforms", 2: "after-tape", 5: "after-mlir"},
             resources={
                 "before-transforms": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
@@ -627,10 +763,6 @@ class TestMarkerIntegration:
     def test_marker_with_tape_and_mlir_transforms_level_all(self, simple_circuit):
         """Tests that markers can work with both tape and mlir transforms when level is 'all'."""
 
-        @qml.transform
-        def dummy_transform(tape):
-            return (tape,), lambda res: res[0]
-
         simple_circuit = qml.marker(simple_circuit, "before-transforms")
         simple_circuit = dummy_transform(simple_circuit)
         simple_circuit = dummy_transform(simple_circuit)
@@ -648,14 +780,18 @@ class TestMarkerIntegration:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=[
-                "before-transforms",
-                "dummy_transform",
-                "after-tape",
-                "Before MLIR Passes (MLIR-0)",
-                "cancel-inverses (MLIR-1)",
-                "after-mlir",
-            ],
+            level=dict(
+                enumerate(
+                    (
+                        "before-transforms",
+                        "dummy_transform",
+                        "after-tape",
+                        "Before MLIR Passes",
+                        "cancel-inverses",
+                        "after-mlir",
+                    )
+                )
+            ),
             resources={
                 "before-transforms": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
@@ -675,13 +811,13 @@ class TestMarkerIntegration:
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "Before MLIR Passes (MLIR-0)": SpecsResources(
+                "Before MLIR Passes": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     gate_sizes={1: 6, 2: 2},
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "cancel-inverses (MLIR-1)": SpecsResources(
+                "cancel-inverses": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2},
                     gate_sizes={1: 4},
                     measurements={"probs(all wires)": 1},
@@ -700,6 +836,7 @@ class TestMarkerIntegration:
 
         check_specs_same(actual, expected)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_redundant_marker(self, simple_circuit):
         """Test that two markers on the same level generate the same specs."""
 
@@ -714,7 +851,7 @@ class TestMarkerIntegration:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=["m0", "m1, m1-duplicate"],
+            level={0: "m0", 1: "m1, m1-duplicate"},
             resources={
                 "m0": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
@@ -731,10 +868,16 @@ class TestMarkerIntegration:
             },
         )
 
-        actual = qml.specs(simple_circuit, level=["m0", "m1", "m1-duplicate"])()
+        with pytest.warns(
+            UserWarning,
+            match="The 'level' argument to qml.specs for QJIT'd QNodes has been sorted to be "
+            "in ascending order with no duplicate levels.",
+        ):
+            actual = qml.specs(simple_circuit, level=["m0", "m1", "m1-duplicate"])()
 
         check_specs_same(actual, expected)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_marker(self, simple_circuit):
         """Test that qml.marker can be used appropriately."""
 
@@ -750,7 +893,7 @@ class TestMarkerIntegration:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=["m0", "m1", "m2"],
+            level={0: "m0", 1: "m1", 2: "m2"},
             resources={
                 "m0": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},

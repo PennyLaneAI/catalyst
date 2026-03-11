@@ -8,6 +8,7 @@ set(LIBS
     MLIRRegisterAllDialects
     MLIRCatalyst
     MLIRQuantum
+    MLIRQRef
     MLIRPBC
     MLIRGradient
     MLIRMBQC
@@ -15,6 +16,8 @@ set(LIBS
     MLIRPauliFrame
     MLIRIon
     MLIRRTIO
+    MLIRQecLogical
+    MLIRQecPhysical
 )
 
 add_llvm_executable(quantum-lsp-server quantum-lsp-server.cpp)
