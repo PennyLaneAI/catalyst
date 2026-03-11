@@ -67,12 +67,6 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     /// Check if an operation is a supported measurement operation
     static bool isSupportedMeasOp(Operation *op) { return isa<ExpvalOp>(op); }
 
-    /// Check if an operation is an observable operation.
-    static bool isObservableOp(Operation *op)
-    {
-        return isa<NamedObsOp, ComputationalBasisOp, HamiltonianOp, TensorOp, HermitianOp>(op);
-    }
-
     /// Calculate the number of groups: one group per observable
     static int calculateNumGroups(func::FuncOp funcOp)
     {
@@ -224,9 +218,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
         // Update return statement first (drops uses of the removed values)
         updateReturnStatement(groupFunc, returnValuesToRemove);
 
-        // Walk the def chain upward and erase dead operations.
-        // But skip observable ops as they are leaf nodes, we erase them but don't recurse into
-        // their operands
+        // Walk the def chain upward and erase dead operations, stopping at qubit/qreg boundaries
         llvm::SmallPtrSet<Operation *, 4> visited;
         while (!removeOps.empty()) {
             Operation *op = removeOps.front();
@@ -241,12 +233,12 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
                 continue;
             }
 
-            // Queue operand producers before erasing. And skip for observable ops
-            if (!isObservableOp(op)) {
-                for (Value operand : op->getOperands()) {
-                    if (auto *defOp = operand.getDefiningOp()) {
-                        removeOps.push_back(defOp);
-                    }
+            for (Value operand : op->getOperands()) {
+                if (isa<QubitType, QuregType>(operand.getType())) {
+                    continue;
+                }
+                if (auto *defOp = operand.getDefiningOp()) {
+                    removeOps.push_back(defOp);
                 }
             }
 
