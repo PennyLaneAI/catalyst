@@ -20,10 +20,10 @@ For a complete description of this dialect, please see
 
     mlir/include/QecLogical/IR/QecLogicalDialect.td
 """
-from collections.abc import Sequence, Set
-from typing import TypeAlias
+from collections.abc import Sequence
+from typing import ClassVar, TypeAlias
 
-from xdsl.dialects.builtin import I64, IndexType, IntegerAttr, IntegerType
+from xdsl.dialects.builtin import I64, ContainerOf, IndexType, IntegerAttr, IntegerType
 from xdsl.ir import (
     Attribute,
     Dialect,
@@ -34,9 +34,9 @@ from xdsl.ir import (
 )
 from xdsl.irdl import (
     AtLeast,
-    AttrConstraint,
     IRDLOperation,
     TypeAttributeInvT,
+    VarConstraint,
     irdl_attr_definition,
     irdl_op_definition,
     operand_def,
@@ -44,7 +44,6 @@ from xdsl.irdl import (
     opt_prop_def,
     result_def,
 )
-from xdsl.irdl.constraints import ConstraintContext
 from xdsl.parser import AttrParser
 from xdsl.printer import Printer
 
@@ -111,6 +110,9 @@ class LogicalHyperRegisterType(ParametrizedAttribute, TypeAttribute):
 LogicalCodeBlockSSAValue: TypeAlias = SSAValue[LogicalCodeblockType]
 LogicalHyperRegisterSSAValue: TypeAlias = SSAValue[LogicalHyperRegisterType]
 
+anyLogicalCodeblock = ContainerOf(LogicalCodeblockType)
+anyLogicalHyperRegister = ContainerOf(LogicalHyperRegisterType)
+
 
 def _get_type_from_ssa_value_or_operation(
     arg: SSAValue | Operation, expected_type: TypeAttributeInvT
@@ -145,50 +147,6 @@ def get_logical_hyper_reg_type(
 ) -> LogicalHyperRegisterType:
     """Helper function to return the logical hyper-register type given an SSA value or operation."""
     return _get_type_from_ssa_value_or_operation(hyper_reg, LogicalHyperRegisterType)
-
-
-class LogicalHyperRegisterTypeConstraint(AttrConstraint):
-    """Constraint to make LogicalHyperRegisterType inferrable during IRDL declaration."""
-
-    # This is a bit of a hack for ops that both consume and return a LogicalHyperRegisterType.
-    # Here's what's happening. In the op's assembly format, we typically specify the input
-    # hyper-register operand with `type($in_hyper_reg)`, but we don't do the same for the
-    # `$out_hyper_reg` result, since we implicitly constrain it to be the same type as the input.
-    # When xDSL parses the op's assembly format, in FormatProgram.parse(), it calls a function
-    # resolve_constraint_variables(). This function runs the verify() method of every constrained
-    # operand, result, attribute, etc. in the op. From these verify() methods, it is possible to
-    # update a ConstraintContext variable with data relating to the constraints needed for other
-    # operands/results/attributes/etc. When it calls verify() on the input hyper-register operand,
-    # we store its type in the context variable. Then, when the assembly parser attempts to resolve
-    # the result types, it calls the infer() method, which looks up the hyper-register type in the
-    # context variable and uses the same type for the returned hyper-register.
-
-    def verify(self, attr: Attribute, constraint_context: ConstraintContext) -> None:
-        """Verify the constraint and add resolved values to the ConstraintContext."""
-        constraint_context.set_attr_variable("hyper_reg_type", attr)
-
-    # pylint: disable=unused-argument
-    def can_infer(self, var_constraint_names: Set[str]) -> bool:
-        """Check if there is enough information to infer the attribute given the constraint
-        variables that are already set.
-        """
-        # Assume we can always infer
-        return True
-
-    def infer(self, context: ConstraintContext) -> LogicalHyperRegisterType:
-        """Infer the attribute given the the values for all variables."""
-        hyper_reg_type = context.get_variable("hyper_reg_type")
-        assert isinstance(
-            hyper_reg_type, LogicalHyperRegisterType
-        ), f"Expected a LogicalHyperRegisterType from constraint context, but got {hyper_reg_type}"
-        return hyper_reg_type
-
-    # pylint: disable=unused-argument
-    def mapping_type_vars(self, type_var_mapping):
-        """A helper function to make type vars used in attribute definitions concrete when creating
-        constraints for new attributes or operations.
-        """
-        return self  # pragma: nocover
 
 
 @irdl_op_definition
@@ -270,13 +228,15 @@ class ExtractCodeblockOp(IRDLOperation):
 class InsertCodeblockOp(IRDLOperation):
     """Update the logical codeblock value of a hyper-register."""
 
+    T: ClassVar = VarConstraint("T", anyLogicalHyperRegister)
+
     name = "qecl.insert_block"
 
     assembly_format = """
             $in_hyper_reg `[` ($idx^):($idx_attr)? `]` `,` $codeblock attr-dict `:` type($in_hyper_reg) `,` type($codeblock)
         """
 
-    in_hyper_reg = operand_def(LogicalHyperRegisterTypeConstraint())
+    in_hyper_reg = operand_def(T)
 
     idx = opt_operand_def(IndexType)
 
@@ -284,7 +244,7 @@ class InsertCodeblockOp(IRDLOperation):
 
     codeblock = operand_def(LogicalCodeblockType)
 
-    out_hyper_reg = result_def(LogicalHyperRegisterTypeConstraint())
+    out_hyper_reg = result_def(T)
 
     def __init__(
         self,
