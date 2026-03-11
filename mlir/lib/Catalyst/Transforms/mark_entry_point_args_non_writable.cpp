@@ -41,7 +41,7 @@ struct MarkEntryPointArgsNonWritablePass
             }
 
             for (auto [index, arg] : llvm::enumerate(funcOp.getArguments())) {
-                if (!isa<TensorType, MemRefType>(arg.getType())) {
+                if (!isa<TensorType>(arg.getType())) {
                     continue;
                 }
                 funcOp.setArgAttr(index, bufferization::BufferizationDialect::kWritableAttrName,
