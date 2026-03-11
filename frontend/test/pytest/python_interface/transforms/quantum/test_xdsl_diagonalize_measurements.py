@@ -63,7 +63,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         """Test that a PauliZ observable is not affected by diagonalization"""
 
         program = """
-            func.func @test_func() {
+            func.func @test_func() attributes {quantum.node} {
                 %0 = "test.op"() : () -> !quantum.bit
 
                 // CHECK: quantum.namedobs %0[PauliZ] : !quantum.obs
@@ -85,7 +85,7 @@ class TestDiagonalizeFinalMeasurementsPass:
     def test_with_supported_base_obs(self, supported_base_obs, run_filecheck):
         """Check observables in the supported_base_obs would not be diagonalized."""
         program = """
-            func.func @test_func() {
+            func.func @test_func() attributes {quantum.node} {
                 // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
                 %0 = "test.op"() : () -> !quantum.bit
 
@@ -104,7 +104,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         """Test that an Identity observable is not affected by diagonalization."""
 
         program = """
-            func.func @test_func() {
+            func.func @test_func() attributes {quantum.node} {
                 // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
                 %0 = "test.op"() : () -> !quantum.bit
 
@@ -123,7 +123,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         """Test that when a PauliX observable diagonalization is not expected."""
 
         program = """
-            func.func @test_func() {
+            func.func @test_func() attributes {quantum.node} {
                 // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
                 %0 = "test.op"() : () -> !quantum.bit
 
@@ -143,7 +143,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         gates are inserted and the observable becomes PauliZ."""
 
         program = """
-            func.func @test_func() {
+            func.func @test_func() attributes {quantum.node} {
                 // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
                 %0 = "test.op"() : () -> !quantum.bit
 
@@ -165,7 +165,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         """Test that when a PauliY observable diagonalization is not expected."""
 
         program = """
-            func.func @test_func() {
+            func.func @test_func() attributes {quantum.node} {
                 // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
                 %0 = "test.op"() : () -> !quantum.bit
 
@@ -185,7 +185,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         gates are inserted and the observable becomes PauliZ."""
 
         program = """
-            func.func @test_func() {
+            func.func @test_func() attributes {quantum.node} {
                 // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
                 %0 = "test.op"() : () -> !quantum.bit
 
@@ -209,7 +209,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         """Test that when a Hadamard observable diagonalization is not expected."""
 
         program = """
-            func.func @test_func() {
+            func.func @test_func() attributes {quantum.node} {
                 // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
                 %0 = "test.op"() : () -> !quantum.bit
 
@@ -229,7 +229,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         gates are inserted and the observable becomes PauliZ."""
 
         program = """
-            func.func @test_func() {
+            func.func @test_func() attributes {quantum.node} {
                 // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
                 %0 = "test.op"() : () -> !quantum.bit
 
@@ -258,7 +258,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         """
 
         program = """
-            func.func @test_func() {
+            func.func @test_func() attributes {quantum.node} {
                 // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
                 // CHECK: [[q1:%.*]] = "test.op"() : () -> !quantum.bit
                 // CHECK: [[q2:%.*]] = "test.op"() : () -> !quantum.bit
@@ -304,7 +304,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         """
 
         program = """
-            func.func @test_func() {
+            func.func @test_func() attributes {quantum.node} {
                 // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
                 // CHECK: [[q1:%.*]] = "test.op"() : () -> !quantum.bit
                 // CHECK: [[q2:%.*]] = "test.op"() : () -> !quantum.bit
@@ -356,7 +356,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         """
 
         program = """
-            func.func @test_func() {
+            func.func @test_func() attributes {quantum.node} {
                 // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
                 // CHECK-NEXT: [[q1:%.*]] = "test.op"() : () -> !quantum.bit
                 %0 = "test.op"() : () -> !quantum.bit
@@ -392,7 +392,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         """
 
         program = """
-            func.func @test_func() {
+            func.func @test_func() attributes {quantum.node} {
                 %0 = "test.op"() : () -> !quantum.bit
                 %1 = "test.op"() : () -> !quantum.bit
 
@@ -429,7 +429,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         """
 
         program = """
-            func.func @test_func() {
+            func.func @test_func() attributes {quantum.node} {
                 %0 = "test.op"() : () -> !quantum.bit
                 // CHECK: quantum.custom "Hadamard"()
                 // CHECK-NEXT: quantum.namedobs [[q:%.+]][PauliZ]
@@ -464,7 +464,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         # both quantum.namedobs and the quantum.insert, it will be passed to the Hadamard, and the
         # SSA value that is output by the *Hadmard* operation will be passed to namedobs and insert.
         program = """
-            func.func @test_func() {
+            func.func @test_func() attributes {quantum.node} {
                 %0 = quantum.alloc(3) : !quantum.reg
                 %1 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
                 %2 = tensor.extract %1[] : tensor<i64>
