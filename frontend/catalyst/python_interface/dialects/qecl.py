@@ -23,7 +23,7 @@ For a complete description of this dialect, please see
 from collections.abc import Sequence
 from typing import ClassVar, TypeAlias
 
-from xdsl.dialects.builtin import I64, ContainerOf, IndexType, IntegerAttr, IntegerType
+from xdsl.dialects.builtin import I64, ContainerOf, IndexType, IntegerAttr
 from xdsl.ir import (
     Attribute,
     Dialect,

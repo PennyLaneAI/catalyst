@@ -100,6 +100,9 @@ def test_op_constructors():
     hyper_reg = create_ssa_value(qecl.LogicalHyperRegisterType(width, k))
     codeblock = create_ssa_value(qecl.LogicalCodeblockType(k))
 
+    idx_value = create_ssa_value(IndexType())
+    idx_attr = IntegerAttr.from_index_int_value(0)
+
     # alloc
     alloc_op = qecl.AllocOp(qecl.LogicalHyperRegisterType(width, k))
     assert len(alloc_op.result_types) == 1
@@ -116,13 +119,9 @@ def test_op_constructors():
     assert len(extract_block_op.result_types) == 1
     assert isinstance(extract_block_op.result_types[0], qecl.LogicalCodeblockType)
     assert extract_block_op.result_types[0].k.value.data == k
-    extract_block_op_idx_attr = qecl.ExtractCodeblockOp(
-        hyper_reg=hyper_reg, idx=IntegerAttr.from_index_int_value(0)
-    )
+    extract_block_op_idx_attr = qecl.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=idx_attr)
     assert extract_block_op_idx_attr
-    extract_block_op_idx_ssa = qecl.ExtractCodeblockOp(
-        hyper_reg=hyper_reg, idx=create_ssa_value(IndexType())
-    )
+    extract_block_op_idx_ssa = qecl.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=idx_value)
     assert extract_block_op_idx_ssa
 
     # insert_block
@@ -132,11 +131,11 @@ def test_op_constructors():
     assert insert_block_op.result_types[0].width.value.data == width
     assert insert_block_op.result_types[0].k.value.data == k
     insert_block_op_idx_attr = qecl.InsertCodeblockOp(
-        in_hyper_reg=hyper_reg, idx=IntegerAttr.from_index_int_value(0), codeblock=codeblock
+        in_hyper_reg=hyper_reg, idx=idx_attr, codeblock=codeblock
     )
     assert insert_block_op_idx_attr
     insert_block_op_idx_ssa = qecl.InsertCodeblockOp(
-        in_hyper_reg=hyper_reg, idx=create_ssa_value(IndexType()), codeblock=codeblock
+        in_hyper_reg=hyper_reg, idx=idx_value, codeblock=codeblock
     )
     assert insert_block_op_idx_ssa
 
