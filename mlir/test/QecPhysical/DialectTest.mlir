@@ -151,3 +151,11 @@ func.func @test_gate_op_cnot(
     %6, %7 = qecp.cnot %3, %1 : !qecp.qubit<aux>, !qecp.qubit<data>
     func.return
 }
+
+// -----
+
+func.func @test_measure(%arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<aux>) {
+    %mres0, %0 = qecp.measure %arg0 : i1, !qecp.qubit<data>
+    %mres1, %1 = qecp.measure %arg1 : i1, !qecp.qubit<aux>
+    func.return
+}
