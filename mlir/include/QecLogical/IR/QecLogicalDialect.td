@@ -16,6 +16,7 @@
 #define QEC_LOGICAL_DIALECT
 
 include "mlir/IR/DialectBase.td"
+include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//
 // QecLogical dialect definition.
