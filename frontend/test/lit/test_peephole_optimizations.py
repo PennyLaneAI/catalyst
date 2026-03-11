@@ -210,9 +210,9 @@ def test_pipeline_lowering_global():
         return g(1.2), h(1.2)
 
     # CHECK: quantum_kernel
-    # CHECK: pipelines=(('main', (<cancel-inverses()>, merge-rotations()>)),)
+    # CHECK: pipelines=(('main', (<cancel-inverses()>, <merge-rotations()>)),)
     # CHECK: quantum_kernel
-    # CHECK: pipelines=(('main', (<cancel-inverses()>, merge-rotations()>)),)
+    # CHECK: pipelines=(('main', (<cancel-inverses()>, <merge-rotations()>)),)
     print_jaxpr(global_wf)
 
     # CHECK: transform.named_sequence @__transform_main
