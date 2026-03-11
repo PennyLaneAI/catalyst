@@ -157,3 +157,28 @@ def test_assembly_format(run_filecheck, pretty_print):
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
+
+
+class TestQecLogicalHelpers:
+    """Tests for the QEC logical dialect helper functions"""
+
+    @pytest.mark.parametrize(
+        "in_hyper_reg_type",
+        [
+            qecl.LogicalHyperRegisterType(1, 1),
+            qecl.LogicalHyperRegisterType(1, 3),
+            qecl.LogicalHyperRegisterType(3, 1),
+            qecl.LogicalHyperRegisterType(3, 3),
+        ],
+    )
+    def test_get_logical_hyper_reg_type(self, in_hyper_reg_type):
+        """Test that the qecl.get_logical_hyper_reg_type function returns the correct type when
+        given an SSA value or an operation.
+        """
+        in_hyper_reg_ssa_val = create_ssa_value(in_hyper_reg_type)
+        out_hyper_reg_type_from_ssa = qecl.get_logical_hyper_reg_type(in_hyper_reg_ssa_val)
+        assert in_hyper_reg_type == out_hyper_reg_type_from_ssa
+
+        in_hyper_reg_defining_op = in_hyper_reg_ssa_val.op
+        out_hyper_reg_type_from_op = qecl.get_logical_hyper_reg_type(in_hyper_reg_defining_op)
+        assert in_hyper_reg_type == out_hyper_reg_type_from_op
