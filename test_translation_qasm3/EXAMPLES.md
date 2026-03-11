@@ -624,7 +624,6 @@ for n in [2, 5, 10, 20]:
 ---
 
 For more examples, see:
-- [CLAUDE.md](../CLAUDE.md) - Full testing guide
 - [README.md](README.md) - Test suite documentation
 - [test_translation.py](test_translation.py) - Complete test runner
 
