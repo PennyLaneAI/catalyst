@@ -805,21 +805,39 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
     """Integrate test for NonCommutingObservableValidator"""
 
-    # Representative non-commuting Hamiltonians (Single Measurement)
-    SINGLE_OBS_LIST = [
+    A = np.array([[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(-1.0, 0.0)]])
+    # non-commuting Hamiltonians (Single Measurement)
+    NON_COMMUTE_SINGLE_OBS_LIST = [
         qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.X(0)]),  # qwc check
         qml.Hamiltonian([1.0, 1.0], [qml.Z(2), qml.Hadamard(2)]),  # non-overlap check via Hadamard
         qml.Hamiltonian(
-            [1.0, 1.0], [qml.Z(1), qml.X(0) @ qml.Hermitian(np.eye(2), wires=1)]
+            [1.0, 1.0], [qml.Z(1), qml.X(0) @ qml.Hermitian(A, wires=1)]
         ),  # non-overlap check via Hermitian
     ]
 
-    # Representative non-commuting pairs (Multiple Measurements)
-    MULTI_OBS_LIST = [
+    # commuting Hamiltonians (Single Measurement)
+    COMMUTE_SINGLE_OBS_LIST = [
+        qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.Z(0)]),  # qwc check
+        qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.I(0)]),  # qwc check
+        qml.Hamiltonian(
+            [1.0, 1.0], [qml.Z(1), qml.Hermitian(A, wires=0)]
+        ),  # non-overlap check via Hermitian
+    ]
+
+    # non-commuting pairs (Multiple Measurements)
+    NON_COMMUTE_MULTI_OBS_LIST = [
         (qml.X(0), qml.Y(0)),  # NamedObs
         (qml.X(0) @ qml.Y(1), qml.Z(1)),  # TensorObs
         (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.X(0)),  # Hamiltonians vs NamedObs
-        (qml.Hermitian(np.eye(2), wires=1), qml.Z(1)),  # HermitianOps
+        (qml.Hermitian(A, wires=1), qml.Z(1)),  # HermitianOps
+    ]
+
+    # commuting pairs (Multiple Measurements)
+    COMMUTE_MULTI_OBS_LIST = [
+        (qml.X(0), qml.I(0)),  # NamedObs
+        (qml.X(0) @ qml.Z(1), qml.Z(1)),  # TensorObs
+        (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.I(0)),  # Hamiltonians vs NamedObs
+        (qml.Hermitian(A, wires=1), qml.X(2)),  # HermitianOps
     ]
 
     @pytest.fixture
@@ -828,10 +846,10 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
         return qml.device("lightning.qubit", wires=4)
 
     @pytest.mark.parametrize("add_compbasis_meas", ["false", "wires", "qreg"])
-    @pytest.mark.parametrize("obs", SINGLE_OBS_LIST)
+    @pytest.mark.parametrize("obs", NON_COMMUTE_SINGLE_OBS_LIST)
     @pytest.mark.parametrize("measurements", [qml.expval, qml.var, qml.sample])
-    def test_qwc_error_single_measurement(self, add_compbasis_meas, device, obs, measurements):
-        """Check for single measurement non-commuting Hamiltonians."""
+    def test_non_commuting_single_measurement(self, add_compbasis_meas, device, obs, measurements):
+        """An RuntimeError is raised for single measurement non-commuting Hamiltonians."""
 
         # pylint: disable=inconsistent-return-statements
         @qml.qjit()
@@ -850,10 +868,10 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
         with pytest.raises(RuntimeError, match=_non_commuting_err_msg):
             circuit(0.7)
 
-    @pytest.mark.parametrize("obs", MULTI_OBS_LIST)
+    @pytest.mark.parametrize("obs", NON_COMMUTE_MULTI_OBS_LIST)
     @pytest.mark.parametrize("m", [(qml.expval, qml.var), (qml.expval, qml.sample)])
-    def test_qwc_error_multiple_measurements(self, device, obs, m):
-        """Check for multiple non-commuting measurements."""
+    def test_non_commuting_multiple_measurements(self, device, obs, m):
+        """An RuntimeError is raised for multiple non-commuting measurements."""
 
         @qml.qjit()
         @diagonalize_final_measurements_pass
@@ -865,3 +883,33 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
 
         with pytest.raises(RuntimeError, match=_non_commuting_err_msg):
             circuit(0.7)
+
+    @pytest.mark.parametrize("obs", COMMUTE_SINGLE_OBS_LIST)
+    @pytest.mark.parametrize("measurements", [qml.expval, qml.var])
+    def test_commuting_single_measurement(self, device, obs, measurements):
+        """No error is raised for single measurement commuting Hamiltonians."""
+
+        @qml.qjit()
+        @diagonalize_final_measurements_pass
+        @qml.set_shots(10)
+        @qml.qnode(device)
+        def circuit(x):
+            qml.RX(x, 0)
+            return measurements(obs)
+
+        circuit(0.7)
+
+    @pytest.mark.parametrize("obs", COMMUTE_MULTI_OBS_LIST)
+    @pytest.mark.parametrize("m", [(qml.expval, qml.var)])
+    def test_commuting_multiple_measurements(self, device, obs, m):
+        """No error is raised for multiple commuting measurements."""
+
+        @qml.qjit()
+        @diagonalize_final_measurements_pass
+        @qml.set_shots(10)
+        @qml.qnode(device)
+        def circuit(x):
+            qml.RX(x, 0)
+            return m[0](obs[0]), m[1](obs[1])
+
+        circuit(0.7)
