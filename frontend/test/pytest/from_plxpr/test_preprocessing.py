@@ -301,9 +301,15 @@ class TestMeasurementPreprocessing:
         device_pipeline = pipelines[1][1]
 
         if transform_needed:
-            assert any(t.pass_name == "split-non-commuting" for t in device_pipeline)
+            assert any(
+                t.pass_name == "empty" and t.kwargs["key"] == "split_non_commuting"
+                for t in device_pipeline
+            )
         else:
-            assert not any(t.pass_name == "split-non-commuting" for t in device_pipeline)
+            assert not any(
+                t.pass_name == "empty" and t.kwargs["key"] == "split_non_commuting"
+                for t in device_pipeline
+            )
 
     @pytest.mark.parametrize(
         "split_non_commuting_needed,sum_supported,transform_needed",
@@ -387,9 +393,15 @@ class TestMeasurementPreprocessing:
         device_pipeline = pipelines[1][1]
 
         if transform_needed:
-            assert any(t.pass_name == "measurements-from-samples" for t in device_pipeline)
+            assert any(
+                t.pass_name == "empty" and t.kwargs["key"] == "measurements_from_samples"
+                for t in device_pipeline
+            )
         else:
-            assert not any(t.pass_name == "measurements-from-samples" for t in device_pipeline)
+            assert not any(
+                t.pass_name == "empty" and t.kwargs["key"] == "measurements_from_samples"
+                for t in device_pipeline
+            )
 
     @pytest.mark.parametrize(
         "non_counts_supported,transform_needed", [(True, False), (False, True)]
@@ -428,9 +440,15 @@ class TestMeasurementPreprocessing:
         device_pipeline = pipelines[1][1]
 
         if transform_needed:
-            assert any(t.pass_name == "measurements-from-counts" for t in device_pipeline)
+            assert any(
+                t.pass_name == "empty" and t.kwargs["key"] == "measurements_from_counts"
+                for t in device_pipeline
+            )
         else:
-            assert not any(t.pass_name == "measurements-from-counts" for t in device_pipeline)
+            assert not any(
+                t.pass_name == "empty" and t.kwargs["key"] == "measurements_from_counts"
+                for t in device_pipeline
+            )
 
     def test_unsupported_samples_counts_observables_error(self):
         """Test that an error is raised if a device doesn't support any observables,
@@ -484,9 +502,15 @@ class TestMeasurementPreprocessing:
         device_pipeline = pipelines[1][1]
 
         if transform_needed:
-            assert any(t.pass_name == "diagonalize-measurements" for t in device_pipeline)
+            assert any(
+                t.pass_name == "empty" and t.kwargs["key"] == "diagonalize_measurements"
+                for t in device_pipeline
+            )
         else:
-            assert not any(t.pass_name == "diagonalize-measurements" for t in device_pipeline)
+            assert not any(
+                t.pass_name == "empty" and t.kwargs["key"] == "diagonalize_measurements"
+                for t in device_pipeline
+            )
 
 
 class TestOperationPreprocessing:
@@ -512,8 +536,14 @@ class TestOperationPreprocessing:
 
         assert pipelines
         device_pipeline = pipelines[1][1]
-        assert any(t.pass_name == "verify-operations" for t in device_pipeline)
-        assert any(t.pass_name == "validate-measurements" for t in device_pipeline)
+        assert any(
+            t.pass_name == "empty" and t.kwargs["key"] == "verify_operations"
+            for t in device_pipeline
+        )
+        assert any(
+            t.pass_name == "empty" and t.kwargs["key"] == "validate_measurements"
+            for t in device_pipeline
+        )
 
 
 class TestGradientPreprocessing:
@@ -542,10 +572,14 @@ class TestGradientPreprocessing:
         device_pipeline = pipelines[1][1]
 
         if diff_method is not None:
-            assert any(t.pass_name == "verify-no-state-variance-returns" for t in device_pipeline)
+            assert any(
+                t.pass_name == "empty" and t.kwargs["key"] == "verify_no_state_variance_returns"
+                for t in device_pipeline
+            )
         else:
             assert not any(
-                t.pass_name == "verify-no-state-variance-returns" for t in device_pipeline
+                t.pass_name == "empty" and t.kwargs["key"] == "verify_no_state_variance_returns"
+                for t in device_pipeline
             )
 
     @pytest.mark.parametrize("diff_method", ["adjoint", "parameter-shift", None])
@@ -591,10 +625,14 @@ class TestGradientPreprocessing:
         device_pipeline = pipelines[1][1]
 
         if diff_method == "adjoint":
-            assert any(t.pass_name == "validate-observables-adjoint-diff" for t in device_pipeline)
+            assert any(
+                t.pass_name == "empty" and t.kwargs["key"] == "validate_observables_adjoint_diff"
+                for t in device_pipeline
+            )
         else:
             assert not any(
-                t.pass_name == "validate-observables-adjoint-diff" for t in device_pipeline
+                t.pass_name == "empty" and t.kwargs["key"] == "validate_observables_adjoint_diff"
+                for t in device_pipeline
             )
 
     @pytest.mark.parametrize("diff_method", ["adjoint", "parameter-shift", None])
@@ -621,11 +659,13 @@ class TestGradientPreprocessing:
 
         if diff_method == "parameter-shift":
             assert any(
-                t.pass_name == "validate-observables-parameter-shift" for t in device_pipeline
+                t.pass_name == "empty" and t.kwargs["key"] == "validate_observables_parameter_shift"
+                for t in device_pipeline
             )
         else:
             assert not any(
-                t.pass_name == "validate-observables-parameter-shift" for t in device_pipeline
+                t.pass_name == "empty" and t.kwargs["key"] == "validate_observables_parameter_shift"
+                for t in device_pipeline
             )
 
 
@@ -685,17 +725,21 @@ class TestIntegration:
 
             assert any(t.pass_name == "dynamic-one-shot" for t in f1_device_pipeline)
             assert any(
-                t.pass_name == "verify-no-state-variance-returns" for t in f1_device_pipeline
+                t.pass_name == "empty" and t.kwargs["key"] == "verify_no_state_variance_returns"
+                for t in f1_device_pipeline
             )
             assert any(
-                t.pass_name == "validate-observables-parameter-shift" for t in f1_device_pipeline
+                t.pass_name == "empty" and t.kwargs["key"] == "validate_observables_parameter_shift"
+                for t in f1_device_pipeline
             )
 
             assert any(
-                t.pass_name == "verify-no-state-variance-returns" for t in f2_device_pipeline
+                t.pass_name == "empty" and t.kwargs["key"] == "verify_no_state_variance_returns"
+                for t in f2_device_pipeline
             )
             assert any(
-                t.pass_name == "validate-observables-adjoint-diff" for t in f2_device_pipeline
+                t.pass_name == "empty" and t.kwargs["key"] == "validate_observables_adjoint_diff"
+                for t in f2_device_pipeline
             )
 
             # 2 warnings for 2 QNodes
