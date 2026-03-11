@@ -216,3 +216,69 @@ def test_assembly_format(run_filecheck, pretty_print):
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
+
+class TestQecPhysicalHelpers:
+    """Tests for the QEC physical dialect helper functions"""
+
+    @pytest.mark.parametrize(
+        "in_hyper_reg_type",
+        [
+            qecp.PhysicalHyperRegisterType(1, 1, 1),
+            qecp.PhysicalHyperRegisterType(1, 1, 7),
+            qecp.PhysicalHyperRegisterType(3, 1, 1),
+            qecp.PhysicalHyperRegisterType(3, 1, 7),
+            qecp.PhysicalHyperRegisterType(3, 2, 1),
+            qecp.PhysicalHyperRegisterType(3, 2, 7),
+        ],
+    )
+    def test_get_physical_hyper_reg_type(self, in_hyper_reg_type):
+        """Test that the qecl.get_physical_hyper_reg_type function returns the correct type when
+        given an SSA value or an operation.
+        """
+        in_hyper_reg_ssa_val = create_ssa_value(in_hyper_reg_type)
+        out_hyper_reg_type_from_ssa = qecp.get_physical_hyper_reg_type(in_hyper_reg_ssa_val)
+        assert in_hyper_reg_type == out_hyper_reg_type_from_ssa
+
+        in_hyper_reg_defining_op = in_hyper_reg_ssa_val.op
+        out_hyper_reg_type_from_op = qecp.get_physical_hyper_reg_type(in_hyper_reg_defining_op)
+        assert in_hyper_reg_type == out_hyper_reg_type_from_op
+    
+    @pytest.mark.parametrize(
+        "in_codeblock_type",
+        [
+            qecp.PhysicalCodeblockType(1, 1),
+            qecp.PhysicalCodeblockType(1, 7),
+            qecp.PhysicalCodeblockType(7, 1),
+            qecp.PhysicalCodeblockType(7, 7),
+        ],
+    )
+    def test_get_physical_codeblock_type(self, in_codeblock_type):
+        """Test that the qecl.get_physical_codeblock_type function returns the correct type when
+        given an SSA value or an operation.
+        """
+        in_codeblock_ssa_val = create_ssa_value(in_codeblock_type)
+        out_codeblock_type_from_ssa = qecp.get_physical_codeblock_type(in_codeblock_ssa_val)
+        assert in_codeblock_type == out_codeblock_type_from_ssa
+
+        in_codeblock_defining_op = in_codeblock_ssa_val.op
+        out_codeblock_type_from_op = qecp.get_physical_codeblock_type(in_codeblock_defining_op)
+        assert in_codeblock_type == out_codeblock_type_from_op
+
+    @pytest.mark.parametrize(
+        "in_qubit_type",
+        [
+            qecp.QecPhysicalQubitType("data"),
+            qecp.QecPhysicalQubitType("aux"),
+        ],
+    )
+    def test_get_physical_qubit_type(self, in_qubit_type):
+        """Test that the qecl.get_physical_qubit_type function returns the correct type when
+        given an SSA value or an operation.
+        """
+        in_qubit_ssa_val = create_ssa_value(in_qubit_type)
+        out_qubit_type_from_ssa = qecp.get_physical_qubit_type(in_qubit_ssa_val)
+        assert in_qubit_type == out_qubit_type_from_ssa
+
+        in_qubit_defining_op = in_qubit_ssa_val.op
+        out_qubit_type_from_op = qecp.get_physical_qubit_type(in_qubit_defining_op)
+        assert in_qubit_type == out_qubit_type_from_op
