@@ -181,7 +181,6 @@ def assert_dag_structure(nodes, edges, expected_edges):
                 ), f"Expected {attr_key}='{expected_val}', got '{actual_val}'."
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestFuncOpVisualization:
     """Tests the visualization of FuncOps with bounding boxes"""
 
@@ -259,7 +258,6 @@ class TestFuncOpVisualization:
         assert graph_clusters["cluster2"]["parent_cluster_uid"] == "cluster0"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestDeviceNode:
     """Tests that the device node is correctly visualized."""
 
@@ -344,7 +342,6 @@ class TestDeviceNode:
         assert graph_nodes["node2"]["label"] == "LightningSimulator"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestForOp:
     """Tests that the for loop control flow can be visualized correctly."""
 
@@ -400,7 +397,6 @@ class TestForOp:
         assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestWhileOp:
     """Tests that the while loop control flow can be visualized correctly."""
 
@@ -461,7 +457,6 @@ class TestWhileOp:
         assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestIfOp:
     """Tests that the conditional control flow can be visualized correctly."""
 
@@ -781,7 +776,6 @@ class TestGetLabel:
         assert get_label(meas) == label
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestCreateStaticOperatorNodes:
     """Tests that operators with static parameters can be created and visualized as nodes."""
 
@@ -1029,13 +1023,13 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node1"]["label"] == "<name> PauliRot|<wire> [0]"
         assert nodes["node2"]["label"] == "<name> PauliRot|<wire> [0, 1, 2]"
 
-    def test_complex_measurements(self, capture_mode):
+    def test_complex_measurements(self):
         """Tests that complex measurements can be created."""
 
         dev = qml.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, capture=capture_mode)
+        @qml.qjit(autograph=True, capture=True)
         @qml.qnode(dev)
         def my_workflow():
             coeffs = [0.2, -0.543]
@@ -1121,7 +1115,6 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node1"]["label"] == f"<name> BasisState|<wire> {wires}"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestCreateDynamicOperatorNodes:
     """Tests that operator nodes with dynamic parameters or wires can be created and visualized."""
 
@@ -1324,7 +1317,6 @@ class TestCreateDynamicOperatorNodes:
         assert nodes["node2"]["attrs"]["fillcolor"] == "#70B3F5"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestCreateStaticMeasurementNodes:
     """Tests that measurements with static parameters can be created and visualized as nodes."""
 
@@ -1433,7 +1425,6 @@ class TestCreateStaticMeasurementNodes:
         assert nodes["node1"]["label"] == get_label(qml.sample(**kwargs))
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestCreateDynamicMeasurementNodes:
     """Tests that measurements on dynamic wires render correctly."""
 
@@ -1519,7 +1510,6 @@ class TestCreateDynamicMeasurementNodes:
         )
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestOperatorConnectivity:
     """Tests that operators are properly connected."""
 
@@ -2368,7 +2358,6 @@ class TestOperatorConnectivity:
         assert_dag_structure(nodes, edges, expected_edges)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestTerminalMeasurementConnectivity:
     """Test that terminal measurements connect properly."""
 
@@ -2663,7 +2652,6 @@ class TestTerminalMeasurementConnectivity:
         assert edges[("node0", "node3")]["attrs"]["style"] == "dashed"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestCtrl:
     """Tests that the ctrl transform is visualized correctly."""
 
@@ -2776,7 +2764,6 @@ class TestCtrl:
         assert nodes["node2"]["parent_cluster_uid"] == "cluster1"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestAdjoint:
     """Tests that the ctrl transform is visualized correctly."""
 
