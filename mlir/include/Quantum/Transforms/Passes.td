@@ -118,6 +118,30 @@ def MergeRotationsPass : Pass<"merge-rotations"> {
 
 def GraphDecompositionPass : Pass<"graph-decomposition"> {
     let summary = "Decompose gates using an MLIR-native graph-based framework.";
+
+    let options = [
+    ListOption<
+    /*C++ name*/"targetGateSetOption", 
+    /*CLI name*/"gate-set", 
+    /*Type*/"std::string", 
+    /*Description*/"The accepted gates to decompose to.">,
+    ListOption<
+    /*C++ name*/"fixedDecompsOption", 
+    /*CLI name*/"fixed-decomps", 
+    /*Type*/"std::string", 
+    /*Description*/"A map of operators to decomposition rules that will be used over any built-in rules.">,
+    ListOption<
+    /*C++ name*/"altDecompsOption", 
+    /*CLI name*/"alt-decomps", 
+    /*Type*/"std::string", 
+    /*Description*/"A map of operators to alternative decomposition rules that will be considered alongside any built-in rules.">,
+    Option<
+    /*C++ name*/"stageOption", 
+    /*CLI name*/"stage", 
+    /*Type*/"int",
+    /*Default*/"-1",
+    /*Description*/"Which decomposition to apply .">,
+    ];
 }
 
 def DecomposeLoweringPass : Pass<"decompose-lowering"> {
