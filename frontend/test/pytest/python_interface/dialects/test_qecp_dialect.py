@@ -14,6 +14,8 @@
 
 """Unit tests for the xDSL QecPhysical dialect."""
 
+from typing import cast
+
 import pytest
 from xdsl.dialects import test
 from xdsl.dialects.builtin import IntegerAttr, IntegerType
@@ -28,7 +30,7 @@ pytestmark = pytest.mark.xdsl
 def create_ssa_value(t: AttributeCovT) -> OpResult[AttributeCovT]:
     """Create a single SSA value with the given type for testing purposes."""
     op = test.TestOp(result_types=(t,))
-    return op.results[0]
+    return cast(OpResult[AttributeCovT], op.results[0])
 
 
 all_ops = list(qecp.QecPhysical.operations)
