@@ -181,5 +181,59 @@ def InsertQubitOp : QecPhysical_Op<"insert", [AllTypesMatch<["in_codeblock", "ou
     let hasFolder = 1;
 }
 
+def HadamardOp : QecPhysical_Op<"hadamard", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical Hadamard gate operation.";
+
+    let arguments = (ins
+        QecPhysicalQubitType:$in_qubit
+    );
+
+    let results = (outs
+        QecPhysicalQubitType:$out_qubit
+    );
+
+    let assemblyFormat = [{
+        $in_qubit attr-dict `:` qualified(type($in_qubit))
+    }];
+}
+
+def SOp : QecPhysical_Op<"s", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical S (π/2 phase) gate operation.";
+
+    let arguments = (ins
+        QecPhysicalQubitType:$in_qubit,
+        UnitAttr:$adjoint
+    );
+
+    let results = (outs
+        QecPhysicalQubitType:$out_qubit
+    );
+
+    let assemblyFormat = [{
+        $in_qubit (`adj` $adjoint^)? attr-dict `:` qualified(type($in_qubit))
+    }];
+}
+
+def CnotOp : QecPhysical_Op<"cnot", [
+    AllTypesMatch<["in_ctrl_qubit", "out_ctrl_qubit"]>,
+    AllTypesMatch<["in_trgt_qubit", "out_trgt_qubit"]>
+]> {
+    let summary = "A physical CNOT gate operation.";
+
+    let arguments = (ins
+        QecPhysicalQubitType:$in_ctrl_qubit,
+        QecPhysicalQubitType:$in_trgt_qubit
+    );
+
+    let results = (outs
+        QecPhysicalQubitType:$out_ctrl_qubit,
+        QecPhysicalQubitType:$out_trgt_qubit
+    );
+
+    let assemblyFormat = [{
+        $in_ctrl_qubit `,` $in_trgt_qubit attr-dict `:` qualified(type($in_ctrl_qubit)) `,` qualified(type($in_trgt_qubit))
+    }];
+}
+
 
 #endif // QEC_PHYSICAL_OPS
