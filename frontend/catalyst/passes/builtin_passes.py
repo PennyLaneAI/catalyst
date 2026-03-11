@@ -17,12 +17,15 @@
 import copy
 import functools
 import json
+from typing import Iterable
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.passes.pass_api import PassPipelineWrapper
 from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=line-too-long, too-many-lines
+
+DECOMP_STAGE = 0
 
 
 ## API ##
@@ -1482,10 +1485,10 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
     return PassPipelineWrapper(qnode, "decompose-arbitrary-ppr")
 
 
-def graph_decompose(
+def graph_decomposition(
     qnode=None,
     *,
-    gateset: dict,
+    gate_set: Iterable,
     fixed_decomps: dict | None = None,
     alt_decomps: dict | None = None,
 ):
@@ -1514,27 +1517,32 @@ def graph_decompose(
 
     TODO add an example once the implementation is complete.
     """
-
-    graph_decompose_pass = {
-        "graph-decompose": {}
-        | (
-            {"fixed_decomps": {str(op): rule.__name__ for op, rule in fixed_decomps.items()}}
-            if fixed_decomps
-            else {}
-        )
-        | (
-            {"alt_decomps": {str(op): rule.__name__ for op, rule in alt_decomps.items()}}
-            if alt_decomps
-            else {}
-        )
-    }
-
     if qnode is None:
         return functools.partial(
-            graph_decompose,
-            gateset=gateset,
+            graph_decomposition,
+            gate_set=gate_set,
             fixed_decomps=fixed_decomps,
             alt_decomps=alt_decomps,
         )
 
-    return PassPipelineWrapper(qnode, graph_decompose_pass)
+    options = {
+        "stage": DECOMP_STAGE,
+        "gate_set": tuple(op.__name__ for op in gate_set),
+    }
+
+    if fixed_decomps:
+        options |= {
+            "fixed_decomps": {op.__name__: rule.__name__ for op, rule in fixed_decomps.items()}
+        }
+
+    if alt_decomps:
+        options |= {
+            "alt_decomps": {
+                op.__name__: tuple(rule.__name__ for rule in rules)
+                for op, rules in alt_decomps.items()
+            }
+        }
+
+    graph_decomposition_pass = {"graph-decomposition": options}
+
+    return PassPipelineWrapper(qnode, graph_decomposition_pass)
