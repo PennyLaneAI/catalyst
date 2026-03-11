@@ -860,7 +860,7 @@ void __catalyst__qis__PSWAP(double phi, QUBIT *wire0, QUBIT *wire1, const Modifi
 }
 
 void __catalyst__qis__PauliRot(const char *pauliStr, double theta, const Modifiers *modifiers,
-                               int64_t numQubits, ...)
+                               bool cond, int64_t numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
 
@@ -876,6 +876,10 @@ void __catalyst__qis__PauliRot(const char *pauliStr, double theta, const Modifie
         wires[i] = va_arg(args, QubitIdType);
     }
     va_end(args);
+
+    if (!cond) {
+        return;
+    }
 
     getQuantumDevicePtr()->NamedOperation("PauliRot", {theta}, wires,
                                           /* modifiers */ MODIFIERS_ARGS(modifiers), {pauliStr_});

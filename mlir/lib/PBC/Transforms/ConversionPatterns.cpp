@@ -76,10 +76,11 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
         //                                 const Modifiers*, int64_t numQubits, ...qubits)
         StringRef qirName = "__catalyst__qis__PauliRot";
         Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-        Type qirSignature = LLVM::LLVMFunctionType::get(
-            LLVM::LLVMVoidType::get(ctx),
-            {ptrType, Float64Type::get(ctx), ptrType, IntegerType::get(ctx, 64)},
-            /*isVarArg=*/true);
+        Type qirSignature =
+            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
+                                        {ptrType, Float64Type::get(ctx), ptrType,
+                                         IntegerType::get(ctx, 1), IntegerType::get(ctx, 64)},
+                                        /*isVarArg=*/true);
 
         LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, qirName, qirSignature);
@@ -87,9 +88,13 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
         // Get the rotation angle based on the op type
         // Since the qml.PauliRot(phi) == PPR(phi/2), this rotation_kind is multiplied by 2.
         Value thetaValue;
+        Value cond;
         if constexpr (std::is_same_v<T, PPRotationOp>) {
             if (op.getCondition()) {
-                return op.emitOpError("PPRotationOp with condition is not supported.");
+                cond = op.getCondition();
+            }
+            else {
+                cond = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(1));
             }
             // Compute the rotation angle: theta = π / rotation_kind
             // rotation_kind can be ±1, ±2, ±4, ±8
@@ -99,7 +104,10 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
         }
         else if constexpr (std::is_same_v<T, PPRotationArbitraryOp>) {
             if (op.getCondition()) {
-                return op.emitOpError("PPRotationArbitraryOp with condition is not supported.");
+                cond = op.getCondition();
+            }
+            else {
+                cond = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(1));
             }
             // multiply by 2 to get the rotation angle
             thetaValue = LLVM::FMulOp::create(
@@ -107,6 +115,7 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
                 LLVM::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0)));
         }
         else if constexpr (std::is_same_v<T, PauliRotOp>) {
+            cond = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(1));
             // Use the arbitrary angle directly
             thetaValue = adaptor.getAngle();
         }
@@ -117,6 +126,7 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
         args.push_back(pauliWordPtr);
         args.push_back(thetaValue);
         args.push_back(LLVM::ZeroOp::create(rewriter, loc, ptrType));
+        args.push_back(cond);
         args.push_back(
             LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
         args.append(adaptor.getInQubits().begin(), adaptor.getInQubits().end());
