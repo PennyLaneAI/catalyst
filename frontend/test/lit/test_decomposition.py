@@ -574,7 +574,7 @@ def test_decompose_gateset_without_graph():
     @qml.qjit(target="mlir")
     @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK: func.func public @circuit_8() -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode}
+    # CHECK: func.func public @circuit_8() -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, quantum.node}
     def circuit_8():
         return qml.expval(qml.Z(0))
 

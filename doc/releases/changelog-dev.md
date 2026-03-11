@@ -149,6 +149,34 @@
   quantum-opt --resource-tracker -mlir-pass-statistics input.mlir
   ```
 
+* The `diagonalize-final-measurements` xDSL pass now accepts the optional keyword argument ``supported_base_obs``. The kwarg``to_eigvals`` is now also included in the call signature for compatibility with the tape transform, but this kwarg is unused and can only take its default value, `False`.
+  [(#2517)](https://github.com/PennyLaneAI/catalyst/pull/2517)
+
+  These pass options can be applied as follows in the example below:
+
+  ```python
+  import pennylane as qp
+
+  def diagonalize_measurements_setup_inputs(
+      to_eigvals: bool = False, supported_base_obs: tuple[str] = ("PauliX",)
+  ):
+      return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
+
+  diagonalize_measurements = qp.transform(
+      pass_name="diagonalize-final-measurements", setup_inputs=diagonalize_measurements_setup_inputs
+  )
+
+  dev = qp.device("null.qubit", wires=4)
+  @qp.qjit(target="mlir", keep_intermediate=True)
+  @diagonalize_measurements(supported_base_obs=('PauliX',))
+  @qp.qnode(dev, shots=1000)
+  def circuit():
+      qp.CRX(0.1, wires=[0, 1])
+      return qp.expval(qp.X(0))
+
+  circuit()
+  ```
+
 * Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
   effectively filtering for decomposition rules in the MLIR-native decomposition framework.
   [(#2539)](https://github.com/PennyLaneAI/catalyst/pull/2539)
@@ -296,6 +324,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fix a bug where `draw_graph` failed at rendering measurements containing scalar products of observables. 
+  [(#2545)](https://github.com/PennyLaneAI/catalyst/pull/2545)
+
 * Fixed a bug where the unified compiler would trigger a passed callback function 1 extra time for the initial pass level.
   [(#2528)](https://github.com/PennyLaneAI/catalyst/pull/2528)
 
@@ -343,8 +374,19 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Updated integration tests to match changes to the PennyLane `qml.specs` frontend made in https://github.com/PennyLaneAI/pennylane/pull/9088.
+* The QNode lowering to MLIR now supports providing multiple named transform pipelines.
+  [(#2556)](https://github.com/PennyLaneAI/catalyst/pull/2556)
+
+* Both the MLIR and xDSL `ApplyTransformSequencePass` implementations have been updated to support interpreting multiple
+  `transform.named_sequence` operations for a single transformer module.
+  [(#2550)](https://github.com/PennyLaneAI/catalyst/pull/2550)
+
+* Update nightly RC builds to be triggered by Lightning.
+  [(#2491)](https://github.com/PennyLaneAI/catalyst/pull/2491)
+
+* Updated integration tests to match changes to the PennyLane `qml.specs` frontend made in https://github.com/PennyLaneAI/pennylane/pull/9088 and https://github.com/PennyLaneAI/pennylane/pull/9091.
   [(#2513)](https://github.com/PennyLaneAI/catalyst/pull/2513)
+  [(#2533)](https://github.com/PennyLaneAI/catalyst/pull/2533)
 
 * The `prepare` operation from the PBC dialect in MLIR now implicitly allocates new qubits
   rather than requiring existing ones. This better suits our purposes for further lowering
@@ -610,10 +652,19 @@
   }
   ```
 
-  * A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in
-    measurement processes. It is also registered in xDSL.
-    [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
-    [(#2536)](https://github.com/PennyLaneAI/catalyst/pull/2536)
+* A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in 
+  measurement processes. It is also registered in xDSL.
+  [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
+  [(#2536)](https://github.com/PennyLaneAI/catalyst/pull/2536)
+
+* An experimental *QEC Logical* MLIR dialect has been added. An equivalent xDSL dialect has also
+  been added for compatibility with the Python interface to Catalyst.
+  [(#2512)](https://github.com/PennyLaneAI/catalyst/pull/2512)
+
+* An experimental *QEC Physical* MLIR dialect has been added. An equivalent xDSL dialect has also
+  been added for compatibility with the Python interface to Catalyst.
+  [(#2519)](https://github.com/PennyLaneAI/catalyst/pull/2519)
+
 
 <h3>Documentation 📝</h3>
 
@@ -639,6 +690,7 @@ River McCubbin,
 Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
+Shuli Shu,
 Paul Haochen Wang,
 David Wierichs,
 Jake Zaia,
