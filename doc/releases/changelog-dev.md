@@ -175,6 +175,7 @@
       return qp.expval(qp.X(0))
 
   circuit()
+  ```
 
 * Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
   effectively filtering for decomposition rules in the MLIR-native decomposition framework.
@@ -316,7 +317,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Fix a bug where `draw_graph` failed at rendering measurements containing scalar products of observables. 
+* Fixed a bug in the `split-non-commuting` pass where dead `NamedObsOp`s were left behind after
+  erasing composite obs (`TensorOp`, `HamiltonianOp`).
+  [(#2567)](https://github.com/PennyLaneAI/catalyst/pull/2567)
+
+* Fix a bug where `draw_graph` failed at rendering measurements containing scalar products of observables.
   [(#2545)](https://github.com/PennyLaneAI/catalyst/pull/2545)
 
 * Fixed a bug where the unified compiler would trigger a passed callback function 1 extra time for the initial pass level.
@@ -366,11 +371,19 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Update nightly RC builds to be triggered by Lightning. 
+* The QNode lowering to MLIR now supports providing multiple named transform pipelines.
+  [(#2556)](https://github.com/PennyLaneAI/catalyst/pull/2556)
+
+* Both the MLIR and xDSL `ApplyTransformSequencePass` implementations have been updated to support interpreting multiple
+  `transform.named_sequence` operations for a single transformer module.
+  [(#2550)](https://github.com/PennyLaneAI/catalyst/pull/2550)
+
+* Update nightly RC builds to be triggered by Lightning.
   [(#2491)](https://github.com/PennyLaneAI/catalyst/pull/2491)
-  
-* Updated integration tests to match changes to the PennyLane `qml.specs` frontend made in https://github.com/PennyLaneAI/pennylane/pull/9088.
+
+* Updated integration tests to match changes to the PennyLane `qml.specs` frontend made in https://github.com/PennyLaneAI/pennylane/pull/9088 and https://github.com/PennyLaneAI/pennylane/pull/9091.
   [(#2513)](https://github.com/PennyLaneAI/catalyst/pull/2513)
+  [(#2533)](https://github.com/PennyLaneAI/catalyst/pull/2533)
 
 * The `prepare` operation from the PBC dialect in MLIR now implicitly allocates new qubits
   rather than requiring existing ones. This better suits our purposes for further lowering
@@ -636,7 +649,7 @@
   }
   ```
 
-* A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in 
+* A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in
   measurement processes. It is also registered in xDSL.
   [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
   [(#2536)](https://github.com/PennyLaneAI/catalyst/pull/2536)

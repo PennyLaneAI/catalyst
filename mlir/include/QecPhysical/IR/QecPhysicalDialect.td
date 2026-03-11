@@ -16,6 +16,7 @@
 #define QEC_PHYSICAL_DIALECT
 
 include "mlir/IR/DialectBase.td"
+include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//
 // QecPhysical dialect definition.
