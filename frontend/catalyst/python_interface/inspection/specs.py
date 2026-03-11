@@ -32,11 +32,35 @@ class StopCompilation(Exception):
     """Custom exception to stop compilation early when the desired specs level is reached."""
 
 
+def _make_level_name_unique(level_name: str, existing_names: set[str]) -> str:
+    """Helper function to make a level name unique by appending a suffix if necessary.
+
+    Args:
+        level_name (str): The original level name
+        existing_names (set[str]): The set of existing level names to check against
+
+    Returns:
+        str: A unique level name
+
+    Example:
+        >>> existing = {"cancel-inverses", "merge-rotations", "cancel-inverses-2"}
+        >>> _make_level_name_unique("cancel-inverses", existing)
+        'cancel-inverses-3'
+    """
+    unique_name = level_name
+    counter = 1
+    while unique_name in existing_names:
+        counter += 1
+        unique_name = f"{level_name}-{counter}"
+    return unique_name
+
+
 def mlir_specs(
     qnode: QJIT,
     level: int | tuple[int] | list[int] | Literal["all"],
     *args,
-    level_to_markers: dict[int, tuple[str]] | None = None,
+    level_to_markers: dict[int, list[str]] | None = None,
+    existing_level_names: set[str] | None = None,
     **kwargs,
 ) -> ResourcesResult | dict[str, ResourcesResult]:
     """Compute the specs used for a circuit at the level of an MLIR pass.
@@ -56,6 +80,7 @@ def mlir_specs(
 
     cache: dict[int, tuple[ResourcesResult, str]] = {}
     level_to_markers: dict[int, list[str]] = level_to_markers or {}
+    existing_level_names: set[str] = existing_level_names or set()
 
     if not isinstance(qnode, QJIT) or (not isinstance(qnode.original_function, QNode)):
         raise ValueError(
@@ -77,12 +102,15 @@ def mlir_specs(
         pass_instance = previous_pass if previous_pass else next_pass
         result = specs_collect(module)
 
-        pass_name = str(pass_instance) + f" (MLIR-{pass_level})"
+        pass_name = str(pass_instance)
         # Always prioritize marker label if it exists
         if m := level_to_markers.get(pass_level):
             pass_name = ", ".join(m if not isinstance(m, str) else [m])
         elif pass_level == 0:
-            pass_name = "Before MLIR Passes (MLIR-0)"
+            pass_name = "Before MLIR Passes"
+
+        pass_name = _make_level_name_unique(pass_name, existing_level_names)
+        existing_level_names.add(pass_name)
 
         cache[pass_level] = (result, pass_name)
 
