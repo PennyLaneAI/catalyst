@@ -175,6 +175,10 @@
       return qp.expval(qp.X(0))
 
   circuit()
+  ```
+
+* The `diagonalize-final-measurements` xDSL pass now supports the observable commutativity check. A new `NonCommutingObservableValidator` is added to check the commutativity of each circuit in the IR. The `qubit-wise commutativity`(QWC) check would be applied if there are only `Pauli` observables in the circuit. Otherwise, the more strict non-overlapping observable check is applied.
+  [(#2538)](https://github.com/PennyLaneAI/catalyst/pull/2538)
 
 * Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
   effectively filtering for decomposition rules in the MLIR-native decomposition framework.
