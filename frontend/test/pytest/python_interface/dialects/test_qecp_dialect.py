@@ -217,6 +217,7 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
 
+
 class TestQecPhysicalHelpers:
     """Tests for the QEC physical dialect helper functions"""
 
@@ -242,7 +243,7 @@ class TestQecPhysicalHelpers:
         in_hyper_reg_defining_op = in_hyper_reg_ssa_val.op
         out_hyper_reg_type_from_op = qecp.get_physical_hyper_reg_type(in_hyper_reg_defining_op)
         assert in_hyper_reg_type == out_hyper_reg_type_from_op
-    
+
     @pytest.mark.parametrize(
         "in_codeblock_type",
         [
