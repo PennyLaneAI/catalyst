@@ -27,7 +27,7 @@ from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
 
 from catalyst.python_interface.parser import QuantumParser
-from catalyst.python_interface.pass_api import ApplyTransformSequence
+from catalyst.python_interface.pass_api import ApplyTransformSequencePass
 
 
 # pylint: disable=too-few-public-methods
@@ -65,7 +65,7 @@ class Compiler:
         parser = QuantumParser(ctx, gentxtmod)
         # xmod is modified in place
         xmod = parser.parse_module()
-        pipeline = PassPipeline((ApplyTransformSequence(callback=callback),))
+        pipeline = PassPipeline((ApplyTransformSequencePass(callback=callback),))
         pipeline.apply(ctx, xmod)
 
         # Convert back to string
