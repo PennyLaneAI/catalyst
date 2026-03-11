@@ -25,7 +25,6 @@ from catalyst.tracing.contexts import EvaluationContext
 PipelineDict: TypeAlias = dict[str, dict[str, str]]
 
 
-## API ##
 def pipeline(pass_pipeline: PipelineDict):
     """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode
     within a qjit-compiled program.
