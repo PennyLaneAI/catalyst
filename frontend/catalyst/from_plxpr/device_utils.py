@@ -16,7 +16,6 @@ This submodule defines utilities for device preprocessing for from_plxpr.
 """
 # pylint: disable=too-many-arguments, too-many-positional-arguments
 import warnings
-from functools import lru_cache
 
 import pennylane as qml
 from pennylane.devices.capabilities import DeviceCapabilities, ExecutionCondition
@@ -280,37 +279,11 @@ def _safe_create_bound_transform(
     """Create a bound transform safely. If the transform is not supported at the MLIR/xDSL
     layer, an identity xDSL transform is inserted for it."""
     if not transform.pass_name:
+        transform_name = transform.tape_transform.__name__
         if warn:
-            unsupported_transforms.append(transform.tape_transform.__name__)
-        return _get_dummy_xdsl_transform(transform)
+            unsupported_transforms.append(transform_name)
+
+        empty_transform = Transform(pass_name="empty")
+        return BoundTransform(empty_transform, kwargs={"key": transform_name})
 
     return BoundTransform(transform, args, kwargs)
-
-
-@lru_cache
-def _get_dummy_xdsl_transform(
-    original_transform: Transform | BoundTransform,
-) -> BoundTransform:
-    """Create an xDSL transform to insert into the compile pipeline. A boolean indicating
-    whether the transform is a dummy transform is also returned."""
-    # pylint: disable=import-outside-toplevel
-    from catalyst.python_interface.pass_api import compiler_transform
-
-    # Force kebab-case for the transform name
-    pass_name = original_transform.tape_transform.__name__.replace("_", "-")
-
-    class NullPass(ModulePass):
-        """Empty ModulePass to handle transforms with no MLIR/xDSL implementations."""
-
-        name = pass_name
-        dummy_transform: bool = True
-
-        def __init__(self, *_, dummy_transform=True, **__):
-            self.dummy_transform = dummy_transform
-
-        # pylint: disable=unused-argument
-        def apply(self, ctx, op):
-            """Apply the pass (do nothing)."""
-
-    registered_transform = compiler_transform(NullPass)
-    return BoundTransform(registered_transform, kwargs={"dummy_transform": True})
