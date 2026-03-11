@@ -29,7 +29,7 @@ from collections import defaultdict
 
 from pennylane.ops import Hadamard, PauliX, PauliY
 from xdsl import context, passes, pattern_rewriter
-from xdsl.dialects import arith, builtin
+from xdsl.dialects import arith, builtin, func
 from xdsl.rewriter import InsertPoint
 
 from catalyst.python_interface.dialects.quantum import (
@@ -77,13 +77,13 @@ def _diagonalize(obs: NamedObsOp, supported_base_obs) -> bool:
 
 class NonCommutingObservableValidator:
     """
-    Validates if all quantum observables in a builtin.ModuleOp commute.
+    Validates if all quantum observables of an operation commute.
     """
 
     _error_msg = "Only observables are not qwc. Please apply the `split-non-commuting` pass first."
 
-    def __init__(self, module_op, supported_base_obs: tuple[str]):
-        self.module_op = module_op
+    def __init__(self, op, supported_base_obs: tuple[str]):
+        self.op = op
         self.supported_base_obs = set(supported_base_obs)
 
         # Core State
@@ -106,21 +106,21 @@ class NonCommutingObservableValidator:
 
     def _analyze_module(self):
         """Single walk through the IR to populate qubit and observable maps."""
-        for op in self.module_op.walk():
-            if isinstance(op, NamedObsOp):
-                self._register_qubits([op.qubit], op.type.data.value)
-                if op.type.data.value == "Hadamard":
+        for op_ in self.op.walk():
+            if isinstance(op_, NamedObsOp):
+                self._register_qubits([op_.qubit], op_.type.data.value)
+                if op_.type.data.value == "Hadamard":
                     self.is_qwc_compatible = False
 
-            elif isinstance(op, HermitianOp):
+            elif isinstance(op_, HermitianOp):
                 self.is_qwc_compatible = False
-                self._register_qubits(op.qubits, "Hermitian")
+                self._register_qubits(op_.qubits, "Hermitian")
 
-            elif isinstance(op, ComputationalBasisOp):
-                if op.qreg:
+            elif isinstance(op_, ComputationalBasisOp):
+                if op_.qreg:
                     self.visited_qreg = True
-                if op.qubits:
-                    self._register_qubits(op.qubits, "PauliZ")
+                if op_.qubits:
+                    self._register_qubits(op_.qubits, "PauliZ")
 
     def _register_qubits(self, qubits, obs_type):
         """Updates tracking for SSA qubit values and their associated observables."""
@@ -156,7 +156,7 @@ class NonCommutingObservableValidator:
 
 class DiagonalizeFinalMeasurementsPattern(
     pattern_rewriter.RewritePattern
-):  # pylint: disable=too-few-public-methods
+):  # pylint: disable=too-few-public-methods, trailing-whitespace, cell-var-from-loop
     """RewritePattern for diagonalizing final measurements."""
 
     def __init__(self, supported_base_obs: set[str]):
@@ -165,72 +165,74 @@ class DiagonalizeFinalMeasurementsPattern(
 
     @pattern_rewriter.op_type_rewrite_pattern
     def match_and_rewrite(
-        self, observable: NamedObsOp, rewriter: pattern_rewriter.PatternRewriter, /
+        self, quantum_funcOp: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter, /
     ):
         """Replace non-diagonalized observables with their diagonalizing gates and supported
         base observables."""
 
-        if _diagonalize(observable, self.supported_base_obs):
+        for op in quantum_funcOp.body.walk():
+            if isinstance(op, NamedObsOp) and _diagonalize(op, self.supported_base_obs):
 
-            diagonalizing_gates = _gate_map[observable.type.data]
-            params = _params_map[observable.type.data]
+                diagonalizing_gates = _gate_map[op.type.data]
+                params = _params_map[op.type.data]
 
-            qubit = observable.qubit
+                qubit = op.qubit
 
-            insert_point = InsertPoint.before(observable)
+                insert_point = InsertPoint.before(op)
 
-            commute_obs = [
-                use.operation
-                for use in observable.qubit.uses
-                if isinstance(use.operation, (NamedObsOp)) and use.operation is not observable
-            ]
+                commute_obs = [
+                    use.operation
+                    for use in op.qubit.uses
+                    if isinstance(use.operation, (NamedObsOp)) and use.operation is not op
+                ]
 
-            for name, op_data in zip(diagonalizing_gates, params):
-                if op_data:
-                    param_ssa_values = []
-                    for param in op_data:
-                        paramOp = arith.ConstantOp(
-                            builtin.FloatAttr(data=param, type=builtin.Float64Type())
-                        )
-                        rewriter.insert_op(paramOp, insert_point)
-                        param_ssa_values.append(paramOp.results[0])
+                for name, op_data in zip(diagonalizing_gates, params):
+                    if op_data:
+                        param_ssa_values = []
+                        for param in op_data:
+                            paramOp = arith.ConstantOp(
+                                builtin.FloatAttr(data=param, type=builtin.Float64Type())
+                            )
+                            rewriter.insert_op(paramOp, insert_point)
+                            param_ssa_values.append(paramOp.results[0])
 
-                    gate = CustomOp(in_qubits=qubit, gate_name=name, params=param_ssa_values)
-                else:
-                    gate = CustomOp(in_qubits=qubit, gate_name=name)
+                        gate = CustomOp(in_qubits=qubit, gate_name=name, params=param_ssa_values)
+                    else:
+                        gate = CustomOp(in_qubits=qubit, gate_name=name)
 
-                rewriter.insert_op(gate, insert_point)
+                    rewriter.insert_op(gate, insert_point)
 
-                qubit = gate.out_qubits[0]
+                    qubit = gate.out_qubits[0]
 
-            # we need to replace the initial qubit use everwhere EXCEPT the use that is now the
-            # input to the first diagonalizing gate. Its not enough to only change the NamedObsOp,
-            # because the qubit might be inserted/deallocated later
-            uses_to_change = [
-                use
-                for use in observable.qubit.uses
-                if not isinstance(
-                    use.operation, (CustomOp, GlobalPhaseOp, MultiRZOp, QubitUnitaryOp)
-                )
-            ]
-
-            observable.qubit.replace_by_if(qubit, lambda use: use in uses_to_change)
-            for use in uses_to_change:
-                rewriter.notify_op_modified(use.operation)
-
-            # then we also update the observable to be in the Z basis. Since this is done with the
-            # rewriter, we don't need to call `rewriter.notify_modified(observable)` regarding this
-            diag_obs = NamedObsOp(
-                qubit=qubit, obs_type=NamedObservableAttr(NamedObservable("PauliZ"))
-            )
-            rewriter.replace_op(observable, diag_obs)
-
-            for ob in commute_obs:
-                if ob.type.data.value == observable.type.data.value:
-                    diag_obs = NamedObsOp(
-                        qubit=qubit, obs_type=NamedObservableAttr(NamedObservable("PauliZ"))
+                # we need to replace the initial qubit use everwhere EXCEPT the use that is now the
+                # input to the first diagonalizing gate. It's not enough to only change the 
+                # NamedObsOp, because the qubit might be inserted/deallocated later
+                uses_to_change = [
+                    use
+                    for use in op.qubit.uses
+                    if not isinstance(
+                        use.operation, (CustomOp, GlobalPhaseOp, MultiRZOp, QubitUnitaryOp)
                     )
-                    rewriter.replace_op(ob, diag_obs)
+                ]
+
+                op.qubit.replace_by_if(qubit, lambda use: use in uses_to_change)
+                for use in uses_to_change:
+                    rewriter.notify_op_modified(use.operation)
+
+                # then we also update the observable to be in the Z basis. Since this is done with
+                # the rewriter, we don't need to call `rewriter.notify_modified(observable)` 
+                # regarding this
+                diag_obs = NamedObsOp(
+                    qubit=qubit, obs_type=NamedObservableAttr(NamedObservable("PauliZ"))
+                )
+                rewriter.replace_op(op, diag_obs)
+
+                for ob in commute_obs:
+                    if ob.type.data.value == op.type.data.value:
+                        diag_obs = NamedObsOp(
+                            qubit=qubit, obs_type=NamedObservableAttr(NamedObservable("PauliZ"))
+                        )
+                        rewriter.replace_op(ob, diag_obs)
 
 
 class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
@@ -275,13 +277,17 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the diagonalize final measurements pass."""
-        # Validate if each circuit in the module is commuting and an error
-        # will raise if not.
-        NonCommutingObservableValidator(op, self.supported_base_obs)
+        for op_ in op.walk():
+            if isinstance(op_, func.FuncOp) and "quantum.node" in op_.attributes:
+                # Validate if each circuit in the module is commuting and an error
+                # will raise if not.
+                NonCommutingObservableValidator(op_, self.supported_base_obs)
 
-        pattern_rewriter.PatternRewriteWalker(
-            DiagonalizeFinalMeasurementsPattern(self.supported_base_obs)
-        ).rewrite_module(op)
+                rewriter = pattern_rewriter.PatternRewriter(op_)
+
+                DiagonalizeFinalMeasurementsPattern(self.supported_base_obs).match_and_rewrite(
+                    op_, rewriter
+                )
 
 
 diagonalize_final_measurements_pass = compiler_transform(DiagonalizeFinalMeasurementsPass)
