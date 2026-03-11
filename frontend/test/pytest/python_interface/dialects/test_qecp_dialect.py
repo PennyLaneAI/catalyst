@@ -18,7 +18,7 @@ from typing import cast
 
 import pytest
 from xdsl.dialects import test
-from xdsl.dialects.builtin import IntegerAttr, IntegerType
+from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType
 from xdsl.ir import AttributeCovT, OpResult
 
 from catalyst.python_interface.dialects import qecp
@@ -123,6 +123,9 @@ def test_op_constructors():
     q_aux = create_ssa_value(qecp.QecPhysicalQubitType("aux"))
     q_data = create_ssa_value(qecp.QecPhysicalQubitType("data"))
 
+    idx_value = create_ssa_value(IndexType())
+    idx_attr = IntegerAttr.from_index_int_value(0)
+
     # alloc
     alloc_op = qecp.AllocOp(qecp.PhysicalHyperRegisterType(width, k, n))
     assert len(alloc_op.result_types) == 1
@@ -151,6 +154,10 @@ def test_op_constructors():
     assert isinstance(extract_block_op.result_types[0], qecp.PhysicalCodeblockType)
     assert extract_block_op.result_types[0].k.value.data == k
     assert extract_block_op.result_types[0].n.value.data == n
+    extract_block_op_idx_attr = qecp.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=idx_attr)
+    assert extract_block_op_idx_attr
+    extract_block_op_idx_ssa = qecp.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=idx_value)
+    assert extract_block_op_idx_ssa
 
     # insert_block
     insert_block_op = qecp.InsertCodeblockOp(in_hyper_reg=hyper_reg, idx=0, codeblock=codeblock)
@@ -159,12 +166,24 @@ def test_op_constructors():
     assert insert_block_op.result_types[0].width.value.data == width
     assert insert_block_op.result_types[0].k.value.data == k
     assert insert_block_op.result_types[0].n.value.data == n
+    insert_block_op_idx_attr = qecp.InsertCodeblockOp(
+        in_hyper_reg=hyper_reg, idx=idx_attr, codeblock=codeblock
+    )
+    assert insert_block_op_idx_attr
+    insert_block_op_idx_ssa = qecp.InsertCodeblockOp(
+        in_hyper_reg=hyper_reg, idx=idx_value, codeblock=codeblock
+    )
+    assert insert_block_op_idx_ssa
 
     # extract
     extract_op = qecp.ExtractQubitOp(codeblock=codeblock, idx=0)
     assert len(extract_op.result_types) == 1
     assert isinstance(extract_op.result_types[0], qecp.QecPhysicalQubitType)
     assert extract_op.result_types[0].role.data == qecp.QecPhysicalQubitRole.Data
+    extract_block_op_idx_attr = qecp.ExtractQubitOp(codeblock=codeblock, idx=idx_attr)
+    assert extract_block_op_idx_attr
+    extract_block_op_idx_ssa = qecp.ExtractQubitOp(codeblock=codeblock, idx=idx_value)
+    assert extract_block_op_idx_ssa
 
     # insert
     insert_op = qecp.InsertQubitOp(in_codeblock=codeblock, idx=0, qubit=q_data)
@@ -172,6 +191,14 @@ def test_op_constructors():
     assert isinstance(insert_op.result_types[0], qecp.PhysicalCodeblockType)
     assert insert_op.result_types[0].k.value.data == k
     assert insert_op.result_types[0].n.value.data == n
+    insert_block_op_idx_attr = qecp.InsertQubitOp(
+        in_codeblock=codeblock, idx=idx_attr, qubit=q_data
+    )
+    assert insert_block_op_idx_attr
+    insert_block_op_idx_ssa = qecp.InsertQubitOp(
+        in_codeblock=codeblock, idx=idx_value, qubit=q_data
+    )
+    assert insert_block_op_idx_ssa
 
 
 @pytest.mark.parametrize(

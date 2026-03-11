@@ -22,10 +22,10 @@ For a complete description of this dialect, please see
     mlir/include/QecPhysical/IR/QecPhysicalDialect.td
 """
 
-from collections.abc import Sequence, Set
-from typing import TypeAlias
+from collections.abc import Sequence
+from typing import ClassVar, TypeAlias
 
-from xdsl.dialects.builtin import I64, IndexType, IntegerAttr, IntegerType
+from xdsl.dialects.builtin import I64, ContainerOf, IndexType, IntegerAttr
 from xdsl.ir import (
     Attribute,
     Dialect,
@@ -39,9 +39,9 @@ from xdsl.ir import (
 )
 from xdsl.irdl import (
     AtLeast,
-    AttrConstraint,
     IRDLOperation,
     TypeAttributeInvT,
+    VarConstraint,
     irdl_attr_definition,
     irdl_op_definition,
     operand_def,
@@ -49,7 +49,6 @@ from xdsl.irdl import (
     opt_prop_def,
     result_def,
 )
-from xdsl.irdl.constraints import ConstraintContext
 from xdsl.parser import AttrParser
 from xdsl.printer import Printer
 
@@ -177,6 +176,10 @@ QecPhysicalQubitSSAValue: TypeAlias = SSAValue[QecPhysicalQubitType]
 PhysicalCodeBlockSSAValue: TypeAlias = SSAValue[PhysicalCodeblockType]
 PhysicalHyperRegisterSSAValue: TypeAlias = SSAValue[PhysicalHyperRegisterType]
 
+anyPhysicalQubit = ContainerOf(QecPhysicalQubitType)
+anyPhysicalCodeblock = ContainerOf(PhysicalCodeblockType)
+anyPhysicalHyperRegister = ContainerOf(PhysicalHyperRegisterType)
+
 
 def _get_type_from_ssa_value_or_operation(
     arg: SSAValue | Operation, expected_type: TypeAttributeInvT
@@ -225,74 +228,6 @@ def get_physical_qubit_type(
 ) -> QecPhysicalQubitType:
     """Helper function to return the physical qubit type given an SSA value or operation."""
     return _get_type_from_ssa_value_or_operation(qubit, QecPhysicalQubitType)
-
-
-class PhysicalHyperRegisterTypeConstraint(AttrConstraint):
-    """Constraint to make PhysicalHyperRegisterType inferrable during IRDL declaration."""
-
-    # This is a bit of a hack for ops that both consume and return a PhysicalHyperRegisterType.
-    # See comment for LogicalHyperRegisterTypeConstraint for an explanation of what's happening.
-
-    def verify(self, attr: Attribute, constraint_context: ConstraintContext) -> None:
-        """Verify the constraint and add resolved values to the ConstraintContext."""
-        constraint_context.set_attr_variable("hyper_reg_type", attr)
-
-    # pylint: disable=unused-argument
-    def can_infer(self, var_constraint_names: Set[str]) -> bool:
-        """Check if there is enough information to infer the attribute given the constraint
-        variables that are already set.
-        """
-        # Assume we can always infer
-        return True
-
-    def infer(self, context: ConstraintContext) -> PhysicalHyperRegisterType:
-        """Infer the attribute given the the values for all variables."""
-        hyper_reg_type = context.get_variable("hyper_reg_type")
-        assert isinstance(
-            hyper_reg_type, PhysicalHyperRegisterType
-        ), f"Expected a PhysicalHyperRegisterType from constraint context, but got {hyper_reg_type}"
-        return hyper_reg_type
-
-    # pylint: disable=unused-argument
-    def mapping_type_vars(self, type_var_mapping):
-        """A helper function to make type vars used in attribute definitions concrete when creating
-        constraints for new attributes or operations.
-        """
-        return self  # pragma: nocover
-
-
-class PhysicalCodeblockTypeConstraint(AttrConstraint):
-    """Constraint to make PhysicalCodeblockType inferrable during IRDL declaration."""
-
-    # This is a bit of a hack for ops that both consume and return a PhysicalCodeblockType.
-    # See comment for LogicalHyperRegisterTypeConstraint for an explanation of what's happening.
-
-    def verify(self, attr: Attribute, constraint_context: ConstraintContext) -> None:
-        """Verify the constraint and add resolved values to the ConstraintContext."""
-        constraint_context.set_attr_variable("codeblock_type", attr)
-
-    # pylint: disable=unused-argument
-    def can_infer(self, var_constraint_names: Set[str]) -> bool:
-        """Check if there is enough information to infer the attribute given the constraint
-        variables that are already set.
-        """
-        # Assume we can always infer
-        return True
-
-    def infer(self, context: ConstraintContext) -> PhysicalCodeblockType:
-        """Infer the attribute given the the values for all variables."""
-        codeblock_type = context.get_variable("codeblock_type")
-        assert isinstance(
-            codeblock_type, PhysicalCodeblockType
-        ), f"Expected a PhysicalCodeblockType from constraint context, but got {codeblock_type}"
-        return codeblock_type
-
-    # pylint: disable=unused-argument
-    def mapping_type_vars(self, type_var_mapping):
-        """A helper function to make type vars used in attribute definitions concrete when creating
-        constraints for new attributes or operations.
-        """
-        return self  # pragma: nocover
 
 
 @irdl_op_definition
@@ -387,7 +322,7 @@ class ExtractCodeblockOp(IRDLOperation):
     def __init__(
         self,
         hyper_reg: PhysicalHyperRegisterSSAValue | Operation,
-        idx: int | SSAValue[IntegerType] | Operation | IntegerAttr,
+        idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
     ):
         if isinstance(idx, int):
             idx = IntegerAttr.from_int_and_width(idx, 64)
@@ -413,13 +348,15 @@ class ExtractCodeblockOp(IRDLOperation):
 class InsertCodeblockOp(IRDLOperation):
     """Update the physical codeblock value of a hyper-register."""
 
+    T: ClassVar = VarConstraint("T", anyPhysicalHyperRegister)
+
     name = "qecp.insert_block"
 
     assembly_format = """
             $in_hyper_reg `[` ($idx^):($idx_attr)? `]` `,` $codeblock attr-dict `:` type($in_hyper_reg) `,` type($codeblock)
         """
 
-    in_hyper_reg = operand_def(PhysicalHyperRegisterTypeConstraint())
+    in_hyper_reg = operand_def(T)
 
     idx = opt_operand_def(IndexType)
 
@@ -427,12 +364,12 @@ class InsertCodeblockOp(IRDLOperation):
 
     codeblock = operand_def(PhysicalCodeblockType)
 
-    out_hyper_reg = result_def(PhysicalHyperRegisterTypeConstraint())
+    out_hyper_reg = result_def(T)
 
     def __init__(
         self,
         in_hyper_reg: PhysicalHyperRegisterSSAValue | Operation,
-        idx: SSAValue[IntegerType] | Operation | int | IntegerAttr,
+        idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
         codeblock: PhysicalCodeBlockSSAValue | Operation,
     ):
         if isinstance(idx, int):
@@ -473,7 +410,7 @@ class ExtractQubitOp(IRDLOperation):
     def __init__(
         self,
         codeblock: PhysicalCodeBlockSSAValue | Operation,
-        idx: int | SSAValue[IntegerType] | Operation | IntegerAttr,
+        idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
     ):
         if isinstance(idx, int):
             idx = IntegerAttr.from_int_and_width(idx, 64)
@@ -498,13 +435,15 @@ class ExtractQubitOp(IRDLOperation):
 class InsertQubitOp(IRDLOperation):
     """Update the physical qubit value of a codeblock."""
 
+    T: ClassVar = VarConstraint("T", anyPhysicalCodeblock)
+
     name = "qecp.insert"
 
     assembly_format = """
             $in_codeblock `[` ($idx^):($idx_attr)? `]` `,` $qubit attr-dict `:` type($in_codeblock) `,` type($qubit)
         """
 
-    in_codeblock = operand_def(PhysicalCodeblockTypeConstraint())
+    in_codeblock = operand_def(T)
 
     idx = opt_operand_def(IndexType)
 
@@ -512,12 +451,12 @@ class InsertQubitOp(IRDLOperation):
 
     qubit = operand_def(QecPhysicalQubitType)
 
-    out_codeblock = result_def(PhysicalCodeblockTypeConstraint())
+    out_codeblock = result_def(T)
 
     def __init__(
         self,
         in_codeblock: PhysicalCodeBlockSSAValue | Operation,
-        idx: SSAValue[IntegerType] | Operation | int | IntegerAttr,
+        idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
         qubit: QecPhysicalQubitSSAValue | Operation,
     ):
         if isinstance(idx, int):
