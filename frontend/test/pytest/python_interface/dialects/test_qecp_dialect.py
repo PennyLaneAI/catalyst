@@ -18,10 +18,11 @@ from typing import cast
 
 import pytest
 from xdsl.dialects import test
-from xdsl.dialects.builtin import IndexType, IntegerAttr
+from xdsl.dialects.builtin import IndexType, IntegerAttr, UnitAttr
 from xdsl.ir import AttributeCovT, OpResult
 
 from catalyst.python_interface.dialects import qecp
+from catalyst.python_interface.dialects.qecp import QecPhysicalQubitRole
 
 pytestmark = pytest.mark.xdsl
 
@@ -45,6 +46,9 @@ expected_ops_names = {
     "InsertCodeblockOp": "qecp.insert_block",
     "ExtractQubitOp": "qecp.extract",
     "InsertQubitOp": "qecp.insert",
+    "HadamardOp": "qecp.hadamard",
+    "SOp": "qecp.s",
+    "CnotOp": "qecp.cnot",
 }
 
 expected_attrs_names = {
@@ -214,6 +218,66 @@ class TestQecPhysicalOps:
         assert insert_op.result_types[0].k == self.k
         assert insert_op.result_types[0].n == self.n
 
+    @pytest.mark.parametrize(
+        "qubit",
+        [
+            create_ssa_value(qecp.QecPhysicalQubitType("data")),
+            create_ssa_value(qecp.QecPhysicalQubitType("aux")),
+        ],
+    )
+    def test_qecp_op_constructor_hadamard(self, qubit):
+        """Test the constructor of the qecp.hadamard op."""
+        hadamard_op = qecp.HadamardOp(qubit)
+        assert len(hadamard_op.operands) == 1
+        assert hadamard_op.operand_types[0] == qubit.type
+        assert len(hadamard_op.result_types) == 1
+        assert hadamard_op.result_types[0] == qubit.type
+
+    @pytest.mark.parametrize(
+        "qubit",
+        [
+            create_ssa_value(qecp.QecPhysicalQubitType("data")),
+            create_ssa_value(qecp.QecPhysicalQubitType("aux")),
+        ],
+    )
+    @pytest.mark.parametrize("adj", [False, True, UnitAttr()])
+    def test_qecp_op_constructor_s(self, qubit, adj):
+        """Test the constructor of the qecp.s op."""
+        s_op = qecp.SOp(qubit, adjoint=adj)
+        assert len(s_op.operands) == 1
+        assert s_op.operand_types[0] == qubit.type
+        assert len(s_op.result_types) == 1
+        assert s_op.result_types[0] == qubit.type
+
+        if adj:
+            assert s_op.properties.get("adjoint") == UnitAttr()
+        else:
+            assert s_op.properties.get("adjoint") is None
+
+    @pytest.mark.parametrize(
+        "qubit_ctrl",
+        [
+            create_ssa_value(qecp.QecPhysicalQubitType("data")),
+            create_ssa_value(qecp.QecPhysicalQubitType("aux")),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "qubit_trgt",
+        [
+            create_ssa_value(qecp.QecPhysicalQubitType("data")),
+            create_ssa_value(qecp.QecPhysicalQubitType("aux")),
+        ],
+    )
+    def test_qecp_op_constructor_cnot(self, qubit_ctrl, qubit_trgt):
+        """Test the constructor of the qecp.cnot op."""
+        cnot_op = qecp.CnotOp(qubit_ctrl, qubit_trgt)
+        assert len(cnot_op.operands) == 2
+        assert cnot_op.operand_types[0] == qubit_ctrl.type
+        assert cnot_op.operand_types[1] == qubit_trgt.type
+        assert len(cnot_op.result_types) == 2
+        assert cnot_op.result_types[0] == qubit_ctrl.type
+        assert cnot_op.result_types[1] == qubit_trgt.type
+
 
 @pytest.mark.parametrize(
     "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
@@ -250,12 +314,27 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     // CHECK: qecp.insert_block [[hyperreg]][{{\s*}}0], [[block0]] : !qecp.hyperreg<3 x 1 x 7>, !qecp.codeblock<1 x 7>
     %hreg1 = qecp.insert_block %hyperreg[ 0], %block0 : !qecp.hyperreg<3 x 1 x 7>, !qecp.codeblock<1 x 7>
-    
+
     // CHECK: [[q0:%.+]] = qecp.extract [[block0]][{{\s*}}0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
     %q0 = qecp.extract %block0[ 0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
 
     // CHECK: [[block1:%.+]] = qecp.insert [[block0]][{{\s*}}0], [[q0]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
     %block1 = qecp.insert %block0[ 0], %q0 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+
+    // CHECK: [[q_data1:%.+]] = qecp.hadamard [[q_data]] : !qecp.qubit<data>
+    %q_data1 = qecp.hadamard %q_data : !qecp.qubit<data>
+
+    // CHECK: [[q_data2:%.+]] = qecp.s [[q_data1]] : !qecp.qubit<data>
+    %q_data2 = qecp.s %q_data1 : !qecp.qubit<data>
+
+    // CHECK: [[q_data3:%.+]] = qecp.s [[q_data2]] adj : !qecp.qubit<data>
+    %q_data3 = qecp.s %q_data2 adj : !qecp.qubit<data>
+
+    // CHECK: [[q_data4:%.+]], [[q_data5:%.+]] = qecp.cnot [[q_data2]], [[q_data3]] : !qecp.qubit<data>, !qecp.qubit<data>
+    %q_data4, %q_data5 = qecp.cnot %q_data2, %q_data3 : !qecp.qubit<data>, !qecp.qubit<data>
+
+    // CHECK: [[q_data6:%.+]], [[q_aux2:%.+]] = qecp.cnot [[q_data4]], [[q_aux1]] : !qecp.qubit<data>, !qecp.qubit<aux>
+    %q_data6, %q_aux2 = qecp.cnot %q_data4, %q_aux1 : !qecp.qubit<data>, !qecp.qubit<aux>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)

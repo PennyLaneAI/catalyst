@@ -25,7 +25,7 @@ For a complete description of this dialect, please see
 from collections.abc import Sequence
 from typing import ClassVar, TypeAlias
 
-from xdsl.dialects.builtin import I64, ContainerOf, IndexType, IntegerAttr
+from xdsl.dialects.builtin import I64, ContainerOf, IndexType, IntegerAttr, UnitAttr
 from xdsl.ir import (
     Attribute,
     Dialect,
@@ -476,6 +476,92 @@ class InsertQubitOp(IRDLOperation):
         )
 
 
+@irdl_op_definition
+class HadamardOp(IRDLOperation):
+    """A physical Hadamard gate operation."""
+
+    T: ClassVar = VarConstraint("T", anyPhysicalQubit)
+
+    name = "qecp.hadamard"
+
+    assembly_format = """
+            $in_qubit attr-dict `:` type($out_qubit)
+        """
+
+    in_qubit = operand_def(T)
+
+    out_qubit = result_def(T)
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        in_qubit_type = get_physical_qubit_type(in_qubit)
+        super().__init__(operands=(in_qubit,), result_types=(in_qubit_type,))
+
+
+@irdl_op_definition
+class SOp(IRDLOperation):
+    """A physical S (π/2 phase) gate operation."""
+
+    T: ClassVar = VarConstraint("T", anyPhysicalQubit)
+
+    name = "qecp.s"
+
+    assembly_format = """
+            $in_qubit (`adj` $adjoint^)? attr-dict `:` type($out_qubit)
+        """
+
+    in_qubit = operand_def(T)
+
+    adjoint = adjoint = opt_prop_def(UnitAttr)
+
+    out_qubit = result_def(T)
+
+    def __init__(
+        self, in_qubit: QecPhysicalQubitSSAValue | Operation, adjoint: UnitAttr | bool = False
+    ):
+        in_qubit_type = get_physical_qubit_type(in_qubit)
+
+        properties = {}
+        if adjoint:
+            properties["adjoint"] = UnitAttr()
+
+        super().__init__(operands=(in_qubit,), result_types=(in_qubit_type,), properties=properties)
+
+
+@irdl_op_definition
+class CnotOp(IRDLOperation):
+    """A physical CNOT gate operation."""
+
+    T_CTRL: ClassVar = VarConstraint("T_CTRL", anyPhysicalQubit)
+    T_TRGT: ClassVar = VarConstraint("T_TRGT", anyPhysicalQubit)
+
+    name = "qecp.cnot"
+
+    assembly_format = """
+            $in_ctrl_qubit `,` $in_trgt_qubit attr-dict `:` type($out_ctrl_qubit) `,` type($out_trgt_qubit)
+        """
+
+    in_ctrl_qubit = operand_def(T_CTRL)
+
+    in_trgt_qubit = operand_def(T_TRGT)
+
+    out_ctrl_qubit = result_def(T_CTRL)
+
+    out_trgt_qubit = result_def(T_TRGT)
+
+    def __init__(
+        self,
+        in_ctrl_qubit: QecPhysicalQubitSSAValue | Operation,
+        in_trgt_qubit: QecPhysicalQubitSSAValue | Operation,
+    ):
+        in_ctrl_qubit_type = get_physical_qubit_type(in_ctrl_qubit)
+        in_trgt_qubit_type = get_physical_qubit_type(in_trgt_qubit)
+
+        super().__init__(
+            operands=(in_ctrl_qubit, in_trgt_qubit),
+            result_types=(in_ctrl_qubit_type, in_trgt_qubit_type),
+        )
+
+
 QecPhysical = Dialect(
     "qecp",
     [
@@ -487,6 +573,9 @@ QecPhysical = Dialect(
         InsertCodeblockOp,
         ExtractQubitOp,
         InsertQubitOp,
+        HadamardOp,
+        SOp,
+        CnotOp,
     ],
     [
         QecPhysicalQubitRoleAttr,
