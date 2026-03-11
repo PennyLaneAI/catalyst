@@ -226,17 +226,17 @@ class TestMLIRSpecs:
             ),
         }
         if qml.capture.enabled() and not skip_preprocess:
-            expected["verify-operations (MLIR-3)"] = make_static_resources(
+            expected["verify-operations"] = make_static_resources(
                 operations={"RX": {1: 1}, "RZ": {1: 1}},
                 measurements={"probs(all wires)": 1},
                 num_allocs=2,
             )
-            expected["validate-measurements (MLIR-4)"] = make_static_resources(
+            expected["validate-measurements"] = make_static_resources(
                 operations={"RX": {1: 1}, "RZ": {1: 1}},
                 measurements={"probs(all wires)": 1},
                 num_allocs=2,
             )
-            expected["verify-no-state-variance-returns (MLIR-5)"] = make_static_resources(
+            expected["verify-no-state-variance-returns"] = make_static_resources(
                 operations={"RX": {1: 1}, "RZ": {1: 1}},
                 measurements={"probs(all wires)": 1},
                 num_allocs=2,

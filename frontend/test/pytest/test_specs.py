@@ -223,11 +223,11 @@ class TestPassByPassSpecs:
         ):
             qml.specs(no_passes, level=-1)()
 
-        with pytest.raises(check=ValueError, match="Requested specs levels 2"):
-            qml.specs(no_passes, level=2)()
+        with pytest.raises(check=ValueError, match="Requested specs levels 10"):
+            qml.specs(no_passes, level=10)()
 
-        with pytest.raises(check=ValueError, match="Requested specs levels 2, 3"):
-            qml.specs(no_passes, level=[2, 3])()
+        with pytest.raises(check=ValueError, match="Requested specs levels 10, 11"):
+            qml.specs(no_passes, level=[10, 11])()
 
     @pytest.mark.usefixtures("use_both_frontend")
     def test_basic_passes_multi_level(self, simple_circuit):

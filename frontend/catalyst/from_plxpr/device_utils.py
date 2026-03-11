@@ -58,15 +58,16 @@ def create_device_preprocessing_pipeline(
     device: qml.devices.Device, execution_config: ExecutionConfig, shots: int, warn: bool = True
 ) -> list[BoundTransform]:
     """Create a pipeline of device preprocessing transforms for lowering QNodes."""
+    shots_present = qml.math.is_abstract(shots) or shots != 0
     capabilities: DeviceCapabilities = get_qjit_device_capabilities(
-        get_device_capabilities(device, shots=shots)
+        get_device_capabilities(device, shots=shots_present)
     )
 
     finite_shots_only = all(
         ExecutionCondition.FINITE_SHOTS_ONLY in conditions
         for conditions in capabilities.measurement_processes.values()
     )
-    if not shots and finite_shots_only:
+    if not shots_present and finite_shots_only:
         raise CompileError(
             f"'{device.name}' only supports finite shot measurements, but "
             "analytic execution was requested."
@@ -123,7 +124,8 @@ def _mcm_preprocessing(
         )
 
     if mcm_config.mcm_method == MCM_METHOD.ONE_SHOT:
-        if not shots:
+        shots_present = qml.math.is_abstract(shots) or shots != 0
+        if not shots_present:
             raise CompileError("Cannot use mcm_method='one-shot' with analytic mode.")
         pipeline.append(
             _safe_create_bound_transform(
@@ -251,7 +253,8 @@ def _gradient_preprocessing(
             )
         )
     if execution_config.gradient_method == "adjoint":
-        if shots:
+        shots_present = qml.math.is_abstract(shots) or shots != 0
+        if shots_present:
             raise CompileError("Cannot use diff_method='adjoint' with finite shots.")
         # qjit_device should technically be an instance of QJITDevice,
         # but we'll ignore it for now.
