@@ -9,6 +9,7 @@
   then performs the appropriate classical statistical postprocessing across the execution results
   from all shots.
   [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
+  [(#2573)](https://github.com/PennyLaneAI/catalyst/pull/2573)
 
   With this new MLIR pass, one shot execution mode is now available when capture is enabled.
 
@@ -175,6 +176,7 @@
       return qp.expval(qp.X(0))
 
   circuit()
+  ```
 
 * Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
   effectively filtering for decomposition rules in the MLIR-native decomposition framework.
@@ -319,6 +321,10 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fixed a bug in the `split-non-commuting` pass where dead `NamedObsOp`s were left behind after
+  erasing composite obs (`TensorOp`, `HamiltonianOp`).
+  [(#2567)](https://github.com/PennyLaneAI/catalyst/pull/2567)
 
 * Fix a bug where `draw_graph` failed at rendering measurements containing scalar products of observables.
   [(#2545)](https://github.com/PennyLaneAI/catalyst/pull/2545)
