@@ -21,6 +21,7 @@ file(GLOB SRC
     QnodeToAsyncPatterns.cpp
     RegisterInactiveCallbackPass.cpp
     ResourceTrackerPass.cpp
+    RegisterDecompRuleResourcePass.cpp
     SplitMultipleTapes.cpp
     TBAAPatterns.cpp
     TBAATagsPass.cpp
