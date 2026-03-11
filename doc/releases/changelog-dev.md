@@ -175,6 +175,7 @@
       return qp.expval(qp.X(0))
 
   circuit()
+  ```
 
 * Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
   effectively filtering for decomposition rules in the MLIR-native decomposition framework.
