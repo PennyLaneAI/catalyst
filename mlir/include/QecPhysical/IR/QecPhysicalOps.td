@@ -250,5 +250,30 @@ def DecodeEsmCssOp : QecPhysical_Op<"decode_esm_css"> {
     }];
 }
 
+def DecodePhysicalMeasurementOp : QecPhysical_Op<"decode_physical_meas"> {
+    let summary = [{
+        Decode physical measurement results and return the corresponding logical measurement.
+    }];
+
+    let description = [{
+        This operation decodes the results of a transversal measurement operation acting on a
+        physical codeblock and returns the corresponding logical measurement result(s). The logical
+        measurement results are returned as a one-dimensional tensor with shape=(k,), where k is the
+        number of QEC logical qubits encoded by the physical codeblock.
+    }];
+
+    let arguments = (ins
+        AnyTypeOf<[1DTensorOf<[I1]>, MemRefRankOf<[I1], [1]>]>:$physical_measurements
+    );
+
+    let results = (outs
+        1DTensorOf<[I1]>:$logical_measurements
+    );
+
+    let assemblyFormat = [{
+        $physical_measurements attr-dict `:` type($physical_measurements) `->` type($logical_measurements)
+    }];
+}
+
 
 #endif // QEC_PHYSICAL_OPS
