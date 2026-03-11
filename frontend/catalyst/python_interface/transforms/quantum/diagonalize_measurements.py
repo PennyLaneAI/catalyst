@@ -205,7 +205,7 @@ class DiagonalizeFinalMeasurementsPattern(
                     qubit = gate.out_qubits[0]
 
                 # we need to replace the initial qubit use everwhere EXCEPT the use that is now the
-                # input to the first diagonalizing gate. It's not enough to only change the 
+                # input to the first diagonalizing gate. It's not enough to only change the
                 # NamedObsOp, because the qubit might be inserted/deallocated later
                 uses_to_change = [
                     use
@@ -220,7 +220,7 @@ class DiagonalizeFinalMeasurementsPattern(
                     rewriter.notify_op_modified(use.operation)
 
                 # then we also update the observable to be in the Z basis. Since this is done with
-                # the rewriter, we don't need to call `rewriter.notify_modified(observable)` 
+                # the rewriter, we don't need to call `rewriter.notify_modified(observable)`
                 # regarding this
                 diag_obs = NamedObsOp(
                     qubit=qubit, obs_type=NamedObservableAttr(NamedObservable("PauliZ"))
