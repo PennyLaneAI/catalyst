@@ -147,3 +147,10 @@ func.func @test_decode_esm_css(%arg0 : !qecp.tanner_graph<8, 6, i32>, %arg1 : te
     %0 = qecp.decode_esm_css(%arg0 : !qecp.tanner_graph<8, 6, i32>) %arg1 : tensor<2xi1> -> tensor<1xindex>
     func.return
 }
+
+// -----
+
+func.func @test_decode_physical_meas(%arg1 : tensor<7xi1>) {
+    %0 = qecp.decode_physical_meas %arg1 : tensor<7xi1> -> tensor<1xi1>
+    func.return
+}
