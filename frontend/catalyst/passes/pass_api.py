@@ -149,7 +149,11 @@ def apply_pass(pass_name: str, *flags, **valued_options):
             def module():
                 return qnode()
     """
-    return lambda obj: transform(pass_name=pass_name)(obj, *flags, **valued_options)
+
+    def decorator(obj):
+        return transform(pass_name=pass_name)(obj, *flags, **valued_options)
+
+    return decorator
 
 
 def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valued_options):
@@ -186,7 +190,10 @@ def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valu
     if not path_to_plugin.exists():
         raise FileNotFoundError(f"File '{path_to_plugin}' does not exist.")
 
-    return lambda obj: transform(pass_name=pass_name)(obj, *flags, **valued_options)
+    def decorator(obj):
+        return transform(pass_name=pass_name)(obj, *flags, **valued_options)
+
+    return decorator
 
 
 class Pass:
