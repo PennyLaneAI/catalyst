@@ -364,7 +364,7 @@ def test_ppr_to_ppm_auto_corrected():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=2)()
+    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.gate_types
 
     assert gate_types["GlobalPhase"] == 4
@@ -393,7 +393,7 @@ def test_ppr_to_ppm_inject_magic_state():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=2)()
+    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.gate_types
     assert gate_types["PPR-pi/4-w1"] == 6
     assert gate_types["PPR-pi/4-w2"] == 1
@@ -421,7 +421,7 @@ def test_ppr_to_ppm_pauli_corrected():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=2)()
+    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.gate_types
     assert gate_types["PPR-pi/4-w1"] == 6
     assert gate_types["PPR-pi/4-w2"] == 1
