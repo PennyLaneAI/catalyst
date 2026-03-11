@@ -29,7 +29,6 @@ using namespace catalyst::quantum;
 namespace catalyst {
 namespace quantum {
 #define GEN_PASS_DEF_GRAPHDECOMPOSITIONPASS
-#define GEN_PASS_DECL_GRAPHDECOMPOSITIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDecompositionPass> {
@@ -40,8 +39,27 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // gate name to the corresponding function.
         llvm::StringMap<func::FuncOp> customRules;
 
+        llvm::StringMap<llvm::StringRef> fixedDecomps;
+        llvm::StringMap<llvm::StringRef> altDecomps;
+
+        for (const std::string &opRulePair : fixedDecompsOption) {
+            llvm::StringRef pairRef(opRulePair);
+
+            auto [opName, ruleName] = pairRef.split("=");
+            fixedDecomps[opName] = ruleName;
+        }
+
+        for (const std::string &opRulePair : altDecompsOption) {
+            llvm::StringRef pairRef(opRulePair);
+
+            auto [opName, ruleName] = pairRef.split("=");
+            altDecomps[opName] = ruleName;
+        }
+
         // To sync with the graph solver branch, targetGateset should be DictionaryAttr
-        // TODO: it requires updates to the frontend.
+        // this is passes from the frontend as a dictionary
+        // TODO why should this be a dictionary and not a list? Are we passing weights each
+        // time?
         DictionaryAttr targetGateset;
 
         // List of operators
@@ -75,9 +93,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         auto solution = GraphDecompositionSolver::Solve(setOfOps, setOfResources, targetGateset);
 
         ///////////////////////////
-        // Step 6: Insert decomposition rules picked by the graph solver (solution) into the module
-        // and then run the decompose-lowering patterns to apply the decomposition rules and
-        // rewrite the quantum operations.
+        // Step 6: Insert decomposition rules picked by the graph solver (solution) into the
+        // module and then run the decompose-lowering patterns to apply the decomposition rules
+        // and rewrite the quantum operations.
         insertChosenRules(solution, module);
 
         ///////////////////////////
@@ -102,8 +120,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             if (StringRef funcName = func.getName();
                 func->getAttrOfType<StringAttr>("target_gate")) {
                 // TODO: Update this to only register rules that are customly defined for this
-                // specific qp.decompose HOW? it requires updates to the lowering patterns from the
-                // frontend ...
+                // specific qp.decompose HOW? it requires updates to the lowering patterns from
+                // the frontend ...
 
                 custom_rules[funcName] = func;
             }
