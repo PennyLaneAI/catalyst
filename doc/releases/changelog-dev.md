@@ -224,9 +224,6 @@
 
 <h3>Improvements 🛠</h3>
 
-* Catalyst internally uses the new unified transforms API rather than `PassPipelineWrapper`.
-  [(#2525)](https://github.com/PennyLaneAI/catalyst/pull/2525)
-  
 * `catalyst.python_interface.utils.get_constant_from_ssa` can now extract constant values cast using
   `arith.index_cast`.
   [(#2542)](https://github.com/PennyLaneAI/catalyst/pull/2542)
@@ -373,6 +370,9 @@
   [(#2459)](https://github.com/PennyLaneAI/catalyst/pull/2459)
 
 <h3>Internal changes ⚙️</h3>
+
+* Catalyst internally uses the new unified transforms API rather than `PassPipelineWrapper`.
+  [(#2525)](https://github.com/PennyLaneAI/catalyst/pull/2525)  
 
 * The QNode lowering to MLIR now supports providing multiple named transform pipelines.
   [(#2556)](https://github.com/PennyLaneAI/catalyst/pull/2556)
