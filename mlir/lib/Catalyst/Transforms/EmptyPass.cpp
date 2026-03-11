@@ -16,8 +16,8 @@
 
 #define DEBUG_TYPE "empty"
 
-#include "llvm/Support/Debug.h"
 #include "mlir/Pass/Pass.h"
+#include "llvm/Support/Debug.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -27,7 +27,6 @@ namespace catalyst {
 #define GEN_PASS_DECL_EMPTYPASS
 #define GEN_PASS_DEF_EMPTYPASS
 #include "Catalyst/Transforms/Passes.h.inc"
-
 
 struct EmptyPass : impl::EmptyPassBase<EmptyPass> {
     using EmptyPassBase::EmptyPassBase;
