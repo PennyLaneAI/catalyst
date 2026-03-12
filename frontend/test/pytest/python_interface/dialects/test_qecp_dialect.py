@@ -226,14 +226,18 @@ class TestQecPhysicalOps:
         assert insert_op.result_types[0].k == self.k
         assert insert_op.result_types[0].n == self.n
 
-    row_idx_val = create_ssa_value(TensorType(i32, (8,)))
-    col_ptr_val = create_ssa_value(TensorType(i32, (6,)))
-    assemble_tanner_op = qecp.AssembleTannerGraphOp(
-        row_idx=row_idx_val, col_ptr=col_ptr_val, tanner_graph_type=qecp.TannerGraphType(8, 6, i32)
-    )
-    assert len(assemble_tanner_op.operands) == 2
-    assert len(assemble_tanner_op.result_types) == 1
-    assert isinstance(assemble_tanner_op.result_types[0], qecp.TannerGraphType)
+    def test_qecp_op_constructor_assemble_tanner(self):
+        """Test the constructor of the qecp.assemble_tanner op."""
+        row_idx_val = create_ssa_value(TensorType(i32, (8,)))
+        col_ptr_val = create_ssa_value(TensorType(i32, (6,)))
+        assemble_tanner_op = qecp.AssembleTannerGraphOp(
+            row_idx=row_idx_val,
+            col_ptr=col_ptr_val,
+            tanner_graph_type=qecp.TannerGraphType(8, 6, i32),
+        )
+        assert len(assemble_tanner_op.operands) == 2
+        assert len(assemble_tanner_op.result_types) == 1
+        assert isinstance(assemble_tanner_op.result_types[0], qecp.TannerGraphType)
 
 
 @pytest.mark.parametrize(
