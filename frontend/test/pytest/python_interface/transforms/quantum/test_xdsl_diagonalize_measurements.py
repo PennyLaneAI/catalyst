@@ -819,6 +819,8 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
     COMMUTE_SINGLE_OBS_LIST = [
         qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.Z(0)]),  # qwc check
         qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.I(0)]),  # qwc check
+        qml.Hamiltonian([1.0, 1.0], [qml.Hadamard(0), qml.I(0)]),  # qwc check
+        qml.Hamiltonian([1.0, 1.0], [qml.X(0), qml.I(0)]),  # qwc check
         qml.Hamiltonian(
             [1.0, 1.0], [qml.Z(1), qml.Hermitian(A, wires=0)]
         ),  # non-overlap check via Hermitian

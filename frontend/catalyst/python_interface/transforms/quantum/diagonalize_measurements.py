@@ -109,8 +109,6 @@ class NonCommutingObservableValidator:
         for op_ in self.op.walk():
             if isinstance(op_, NamedObsOp):
                 self._register_qubits([op_.qubit], op_.type.data.value)
-                if op_.type.data.value == "Hadamard":
-                    self.is_qwc_compatible = False
 
             elif isinstance(op_, HermitianOp):
                 self.is_qwc_compatible = False
@@ -152,7 +150,6 @@ class NonCommutingObservableValidator:
         """Strictest check: no two observables can share a qubit."""
         if self.overlapped_qubits or (self.visited_qreg and self.obs_on_qubits):
             raise RuntimeError(self._error_msg)
-
 
 class DiagonalizeFinalMeasurementsPattern(
     pattern_rewriter.RewritePattern
@@ -204,7 +201,7 @@ class DiagonalizeFinalMeasurementsPattern(
 
                     qubit = gate.out_qubits[0]
 
-                # we need to replace the initial qubit use everwhere EXCEPT the use that is now the
+                # we need to replace the initial qubit use everywhere EXCEPT the use that is now the
                 # input to the first diagonalizing gate. It's not enough to only change the
                 # NamedObsOp, because the qubit might be inserted/deallocated later
                 uses_to_change = [
