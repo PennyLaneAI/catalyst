@@ -82,123 +82,137 @@ def test_all_attributes_names(attr):
     assert attr.name == expected_name
 
 
-def test_type_constructors():
-    """Test the constructors of each type defined in the qecp dialect work as expected."""
+class TestQecPhysicalTypes:
+    """Tests relating to the qecp types."""
 
-    q_data = qecp.QecPhysicalQubitType("data")
-    assert isinstance(q_data.role, qecp.QecPhysicalQubitRoleAttr)
-    assert q_data.role.data == str(qecp.QecPhysicalQubitRole.Data)
+    @pytest.mark.parametrize(
+        "role", ["data", qecp.QecPhysicalQubitRole.Data, "aux", qecp.QecPhysicalQubitRole.Aux]
+    )
+    def test_qecp_type_constructor_qubit(self, role):
+        """Test the constructor of qecp.QecPhysicalQubitType."""
+        q_data = qecp.QecPhysicalQubitType(role)
+        expected_role = qecp.QecPhysicalQubitRoleAttr(role)
+        assert q_data.role == expected_role
 
-    q_aux = qecp.QecPhysicalQubitType("aux")
-    assert isinstance(q_aux.role, qecp.QecPhysicalQubitRoleAttr)
-    assert q_aux.role.data == str(qecp.QecPhysicalQubitRole.Aux)
+    @pytest.mark.parametrize("k", [1, 2, IntegerAttr.from_int_and_width(1, 64)])
+    @pytest.mark.parametrize("n", [1, 7, IntegerAttr.from_int_and_width(7, 64)])
+    def test_qecp_type_constructor_codeblock(self, k, n):
+        """Test the constructor of qecp.PhysicalCodeblockType."""
+        codeblock = qecp.PhysicalCodeblockType(k, n)
+        expected_k = k if isinstance(k, IntegerAttr) else IntegerAttr.from_int_and_width(k, 64)
+        expected_n = n if isinstance(n, IntegerAttr) else IntegerAttr.from_int_and_width(n, 64)
+        assert codeblock.k == expected_k
+        assert codeblock.n == expected_n
 
-    codeblock = qecp.PhysicalCodeblockType(1, 7)
-    assert isinstance(codeblock.k, IntegerAttr)
-    assert codeblock.k.value.data == 1
-    assert codeblock.k.type == IntegerType(64)
-    assert codeblock.n.value.data == 7
-    assert codeblock.n.type == IntegerType(64)
-
-    hyper_reg = qecp.PhysicalHyperRegisterType(3, 1, 7)
-    assert isinstance(hyper_reg.width, IntegerAttr)
-    assert hyper_reg.width.value.data == 3
-    assert hyper_reg.width.type == IntegerType(64)
-    assert isinstance(hyper_reg.k, IntegerAttr)
-    assert hyper_reg.k.value.data == 1
-    assert hyper_reg.k.type == IntegerType(64)
-    assert isinstance(hyper_reg.n, IntegerAttr)
-    assert hyper_reg.n.value.data == 7
-    assert hyper_reg.n.type == IntegerType(64)
+    @pytest.mark.parametrize("width", [1, 3, IntegerAttr.from_int_and_width(3, 64)])
+    @pytest.mark.parametrize("k", [1, 2, IntegerAttr.from_int_and_width(1, 64)])
+    @pytest.mark.parametrize("n", [1, 7, IntegerAttr.from_int_and_width(7, 64)])
+    def test_qecp_type_constructor_hyper_reg(self, width, k, n):
+        """Test the constructor of qecp.PhysicalHyperRegisterType."""
+        hyper_reg = qecp.PhysicalHyperRegisterType(width, k, n)
+        expected_width = (
+            width if isinstance(width, IntegerAttr) else IntegerAttr.from_int_and_width(width, 64)
+        )
+        expected_k = k if isinstance(k, IntegerAttr) else IntegerAttr.from_int_and_width(k, 64)
+        expected_n = n if isinstance(n, IntegerAttr) else IntegerAttr.from_int_and_width(n, 64)
+        assert hyper_reg.width == expected_width
+        assert hyper_reg.k == expected_k
+        assert hyper_reg.n == expected_n
 
 
-def test_op_constructors():
-    """Test the constructors of each op defined in the qecp dialect work as expected."""
-    width = 3
-    k = 1
-    n = 7
+class TestQecPhysicalOps:
+    """Tests relating to the qecp ops."""
 
-    hyper_reg = create_ssa_value(qecp.PhysicalHyperRegisterType(width, k, n))
-    codeblock = create_ssa_value(qecp.PhysicalCodeblockType(k, n))
-    q_aux = create_ssa_value(qecp.QecPhysicalQubitType("aux"))
-    q_data = create_ssa_value(qecp.QecPhysicalQubitType("data"))
-
-    idx_value = create_ssa_value(IndexType())
+    width = IntegerAttr.from_int_and_width(3, 64)
+    k = IntegerAttr.from_int_and_width(1, 64)
+    n = IntegerAttr.from_int_and_width(7, 64)
     idx_attr = IntegerAttr.from_index_int_value(0)
 
-    # alloc
-    alloc_op = qecp.AllocOp(qecp.PhysicalHyperRegisterType(width, k, n))
-    assert len(alloc_op.result_types) == 1
-    assert isinstance(alloc_op.result_types[0], qecp.PhysicalHyperRegisterType)
-    assert alloc_op.result_types[0].width.value.data == width
-    assert alloc_op.result_types[0].k.value.data == k
-    assert alloc_op.result_types[0].n.value.data == n
+    def _get_hyper_reg_value(self):
+        return create_ssa_value(qecp.PhysicalHyperRegisterType(self.width, self.k, self.n))
 
-    # dealloc
-    dealloc_op = qecp.DeallocOp(hyper_reg)
-    assert len(dealloc_op.result_types) == 0
+    def _get_codeblock_value(self):
+        return create_ssa_value(qecp.PhysicalCodeblockType(self.k, self.n))
 
-    # alloc_aux
-    alloc_aux_op = qecp.AllocAuxQubitOp()
-    assert len(alloc_aux_op.result_types) == 1
-    assert isinstance(alloc_aux_op.result_types[0], qecp.QecPhysicalQubitType)
-    assert alloc_aux_op.result_types[0].role.data == qecp.QecPhysicalQubitRole.Aux
+    def _get_qubit_data_value(self):
+        return create_ssa_value(qecp.QecPhysicalQubitType("data"))
 
-    # dealloc_aux
-    dealloc_aux_op = qecp.DeallocAuxQubitOp(q_aux)
-    assert len(dealloc_aux_op.result_types) == 0
+    def _get_qubit_aux_value(self):
+        return create_ssa_value(qecp.QecPhysicalQubitType("aux"))
 
-    # extract_block
-    extract_block_op = qecp.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=0)
-    assert len(extract_block_op.result_types) == 1
-    assert isinstance(extract_block_op.result_types[0], qecp.PhysicalCodeblockType)
-    assert extract_block_op.result_types[0].k.value.data == k
-    assert extract_block_op.result_types[0].n.value.data == n
-    extract_block_op_idx_attr = qecp.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=idx_attr)
-    assert extract_block_op_idx_attr
-    extract_block_op_idx_ssa = qecp.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=idx_value)
-    assert extract_block_op_idx_ssa
+    def test_qecp_op_constructor_alloc(self):
+        """Test the constructor of the qecp.alloc op."""
+        alloc_op = qecp.AllocOp(qecp.PhysicalHyperRegisterType(self.width, self.k, self.n))
+        assert len(alloc_op.result_types) == 1
+        assert isinstance(alloc_op.result_types[0], qecp.PhysicalHyperRegisterType)
+        assert alloc_op.result_types[0].width == self.width
+        assert alloc_op.result_types[0].k == self.k
+        assert alloc_op.result_types[0].n == self.n
 
-    # insert_block
-    insert_block_op = qecp.InsertCodeblockOp(in_hyper_reg=hyper_reg, idx=0, codeblock=codeblock)
-    assert len(insert_block_op.result_types) == 1
-    assert isinstance(insert_block_op.result_types[0], qecp.PhysicalHyperRegisterType)
-    assert insert_block_op.result_types[0].width.value.data == width
-    assert insert_block_op.result_types[0].k.value.data == k
-    assert insert_block_op.result_types[0].n.value.data == n
-    insert_block_op_idx_attr = qecp.InsertCodeblockOp(
-        in_hyper_reg=hyper_reg, idx=idx_attr, codeblock=codeblock
+    def test_qecp_op_constructor_dealloc(self):
+        """Test the constructor of the qecp.dealloc op."""
+        dealloc_op = qecp.DeallocOp(self._get_hyper_reg_value())
+        assert len(dealloc_op.result_types) == 0
+
+    def test_qecp_op_constructor_alloc_aux(self):
+        """Test the constructor of the qecp.alloc_aux op."""
+        alloc_aux_op = qecp.AllocAuxQubitOp()
+        assert len(alloc_aux_op.result_types) == 1
+        assert isinstance(alloc_aux_op.result_types[0], qecp.QecPhysicalQubitType)
+        assert alloc_aux_op.result_types[0].role.data == qecp.QecPhysicalQubitRole.Aux
+
+    def test_qecp_op_constructor_dealloc_aux(self):
+        """Test the constructor of the qecp.dealloc_aux op."""
+        dealloc_aux_op = qecp.DeallocAuxQubitOp(self._get_qubit_aux_value())
+        assert len(dealloc_aux_op.result_types) == 0
+
+    @pytest.mark.parametrize(
+        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
     )
-    assert insert_block_op_idx_attr
-    insert_block_op_idx_ssa = qecp.InsertCodeblockOp(
-        in_hyper_reg=hyper_reg, idx=idx_value, codeblock=codeblock
-    )
-    assert insert_block_op_idx_ssa
+    def test_qecp_op_constructor_extract_block(self, idx):
+        """Test the constructor of the qecp.extract_block op."""
+        extract_block_op = qecp.ExtractCodeblockOp(hyper_reg=self._get_hyper_reg_value(), idx=idx)
+        assert len(extract_block_op.result_types) == 1
+        assert isinstance(extract_block_op.result_types[0], qecp.PhysicalCodeblockType)
+        assert extract_block_op.result_types[0].k == self.k
+        assert extract_block_op.result_types[0].n == self.n
 
-    # extract
-    extract_op = qecp.ExtractQubitOp(codeblock=codeblock, idx=0)
-    assert len(extract_op.result_types) == 1
-    assert isinstance(extract_op.result_types[0], qecp.QecPhysicalQubitType)
-    assert extract_op.result_types[0].role.data == qecp.QecPhysicalQubitRole.Data
-    extract_block_op_idx_attr = qecp.ExtractQubitOp(codeblock=codeblock, idx=idx_attr)
-    assert extract_block_op_idx_attr
-    extract_block_op_idx_ssa = qecp.ExtractQubitOp(codeblock=codeblock, idx=idx_value)
-    assert extract_block_op_idx_ssa
+    @pytest.mark.parametrize(
+        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
+    )
+    def test_qecp_op_constructor_insert_block(self, idx):
+        """Test the constructor of the qecp.insert_block op."""
+        insert_block_op = qecp.InsertCodeblockOp(
+            in_hyper_reg=self._get_hyper_reg_value(), idx=idx, codeblock=self._get_codeblock_value()
+        )
+        assert len(insert_block_op.result_types) == 1
+        assert isinstance(insert_block_op.result_types[0], qecp.PhysicalHyperRegisterType)
+        assert insert_block_op.result_types[0].width == self.width
+        assert insert_block_op.result_types[0].k == self.k
+        assert insert_block_op.result_types[0].n == self.n
 
-    # insert
-    insert_op = qecp.InsertQubitOp(in_codeblock=codeblock, idx=0, qubit=q_data)
-    assert len(insert_op.result_types) == 1
-    assert isinstance(insert_op.result_types[0], qecp.PhysicalCodeblockType)
-    assert insert_op.result_types[0].k.value.data == k
-    assert insert_op.result_types[0].n.value.data == n
-    insert_block_op_idx_attr = qecp.InsertQubitOp(
-        in_codeblock=codeblock, idx=idx_attr, qubit=q_data
+    @pytest.mark.parametrize(
+        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
     )
-    assert insert_block_op_idx_attr
-    insert_block_op_idx_ssa = qecp.InsertQubitOp(
-        in_codeblock=codeblock, idx=idx_value, qubit=q_data
+    def test_qecp_op_constructor_extract(self, idx):
+        """Test the constructor of the qecp.extract op."""
+        extract_op = qecp.ExtractQubitOp(codeblock=self._get_codeblock_value(), idx=idx)
+        assert len(extract_op.result_types) == 1
+        assert isinstance(extract_op.result_types[0], qecp.QecPhysicalQubitType)
+        assert extract_op.result_types[0].role.data == qecp.QecPhysicalQubitRole.Data
+
+    @pytest.mark.parametrize(
+        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
     )
-    assert insert_block_op_idx_ssa
+    def test_qecp_op_constructor_insert(self, idx):
+        """Test the constructor of the qecp.insert op."""
+        insert_op = qecp.InsertQubitOp(
+            in_codeblock=self._get_codeblock_value(), idx=idx, qubit=self._get_qubit_data_value()
+        )
+        assert len(insert_op.result_types) == 1
+        assert isinstance(insert_op.result_types[0], qecp.PhysicalCodeblockType)
+        assert insert_op.result_types[0].k == self.k
+        assert insert_op.result_types[0].n == self.n
 
 
 @pytest.mark.parametrize(
