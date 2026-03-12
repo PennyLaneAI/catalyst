@@ -15,7 +15,9 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "RTIO/IR/RTIOOps.h"
@@ -26,6 +28,82 @@
 
 using namespace mlir;
 using namespace catalyst::rtio;
+
+namespace {
+
+//===----------------------------------------------------------------------===//
+// RPC helpers
+//===----------------------------------------------------------------------===//
+
+/// Ensure a null-terminated LLVM global constant for the given string exists in the module.
+///
+/// The global is inserted at the start of the module body; the AddressOf/GEP
+/// are emitted at the caller's insertion point.
+/// Example:
+/// Given a rtio.rpc operation:
+/// ```mlir
+/// rtio.rpc @foo tag("n:si") (%a, %b : i32, i32)
+/// ```
+///
+/// What we expect to get:
+/// ┌───────────────────────────────────────────────────────────────────┐
+/// │ 1. tagPtr = __rtio_str_n_si (global)                              │
+/// │                                                                   │
+/// │ 2. argsArray = alloca [3 x ptr]                                   │
+/// │    Create 3 argSlot alloca on the stack                           │
+/// │    argSlot[0] = alloca i32; store %a; argsArray[0] = &argSlot[0]  │
+/// │    argSlot[1] = alloca i32; store %b; argsArray[1] = &argSlot[1]  │
+/// │    argsArray[2] = nullptr                                         │
+/// │                                                                   │
+/// │ 3. rpc_send(rpc_id, tagPtr, argsArray)                            │
+/// │                                                                   │
+/// │ 4. (sync only) resultSlot = alloca [8 x i8]; rpc_recv(resultSlot) │
+/// └───────────────────────────────────────────────────────────────────┘
+static Value getOrCreateStringGlobal(ConversionPatternRewriter &rewriter, ModuleOp module,
+                                     Location loc, StringRef str)
+{
+    MLIRContext *ctx = rewriter.getContext();
+
+    // get a unique symbol name from the string content (__rtio_str_<string>)
+    std::string globalName = "__rtio_str_" + str.str();
+    for (char &c : globalName) {
+        // Replace non-alphanumeric characters with '_'
+        // Example: "n:IIf" -> "n_IIf"
+        if (!llvm::isAlnum(c) && c != '_') {
+            c = '_';
+        }
+    }
+
+    auto i8Ty = IntegerType::get(ctx, 8);
+    auto ptrTy = LLVM::LLVMPointerType::get(ctx);
+
+    // Create the global only if it does not exist yet.
+    LLVM::GlobalOp globalOp;
+    if (auto existing = module.lookupSymbol<LLVM::GlobalOp>(globalName)) {
+        globalOp = existing;
+    }
+    else {
+        SmallVector<uint8_t> bytes(str.begin(), str.end());
+        bytes.push_back('\0');
+
+        auto arrayTy = LLVM::LLVMArrayType::get(i8Ty, bytes.size());
+        auto dataAttrType = RankedTensorType::get({(int64_t)bytes.size()}, i8Ty);
+        auto dataAttr = DenseElementsAttr::get(dataAttrType, llvm::ArrayRef(bytes));
+
+        OpBuilder::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(module.getBody());
+        globalOp = LLVM::GlobalOp::create(rewriter, loc, arrayTy, /*isConstant=*/true,
+                                          LLVM::Linkage::Private, globalName, dataAttr);
+    }
+
+    // Emit AddressOf + GEP[0, 0] to get the pointer to the first byte
+    auto arrayTy = cast<LLVM::LLVMArrayType>(globalOp.getType());
+    Value addr = LLVM::AddressOfOp::create(rewriter, loc, ptrTy, globalOp.getName());
+    SmallVector<LLVM::GEPArg> indices = {0, 0};
+    return LLVM::GEPOp::create(rewriter, loc, ptrTy, arrayTy, addr, indices);
+}
+
+} // namespace
 
 namespace {
 
@@ -157,6 +235,96 @@ struct ChannelOpLowering : public OpConversionPattern<RTIOChannelOp> {
     }
 };
 
+/// Lower `rtio.rpc` to ARTIQ `rpc_send` / `rpc_recv` calls.
+///
+/// Protocol:
+///   1. Create tag string global.
+///   2. Build args array.
+///   3. Call rpc_send(id, tag_ptr, args_ptr) (or rpc_send_async for async).
+///   4. For sync calls, call rpc_recv(slot_ptr) to wait for the host reply.
+struct RPCOpLowering : public OpConversionPattern<RTIORPCOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(RTIORPCOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        auto rpcIdAttr = op->getAttrOfType<IntegerAttr>("rpc_id");
+        if (!rpcIdAttr) {
+            return op->emitError("rtio.rpc is missing rpc_id attribute, please "
+                                 "run the RPC ID assignment sub-pass first");
+        }
+
+        Location loc = op.getLoc();
+        MLIRContext *ctx = rewriter.getContext();
+        ModuleOp module = op->getParentOfType<ModuleOp>();
+
+        Type i8Ty = IntegerType::get(ctx, 8);
+        Type i32Ty = IntegerType::get(ctx, 32);
+        Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+
+        ARTIQRuntimeBuilder artiq(rewriter, op);
+
+        // 1. Get or create the `tag` string global
+        // e.g. tag = "n:IIf" -> string global "__rtio_str_n_IIf"
+        Value tagPtr = getOrCreateStringGlobal(rewriter, module, loc, op.getTag());
+        rewriter.setInsertionPoint(op);
+
+        // 2. Build args array (null-terminated void*[N+1] alloca on the stack)
+        ValueRange args = adaptor.getArgs();
+        size_t numArgs = args.size();
+
+        auto ptrArrayTy = LLVM::LLVMArrayType::get(ptrTy, numArgs + 1);
+        Value one = arith::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(1));
+        Value argsArray = LLVM::AllocaOp::create(rewriter, loc, ptrTy, ptrArrayTy, one);
+
+        for (size_t i = 0; i < numArgs; i++) {
+            Value arg = args[i];
+            Type argTy = arg.getType();
+
+            // Box the argument into a stack slot
+            Value argSlot;
+            if (isa<LLVM::LLVMPointerType>(argTy)) {
+                argSlot = LLVM::AllocaOp::create(rewriter, loc, ptrTy, ptrTy, one);
+            }
+            else {
+                argSlot = LLVM::AllocaOp::create(rewriter, loc, ptrTy, argTy, one);
+            }
+            LLVM::StoreOp::create(rewriter, loc, arg, argSlot);
+
+            // Store the slot pointer into ptrArray[i]
+            SmallVector<LLVM::GEPArg> idxs = {0, i};
+            Value elemPtr = LLVM::GEPOp::create(rewriter, loc, ptrTy, ptrArrayTy, argsArray, idxs);
+            LLVM::StoreOp::create(rewriter, loc, argSlot, elemPtr);
+        }
+
+        // Null-terminate the args array
+        Value null = LLVM::ZeroOp::create(rewriter, loc, ptrTy);
+        SmallVector<LLVM::GEPArg> nullIdxs = {0, numArgs};
+        Value nullElemPtr =
+            LLVM::GEPOp::create(rewriter, loc, ptrTy, ptrArrayTy, argsArray, nullIdxs);
+        LLVM::StoreOp::create(rewriter, loc, null, nullElemPtr);
+
+        // 3. Call rpc_send / rpc_send_async
+        Value serviceId = arith::ConstantOp::create(
+            rewriter, loc, rewriter.getIntegerAttr(i32Ty, rpcIdAttr.getInt()));
+
+        if (op.getIsAsync()) {
+            artiq.rpcSendAsync(serviceId, tagPtr, argsArray);
+        }
+        else {
+            artiq.rpcSend(serviceId, tagPtr, argsArray);
+
+            // rpc_recv for sync calls
+            auto slotTy = LLVM::LLVMArrayType::get(i8Ty, 8);
+            Value resultSlot = LLVM::AllocaOp::create(rewriter, loc, ptrTy, slotTy, one);
+            artiq.rpcRecv(resultSlot);
+        }
+
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
 //===----------------------------------------------------------------------===//
 // Rewrite Patterns
 //===----------------------------------------------------------------------===//
@@ -283,8 +451,9 @@ namespace rtio {
 void populateRTIOToARTIQConversionPatterns(LLVMTypeConverter &typeConverter,
                                            RewritePatternSet &patterns)
 {
-    patterns.add<SyncOpLowering, EmptyOpLowering, ChannelOpLowering, PulseOpLowering>(
-        typeConverter, patterns.getContext());
+    patterns
+        .add<SyncOpLowering, EmptyOpLowering, ChannelOpLowering, PulseOpLowering, RPCOpLowering>(
+            typeConverter, patterns.getContext());
 }
 
 void populateRTIORewritePatterns(RewritePatternSet &patterns)

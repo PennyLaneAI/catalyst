@@ -167,6 +167,46 @@ def RTIOSyncOp : RTIO_Op<"sync"> {
     let hasVerifier = 1;
 }
 
+def RTIORPCOp : RTIO_Op<"rpc"> {
+    let summary = "Invoke a host RPC function from the kernel";
+    let description = [{
+        Represents an outgoing RPC call from the kernel to the host
+        using `rpc_send` / `rpc_recv` / `rpc_send_async`
+
+        Attributes:
+        - callee:    The symbolic name of the host-side callable to invoke.
+        - tag:       type-tag string encoding the return and argument types,
+                     which is compatiable with the ARTIQ RPC wire protocol.
+                     (e.g. "n:" for void no-arg, "n:si" for void(str,i32)).
+        - is_async:  If present the call is async.
+        - rpc_id:    Populated by the RPC-ID assignment sub-pass.
+
+        Example (sync, no args):
+        ```mlir
+        rtio.rpc @program_awg tag("n:")
+        ```
+
+        Example (sync, with args):
+        ```mlir
+        rtio.rpc @set_dataset tag("n:sO") (%key, %val : !llvm.ptr, !llvm.ptr)
+        ```
+    }];
+
+    let arguments = (ins
+        SymbolRefAttr:$callee,
+        StrAttr:$tag,
+        UnitAttr:$is_async,
+        OptionalAttr<I32Attr>:$rpc_id,
+        Variadic<AnyType>:$args
+    );
+
+    let results = (outs);
+
+    let assemblyFormat = [{
+        $callee `tag` `(` $tag `)` (`async` $is_async^)? (`(` $args^ `:` type($args) `)`)? attr-dict
+    }];
+}
+
 def RTIOEmptyOp : RTIO_Op<"empty", [Pure]> {
     let summary = "Create an empty event for sequencing";
     let description = [{
