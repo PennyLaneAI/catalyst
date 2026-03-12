@@ -189,8 +189,10 @@ def test_jacobian_outside_qjit_argnums(argnums):
     assert np.allclose(expected[1], result[1])
 
 
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 def test_non_differentiable_qnode(capture_mode):
     """Check for an error message when the QNode is explicitly marked non-differentiable."""
@@ -214,8 +216,10 @@ def test_non_differentiable_qnode(capture_mode):
         grad_f(1.0)
 
 
-# capture=True raises ValueError("Only Measurement Processes can be returned from QNode's") on mixed returns.
-# Classification: missing PL feature; fix by supporting classical+measurement mixed QNode returns under capture.
+# capture=True raises ValueError("Only Measurement Processes can be returned from QNode's") on mixed
+# returns.
+# Classification: missing PL feature; fix by supporting classical+measurement mixed QNode returns
+# under capture.
 @pytest.mark.capture_todo
 def test_param_shift_on_non_expval(backend, capture_mode):
     """Check for an error message when parameter-shift is used on QNodes that return anything but
@@ -237,8 +241,10 @@ def test_param_shift_on_non_expval(backend, capture_mode):
         qjit(workflow, capture=capture_mode)
 
 
-# capture=True raises ValueError("Only Measurement Processes can be returned from QNode's") on mixed returns.
-# Classification: missing PL feature; fix by supporting classical+measurement mixed QNode returns under capture.
+# capture=True raises ValueError("Only Measurement Processes can be returned from QNode's") on mixed
+# returns.
+# Classification: missing PL feature; fix by supporting classical+measurement mixed QNode returns
+# under capture.
 @pytest.mark.capture_todo
 def test_adjoint_on_non_expval(backend, capture_mode):
     """Check for an error message when adjoint is used on QNodes that return anything but
@@ -258,8 +264,10 @@ def test_adjoint_on_non_expval(backend, capture_mode):
         qjit(workflow, capture=capture_mode)
 
 
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 def test_grad_on_qjit(capture_mode):
     """Check that grad works when called on an existing qjit object that does not wrap a QNode."""
@@ -274,8 +282,10 @@ def test_grad_on_qjit(capture_mode):
     assert np.allclose(result, expected)
 
 
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 def test_value_and_grad_on_qjit_classical(capture_mode):
     """Check that value_and_grad works when called on an qjit object that does not wrap a QNode."""
@@ -323,8 +333,10 @@ def test_value_and_grad_on_qjit_classical(capture_mode):
     assert np.allclose(result[1], expected[1])
 
 
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 def test_value_and_grad_on_qjit_classical_vector(capture_mode):
     """Check that value_and_grad works when called on an qjit object that does not wrap a QNode
@@ -345,8 +357,10 @@ def test_value_and_grad_on_qjit_classical_vector(capture_mode):
     assert np.allclose(result[1], expected[1])
 
 
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 def test_value_and_grad_on_qjit_classical_dict(capture_mode):
     """Check that value_and_grad works when called on an qjit object that does not wrap a QNode
@@ -369,8 +383,10 @@ def test_value_and_grad_on_qjit_classical_dict(capture_mode):
     assert np.allclose(result[1]["world"], expected[1]["world"])
 
 
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_value_and_grad_on_qjit_quantum(diff_method, capture_mode):
@@ -398,8 +414,10 @@ def test_value_and_grad_on_qjit_quantum(diff_method, capture_mode):
         assert np.allclose(result, expected)
 
 
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_value_and_grad_on_qjit_quantum_variant(diff_method, capture_mode):
@@ -428,8 +446,10 @@ def test_value_and_grad_on_qjit_quantum_variant(diff_method, capture_mode):
         assert np.allclose(result, expected)
 
 
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 @pytest.mark.parametrize(
@@ -471,8 +491,10 @@ def test_value_and_grad_on_qjit_quantum_variant_argnum(argnum, diff_method, capt
         assert np.allclose(result[1], expected[1])
 
 
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_value_and_grad_on_qjit_quantum_variant_tree(diff_method, capture_mode):
@@ -919,8 +941,10 @@ def test_ps_probs(backend, capture_mode):
     assert np.allclose(result, reference)
 
 
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 @pytest.mark.parametrize("gate_n_inputs", [(qml.CRX, [1]), (qml.CRot, [1, 2, 3])])
 def test_ps_four_term_rule(backend, gate_n_inputs, capture_mode):
@@ -1109,8 +1133,10 @@ def test_adjoint_grad_range_change(inp, backend, capture_mode):
     assert np.allclose(compiled_grad_range_change(inp), interpretted_grad_range_change(inp))
 
 
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 @pytest.mark.parametrize("method", [("parameter-shift"), ("adjoint")])
 def test_assert_no_higher_order_without_fd(method, backend, capture_mode):
@@ -1132,7 +1158,8 @@ def test_assert_no_higher_order_without_fd(method, backend, capture_mode):
 
 
 # capture=True changes validation behavior (expected exceptions are not raised in this path).
-# Classification: Catalyst integration gap; fix by restoring/aligning gradient-method verification checks under capture.
+# Classification: Catalyst integration gap; fix by restoring/aligning gradient-method verification
+# checks under capture.
 @pytest.mark.capture_todo
 def test_assert_invalid_diff_method(capture_mode):
     """Test invalid diff method detection"""
@@ -1259,8 +1286,10 @@ def test_jax_consts(h_coeffs, g_method, backend, capture_mode):
     assert np.allclose(compile_grad(jnp.array(inp)), expected)
 
 
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 def test_non_float_arg(backend, capture_mode):
     """Test a function which attempts to differentiate non-floating point arguments."""
@@ -1282,8 +1311,10 @@ def test_non_float_arg(backend, capture_mode):
         cost_fn(1j, 2.0)
 
 
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 def test_non_float_res(backend, capture_mode):
     """Test a function which attempts to differentiate non-floating point results."""
@@ -1341,8 +1372,10 @@ def test_finite_diff_multiple_devices(inp, diff_method, backend, capture_mode):
     assert np.allclose(result[0], result[1])
 
 
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 def test_grad_on_non_scalar_output(backend, capture_mode):
     """Test a function which attempts to use `grad` on a function that returns a non-scalar."""
@@ -1360,8 +1393,10 @@ def test_grad_on_non_scalar_output(backend, capture_mode):
         compiled(1.0)
 
 
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 def test_grad_on_multi_result_function(backend, capture_mode):
     """Test a function which attempts to use `grad` on a function that returns multiple values."""
@@ -1436,8 +1471,10 @@ def test_loop_with_dyn_wires(backend, diff_method, capture_mode):
     assert np.allclose(result, expected)
 
 
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 def test_classical_kwargs(capture_mode):
     """Test the gradient on a classical function with keyword arguments"""
@@ -1455,8 +1492,10 @@ def test_classical_kwargs(capture_mode):
 
 
 # @pytest.mark.usefixtures("use_both_frontend")
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 def test_classical_kwargs_switched_arg_order(capture_mode):
     """Test the gradient on classical function with keyword arguments and switched argument order"""
@@ -1910,8 +1949,10 @@ class TestGradientErrors:
     """Test errors when an operation which does not have a valid gradient is reachable
     from the grad op"""
 
-    # capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-    # Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+    # capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-
+    # MLIR path).
+    # Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering
+    # for these workflows.
     @pytest.mark.capture_todo
     def test_measure_error(self, capture_mode):
         """Test with measure"""
@@ -1944,8 +1985,10 @@ class TestGradientErrors:
             def cir(x: float):
                 return grad(f)(x)
 
-    # capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-    # Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+    # capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-
+    # MLIR path).
+    # Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering
+    # for these workflows.
     @pytest.mark.capture_todo
     def test_with_zne(self, capture_mode):
         """Test with ZNE"""
@@ -2016,8 +2059,10 @@ class TestGradientUsagePatterns:
         assert np.allclose(res_pattern_partial, expected)
 
 
-# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR path).
-# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for these workflows.
+# capture=True fails in AD/lowering (e.g., CompileError Enzyme/InvalidInputException in JAX-to-MLIR
+# path).
+# Classification: Catalyst integration gap; fix by stabilizing capture-mode gradient lowering for
+# these workflows.
 @pytest.mark.capture_todo
 @pytest.mark.parametrize("argnums", [0, 1, (0, 1)])
 def test_grad_argnums(argnums, capture_mode):
@@ -2091,7 +2136,8 @@ class TestGradientMethodErrors:
         return CustomDevice(**kwargs)
 
     # capture=True changes validation behavior (expected exceptions are not raised in this path).
-    # Classification: Catalyst integration gap; fix by restoring/aligning gradient-method verification checks under capture.
+    # Classification: Catalyst integration gap; fix by restoring/aligning gradient-method
+    # verification checks under capture.
     @pytest.mark.capture_todo
     def test_device_grad_method_error(self, capture_mode):
         """Test that using 'device' grad method raises appropriate error."""
@@ -2107,7 +2153,8 @@ class TestGradientMethodErrors:
             qjit(grad(f), capture=capture_mode)(0.5)
 
     # capture=True changes validation behavior (expected exceptions are not raised in this path).
-    # Classification: Catalyst integration gap; fix by restoring/aligning gradient-method verification checks under capture.
+    # Classification: Catalyst integration gap; fix by restoring/aligning gradient-method
+    # verification checks under capture.
     @pytest.mark.capture_todo
     def test_finite_diff_grad_method_error(self, capture_mode):
         """Test that using 'finite-diff' grad method raises appropriate error."""
@@ -2123,7 +2170,8 @@ class TestGradientMethodErrors:
             qjit(grad(f), capture=capture_mode)(0.5)
 
     # capture=True changes validation behavior (expected exceptions are not raised in this path).
-    # Classification: Catalyst integration gap; fix by restoring/aligning gradient-method verification checks under capture.
+    # Classification: Catalyst integration gap; fix by restoring/aligning gradient-method
+    # verification checks under capture.
     @pytest.mark.capture_todo
     def test_invalid_grad_method_error(self, capture_mode):
         """Test that using an invalid grad method raises appropriate error."""
@@ -2311,8 +2359,10 @@ class TestParameterShiftVerificationIntegrationTests:
     Source of truth obtained from shortcut story: 84819
     """
 
-    # capture=True raises CompileError("catalyst.measure can only be used from within @qjit") in gradient tracing.
-    # Classification: Catalyst integration gap; fix by routing MCM checks through capture-compatible primitives/lowering.
+    # capture=True raises CompileError("catalyst.measure can only be used from within @qjit") in
+    # gradient tracing.
+    # Classification: Catalyst integration gap; fix by routing MCM checks through capture-compatible
+    # primitives/lowering.
     @pytest.mark.capture_todo
     def test_is_mcm(self, backend, capture_mode):
         """No mcm"""
@@ -2345,7 +2395,8 @@ class TestParameterShiftVerificationIntegrationTests:
             return qml.expval(qml.PauliZ(wires=0))
 
     # capture=True changes validation behavior (expected exceptions are not raised in this path).
-    # Classification: Catalyst integration gap; fix by restoring/aligning gradient-method verification checks under capture.
+    # Classification: Catalyst integration gap; fix by restoring/aligning gradient-method
+    # verification checks under capture.
     @pytest.mark.capture_todo
     def test_grad_recipe_dynamic(self, backend, capture_mode):
         """Raise exception when there is an op with a grad_recipe that's dynamic"""
@@ -2368,7 +2419,8 @@ class TestParameterShiftVerificationIntegrationTests:
                 return qml.expval(qml.PauliZ(wires=0))
 
     # capture=True changes validation behavior (expected exceptions are not raised in this path).
-    # Classification: Catalyst integration gap; fix by restoring/aligning gradient-method verification checks under capture.
+    # Classification: Catalyst integration gap; fix by restoring/aligning gradient-method
+    # verification checks under capture.
     @pytest.mark.capture_todo
     def test_grad_recipe_static(self, backend, capture_mode):
         """Raise exception when there is an op with a mismatching grad_recipe"""
@@ -2389,7 +2441,8 @@ class TestParameterShiftVerificationIntegrationTests:
                 return qml.expval(qml.PauliZ(wires=0))
 
     # capture=True changes validation behavior (expected exceptions are not raised in this path).
-    # Classification: Catalyst integration gap; fix by restoring/aligning gradient-method verification checks under capture.
+    # Classification: Catalyst integration gap; fix by restoring/aligning gradient-method
+    # verification checks under capture.
     @pytest.mark.capture_todo
     def test_parameter_frequencies(self, backend, capture_mode):
         """Raise exception when when there is an lengths are mismatched."""
@@ -2413,7 +2466,8 @@ class TestParameterShiftVerificationIntegrationTests:
             circuit(0.5)
 
     # capture=True changes validation behavior (expected exceptions are not raised in this path).
-    # Classification: Catalyst integration gap; fix by restoring/aligning gradient-method verification checks under capture.
+    # Classification: Catalyst integration gap; fix by restoring/aligning gradient-method
+    # verification checks under capture.
     @pytest.mark.capture_todo
     def test_parameter_frequencies_not_one(self, backend, capture_mode):
         """When there is an op without parameter_frequencies, ps gradient should fail"""
