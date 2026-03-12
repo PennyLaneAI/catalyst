@@ -29,8 +29,8 @@ import catalyst
 from catalyst import measure
 from catalyst.utils.exceptions import CompileError
 
-# pylint: disable=too-many-lines,missing-class-docstring,missing-function-docstring,too-many-public-
-# methods
+# pylint: disable=too-many-lines,missing-class-docstring
+# pylint: disable=missing-function-docstring,too-many-public-methods
 
 
 class TestCatalyst:
