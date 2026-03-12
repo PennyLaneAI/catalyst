@@ -18,8 +18,8 @@
 
 #include <boost/graph/adjacency_list.hpp>
 
-#include <variant>
 #include <iostream>
+#include <variant>
 
 #include "DecompositionGraph.hpp"
 
@@ -32,7 +32,7 @@ struct DecompositionGraph::Impl {
     struct OperatorVertex {
         OperatorId op_id;
     };
- 
+
     struct RuleVertex {
         RuleId rule_id;
     };
@@ -50,20 +50,21 @@ struct DecompositionGraph::Impl {
     };
 
     using BbGraph = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
-                                    GraphVertex, GraphWeightedEdge>;
+                                          GraphVertex, GraphWeightedEdge>;
     using Vertex = boost::graph_traits<BbGraph>::vertex_descriptor;
 
     BbGraph graph;
     std::vector<Core::OperatorNode> operators;
     Core::WeightedGateset gateset;
     std::vector<Core::RuleNode> rules;
-    
+
     std::unordered_map<Core::OperatorNode, OperatorId, Core::OperatorNodeHash> opToId;
     std::vector<Core::OperatorNode> idToOp;
     std::unordered_map<OperatorId, Vertex> opIdToVertex;
-    
+
     std::unordered_map<RuleId, Vertex> ruleIdToVertex;
-    std::unordered_map<Core::OperatorNode, std::vector<Core::RuleNode>, Core::OperatorNodeHash> rulesForop;
+    std::unordered_map<Core::OperatorNode, std::vector<Core::RuleNode>, Core::OperatorNodeHash>
+        rulesForop;
 
     OperatorId registerOp(const Core::OperatorNode &op)
     {
@@ -77,38 +78,42 @@ struct DecompositionGraph::Impl {
         idToOp.push_back(op);
         // return newId;
         // opToId[op] = newId;
-        const auto vertex = boost::add_vertex(GraphVertex{VertexType::Operator, OperatorVertex{newId}}, graph);
+        const auto vertex =
+            boost::add_vertex(GraphVertex{VertexType::Operator, OperatorVertex{newId}}, graph);
         opIdToVertex.emplace(newId, vertex);
         return newId;
     }
 
-
-    Impl(std::vector<Core::OperatorNode> _operators, Core::WeightedGateset _gateset, std::vector<Core::RuleNode> _rules)
+    Impl(std::vector<Core::OperatorNode> _operators, Core::WeightedGateset _gateset,
+         std::vector<Core::RuleNode> _rules)
         : operators(std::move(_operators)), gateset(std::move(_gateset)), rules(std::move(_rules))
-    {}
+    {
+    }
 
     void buildGraph()
     {
         // Register all operators and create vertices
-        for (const auto& op: operators) {
+        for (const auto &op : operators) {
             registerOp(op);
         }
 
         // Register all target gates and create vertices
-        for (const auto& [op, _]: gateset.ops) {
+        for (const auto &[op, _] : gateset.ops) {
             registerOp(op);
         }
 
         // Register all rules and create vertices
         for (RuleId ruleId = 0; ruleId < rules.size(); ruleId++) {
-            const auto& rule = rules[ruleId];
+            const auto &rule = rules[ruleId];
             registerOp(rule.output);
-            for (const auto& inout: rule.inputs) {
+            for (const auto &inout : rule.inputs) {
                 registerOp(inout.op);
             }
 
-            const auto ruleVertex = boost::add_vertex(GraphVertex{VertexType::Rule, RuleVertex{ruleId}}, graph);
-            // const auto ruleVertex = boost::add_vertex(GraphVertex{VertexType::Rule, RuleVertex{ruleId}}, graph);
+            const auto ruleVertex =
+                boost::add_vertex(GraphVertex{VertexType::Rule, RuleVertex{ruleId}}, graph);
+            // const auto ruleVertex = boost::add_vertex(GraphVertex{VertexType::Rule,
+            // RuleVertex{ruleId}}, graph);
             ruleIdToVertex.emplace(ruleId, ruleVertex);
             rulesForop[rule.output].push_back(rule);
         }
@@ -119,7 +124,7 @@ struct DecompositionGraph::Impl {
             const auto output_vertex = opIdToVertex[opToId[rule.output]];
             boost::add_edge(rule_vertex, output_vertex, GraphWeightedEdge{}, graph);
 
-            for (const auto& input: rule.inputs) {
+            for (const auto &input : rule.inputs) {
                 const auto input_vertex = opIdToVertex[opToId[input.op]];
                 boost::add_edge(input_vertex, rule_vertex, GraphWeightedEdge{}, graph);
             }
@@ -127,7 +132,9 @@ struct DecompositionGraph::Impl {
     }
 };
 
-DecompositionGraph::DecompositionGraph(std::vector<Core::OperatorNode> operators, Core::WeightedGateset gateset, std::vector<Core::RuleNode> rules)
+DecompositionGraph::DecompositionGraph(std::vector<Core::OperatorNode> operators,
+                                       Core::WeightedGateset gateset,
+                                       std::vector<Core::RuleNode> rules)
     : impl(std::make_unique<Impl>(std::move(operators), std::move(gateset), std::move(rules)))
 {
     impl->buildGraph();
@@ -135,7 +142,10 @@ DecompositionGraph::DecompositionGraph(std::vector<Core::OperatorNode> operators
 
 DecompositionGraph::~DecompositionGraph() = default;
 
-DecompositionGraph::DecompositionGraph(const DecompositionGraph &other) : impl(std::make_unique<Impl>(*other.impl)) {}
+DecompositionGraph::DecompositionGraph(const DecompositionGraph &other)
+    : impl(std::make_unique<Impl>(*other.impl))
+{
+}
 
 DecompositionGraph::DecompositionGraph(DecompositionGraph &&other) noexcept = default;
 
@@ -164,22 +174,14 @@ DecompositionGraph &DecompositionGraph::operator=(DecompositionGraph &&other) no
     return impl->rules;
 }
 
-std::size_t DecompositionGraph::getNumRules() const
-{
-    return impl->rules.size();
-}
+std::size_t DecompositionGraph::getNumRules() const { return impl->rules.size(); }
 
-std::size_t DecompositionGraph::getNumOperators() const
-{
-    return impl->operators.size();
-}
+std::size_t DecompositionGraph::getNumOperators() const { return impl->operators.size(); }
 
-const Core::RuleNode &DecompositionGraph::getRule(RuleId id) const
-{
-    return impl->rules[id];
-}
+const Core::RuleNode &DecompositionGraph::getRule(RuleId id) const { return impl->rules[id]; }
 
-const std::vector<Core::RuleNode> &DecompositionGraph::getAllRulesFor(const Core::OperatorNode &op) const
+const std::vector<Core::RuleNode> &
+DecompositionGraph::getAllRulesFor(const Core::OperatorNode &op) const
 {
     static const std::vector<Core::RuleNode> empty;
     const auto it = impl->rulesForop.find(op);

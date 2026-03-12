@@ -18,43 +18,44 @@
 
 #pragma once
 
-#include <vector>
 #include <memory>
+#include <vector>
 
-#include "QuantumNodes.hpp"
 #include "GraphStructs.hpp"
+#include "QuantumNodes.hpp"
 
 namespace DecompGraph::Solver {
 
 class DecompositionGraph {
-    private:
-        struct Impl;
-        std::unique_ptr<Impl> impl;
+  private:
+    struct Impl;
+    std::unique_ptr<Impl> impl;
 
-    public:
-        using RuleId = std::size_t;
-        
-        DecompositionGraph(std::vector<Core::OperatorNode> operators, Core::WeightedGateset gateset, std::vector<Core::RuleNode> rules);
-        ~DecompositionGraph();
+  public:
+    using RuleId = std::size_t;
 
-        // copy and move constructors and assignment operators
-        DecompositionGraph(const DecompositionGraph &other);
-        DecompositionGraph(DecompositionGraph &&other) noexcept;
-        DecompositionGraph &operator=(const DecompositionGraph &other);
-        DecompositionGraph &operator=(DecompositionGraph &&other) noexcept;
+    DecompositionGraph(std::vector<Core::OperatorNode> operators, Core::WeightedGateset gateset,
+                       std::vector<Core::RuleNode> rules);
+    ~DecompositionGraph();
 
-        [[nodiscard]] const std::vector<Core::OperatorNode> &getRoots() const noexcept;
-        [[nodiscard]] const Core::WeightedGateset &getGateset() const noexcept;
-        [[nodiscard]] const std::vector<Core::RuleNode> &getRules() const noexcept;
-        std::size_t getNumRules() const;
-        std::size_t getNumOperators() const;
+    // copy and move constructors and assignment operators
+    DecompositionGraph(const DecompositionGraph &other);
+    DecompositionGraph(DecompositionGraph &&other) noexcept;
+    DecompositionGraph &operator=(const DecompositionGraph &other);
+    DecompositionGraph &operator=(DecompositionGraph &&other) noexcept;
 
-        // helper methods
-        // TODO(Ali): move them to private/protected after testing
-        const Core::RuleNode & getRule(RuleId id) const;
-        const std::vector<Core::RuleNode> & getAllRulesFor(const Core::OperatorNode &op) const;
-        bool isTargetGate(const Core::OperatorNode &op) const;
-        bool hasOperator(const Core::OperatorNode &op) const;       
+    [[nodiscard]] const std::vector<Core::OperatorNode> &getRoots() const noexcept;
+    [[nodiscard]] const Core::WeightedGateset &getGateset() const noexcept;
+    [[nodiscard]] const std::vector<Core::RuleNode> &getRules() const noexcept;
+    std::size_t getNumRules() const;
+    std::size_t getNumOperators() const;
+
+    // helper methods
+    // TODO(Ali): move them to private/protected after testing
+    const Core::RuleNode &getRule(RuleId id) const;
+    const std::vector<Core::RuleNode> &getAllRulesFor(const Core::OperatorNode &op) const;
+    bool isTargetGate(const Core::OperatorNode &op) const;
+    bool hasOperator(const Core::OperatorNode &op) const;
 };
 
 } // namespace DecompGraph::Solver
