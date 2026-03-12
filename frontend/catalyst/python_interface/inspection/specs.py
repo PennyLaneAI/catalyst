@@ -22,7 +22,6 @@ from typing import Literal
 from pennylane.workflow.qnode import QNode
 
 from catalyst.jit import QJIT
-from catalyst.passes.pass_api import PassPipelineWrapper
 from catalyst.python_interface.compiler import Compiler
 
 from .specs_collector import ResourcesResult, specs_collect
@@ -83,13 +82,7 @@ def mlir_specs(
     level_to_markers: dict[int, list[str]] = level_to_markers or {}
     existing_level_names: set[str] = existing_level_names or set()
 
-    if not isinstance(qnode, QJIT) or (
-        not isinstance(qnode.original_function, QNode)
-        and not (
-            isinstance(qnode.original_function, PassPipelineWrapper)
-            and isinstance(qnode.original_qnode, QNode)
-        )
-    ):
+    if not isinstance(qnode, QJIT) or (not isinstance(qnode.original_function, QNode)):
         raise ValueError(
             "The provided `qnode` argument does not appear to be a valid QJIT compiled QNode."
         )
