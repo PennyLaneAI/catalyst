@@ -240,15 +240,18 @@ class TestQecPhysicalOps:
         assert len(assemble_tanner_op.result_types) == 1
         assert isinstance(assemble_tanner_op.result_types[0], qecp.TannerGraphType)
 
-    # decode_esm_css
-    tanner_graph = create_ssa_value(qecp.TannerGraphType(8, 6, i32))
-    esm = create_ssa_value(TensorType(IntegerType(1), shape=(3,)))
-    decode_esm_css_op = qecp.DecodeEsmCssOp(tanner_graph, esm, TensorType(IndexType(), shape=(2,)))
-    assert len(decode_esm_css_op.operands) == 2
-    assert isinstance(decode_esm_css_op.operands[0].type, qecp.TannerGraphType)
-    assert isinstance(decode_esm_css_op.operands[1].type, TensorType)
-    assert len(decode_esm_css_op.result_types) == 1
-    assert isinstance(decode_esm_css_op.result_types[0], TensorType)
+    def test_qecp_op_constructor_decode_esm_css(self):
+        """Test the constructor of the qecp.decode_esm_css op."""
+        tanner_graph = create_ssa_value(qecp.TannerGraphType(8, 6, i32))
+        esm = create_ssa_value(TensorType(IntegerType(1), shape=(3,)))
+        decode_esm_css_op = qecp.DecodeEsmCssOp(
+            tanner_graph, esm, TensorType(IndexType(), shape=(2,))
+        )
+        assert len(decode_esm_css_op.operands) == 2
+        assert isinstance(decode_esm_css_op.operands[0].type, qecp.TannerGraphType)
+        assert isinstance(decode_esm_css_op.operands[1].type, TensorType)
+        assert len(decode_esm_css_op.result_types) == 1
+        assert isinstance(decode_esm_css_op.result_types[0], TensorType)
 
 
 @pytest.mark.parametrize(
