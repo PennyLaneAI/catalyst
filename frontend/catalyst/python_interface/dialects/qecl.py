@@ -347,11 +347,13 @@ class EncodeOp(IRDLOperation):
 class QecCycleOp(IRDLOperation):
     """Perform a single cycle of a quantum error-correction protocol."""
 
+    T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
+
     name = "qecl.qec"
 
-    in_codeblock = operand_def(LogicalCodeblockConstraint())
+    in_codeblock = operand_def(T)
 
-    out_codeblock = result_def(LogicalCodeblockConstraint())
+    out_codeblock = result_def(T)
 
     assembly_format = """
             $in_codeblock attr-dict `:` type($in_codeblock)

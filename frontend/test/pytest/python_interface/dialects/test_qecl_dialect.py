@@ -163,11 +163,11 @@ class TestQecLogicalOps:
         assert isinstance(encode_op.result_types[0], qecl.LogicalCodeblockType)
         assert encode_op.result_types[0].k == self.k
 
-    # qec
-    qec_op = qecl.QecCycleOp(in_codeblock=codeblock)
-    assert len(encode_op.result_types) == 1
-    assert isinstance(qec_op.result_types[0], qecl.LogicalCodeblockType)
-    assert qec_op.result_types[0].k.value.data == k
+    def test_qecl_op_constructor_qec(self):
+        qec_op = qecl.QecCycleOp(in_codeblock=self._get_codeblock_value())
+        assert len(qec_op.result_types) == 1
+        assert isinstance(qec_op.result_types[0], qecl.LogicalCodeblockType)
+        assert qec_op.result_types[0].k == self.k
 
 
 @pytest.mark.parametrize(
