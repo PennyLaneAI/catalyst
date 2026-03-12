@@ -14,13 +14,8 @@
 
 #pragma once
 
-#include "mlir/IR/Dialect.h"
+#include "mlir/IR/Attributes.h"
 
-#include "QecLogical/IR/QecLogicalAttrDefs.h"
-#include "QecLogical/IR/QecLogicalTypes.h"
-
-//===----------------------------------------------------------------------===//
-// QecLogical dialect declarations.
-//===----------------------------------------------------------------------===//
-
-#include "QecLogical/IR/QecLogicalOpsDialect.h.inc"
+#include "QecLogical/IR/QecLogicalEnums.h.inc"
+#define GET_ATTRDEF_CLASSES
+#include "QecLogical/IR/QecLogicalAttributes.h.inc"

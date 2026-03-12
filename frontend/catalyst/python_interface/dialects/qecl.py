@@ -27,9 +27,12 @@ from xdsl.dialects.builtin import I64, ContainerOf, IndexType, IntegerAttr
 from xdsl.ir import (
     Attribute,
     Dialect,
+    EnumAttribute,
     Operation,
     ParametrizedAttribute,
+    SpacedOpaqueSyntaxAttribute,
     SSAValue,
+    StrEnum,
     TypeAttribute,
 )
 from xdsl.irdl import (
@@ -42,10 +45,35 @@ from xdsl.irdl import (
     operand_def,
     opt_operand_def,
     opt_prop_def,
+    prop_def,
     result_def,
 )
 from xdsl.parser import AttrParser
 from xdsl.printer import Printer
+
+
+class LogicalCodeblockInitState(StrEnum):
+    """Enum for logical codeblock initial state"""
+
+    Zero = "zero"
+    # Add other supported codeblock initial states here
+
+
+@irdl_attr_definition
+class LogicalCodeblockInitStateAttr(
+    EnumAttribute[LogicalCodeblockInitState], SpacedOpaqueSyntaxAttribute
+):
+    """Role specialization of QEC physical qubits"""
+
+    name = "qecl.codeblock_init_state"
+
+    def __init__(self, init_state: str | LogicalCodeblockInitState):
+        init_state_enum = (
+            init_state
+            if isinstance(init_state, LogicalCodeblockInitState)
+            else LogicalCodeblockInitState(init_state)
+        )
+        super().__init__(init_state_enum)
 
 
 @irdl_attr_definition
@@ -147,6 +175,13 @@ def get_logical_hyper_reg_type(
 ) -> LogicalHyperRegisterType:
     """Helper function to return the logical hyper-register type given an SSA value or operation."""
     return _get_type_from_ssa_value_or_operation(hyper_reg, LogicalHyperRegisterType)
+
+
+def get_logical_codeblock_type(
+    hyper_reg: LogicalCodeBlockSSAValue | Operation,
+) -> LogicalCodeblockType:
+    """Helper function to return the logical codeblock type given an SSA value or operation."""
+    return _get_type_from_ssa_value_or_operation(hyper_reg, LogicalCodeblockType)
 
 
 @irdl_op_definition
@@ -269,6 +304,45 @@ class InsertCodeblockOp(IRDLOperation):
         )
 
 
+@irdl_op_definition
+class EncodeOp(IRDLOperation):
+    """Encode a logical codeblock to the specified logical state."""
+
+    T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
+
+    name = "qecl.encode"
+
+    in_codeblock = operand_def(T)
+
+    init_state = prop_def(LogicalCodeblockInitStateAttr)
+
+    out_codeblock = result_def(T)
+
+    assembly_format = """
+            `[` $init_state `]` $in_codeblock attr-dict `:` type($in_codeblock)
+        """
+
+    def __init__(
+        self,
+        in_codeblock: LogicalCodeBlockSSAValue | Operation,
+        init_state: str | LogicalCodeblockInitStateAttr,
+    ):
+        operands = (in_codeblock,)
+
+        init_state_attr = (
+            init_state
+            if isinstance(init_state, LogicalCodeblockInitStateAttr)
+            else LogicalCodeblockInitStateAttr(init_state)
+        )
+        properties = {"init_state": init_state_attr}
+
+        in_codeblock_type = get_logical_codeblock_type(in_codeblock)
+
+        super().__init__(
+            operands=operands, result_types=(in_codeblock_type,), properties=properties
+        )
+
+
 QecLogical = Dialect(
     "qecl",
     [
@@ -276,8 +350,10 @@ QecLogical = Dialect(
         DeallocOp,
         ExtractCodeblockOp,
         InsertCodeblockOp,
+        EncodeOp,
     ],
     [
+        LogicalCodeblockInitStateAttr,
         LogicalCodeblockType,
         LogicalHyperRegisterType,
     ],
