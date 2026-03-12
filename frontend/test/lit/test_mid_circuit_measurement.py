@@ -100,20 +100,46 @@ print(test_one_shot_with_passes.mlir)
 @qjit(capture=True, target="mlir")
 def test_mcm_obs():
     """
-    Test generation of mcm observale operation.
+    Test generation of mcm observable operation.
     """
 
     # CHECK:  [[m0:%.+]], {{%.+}} = quantum.measure
+    # CHECK:  [[m0_tensor_i1:%.+]] = tensor.from_elements [[m0]] : tensor<i1>
+    # CHECK:  [[m0_tensor_i64:%.+]] = stablehlo.convert [[m0_tensor_i1]] : (tensor<i1>) -> tensor<i64>
+
     # CHECK:  [[m1:%.+]], {{%.+}} = quantum.measure
-    # CHECK:  [[expvalObs:%.+]] = quantum.mcmobs [[m0]] : !quantum.obs
+    # CHECK:  [[m1_tensor_i1:%.+]] = tensor.from_elements [[m1]] : tensor<i1>
+    # CHECK:  [[m1_tensor_i64:%.+]] = stablehlo.convert [[m1_tensor_i1]] : (tensor<i1>) -> tensor<i64>
+
+    # CHECK:  [[m0_tensor_i1:%.+]] = stablehlo.convert [[m0_tensor_i64]] : (tensor<i64>) -> tensor<i1>
+    # CHECK:  [[m0_i1:%.+]] = tensor.extract [[m0_tensor_i1]][] : tensor<i1>
+    # CHECK:  [[expvalObs:%.+]] = quantum.mcmobs [[m0_i1]] : !quantum.obs
     # CHECK:  [[expval:%.+]] = quantum.expval [[expvalObs]] : f64
-    # CHECK:  [[sampleObs:%.+]] = quantum.mcmobs [[m0]], [[m1]] : !quantum.obs
+
+    # CHECK:  [[m0_tensor_i1:%.+]] = stablehlo.convert [[m0_tensor_i64]] : (tensor<i64>) -> tensor<i1>
+    # CHECK:  [[m0_i1:%.+]] = tensor.extract [[m0_tensor_i1]][] : tensor<i1>
+    # CHECK:  [[m1_tensor_i1:%.+]] = stablehlo.convert [[m1_tensor_i64]] : (tensor<i64>) -> tensor<i1>
+    # CHECK:  [[m1_i1:%.+]] = tensor.extract [[m1_tensor_i1]][] : tensor<i1>
+    # CHECK:  [[sampleObs:%.+]] = quantum.mcmobs [[m0_i1]], [[m1_i1]] : !quantum.obs
     # CHECK:  [[sample:%.+]] = quantum.sample [[sampleObs]] : tensor<1000x2xf64>
-    # CHECK:  [[probsObs:%.+]] = quantum.mcmobs [[m0]], [[m1]] : !quantum.obs
+
+    # CHECK:  [[m0_tensor_i1:%.+]] = stablehlo.convert [[m0_tensor_i64]] : (tensor<i64>) -> tensor<i1>
+    # CHECK:  [[m0_i1:%.+]] = tensor.extract [[m0_tensor_i1]][] : tensor<i1>
+    # CHECK:  [[m1_tensor_i1:%.+]] = stablehlo.convert [[m1_tensor_i64]] : (tensor<i64>) -> tensor<i1>
+    # CHECK:  [[m1_i1:%.+]] = tensor.extract [[m1_tensor_i1]][] : tensor<i1>
+    # CHECK:  [[probsObs:%.+]] = quantum.mcmobs [[m0_i1]], [[m1_i1]] : !quantum.obs
     # CHECK:  [[probs:%.+]] = quantum.probs [[probsObs]] : tensor<4xf64>
-    # CHECK:  [[varObs:%.+]] = quantum.mcmobs [[m0]] : !quantum.obs
+
+    # CHECK:  [[m0_tensor_i1:%.+]] = stablehlo.convert [[m0_tensor_i64]] : (tensor<i64>) -> tensor<i1>
+    # CHECK:  [[m0_i1:%.+]] = tensor.extract [[m0_tensor_i1]][] : tensor<i1>
+    # CHECK:  [[varObs:%.+]] = quantum.mcmobs [[m0_i1]] : !quantum.obs
     # CHECK:  [[var:%.+]] = quantum.var [[varObs]] : f64
-    # CHECK:  [[countsObs:%.+]] = quantum.mcmobs [[m0]], [[m1]] : !quantum.obs
+
+    # CHECK:  [[m0_tensor_i1:%.+]] = stablehlo.convert [[m0_tensor_i64]] : (tensor<i64>) -> tensor<i1>
+    # CHECK:  [[m0_i1:%.+]] = tensor.extract [[m0_tensor_i1]][] : tensor<i1>
+    # CHECK:  [[m1_tensor_i1:%.+]] = stablehlo.convert [[m1_tensor_i64]] : (tensor<i64>) -> tensor<i1>
+    # CHECK:  [[m1_i1:%.+]] = tensor.extract [[m1_tensor_i1]][] : tensor<i1>
+    # CHECK:  [[countsObs:%.+]] = quantum.mcmobs [[m0_i1]], [[m1_i1]] : !quantum.obs
     # CHECK:  [[counts:%.+]] = quantum.counts [[countsObs]] : tensor<4xf64>, tensor<4xi64>
 
     dev = qml.device("lightning.qubit", wires=2)

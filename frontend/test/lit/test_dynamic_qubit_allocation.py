@@ -102,12 +102,20 @@ def test_measure_with_reset():
     Test qml.allocate with qml.measure with a reset.
     """
 
+    # CHECK: [[zero:%.+]] = stablehlo.constant dense<0> : tensor<i64>
+
     # CHECK: [[device_init_qreg:%.+]] = quantum.alloc( 3)
 
     # CHECK: [[dyn_qreg:%.+]] = quantum.alloc( 1)
     # CHECK: [[dyn_qubit:%.+]] = quantum.extract [[dyn_qreg]][ 0]
     # CHECK: [[mres:%.+]], [[mout_qubit:%.+]] = quantum.measure [[dyn_qubit]] postselect 1
-    # CHECK: [[reset_qubit:%.+]] = scf.if [[mres]] -> (!quantum.bit) {
+    # CHECK: [[tensor_i1_mres:%.+]] = tensor.from_elements [[mres]] : tensor<i1>
+    # CHECK: [[tensor_i64_mres:%.+]] = stablehlo.convert [[tensor_i1_mres]] : (tensor<i1>) -> tensor<i64>
+    # CHECK: [[all_zeros:%.+]] = stablehlo.broadcast_in_dim [[zero]], dims = [] : (tensor<i64>) -> tensor<i64>
+    # CHECK: [[cmp_tensor:%.+]] = stablehlo.compare  NE, [[tensor_i64_mres]], [[all_zeros]],  SIGNED : (tensor<i64>, tensor<i64>) -> tensor<i1>
+    # CHECK: [[convert:%.+]] = stablehlo.convert [[cmp_tensor]] : tensor<i1>
+    # CHECK: [[extracted_cmp:%.+]] = tensor.extract [[convert]][] : tensor<i1>
+    # CHECK: [[reset_qubit:%.+]] = scf.if [[extracted_cmp]] -> (!quantum.bit) {
     # CHECK:    [[x_out_qubit:%.+]] = quantum.custom "PauliX"() [[mout_qubit]]
     # CHECK:    scf.yield [[x_out_qubit]] : !quantum.bit
     # CHECK:  } else {
