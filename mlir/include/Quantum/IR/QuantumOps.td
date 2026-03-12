@@ -539,7 +539,7 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
     let summary = "Apply a Pauli Product Rotation";
     let description = [{
         The `quantum.paulirot` operation applies a rotation around a Pauli product
-        operator to the state-vector. 
+        operator to the state-vector.
         The arguments are the rotation angle `angle`, a string representing the
         Pauli product operator, and a set of qubits the operation acts on.
     }];
@@ -561,7 +561,7 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
     let assemblyFormat = [{
         $pauli_product `(` $angle `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
-    
+
     let extraClassDeclaration = extraBaseClassDeclaration # [{
         mlir::ValueRange getAllParams() {
             return getODSOperands(getParamOperandIdx());
