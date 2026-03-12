@@ -109,6 +109,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // Step 7: Run decompose-lowering patterns to apply the decomposition rules
         PassManager pm(&getContext());
         pm.addPass(createDecomposeLoweringPass());
+
+        if (failed(pm.run(module))) {
+            return signalPassFailure();
+        }
     }
 
   private:
