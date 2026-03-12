@@ -17,8 +17,8 @@ This module provides the utilities necessary to AOT compile PennyLane's decompos
 Bytecode.
 """
 
-import argparse
 import inspect
+import subprocess
 import warnings
 from functools import lru_cache
 from pathlib import Path
@@ -35,9 +35,10 @@ from pennylane.wires import Wires
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION
 from catalyst.jax_primitives import decomposition_rule
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.runtime_environment import DEFAULT_BIN_PATHS
 
-DEFAULT_RULE_DIR = Path("./decomposition-rules/cached-rules")
-DECOMP_FILE_NAME = Path("decompositions.mlir")
+DEFAULT_RULE_DIR = Path(__file__).parent.parent / Path("resources")
+BYTECODE_FILE_NAME = Path("decomposition_rules.mlirbc")
 
 
 @lru_cache
@@ -93,7 +94,7 @@ def get_dummy_args(func: Callable) -> list[str | float | int]:
     dummy_args: list = []
     for param in func_sig.parameters.values():
         type_annotation = param.annotation
-        if get_origin(type_annotation) in (Union, UnionType):
+        if get_origin(type_annotation) is Union or get_origin(type_annotation) is UnionType:
             type_annotation = get_args(type_annotation)
         else:
             type_annotation = (type_annotation,)
@@ -241,21 +242,14 @@ def compile_op_decomp_rules(
     return (mlir_modules, num_successes, num_failures)
 
 
-def main():
+def precompile_decomp_rules(decomp_dir_path: Path = DEFAULT_RULE_DIR):
     """
     filters compiler-compatible decomposition ops from PennyLane, grabs their associated
     decomposition rules, and compiles them via a wrapper function with qjit to mlir.
     Intended for use with `make decomp-rules` in catalyst/mlir.
     """
 
-    parser = argparse.ArgumentParser(prog="decomposition rule pre-compiler")
-    parser.add_argument("-d", "--dir", default=DEFAULT_RULE_DIR)
-
-    decomp_dir_path = Path(parser.parse_args().dir)
-    if not decomp_dir_path.exists():
-        decomp_dir_path.mkdir()
-
-    decomps_file_path = decomp_dir_path / DECOMP_FILE_NAME
+    decomp_dir_path.mkdir(parents=True, exist_ok=True)
 
     target_ops, num_ops_missed = get_compiler_ops()
     if num_ops_missed:
@@ -264,21 +258,35 @@ def main():
     num_successes = 0
     num_failures = 0
 
-    with open(decomps_file_path, "w", encoding="utf-8") as mlir_file:
-        for func in target_ops:
-            results, num_new_successes, num_new_failures = compile_op_decomp_rules(func)
-            num_successes += num_new_successes
-            num_failures += num_new_failures
-            if results:
-                for name, circuit_mlir in results.items():
-                    if circuit_mlir:
-                        mlir_file.write(circuit_mlir.replace("@rule_wrapper", "@" + name))
+    mlir_rules = ""
+    for func in target_ops:
+        results, num_new_successes, num_new_failures = compile_op_decomp_rules(func)
+        num_successes += num_new_successes
+        num_failures += num_new_failures
+        if results:
+            for name, circuit_mlir in results.items():
+                if circuit_mlir:
+                    mlir_rules += str(circuit_mlir).replace("@rule_wrapper", "@" + name)
 
     if num_failures:
         warnings.warn(
             f"compiled {num_successes} / {num_failures + num_successes} decomposition rules"
         )
 
+    # FIXME use catalyst.compiler._quantum_opt once the catalyst dangling options are fixed
+    bytecode = subprocess.run(
+        (
+            f"{DEFAULT_BIN_PATHS['cli']}/quantum-opt",
+            "--emit-bytecode",
+            "--register-decomp-rule-resource",
+        ),
+        input=mlir_rules.encode("utf-8"),
+        capture_output=True,
+    ).stdout
+
+    with open(decomp_dir_path / BYTECODE_FILE_NAME, "wb") as bytecode_file:
+        bytecode_file.write(bytecode)
+
 
 if __name__ == "__main__":
-    main()
+    precompile_decomp_rules()

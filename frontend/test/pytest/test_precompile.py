@@ -19,15 +19,13 @@ Tests for the decomposition rule precompilation utilities.
 import pennylane as qp
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
-from precompile import (
-    DECOMP_FILE_NAME,
-    DEFAULT_RULE_DIR,
+
+from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION
+from catalyst.utils.precompile_decomposition_rules import (
     compile_op_decomp_rules,
     get_compiler_ops,
     get_dummy_args,
 )
-
-from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION
 
 
 def test_get_compiler_ops():
@@ -163,19 +161,3 @@ class TestCompileOpDecompRules:
 
         assert successes == 5
         assert failures == 0
-
-
-def test_mlir_output():
-    """
-    Spot checks that the compiled rules appear in the mlir file.
-    """
-
-    rules = ""
-    with open(DEFAULT_RULE_DIR / DECOMP_FILE_NAME, encoding="utf-8") as mlir_file:
-        rules = mlir_file.read()
-
-    assert "_rx_to_rot" in rules
-    assert "_hadamard_to_rz_rx" in rules
-    assert "_rot_to_rz_ry_rz" in rules
-    assert "_cswap" in rules
-    assert "_isingxy_to_h_cy" in rules
