@@ -1292,8 +1292,12 @@ void squashAliasingGetOps(func::FuncOp func)
 
     func->walk<WalkOrder::PreOrder>([&](qref::GetOp getOp) {
         for (auto visited : uniqueGetOps) {
-            if (OperationEquivalence::isEquivalentTo(getOp, visited,
-                                                     OperationEquivalence::IgnoreLocations)) {
+            bool equivalent = OperationEquivalence::isEquivalentTo(
+                getOp, visited, OperationEquivalence::IgnoreLocations);
+            bool visibleViaClosure = visited.getQubit().getParentRegion()->isAncestor(
+                getOp.getQubit().getParentRegion());
+
+            if (equivalent && visibleViaClosure) {
                 getOp.getQubit().replaceAllUsesWith(visited.getQubit());
                 aliasingGetOps.push_back(getOp);
                 return WalkResult::advance();
