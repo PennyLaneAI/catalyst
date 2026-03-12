@@ -710,7 +710,11 @@ def handle_measure(self, wire, reset, postselect):
             ]
         )
         out_wire = cond_p.bind(
-            result, out_wire, out_wire, branch_jaxprs=correction, num_implicit_outputs=None
+            jnp.bool(result),
+            out_wire,
+            out_wire,
+            branch_jaxprs=correction,
+            num_implicit_outputs=None,
         )[0]
 
     in_qreg[in_qreg.global_index_to_local_index(wire)] = out_wire
