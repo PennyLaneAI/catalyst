@@ -18,7 +18,7 @@ from typing import cast
 
 import pytest
 from xdsl.dialects import test
-from xdsl.dialects.builtin import I64, IndexType, IntegerAttr, UnitAttr
+from xdsl.dialects.builtin import I64, IndexType, IntegerAttr, IntegerType, UnitAttr
 from xdsl.ir import AttributeCovT, OpResult
 
 from catalyst.python_interface.dialects import qecl
@@ -46,6 +46,7 @@ expected_ops_names = {
     "HadamardOp": "qecl.hadamard",
     "SOp": "qecl.s",
     "CnotOp": "qecl.cnot",
+    "MeasureOp": "qecl.measure",
 }
 
 expected_attrs_names = {
@@ -217,6 +218,16 @@ class TestQecLogicalOps:
         assert cnot_op.result_types[0].k == self.k
         assert isinstance(cnot_op.result_types[1], qecl.LogicalCodeblockType)
         assert cnot_op.result_types[1].k == self.k
+
+    @pytest.mark.parametrize(
+        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
+    )
+    def test_qecl_op_constructor_measure(self, idx):
+        measure_op = qecl.MeasureOp(in_codeblock=self._get_codeblock_value(), idx=idx)
+        assert len(measure_op.result_types) == 2
+        assert measure_op.result_types[0] == IntegerType(1)
+        assert isinstance(measure_op.result_types[1], qecl.LogicalCodeblockType)
+        assert measure_op.result_types[1].k == self.k
 
 
 @pytest.mark.parametrize(

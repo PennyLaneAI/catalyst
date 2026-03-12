@@ -23,7 +23,15 @@ For a complete description of this dialect, please see
 from collections.abc import Sequence
 from typing import ClassVar, TypeAlias
 
-from xdsl.dialects.builtin import I64, ContainerOf, IndexType, IntegerAttr, UnitAttr
+from xdsl.dialects.builtin import (
+    I64,
+    ContainerOf,
+    IndexType,
+    IntegerAttr,
+    IntegerType,
+    UnitAttr,
+    i1,
+)
 from xdsl.ir import (
     Attribute,
     Dialect,
@@ -533,6 +541,55 @@ class CnotOp(IRDLOperation):
         )
 
 
+@irdl_op_definition
+class MeasureOp(IRDLOperation):
+    """A logical single-qubit projective measurement in the computational basis."""
+
+    T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
+
+    name = "qecl.measure"
+
+    assembly_format = """
+            $in_codeblock `[` ($idx^):($idx_attr)? `]` attr-dict `:` type($mres) `,` type($in_codeblock)
+        """
+
+    in_codeblock = operand_def(T)
+
+    idx = opt_operand_def(IndexType)
+
+    idx_attr = opt_prop_def(IntegerAttr.constr(type=IndexType, value=AtLeast(0)))
+
+    mres = result_def(IntegerType(1))
+
+    out_codeblock = result_def(T)
+
+    def __init__(
+        self,
+        in_codeblock: LogicalCodeBlockSSAValue | Operation,
+        idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
+    ):
+        if isinstance(idx, int):
+            idx = IntegerAttr.from_int_and_width(idx, 64)
+
+        if isinstance(idx, IntegerAttr):
+            operands = (in_codeblock, None)
+            properties = {"idx_attr": idx}
+        else:
+            operands = (in_codeblock, idx)
+            properties = {}
+
+        in_codeblock_type = get_logical_codeblock_type(in_codeblock)
+
+        super().__init__(
+            operands=operands,
+            result_types=(
+                i1,
+                in_codeblock_type,
+            ),
+            properties=properties,
+        )
+
+
 QecLogical = Dialect(
     "qecl",
     [
@@ -545,6 +602,7 @@ QecLogical = Dialect(
         HadamardOp,
         SOp,
         CnotOp,
+        MeasureOp,
     ],
     [
         LogicalCodeblockInitStateAttr,
