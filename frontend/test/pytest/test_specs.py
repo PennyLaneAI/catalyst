@@ -613,9 +613,9 @@ class TestPassByPassSpecs:
             device_name="null.qubit",
             num_device_wires=3,
             shots=Shots(None),
-            level={1: "split-non-commuting (MLIR-1)", 2: "cancel-inverses (MLIR-2)"},
+            level={1: "split-non-commuting", 2: "cancel-inverses"},
             resources={
-                "split-non-commuting (MLIR-1)": [
+                "split-non-commuting": [
                     SpecsResources(
                         gate_types={"Hadamard": 1, "PauliX": 2},
                         gate_sizes={1: 3},
@@ -635,7 +635,7 @@ class TestPassByPassSpecs:
                         num_allocs=3,
                     ),
                 ],
-                "cancel-inverses (MLIR-2)": [  # The split should remain throughout subsequent passes
+                "cancel-inverses": [  # The split should remain throughout subsequent passes
                     SpecsResources(
                         gate_types={"Hadamard": 1},
                         gate_sizes={1: 1},

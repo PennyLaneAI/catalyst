@@ -280,7 +280,7 @@ class TestMLIRSpecs:
             return qml.expval(qml.PauliX(0)), qml.expval(qml.PauliY(0)), qml.expval(qml.PauliZ(0))
 
         expected = {
-            "split-non-commuting (MLIR-1)": [
+            "split-non-commuting": [
                 make_static_resources(
                     operations={"Hadamard": {1: 2}},
                     measurements={"expval(PauliX)": 1},
@@ -297,7 +297,7 @@ class TestMLIRSpecs:
                     num_allocs=2,
                 ),
             ],
-            "cancel-inverses (MLIR-2)": [
+            "cancel-inverses": [
                 make_static_resources(
                     measurements={"expval(PauliX)": 1},
                     num_allocs=2,
