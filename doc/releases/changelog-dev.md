@@ -376,6 +376,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Added an `EmptyPass` MLIR pass that does not transform the program for debugging and standing in for
+  unimplemented transforms.
+  [(#2575)](https://github.com/PennyLaneAI/catalyst/pull/2575)
+
 * The QNode lowering to MLIR now supports providing multiple named transform pipelines.
   [(#2556)](https://github.com/PennyLaneAI/catalyst/pull/2556)
 
