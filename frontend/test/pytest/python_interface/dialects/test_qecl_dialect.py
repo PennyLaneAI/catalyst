@@ -154,11 +154,13 @@ class TestQecLogicalOps:
         assert insert_block_op.result_types[0].width == self.width
         assert insert_block_op.result_types[0].k == self.k
 
-    # encode
-    encode_op = qecl.EncodeOp(in_codeblock=codeblock, init_state="zero")
-    assert len(encode_op.result_types) == 1
-    assert isinstance(encode_op.result_types[0], qecl.LogicalCodeblockType)
-    assert encode_op.result_types[0].k.value.data == k
+    @pytest.mark.parametrize("init_state", ["zero", qecl.LogicalCodeblockInitStateAttr("zero")])
+    def test_qecl_op_constructor_encode(self, init_state):
+        """Test the constructor of the qecl.encode op."""
+        encode_op = qecl.EncodeOp(in_codeblock=self._get_codeblock_value(), init_state=init_state)
+        assert len(encode_op.result_types) == 1
+        assert isinstance(encode_op.result_types[0], qecl.LogicalCodeblockType)
+        assert encode_op.result_types[0].k == self.k
 
 
 @pytest.mark.parametrize(
