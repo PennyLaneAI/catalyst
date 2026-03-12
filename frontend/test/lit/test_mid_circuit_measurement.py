@@ -19,6 +19,8 @@ import pennylane as qml
 from catalyst import measure, qjit
 from catalyst.passes import merge_rotations
 
+# pylint: disable=line-too-long
+
 
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))

@@ -23,6 +23,8 @@ import pennylane as qml
 from catalyst import qjit
 from catalyst.jax_primitives import qalloc_p, qdealloc_qb_p, qextract_p
 
+# pylint: disable=line-too-long
+
 
 @qjit(target="mlir")
 def test_single_qubit_dealloc():
