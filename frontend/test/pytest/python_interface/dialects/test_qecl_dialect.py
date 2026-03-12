@@ -18,7 +18,7 @@ from typing import cast
 
 import pytest
 from xdsl.dialects import test
-from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType
+from xdsl.dialects.builtin import I64, IndexType, IntegerAttr
 from xdsl.ir import AttributeCovT, OpResult
 
 from catalyst.python_interface.dialects import qecl
@@ -76,68 +76,81 @@ def test_all_attributes_names(attr):
     assert attr.name == expected_name
 
 
-def test_type_constructors():
-    """Test the constructors of each type defined in the qecl dialect work as expected."""
-    codeblock = qecl.LogicalCodeblockType(1)
-    assert isinstance(codeblock.k, IntegerAttr)
-    assert codeblock.k.value.data == 1
-    assert codeblock.k.type == IntegerType(64)
+class TestQecLogicalTypes:
+    """Tests relating to the qecl types."""
 
-    hyper_reg = qecl.LogicalHyperRegisterType(3, 1)
-    assert isinstance(hyper_reg.width, IntegerAttr)
-    assert hyper_reg.width.value.data == 3
-    assert hyper_reg.width.type == IntegerType(64)
-    assert isinstance(hyper_reg.k, IntegerAttr)
-    assert hyper_reg.k.value.data == 1
-    assert hyper_reg.k.type == IntegerType(64)
+    @pytest.mark.parametrize("k", [1, 2, IntegerAttr.from_int_and_width(1, 64)])
+    def test_qecl_type_constructor_codeblock(self, k: int | IntegerAttr[I64]):
+        """Test the constructor of qecl.LogicalCodeblockType."""
+        codeblock = qecl.LogicalCodeblockType(k)
+
+        expected_k = k if isinstance(k, IntegerAttr) else IntegerAttr.from_int_and_width(k, 64)
+        assert codeblock.k == expected_k
+
+    @pytest.mark.parametrize("width", [1, 3, IntegerAttr.from_int_and_width(3, 64)])
+    @pytest.mark.parametrize("k", [1, 2, IntegerAttr.from_int_and_width(1, 64)])
+    def test_qecl_type_constructor_hyper_reg(
+        self, width: int | IntegerAttr[I64], k: int | IntegerAttr[I64]
+    ):
+        """Test the constructor of qecl.LogicalHyperRegisterType."""
+        hyper_reg = qecl.LogicalHyperRegisterType(width, k)
+
+        expected_width = (
+            width if isinstance(width, IntegerAttr) else IntegerAttr.from_int_and_width(width, 64)
+        )
+        expected_k = k if isinstance(k, IntegerAttr) else IntegerAttr.from_int_and_width(k, 64)
+        assert hyper_reg.width == expected_width
+        assert hyper_reg.k == expected_k
 
 
-def test_op_constructors():
-    """Test the constructors of each op defined in the qecl dialect work as expected."""
-    width = 3
-    k = 1
+class TestQecLogicalOps:
+    """Tests relating to the qecl ops."""
 
-    hyper_reg = create_ssa_value(qecl.LogicalHyperRegisterType(width, k))
-    codeblock = create_ssa_value(qecl.LogicalCodeblockType(k))
-
-    idx_value = create_ssa_value(IndexType())
+    width = IntegerAttr.from_int_and_width(3, 64)
+    k = IntegerAttr.from_int_and_width(1, 64)
     idx_attr = IntegerAttr.from_index_int_value(0)
 
-    # alloc
-    alloc_op = qecl.AllocOp(qecl.LogicalHyperRegisterType(width, k))
-    assert len(alloc_op.result_types) == 1
-    assert isinstance(alloc_op.result_types[0], qecl.LogicalHyperRegisterType)
-    assert alloc_op.result_types[0].width.value.data == width
-    assert alloc_op.result_types[0].k.value.data == k
+    def _get_hyper_reg_value(self):
+        return create_ssa_value(qecl.LogicalHyperRegisterType(self.width, self.k))
 
-    # dealloc
-    dealloc_op = qecl.DeallocOp(hyper_reg)
-    assert len(dealloc_op.result_types) == 0
+    def _get_codeblock_value(self):
+        return create_ssa_value(qecl.LogicalCodeblockType(self.k))
 
-    # extract_block
-    extract_block_op = qecl.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=0)
-    assert len(extract_block_op.result_types) == 1
-    assert isinstance(extract_block_op.result_types[0], qecl.LogicalCodeblockType)
-    assert extract_block_op.result_types[0].k.value.data == k
-    extract_block_op_idx_attr = qecl.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=idx_attr)
-    assert extract_block_op_idx_attr
-    extract_block_op_idx_ssa = qecl.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=idx_value)
-    assert extract_block_op_idx_ssa
+    def test_qecl_op_constructor_alloc(self):
+        """Test the constructor of the qecl.alloc op."""
+        alloc_op = qecl.AllocOp(qecl.LogicalHyperRegisterType(self.width, self.k))
+        assert len(alloc_op.result_types) == 1
+        assert isinstance(alloc_op.result_types[0], qecl.LogicalHyperRegisterType)
+        assert alloc_op.result_types[0].width == self.width
+        assert alloc_op.result_types[0].k == self.k
 
-    # insert_block
-    insert_block_op = qecl.InsertCodeblockOp(in_hyper_reg=hyper_reg, idx=0, codeblock=codeblock)
-    assert len(insert_block_op.result_types) == 1
-    assert isinstance(insert_block_op.result_types[0], qecl.LogicalHyperRegisterType)
-    assert insert_block_op.result_types[0].width.value.data == width
-    assert insert_block_op.result_types[0].k.value.data == k
-    insert_block_op_idx_attr = qecl.InsertCodeblockOp(
-        in_hyper_reg=hyper_reg, idx=idx_attr, codeblock=codeblock
+    def test_qecl_op_constructor_dealloc(self):
+        """Test the constructor of the qecl.dealloc op."""
+        dealloc_op = qecl.DeallocOp(self._get_hyper_reg_value())
+        assert len(dealloc_op.result_types) == 0
+
+    @pytest.mark.parametrize(
+        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
     )
-    assert insert_block_op_idx_attr
-    insert_block_op_idx_ssa = qecl.InsertCodeblockOp(
-        in_hyper_reg=hyper_reg, idx=idx_value, codeblock=codeblock
+    def test_qecl_op_constructor_extract_block(self, idx):
+        """Test the constructor of the qecl.extract_block op."""
+        extract_block_op = qecl.ExtractCodeblockOp(hyper_reg=self._get_hyper_reg_value(), idx=idx)
+        assert len(extract_block_op.result_types) == 1
+        assert isinstance(extract_block_op.result_types[0], qecl.LogicalCodeblockType)
+        assert extract_block_op.result_types[0].k == self.k
+
+    @pytest.mark.parametrize(
+        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
     )
-    assert insert_block_op_idx_ssa
+    def test_qecl_op_constructor_insert_block(self, idx):
+        """Test the constructor of the qecl.insert_block op."""
+        insert_block_op = qecl.InsertCodeblockOp(
+            in_hyper_reg=self._get_hyper_reg_value(), idx=idx, codeblock=self._get_codeblock_value()
+        )
+        assert len(insert_block_op.result_types) == 1
+        assert isinstance(insert_block_op.result_types[0], qecl.LogicalHyperRegisterType)
+        assert insert_block_op.result_types[0].width == self.width
+        assert insert_block_op.result_types[0].k == self.k
 
 
 @pytest.mark.parametrize(
