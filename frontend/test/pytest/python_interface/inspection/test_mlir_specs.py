@@ -202,17 +202,17 @@ class TestMLIRSpecs:
             simple_circuit = catalyst.passes.merge_rotations(simple_circuit)
 
         expected = {
-            "Before MLIR Passes (MLIR-0)": make_static_resources(
+            "Before MLIR Passes": make_static_resources(
                 operations={"RX": {1: 2}, "RZ": {1: 2}, "Hadamard": {1: 2}, "CNOT": {2: 2}},
                 measurements={"probs(all wires)": 1},
                 num_allocs=2,
             ),
-            "cancel-inverses (MLIR-1)": make_static_resources(
+            "cancel-inverses": make_static_resources(
                 operations={"RX": {1: 2}, "RZ": {1: 2}},
                 measurements={"probs(all wires)": 1},
                 num_allocs=2,
             ),
-            "merge-rotations (MLIR-2)": make_static_resources(
+            "merge-rotations": make_static_resources(
                 operations={"RX": {1: 1}, "RZ": {1: 1}},
                 measurements={"probs(all wires)": 1},
                 num_allocs=2,
@@ -240,12 +240,12 @@ class TestMLIRSpecs:
             simple_circuit = catalyst.passes.merge_rotations(simple_circuit)
 
         expected = {
-            "Before MLIR Passes (MLIR-0)": make_static_resources(
+            "Before MLIR Passes": make_static_resources(
                 operations={"RX": {1: 2}, "RZ": {1: 2}, "Hadamard": {1: 2}, "CNOT": {2: 2}},
                 measurements={"probs(all wires)": 1},
                 num_allocs=2,
             ),
-            "merge-rotations (MLIR-2)": make_static_resources(
+            "merge-rotations": make_static_resources(
                 operations={"RX": {1: 1}, "RZ": {1: 1}},
                 measurements={"probs(all wires)": 1},
                 num_allocs=2,
