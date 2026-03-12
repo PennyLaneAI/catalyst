@@ -2435,12 +2435,11 @@ class TestParameterShiftVerificationIntegrationTests:
                 return qml.expval(qml.PauliZ(wires=0))
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_closure_variable_grad(diff_method):
+def test_closure_variable_grad(diff_method, capture_mode):
     """Test that grad can take closure variables"""
 
-    @qml.qjit
+    @qml.qjit(capture=capture_mode)
     def workflow_closure(x, y):
 
         dev = qml.device("lightning.qubit", wires=1)
@@ -2454,7 +2453,7 @@ def test_closure_variable_grad(diff_method):
         g = grad(circuit)
         return g(x)
 
-    @qml.qjit
+    @qml.qjit(capture=capture_mode)
     def workflow_no_closure(x, y):
 
         dev = qml.device("lightning.qubit", wires=1)
