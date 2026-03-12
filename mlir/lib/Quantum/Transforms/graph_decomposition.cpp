@@ -98,7 +98,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // Step 4: Get the resources for all the rules (both built-in and custom)
         // and convert them to RuleNodes for later use in the graph decomposition
         // TODO get nodes from user rules
-        getRuleNodes(module, customRules, setOfResources);
+        getRuleNodes(module, bytecodeRulesFile, customRules, setOfResources);
 
         ///////////////////////////
         // Step 5: Build and solve the decomposition graph
@@ -158,16 +158,12 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         });
     }
 
-    void getRuleNodes([[maybe_unused]] ModuleOp module,
+    void getRuleNodes([[maybe_unused]] ModuleOp module, llvm::StringRef filename,
                       [[maybe_unused]] const llvm::StringMap<func::FuncOp> &custom_rules,
                       [[maybe_unused]] std::vector<RuleNode> &rules)
     {
 
         // TODO user nodes
-
-        llvm::StringRef filename =
-            "./decomposition-rules/cached-rules/decompositions.mlirbc"; // TODO make this a
-                                                                        // param/default param?
 
         std::vector<mlir::OwningOpRef<mlir::func::FuncOp>> builtinRules =
             getRulesFromBytecode(filename, module.getContext());
