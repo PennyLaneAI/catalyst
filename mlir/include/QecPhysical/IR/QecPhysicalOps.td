@@ -235,5 +235,21 @@ def CnotOp : QecPhysical_Op<"cnot", [
     }];
 }
 
+def MeasureOp : QecPhysical_Op<"measure", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical single-qubit projective measurement in the computational basis.";
+
+    let arguments = (ins
+        QecPhysicalQubitType:$in_qubit
+    );
+
+    let results = (outs
+        I1:$mres,
+        QecPhysicalQubitType:$out_qubit
+    );
+
+    let assemblyFormat = [{
+        $in_qubit attr-dict `:` type($mres) `,` qualified(type($in_qubit))
+    }];
+}
 
 #endif // QEC_PHYSICAL_OPS

@@ -18,7 +18,7 @@ from typing import cast
 
 import pytest
 from xdsl.dialects import test
-from xdsl.dialects.builtin import IndexType, IntegerAttr, UnitAttr
+from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType, UnitAttr
 from xdsl.ir import AttributeCovT, OpResult
 
 from catalyst.python_interface.dialects import qecp
@@ -49,6 +49,7 @@ expected_ops_names = {
     "HadamardOp": "qecp.hadamard",
     "SOp": "qecp.s",
     "CnotOp": "qecp.cnot",
+    "MeasureOp": "qecp.measure",
 }
 
 expected_attrs_names = {
@@ -278,6 +279,20 @@ class TestQecPhysicalOps:
         assert cnot_op.result_types[0] == qubit_ctrl.type
         assert cnot_op.result_types[1] == qubit_trgt.type
 
+    @pytest.mark.parametrize(
+        "qubit",
+        [
+            create_ssa_value(qecp.QecPhysicalQubitType("data")),
+            create_ssa_value(qecp.QecPhysicalQubitType("aux")),
+        ],
+    )
+    def test_qecp_op_constructor_measure(self, qubit):
+        """Test the constructor of the qecp.measure op."""
+        measure_op = qecp.MeasureOp(qubit)
+        assert len(measure_op.result_types) == 2
+        assert measure_op.result_types[0] == IntegerType(1)
+        assert measure_op.result_types[1] == qubit.type
+
 
 @pytest.mark.parametrize(
     "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
@@ -335,6 +350,11 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     // CHECK: [[q_data6:%.+]], [[q_aux2:%.+]] = qecp.cnot [[q_data4]], [[q_aux1]] : !qecp.qubit<data>, !qecp.qubit<aux>
     %q_data6, %q_aux2 = qecp.cnot %q_data4, %q_aux1 : !qecp.qubit<data>, !qecp.qubit<aux>
+
+    // CHECK: [[mres0:%.+]], [[q_data7:%.+]] = qecp.measure [[q_data6]] : i1, !qecp.qubit<data>
+    // CHECK: [[mres1:%.+]], [[q_aux3:%.+]] = qecp.measure [[q_aux2]] : i1, !qecp.qubit<aux>
+    %mres0, %q_data7 = qecp.measure %q_data6 : i1, !qecp.qubit<data>
+    %mres1, %q_aux3 = qecp.measure %q_aux2 : i1, !qecp.qubit<aux>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
