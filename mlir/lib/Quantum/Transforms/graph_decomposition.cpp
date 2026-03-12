@@ -15,6 +15,7 @@
 #define DEBUG_TYPE "graph-decomposition"
 
 #include "mlir/Pass/PassManager.h"
+#include "llvm/ADT/StringExtras.h"
 
 #include "Catalyst/Transforms/Passes.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -75,15 +76,19 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         ///////////////////////////
         // Step 2: Get the target gateset for decomposition from the module attribute
         // To sync with the graph solver branch, targetGateset should be DictionaryAttr
-        // this is passed from the frontend as a dictionary
-        // TODO why should this be a dictionary and not a list? Are we passing weights each time?
-        std::vector<llvm::StringRef> targetGateSet;
-        llvm::errs() << "Gate Set: ";
-        for (llvm::StringRef gate : targetGateSetOption) {
-            llvm::errs() << gate << ", ";
-            targetGateSet.push_back(gate);
+        std::unordered_map<std::string, float> targetGateToCost;
+        llvm::errs() << "gate set:\n";
+        for (const std::string &opCostPair : targetGateSetOption) {
+            llvm::StringRef pairRef(opCostPair);
+
+            auto [opName, cost] = pairRef.split("=");
+            bool success = to_float(cost, targetGateToCost[opName.str()]);
+
+            if (!success) {
+                return signalPassFailure();
+            }
+            llvm::errs() << "\t" << opName << ": " << cost << ",\n";
         }
-        llvm::errs() << '\n';
 
         ///////////////////////////
         // Step 3: Get and convert operators in the module required for creating the graph
@@ -97,7 +102,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 5: Build and solve the decomposition graph
-        auto solution = GraphDecompositionSolver::Solve(setOfOps, setOfResources, targetGateSet);
+        auto solution = GraphDecompositionSolver::Solve(setOfOps, setOfResources, targetGateToCost);
 
         ///////////////////////////
         // Step 6: Insert decomposition rules picked by the graph solver (solution) into the
@@ -160,7 +165,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         // TODO user nodes
 
-        // TODO builtin nodes
         llvm::StringRef filename =
             "./decomposition-rules/cached-rules/decompositions.mlirbc"; // TODO make this a
                                                                         // param/default param?
