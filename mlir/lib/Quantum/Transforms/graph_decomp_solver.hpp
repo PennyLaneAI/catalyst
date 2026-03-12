@@ -56,7 +56,7 @@ struct GraphDecompositionSolver {
      */
     static std::vector<RuleNode> Solve(const std::vector<OperatorNode> &operators,
                                        const std::vector<RuleNode> &rules,
-                                       const std::vector<llvm::StringRef> &gateset)
+                                       const std::unordered_map<std::string, float> &gateset)
     {
         return {};
     }
