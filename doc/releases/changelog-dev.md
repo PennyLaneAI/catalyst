@@ -322,7 +322,7 @@
   were updated in-place. Entry-point arguments are now treated as non-writable during bufferization,
   preserving the expected immutability of user inputs.
   [(#2562)](https://github.com/PennyLaneAI/catalyst/pull/2562)
-  
+
 * Fixed a bug in the `split-non-commuting` pass where dead `NamedObsOp`s were left behind after
   erasing composite obs (`TensorOp`, `HamiltonianOp`).
   [(#2567)](https://github.com/PennyLaneAI/catalyst/pull/2567)
@@ -375,11 +375,16 @@
 * Fixed incorrect global phase when lowering CNOT gates into PPR/PPM operations.
   [(#2459)](https://github.com/PennyLaneAI/catalyst/pull/2459)
 
+* Fixed a bug where the Catalyst measurement primitive was incorrectly returning a boolean type
+  as the measurement result, when replacing the PennyLane measurement primitive, whose measurement
+  result is integer type.
+  [(#2582)](https://github.com/PennyLaneAI/catalyst/pull/2582)
+
 <h3>Internal changes ⚙️</h3>
 
 * Catalyst internally uses the new unified transforms API rather than `PassPipelineWrapper`.
-  [(#2525)](https://github.com/PennyLaneAI/catalyst/pull/2525)  
-  
+  [(#2525)](https://github.com/PennyLaneAI/catalyst/pull/2525)
+
 * Added an `EmptyPass` MLIR pass that does not transform the program for debugging and standing in for
   unimplemented transforms.
   [(#2575)](https://github.com/PennyLaneAI/catalyst/pull/2575)
