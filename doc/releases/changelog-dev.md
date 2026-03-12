@@ -9,6 +9,7 @@
   then performs the appropriate classical statistical postprocessing across the execution results
   from all shots.
   [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
+  [(#2573)](https://github.com/PennyLaneAI/catalyst/pull/2573)
 
   With this new MLIR pass, one shot execution mode is now available when capture is enabled.
 
@@ -370,6 +371,13 @@
   [(#2459)](https://github.com/PennyLaneAI/catalyst/pull/2459)
 
 <h3>Internal changes ⚙️</h3>
+
+* Catalyst internally uses the new unified transforms API rather than `PassPipelineWrapper`.
+  [(#2525)](https://github.com/PennyLaneAI/catalyst/pull/2525)  
+  
+* Added an `EmptyPass` MLIR pass that does not transform the program for debugging and standing in for
+  unimplemented transforms.
+  [(#2575)](https://github.com/PennyLaneAI/catalyst/pull/2575)
 
 * The QNode lowering to MLIR now supports providing multiple named transform pipelines.
   [(#2556)](https://github.com/PennyLaneAI/catalyst/pull/2556)
