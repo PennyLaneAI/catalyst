@@ -1525,10 +1525,12 @@ def graph_decomposition(
             alt_decomps=alt_decomps,
         )
 
-    options = {
-        "stage": DECOMP_STAGE,
-        "gate_set": tuple(op.__name__ for op in gate_set),
-    }
+    if not isinstance(gate_set, dict):
+        gate_set = {op.__name__: 1.0 for op in gate_set}
+    else:
+        gate_set = {op.__name__: cost for op, cost in gate_set.items()}
+
+    options = {"gate_set": gate_set}
 
     if fixed_decomps:
         options |= {
