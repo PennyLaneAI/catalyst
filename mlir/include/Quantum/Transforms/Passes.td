@@ -136,11 +136,11 @@ def GraphDecompositionPass : Pass<"graph-decomposition"> {
     /*Type*/"std::string", 
     /*Description*/"A map of operators to alternative decomposition rules that will be considered alongside any built-in rules.">,
     Option<
-    /*C++ name*/"stageOption", 
-    /*CLI name*/"stage", 
-    /*Type*/"int",
-    /*Default*/"-1",
-    /*Description*/"Which decomposition to apply .">,
+    /*C++ name*/"bytecodeRulesFile", 
+    /*CLI name*/"bytecode-rules", 
+    /*Type*/"std::string", 
+    /*Default*/[{ "./decomposition_rules.mlirbc" }],
+    /*Description*/"A map of operators to alternative decomposition rules that will be considered alongside any built-in rules.">
     ];
 }
 
