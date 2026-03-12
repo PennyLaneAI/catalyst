@@ -73,3 +73,10 @@ func.func @test_encode_block(%arg0 : !qecl.codeblock<1>) {
     %0 = qecl.encode [zero] %arg0 : !qecl.codeblock<1>
     func.return
 }
+
+// -----
+
+func.func @test_qec_cycle(%arg0 : !qecl.codeblock<1>) {
+    %0 = qecl.qec %arg0 : !qecl.codeblock<1>
+    func.return
+}
