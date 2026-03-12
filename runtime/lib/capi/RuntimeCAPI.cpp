@@ -1038,12 +1038,21 @@ RESULT *__catalyst__qis__Measure(QUBIT *wire, int32_t postselect)
     return getQuantumDevicePtr()->Measure(reinterpret_cast<QubitIdType>(wire), postselectOpt);
 }
 
-RESULT *__catalyst__qis__PauliMeasure(const char *pauliStr, int64_t numQubits, ...)
+RESULT *__catalyst__qis__PauliMeasure(const char *pauliStr, const char *pauliStrAlt, bool selectAlt,
+                                      int64_t numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
 
     // convert chat* to string
-    std::string pauliStr_(pauliStr);
+    std::string pauliStr_;
+    if (selectAlt) {
+        RT_FAIL_IF(pauliStrAlt == nullptr, "Invalid (null) alternative pauli string provided.");
+        pauliStr_ = pauliStrAlt;
+    }
+    else {
+        RT_FAIL_IF(pauliStr == nullptr, "Invalid (null) pauli string provided.");
+        pauliStr_ = pauliStr;
+    }
     RT_FAIL_IF(static_cast<size_t>(numQubits) != pauliStr_.size(),
                "The length of the pauli string must be equal to the number of wires.");
 

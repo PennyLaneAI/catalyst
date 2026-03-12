@@ -141,7 +141,7 @@ namespace pbc {
 
 void populateUnrollConditionalPPRPPMPatterns(RewritePatternSet &patterns)
 {
-    patterns.add<LowerSelectPPM>(patterns.getContext());
+    // patterns.add<LowerSelectPPM>(patterns.getContext());
     // patterns.add<LowerCondPPR>(patterns.getContext());
 }
 

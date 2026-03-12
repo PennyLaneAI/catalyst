@@ -102,7 +102,7 @@ ObsIdType __catalyst__qis__HamiltonianObs(MemRefT_double_1d *, int64_t, /*obsKey
 
 // Struct pointers arguments here represent return values.
 RESULT *__catalyst__qis__Measure(QUBIT *, int32_t);
-RESULT *__catalyst__qis__PauliMeasure(const char *, int64_t, /*qubits*/...);
+RESULT *__catalyst__qis__PauliMeasure(const char *, const char *, bool, int64_t, /*qubits*/...);
 double __catalyst__qis__Expval(ObsIdType);
 double __catalyst__qis__Variance(ObsIdType);
 void __catalyst__qis__Probs(MemRefT_double_1d *, int64_t, /*qubits*/...);

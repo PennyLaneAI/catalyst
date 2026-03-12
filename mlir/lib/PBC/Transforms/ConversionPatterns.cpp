@@ -72,8 +72,8 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
         // Create a global string for the Pauli word
         Value pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct());
 
-        // void __catalyst__qis__PauliRot(const char* pauliStr, double theta,
-        //                                 const Modifiers*, int64_t numQubits, ...qubits)
+        // void __catalyst__qis__PauliRot(const char* pauliStr, double theta, const Modifiers*,
+        //                                bool cond, int64_t numQubits, ...qubits)
         StringRef qirName = "__catalyst__qis__PauliRot";
         Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
         Type qirSignature =
@@ -119,6 +119,9 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
             // Use the arbitrary angle directly
             thetaValue = adaptor.getAngle();
         }
+        else {
+            static_assert(false, "unexpected type in templated rewrite");
+        }
 
         // Build the arguments: pauliStr, theta, modifiers, numQubits, qubits...
         int64_t numQubits = adaptor.getInQubits().size();
@@ -140,27 +143,42 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
     }
 };
 
-struct PPMeasurementOpPattern : public OpConversionPattern<PPMeasurementOp> {
-    using OpConversionPattern::OpConversionPattern;
+template <typename T> struct PPMeasurementOpPattern : public OpConversionPattern<T> {
+    using OpConversionPattern<T>::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(PPMeasurementOp op, PPMeasurementOpAdaptor adaptor,
+    LogicalResult matchAndRewrite(T op, typename T::Adaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         Location loc = op.getLoc();
-        MLIRContext *ctx = getContext();
-        const TypeConverter *conv = getTypeConverter();
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        MLIRContext *ctx = this->getContext();
+        const TypeConverter *conv = this->getTypeConverter();
+        ModuleOp mod = op->template getParentOfType<ModuleOp>();
 
         // Create a global string for the Pauli word
-        Value pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct());
+        Value selectAlt;
+        Value pauliWordPtr, pauliWordAltPtr;
+        if constexpr (std::is_same_v<T, PPMeasurementOp>) {
+            pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct());
+            pauliWordAltPtr = pauliWordPtr;
+            selectAlt = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(false));
+        }
+        else if constexpr (std::is_same_v<T, SelectPPMeasurementOp>) {
+            pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct_0());
+            pauliWordAltPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct_1());
+            selectAlt = op.getSelectSwitch();
+        }
+        else {
+            static_assert(false, "unexpected type in templated rewrite");
+        }
 
         // RESULT* __catalyst__qis__PauliMeasure(const char* pauliWord, int64_t numQubits,
         // ...qubits)
         StringRef qirName = "__catalyst__qis__PauliMeasure";
         Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-        Type qirSignature = LLVM::LLVMFunctionType::get(conv->convertType(ResultType::get(ctx)),
-                                                        {ptrType, IntegerType::get(ctx, 64)},
-                                                        /*isVarArg=*/true);
+        Type qirSignature = LLVM::LLVMFunctionType::get(
+            conv->convertType(ResultType::get(ctx)),
+            {ptrType, ptrType, IntegerType::get(ctx, 1), IntegerType::get(ctx, 64)},
+            /*isVarArg=*/true);
 
         LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, qirName, qirSignature);
@@ -169,6 +187,8 @@ struct PPMeasurementOpPattern : public OpConversionPattern<PPMeasurementOp> {
         int64_t numQubits = adaptor.getInQubits().size();
         SmallVector<Value> args;
         args.push_back(pauliWordPtr);
+        args.push_back(pauliWordAltPtr);
+        args.push_back(selectAlt);
         args.push_back(
             LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
         args.append(adaptor.getInQubits().begin(), adaptor.getInQubits().end());
@@ -180,10 +200,13 @@ struct PPMeasurementOpPattern : public OpConversionPattern<PPMeasurementOp> {
         Value mres = LLVM::LoadOp::create(rewriter, loc, IntegerType::get(ctx, 1), resultPtr);
 
         // if the uint16_t rotation_sign is -1, we need to negate the measurement result
-        if (static_cast<int16_t>(op.getRotationSign()) == -1) {
-            Value one = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI1Type(),
-                                                 rewriter.getBoolAttr(true));
-            mres = LLVM::XOrOp::create(rewriter, loc, mres, one);
+        // TODO: fix PauliWord sign for PPM
+        if constexpr (std::is_same_v<T, PPMeasurementOp>) {
+            if (static_cast<int16_t>(op.getRotationSign()) == -1) {
+                Value one = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI1Type(),
+                                                     rewriter.getBoolAttr(true));
+                mres = LLVM::XOrOp::create(rewriter, loc, mres, one);
+            }
         }
 
         // Replace the op with the measurement result and the input qubits
@@ -209,7 +232,9 @@ void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePattern
     patterns.add<PPRotationBasedPattern<PPRotationOp>>(typeConverter, patterns.getContext());
     patterns.add<PPRotationBasedPattern<PPRotationArbitraryOp>>(typeConverter,
                                                                 patterns.getContext());
-    patterns.add<PPMeasurementOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<PPMeasurementOpPattern<PPMeasurementOp>>(typeConverter, patterns.getContext());
+    patterns.add<PPMeasurementOpPattern<SelectPPMeasurementOp>>(typeConverter,
+                                                                patterns.getContext());
 }
 
 } // namespace pbc
