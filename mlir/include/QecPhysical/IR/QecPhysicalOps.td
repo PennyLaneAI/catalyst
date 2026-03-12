@@ -201,5 +201,54 @@ def AssembleTannerGraphOp : QecPhysical_Op<"assemble_tanner"> {
     let hasVerifier = 1;
 }
 
+def DecodeEsmCssOp : QecPhysical_Op<"decode_esm_css"> {
+    let summary = [{
+        Decode an ESM for a CSS code and return the index (indices) in the codeblock where the
+        error(s) occurred."
+    }];
+
+    let description = [{
+        This operation decodes an error-syndrome measurement (ESM), given as a one-dimensional
+        tensor or memref of bits, for a CSS code specified by its Tanner graph. The operation
+        returns the index (or indices) in the physical codeblock where the error(s) occurred.
+
+        Importantly, this operation does not return the *type* of error that occurred (e.g. X, Z).
+        It assumes that the QEC code is a CSS code and that separate Tanner graphs are used for X
+        and Z checks. It is therefore up to the user of this operation to determine what type(s) of
+        correction(s) to apply given the Tanner graph that was supplied.
+
+        If no correctable error was detected, this operation returns an index value of -1.
+
+        #### Example
+
+        ```mlir
+        // CSS Tanner graphs, separated for X and Z checks
+        %tannerX = ... : !qecp.tanner_graph<8, 6, i32>
+        %tannerZ = ... : !qecp.tanner_graph<8, 6, i32>
+
+        // ESM
+        %esm0, %aux01 = qecp.measure %aux00 : i1, !qecp.qubit<aux>
+        %esm1, %aux11 = qecp.measure %aux10 : i1, !qecp.qubit<aux>
+        %esm = tensor.from_elements %esm0, %esm1 : tensor<2xi1>
+
+        // Decode ESM, return single index in codeblock where error occurred
+        %err_idx = qecp.decode_esm_css(%tannerX : !qecp.tanner_graph<8, 6, i32>) %esm : tensor<2xi1> -> tensor<1xindex>
+        ```
+    }];
+
+    let arguments = (ins
+        AnyTypeOf<[1DTensorOf<[I1]>, MemRefRankOf<[I1], [1]>]>:$esm,
+        TannerGraphType:$tanner_graph
+    );
+
+    let results = (outs
+        1DTensorOf<[Index]>:$err_idx
+    );
+
+    let assemblyFormat = [{
+        `(` $tanner_graph `:` qualified(type($tanner_graph)) `)` $esm attr-dict `:` type($esm) `->` type($err_idx)
+    }];
+}
+
 
 #endif // QEC_PHYSICAL_OPS
