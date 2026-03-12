@@ -140,8 +140,9 @@ enzyme:
 dialects:
 	$(MAKE) -C mlir dialects
 
-decomp-rules:
-	$(MAKE) -C mlir decomp-rules
+decomp-rules: frontend dialects
+	$(PYTHON) -m frontend.catalyst.utils.precompile_decomposition_rules
+
 
 .PHONY: dialect-docs
 dialect-docs:
