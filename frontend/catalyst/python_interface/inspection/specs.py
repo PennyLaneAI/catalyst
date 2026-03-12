@@ -109,7 +109,7 @@ def mlir_specs(
         """Callback function for gathering circuit specs."""
         result = specs_collect(module)
 
-        pass_name = str(pass_instance)
+        pass_name = str(previous_pass)
         # Always prioritize marker label if it exists
         if m := level_to_markers.get(pass_level):
             pass_name = ", ".join(m if not isinstance(m, str) else [m])
