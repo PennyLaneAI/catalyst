@@ -699,6 +699,7 @@ def handle_measure(self, wire, reset, postselect):
         _[0] for _ in get_in_qubit_values([wire], self.qubit_index_recorder, self.init_qreg)
     )
     result, out_wire = measure_p.bind(in_wire, postselect=postselect)
+    result = jnp.astype(result, int)
 
     if reset:
         # Constants need to be passed as input values for some reason I forgot about.
