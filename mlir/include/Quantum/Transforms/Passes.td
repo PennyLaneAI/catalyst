@@ -135,12 +135,6 @@ def GraphDecompositionPass : Pass<"graph-decomposition"> {
     /*CLI name*/"alt-decomps", 
     /*Type*/"std::string", 
     /*Description*/"A map of operators to alternative decomposition rules that will be considered alongside any built-in rules.">,
-    Option<
-    /*C++ name*/"stageOption", 
-    /*CLI name*/"stage", 
-    /*Type*/"int",
-    /*Default*/"-1",
-    /*Description*/"Which decomposition to apply .">,
     ];
 }
 
