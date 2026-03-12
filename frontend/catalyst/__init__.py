@@ -163,6 +163,11 @@ while processing the following with AutoGraph:
     for x in params:
 """
 
+from catalyst.utils.precompile_decomposition_rules import precompile_decomp_rules
+
+if not INSTALLED:
+    precompile_decomp_rules()
+
 
 __all__ = (
     "qjit",
