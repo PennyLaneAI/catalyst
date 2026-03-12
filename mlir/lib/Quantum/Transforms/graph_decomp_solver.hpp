@@ -56,7 +56,7 @@ struct GraphDecompositionSolver {
      */
     static std::vector<RuleNode> Solve(const std::vector<OperatorNode> &operators,
                                        const std::vector<RuleNode> &rules,
-                                       const DictionaryAttr &gateset)
+                                       const std::vector<llvm::StringRef> &gateset)
     {
         return {};
     }
