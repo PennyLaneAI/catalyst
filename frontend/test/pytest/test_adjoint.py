@@ -26,7 +26,7 @@ from pennylane import adjoint, cond, for_loop, qjit, while_loop
 from pennylane.ops.op_math.adjoint import Adjoint, AdjointOperation
 
 import catalyst
-from catalyst import measure
+from catalyst import debug, measure
 from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=too-many-lines,missing-class-docstring
