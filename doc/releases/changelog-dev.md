@@ -372,6 +372,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Catalyst internally uses the new unified transforms API rather than `PassPipelineWrapper`.
+  [(#2525)](https://github.com/PennyLaneAI/catalyst/pull/2525)  
+  
 * Added an `EmptyPass` MLIR pass that does not transform the program for debugging and standing in for
   unimplemented transforms.
   [(#2575)](https://github.com/PennyLaneAI/catalyst/pull/2575)
