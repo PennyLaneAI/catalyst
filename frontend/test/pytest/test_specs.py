@@ -24,7 +24,7 @@ from pennylane.resource import CircuitSpecs, SpecsResources
 import catalyst
 from catalyst import qjit
 
-# pylint:disable = protected-access,attribute-defined-outside-init
+# pylint:disable = protected-access,attribute-defined-outside-init,too-many-lines
 
 
 @qml.transform

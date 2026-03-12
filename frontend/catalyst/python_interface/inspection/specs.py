@@ -75,7 +75,8 @@ def mlir_specs(
         **kwargs: Keyword arguments to pass to the QNode
 
     Returns:
-        ResourcesResult | list[ResourcesResult] | dict[str, ResourcesResult | list[ResourcesResult]]:
+        ResourcesResult | list[ResourcesResult] |
+        dict[str, ResourcesResult | list[ResourcesResult]]:
             The resources for the circuit at the specified levels
     """
 
