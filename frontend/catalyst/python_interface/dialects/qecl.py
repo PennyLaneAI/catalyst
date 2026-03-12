@@ -505,13 +505,20 @@ class CnotOp(IRDLOperation):
         in_trgt_codeblock: LogicalCodeBlockSSAValue | Operation,
         idx_trgt: int | IntegerAttr | SSAValue[IndexType] | Operation,
     ):
-        if isinstance(idx_ctrl, int) and isinstance(idx_trgt, int):
+        if isinstance(idx_ctrl, int):
             idx_ctrl = IntegerAttr.from_int_and_width(idx_ctrl, 64)
+        if isinstance(idx_trgt, int):
             idx_trgt = IntegerAttr.from_int_and_width(idx_trgt, 64)
 
         if isinstance(idx_ctrl, IntegerAttr) and isinstance(idx_trgt, IntegerAttr):
             operands = (in_ctrl_codeblock, None, in_trgt_codeblock, None)
             properties = {"idx_ctrl_attr": idx_ctrl, "idx_trgt_attr": idx_trgt}
+        elif isinstance(idx_ctrl, IntegerAttr):
+            operands = (in_ctrl_codeblock, None, in_trgt_codeblock, idx_trgt)
+            properties = {"idx_ctrl_attr": idx_ctrl}
+        elif isinstance(idx_trgt, IntegerAttr):
+            operands = (in_ctrl_codeblock, idx_ctrl, in_trgt_codeblock, None)
+            properties = {"idx_trgt_attr": idx_trgt}
         else:
             operands = (in_ctrl_codeblock, idx_ctrl, in_trgt_codeblock, idx_trgt)
             properties = {}

@@ -18,7 +18,7 @@ from typing import cast
 
 import pytest
 from xdsl.dialects import test
-from xdsl.dialects.builtin import I64, IndexType, IntegerAttr
+from xdsl.dialects.builtin import I64, IndexType, IntegerAttr, UnitAttr
 from xdsl.ir import AttributeCovT, OpResult
 
 from catalyst.python_interface.dialects import qecl
@@ -172,24 +172,51 @@ class TestQecLogicalOps:
         assert isinstance(qec_op.result_types[0], qecl.LogicalCodeblockType)
         assert qec_op.result_types[0].k == self.k
 
-    # hadamard
-    hadamard_op = qecl.HadamardOp(in_codeblock=codeblock, idx=0)
-    assert len(hadamard_op.result_types) == 1
-    assert isinstance(hadamard_op.result_types[0], qecl.LogicalCodeblockType)
-
-    # s
-    s_op = qecl.SOp(in_codeblock=codeblock, idx=0)
-    assert len(s_op.result_types) == 1
-    assert isinstance(s_op.result_types[0], qecl.LogicalCodeblockType)
-
-    # cnot
-    codeblock_ctrl = create_ssa_value(qecl.LogicalCodeblockType(1))
-    cnot_op = qecl.CnotOp(
-        in_ctrl_codeblock=codeblock_ctrl, idx_ctrl=0, in_trgt_codeblock=codeblock, idx_trgt=0
+    @pytest.mark.parametrize(
+        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
     )
-    assert len(cnot_op.result_types) == 2
-    assert isinstance(cnot_op.result_types[0], qecl.LogicalCodeblockType)
-    assert isinstance(cnot_op.result_types[1], qecl.LogicalCodeblockType)
+    def test_qecl_op_constructor_hadamard(self, idx):
+        """Test the constructor of the qecl.hadamard op."""
+        hadamard_op = qecl.HadamardOp(in_codeblock=self._get_codeblock_value(), idx=idx)
+        assert len(hadamard_op.result_types) == 1
+        assert isinstance(hadamard_op.result_types[0], qecl.LogicalCodeblockType)
+        assert hadamard_op.result_types[0].k == self.k
+
+    @pytest.mark.parametrize(
+        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
+    )
+    @pytest.mark.parametrize("adj", [False, True, UnitAttr()])
+    def test_qecl_op_constructor_s(self, idx, adj):
+        """Test the constructor of the qecl.s op."""
+        s_op = qecl.SOp(in_codeblock=self._get_codeblock_value(), idx=0, adjoint=adj)
+        assert len(s_op.result_types) == 1
+        assert isinstance(s_op.result_types[0], qecl.LogicalCodeblockType)
+        assert s_op.result_types[0].k == self.k
+
+        if adj:
+            assert s_op.properties.get("adjoint") == UnitAttr()
+        else:
+            assert s_op.properties.get("adjoint") is None
+
+    @pytest.mark.parametrize(
+        "idx_ctrl", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
+    )
+    @pytest.mark.parametrize(
+        "idx_trgt", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
+    )
+    def test_qecl_op_constructor_cnot(self, idx_ctrl, idx_trgt):
+        """Test the constructor of the qecl.cnot op."""
+        cnot_op = qecl.CnotOp(
+            in_ctrl_codeblock=self._get_codeblock_value(),
+            idx_ctrl=idx_ctrl,
+            in_trgt_codeblock=self._get_codeblock_value(),
+            idx_trgt=idx_trgt,
+        )
+        assert len(cnot_op.result_types) == 2
+        assert isinstance(cnot_op.result_types[0], qecl.LogicalCodeblockType)
+        assert cnot_op.result_types[0].k == self.k
+        assert isinstance(cnot_op.result_types[1], qecl.LogicalCodeblockType)
+        assert cnot_op.result_types[1].k == self.k
 
 
 @pytest.mark.parametrize(
