@@ -26,7 +26,6 @@ from pennylane.transforms import (
     split_to_single_terms,
 )
 from pennylane.transforms.core import BoundTransform, Transform
-from xdsl.passes import ModulePass
 
 from catalyst.device.decomposition import (
     measurements_from_counts,
