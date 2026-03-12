@@ -47,6 +47,7 @@ expected_ops_names = {
     "InsertQubitOp": "qecp.insert",
     "AssembleTannerGraphOp": "qecp.assemble_tanner",
     "DecodeEsmCssOp": "qecp.decode_esm_css",
+    "DecodePhysicalMeasurementOp": "qecp.decode_physical_meas",
 }
 
 expected_attrs_names = {
@@ -253,6 +254,18 @@ class TestQecPhysicalOps:
         assert len(decode_esm_css_op.result_types) == 1
         assert isinstance(decode_esm_css_op.result_types[0], TensorType)
 
+    def test_qecp_op_constructor_decode_physical_meas(self):
+        """Test the constructor of the qecp.decode_physical_meas op."""
+        physical_measurements = create_ssa_value(TensorType(IntegerType(1), shape=(7,)))
+        result_type = TensorType(IntegerType(1), shape=(1,))
+        decode_physical_meas_op = qecp.DecodePhysicalMeasurementOp(
+            physical_measurements, result_type
+        )
+        assert len(decode_physical_meas_op.operands) == 1
+        assert decode_physical_meas_op.operands[0].type == physical_measurements.type
+        assert len(decode_physical_meas_op.result_types) == 1
+        assert decode_physical_meas_op.result_types[0] == result_type
+
 
 @pytest.mark.parametrize(
     "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
@@ -308,6 +321,11 @@ def test_assembly_format(run_filecheck, pretty_print):
     // CHECK: [[err_idx:%.+]] = qecp.decode_esm_css([[tgraph]] : !qecp.tanner_graph<8, 6, i32>) [[esm]] : tensor<3xi1> -> tensor<2xindex>
     %esm = "test.op"() : () -> tensor<3xi1>
     %err_idx = qecp.decode_esm_css(%tgraph : !qecp.tanner_graph<8, 6, i32>) %esm : tensor<3xi1> -> tensor<2xindex>
+
+    // CHECK: [[physical_meas:%.+]] = "test.op"() : () -> tensor<7xi1>
+    // CHECK: [[logical_meas:%.+]] = qecp.decode_physical_meas [[physical_meas]] : tensor<7xi1> -> tensor<1xi1>
+    %physical_meas = "test.op"() : () -> tensor<7xi1>
+    %logical_meas = qecp.decode_physical_meas %physical_meas : tensor<7xi1> -> tensor<1xi1>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
