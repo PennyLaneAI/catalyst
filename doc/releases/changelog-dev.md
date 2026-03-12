@@ -322,6 +322,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where input array arguments could be mutated during execution when copied inputs
+  were updated in-place. Entry-point arguments are now treated as non-writable during bufferization,
+  preserving the expected immutability of user inputs.
+  [(#2562)](https://github.com/PennyLaneAI/catalyst/pull/2562)
+  
 * Fixed a bug in the `split-non-commuting` pass where dead `NamedObsOp`s were left behind after
   erasing composite obs (`TensorOp`, `HamiltonianOp`).
   [(#2567)](https://github.com/PennyLaneAI/catalyst/pull/2567)
