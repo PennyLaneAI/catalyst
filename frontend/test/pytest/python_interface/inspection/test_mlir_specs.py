@@ -78,7 +78,7 @@ def make_static_resources(
 @pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "skip_preprocess",
-    [pytest.param(True, id="preprocess"), pytest.param(False, id="skip_preprocess")],
+    [pytest.param(True, id="skip_preprocess"), pytest.param(False, id="preprocess")],
 )
 class TestMLIRSpecs:
     """Unit tests for the mlir_specs function in the Python Compiler inspection module."""
@@ -233,13 +233,13 @@ class TestMLIRSpecs:
                 num_allocs=2,
             )
             # Dummy pass to replace validate_measurements
-            expected["empty"] = make_static_resources(
+            expected["empty-2"] = make_static_resources(
                 operations={"RX": {1: 1}, "RZ": {1: 1}},
                 measurements={"probs(all wires)": 1},
                 num_allocs=2,
             )
             # Dummy pass to replace verify_no_state_variance_returns
-            expected["empty"] = make_static_resources(
+            expected["empty-3"] = make_static_resources(
                 operations={"RX": {1: 1}, "RZ": {1: 1}},
                 measurements={"probs(all wires)": 1},
                 num_allocs=2,
@@ -306,13 +306,6 @@ class TestMLIRSpecs:
 
     def test_malformed_qnode(self, skip_preprocess):
         """Test that a QNode without measurements can still be collected."""
-        if qml.capture.enabled() and not skip_preprocess:
-            pytest.xfail(
-                reason=(
-                    "Preprocessing with dummy transforms triggers the xDSL pipeline, "
-                    "which doesn't support malformed QNodes"
-                )
-            )
         if not qml.capture.enabled() and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
