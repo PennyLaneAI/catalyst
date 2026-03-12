@@ -9,6 +9,7 @@
   then performs the appropriate classical statistical postprocessing across the execution results
   from all shots.
   [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
+  [(#2573)](https://github.com/PennyLaneAI/catalyst/pull/2573)
 
   With this new MLIR pass, one shot execution mode is now available when capture is enabled.
 
@@ -175,6 +176,7 @@
       return qp.expval(qp.X(0))
 
   circuit()
+  ```
 
 * Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
   effectively filtering for decomposition rules in the MLIR-native decomposition framework.
@@ -316,7 +318,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Fix a bug where `draw_graph` failed at rendering measurements containing scalar products of observables. 
+* Fixed a bug in the `split-non-commuting` pass where dead `NamedObsOp`s were left behind after
+  erasing composite obs (`TensorOp`, `HamiltonianOp`).
+  [(#2567)](https://github.com/PennyLaneAI/catalyst/pull/2567)
+
+* Fix a bug where `draw_graph` failed at rendering measurements containing scalar products of observables.
   [(#2545)](https://github.com/PennyLaneAI/catalyst/pull/2545)
 
 * Fixed a bug where the unified compiler would trigger a passed callback function 1 extra time for the initial pass level.
@@ -365,6 +371,13 @@
   [(#2459)](https://github.com/PennyLaneAI/catalyst/pull/2459)
 
 <h3>Internal changes ⚙️</h3>
+
+* Catalyst internally uses the new unified transforms API rather than `PassPipelineWrapper`.
+  [(#2525)](https://github.com/PennyLaneAI/catalyst/pull/2525)  
+  
+* Added an `EmptyPass` MLIR pass that does not transform the program for debugging and standing in for
+  unimplemented transforms.
+  [(#2575)](https://github.com/PennyLaneAI/catalyst/pull/2575)
 
 * The QNode lowering to MLIR now supports providing multiple named transform pipelines.
   [(#2556)](https://github.com/PennyLaneAI/catalyst/pull/2556)
@@ -644,7 +657,7 @@
   }
   ```
 
-* A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in 
+* A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in
   measurement processes. It is also registered in xDSL.
   [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
   [(#2536)](https://github.com/PennyLaneAI/catalyst/pull/2536)

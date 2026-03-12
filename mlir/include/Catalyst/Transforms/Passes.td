@@ -317,4 +317,19 @@ def RegisterDecompRuleResourcePass : Pass<"register-decomp-rule-resource"> {
     }];
 }
 
+def EmptyPass : Pass<"empty"> {
+    let summary = "Empty pass that does nothing.";
+
+    let options = [
+        Option<
+            /*C++ var name=*/"key",
+            /*CLI arg name=*/"key",
+            /*type=*/"std::string",
+            /*default=*/"\"\"",
+            /*description=*/
+            "Useful for storing metadata about the pass for inspectability."
+        >
+    ];
+}
+
 #endif // CATALYST_PASSES
