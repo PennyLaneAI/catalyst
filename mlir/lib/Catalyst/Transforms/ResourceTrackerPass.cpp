@@ -14,6 +14,11 @@
 
 #define DEBUG_TYPE "resource-tracker"
 
+#include <chrono>
+#include <format>
+#include <fstream>
+#include <string>
+
 #include "llvm/Support/JSON.h"
 
 #include "mlir/Pass/Pass.h"
@@ -119,6 +124,7 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
     {
         llvm::json::Object root;
 
+        StringRef jit_fn_name("");
         for (const auto &funcEntry : results) {
             llvm::json::Object funcObj;
             const ResourceResult &result = funcEntry.getValue();
@@ -163,11 +169,22 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
             funcObj["device_name"] = result.deviceName;
 
             root[funcEntry.getKey()] = std::move(funcObj);
+
+            if (funcEntry.getKey().starts_with("jit_")) {
+                jit_fn_name = funcEntry.getKey().drop_front(4);
+            }
         }
 
-        // TODO: write to file, when called from frontend. Then, frontend read and delete the file.
         llvm::json::Value jsonValue(std::move(root));
-        llvm::outs() << llvm::formatv("{0:2}", jsonValue) << "\n";
+
+        std::string file_name = "__mlir_resources_";
+        file_name += jit_fn_name;
+        file_name += std::format("_{:%Y%m%d_%H%M%S}", std::chrono::system_clock::now());
+
+        std::ofstream ofile(file_name);
+        assert(ofile.is_open() && "Invalid file to store resource results");
+        ofile << llvm::formatv("{0:2}", jsonValue).str() << "\n";
+        ofile.close();
     }
 };
 
