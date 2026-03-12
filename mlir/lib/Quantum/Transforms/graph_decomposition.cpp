@@ -42,25 +42,23 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         llvm::StringMap<llvm::StringRef> fixedDecomps;
         llvm::StringMap<llvm::StringRef> altDecomps;
 
+        llvm::errs() << "fixed decomps:\n";
         for (const std::string &opRulePair : fixedDecompsOption) {
             llvm::StringRef pairRef(opRulePair);
 
             auto [opName, ruleName] = pairRef.split("=");
             fixedDecomps[opName] = ruleName;
+            llvm::errs() << "\t" << opName << ": " << ruleName << ",\n";
         }
 
+        llvm::errs() << "alt decomps:\n";
         for (const std::string &opRulePair : altDecompsOption) {
             llvm::StringRef pairRef(opRulePair);
 
             auto [opName, ruleName] = pairRef.split("=");
             altDecomps[opName] = ruleName;
+            llvm::errs() << "\t" << opName << ": " << ruleName << ",\n";
         }
-
-        // To sync with the graph solver branch, targetGateset should be DictionaryAttr
-        // this is passes from the frontend as a dictionary
-        // TODO why should this be a dictionary and not a list? Are we passing weights each
-        // time?
-        DictionaryAttr targetGateset;
 
         // List of operators
         std::vector<OperatorNode> setOfOps = {};
@@ -76,7 +74,16 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 2: Get the target gateset for decomposition from the module attribute
-        getDecompGateset(module, targetGateset);
+        // To sync with the graph solver branch, targetGateset should be DictionaryAttr
+        // this is passed from the frontend as a dictionary
+        // TODO why should this be a dictionary and not a list? Are we passing weights each time?
+        std::vector<llvm::StringRef> targetGateSet;
+        llvm::errs() << "Gate Set: ";
+        for (llvm::StringRef gate : targetGateSetOption) {
+            llvm::errs() << gate << ", ";
+            targetGateSet.push_back(gate);
+        }
+        llvm::errs() << '\n';
 
         ///////////////////////////
         // Step 3: Get and convert operators in the module required for creating the graph
@@ -90,7 +97,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 5: Build and solve the decomposition graph
-        auto solution = GraphDecompositionSolver::Solve(setOfOps, setOfResources, targetGateset);
+        auto solution = GraphDecompositionSolver::Solve(setOfOps, setOfResources, targetGateSet);
 
         ///////////////////////////
         // Step 6: Insert decomposition rules picked by the graph solver (solution) into the
@@ -102,6 +109,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // Step 7: Run decompose-lowering patterns to apply the decomposition rules
         PassManager pm(&getContext());
         pm.addPass(createDecomposeLoweringPass());
+
+        if (failed(pm.run(module))) {
+            return signalPassFailure();
+        }
     }
 
   private:
@@ -127,22 +138,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
             return WalkResult::skip();
         });
-    }
-
-    void getDecompGateset(ModuleOp module, DictionaryAttr &gateset)
-    {
-        // module.walk([&](func::FuncOp func) {
-        //     if (auto gate_set_attr =
-        //             func->getAttrOfType<ArrayAttr>("decomp_gateset")) {
-        //         for (auto gate : gate_set_attr.getValue()) {
-        //             StringRef gate_name = cast<StringAttr>(gate).getValue();
-        //             gateset.insert(gate_name);
-        //         }
-        //         return WalkResult::interrupt();
-        //     }
-        //     return WalkResult::skip();
-        // });
-        return;
     }
 
     void getOperators([[maybe_unused]] ModuleOp module,
