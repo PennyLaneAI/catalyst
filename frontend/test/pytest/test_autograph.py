@@ -2619,11 +2619,11 @@ class TestJaxIndexOperatorUpdate:
                 test_array_index(x)
 
 
-class TestWithPassPipelineWrapper:
+class TestWithPass:
     """Test with passes"""
 
     @pytest.mark.capture_todo
-    def test_with_pass_pipeline_wrapper(self, capture_mode):
+    def test_with_pass(self, capture_mode):
         """this test should work. So there are no asserts"""
 
         @qjit(autograph=True, capture=capture_mode)
