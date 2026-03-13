@@ -26,6 +26,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "Exception.hpp"
+
 namespace DecompGraph::Core {
 
 /**
@@ -109,6 +111,15 @@ struct WeightedGateset {
     std::unordered_map<OperatorNode, double, OperatorNodeHash> ops;
 
     [[nodiscard]] bool contains(const OperatorNode &op) const { return ops.find(op) != ops.end(); }
+    [[nodiscard]] double getCost(const OperatorNode &op) const
+    {
+        auto it = ops.find(op);
+        if (it != ops.end()) {
+            return it->second;
+        }
+
+        RT_FAIL("Operator is not in the target gateset");
+    }
 };
 
 /**
@@ -117,11 +128,11 @@ struct WeightedGateset {
  */
 struct ChosenDecompRule {
     OperatorNode op;
-    bool is_basis{false};
-    std::string chosen_rule_id;
-    std::vector<RuleTerm> chosen_inputs;
-    double total_cost{0.0};
-    std::unordered_map<OperatorNode, int, OperatorNodeHash> basis_counts;
+    bool isBasis{false};
+    std::string chosenRuleId;
+    std::vector<RuleTerm> chosenInputs;
+    double totalCost{0.0};
+    std::unordered_map<OperatorNode, int, OperatorNodeHash> basisCounts;
 };
 
 /**
@@ -130,8 +141,8 @@ struct ChosenDecompRule {
  * in the graph.
  */
 struct GraphResult {
-    std::unordered_map<OperatorNode, ChosenDecompRule, OperatorNodeHash> optimized_map;
-    std::vector<OperatorNode> solved_roots;
+    std::unordered_map<OperatorNode, ChosenDecompRule, OperatorNodeHash> optimizedMap;
+    std::vector<OperatorNode> solvedRoots;
 };
 
 } // namespace DecompGraph::Core

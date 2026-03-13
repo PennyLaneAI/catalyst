@@ -117,6 +117,9 @@ TEST_CASE("Test WeightedGateset construction and contains", "[DecompGraph::Core]
     REQUIRE(gateset.contains(h));
     REQUIRE(gateset.contains(cnot));
     REQUIRE_FALSE(gateset.contains(rx));
+
+    REQUIRE(gateset.getCost(h) == 1.0);
+    REQUIRE(gateset.getCost(cnot) == 2.0);
 }
 
 TEST_CASE("Test ChosenDecompRule construction", "[DecompGraph::Core]")
@@ -131,15 +134,15 @@ TEST_CASE("Test ChosenDecompRule construction", "[DecompGraph::Core]")
     ChosenDecompRule chosenRule{h, false, "h_to_rz_rx_rz", {term1, term2}, 3.0, {{rz, 2}, {rx, 1}}};
 
     REQUIRE(chosenRule.op == h);
-    REQUIRE(chosenRule.is_basis == false);
-    REQUIRE(chosenRule.chosen_rule_id == "h_to_rz_rx_rz");
-    REQUIRE(chosenRule.chosen_inputs.size() == 2);
-    REQUIRE(chosenRule.chosen_inputs[0].op == rz);
-    REQUIRE(chosenRule.chosen_inputs[0].multiplicity == 2);
-    REQUIRE(chosenRule.chosen_inputs[1].op == rx);
-    REQUIRE(chosenRule.chosen_inputs[1].multiplicity == 1);
-    REQUIRE(chosenRule.total_cost == 3.0);
-    REQUIRE(chosenRule.basis_counts.size() == 2);
-    REQUIRE(chosenRule.basis_counts[rz] == 2);
-    REQUIRE(chosenRule.basis_counts[rx] == 1);
+    REQUIRE(chosenRule.isBasis == false);
+    REQUIRE(chosenRule.chosenRuleId == "h_to_rz_rx_rz");
+    REQUIRE(chosenRule.chosenInputs.size() == 2);
+    REQUIRE(chosenRule.chosenInputs[0].op == rz);
+    REQUIRE(chosenRule.chosenInputs[0].multiplicity == 2);
+    REQUIRE(chosenRule.chosenInputs[1].op == rx);
+    REQUIRE(chosenRule.chosenInputs[1].multiplicity == 1);
+    REQUIRE(chosenRule.totalCost == 3.0);
+    REQUIRE(chosenRule.basisCounts.size() == 2);
+    REQUIRE(chosenRule.basisCounts[rz] == 2);
+    REQUIRE(chosenRule.basisCounts[rx] == 1);
 }
