@@ -119,7 +119,7 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
             thetaValue = adaptor.getAngle();
         }
         else {
-            static_assert(false, "unexpected type in templated rewrite");
+            static_assert(!std::is_same_v<T, T>(), "unexpected type in templated rewrite");
         }
 
         // Build the arguments: pauliStr, theta, modifiers, numQubits, qubits...
@@ -167,7 +167,7 @@ template <typename T> struct PPMeasurementOpPattern : public OpConversionPattern
             selectSwitch = op.getSelectSwitch();
         }
         else {
-            static_assert(false, "unexpected type in templated rewrite");
+            static_assert(!std::is_same_v<T, T>(), "unexpected type in templated rewrite");
         }
 
         // RESULT* __catalyst__qis__PauliMeasure(const char* pauliWord, int64_t numQubits,
