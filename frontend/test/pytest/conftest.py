@@ -74,7 +74,11 @@ def use_both_frontend(request):
     """Runs the test once with capture enabled and once with it disabled."""
     if request.param == "capture":
         if "capture_todo" in request.keywords:
-            pytest.xfail("capture todo's do not yet work with program capture.")
+            request.node.add_marker(
+                pytest.mark.xfail(
+                    reason="Not expected to work yet with program capture.", strict=True
+                )
+            )
         qml.capture.enable()
         try:
             yield
@@ -101,14 +105,18 @@ def capture_mode(request):
 
     Markers:
         @pytest.mark.old_frontend - Skip when capture_mode=True
-        @pytest.mark.capture_todo - xfail when capture_mode=True
+        @pytest.mark. - xfail when capture_mode=True
     """
     if request.param:  # capture=True
         if "old_frontend" in request.keywords:
             pytest.skip("Test is specific to the old frontend and should not run with capture.")
         if "capture_todo" in request.keywords:
-            pytest.xfail("Not expected to work yet with program capture.")
-    return request.param
+            request.node.add_marker(
+                pytest.mark.xfail(
+                    reason="Not expected to work yet with program capture.", strict=True
+                )
+            )
+        return request.param
 
 
 def pytest_collection_modifyitems(items, config):  # pylint: disable=unused-argument
