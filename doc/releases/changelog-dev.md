@@ -514,14 +514,6 @@
   global phase correctness.
   [(#2419)](https://github.com/PennyLaneAI/catalyst/pull/2419)
 
-* New qubit-type specializations have been added to Catalyst's MLIR type system. These new qubit
-  types include `!quantum.bit<logical>`, `!quantum.bit<pbc>` and `!quantum.bit<physical>`. The
-  original `!quantum.bit` type continues to be supported and used as the default qubit type.
-  [(#2369)](https://github.com/PennyLaneAI/catalyst/pull/2369)
-
-  The corresponding register-type specializations have also been added.
-  [(#2431)](https://github.com/PennyLaneAI/catalyst/pull/2431)
-
 * The upstream MLIR `Test` dialect is now available via the `catalyst` command line tool.
   [(#2417)](https://github.com/PennyLaneAI/catalyst/pull/2417)
 

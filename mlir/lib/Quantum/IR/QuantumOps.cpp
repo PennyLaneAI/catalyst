@@ -20,7 +20,6 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 #include "llvm/ADT/StringSet.h"
-#include "llvm/ADT/Twine.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 #include "QRef/IR/QRefOps.h"
@@ -217,19 +216,6 @@ LogicalResult ExtractOp::verify()
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected op to have a non-null index";
     }
-
-    const auto qregLevel = getQreg().getType().getLevel();
-    const auto qbitLevel = getQubit().getType().getLevel();
-
-    if (qregLevel != qbitLevel) {
-        const auto qregLevelStr = stringifyQubitLevel(qregLevel);
-        const auto qbitLevelStr = stringifyQubitLevel(qbitLevel);
-        Twine aReg = (qregLevel == QubitLevel::Abstract) ? "an " : "a ";
-        Twine aBit = (qbitLevel == QubitLevel::Abstract) ? "an " : "a ";
-        return emitOpError() << "type mismatch: extracting from " << aReg << qregLevelStr
-                             << " register should produce " << aReg << qregLevelStr
-                             << " qubit but this op returns " << aBit << qbitLevelStr << " qubit";
-    }
     return success();
 }
 
@@ -237,17 +223,6 @@ LogicalResult InsertOp::verify()
 {
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected op to have a non-null index";
-    }
-
-    const auto inQregLevel = getInQreg().getType().getLevel();
-    const auto qbitLevel = getQubit().getType().getLevel();
-
-    if (inQregLevel != qbitLevel) {
-        const auto inQregLevelStr = stringifyQubitLevel(inQregLevel);
-        const auto qbitLevelStr = stringifyQubitLevel(qbitLevel);
-        Twine aBit = (qbitLevel == QubitLevel::Abstract) ? "an " : "a ";
-        return emitOpError() << "type mismatch: cannot insert " << aBit << qbitLevelStr
-                             << " qubit into a register requiring " << inQregLevelStr << " qubits";
     }
     return success();
 }
