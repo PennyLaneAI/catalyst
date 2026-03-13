@@ -129,10 +129,10 @@ struct WeightedGateset {
 struct ChosenDecompRule {
     OperatorNode op;
     bool isBasis{false};
-    std::string chosenRuleId;
+    std::string chosenRuleName;
     std::vector<RuleTerm> chosenInputs;
     double totalCost{0.0};
-    std::unordered_map<OperatorNode, int, OperatorNodeHash> basisCounts;
+    std::unordered_map<OperatorNode, std::size_t, OperatorNodeHash> basisCounts;
 };
 
 /**
