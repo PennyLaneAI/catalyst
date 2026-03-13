@@ -178,7 +178,11 @@
   circuit()
   ```
 
-* The `diagonalize-final-measurements` xDSL pass now supports the observable commutativity check. A new `NonCommutingObservableValidator` is added to check the commutativity of each circuit (a `func.func` with a `quantum.node` attribute) in the IR. The `qubit-wise commutativity`(QWC) check would be applied if there are only `Pauli` observables in the circuit. Otherwise, the more strict non-overlapping observable check is applied.
+* The `diagonalize-final-measurements` xDSL pass now includes an observable-commutativity check and
+  raises an error if non-commuting terms are encountered. The check is applied to each `qnode` in
+  the IR (that is, a `func.func` op with a `quantum.node` attribute). If the measurement contains
+  only Pauli or Hadamard observables, the *qubit-wise commutativity* (QWC) check is applied.
+  Otherwise, the more strict *non-overlapping observable* check is applied.
   [(#2538)](https://github.com/PennyLaneAI/catalyst/pull/2538)
 
 * Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
