@@ -581,7 +581,7 @@ def specs_collect(module: ModuleOp) -> ResourcesResult | list[ResourcesResult]:
             entry_funcs.append(func_op.sym_name.data)
 
     if not entry_funcs:
-        raise ValueError("Entry function not found in module.")
+        raise ValueError("Entry function not found in module.")  # pragma: no-cover
 
     if (
         len(
