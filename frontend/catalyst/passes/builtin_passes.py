@@ -148,7 +148,7 @@ def disentangle_cnot(qnode):
         This transform requires decorating the workflow with :func:`pennylane.qjit`.
 
     Args:
-        fn (QNode): the QNode to apply the pass to.
+        fn (QNode): the QNode to apply the pass to
 
     Returns:
         ~.QNode:
