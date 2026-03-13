@@ -16,6 +16,7 @@ from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
 from catalyst.jax_primitives import decomposition_rule
+from catalyst.passes import graph_decomposition
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1674,3 +1675,77 @@ def test_default_decomps():
 
 
 test_default_decomps()
+
+
+def test_graph_decomp_registered():
+    """Test that the `graph_decomposition` pass is registered correctly."""
+
+    @qjit(target="mlir")
+    # CHECK: transform.apply_registered_pass "graph-decomposition"
+    @graph_decomposition(gate_set={qml.RX})
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def circuit():
+        return
+
+    print(circuit.mlir)
+
+
+test_graph_decomp_registered()
+
+
+def test_cpp_decomp_args():
+    """Test that the `graph_decomposition` pass lowers arguments to mlir correctly."""
+
+    def x_to_rx(wire):
+        qml.RX(np.pi, wire)
+
+    def y_to_ry(wire):
+        qml.RY(np.pi, wire)
+
+    def h_to_rx_ry(wire):
+        qml.RX(np.pi / 2)
+        qml.RY(np.pi / 2)
+
+    @qjit(target="mlir")
+    # CHECK: "graph-decomposition" with options = {
+    # CHECK-DAG: "gate-set" = {Hadamard = 1.000000e+00 : f64, RX = 1.000000e+00 : f64, RY = 1.000000e+00 : f64}
+    # CHECK-DAG: "fixed-decomps" = {PauliX = "x_to_rx", PauliY = "y_to_ry"}
+    # CHECK-DAG: "alt-decomps" = {Hadamard = ["h_to_rx_ry"]}
+    # CHECK-DAG: "bytecode-rules" = "/decomp_rules.mlirbc"
+    # CHECK: } to {{%.+}} : (!transform.op<"builtin.module">)
+    @graph_decomposition(
+        gate_set={qml.RX, qml.H, qml.RY},
+        fixed_decomps={qml.X: x_to_rx, qml.Y: y_to_ry},
+        alt_decomps={qml.H: [h_to_rx_ry]},
+        rule_path="/decomp_rules.mlirbc",
+    )
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def circuit():
+        return
+
+    print(circuit.mlir)
+
+
+test_cpp_decomp_args()
+
+
+def test_cpp_decomp_empty_args():
+    """
+    Test that the `graph_decomposition` pass correctly handled arg lowering when no values are
+    supplied.
+    """
+
+    @qjit(target="mlir")
+    # CHECK: transform.apply_registered_pass "graph-decomposition"
+    # CHECK-NOT: fixed-decomps
+    # CHECK-NOT: alt-decomps
+    # CHECK: "bytecode-rules" = "{{.*}}/decomposition_rules.mlirbc"
+    @graph_decomposition(gate_set={qml.RX})
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
+        return
+
+    print(circuit.mlir)
+
+
+test_cpp_decomp_empty_args()
