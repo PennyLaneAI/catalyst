@@ -21,7 +21,6 @@
 #include <memory>
 #include <vector>
 
-#include "GraphStructs.hpp"
 #include "QuantumNodes.hpp"
 
 namespace DecompGraph::Solver {
@@ -34,6 +33,20 @@ class DecompositionGraph {
   public:
     using RuleId = std::size_t;
 
+    /**
+     * @brief Constructs the decomposition graph from the given operators, gateset, and rules.
+     *
+     * The constructor initializes the graph by registering all operators and rules, creating
+     * vertices for them, and adding edges according to the decomposition rules. The graph is
+     * built in such a way that it can be efficiently traversed by the decomposition solver
+     * to find optimal decompositions of the target gates.
+     *
+     * @param operators The list of operators that are used in the decomposition rules and gateset.
+     * @param gateset The target gateset that we want to decompose into, along with their associated
+     * costs.
+     * @param rules The list of decomposition rules that define how operators can be decomposed into
+     * other operators.
+     */
     DecompositionGraph(std::vector<Core::OperatorNode> operators, Core::WeightedGateset gateset,
                        std::vector<Core::RuleNode> rules);
     ~DecompositionGraph();
@@ -44,17 +57,65 @@ class DecompositionGraph {
     DecompositionGraph &operator=(const DecompositionGraph &other);
     DecompositionGraph &operator=(DecompositionGraph &&other) noexcept;
 
+    /**
+     * @brief Solves the graph decomposition problem and returns the resulting
+     * decomposition rules for the target gates.
+     *
+     * @param op The operator node for which we want to find the best decomposition rule.
+     * @return The chosen decomposition rule for the given operator node.
+     */
     [[nodiscard]] const std::vector<Core::OperatorNode> &getRoots() const noexcept;
+
+    /**
+     * @brief Returns the target gateset for the graph decomposition problem, which includes
+     * the operators that we want to decompose into and their associated costs.
+     *
+     * @return The target gateset for the graph decomposition problem.
+     */
     [[nodiscard]] const Core::WeightedGateset &getGateset() const noexcept;
+
+    /**
+     * @brief Returns the list of decomposition rules for the graph decomposition problem,
+     * which define how operators can be decomposed into other operators. Each rule includes
+     * the output operator it produces and the input operators it requires, along with their
+     * multiplicities.
+     *
+     * @return The list of decomposition rules for the graph decomposition problem.
+     */
     [[nodiscard]] const std::vector<Core::RuleNode> &getRules() const noexcept;
+
+    /**
+     * @brief Returns the number of decomposition rules in the graph.
+     */
     std::size_t getNumRules() const;
+
+    /**
+     * @brief Returns the number of unique operators in the graph.
+     */
     std::size_t getNumOperators() const;
 
     // helper methods
     // TODO(Ali): move them to private/protected after testing
+
+    /**
+     * @brief Returns the decomposition rule corresponding to the given rule ID.
+     */
     const Core::RuleNode &getRule(RuleId id) const;
+
+    /**
+     * @brief Returns all decomposition rules that can decompose the given operator node.
+     */
     const std::vector<Core::RuleNode> &getAllRulesFor(const Core::OperatorNode &op) const;
+
+    /**
+     * @brief Checks if the given operator node is a target gate in the gateset.
+     */
     bool isTargetGate(const Core::OperatorNode &op) const;
+
+    /**
+     * @brief Checks if the given operator node exists in the graph,
+     * either as a root operator or as an operator appearing in the decomposition rules.
+     */
     bool hasOperator(const Core::OperatorNode &op) const;
 };
 

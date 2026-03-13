@@ -18,6 +18,7 @@
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "DecompositionGraph.hpp"
+#include "DecompositionSolver.hpp"
 #include "QuantumNodes.hpp"
 
 using namespace Catch::Matchers;
@@ -163,4 +164,75 @@ TEST_CASE("Test the graph construction with realistic ops and multiple rules fro
     REQUIRE(graph.getNumRules() == 5);
     REQUIRE(graph.getNumOperators() == 1);
     REQUIRE(graph.getAllRulesFor(customBellOp).size() == 2);
+}
+
+TEST_CASE("Test DecompositionSolver with one single operator", "[DecompGraph::Solver]")
+{
+    const OperatorNode h{"H", 1, 0, false};
+    const OperatorNode rz{"RZ", 1, 1, false};
+    const OperatorNode rx{"RX", 1, 1, false};
+    const OperatorNode ry{"RY", 1, 1, false};
+
+    const WeightedGateset gateset{{{rz, 1.0}, {ry, 2.0}, {rx, 3.0}}};
+
+    const std::vector<RuleNode> rules{
+        {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}},
+        {"h_to_ry_rx_ry", h, {{ry, 2}, {rx, 1}}},
+    };
+
+    const DecompositionGraph graph({h}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+    REQUIRE(result.solvedRoots.size() == 1);
+    REQUIRE(result.solvedRoots[0] == h);
+    REQUIRE(result.optimizedMap.size() == 3);
+    const auto &chosen_rule = result.optimizedMap.at(h);
+    REQUIRE_FALSE(chosen_rule.isBasis);
+    REQUIRE(chosen_rule.chosenRuleName == "h_to_rz_rx_rz");
+    REQUIRE(chosen_rule.chosenInputs.size() == 2);
+    REQUIRE(chosen_rule.chosenInputs[0].op == rz);
+    REQUIRE(chosen_rule.chosenInputs[0].multiplicity == 2);
+    REQUIRE(chosen_rule.chosenInputs[1].op == rx);
+    REQUIRE(chosen_rule.chosenInputs[1].multiplicity == 1);
+    REQUIRE(chosen_rule.totalCost == 1.0 * 2 + 3.0 * 1);
+    REQUIRE(chosen_rule.basisCounts.size() == 2);
+    REQUIRE(chosen_rule.basisCounts.at(rz) == 2);
+    REQUIRE(chosen_rule.basisCounts.at(rx) == 1);
+
+    const auto &rz_rule = result.optimizedMap.at(rz);
+    REQUIRE(rz_rule.isBasis);
+    const auto &rx_rule = result.optimizedMap.at(rx);
+    REQUIRE(rx_rule.isBasis);
+}
+
+TEST_CASE("Test the graph solver with intermediate ops and multiple rules", "[DecompGraph::Solver]")
+{
+    const OperatorNode h{"H", 1, 0, false};
+    const OperatorNode rz{"RZ", 1, 1, false};
+    const OperatorNode rx{"RX", 1, 1, false};
+    const OperatorNode ry{"RY", 1, 1, false};
+    const OperatorNode cnot{"CNOT", 2, 0, false};
+    const OperatorNode swap{"SWAP", 2, 0, false};
+    const OperatorNode customBellOp{"BellOp", 2, 0, false};
+
+    const WeightedGateset gateset{{{rz, 1.0}, {rx, 3.0}, {cnot, 5.0}}};
+
+    const std::vector<RuleNode> rules{
+        {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}},
+        {"h_to_ry_rx_ry", h, {{ry, 2}, {rx, 1}}},
+        {"swap_to_cnot", swap, {{cnot, 3}}},
+        {"bell_to_cnot_h", customBellOp, {{cnot, 1}, {h, 1}}},
+        {"bell_to_swap_h_cnot", customBellOp, {{swap, 1}, {h, 1}, {cnot, 1}}},
+    };
+
+    const DecompositionGraph graph({customBellOp}, gateset, rules);
+    DecompositionSolver solver(graph);
+
+    const auto result = solver.solve();
+    REQUIRE(result.solvedRoots.size() == 1);
+    REQUIRE(result.solvedRoots[0] == customBellOp);
+    REQUIRE(result.optimizedMap.size() == 4);
+    const auto &chosen_rule = result.optimizedMap.at(customBellOp);
+    REQUIRE_FALSE(chosen_rule.isBasis);
+    REQUIRE(chosen_rule.chosenRuleName == "bell_to_cnot_h");
 }

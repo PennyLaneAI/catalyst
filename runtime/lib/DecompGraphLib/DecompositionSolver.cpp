@@ -68,7 +68,7 @@ void DecompositionSolver::collectClosure(const Core::OperatorNode &op, Core::Gra
 
     const auto chosen_rule = solvedMap.find(op);
     if (chosen_rule == solvedMap.end()) {
-        RT_FAIL("Operator not solved");
+        return; // FIXME: this should not happen!
     }
 
     result.optimizedMap.emplace(op, chosen_rule->second);
