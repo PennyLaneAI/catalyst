@@ -187,9 +187,11 @@ func::FuncOp splitQuantumAndPostProcessing(IRRewriter &builder, func::FuncOp qno
     // 2. The quantum kernel only returns MPs' direct results.
     // 2.1. Create the return op
     SmallVector<Value> MPResults;
+    SmallVector<DictionaryAttr> MPResAttrs;
     qKernel->walk([&](quantum::MeasurementProcess mp) {
         for (auto v : mp->getResults()) {
             MPResults.push_back(v);
+            MPResAttrs.push_back(DictionaryAttr());
         }
     });
 
@@ -203,6 +205,7 @@ func::FuncOp splitQuantumAndPostProcessing(IRRewriter &builder, func::FuncOp qno
     auto oldKernelType = qKernel.getFunctionType();
     qKernel.setFunctionType(
         FunctionType::get(ctx, oldKernelType.getInputs(), TypeRange(MPResults)));
+    qKernel.setAllResultAttrs(ArrayRef<Attribute>(MPResAttrs.begin(), MPResAttrs.end()));
 
     // 3. Append arguments to the post processing function
     // 3.1. Update the function type
@@ -288,6 +291,7 @@ func::FuncOp createOneShotKernel(IRRewriter &builder, func::FuncOp qnodeFunc, Op
     builder.setInsertionPointToStart(&qnodeFunc->getParentOfType<ModuleOp>()->getRegion(0).front());
     auto oneShotKernel = cast<func::FuncOp>(qnodeFunc->clone(mapper));
     oneShotKernel.setSymNameAttr(StringAttr::get(ctx, qnodeFunc.getSymName() + ".one_shot_kernel"));
+    oneShotKernel->setAttr("quantum.node", builder.getUnitAttr());
     builder.insert(oneShotKernel);
 
     // Set the number of shots in the new kernel to one.
@@ -1062,21 +1066,23 @@ struct DynamicOneShotPass : public impl::DynamicOneShotPassBase<DynamicOneShotPa
 
     void runOnOperation() override
     {
-        Operation *mod = getOperation();
+        ModuleOp mod = getOperation();
         Location loc = mod->getLoc();
         IRRewriter builder(mod->getContext());
 
         // Collect all qnode functions.
         // We find qnode functions by identifying the parent function ops of MPs
-        SetVector<func::FuncOp> qnodeFuncs;
-        mod->walk([&](MeasurementProcess _mp) {
-            qnodeFuncs.insert(_mp->getParentOfType<func::FuncOp>());
-        });
+        SmallVector<func::FuncOp> qnodeFuncs;
+        for (auto func : mod.getOps<func::FuncOp>()) {
+            if (func->hasAttrOfType<UnitAttr>("quantum.node")) {
+                qnodeFuncs.push_back(func);
+            }
+        }
 
         // For each qnode function, find the returned MPs
         // Then handle the one shot logic for each MP type
         for (auto qnodeFunc : qnodeFuncs) {
-            qnodeFunc->removeAttr("qnode");
+            qnodeFunc->removeAttr("quantum.node");
             func::FuncOp qKernel = splitQuantumAndPostProcessing(builder, qnodeFunc);
 
             auto deviceInitOp = *qKernel.getOps<quantum::DeviceInitOp>().begin();

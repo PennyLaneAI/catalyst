@@ -15,7 +15,7 @@
 // RUN: quantum-opt --dynamic-one-shot --split-input-file --verify-diagnostics %s | FileCheck %s
 
 
-func.func public @test_expval(%arg0: f64) -> tensor<f64> {
+func.func public @test_expval(%arg0: f64) -> tensor<f64> attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -33,7 +33,7 @@ func.func public @test_expval(%arg0: f64) -> tensor<f64> {
 }
 
 
-// CHECK: func.func public @test_expval.quantum.one_shot_kernel(%arg0: f64) -> f64
+// CHECK: func.func public @test_expval.quantum.one_shot_kernel(%arg0: f64) -> f64 attributes {quantum.node}
 // CHECK:  [[one:%.+]] = arith.constant 1 : i64
 // CHECK:  quantum.device shots([[one]]) ["", "", ""]
 // CHECK:  quantum.expval
@@ -67,7 +67,7 @@ func.func public @test_expval(%arg0: f64) -> tensor<f64> {
 // -----
 
 
-func.func public @test_expval_mcm(%arg0: f64) -> tensor<f64> {
+func.func public @test_expval_mcm(%arg0: f64) -> tensor<f64> attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -84,7 +84,7 @@ func.func public @test_expval_mcm(%arg0: f64) -> tensor<f64> {
 }
 
 
-// CHECK:   func.func public @test_expval_mcm.quantum.one_shot_kernel(%arg0: f64) -> f64
+// CHECK:   func.func public @test_expval_mcm.quantum.one_shot_kernel(%arg0: f64) -> f64 attributes {quantum.node}
 // CHECK:     [[one:%.+]] = arith.constant 1 : i64
 // CHECK:     quantum.device shots([[one]]) ["", "", ""]
 // CHECK:     [[mres:%.+]], {{%.+}} = quantum.measure {{%.+}} : i1, !quantum.bit
@@ -115,7 +115,7 @@ func.func public @test_expval_mcm(%arg0: f64) -> tensor<f64> {
 // -----
 
 
-func.func public @test_var_mcm(%arg0: f64) -> tensor<f64> {
+func.func public @test_var_mcm(%arg0: f64) -> tensor<f64> attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -131,7 +131,7 @@ func.func public @test_var_mcm(%arg0: f64) -> tensor<f64> {
   return %from_elements : tensor<f64>
 }
 
-// CHECK:   func.func public @test_var_mcm.quantum.one_shot_kernel(%arg0: f64) -> f64
+// CHECK:   func.func public @test_var_mcm.quantum.one_shot_kernel(%arg0: f64) -> f64 attributes {quantum.node}
 // CHECK:     [[one:%.+]] = arith.constant 1 : i64
 // CHECK:     quantum.device shots([[one]]) ["", "", ""]
 // CHECK:     [[mres:%.+]], {{%.+}} = quantum.measure {{%.+}} : i1, !quantum.bit
@@ -165,7 +165,7 @@ func.func public @test_var_mcm(%arg0: f64) -> tensor<f64> {
 // -----
 
 
-func.func public @test_probs(%arg0: f64) -> tensor<4xf64> {
+func.func public @test_probs(%arg0: f64) -> tensor<4xf64> attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -180,7 +180,7 @@ func.func public @test_probs(%arg0: f64) -> tensor<4xf64> {
   return %4 : tensor<4xf64>
 }
 
-// CHECK: func.func public @test_probs.quantum.one_shot_kernel(%arg0: f64) -> tensor<4xf64>
+// CHECK: func.func public @test_probs.quantum.one_shot_kernel(%arg0: f64) -> tensor<4xf64> attributes {quantum.node}
 // CHECK:   [[one:%.+]] = arith.constant 1 : i64
 // CHECK:   quantum.device shots([[one]]) ["", "", ""]
 // CHECK:   quantum.probs
@@ -213,7 +213,7 @@ func.func public @test_probs(%arg0: f64) -> tensor<4xf64> {
 // -----
 
 
-func.func public @test_probs_mcm(%arg0: f64) -> tensor<4xf64> {
+func.func public @test_probs_mcm(%arg0: f64) -> tensor<4xf64> attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -232,7 +232,7 @@ func.func public @test_probs_mcm(%arg0: f64) -> tensor<4xf64> {
 }
 
 
-// CHECK:   func.func public @test_probs_mcm.quantum.one_shot_kernel(%arg0: f64) -> tensor<4xf64>
+// CHECK:   func.func public @test_probs_mcm.quantum.one_shot_kernel(%arg0: f64) -> tensor<4xf64> attributes {quantum.node}
 // CHECK:     [[one:%.+]] = arith.constant 1 : i64
 // CHECK:     quantum.device shots([[one]]) ["", "", ""]
 // CHECK:     [[mres0:%.+]], {{%.+}} = quantum.measure {{%.+}} : i1, !quantum.bit
@@ -277,7 +277,7 @@ func.func public @test_probs_mcm(%arg0: f64) -> tensor<4xf64> {
 // -----
 
 
-func.func public @test_probs_dynamic_shape(%arg0: f64, %num_qubits: i64) -> tensor<?xf64> {
+func.func public @test_probs_dynamic_shape(%arg0: f64, %num_qubits: i64) -> tensor<?xf64> attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc(%num_qubits) : !quantum.reg
@@ -292,7 +292,7 @@ func.func public @test_probs_dynamic_shape(%arg0: f64, %num_qubits: i64) -> tens
   return %4 : tensor<?xf64>
 }
 
-// CHECK: func.func public @test_probs_dynamic_shape.quantum.one_shot_kernel(%arg0: f64, [[num_qubits:%.+]]: i64) -> tensor<?xf64>
+// CHECK: func.func public @test_probs_dynamic_shape.quantum.one_shot_kernel(%arg0: f64, [[num_qubits:%.+]]: i64) -> tensor<?xf64> attributes {quantum.node}
 // CHECK:   [[one:%.+]] = arith.constant 1 : i64
 // CHECK:   quantum.device shots([[one]]) ["", "", ""]
 // CHECK:   quantum.probs {{%.+}} shape [[num_qubits]] : tensor<?xf64>
@@ -330,7 +330,7 @@ func.func public @test_probs_dynamic_shape(%arg0: f64, %num_qubits: i64) -> tens
 // -----
 
 
-func.func public @test_sample(%arg0: f64) -> tensor<1000x2xi64> {
+func.func public @test_sample(%arg0: f64) -> tensor<1000x2xi64> attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -347,7 +347,7 @@ func.func public @test_sample(%arg0: f64) -> tensor<1000x2xi64> {
 }
 
 
-// CHECK: func.func public @test_sample.quantum.one_shot_kernel(%arg0: f64) -> tensor<1x2xf64>
+// CHECK: func.func public @test_sample.quantum.one_shot_kernel(%arg0: f64) -> tensor<1x2xf64> attributes {quantum.node}
 // CHECK:   [[one:%.+]] = arith.constant 1 : i64
 // CHECK:   quantum.device shots([[one]]) ["", "", ""]
 // CHECK:   [[sample:%.+]] = quantum.sample {{%.+}} : tensor<1x2xf64>
@@ -378,7 +378,7 @@ func.func public @test_sample(%arg0: f64) -> tensor<1000x2xi64> {
 // -----
 
 
-func.func public @test_sample_mcm(%arg0: f64) -> tensor<1000x1xi64> {
+func.func public @test_sample_mcm(%arg0: f64) -> tensor<1000x1xi64> attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -394,7 +394,7 @@ func.func public @test_sample_mcm(%arg0: f64) -> tensor<1000x1xi64> {
   return %5 : tensor<1000x1xi64>
 }
 
-// CHECK:   func.func public @test_sample_mcm.quantum.one_shot_kernel(%arg0: f64) -> tensor<1x1xf64>
+// CHECK:   func.func public @test_sample_mcm.quantum.one_shot_kernel(%arg0: f64) -> tensor<1x1xf64> attributes {quantum.node}
 // CHECK:     [[one:%.+]] = arith.constant 1 : i64
 // CHECK:     quantum.device shots([[one]]) ["", "", ""]
 // CHECK:     [[mres:%.+]], {{%.+}} = quantum.measure {{%.+}} : i1, !quantum.bit
@@ -424,7 +424,7 @@ func.func public @test_sample_mcm(%arg0: f64) -> tensor<1000x1xi64> {
 // -----
 
 
-func.func public @test_sample_dynamic_shape(%arg0: f64, %shots: i64, %num_qubits: i64) -> tensor<?x?xi64> {
+func.func public @test_sample_dynamic_shape(%arg0: f64, %shots: i64, %num_qubits: i64) -> tensor<?x?xi64> attributes {quantum.node} {
   quantum.device shots(%shots) ["", "", ""]
   %0 = quantum.alloc(%num_qubits) : !quantum.reg
   %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -440,7 +440,7 @@ func.func public @test_sample_dynamic_shape(%arg0: f64, %shots: i64, %num_qubits
 }
 
 
-// CHECK: func.func public @test_sample_dynamic_shape.quantum.one_shot_kernel(%arg0: f64, [[shots:%.+]]: i64, [[num_qubits:%.+]]: i64) -> tensor<1x?xf64>
+// CHECK: func.func public @test_sample_dynamic_shape.quantum.one_shot_kernel(%arg0: f64, [[shots:%.+]]: i64, [[num_qubits:%.+]]: i64) -> tensor<1x?xf64> attributes {quantum.node}
 // CHECK:   [[one:%.+]] = arith.constant 1 : i64
 // CHECK:   quantum.device shots([[one]]) ["", "", ""]
 // CHECK:   [[sample:%.+]] = quantum.sample {{%.+}} shape [[num_qubits]] : tensor<1x?xf64>
@@ -473,7 +473,7 @@ func.func public @test_sample_dynamic_shape(%arg0: f64, %shots: i64, %num_qubits
 // -----
 
 
-func.func public @test_counts(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) {
+func.func public @test_counts(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -490,7 +490,7 @@ func.func public @test_counts(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) {
 }
 
 
-// CHECK: func.func public @test_counts.quantum.one_shot_kernel(%arg0: f64) -> (tensor<4xf64>, tensor<4xi64>)
+// CHECK: func.func public @test_counts.quantum.one_shot_kernel(%arg0: f64) -> (tensor<4xf64>, tensor<4xi64>) attributes {quantum.node}
 // CHECK:   [[one:%.+]] = arith.constant 1 : i64
 // CHECK:   quantum.device shots([[one]]) ["", "", ""]
 // CHECK:   quantum.counts
@@ -523,7 +523,7 @@ func.func public @test_counts(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) {
 // -----
 
 
-func.func public @test_counts_mcm(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) {
+func.func public @test_counts_mcm(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -543,7 +543,7 @@ func.func public @test_counts_mcm(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) 
 }
 
 
-// CHECK:   func.func public @test_counts_mcm.quantum.one_shot_kernel(%arg0: f64) -> (tensor<4xf64>, tensor<4xi64>)
+// CHECK:   func.func public @test_counts_mcm.quantum.one_shot_kernel(%arg0: f64) -> (tensor<4xf64>, tensor<4xi64>) attributes {quantum.node}
 // CHECK:     [[one:%.+]] = arith.constant 1 : i64
 // CHECK:     quantum.device shots([[one]]) ["", "", ""]
 // CHECK:     [[mres0:%.+]], {{%.+}} = quantum.measure {{%.+}} : i1, !quantum.bit
@@ -589,7 +589,7 @@ func.func public @test_counts_mcm(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) 
 // -----
 
 
-func.func public @test_counts_dynamic_shape(%arg0: f64, %num_qubits: i64) -> (tensor<?xi64>, tensor<?xi64>) {
+func.func public @test_counts_dynamic_shape(%arg0: f64, %num_qubits: i64) -> (tensor<?xi64>, tensor<?xi64>) attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc(%num_qubits) : !quantum.reg
@@ -606,7 +606,7 @@ func.func public @test_counts_dynamic_shape(%arg0: f64, %num_qubits: i64) -> (te
 }
 
 
-// CHECK: func.func public @test_counts_dynamic_shape.quantum.one_shot_kernel(%arg0: f64, [[num_qubits:%.+]]: i64) -> (tensor<?xf64>, tensor<?xi64>)
+// CHECK: func.func public @test_counts_dynamic_shape.quantum.one_shot_kernel(%arg0: f64, [[num_qubits:%.+]]: i64) -> (tensor<?xf64>, tensor<?xi64>) attributes {quantum.node}
 // CHECK:   [[one:%.+]] = arith.constant 1 : i64
 // CHECK:   quantum.device shots([[one]]) ["", "", ""]
 // CHECK:   quantum.counts {{%.+}} shape [[num_qubits]] : tensor<?xf64>, tensor<?xi64>
@@ -643,7 +643,7 @@ func.func public @test_counts_dynamic_shape(%arg0: f64, %num_qubits: i64) -> (te
 // -----
 
 
-func.func public @test_many_MPs(%arg0: f64) -> (tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>) {
+func.func public @test_many_MPs(%arg0: f64) -> (tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>) attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
 
@@ -681,7 +681,7 @@ func.func public @test_many_MPs(%arg0: f64) -> (tensor<1000x2xi64>, tensor<4xi64
 }
 
 
-// CHECK: func.func public @test_many_MPs.quantum.one_shot_kernel(%arg0: f64) -> (tensor<1x2xf64>, tensor<4xf64>, tensor<4xi64>, f64, tensor<4xf64>)
+// CHECK: func.func public @test_many_MPs.quantum.one_shot_kernel(%arg0: f64) -> (tensor<1x2xf64>, tensor<4xf64>, tensor<4xi64>, f64, tensor<4xf64>) attributes {quantum.node}
 // CHECK:   [[one:%.+]] = arith.constant 1 : i64
 // CHECK:   quantum.device shots([[one]]) ["", "", ""]
 
@@ -762,3 +762,62 @@ func.func public @test_analytical() {
 // CHECK:   [[_1:%.+]] = tensor.extract [[_0]][] : tensor<i64>
 // CHECK:   quantum.device shots([[_1]]) ["", "", ""]
 // CHECK:   return
+
+
+// -----
+
+
+"func.func"() <{function_type = () -> (f64, f64), res_attrs = [{}, {}], sym_name = "test_generic_with_postprocessing", sym_visibility = "public"}> ({
+  %0 = "stablehlo.constant"() <{value = dense<10> : tensor<i64>}> : () -> tensor<i64>
+  %1 = "tensor.extract"(%0) : (tensor<i64>) -> i64
+  "quantum.device"(%1) {device_name = "", kwargs = "", lib = ""} : (i64) -> ()
+  %2 = "quantum.alloc"() {nqubits_attr = 1 : i64} : () -> !quantum.reg
+  %3 = "quantum.extract"(%2, %1) : (!quantum.reg, i64) -> !quantum.bit
+  %4 = "quantum.namedobs"(%3) {type = #quantum<named_observable PauliZ>} : (!quantum.bit) -> !quantum.obs
+  %5 = "quantum.expval"(%4) : (!quantum.obs) -> f64
+  "quantum.dealloc"(%2) : (!quantum.reg) -> ()
+  "quantum.device_release"() : () -> ()
+  "func.return"(%5, %5) : (f64, f64) -> ()
+}) {quantum.node} : () -> ()
+
+
+// CHECK: func.func public @test_generic_with_postprocessing.quantum.one_shot_kernel() -> f64 attributes {quantum.node} {
+//   CHECK: [[shots:%.+]] = arith.constant 1 : i64
+//   CHECK: [[c0:%.+]] = stablehlo.constant dense<10> : tensor<i64>
+//   CHECK: [[c0_ext:%.+]] = tensor.extract [[c0]][] : tensor<i64>
+//   CHECK: quantum.device shots([[shots]]) ["", "", ""]
+//   CHECK: [[qreg:%.+]] = quantum.alloc( 1) : !quantum.reg
+//   CHECK: [[q0:%.+]] = quantum.extract [[qreg]][[[c0_ext]]] : !quantum.reg -> !quantum.bit
+//   CHECK: [[obs:%.+]] = quantum.namedobs [[q0]][ PauliZ] : !quantum.obs
+//   CHECK: [[expval:%.+]] = quantum.expval [[obs]] : f64
+//   CHECK: quantum.dealloc [[qreg]] : !quantum.reg
+//   CHECK: quantum.device_release
+//   CHECK: return [[expval]] : f64
+// CHECK: }
+
+// CHECK: func.func public @test_generic_with_postprocessing.quantum() -> f64 {
+//   CHECK: [[shots_tensor:%.+]] = stablehlo.constant dense<10> : tensor<i64>
+//   CHECK: [[shots_int:%.+]] = tensor.extract [[shots_tensor]][] : tensor<i64>
+//   CHECK: [[sum_init:%.+]] = arith.constant 0.000000e+00 : f64
+//   CHECK: [[min:%.+]] = arith.constant 0 : index
+//   CHECK: [[step:%.+]] = arith.constant 1 : index
+//   CHECK: [[max:%.+]] = index.casts [[shots_int]] : i64 to index
+//   CHECK: [[sum_final:%.+]] = scf.for {{%.+}} = [[min]] to [[max]] step [[step]] iter_args([[iter_arg:%.+]] = [[sum_init]]) -> (f64) {
+//   CHECK:   [[cur_expval:%.+]] = func.call @test_generic_with_postprocessing.quantum.one_shot_kernel() : () -> f64
+//   CHECK:   [[cur_sum:%.+]] = arith.addf [[cur_expval]], [[iter_arg]] : f64
+//   CHECK:   scf.yield [[cur_sum]] : f64
+//   CHECK: }
+//   CHECK: [[shots_float:%.+]] = arith.sitofp [[shots_int]] : i64 to f64
+//   CHECK: [[expval_final:%.+]] = arith.divf [[sum_final]], [[shots_float]] : f64
+//   CHECK: return [[expval_final]] : f64
+// CHECK: }
+
+// CHECK: func.func public @test_generic_with_postprocessing.postprocess([[arg:%.+]]: f64) -> (f64, f64) {
+//   CHECK: return [[arg]], [[arg]] : f64, f64
+// CHECK: }
+
+// CHECK: func.func public @test_generic_with_postprocessing() -> (f64, f64) {
+//   CHECK: [[qres:%.+]] = call @test_generic_with_postprocessing.quantum() : () -> f64
+//   CHECK: [[res:%.+]]:2 = call @test_generic_with_postprocessing.postprocess([[qres]]) : (f64) -> (f64, f64)
+//   CHECK: return [[res]]#0, [[res]]#1 : f64, f64
+// CHECK: }

@@ -359,11 +359,12 @@ def handle_qnode(
         gateset = [_get_operator_name(op) for op in self.decompose_tkwargs.get("gate_set", [])]
         setattr(qnode, "decompose_gatesets", [gateset])
 
+    pipelines = (("main", tuple(self._pass_pipeline)),)
     return quantum_kernel_p.bind(
         wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
         *non_const_args,
         qnode=qnode,
-        pipeline=self._pass_pipeline,
+        pipelines=pipelines,
     )
 
 
@@ -412,7 +413,7 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     # Add the decompose-lowering pass to the start of the pipeline
     if use_graph:
         t = qml.transform(pass_name="decompose-lowering")
-        pass_container = qml.transforms.core.TransformContainer(t)
+        pass_container = qml.transforms.core.BoundTransform(t)
         next_eval._pass_pipeline.insert(0, pass_container)
 
     # We still need to construct and solve the graph based on
@@ -446,7 +447,7 @@ def handle_transform(
     consts = args[_tuple_to_slice(consts_slice)]
     non_const_args = args[_tuple_to_slice(args_slice)]
     targs = args[_tuple_to_slice(targs_slice)]
-    tkwargs = _tuple_to_dict(tkwargs)
+    pl_tkwargs = _tuple_to_dict(tkwargs)
 
     # If the transform is a decomposition transform
     # and the graph-based decomposition is enabled
@@ -454,7 +455,7 @@ def handle_transform(
     if transform_name == "decompose_plxpr_to_plxpr":
         use_graph = qml.decomposition.enabled_graph()
         return _handle_decompose_transform(
-            self, inner_jaxpr, consts, non_const_args, tkwargs, use_graph
+            self, inner_jaxpr, consts, non_const_args, pl_tkwargs, use_graph
         )
 
     catalyst_pass_name = transform.pass_name
@@ -470,11 +471,11 @@ def handle_transform(
 
         unravelled_jaxpr = jax.make_jaxpr(wrapper)(*non_const_args)
         final_jaxpr = transform._plxpr_transform(
-            unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, tkwargs, *non_const_args
+            unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, pl_tkwargs, *non_const_args
         )
         if transforms_to_passes[transform][1]:
             final_jaxpr = pl_decompose._plxpr_transform(
-                final_jaxpr.jaxpr, final_jaxpr.consts, targs, tkwargs, *non_const_args
+                final_jaxpr.jaxpr, final_jaxpr.consts, targs, pl_tkwargs, *non_const_args
             )
 
         return copy(self).eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
@@ -482,7 +483,7 @@ def handle_transform(
     # Apply the corresponding Catalyst pass counterpart
     next_eval = copy(self)
     t = qml.transform(pass_name=catalyst_pass_name)
-    bound_pass = qml.transforms.core.TransformContainer(t, args=targs, kwargs=tkwargs)
+    bound_pass = qml.transforms.core.BoundTransform(t, args=targs, kwargs=dict(tkwargs))
     next_eval._pass_pipeline.insert(0, bound_pass)
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
