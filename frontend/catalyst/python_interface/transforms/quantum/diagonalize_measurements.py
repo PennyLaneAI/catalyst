@@ -26,7 +26,9 @@ Known Limitations
 """
 
 from collections import defaultdict
+from collections.abc import Collection
 
+from pennylane.exceptions import CompileError
 from pennylane.ops import Hadamard, PauliX, PauliY
 from xdsl import context, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin, func
@@ -80,9 +82,9 @@ class NonCommutingObservableValidator:
     Validates if all quantum observables of an operation commute.
     """
 
-    _error_msg = "Only observables are not qwc. Please apply the `split-non-commuting` pass first."
+    _error_msg = "Observables are not qubit-wise commuting. Please apply the `split-non-commuting` pass first."
 
-    def __init__(self, op, supported_base_obs: tuple[str]):
+    def __init__(self, op, supported_base_obs: Collection[str]):
         self.op = op
         self.supported_base_obs = set(supported_base_obs)
 
@@ -130,26 +132,27 @@ class NonCommutingObservableValidator:
 
     def _run_qwc_validation(self):
         """Validates Qubit-Wise Commutativity logic."""
-        try:
-            if self.visited_qreg:
-                # If a register is used, all ops must be Z-basis or Identity
-                for obs_set in self.obs_on_qubits.values():
-                    if not obs_set.issubset({"PauliZ", "Identity"}):
-                        raise RuntimeError(self._error_msg)
-            else:
-                # Check overlapping qubits for conflicts (more than 1 non-Identity)
-                for q in self.overlapped_qubits:
-                    obs = self.obs_on_qubits[q]
-                    if len(obs - {"Identity"}) > 1:
-                        raise RuntimeError(self._error_msg)
-        except RuntimeError:
+        success = True
+        if self.visited_qreg:
+            # If a register is used, all ops must be Z-basis or Identity
+            for obs_set in self.obs_on_qubits.values():
+                if not obs_set.issubset({"PauliZ", "Identity"}):
+                    success = False
+        else:
+            # Check overlapping qubits for conflicts (more than 1 non-Identity)
+            for q in self.overlapped_qubits:
+                obs = self.obs_on_qubits[q]
+                if len(obs - {"Identity"}) > 1:
+                    success = False
+        if not success:
             # Fallback to stricter check if QWC logic fails
             self._run_non_overlapping_validation()
 
     def _run_non_overlapping_validation(self):
         """Strictest check: no two observables can share a qubit."""
         if self.overlapped_qubits or (self.visited_qreg and self.obs_on_qubits):
-            raise RuntimeError(self._error_msg)
+            raise CompileError(self._error_msg)
+
 
 class DiagonalizeFinalMeasurementsPattern(
     pattern_rewriter.RewritePattern

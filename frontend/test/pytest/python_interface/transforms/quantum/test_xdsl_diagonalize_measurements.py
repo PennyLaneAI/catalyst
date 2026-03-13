@@ -18,6 +18,7 @@ import re
 import numpy as np
 import pennylane as qml
 import pytest
+from pennylane.exceptions import CompileError
 
 from catalyst.python_interface.transforms import (
     DiagonalizeFinalMeasurementsPass,
@@ -27,7 +28,9 @@ from catalyst.python_interface.transforms import (
 pytestmark = pytest.mark.xdsl
 
 
-_non_commuting_err_msg = "Only observables are not qwc. Please apply the `split-non-commuting"
+_non_commuting_err_msg = (
+    "Observables are not qubit-wise commuting. Please apply the `split-non-commuting` pass first"
+)
 
 
 class TestDiagonalizeFinalMeasurementsPass:
@@ -619,7 +622,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
             qml.RX(x, 0)
             return qml.expval(qml.Y(0)), qml.expval(qml.X(0))
 
-        with pytest.raises(RuntimeError, match=f"{_non_commuting_err_msg}"):
+        with pytest.raises(CompileError, match=f"{_non_commuting_err_msg}"):
             _ = circuit(0.7)
 
 
@@ -851,7 +854,7 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
     @pytest.mark.parametrize("obs", NON_COMMUTE_SINGLE_OBS_LIST)
     @pytest.mark.parametrize("measurements", [qml.expval, qml.var, qml.sample])
     def test_non_commuting_single_measurement(self, add_compbasis_meas, device, obs, measurements):
-        """An RuntimeError is raised for single measurement non-commuting Hamiltonians."""
+        """An CompileError is raised for single measurement non-commuting Hamiltonians."""
 
         # pylint: disable=inconsistent-return-statements
         @qml.qjit()
@@ -867,13 +870,13 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
             if add_compbasis_meas == "qreg":
                 return qml.sample(), measurements(obs)
 
-        with pytest.raises(RuntimeError, match=_non_commuting_err_msg):
+        with pytest.raises(CompileError, match=_non_commuting_err_msg):
             circuit(0.7)
 
     @pytest.mark.parametrize("obs", NON_COMMUTE_MULTI_OBS_LIST)
     @pytest.mark.parametrize("m", [(qml.expval, qml.var), (qml.expval, qml.sample)])
     def test_non_commuting_multiple_measurements(self, device, obs, m):
-        """An RuntimeError is raised for multiple non-commuting measurements."""
+        """An CompileError is raised for multiple non-commuting measurements."""
 
         @qml.qjit()
         @diagonalize_final_measurements_pass
@@ -883,7 +886,7 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
             qml.RX(x, 0)
             return m[0](obs[0]), m[1](obs[1])
 
-        with pytest.raises(RuntimeError, match=_non_commuting_err_msg):
+        with pytest.raises(CompileError, match=_non_commuting_err_msg):
             circuit(0.7)
 
     @pytest.mark.parametrize("obs", COMMUTE_SINGLE_OBS_LIST)
