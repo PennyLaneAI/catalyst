@@ -551,7 +551,7 @@ def specs_collect(module: ModuleOp) -> ResourcesResult | list[ResourcesResult]:
     """Collect PennyLane resources from the module."""
 
     func_to_resources = {}
-    entry_funcs = []
+    qnode_funcs = []  # This list stores the functions which are an individual qnode execution
 
     func_decl_warning = False
 
@@ -577,16 +577,16 @@ def specs_collect(module: ModuleOp) -> ResourcesResult | list[ResourcesResult]:
         func_to_resources[func_op.sym_name.data] = resources
 
         if "quantum.node" in func_op.attributes:
-            # The main entrypoint for a qnode is always marked by the `quantum.node` attribute
-            entry_funcs.append(func_op.sym_name.data)
+            # The top-level definition of a qnode is always marked with the `quantum.node` attribute
+            qnode_funcs.append(func_op.sym_name.data)
 
-    if not entry_funcs:
-        raise ValueError("Entry function not found in module.")  # pragma: no-cover
+    if not qnode_funcs:  # pragma: no cover
+        raise ValueError("No `quantum.node` functions found in module.")
 
     if (
         len(
             res := [
-                _resolve_function_calls(entry_func, func_to_resources) for entry_func in entry_funcs
+                _resolve_function_calls(qnode_func, func_to_resources) for qnode_func in qnode_funcs
             ]
         )
         == 1
