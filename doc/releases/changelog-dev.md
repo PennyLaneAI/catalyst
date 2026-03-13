@@ -375,9 +375,9 @@
 * Fixed incorrect global phase when lowering CNOT gates into PPR/PPM operations.
   [(#2459)](https://github.com/PennyLaneAI/catalyst/pull/2459)
 
-* Fixed a bug where the Catalyst measurement primitive was incorrectly returning a boolean type
-  as the measurement result, when replacing the PennyLane measurement primitive, whose measurement
-  result is integer type.
+* Fixed a bug where the Catalyst measurement primitive returning a boolean type as the measurement
+  result was incorrectly replacing the PennyLane measurement primitive, whose measurement
+  result is integer type, during the PLxPR conversion.
   [(#2582)](https://github.com/PennyLaneAI/catalyst/pull/2582)
 
 <h3>Internal changes ⚙️</h3>
