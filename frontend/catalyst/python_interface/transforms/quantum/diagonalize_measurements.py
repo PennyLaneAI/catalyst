@@ -82,7 +82,10 @@ class NonCommutingObservableValidator:
     Validates if all quantum observables of an operation commute.
     """
 
-    _error_msg = "Observables are not qubit-wise commuting. Please apply the `split-non-commuting` pass first."
+    _error_msg = (
+        "Observables are not qubit-wise commuting. Please apply the "
+        "`split-non-commuting` pass first."
+    )
 
     def __init__(self, op, supported_base_obs: Collection[str]):
         self.op = op
