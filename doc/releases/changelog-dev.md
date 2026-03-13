@@ -225,6 +225,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* `mlir_specs` now supports MLIR passes which create multiple qnode entry points, such as `split-non-commuting` pass.
+  When such passes are present, `mlir_specs` will return a list of resources with 1 per entrypoint.
+  [(#2534)](https://github.com/PennyLaneAI/catalyst/pull/2534)
+
 * `catalyst.python_interface.utils.get_constant_from_ssa` can now extract constant values cast using
   `arith.index_cast`.
   [(#2542)](https://github.com/PennyLaneAI/catalyst/pull/2542)
