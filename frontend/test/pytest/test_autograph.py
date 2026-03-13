@@ -2622,7 +2622,6 @@ class TestJaxIndexOperatorUpdate:
 class TestWithPass:
     """Test with passes"""
 
-    @pytest.mark.capture_todo
     def test_with_pass(self, capture_mode):
         """this test should work. So there are no asserts"""
 
