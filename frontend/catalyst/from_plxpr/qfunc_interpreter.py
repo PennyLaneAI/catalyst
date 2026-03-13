@@ -653,6 +653,7 @@ def handle_pauli_measure(self, *invals, pauli_word, **params):
     result, *out_qubits = outvals  # First element is the measurement result
     for in_qreg, w, new_wire in zip(in_qregs, invals, out_qubits):
         in_qreg[in_qreg.global_index_to_local_index(w)] = new_wire
+    result = jnp.astype(result, int)
     return result
 
 
