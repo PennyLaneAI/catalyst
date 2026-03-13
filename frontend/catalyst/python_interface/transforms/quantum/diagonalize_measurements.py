@@ -159,7 +159,7 @@ class NonCommutingObservableValidator:
 
 class DiagonalizeFinalMeasurementsPattern(
     pattern_rewriter.RewritePattern
-):  # pylint: disable=too-few-public-methods, trailing-whitespace, cell-var-from-loop
+):  # pylint: disable=too-few-public-methods
     """RewritePattern for diagonalizing final measurements."""
 
     def __init__(self, supported_base_obs: set[str]):
@@ -218,6 +218,7 @@ class DiagonalizeFinalMeasurementsPattern(
                     )
                 ]
 
+                # pylint: disable = cell-var-from-loop
                 op.qubit.replace_by_if(qubit, lambda use: use in uses_to_change)
                 for use in uses_to_change:
                     rewriter.notify_op_modified(use.operation)
