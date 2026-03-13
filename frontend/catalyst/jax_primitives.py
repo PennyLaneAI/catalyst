@@ -1835,7 +1835,12 @@ def _mcmobs_abstract_eval(*mcms):
 def _mcm_obs_lowering(jax_ctx: mlir.LoweringRuleContext, *mcms: list[ir.Value]):
     ctx = jax_ctx.module_context.context
     result_type = ir.OpaqueType.get("quantum", "obs", ctx)
-    extracted = [extract_scalar(mcm, "mcmobs") for mcm in mcms]
+    tensor_i1_type = ir.RankedTensorType.get([], ir.IntegerType.get_signless(1))
+
+    extracted = []
+    for mcm in mcms:
+        convert_op = StableHLOConvertOp(tensor_i1_type, mcm)
+        extracted.append(extract_scalar(convert_op.result, "mcmobs"))
     return MCMObsOp(result_type, extracted).results
 
 
