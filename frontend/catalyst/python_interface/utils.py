@@ -31,7 +31,6 @@ from xdsl.dialects.builtin import (
 )
 from xdsl.dialects.tensor import ExtractOp as tensorExtractOp
 from xdsl.ir import Attribute, SSAValue
-
 from xdsl_jax.dialects.stablehlo import ConstantOp as hloConstantOp
 
 
