@@ -16,15 +16,16 @@
 
 This module contains the implementation of the xDSL quantum-to-qecl dialect-conversion pass.
 """
+
 import math
 from dataclasses import dataclass
 
 from xdsl.context import Context
 from xdsl.dialects import builtin
 from xdsl.dialects.builtin import IntegerAttr
-from xdsl.ir import BlockOps
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
+    GreedyRewritePatternApplier,
     PatternRewriter,
     PatternRewriteWalker,
     RewritePattern,
@@ -32,10 +33,11 @@ from xdsl.pattern_rewriter import (
 )
 
 from catalyst.python_interface.dialects import qecl, quantum
+from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 
 
 @dataclass(frozen=True)
-class AllocConversion(RewritePattern):
+class AllocOpConversion(RewritePattern):
     """Converts `quantum.alloc` ops to equivalent `qecl.alloc` ops."""
 
     k: int
@@ -62,7 +64,136 @@ class AllocConversion(RewritePattern):
             qecl.AllocOp(qecl.LogicalHyperRegisterType(width=hyper_reg_width, k=self.k)),
         )
 
-        BlockOps
+
+@dataclass(frozen=True)
+class ExtractOpConversion(RewritePattern):
+    """Converts `quantum.extract` ops to equivalent `qecl.extract_block` ops."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: quantum.ExtractOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `quantum.extract` ops."""
+
+        hyper_reg = op.qreg
+        assert isinstance(
+            hyper_reg.type, qecl.LogicalHyperRegisterType
+        ), f"Expected 'hyper_reg' to be a LogicalHyperRegisterType, but got {type(hyper_reg)}"
+
+        idx = op.idx if op.idx is not None else op.idx_attr
+        assert idx is not None, "Both idx and idx_attr are null"
+
+        # If we extract immediately after an alloc operation, we must also insert ops to perform
+        # encoding and a QEC cycle. Cases where we don't immediately extract are typically around
+        # control-flow operations.
+        hyper_reg_owner = op.qreg.owner
+        if isinstance(hyper_reg_owner, qecl.AllocOp):
+            ops_to_insert = [
+                extract_codeblock_op := qecl.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=idx),
+                encode_op := qecl.EncodeOp(
+                    in_codeblock=extract_codeblock_op,
+                    init_state=qecl.LogicalCodeblockInitState.Zero,
+                ),
+                qecl.QecCycleOp(in_codeblock=encode_op.results[0]),
+            ]
+        else:
+            ops_to_insert = [qecl.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=idx)]
+
+        rewriter.replace_op(op, ops_to_insert)
+
+
+class InsertOpConversion(RewritePattern):
+    """Converts `quantum.extract` ops to equivalent `qecl.insert_block` ops."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: quantum.InsertOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `quantum.insert` ops."""
+
+        idx = op.idx if op.idx is not None else op.idx_attr
+        assert idx is not None, "Both idx and idx_attr are null"
+
+        in_hyper_reg = op.in_qreg
+        assert isinstance(
+            in_hyper_reg.type, qecl.LogicalHyperRegisterType
+        ), f"Expected 'in_hyper_reg' to be a LogicalHyperRegisterType, but got {type(in_hyper_reg)}"
+
+        codeblock = op.qubit
+        assert isinstance(
+            codeblock.type, qecl.LogicalCodeblockType
+        ), f"Expected 'codeblock' to be a LogicalCodeblockType, but got {type(codeblock)}"
+
+        rewriter.replace_op(
+            op, qecl.InsertCodeblockOp(in_hyper_reg=in_hyper_reg, idx=idx, codeblock=codeblock)
+        )
+
+
+class DeallocOpConversion(RewritePattern):
+    """Converts `quantum.dealloc` ops to equivalent `qecl.dealloc` ops."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: quantum.DeallocOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `quantum.dealloc` ops."""
+
+        hyper_reg = op.qreg
+        assert isinstance(
+            hyper_reg.type, qecl.LogicalHyperRegisterType
+        ), f"Expected 'hyper_reg' to be a LogicalHyperRegisterType, but got {type(hyper_reg)}"
+
+        rewriter.replace_op(op, qecl.DeallocOp(hyper_reg=hyper_reg))
+
+
+class CustomOpConversion(RewritePattern):
+    """TODO"""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: quantum.CustomOp, rewriter: PatternRewriter):
+        gate_name = op.gate_name.data
+
+        match gate_name:
+            case "Hadamard":
+                codeblock = op.in_qubits[0]
+                assert isinstance(codeblock.type, qecl.LogicalCodeblockType)
+                assert codeblock.type.k.value.data == 1
+                op_to_insert = qecl.HadamardOp(in_codeblock=codeblock, idx=0)
+
+            case "S":
+                codeblock = op.in_qubits[0]
+                assert isinstance(codeblock.type, qecl.LogicalCodeblockType)
+                assert codeblock.type.k.value.data == 1
+                adjoint = True if op.properties.get("adjoint") else False
+                op_to_insert = qecl.SOp(in_codeblock=codeblock, idx=0, adjoint=adjoint)
+
+            case "CNOT":
+                ctrl_codeblock = op.in_qubits[0]
+                trgt_codeblock = op.in_qubits[1]
+                assert isinstance(ctrl_codeblock.type, qecl.LogicalCodeblockType)
+                assert ctrl_codeblock.type.k.value.data == 1
+                assert isinstance(trgt_codeblock.type, qecl.LogicalCodeblockType)
+                assert trgt_codeblock.type.k.value.data == 1
+                op_to_insert = qecl.CnotOp(
+                    in_ctrl_codeblock=ctrl_codeblock,
+                    idx_ctrl=0,
+                    in_trgt_codeblock=trgt_codeblock,
+                    idx_trgt=0,
+                )
+
+            case _:
+                raise NotImplementedError(
+                    f"Conversion of 'quantum.custom' op only supports gates 'Hadamard', 'S' and "
+                    f"'CNOT', but got {gate_name}"
+                )
+
+        rewriter.replace_op(op, op_to_insert)
+
+
+class MeasureOpConversion(RewritePattern):
+    """TODO"""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: quantum.MeasureOp, rewriter: PatternRewriter):
+        """TODO"""
+        codeblock = op.in_qubit
+        assert isinstance(codeblock.type, qecl.LogicalCodeblockType)
+        assert codeblock.type.k.value.data == 1
+        rewriter.replace_op(op, qecl.MeasureOp(in_codeblock=codeblock, idx=0))
 
 
 @dataclass(frozen=True)
@@ -76,4 +207,24 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
     k: int
 
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
-        PatternRewriteWalker(AllocConversion(self.k)).rewrite_module(op)
+        if self.k != 1:
+            raise NotImplementedError(
+                f"The {self.name} only supports QEC codes where the number of logical qubits per "
+                f"codeblock, k, is 1, but got k = {self.k}"
+            )
+
+        PatternRewriteWalker(
+            GreedyRewritePatternApplier(
+                [
+                    AllocOpConversion(self.k),
+                    ExtractOpConversion(),
+                    InsertOpConversion(),
+                    DeallocOpConversion(),
+                    CustomOpConversion(),
+                    MeasureOpConversion(),
+                ]
+            )
+        ).rewrite_module(op)
+
+
+convert_quantum_to_qecl_pass = compiler_transform(ConvertQuantumToQecLogicalPass)
