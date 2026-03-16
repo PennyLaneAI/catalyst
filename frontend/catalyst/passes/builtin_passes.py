@@ -1491,7 +1491,7 @@ def graph_decomposition(
     gate_set: Iterable,
     fixed_decomps: dict | None = None,
     alt_decomps: dict | None = None,
-    rule_path: Path = DEFAULT_RULE_DIR / BYTECODE_FILE_NAME,
+    _builtin_rule_path: Path = DEFAULT_RULE_DIR / BYTECODE_FILE_NAME,
 ):
     R"""
     Specify that the ``-graph-decomposition`` MLIR compiler pass for applying optimal gate
@@ -1524,7 +1524,7 @@ def graph_decomposition(
             gate_set=gate_set,
             fixed_decomps=fixed_decomps,
             alt_decomps=alt_decomps,
-            rule_path=rule_path,
+            _builtin_rule_path=_builtin_rule_path,
         )
 
     if not isinstance(gate_set, dict):
@@ -1532,7 +1532,7 @@ def graph_decomposition(
     else:
         gate_set = {op.__name__: cost for op, cost in gate_set.items()}
 
-    options = {"gate_set": gate_set, "bytecode-rules": str(rule_path)}
+    options = {"gate_set": gate_set, "bytecode-rules": str(_builtin_rule_path)}
 
     if fixed_decomps:
         options |= {

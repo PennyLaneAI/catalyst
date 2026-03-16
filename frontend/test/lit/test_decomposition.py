@@ -1717,7 +1717,7 @@ def test_cpp_decomp_args():
         gate_set={qml.RX, qml.H, qml.RY},
         fixed_decomps={qml.X: x_to_rx, qml.Y: y_to_ry},
         alt_decomps={qml.H: [h_to_rx_ry]},
-        rule_path="/decomp_rules.mlirbc",
+        _builtin_rule_path="/decomp_rules.mlirbc",
     )
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def circuit():
