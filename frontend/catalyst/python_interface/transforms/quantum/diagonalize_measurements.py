@@ -101,10 +101,7 @@ class NonCommutingObservableValidator:
         # 1. Single pass to gather all required IR metadata
         self._analyze_module()
 
-        # 2. Determine validation strategy
-        diagonalize_all = self.supported_base_obs.issubset(_default_supported_obs)
-
-        if self.is_qwc_compatible and diagonalize_all:
+        if self.is_qwc_compatible:
             self._run_qwc_validation()
         else:
             self._run_non_overlapping_validation()
