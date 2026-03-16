@@ -13,8 +13,6 @@
 # limitations under the License.
 """This submodule contains xDSL dialects for the unified compiler."""
 
-from xdsl_jax.dialects.stablehlo import StableHLO
-
 from .catalyst import Catalyst
 from .mbqc import MBQC
 from .pbc import PBC
@@ -22,4 +20,4 @@ from .qecl import QecLogical
 from .qecp import QecPhysical
 from .quantum import Quantum
 
-__all__ = ["Catalyst", "MBQC", "QecLogical", "QecPhysical", "Quantum", "PBC", "StableHLO"]
+__all__ = ["Catalyst", "MBQC", "QecLogical", "QecPhysical", "Quantum", "PBC"]
