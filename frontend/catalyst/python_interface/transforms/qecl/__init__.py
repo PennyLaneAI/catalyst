@@ -14,8 +14,9 @@
 
 """xDSL API for qecl transforms"""
 
-from .convert_quantum_to_qecl import ConvertQuantumToQecLogicalPass
+from .convert_quantum_to_qecl import ConvertQuantumToQecLogicalPass, convert_quantum_to_qecl_pass
 
 __all__ = [
     "ConvertQuantumToQecLogicalPass",
+    "convert_quantum_to_qecl_pass",
 ]
