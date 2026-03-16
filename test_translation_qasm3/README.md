@@ -6,14 +6,23 @@ This directory contains tests for the Catalyst QASM 3 translation pipeline.
 
 ```
 test_translation_qasm3/
-├── qasm3_circuits/           # Test circuit files 
+├── qasm3_circuits/           # Test circuit files
 │   ├── bell_state_*.qasm    # Bell state variants
 │   ├── ghz_*.qasm           # GHZ states
 │   ├── rotation_gates_*.qasm # Rotation gates
 │   ├── conditional_*.qasm    # Classical control flow
 │   └── ... (59 total circuits)
+├── random_circuits/          # Generated random circuits
+│   ├── small/               # Small random circuits (2-4 qubits)
+│   ├── medium/              # Medium random circuits (5-7 qubits)
+│   ├── qv/                  # Quantum volume circuits
+│   └── clifford/            # Clifford circuits
+├── benchmark_results/        # Benchmark output files
 ├── test_translation.py       # Legacy test runner
 ├── test_qasm3_translation_pytest.py  # Pytest-based test suite
+├── test_random_circuits_pytest.py    # Randomized circuit tests
+├── random_circuit_generator.py       # Random circuit generation utilities
+├── benchmark_random_circuits.py      # Benchmark runner for random circuits
 ├── conftest.py              # Pytest configuration
 └── README.md                # This file
 ```
@@ -59,6 +68,91 @@ test_translation_qasm3/
 - Zero-angle rotations
 - Full 2π rotations
 - Inverse gate pairs
+
+## Randomized Benchmarking
+
+The test suite includes comprehensive randomized benchmarking capabilities to test the translation pipeline with automatically generated circuits.
+
+### Random Circuit Types
+
+1. **Standard Random Circuits**: Randomly generated circuits using Qiskit's `random_circuit()` function
+2. **Quantum Volume Circuits**: Industry-standard benchmark circuits with random SU(4) unitaries
+3. **Clifford Circuits**: Circuits composed of Clifford gates (H, S, CNOT), efficiently simulable
+4. **Custom Gate Set Circuits**: Random circuits using user-specified gate sets
+
+### Running Benchmarks
+
+```bash
+# Basic benchmark with standard random circuits
+python test_translation_qasm3/benchmark_random_circuits.py \
+    --num-qubits 4 --depth 10 --count 20 --verbose
+
+# Quantum volume circuits
+python test_translation_qasm3/benchmark_random_circuits.py \
+    --circuit-type qv --num-qubits 4 --count 10
+
+# Clifford circuits
+python test_translation_qasm3/benchmark_random_circuits.py \
+    --circuit-type clifford --num-qubits 3 --depth 15 --count 10
+
+# Comprehensive batch mode (tests multiple configurations)
+python test_translation_qasm3/benchmark_random_circuits.py \
+    --batch-mode --output benchmark_results/batch_results.json
+
+# With specific random seed for reproducibility
+python test_translation_qasm3/benchmark_random_circuits.py \
+    --num-qubits 5 --depth 20 --count 15 --seed 42
+```
+
+### Running Randomized Tests with Pytest
+
+```bash
+# Run all randomized circuit tests
+pytest test_translation_qasm3/test_random_circuits_pytest.py -v
+
+# Run specific test categories
+pytest test_translation_qasm3/test_random_circuits_pytest.py -k "scalability" -v
+pytest test_translation_qasm3/test_random_circuits_pytest.py -k "quantum_volume" -v
+pytest test_translation_qasm3/test_random_circuits_pytest.py -k "semantic_equivalence" -v
+
+# Run stress tests
+pytest test_translation_qasm3/test_random_circuits_pytest.py::TestStressTests -v
+
+# Run with parallel execution
+pytest test_translation_qasm3/test_random_circuits_pytest.py -n auto
+```
+
+### Benchmark Metrics
+
+The benchmark runner tracks:
+- **Translation Time**: MLIR generation, optimization, and QASM3 translation phases
+- **MLIR Size**: Line count and operation count
+- **Gate Count**: Before and after optimization
+- **Success Rate**: Percentage of circuits that translate successfully
+- **Optimization Effectiveness**: Percentage of gate reduction after optimization
+
+### Generating Random Circuits
+
+You can also generate random circuits for manual testing:
+
+```python
+from pathlib import Path
+from random_circuit_generator import RandomCircuitGenerator, RandomCircuitConfig
+
+# Create generator
+generator = RandomCircuitGenerator(seed=42)
+
+# Generate a single circuit
+config = RandomCircuitConfig(num_qubits=3, depth=10, measure=True)
+circuit = generator.generate_standard_random(config)
+
+# Generate a batch
+circuits = generator.generate_batch(config, count=10, circuit_type='standard')
+
+# Save circuits to files
+output_dir = Path('test_translation_qasm3/random_circuits')
+generator.save_batch(circuits, output_dir, prefix='my_random')
+```
 
 ## Running Tests
 after build project successfully, if not, run `make all` first
@@ -233,5 +327,6 @@ Average translation time per circuit:
 
 ---
 
-**Last Updated**: 2026-03-11
-**Test Coverage**: 59 circuits across 6 categories
+**Last Updated**: 2026-03-12
+**Test Coverage**: 59 hand-crafted circuits across 6 categories + unlimited randomized circuits
+**Benchmarking**: Randomized circuit generation with Quantum Volume, Clifford, and custom gate sets

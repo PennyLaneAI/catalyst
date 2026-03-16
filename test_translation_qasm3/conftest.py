@@ -44,3 +44,19 @@ def circuits_dir():
 def temp_mlir_file(tmp_path):
     """Temporary MLIR file for testing."""
     return tmp_path / "test.mlir"
+
+
+def pytest_addoption(parser):
+    """Add custom command-line options."""
+    parser.addoption(
+        "--use-pass-pipeline",
+        action="store_true",
+        default=False,
+        help="Enable quantum-opt pass-pipeline optimization (default: disabled)"
+    )
+
+
+@pytest.fixture(scope="session")
+def use_pass_pipeline(request):
+    """Flag indicating whether to use quantum-opt pass-pipeline optimization."""
+    return request.config.getoption("--use-pass-pipeline")
