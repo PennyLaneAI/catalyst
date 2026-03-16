@@ -765,7 +765,8 @@ class QJIT(CatalystCallable):
             PyTreeDef: PyTree metadata of the function output
             Tuple[Any]: the dynamic argument signature
         """
-        verify_static_argnums(args, self.compile_options.static_argnums)
+
+        verify_static_argnums(args, self.original_function, self.compile_options.static_argnums)
         static_argnums = self.compile_options.static_argnums
         abstracted_axes = self.compile_options.abstracted_axes
 
