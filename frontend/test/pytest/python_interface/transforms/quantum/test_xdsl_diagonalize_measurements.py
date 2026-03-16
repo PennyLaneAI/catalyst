@@ -612,7 +612,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
         expected_expval = -np.sin(phi)
         expected_var = 1 - np.sin(phi) ** 2
 
-        expval, var = circuit(1.23)
+        expval, var = circuit(phi)
         assert np.allclose(expected_expval, expval)
         assert np.allclose(expected_var, var)
 
