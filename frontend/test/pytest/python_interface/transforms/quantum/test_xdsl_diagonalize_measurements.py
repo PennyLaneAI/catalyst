@@ -429,7 +429,15 @@ class TestDiagonalizeFinalMeasurementsPass:
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
             return qml.var(qml.X(0)), qml.var(qml.X(0))
-        """
+def test_overlapping_commuting_observables(self, run_filecheck):
+"""Test the case where multiple overlapping (commuting) observables exist in
+       the same circuit (diagonalization is only performed once).
+
+       @qml.qjit(target="mlir")
+       @qml.qnode(qml.device("lightning.qubit", wires=1))
+       def circuit():
+           return qml.var(qml.X(0)), qml.var(qml.X(0))
+       """
 
         program = """
             func.func @test_func() attributes {quantum.node} {
