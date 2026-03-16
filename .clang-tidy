@@ -1,0 +1,61 @@
+---
+ExtraArgs: [ "-std=c++20" ]
+Checks: >-
+  '-*,
+  bugprone-*,
+  bugprone-suspicious-*,
+  clang-diagnostic-*,
+  clang-analyzer-*,
+  concurrency-*,
+  cppcoreguidelines-*,
+  hicpp-*,
+  -hicpp-no-array-decay,
+  llvm-namespace-comment,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  mpi-*,
+  openmp-*,
+  performance-*,
+  portability-*,
+  readability-*'
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*'
+AnalyzeTemporaryDtors: true
+FormatStyle:     Attach
+InheritParentConfig: true
+User:            mlxd
+CheckOptions:
+  - key:             readability-static-accessed-through-instance.NameSpecifierNestingThreshold
+    value:           '3'
+  - key:             readability-function-size.VariableThreshold
+    value:           -1
+  - key:             readability-uppercase-literal-suffix.NewSuffixes
+    value:           'L;LL;LU;LLU'
+  - key:             readability-identifier-naming.ClassCase
+    value:           'CamelCase'
+  - key:             readability-identifier-naming.MemberCase
+    value:           'camelBack'
+  - key:             readability-identifier-naming.MacroDefinitionCase
+    value:           'UPPER_CASE'
+  - key:             readability-identifier-naming.ProtectedMemberCase
+    value:           'snake_case'
+  - key:             readability-identifier-naming.PrivateMemberCase
+    value:           'snake_case'
+  - key:             readability-identifier-naming.PrivateMemberSuffix
+    value:           '_'
+  - key:             readability-identifier-naming.TemplateParameterCase
+    value:           'CamelCase'
+  - key:             readability-identifier-naming.TemplateParameterSuffix
+    value:           'T'
+  - key:             readability-magic-numbers.IgnorePowersOf2IntegerValues
+    value:           true
+  - key:             modernize-use-default-member-init.UseAssignment
+    value:           'false'
+  - key:             modernize-avoid-bind.PermissiveParameterList
+    value:           'true'
+  - key:             modernize-use-emplace.TupleTypes
+    value:           '::std::pair;::std::tuple'
+  - key:             modernize-use-emplace.TupleMakeFunctions
+    value:           '::std::make_pair;::std::make_tuple'
+...
+

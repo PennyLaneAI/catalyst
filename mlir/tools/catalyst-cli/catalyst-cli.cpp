@@ -12,6 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Driver/CompilerDriver.h"
+#include "Driver/CompilerDriver.hpp"
 
 int main(int argc, char **argv) { return QuantumDriverMainFromCL(argc, argv); }
