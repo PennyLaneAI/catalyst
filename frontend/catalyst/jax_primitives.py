@@ -137,8 +137,8 @@ with Patcher(
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
 from pennylane.capture.primitives import quantum_subroutine_prim
-from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
 from pennylane.capture.primitives import value_and_grad_prim as pl_value_and_grad_prim
+from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
@@ -833,7 +833,6 @@ def _capture_value_and_grad_lowering(ctx, *args, jaxpr, fn, h, method, argnums):
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
 
-
     val_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
     gradient_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
@@ -849,7 +848,6 @@ def _capture_value_and_grad_lowering(ctx, *args, jaxpr, fn, h, method, argnums):
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
-
 
 
 #

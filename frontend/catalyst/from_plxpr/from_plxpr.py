@@ -30,8 +30,8 @@ from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
 from pennylane.capture.primitives import transform_prim
-from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
 from pennylane.capture.primitives import value_and_grad_prim as pl_value_and_grad_prim
+from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
 from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
 from pennylane.transforms import gridsynth as pl_gridsynth
@@ -264,6 +264,7 @@ def handle_value_and_grad(self, *args, jaxpr, **kwargs):
     j = new_jaxpr.jaxpr
     new_j = j.replace(constvars=(), invars=j.constvars + j.invars)
     return pl_value_and_grad_prim.bind(*new_args, jaxpr=new_j, **kwargs)
+
 
 @WorkflowInterpreter.register_primitive(pl_jvp_prim)
 def handle_jvp(self, *args, jaxpr, **kwargs):
