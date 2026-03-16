@@ -34,7 +34,7 @@ from catalyst.python_interface.conversion import (
     xdsl_from_qjit,
     xdsl_module,
 )
-from catalyst.python_interface.dialects.stablehlo import ConstantOp as hloConstantOp
+from xdsl_jax.dialects.stablehlo import ConstantOp as hloConstantOp
 from catalyst.python_interface.utils import get_constant_from_ssa, get_pyval_from_xdsl_attr
 
 pytestmark = pytest.mark.xdsl
