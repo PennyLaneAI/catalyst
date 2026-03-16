@@ -292,14 +292,14 @@ struct RPCOpLowering : public OpConversionPattern<RTIORPCOp> {
             LLVM::StoreOp::create(rewriter, loc, arg, argSlot);
 
             // Store the slot pointer into ptrArray[i]
-            SmallVector<LLVM::GEPArg> idxs = {0, i};
+            SmallVector<LLVM::GEPArg> idxs = {0, static_cast<int32_t>(i)};
             Value elemPtr = LLVM::GEPOp::create(rewriter, loc, ptrTy, ptrArrayTy, argsArray, idxs);
             LLVM::StoreOp::create(rewriter, loc, argSlot, elemPtr);
         }
 
         // Null-terminate the args array
         Value null = LLVM::ZeroOp::create(rewriter, loc, ptrTy);
-        SmallVector<LLVM::GEPArg> nullIdxs = {0, numArgs};
+        SmallVector<LLVM::GEPArg> nullIdxs = {0, static_cast<int32_t>(numArgs)};
         Value nullElemPtr =
             LLVM::GEPOp::create(rewriter, loc, ptrTy, ptrArrayTy, argsArray, nullIdxs);
         LLVM::StoreOp::create(rewriter, loc, null, nullElemPtr);
