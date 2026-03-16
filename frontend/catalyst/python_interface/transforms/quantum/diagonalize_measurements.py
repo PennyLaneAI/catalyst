@@ -183,6 +183,13 @@ class DiagonalizeFinalMeasurementsPattern(
 
                 insert_point = InsertPoint.before(op)
 
+                # For commuting observables, we only need to diagonalize the first observable
+                # encountered in the IR for each qubit. With the current disign of observable
+                # operations, same observables acting at the same qubit are not reused in the
+                # measurement operations. Instead, the qubit ssa value is reused. Consequently,
+                # we could only diagonalize the first encountered observable for a qubit and
+                # then update the sequent observables act on the same qubit. The following patch
+                # collects the sequent observables act on the same qubit for the update later.
                 commute_obs = [
                     use.operation
                     for use in op.qubit.uses
@@ -231,6 +238,8 @@ class DiagonalizeFinalMeasurementsPattern(
                 )
                 rewriter.replace_op(op, diag_obs)
 
+                # update the sequent observables act on the same qubit to be in Z basis, if
+                # the observable is same as the current op.
                 for ob in commute_obs:
                     if ob.type.data.value == op.type.data.value:
                         diag_obs = NamedObsOp(
