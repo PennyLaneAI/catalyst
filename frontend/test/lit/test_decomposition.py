@@ -1761,3 +1761,36 @@ def test_cpp_decomp_empty_args():
 
 
 test_cpp_decomp_empty_args()
+
+
+def test_cpp_decomp_string_op_names():
+    """Test that cpp decomp args work with string op names."""
+
+    def y_to_xz(op, wires):
+        qml.RX(np.pi, wires)
+        qml.RZ(np.pi, wires)
+
+    @qjit(target="mlir")
+    # CHECK: transform.apply_registered_pass "graph-decomposition" with options = {
+    # CHECK-DAG: "fixed-decomps" = {PauliX = "{{.*}}", PauliZ = "{{.*}}"}
+    # CHECK-DAG: "alt-decomps" = {PauliY = ["{{.*}}", "y_to_xz"]}
+    # CHECK: } to {{%.+}} : (!transform.op<"builtin.module">)
+    @graph_decomposition(
+        gate_set={"RX", "RY", "RZ"},
+        fixed_decomps={
+            "X": lambda wires: qml.RX(np.pi, wires),
+            "PauliZ": lambda wires: qml.RZ(np.pi, wires),
+        },
+        alt_decomps={"PauliY": [lambda wires: qml.RY(np.pi, wires), y_to_xz]},
+    )
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def circuit():
+        qml.X(0)
+        qml.Y(1)
+        qml.Z(0)
+        return qml.probs()
+
+    print(circuit.mlir)
+
+
+test_cpp_decomp_string_op_names()
