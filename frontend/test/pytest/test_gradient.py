@@ -263,77 +263,81 @@ def test_grad_on_qjit():
     assert np.allclose(result, expected)
 
 
-def test_value_and_grad_on_qjit_classical():
+@pytest.mark.parametrize("capture", (True, False))
+def test_value_and_grad_on_qjit_classical(capture):
     """Check that value_and_grad works when called on an qjit object that does not wrap a QNode."""
 
-    @qjit
+    @qjit(capture=capture)
     def f1(x: float):
         return x * x
 
-    result = qjit(value_and_grad(f1))(3.0)
+    result = qjit(qml.value_and_grad(f1))(3.0)
     expected = (9.0, 6.0)
     assert np.allclose(result, expected)
 
-    @qjit
+    @qjit(capture=capture)
     def f2(x: float):
         return [x * x]
 
-    result = qjit(value_and_grad(f2))(3.0)
+    result = qjit(qml.value_and_grad(f2), capture=capture)(3.0)
     expected = ([9.0], [6.0])
     assert np.allclose(result, expected)
 
-    @qjit
+    @qjit(capture=capture)
     def f3(x: float):
         return {"helloworld": x * x}
 
-    result = qjit(value_and_grad(f3))(3.0)
+    result = qjit(qml.value_and_grad(f3), capture=capture)(3.0)
     expected = ({"helloworld": 9.0}, {"helloworld": 6.0})
     assert np.allclose(result[0]["helloworld"], expected[0]["helloworld"])
     assert np.allclose(result[1]["helloworld"], expected[1]["helloworld"])
 
-    @qjit
+    @qjit(capture=capture)
     def f4(x: float, y: float, z: float):
         return 100 * x + 200 * y + 300 * z
 
-    result = qjit(value_and_grad(f4))(0.1, 0.2, 0.3)
+    result = qjit(qml.value_and_grad(f4), capture=capture)(0.1, 0.2, 0.3)
     expected = (140, 100)
     assert np.allclose(result, expected)
 
-    @qjit
+    @qjit(capture=capture)
     def f5(x: float, y: float, z: float):
         return 100 * x + 200 * y + 300 * z
 
-    result = qjit(value_and_grad(f5, argnums=(0, 1, 2)))(0.1, 0.2, 0.3)
+    result = qjit(qml.value_and_grad(f5, argnums=(0, 1, 2)), capture=capture)(0.1, 0.2, 0.3)
     expected = (140, (100, 200, 300))
     assert np.allclose(result[0], expected[0])
     assert np.allclose(result[1], expected[1])
 
 
-def test_value_and_grad_on_qjit_classical_vector():
+
+@pytest.mark.parametrize("capture", (True, False))
+def test_value_and_grad_on_qjit_classical_vector(capture):
     """Check that value_and_grad works when called on an qjit object that does not wrap a QNode
     and takes in a vector.
     """
 
-    @qjit
+    @qjit(capture=capture)
     def f(vec):
         # Takes in a 2D vector (x,y) and computes 30x+40y
         prod = jnp.array([30, 40]) * vec
         return prod[0] + prod[1]
 
     x = jnp.array([1.0, 1.0])
-    result = qjit(value_and_grad(f))(x)
+    result = qjit(qml.value_and_grad(f), capture=capture)(x)
     expected = (70.0, [30.0, 40.0])
 
     assert np.allclose(result[0], expected[0])
     assert np.allclose(result[1], expected[1])
 
 
-def test_value_and_grad_on_qjit_classical_dict():
+@pytest.mark.parametrize("capture", (True, False))
+def test_value_and_grad_on_qjit_classical_dict(capture):
     """Check that value_and_grad works when called on an qjit object that does not wrap a QNode
     and takes in a dictionary.
     """
 
-    @qjit
+    @qjit(capture=capture)
     def f(tree):
         # Takes in two 2D vectors (x1, x2) and (y1, y2) and computes x1y1+x2y2
         hello = tree["hello"]  # (x1, x2)
@@ -341,7 +345,7 @@ def test_value_and_grad_on_qjit_classical_dict():
         return (hello * world).sum()
 
     x = {"hello": jnp.array([1.0, 2.0]), "world": jnp.array([3.0, 4.0])}
-    result = qjit(value_and_grad(f))(x)
+    result = qjit(qml.value_and_grad(f), capture=capture)(x)
     expected = (11.0, {"hello": jnp.array([3.0, 4.0]), "world": jnp.array([1.0, 2.0])})
 
     assert np.allclose(result[0], expected[0])
@@ -349,9 +353,13 @@ def test_value_and_grad_on_qjit_classical_dict():
     assert np.allclose(result[1]["world"], expected[1]["world"])
 
 
+@pytest.mark.parametrize("capture", (True, False))
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_value_and_grad_on_qjit_quantum(diff_method):
+def test_value_and_grad_on_qjit_quantum(diff_method, capture):
     """Check that value_and_grad works when called on an qjit object that does wrap a QNode."""
+
+    if capture and diff_method == "adjoint":
+        pytest.xfail("No validation yet.")
 
     @qjit
     def workflow(x: float):
@@ -368,18 +376,22 @@ def test_value_and_grad_on_qjit_quantum(diff_method):
             CompileError,
             match="The adjoint method can only be used for QNodes which return qml.expval",
         ):
-            qjit(value_and_grad(workflow))(3.0)
+            qjit(qml.value_and_grad(workflow), capture=capture)(3.0)
     else:
-        result = qjit(value_and_grad(workflow))(3.0)
+        result = qjit(qml.value_and_grad(workflow), capture=capture)(3.0)
         expected = (3.0, 1.0)
         assert np.allclose(result, expected)
 
 
+@pytest.mark.parametrize('capture', (True, False))
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_value_and_grad_on_qjit_quantum_variant(diff_method):
+def test_value_and_grad_on_qjit_quantum_variant(diff_method, capture):
     """
     Check that value_and_grad works when called on a QNode with trainable parameters.
     """
+
+    if capture and diff_method == "adjoint":
+        pytest.xfail("No validation yet.")
 
     def workflow_variant(x: float):
         @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method=diff_method)
@@ -395,21 +407,24 @@ def test_value_and_grad_on_qjit_quantum_variant(diff_method):
             CompileError,
             match="The adjoint method can only be used for QNodes which return qml.expval",
         ):
-            qjit(value_and_grad(workflow_variant))(1.1)
+            qjit(qml.value_and_grad(workflow_variant), capture=capture)(1.1)
     else:
-        result = qjit(value_and_grad(workflow_variant))(1.1)
-        expected = (workflow_variant(1.1), qjit(grad(workflow_variant))(1.1))
+        result = qjit(qml.value_and_grad(workflow_variant), capture=capture)(1.1)
+        expected = (workflow_variant(1.1), qjit(qml.grad(workflow_variant), capture=capture)(1.1))
         assert np.allclose(result, expected)
 
 
+@pytest.mark.parametrize('capture', (True, False))
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 @pytest.mark.parametrize(
     "argnum", [(0, 1, 2), (0), (1), (2), (0, 1), (0, 2), (1, 2), (1, 0, 2), (2, 0, 1)]
 )
-def test_value_and_grad_on_qjit_quantum_variant_argnum(argnum, diff_method):
+def test_value_and_grad_on_qjit_quantum_variant_argnum(argnum, diff_method, capture):
     """
     Check that value_and_grad works when called on a QNode with multiple trainable parameters.
     """
+    if capture and diff_method == "adjoint":
+        pytest.xfail("No validation yet.")
 
     def workflow_variant(x: float, y: float, z: float):
         @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method=diff_method)
@@ -427,23 +442,26 @@ def test_value_and_grad_on_qjit_quantum_variant_argnum(argnum, diff_method):
             CompileError,
             match="The adjoint method can only be used for QNodes which return qml.expval",
         ):
-            qjit(value_and_grad(workflow_variant, argnums=argnum))(1.1, 2.2, 3.3)
+            qjit(qml.value_and_grad(workflow_variant, argnums=argnum), capture=capture)(1.1, 2.2, 3.3)
     else:
-        result = qjit(value_and_grad(workflow_variant, argnums=argnum))(1.1, 2.2, 3.3)
+        result = qjit(qml.value_and_grad(workflow_variant, argnums=argnum), capture=capture)(1.1, 2.2, 3.3)
         expected = (
             workflow_variant(1.1, 2.2, 3.3),
-            qjit(grad(workflow_variant, argnums=argnum))(1.1, 2.2, 3.3),
+            qjit(qml.grad(workflow_variant, argnums=argnum), capture=capture)(1.1, 2.2, 3.3),
         )
         assert np.allclose(result[0], expected[0])
         assert np.allclose(result[1], expected[1])
 
 
+@pytest.mark.parametrize('capture', (True, False))
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_value_and_grad_on_qjit_quantum_variant_tree(diff_method):
+def test_value_and_grad_on_qjit_quantum_variant_tree(diff_method, capture):
     """
     Check that value_and_grad works when called on an qjit object that does wrap a QNode
     with trainable parameters and a general pytree input.
     """
+    if capture and diff_method == "adjoint":
+        pytest.xfail("No validation yet.")
 
     def workflow_variant_tree(params):
         @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method=diff_method)
@@ -461,9 +479,9 @@ def test_value_and_grad_on_qjit_quantum_variant_tree(diff_method):
             CompileError,
             match="The adjoint method can only be used for QNodes which return qml.expval",
         ):
-            qjit(value_and_grad(qjit(workflow_variant_tree)))(params)
+            qjit(qml.value_and_grad(qjit(workflow_variant_tree)), capture=capture)(params)
     else:
-        result = qjit(value_and_grad(qjit(workflow_variant_tree)))(params)
+        result = qjit(qml.value_and_grad(qjit(workflow_variant_tree)), capture=capture)(params)
         expected = (workflow_variant_tree(params), qjit(grad(workflow_variant_tree))(params))
         assert np.allclose(result[0], expected[0])
         assert np.allclose(result[1]["x"], expected[1]["x"])
@@ -1427,8 +1445,9 @@ def test_classical_kwargs_switched_arg_order():
     assert np.allclose(expected, result)
 
 
+@pytest.mark.parametrize('capture', (True, False))
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_qnode_kwargs(backend, diff_method):
+def test_qnode_kwargs(backend, diff_method, capture):
     """Test the gradient on a qnode with keyword arguments"""
     num_wires = 1
     dev = qml.device(backend, wires=num_wires)
@@ -1440,24 +1459,24 @@ def test_qnode_kwargs(backend, diff_method):
         qml.RX(z, wires=0)
         return qml.expval(qml.PauliZ(0))
 
-    result = qjit(qml.jacobian(circuit, argnums=[0]))(0.1, y=0.2, z=0.3)
-    expected = qjit(qml.jacobian(circuit, argnums=[0]))(0.1, 0.2, 0.3)
+    result = qjit(qml.jacobian(circuit, argnums=[0]), capture=capture)(0.1, y=0.2, z=0.3)
+    expected = qjit(qml.jacobian(circuit, argnums=[0]), capture=capture)(0.1, 0.2, 0.3)
     assert np.allclose(expected, result)
-    result = qjit(qml.grad(circuit, argnums=[0]))(0.1, y=0.2, z=0.3)
-    expected = qjit(qml.grad(circuit, argnums=[0]))(0.1, 0.2, 0.3)
+    result = qjit(qml.grad(circuit, argnums=[0]), capture=capture)(0.1, y=0.2, z=0.3)
+    expected = qjit(qml.grad(circuit, argnums=[0]), capture=capture)(0.1, 0.2, 0.3)
     assert np.allclose(expected, result)
 
-    if not qml.capture.enabled():
-        result_val, result_grad = qjit(value_and_grad(circuit, argnums=[0]))(0.1, y=0.2, z=0.3)
-        expected_val = qjit(circuit)(0.1, 0.2, 0.3)
-        expected_grad = qjit(qml.grad(circuit, argnums=[0]))(0.1, 0.2, 0.3)
+    result_val, result_grad = qjit(qml.value_and_grad(circuit, argnums=[0]), capture=capture)(0.1, y=0.2, z=0.3)
+    expected_val = qjit(circuit)(0.1, 0.2, 0.3)
+    expected_grad = qjit(qml.grad(circuit, argnums=[0]), capture=capture)(0.1, 0.2, 0.3)
 
-        assert np.allclose(expected_val, result_val)
-        assert np.allclose(expected_grad, result_grad)
+    assert np.allclose(expected_val, result_val)
+    assert np.allclose(expected_grad, result_grad)
 
 
+@pytest.mark.parametrize('capture', (True, False))
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_qnode_kwargs_switched_arg_order(backend, diff_method):
+def test_qnode_kwargs_switched_arg_order(backend, diff_method, capture):
     """Test the gradient on a qnode with keyword arguments and switched argument order"""
     num_wires = 1
     dev = qml.device(backend, wires=num_wires)
@@ -1469,20 +1488,20 @@ def test_qnode_kwargs_switched_arg_order(backend, diff_method):
         qml.RX(z, wires=0)
         return qml.expval(qml.PauliZ(0))
 
-    switched_order = qjit(qml.jacobian(circuit, argnums=[0]))(0.1, z=0.3, y=0.2)
-    expected = qjit(qml.jacobian(circuit, argnums=[0]))(0.1, 0.2, 0.3)
+    switched_order = qjit(qml.jacobian(circuit, argnums=[0]), capture=capture)(0.1, z=0.3, y=0.2)
+    expected = qjit(qml.jacobian(circuit, argnums=[0]), capture=capture)(0.1, 0.2, 0.3)
     assert np.allclose(expected[0], switched_order[0])
-    switched_order = qjit(qml.grad(circuit, argnums=[0]))(0.1, z=0.3, y=0.2)
-    expected = qjit(qml.grad(circuit, argnums=[0]))(0.1, 0.2, 0.3)
+    switched_order = qjit(qml.grad(circuit, argnums=[0]), capture=capture)(0.1, z=0.3, y=0.2)
+    expected = qjit(qml.grad(circuit, argnums=[0]), capture=capture)(0.1, 0.2, 0.3)
     assert np.allclose(expected[0], switched_order[0])
-    if not qml.capture.enabled():
-        switched_order_val, switched_order_grad = qjit(value_and_grad(circuit, argnums=[0]))(
-            0.1, z=0.3, y=0.2
-        )
-        expected_val = qjit(circuit)(0.1, 0.2, 0.3)
-        expected_grad = qjit(grad(circuit, argnums=[0]))(0.1, 0.2, 0.3)
-        assert np.allclose(expected_val, switched_order_val)
-        assert np.allclose(expected_grad, switched_order_grad)
+
+    switched_order_val, switched_order_grad = qjit(qml.value_and_grad(circuit, argnums=[0]), capture=capture)(
+        0.1, z=0.3, y=0.2
+    )
+    expected_val = qjit(circuit, capture=capture)(0.1, 0.2, 0.3)
+    expected_grad = qjit(grad(circuit, argnums=[0]), capture=capture)(0.1, 0.2, 0.3)
+    assert np.allclose(expected_val, switched_order_val)
+    assert np.allclose(expected_grad, switched_order_grad)
 
 
 @pytest.mark.usefixtures("use_both_frontend")
@@ -2394,11 +2413,12 @@ def test_closure_variable_grad(diff_method):
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.parametrize("capture", (True, False))
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_closure_variable_value_and_grad(diff_method):
+def test_closure_variable_value_and_grad(diff_method, capture):
     """Test that value and grad can take closure variables"""
 
-    @qml.qjit
+    @qml.qjit(capture=capture)
     def workflow_closure(x, y):
 
         dev = qml.device("lightning.qubit", wires=1)
@@ -2409,10 +2429,10 @@ def test_closure_variable_value_and_grad(diff_method):
             qml.RX(jnp.pi * y, wires=0)
             return qml.expval(qml.PauliY(0))
 
-        g = value_and_grad(circuit)
+        g = qml.value_and_grad(circuit)
         return g(x)
 
-    @qml.qjit
+    @qml.qjit(capture=capture)
     def workflow_no_closure(x, y):
 
         dev = qml.device("lightning.qubit", wires=1)
@@ -2423,7 +2443,7 @@ def test_closure_variable_value_and_grad(diff_method):
             qml.RX(jnp.pi * y, wires=0)
             return qml.expval(qml.PauliY(0))
 
-        g = value_and_grad(circuit)
+        g = qml.value_and_grad(circuit)
         return g(x, y)
 
     x, y = 1.0, 0.25

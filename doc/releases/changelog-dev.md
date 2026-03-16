@@ -224,6 +224,8 @@
 
 <h3>Improvements 🛠</h3>
 
+* `qml.value_and_grad` can now be used with program capture `qml.qjit(capture=True).
+
 * `catalyst.python_interface.utils.get_constant_from_ssa` can now extract constant values cast using
   `arith.index_cast`.
   [(#2542)](https://github.com/PennyLaneAI/catalyst/pull/2542)
