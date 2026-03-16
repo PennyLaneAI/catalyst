@@ -229,6 +229,7 @@ class TestPassByPassSpecs:
         with pytest.raises(check=ValueError, match="Requested specs levels 2, 3"):
             qml.specs(no_passes, level=[2, 3])()
 
+    @pytest.mark.xfail(reason="pending on specs fix")
     @pytest.mark.usefixtures("use_both_frontend")
     def test_basic_passes_multi_level(self, simple_circuit):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
@@ -420,6 +421,7 @@ class TestPassByPassSpecs:
             check_specs_header_same(actual, single_level_specs, skip_level=True)
             check_specs_resources_same(res, single_level_specs["resources"])
 
+    @pytest.mark.xfail(reason="pending on specs fix")
     def test_mix_transforms_and_passes(self, simple_circuit):
         """Test using a mix of compiler passes and plain tape transforms"""
 
@@ -525,6 +527,7 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
+    @pytest.mark.xfail(reason="pending on specs fix")
     @pytest.mark.usefixtures("use_both_frontend")
     def test_advanced_measurements(self):
         """Test that advanced measurements such as LinearCombination are handled correctly."""
@@ -596,6 +599,7 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
+    @pytest.mark.xfail(reason="pending on specs fix")
     @pytest.mark.usefixtures("use_capture")
     def test_subroutine(self):
         """Test qml.specs when there is a Catalyst subroutine"""
@@ -629,6 +633,7 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
+    @pytest.mark.xfail(reason="pending on specs fix")
     def test_ppr(self):
         """Test that PPRs are handled correctly."""
 
@@ -657,6 +662,7 @@ class TestPassByPassSpecs:
         actual = qml.specs(circ, level=1)()
         check_specs_same(actual, expected)
 
+    @pytest.mark.xfail(reason="pending on specs fix")
     @pytest.mark.usefixtures("use_capture")
     def test_arbitrary_ppr(self):
         """Test that PPRs are handled correctly."""

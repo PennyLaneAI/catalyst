@@ -17,10 +17,15 @@
 import copy
 import functools
 import json
+from pathlib import Path
+from typing import Iterable
+
+from pennylane.decomposition.utils import to_name
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.passes.pass_api import PassPipelineWrapper
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.precompile_decomposition_rules import BYTECODE_FILE_NAME, DEFAULT_RULE_DIR
 
 # pylint: disable=line-too-long, too-many-lines
 
@@ -1480,3 +1485,87 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
         ...
     """
     return PassPipelineWrapper(qnode, "decompose-arbitrary-ppr")
+
+
+def graph_decomposition(
+    qnode=None,
+    *,
+    gate_set: Iterable[type | str] | dict[type | str, float],
+    fixed_decomps: dict | None = None,
+    alt_decomps: dict | None = None,
+    _builtin_rule_path: Path = DEFAULT_RULE_DIR / BYTECODE_FILE_NAME,
+):
+    R"""
+    Specify that the ``-graph-decomposition`` MLIR compiler pass for applying optimal gate
+    decompositions should be applied to the decorated QNode during :func:`~.qjit` compilation.
+
+    .. note::
+
+        The QNode itself will not be changed or transformed by applying these decorators.
+
+        As a result, circuit inspection tools such as :func:`~.draw` will continue
+        to display the circuit as written in Python.
+
+        To instead view the optimized circuit, the MLIR must be viewed
+        after the ``"QuantumCompilationStage"`` stage via the
+        :func:`~.get_compilation_stage` function.
+
+    Args:
+        fn (QNode): the QNode to apply the graph decomposition compiler pass to.
+        gate_set (Iterable[type | str] | dict[type | str, float]): the set of gates that are
+            permissable after decomposition.
+        fixed_decomps (dict | None): map ops to decomps that will be forcibly applied.
+        alt_decomps (dict | None): map ops to lists of decomps that the graph system will consider.
+
+    Returns:
+        ~.QNode:
+
+    **Example**
+
+    @qp.qjit
+    # decompose to device gateset implicitly at later stages
+    @qp.transform(pass_name="cancel-inverses") # secondary optimizations
+    @qp.decompose(
+        gate_set={qp.RX, qp.RZ}
+    ) # decompose to secondary gateset
+    @qp.transform(pass_name="merge-rotations") # apply optimizations to primary gateset
+    @qp.decompose(
+        gate_set={qp.PauliRot, qp.PauliMeasure},
+        fixed_decomps={custom_op: lambda op, wires: qp.PauliRot(np.pi / 4, "XZ", wires)},
+    ) # decompose to primary gateset
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
+    def circuit():
+        custom_op(0)
+    """
+    if qnode is None:
+        return functools.partial(
+            graph_decomposition,
+            gate_set=gate_set,
+            fixed_decomps=fixed_decomps,
+            alt_decomps=alt_decomps,
+            _builtin_rule_path=_builtin_rule_path,
+        )
+
+    if not isinstance(gate_set, dict):
+        gate_set = {to_name(op): 1.0 for op in gate_set}
+    else:
+        gate_set = {to_name(op): cost for op, cost in gate_set.items()}
+
+    options = {"gate-set": gate_set, "bytecode-rules": str(_builtin_rule_path)}
+
+    if fixed_decomps:
+        options |= {
+            "fixed-decomps": {to_name(op): rule.__name__ for op, rule in fixed_decomps.items()}
+        }
+
+    if alt_decomps:
+        options |= {
+            "alt-decomps": {
+                to_name(op): tuple(rule.__name__ for rule in rules)
+                for op, rules in alt_decomps.items()
+            }
+        }
+
+    graph_decomposition_pass = {"graph-decomposition": options}
+
+    return PassPipelineWrapper(qnode, graph_decomposition_pass)
