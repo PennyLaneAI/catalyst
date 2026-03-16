@@ -26,22 +26,30 @@ from pennylane import adjoint, cond, for_loop, qjit, while_loop
 from pennylane.ops.op_math.adjoint import Adjoint, AdjointOperation
 
 import catalyst
-from catalyst import debug, measure, qjit
+from catalyst import debug, measure
+from catalyst.utils.exceptions import CompileError
 
-# pylint: disable=too-many-lines,missing-class-docstring,missing-function-docstring,too-many-public-methods
+# pylint: disable=too-many-lines,missing-class-docstring
+# pylint: disable=missing-function-docstring,too-many-public-methods
 
 
 class TestCatalyst:
     """Integration tests for Catalyst adjoint functionality."""
 
-    def verify_catalyst_adjoint_against_pennylane(self, quantum_func, device, *args):
+    def verify_catalyst_adjoint_against_pennylane(
+        self, quantum_func, device, *args, capture_mode=None
+    ):
         """
         A helper function for verifying Catalyst's native adjoint against the behaviour of
         PennyLane's adjoint function. This is specialized to verifying the behaviour of a single
         function that has its adjoint computed.
         """
 
-        @qjit
+        qjit_kwargs = {}
+        if capture_mode is not None:
+            qjit_kwargs["capture"] = capture_mode
+
+        @qjit(**qjit_kwargs)
         @qml.qnode(device)
         def catalyst_workflow(*args):
             adjoint(quantum_func)(*args)
@@ -52,18 +60,11 @@ class TestCatalyst:
             qml.adjoint(quantum_func)(*args)
             return qml.state()
 
-        capture_enabled = qml.capture.enabled()
-        qml.capture.disable()
-        try:
-            pl_res = pennylane_workflow(*args)
-        finally:
-            if capture_enabled:
-                qml.capture.enable()
+        pl_res = pennylane_workflow(*args)
 
         assert_allclose(catalyst_workflow(*args), pl_res)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_adjoint_func(self, backend):
+    def test_adjoint_func(self, backend, capture_mode):
         """Ensures that catalyst.adjoint accepts simple Python functions as argument. Makes sure
         that simple quantum gates are adjointed correctly."""
 
@@ -74,7 +75,7 @@ class TestCatalyst:
 
         device = qml.device(backend, wires=2)
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(device)
         def C_workflow():
             qml.PauliX(wires=0)
@@ -93,13 +94,12 @@ class TestCatalyst:
         desired = PL_workflow()
         assert_allclose(actual, desired)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     @pytest.mark.parametrize("theta, val", [(jnp.pi, 0), (-100.0, 1)])
-    def test_adjoint_op(self, theta, val, backend):
+    def test_adjoint_op(self, theta, val, backend, capture_mode):
         """Ensures that catalyst.adjoint accepts single PennyLane operators classes as argument."""
         device = qml.device(backend, wires=2)
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(device)
         def C_workflow(theta, val):
             adjoint(qml.RY)(jnp.pi, val)
@@ -116,14 +116,13 @@ class TestCatalyst:
         desired = PL_workflow(theta, val)
         assert_allclose(actual, desired)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     @pytest.mark.parametrize("theta, val", [(np.pi, 0), (-100.0, 2)])
-    def test_adjoint_bound_op(self, theta, val, backend):
+    def test_adjoint_bound_op(self, theta, val, backend, capture_mode):
         """Ensures that catalyst.adjoint accepts single PennyLane operators objects as argument."""
 
         device = qml.device(backend, wires=3)
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(device)
         def C_workflow(theta, val):
             adjoint(qml.RX(jnp.pi, val))
@@ -142,9 +141,8 @@ class TestCatalyst:
         desired = PL_workflow(theta, val)
         assert_allclose(actual, desired, atol=1e-6, rtol=1e-6)
 
-    @pytest.mark.usefixtures("use_both_frontend")
     @pytest.mark.parametrize("w, p", [(0, 0.5), (0, -100.0), (1, 123.22)])
-    def test_adjoint_param_fun(self, w, p, backend):
+    def test_adjoint_param_fun(self, w, p, backend, capture_mode):
         """Ensures that catalyst.adjoint accepts parameterized Python functions as arguments."""
 
         def func(w, theta1, theta2, theta3=1):
@@ -154,7 +152,7 @@ class TestCatalyst:
 
         device = qml.device(backend, wires=2)
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(device)
         def C_workflow(w, theta):
             qml.PauliX(wires=0)
@@ -173,8 +171,7 @@ class TestCatalyst:
         desired = PL_workflow(w, p)
         assert_allclose(actual, desired)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_adjoint_nested_fun(self, backend):
+    def test_adjoint_nested_fun(self, backend, capture_mode):
         """Ensures that catalyst.adjoint allows arbitrary nesting."""
 
         def func(A, I):
@@ -184,7 +181,7 @@ class TestCatalyst:
                 I = I + 1
                 A(partial(func, A=A, I=I))()
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=2))
         def C_workflow():
             qml.RX(np.pi / 2, wires=0)
@@ -201,8 +198,7 @@ class TestCatalyst:
 
         assert_allclose(C_workflow(), PL_workflow())
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_adjoint_qubitunitary(self, backend):
+    def test_adjoint_qubitunitary(self, backend, capture_mode):
         """Ensures that catalyst.adjoint supports QubitUnitary oprtations."""
 
         def func():
@@ -218,10 +214,11 @@ class TestCatalyst:
                 wires=[0, 1],
             )
 
-        self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2))
+        self.verify_catalyst_adjoint_against_pennylane(
+            func, qml.device(backend, wires=2), capture_mode=capture_mode
+        )
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_adjoint_qubitunitary_dynamic_variable_loop(self, backend):
+    def test_adjoint_qubitunitary_dynamic_variable_loop(self, backend, capture_mode):
         """Ensures that catalyst.adjoint supports QubitUnitary oprtations."""
 
         def func(gate):
@@ -243,17 +240,20 @@ class TestCatalyst:
             ]
         )
 
-        self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2), _input)
+        self.verify_catalyst_adjoint_against_pennylane(
+            func, qml.device(backend, wires=2), _input, capture_mode=capture_mode
+        )
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_adjoint_multirz(self, backend):
+    def test_adjoint_multirz(self, backend, capture_mode):
         """Ensures that catalyst.adjoint supports MultiRZ operations."""
 
         def func():
             qml.PauliX(0)
             qml.MultiRZ(theta=np.pi / 2, wires=[0, 1])
 
-        self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2))
+        self.verify_catalyst_adjoint_against_pennylane(
+            func, qml.device(backend, wires=2), capture_mode=capture_mode
+        )
 
     def test_adjoint_pcphase(self, backend):
         """Ensures that catalyst.adjoint supports PCPhase operations."""
@@ -264,16 +264,22 @@ class TestCatalyst:
 
         self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2))
 
-    def test_adjoint_no_measurements(self):
+    def test_adjoint_no_measurements(self, capture_mode):
         """Checks that catalyst.adjoint rejects functions containing quantum measurements."""
 
         def func():
             qml.RX(np.pi / 2, wires=0)
             qml.sample()
 
-        with pytest.raises(ValueError, match="Measurement process cannot be used"):
+        expected_error = CompileError if capture_mode else ValueError
+        expected_msg = (
+            "quantum measurements are not allowed in the adjoint regions"
+            if capture_mode
+            else "Measurement process cannot be used"
+        )
+        with pytest.raises(expected_error, match=expected_msg):
 
-            @qjit
+            @qjit(capture=capture_mode)
             @qml.qnode(qml.device("lightning.qubit", wires=2))
             def C_workflow():
                 adjoint(func)()
@@ -281,11 +287,12 @@ class TestCatalyst:
 
             C_workflow()
 
-    def test_adjoint_invalid_argument(self):
+    def test_adjoint_invalid_argument(self, capture_mode):
         """Checks that catalyst.adjoint rejects non-quantum program arguments."""
-        with pytest.raises(ValueError, match="Expected a callable"):
+        expected_msg = "not callable" if capture_mode else "Expected a callable"
+        with pytest.raises(ValueError, match=expected_msg):
 
-            @qjit
+            @qjit(capture=capture_mode)
             @qml.qnode(qml.device("lightning.qubit", wires=2))
             def C_workflow():
                 adjoint(33)()
@@ -293,8 +300,7 @@ class TestCatalyst:
 
             C_workflow()
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_adjoint_classical_loop(self, backend):
+    def test_adjoint_classical_loop(self, backend, capture_mode):
         """Checks that catalyst.adjoint supports purely-classical Control-flows."""
 
         def func(w=0):
@@ -305,11 +311,12 @@ class TestCatalyst:
             qml.PauliX(wires=loop(w))  # pylint: disable=no-value-for-parameter
             qml.RX(np.pi / 2, wires=w)
 
-        self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=3), 0)
+        self.verify_catalyst_adjoint_against_pennylane(
+            func, qml.device(backend, wires=3), 0, capture_mode=capture_mode
+        )
 
-    @pytest.mark.usefixtures("use_both_frontend")
     @pytest.mark.parametrize("pred", [True, False])
-    def test_adjoint_cond(self, backend, pred):
+    def test_adjoint_cond(self, backend, capture_mode, pred):
         """Tests that the correct gates are applied in reverse in a conditional branch"""
 
         def func(pred, theta):
@@ -320,10 +327,11 @@ class TestCatalyst:
             cond_fn()
 
         dev = qml.device(backend, wires=1)
-        self.verify_catalyst_adjoint_against_pennylane(func, dev, pred, jnp.pi)
+        self.verify_catalyst_adjoint_against_pennylane(
+            func, dev, pred, jnp.pi, capture_mode=capture_mode
+        )
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_adjoint_while_loop(self, backend):
+    def test_adjoint_while_loop(self, backend, capture_mode):
         """
         Tests that the correct gates are applied in reverse in a while loop with a statically
         unknown number of iterations.
@@ -341,10 +349,9 @@ class TestCatalyst:
             qml.RZ(final, wires=0)
 
         dev = qml.device(backend, wires=1)
-        self.verify_catalyst_adjoint_against_pennylane(func, dev, 10)
+        self.verify_catalyst_adjoint_against_pennylane(func, dev, 10, capture_mode=capture_mode)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_adjoint_for_loop(self, backend):
+    def test_adjoint_for_loop(self, backend, capture_mode):
         """Tests the correct application of gates (with dynamic wires)"""
 
         def func(ub):
@@ -355,10 +362,9 @@ class TestCatalyst:
             loop_body()  # pylint: disable=no-value-for-parameter
 
         dev = qml.device(backend, wires=5)
-        self.verify_catalyst_adjoint_against_pennylane(func, dev, 4)
+        self.verify_catalyst_adjoint_against_pennylane(func, dev, 4, capture_mode=capture_mode)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_adjoint_while_nested(self, backend):
+    def test_adjoint_while_nested(self, backend, capture_mode):
         """Tests the correct handling of nested while loops."""
 
         def func(limit, inner_iters):
@@ -387,11 +393,14 @@ class TestCatalyst:
 
         dev = qml.device(backend, wires=2)
         self.verify_catalyst_adjoint_against_pennylane(
-            func, dev, 10, jnp.array([2, 4, 3, 5, 1, 7, 4, 6, 9, 10])
+            func,
+            dev,
+            10,
+            jnp.array([2, 4, 3, 5, 1, 7, 4, 6, 9, 10]),
+            capture_mode=capture_mode,
         )
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_adjoint_nested_with_control_flow(self, backend):
+    def test_adjoint_nested_with_control_flow(self, backend, capture_mode):
         """
         Tests that nested adjoint ops produce correct results in the presence of nested control
         flow.
@@ -431,7 +440,7 @@ class TestCatalyst:
 
         dev = qml.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(dev)
         def catalyst_workflow(*args):
             adjoint(c_quantum_func)(*args)
@@ -444,8 +453,7 @@ class TestCatalyst:
 
         assert_allclose(catalyst_workflow(jnp.pi), pennylane_workflow(jnp.pi))
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_adjoint_for_nested(self, backend):
+    def test_adjoint_for_nested(self, backend, capture_mode):
         """
         Tests the adjoint op with nested and interspersed for/while loops that produce classical
         values in addition to quantum ones
@@ -477,12 +485,16 @@ class TestCatalyst:
             loop_outer()  # pylint: disable=no-value-for-parameter
 
         dev = qml.device(backend, wires=1)
-        self.verify_catalyst_adjoint_against_pennylane(func, dev, jnp.pi)
+        self.verify_catalyst_adjoint_against_pennylane(func, dev, jnp.pi, capture_mode=capture_mode)
 
-    def test_adjoint_wires(self, backend):
+    # capture=True raises AttributeError("'NoneType' object has no attribute 'wires'") for
+    # adjoint(func)(...)
+    # Classification: PL capture gap; fix by preserving Adjoint op metadata/wires in capture path.
+    @pytest.mark.capture_todo
+    def test_adjoint_wires(self, backend, capture_mode):
         """Test the wires property of Adjoint"""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(theta):
             def func(theta):
@@ -496,10 +508,15 @@ class TestCatalyst:
         # Without the `wires` property, returns `[-1]`
         assert circuit(0.3) == qml.wires.Wires([0, 2])
 
-    def test_adjoint_wires_qubitunitary(self, backend):
+    # capture=True raises AttributeError("'NoneType' object has no attribute 'wires'") for nested
+    # adjoint.
+    # Classification: PL capture gap; fix by preserving nested Adjoint op metadata/wires in capture
+    # path.
+    @pytest.mark.capture_todo
+    def test_adjoint_wires_qubitunitary(self, backend, capture_mode):
         """Test the wires property of nested Adjoint with QubitUnitary"""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=3))
         def circuit():
             def func():
@@ -522,7 +539,7 @@ class TestCatalyst:
         assert circuit() == qml.wires.Wires([0, 1])
 
     @pytest.mark.xfail(reason="adjoint.wires is not supported with variable wires")
-    def test_adjoint_var_wires(self, backend):
+    def test_adjoint_var_wires(self, backend, capture_mode):
         """Test catalyst.adjoint.wires with variable wires."""
 
         device = qml.device(backend, wires=3)
@@ -532,7 +549,7 @@ class TestCatalyst:
             qml.RY(theta / 2, wires=w1)
             qml.RZ(theta, wires=2)
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(device)
         def C_workflow(w0, w1, theta):
             qml.PauliX(wires=0)
@@ -548,10 +565,10 @@ class TestCatalyst:
         C_workflow(0, 1, 0.23)
 
     @pytest.mark.xfail(reason="adjoint.wires is not supported with control-flow branches")
-    def test_adjoint_wires_controlflow(self, backend):
+    def test_adjoint_wires_controlflow(self, backend, capture_mode):
         """Test the wires property of Adjoint  in a conditional branch"""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=3))
         def circuit():
             def func(pred, theta):
@@ -567,8 +584,7 @@ class TestCatalyst:
         # It returns `-1` instead of `0`
         assert circuit() == qml.wires.Wires([0])
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_adjoint_ctrl_ctrl_subroutine(self, backend):
+    def test_adjoint_ctrl_ctrl_subroutine(self, backend, capture_mode):
         """https://github.com/PennyLaneAI/catalyst/issues/589"""
 
         def subsubroutine():
@@ -587,15 +603,20 @@ class TestCatalyst:
             return qml.probs(wires=dev.wires)
 
         expected = circuit()
-        observed = qjit(circuit)()
+        observed = qjit(circuit, capture=capture_mode)()
         assert_allclose(expected, observed)
 
-    def test_adjoint_outside_qjit(self, backend):
+    # capture=True raises RuntimeError("No queuing context available to append operation to.") in
+    # qml.apply.
+    # Classification: PL capture gap; fix by enabling qml.apply on pre-built adjoint ops under
+    # capture.
+    @pytest.mark.capture_todo
+    def test_adjoint_outside_qjit(self, backend, capture_mode):
         """Test that the hybrid adjoint can be used from outside qjit & qnode."""
 
         adj_op = adjoint(qml.RY(np.pi / 2, wires=0))
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit():
             qml.Hadamard(0)
@@ -1630,26 +1651,39 @@ class TestAdjointConstructorIntegration:
 
 class TestMidCircuitMeasurementAfterAdjoint:
 
-    def test_issue_1055(self, backend):
+    # capture=True raises NotImplementedError("Measurements of mcms are not yet supported.") on
+    # qml.sample(mcm).
+    # Classification: missing PL/Catalyst feature; fix by adding capture lowering/execution for MCM
+    # terminal measurements.
+    @pytest.mark.capture_todo
+    def test_issue_1055(self, backend, capture_mode):
         """See https://github.com/PennyLaneAI/catalyst/issues/1055"""
 
         def subroutine():
             qml.Hadamard(wires=1)
 
-        @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qjit(capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=2), shots=1)
         def circuit():
             # Comment/uncomment to toggle bug
             adjoint(subroutine)()
 
-            res = measure(0)
+            # Use PennyLane primitive under capture mode; catalyst.measure is old-frontend-only.
+            measure_prim = qml.measure if capture_mode else measure
+            res = measure_prim(0)
 
             # This call is just to show that it works after the measurement
             adjoint(subroutine)()
 
+            if capture_mode:
+                return qml.sample(res)
             return res
 
-        assert not circuit()
+        observed = circuit()
+        if capture_mode:
+            assert int(observed[0]) == 0
+        else:
+            assert not observed
 
 
 if __name__ == "__main__":

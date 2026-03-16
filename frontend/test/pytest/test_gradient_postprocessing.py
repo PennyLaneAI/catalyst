@@ -19,13 +19,13 @@ import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
-from catalyst import DifferentiableCompileError, grad, jacobian, qjit
+from catalyst import DifferentiableCompileError, grad, qjit
 
 SUPPORTED_DIFF_METHODS = ["parameter-shift", "adjoint"]
 
 
 @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
-def test_scalar_scalar(backend, diff_method):
+def test_scalar_scalar(capture_mode, backend, diff_method):
     """Test a hybrid scalar -> scalar (internally a point tensor -> point tensor) workflow"""
 
     @qml.qnode(qml.device(backend, wires=1), diff_method=diff_method)
@@ -37,9 +37,9 @@ def test_scalar_scalar(backend, diff_method):
         w = workflow(x)
         return jnp.cos(w)
 
-    @qjit
+    @qjit(capture=capture_mode)
     def jac_postprocess(x):
-        return grad(postprocess, method="auto")(x)
+        return qml.grad(postprocess, method="auto")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
     catalyst_jacobian = jac_postprocess(0.5)
@@ -47,7 +47,7 @@ def test_scalar_scalar(backend, diff_method):
 
 
 @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
-def test_one_to_many(backend, diff_method):
+def test_one_to_many(capture_mode, backend, diff_method):
     """Test a tall Jacobian (one input to many outputs)"""
 
     @qml.qnode(qml.device(backend, wires=1), diff_method=diff_method)
@@ -59,9 +59,9 @@ def test_one_to_many(backend, diff_method):
         w = workflow(x)
         return jnp.array([jnp.cos(w), w, w * 2])
 
-    @qjit
+    @qjit(capture=capture_mode)
     def jac_postprocess(x):
-        return jacobian(postprocess, method="auto")(x)
+        return qml.jacobian(postprocess, method="auto")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
     catalyst_jacobian = jac_postprocess(0.5)
@@ -69,7 +69,7 @@ def test_one_to_many(backend, diff_method):
 
 
 @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
-def test_many_to_one(backend, diff_method):
+def test_many_to_one(capture_mode, backend, diff_method):
     """Test a wide Jacobian (many inputs to one output)"""
 
     @qml.qnode(qml.device(backend, wires=1), diff_method=diff_method)
@@ -84,9 +84,9 @@ def test_many_to_one(backend, diff_method):
         w = workflow(x)
         return jnp.cos(w)
 
-    @qjit
+    @qjit(capture=capture_mode)
     def jac_postprocess(x):
-        return grad(postprocess, method="auto")(x)
+        return qml.grad(postprocess, method="auto")(x)
 
     x = jnp.array([0.5, 0.4, 0.3, 0.2])
     jax_jacobian = jax.jacobian(postprocess)(x)
@@ -94,7 +94,7 @@ def test_many_to_one(backend, diff_method):
     assert catalyst_jacobian == pytest.approx(jax_jacobian)
 
 
-def test_tensor_measure(backend):
+def test_tensor_measure(capture_mode, backend):
     """Tests correctness of a derivative of a qnode that returns a tensor"""
 
     @qml.qnode(qml.device(backend, wires=2), diff_method="parameter-shift")
@@ -107,16 +107,16 @@ def test_tensor_measure(backend):
         probs = workflow(x)
         return jnp.sum(probs) / jnp.prod(probs)
 
-    @qjit
+    @qjit(capture=capture_mode)
     def jac_postprocess(x):
-        return jacobian(postprocess, method="auto")(x)
+        return qml.jacobian(postprocess, method="auto")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
     catalyst_jacobian = jac_postprocess(0.5)
     assert catalyst_jacobian == pytest.approx(jax_jacobian)
 
 
-def test_multi_measure(backend):
+def test_multi_measure(capture_mode, backend):
     """Tests correctness of a derivative of a qnode with multiple measurements"""
 
     @qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")
@@ -128,30 +128,30 @@ def test_multi_measure(backend):
         w, probs = workflow(x)
         return jnp.cos(w) + jnp.prod(probs)
 
-    @qjit
+    @qjit(capture=capture_mode)
     def jac_postprocess(x):
-        return grad(postprocess, method="auto")(x)
+        return qml.grad(postprocess, method="auto")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
     catalyst_jacobian = jac_postprocess(0.5)
     assert catalyst_jacobian == pytest.approx(jax_jacobian)
 
 
-def test_purely_classical():
+def test_purely_classical(capture_mode):
     """Test the behaviour of the grad op on a purely classical function"""
 
     def postprocess(x):
         return x**2
 
-    @qjit
+    @qjit(capture=capture_mode)
     def classical_grad(x):
-        return grad(postprocess, method="auto")(x)
+        return qml.grad(postprocess, method="auto")(x)
 
     assert classical_grad(4.5) == 9
 
 
 @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
-def test_jacobian(backend, diff_method):
+def test_jacobian(capture_mode, backend, diff_method):
     """Tests correctness of a full Jacobian with multiple inputs and outputs"""
 
     @qml.qnode(qml.device(backend, wires=1), diff_method=diff_method)
@@ -166,16 +166,16 @@ def test_jacobian(backend, diff_method):
         w = workflow(x)
         return jnp.array([[jnp.sin(w), jnp.cos(w)], [w, w * 2], [w / 2, w]])
 
-    @qjit
+    @qjit(capture=capture_mode)
     def jac_postprocess(x):
-        return jacobian(postprocess, method="auto")(x)
+        return qml.jacobian(postprocess, method="auto")(x)
 
     x = jnp.array([0.5, 0.4, 0.3, 0.2])
     assert jac_postprocess(x) == pytest.approx(jax.jacobian(postprocess)(x))
 
 
 @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
-def test_multi_result(backend, diff_method):
+def test_multi_result(capture_mode, backend, diff_method):
     """Tests the correctness of multiple Jacobians from multiple results"""
 
     @qml.qnode(qml.device(backend, wires=1), diff_method=diff_method)
@@ -187,9 +187,9 @@ def test_multi_result(backend, diff_method):
         w = workflow(x)
         return jnp.cos(w), jnp.array([w, x * 2.454])
 
-    @qjit
+    @qjit(capture=capture_mode)
     def jac_postprocess(x):
-        return jacobian(postprocess, method="auto")(x)
+        return qml.jacobian(postprocess, method="auto")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
     catalyst_jacobian = jac_postprocess(0.5)
@@ -198,7 +198,7 @@ def test_multi_result(backend, diff_method):
 
 
 @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
-def test_multi_arg_multi_result(backend, diff_method):
+def test_multi_arg_multi_result(capture_mode, backend, diff_method):
     """Tests multiple tensor arguments and results"""
 
     @qml.qnode(qml.device(backend, wires=1), diff_method=diff_method)
@@ -211,9 +211,9 @@ def test_multi_arg_multi_result(backend, diff_method):
         w = workflow(x, y)
         return jnp.cos(w), jnp.array([w, x[0] * 2.454])
 
-    @qjit
+    @qjit(capture=capture_mode)
     def jac_postprocess(x, y):
-        return jacobian(postprocess, argnums=[0, 1], method="auto")(x, y)
+        return qml.jacobian(postprocess, argnums=[0, 1], method="auto")(x, y)
 
     args = (jnp.array([0.5, 0, 0]), 0.4)
     jax_jacobian = jax.jacobian(postprocess, argnums=[0, 1])(*args)
@@ -224,7 +224,7 @@ def test_multi_arg_multi_result(backend, diff_method):
             assert jax_jacobian[i][j] == pytest.approx(catalyst_jacobian[i][j])
 
 
-def test_multi_qnode(backend):
+def test_multi_qnode(capture_mode, backend):
     """Test a multi-QNode workflow where each QNode has a different diff_method"""
     device = qml.device(backend, wires=2)
 
@@ -244,15 +244,15 @@ def test_multi_qnode(backend):
     def postprocess(x):
         return jnp.tanh(second_qnode(x)) * jnp.cos(first_qnode(x))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def grad_workflow(x):
-        return grad(postprocess, method="auto")(x)
+        return qml.grad(postprocess, method="auto")(x)
 
     x = jnp.array([0.1, 0.2, 0.3])
     assert grad_workflow(x) == pytest.approx(jax.jacobian(postprocess)(x))
 
 
-def test_qnode_different_returns(backend):
+def test_qnode_different_returns(capture_mode, backend):
     """Test a multi-QNode workflow where the QNodes have different diff_methods and return
     different shapes.
     """
@@ -270,15 +270,16 @@ def test_qnode_different_returns(backend):
     def loss(params):
         return jnp.prod(circuit_A(params)) + circuit_B(params)
 
-    @qjit
+    @qjit(capture=capture_mode)
     def grad_loss(theta):
-        return grad(loss, method="auto")(theta)
+        return qml.grad(loss, method="auto")(theta)
 
     x = jnp.array([1.0, 2.0])
     assert grad_loss(x) == pytest.approx(jax.jacobian(loss)(x))
 
 
-def test_no_nested_grad_without_fd():
+@pytest.mark.old_frontend
+def test_no_nested_grad_without_fd(capture_mode):
     """Test input validation for higher order derivatives where outer grad ops don't have
     method='fd'.
     """
@@ -291,9 +292,9 @@ def test_no_nested_grad_without_fd():
 
     with pytest.raises(DifferentiableCompileError, match="higher order derivatives"):
 
-        @qjit
+        @qjit(capture=capture_mode)
         def outer(x: float):
-            return grad(middle, method="auto")(x)
+            return qml.grad(middle, method="auto")(x)
 
         outer(9.0)
 
