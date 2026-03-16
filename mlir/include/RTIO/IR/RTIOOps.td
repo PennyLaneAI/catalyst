@@ -170,8 +170,7 @@ def RTIOSyncOp : RTIO_Op<"sync"> {
 def RTIORPCOp : RTIO_Op<"rpc"> {
     let summary = "Invoke a host RPC function from the kernel";
     let description = [{
-        Represents an outgoing RPC call from the kernel to the host
-        using `rpc_send` / `rpc_recv` / `rpc_send_async`
+        Represents an outgoing RPC call from the kernel to the host.
 
         Attributes:
         - callee:    The symbolic name of the host-side callable to invoke.
