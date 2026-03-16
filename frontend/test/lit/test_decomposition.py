@@ -1747,5 +1747,17 @@ def test_cpp_decomp_empty_args():
 
     print(circuit.mlir)
 
+    @qjit(target="mlir")
+    # CHECK: transform.apply_registered_pass "graph-decomposition"
+    # CHECK-NOT: fixed-decomps
+    # CHECK-NOT: alt-decomps
+    # CHECK: "bytecode-rules" = "{{.*}}/decomposition_rules.mlirbc"
+    @graph_decomposition(gate_set={qml.RX}, fixed_decomps={}, alt_decomps={})
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit2():
+        return
+
+    print(circuit2.mlir)
+
 
 test_cpp_decomp_empty_args()
