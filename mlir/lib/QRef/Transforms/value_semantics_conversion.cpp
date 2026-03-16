@@ -495,7 +495,7 @@ void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValu
                     Value rQreg = getRSourceRegisterValue(v);
                     if (rQreg.getParentRegion()->isProperAncestor(&r)) {
                         auto getOp = cast<qref::GetOp>(v.getDefiningOp());
-                        if (getOp.getIdx() && getOp.getIdx().getParentRegion() == &r) {
+                        if (getOp.getIdx() && r.isAncestor(getOp.getIdx().getParentRegion())) {
                             // dynamic extract index is from within the region, must take in the reg
                             necessaryRegionRValues.insert(rQreg);
                         }
@@ -507,6 +507,87 @@ void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValu
             }
         }
     });
+}
+
+/**
+ * @brief Hoist all rQubit Values in `rValuesUsedByRegion` from qref.get operations that alias each
+ * other before the `insertionPoint` argument.
+ *
+ * @param builder
+ * @param rValuesUsedByRegion
+ * @param insertionPoint
+ */
+void hoistAliasingGetOps(IRRewriter &builder, SetVector<Value> &rValuesUsedByRegion,
+                         Operation *insertionPoint)
+{
+    OpBuilder::InsertionGuard guard(builder);
+
+    llvm::DenseMap<Value, Value> replacementMap;
+
+    // 1. Place the aliasing qref.get ops into groups
+    SmallVector<SmallVector<Value>> equivalenceGroups;
+
+    for (Value val : rValuesUsedByRegion) {
+        Operation *defOp = val.getDefiningOp();
+        if (!defOp || !isa<qref::GetOp>(defOp)) {
+            continue;
+        }
+
+        Value dynamicGetIdx = cast<qref::GetOp>(defOp).getIdx();
+        if (dynamicGetIdx &&
+            insertionPoint->getParentRegion()->isProperAncestor(dynamicGetIdx.getParentRegion())) {
+            // A get op with an index Value defined in an inner region, don't hoist
+            continue;
+        }
+
+        bool placedInGroup = false;
+        for (auto &group : equivalenceGroups) {
+            // Compare against the 'leader' of the group
+            if (OperationEquivalence::isEquivalentTo(defOp, group[0].getDefiningOp(),
+                                                     OperationEquivalence::IgnoreLocations)) {
+                group.push_back(val);
+                placedInGroup = true;
+                break;
+            }
+        }
+
+        if (!placedInGroup) {
+            equivalenceGroups.push_back({val});
+        }
+    }
+
+    // 2. For each group, create one new Op and replace all
+    for (auto &group : equivalenceGroups) {
+        auto groupRepresentative = cast<qref::GetOp>(group[0].getDefiningOp());
+        builder.setInsertionPoint(insertionPoint);
+
+        auto newGetOp = qref::GetOp::create(
+            builder, groupRepresentative.getLoc(),
+            qref::QubitType::get(groupRepresentative->getContext()), groupRepresentative.getQreg(),
+            groupRepresentative.getIdx(), groupRepresentative.getIdxAttrAttr());
+
+        for (Value oldVal : group) {
+            oldVal.replaceAllUsesWith(newGetOp.getResult());
+            replacementMap[oldVal] = newGetOp.getResult();
+        }
+    }
+
+    // 3. Replace occurrences in the rValuesUsedByRegion input
+    SetVector<Value> newRValuesUsedByRegion;
+    for (Value v : rValuesUsedByRegion) {
+        if (replacementMap.count(v)) {
+            newRValuesUsedByRegion.insert(replacementMap[v]);
+        }
+        else {
+            newRValuesUsedByRegion.insert(v);
+        }
+    }
+    rValuesUsedByRegion = std::move(newRValuesUsedByRegion);
+
+    for (auto &pair : replacementMap) {
+        Operation *oldOp = pair.first.getDefiningOp();
+        oldOp->erase();
+    }
 }
 
 /**
@@ -849,6 +930,7 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
     if (hasElseRegion) {
         getNecessaryRegionRValues(ifOp.getElseRegion(), rValuesUsedByRegion);
     }
+    hoistAliasingGetOps(builder, rValuesUsedByRegion, ifOp);
 
     if (rValuesUsedByRegion.size() == 0) {
         return;
@@ -1089,6 +1171,7 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
     SetVector<Value> rValuesUsedByRegion;
     getNecessaryRegionRValues(whileOp.getBefore(), rValuesUsedByRegion);
     getNecessaryRegionRValues(whileOp.getAfter(), rValuesUsedByRegion);
+    hoistAliasingGetOps(builder, rValuesUsedByRegion, whileOp);
 
     if (rValuesUsedByRegion.size() == 0) {
         return;

@@ -39,6 +39,8 @@ struct TransientQubitExtractor;
 // Misc helper functions
 Value getRSourceRegisterValue(Value rQubit);
 void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValues);
+void hoistAliasingGetOps(IRRewriter &builder, SetVector<Value> &rValuesUsedByRegion,
+                         Operation *insertionPoint);
 DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumGate rGateOp);
 Operation *addRootVValuesToRetOp(Region &r, QubitValueTracker &tracker);
 
