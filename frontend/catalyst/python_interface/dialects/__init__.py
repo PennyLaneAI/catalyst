@@ -19,6 +19,6 @@ from .pbc import PBC
 from .qecl import QecLogical
 from .qecp import QecPhysical
 from .quantum import Quantum
-from .stablehlo import StableHLO
+from xdsl_jax.dialects.stablehlo import StableHLO
 
 __all__ = ["Catalyst", "MBQC", "QecLogical", "QecPhysical", "Quantum", "PBC", "StableHLO"]
