@@ -20,6 +20,8 @@ import json
 from pathlib import Path
 from typing import Iterable
 
+from pennylane.decomposition.utils import to_name
+
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.passes.pass_api import PassPipelineWrapper
 from catalyst.utils.exceptions import CompileError
@@ -1488,7 +1490,7 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
 def graph_decomposition(
     qnode=None,
     *,
-    gate_set: Iterable,
+    gate_set: Iterable[type | str] | dict[type | str, float],
     fixed_decomps: dict | None = None,
     alt_decomps: dict | None = None,
     _builtin_rule_path: Path = DEFAULT_RULE_DIR / BYTECODE_FILE_NAME,
@@ -1510,7 +1512,8 @@ def graph_decomposition(
 
     Args:
         fn (QNode): the QNode to apply the graph decomposition compiler pass to.
-        gate_set (Iterable): the set of gates that are permissable after decomposition.
+        gate_set (Iterable[type | str] | dict[type | str, float]): the set of gates that are
+            permissable after decomposition.
         fixed_decomps (dict | None): map ops to decomps that will be forcibly applied.
         alt_decomps (dict | None): map ops to lists of decomps that the graph system will consider.
 
@@ -1544,9 +1547,9 @@ def graph_decomposition(
         )
 
     if not isinstance(gate_set, dict):
-        gate_set = {op.__name__: 1.0 for op in gate_set}
+        gate_set = {to_name(op): 1.0 for op in gate_set}
     else:
-        gate_set = {op.__name__: cost for op, cost in gate_set.items()}
+        gate_set = {to_name(op): cost for op, cost in gate_set.items()}
 
     options = {"gate_set": gate_set, "bytecode-rules": str(_builtin_rule_path)}
 
@@ -1558,7 +1561,7 @@ def graph_decomposition(
     if alt_decomps:
         options |= {
             "alt_decomps": {
-                op.__name__: tuple(rule.__name__ for rule in rules)
+                to_name(op): tuple(rule.__name__ for rule in rules)
                 for op, rules in alt_decomps.items()
             }
         }
