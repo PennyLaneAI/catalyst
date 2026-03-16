@@ -235,6 +235,22 @@ struct ChannelOpLowering : public OpConversionPattern<RTIOChannelOp> {
     }
 };
 
+/// Get slot size in bytes for ARTIQ RPC return type code.
+static int getSlotSizeForReturnCode(char code)
+{
+    switch (code) {
+    case 'i':
+        return 4;
+    case 'I':
+    case 'f':
+    case 's':
+    case 'O':
+        return 8;
+    default:
+        llvm_unreachable("unknown ARTIQ RPC return type code");
+    }
+}
+
 /// Lower `rtio.rpc` to ARTIQ `rpc_send` / `rpc_recv` calls.
 ///
 /// Protocol:
@@ -308,19 +324,34 @@ struct RPCOpLowering : public OpConversionPattern<RTIORPCOp> {
         Value serviceId = arith::ConstantOp::create(
             rewriter, loc, rewriter.getIntegerAttr(i32Ty, rpcIdAttr.getInt()));
 
+        SmallVector<Value> replacementValues;
+
         if (op.getIsAsync()) {
             artiq.rpcSendAsync(serviceId, tagPtr, argsArray);
         }
         else {
+            // 4. For sync calls, call rpc_send(id, tag_ptr, args_ptr) and rpc_recv(slot_ptr)
             artiq.rpcSend(serviceId, tagPtr, argsArray);
 
-            // rpc_recv for sync calls
-            auto slotTy = LLVM::LLVMArrayType::get(i8Ty, 8);
+            // Parse tag for return type
+            StringRef tag = op.getTag();
+            size_t colon = tag.find(':');
+            StringRef returnPart = colon != StringRef::npos ? tag.take_front(colon) : "n";
+
+            int slotSize = (returnPart == "n") ? 8 : getSlotSizeForReturnCode(returnPart[0]);
+            auto slotTy = LLVM::LLVMArrayType::get(i8Ty, slotSize);
             Value resultSlot = LLVM::AllocaOp::create(rewriter, loc, ptrTy, slotTy, one);
             artiq.rpcRecv(resultSlot);
+
+            // For non-void return, load from slot and provide as replacement
+            if (returnPart != "n" && op.getNumResults() == 1) {
+                Type resultTy = getTypeConverter()->convertType(op.getResult(0).getType());
+                Value loaded = LLVM::LoadOp::create(rewriter, loc, resultTy, resultSlot);
+                replacementValues.push_back(loaded);
+            }
         }
 
-        rewriter.eraseOp(op);
+        rewriter.replaceOp(op, replacementValues);
         return success();
     }
 };

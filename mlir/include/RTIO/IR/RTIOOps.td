@@ -189,6 +189,11 @@ def RTIORPCOp : RTIO_Op<"rpc"> {
         ```mlir
         rtio.rpc @set_dataset tag("n:sO") (%key, %val : !llvm.ptr, !llvm.ptr)
         ```
+
+        Example (sync, with return value):
+        ```mlir
+        %x = rtio.rpc @get_value tag("I:") -> i64
+        ```
     }];
 
     let arguments = (ins
@@ -199,11 +204,14 @@ def RTIORPCOp : RTIO_Op<"rpc"> {
         Variadic<AnyType>:$args
     );
 
-    let results = (outs);
+    let results = (outs Variadic<AnyType>:$results);
 
     let assemblyFormat = [{
-        $callee `tag` `(` $tag `)` (`async` $is_async^)? (`(` $args^ `:` type($args) `)`)? attr-dict
+        $callee `tag` `(` $tag `)` (`async` $is_async^)? (`(` $args^ `:` type($args) `)`)?
+        (`->` type($results)^)? attr-dict
     }];
+
+    let hasVerifier = 1;
 }
 
 def RTIOEmptyOp : RTIO_Op<"empty", [Pure]> {
