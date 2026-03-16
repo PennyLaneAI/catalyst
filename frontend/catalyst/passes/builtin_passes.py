@@ -1551,16 +1551,16 @@ def graph_decomposition(
     else:
         gate_set = {to_name(op): cost for op, cost in gate_set.items()}
 
-    options = {"gate_set": gate_set, "bytecode-rules": str(_builtin_rule_path)}
+    options = {"gate-set": gate_set, "bytecode-rules": str(_builtin_rule_path)}
 
     if fixed_decomps:
         options |= {
-            "fixed_decomps": {op.__name__: rule.__name__ for op, rule in fixed_decomps.items()}
+            "fixed-decomps": {op.__name__: rule.__name__ for op, rule in fixed_decomps.items()}
         }
 
     if alt_decomps:
         options |= {
-            "alt_decomps": {
+            "alt-decomps": {
                 to_name(op): tuple(rule.__name__ for rule in rules)
                 for op, rules in alt_decomps.items()
             }
