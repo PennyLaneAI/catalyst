@@ -438,6 +438,7 @@ class TestDiagonalizeFinalMeasurementsPass:
                 // CHECK-NEXT: quantum.namedobs [[q:%.+]][PauliZ]
                 %1 = quantum.namedobs %0[PauliX] : !quantum.obs
                 %2 = quantum.var %1 : f64
+                // CHECK-NOT: quantum.custom "Hadamard"()
                 // CHECK: quantum.namedobs [[q:%.+]][PauliZ]
                 %3 = quantum.namedobs %0[PauliX] : !quantum.obs
                 %4 = quantum.var %3 : f64
@@ -594,7 +595,8 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
     @pytest.mark.usefixtures("use_capture")
-    def test_overlapping_commute_observables_multiple_measurements(self):
+    @pytest.mark.parametrize("phi", [0.123, 1.23])
+    def test_overlapping_commute_observables_multiple_measurements(self, phi):
         """Test the case where multiple overlapping (commuting) observables exist in
         the same circuit."""
 
@@ -607,7 +609,12 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
             qml.RX(x, 0)
             return qml.expval(qml.Y(0)), qml.var(qml.Y(0))
 
-        _ = circuit(1.23)
+        expected_expval = -np.sin(phi)
+        expected_var = 1 - np.sin(phi) ** 2
+
+        expval, var = circuit(1.23)
+        assert np.allclose(expected_expval, expval)
+        assert np.allclose(expected_var, var)
 
     @pytest.mark.usefixtures("use_capture")
     def test_non_commuting_observables_raise_error(self):
@@ -787,21 +794,6 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         )
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
-
-    def test_overlapping_commute_observables_no_error_raises(self):
-        """Test the case where multiple overlapping (commuting) observables exist in
-        the same circuit."""
-
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qjit()
-        @diagonalize_final_measurements_pass
-        @qml.qnode(dev)
-        def circuit(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.Y(0)), qml.var(qml.Y(0))
-
-        _ = circuit(1.23)
 
 
 @pytest.mark.usefixtures("use_capture")
