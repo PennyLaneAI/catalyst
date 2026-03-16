@@ -678,7 +678,6 @@ func.func @test_if_with_existing_results(%arg0: i1, %arg1: f64) -> i1 attributes
 func.func @test_if_nested_for(%arg0: i1) attributes {quantum.node} {
     // CHECK: [[qreg:%.+]] = quantum.alloc( 3) : !quantum.reg
     %a = qref.alloc(3) : !qref.reg<3>
-    %q0 = qref.get %a[0] : !qref.reg<3> -> !qref.bit
 
     // CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[q1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
@@ -691,6 +690,7 @@ func.func @test_if_nested_for(%arg0: i1) attributes {quantum.node} {
         // CHECK: [[forOut:%.+]]:3 = scf.for %arg1 = {{%.+}} to {{%.+}} step {{.+}} iter_args(%arg2 = [[q0]], %arg3 = [[q1]], %arg4 = [[qreg]])
         // CHECK-SAME: -> (!quantum.bit, !quantum.bit, !quantum.reg)
         scf.for %i = %start to %stop step %step {
+            %q0 = qref.get %a[0] : !qref.reg<3> -> !qref.bit
             %q1 = qref.get %a[1] : !qref.reg<3> -> !qref.bit
             %int = index.casts %i : index to i64
             %this_q = qref.get %a[%int] : !qref.reg<3>, i64 -> !qref.bit
@@ -705,6 +705,7 @@ func.func @test_if_nested_for(%arg0: i1) attributes {quantum.node} {
             scf.yield
         }
 
+        %q0 = qref.get %a[0] : !qref.reg<3> -> !qref.bit
         %q1 = qref.get %a[1] : !qref.reg<3> -> !qref.bit
 
         // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[forOut]]#0, [[forOut]]#1 : !quantum.bit, !quantum.bit
