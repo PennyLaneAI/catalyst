@@ -192,9 +192,8 @@ class ARTIQRuntimeBuilder {
     void rpcSendAsync(Value serviceId, Value tagPtr, Value argsPtr)
     {
         Type ptrTy = LLVM::LLVMPointerType::get(ctx);
-        auto func =
-            ensureFunc(ARTIQFuncNames::rpcSendAsync,
-                       LLVM::LLVMFunctionType::get(voidTy, {i32Ty, ptrTy, ptrTy}));
+        auto func = ensureFunc(ARTIQFuncNames::rpcSendAsync,
+                               LLVM::LLVMFunctionType::get(voidTy, {i32Ty, ptrTy, ptrTy}));
         LLVM::CallOp::create(builder, getLoc(), func, ValueRange{serviceId, tagPtr, argsPtr});
     }
 
