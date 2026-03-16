@@ -1555,7 +1555,7 @@ def graph_decomposition(
 
     if fixed_decomps:
         options |= {
-            "fixed-decomps": {op.__name__: rule.__name__ for op, rule in fixed_decomps.items()}
+            "fixed-decomps": {to_name(op): rule.__name__ for op, rule in fixed_decomps.items()}
         }
 
     if alt_decomps:
