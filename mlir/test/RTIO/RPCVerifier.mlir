@@ -63,7 +63,7 @@ module @invalid_tag_format {
 
 module @invalid_arg_count {
   func.func @__kernel__(%x: i64) {
-    // expected-error@+1 {{tag has 2 arg type codes but 1 argument provided}}
+    // expected-error@+1 {{tag has 2 arg type code(s) but 1 argument(s) provided}}
     rtio.rpc @foo tag("n:II") (%x : i64)
     return
   }
