@@ -40,6 +40,10 @@ def is_supported(op: Operator, capabilities: DeviceCapabilities) -> bool:
     """Check whether an operation is supported by the device."""
     return op.name in capabilities.operations
 
+def is_quantum_gate(op: Operator) -> bool:
+    """Check whether an operation is a quantum gate."""
+    return isinstance(op, qml.operation.Gate)
+    # and isinstance(op, qml.operation.DynamicGate)
 
 def _is_grad_recipe_same_as_catalyst(op):
     """Checks that the grad_recipe for the op matches the hard coded one in Catalyst."""
