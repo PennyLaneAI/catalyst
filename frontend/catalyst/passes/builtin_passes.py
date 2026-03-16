@@ -1510,13 +1510,29 @@ def graph_decomposition(
 
     Args:
         fn (QNode): the QNode to apply the graph decomposition compiler pass to.
+        gate_set (Iterable): the set of gates that are permissable after decomposition.
+        fixed_decomps (dict | None): map ops to decomps that will be forcibly applied.
+        alt_decomps (dict | None): map ops to lists of decomps that the graph system will consider.
 
     Returns:
         ~.QNode:
 
     **Example**
 
-    TODO add an example once the implementation is complete.
+    @qp.qjit
+    # decompose to device gateset implicitly at later stages
+    @qp.transform(pass_name="cancel-inverses") # secondary optimizations
+    @qp.decompose(
+        gate_set={qp.RX, qp.RZ}
+    ) # decompose to secondary gateset
+    @qp.transform(pass_name="merge-rotations") # apply optimizations to primary gateset
+    @qp.decompose(
+        gate_set={qp.PauliRot, qp.PauliMeasure},
+        fixed_decomps={custom_op: lambda op, wires: qp.PauliRot(np.pi / 4, "XZ", wires)},
+    ) # decompose to primary gateset
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
+    def circuit():
+        custom_op(0)
     """
     if qnode is None:
         return functools.partial(
