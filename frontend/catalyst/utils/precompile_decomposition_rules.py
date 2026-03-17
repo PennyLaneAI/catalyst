@@ -300,6 +300,7 @@ def precompile_decomp_rules(decomp_dir_path: Path = DEFAULT_RULE_DIR):
         ),
         input=mlir_rules.encode("utf-8"),
         capture_output=True,
+        check=True,
     ).stdout
 
     with open(decomp_dir_path / BYTECODE_FILE_NAME, "wb") as bytecode_file:
