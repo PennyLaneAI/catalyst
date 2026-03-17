@@ -135,12 +135,12 @@ TEST_CASE("Test ChosenDecompRule construction", "[DecompGraph::Core]")
 
     REQUIRE(chosenRule.op == h);
     REQUIRE(chosenRule.isBasis == false);
-    REQUIRE(chosenRule.chosenRuleName == "h_to_rz_rx_rz");
-    REQUIRE(chosenRule.chosenInputs.size() == 2);
-    REQUIRE(chosenRule.chosenInputs[0].op == rz);
-    REQUIRE(chosenRule.chosenInputs[0].multiplicity == 2);
-    REQUIRE(chosenRule.chosenInputs[1].op == rx);
-    REQUIRE(chosenRule.chosenInputs[1].multiplicity == 1);
+    REQUIRE(chosenRule.ruleName == "h_to_rz_rx_rz");
+    REQUIRE(chosenRule.inputs.size() == 2);
+    REQUIRE(chosenRule.inputs[0].op == rz);
+    REQUIRE(chosenRule.inputs[0].multiplicity == 2);
+    REQUIRE(chosenRule.inputs[1].op == rx);
+    REQUIRE(chosenRule.inputs[1].multiplicity == 1);
     REQUIRE(chosenRule.totalCost == 3.0);
     REQUIRE(chosenRule.basisCounts.size() == 2);
     REQUIRE(chosenRule.basisCounts[rz] == 2);

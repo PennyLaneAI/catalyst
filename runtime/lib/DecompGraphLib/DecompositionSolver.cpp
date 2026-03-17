@@ -33,52 +33,37 @@ Core::ChosenDecompRule DecompositionSolver::solveOperator(const Core::OperatorNo
         RT_FAIL("Cycle detected in the decomposition graph");
     }
 
-    visited.insert(op);
-    solvingStack.push_back(op);
 
-    try {
-        Core::ChosenDecompRule chosen_rule;
+    // RAII guard for the visited set to check/solve the graph recursively
+    struct VisitGuard {
+        std::unordered_set<Core::OperatorNode, Core::OperatorNodeHash> &visited_;
+        std::vector<Core::OperatorNode> &solvingStack_;
+        const Core::OperatorNode &currentNode_;
 
-        if (graph.isTargetGate(op)) {
-            chosen_rule = basisRule(op);
+        explicit VisitGuard(
+            std::unordered_set<Core::OperatorNode, Core::OperatorNodeHash> &visited,
+            std::vector<Core::OperatorNode> &solvingStack,
+            const Core::OperatorNode &node) : visited_(visited), solvingStack_(solvingStack), currentNode_(node)
+        {
+            visited_.insert(currentNode_); // add to visited in case of exceptions
+            solvingStack_.push_back(currentNode_); // push to stack in case of exceptions
         }
-        else {
-            chosen_rule = bestRule(op);
+        ~VisitGuard() { 
+            visited_.erase(currentNode_);
+            if (!solvingStack_.empty()) {
+                solvingStack_.pop_back();
+            }
         }
 
-        solvedMap.emplace(op, chosen_rule);
-        visited.erase(op);
-        solvingStack.pop_back();
-        return chosen_rule;
-    }
-    catch (...) {
-        // Otherwise, we clean up the visited set and solving stack on exceptions
-        // to avoid false cycle detections in future calls.
-        visited.erase(op);
-        solvingStack.pop_back();
-        return {}; // or throw ?
-    }
-}
+        VisitGuard(const VisitGuard &) = delete;
+        VisitGuard &operator=(const VisitGuard &) = delete;
+    } visitGuard(visited, solvingStack, op);
 
-void DecompositionSolver::collectClosure(const Core::OperatorNode &op, Core::GraphResult &result)
-{
-    if (result.optimizedMap.find(op) != result.optimizedMap.end()) {
-        return; // already in closure
+    auto chosen = graph.isTargetGate(op) ? basisRule(op) : bestRule(op);
+    if (!chosen.ruleName.empty()) {
+        solvedMap.emplace(op, chosen);
     }
-
-    const auto chosen_rule = solvedMap.find(op);
-    if (chosen_rule == solvedMap.end()) {
-        return; // FIXME: this should not happen!
-    }
-
-    result.optimizedMap.emplace(op, chosen_rule->second);
-    if (chosen_rule->second.isBasis) {
-        return; // basis case, stop recursion
-    }
-
-    for (const auto &input : chosen_rule->second.chosenInputs) {
-        collectClosure(input.op, result);
-    }
+    return chosen;
 }
 
 Core::GraphResult DecompositionSolver::solve()
@@ -88,11 +73,14 @@ Core::GraphResult DecompositionSolver::solve()
     result.solvedRoots = graph.getRoots();
 
     for (const auto &root : result.solvedRoots) {
-        (void)solveOperator(root);
+        const auto chosen_rule = solveOperator(root);
+        if (chosen_rule.ruleName.empty()) {
+            RT_FAIL("Failed to solve the root operator");
+        }
     }
 
-    for (const auto &root : result.solvedRoots) {
-        collectClosure(root, result);
+    for (const auto& [op, entry] : solvedMap) {
+        result.optimizedMap.emplace(op, entry);
     }
 
     return result;

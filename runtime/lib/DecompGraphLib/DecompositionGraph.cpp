@@ -44,10 +44,7 @@ struct DecompositionGraph::Impl {
         std::variant<OperatorVertex, RuleVertex> payload;
     };
 
-    struct GraphWeightedEdge {
-        // EdgeType type;
-        // double weight = 0.0; // default 0.0 for StartToBasisOp & RuleToOperator
-    };
+    struct GraphWeightedEdge {}; // placeholder used in the boost graph as a type
 
     using BbGraph = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
                                           GraphVertex, GraphWeightedEdge>;
@@ -64,7 +61,7 @@ struct DecompositionGraph::Impl {
 
     std::unordered_map<RuleId, Vertex> ruleIdToVertex;
     std::unordered_map<Core::OperatorNode, std::vector<Core::RuleNode>, Core::OperatorNodeHash>
-        rulesForop;
+        opToRules;
 
     OperatorId registerOp(const Core::OperatorNode &op)
     {
@@ -92,40 +89,35 @@ struct DecompositionGraph::Impl {
 
     void buildGraph()
     {
-        // Register all operators and create vertices
+        // Register all operators
         for (const auto &op : operators) {
             registerOp(op);
         }
 
-        // Register all target gates and create vertices
+        // Register all target gates
         for (const auto &[op, _] : gateset.ops) {
             registerOp(op);
         }
 
-        // Register all rules and create vertices
+        // Register all rules
         for (RuleId ruleId = 0; ruleId < rules.size(); ruleId++) {
             const auto &rule = rules[ruleId];
-            registerOp(rule.output);
-            for (const auto &inout : rule.inputs) {
-                registerOp(inout.op);
-            }
+            const auto id = registerOp(rule.output);
+            const auto output_vertex = opIdToVertex[id];
 
-            const auto ruleVertex =
+            // Create a vertex for the rule and connect it to its output operator vertex
+            const auto rule_vertex =
                 boost::add_vertex(GraphVertex{VertexType::Rule, RuleVertex{ruleId}}, graph);
-            // const auto ruleVertex = boost::add_vertex(GraphVertex{VertexType::Rule,
-            // RuleVertex{ruleId}}, graph);
-            ruleIdToVertex.emplace(ruleId, ruleVertex);
-            rulesForop[rule.output].push_back(rule);
-        }
+            ruleIdToVertex.emplace(ruleId, rule_vertex);
+            opToRules[rule.output].push_back(rule);
 
-        for (RuleId ruleId = 0; ruleId < rules.size(); ruleId++) {
-            const auto &rule = rules[ruleId];
-            const auto rule_vertex = ruleIdToVertex[ruleId];
-            const auto output_vertex = opIdToVertex[opToId[rule.output]];
+            // Connect rule vertex to output operator vertex
             boost::add_edge(rule_vertex, output_vertex, GraphWeightedEdge{}, graph);
 
+            // Connect rule vertex to input operator vertices
             for (const auto &input : rule.inputs) {
-                const auto input_vertex = opIdToVertex[opToId[input.op]];
+                const auto input_id = registerOp(input.op);
+                const auto input_vertex = opIdToVertex[input_id];
                 boost::add_edge(input_vertex, rule_vertex, GraphWeightedEdge{}, graph);
             }
         }
@@ -184,8 +176,8 @@ const std::vector<Core::RuleNode> &
 DecompositionGraph::getAllRulesFor(const Core::OperatorNode &op) const
 {
     static const std::vector<Core::RuleNode> empty;
-    const auto it = impl->rulesForop.find(op);
-    if (it != impl->rulesForop.end()) {
+    const auto it = impl->opToRules.find(op);
+    if (it != impl->opToRules.end()) {
         return it->second;
     }
     return empty;

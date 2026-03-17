@@ -50,6 +50,7 @@ class DecompositionSolver {
         solution.isBasis = true;
         solution.totalCost = graph.getGateset().getCost(op);
         solution.basisCounts.emplace(op, 1);
+        solution.ruleName = "BasisRule";
         return solution;
     }
 
@@ -60,20 +61,26 @@ class DecompositionSolver {
     Core::ChosenDecompRule evalRule(const Core::RuleNode &rule)
     {
         Core::ChosenDecompRule solution;
-        solution.chosenRuleName = rule.name;
+        solution.ruleName = rule.name;
         solution.isBasis = false;
-        solution.chosenInputs = rule.inputs;
+        solution.inputs = rule.inputs;
         solution.op = rule.output;
 
         double total_cost = 0.0;
         for (const auto &input : rule.inputs) {
             const auto child = solveOperator(input.op);
+            if (child.ruleName.empty()) {
+                return {solution.op, false, "", {}, 0.0, {}}; // invalid rule
+            }
             total_cost += child.totalCost * static_cast<double>(input.multiplicity);
             for (const auto &[basis_op, count] : child.basisCounts) {
                 solution.basisCounts[basis_op] += count * input.multiplicity;
             }
         }
 
+        if (total_cost == 0.0) {
+            return {solution.op, false, "", {}, 0.0, {}}; // invalid rule
+        }
         solution.totalCost = total_cost;
         return solution;
     }
@@ -86,20 +93,20 @@ class DecompositionSolver {
     {
         const auto &all_rules = graph.getAllRulesFor(op);
         if (all_rules.empty()) {
-            RT_FAIL("No decomposition rule found for operator");
+            return {op, false, "", {}, 0.0, {}}; // no valid rules
         }
-
+        
         std::optional<Core::ChosenDecompRule> best_rule;
 
         for (const auto &rule : all_rules) {
             auto candidate = evalRule(rule);
-            if (!best_rule.has_value() || candidate.totalCost < best_rule->totalCost) {
+            if (!candidate.ruleName.empty() && (!best_rule.has_value() || candidate.totalCost < best_rule->totalCost)) {
                 best_rule = std::move(candidate);
             }
         }
 
         if (!best_rule.has_value()) {
-            RT_FAIL("No valid decomposition rule found for operator");
+            return {op, false, "", {}, 0.0, {}}; // no valid rules
         }
 
         return best_rule.value();
@@ -144,20 +151,6 @@ class DecompositionSolver {
      *
      */
     Core::ChosenDecompRule solveOperator(const Core::OperatorNode &op);
-
-    /**
-     * @brief Collects the closure of the given operator node in the result.
-     *
-     * This method recursively collects the chosen decomposition rules for
-     * the given operator node and all of its descendant operator nodes in
-     * the decomposition graph, and populates the optimizedMap in the result
-     * with these mappings.
-     *
-     * @param op The operator node for which to collect the closure.
-     * @param result The GraphResult object to populate with the optimized
-     * mapping from operator nodes to their chosen decomposition rules.
-     */
-    void collectClosure(const Core::OperatorNode &op, Core::GraphResult &result);
 };
 
 } // namespace DecompGraph::Solver

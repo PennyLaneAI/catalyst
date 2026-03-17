@@ -185,15 +185,15 @@ TEST_CASE("Test DecompositionSolver with one single operator", "[DecompGraph::So
     const auto result = solver.solve();
     REQUIRE(result.solvedRoots.size() == 1);
     REQUIRE(result.solvedRoots[0] == h);
-    REQUIRE(result.optimizedMap.size() == 3);
+    REQUIRE(result.optimizedMap.size() == 4);
     const auto &chosen_rule = result.optimizedMap.at(h);
     REQUIRE_FALSE(chosen_rule.isBasis);
-    REQUIRE(chosen_rule.chosenRuleName == "h_to_rz_rx_rz");
-    REQUIRE(chosen_rule.chosenInputs.size() == 2);
-    REQUIRE(chosen_rule.chosenInputs[0].op == rz);
-    REQUIRE(chosen_rule.chosenInputs[0].multiplicity == 2);
-    REQUIRE(chosen_rule.chosenInputs[1].op == rx);
-    REQUIRE(chosen_rule.chosenInputs[1].multiplicity == 1);
+    REQUIRE(chosen_rule.ruleName == "h_to_rz_rx_rz");
+    REQUIRE(chosen_rule.inputs.size() == 2);
+    REQUIRE(chosen_rule.inputs[0].op == rz);
+    REQUIRE(chosen_rule.inputs[0].multiplicity == 2);
+    REQUIRE(chosen_rule.inputs[1].op == rx);
+    REQUIRE(chosen_rule.inputs[1].multiplicity == 1);
     REQUIRE(chosen_rule.totalCost == 1.0 * 2 + 3.0 * 1);
     REQUIRE(chosen_rule.basisCounts.size() == 2);
     REQUIRE(chosen_rule.basisCounts.at(rz) == 2);
@@ -203,6 +203,8 @@ TEST_CASE("Test DecompositionSolver with one single operator", "[DecompGraph::So
     REQUIRE(rz_rule.isBasis);
     const auto &rx_rule = result.optimizedMap.at(rx);
     REQUIRE(rx_rule.isBasis);
+    const auto &ry_rule = result.optimizedMap.at(ry);
+    REQUIRE(ry_rule.isBasis);
 }
 
 TEST_CASE("Test the graph solver with intermediate ops and multiple rules", "[DecompGraph::Solver]")
@@ -231,8 +233,12 @@ TEST_CASE("Test the graph solver with intermediate ops and multiple rules", "[De
     const auto result = solver.solve();
     REQUIRE(result.solvedRoots.size() == 1);
     REQUIRE(result.solvedRoots[0] == customBellOp);
-    REQUIRE(result.optimizedMap.size() == 4);
+    REQUIRE(result.optimizedMap.size() == 6);
     const auto &chosen_rule = result.optimizedMap.at(customBellOp);
     REQUIRE_FALSE(chosen_rule.isBasis);
-    REQUIRE(chosen_rule.chosenRuleName == "bell_to_cnot_h");
+    REQUIRE(chosen_rule.ruleName == "bell_to_cnot_h");
+    
+    const auto &chosen_rule_h = result.optimizedMap.at(h);
+    REQUIRE_FALSE(chosen_rule_h.isBasis);
+    REQUIRE(chosen_rule_h.ruleName == "h_to_rz_rx_rz");
 }
