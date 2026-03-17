@@ -251,13 +251,12 @@ def compile_op_decomp_rules(
 
     mlir_modules = {}
 
-    op_num_wires = op_class.num_wires if op_class.num_wires else 2
-    dev = qp.device("null.qubit", wires=op_num_wires)
+    dev = qp.device("null.qubit", wires=op_class.num_wires)
 
     for rule in op_decomp_rules:
         try:
             rule_name = rule._impl.__name__  # pylint: disable=protected-access
-            mlir_modules[rule_name] = compile_rule(op_class, op_num_wires, rule, dev)
+            mlir_modules[rule_name] = compile_rule(op_class, op_class.num_wires, rule, dev)
         except TypeError as e:
             warnings.warn(f"dummy args failed to compile {rule_name}: {e}")
         except CompileError as e:
@@ -276,7 +275,6 @@ def precompile_decomp_rules(decomp_dir_path: Path = DEFAULT_RULE_DIR):
     decomposition rules, and compiles them via a wrapper function with qjit to mlir.
     Intended for use with `make decomp-rules` in catalyst/mlir.
     """
-
     decomp_dir_path.mkdir(parents=True, exist_ok=True)
 
     target_ops, num_ops_missed = get_compiler_ops()
