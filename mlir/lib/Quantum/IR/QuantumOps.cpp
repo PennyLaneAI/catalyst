@@ -560,5 +560,9 @@ LogicalResult AdjointOp::verify()
         }
     }
 
+    if (this->getOperandTypes() != this->getResultTypes()) {
+        return emitOpError("Adjoint op operand types and result types must be the same");
+    }
+
     return success();
 }

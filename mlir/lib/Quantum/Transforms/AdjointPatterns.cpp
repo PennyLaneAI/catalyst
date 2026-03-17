@@ -57,7 +57,6 @@ void cloneAdjointRegion(AdjointOp op, OpBuilder &builder, IRMapping &mapping,
         builder.clone(op, mapping);
     }
     auto yieldOp = cast<quantum::YieldOp>(block.getTerminator());
-    // return mapping.lookupOrDefault(yieldOp.getOperand(0));
     for (Value yieldVal : yieldOp->getOperands()) {
         reversedResults.push_back(mapping.lookupOrDefault(yieldVal));
     }
@@ -125,15 +124,12 @@ class AdjointGenerator {
                 visitOperation(ppr, builder);
             }
             else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(&op)) {
-                // BlockArgument regionArg = adjointOp.getRegion().getArgument(0);
-                // Value result = adjointOp.getResult();
                 for (auto [regionArg, result] : llvm::zip_equal(
                          adjointOp.getRegion().getArguments(), adjointOp.getResults())) {
                     remappedValues.map(regionArg, remappedValues.lookup(result));
                 }
                 SmallVector<Value> reversedResults;
                 cloneAdjointRegion(adjointOp, builder, remappedValues, reversedResults);
-                // remappedValues.map(adjointOp.getQreg(), reversedResult);
                 for (auto [operand, reversedResult] :
                      llvm::zip_equal(adjointOp.getArgs(), reversedResults)) {
                     remappedValues.map(operand, reversedResult);
