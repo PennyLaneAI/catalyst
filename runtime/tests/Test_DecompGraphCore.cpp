@@ -17,7 +17,7 @@
 #include <catch2/generators/catch_generators_all.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
-#include "QuantumNodes.hpp"
+#include "DecompositionTypes.hpp"
 
 using namespace Catch::Matchers;
 using namespace DecompGraph::Core;

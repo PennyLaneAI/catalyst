@@ -13,13 +13,12 @@
 // limitations under the License.
 
 /**
- * @file QuantumNodes.hpp
+ * @file DecompositionTypes.hpp
  * @brief This file defines the core data structures for representing operators and rules
  * in the decomposition framework.
  */
 #pragma once
 
-#include <iostream>
 #include <limits>
 #include <optional>
 #include <string>

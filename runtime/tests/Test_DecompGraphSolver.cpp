@@ -19,7 +19,7 @@
 
 #include "DecompositionGraph.hpp"
 #include "DecompositionSolver.hpp"
-#include "QuantumNodes.hpp"
+#include "DecompositionTypes.hpp"
 
 using namespace Catch::Matchers;
 using namespace DecompGraph::Core;

@@ -21,7 +21,7 @@
 #include <memory>
 #include <vector>
 
-#include "QuantumNodes.hpp"
+#include "DecompositionTypes.hpp"
 
 namespace DecompGraph::Solver {
 

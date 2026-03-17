@@ -26,7 +26,7 @@
 #include "Exception.hpp"
 
 #include "DecompositionGraph.hpp"
-#include "QuantumNodes.hpp"
+#include "DecompositionTypes.hpp"
 
 namespace DecompGraph::Solver {
 
