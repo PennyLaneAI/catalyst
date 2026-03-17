@@ -196,7 +196,7 @@ def compile_rule(
 
 def compile_op_decomp_rules(
     op_class: Operator,
-) -> tuple[dict[str, str | None], int, int]:
+) -> dict[str, str | None]:
     """
     Compile all decomposition rules for op_class.
 
@@ -207,9 +207,6 @@ def compile_op_decomp_rules(
         int: the number of rules that successfully compiled
         int: the number of rules that failed to compile
     """
-    num_failures = 0
-    num_successes = 0
-
     op_decomp_rules = qp.decomposition.decomposition_graph.list_decomps(op_class)
 
     mlir_modules = {}
@@ -221,20 +218,16 @@ def compile_op_decomp_rules(
         try:
             rule_name = rule._impl.__name__  # pylint: disable=protected-access
             mlir_modules[rule_name] = compile_rule(op_class, op_num_wires, rule, dev)
-            num_successes += 1
         except TypeError as e:
             warnings.warn(f"dummy args failed to compile {rule_name}: {e}")
-            num_failures += 1
         except CompileError as e:
             warnings.warn(f"failed to compile {rule_name}: {e}")
-            num_failures += 1
         except Exception as e:  # pylint: disable=broad-exception-caught
             warnings.warn(f"Unexpected error while trying to compile {rule_name}: {e}")
-            num_failures += 1
         finally:
             qp.decomposition.disable_graph()
 
-    return (mlir_modules, num_successes, num_failures)
+    return mlir_modules
 
 
 def precompile_decomp_rules(decomp_dir_path: Path = DEFAULT_RULE_DIR):
@@ -250,23 +243,13 @@ def precompile_decomp_rules(decomp_dir_path: Path = DEFAULT_RULE_DIR):
     if num_ops_missed:
         warnings.warn(f"failed to collect {num_ops_missed} op(s) from PennyLane")
 
-    num_successes = 0
-    num_failures = 0
-
     mlir_rules = ""
     for func in target_ops:
-        results, num_new_successes, num_new_failures = compile_op_decomp_rules(func)
-        num_successes += num_new_successes
-        num_failures += num_new_failures
+        results = compile_op_decomp_rules(func)
         if results:
             for name, circuit_mlir in results.items():
                 if circuit_mlir:
                     mlir_rules += str(circuit_mlir).replace("@rule_wrapper", "@" + name)
-
-    if num_failures:
-        warnings.warn(
-            f"compiled {num_successes} / {num_failures + num_successes} decomposition rules"
-        )
 
     # FIXME use catalyst.compiler._quantum_opt once the catalyst dangling options are fixed
     bytecode = subprocess.run(
