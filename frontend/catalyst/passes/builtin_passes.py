@@ -1527,4 +1527,4 @@ def graph_decomposition(
 
     graph_decomposition_pass = {"graph-decomposition": options}
 
-    return PassPipelineWrapper(qnode, graph_decomposition_pass)
+    return qml.transform(pass_name="decompose-arbitrary-ppr", **graph_decomposition_pass)(qnode)
