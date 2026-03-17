@@ -291,10 +291,10 @@ class TestMLIRSpecs:
         ):
             mlir_specs(simple_circuit, level=[0, 20])
 
-    def test_splitting_pass(self):
+    def test_splitting_pass(self, skip_preprocess):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
 
-        @qml.qjit
+        @qml.qjit(skip_preprocess=skip_preprocess)
         @qml.transforms.cancel_inverses
         @qml.transform(pass_name="split-non-commuting")
         @qml.qnode(qml.device("null.qubit", wires=2))
@@ -349,7 +349,7 @@ class TestMLIRSpecs:
             for r, er in zip(res[lvl], expected_res):
                 assert resources_equal(r, er)
 
-    def test_not_qnode(self):
+    def test_not_qnode(self, skip_preprocess):  # pylint: disable=unused-argument
         """Test that a malformed QNode raises an error."""
 
         def not_a_qnode():
