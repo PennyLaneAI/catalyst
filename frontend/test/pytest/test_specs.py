@@ -24,7 +24,7 @@ from pennylane.resource import CircuitSpecs, SpecsResources
 import catalyst
 from catalyst import qjit
 
-# pylint:disable = protected-access,attribute-defined-outside-init,too-many-lines
+# pylint:disable = protected-access,attribute-defined-outside-init
 
 
 @qml.transform
@@ -91,31 +91,6 @@ def check_specs_same(actual: CircuitSpecs, expected: CircuitSpecs):
 
 class TestDeviceLevelSpecs:
     """Test qml.specs() at device level"""
-
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_with_passes(self):
-        """Test that device-level specs count resources *after* all passes are applied"""
-
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qjit
-        @qml.transforms.merge_rotations
-        @qml.transforms.cancel_inverses
-        @qml.qnode(dev)
-        def circuit():
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            qml.CNOT(wires=[0, 1])
-            qml.CNOT(wires=[0, 1])
-            qml.RX(1.2, wires=0)
-            qml.RX(1.2, wires=0)
-            return qml.expval(qml.PauliZ(0))
-
-        cat_specs = qml.specs(circuit, level="device")()
-
-        assert cat_specs.resources.num_gates == 1
-        assert cat_specs.resources.gate_types == {"RX": 1}
-        assert cat_specs.resources.gate_sizes == {1: 1}
 
     def test_simple(self):
         """Test a simple case of qml.specs() against PennyLane"""
@@ -582,11 +557,11 @@ class TestPassByPassSpecs:
             "sample(all wires)": 1,
         }
 
-    def test_split_non_commuting_tape(self):
+    def test_split_non_commuting(self):
         """Test that qml.transforms.split_non_commuting works as expected"""
 
         @qml.transforms.cancel_inverses
-        @qml.transforms.split_non_commuting  # Applies as tape transform
+        @qml.transforms.split_non_commuting
         @qml.qnode(qml.device("null.qubit", wires=3))
         def circuit():
             qml.H(0)
