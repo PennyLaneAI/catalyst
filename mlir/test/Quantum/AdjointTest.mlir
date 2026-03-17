@@ -101,6 +101,45 @@ func.func private @workflow_nested() -> tensor<4xcomplex<f64>> attributes {} {
   return %5 : tensor<4xcomplex<f64>>
 }
 
+
+// CHECK-LABEL:      @workflow_many_args
+func.func private @workflow_many_args() -> tensor<4xcomplex<f64>> attributes {} {
+  %cst = arith.constant 4.000000e-01 : f64
+  %c0_i64 = arith.constant 0 : i64
+  %c1_i64 = arith.constant 1 : i64
+  quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
+  %0 = quantum.alloc( 2) : !quantum.reg
+
+  // CHECK: [[q0:%.+]] = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+  // CHECK: [[RX:%.+]] = quantum.custom "RX"({{%.+}}) [[q0]] : !quantum.bit
+  // CHECK: [[q1:%.+]] = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+  %1 = quantum.extract %0[%c0_i64] : !quantum.reg -> !quantum.bit
+  %2 = quantum.custom "RX"(%cst) %1 : !quantum.bit
+  %3 = quantum.extract %0[%c1_i64] : !quantum.reg -> !quantum.bit
+  %4:2 = quantum.adjoint(%2, %3) : !quantum.bit, !quantum.bit -> !quantum.bit, !quantum.bit {
+  // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[RX]], [[q1]] adj : !quantum.bit, !quantum.bit
+  // CHECK: [[PauliY:%.+]] = quantum.custom "PauliY"() [[CNOT]]#1 adj : !quantum.bit
+  // CHECK: [[PauliX:%.+]] = quantum.custom "PauliX"() [[CNOT]]#0 adj : !quantum.bit
+
+  ^bb0(%arg0: !quantum.bit, %arg1: !quantum.bit):
+    %5 = quantum.custom "PauliX"() %arg0 : !quantum.bit
+    %6 = quantum.custom "PauliY"() %arg1 : !quantum.bit
+    %7:2 = quantum.custom "CNOT"() %5, %6 : !quantum.bit, !quantum.bit
+    quantum.yield %7#0, %7#1 : !quantum.bit, !quantum.bit
+  }
+
+  // CHECK: [[RY:%.+]] = quantum.custom "RY"({{%.+}}) [[PauliX]] : !quantum.bit
+  // CHECK: [[insert0:%.+]] = quantum.insert {{%.+}}[ 0], [[RY]] : !quantum.reg, !quantum.bit
+  // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[PauliY]] : !quantum.reg, !quantum.bit
+  %8 = quantum.custom "RY"(%cst) %4#0 : !quantum.bit
+  %9 = quantum.insert %0[%c0_i64], %8 : !quantum.reg, !quantum.bit
+  %10 = quantum.insert %9[%c1_i64], %4#1 : !quantum.reg, !quantum.bit
+  %11 = quantum.compbasis qreg %10 : !quantum.obs
+  %12 = quantum.state %11 : tensor<4xcomplex<f64>>
+  quantum.dealloc %10 : !quantum.reg
+  return %12 : tensor<4xcomplex<f64>>
+}
+
 // -----
 
 func.func @workflow_unhandled() {
