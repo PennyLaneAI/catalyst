@@ -31,8 +31,11 @@ from catalyst.device.decomposition import (
     measurements_from_counts,
     measurements_from_samples,
 )
+
+# pylint: disable=protected-access
 from catalyst.device.qjit_device import (
-    get_device_capabilities,
+    _load_device_capabilities,
+    filter_device_capabilities_with_shots,
     get_qjit_device_capabilities,
 )
 from catalyst.device.verification import (
@@ -57,8 +60,13 @@ def create_device_preprocessing_pipeline(
 ) -> list[BoundTransform]:
     """Create a pipeline of device preprocessing transforms for lowering QNodes."""
     shots_present = qml.math.is_abstract(shots) or shots != 0
-    capabilities: DeviceCapabilities = get_qjit_device_capabilities(
-        get_device_capabilities(device, shots=shots_present)
+    raw_capabilities: DeviceCapabilities = get_qjit_device_capabilities(
+        _load_device_capabilities(device)
+    )
+    capabilities: DeviceCapabilities = filter_device_capabilities_with_shots(
+        raw_capabilities,
+        shots_present=shots_present,
+        unitary_support=getattr(device, "_to_matrix_ops", None),
     )
 
     finite_shots_only = all(
