@@ -14,6 +14,7 @@
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pennylane as qml
 import pytest
 
@@ -56,6 +57,25 @@ def test_buffer_args(fn, params):
     interpreted_fn = qml.QNode(fn, device)
     jitted_fn = qjit(interpreted_fn)
     assert jnp.allclose(interpreted_fn(*params), jitted_fn(*params))
+
+
+def test_qjit_does_not_mutate_numpy_input_buffers():
+    """A copied input that is functionally updated must not alias the caller buffer."""
+
+    @qjit
+    def update_with_copy(x):
+        y = qml.math.copy(x)
+        return y.at[0, 0].set(7.0)
+
+    matrix = np.arange(9.0).reshape(3, 3)
+    original = matrix.copy()
+    expected = original.copy()
+    expected[0, 0] = 7.0
+
+    result = update_with_copy(matrix)
+
+    assert np.allclose(matrix, original)
+    assert jnp.allclose(result, expected)
 
 
 class TestReturnValues:

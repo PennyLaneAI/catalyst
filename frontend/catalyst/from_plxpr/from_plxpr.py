@@ -51,6 +51,7 @@ from catalyst.jax_primitives import (
 )
 from catalyst.utils.patching import Patcher
 
+from .device_utils import create_device_preprocessing_pipeline
 from .qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
 from .qubit_handler import (
     QubitHandler,
@@ -131,11 +132,20 @@ def _get_device_kwargs(device) -> dict:
 
 # code example has long lines
 # pylint: disable=line-too-long
-def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
+def from_plxpr(
+    plxpr: ClosedJaxpr, skip_preprocess: bool = False, _preprocess_warn: bool = True
+) -> Callable[..., Jaxpr]:
     """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
     Args:
         jaxpr (ClosedJaxpr): PennyLane variant jaxpr
+        skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
+            If ``True``, transforms used to preprocess and validate the user program before
+            executing on a quantum backend will not be used. ``False`` by default.
+        _preprocess_warn (bool): Private argument to control whether a warning should be raised
+            if any device preprocessing transforms in the compilation pipeline do not have
+            native MLIR implementations. This argument is targeted at developers and should
+            generally not be used. ``True`` by default.
 
     Returns:
         Callable: A function that accepts the same arguments as the plxpr and returns catalyst
@@ -193,7 +203,10 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
 
     """
 
-    original_fn = partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts)
+    interpreter = WorkflowInterpreter(
+        skip_preprocess=skip_preprocess, _preprocess_warn=_preprocess_warn
+    )
+    original_fn = partial(interpreter.eval, plxpr.jaxpr, plxpr.consts)
 
     # pylint: disable=import-outside-toplevel
     from jax._src.interpreters.partial_eval import DynamicJaxprTrace
@@ -211,16 +224,20 @@ class WorkflowInterpreter(PlxprInterpreter):
     """An interpreter that converts a qnode primitive from a plxpr variant to a catalyst jaxpr variant."""
 
     def __copy__(self):
-        new_version = WorkflowInterpreter()
+        new_version = WorkflowInterpreter(
+            skip_preprocess=self._skip_preprocess, _preprocess_warn=self._preprocess_warn
+        )
         new_version._pass_pipeline = copy(self._pass_pipeline)
         new_version.init_qreg = self.init_qreg
         new_version.requires_decompose_lowering = self.requires_decompose_lowering
         new_version.decompose_tkwargs = copy(self.decompose_tkwargs)
         return new_version
 
-    def __init__(self):
+    def __init__(self, skip_preprocess=False, _preprocess_warn=True):
         self._pass_pipeline = []
         self.init_qreg = None
+        self._skip_preprocess = skip_preprocess
+        self._preprocess_warn = _preprocess_warn
 
         # Compiler options for the new decomposition system
         self.requires_decompose_lowering = False
@@ -359,11 +376,18 @@ def handle_qnode(
         gateset = [_get_operator_name(op) for op in self.decompose_tkwargs.get("gate_set", [])]
         setattr(qnode, "decompose_gatesets", [gateset])
 
+    pipelines = (("main", tuple(self._pass_pipeline)),)
+    if not self._skip_preprocess:
+        device_preprocessing_pipeline = create_device_preprocessing_pipeline(
+            qnode.device, execution_config, shots, warn=self._preprocess_warn
+        )
+        pipelines += (("device", device_preprocessing_pipeline),)
+
     return quantum_kernel_p.bind(
         wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
         *non_const_args,
         qnode=qnode,
-        pipeline=self._pass_pipeline,
+        pipelines=pipelines,
     )
 
 
@@ -412,7 +436,7 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     # Add the decompose-lowering pass to the start of the pipeline
     if use_graph:
         t = qml.transform(pass_name="decompose-lowering")
-        pass_container = qml.transforms.core.TransformContainer(t)
+        pass_container = qml.transforms.core.BoundTransform(t)
         next_eval._pass_pipeline.insert(0, pass_container)
 
     # We still need to construct and solve the graph based on
@@ -482,14 +506,21 @@ def handle_transform(
     # Apply the corresponding Catalyst pass counterpart
     next_eval = copy(self)
     t = qml.transform(pass_name=catalyst_pass_name)
-    bound_pass = qml.transforms.core.TransformContainer(t, args=targs, kwargs=dict(tkwargs))
+    bound_pass = qml.transforms.core.BoundTransform(t, args=targs, kwargs=dict(tkwargs))
     next_eval._pass_pipeline.insert(0, bound_pass)
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
 
 # pylint: disable=too-many-positional-arguments
 def trace_from_pennylane(
-    fn, static_argnums, dynamic_args, abstracted_axes, sig, kwargs, debug_info=None
+    fn,
+    static_argnums,
+    dynamic_args,
+    abstracted_axes,
+    sig,
+    kwargs,
+    skip_preprocess=False,
+    debug_info=None,
 ):
     """Capture the JAX program representation (JAXPR) of the wrapped function, using
     PL capure module.
@@ -509,6 +540,9 @@ def trace_from_pennylane(
             are indicated with their literal values, and dynamic arguments are indicated by abstract
             values.
         kwargs(Dict[str, Any]): keyword argumemts to the function.
+        skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
+            If ``True``, transforms used to preprocess and validate the user program before
+            executing on a quantum backend will not be used. ``False`` by default.
         debug_info(jax.api_util.debug_info): a source debug information object required by jaxprs.
 
     Returns:
@@ -565,7 +599,7 @@ def trace_from_pennylane(
             fn.static_argnums = static_argnums
 
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-        jaxpr = from_plxpr(plxpr)(*plxpr.in_avals)
+        jaxpr = from_plxpr(plxpr, skip_preprocess=skip_preprocess)(*plxpr.in_avals)
 
     return jaxpr, out_type, out_treedef, sig
 

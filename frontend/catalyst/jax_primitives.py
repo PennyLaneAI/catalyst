@@ -564,11 +564,11 @@ def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memre
 # module
 #
 @quantum_kernel_p.def_impl
-def _quantum_kernel_def_impl(*args, call_jaxpr, qnode, pipeline=None):  # pragma: no cover
+def _quantum_kernel_def_impl(*args, call_jaxpr, qnode, pipelines=None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode, pipeline=None):
+def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode, pipelines=None):
     """Lower's qnodes to moduleOp
 
     Args:
@@ -580,10 +580,9 @@ def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode, pipeline=None):
       List[mlir.Value] corresponding
     """
     assert isinstance(qnode, qml.QNode), "This function expects qnodes"
-    if pipeline is None:
-        pipeline = tuple()
+    pipelines = pipelines or ()
 
-    func_op = lower_callable(ctx, qnode, call_jaxpr, pipeline)
+    func_op = lower_callable(ctx, qnode, call_jaxpr, pipelines)
     call_op = create_call_op(ctx, func_op, *args)
     return call_op.results
 
@@ -1836,7 +1835,12 @@ def _mcmobs_abstract_eval(*mcms):
 def _mcm_obs_lowering(jax_ctx: mlir.LoweringRuleContext, *mcms: list[ir.Value]):
     ctx = jax_ctx.module_context.context
     result_type = ir.OpaqueType.get("quantum", "obs", ctx)
-    extracted = [extract_scalar(mcm, "mcmobs") for mcm in mcms]
+    tensor_i1_type = ir.RankedTensorType.get([], ir.IntegerType.get_signless(1))
+
+    extracted = []
+    for mcm in mcms:
+        convert_op = StableHLOConvertOp(tensor_i1_type, mcm)
+        extracted.append(extract_scalar(convert_op.result, "mcmobs"))
     return MCMObsOp(result_type, extracted).results
 
 
