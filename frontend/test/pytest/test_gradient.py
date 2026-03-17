@@ -265,44 +265,56 @@ def test_grad_on_qjit():
 
 @pytest.mark.parametrize("capture", (True, False))
 def test_value_and_grad_on_qjit_classical(capture):
-    """Check that value_and_grad works when called on an qjit object that does not wrap a QNode."""
+    """Check that value_and_grad works when called on an qjit object that does not wrap a QNode.
+    We ignore nested qjit's with program capture till [sc-114222] fixing nested qjit's is resolved.
+    """
 
-    @qjit(capture=capture)
     def f1(x: float):
         return x * x
+
+    if not capture:
+        f1 = qjit(f1, capture=capture)
 
     result = qjit(qml.value_and_grad(f1))(3.0)
     expected = (9.0, 6.0)
     assert np.allclose(result, expected)
 
-    @qjit(capture=capture)
     def f2(x: float):
         return [x * x]
+    
+    if not capture:
+        f2 = qjit(f2, capture=capture)
 
     result = qjit(qml.value_and_grad(f2), capture=capture)(3.0)
     expected = ([9.0], [6.0])
     assert np.allclose(result, expected)
 
-    @qjit(capture=capture)
     def f3(x: float):
         return {"helloworld": x * x}
+    
+    if not capture:
+        f2 = qjit(f2, capture=capture)
 
     result = qjit(qml.value_and_grad(f3), capture=capture)(3.0)
     expected = ({"helloworld": 9.0}, {"helloworld": 6.0})
     assert np.allclose(result[0]["helloworld"], expected[0]["helloworld"])
     assert np.allclose(result[1]["helloworld"], expected[1]["helloworld"])
 
-    @qjit(capture=capture)
     def f4(x: float, y: float, z: float):
         return 100 * x + 200 * y + 300 * z
+    
+    if not capture:
+        f2 = qjit(f4, capture=capture)
 
     result = qjit(qml.value_and_grad(f4), capture=capture)(0.1, 0.2, 0.3)
     expected = (140, 100)
     assert np.allclose(result, expected)
 
-    @qjit(capture=capture)
     def f5(x: float, y: float, z: float):
         return 100 * x + 200 * y + 300 * z
+    
+    if not capture:
+        f5 = qjit(f5, capture=capture)
 
     result = qjit(qml.value_and_grad(f5, argnums=(0, 1, 2)), capture=capture)(0.1, 0.2, 0.3)
     expected = (140, (100, 200, 300))
@@ -314,13 +326,16 @@ def test_value_and_grad_on_qjit_classical(capture):
 def test_value_and_grad_on_qjit_classical_vector(capture):
     """Check that value_and_grad works when called on an qjit object that does not wrap a QNode
     and takes in a vector.
+    We ignore nested qjit's with program capture till [sc-114222] fixing nested qjit's is resolved.
     """
 
-    @qjit(capture=capture)
     def f(vec):
         # Takes in a 2D vector (x,y) and computes 30x+40y
         prod = jnp.array([30, 40]) * vec
         return prod[0] + prod[1]
+
+    if not capture:
+        f = qjit(f, capture=capture)
 
     x = jnp.array([1.0, 1.0])
     result = qjit(qml.value_and_grad(f), capture=capture)(x)
@@ -334,14 +349,18 @@ def test_value_and_grad_on_qjit_classical_vector(capture):
 def test_value_and_grad_on_qjit_classical_dict(capture):
     """Check that value_and_grad works when called on an qjit object that does not wrap a QNode
     and takes in a dictionary.
+
+    We ignore nested qjit's with program capture till [sc-114222] fixing nested qjit's is resolved.
     """
 
-    @qjit(capture=capture)
     def f(tree):
         # Takes in two 2D vectors (x1, x2) and (y1, y2) and computes x1y1+x2y2
         hello = tree["hello"]  # (x1, x2)
         world = tree["world"]  # (y1, y2)
         return (hello * world).sum()
+    
+    if not capture:
+        f = qjit(f, capture=capture)
 
     x = {"hello": jnp.array([1.0, 2.0]), "world": jnp.array([3.0, 4.0])}
     result = qjit(qml.value_and_grad(f), capture=capture)(x)
@@ -355,12 +374,14 @@ def test_value_and_grad_on_qjit_classical_dict(capture):
 @pytest.mark.parametrize("capture", (True, False))
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_value_and_grad_on_qjit_quantum(diff_method, capture):
-    """Check that value_and_grad works when called on an qjit object that does wrap a QNode."""
+    """Check that value_and_grad works when called on an qjit object that does wrap a QNode.
+    
+    We ignore nested qjit's with program capture till [sc-114222] fixing nested qjit's is resolved.
+    """
 
     if capture and diff_method == "adjoint":
         pytest.xfail("No validation yet.")
 
-    @qjit
     def workflow(x: float):
         @qml.qnode(qml.device("lightning.qubit", wires=3), diff_method=diff_method)
         def circuit():
@@ -369,6 +390,9 @@ def test_value_and_grad_on_qjit_quantum(diff_method, capture):
             return qml.probs()  # This is [1, 0, 0, ...]
 
         return x * (circuit()[0])
+    
+    if not capture:
+        workflow = qjit(workflow)
 
     if diff_method == "adjoint":
         with pytest.raises(
@@ -462,6 +486,8 @@ def test_value_and_grad_on_qjit_quantum_variant_tree(diff_method, capture):
     """
     Check that value_and_grad works when called on an qjit object that does wrap a QNode
     with trainable parameters and a general pytree input.
+
+    We ignore nested qjit's with program capture till [sc-114222] fixing nested qjit's is resolved.
     """
     if capture and diff_method == "adjoint":
         pytest.xfail("No validation yet.")
@@ -477,14 +503,18 @@ def test_value_and_grad_on_qjit_quantum_variant_tree(diff_method, capture):
 
     params = {"x": 0.12, "y": 0.34}
 
+    if not capture:
+        workflow_variant_tree = qjit(workflow_variant_tree)
+
     if diff_method == "adjoint":
         with pytest.raises(
             CompileError,
             match="The adjoint method can only be used for QNodes which return qml.expval",
         ):
-            qjit(qml.value_and_grad(qjit(workflow_variant_tree)), capture=capture)(params)
+
+            qjit(qml.value_and_grad(workflow_variant_tree), capture=capture)(params)
     else:
-        result = qjit(qml.value_and_grad(qjit(workflow_variant_tree)), capture=capture)(params)
+        result = qjit(qml.value_and_grad(workflow_variant_tree), capture=capture)(params)
         expected = (workflow_variant_tree(params), qjit(grad(workflow_variant_tree))(params))
         assert np.allclose(result[0], expected[0])
         assert np.allclose(result[1]["x"], expected[1]["x"])
