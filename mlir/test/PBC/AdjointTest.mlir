@@ -17,7 +17,7 @@
 // CHECK-LABEL:      @workflow
 func.func private @workflow(%r: !quantum.reg) -> !quantum.reg attributes {} {
   // CHECK-NOT: quantum.adjoint
-  %r_out = quantum.adjoint(%r) : !quantum.reg {
+  %r_out = quantum.adjoint(%r) : !quantum.reg -> !quantum.reg {
   ^bb0(%arg0: !quantum.reg):
     %0 = quantum.extract %arg0[0] : !quantum.reg -> !quantum.bit
 

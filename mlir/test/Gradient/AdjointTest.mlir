@@ -17,7 +17,9 @@
 // Check scalar to scalar function
 func.func private @funcScalarScalar(%arg0: f64) -> f64 attributes {qnode, diff_method = "adjoint"} {
     %0 = quantum.alloc(1) : !quantum.reg
-    %1 = quantum.adjoint(%0) : !quantum.reg {}  // prevent folding of dealloc into alloc
+    %1 = quantum.adjoint(%0) : !quantum.reg -> !quantum.reg {
+    ^bb0(%arg1: !quantum.reg):
+    }  // prevent folding of dealloc into alloc
     quantum.dealloc %1 : !quantum.reg
     return %arg0 : f64
 }
@@ -43,7 +45,9 @@ func.func @gradCallScalarScalar(%arg0: f64) -> f64 {
 // Check scalar to tensor function
 func.func private @funcScalarTensor(%arg0: f64) -> tensor<2x3xf64> attributes {qnode, diff_method = "adjoint"} {
     %0 = quantum.alloc(1) : !quantum.reg
-    %1 = quantum.adjoint(%0) : !quantum.reg {}  // prevent folding of dealloc into alloc
+    %1 = quantum.adjoint(%0) : !quantum.reg -> !quantum.reg {
+    ^bb0(%arg1: !quantum.reg):
+    }  // prevent folding of dealloc into alloc
     quantum.dealloc %1 : !quantum.reg
     %c0 = arith.constant 0.0 : f64
     %res = tensor.from_elements %c0, %c0, %c0, %c0, %c0, %c0 : tensor<2x3xf64>
@@ -70,7 +74,9 @@ func.func @gradCallScalarTensor(%arg0: f64) -> tensor<2x3xf64> {
 // Check tensor to scalar
 func.func private @funcTensorScalar(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_method = "adjoint"} {
     %0 = quantum.alloc(1) : !quantum.reg
-    %1 = quantum.adjoint(%0) : !quantum.reg {}  // prevent folding of dealloc into alloc
+    %1 = quantum.adjoint(%0) : !quantum.reg -> !quantum.reg {
+    ^bb0(%arg1: !quantum.reg):
+    }  // prevent folding of dealloc into alloc
     quantum.dealloc %1 : !quantum.reg
     %res = arith.constant 0.0 : f64
     return %res : f64
@@ -97,7 +103,9 @@ func.func @gradCallTensorScalar(%arg0: tensor<3xf64>) -> tensor<3xf64> {
 // Check tensor to tensor case
 func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf64> attributes {qnode, diff_method = "adjoint"} {
     %0 = quantum.alloc(1) : !quantum.reg
-    %1 = quantum.adjoint(%0) : !quantum.reg {}  // prevent folding of dealloc into alloc
+    %1 = quantum.adjoint(%0) : !quantum.reg -> !quantum.reg {
+    ^bb0(%arg1: !quantum.reg):
+    }  // prevent folding of dealloc into alloc
     quantum.dealloc %1 : !quantum.reg
     %c0 = arith.constant 0.0 : f64
     %res = tensor.from_elements %c0, %c0 : tensor<2xf64>
@@ -124,7 +132,9 @@ func.func @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2x7x3x2x1x
 // Check the multiple results case
 func.func @funcMultiRes(%arg0: f64) -> (f64, tensor<2xf64>) attributes {qnode, diff_method = "adjoint"} {
     %0 = quantum.alloc(1) : !quantum.reg
-    %1 = quantum.adjoint(%0) : !quantum.reg {}  // prevent folding of dealloc into alloc
+    %1 = quantum.adjoint(%0) : !quantum.reg -> !quantum.reg {
+    ^bb0(%arg1: !quantum.reg):
+    }  // prevent folding of dealloc into alloc
     quantum.dealloc %1 : !quantum.reg
     %res = tensor.from_elements %arg0, %arg0 : tensor<2xf64>
     func.return %arg0, %res : f64, tensor<2xf64>
@@ -151,7 +161,9 @@ func.func @gradCallMultiRes(%arg0: f64) -> (f64, tensor<2xf64>)  {
 // Check the case with multiple grad invocations with varying diffArgIndices
 func.func @funcMultiArg(%arg0: f64, %arg1: tensor<2xf64>) -> f64 attributes {qnode, diff_method = "adjoint"} {
     %0 = quantum.alloc(1) : !quantum.reg
-    %1 = quantum.adjoint(%0) : !quantum.reg {}  // prevent folding of dealloc into alloc
+    %1 = quantum.adjoint(%0) : !quantum.reg -> !quantum.reg {
+    ^bb0(%arg2: !quantum.reg):
+    }  // prevent folding of dealloc into alloc
     quantum.dealloc %1 : !quantum.reg
     func.return %arg0 : f64
 }
@@ -179,7 +191,9 @@ func.func @gradCallMultiArg(%arg0: f64, %arg1: tensor<2xf64>) -> (f64, tensor<2x
 // Check multiple grad calls to same function with the same diffArgIndices
 func.func private @funcMultiCall(%arg0: f64) -> f64 attributes {qnode, diff_method = "adjoint"} {
     %0 = quantum.alloc(1) : !quantum.reg
-    %1 = quantum.adjoint(%0) : !quantum.reg {}  // prevent folding of dealloc into alloc
+    %1 = quantum.adjoint(%0) : !quantum.reg -> !quantum.reg {
+    ^bb0(%arg1: !quantum.reg):
+    }  // prevent folding of dealloc into alloc
     quantum.dealloc %1 : !quantum.reg
     func.return %arg0 : f64
 }

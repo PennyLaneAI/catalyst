@@ -2765,7 +2765,7 @@ def _adjoint_lowering(
     ), f"Expected a single result of quantum.register type, got: {output_types}"
 
     # Build an adjoint operation with a single-block region.
-    op = AdjointOp(output_types[0], qargs[0])
+    op = AdjointOp(output_types, qargs)
     adjoint_block = op.regions[0].blocks.append(*[mlir.aval_to_ir_types(a)[0] for a in aqargs])
     with ir.InsertionPoint(adjoint_block):
         source_info_util.extend_name_stack("adjoint")

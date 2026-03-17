@@ -23,7 +23,7 @@
     // CHECK:      [[qReg:%.+]] = call @simpleCircuit.quantumAlloc([[nQubits]]) : (i64) -> !quantum.reg
     // CHECK:      [[outQregFor:%.+]]  = scf.for %arg2 = [[c0]] to %arg1 step [[c1]] iter_args([[inQreg:%.+]] = [[qReg]]) -> (!quantum.reg) {
         // CHECK:      [[outQreg1:%.+]] = func.call @simpleCircuit.withoutMeasurements(%arg0, [[inQreg]]) : (tensor<3xf64>, !quantum.reg) -> !quantum.reg
-        // CHECK:      [[outQreg2:%.+]] = quantum.adjoint([[outQreg1]]) : !quantum.reg {
+        // CHECK:      [[outQreg2:%.+]] = quantum.adjoint([[outQreg1]]) : !quantum.reg -> !quantum.reg {
         // CHECK:      ^bb0(%arg4: !quantum.reg):
             // CHECK:      [[callWithoutMeasurements:%.+]] = func.call @simpleCircuit.withoutMeasurements(%arg0, %arg4) : (tensor<3xf64>, !quantum.reg) -> !quantum.reg
             // CHECK:      quantum.yield [[callWithoutMeasurements]] : !quantum.reg

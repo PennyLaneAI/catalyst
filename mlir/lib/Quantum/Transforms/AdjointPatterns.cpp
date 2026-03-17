@@ -49,14 +49,17 @@ namespace {
 
 /// Clone the region of the adjoint operation `op` to the insertion point specified by the
 /// `builder`. Build and return the value mapping `mapping`.
-Value cloneAdjointRegion(AdjointOp op, OpBuilder &builder, IRMapping &mapping)
+void cloneAdjointRegion(AdjointOp op, OpBuilder &builder, IRMapping &mapping, SmallVector<Value> &reversedResults)
 {
     Block &block = op.getRegion().front();
     for (Operation &op : block.without_terminator()) {
         builder.clone(op, mapping);
     }
     auto yieldOp = cast<quantum::YieldOp>(block.getTerminator());
-    return mapping.lookupOrDefault(yieldOp.getOperand(0));
+    //return mapping.lookupOrDefault(yieldOp.getOperand(0));
+    for (Value yieldVal : yieldOp->getOperands()){
+        reversedResults.push_back(mapping.lookupOrDefault(yieldVal));
+    }
 }
 
 /// A class that generates the quantum "backwards pass" of the adjoint operation using the stored
@@ -121,11 +124,17 @@ class AdjointGenerator {
                 visitOperation(ppr, builder);
             }
             else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(&op)) {
-                BlockArgument regionArg = adjointOp.getRegion().getArgument(0);
-                Value result = adjointOp.getResult();
-                remappedValues.map(regionArg, remappedValues.lookup(result));
-                Value reversedResult = cloneAdjointRegion(adjointOp, builder, remappedValues);
-                remappedValues.map(adjointOp.getQreg(), reversedResult);
+                // BlockArgument regionArg = adjointOp.getRegion().getArgument(0);
+                // Value result = adjointOp.getResult();
+                for (auto [regionArg, result] : llvm::zip_equal(adjointOp.getRegion().getArguments(), adjointOp.getResults())){
+                    remappedValues.map(regionArg, remappedValues.lookup(result));
+                }
+                SmallVector<Value> reversedResults;
+                cloneAdjointRegion(adjointOp, builder, remappedValues, reversedResults);
+                //remappedValues.map(adjointOp.getQreg(), reversedResult);
+                for (auto [operand, reversedResult] : llvm::zip_equal(adjointOp.getArgs(), reversedResults)){
+                    remappedValues.map(operand, reversedResult);
+                }
             }
             else if (isa<QuantumDialect>(op.getDialect())) {
                 op.emitError("Unhandled operation in adjoint region");
@@ -374,7 +383,7 @@ class AdjointGenerator {
         IRRewriter rewriter(builder);
         rewriter.eraseOp(terminator);
         builder.setInsertionPointAfter(adjointOp);
-        func::ReturnOp::create(builder, loc, adjointOp.getResult());
+        func::ReturnOp::create(builder, loc, adjointOp.getResults());
 
         // Leave the adjoint func op to go back at the saved insertion
         builder.restoreInsertionPoint(insertionSaved);
@@ -528,7 +537,9 @@ struct AdjointSingleOpRewritePattern : public OpRewritePattern<AdjointOp> {
         // Initialize the backward pass with the operand of the quantum.yield
         auto yieldOp = cast<quantum::YieldOp>(adjoint.getRegion().front().getTerminator());
         assert(yieldOp.getNumOperands() == 1 && "Expected quantum.yield to have one operand");
-        oldToCloned.map(yieldOp.getOperands().front(), adjoint.getQreg());
+        for (auto [yieldVal, adjointOperand] : llvm::zip_equal(yieldOp.getOperands(), adjoint.getArgs())){
+            oldToCloned.map(yieldVal, adjointOperand);
+        }
 
         // Emit the adjoint quantum operations and reversed control flow, using cached values.
         AdjointGenerator adjointGenerator{oldToCloned, cache};
