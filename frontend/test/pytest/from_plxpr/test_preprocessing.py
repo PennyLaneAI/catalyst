@@ -27,6 +27,7 @@ from pennylane.devices.capabilities import (
     OperatorProperties,
 )
 
+from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
 from catalyst.from_plxpr import from_plxpr
 from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.utils.exceptions import CompileError
@@ -60,6 +61,21 @@ class CapabilitiesDevice(NullQubit):
         return self._capabilities
 
 
+def get_pipelines(f, skip_preprocess=False):
+    """Utility to get the transform pipelines for a QNode from jaxpr."""
+    jaxpr = jax.make_jaxpr(f)()
+    cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=skip_preprocess)()
+    pipelines = None
+
+    for eqn in cjaxpr.eqns:
+        if eqn.primitive == quantum_kernel_p:
+            pipelines = eqn.params.get("pipelines", None)
+            break
+
+    assert pipelines is not None
+    return pipelines
+
+
 class TestGeneralPreprocessing:
     """Tests for general preprocessing."""
 
@@ -75,16 +91,8 @@ class TestGeneralPreprocessing:
             _ = qml.measure(0)
             return qml.expval(qml.Z(0))
 
-        jaxpr = jax.make_jaxpr(f)()
-        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=skip_preprocess)()
+        pipelines = get_pipelines(f, skip_preprocess=skip_preprocess)
 
-        pipelines = None
-        for eqn in cjaxpr.eqns:
-            if eqn.primitive == quantum_kernel_p:
-                pipelines = eqn.params.get("pipelines", None)
-                break
-
-        assert pipelines is not None
         if skip_preprocess:
             assert len(pipelines) == 1
             assert pipelines[0][0] == "main"
@@ -207,16 +215,7 @@ class TestMCMPreprocessing:
             _ = qml.measure(0)
             return qml.expval(qml.Z(0))
 
-        jaxpr = jax.make_jaxpr(f)()
-        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
-
-        pipelines = None
-        for eqn in cjaxpr.eqns:
-            if eqn.primitive == quantum_kernel_p:
-                pipelines = eqn.params.get("pipelines", None)
-                break
-
-        assert pipelines
+        pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
         assert any(t.pass_name == "dynamic-one-shot" for t in device_pipeline)
 
@@ -224,8 +223,24 @@ class TestMCMPreprocessing:
 class TestMeasurementPreprocessing:
     """Tests for preprocessing related to terminal measurements."""
 
+    @staticmethod
+    def assert_transform_presence(pipeline, transform, transform_needed, is_empty_transform):
+        """Utility function to assert whether a transform is present in the pipeline
+        only when necessary."""
+        if is_empty_transform:
+            cond_fn = lambda t: t.pass_name == "empty" and t.kwargs["key"] == transform.__name__
+        else:
+            cond_fn = lambda t: t.pass_name == transform.pass_name
+
+        has_transform = any(cond_fn(t) for t in pipeline)
+
+        if transform_needed:
+            assert has_transform
+        else:
+            assert not has_transform
+
     @pytest.mark.parametrize(
-        "capabilities,transform_needed",
+        "capabilities,needs_split_non_commuting",
         [
             (
                 # Non-commuting observables unsupported
@@ -279,7 +294,7 @@ class TestMeasurementPreprocessing:
             ),
         ],
     )
-    def test_split_non_commuting(self, capabilities, transform_needed):
+    def test_split_non_commuting(self, capabilities, needs_split_non_commuting):
         """Test that split_non_commuting is added to the pipeline when needed."""
         dev = CapabilitiesDevice(wires=4)
         dev.capabilities = capabilities
@@ -288,35 +303,21 @@ class TestMeasurementPreprocessing:
         def f():
             qml.expval(qml.Z(0))
 
-        jaxpr = jax.make_jaxpr(f)()
-        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
-
-        pipelines = None
-        for eqn in cjaxpr.eqns:
-            if eqn.primitive == quantum_kernel_p:
-                pipelines = eqn.params.get("pipelines", None)
-                break
-
-        assert pipelines
+        pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
-
-        if transform_needed:
-            assert any(
-                t.pass_name == "empty" and t.kwargs["key"] == "split_non_commuting"
-                for t in device_pipeline
-            )
-        else:
-            assert not any(
-                t.pass_name == "empty" and t.kwargs["key"] == "split_non_commuting"
-                for t in device_pipeline
-            )
+        self.assert_transform_presence(
+            device_pipeline,
+            transform=qml.transforms.split_non_commuting,
+            transform_needed=needs_split_non_commuting,
+            is_empty_transform=True,
+        )
 
     @pytest.mark.parametrize(
-        "split_non_commuting_needed,sum_supported,transform_needed",
+        "split_non_commuting_present,sum_supported,needs_split_to_single_terms",
         [(True, False, False), (True, True, False), (False, True, False), (False, False, True)],
     )
     def test_split_to_single_terms(
-        self, split_non_commuting_needed, sum_supported, transform_needed
+        self, split_non_commuting_present, sum_supported, needs_split_to_single_terms
     ):
         """Test that split_to_single_terms is added to the pipeline when needed."""
         observables = {
@@ -330,7 +331,7 @@ class TestMeasurementPreprocessing:
 
         dev = CapabilitiesDevice(wires=4)
         dev.capabilities = DeviceCapabilities(
-            non_commuting_observables=not split_non_commuting_needed,
+            non_commuting_observables=not split_non_commuting_present,
             observables=observables,
             measurement_processes={"ExpectationMP": [], "SampleMP": [], "CountsMP": []},
         )
@@ -339,30 +340,20 @@ class TestMeasurementPreprocessing:
         def f():
             qml.expval(qml.Z(0))
 
-        jaxpr = jax.make_jaxpr(f)()
-        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
-
-        pipelines = None
-        for eqn in cjaxpr.eqns:
-            if eqn.primitive == quantum_kernel_p:
-                pipelines = eqn.params.get("pipelines", None)
-                break
-
-        assert pipelines
+        pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
+        self.assert_transform_presence(
+            device_pipeline,
+            transform=qml.transforms.split_to_single_terms,
+            transform_needed=needs_split_to_single_terms,
+            is_empty_transform=False,
+        )
 
-        if transform_needed:
-            assert any(t.pass_name == "split-to-single-terms" for t in device_pipeline)
-        else:
-            assert not any(t.pass_name == "split-to-single-terms" for t in device_pipeline)
-
-    @pytest.mark.parametrize(
-        "non_sample_supported,transform_needed", [(True, False), (False, True)]
-    )
-    def test_measurements_from_samples(self, non_sample_supported, transform_needed):
+    @pytest.mark.parametrize("only_samples_supported", [True, False])
+    def test_measurements_from_samples(self, only_samples_supported):
         """Test that measurements_from_samples is added to the pipeline when needed."""
         measurements = {"SampleMP": []}
-        if non_sample_supported:
+        if not only_samples_supported:
             measurements["ExpectationMP"] = []
 
         dev = CapabilitiesDevice(wires=4)
@@ -380,36 +371,20 @@ class TestMeasurementPreprocessing:
         def f():
             qml.expval(qml.Z(0))
 
-        jaxpr = jax.make_jaxpr(f)()
-        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
-
-        pipelines = None
-        for eqn in cjaxpr.eqns:
-            if eqn.primitive == quantum_kernel_p:
-                pipelines = eqn.params.get("pipelines", None)
-                break
-
-        assert pipelines
+        pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
+        self.assert_transform_presence(
+            device_pipeline,
+            transform=measurements_from_samples,
+            transform_needed=only_samples_supported,
+            is_empty_transform=True,
+        )
 
-        if transform_needed:
-            assert any(
-                t.pass_name == "empty" and t.kwargs["key"] == "measurements_from_samples"
-                for t in device_pipeline
-            )
-        else:
-            assert not any(
-                t.pass_name == "empty" and t.kwargs["key"] == "measurements_from_samples"
-                for t in device_pipeline
-            )
-
-    @pytest.mark.parametrize(
-        "non_counts_supported,transform_needed", [(True, False), (False, True)]
-    )
-    def test_measurments_from_counts(self, non_counts_supported, transform_needed):
+    @pytest.mark.parametrize("only_counts_supported", [True, False])
+    def test_measurements_from_counts(self, only_counts_supported):
         """Test that measurements_from_counts is added to the pipeline when needed."""
         measurements = {"CountsMP": []}
-        if non_counts_supported:
+        if not only_counts_supported:
             measurements["SampleMP"] = []
 
         dev = CapabilitiesDevice(wires=4)
@@ -427,28 +402,14 @@ class TestMeasurementPreprocessing:
         def f():
             qml.expval(qml.Z(0))
 
-        jaxpr = jax.make_jaxpr(f)()
-        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
-
-        pipelines = None
-        for eqn in cjaxpr.eqns:
-            if eqn.primitive == quantum_kernel_p:
-                pipelines = eqn.params.get("pipelines", None)
-                break
-
-        assert pipelines
+        pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
-
-        if transform_needed:
-            assert any(
-                t.pass_name == "empty" and t.kwargs["key"] == "measurements_from_counts"
-                for t in device_pipeline
-            )
-        else:
-            assert not any(
-                t.pass_name == "empty" and t.kwargs["key"] == "measurements_from_counts"
-                for t in device_pipeline
-            )
+        self.assert_transform_presence(
+            device_pipeline,
+            transform=measurements_from_counts,
+            transform_needed=only_counts_supported,
+            is_empty_transform=True,
+        )
 
     def test_unsupported_samples_counts_observables_error(self):
         """Test that an error is raised if a device doesn't support any observables,
@@ -468,7 +429,7 @@ class TestMeasurementPreprocessing:
             _ = interpreter()
 
     @pytest.mark.parametrize(
-        "supported_obs,transform_needed",
+        "supported_obs,needs_diagonalize_measurements",
         [
             (["PauliZ", "Prod"], True),
             (["PauliX", "PauliY", "Hadamard"], True),
@@ -476,7 +437,7 @@ class TestMeasurementPreprocessing:
             (["PauliX", "PauliY", "PauliZ", "Hadamard", "Sum"], False),
         ],
     )
-    def test_diagonalize_measurements(self, supported_obs, transform_needed):
+    def test_diagonalize_measurements(self, supported_obs, needs_diagonalize_measurements):
         """Test that diagonalize_measurements is added to the pipeline when needed."""
 
         dev = CapabilitiesDevice(wires=4)
@@ -489,28 +450,14 @@ class TestMeasurementPreprocessing:
         def f():
             qml.expval(qml.Z(0))
 
-        jaxpr = jax.make_jaxpr(f)()
-        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
-
-        pipelines = None
-        for eqn in cjaxpr.eqns:
-            if eqn.primitive == quantum_kernel_p:
-                pipelines = eqn.params.get("pipelines", None)
-                break
-
-        assert pipelines
+        pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
-
-        if transform_needed:
-            assert any(
-                t.pass_name == "empty" and t.kwargs["key"] == "diagonalize_measurements"
-                for t in device_pipeline
-            )
-        else:
-            assert not any(
-                t.pass_name == "empty" and t.kwargs["key"] == "diagonalize_measurements"
-                for t in device_pipeline
-            )
+        self.assert_transform_presence(
+            device_pipeline,
+            transform=qml.transforms.diagonalize_measurements,
+            transform_needed=needs_diagonalize_measurements,
+            is_empty_transform=True,
+        )
 
 
 class TestOperationPreprocessing:
@@ -525,16 +472,7 @@ class TestOperationPreprocessing:
         def f():
             return qml.expval(qml.Z(0))
 
-        jaxpr = jax.make_jaxpr(f)()
-        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
-
-        pipelines = None
-        for eqn in cjaxpr.eqns:
-            if eqn.primitive == quantum_kernel_p:
-                pipelines = eqn.params.get("pipelines", None)
-                break
-
-        assert pipelines
+        pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
         assert any(
             t.pass_name == "empty" and t.kwargs["key"] == "verify_operations"
@@ -559,16 +497,7 @@ class TestGradientPreprocessing:
         def f():
             return qml.expval(qml.Z(0))
 
-        jaxpr = jax.make_jaxpr(f)()
-        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
-
-        pipelines = None
-        for eqn in cjaxpr.eqns:
-            if eqn.primitive == quantum_kernel_p:
-                pipelines = eqn.params.get("pipelines", None)
-                break
-
-        assert pipelines
+        pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
 
         if diff_method is not None:
@@ -612,16 +541,7 @@ class TestGradientPreprocessing:
         def f():
             return qml.expval(qml.Z(0))
 
-        jaxpr = jax.make_jaxpr(f)()
-        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
-
-        pipelines = None
-        for eqn in cjaxpr.eqns:
-            if eqn.primitive == quantum_kernel_p:
-                pipelines = eqn.params.get("pipelines", None)
-                break
-
-        assert pipelines
+        pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
 
         if diff_method == "adjoint":
@@ -645,16 +565,7 @@ class TestGradientPreprocessing:
         def f():
             return qml.expval(qml.Z(0))
 
-        jaxpr = jax.make_jaxpr(f)()
-        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
-
-        pipelines = None
-        for eqn in cjaxpr.eqns:
-            if eqn.primitive == quantum_kernel_p:
-                pipelines = eqn.params.get("pipelines", None)
-                break
-
-        assert pipelines
+        pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
 
         if diff_method == "parameter-shift":

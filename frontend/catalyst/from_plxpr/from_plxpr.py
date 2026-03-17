@@ -142,6 +142,10 @@ def from_plxpr(
         skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
             If ``True``, transforms used to preprocess and validate the user program before
             executing on a quantum backend will not be used. ``False`` by default.
+        _preprocess_warn (bool): Private argument to control whether a warning should be raised
+            if any device preprocessing transforms in the compilation pipeline do not have
+            native MLIR implementations. This argument is targeted at developers and should
+            generally not be used. ``True`` by default.
 
     Returns:
         Callable: A function that accepts the same arguments as the plxpr and returns catalyst
