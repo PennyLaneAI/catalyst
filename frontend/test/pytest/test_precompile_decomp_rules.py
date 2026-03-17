@@ -23,8 +23,8 @@ from pennylane.wires import WiresLike
 from catalyst.utils.precompile_decomposition_rules import (
     COMPILER_OPS_FOR_DECOMPOSITION,
     compile_op_decomp_rules,
+    get_abstract_args,
     get_compiler_ops,
-    get_dummy_args,
 )
 
 
@@ -39,83 +39,83 @@ def test_get_compiler_ops():
     assert failures == 0
 
 
-class TestGetDummyArgs:
+class TestGetAbstractArgs:
     """
-    Tests for get_dummy_args.
+    Tests for get_abstract_args.
     """
 
     def test_empty_func(self):
         """
-        Test that get_dummy_args correctly handles funcs with no args.
+        Test that get_abstract_args correctly handles funcs with no args.
         """
 
         def empty():
             return
 
-        assert not get_dummy_args(empty)
+        assert not get_abstract_args(empty)
 
     def test_int_param(self):
         """
-        Test that get_dummy_args correctly handles funcs with int params.
+        Test that get_abstract_args correctly handles funcs with int params.
         """
 
         def int_param(x: int):
             return x
 
-        assert get_dummy_args(int_param) == [0]
+        assert get_abstract_args(int_param) == [int]
 
     def test_float_param(self):
         """
-        Test that get_dummy_args correctly handles funcs with float params.
+        Test that get_abstract_args correctly handles funcs with float params.
         """
 
         def float_param(x: float):
             return x * 2
 
-        assert get_dummy_args(float_param) == [0.0]
+        assert get_abstract_args(float_param) == [float]
 
     def test_tensorlike_param(self):
         """
-        Test that get_dummy_args correctly handles funcs with TensorLike params.
+        Test that get_abstract_args correctly handles funcs with TensorLike params.
         """
 
         def tensorlike_param(a: TensorLike):
             return 3 + a
 
-        assert get_dummy_args(tensorlike_param) == [0.0]
+        assert get_abstract_args(tensorlike_param) == [float]
 
     def test_ignore_wires(self):
         """
-        Test that get_dummy_args correctly ignores WiresLike params.
+        Test that get_abstract_args correctly ignores WiresLike params.
         """
 
         def wire_param(wires: WiresLike):
             return wires
 
-        assert not get_dummy_args(wire_param)
+        assert not get_abstract_args(wire_param)
 
     def test_mixed_params(self):
         """
-        Test that get_dummy_args correctly handles mixed params.
+        Test that get_abstract_args correctly handles mixed params.
         """
 
         def mixed_params(x: int, y: float, w: WiresLike):
             return int(x - y), w
 
-        assert get_dummy_args(mixed_params) == [
-            0,
-            0.0,
+        assert get_abstract_args(mixed_params) == [
+            int,
+            float,
         ]
 
     def test_named_params(self):
         """
-        Test that get_dummy_args correctly guesses for named params.
+        Test that get_abstract_args correctly guesses for named params.
         """
 
         def angle_names(theta, phi, omega):
             return theta + phi + omega
 
-        assert get_dummy_args(angle_names) == [0.0, 0.0, 0.0]
+        assert get_abstract_args(angle_names) == [float, float, float]
 
 
 class TestCompileOpDecompRules:

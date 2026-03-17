@@ -114,7 +114,7 @@ def get_compiler_ops() -> tuple[set[type[Operator]], int]:
     return compiler_op_classes, num_failures
 
 
-def get_dummy_args(func: Callable) -> list[float | int]:
+def get_abstract_args(func: Callable) -> list[float | int]:
     """
     Create dummy args for a callable.
 
@@ -139,17 +139,15 @@ def get_dummy_args(func: Callable) -> list[float | int]:
             continue
         if param.name == "wires" or Wires in type_annotation:  # wires are handled separately
             continue
-        if param.kind == inspect.Parameter.VAR_POSITIONAL:
-            continue
-        if param.kind == inspect.Parameter.VAR_KEYWORD:
+        if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
             continue
 
-        elif float in type_annotation or TensorLike in type_annotation:
-            dummy_args.append(0.0)
+        if float in type_annotation or TensorLike in type_annotation:
+            dummy_args.append(float)
         elif int in type_annotation:
-            dummy_args.append(0)
+            dummy_args.append(int)
         elif param.name in ["theta", "phi", "delta", "omega"]:
-            dummy_args.append(0.0)
+            dummy_args.append(float)
         else:
             raise ValueError(
                 f"Cannot resolve the {param.name} parameter of the {func} decomposition rule."
@@ -204,9 +202,7 @@ def compile_rule(
     Returns:
         str: string representation of the mlir of the decomposition rule.
     """
-    abstract_args = [
-        type(arg) for arg in get_dummy_args(rule._impl)  # pylint: disable=protected-access
-    ]
+    abstract_args = get_abstract_args(rule._impl)  # pylint: disable=protected-access
 
     if str in abstract_args:
         raise ValueError("Cannot compile decomposition rules with string arguments.")
