@@ -1,7 +1,7 @@
 add_subdirectory(capi)
 add_subdirectory(backend)
 add_subdirectory(registry)
-add_subdirectory(DecompGraphLib)
+add_subdirectory(DecompGraphSolver)
 add_subdirectory(RSDecompRuntime)
 
 if(ENABLE_OQD)
