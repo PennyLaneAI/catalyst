@@ -33,8 +33,7 @@ from catalyst.jax_primitives import decomposition_rule
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import DEFAULT_BIN_PATHS
 
-DEFAULT_RULE_DIR = Path(__file__).parent.parent / Path("resources")
-BYTECODE_FILE_NAME = Path("decomposition_rules.mlirbc")
+BYTECODE_FILE_PATH = Path(__file__).parent.parent / Path("resources/decomposition_rules.mlirbc")
 
 COMPILER_OPS_FOR_DECOMPOSITION = {
     "CNOT",
@@ -265,16 +264,16 @@ def compile_op_decomp_rules(
     return mlir_modules
 
 
-def precompile_decomp_rules(decomp_dir_path: Path = DEFAULT_RULE_DIR):
+def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
     """
     Compile PennyLane built-in decomposition rules to MLIR Bytecode.
 
     Intended for use with `make decomp-rules` in catalyst/mlir.
 
     Args:
-        decomp_dir_path (Path): path to compile rules to.
+        decomp_file_path (Path): path to compile rules to.
     """
-    decomp_dir_path.mkdir(parents=True, exist_ok=True)
+    decomp_file_path.parent.mkdir(parents=True, exist_ok=True)
 
     target_ops, num_ops_missed = get_compiler_ops()
     if num_ops_missed:
@@ -298,7 +297,7 @@ def precompile_decomp_rules(decomp_dir_path: Path = DEFAULT_RULE_DIR):
         check=True,
     ).stdout
 
-    with open(decomp_dir_path / BYTECODE_FILE_NAME, "wb") as bytecode_file:
+    with open(decomp_file_path, "wb") as bytecode_file:
         bytecode_file.write(bytecode)
 
 
