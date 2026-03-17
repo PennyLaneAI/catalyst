@@ -197,8 +197,8 @@ def test_disentangle_passes():
         return qml.state()
 
     input_mlir_string = circuit_with_disentangle_passes.mlir
-    assert "disentangle-CNOT" in input_mlir_string
-    assert "disentangle-SWAP" in input_mlir_string
+    assert "disentangle-cnot" in input_mlir_string
+    assert "disentangle-swap" in input_mlir_string
 
     # both SWAP and CNOT should be removed by the disentangle passes
     transformed_mlir_string = circuit_with_disentangle_passes.mlir_opt

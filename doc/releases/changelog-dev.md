@@ -178,6 +178,13 @@
   circuit()
   ```
 
+* The `diagonalize-final-measurements` xDSL pass now includes an observable-commutativity check and
+  raises an error if non-commuting terms are encountered. The check is applied to each `qnode` in
+  the IR (that is, a `func.func` op with a `quantum.node` attribute). If the measurement contains
+  only Pauli or Hadamard observables, the *qubit-wise commutativity* (QWC) check is applied.
+  Otherwise, the more strict *non-overlapping observable* check is applied.
+  [(#2538)](https://github.com/PennyLaneAI/catalyst/pull/2538)
+
 * Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
   effectively filtering for decomposition rules in the MLIR-native decomposition framework.
   [(#2539)](https://github.com/PennyLaneAI/catalyst/pull/2539)
@@ -283,6 +290,10 @@
   [(#2486)](https://github.com/PennyLaneAI/catalyst/pull/2486)
 
 <h3>Breaking changes 💔</h3>
+
+* The ``-disentangle-CNOT`` and ``-disentangle-SWAP`` Catalyst CLI commands have been renamed to
+  ``-disentangle-cnot`` and ``-disentangle-swap`` (all lower-case).
+  [(#2546)](https://github.com/PennyLaneAI/catalyst/pull/2546)
 
 * `catalyst.python_interface.inspection.draw` and `catalyst.python_interface.inspection.generate_mlir_graph` no longer
   accept QNodes as the input. Now, the input must always be a :class:`~.QJIT` object.
@@ -676,14 +687,32 @@
   been added for compatibility with the Python interface to Catalyst.
   [(#2519)](https://github.com/PennyLaneAI/catalyst/pull/2519)
 
-
 <h3>Documentation 📝</h3>
+
+* Docstrings for :func:`~.passes.disentangle_cnot` and :func:`~.passes.disentangle_swap` have been improved
+  by using updated features for inspection and by calling them from the PennyLane frontend.
+  [(#2546)](https://github.com/PennyLaneAI/catalyst/pull/2546)
 
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
   [(#2406)](https://github.com/PennyLaneAI/catalyst/pull/2406)
 
 * Updated the changelog and builtin_passes.py to link to <https://pennylane.ai/compilation/pauli-based-computation> instead.
   [(#2409)](https://github.com/PennyLaneAI/catalyst/pull/2409)
+
+* Infrastructure has been put in place for features that are accessible from both PennyLane and
+  Catalyst to have a single source of truth for documentation, which will provide a better overall
+  experience when consulting our documentation.
+  [(#2481)](https://github.com/PennyLaneAI/catalyst/pull/2481)
+
+  Several entry-points were added to ``setup.py`` for the Pauli-based computation compilation passes
+  and the :func:`~.draw_graph` function. This allows for the ability to use Catalyst features from
+  PennyLane directly (related: [(#9020)](https://github.com/PennyLaneAI/pennylane/pull/9020)) and
+  for the documentation of those features to be accessible to both Catalyst and PennyLane, creating
+  a single source of truth for such features.
+
+  In addition, the documentation for all Pauli-based computation transforms has been updated to be
+  more user-focused by showing examples with :func:`~.specs` and by calling the transforms from the
+  PennyLane frontend.
 
 <h3>Contributors ✍️</h3>
 
