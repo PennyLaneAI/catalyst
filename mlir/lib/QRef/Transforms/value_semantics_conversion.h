@@ -41,6 +41,7 @@ Value getRSourceRegisterValue(Value rQubit);
 void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValues);
 void hoistAliasingGetOps(IRRewriter &builder, SetVector<Value> &rValuesUsedByRegion,
                          Operation *insertionPoint);
+void squashAliasingGetOps(func::FuncOp func);
 DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumGate rGateOp);
 Operation *addRootVValuesToRetOp(Region &r, QubitValueTracker &tracker);
 
@@ -65,11 +66,11 @@ void handleNamedObs(IRRewriter &builder, qref::NamedObsOp rNamedObsOp, QubitValu
 void handleHermitian(IRRewriter &builder, qref::HermitianOp rHermitianOp,
                      QubitValueTracker &tracker);
 void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker);
+void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker);
 void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker);
 void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker);
 
 // Main driver
 void walkRegionAndHandle(IRRewriter &builder, Region &r, QubitValueTracker &tracker);
 void handleRegion(IRRewriter &builder, Region &r);
-void squashAliasingGetOps(func::FuncOp func);
 } // namespace ReferenceToValueSemanticsConversion

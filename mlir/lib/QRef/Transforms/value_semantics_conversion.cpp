@@ -511,7 +511,12 @@ void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValu
 
 /**
  * @brief Hoist all rQubit Values in `rValuesUsedByRegion` from qref.get operations that alias each
- * other before the `insertionPoint` argument.
+ * other before the `insertionPoint` operation. The aliasing qref.get op results in
+ * `rValuesUsedByRegion` are replaced by the newly created qref.get op.
+ *
+ * This function is used to hoist qref.get operations on neighboring scopes that do not parent each
+ * other, for example the "then" and "else" regions of an scf.if op, or the "condition" and "do"
+ * regions of an scf.while op.
  *
  * @param builder
  * @param rValuesUsedByRegion
@@ -591,6 +596,39 @@ void hoistAliasingGetOps(IRRewriter &builder, SetVector<Value> &rValuesUsedByReg
 }
 
 /**
+ * @brief Replace all uses of qref.get operations in inner scopes with an aliasing one from an
+ * outer scope, if one exists.
+ *
+ * @param func
+ */
+void squashAliasingGetOps(func::FuncOp func)
+{
+    SmallVector<qref::GetOp> uniqueGetOps;
+    SmallVector<qref::GetOp> aliasingGetOps;
+
+    func->walk<WalkOrder::PreOrder>([&](qref::GetOp getOp) {
+        for (auto visited : uniqueGetOps) {
+            bool equivalent = OperationEquivalence::isEquivalentTo(
+                getOp, visited, OperationEquivalence::IgnoreLocations);
+            bool visibleViaClosure = visited.getQubit().getParentRegion()->isAncestor(
+                getOp.getQubit().getParentRegion());
+
+            if (equivalent && visibleViaClosure) {
+                getOp.getQubit().replaceAllUsesWith(visited.getQubit());
+                aliasingGetOps.push_back(getOp);
+                return WalkResult::advance();
+            }
+        }
+        uniqueGetOps.push_back(getOp);
+        return WalkResult::advance();
+    });
+
+    for (auto getOp : aliasingGetOps) {
+        getOp.erase();
+    }
+}
+
+/**
  * @brief Given a qref gate operation, compute the result segment sizes for the corresponding value
  * semantics gate operation.
  *
@@ -617,7 +655,7 @@ DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumGate r
  * This is necessary since qref operations do not return quantum values.
  *
  * @param r
- * @param tracker
+ * @param trackervoid squashAliasingGetOps(func::FuncOp func);
  * @return Operation*
  */
 Operation *addRootVValuesToRetOp(Region &r, QubitValueTracker &tracker)
@@ -1070,6 +1108,134 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
     builder.eraseOp(ifOp);
 }
 
+void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(switchOp);
+    MLIRContext *ctx = switchOp->getContext();
+    Location loc = switchOp->getLoc();
+
+    SetVector<Value> rValuesUsedByRegion;
+    for (Region &r : switchOp.getCaseRegions()) {
+        getNecessaryRegionRValues(r, rValuesUsedByRegion);
+    }
+    getNecessaryRegionRValues(switchOp.getDefaultRegion(), rValuesUsedByRegion);
+    hoistAliasingGetOps(builder, rValuesUsedByRegion, switchOp);
+
+    if (rValuesUsedByRegion.size() == 0) {
+        return;
+    }
+
+    scf::IndexSwitchOp newSwitchOp;
+    {
+        // 1. Send in the vValues from above as arguments
+        // This handles the flow from outside the new if op into the new switch op
+        // i.e. the extract op results are viewed as the new switch op's "operands"
+        // Note that since scf.index_switch cannot formally take operands, we need to pretend the
+        // extracted vQubits are "root".
+        SmallVector<Value> regionOperands;
+        regionOperands.append(rValuesUsedByRegion.begin(), rValuesUsedByRegion.end());
+        TransientQubitExtractor extractor(switchOp, regionOperands, tracker, builder);
+
+        SmallVector<Type> newResultTypes(switchOp->getResultTypes());
+        for (Value rValue : rValuesUsedByRegion) {
+            if (isa<qref::QubitType>(rValue.getType())) {
+                newResultTypes.push_back(quantum::QubitType::get(ctx));
+            }
+            else if (isa<qref::QuregType>(rValue.getType())) {
+                newResultTypes.push_back(quantum::QuregType::get(ctx));
+            }
+        }
+
+        newSwitchOp = scf::IndexSwitchOp::create(builder, loc, newResultTypes, switchOp.getArg(),
+                                                 switchOp.getCases(), switchOp.getNumCases());
+
+        // 2. Handle the "default" region
+        // We are effectively treating the region as a subroutine, so all input rValues are root
+        // The subroutine needs its own tracker with its own root values
+        builder.inlineRegionBefore(switchOp.getDefaultRegion(), newSwitchOp.getDefaultRegion(),
+                                   newSwitchOp.getDefaultRegion().end());
+
+        // Copy over all the existing root Value maps in the outer scope
+        QubitValueTracker defaultRegionTracker = tracker;
+
+        // newly extracted qubits, though non-root outside, are considered root inside!
+        for (auto [vQubit, idx] : llvm::zip_equal(extractor.getExtractedVQubits(),
+                                                  extractor.getNonRootQubitOperandIndices())) {
+            defaultRegionTracker.setCurrentVQubit(rValuesUsedByRegion[idx], vQubit);
+        }
+
+        walkRegionAndHandle(builder, newSwitchOp.getDefaultRegion(), defaultRegionTracker);
+
+        // Yield the new quantum results
+        auto defaultYieldOp = dyn_cast<scf::YieldOp>(newSwitchOp.getDefaultBlock().getTerminator());
+        assert(defaultYieldOp &&
+               "Expected scf.index_switch regions to terminate with scf.yield ops");
+        SmallVector<Value> defaultYieldVals(defaultYieldOp->getOperands());
+        for (Value v : rValuesUsedByRegion) {
+            if (isa<qref::QubitType>(v.getType())) {
+                defaultYieldVals.push_back(defaultRegionTracker.getCurrentVQubit(v));
+            }
+            else if (isa<qref::QuregType>(v.getType())) {
+                defaultYieldVals.push_back(defaultRegionTracker.getCurrentVQreg(v));
+            }
+        }
+        defaultYieldOp->setOperands(defaultYieldVals);
+
+        // 3. Handle the case regions
+        for (auto [oldCaseRegion, newCaseRegion] :
+             llvm::zip_equal(switchOp.getCaseRegions(), newSwitchOp.getCaseRegions())) {
+            builder.inlineRegionBefore(oldCaseRegion, newCaseRegion, newCaseRegion.end());
+
+            QubitValueTracker caseRegionTracker = tracker;
+            for (auto [vQubit, idx] : llvm::zip_equal(extractor.getExtractedVQubits(),
+                                                      extractor.getNonRootQubitOperandIndices())) {
+                caseRegionTracker.setCurrentVQubit(rValuesUsedByRegion[idx], vQubit);
+            }
+
+            walkRegionAndHandle(builder, newCaseRegion, caseRegionTracker);
+
+            auto caseYieldOp = dyn_cast<scf::YieldOp>(newCaseRegion.front().getTerminator());
+            assert(defaultYieldOp &&
+                   "Expected scf.index_switch regions to terminate with scf.yield ops");
+            SmallVector<Value> caseYieldVals(caseYieldOp->getOperands());
+            for (Value v : rValuesUsedByRegion) {
+                if (isa<qref::QubitType>(v.getType())) {
+                    caseYieldVals.push_back(caseRegionTracker.getCurrentVQubit(v));
+                }
+                else if (isa<qref::QuregType>(v.getType())) {
+                    caseYieldVals.push_back(caseRegionTracker.getCurrentVQreg(v));
+                }
+            }
+            caseYieldOp->setOperands(caseYieldVals);
+        }
+
+        // Update outer tracker with results
+        for (auto [i, j] :
+             llvm::zip_equal(extractor.getQRegOperandIndices(), extractor.getQRegResultIndices())) {
+            tracker.setCurrentVQreg(rValuesUsedByRegion[i], newSwitchOp->getResult(j));
+        }
+
+        for (auto [i, j] : llvm::zip_equal(extractor.getRootQubitOperandIndices(),
+                                           extractor.getRootQubitResultIndices())) {
+            tracker.setCurrentVQubit(rValuesUsedByRegion[i], newSwitchOp->getResult(j));
+        }
+
+        extractor.setVOp(newSwitchOp);
+    }
+
+    for (auto [i, v] : llvm::enumerate(switchOp->getResults())) {
+        builder.replaceAllUsesWith(v, newSwitchOp->getResult(i));
+    }
+
+    newSwitchOp.walk([&](qref::GetOp getOp) {
+        assert(getOp.use_empty() &&
+               "qref.bit Values must have no uses after the semantic conversion");
+        builder.eraseOp(getOp);
+    });
+    builder.eraseOp(switchOp);
+}
+
 void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker)
 {
     OpBuilder::InsertionGuard guard(builder);
@@ -1305,6 +1471,9 @@ void walkRegionAndHandle(IRRewriter &builder, Region &r, QubitValueTracker &trac
         else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
             handleIf(builder, ifOp, tracker);
         }
+        else if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(op)) {
+            handleSwitch(builder, switchOp, tracker);
+        }
         else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
             handleFor(builder, forOp, tracker);
         }
@@ -1368,32 +1537,6 @@ void handleRegion(IRRewriter &builder, Region &r)
     }
 }
 
-void squashAliasingGetOps(func::FuncOp func)
-{
-    SmallVector<qref::GetOp> uniqueGetOps;
-    SmallVector<qref::GetOp> aliasingGetOps;
-
-    func->walk<WalkOrder::PreOrder>([&](qref::GetOp getOp) {
-        for (auto visited : uniqueGetOps) {
-            bool equivalent = OperationEquivalence::isEquivalentTo(
-                getOp, visited, OperationEquivalence::IgnoreLocations);
-            bool visibleViaClosure = visited.getQubit().getParentRegion()->isAncestor(
-                getOp.getQubit().getParentRegion());
-
-            if (equivalent && visibleViaClosure) {
-                getOp.getQubit().replaceAllUsesWith(visited.getQubit());
-                aliasingGetOps.push_back(getOp);
-                return WalkResult::advance();
-            }
-        }
-        uniqueGetOps.push_back(getOp);
-        return WalkResult::advance();
-    });
-
-    for (auto getOp : aliasingGetOps) {
-        getOp.erase();
-    }
-}
 } // namespace ReferenceToValueSemanticsConversion
 
 namespace catalyst {

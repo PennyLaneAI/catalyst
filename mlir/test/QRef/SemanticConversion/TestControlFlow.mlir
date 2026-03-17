@@ -779,3 +779,67 @@ func.func @test_if_mixed_root_nonroot(%arg0: i1, %arg1: f64) -> i1 attributes {q
 }
 
 
+// -----
+
+
+//
+// switch statements
+//
+
+
+// CHECK-LABEL: test_switch
+func.func @test_switch(%arg0: index, %arg1: f64) attributes {quantum.node} {
+    // CHECK: [[q:%.+]] = quantum.alloc_qb : !quantum.bit
+    // CHECK: [[reg:%.+]] = quantum.alloc( 3) : !quantum.reg
+    %q = qref.alloc_qb : !qref.bit
+    %a = qref.alloc(3) : !qref.reg<3>
+
+    %q0 = qref.get %a[0] : !qref.reg<3> -> !qref.bit
+
+    // CHECK: [[q0:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[q1:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
+    // CHECK: [[switchOut:%.+]]:3 = scf.index_switch %arg0 -> !quantum.bit, !quantum.bit, !quantum.bit
+    scf.index_switch %arg0
+
+    // CHECK: case 10
+    case 10 {
+        // CHECK: [[HADAMARD:%.+]] = quantum.custom "Hadamard"() [[q]] : !quantum.bit
+        qref.custom "Hadamard"() %q : !qref.bit
+
+        %q1 = qref.get %a[1] : !qref.reg<3> -> !qref.bit
+
+        // CHECK: [[TOFFOLI:%.+]]:3 = quantum.custom "Toffoli"() [[HADAMARD]], [[q0]], [[q1]] : !quantum.bit, !quantum.bit, !quantum.bit
+        qref.custom "Toffoli"() %q, %q0, %q1 : !qref.bit, !qref.bit, !qref.bit
+
+        // CHECK: scf.yield [[TOFFOLI]]#0, [[TOFFOLI]]#1, [[TOFFOLI]]#2 : !quantum.bit, !quantum.bit, !quantum.bit
+        scf.yield
+    }
+
+    // CHECK: case 20
+    case 20 {
+        // CHECK: [[RX:%.+]] = quantum.custom "RX"(%arg1) [[q]] : !quantum.bit
+        qref.custom "RX"(%arg1) %q : !qref.bit
+
+        %q1 = qref.get %a[1] : !qref.reg<3> -> !qref.bit
+
+        // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[RX]], [[q1]] : !quantum.bit, !quantum.bit
+        qref.custom "CNOT"() %q, %q1 : !qref.bit, !qref.bit
+
+        // CHECK: scf.yield [[CNOT]]#0, [[q0]], [[CNOT]]#1 : !quantum.bit, !quantum.bit, !quantum.bit
+        scf.yield
+    }
+    default {
+        // CHECK: scf.yield [[q]], [[q0]], [[q1]] : !quantum.bit, !quantum.bit, !quantum.bit
+        scf.yield
+    }
+    // CHECK: [[insert0:%.+]] = quantum.insert [[reg]][ 0], [[switchOut]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[switchOut]]#2 : !quantum.reg, !quantum.bit
+
+    // CHECK: quantum.dealloc_qb [[switchOut]]#0 : !quantum.bit
+    qref.dealloc_qb %q : !qref.bit
+
+    // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
+    qref.dealloc %a : !qref.reg<3>
+
+    return
+}
