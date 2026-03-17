@@ -281,7 +281,7 @@ def test_value_and_grad_on_qjit_classical(capture):
 
     def f2(x: float):
         return [x * x]
-    
+
     if not capture:
         f2 = qjit(f2, capture=capture)
 
@@ -291,7 +291,7 @@ def test_value_and_grad_on_qjit_classical(capture):
 
     def f3(x: float):
         return {"helloworld": x * x}
-    
+
     if not capture:
         f2 = qjit(f2, capture=capture)
 
@@ -302,7 +302,7 @@ def test_value_and_grad_on_qjit_classical(capture):
 
     def f4(x: float, y: float, z: float):
         return 100 * x + 200 * y + 300 * z
-    
+
     if not capture:
         f2 = qjit(f4, capture=capture)
 
@@ -312,7 +312,7 @@ def test_value_and_grad_on_qjit_classical(capture):
 
     def f5(x: float, y: float, z: float):
         return 100 * x + 200 * y + 300 * z
-    
+
     if not capture:
         f5 = qjit(f5, capture=capture)
 
@@ -358,7 +358,7 @@ def test_value_and_grad_on_qjit_classical_dict(capture):
         hello = tree["hello"]  # (x1, x2)
         world = tree["world"]  # (y1, y2)
         return (hello * world).sum()
-    
+
     if not capture:
         f = qjit(f, capture=capture)
 
@@ -375,7 +375,7 @@ def test_value_and_grad_on_qjit_classical_dict(capture):
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 def test_value_and_grad_on_qjit_quantum(diff_method, capture):
     """Check that value_and_grad works when called on an qjit object that does wrap a QNode.
-    
+
     We ignore nested qjit's with program capture till [sc-114222] fixing nested qjit's is resolved.
     """
 
@@ -390,7 +390,7 @@ def test_value_and_grad_on_qjit_quantum(diff_method, capture):
             return qml.probs()  # This is [1, 0, 0, ...]
 
         return x * (circuit()[0])
-    
+
     if not capture:
         workflow = qjit(workflow)
 
