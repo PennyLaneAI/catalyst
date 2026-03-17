@@ -129,16 +129,19 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         """
         observable_op = op.operands[0].owner
 
+        if isinstance(observable_op, quantum.HamiltonianOp):
+            raise CompileError("Encountered a quantum.HamiltonianOp while applying `measurements_from_samples`. This is not supported with Catalyst. " \
+            "Please apply `qml.transforms.split_non_commuting` prior to `measurements_from_samples` to split the Hamiltonian into separate terms.")
+
         supported_obs_types = (
             quantum.NamedObsOp,
             quantum.TensorOp,
-            quantum.HamiltonianOp,
             quantum.MCMObsOp,
         )
         if not isinstance(observable_op, supported_obs_types):
             raise NotImplementedError(
                 "Supported observable types for measurements-from-samples are quantum.NamedObsOp, "
-                "quantum.TensorOp, quantum.HamiltonianOp, and quantum.MCMObsOp, but received "
+                "quantum.TensorOp, and quantum.MCMObsOp, but received "
                 f"{type(op).__name__}"
             )
 
@@ -176,23 +179,12 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             # pl_op_equivalent = qp.prod(*[qp.Z(i) for i, _ in enumerate(all_obs)])
             in_qubits = [obs.operands[0] for obs in all_obs]
 
-            raise NotImplementedError("you haven't added Tensor support yet")
-
-        elif isinstance(op, quantum.HamiltonianOp):
-            # coeffs = op.operands[0].owner.operands[0].owner.operands[0].owner.value # ahhhhhhhh
-            observables = op.operands[1:]
-
-            # for obs in observables:
-            #     cls._get_observable_qubits(obs)
-
-            raise NotImplementedError("you haven't added Hamiltonian support yet")
-
         elif isinstance(op, quantum.MCMObsOp):
             raise NotImplementedError("you haven't added MCMObsOp support yet")
 
         else:
             raise NotImplementedError(
-                f"Supported observable types for measurements-from-samples are quantum.NamedObsOp, quantum.TensorOp, quantum.HamiltonianOp, and quantum.MCMObsOp, but received {type(op).__name__}"
+                f"Supported observable types for measurements-from-samples are quantum.NamedObsOp, quantum.TensorOp, and quantum.MCMObsOp, but received {type(op).__name__}"
             )
         
         return in_qubits
@@ -639,11 +631,11 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
 
         return postprocessing_func_op 
 
-def get_postprocessing_expval(mp, num_wires):
+def get_postprocessing_expval(num_wires):
 
     @xdsl_module
     @jax.jit
-    def _postprocessing_expval(samples):
+    def _postprocessing_expval(eigvals, samples):
         """Post-processing to recover the expectation value from the given `samples` array.
 
         This function assumes that the samples are in the computational basis (0s and 1s) and that the
@@ -657,6 +649,7 @@ def get_postprocessing_expval(mp, num_wires):
         Returns:
             jax.core.ShapedArray: The expectation value for each requested column.
         """
+        
         powers_of_two = 2 ** jnp.arange(num_wires)[::-1]
         indices = samples @ powers_of_two
         eigval_samples = jnp.take(eigvals, indices.astype(int))
