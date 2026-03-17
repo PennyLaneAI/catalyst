@@ -78,7 +78,7 @@ def get_compiler_ops() -> tuple[set[type[Operator]], int]:
     return compiler_op_classes, num_failures
 
 
-def get_dummy_args(func: Callable) -> list[str | float | int]:
+def get_dummy_args(func: Callable) -> list[float | int]:
     """
     Create dummy args for a callable.
 
@@ -108,18 +108,16 @@ def get_dummy_args(func: Callable) -> list[str | float | int]:
         if param.kind == inspect.Parameter.VAR_KEYWORD:
             continue
 
-        if str in type_annotation:
-            dummy_args.append("XX")  # we default to two wires
         elif float in type_annotation or TensorLike in type_annotation:
             dummy_args.append(0.0)
         elif int in type_annotation:
             dummy_args.append(0)
-        elif param.name in ["pauli_word", "pauli_string"]:
-            dummy_args.append("XX")
-        elif param.name in ["theta", "phi", "omega"]:
+        elif param.name in ["theta", "phi", "delta", "omega"]:
             dummy_args.append(0.0)
         else:
-            dummy_args.append(0)  # guess int for unknown args
+            raise ValueError(
+                f"Cannot resolve the {param.name} parameter of the {func} decomposition rule."
+            )
 
     return dummy_args
 
@@ -176,9 +174,8 @@ def compile_rule(
         type(arg) for arg in get_dummy_args(rule._impl)  # pylint: disable=protected-access
     ]
 
-    # TODO add support for strings
     if str in abstract_args:
-        return None
+        raise ValueError("Cannot compile decomposition rules with string arguments.")
 
     qp.capture.enable()
     qp.decomposition.enable_graph()
