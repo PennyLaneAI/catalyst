@@ -374,10 +374,10 @@ def handle_qnode(
 
     pipelines = (("main", tuple(self._pass_pipeline)),)
     if not self._skip_preprocess:
-        device_pipeline = create_device_preprocessing_pipeline(
+        device_preprocessing_pipeline = create_device_preprocessing_pipeline(
             qnode.device, execution_config, shots, warn=self._preprocess_warn
         )
-        pipelines += (("device", device_pipeline),)
+        pipelines += (("device", device_preprocessing_pipeline),)
 
     return quantum_kernel_p.bind(
         wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
