@@ -114,7 +114,7 @@ def get_compiler_ops() -> tuple[set[type[Operator]], int]:
     return compiler_op_classes, num_failures
 
 
-def get_abstract_args(func: Callable) -> list[float | int]:
+def get_abstract_args(func: Callable) -> list[type]:
     """
     Create dummy args for a callable.
 
@@ -124,10 +124,8 @@ def get_abstract_args(func: Callable) -> list[float | int]:
     Returns:
         list: dummy args matching the (positional) signature of func.
     """
-    # pylint: disable=too-many-branches
-
     func_sig = inspect.signature(func)
-    dummy_args: list = []
+    abstract_args: list = []
     for param in func_sig.parameters.values():
         type_annotation = param.annotation
         if get_origin(type_annotation) is Union or get_origin(type_annotation) is UnionType:
@@ -135,25 +133,23 @@ def get_abstract_args(func: Callable) -> list[float | int]:
         else:
             type_annotation = (type_annotation,)
 
-        if param.default is not inspect.Parameter.empty:  # use defaults whenever possible
-            continue
         if param.name == "wires" or Wires in type_annotation:  # wires are handled separately
             continue
         if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
             continue
 
         if float in type_annotation or TensorLike in type_annotation:
-            dummy_args.append(float)
+            abstract_args.append(float)
         elif int in type_annotation:
-            dummy_args.append(int)
+            abstract_args.append(int)
         elif param.name in ["theta", "phi", "delta", "omega"]:
-            dummy_args.append(float)
+            abstract_args.append(float)
         else:
             raise ValueError(
                 f"Cannot resolve the {param.name} parameter of the {func} decomposition rule."
             )
 
-    return dummy_args
+    return abstract_args
 
 
 def get_func_from_circuit(module) -> str | None:
