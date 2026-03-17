@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-This module provides the utilities necessary to AOT compile PennyLane's decomposition rules to MLIR
-Bytecode.
-"""
+"""Utilities for AOT compiling PennyLane's decomposition rules to MLIR Bytecode."""
 
 import inspect
 import subprocess
@@ -32,19 +29,58 @@ from pennylane.operation import Operator
 from pennylane.typing import TensorLike
 from pennylane.wires import Wires
 
-from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION
 from catalyst.jax_primitives import decomposition_rule
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import DEFAULT_BIN_PATHS
 
-DEFAULT_RULE_DIR = Path(__file__).parent.parent / Path("resources")
-BYTECODE_FILE_NAME = Path("decomposition_rules.mlirbc")
+BYTECODE_FILE_PATH = Path(__file__).parent.parent / Path("resources/decomposition_rules.mlirbc")
+
+COMPILER_OPS_FOR_DECOMPOSITION = {
+    "CNOT",
+    "ControlledPhaseShift",
+    "CRot",
+    "CRX",
+    "CRY",
+    "CRZ",
+    "CSWAP",
+    "CY",
+    "CZ",
+    "Hadamard",
+    "Identity",
+    "IsingXX",
+    "IsingXY",
+    "IsingYY",
+    "IsingZZ",
+    "SingleExcitation",
+    "DoubleExcitation",
+    "ISWAP",
+    "PauliX",
+    "PauliY",
+    "PauliZ",
+    "PauliRot",
+    "PauliMeasure",
+    "PhaseShift",
+    "PSWAP",
+    "Rot",
+    "RX",
+    "RY",
+    "RZ",
+    "S",
+    "SWAP",
+    "T",
+    "Toffoli",
+    "U1",
+    "U2",
+    "U3",
+    "MultiRZ",
+    "GlobalPhase",
+}
 
 
 @lru_cache
 def get_compiler_ops() -> tuple[set[type[Operator]], int]:
     """
-    Extracts all ops from pennylane that have decompositions in catalyst
+    Extracts all ops from pennylane that have decompositions in catalyst.
 
     Returns:
         set[Operation]: the set of PennyLane ops that are compiler-compatible
@@ -63,7 +99,7 @@ def get_compiler_ops() -> tuple[set[type[Operator]], int]:
     # FIXME: manual override for PauliMeasure
     pl_op_classes.add(qp.ops.PauliMeasure)
 
-    supported_compiler_op_names = set(COMPILER_OPS_FOR_DECOMPOSITION)
+    supported_compiler_op_names = COMPILER_OPS_FOR_DECOMPOSITION
 
     compiler_op_classes = set(
         op_class for op_class in pl_op_classes if op_class.__name__ in supported_compiler_op_names
@@ -78,7 +114,7 @@ def get_compiler_ops() -> tuple[set[type[Operator]], int]:
     return compiler_op_classes, num_failures
 
 
-def get_dummy_args(func: Callable) -> list[str | float | int]:
+def get_dummy_args(func: Callable) -> list[float | int]:
     """
     Create dummy args for a callable.
 
@@ -108,18 +144,16 @@ def get_dummy_args(func: Callable) -> list[str | float | int]:
         if param.kind == inspect.Parameter.VAR_KEYWORD:
             continue
 
-        if str in type_annotation:
-            dummy_args.append("XX")  # we default to two wires
         elif float in type_annotation or TensorLike in type_annotation:
             dummy_args.append(0.0)
         elif int in type_annotation:
             dummy_args.append(0)
-        elif param.name in ["pauli_word", "pauli_string"]:
-            dummy_args.append("XX")
-        elif param.name in ["theta", "phi", "omega"]:
+        elif param.name in ["theta", "phi", "delta", "omega"]:
             dummy_args.append(0.0)
         else:
-            dummy_args.append(0)  # guess int for unknown args
+            raise ValueError(
+                f"Cannot resolve the {param.name} parameter of the {func} decomposition rule."
+            )
 
     return dummy_args
 
@@ -135,7 +169,6 @@ def get_func_from_circuit(module) -> str | None:
         str: string representation of FuncOp named `rule_wrapper` from module
         None: if no such FuncOp can be found
     """
-
     decomp_func_op = None
 
     def find_condition(op):
@@ -164,7 +197,6 @@ def compile_rule(
 
     Args:
         op_class: A PennyLane class subclassing Operation
-        op_args: a valid (positional) arguments to op_class
         op_num_wires: the number of wires used by op_class
         rule (DecompositionRule): the decomposition rule to be compiled
         dev (Device): a device for qjit
@@ -176,11 +208,9 @@ def compile_rule(
         type(arg) for arg in get_dummy_args(rule._impl)  # pylint: disable=protected-access
     ]
 
-    # TODO add support for strings
     if str in abstract_args:
-        return None
+        raise ValueError("Cannot compile decomposition rules with string arguments.")
 
-    qp.capture.enable()
     qp.decomposition.enable_graph()
 
     # WARNING: do not rename this function, we use it to extract the rule from the compiled
@@ -189,7 +219,7 @@ def compile_rule(
     def rule_wrapper(*args, wires, **_):
         return rule(*args, wires=wires, **_)
 
-    @qp.qjit(target="mlir")
+    @qp.qjit(capture=True, target="mlir")
     @qp.qnode(dev)
     def circuit():
         rule_wrapper(*abstract_args, wires=jax.core.ShapedArray((op_num_wires,), int))
@@ -199,79 +229,61 @@ def compile_rule(
 
 
 def compile_op_decomp_rules(
-    op_class: Operator,
-) -> tuple[dict[str, str | None], int, int]:
+    op_class: type[Operator],
+) -> dict[str, str | None]:
     """
     Compile all decomposition rules for op_class.
 
     Note: the modules include the full circuit IR.
 
+    Args:
+        op_class (type[Operator]): the op class to compile decomposition rules for.
+
     Returns:
         dict[str, str | None]: decomposition rule names to compiled mlir modules.
-        int: the number of rules that successfully compiled
-        int: the number of rules that failed to compile
     """
-    num_failures = 0
-    num_successes = 0
-
     op_decomp_rules = qp.decomposition.decomposition_graph.list_decomps(op_class)
 
     mlir_modules = {}
 
-    op_num_wires = op_class.num_wires if op_class.num_wires else 2
-    dev = qp.device("lightning.qubit", wires=op_num_wires)
+    dev = qp.device("null.qubit", wires=op_class.num_wires)
 
     for rule in op_decomp_rules:
         try:
             rule_name = rule._impl.__name__  # pylint: disable=protected-access
-            mlir_modules[rule_name] = compile_rule(op_class, op_num_wires, rule, dev)
-            num_successes += 1
+            mlir_modules[rule_name] = compile_rule(op_class, op_class.num_wires, rule, dev)
         except TypeError as e:
             warnings.warn(f"dummy args failed to compile {rule_name}: {e}")
-            num_failures += 1
         except CompileError as e:
             warnings.warn(f"failed to compile {rule_name}: {e}")
-            num_failures += 1
         except Exception as e:  # pylint: disable=broad-exception-caught
             warnings.warn(f"Unexpected error while trying to compile {rule_name}: {e}")
-            num_failures += 1
         finally:
-            qp.capture.disable()
             qp.decomposition.disable_graph()
 
-    return (mlir_modules, num_successes, num_failures)
+    return mlir_modules
 
 
-def precompile_decomp_rules(decomp_dir_path: Path = DEFAULT_RULE_DIR):
+def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
     """
-    filters compiler-compatible decomposition ops from PennyLane, grabs their associated
-    decomposition rules, and compiles them via a wrapper function with qjit to mlir.
+    Compile PennyLane built-in decomposition rules to MLIR Bytecode.
+
     Intended for use with `make decomp-rules` in catalyst/mlir.
-    """
 
-    decomp_dir_path.mkdir(parents=True, exist_ok=True)
+    Args:
+        decomp_file_path (Path): path to compile rules to.
+    """
+    decomp_file_path.parent.mkdir(parents=True, exist_ok=True)
 
     target_ops, num_ops_missed = get_compiler_ops()
     if num_ops_missed:
         warnings.warn(f"failed to collect {num_ops_missed} op(s) from PennyLane")
 
-    num_successes = 0
-    num_failures = 0
-
-    mlir_rules = ""
-    for func in target_ops:
-        results, num_new_successes, num_new_failures = compile_op_decomp_rules(func)
-        num_successes += num_new_successes
-        num_failures += num_new_failures
-        if results:
-            for name, circuit_mlir in results.items():
-                if circuit_mlir:
-                    mlir_rules += str(circuit_mlir).replace("@rule_wrapper", "@" + name)
-
-    if num_failures:
-        warnings.warn(
-            f"compiled {num_successes} / {num_failures + num_successes} decomposition rules"
-        )
+    mlir_rules = "".join(
+        str(mlir).replace("@rule_wrapper", f"@{name}")
+        for func in target_ops
+        for name, mlir in compile_op_decomp_rules(func).items()
+    )
 
     # FIXME use catalyst.compiler._quantum_opt once the catalyst dangling options are fixed
     bytecode = subprocess.run(
@@ -282,9 +294,10 @@ def precompile_decomp_rules(decomp_dir_path: Path = DEFAULT_RULE_DIR):
         ),
         input=mlir_rules.encode("utf-8"),
         capture_output=True,
+        check=True,
     ).stdout
 
-    with open(decomp_dir_path / BYTECODE_FILE_NAME, "wb") as bytecode_file:
+    with open(decomp_file_path, "wb") as bytecode_file:
         bytecode_file.write(bytecode)
 
 
