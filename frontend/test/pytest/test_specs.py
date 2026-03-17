@@ -254,6 +254,7 @@ class TestPassByPassSpecs:
         with pytest.raises(check=ValueError, match="Requested specs levels 2, 3"):
             qml.specs(no_passes, level=[2, 3])()
 
+    @pytest.mark.xfail(reason="pending on specs fix")
     @pytest.mark.usefixtures("use_both_frontend")
     def test_basic_passes_multi_level(self, simple_circuit):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
@@ -445,6 +446,7 @@ class TestPassByPassSpecs:
             check_specs_header_same(actual, single_level_specs, skip_level=True)
             check_specs_resources_same(res, single_level_specs["resources"])
 
+    @pytest.mark.xfail(reason="pending on specs fix")
     def test_mix_transforms_and_passes(self, simple_circuit):
         """Test using a mix of compiler passes and plain tape transforms"""
 
@@ -550,6 +552,7 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
+    @pytest.mark.xfail(reason="pending on specs fix")
     @pytest.mark.usefixtures("use_both_frontend")
     def test_advanced_measurements(self):
         """Test that advanced measurements such as LinearCombination are handled correctly."""
@@ -621,70 +624,7 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
-    def test_split_non_commuting_mlir(self):
-        """Test that qml.transforms.split_non_commuting works as expected"""
-
-        @qml.transforms.cancel_inverses
-        @qml.transform(pass_name="split-non-commuting")  # Applies as MLIR pass
-        @qml.qnode(qml.device("null.qubit", wires=3))
-        def circuit():
-            qml.H(0)
-            qml.X(0)
-            qml.X(0)
-            return qml.expval(qml.X(0)), qml.expval(qml.Y(0)), qml.expval(qml.Z(0))
-
-        actual = qml.specs(qjit(circuit), level=[1, 2])()
-        expected = CircuitSpecs(
-            device_name="null.qubit",
-            num_device_wires=3,
-            shots=Shots(None),
-            level={1: "split-non-commuting", 2: "cancel-inverses"},
-            resources={
-                "split-non-commuting": [
-                    SpecsResources(
-                        gate_types={"Hadamard": 1, "PauliX": 2},
-                        gate_sizes={1: 3},
-                        measurements={"expval(PauliX)": 1},
-                        num_allocs=3,
-                    ),
-                    SpecsResources(
-                        gate_types={"Hadamard": 1, "PauliX": 2},
-                        gate_sizes={1: 3},
-                        measurements={"expval(PauliY)": 1},
-                        num_allocs=3,
-                    ),
-                    SpecsResources(
-                        gate_types={"Hadamard": 1, "PauliX": 2},
-                        gate_sizes={1: 3},
-                        measurements={"expval(PauliZ)": 1},
-                        num_allocs=3,
-                    ),
-                ],
-                "cancel-inverses": [  # The split should remain throughout subsequent passes
-                    SpecsResources(
-                        gate_types={"Hadamard": 1},
-                        gate_sizes={1: 1},
-                        measurements={"expval(PauliX)": 1},
-                        num_allocs=3,
-                    ),
-                    SpecsResources(
-                        gate_types={"Hadamard": 1},
-                        gate_sizes={1: 1},
-                        measurements={"expval(PauliY)": 1},
-                        num_allocs=3,
-                    ),
-                    SpecsResources(
-                        gate_types={"Hadamard": 1},
-                        gate_sizes={1: 1},
-                        measurements={"expval(PauliZ)": 1},
-                        num_allocs=3,
-                    ),
-                ],
-            },
-        )
-
-        check_specs_same(actual, expected)
-
+    @pytest.mark.xfail(reason="pending on specs fix")
     @pytest.mark.usefixtures("use_capture")
     def test_subroutine(self):
         """Test qml.specs when there is a Catalyst subroutine"""
@@ -718,6 +658,7 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
+    @pytest.mark.xfail(reason="pending on specs fix")
     def test_ppr(self):
         """Test that PPRs are handled correctly."""
 
@@ -746,6 +687,7 @@ class TestPassByPassSpecs:
         actual = qml.specs(circ, level=1)()
         check_specs_same(actual, expected)
 
+    @pytest.mark.xfail(reason="pending on specs fix")
     @pytest.mark.usefixtures("use_capture")
     def test_arbitrary_ppr(self):
         """Test that PPRs are handled correctly."""

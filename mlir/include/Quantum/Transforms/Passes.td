@@ -116,6 +116,34 @@ def MergeRotationsPass : Pass<"merge-rotations"> {
     let dependentDialects = ["math::MathDialect"];
 }
 
+def GraphDecompositionPass : Pass<"graph-decomposition"> {
+    let summary = "Decompose gates using an MLIR-native graph-based framework.";
+
+    let options = [
+    ListOption<
+    /*C++ name*/"targetGateSetOption", 
+    /*CLI name*/"gate-set", 
+    /*Type*/"std::string", 
+    /*Description*/"The accepted gates to decompose to.">,
+    ListOption<
+    /*C++ name*/"fixedDecompsOption", 
+    /*CLI name*/"fixed-decomps", 
+    /*Type*/"std::string", 
+    /*Description*/"A map of operators to decomposition rules that will be used over any built-in rules.">,
+    ListOption<
+    /*C++ name*/"altDecompsOption", 
+    /*CLI name*/"alt-decomps", 
+    /*Type*/"std::string", 
+    /*Description*/"A map of operators to alternative decomposition rules that will be considered alongside any built-in rules.">,
+    Option<
+    /*C++ name*/"bytecodeRulesFile", 
+    /*CLI name*/"bytecode-rules", 
+    /*Type*/"std::string", 
+    /*Default*/[{ "./decomposition_rules.mlirbc" }],
+    /*Description*/"A map of operators to alternative decomposition rules that will be considered alongside any built-in rules.">
+    ];
+}
+
 def DecomposeLoweringPass : Pass<"decompose-lowering"> {
     let summary = "Replace quantum operations with compiled decomposition rules.";
 }
