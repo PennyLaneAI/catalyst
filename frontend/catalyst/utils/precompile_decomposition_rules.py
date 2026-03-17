@@ -281,13 +281,11 @@ def precompile_decomp_rules(decomp_dir_path: Path = DEFAULT_RULE_DIR):
     if num_ops_missed:
         warnings.warn(f"failed to collect {num_ops_missed} op(s) from PennyLane")
 
-    mlir_rules = ""
-    for func in target_ops:
-        results = compile_op_decomp_rules(func)
-        if results:
-            for name, circuit_mlir in results.items():
-                if circuit_mlir:
-                    mlir_rules += str(circuit_mlir).replace("@rule_wrapper", "@" + name)
+    mlir_rules = "".join(
+        str(mlir).replace("@rule_wrapper", f"@{name}")
+        for func in target_ops
+        for name, mlir in compile_op_decomp_rules(func).items()
+    )
 
     # FIXME use catalyst.compiler._quantum_opt once the catalyst dangling options are fixed
     bytecode = subprocess.run(
