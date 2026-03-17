@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-This module provides the utilities necessary to AOT compile PennyLane's decomposition rules to MLIR
-Bytecode.
-"""
+"""Utilities for AOT compiling PennyLane's decomposition rules to MLIR Bytecode."""
 
 import inspect
 import subprocess
@@ -84,7 +81,7 @@ COMPILER_OPS_FOR_DECOMPOSITION = {
 @lru_cache
 def get_compiler_ops() -> tuple[set[type[Operator]], int]:
     """
-    Extracts all ops from pennylane that have decompositions in catalyst
+    Extracts all ops from pennylane that have decompositions in catalyst.
 
     Returns:
         set[Operation]: the set of PennyLane ops that are compiler-compatible
@@ -173,7 +170,6 @@ def get_func_from_circuit(module) -> str | None:
         str: string representation of FuncOp named `rule_wrapper` from module
         None: if no such FuncOp can be found
     """
-
     decomp_func_op = None
 
     def find_condition(op):
@@ -202,7 +198,6 @@ def compile_rule(
 
     Args:
         op_class: A PennyLane class subclassing Operation
-        op_args: a valid (positional) arguments to op_class
         op_num_wires: the number of wires used by op_class
         rule (DecompositionRule): the decomposition rule to be compiled
         dev (Device): a device for qjit
@@ -235,17 +230,18 @@ def compile_rule(
 
 
 def compile_op_decomp_rules(
-    op_class: Operator,
+    op_class: type[Operator],
 ) -> dict[str, str | None]:
     """
     Compile all decomposition rules for op_class.
 
     Note: the modules include the full circuit IR.
 
+    Args:
+        op_class (type[Operator]): the op class to compile decomposition rules for.
+
     Returns:
         dict[str, str | None]: decomposition rule names to compiled mlir modules.
-        int: the number of rules that successfully compiled
-        int: the number of rules that failed to compile
     """
     op_decomp_rules = qp.decomposition.decomposition_graph.list_decomps(op_class)
 
@@ -271,9 +267,12 @@ def compile_op_decomp_rules(
 
 def precompile_decomp_rules(decomp_dir_path: Path = DEFAULT_RULE_DIR):
     """
-    filters compiler-compatible decomposition ops from PennyLane, grabs their associated
-    decomposition rules, and compiles them via a wrapper function with qjit to mlir.
+    Compile PennyLane built-in decomposition rules to MLIR Bytecode.
+
     Intended for use with `make decomp-rules` in catalyst/mlir.
+
+    Args:
+        decomp_dir_path (Path): path to compile rules to.
     """
     decomp_dir_path.mkdir(parents=True, exist_ok=True)
 
