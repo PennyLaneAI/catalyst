@@ -148,7 +148,7 @@ def DecomposeLoweringPass : Pass<"decompose-lowering"> {
     let summary = "Replace quantum operations with compiled decomposition rules.";
 }
 
-def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {
+def DisentangleCNOTPass : Pass<"disentangle-cnot"> {
     let summary = "Replace a CNOT gate with two single qubit gates whenever possible.";
 
     let options = [
@@ -158,7 +158,7 @@ def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {
     ];
 }
 
-def DisentangleSWAPPass : Pass<"disentangle-SWAP"> {
+def DisentangleSWAPPass : Pass<"disentangle-swap"> {
     let summary = "Replace a SWAP gate with single qubit gates and a shorter SWAPZ gates whenever possible.";
 
     let options = [
