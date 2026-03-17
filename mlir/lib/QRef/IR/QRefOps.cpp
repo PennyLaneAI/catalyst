@@ -210,6 +210,17 @@ LogicalResult AdjointOp::verify()
         return emitOpError("quantum measurements are not allowed in the adjoint regions");
     }
 
+    Block &b = this->getRegion().front();
+    if (b.getNumArguments() != this->getArgs().size()){
+        return emitOpError("Adjoint op number of operands must be the same as the number of arguments on its block");
+    }
+
+    for (auto [operand, bbArg] : llvm::zip_equal(this->getArgs(), b.getArguments())){
+        if (operand.getType() != bbArg.getType()){
+            return emitOpError("Adjoint op operand types must be the same as the argument types on its block");
+        }
+    }
+
     return success();
 }
 

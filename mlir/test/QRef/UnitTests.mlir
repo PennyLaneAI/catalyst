@@ -240,6 +240,19 @@ func.func @test_adjoint_op(%r: !qref.reg<2>)
 
 // -----
 
+func.func @test_adjoint_multiple_args(%r: !qref.reg<2>, %q: !qref.bit)
+{
+    qref.adjoint(%r, %q) : !qref.reg<2>, !qref.bit {
+    ^bb0(%arg0: !qref.reg<2>, %arg1: !qref.bit):
+        %q1 = qref.get %arg0[1] : !qref.reg<2> -> !qref.bit
+        qref.custom "Hadamard"() %arg1 : !qref.bit
+        qref.custom "CNOT"() %arg1, %q1 : !qref.bit, !qref.bit
+    }
+    return
+}
+
+// -----
+
 func.func @test_computational_basis_op(%q0: !qref.bit, %q1: !qref.bit, %r: !qref.reg<5>)
 {
     %obs_q = qref.compbasis qubits %q0, %q1 : !quantum.obs
