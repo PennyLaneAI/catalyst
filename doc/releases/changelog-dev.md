@@ -229,7 +229,7 @@
   }
   ```
 
-* Added a cache of pre-compiled decomposition rules for use with the upcoming C++ graph
+* Added a cache of pre-compiled PennyLane built-in decomposition rules for use with the C++ graph
   decomposition system.
   [(#2531)](https://github.com/PennyLaneAI/catalyst/pull/2531)
 

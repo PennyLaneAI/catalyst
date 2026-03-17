@@ -83,6 +83,11 @@ from catalyst.utils.exceptions import (
     DifferentiableCompileError,
     PlxprCaptureCFCompatibilityError,
 )
+from catalyst.utils.precompile_decomposition_rules import precompile_decomp_rules
+
+if not INSTALLED:
+    precompile_decomp_rules()
+
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising
@@ -162,12 +167,6 @@ while processing the following with AutoGraph:
   File "<ipython-input-44-dbae11e6d745>", line 7, in f
     for x in params:
 """
-
-from catalyst.utils.precompile_decomposition_rules import precompile_decomp_rules
-
-if not INSTALLED:
-    precompile_decomp_rules()
-
 
 __all__ = (
     "qjit",

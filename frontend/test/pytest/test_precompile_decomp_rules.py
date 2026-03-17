@@ -20,8 +20,8 @@ import pennylane as qp
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
 
-from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION
 from catalyst.utils.precompile_decomposition_rules import (
+    COMPILER_OPS_FOR_DECOMPOSITION,
     compile_op_decomp_rules,
     get_compiler_ops,
     get_dummy_args,
@@ -84,16 +84,6 @@ class TestGetDummyArgs:
 
         assert get_dummy_args(tensorlike_param) == [0.0]
 
-    def test_str_param(self):
-        """
-        Test that get_dummy_args correctly handles funcs with str params.
-        """
-
-        def str_param(string: str):
-            return "hello " + string
-
-        assert get_dummy_args(str_param) == ["XX"]
-
     def test_ignore_wires(self):
         """
         Test that get_dummy_args correctly ignores WiresLike params.
@@ -109,20 +99,18 @@ class TestGetDummyArgs:
         Test that get_dummy_args correctly handles mixed params.
         """
 
-        def mixed_params(x: int, y: float, z: str, w: WiresLike):
-            return int(x - y) * z, w
+        def mixed_params(x: int, y: float, w: WiresLike):
+            return int(x - y), w
 
-        assert get_dummy_args(mixed_params) == [0, 0.0, "XX"]
+        assert get_dummy_args(mixed_params) == [
+            0,
+            0.0,
+        ]
 
     def test_named_params(self):
         """
         Test that get_dummy_args correctly guesses for named params.
         """
-
-        def pauli_names(pauli_word, pauli_string):
-            return pauli_word + " and " + pauli_string
-
-        assert get_dummy_args(pauli_names) == ["XX", "XX"]
 
         def angle_names(theta, phi, omega):
             return theta + phi + omega
@@ -139,25 +127,19 @@ class TestCompileOpDecompRules:
         """
         Test that compile_op_decomp_rules successfully compiles each decomp rule for Hadamards
         """
-        rules, successes, failures = compile_op_decomp_rules(qp.H)
+        rules = compile_op_decomp_rules(qp.H)
 
         assert "_hadamard_to_rz_rx" in rules
         assert "_hadamard_to_rz_ry" in rules
-
-        assert successes == 2
-        assert failures == 0
 
     def test_rx(self):
         """
         Test that compile_op_decomp_rules successfully compiles each decomp rule for Hadamards
         """
-        rules, successes, failures = compile_op_decomp_rules(qp.RX)
+        rules = compile_op_decomp_rules(qp.RX)
 
         assert "_rx_to_rot" in rules
         assert "_rx_to_rz_ry" in rules
         assert "_rx_to_ry_cliff" in rules
         assert "_rx_to_rz_cliff" in rules
         assert "_rx_to_ppr" in rules
-
-        assert successes == 5
-        assert failures == 0
