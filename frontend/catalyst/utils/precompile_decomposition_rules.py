@@ -177,7 +177,6 @@ def compile_rule(
     if str in abstract_args:
         raise ValueError("Cannot compile decomposition rules with string arguments.")
 
-    qp.capture.enable()
     qp.decomposition.enable_graph()
 
     # WARNING: do not rename this function, we use it to extract the rule from the compiled
@@ -186,7 +185,7 @@ def compile_rule(
     def rule_wrapper(*args, wires, **_):
         return rule(*args, wires=wires, **_)
 
-    @qp.qjit(target="mlir")
+    @qp.qjit(capture=True, target="mlir")
     @qp.qnode(dev)
     def circuit():
         rule_wrapper(*abstract_args, wires=jax.core.ShapedArray((op_num_wires,), int))
@@ -233,7 +232,6 @@ def compile_op_decomp_rules(
             warnings.warn(f"Unexpected error while trying to compile {rule_name}: {e}")
             num_failures += 1
         finally:
-            qp.capture.disable()
             qp.decomposition.disable_graph()
 
     return (mlir_modules, num_successes, num_failures)
