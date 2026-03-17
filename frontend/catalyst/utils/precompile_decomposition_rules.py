@@ -103,7 +103,7 @@ def get_compiler_ops() -> tuple[set[type[Operator]], int]:
     # FIXME: manual override for PauliMeasure
     pl_op_classes.add(qp.ops.PauliMeasure)
 
-    supported_compiler_op_names = set(COMPILER_OPS_FOR_DECOMPOSITION)
+    supported_compiler_op_names = COMPILER_OPS_FOR_DECOMPOSITION
 
     compiler_op_classes = set(
         op_class for op_class in pl_op_classes if op_class.__name__ in supported_compiler_op_names
