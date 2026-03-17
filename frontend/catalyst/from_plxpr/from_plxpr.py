@@ -273,7 +273,7 @@ def handle_vjp(self, *args, jaxpr, **kwargs):
 
 @WorkflowInterpreter.register_primitive(pl_value_and_grad_prim)
 def handle_value_and_grad(self, *args, jaxpr, **kwargs):
-    """Translate a vjp equation."""
+    """Translate a value_and_grad equation."""
     f = partial(copy(self).eval, jaxpr, [])
     new_jaxpr = jax.make_jaxpr(f)(*args[: len(jaxpr.invars)])
 
