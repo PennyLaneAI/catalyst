@@ -187,9 +187,11 @@ func::FuncOp splitQuantumAndPostProcessing(IRRewriter &builder, func::FuncOp qno
     // 2. The quantum kernel only returns MPs' direct results.
     // 2.1. Create the return op
     SmallVector<Value> MPResults;
+    SmallVector<DictionaryAttr> MPResAttrs;
     qKernel->walk([&](quantum::MeasurementProcess mp) {
         for (auto v : mp->getResults()) {
             MPResults.push_back(v);
+            MPResAttrs.push_back(DictionaryAttr());
         }
     });
 
@@ -203,6 +205,7 @@ func::FuncOp splitQuantumAndPostProcessing(IRRewriter &builder, func::FuncOp qno
     auto oldKernelType = qKernel.getFunctionType();
     qKernel.setFunctionType(
         FunctionType::get(ctx, oldKernelType.getInputs(), TypeRange(MPResults)));
+    qKernel.setAllResultAttrs(ArrayRef<Attribute>(MPResAttrs.begin(), MPResAttrs.end()));
 
     // 3. Append arguments to the post processing function
     // 3.1. Update the function type

@@ -177,25 +177,24 @@ struct ApplyTransformSequencePass
         // a valid transform with the transform dialect
         // We need to extract the transform.named_sequence in the
         // transformer module.
-        transform::NamedSequenceOp transformer_main_sequence;
-        transformer->walk([&](transform::NamedSequenceOp op) {
-            assert(!transformer_main_sequence &&
-                   "expected only one transform sequence in the transform module");
-            transformer_main_sequence = op;
+        WalkResult transformResult = transformer->walk([&](transform::NamedSequenceOp op) {
+            if (PassInstrumentor *passInstrumentor = getAnalysisManager().getPassInstrumentor()) {
+                // Manually execute the transform sequence with individual subpass tracking
+                if (failed(applyTransformsWithSubpassTracking(payload, op, passInstrumentor))) {
+                    return WalkResult::interrupt();
+                }
+            }
+            else {
+                if (failed(transform::applyTransforms(payload, op, {},
+                                                      transform::TransformOptions(), false))) {
+                    return WalkResult::interrupt();
+                }
+            }
+            return WalkResult::advance();
         });
 
-        if (PassInstrumentor *passInstrumentor = getAnalysisManager().getPassInstrumentor()) {
-            // Manually execute the transform sequence with individual subpass tracking
-            if (failed(applyTransformsWithSubpassTracking(payload, transformer_main_sequence,
-                                                          passInstrumentor))) {
-                return signalPassFailure();
-            }
-        }
-        else {
-            if (failed(transform::applyTransforms(payload, transformer_main_sequence, {},
-                                                  transform::TransformOptions(), false))) {
-                return signalPassFailure();
-            }
+        if (transformResult.wasInterrupted()) {
+            return signalPassFailure();
         }
 
         transformer.erase();
