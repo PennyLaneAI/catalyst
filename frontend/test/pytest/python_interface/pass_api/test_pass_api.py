@@ -71,7 +71,7 @@ class TestDictToCompilePipeline:
         valued_options = {}
         cp = dict_to_compile_pipeline(pass_name, *flags, **valued_options)
 
-        test_map = {"disentangle_cnot": "disentangle-CNOT", "disentangle_swap": "disentangle-SWAP"}
+        test_map = {"disentangle_cnot": "disentangle-cnot", "disentangle_swap": "disentangle-swap"}
 
         assert cp == CompilePipeline(qml.transform(pass_name=test_map[pass_name]))
 
