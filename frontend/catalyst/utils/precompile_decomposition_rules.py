@@ -35,6 +35,7 @@ from catalyst.utils.runtime_environment import DEFAULT_BIN_PATHS
 
 BYTECODE_FILE_PATH = Path(__file__).parent.parent / Path("resources/decomposition_rules.mlirbc")
 
+# TODO uncomment dynamic size wires ops once they are supported
 COMPILER_OPS_FOR_DECOMPOSITION = {
     "CNOT",
     "ControlledPhaseShift",
@@ -46,7 +47,7 @@ COMPILER_OPS_FOR_DECOMPOSITION = {
     "CY",
     "CZ",
     "Hadamard",
-    "Identity",
+    # "Identity",
     "IsingXX",
     "IsingXY",
     "IsingYY",
@@ -57,8 +58,8 @@ COMPILER_OPS_FOR_DECOMPOSITION = {
     "PauliX",
     "PauliY",
     "PauliZ",
-    "PauliRot",
-    "PauliMeasure",
+    # "PauliRot",
+    # "PauliMeasure",
     "PhaseShift",
     "PSWAP",
     "Rot",
@@ -72,8 +73,8 @@ COMPILER_OPS_FOR_DECOMPOSITION = {
     "U1",
     "U2",
     "U3",
-    "MultiRZ",
-    "GlobalPhase",
+    # "MultiRZ",
+    # "GlobalPhase",
 }
 
 
