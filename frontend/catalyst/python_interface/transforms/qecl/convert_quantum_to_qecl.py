@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from xdsl.context import Context
 from xdsl.dialects import builtin
 from xdsl.dialects.builtin import IntegerAttr
+from xdsl.ir import Attribute, Operation, SSAValue, TypeAttribute
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
@@ -35,6 +36,8 @@ from xdsl.pattern_rewriter import (
 from catalyst.python_interface.dialects import qecl, quantum
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 
+# MARK: Conversion Patterns
+
 
 @dataclass(frozen=True)
 class AllocOpConversion(RewritePattern):
@@ -45,17 +48,14 @@ class AllocOpConversion(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: quantum.AllocOp, rewriter: PatternRewriter):
         """Rewrite pattern for `quantum.alloc` ops."""
-        nqubits_attr = op.properties.get("nqubits_attr")
+        nqubits_attr = op.get_attr_or_prop("nqubits_attr")
         if nqubits_attr is None:
             raise NotImplementedError(
                 f"Failed to convert op '{op}': conversion pattern for '{op.name}' does not support "
                 f"a dynamic number of qubits"
             )
 
-        assert isinstance(
-            nqubits_attr, IntegerAttr
-        ), f"Expected 'nqubits_attr' to be an IntegerAttr, but got {type(nqubits_attr)}"
-
+        _assert_attribute_type(nqubits_attr, IntegerAttr, "nqubits_attr", op)
         nqubits = nqubits_attr.value.data
 
         hyper_reg_width = math.ceil(nqubits / self.k)
@@ -74,9 +74,7 @@ class ExtractOpConversion(RewritePattern):
         """Rewrite pattern for `quantum.extract` ops."""
 
         hyper_reg = op.qreg
-        assert isinstance(
-            hyper_reg.type, qecl.LogicalHyperRegisterType
-        ), f"Expected 'hyper_reg' to be a LogicalHyperRegisterType, but got {type(hyper_reg)}"
+        _assert_operand_type(hyper_reg, qecl.LogicalHyperRegisterType, "qreg", op)
 
         idx = op.idx if op.idx is not None else op.idx_attr
         assert idx is not None, "Both idx and idx_attr are null"
@@ -111,14 +109,10 @@ class InsertOpConversion(RewritePattern):
         assert idx is not None, "Both idx and idx_attr are null"
 
         in_hyper_reg = op.in_qreg
-        assert isinstance(
-            in_hyper_reg.type, qecl.LogicalHyperRegisterType
-        ), f"Expected 'in_hyper_reg' to be a LogicalHyperRegisterType, but got {type(in_hyper_reg)}"
+        _assert_operand_type(in_hyper_reg, qecl.LogicalHyperRegisterType, "in_qreg", op)
 
         codeblock = op.qubit
-        assert isinstance(
-            codeblock.type, qecl.LogicalCodeblockType
-        ), f"Expected 'codeblock' to be a LogicalCodeblockType, but got {type(codeblock)}"
+        _assert_operand_type(codeblock, qecl.LogicalCodeblockType, "qubit", op)
 
         rewriter.replace_op(
             op, qecl.InsertCodeblockOp(in_hyper_reg=in_hyper_reg, idx=idx, codeblock=codeblock)
@@ -133,30 +127,37 @@ class DeallocOpConversion(RewritePattern):
         """Rewrite pattern for `quantum.dealloc` ops."""
 
         hyper_reg = op.qreg
-        assert isinstance(
-            hyper_reg.type, qecl.LogicalHyperRegisterType
-        ), f"Expected 'hyper_reg' to be a LogicalHyperRegisterType, but got {type(hyper_reg)}"
+        _assert_operand_type(hyper_reg, qecl.LogicalHyperRegisterType, "qreg", op)
 
         rewriter.replace_op(op, qecl.DeallocOp(hyper_reg=hyper_reg))
 
 
 class CustomOpConversion(RewritePattern):
-    """TODO"""
+    """Converts `quantum.custom` ops to equivalent `qecl.hadamard`, `qecl.s` and `qecl.cnot` ops.
+
+    NOTES
+    -----
+
+    This conversion pattern assumes that k = 1, and as such always applies the logical gate
+    operation to the codeblock at index 0. This simplification will need to be addressed when the
+    quantum-to-qecl dialect conversion supports arbitrary values of k >= 1.
+    """
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: quantum.CustomOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `quantum.custom` ops."""
         gate_name = op.gate_name.data
 
         match gate_name:
             case "Hadamard":
                 codeblock = op.in_qubits[0]
-                assert isinstance(codeblock.type, qecl.LogicalCodeblockType)
+                _assert_operand_type(codeblock, qecl.LogicalCodeblockType, "in_qubits[0]", op)
                 assert codeblock.type.k.value.data == 1
                 op_to_insert = qecl.HadamardOp(in_codeblock=codeblock, idx=0)
 
             case "S":
                 codeblock = op.in_qubits[0]
-                assert isinstance(codeblock.type, qecl.LogicalCodeblockType)
+                _assert_operand_type(codeblock, qecl.LogicalCodeblockType, "in_qubits[0]", op)
                 assert codeblock.type.k.value.data == 1
                 adjoint = True if op.properties.get("adjoint") else False
                 op_to_insert = qecl.SOp(in_codeblock=codeblock, idx=0, adjoint=adjoint)
@@ -164,9 +165,9 @@ class CustomOpConversion(RewritePattern):
             case "CNOT":
                 ctrl_codeblock = op.in_qubits[0]
                 trgt_codeblock = op.in_qubits[1]
-                assert isinstance(ctrl_codeblock.type, qecl.LogicalCodeblockType)
+                _assert_operand_type(ctrl_codeblock, qecl.LogicalCodeblockType, "in_qubits[0]", op)
+                _assert_operand_type(trgt_codeblock, qecl.LogicalCodeblockType, "in_qubits[1]", op)
                 assert ctrl_codeblock.type.k.value.data == 1
-                assert isinstance(trgt_codeblock.type, qecl.LogicalCodeblockType)
                 assert trgt_codeblock.type.k.value.data == 1
                 op_to_insert = qecl.CnotOp(
                     in_ctrl_codeblock=ctrl_codeblock,
@@ -177,23 +178,57 @@ class CustomOpConversion(RewritePattern):
 
             case _:
                 raise NotImplementedError(
-                    f"Conversion of 'quantum.custom' op only supports gates 'Hadamard', 'S' and "
-                    f"'CNOT', but got {gate_name}"
+                    f"Conversion of op '{op.name}' only supports gates 'Hadamard', 'S' and 'CNOT', "
+                    f"but got {gate_name}"
                 )
 
         rewriter.replace_op(op, op_to_insert)
 
 
 class MeasureOpConversion(RewritePattern):
-    """TODO"""
+    """Converts `quantum.measure` ops to equivalent `qecl.measure` ops.
+
+    NOTES
+    -----
+
+    This conversion pattern assumes that k = 1, and as such always applies the logical measurement
+    operation to the codeblock at index 0. This simplification will need to be addressed when the
+    quantum-to-qecl dialect conversion supports arbitrary values of k >= 1.
+    """
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: quantum.MeasureOp, rewriter: PatternRewriter):
-        """TODO"""
+        """Rewrite pattern for `quantum.measure` ops."""
         codeblock = op.in_qubit
-        assert isinstance(codeblock.type, qecl.LogicalCodeblockType)
+        _assert_operand_type(codeblock, qecl.LogicalCodeblockType, "in_qubit", op)
         assert codeblock.type.k.value.data == 1
         rewriter.replace_op(op, qecl.MeasureOp(in_codeblock=codeblock, idx=0))
+
+
+# MARK: Helpers
+
+
+def _assert_operand_type(
+    operand: SSAValue, expected_type: type[TypeAttribute], operand_name: str, op: Operation
+):
+    """Helper function to assert that an operand of an op has the expected type."""
+    assert isinstance(operand.type, expected_type), (
+        f"Expected operand '{operand_name}' of {op.name} op to have type "
+        f"'{type(expected_type).__name__}', but got {type(operand.type)}"
+    )
+
+
+def _assert_attribute_type(
+    attr: Attribute, expected_type: type[Attribute], attr_name: str, op: Operation
+):
+    """Helper function to assert that an attribute of an op has the expected type."""
+    assert isinstance(attr, expected_type), (
+        f"Expected attribute '{attr_name}' of {op.name} op to have type "
+        f"'{type(expected_type).__name__}', but got {type(attr)}"
+    )
+
+
+# MARK: Conversion Pass
 
 
 @dataclass(frozen=True)
