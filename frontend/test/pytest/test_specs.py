@@ -625,6 +625,71 @@ class TestPassByPassSpecs:
         check_specs_same(actual, expected)
 
     @pytest.mark.xfail(reason="pending on specs fix")
+    def test_split_non_commuting_mlir(self):
+        """Test that qml.transforms.split_non_commuting works as expected"""
+
+        @qml.transforms.cancel_inverses
+        @qml.transform(pass_name="split-non-commuting")  # Applies as MLIR pass
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circuit():
+            qml.H(0)
+            qml.X(0)
+            qml.X(0)
+            return qml.expval(qml.X(0)), qml.expval(qml.Y(0)), qml.expval(qml.Z(0))
+
+        actual = qml.specs(qjit(circuit), level=[1, 2])()
+        expected = CircuitSpecs(
+            device_name="null.qubit",
+            num_device_wires=3,
+            shots=Shots(None),
+            level={1: "split-non-commuting", 2: "cancel-inverses"},
+            resources={
+                "split-non-commuting": [
+                    SpecsResources(
+                        gate_types={"Hadamard": 1, "PauliX": 2},
+                        gate_sizes={1: 3},
+                        measurements={"expval(PauliX)": 1},
+                        num_allocs=3,
+                    ),
+                    SpecsResources(
+                        gate_types={"Hadamard": 1, "PauliX": 2},
+                        gate_sizes={1: 3},
+                        measurements={"expval(PauliY)": 1},
+                        num_allocs=3,
+                    ),
+                    SpecsResources(
+                        gate_types={"Hadamard": 1, "PauliX": 2},
+                        gate_sizes={1: 3},
+                        measurements={"expval(PauliZ)": 1},
+                        num_allocs=3,
+                    ),
+                ],
+                "cancel-inverses": [  # The split should remain throughout subsequent passes
+                    SpecsResources(
+                        gate_types={"Hadamard": 1},
+                        gate_sizes={1: 1},
+                        measurements={"expval(PauliX)": 1},
+                        num_allocs=3,
+                    ),
+                    SpecsResources(
+                        gate_types={"Hadamard": 1},
+                        gate_sizes={1: 1},
+                        measurements={"expval(PauliY)": 1},
+                        num_allocs=3,
+                    ),
+                    SpecsResources(
+                        gate_types={"Hadamard": 1},
+                        gate_sizes={1: 1},
+                        measurements={"expval(PauliZ)": 1},
+                        num_allocs=3,
+                    ),
+                ],
+            },
+        )
+
+        check_specs_same(actual, expected)
+
+    @pytest.mark.xfail(reason="pending on specs fix")
     @pytest.mark.usefixtures("use_capture")
     def test_subroutine(self):
         """Test qml.specs when there is a Catalyst subroutine"""

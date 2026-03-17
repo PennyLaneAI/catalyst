@@ -20,9 +20,8 @@ import json
 from pathlib import Path
 from typing import Iterable
 
-from pennylane.decomposition.utils import to_name
-
 import pennylane as qml
+from pennylane.decomposition.utils import to_name
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.utils.exceptions import CompileError
@@ -1444,7 +1443,7 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
     ``PPR-Phi-w<int>`` corresponds to a PPR whose angle of rotation is not :math:`\tfrac{\pi}{2}`,
     :math:`\tfrac{\pi}{4}`, or :math:`\tfrac{\pi}{8}`.
     """
-    return PassPipelineWrapper(qnode, "decompose-arbitrary-ppr")
+    return qml.transform(pass_name="decompose-arbitrary-ppr")(qnode)
 
 
 def graph_decomposition(
