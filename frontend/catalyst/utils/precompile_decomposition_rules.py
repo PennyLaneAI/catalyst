@@ -212,7 +212,7 @@ def compile_op_decomp_rules(
     mlir_modules = {}
 
     op_num_wires = op_class.num_wires if op_class.num_wires else 2
-    dev = qp.device("lightning.qubit", wires=op_num_wires)
+    dev = qp.device("null.qubit", wires=op_num_wires)
 
     for rule in op_decomp_rules:
         try:
