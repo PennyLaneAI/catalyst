@@ -32,13 +32,53 @@ from pennylane.operation import Operator
 from pennylane.typing import TensorLike
 from pennylane.wires import Wires
 
-from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION
 from catalyst.jax_primitives import decomposition_rule
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import DEFAULT_BIN_PATHS
 
 DEFAULT_RULE_DIR = Path(__file__).parent.parent / Path("resources")
 BYTECODE_FILE_NAME = Path("decomposition_rules.mlirbc")
+
+COMPILER_OPS_FOR_DECOMPOSITION = {
+    "CNOT",
+    "ControlledPhaseShift",
+    "CRot",
+    "CRX",
+    "CRY",
+    "CRZ",
+    "CSWAP",
+    "CY",
+    "CZ",
+    "Hadamard",
+    "Identity",
+    "IsingXX",
+    "IsingXY",
+    "IsingYY",
+    "IsingZZ",
+    "SingleExcitation",
+    "DoubleExcitation",
+    "ISWAP",
+    "PauliX",
+    "PauliY",
+    "PauliZ",
+    "PauliRot",
+    "PauliMeasure",
+    "PhaseShift",
+    "PSWAP",
+    "Rot",
+    "RX",
+    "RY",
+    "RZ",
+    "S",
+    "SWAP",
+    "T",
+    "Toffoli",
+    "U1",
+    "U2",
+    "U3",
+    "MultiRZ",
+    "GlobalPhase",
+}
 
 
 @lru_cache
