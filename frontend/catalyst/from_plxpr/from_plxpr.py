@@ -275,7 +275,7 @@ def handle_vjp(self, *args, jaxpr, **kwargs):
 def handle_value_and_grad(self, *args, jaxpr, **kwargs):
     """Translate a value_and_grad equation."""
     f = partial(copy(self).eval, jaxpr, [])
-    new_jaxpr = jax.make_jaxpr(f)(*args[: len(jaxpr.invars)])
+    new_jaxpr = jax.make_jaxpr(f)(*args)
 
     new_args = (*new_jaxpr.consts, *args)
     j = new_jaxpr.jaxpr
