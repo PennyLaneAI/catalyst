@@ -9,6 +9,7 @@
   then performs the appropriate classical statistical postprocessing across the execution results
   from all shots.
   [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
+  [(#2573)](https://github.com/PennyLaneAI/catalyst/pull/2573)
 
   With this new MLIR pass, one shot execution mode is now available when capture is enabled.
 
@@ -177,6 +178,13 @@
   circuit()
   ```
 
+* The `diagonalize-final-measurements` xDSL pass now includes an observable-commutativity check and
+  raises an error if non-commuting terms are encountered. The check is applied to each `qnode` in
+  the IR (that is, a `func.func` op with a `quantum.node` attribute). If the measurement contains
+  only Pauli or Hadamard observables, the *qubit-wise commutativity* (QWC) check is applied.
+  Otherwise, the more strict *non-overlapping observable* check is applied.
+  [(#2538)](https://github.com/PennyLaneAI/catalyst/pull/2538)
+
 * Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
   effectively filtering for decomposition rules in the MLIR-native decomposition framework.
   [(#2539)](https://github.com/PennyLaneAI/catalyst/pull/2539)
@@ -227,6 +235,10 @@
 
 
 <h3>Improvements 🛠</h3>
+
+* `mlir_specs` now supports MLIR passes which create multiple qnode entry points, such as `split-non-commuting` pass.
+  When such passes are present, `mlir_specs` will return a list of resources with 1 per entrypoint.
+  [(#2534)](https://github.com/PennyLaneAI/catalyst/pull/2534)
 
 * `catalyst.python_interface.utils.get_constant_from_ssa` can now extract constant values cast using
   `arith.index_cast`.
@@ -283,6 +295,10 @@
 
 <h3>Breaking changes 💔</h3>
 
+* The ``-disentangle-CNOT`` and ``-disentangle-SWAP`` Catalyst CLI commands have been renamed to
+  ``-disentangle-cnot`` and ``-disentangle-swap`` (all lower-case).
+  [(#2546)](https://github.com/PennyLaneAI/catalyst/pull/2546)
+
 * `catalyst.python_interface.inspection.draw` and `catalyst.python_interface.inspection.generate_mlir_graph` no longer
   accept QNodes as the input. Now, the input must always be a :class:`~.QJIT` object.
   [(#2542)](https://github.com/PennyLaneAI/catalyst/pull/2542)
@@ -321,7 +337,16 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Fix a bug where `draw_graph` failed at rendering measurements containing scalar products of observables. 
+* Fixed a bug where input array arguments could be mutated during execution when copied inputs
+  were updated in-place. Entry-point arguments are now treated as non-writable during bufferization,
+  preserving the expected immutability of user inputs.
+  [(#2562)](https://github.com/PennyLaneAI/catalyst/pull/2562)
+
+* Fixed a bug in the `split-non-commuting` pass where dead `NamedObsOp`s were left behind after
+  erasing composite obs (`TensorOp`, `HamiltonianOp`).
+  [(#2567)](https://github.com/PennyLaneAI/catalyst/pull/2567)
+
+* Fix a bug where `draw_graph` failed at rendering measurements containing scalar products of observables.
   [(#2545)](https://github.com/PennyLaneAI/catalyst/pull/2545)
 
 * Fixed a bug where the unified compiler would trigger a passed callback function 1 extra time for the initial pass level.
@@ -369,7 +394,19 @@
 * Fixed incorrect global phase when lowering CNOT gates into PPR/PPM operations.
   [(#2459)](https://github.com/PennyLaneAI/catalyst/pull/2459)
 
+* Fixed a bug where the Catalyst measurement primitive returning a boolean type as the measurement
+  result was incorrectly replacing the PennyLane measurement primitive, whose measurement
+  result is integer type, during the PLxPR conversion.
+  [(#2582)](https://github.com/PennyLaneAI/catalyst/pull/2582)
+
 <h3>Internal changes ⚙️</h3>
+
+* Catalyst internally uses the new unified transforms API rather than `PassPipelineWrapper`.
+  [(#2525)](https://github.com/PennyLaneAI/catalyst/pull/2525)
+
+* Added an `EmptyPass` MLIR pass that does not transform the program for debugging and standing in for
+  unimplemented transforms.
+  [(#2575)](https://github.com/PennyLaneAI/catalyst/pull/2575)
 
 * The QNode lowering to MLIR now supports providing multiple named transform pipelines.
   [(#2556)](https://github.com/PennyLaneAI/catalyst/pull/2556)
@@ -491,14 +528,6 @@
   Pauli Product Rotations (PPR), the pass now emits `quantum.gphase` operations to preserve
   global phase correctness.
   [(#2419)](https://github.com/PennyLaneAI/catalyst/pull/2419)
-
-* New qubit-type specializations have been added to Catalyst's MLIR type system. These new qubit
-  types include `!quantum.bit<logical>`, `!quantum.bit<pbc>` and `!quantum.bit<physical>`. The
-  original `!quantum.bit` type continues to be supported and used as the default qubit type.
-  [(#2369)](https://github.com/PennyLaneAI/catalyst/pull/2369)
-
-  The corresponding register-type specializations have also been added.
-  [(#2431)](https://github.com/PennyLaneAI/catalyst/pull/2431)
 
 * The upstream MLIR `Test` dialect is now available via the `catalyst` command line tool.
   [(#2417)](https://github.com/PennyLaneAI/catalyst/pull/2417)
@@ -649,7 +678,7 @@
   }
   ```
 
-* A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in 
+* A new MLIR op, `MCMObsOp`, is defined as a pseudo-observable of mid-circuit measurements for use in
   measurement processes. It is also registered in xDSL.
   [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
   [(#2536)](https://github.com/PennyLaneAI/catalyst/pull/2536)
@@ -662,14 +691,32 @@
   been added for compatibility with the Python interface to Catalyst.
   [(#2519)](https://github.com/PennyLaneAI/catalyst/pull/2519)
 
-
 <h3>Documentation 📝</h3>
+
+* Docstrings for :func:`~.passes.disentangle_cnot` and :func:`~.passes.disentangle_swap` have been improved
+  by using updated features for inspection and by calling them from the PennyLane frontend.
+  [(#2546)](https://github.com/PennyLaneAI/catalyst/pull/2546)
 
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
   [(#2406)](https://github.com/PennyLaneAI/catalyst/pull/2406)
 
 * Updated the changelog and builtin_passes.py to link to <https://pennylane.ai/compilation/pauli-based-computation> instead.
   [(#2409)](https://github.com/PennyLaneAI/catalyst/pull/2409)
+
+* Infrastructure has been put in place for features that are accessible from both PennyLane and
+  Catalyst to have a single source of truth for documentation, which will provide a better overall
+  experience when consulting our documentation.
+  [(#2481)](https://github.com/PennyLaneAI/catalyst/pull/2481)
+
+  Several entry-points were added to ``setup.py`` for the Pauli-based computation compilation passes
+  and the :func:`~.draw_graph` function. This allows for the ability to use Catalyst features from
+  PennyLane directly (related: [(#9020)](https://github.com/PennyLaneAI/pennylane/pull/9020)) and
+  for the documentation of those features to be accessible to both Catalyst and PennyLane, creating
+  a single source of truth for such features.
+
+  In addition, the documentation for all Pauli-based computation transforms has been updated to be
+  more user-focused by showing examples with :func:`~.specs` and by calling the transforms from the
+  PennyLane frontend.
 
 <h3>Contributors ✍️</h3>
 
