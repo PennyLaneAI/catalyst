@@ -31,87 +31,6 @@
 namespace DecompGraph::Solver {
 
 class DecompositionSolver {
-  private:
-    const DecompositionGraph &graph;
-
-    std::unordered_map<Core::OperatorNode, Core::ChosenDecompRule, Core::OperatorNodeHash>
-        solvedMap{};
-    std::unordered_set<Core::OperatorNode, Core::OperatorNodeHash> visited{};
-    std::vector<Core::OperatorNode> solvingStack{};
-
-    /**
-     * @brief Solves for the given operator node and returns the chosen decomposition rule.
-     */
-    Core::ChosenDecompRule basisRule(const Core::OperatorNode &op)
-    {
-        RT_ASSERT(graph.isTargetGate(op) && "Operator is not a target gate in the gateset");
-        Core::ChosenDecompRule solution;
-        solution.op = op;
-        solution.isBasis = true;
-        solution.totalCost = graph.getGateset().getCost(op);
-        solution.basisCounts.emplace(op, 1);
-        solution.ruleName = "BasisRule";
-        return solution;
-    }
-
-    /**
-     * @brief Evaluates the given decomposition rule and returns the resulting chosen
-     * decomposition rule.
-     */
-    Core::ChosenDecompRule evalRule(const Core::RuleNode &rule)
-    {
-        Core::ChosenDecompRule solution;
-        solution.ruleName = rule.name;
-        solution.isBasis = false;
-        solution.inputs = rule.inputs;
-        solution.op = rule.output;
-
-        double total_cost = 0.0;
-        for (const auto &input : rule.inputs) {
-            const auto child = solveOperator(input.op);
-            if (child.ruleName.empty()) {
-                return {solution.op, false, "", {}, 0.0, {}}; // invalid rule
-            }
-            total_cost += child.totalCost * static_cast<double>(input.multiplicity);
-            for (const auto &[basis_op, count] : child.basisCounts) {
-                solution.basisCounts[basis_op] += count * input.multiplicity;
-            }
-        }
-
-        if (total_cost == 0.0) {
-            return {solution.op, false, "", {}, 0.0, {}}; // invalid rule
-        }
-        solution.totalCost = total_cost;
-        return solution;
-    }
-
-    /**
-     * @brief Finds the best decomposition rule for the given operator node by evaluating
-     * all applicable rules and selecting the one with the lowest total cost.
-     */
-    Core::ChosenDecompRule bestRule(const Core::OperatorNode &op)
-    {
-        const auto &all_rules = graph.getAllRulesFor(op);
-        if (all_rules.empty()) {
-            return {op, false, "", {}, 0.0, {}}; // no valid rules
-        }
-        
-        std::optional<Core::ChosenDecompRule> best_rule;
-
-        for (const auto &rule : all_rules) {
-            auto candidate = evalRule(rule);
-            if (!candidate.ruleName.empty() && (!best_rule.has_value() || candidate.totalCost < best_rule->totalCost)) {
-                best_rule = std::move(candidate);
-            }
-        }
-
-        if (!best_rule.has_value()) {
-            return {op, false, "", {}, 0.0, {}}; // no valid rules
-        }
-
-        return best_rule.value();
-    }
-
   public:
     /**
      * @brief Constructs a DecompositionSolver with the given decomposition graph.
@@ -136,8 +55,56 @@ class DecompositionSolver {
      */
     [[nodiscard]] Core::GraphResult solve();
 
-    // helper methods
-    // TODO(Ali): move them to private/protected after testing
+  private:
+    const DecompositionGraph &graph;
+
+    std::unordered_map<Core::OperatorNode, Core::ChosenDecompRule, Core::OperatorNodeHash>
+        solvedMap{};
+    std::unordered_set<Core::OperatorNode, Core::OperatorNodeHash> visited{};
+    std::vector<Core::OperatorNode> solvingStack{};
+
+    /**
+     * @brief basisRule constructs a ChosenDecompRule for a target gate operator,
+     * which is a valid decomposition rule that represents the operator itself as
+     * a basis gate in the target gateset.
+     *
+     * @param op The operator node to solve for.
+     * @return Core::ChosenDecompRule
+     */
+    Core::ChosenDecompRule basisRule(const Core::OperatorNode &op);
+
+    /**
+     * @brief Evaluates the given decomposition rule and returns the resulting chosen
+     * decomposition rule.
+     *
+     * This method recursively solves for the input operators of the given rule,
+     * calculates the total cost of the decomposition by summing the costs of the input
+     * operators according to the target gateset, and aggregates the basis gate counts
+     * from the input operators. If any of the input operators cannot be solved
+     * (i.e., they do not have a valid decomposition rule), this method returns
+     * an invalid ChosenDecompRule with an empty rule name.
+     *
+     * @param rule The decomposition rule to evaluate.
+     * @return Core::ChosenDecompRule The resulting chosen decomposition rule after evaluating
+     * the given rule.
+     */
+    Core::ChosenDecompRule evalRule(const Core::RuleNode &rule);
+
+    /**
+     * @brief Finds the best decomposition rule for the given operator node by evaluating
+     * all applicable rules and selecting the one with the lowest total cost.
+     *
+     * This method retrieves all decomposition rules that can decompose the given operator node
+     * from the decomposition graph, evaluates each rule using the evalRule method, and keeps
+     * track of the best valid rule (i.e., the one with the lowest total cost
+     * that can successfully decompose the operator). If no valid rules are found, this method
+     * returns an invalid ChosenDecompRule with an empty rule name.
+     *
+     * @param op The operator node to find the best decomposition rule for.
+     * @return Core::ChosenDecompRule The best chosen decomposition rule for the given operator
+     * node, or an invalid ChosenDecompRule if no valid rules are found.
+     */
+    Core::ChosenDecompRule bestRule(const Core::OperatorNode &op);
 
     /**
      * @brief Solves for the given operator node and returns the chosen decomposition rule.

@@ -1,4 +1,4 @@
-// Copyright 2025 Xanadu Quantum Technologies Inc.
+// Copyright 2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -237,7 +237,7 @@ TEST_CASE("Test the graph solver with intermediate ops and multiple rules", "[De
     const auto &chosen_rule = result.optimizedMap.at(customBellOp);
     REQUIRE_FALSE(chosen_rule.isBasis);
     REQUIRE(chosen_rule.ruleName == "bell_to_cnot_h");
-    
+
     const auto &chosen_rule_h = result.optimizedMap.at(h);
     REQUIRE_FALSE(chosen_rule_h.isBasis);
     REQUIRE(chosen_rule_h.ruleName == "h_to_rz_rx_rz");
