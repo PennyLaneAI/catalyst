@@ -228,9 +228,14 @@ class TestMeasurementPreprocessing:
         """Utility function to assert whether a transform is present in the pipeline
         only when necessary."""
         if is_empty_transform:
-            cond_fn = lambda t: t.pass_name == "empty" and t.kwargs["key"] == transform.__name__
+
+            def cond_fn(t):
+                return t.pass_name == "empty" and t.kwargs["key"] == transform.__name__
+
         else:
-            cond_fn = lambda t: t.pass_name == transform.pass_name
+
+            def cond_fn(t):
+                return t.pass_name == transform.pass_name
 
         has_transform = any(cond_fn(t) for t in pipeline)
 
