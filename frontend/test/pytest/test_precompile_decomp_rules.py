@@ -61,15 +61,15 @@ class TestGetAbstractArgs:
 class TestCompileOpDecompRules:
     """Tests for compile_op_decomp_rules."""
 
-    def test_hadamard(self):
-        """Test that compile_op_decomp_rules successfully compiles each decomp rule for Hadamards"""
+    def test_compile_hadamard_rules(self):
+        """Test that compile_op_decomp_rules successfully compiles each decomp rule for Hadamards."""
         rules = compile_op_decomp_rules(qp.H)
 
         assert "_hadamard_to_rz_rx" in rules
         assert "_hadamard_to_rz_ry" in rules
 
-    def test_rx(self):
-        """Test that compile_op_decomp_rules successfully compiles each decomp rule for Hadamards"""
+    def test_compile_rx_rules(self):
+        """Test that compile_op_decomp_rules successfully compiles each decomp rule for RX gates."""
         rules = compile_op_decomp_rules(qp.RX)
 
         assert "_rx_to_rot" in rules
