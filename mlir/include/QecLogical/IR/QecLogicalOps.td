@@ -140,59 +140,28 @@ def QecCycleOp : QecLogical_Op<"qec", [AllTypesMatch<["in_codeblock", "out_codeb
     }];
 }
 
-def HadamardOp : QecLogical_Op<"hadamard", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
-    let summary = "A logical Hadamard gate operation.";
-
-    let description = [{
-        This operation represents a logical Hadamard gate operation applied to the logical qubit at
-        the provided index in the logical codeblock. For example,
-
-        ```mlir
-        %1 = qecl.hadamard %0[ 1] : !qecl.codeblock<3>
-        ```
-
-        represents a logical Hadamard operation applied to the logical qubit at index `1` in the
-        codeblock `%0`, which encodes k = 3 logical qubits.
-    }];
-
-    let arguments = (ins
-        LogicalCodeblockType:$in_codeblock,
-        Optional<Index>:$idx,
-        OptionalAttr<ConfinedAttr<IndexAttr, [IntNonNegative]>>:$idx_attr
-    );
-
-    let results = (outs
-        LogicalCodeblockType:$out_codeblock
-    );
-
-    let assemblyFormat = [{
-        $in_codeblock `[` ($idx^):($idx_attr)? `]` attr-dict `:` qualified(type($in_codeblock))
-    }];
-
-    let hasVerifier = 1;
-}
-
-def SOp : QecLogical_Op<"s", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
-    let summary = "A logical S (π/2 phase) gate operation.";
-
-    let description = [{
-        This operation represents a logical S (π/2 phase) gate operation applied to the logical
-        qubit at the provided index in the logical codeblock. For example,
-
-        ```mlir
-        %1 = qecl.s %0[ 1] : !qecl.codeblock<3>
-        ```
-
-        represents a logical S operation applied to the logical qubit at index `1` in the codeblock
-        `%0`, which encodes k = 3 logical qubits.
-
-        The equivalent adjoint operation, S†, is represented by included the `adj` unit attribute:
-
-        ```mlir
-        %1 = qecl.s %0[ 1] adj : !qecl.codeblock<3>
-        ```
-    }];
-
+/**
+ * Base class for single-qubit logical gate operations.
+ *
+ * An operation that inherits from this class represents a logical gate operation applied to the
+ * logical qubit at the provided index in the logical codeblock. For example,
+ *
+ * ```mlir
+ * %1 = qecl.hadamard %0[ 1] : !qecl.codeblock<3>
+ * ```
+ *
+ * represents a logical Hadamard operation applied to the logical qubit at index `1` in the
+ * codeblock `%0`, which encodes k = 3 logical qubits.
+ *
+ * Adjoint operations are supported by adding the `adj` unit attribute. For example, a logical S†
+ * gate operation is represented as follows:
+ *
+ * ```mlir
+ * %1 = qecl.s %0[ 1] adj : !qecl.codeblock<3>
+ * ```
+ */
+class SingleQubitLogicalGate_Op<string mnemonic, list<Trait> traits = []> :
+        QecLogical_Op<mnemonic, traits> {
     let arguments = (ins
         LogicalCodeblockType:$in_codeblock,
         Optional<Index>:$idx,
@@ -209,6 +178,30 @@ def SOp : QecLogical_Op<"s", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]>
     }];
 
     let hasVerifier = 1;
+}
+
+def IdentityOp : SingleQubitLogicalGate_Op<"identity", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
+    let summary = "A logical identity gate operation.";
+}
+
+def PauliXOp : SingleQubitLogicalGate_Op<"x", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
+    let summary = "A logical Pauli X gate operation.";
+}
+
+def PauliYOp : SingleQubitLogicalGate_Op<"y", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
+    let summary = "A logical Pauli Y gate operation.";
+}
+
+def PauliZOp : SingleQubitLogicalGate_Op<"z", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
+    let summary = "A logical Pauli Z gate operation.";
+}
+
+def HadamardOp : SingleQubitLogicalGate_Op<"hadamard", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
+    let summary = "A logical Hadamard gate operation.";
+}
+
+def SOp : SingleQubitLogicalGate_Op<"s", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
+    let summary = "A logical S (π/2 phase) gate operation.";
 }
 
 def CnotOp : QecLogical_Op<"cnot", [

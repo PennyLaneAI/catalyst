@@ -83,6 +83,38 @@ func.func @test_qec_cycle(%arg0 : !qecl.codeblock<1>) {
 
 // -----
 
+func.func @test_gate_op_identity(%arg0 : !qecl.codeblock<1>, %arg1 : index) {
+    %0 = qecl.identity %arg0[0] : !qecl.codeblock<1>
+    %1 = qecl.identity %0[%arg1] : !qecl.codeblock<1>
+    func.return
+}
+
+// -----
+
+func.func @test_gate_op_pauli_x(%arg0 : !qecl.codeblock<1>, %arg1 : index) {
+    %0 = qecl.x %arg0[0] : !qecl.codeblock<1>
+    %1 = qecl.x %0[%arg1] : !qecl.codeblock<1>
+    func.return
+}
+
+// -----
+
+func.func @test_gate_op_pauli_y(%arg0 : !qecl.codeblock<1>, %arg1 : index) {
+    %0 = qecl.y %arg0[0] : !qecl.codeblock<1>
+    %1 = qecl.y %0[%arg1] : !qecl.codeblock<1>
+    func.return
+}
+
+// -----
+
+func.func @test_gate_op_pauli_z(%arg0 : !qecl.codeblock<1>, %arg1 : index) {
+    %0 = qecl.z %arg0[0] : !qecl.codeblock<1>
+    %1 = qecl.z %0[%arg1] : !qecl.codeblock<1>
+    func.return
+}
+
+// -----
+
 func.func @test_gate_op_hadamard(%arg0 : !qecl.codeblock<1>, %arg1 : index) {
     %0 = qecl.hadamard %arg0[0] : !qecl.codeblock<1>
     %1 = qecl.hadamard %0[%arg1] : !qecl.codeblock<1>

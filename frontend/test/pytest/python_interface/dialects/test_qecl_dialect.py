@@ -43,6 +43,10 @@ expected_ops_names = {
     "InsertCodeblockOp": "qecl.insert_block",
     "EncodeOp": "qecl.encode",
     "QecCycleOp": "qecl.qec",
+    "IdentityOp": "qecl.identity",
+    "PauliXOp": "qecl.x",
+    "PauliYOp": "qecl.y",
+    "PauliZOp": "qecl.z",
     "HadamardOp": "qecl.hadamard",
     "SOp": "qecl.s",
     "CnotOp": "qecl.cnot",
@@ -172,6 +176,17 @@ class TestQecLogicalOps:
         assert isinstance(qec_op.result_types[0], qecl.LogicalCodeblockType)
         assert qec_op.result_types[0].k == self.k
 
+    @pytest.mark.parametrize("op", [qecl.IdentityOp, qecl.PauliXOp, qecl.PauliYOp, qecl.PauliZOp])
+    @pytest.mark.parametrize(
+        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
+    )
+    def test_qecl_op_constructor_paulis(self, op, idx):
+        """Test the constructor of the qecl.identity op."""
+        pauli_op = op(in_codeblock=self._get_codeblock_value(), idx=idx)
+        assert len(pauli_op.result_types) == 1
+        assert isinstance(pauli_op.result_types[0], qecl.LogicalCodeblockType)
+        assert pauli_op.result_types[0].k == self.k
+
     @pytest.mark.parametrize(
         "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
     )
@@ -249,19 +264,34 @@ def test_assembly_format(run_filecheck, pretty_print):
     // CHECK: [[block2:%.+]] = qecl.qec [[block1]] : !qecl.codeblock<1>
     %block2 = qecl.qec %block1 : !qecl.codeblock<1>
 
-    // CHECK: [[block3:%.+]] = qecl.hadamard [[block2]][{{\s*}}0] : !qecl.codeblock<1>
-    %block3 = qecl.hadamard %block2[0] : !qecl.codeblock<1>
+    // CHECK: [[block3:%.+]] = qecl.identity [[block2]][{{\s*}}0] : !qecl.codeblock<1>
+    %block3 = qecl.identity %block2[0] : !qecl.codeblock<1>
 
-    // CHECK: [[block4:%.+]] = qecl.s [[block3]][{{\s*}}0] : !qecl.codeblock<1>
-    %block4 = qecl.s %block3[0] : !qecl.codeblock<1>
+    // CHECK: [[block4:%.+]] = qecl.x [[block3]][{{\s*}}0] : !qecl.codeblock<1>
+    %block4 = qecl.x %block3[0] : !qecl.codeblock<1>
 
-    // CHECK: [[block5:%.+]] = qecl.s [[block4]][{{\s*}}0] adj : !qecl.codeblock<1>
-    %block5 = qecl.s %block4[0] adj : !qecl.codeblock<1>
+    // CHECK: [[block5:%.+]] = qecl.x [[block4]][{{\s*}}0] : !qecl.codeblock<1>
+    %block5 = qecl.x %block4[0] : !qecl.codeblock<1>
+
+    // CHECK: [[block6:%.+]] = qecl.y [[block5]][{{\s*}}0] : !qecl.codeblock<1>
+    %block6 = qecl.y %block5[0] : !qecl.codeblock<1>
+
+    // CHECK: [[block7:%.+]] = qecl.z [[block6]][{{\s*}}0] : !qecl.codeblock<1>
+    %block7 = qecl.z %block6[0] : !qecl.codeblock<1>
+
+    // CHECK: [[block8:%.+]] = qecl.hadamard [[block7]][{{\s*}}0] : !qecl.codeblock<1>
+    %block8 = qecl.hadamard %block7[0] : !qecl.codeblock<1>
+
+    // CHECK: [[block9:%.+]] = qecl.s [[block8]][{{\s*}}0] : !qecl.codeblock<1>
+    %block9 = qecl.s %block8[0] : !qecl.codeblock<1>
+
+    // CHECK: [[block10:%.+]] = qecl.s [[block9]][{{\s*}}0] adj : !qecl.codeblock<1>
+    %block10 = qecl.s %block9[0] adj : !qecl.codeblock<1>
 
     // CHECK: [[block_ctrl:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
-    // CHECK: [[block6:%.+]], [[block7:%.+]] = qecl.cnot [[block_ctrl]][{{\s*}}0], [[block5]][{{\s*}}0]
+    // CHECK: [[block11:%.+]], [[block12:%.+]] = qecl.cnot [[block_ctrl]][{{\s*}}0], [[block10]][{{\s*}}0]
     %block_ctrl = "test.op"() : () -> !qecl.codeblock<1>
-    %block6, %block7 = qecl.cnot %block_ctrl[0], %block5[0] : !qecl.codeblock<1>, !qecl.codeblock<1>
+    %block11, %block12 = qecl.cnot %block_ctrl[0], %block10[0] : !qecl.codeblock<1>, !qecl.codeblock<1>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)

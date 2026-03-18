@@ -21,7 +21,7 @@ For a complete description of this dialect, please see
     mlir/include/QecLogical/IR/QecLogicalDialect.td
 """
 from collections.abc import Sequence
-from typing import ClassVar, TypeAlias
+from typing import ClassVar, Mapping, TypeAlias
 
 from xdsl.dialects.builtin import I64, ContainerOf, IndexType, IntegerAttr, UnitAttr
 from xdsl.ir import (
@@ -371,12 +371,11 @@ class QecCycleOp(IRDLOperation):
         super().__init__(operands=operands, result_types=(in_codeblock_type,))
 
 
-@irdl_op_definition
-class HadamardOp(IRDLOperation):
-    """A logical Hadamard gate operation.
+class SingleQubitLogicalGateOp(IRDLOperation):
+    """Base class for single-qubit logical gate operations.
 
-    This operation represents a logical Hadamard gate operation applied to the logical qubit at
-    the provided index in the logical codeblock. For example,
+    An operation that inherits from this class represents a logical gate operation applied to the
+    logical qubit at the provided index in the logical codeblock. For example,
 
     ```mlir
     %1 = qecl.hadamard %0[ 1] : !qecl.codeblock<3>
@@ -384,63 +383,9 @@ class HadamardOp(IRDLOperation):
 
     represents a logical Hadamard operation applied to the logical qubit at index `1` in the
     codeblock `%0`, which encodes k = 3 logical qubits.
-    """
 
-    T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
-
-    name = "qecl.hadamard"
-
-    assembly_format = """
-            $in_codeblock `[` ($idx^):($idx_attr)? `]` attr-dict `:` type($in_codeblock)
-        """
-
-    in_codeblock = operand_def(T)
-
-    idx = opt_operand_def(IndexType)
-
-    idx_attr = opt_prop_def(IntegerAttr.constr(type=IndexType, value=AtLeast(0)))
-
-    out_codeblock = result_def(T)
-
-    def __init__(
-        self,
-        in_codeblock: LogicalCodeBlockSSAValue | Operation,
-        idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
-    ):
-        if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
-
-        if isinstance(idx, IntegerAttr):
-            operands = (in_codeblock, None)
-            properties = {"idx_attr": idx}
-        else:
-            operands = (in_codeblock, idx)
-            properties = {}
-
-        in_codeblock_type = get_logical_codeblock_type(in_codeblock)
-
-        super().__init__(
-            operands=operands,
-            result_types=(in_codeblock_type,),
-            properties=properties,
-        )
-
-
-@irdl_op_definition
-class SOp(IRDLOperation):
-    """A logical S (π/2 phase) gate operation.
-
-    This operation represents a logical S (π/2 phase) gate operation applied to the logical
-    qubit at the provided index in the logical codeblock. For example,
-
-    ```mlir
-    %1 = qecl.s %0[ 1] : !qecl.codeblock<3>
-    ```
-
-    represents a logical S operation applied to the logical qubit at index `1` in the codeblock
-    `%0`, which encodes k = 3 logical qubits.
-
-    The equivalent adjoint operation, S†, is represented by included the `adj` unit attribute:
+    Adjoint operations are supported by adding the `adj` unit attribute. For example, to represent
+    a logical S† gate operation:
 
     ```mlir
     %1 = qecl.s %0[ 1] adj : !qecl.codeblock<3>
@@ -448,12 +393,6 @@ class SOp(IRDLOperation):
     """
 
     T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
-
-    name = "qecl.s"
-
-    assembly_format = """
-            $in_codeblock `[` ($idx^):($idx_attr)? `]` (`adj` $adjoint^)? attr-dict `:` type($in_codeblock)
-        """
 
     in_codeblock = operand_def(T)
 
@@ -465,32 +404,166 @@ class SOp(IRDLOperation):
 
     out_codeblock = result_def(T)
 
+    assembly_format = """
+            $in_codeblock `[` ($idx^):($idx_attr)? `]` (`adj` $adjoint^)? attr-dict `:` type($in_codeblock)
+        """
+
     def __init__(
         self,
         in_codeblock: LogicalCodeBlockSSAValue | Operation,
         idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
         adjoint: UnitAttr | bool = False,
     ):
+        properties: dict[str, Attribute | None] = {}
+
         if isinstance(idx, int):
             idx = IntegerAttr.from_int_and_width(idx, 64)
 
         if isinstance(idx, IntegerAttr):
             operands = (in_codeblock, None)
-            properties = {"idx_attr": idx}
+            properties["idx_attr"] = idx
+
         else:
             operands = (in_codeblock, idx)
-            properties = {}
-
-        in_codeblock_type = get_logical_codeblock_type(in_codeblock)
 
         if adjoint:
             properties["adjoint"] = UnitAttr()
+
+        in_codeblock_type = get_logical_codeblock_type(in_codeblock)
 
         super().__init__(
             operands=operands,
             result_types=(in_codeblock_type,),
             properties=properties,
         )
+
+
+@irdl_op_definition
+class IdentityOp(SingleQubitLogicalGateOp):
+    """A logical Identity gate operation.
+
+    Example:
+
+    ```mlir
+    %1 = qecl.identity %0[ 1] : !qecl.codeblock<3>
+    ```
+    """
+
+    name = "qecl.identity"
+
+    def __init__(
+        self,
+        in_codeblock: LogicalCodeBlockSSAValue | Operation,
+        idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
+    ):
+        super().__init__(in_codeblock, idx)
+
+
+@irdl_op_definition
+class PauliXOp(SingleQubitLogicalGateOp):
+    """A logical Pauli X gate operation.
+
+    Example:
+
+    ```mlir
+    %1 = qecl.x %0[ 1] : !qecl.codeblock<3>
+    ```
+    """
+
+    name = "qecl.x"
+
+    def __init__(
+        self,
+        in_codeblock: LogicalCodeBlockSSAValue | Operation,
+        idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
+    ):
+        super().__init__(in_codeblock, idx)
+
+
+@irdl_op_definition
+class PauliYOp(SingleQubitLogicalGateOp):
+    """A logical Pauli Y gate operation.
+
+    Example:
+
+    ```mlir
+    %1 = qecl.y %0[ 1] : !qecl.codeblock<3>
+    ```
+    """
+
+    name = "qecl.y"
+
+    def __init__(
+        self,
+        in_codeblock: LogicalCodeBlockSSAValue | Operation,
+        idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
+    ):
+        super().__init__(in_codeblock, idx)
+
+
+@irdl_op_definition
+class PauliZOp(SingleQubitLogicalGateOp):
+    """A logical Pauli Z gate operation.
+
+    Example:
+
+    ```mlir
+    %1 = qecl.z %0[ 1] : !qecl.codeblock<3>
+    ```
+    """
+
+    name = "qecl.z"
+
+    def __init__(
+        self,
+        in_codeblock: LogicalCodeBlockSSAValue | Operation,
+        idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
+    ):
+        super().__init__(in_codeblock, idx)
+
+
+@irdl_op_definition
+class HadamardOp(SingleQubitLogicalGateOp):
+    """A logical Hadamard gate operation.
+
+    Example:
+
+    ```mlir
+    %1 = qecl.hadamard %0[ 1] : !qecl.codeblock<3>
+    ```
+    """
+
+    name = "qecl.hadamard"
+
+    def __init__(
+        self,
+        in_codeblock: LogicalCodeBlockSSAValue | Operation,
+        idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
+    ):
+        super().__init__(in_codeblock, idx)
+
+
+@irdl_op_definition
+class SOp(SingleQubitLogicalGateOp):
+    """A logical S (π/2 phase) gate operation.
+
+    Example:
+
+    ```mlir
+    %1 = qecl.s %0[ 1] : !qecl.codeblock<3>
+    %2 = qecl.s %1[ 1] adj : !qecl.codeblock<3>
+    ```
+    """
+
+    name = "qecl.s"
+
+    def __init__(
+        self,
+        in_codeblock: LogicalCodeBlockSSAValue | Operation,
+        idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
+        adjoint: UnitAttr | bool = False,
+    ):
+        super().__init__(in_codeblock, idx, adjoint)
 
 
 @irdl_op_definition
@@ -587,6 +660,10 @@ QecLogical = Dialect(
         InsertCodeblockOp,
         EncodeOp,
         QecCycleOp,
+        IdentityOp,
+        PauliXOp,
+        PauliYOp,
+        PauliZOp,
         HadamardOp,
         SOp,
         CnotOp,
