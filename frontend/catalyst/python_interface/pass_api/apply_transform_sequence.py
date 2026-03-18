@@ -13,16 +13,17 @@
 # limitations under the License.
 """This file contains the pass that applies all passes present in the program representation."""
 
-import io
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from functools import partial
+from io import StringIO
 from typing import Any, Callable
 
 from xdsl.context import Context
 from xdsl.dialects import builtin, transform
 from xdsl.ir import Attribute
 from xdsl.parser import Parser
-from xdsl.passes import ModulePass
+from xdsl.passes import ModulePass, PassPipeline
 from xdsl.pattern_rewriter import PatternRewriter, RewritePattern, op_type_rewrite_pattern
 from xdsl.printer import Printer
 
@@ -98,25 +99,31 @@ class ApplyTransformSequencePass(ModulePass):
             if isinstance(_op, builtin.ModuleOp):
                 nested_modules.append(_op)
 
+        pattern_cls = (
+            partial(ApplyTransformSequencePattern, callback=self.callback)
+            if self.callback
+            else ApplyTransformSequenceNoCallbackPattern
+        )
+
         for mod in nested_modules:
             transformer = self.find_transform_entry_point(mod)
             if transformer is None:
                 continue  # pragma: no cover
 
             # Need to create a new pattern for each nested module to properly handle callbacks
-            pattern = ApplyTransformSequencePattern(ctx, self.passes, self.callback)
+            pattern = pattern_cls(ctx=ctx, passes=self.passes)
             rewriter = PatternRewriter(transformer)
             pattern.match_and_rewrite(transformer, rewriter)
 
 
 class ApplyTransformSequencePattern(RewritePattern):
-    """RewritePattern for applying transform sequences."""
+    """RewritePattern for applying transform sequences when a callback is provided."""
 
     def __init__(
         self,
         ctx: Context,
         passes: dict[str, Callable[[], type[ModulePass]]],
-        callback: Callable | None = None,
+        callback: Callable,
     ):
         self.ctx = ctx
         self.passes = passes
@@ -145,16 +152,12 @@ class ApplyTransformSequencePattern(RewritePattern):
 
     def _pre_pass_callback(self, compilation_pass, module):
         """Callback wrapper to run the callback function before a pass."""
-        if not self.callback:
-            return
         if self.pass_level == 0:
             # Since this is the first pass, there is no previous pass
             self.callback(None, module, compilation_pass, pass_level=0)
 
     def _post_pass_callback(self, compilation_pass, module):
         """Increment level and run callback if defined."""
-        if not self.callback:
-            return
         self.pass_level += 1
         self.callback(compilation_pass, module, None, pass_level=self.pass_level)
 
@@ -181,9 +184,9 @@ class ApplyTransformSequencePattern(RewritePattern):
             return module
 
         # ---- Catalyst path ----
-        buffer = io.StringIO()
+        buffer = StringIO()
         Printer(stream=buffer, print_generic_format=True).print_op(module)
-        schedule = _create_mlir_schedule([op])
+        schedule = _create_mlir_cli_schedule([op])
         self._pre_pass_callback(pass_name, module)
         modified = _quantum_opt(*schedule, "-mlir-print-op-generic", stdin=buffer.getvalue())
 
@@ -193,7 +196,92 @@ class ApplyTransformSequencePattern(RewritePattern):
         return data
 
 
-def _create_mlir_schedule(pass_ops: Sequence[transform.ApplyRegisteredPassOp]) -> list[str]:
+class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
+    """RewritePattern for applying transform sequences when no callback is provided.
+    This is functionally the same as the ``ApplyTransformSequenceWithCallbackPattern``,
+    but uses a more optimized pathway, which is enabled by the lack of a callback."""
+
+    def __init__(
+        self,
+        ctx: Context,
+        passes: dict[str, Callable[[], type[ModulePass]]],
+    ):
+        self.ctx = ctx
+        self.passes = passes
+        self.pass_level = 0
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, transformer: builtin.ModuleOp, rewriter: PatternRewriter):
+        """Rewrite modules containing transform.named_sequences."""
+        payload: builtin.ModuleOp = transformer.parent_op()
+        rewriter.erase_op(transformer)
+
+        pass_ops = []
+        for ns in transformer.ops:
+            assert isinstance(ns, transform.NamedSequenceOp)
+            pass_ops.extend(
+                op for op in ns.body.ops if isinstance(op, transform.ApplyRegisteredPassOp)
+            )
+
+        if len(pass_ops) == 0:
+            return
+
+        schedule = self._cluster_passes(pass_ops)
+        for subschedule in schedule:
+
+            # ---- xDSL path ----
+            if subschedule[0].pass_name.data in self.passes:
+                xdsl_pipeline = []
+                for op in subschedule:
+                    pass_class = self.passes[op.pass_name.data]()
+                    options = {
+                        k.replace("-", "_"): v
+                        for k, v in get_pyval_from_xdsl_attr(op.options).items()
+                    }
+                    xdsl_pipeline.append(pass_class(**options))
+
+                pipeline = PassPipeline(xdsl_pipeline)
+                pipeline.apply(self.ctx, payload)
+
+            # ---- MLIR path ----
+            else:
+                buffer = StringIO()
+                Printer(stream=buffer, print_generic_format=True).print_op(payload)
+
+                mlir_pipeline = _create_mlir_cli_schedule(subschedule)
+                modified = _quantum_opt(
+                    *mlir_pipeline, "-mlir-print-op-generic", stdin=buffer.getvalue()
+                )
+
+                data = Parser(self.ctx, modified).parse_module()
+                rewriter.replace_op(payload, data)
+                payload = data
+
+    def _cluster_passes(
+        self, pass_ops: list[transform.ApplyRegisteredPassOp]
+    ) -> list[list[transform.ApplyRegisteredPassOp]]:
+        """Create a schedule that clusters consecutive xDSL/MLIR passes together."""
+        if not pass_ops:
+            return []
+
+        schedule = []
+        cur_schedule = [pass_ops[0]]
+        cur_state = pass_ops[0].pass_name.data in self.passes
+
+        for op in pass_ops[1:]:
+            new_state = op.pass_name.data in self.passes
+            if new_state == cur_state:
+                cur_schedule.append(op)
+            else:
+                schedule.append(cur_schedule)
+                cur_schedule = [op]
+                cur_state = new_state
+
+        schedule.append(cur_schedule)
+        return schedule
+
+
+def _create_mlir_cli_schedule(pass_ops: Sequence[transform.ApplyRegisteredPassOp]) -> list[str]:
     """Create a pass schedule for applying MLIR pass via CLI flags.
 
     For a pass with options, the corresponding CLI flag will be the following:
