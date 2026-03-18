@@ -582,6 +582,9 @@ class ConstructCircuitDAG:
     def _func_op(self, operation: func.FuncOp) -> None:
         """Visit a FuncOp Operation."""
 
+        if not operation.regions[0].blocks:
+            raise VisualizationError(f"Empty function calls are not yet compatible with 'draw_graph'. Found external function call to {operation.sym_name.data}.")
+
         label: str = (
             "qjit" if operation.sym_name.data.startswith("jit_") else operation.sym_name.data
         )
@@ -597,9 +600,7 @@ class ConstructCircuitDAG:
         self._cluster_uid_counter += 1
         self._cluster_uid_stack.append(uid)
 
-        # NOTE: Don't visit empty external functions
-        if blocks := operation.regions[0].blocks:
-            self._visit_block(blocks[0])
+        self._visit_block(operation.regions[0].blocks[0])
 
     # pylint: disable=unused-argument
     @_visit_operation.register
