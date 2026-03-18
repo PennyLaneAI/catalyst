@@ -91,10 +91,10 @@ LogicalResult RTIORPCOp::verify()
             return emitOpError("tag return type '")
                    << returnPart << "' requires exactly one result";
         }
-        char retCode = returnPart[0];
         if (returnPart.size() != 1) {
             return emitOpError("tag return type must be single character (i, I, f, s, O)");
         }
+        char retCode = returnPart[0];
         if (!isTypeCompatibleWithTagCode(getResults()[0].getType(), retCode)) {
             return emitOpError("result type ")
                    << getResults()[0].getType() << " incompatible with tag return code '" << retCode
