@@ -83,9 +83,15 @@ from catalyst.utils.exceptions import (
     DifferentiableCompileError,
     PlxprCaptureCFCompatibilityError,
 )
-from catalyst.utils.precompile_decomposition_rules import precompile_decomp_rules
+from catalyst.utils.precompile_decomposition_rules import (
+    BYTECODE_FILE_PATH,
+    precompile_decomp_rules,
+)
 
-if not (INSTALLED or os.getenv("DOCUTILSCONFIG") or os.getenv("READTHEDOCS_CANONICAL_URL")):
+if (
+    not (INSTALLED or os.getenv("DOCUTILSCONFIG") or os.getenv("READTHEDOCS_CANONICAL_URL"))
+    and not BYTECODE_FILE_PATH.exists()
+):
     precompile_decomp_rules()
 
 
