@@ -20,7 +20,6 @@ from unittest.mock import Mock
 import jax
 import pennylane as qml
 import pytest
-from jax.interpreters.partial_eval import Const
 from xdsl.dialects import builtin, func, test
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir.core import Block, Region
