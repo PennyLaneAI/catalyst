@@ -306,6 +306,32 @@ class AdjointGenerator {
         }
     }
 
+    void getAdjointCallOpArgs(func::CallOp callOp, std::vector<Value> &args)
+    {
+        // Get the reversed results
+        args = {callOp.getArgOperands().begin(), callOp.getArgOperands().end()};
+        std::queue<Value> reversedResults;
+        for (Value callResult : callOp.getResults()) {
+            if (!isa<QuregType, QubitType>(callResult.getType())) {
+                continue;
+            }
+            reversedResults.push(remappedValues.lookup(callResult));
+        }
+        for (size_t i = 0; i < args.size(); i++) {
+            if (!isa<QuregType, QubitType>(args[i].getType())) {
+                if (!isa<BlockArgument>(args[i]) &&
+                    args[i].getDefiningOp()->getParentRegion() == callOp->getParentRegion()) {
+                    // Encountered a classical call operand from within the adjoint region
+                    // Must use the clone outside
+                    args[i] = remappedValues.lookup(args[i]);
+                }
+            }
+            else {
+                args[i] = reversedResults.front();
+                reversedResults.pop();
+            }
+        }
+    }
     void visitOperation(func::CallOp callOp, OpBuilder &builder)
     {
         // Get the the original function
@@ -392,29 +418,8 @@ class AdjointGenerator {
         // Leave the adjoint func op to go back at the saved insertion
         builder.restoreInsertionPoint(insertionSaved);
 
-        // Get the reversed results
-        std::vector<Value> args = {callOp.getArgOperands().begin(), callOp.getArgOperands().end()};
-        std::queue<Value> reversedResults;
-        for (Value callResult : callOp.getResults()) {
-            if (!isa<QuregType, QubitType>(callResult.getType())) {
-                continue;
-            }
-            reversedResults.push(remappedValues.lookup(callResult));
-        }
-        for (size_t i = 0; i < args.size(); i++) {
-            if (!isa<QuregType, QubitType>(args[i].getType())) {
-                if (!isa<BlockArgument>(args[i]) &&
-                    args[i].getDefiningOp()->getParentRegion() == callOp->getParentRegion()) {
-                    // Encountered a classical call operand from within the adjoint region
-                    // Must use the clone outside
-                    args[i] = remappedValues.lookup(args[i]);
-                }
-            }
-            else {
-                args[i] = reversedResults.front();
-                reversedResults.pop();
-            }
-        }
+        std::vector<Value> args;
+        getAdjointCallOpArgs(callOp, args);
 
         // Call the adjoint func op
         auto adjointCallOp = func::CallOp::create(builder, loc, adjointFnOp, args);
