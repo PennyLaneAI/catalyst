@@ -395,7 +395,6 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
         super().__init__(shots)
 
         self.qnode: func.FuncOp = None
-        self.original_qnode: func.FuncOp = None
         self.call_op: func.CallOp = None
 
     def match_and_rewrite(
@@ -405,8 +404,7 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
         if "quantum.node" not in func_op.attributes:
             return
         
-        self.original_qnode = func_op
-        self._wrap_qnode_in_classical_post_processing(rewriter)
+        self._wrap_qnode_in_classical_post_processing(func_op, rewriter)
 
         measurement_processes = [op for op in self.qnode.body.walk() if isinstance(op, MEASUREMENT_PROCESS_TYPES)]
         for mp in measurement_processes:
@@ -433,7 +431,7 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
 
         return op
 
-    def _wrap_qnode_in_classical_post_processing(self, rewriter):
+    def _wrap_qnode_in_classical_post_processing(self, quantum_node, rewriter):
         """Clones some qnode FuncOp (circ_name) as circ_name.from_samples 
         and inserts it, then replaces circ_name with a FuncOp of the same name 
         that calls circ_name.from_samples."""
@@ -444,20 +442,20 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
         # add a clone of the "qnode" FuncOp named original_name.from_samples to the module
         # we keep the original qnode unmodified for generating post-processing functions later
         # ToDo: if we don't need to do that after all, we could just rename the QNode circ.from_samples and insert an empty FuncOp named circ instead
-        module = self._get_parent_module(self.original_qnode)
-        qnode = self.original_qnode.clone()
-        qnode_name = qnode.sym_name.data + ".from_samples"
-        qnode.sym_name = builtin.StringAttr(qnode_name)
-        rewriter.insert_op(qnode, InsertPoint.at_end(module.body.block))
+        module = self._get_parent_module(quantum_node)
+        new_qnode = quantum_node.clone()
+        qnode_name = new_qnode.sym_name.data + ".from_samples"
+        new_qnode.sym_name = builtin.StringAttr(qnode_name)
+        rewriter.insert_op(new_qnode, InsertPoint.at_end(module.body.block))
 
         # create an empty function and replace the original "qnode" FuncOp
-        func_type = self.original_qnode.function_type
+        func_type = quantum_node.function_type
         outer_fn = func.FuncOp(
-            name=self.original_qnode.sym_name.data, 
+            name=quantum_node.sym_name.data, 
             function_type=func_type, 
             visibility="public"
         )
-        rewriter.replace_op(self.original_qnode, outer_fn)
+        rewriter.replace_op(quantum_node, outer_fn)
 
         # call the cloned QNode inside the new FuncOp
         call_args = outer_fn.body.block.args
@@ -470,7 +468,7 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
         return_op = func.ReturnOp(*qnode_call_results)
         outer_fn.body.block.add_op(return_op)
 
-        self.qnode = qnode
+        self.qnode = new_qnode
         self.call_op = call_op
 
     # ToDo: clean up this mess!!
@@ -620,8 +618,7 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
 
 
     def insert_postprocessing(self, mp, n_qubits, observable_op):
-        # Insert the post-processing function into current module or get handle to it if already
-        # inserted
+        # Insert the post-processing function into current module or get handle if already inserted
         match mp:
             case quantum.ExpvalOp():
                 postprocessing_func_name = (
