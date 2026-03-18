@@ -18,10 +18,10 @@ import re
 from unittest.mock import Mock
 
 import jax
-from jax.interpreters.partial_eval import Const
 import pennylane as qml
 import pytest
-from xdsl.dialects import test, func, builtin
+from jax.interpreters.partial_eval import Const
+from xdsl.dialects import builtin, func, test
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir.core import Block, Region
 
@@ -194,7 +194,9 @@ class TestFuncOpVisualization:
         module = builtin.ModuleOp(ops=[external_func])
 
         utility = ConstructCircuitDAG(FakeDAGBuilder())
-        with pytest.raises(VisualizationError, match=r"Empty function calls are not yet compatible.*test_func"):
+        with pytest.raises(
+            VisualizationError, match=r"Empty function calls are not yet compatible.*test_func"
+        ):
             utility.construct(module)
 
     def test_standard_qnode(self):
