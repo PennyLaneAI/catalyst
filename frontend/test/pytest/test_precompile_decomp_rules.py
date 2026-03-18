@@ -14,14 +14,19 @@
 
 """Tests for the decomposition rule precompilation utilities."""
 
+import subprocess
+
 import pennylane as qp
 
 from catalyst.utils.precompile_decomposition_rules import (
+    BYTECODE_FILE_PATH,
     COMPILER_OPS_FOR_DECOMPOSITION,
     compile_op_decomp_rules,
     get_abstract_args,
     get_compiler_ops,
+    precompile_decomp_rules,
 )
+from catalyst.utils.runtime_environment import DEFAULT_BIN_PATHS
 
 
 def test_get_compiler_ops():
@@ -72,3 +77,26 @@ class TestCompileOpDecompRules:
         assert "_rx_to_ry_cliff" in rules
         assert "_rx_to_rz_cliff" in rules
         assert "_rx_to_ppr" in rules
+
+
+def test_bytecode_file():
+    """Test that the bytecode file is generated correctly."""
+    BYTECODE_FILE_PATH.unlink()
+
+    precompile_decomp_rules()
+
+    assert BYTECODE_FILE_PATH.exists()
+
+    rules = subprocess.run(
+        (f"{DEFAULT_BIN_PATHS['cli']}/quantum-opt", BYTECODE_FILE_PATH),
+        capture_output=True,
+        check=True,
+        text=True,
+    ).stdout
+
+    assert "_isingxy_to_h_cy" in rules
+    assert "_doublexcit" in rules
+    assert "_toffoli_to_ppr" in rules
+    assert "_pauliz_to_ps" in rules
+    assert "_cphase_to_ppr" in rules
+    assert "_crot" in rules
