@@ -811,6 +811,7 @@ class TestCreateStaticOperatorNodes:
         with pytest.raises(
             VisualizationError, match=r"quantum.fake_unsupported_nonskipped_op.*not supported"
         ):
+            # pylint: disable=protected-access
             utility._visit_operation(unknown_op)
 
     def test_custom_op(self):
