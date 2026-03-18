@@ -223,12 +223,6 @@ def compile_op_decomp_rules(
 
     abstract_args = get_abstract_args(op_class)  # pylint: disable=protected-access
 
-    if str in abstract_args:
-        raise ValueError(
-            f"Cannot compile decomposition rules for op {op_class.__name__} with "
-            + "string arguments."
-        )
-
     for rule in op_decomp_rules:
         try:
             rule_name = rule._impl.__name__  # pylint: disable=protected-access
