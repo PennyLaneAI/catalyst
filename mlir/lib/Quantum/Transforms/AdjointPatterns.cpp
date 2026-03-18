@@ -37,6 +37,7 @@
 #include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/IR/QuantumTypes.h"
 #include "Quantum/Transforms/Patterns.h"
 #include "Quantum/Utils/QuantumSplitting.h"
 
@@ -311,13 +312,10 @@ class AdjointGenerator {
         assert(funcOp != nullptr && "The funcOp is null and therefore not supported.");
 
         auto resultTypes = funcOp.getResultTypes();
-        bool multiReturns = resultTypes.size() > 1;
 
-        bool quantum = std::any_of(resultTypes.begin(), resultTypes.end(),
-                                   [](const auto &value) { return isa<QuregType>(value); });
-        assert(!(quantum && multiReturns) && "Adjoint does not support functions with multiple "
-                                             "returns that contain a quantum register.");
-
+        bool quantum = std::any_of(resultTypes.begin(), resultTypes.end(), [](const auto &value) {
+            return isa<QuregType, QubitType>(value);
+        });
         if (!quantum) {
             // This operation is purely classical
             return;
@@ -348,23 +346,27 @@ class AdjointGenerator {
         // Create the block of the adjoint function
         Block *adjointFnBlock = adjointFnOp.addEntryBlock();
         builder.setInsertionPointToStart(adjointFnBlock);
-        Type qregType = quantum::QuregType::get(builder.getContext());
-        auto argumentsSize = adjointFnOp.getArguments().size();
 
-        // The last argument is the quantum register
-        Value lastArg = adjointFnOp.getArgument(argumentsSize - 1);
-        assert(isa<QuregType>(lastArg.getType()) &&
-               "The last argument of the function must be the quantum register.");
-        quantum::AdjointOp adjointOp = quantum::AdjointOp::create(builder, loc, qregType, lastArg);
+        SmallVector<Value> quantumArgs;
+        for (auto adjointFnArg : adjointFnBlock->getArguments()) {
+            if (isa<QuregType, QubitType>(adjointFnArg.getType())) {
+                quantumArgs.push_back(adjointFnArg);
+            }
+        }
+        quantum::AdjointOp adjointOp =
+            quantum::AdjointOp::create(builder, loc, TypeRange(quantumArgs), quantumArgs);
 
         Region *adjointRegion = &adjointOp.getRegion();
         Region &originalRegion = funcOp.getRegion();
 
         // Map the arguments with the original function
         IRMapping map;
-        for (size_t i = 0; i < funcOp.getArguments().size() - 1; i++) {
+        for (size_t i = 0; i < funcOp.getArguments().size(); i++) {
             Value arg = adjointFnOp.front().getArgument(i);
             Value argBlock = originalRegion.front().getArgument(i);
+            if (isa<QuregType, QubitType>(argBlock.getType())) {
+                continue;
+            }
             map.map(argBlock, arg);
         }
 
@@ -387,16 +389,35 @@ class AdjointGenerator {
         // Leave the adjoint func op to go back at the saved insertion
         builder.restoreInsertionPoint(insertionSaved);
 
-        // Get the reversed result
-        Value reversedResult = remappedValues.lookup(getQuantumReg(callOp.getResults()).value());
+        // Get the reversed results
         std::vector<Value> args = {callOp.getArgOperands().begin(), callOp.getArgOperands().end()};
-        args.pop_back();
-        args.push_back(reversedResult);
+        SmallVector<Value> reversedResults;
+        for (Value callResult : callOp.getResults()) {
+            if (!isa<QuregType, QubitType>(callResult.getType())) {
+                continue;
+            }
+            reversedResults.push_back(remappedValues.lookup(callResult));
+        }
+
+        size_t current_reversed_result = 0;
+        for (size_t i = 0; i < args.size(); i++) {
+            if (!isa<QuregType, QubitType>(args[i].getType())) {
+                continue;
+            }
+            args[i] = reversedResults[current_reversed_result];
+            current_reversed_result++;
+        }
+
         // Call the adjoint func op
         auto adjointCallOp = func::CallOp::create(builder, loc, adjointFnOp, args);
-        ValueRange initQreg = callOp.getArgOperands();
-        // Map the initial quantum register with the adjoint result
-        remappedValues.map(getQuantumReg(initQreg).value(), adjointCallOp.getResult(0));
+        size_t i = 0;
+        for (auto callOperand : callOp.getArgOperands()) {
+            if (!isa<QuregType, QubitType>(callOperand.getType())) {
+                continue;
+            }
+            remappedValues.map(callOperand, adjointCallOp.getResult(i));
+            i++;
+        }
     }
 
     void visitOperation(scf::ForOp forOp, OpBuilder &builder)
@@ -548,7 +569,7 @@ struct AdjointSingleOpRewritePattern : public OpRewritePattern<AdjointOp> {
 
         // Explicitly free the memory of the caches.
         cache.emitDealloc(rewriter, adjoint.getLoc());
-        // The final register is the re-mapped region argument of the original adjoint op.
+        // The final quantum values are the re-mapped region arguments of the original adjoint op.
         SmallVector<Value> reversedOutputs;
         for (BlockArgument arg : adjoint.getRegion().getArguments()) {
             reversedOutputs.push_back(oldToCloned.lookup(arg));
