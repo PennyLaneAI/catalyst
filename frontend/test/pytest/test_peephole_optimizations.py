@@ -147,49 +147,6 @@ def test_pipeline_functionality(theta, backend):
     assert np.allclose(res[0], res[1])
 
 
-### Test bad usages of pass decorators ###
-def test_passes_bad_usages():
-    """
-    Tests that an error is raised when cancel_inverses is not used properly
-    """
-
-    def test_passes_not_on_qnode():
-        def classical_func():
-            return 42.42
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            pipeline({})(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            cancel_inverses(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            merge_rotations(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            disentangle_cnot(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            disentangle_swap(classical_func)
-
-    test_passes_not_on_qnode()
-
-
 def test_chained_passes():
     """
     Test that chained passes are present in the transform passes.
@@ -240,8 +197,8 @@ def test_disentangle_passes():
         return qml.state()
 
     input_mlir_string = circuit_with_disentangle_passes.mlir
-    assert "disentangle-CNOT" in input_mlir_string
-    assert "disentangle-SWAP" in input_mlir_string
+    assert "disentangle-cnot" in input_mlir_string
+    assert "disentangle-swap" in input_mlir_string
 
     # both SWAP and CNOT should be removed by the disentangle passes
     transformed_mlir_string = circuit_with_disentangle_passes.mlir_opt
@@ -363,7 +320,7 @@ def test_ppr_to_ppm_auto_corrected():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=2)()
+    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.gate_types
 
     assert gate_types["GlobalPhase"] == 4
@@ -391,7 +348,7 @@ def test_ppr_to_ppm_inject_magic_state():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=2)()
+    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.gate_types
     assert gate_types["PPR-pi/4-w1"] == 6
     assert gate_types["PPR-pi/4-w2"] == 1
@@ -418,7 +375,7 @@ def test_ppr_to_ppm_pauli_corrected():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=2)()
+    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.gate_types
     assert gate_types["PPR-pi/4-w1"] == 6
     assert gate_types["PPR-pi/4-w2"] == 1

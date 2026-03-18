@@ -1477,7 +1477,6 @@ def test_sign_expand(backend):
     assert expected_shape == observed_shape
 
 
-@pytest.mark.xfail(reason="JIT and QJIT return different shapes")
 def test_split_to_single_terms(backend):
     """Test split_to_single_terms"""
 

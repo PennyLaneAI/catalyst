@@ -59,7 +59,7 @@ func.func @custom(%f : f64, %q1 : !quantum.bit, %q2 : !quantum.bit) {
     %q4 = quantum.custom "RZ"(%f) %q1 : !quantum.bit
     %q5, %q6 = quantum.custom "CNOT"() %q1, %q2 : !quantum.bit, !quantum.bit
 
-    // expected-error@+1 {{number of operands and types do not match}}
+    // expected-error@+1 {{number of qubits in input (2) and output (1) must be the same}}
     %err = quantum.custom "CNOT"() %q1, %q2 : !quantum.bit
 
     return
@@ -68,7 +68,7 @@ func.func @custom(%f : f64, %q1 : !quantum.bit, %q2 : !quantum.bit) {
 // -----
 
 func.func @multirz2(%q0 : !quantum.bit, %q1 : !quantum.bit, %theta : f64) {
-    // expected-error@+1 {{number of operands and types do not match}}
+    // expected-error@+1 {{number of qubits in input (2) and output (1) must be the same}}
     %err = quantum.multirz(%theta) %q0, %q1 : !quantum.bit
 
     return
@@ -77,7 +77,7 @@ func.func @multirz2(%q0 : !quantum.bit, %q1 : !quantum.bit, %theta : f64) {
 // -----
 
 func.func @multirz3(%q0 : !quantum.bit, %theta : f64) {
-    // expected-error@+1 {{number of operands and types do not match}}
+    // expected-error@+1 {{number of qubits in input (1) and output (2) must be the same}}
     %err:2 = quantum.multirz(%theta) %q0 : !quantum.bit, !quantum.bit
 
     return
@@ -86,7 +86,7 @@ func.func @multirz3(%q0 : !quantum.bit, %theta : f64) {
 // -----
 
 func.func @unitary2(%q0 : !quantum.bit, %q1 : !quantum.bit,  %m : tensor<4x4xcomplex<f64>>) {
-    // expected-error@+1 {{number of operands and types do not match}}
+    // expected-error@+1 {{number of qubits in input (2) and output (1) must be the same}}
     %err = quantum.unitary(%m: tensor<4x4xcomplex<f64>>) %q0, %q1 : !quantum.bit
 
     return
@@ -110,7 +110,7 @@ func.func @controlled1(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantum.bit) 
     %cst = llvm.mlir.constant (6.000000e-01 : f64) : f64
     %cst_0 = llvm.mlir.constant (9.000000e-01 : f64) : f64
     %cst_1 = llvm.mlir.constant (3.000000e-01 : f64) : f64
-    // expected-error@+1 {{number of operands and types do not match}}
+    // expected-error@+1 {{number of controlling qubits in input (1) and output (0) must be the same}}
     %out_qubits:2  = quantum.custom "Rot"(%cst, %cst_1, %cst_0) %2 ctrls (%3) ctrlvals (%true) : !quantum.bit, !quantum.bit
     return
 }
@@ -122,7 +122,7 @@ func.func @controlled2(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantum.bit) 
     %cst = llvm.mlir.constant (6.000000e-01 : f64) : f64
     %cst_0 = llvm.mlir.constant (9.000000e-01 : f64) : f64
     %cst_1 = llvm.mlir.constant (3.000000e-01 : f64) : f64
-    // expected-error@+1 {{number of operands and types do not match}}
+    // expected-error@+1 {{number of controlling qubits in input (2) and controlling values (1) must be the same}}
     %out_qubits:3  = quantum.custom "Rot"(%cst, %cst_1, %cst_0) %2 ctrls (%3, %3) ctrlvals (%true) : !quantum.bit, !quantum.bit, !quantum.bit
     return
 }
@@ -473,3 +473,50 @@ func.func @state_good(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64, %in_stat
     quantum.state %obs shape %c : tensor<?xcomplex<f64>>
     return
 }
+
+// -----
+
+func.func @expval_and_var_good(%q : !quantum.bit) attributes {quantum.node} {
+    %obs = quantum.namedobs %q[PauliX] : !quantum.obs
+    %exp = quantum.expval %obs : f64
+    %var = quantum.var %obs : f64
+    return
+}
+
+// -----
+
+module {
+func.func @measurement_without_qnode(%q : !quantum.bit) {
+    %obs = quantum.namedobs %q[PauliZ] : !quantum.obs
+    // expected-error@+1 {{requires parent function to carry 'quantum.node' attribute}}
+    %exp = quantum.expval %obs : f64
+    return
+}
+}
+
+// -----
+
+module {
+    %q = quantum.alloc_qb : !quantum.bit
+    %obs = quantum.namedobs %q[PauliZ] : !quantum.obs
+    // expected-error@+1 {{'quantum.expval' op must be nested inside a 'func.func' operation}}
+    quantum.expval %obs : f64
+}
+
+// -----
+
+// COM: e.xpected-error @below {{attribute 'quantum.node' requires at least one measurement process operation in the function body}}
+func.func @qnode_without_measurement(%q : !quantum.bit) attributes {quantum.node} {
+    %obs = quantum.namedobs %q[PauliZ] : !quantum.obs
+    return
+}
+
+// -----
+
+// expected-error @below {{attribute 'quantum.node' is only valid on 'func.func'}}
+%c0 = "arith.constant"() {value = 0 : i64, quantum.node} : () -> i64
+
+// -----
+
+// expected-error@+1 {{'quantum.node' must be a unit attribute}}
+func.func private @wrong_attribute_value() attributes {quantum.node = "wrong"}

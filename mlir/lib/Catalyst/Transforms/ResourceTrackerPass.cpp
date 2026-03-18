@@ -78,6 +78,13 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
     }
 
   private:
+    /**
+     * @brief Accumulate resource counts from a ResourceResult into the pass statistics.
+     *
+     * This is used to populate the pass's Statistic members with totals from the ResourceResult.
+     *
+     * @param result The ResourceResult to accumulate stats from.
+     */
     void accumulateStats(const ResourceResult &result)
     {
         for (const auto &opEntry : result.operations) {
@@ -103,6 +110,11 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
         }
     }
 
+    /**
+     * @brief Print the resource results as JSON to stdout.
+     *
+     * @param results The map of function names to ResourceResults to print.
+     */
     void printJsonOutput(const llvm::StringMap<ResourceResult> &results) const
     {
         llvm::json::Object root;

@@ -259,7 +259,15 @@ void ResourceAnalysis::analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &res
     }
 }
 
-// This implementation is based on the Python implementation in specs_collector.py
+/**
+ * @brief Analyze a region and accumulate resource counts into the given ResourceResult.
+ *
+ * This implementation is based on the Python implementation in `specs_collector.py`.
+ *
+ * @param region The MLIR region to analyze.
+ * @param result The ResourceResult to accumulate counts into.
+ * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
+ */
 void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint)
 {
     for (Block &block : region) {
@@ -292,6 +300,16 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
     }
 }
 
+/**
+ * @brief Collect a single operation into the ResourceResult.
+ *
+ * This categorizes the operation into gates, measurements, classical instructions,
+ * or function calls, and updates the corresponding counts in the ResourceResult.
+ *
+ * @param op The operation to collect.
+ * @param result The ResourceResult to update with the operation's resource usage.
+ * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
+ */
 void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint)
 {
     // Quantum gates
@@ -371,6 +389,13 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     result.classicalInstructions[op->getName().getStringRef()] += 1;
 }
 
+/**
+ * @brief Resolve function calls in the resource results
+ * by inlining callee resources into the caller.
+ *
+ * @param funcName The name of the function to resolve calls for.
+ * This will be called recursively on callees.
+ */
 void ResourceAnalysis::resolveFunctionCalls(StringRef funcName)
 {
     auto it = funcResults.find(funcName);
