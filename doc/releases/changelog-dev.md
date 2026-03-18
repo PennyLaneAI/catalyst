@@ -309,6 +309,10 @@
 * `catalyst.jax_primitives.subroutine` has been moved to `qml.capture.subroutine`.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
 
+* The `StableHLO` dialect has been removed from Catalyst's Python interface module. 
+  Downstream users should now import StableHLO dialect definitions from `xdsl_jax.dialects.stablehlo` instead.
+  [(#2588)](https://github.com/PennyLaneAI/catalyst/pull/2588)
+
 * (Compiler integrators only) The versions of StableHLO/LLVM/Enzyme used by Catalyst have been updated.
   [(#2415)](https://github.com/PennyLaneAI/catalyst/pull/2415)
   [(#2416)](https://github.com/PennyLaneAI/catalyst/pull/2416)
