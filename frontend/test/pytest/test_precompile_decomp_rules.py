@@ -62,7 +62,7 @@ class TestCompileOpDecompRules:
     """Tests for compile_op_decomp_rules."""
 
     def test_compile_hadamard_rules(self):
-        """Test that compile_op_decomp_rules successfully compiles each decomp rule for Hadamards."""
+        """Test that compile_op_decomp_rules successfully compiles each decomp rule for Hadamard."""
         rules = compile_op_decomp_rules(qp.H)
 
         assert "_hadamard_to_rz_rx" in rules
