@@ -78,6 +78,38 @@ func.func @test_insert_type_mismatch(%r : !qecl.hyperreg<3 x 1>, %b : !qecl.code
 
 // -----
 
+func.func @test_gate_op_index_out_of_bounds_identity(%b : !qecl.codeblock<1>) {
+    // expected-error@below {{out-of-bounds index attribute}}
+    %b1 = qecl.identity %b[1] : !qecl.codeblock<1>
+    return
+}
+
+// -----
+
+func.func @test_gate_op_index_out_of_bounds_pauli_x(%b : !qecl.codeblock<1>) {
+    // expected-error@below {{out-of-bounds index attribute}}
+    %b1 = qecl.x %b[1] : !qecl.codeblock<1>
+    return
+}
+
+// -----
+
+func.func @test_gate_op_index_out_of_bounds_pauli_y(%b : !qecl.codeblock<1>) {
+    // expected-error@below {{out-of-bounds index attribute}}
+    %b1 = qecl.y %b[1] : !qecl.codeblock<1>
+    return
+}
+
+// -----
+
+func.func @test_gate_op_index_out_of_bounds_pauli_z(%b : !qecl.codeblock<1>) {
+    // expected-error@below {{out-of-bounds index attribute}}
+    %b1 = qecl.z %b[1] : !qecl.codeblock<1>
+    return
+}
+
+// -----
+
 func.func @test_gate_op_index_out_of_bounds_hadamard(%b : !qecl.codeblock<1>) {
     // expected-error@below {{out-of-bounds index attribute}}
     %b1 = qecl.hadamard %b[1] : !qecl.codeblock<1>
