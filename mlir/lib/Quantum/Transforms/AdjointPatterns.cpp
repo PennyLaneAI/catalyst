@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <mlir/IR/Block.h>
-#include <mlir/IR/Value.h>
 #define DEBUG_TYPE "adjoint"
 
 #include <algorithm>
