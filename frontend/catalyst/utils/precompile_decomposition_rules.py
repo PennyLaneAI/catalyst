@@ -35,6 +35,7 @@ from catalyst.utils.runtime_environment import DEFAULT_BIN_PATHS
 
 BYTECODE_FILE_PATH = Path(__file__).parent.parent / Path("resources/decomposition_rules.mlirbc")
 
+# TODO uncomment dynamic size wires ops once they are supported
 COMPILER_OPS_FOR_DECOMPOSITION = {
     "CNOT",
     "ControlledPhaseShift",
@@ -46,7 +47,7 @@ COMPILER_OPS_FOR_DECOMPOSITION = {
     "CY",
     "CZ",
     "Hadamard",
-    "Identity",
+    # "Identity",
     "IsingXX",
     "IsingXY",
     "IsingYY",
@@ -57,8 +58,8 @@ COMPILER_OPS_FOR_DECOMPOSITION = {
     "PauliX",
     "PauliY",
     "PauliZ",
-    "PauliRot",
-    "PauliMeasure",
+    # "PauliRot",
+    # "PauliMeasure",
     "PhaseShift",
     "PSWAP",
     "Rot",
@@ -72,8 +73,8 @@ COMPILER_OPS_FOR_DECOMPOSITION = {
     "U1",
     "U2",
     "U3",
-    "MultiRZ",
-    "GlobalPhase",
+    # "MultiRZ",
+    # "GlobalPhase",
 }
 
 
@@ -114,7 +115,7 @@ def get_compiler_ops() -> tuple[set[type[Operator]], int]:
     return compiler_op_classes, num_failures
 
 
-def get_dummy_args(func: Callable) -> list[float | int]:
+def get_abstract_args(func: Callable) -> list[type]:
     """
     Create dummy args for a callable.
 
@@ -124,10 +125,8 @@ def get_dummy_args(func: Callable) -> list[float | int]:
     Returns:
         list: dummy args matching the (positional) signature of func.
     """
-    # pylint: disable=too-many-branches
-
     func_sig = inspect.signature(func)
-    dummy_args: list = []
+    abstract_args: list = []
     for param in func_sig.parameters.values():
         type_annotation = param.annotation
         if get_origin(type_annotation) is Union or get_origin(type_annotation) is UnionType:
@@ -135,27 +134,23 @@ def get_dummy_args(func: Callable) -> list[float | int]:
         else:
             type_annotation = (type_annotation,)
 
-        if param.default is not inspect.Parameter.empty:  # use defaults whenever possible
-            continue
         if param.name == "wires" or Wires in type_annotation:  # wires are handled separately
             continue
-        if param.kind == inspect.Parameter.VAR_POSITIONAL:
-            continue
-        if param.kind == inspect.Parameter.VAR_KEYWORD:
+        if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
             continue
 
-        elif float in type_annotation or TensorLike in type_annotation:
-            dummy_args.append(0.0)
+        if float in type_annotation or TensorLike in type_annotation:
+            abstract_args.append(float)
         elif int in type_annotation:
-            dummy_args.append(0)
+            abstract_args.append(int)
         elif param.name in ["theta", "phi", "delta", "omega"]:
-            dummy_args.append(0.0)
+            abstract_args.append(float)
         else:
             raise ValueError(
                 f"Cannot resolve the {param.name} parameter of the {func} decomposition rule."
             )
 
-    return dummy_args
+    return abstract_args
 
 
 def get_func_from_circuit(module) -> str | None:
@@ -204,12 +199,13 @@ def compile_rule(
     Returns:
         str: string representation of the mlir of the decomposition rule.
     """
-    abstract_args = [
-        type(arg) for arg in get_dummy_args(rule._impl)  # pylint: disable=protected-access
-    ]
+    abstract_args = get_abstract_args(rule._impl)  # pylint: disable=protected-access
 
     if str in abstract_args:
-        raise ValueError("Cannot compile decomposition rules with string arguments.")
+        raise ValueError(
+            f"Cannot compile decomposition rule {rule.__name__} for op {op_class.__name__} with "
+            + "string arguments."
+        )
 
     qp.decomposition.enable_graph()
 
@@ -246,6 +242,12 @@ def compile_op_decomp_rules(
 
     mlir_modules = {}
 
+    if not hasattr(op_class, "num_wires") or not op_class.num_wires:
+        warnings.warn(
+            f"Cannot compile decomposition rules for op {op_class.__name__} with an unknown number "
+            + "of wires."
+        )
+
     dev = qp.device("null.qubit", wires=op_class.num_wires)
 
     for rule in op_decomp_rules:
@@ -253,7 +255,7 @@ def compile_op_decomp_rules(
             rule_name = rule._impl.__name__  # pylint: disable=protected-access
             mlir_modules[rule_name] = compile_rule(op_class, op_class.num_wires, rule, dev)
         except TypeError as e:
-            warnings.warn(f"dummy args failed to compile {rule_name}: {e}")
+            warnings.warn(f"Abstract args failed to compile {rule_name}: {e}")
         except CompileError as e:
             warnings.warn(f"failed to compile {rule_name}: {e}")
         except Exception as e:  # pylint: disable=broad-exception-caught
