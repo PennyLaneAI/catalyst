@@ -174,9 +174,8 @@ class ConstructCircuitDAG:
             return
         _SKIPPED_OPS = (*_SKIPPED_QUANTUM_OPS, *_SKIPPED_PBC_OPS, *_SKIPPED_MBQC_OPS)
         if not isinstance(op, _SKIPPED_OPS):
-            raise VisualizationError(
-                f"Visualization for operation '{op.name}' is currently not supported."
-            )
+            _ERROR_MSG = f"Visualization for operation '{op.name}' is currently not supported."
+            raise VisualizationError(_ERROR_MSG)
 
     @_visualize_operation.register
     def _gate_op(
@@ -583,9 +582,8 @@ class ConstructCircuitDAG:
         """Visit a FuncOp Operation."""
 
         if not operation.regions[0].blocks:
-            raise VisualizationError(
-                f"Empty function calls are not yet compatible with 'draw_graph'. Found external function call to {operation.sym_name.data}."
-            )
+            _ERROR_MSG = f"Empty function calls are not yet compatible with 'draw_graph'. Found external function call to {operation.sym_name.data}."
+            raise VisualizationError(_ERROR_MSG)
 
         label: str = (
             "qjit" if operation.sym_name.data.startswith("jit_") else operation.sym_name.data
