@@ -142,13 +142,7 @@ class ConstructCircuitDAG:
     @singledispatchmethod
     def _visit_operation(self, operation: Operation) -> None:
         """Visit an xDSL Operation. Default to visiting each region contained in the operation."""
-        try:
-            self._visualize_operation(operation)
-        except NotImplementedError as e:
-            _ERROR_MSG = (
-                f"'draw_graph' is unable to visualize the operation {operation.name}: {str(e)}"
-            )
-            raise VisualizationError(_ERROR_MSG) from e
+        self._visualize_operation(operation)
 
         for region in operation.regions:
             self._visit_region(region)
