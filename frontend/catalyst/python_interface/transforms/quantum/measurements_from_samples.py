@@ -38,6 +38,7 @@ from itertools import islice
 import jax
 import jax.numpy as jnp
 from pennylane.exceptions import CompileError
+from pennylane import math
 from xdsl import context, ir, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin, func, tensor
 from xdsl.pattern_rewriter import PatternRewriter, RewritePattern
@@ -161,7 +162,6 @@ class MeasurementsFromSamplesPattern(RewritePattern):
                     f"pattern, but received '{op.type.data}'"
                 )
             
-            # pl_op_equivalent = qp.Z(0)
             in_qubits = [
                 op.operands[0],
             ]
@@ -176,11 +176,12 @@ class MeasurementsFromSamplesPattern(RewritePattern):
                         f"rewrite pattern, but received '{op.type.data}'"
                     )
 
-            # pl_op_equivalent = qp.prod(*[qp.Z(i) for i, _ in enumerate(all_obs)])
             in_qubits = [obs.operands[0] for obs in all_obs]
 
         elif isinstance(op, quantum.MCMObsOp):
-            raise NotImplementedError("you haven't added MCMObsOp support yet")
+            in_qubits = [
+                op.operands[0],
+            ]
 
         else:
             raise NotImplementedError(
@@ -352,7 +353,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
     def create_sample_op(
         compbasis_op: quantum.ComputationalBasisOp,
         shots: int,
-        n_qubits: int,
+        sample_dim: int,
         rewriter: PatternRewriter,
     ) -> quantum.SampleOp:
         """Create and insert a sample op (quantum.SampleOp).
@@ -366,7 +367,8 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             compbasis_op (quantum.ComputationalBasisOp): The computational-basis op used as the
                 input operand to the sample op.
             shots (int): Number of shots (to set the shape of the sample op returned array).
-            n_qubits (int): Number of qubits (to set the shape of the sample op returned array).
+            sample_dim (int): Dimension of each sample (to set the shape of the sample op returned 
+                array). 1 for MCMs, otherwise equal to the number of qubits on the observable.
             rewriter (PatternRewriter): The xDSL pattern rewriter.
 
         Returns:
@@ -379,7 +381,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
 
         sample_op = quantum.SampleOp(
             operands=[compbasis_op.results[0], None, None],
-            result_types=[builtin.TensorType(builtin.Float64Type(), [shots, n_qubits])],
+            result_types=[builtin.TensorType(builtin.Float64Type(), [shots, sample_dim])],
         )
 
         return sample_op
@@ -471,9 +473,6 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
         self.qnode = qnode
         self.call_op = call_op
 
-    def _generate_eigenvalues_funcs():
-        pass
-
     # ToDo: clean up this mess!!
     def expval_and_var_to_samples(
         self, mp: quantum.ExpvalOp | quantum.VarianceOp, rewriter: PatternRewriter, /
@@ -481,15 +480,29 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
         """Match and rewrite for quantum.ExpvalOp and quantum.VarOp."""
 
         observable_op = self.get_observable_op(mp)
-        in_qubits = self._get_observable_qubits(observable_op)
-        
-        # insert compbasis_op and sample op
-        compbasis_op = self.create_compbasis_op(in_qubits, observable_op, rewriter)
-        rewriter.insert_op(compbasis_op, insertion_point=InsertPoint.before(observable_op))
-        sample_op = self.create_sample_op(compbasis_op, self._shots, len(in_qubits), rewriter)
-        rewriter.insert_op(sample_op, insertion_point=InsertPoint.after(compbasis_op))
+        if isinstance(observable_op, quantum.MCMObsOp):
 
-        postprocessing_func_op = self.insert_postprocessing(mp, len(in_qubits))
+            sample_dim = 1
+
+            # this is the part you need to figure out how to do correctly tomorrow
+            sample_op = quantum.SampleOp(
+                operands=[observable_op, None, None],
+                result_types=[builtin.TensorType(builtin.Float64Type(), [self._shots, sample_dim])],
+                )
+            rewriter.insert_op(sample_op, insertion_point=InsertPoint.after(observable_op))
+        
+        else:
+            in_qubits = self._get_observable_qubits(observable_op)
+        
+            # insert compbasis_op and sample op
+            compbasis_op = self.create_compbasis_op(in_qubits, observable_op, rewriter)
+            rewriter.insert_op(compbasis_op, insertion_point=InsertPoint.before(observable_op))
+
+            sample_dim = len(in_qubits)
+            sample_op = self.create_sample_op(compbasis_op, self._shots, sample_dim, rewriter)
+            rewriter.insert_op(sample_op, insertion_point=InsertPoint.after(compbasis_op))
+
+        postprocessing_func_op = self.insert_postprocessing(mp, sample_dim, observable_op)
 
         # get the tensor_op the original MP result is passed to
         # from its uses get the index this result is returned at
@@ -514,7 +527,8 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
         # delete now ununsed obs --> mp --> tensor chain
         rewriter.erase_op(tensor_op)
         rewriter.erase_op(mp)
-        rewriter.erase_op(observable_op)
+        if not isinstance(observable_op, quantum.MCMObsOp):
+            rewriter.erase_op(observable_op)
 
     def probs_to_samples(self, probs_op: quantum.ProbsOp, rewriter: PatternRewriter):
         """Match and rewrite for quantum.ProbsOp."""
@@ -534,7 +548,7 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
         sample_op = self.create_sample_op(compbasis_op, self._shots, n_qubits, rewriter)
         rewriter.insert_op(sample_op, insertion_point=InsertPoint.after(compbasis_op))
 
-        postprocessing_func_op = self.insert_postprocessing(probs_op, n_qubits)
+        postprocessing_func_op = self.insert_postprocessing(probs_op, n_qubits, None)
 
         # get the index the probs MP result is returned at
         result_index = list(probs_op.results[0].uses)[0].index
@@ -589,7 +603,7 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
         rewriter.replace_op(self.call_op, new_call_op)
         self.call_op = new_call_op
 
-    def insert_postprocessing(self, mp, n_qubits):
+    def insert_postprocessing(self, mp, n_qubits, observable_op):
         # Insert the post-processing function into current module or get handle to it if already
         # inserted
         match mp:
@@ -597,12 +611,12 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
                 postprocessing_func_name = (
                     f"expval_from_samples.tensor.{self._shots}x{n_qubits}xf64"
                 )
-                postprocessing_jit_func = _postprocessing_expval
+                postprocessing_jit_func = create_postprocessing_obs(observable_op, n_qubits, jnp.mean)
             case quantum.VarianceOp():
                 postprocessing_func_name = (
                     f"var_from_samples.tensor.{self._shots}x{n_qubits}xf64"
                 )
-                postprocessing_jit_func = _postprocessing_var
+                postprocessing_jit_func = create_postprocessing_obs(observable_op, n_qubits, jnp.var)
             case quantum.ProbsOp():
                 postprocessing_func_name = (
                     f"probs_from_samples.tensor.{self._shots}x{n_qubits}xf64"
@@ -631,11 +645,29 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
 
         return postprocessing_func_op 
 
-def get_postprocessing_expval(num_wires):
+def create_postprocessing_obs(obs, num_wires, math_op):
+    
+    if isinstance(obs, quantum.NamedObsOp):
+        eigvals = jnp.array([1, -1])
+        
+    elif isinstance(obs, quantum.TensorOp):
+        eigvals = []
+        for op in range(num_wires):
+            eigvals.append(
+                math.expand_vector(jnp.array([1, -1]), [op], range(num_wires))
+            )
+        eigvals = jnp.prod(jnp.asarray(eigvals), axis=0)
+
+    elif isinstance(obs, quantum.MCMObsOp):
+        eigvals = jnp.array([0, 1])
+    
+    else:
+        raise CompileError(f"Tried to get eigenvalues function but encountered unknown observable {obs}")
+
 
     @xdsl_module
     @jax.jit
-    def _postprocessing_expval(eigvals, samples):
+    def _postprocessing(samples):
         """Post-processing to recover the expectation value from the given `samples` array.
 
         This function assumes that the samples are in the computational basis (0s and 1s) and that the
@@ -649,34 +681,14 @@ def get_postprocessing_expval(num_wires):
         Returns:
             jax.core.ShapedArray: The expectation value for each requested column.
         """
-        
         powers_of_two = 2 ** jnp.arange(num_wires)[::-1]
         indices = samples @ powers_of_two
         eigval_samples = jnp.take(eigvals, indices.astype(int))
 
-        # return jnp.mean(1.0 - 2.0 * samples[:, column], axis=0)
+        return math_op(eigval_samples, axis=0)
 
-        return jnp.mean(eigval_samples, axis=0)
-
-    return _postprocessing_expval
-
-def get_observable_eigval_fn(mp):
-    
-    if isinstance(mp, quantum.NamedObsOp):
-        return jnp.array([1, -1])
-    
-    elif isinstance(mp, quantum.TensorOp):
-        raise NotImplementedError("TensorOp eigvals are not implemented yet")
-    
-    elif isinstance(mp, quantum.HamiltonianOp):
-        raise NotImplementedError("HamiltonianOp eigvals are not implemented yet")
-
-    elif isinstance(mp, quantum.MCMObsOp):
-        return jnp.array([0, 1]) # probably not needed, just have it take its own little path
-    
-    else:
-        raise CompileError(f"Tried to get eigenvalues function but encountered unknown observable {mp}")
-
+    return _postprocessing
+        
 # ToDo: we should probably get shots one "qnode" at a time instead of getting them from 
 # the module and then passing them to the pattern. Right now there's no implementation
 # that adds different shots to different "qnode"s, but its more "we haven't added one yet"
@@ -739,25 +751,6 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
         f"Expected owner of shots operand to be a tensor.ExtractOp or arith.ConstantOp but got "
         f"{type(shots_extract_op).__name__}"
     )
-
-@xdsl_module
-@jax.jit
-def _postprocessing_expval(samples):
-    """Post-processing to recover the expectation value from the given `samples` array for each
-    requested `column` in the array.
-
-    This function assumes that the samples are in the computational basis (0s and 1s) and that the
-    observable operand of the expectation value has eigenvalues +1 and -1.
-
-    Args:
-        samples (jax.core.ShapedArray): Array of samples, with shape (shots, wires).
-        column (int, jax.core.ShapedArray): Column index (or indices) of the `samples` array over
-            which the expectation value is computed.
-
-    Returns:
-        jax.core.ShapedArray: The expectation value for each requested column.
-    """
-    return jnp.mean(1.0 - 2.0 * samples[:, 0], axis=0)
 
 
 @xdsl_module
