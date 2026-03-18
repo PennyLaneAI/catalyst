@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
@@ -20,6 +21,36 @@
 
 using namespace mlir;
 using namespace catalyst::rtio;
+
+//===----------------------------------------------------------------------===//
+// RPC Tag Verification
+//===----------------------------------------------------------------------===//
+
+namespace {
+/// ARTIQ RPC tag format: <return_type>:<arg_types>
+/// Type codes: n=void, i=i32, I=i64, f=f64, s=string, O=object
+bool isTypeCompatibleWithTagCode(Type type, char code)
+{
+    switch (code) {
+    case 'i': {
+        auto intTy = dyn_cast<IntegerType>(type);
+        return intTy && intTy.getWidth() == 32;
+    }
+    case 'I': {
+        auto intTy = dyn_cast<IntegerType>(type);
+        return intTy && intTy.getWidth() == 64;
+    }
+    case 'f': {
+        return isa<Float64Type>(type);
+    }
+    case 's':
+    case 'O':
+        return isa<LLVM::LLVMPointerType>(type);
+    default:
+        return false;
+    }
+}
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // RTIO Operations
@@ -31,6 +62,64 @@ LogicalResult RTIOSyncOp::verify()
     if (getEvents().empty()) {
         return emitOpError("requires at least one event to synchronize");
     }
+    return success();
+}
+
+LogicalResult RTIORPCOp::verify()
+{
+    StringRef tag = getTag();
+    size_t colon = tag.find(':');
+    if (colon == StringRef::npos) {
+        return emitOpError("tag must be in format '<return>:<args>' (e.g. n:IIf)");
+    }
+
+    StringRef returnPart = tag.take_front(colon);
+    StringRef argsPart = tag.drop_front(colon + 1);
+
+    // Validate return type vs results
+    if (returnPart == "n") {
+        if (!getResults().empty()) {
+            return emitOpError("tag return type 'n' (void) requires no results");
+        }
+    }
+    else {
+        // Non-void return: must be sync and have exactly one result
+        if (getIsAsync()) {
+            return emitOpError("RPC with return value must be synchronous (remove 'async')");
+        }
+        if (getResults().size() != 1) {
+            return emitOpError("tag return type '")
+                   << returnPart << "' requires exactly one result";
+        }
+        if (returnPart.size() != 1) {
+            return emitOpError("tag return type must be single character (i, I, f, s, O)");
+        }
+        char retCode = returnPart[0];
+        if (!isTypeCompatibleWithTagCode(getResults()[0].getType(), retCode)) {
+            return emitOpError("result type ")
+                   << getResults()[0].getType() << " incompatible with tag return code '" << retCode
+                   << "' (i=i32, I=i64, f=f64, s/O=ptr)";
+        }
+    }
+
+    // Validate argument count
+    size_t numArgs = getArgs().size();
+    if (argsPart.size() != numArgs) {
+        return emitOpError("tag has ")
+               << argsPart.size() << " arg type code(s) but " << numArgs << " argument(s) provided";
+    }
+
+    // Validate each argument type
+    for (size_t i = 0; i < numArgs; ++i) {
+        Type argTy = getArgs()[i].getType();
+        char code = argsPart[i];
+        if (!isTypeCompatibleWithTagCode(argTy, code)) {
+            return emitOpError("argument ")
+                   << i << " has type " << argTy << " which is incompatible with tag code '" << code
+                   << "' (i=i32, I=i64, f=f64, s/O=ptr)";
+        }
+    }
+
     return success();
 }
 

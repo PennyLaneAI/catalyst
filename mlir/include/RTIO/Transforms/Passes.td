@@ -21,10 +21,11 @@ def RTIOEventToARTIQPass : Pass<"convert-rtio-event-to-artiq", "mlir::ModuleOp">
     let summary = "Convert RTIO event-based operations directly to ARTIQ-compatible LLVM IR";
     let description = [{
         Mapping:
-        - rtio.pulse -> at_mu(operand) DDS config + TTL on + delay + TTL off + now_mu()
-        - rtio.sync -> maximum the timestamp of the input events + at_mu() + now_mu()
+        - rtio.pulse   -> at_mu(operand) DDS config + TTL on + delay + TTL off + now_mu()
+        - rtio.sync    -> maximum the timestamp of the input events + at_mu() + now_mu()
         - rtio.channel -> channel ID
-        - rtio.empty -> just return now_mu()
+        - rtio.empty   -> just return now_mu()
+        - rtio.rpc     -> rpc_send(id, tag, args) [+ rpc_recv() if synchronous]
 
         And this pass generates LLVM IR that directly calls ARTIQ runtime functions
     }];
