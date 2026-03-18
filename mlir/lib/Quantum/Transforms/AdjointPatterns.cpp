@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <mlir/IR/Block.h>
+#include <mlir/IR/Value.h>
 #define DEBUG_TYPE "adjoint"
 
 #include <algorithm>
@@ -401,10 +403,17 @@ class AdjointGenerator {
         }
         for (size_t i = 0; i < args.size(); i++) {
             if (!isa<QuregType, QubitType>(args[i].getType())) {
-                continue;
+                if (!isa<BlockArgument>(args[i]) &&
+                    args[i].getDefiningOp()->getParentRegion() == callOp->getParentRegion()) {
+                    // Encountered a classical call operand from within the adjoint region
+                    // Must use the clone outside
+                    args[i] = remappedValues.lookup(args[i]);
+                }
             }
-            args[i] = reversedResults.front();
-            reversedResults.pop();
+            else {
+                args[i] = reversedResults.front();
+                reversedResults.pop();
+            }
         }
 
         // Call the adjoint func op
