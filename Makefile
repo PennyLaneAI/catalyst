@@ -140,7 +140,7 @@ enzyme:
 dialects:
 	$(MAKE) -C mlir dialects
 
-builtin-decomp-rules: mlir runtime frontend
+builtin-decomp-rules: dialects runtime frontend
 	$(PYTHON) -m frontend.catalyst.utils.precompile_decomposition_rules
 
 
