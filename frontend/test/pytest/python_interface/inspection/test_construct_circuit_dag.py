@@ -186,7 +186,7 @@ def assert_dag_structure(nodes, edges, expected_edges):
 class TestFuncOpVisualization:
     """Tests the visualization of FuncOps with bounding boxes"""
 
-    def test_external_empty_function(self):
+    def test_external_empty_function_visualization_error(self):
         """Regression test for #2541 issue."""
 
         external_func = func.FuncOp.external("test_func", [], [])
