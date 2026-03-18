@@ -373,7 +373,18 @@ class QecCycleOp(IRDLOperation):
 
 @irdl_op_definition
 class HadamardOp(IRDLOperation):
-    """A logical Hadamard gate operation."""
+    """A logical Hadamard gate operation.
+
+    This operation represents a logical Hadamard gate operation applied to the logical qubit at
+    the provided index in the logical codeblock. For example,
+
+    ```mlir
+    %1 = qecl.hadamard %0[ 1] : !qecl.codeblock<3>
+    ```
+
+    represents a logical Hadamard operation applied to the logical qubit at index `1` in the
+    codeblock `%0`, which encodes k = 3 logical qubits.
+    """
 
     T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
 
@@ -417,7 +428,24 @@ class HadamardOp(IRDLOperation):
 
 @irdl_op_definition
 class SOp(IRDLOperation):
-    """A logical S (π/2 phase) gate operation."""
+    """A logical S (π/2 phase) gate operation.
+
+    This operation represents a logical S (π/2 phase) gate operation applied to the logical
+    qubit at the provided index in the logical codeblock. For example,
+
+    ```mlir
+    %1 = qecl.s %0[ 1] : !qecl.codeblock<3>
+    ```
+
+    represents a logical S operation applied to the logical qubit at index `1` in the codeblock
+    `%0`, which encodes k = 3 logical qubits.
+
+    The equivalent adjoint operation, S†, is represented by included the `adj` unit attribute:
+
+    ```mlir
+    %1 = qecl.s %0[ 1] adj : !qecl.codeblock<3>
+    ```
+    """
 
     T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
 
@@ -467,7 +495,24 @@ class SOp(IRDLOperation):
 
 @irdl_op_definition
 class CnotOp(IRDLOperation):
-    """A logical inter-codeblock CNOT gate operation."""
+    """A logical inter-codeblock CNOT gate operation.
+
+    This operation represents a logical inter-codeblock CNOT gate operation applied to the
+    logical qubits at the provided indices in the respective control and target logical
+    codeblocks. For example,
+
+    ```mlir
+    %2, %3 = qecl.cnot %0[ 1], %1[ 2] : !qecl.codeblock<3>, !qecl.codeblock<3>
+    ```
+
+    represents a logical CNOT operation applied to the logical qubit at index `1` in the
+    codeblock `%0` (the control qubit) and the logical qubit at index `2` in the codeblock `%1`
+    (the target qubit), where both codeblocks encode k = 3 logical qubits.
+
+    Note that this operation cannot represent an intra-codeblock CNOT operation—that is, a CNOT
+    operation where the control and target qubits are encoded in the same logical codeblock (for
+    k >= 2).
+    """
 
     T_CTRL: ClassVar = VarConstraint("T_CTRL", anyLogicalCodeblock)
     T_TRGT: ClassVar = VarConstraint("T_TRGT", anyLogicalCodeblock)

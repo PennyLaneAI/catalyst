@@ -143,6 +143,18 @@ def QecCycleOp : QecLogical_Op<"qec", [AllTypesMatch<["in_codeblock", "out_codeb
 def HadamardOp : QecLogical_Op<"hadamard", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
     let summary = "A logical Hadamard gate operation.";
 
+    let description = [{
+        This operation represents a logical Hadamard gate operation applied to the logical qubit at
+        the provided index in the logical codeblock. For example,
+
+        ```mlir
+        %1 = qecl.hadamard %0[ 1] : !qecl.codeblock<3>
+        ```
+
+        represents a logical Hadamard operation applied to the logical qubit at index `1` in the
+        codeblock `%0`, which encodes k = 3 logical qubits.
+    }];
+
     let arguments = (ins
         LogicalCodeblockType:$in_codeblock,
         Optional<Index>:$idx,
@@ -162,6 +174,24 @@ def HadamardOp : QecLogical_Op<"hadamard", [AllTypesMatch<["in_codeblock", "out_
 
 def SOp : QecLogical_Op<"s", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
     let summary = "A logical S (π/2 phase) gate operation.";
+
+    let description = [{
+        This operation represents a logical S (π/2 phase) gate operation applied to the logical
+        qubit at the provided index in the logical codeblock. For example,
+
+        ```mlir
+        %1 = qecl.s %0[ 1] : !qecl.codeblock<3>
+        ```
+
+        represents a logical S operation applied to the logical qubit at index `1` in the codeblock
+        `%0`, which encodes k = 3 logical qubits.
+
+        The equivalent adjoint operation, S†, is represented by included the `adj` unit attribute:
+
+        ```mlir
+        %1 = qecl.s %0[ 1] adj : !qecl.codeblock<3>
+        ```
+    }];
 
     let arguments = (ins
         LogicalCodeblockType:$in_codeblock,
@@ -186,6 +216,24 @@ def CnotOp : QecLogical_Op<"cnot", [
     AllTypesMatch<["in_ctrl_codeblock", "out_ctrl_codeblock", "in_trgt_codeblock", "out_trgt_codeblock"]>
 ]> {
     let summary = "A logical inter-codeblock CNOT gate operation.";
+
+    let description = [{
+        This operation represents a logical inter-codeblock CNOT gate operation applied to the
+        logical qubits at the provided indices in the respective control and target logical
+        codeblocks. For example,
+
+        ```mlir
+        %2, %3 = qecl.cnot %0[ 1], %1[ 2] : !qecl.codeblock<3>, !qecl.codeblock<3>
+        ```
+
+        represents a logical CNOT operation applied to the logical qubit at index `1` in the
+        codeblock `%0` (the control qubit) and the logical qubit at index `2` in the codeblock `%1`
+        (the target qubit), where both codeblocks encode k = 3 logical qubits.
+
+        Note that this operation cannot represent an intra-codeblock CNOT operation—that is, a CNOT
+        operation where the control and target qubits are encoded in the same logical codeblock (for
+        k >= 2).
+    }];
 
     let arguments = (ins
         LogicalCodeblockType:$in_ctrl_codeblock,
