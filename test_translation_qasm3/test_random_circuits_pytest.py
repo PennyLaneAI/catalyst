@@ -74,7 +74,7 @@ def decompose_to_standard_gates(circuit):
     # NOTE: 'barrier', 'measure', and 'id' are not included in basis_gates as they are
     # special operations handled separately by Qiskit's transpiler
     basis_gates = [
-        'h', 'x', 'y', 'z', 's', 'sdg', 't', 'tdg', 'sx', 'sxdg',
+        'h', 'x', 'y', 'z', 's', 't', 'sx',
         'rx', 'ry', 'rz', 'p', 'u', 'u1', 'u2', 'u3',
         'cx', 'cy', 'cz', 'ch', 'cp', 'crx', 'cry', 'crz',
         'swap'
