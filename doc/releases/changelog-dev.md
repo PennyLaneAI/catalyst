@@ -236,6 +236,13 @@
 
 <h3>Improvements 🛠</h3>
 
+* `qml.value_and_grad` can now be used with program capture `qml.qjit(capture=True)`.
+  [(#2587)](https://github.com/PennyLaneAI/catalyst/pull/2587)
+
+* Catalyst with program capture now supports device preprocessing. Currently, preprocessing transforms
+  that do not have native MLIR or xDSL implementations will be replaced with empty transforms.
+  [(#2557)](https://github.com/PennyLaneAI/catalyst/pull/2557)
+
 * `mlir_specs` now supports MLIR passes which create multiple qnode entry points, such as `split-non-commuting` pass.
   When such passes are present, `mlir_specs` will return a list of resources with 1 per entrypoint.
   [(#2534)](https://github.com/PennyLaneAI/catalyst/pull/2534)
