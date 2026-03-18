@@ -61,6 +61,7 @@ class TestConvertToMBQCFormalismPass:
                 %4 = quantum.custom "Identity"() %3 : !quantum.bit
                 // CHECK-NEXT: quantum.gphase
                 quantum.gphase %arg0
+                quantum.dealloc_qb %4 : !quantum.bit
                 return
             }
         """
