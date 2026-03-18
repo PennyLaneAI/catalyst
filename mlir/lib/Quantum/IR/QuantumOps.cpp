@@ -310,11 +310,16 @@ LogicalResult QubitUnitaryOp::verify()
 
 static LogicalResult verifyInQNodeFunction(Operation *op)
 {
-    auto parentModule = op->getParentOfType<ModuleOp>();
-    auto rootModule = parentModule->getParentOfType<ModuleOp>();
-    bool inQuantumKernel = parentModule && rootModule;
-    if (!inQuantumKernel) {
-        return success(); // strict verification only for quantum kernels
+    // strict verification only for quantum kernels
+    // detection is a bit tricky until we have a dedicated operation, use heuristics for now
+    auto kernelModule = op->getParentOfType<ModuleOp>();
+    if (!kernelModule) {
+        return success();
+    }
+
+    auto modIt = kernelModule.getOps<ModuleOp>();
+    if (modIt.empty() || !(*modIt.begin())->hasAttr("transform.with_named_sequence")) {
+        return success();
     }
 
     auto parentFunc = op->getParentOfType<func::FuncOp>();
