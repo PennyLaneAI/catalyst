@@ -341,6 +341,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Quantum adjoint can now be used on subroutines with classical arguments.
+  [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
+
 * Fixed a bug where input array arguments could be mutated during execution when copied inputs
   were updated in-place. Entry-point arguments are now treated as non-writable during bufferization,
   preserving the expected immutability of user inputs.

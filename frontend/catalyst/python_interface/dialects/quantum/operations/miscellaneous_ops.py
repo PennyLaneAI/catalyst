@@ -28,7 +28,6 @@ from xdsl.irdl import (
     ParsePropInAttrDict,
     irdl_op_definition,
     lazy_traits_def,
-    operand_def,
     opt_operand_def,
     opt_prop_def,
     prop_def,
