@@ -31,7 +31,9 @@ from catalyst.utils.runtime_environment import DEFAULT_BIN_PATHS
 
 BYTECODE_FILE_PATH = Path(__file__).parent.parent / Path("resources/decomposition_rules.mlirbc")
 
-# TODO uncomment dynamic size wires ops once they are supported
+# TODO: Uncomment dynamic size wires ops once they are supported
+# FIXME: Use the Gate class instead of this list of compiler ops 
+#              https://github.com/PennyLaneAI/pennylane/pull/8767 
 COMPILER_OPS_FOR_DECOMPOSITION = {
     "CNOT",
     "ControlledPhaseShift",
