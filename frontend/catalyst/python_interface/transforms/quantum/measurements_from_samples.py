@@ -402,7 +402,7 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
         self, func_op: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter, /
     ):
         """Transform a quantum function (qnode) to ..."""
-        if "qnode" not in func_op.attributes:
+        if "quantum.node" not in func_op.attributes:
             return
         
         self.original_qnode = func_op
@@ -486,7 +486,7 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
 
             # this is the part you need to figure out how to do correctly tomorrow
             sample_op = quantum.SampleOp(
-                operands=[observable_op, None, None],
+                operands=[observable_op.results[0], None, None],
                 result_types=[builtin.TensorType(builtin.Float64Type(), [self._shots, sample_dim])],
                 )
             rewriter.insert_op(sample_op, insertion_point=InsertPoint.after(observable_op))

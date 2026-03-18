@@ -61,7 +61,7 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) attributes {qnode}  {
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
@@ -74,8 +74,8 @@ class TestMeasurementsFromSamplesPass:
 
                 // CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q0]] : !quantum.obs
                 // CHECK: [[samples:%.+]] = quantum.sample [[obs]] : tensor<1x1xf64>
-                // CHECK: [[c0:%.+]] = arith.constant dense<0> : tensor<i64>
-                // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.1x1xf64([[samples]], [[c0]]) :
+
+                // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.1x1xf64([[samples]]) :
                 // CHECK-SAME: (tensor<1x1xf64>, tensor<i64>) -> tensor<f64>
                 // CHECK-NOT: quantum.expval
                 %4 = quantum.expval %3 : f64
@@ -96,7 +96,7 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) attributes {qnode}  {
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
                 %0 = arith.constant 1 : i64
                 quantum.device shots(%0) ["", "", ""]
 
@@ -108,8 +108,7 @@ class TestMeasurementsFromSamplesPass:
 
                 // CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q0]] : !quantum.obs
                 // CHECK: [[samples:%.+]] = quantum.sample [[obs]] : tensor<1x1xf64>
-                // CHECK: [[c0:%.+]] = arith.constant dense<0> : tensor<i64>
-                // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.1x1xf64([[samples]], [[c0]]) :
+                // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.1x1xf64([[samples]]) :
                 // CHECK-SAME: (tensor<1x1xf64>, tensor<i64>) -> tensor<f64>
                 // CHECK-NOT: quantum.expval
                 %3 = quantum.expval %2 : f64
@@ -132,7 +131,7 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) attributes {qnode}  {
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
@@ -145,8 +144,7 @@ class TestMeasurementsFromSamplesPass:
 
                 // CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q0]] : !quantum.obs
                 // CHECK: [[samples:%.+]] = quantum.sample [[obs]] : tensor<1x1xf64>
-                // CHECK: [[c0:%.+]] = arith.constant dense<0> : tensor<i64>
-                // CHECK: [[res:%.+]] = func.call @var_from_samples.tensor.1x1xf64([[samples]], [[c0]]) :
+                // CHECK: [[res:%.+]] = func.call @var_from_samples.tensor.1x1xf64([[samples]]) :
                 // CHECK-SAME: (tensor<1x1xf64>, tensor<i64>) -> tensor<f64>
                 // CHECK-NOT: quantum.var
                 %4 = quantum.var %3 : f64
@@ -169,7 +167,7 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) attributes {qnode}  {
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
@@ -205,7 +203,7 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) attributes {qnode}  {
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
@@ -236,7 +234,7 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) attributes {qnode}  {
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
@@ -274,7 +272,7 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) attributes {qnode}  {
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
@@ -291,13 +289,11 @@ class TestMeasurementsFromSamplesPass:
 
                 // CHECK: [[obs0:%.+]] = quantum.compbasis qubits [[q0]] : !quantum.obs
                 // CHECK: [[samples0:%.+]] = quantum.sample [[obs0]] : tensor<1x1xf64>
-                // CHECK: [[c0:%.+]] = arith.constant dense<0> : tensor<i64>
                 // CHECK: [[obs1:%.+]] = quantum.compbasis qubits [[q1]] : !quantum.obs
                 // CHECK: [[samples1:%.+]] = quantum.sample [[obs1]] : tensor<1x1xf64>
-                // CHECK: [[c1:%.+]] = arith.constant dense<0> : tensor<i64>
-                // CHECK: [[res0:%.+]] = func.call @expval_from_samples.tensor.1x1xf64([[samples0]], [[c0]]) :
+                // CHECK: [[res0:%.+]] = func.call @expval_from_samples.tensor.1x1xf64([[samples0]]) :
                 // CHECK-SAME: (tensor<1x1xf64>, tensor<i64>) -> tensor<f64>
-                // CHECK: [[res1:%.+]] = func.call @expval_from_samples.tensor.1x1xf64([[samples1]], [[c1]]) :
+                // CHECK: [[res1:%.+]] = func.call @expval_from_samples.tensor.1x1xf64([[samples1]]) :
                 // CHECK-SAME: (tensor<1x1xf64>, tensor<i64>) -> tensor<f64>
                 // CHECK-NOT: quantum.expval
                 %6 = quantum.expval %4 : f64
@@ -322,7 +318,7 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) attributes {qnode}  {
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
@@ -339,13 +335,11 @@ class TestMeasurementsFromSamplesPass:
 
                 // CHECK: [[obs0:%.+]] = quantum.compbasis qubits [[q0]] : !quantum.obs
                 // CHECK: [[samples0:%.+]] = quantum.sample [[obs0]] : tensor<1x1xf64>
-                // CHECK: [[c0:%.+]] = arith.constant dense<0> : tensor<i64>
                 // CHECK: [[obs1:%.+]] = quantum.compbasis qubits [[q1]] : !quantum.obs
                 // CHECK: [[samples1:%.+]] = quantum.sample [[obs1]] : tensor<1x1xf64>
-                // CHECK: [[c1:%.+]] = arith.constant dense<0> : tensor<i64>
-                // CHECK: [[res0:%.+]] = func.call @var_from_samples.tensor.1x1xf64([[samples0]], [[c0]]) :
+                // CHECK: [[res0:%.+]] = func.call @var_from_samples.tensor.1x1xf64([[samples0]]) :
                 // CHECK-SAME: (tensor<1x1xf64>, tensor<i64>) -> tensor<f64>
-                // CHECK: [[res1:%.+]] = func.call @var_from_samples.tensor.1x1xf64([[samples1]], [[c1]]) :
+                // CHECK: [[res1:%.+]] = func.call @var_from_samples.tensor.1x1xf64([[samples1]]) :
                 // CHECK-SAME: (tensor<1x1xf64>, tensor<i64>) -> tensor<f64>
                 // CHECK-NOT: quantum.var
                 %6 = quantum.var %4 : f64
@@ -370,7 +364,7 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) attributes {qnode}  {
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
@@ -404,7 +398,7 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) attributes {qnode}  {
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
@@ -514,7 +508,7 @@ class TestIntegrationUsefulErrors:
 
         dev = qml.device("lightning.qubit", wires=2)
 
-        with pytest.raises(RuntimeError, match="the circuit contains multiple observables with the same wire"):
+        with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
             @qml.qjit
             @measurements_from_samples_pass
             @qml.qnode(dev, shots=1000)
@@ -533,7 +527,7 @@ class TestIntegrationUsefulErrors:
 
         dev = qml.device("lightning.qubit", wires=2)
 
-        with pytest.raises(RuntimeError, match="the circuit contains multiple observables with the same wire"):
+        with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
             @qml.qjit
             @measurements_from_samples_pass
             @qml.qnode(dev, shots=1000)
@@ -553,7 +547,7 @@ class TestIntegrationUsefulErrors:
 
         dev = qml.device("lightning.qubit", wires=2)
 
-        with pytest.raises(RuntimeError, match="the circuit contains multiple observables with the same wire"):
+        with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
             @qml.qjit
             @measurements_from_samples_pass
             @qml.qnode(dev, shots=1000)
@@ -572,7 +566,7 @@ class TestIntegrationUsefulErrors:
                 
         dev = qml.device("lightning.qubit", wires=2)
 
-        with pytest.raises(RuntimeError, match="the circuit contains multiple observables with the same wire"):
+        with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
             @qml.qjit
             @measurements_from_samples_pass
             @qml.qnode(dev, shots=1000)
@@ -1166,7 +1160,7 @@ class TestIntegrationWithExecution:
                 qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
                 qml.var(qml.PauliX(wires=1)),
                 qml.sample(wires=[2]),
-                # qml.sample(qml.PauliX(wires=0) @ qml.PauliX(wires=1) @ qml.PauliX(wires=2)),
+                # qml.sample(qml.Pagit uliX(wires=0) @ qml.PauliX(wires=1) @ qml.PauliX(wires=2)),
                 qml.probs(wires=[3]),
             )
 
@@ -1179,7 +1173,7 @@ class TestIntegrationWithExecution:
 
         theta = 1.9
 
-        expval_res, var_res, sample_res, probs_res = qjit(transformed_circuit, seed=37)(theta)
+        expval_res, var_res, sample_res, probs_res = transformed_circuit(theta)
 
         expval_expected = np.sin(theta) * np.sin(theta / 2)
         var_expected = 1 - np.sin(2 * theta) ** 2
