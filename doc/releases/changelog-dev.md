@@ -232,6 +232,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* The `quantum.adjoint` and `qref.adjoint` operations can now take in multiple quantum values, allowing
+  both qubits and registers, as opposed to constraining the operand to be a single quantum register.
+  [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
+
 * Catalyst with program capture now supports device preprocessing. Currently, preprocessing transforms
   that do not have native MLIR or xDSL implementations will be replaced with empty transforms.
   [(#2557)](https://github.com/PennyLaneAI/catalyst/pull/2557)
