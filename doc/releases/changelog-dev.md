@@ -178,6 +178,13 @@
   circuit()
   ```
 
+* The `diagonalize-final-measurements` xDSL pass now includes an observable-commutativity check and
+  raises an error if non-commuting terms are encountered. The check is applied to each `qnode` in
+  the IR (that is, a `func.func` op with a `quantum.node` attribute). If the measurement contains
+  only Pauli or Hadamard observables, the *qubit-wise commutativity* (QWC) check is applied.
+  Otherwise, the more strict *non-overlapping observable* check is applied.
+  [(#2538)](https://github.com/PennyLaneAI/catalyst/pull/2538)
+
 * Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
   effectively filtering for decomposition rules in the MLIR-native decomposition framework.
   [(#2539)](https://github.com/PennyLaneAI/catalyst/pull/2539)
@@ -224,6 +231,10 @@
 
 
 <h3>Improvements 🛠</h3>
+
+* Catalyst with program capture now supports device preprocessing. Currently, preprocessing transforms
+  that do not have native MLIR or xDSL implementations will be replaced with empty transforms.
+  [(#2557)](https://github.com/PennyLaneAI/catalyst/pull/2557)
 
 * `mlir_specs` now supports MLIR passes which create multiple qnode entry points, such as `split-non-commuting` pass.
   When such passes are present, `mlir_specs` will return a list of resources with 1 per entrypoint.
