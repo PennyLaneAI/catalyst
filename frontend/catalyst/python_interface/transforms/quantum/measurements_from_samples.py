@@ -484,7 +484,7 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
 
             sample_dim = 1
 
-            # this is the part you need to figure out how to do correctly tomorrow
+            # ToDo: get this working
             sample_op = quantum.SampleOp(
                 operands=[observable_op.results[0], None, None],
                 result_types=[builtin.TensorType(builtin.Float64Type(), [self._shots, sample_dim])],
@@ -528,7 +528,7 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
         rewriter.erase_op(tensor_op)
         rewriter.erase_op(mp)
         if not isinstance(observable_op, quantum.MCMObsOp):
-            rewriter.erase_op(observable_op)
+            self.erase_observable(observable_op, rewriter)
 
     def probs_to_samples(self, probs_op: quantum.ProbsOp, rewriter: PatternRewriter):
         """Match and rewrite for quantum.ProbsOp."""
@@ -603,6 +603,22 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
         rewriter.replace_op(self.call_op, new_call_op)
         self.call_op = new_call_op
 
+    @staticmethod
+    def erase_observable(obs, rewriter):
+
+        if isinstance(obs, quantum.NamedObsOp):
+            rewriter.erase_op(obs)
+
+        elif isinstance(obs, quantum.TensorOp):
+            inner_obs = [op.owner for op in obs.operands]
+            rewriter.erase_op(obs)
+            for o in inner_obs:
+                rewriter.erase_op(o)
+
+        else:
+            raise TypeError(f"Expected a quantum.NamedObsOp or quantum.TensorOp, but received {obs}")
+
+
     def insert_postprocessing(self, mp, n_qubits, observable_op):
         # Insert the post-processing function into current module or get handle to it if already
         # inserted
@@ -646,6 +662,9 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
         return postprocessing_func_op 
 
 def create_postprocessing_obs(obs, num_wires, math_op):
+
+    if isinstance(obs, quantum.MCMObsOp):
+        raise NotImplementedError("The measurements-from-samples pass doesn't support expectation values of MCMs")
     
     if isinstance(obs, quantum.NamedObsOp):
         eigvals = jnp.array([1, -1])
@@ -657,9 +676,6 @@ def create_postprocessing_obs(obs, num_wires, math_op):
                 math.expand_vector(jnp.array([1, -1]), [op], range(num_wires))
             )
         eigvals = jnp.prod(jnp.asarray(eigvals), axis=0)
-
-    elif isinstance(obs, quantum.MCMObsOp):
-        eigvals = jnp.array([0, 1])
     
     else:
         raise CompileError(f"Tried to get eigenvalues function but encountered unknown observable {obs}")
