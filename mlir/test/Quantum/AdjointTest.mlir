@@ -281,10 +281,11 @@ func.func private @circuit(%arg0: f64, %arg1: !quantum.bit, %arg2: !quantum.bit)
 // CHECK:   return [[X]], [[RX]] : !quantum.bit, !quantum.bit
 
 // CHECK:   func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> {
+// CHECK:   [[cst:%.+]] = arith.constant 4.000000e-01 : f64
 // CHECK:   [[q0:%.+]] = quantum.extract {{%.+}}[ 0] : !quantum.reg -> !quantum.bit
 // CHECK:   [[q1:%.+]] = quantum.extract {{%.+}}[ 1] : !quantum.reg -> !quantum.bit
 // CHECK:   [[RY:%.+]] = quantum.custom "RY"({{%.+}}) [[q1]] adj : !quantum.bit
-// CHECK:   [[call:%.+]]:2 = call @circuit.adjoint(%arg0, [[q0]], [[RY]]) : (f64, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+// CHECK:   [[call:%.+]]:2 = call @circuit.adjoint([[cst]], [[q0]], [[RY]]) : (f64, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
 // CHECK:   [[Z:%.+]] = quantum.custom "PauliZ"() [[call]]#1 adj : !quantum.bit
 // CHECK:   [[RX:%.+]] = quantum.custom "RX"({{%.+}}) [[call]]#0 adj : !quantum.bit
 // CHECK:   [[X:%.+]] = quantum.custom "PauliX"() [[RX]] adj : !quantum.bit
@@ -303,7 +304,8 @@ func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> attrib
       %4 = quantum.custom "PauliX"() %arg1 : !quantum.bit
       %5 = quantum.custom "RX"(%arg0) %4 : !quantum.bit
       %6 = quantum.custom "PauliZ"() %arg2 : !quantum.bit
-      %7:2 = func.call @circuit(%arg0, %5, %6): (f64, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+      %cst = arith.constant 4.000000e-01 : f64
+      %7:2 = func.call @circuit(%cst, %5, %6): (f64, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
       %8 = quantum.custom "RY"(%arg0) %7#1 : !quantum.bit
       quantum.yield %7#0, %8 : !quantum.bit, !quantum.bit
   }
