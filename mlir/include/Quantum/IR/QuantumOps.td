@@ -742,7 +742,7 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect
 class Region_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [NoMemoryEffect]>;
 
-def AdjointOp : Region_Op<"adjoint", [SingleBlockImplicitTerminator<"YieldOp">]> {
+def AdjointOp : Region_Op<"adjoint", [SingleBlockImplicitTerminator<"YieldOp">, AllTypesMatch<["args", "results"]>]> {
     let summary = "Calculate the adjoint of the enclosed operations";
 
     let regions = (region SizedRegion<1>:$region);
@@ -756,7 +756,7 @@ def AdjointOp : Region_Op<"adjoint", [SingleBlockImplicitTerminator<"YieldOp">]>
     );
 
     let assemblyFormat = [{
-        `(` $args `)` attr-dict `:` type(operands) `->` type(results) $region
+        `(` $args `)` attr-dict `:` type($results) $region
     }];
 
     let hasVerifier = 1;

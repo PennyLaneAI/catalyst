@@ -25,7 +25,7 @@ func.func private @workflow_plain() -> tensor<4xcomplex<f64>> attributes {} {
   // CHECK:        RX
   %2 = quantum.custom "RX"(%cst) %1 : !quantum.bit
   %3 = quantum.insert %0[%c0_i64], %2 : !quantum.reg, !quantum.bit
-  %4 = quantum.adjoint(%3) : !quantum.reg -> !quantum.reg {
+  %4 = quantum.adjoint(%3) : !quantum.reg {
   // CHECK:        PauliZ
   // CHECK-SAME:          adj
   // CHECK:        PauliY
@@ -69,19 +69,19 @@ func.func private @workflow_nested() -> tensor<4xcomplex<f64>> attributes {} {
   %c0_i64 = arith.constant 0 : i64
   quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
   %0 = quantum.alloc( 2) : !quantum.reg
-  %1 = quantum.adjoint(%0) : !quantum.reg -> !quantum.reg {
+  %1 = quantum.adjoint(%0) : !quantum.reg {
   ^bb0(%arg0: !quantum.reg):
     %6 = quantum.extract %arg0[%c1_i64] : !quantum.reg -> !quantum.bit
     %7 = quantum.custom "OpA"() %6 : !quantum.bit
     %8 = quantum.custom "OpB"() %7 : !quantum.bit
     %9 = quantum.insert %arg0[%c1_i64], %8 : !quantum.reg, !quantum.bit
-    %10 = quantum.adjoint(%9) : !quantum.reg -> !quantum.reg {
+    %10 = quantum.adjoint(%9) : !quantum.reg {
     ^bb0(%arg1: !quantum.reg):
       %11 = quantum.extract %arg1[%c1_i64] : !quantum.reg -> !quantum.bit
       %12 = quantum.custom "OpC"() %11 : !quantum.bit
       %13 = quantum.custom "OpD"() %12 : !quantum.bit
       %14 = quantum.insert %arg1[%c1_i64], %13 : !quantum.reg, !quantum.bit
-      %15 = quantum.adjoint(%14) : !quantum.reg -> !quantum.reg {
+      %15 = quantum.adjoint(%14) : !quantum.reg {
       ^bb0(%arg2: !quantum.reg):
         %16 = quantum.extract %arg2[%c1_i64] : !quantum.reg -> !quantum.bit
         %17 = quantum.custom "OpE"() %16 : !quantum.bit
@@ -116,7 +116,7 @@ func.func private @workflow_many_args() -> tensor<4xcomplex<f64>> attributes {} 
   %1 = quantum.extract %0[%c0_i64] : !quantum.reg -> !quantum.bit
   %2 = quantum.custom "RX"(%cst) %1 : !quantum.bit
   %3 = quantum.extract %0[%c1_i64] : !quantum.reg -> !quantum.bit
-  %4:2 = quantum.adjoint(%2, %3) : !quantum.bit, !quantum.bit -> !quantum.bit, !quantum.bit {
+  %4:2 = quantum.adjoint(%2, %3) : !quantum.bit, !quantum.bit {
   // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[RX]], [[q1]] adj : !quantum.bit, !quantum.bit
   // CHECK: [[PauliY:%.+]] = quantum.custom "PauliY"() [[CNOT]]#1 adj : !quantum.bit
   // CHECK: [[PauliX:%.+]] = quantum.custom "PauliX"() [[CNOT]]#0 adj : !quantum.bit
@@ -144,7 +144,7 @@ func.func private @workflow_many_args() -> tensor<4xcomplex<f64>> attributes {} 
 
 func.func @workflow_unhandled() {
   %0 = quantum.alloc(1) : !quantum.reg
-  %1 = quantum.adjoint (%0) : !quantum.reg -> !quantum.reg {
+  %1 = quantum.adjoint (%0) : !quantum.reg {
   ^bb0(%arg0: !quantum.reg):
     %qb = quantum.extract %arg0[0] : !quantum.reg -> !quantum.bit
     // expected-error@+1 {{Unhandled operation in adjoint region}}
@@ -161,7 +161,7 @@ func.func @workflow_unhandled() {
 func.func private @qubit_unitary_test(%arg0: tensor<4x4xcomplex<f64>>) -> tensor<4xcomplex<f64>> {
     quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
     %0 = quantum.alloc( 2) : !quantum.reg
-    %1 = quantum.adjoint(%0) : !quantum.reg -> !quantum.reg {
+    %1 = quantum.adjoint(%0) : !quantum.reg {
     ^bb0(%arg1: !quantum.reg):
       %6 = quantum.extract %arg1[ 0] : !quantum.reg -> !quantum.bit
       %7 = quantum.extract %arg1[ 1] : !quantum.reg -> !quantum.bit
@@ -243,7 +243,7 @@ func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> attrib
   %1 = quantum.extract %0[%c0_i64] : !quantum.reg -> !quantum.bit
   %2 = quantum.custom "RX"(%cst) %1 : !quantum.bit
   %3 = quantum.insert %0[%c0_i64], %2 : !quantum.reg, !quantum.bit
-  %4 = quantum.adjoint(%3) : !quantum.reg -> !quantum.reg {
+  %4 = quantum.adjoint(%3) : !quantum.reg {
     ^bb0(%arg1: !quantum.reg):
       %5 = quantum.extract %arg1[%c0_i64] : !quantum.reg -> !quantum.bit
       %6 = quantum.custom "PauliX"() %5 : !quantum.bit
@@ -299,7 +299,7 @@ func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> attrib
   %0 = quantum.alloc( 2) : !quantum.reg
   %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
   %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-  %3:2 = quantum.adjoint(%1, %2) : !quantum.bit, !quantum.bit -> !quantum.bit, !quantum.bit {
+  %3:2 = quantum.adjoint(%1, %2) : !quantum.bit, !quantum.bit {
     ^bb0(%arg1: !quantum.bit, %arg2: !quantum.bit):
       %4 = quantum.custom "PauliX"() %arg1 : !quantum.bit
       %5 = quantum.custom "RX"(%arg0) %4 : !quantum.bit
@@ -333,7 +333,7 @@ func.func private @param_ordering(%0: !quantum.reg) -> !quantum.reg {
   // CHECK:     catalyst.list_push [[C3]]
 
   // CHECK-NOT: quantum.adjoint
-  %1 = quantum.adjoint(%0) : !quantum.reg -> !quantum.reg {
+  %1 = quantum.adjoint(%0) : !quantum.reg {
   ^bb0(%r0: !quantum.reg):
     %q0 = quantum.extract %r0[ 0] : !quantum.reg -> !quantum.bit
 
