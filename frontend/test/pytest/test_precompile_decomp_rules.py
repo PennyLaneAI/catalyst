@@ -88,7 +88,10 @@ def test_bytecode_file():
     assert BYTECODE_FILE_PATH.exists()
 
     rules = subprocess.run(
-        (f"{DEFAULT_BIN_PATHS['cli']}/quantum-opt", BYTECODE_FILE_PATH),
+        (
+            f"{DEFAULT_BIN_PATHS['cli']}/quantum-opt",
+            BYTECODE_FILE_PATH,
+        ),
         capture_output=True,
         check=True,
         text=True,
