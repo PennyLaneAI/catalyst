@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <queue>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -391,32 +392,33 @@ class AdjointGenerator {
 
         // Get the reversed results
         std::vector<Value> args = {callOp.getArgOperands().begin(), callOp.getArgOperands().end()};
-        SmallVector<Value> reversedResults;
+        std::queue<Value> reversedResults;
         for (Value callResult : callOp.getResults()) {
             if (!isa<QuregType, QubitType>(callResult.getType())) {
                 continue;
             }
-            reversedResults.push_back(remappedValues.lookup(callResult));
+            reversedResults.push(remappedValues.lookup(callResult));
         }
-
-        size_t current_reversed_result = 0;
         for (size_t i = 0; i < args.size(); i++) {
             if (!isa<QuregType, QubitType>(args[i].getType())) {
                 continue;
             }
-            args[i] = reversedResults[current_reversed_result];
-            current_reversed_result++;
+            args[i] = reversedResults.front();
+            reversedResults.pop();
         }
 
         // Call the adjoint func op
         auto adjointCallOp = func::CallOp::create(builder, loc, adjointFnOp, args);
-        size_t i = 0;
+        std::queue<Value> adjointCallOpResults;
+        for (Value adjointCallResult : adjointCallOp->getResults()) {
+            adjointCallOpResults.push(adjointCallResult);
+        }
         for (auto callOperand : callOp.getArgOperands()) {
             if (!isa<QuregType, QubitType>(callOperand.getType())) {
                 continue;
             }
-            remappedValues.map(callOperand, adjointCallOp.getResult(i));
-            i++;
+            remappedValues.map(callOperand, adjointCallOpResults.front());
+            adjointCallOpResults.pop();
         }
     }
 
