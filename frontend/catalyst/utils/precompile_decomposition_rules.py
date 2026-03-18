@@ -115,42 +115,24 @@ def get_compiler_ops() -> tuple[set[type[Operator]], int]:
     return compiler_op_classes, num_failures
 
 
-def get_abstract_args(func: Callable) -> list[type]:
+def get_abstract_args(op_class: type[Operator]) -> list[type]:
     """
-    Create dummy args for a callable.
+    Create jax-compatible abstract args for catalyst DecompositionRules that apply to op_class.
 
     Args:
-        func: callable to create args for
+        op_class: operator to create args for.
 
     Returns:
-        list: dummy args matching the (positional) signature of func.
+        list: abstract args for DecompositionRules.
     """
-    func_sig = inspect.signature(func)
-    abstract_args: list = []
-    for param in func_sig.parameters.values():
-        type_annotation = param.annotation
-        if get_origin(type_annotation) is Union or get_origin(type_annotation) is UnionType:
-            type_annotation = get_args(type_annotation)
-        else:
-            type_annotation = (type_annotation,)
-
-        if param.name == "wires" or Wires in type_annotation:  # wires are handled separately
-            continue
-        if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
-            continue
-
-        if float in type_annotation or TensorLike in type_annotation:
-            abstract_args.append(float)
-        elif int in type_annotation:
-            abstract_args.append(int)
-        elif param.name in ["theta", "phi", "delta", "omega"]:
-            abstract_args.append(float)
-        else:
-            raise ValueError(
-                f"Cannot resolve the {param.name} parameter of the {func} decomposition rule."
-            )
-
-    return abstract_args
+    # decomposition rule signatures are of the form
+    #   (*op_params, wires, **op_resource_params, **hyperparams)
+    # see https://github.com/PennyLaneAI/catalyst/pull/2531#discussion_r2949351413
+    if isinstance(op_class.ndim_params, tuple) and any(dim > 0 for dim in op_class.ndim_params):
+        raise ValueError(
+            f"Cannot generate arguments for {op_class.__name__} with multi-dimensional parameters."
+        )
+    return [float for _ in range(op_class.num_params)]
 
 
 def get_func_from_circuit(module) -> str | None:
@@ -181,6 +163,7 @@ def get_func_from_circuit(module) -> str | None:
 
 def compile_rule(
     op_class,
+    abstract_args,
     op_num_wires,
     rule,
     dev,
@@ -199,14 +182,6 @@ def compile_rule(
     Returns:
         str: string representation of the mlir of the decomposition rule.
     """
-    abstract_args = get_abstract_args(rule._impl)  # pylint: disable=protected-access
-
-    if str in abstract_args:
-        raise ValueError(
-            f"Cannot compile decomposition rule {rule.__name__} for op {op_class.__name__} with "
-            + "string arguments."
-        )
-
     qp.decomposition.enable_graph()
 
     # WARNING: do not rename this function, we use it to extract the rule from the compiled
@@ -250,10 +225,20 @@ def compile_op_decomp_rules(
 
     dev = qp.device("null.qubit", wires=op_class.num_wires)
 
+    abstract_args = get_abstract_args(op_class)  # pylint: disable=protected-access
+
+    if str in abstract_args:
+        raise ValueError(
+            f"Cannot compile decomposition rules for op {op_class.__name__} with "
+            + "string arguments."
+        )
+
     for rule in op_decomp_rules:
         try:
             rule_name = rule._impl.__name__  # pylint: disable=protected-access
-            mlir_modules[rule_name] = compile_rule(op_class, op_class.num_wires, rule, dev)
+            mlir_modules[rule_name] = compile_rule(
+                op_class, abstract_args, op_class.num_wires, rule, dev
+            )
         except TypeError as e:
             warnings.warn(f"Abstract args failed to compile {rule_name}: {e}")
         except CompileError as e:
