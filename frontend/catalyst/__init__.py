@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2022 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -85,7 +85,7 @@ from catalyst.utils.exceptions import (
 )
 from catalyst.utils.precompile_decomposition_rules import precompile_decomp_rules
 
-if not INSTALLED:
+if not (INSTALLED or os.getenv("DOCUTILSCONFIG") or os.getenv("READTHEDOCS_CANONICAL_URL")):
     precompile_decomp_rules()
 
 
