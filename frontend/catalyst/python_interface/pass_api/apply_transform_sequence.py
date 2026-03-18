@@ -228,34 +228,10 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
 
         schedule = self._cluster_passes(pass_ops)
         for subschedule in schedule:
-
-            # ---- xDSL path ----
             if subschedule[0].pass_name.data in self.passes:
-                xdsl_pipeline = []
-                for op in subschedule:
-                    pass_class = self.passes[op.pass_name.data]()
-                    options = {
-                        k.replace("-", "_"): v
-                        for k, v in get_pyval_from_xdsl_attr(op.options).items()
-                    }
-                    xdsl_pipeline.append(pass_class(**options))
-
-                pipeline = PassPipeline(xdsl_pipeline)
-                pipeline.apply(self.ctx, payload)
-
-            # ---- MLIR path ----
+                self._apply_xdsl_pipeline(payload, subschedule)
             else:
-                buffer = StringIO()
-                Printer(stream=buffer, print_generic_format=True).print_op(payload)
-
-                mlir_pipeline = _create_mlir_cli_schedule(subschedule)
-                modified = _quantum_opt(
-                    *mlir_pipeline, "-mlir-print-op-generic", stdin=buffer.getvalue()
-                )
-
-                data = Parser(self.ctx, modified).parse_module()
-                rewriter.replace_op(payload, data)
-                payload = data
+                payload = self._apply_mlir_pipeline(payload, subschedule, rewriter)
 
     def _cluster_passes(
         self, pass_ops: list[transform.ApplyRegisteredPassOp]
@@ -279,6 +255,38 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
 
         schedule.append(cur_schedule)
         return schedule
+
+    def _apply_xdsl_pipeline(
+        self, payload: builtin.ModuleOp, pass_ops: list[transform.ApplyRegisteredPassOp]
+    ) -> None:
+        """Interpret a sequence of ``ApplyRegisteredPassOp``\ s corresponding to xDSL passes."""
+        pipeline = []
+        for op in pass_ops:
+            pass_class = self.passes[op.pass_name.data]()
+            options = {
+                k.replace("-", "_"): v for k, v in get_pyval_from_xdsl_attr(op.options).items()
+            }
+            pipeline.append(pass_class(**options))
+
+        pipeline = PassPipeline(pipeline)
+        pipeline.apply(self.ctx, payload)
+
+    def _apply_mlir_pipeline(
+        self,
+        payload: builtin.ModuleOp,
+        pass_ops: list[transform.ApplyRegisteredPassOp],
+        rewriter: PatternRewriter,
+    ) -> builtin.ModuleOp:
+        """Interpret a sequence of ``ApplyRegisteredPassOp``\ s corresponding to MLIR passes."""
+        buffer = StringIO()
+        Printer(stream=buffer, print_generic_format=True).print_op(payload)
+
+        pipeline = _create_mlir_cli_schedule(pass_ops)
+        modified = _quantum_opt(*pipeline, "-mlir-print-op-generic", stdin=buffer.getvalue())
+
+        data = Parser(self.ctx, modified).parse_module()
+        rewriter.replace_op(payload, data)
+        return data
 
 
 def _create_mlir_cli_schedule(pass_ops: Sequence[transform.ApplyRegisteredPassOp]) -> list[str]:

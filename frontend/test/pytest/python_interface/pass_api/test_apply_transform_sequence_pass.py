@@ -31,7 +31,7 @@ from catalyst.python_interface.conversion import parse_generic_to_xdsl_module, x
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.pass_api.apply_transform_sequence import (
     ApplyTransformSequencePass,
-    _create_mlir_schedule,
+    _create_mlir_cli_schedule,
 )
 from catalyst.python_interface.transforms import merge_rotations_pass
 
@@ -95,7 +95,7 @@ class TestCreateMLIRSchedule:
     def test_pass_no_options(self):
         """Test that passes with no options are parsed correctly."""
         pass_op = create_apply_registered_pass_op("test-pass")
-        schedule = _create_mlir_schedule(pass_ops=[pass_op])
+        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert schedule[0] == "--test-pass"
 
@@ -111,7 +111,7 @@ class TestCreateMLIRSchedule:
                 "str-opt-with-spaces": "foo bar",
             },
         )
-        schedule = _create_mlir_schedule(pass_ops=[pass_op])
+        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert schedule[0] == (
             "--test-pass=int-opt=1 float-opt=1.5 bool-opt=false str-opt='test_string' "
@@ -121,7 +121,7 @@ class TestCreateMLIRSchedule:
     def test_pass_array_options(self):
         """Test that passes with array options are parsed correctly."""
         pass_op = create_apply_registered_pass_op("test-pass", options={"list-opt": (1, 2, 3, 4)})
-        schedule = _create_mlir_schedule(pass_ops=[pass_op])
+        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert schedule[0] == "--test-pass=list-opt=1,2,3,4"
 
@@ -130,7 +130,7 @@ class TestCreateMLIRSchedule:
         pass_op = create_apply_registered_pass_op(
             "test-pass", options={"dict-opt": {"a": 1, "b": 2, "c": 3, "d": 4}}
         )
-        schedule = _create_mlir_schedule(pass_ops=[pass_op])
+        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert schedule[0] == "--test-pass=dict-opt={a=1 b=2 c=3 d=4}"
 
@@ -143,7 +143,7 @@ class TestCreateMLIRSchedule:
                 "dict-opt": {"f": (1, 2), "g": 1},
             },
         )
-        schedule = _create_mlir_schedule(pass_ops=[pass_op])
+        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert (
             schedule[0]
@@ -157,7 +157,7 @@ class TestCreateMLIRSchedule:
         pass_op3 = create_apply_registered_pass_op(
             "test-pass3", options={"list-opt": (False, True, False)}
         )
-        schedule = _create_mlir_schedule(pass_ops=[pass_op1, pass_op2, pass_op3])
+        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op1, pass_op2, pass_op3])
         assert len(schedule) == 3
         assert schedule[0] == "--test-pass1"
         assert schedule[1] == "--test-pass2=int-opt=1"
