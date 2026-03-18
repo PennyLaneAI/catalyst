@@ -19,15 +19,11 @@ import subprocess
 import warnings
 from functools import lru_cache
 from pathlib import Path
-from types import UnionType
-from typing import Callable, Union, get_args, get_origin
 
 import jax
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from pennylane.operation import Operator
-from pennylane.typing import TensorLike
-from pennylane.wires import Wires
 
 from catalyst.jax_primitives import decomposition_rule
 from catalyst.utils.exceptions import CompileError
