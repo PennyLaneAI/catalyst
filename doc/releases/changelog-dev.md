@@ -232,6 +232,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* `qml.value_and_grad` can now be used with program capture `qml.qjit(capture=True)`.
+  [(#2587)](https://github.com/PennyLaneAI/catalyst/pull/2587)
+
 * Catalyst with program capture now supports device preprocessing. Currently, preprocessing transforms
   that do not have native MLIR or xDSL implementations will be replaced with empty transforms.
   [(#2557)](https://github.com/PennyLaneAI/catalyst/pull/2557)
