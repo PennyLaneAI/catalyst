@@ -583,7 +583,9 @@ class ConstructCircuitDAG:
         """Visit a FuncOp Operation."""
 
         if not operation.regions[0].blocks:
-            raise VisualizationError(f"Empty function calls are not yet compatible with 'draw_graph'. Found external function call to {operation.sym_name.data}.")
+            raise VisualizationError(
+                f"Empty function calls are not yet compatible with 'draw_graph'. Found external function call to {operation.sym_name.data}."
+            )
 
         label: str = (
             "qjit" if operation.sym_name.data.startswith("jit_") else operation.sym_name.data
