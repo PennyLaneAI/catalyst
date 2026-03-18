@@ -259,7 +259,7 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
     def _apply_xdsl_pipeline(
         self, payload: builtin.ModuleOp, pass_ops: list[transform.ApplyRegisteredPassOp]
     ) -> None:
-        """Interpret a sequence of ``ApplyRegisteredPassOp``\ s corresponding to xDSL passes."""
+        r"""Interpret a sequence of ``ApplyRegisteredPassOp``\ s corresponding to xDSL passes."""
         pipeline = []
         for op in pass_ops:
             pass_class = self.passes[op.pass_name.data]()
@@ -277,7 +277,7 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
         pass_ops: list[transform.ApplyRegisteredPassOp],
         rewriter: PatternRewriter,
     ) -> builtin.ModuleOp:
-        """Interpret a sequence of ``ApplyRegisteredPassOp``\ s corresponding to MLIR passes."""
+        r"""Interpret a sequence of ``ApplyRegisteredPassOp``\ s corresponding to MLIR passes."""
         buffer = StringIO()
         Printer(stream=buffer, print_generic_format=True).print_op(payload)
 
