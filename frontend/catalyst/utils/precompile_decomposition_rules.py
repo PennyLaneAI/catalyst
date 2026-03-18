@@ -257,7 +257,7 @@ def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
         warnings.warn(f"failed to collect {num_ops_missed} op(s) from PennyLane")
 
     mlir_rules = "".join(
-        str(mlir).replace("@rule_wrapper", f"@{name}")
+        str(mlir).replace("@rule_wrapper", f"@__builtin_{name}")
         for func in target_ops
         for name, mlir in compile_op_decomp_rules(func).items()
     )
