@@ -457,7 +457,7 @@ jobs:
         STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
-        make decomp-rules
+        make builtin-decomp-rules
 
     - name: Cache CCache on main branch
       id: save-ccache
