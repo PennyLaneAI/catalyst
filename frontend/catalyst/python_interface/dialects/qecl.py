@@ -543,7 +543,19 @@ class CnotOp(IRDLOperation):
 
 @irdl_op_definition
 class MeasureOp(IRDLOperation):
-    """A logical single-qubit projective measurement in the computational basis."""
+    """A logical single-qubit projective measurement in the computational basis.
+
+    This operation represents a logical, projective computational-basis measurement of the
+    logical qubit at the provided index in the logical codeblock. For example,
+
+    ```mlir
+    %mres, %1 = qecl.measure %0[ 1] : i1, !qecl.codeblock<3>
+    ```
+
+    represents a measurement of the logical qubit at index `1` in the codeblock `%0`, which
+    encodes k = 3 logical qubits. The result of the measurement is returned as the value
+    `%mres`.
+    """
 
     T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
 
