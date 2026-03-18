@@ -401,6 +401,11 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Added a optimized pathway to the xDSL `ApplyTransformSequencePass` so that it can schedule consecutive MLIR
+  passes together rather than individually. This minimizes the number of round-trips between xDSL and MLIR, improving
+  performance when several consecutive MLIR passes are used when there are also xDSL passes in the pipeline.
+  [(#2592)](https://github.com/PennyLaneAI/catalyst/pull/2592)
+
 * Catalyst internally uses the new unified transforms API rather than `PassPipelineWrapper`.
   [(#2525)](https://github.com/PennyLaneAI/catalyst/pull/2525)
 
