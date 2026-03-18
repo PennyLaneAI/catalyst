@@ -401,6 +401,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Updated Catalyst's xDSL dependencies to `xdsl` 0.57.3 and `xdsl-jax` 0.4.0.
+  [(#2591)](https://github.com/PennyLaneAI/catalyst/pull/2591)
+
 * Catalyst internally uses the new unified transforms API rather than `PassPipelineWrapper`.
   [(#2525)](https://github.com/PennyLaneAI/catalyst/pull/2525)
 
