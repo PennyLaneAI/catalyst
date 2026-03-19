@@ -195,7 +195,7 @@ class TestFuncOpVisualization:
 
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         with pytest.raises(
-            VisualizationError, match=r"Empty function calls are not yet compatible.*test_func"
+            VisualizationError, match=r"Calls to functions without a definition are not yet compatible.*test_func"
         ):
             utility.construct(module)
 
