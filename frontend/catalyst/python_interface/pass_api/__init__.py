@@ -26,8 +26,6 @@ __all__ = [
     "CompilationPass",
     "CompilerTransform",
     "available_passes",
-    "is_xdsl_pass",
-    "register_pass",
     "compiler_transform",
     "is_xdsl_pass",
     "register_pass",
