@@ -213,6 +213,27 @@ def resolve_constant_params(ssa: SSAValue) -> float | int | str:
         case "arith.addf":
             return sum(resolve_constant_params(o) for o in op.operands)
 
+        case "arith.subf":
+            x, y = (
+                resolve_constant_params(op.operands[0]),
+                resolve_constant_params(op.operands[1]),
+            )
+            return f"({x} - {y})"
+
+        case "arith.mulf":
+            x, y = (
+                resolve_constant_params(op.operands[0]),
+                resolve_constant_params(op.operands[1]),
+            )
+            return f"({x} * {y})"
+
+        case "arith.divf":
+            x, y = (
+                resolve_constant_params(op.operands[0]),
+                resolve_constant_params(op.operands[1]),
+            )
+            return f"({x} / {y})"
+
         case "arith.constant":
             return op.value.value.data  # Catalyst
 
