@@ -99,41 +99,43 @@ class TestCompileOpDecompRules:
             compile_op_decomp_rules(qp.Identity)
 
     def test_compile_error(self):
-        """Test that compile_op_decomp_rules warns when compilation fails."""
+        """Test that compile_op_decomp_rules warns when compilation of a rule fails."""
 
-        class FakeOp(qp.operation.Operator):
-            """Test class with incompatible decomp rule."""
+        with pytest.warns(match="Failed to compile"):
 
-            num_wires = 1
-            num_params = 1
-            ndim_params = (0,)
+            class FakeOp(qp.operation.Operator):
+                """Test class with incompatible decomp rule."""
 
-        @qp.register_resources({})
-        def fake_op_decomp(string):
-            qp.PauliRot(2, string)
+                num_wires = 3
+                num_params = 1
+                ndim_params = (0,)
 
-        qp.add_decomps(FakeOp, fake_op_decomp)
+            @qp.register_resources({})
+            def fake_op_decomp(param, wires):
+                _quantum_opt(stdin="module {")
 
-        with pytest.warns(match="Unexpected error"):
+            qp.add_decomps(FakeOp, fake_op_decomp)
+
             compile_op_decomp_rules(FakeOp)
 
     def test_unexpected_error(self):
         """Test that compile_op_decomp_rules warns when an unexpected exception is thrown."""
 
-        class FakeOp(qp.operation.Operator):
-            """Test class without ndim_params."""
-
-            num_wires = 1
-            num_params = 1
-
-        @qp.register_resources({})
-        def fake_op_decomp(string):
-            qp.PauliRot(2, string)
-
-        qp.add_decomps(FakeOp, fake_op_decomp)
-
         with pytest.warns(match="Unexpected error"):
-            compile_op_decomp_rules(FakeOp)
+
+            class NewFakeOp(qp.operation.Operator):
+                """Test class without ndim_params."""
+
+                num_wires = 1
+                num_params = 1
+
+            @qp.register_resources({})
+            def fake_op_decomp(string):
+                qp.PauliRot(2, string)
+
+            qp.add_decomps(NewFakeOp, fake_op_decomp)
+
+            compile_op_decomp_rules(NewFakeOp)
 
 
 def test_bytecode_file():
