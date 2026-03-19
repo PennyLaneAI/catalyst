@@ -38,9 +38,9 @@ from .apply_transform_sequence import register_pass
 class CompilerTransform(Transform):
     """Wrapper class for applying passes to QJIT-ed workflows."""
 
-    module_pass: ModulePass
+    module_pass: type[ModulePass]
 
-    def __init__(self, module_pass: ModulePass):
+    def __init__(self, module_pass: type[ModulePass]):
         self.module_pass = module_pass
         super().__init__(pass_name=module_pass.name)
 

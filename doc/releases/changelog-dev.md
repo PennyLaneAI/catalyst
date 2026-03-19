@@ -237,6 +237,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* `qml.value_and_grad` can now be used with program capture `qml.qjit(capture=True)`.
+  [(#2587)](https://github.com/PennyLaneAI/catalyst/pull/2587)
+
 * Catalyst with program capture now supports device preprocessing. Currently, preprocessing transforms
   that do not have native MLIR or xDSL implementations will be replaced with empty transforms.
   [(#2557)](https://github.com/PennyLaneAI/catalyst/pull/2557)
@@ -342,6 +345,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where the `catalyst` CLI tool would emit text when called with `--emit-bytecode`.
+  [(#2596)](https://github.com/PennyLaneAI/catalyst/pull/2596)
+
 * Fixed a bug where input array arguments could be mutated during execution when copied inputs
   were updated in-place. Entry-point arguments are now treated as non-writable during bufferization,
   preserving the expected immutability of user inputs.
@@ -405,6 +411,9 @@
   [(#2582)](https://github.com/PennyLaneAI/catalyst/pull/2582)
 
 <h3>Internal changes ⚙️</h3>
+
+* `draw_graph` now raises a more informative error when attempting to visualize an unsupported empty external function.
+  [(#2559)](https://github.com/PennyLaneAI/catalyst/pull/2559)
 
 * Catalyst internally uses the new unified transforms API rather than `PassPipelineWrapper`.
   [(#2525)](https://github.com/PennyLaneAI/catalyst/pull/2525)
