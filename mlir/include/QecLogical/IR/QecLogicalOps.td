@@ -251,5 +251,39 @@ def CnotOp : QecLogical_Op<"cnot", [
     let hasVerifier = 1;
 }
 
+def MeasureOp : QecLogical_Op<"measure", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
+    let summary = "A logical single-qubit projective measurement in the computational basis.";
+
+    let description = [{
+        This operation represents a logical, projective computational-basis measurement of the
+        logical qubit at the provided index in the logical codeblock. For example,
+
+        ```mlir
+        %mres, %1 = qecl.measure %0[ 1] : i1, !qecl.codeblock<3>
+        ```
+
+        represents a measurement of the logical qubit at index `1` in the codeblock `%0`, which
+        encodes k = 3 logical qubits. The result of the measurement is returned as the value
+        `%mres`.
+    }];
+
+    let arguments = (ins
+        LogicalCodeblockType:$in_codeblock,
+        Optional<Index>:$idx,
+        OptionalAttr<ConfinedAttr<IndexAttr, [IntNonNegative]>>:$idx_attr
+    );
+
+    let results = (outs
+        I1:$mres,
+        LogicalCodeblockType:$out_codeblock
+    );
+
+    let assemblyFormat = [{
+        $in_codeblock `[` ($idx^):($idx_attr)? `]` attr-dict `:` type($mres) `,` qualified(type($in_codeblock))
+    }];
+
+    let hasVerifier = 1;
+}
+
 
 #endif // QEC_LOGICAL_OPS
