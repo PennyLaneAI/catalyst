@@ -203,7 +203,6 @@ def resolve_constant_params(ssa: SSAValue) -> float | int | str:
                 x = resolve_constant_params(op.operands[0])
                 y = resolve_constant_params(op.operands[1])
                 return f"({x} % {y})"
-            raise NotImplementedError(f"Function call to {op.callee} not supported")
 
         case "tensor.from_elements":
             return resolve_constant_params(op.operands[0])
