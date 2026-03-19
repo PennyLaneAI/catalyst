@@ -340,6 +340,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where the `catalyst` CLI tool would emit text when called with `--emit-bytecode`.
+  [(#2596)](https://github.com/PennyLaneAI/catalyst/pull/2596)
+
 * Fixed a bug where input array arguments could be mutated during execution when copied inputs
   were updated in-place. Entry-point arguments are now treated as non-writable during bufferization,
   preserving the expected immutability of user inputs.
@@ -408,6 +411,9 @@
   passes together rather than individually. This minimizes the number of round-trips between xDSL and MLIR, improving
   performance when several consecutive MLIR passes are used when there are also xDSL passes in the pipeline.
   [(#2592)](https://github.com/PennyLaneAI/catalyst/pull/2592)
+
+* `draw_graph` now raises a more informative error when attempting to visualize an unsupported empty external function.
+  [(#2559)](https://github.com/PennyLaneAI/catalyst/pull/2559)
 
 * Catalyst internally uses the new unified transforms API rather than `PassPipelineWrapper`.
   [(#2525)](https://github.com/PennyLaneAI/catalyst/pull/2525)
