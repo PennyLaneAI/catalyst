@@ -15,6 +15,7 @@
 # pylint: disable=line-too-long
 
 import subprocess
+from io import StringIO
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -24,6 +25,7 @@ from xdsl.context import Context
 from xdsl.dialects import builtin, func, test, transform
 from xdsl.ir import Attribute, SSAValue
 from xdsl.passes import ModulePass
+from xdsl.printer import Printer
 
 from catalyst import qjit
 from catalyst.python_interface import QuantumParser
@@ -283,6 +285,93 @@ class TestApplyTransformSequencePass:
         assert "--mlir-pass1=a=1 b='foo'" in captured_cmds[0]
         # We check that there is a space after the pass name to check that no options were specified
         assert "--mlir-pass2 " in captured_cmds[1]
+
+    def test_interpret_named_sequence_consecutive_mlir_passes(self, mocker, capsys):
+        """Test that a NamedSequenceOp can be interpreted correctly when it contains
+        both xDSL and MLIR passes."""
+        program = """
+            builtin.module @workflow {
+                builtin.module {
+                    builtin.module attributes {transform.with_named_sequence} {
+                        transform.named_sequence @__transform_0(%t0_arg0 : !transform.op<"builtin.module">) {
+                            %t0_0 = transform.apply_registered_pass "options-pass" to %t0_arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            %t0_1 = transform.apply_registered_pass "mlir-pass1" with options = {a = 1 : i64, b = "foo"} to %t0_0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            %t0_2 = transform.apply_registered_pass "mlir-pass2" to %t0_1 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            %t0_3 = transform.apply_registered_pass "mlir-pass2" with options = {c = [1 : i64, 2 : i64, 3 : i64], d = false} to %t0_2 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            %t0_4 = transform.apply_registered_pass "mlir-pass1" to %t0_3 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            transform.yield
+                        }
+                    }
+                }
+            }
+        """
+
+        pass_options = [{}, {"a": 1, "b": "foo"}, {}, {"c": (1, 2, 3), "d": False}, {}]
+        mod = parse_generic_to_xdsl_module(program)
+
+        captured_cmds = []
+        num_calls = 0
+
+        def mock_subprocess_run(cmd, **kwargs):
+            """Mock implementation of subprocess.run"""
+            nonlocal captured_cmds
+            nonlocal num_calls
+            captured_cmds.append(subprocess.list2cmdline(cmd))
+            num_calls += 1
+            return MagicMock(args=cmd, stdout=kwargs.get("input", ""), returncode=0)
+
+        mocker.patch("subprocess.run", side_effect=mock_subprocess_run)
+
+        _pass = ApplyTransformSequencePass(
+            passes={"options-pass": lambda: OptionsPass}, callback=None
+        )
+        ctx = Context()
+        ctx.load_dialect(builtin.Builtin)
+        ctx.load_dialect(transform.Transform)
+        _pass.apply(ctx, mod)
+
+        # Assert that xDSL passes were applied correctly
+        captured = capsys.readouterr()
+        assert captured.out.strip().split("\n") == [
+            f"Applying options-pass with options {pass_options[0]}"
+        ]
+
+        # Assert that MLIR passes were applied correctly
+        assert len(captured_cmds) == 1
+        assert (
+            '"--mlir-pass1=a=1 b=\'foo\'" --mlir-pass2 "--mlir-pass2=c=1,2,3 d=false" --mlir-pass1'
+            in captured_cmds[0]
+        )
+
+    def test_interpret_named_sequence_no_passes(self):
+        """Test that a NamedSequenceOp can be interpreted correctly when there are no passes."""
+        program = """
+            builtin.module @workflow {
+                builtin.module {
+                    builtin.module attributes {transform.with_named_sequence} {
+                        transform.named_sequence @__transform_0(%t0_arg0 : !transform.op<"builtin.module">) {
+                            transform.yield
+                        }
+                    }
+                }
+            }
+        """
+        mod = parse_generic_to_xdsl_module(program)
+        _pass = ApplyTransformSequencePass()
+
+        ctx = Context()
+        ctx.load_dialect(builtin.Builtin)
+        ctx.load_dialect(transform.Transform)
+        _pass.apply(ctx, mod)
+
+        expected_program = """
+            builtin.module @workflow {
+                builtin.module {
+                }
+            }
+        """
+        expected_mod = parse_generic_to_xdsl_module(expected_program)
+        assert mod.is_structurally_equivalent(expected_mod)
 
     def test_callback_count_with_passes(self):
         """Test that the apply function calls the callback the correct number of times."""
