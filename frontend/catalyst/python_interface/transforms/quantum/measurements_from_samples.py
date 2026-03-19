@@ -166,6 +166,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         if shots == 0:
             raise ValueError("The measurements_from_samples pass requires non-zero shots")
         self._shots = shots
+        self.postprocessing_idx = 0
 
     @abstractmethod
     def match_and_rewrite(self, op: ir.Operation, rewriter: PatternRewriter, /):
@@ -268,9 +269,8 @@ class MeasurementsFromSamplesPattern(RewritePattern):
 
         return None
 
-    @classmethod
     def get_postprocessing_funcs_from_module_and_insert(
-        cls,
+        self,
         postprocessing_module: builtin.ModuleOp,
         matched_op: ir.Operation,
         name: str | None = None,
@@ -311,6 +311,9 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         if name is not None:
             postprocessing_func_op.sym_name = builtin.StringAttr(data=name)
 
+        # relabel all the callees in the postprocessing FuncOp
+        self.relabel_called_functions(func_op=postprocessing_func_op, idx=self.postprocessing_idx)
+
         parent_block = parent_func_op.parent
         parent_block.insert_op_after(postprocessing_func_op, parent_func_op)
 
@@ -319,10 +322,29 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             prev_op = postprocessing_func_op
             for _op in islice(postprocessing_module.body.ops, 1, None):
                 helper_op = _op.clone()
+                # if the helper_op calls any functions in the module, also rellabel those callees
+                self.relabel_called_functions(helper_op, self.postprocessing_idx)
+                new_name = helper_op.sym_name.data + f"_{self.postprocessing_idx}"
+                helper_op.sym_name = builtin.StringAttr(new_name)
                 parent_block.insert_op_after(helper_op, prev_op)
                 prev_op = helper_op
 
+        self.postprocessing_idx += 1
+
         return postprocessing_func_op
+
+    @staticmethod
+    def relabel_called_functions(func_op, idx):
+
+        # Append the idx to the name of any called functions
+        for op in func_op.body.walk():
+            if isinstance(op, func.CallOp):
+                new_name = op.callee.string_value() + f"_{idx}"
+                op.callee = builtin.SymbolRefAttr(new_name)
+
+
+
+
 
     @staticmethod
     def get_n_qubits_from_qreg(qreg: ir.SSAValue):
