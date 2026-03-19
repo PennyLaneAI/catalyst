@@ -108,64 +108,45 @@ class AddPostProcessingPattern(RewritePattern):
     def match_and_rewrite(
         self, func_op: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter, /
     ):
-        """Transform a quantum function (qnode) to separate it into a new quantum node
+        """Transform a quantum node (qnode) to separate it into a quantum node
         and an outer function that calls the quantum node. Subsequent patterns can the apply 
         postprocessing to the results of the call in the outer function when changes are made 
         to the quantum node.
+
+        The name of the quantum node is changed to original_name.pass_str, and the new outer 
+        postprocessing function is given the original name.
         """
 
         if "quantum.node" not in func_op.attributes:
             return
         
-        self._wrap_qnode_in_classical_post_processing(func_op, rewriter)
+        # get names of the postprocessing and quantum_node functions
+        outer_fn_name = func_op.sym_name.data
+        qnode_name = outer_fn_name + f".{self._pass_str}"
+        
+        # update quantum_node name to include pass string
+        func_op.sym_name = builtin.StringAttr(qnode_name)
+        rewriter.notify_op_modified(func_op)
 
-    def _get_parent_module(self, op: func.FuncOp) -> builtin.ModuleOp:
-        """Get the first ancestral builtin.ModuleOp op of a given func.func op."""
-        while (op := op.parent_op()) and not isinstance(op, builtin.ModuleOp):
-            pass  # pragma: no cover
-        if op is None:
-            raise RuntimeError(  # pragma: no cover
-                "The given qnode func is not nested within a builtin.module. Please ensure the "
-                "qnode func is defined in a builtin.module."
-            )
-
-        return op
-
-    def _wrap_qnode_in_classical_post_processing(self, quantum_node, rewriter):
-        """Clones some qnode FuncOp (circ_name) as circ_name.from_samples 
-        and inserts it, then replaces circ_name with a FuncOp of the same name 
-        that calls circ_name.from_samples."""
-
-        # this seems circuitous, why not just rename the QNode and then insert an 
-        # empty function right before it?
-        # add a clone of the "qnode" FuncOp named original_name.from_samples to the module
-        # ToDo: if we don't need to do that after all, we could just rename the QNode circ.from_samples and insert an empty FuncOp named circ instead
-        module = self._get_parent_module(quantum_node)
-        new_qnode = quantum_node.clone()
-        qnode_name = new_qnode.sym_name.data + f".{self._pass_str}"
-        new_qnode.sym_name = builtin.StringAttr(qnode_name)
-        rewriter.insert_op(new_qnode, InsertPoint.at_end(module.body.block))
-
-        # create an empty function and replace the original "qnode" FuncOp
-        func_type = quantum_node.function_type
+        # create the outer (postprocessing) fn with the original node name
+        func_type = func_op.function_type
         outer_fn = func.FuncOp(
-            name=quantum_node.sym_name.data, 
+            name=outer_fn_name, 
             function_type=func_type, 
             visibility="public"
         )
-        rewriter.replace_op(quantum_node, outer_fn)
+        rewriter.insert_op(outer_fn, InsertPoint.before(func_op))
 
-        # call the cloned QNode inside the new FuncOp
+        # call the renamed quantum_node inside the new outer FuncOp
         call_args = outer_fn.body.block.args
         result_types = func_type.outputs.data
         call_op = func.CallOp(qnode_name, call_args, result_types)
         outer_fn.body.block.add_op(call_op)
 
-        # add a return op in the new FuncOp returning QNode results
+        # add a ReturnOp in the new FuncOp returning quantum_node results
         qnode_call_results = call_op.results
         return_op = func.ReturnOp(*qnode_call_results)
         outer_fn.body.block.add_op(return_op)
-
 
 
 class MeasurementsFromSamplesPattern(RewritePattern):
