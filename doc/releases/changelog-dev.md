@@ -528,6 +528,10 @@
   definitions in separate file scopes.
   [(#2329)](https://github.com/PennyLaneAI/catalyst/pull/2329)
 
+* Improve speed and reliability of xDSL inspection functionality by only running the necessary
+  compilation steps if the QJIT object does not already have an MLIR representation.
+  [(#2598)](https://github.com/PennyLaneAI/catalyst/pull/2598)
+
 * Added lowering of `pbc.ppm`, `pbc.ppr`, and `quantum.paulirot` to the runtime CAPI and QuantumDevice C++ API.
   [(#2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
   [(#2413)](https://github.com/PennyLaneAI/catalyst/pull/2413)
