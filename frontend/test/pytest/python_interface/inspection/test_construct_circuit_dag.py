@@ -799,17 +799,18 @@ class TestGetLabel:
 class TestCreateStaticOperatorNodes:
     """Tests that operators with static parameters can be created and visualized as nodes."""
 
-    def test_unsupported_non_skipped_op_raises_visualization_error(self):
+    @pytest.mark.parametrize("dialect", ["quantum", "pbc", "mbqc"])
+    def test_unsupported_non_skipped_op_raises_visualization_error(self, dialect):
         """Tests that an unknown non-skipped operator raises an error."""
 
         unknown_op = MagicMock(spec=Operation)
-        unknown_op.dialect_name.return_value = "quantum"
-        unknown_op.name = "quantum.fake_unsupported_nonskipped_op"
+        unknown_op.dialect_name.return_value = dialect
+        unknown_op.name = f"{dialect}.fake_unsupported_nonskipped_op"
         unknown_op.__class__ = type("FakeQuantumOp", (Operation,), {})
 
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         with pytest.raises(
-            VisualizationError, match=r"quantum.fake_unsupported_nonskipped_op.*not supported"
+            VisualizationError, match=rf"{dialect}.fake_unsupported_nonskipped_op.*not supported"
         ):
             # pylint: disable=protected-access
             utility._visit_operation(unknown_op)
