@@ -237,7 +237,7 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
         self, pass_ops: list[transform.ApplyRegisteredPassOp]
     ) -> list[list[transform.ApplyRegisteredPassOp]]:
         """Create a schedule that clusters consecutive xDSL/MLIR passes together."""
-        if not pass_ops:
+        if not pass_ops:  # pragma: no cover
             return []
 
         schedule = []
