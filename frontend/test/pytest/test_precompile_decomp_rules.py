@@ -81,7 +81,7 @@ class TestCompileOpDecompRules:
 
 def test_bytecode_file():
     """Test that the bytecode file is generated correctly."""
-    BYTECODE_FILE_PATH.unlink()
+    BYTECODE_FILE_PATH.unlink(missing_ok=True)
 
     precompile_decomp_rules()
 
