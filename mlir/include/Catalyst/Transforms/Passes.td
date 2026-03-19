@@ -130,6 +130,15 @@ def MemrefToLLVMWithTBAAPass : Pass<"memref-to-llvm-tbaa", "mlir::ModuleOp"> {
   ];
 }
 
+def MarkEntryPointArgsNonWritablePass : Pass<"mark-entry-point-args-non-writable", "mlir::ModuleOp"> {
+    let summary = "Mark entry-point arguments as non-writable for bufferization.";
+
+    let dependentDialects = [
+        "bufferization::BufferizationDialect",
+        "func::FuncDialect"
+    ];
+}
+
 def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
     let summary = "Apply the passes scheduled with the transform dialect.";
 }
@@ -315,6 +324,21 @@ def RegisterDecompRuleResourcePass : Pass<"register-decomp-rule-resource"> {
         }
         ```
     }];
+}
+
+def EmptyPass : Pass<"empty"> {
+    let summary = "Empty pass that does nothing.";
+
+    let options = [
+        Option<
+            /*C++ var name=*/"key",
+            /*CLI arg name=*/"key",
+            /*type=*/"std::string",
+            /*default=*/"\"\"",
+            /*description=*/
+            "Useful for storing metadata about the pass for inspectability."
+        >
+    ];
 }
 
 #endif // CATALYST_PASSES

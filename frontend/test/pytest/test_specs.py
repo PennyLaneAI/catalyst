@@ -24,7 +24,7 @@ from pennylane.resource import CircuitSpecs, SpecsResources
 import catalyst
 from catalyst import qjit
 
-# pylint:disable = protected-access,attribute-defined-outside-init
+# pylint:disable = protected-access,attribute-defined-outside-init,too-many-lines
 
 
 @qml.transform
@@ -91,6 +91,31 @@ def check_specs_same(actual: CircuitSpecs, expected: CircuitSpecs):
 
 class TestDeviceLevelSpecs:
     """Test qml.specs() at device level"""
+
+    @pytest.mark.usefixtures("use_both_frontend")
+    def test_with_passes(self):
+        """Test that device-level specs count resources *after* all passes are applied"""
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qjit
+        @qml.transforms.merge_rotations
+        @qml.transforms.cancel_inverses
+        @qml.qnode(dev)
+        def circuit():
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=0)
+            qml.CNOT(wires=[0, 1])
+            qml.CNOT(wires=[0, 1])
+            qml.RX(1.2, wires=0)
+            qml.RX(1.2, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        cat_specs = qml.specs(circuit, level="device")()
+
+        assert cat_specs.resources.num_gates == 1
+        assert cat_specs.resources.gate_types == {"RX": 1}
+        assert cat_specs.resources.gate_sizes == {1: 1}
 
     def test_simple(self):
         """Test a simple case of qml.specs() against PennyLane"""
@@ -223,11 +248,11 @@ class TestPassByPassSpecs:
         ):
             qml.specs(no_passes, level=-1)()
 
-        with pytest.raises(check=ValueError, match="Requested specs levels 2"):
-            qml.specs(no_passes, level=2)()
+        with pytest.raises(check=ValueError, match="Requested specs levels 10"):
+            qml.specs(no_passes, level=10)()
 
-        with pytest.raises(check=ValueError, match="Requested specs levels 2, 3"):
-            qml.specs(no_passes, level=[2, 3])()
+        with pytest.raises(check=ValueError, match="Requested specs levels 10, 11"):
+            qml.specs(no_passes, level=[10, 11])()
 
     @pytest.mark.usefixtures("use_both_frontend")
     def test_basic_passes_multi_level(self, simple_circuit):
@@ -554,11 +579,11 @@ class TestPassByPassSpecs:
             "sample(all wires)": 1,
         }
 
-    def test_split_non_commuting(self):
+    def test_split_non_commuting_tape(self):
         """Test that qml.transforms.split_non_commuting works as expected"""
 
         @qml.transforms.cancel_inverses
-        @qml.transforms.split_non_commuting
+        @qml.transforms.split_non_commuting  # Applies as tape transform
         @qml.qnode(qml.device("null.qubit", wires=3))
         def circuit():
             qml.H(0)
@@ -592,6 +617,70 @@ class TestPassByPassSpecs:
                     num_allocs=1,
                 ),
             ],
+        )
+
+        check_specs_same(actual, expected)
+
+    def test_split_non_commuting_mlir(self):
+        """Test that qml.transforms.split_non_commuting works as expected"""
+
+        @qml.transforms.cancel_inverses
+        @qml.transform(pass_name="split-non-commuting")  # Applies as MLIR pass
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circuit():
+            qml.H(0)
+            qml.X(0)
+            qml.X(0)
+            return qml.expval(qml.X(0)), qml.expval(qml.Y(0)), qml.expval(qml.Z(0))
+
+        actual = qml.specs(qjit(circuit), level=[1, 2])()
+        expected = CircuitSpecs(
+            device_name="null.qubit",
+            num_device_wires=3,
+            shots=Shots(None),
+            level={1: "split-non-commuting", 2: "cancel-inverses"},
+            resources={
+                "split-non-commuting": [
+                    SpecsResources(
+                        gate_types={"Hadamard": 1, "PauliX": 2},
+                        gate_sizes={1: 3},
+                        measurements={"expval(PauliX)": 1},
+                        num_allocs=3,
+                    ),
+                    SpecsResources(
+                        gate_types={"Hadamard": 1, "PauliX": 2},
+                        gate_sizes={1: 3},
+                        measurements={"expval(PauliY)": 1},
+                        num_allocs=3,
+                    ),
+                    SpecsResources(
+                        gate_types={"Hadamard": 1, "PauliX": 2},
+                        gate_sizes={1: 3},
+                        measurements={"expval(PauliZ)": 1},
+                        num_allocs=3,
+                    ),
+                ],
+                "cancel-inverses": [  # The split should remain throughout subsequent passes
+                    SpecsResources(
+                        gate_types={"Hadamard": 1},
+                        gate_sizes={1: 1},
+                        measurements={"expval(PauliX)": 1},
+                        num_allocs=3,
+                    ),
+                    SpecsResources(
+                        gate_types={"Hadamard": 1},
+                        gate_sizes={1: 1},
+                        measurements={"expval(PauliY)": 1},
+                        num_allocs=3,
+                    ),
+                    SpecsResources(
+                        gate_types={"Hadamard": 1},
+                        gate_sizes={1: 1},
+                        measurements={"expval(PauliZ)": 1},
+                        num_allocs=3,
+                    ),
+                ],
+            },
         )
 
         check_specs_same(actual, expected)

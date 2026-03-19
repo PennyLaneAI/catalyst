@@ -617,7 +617,7 @@ class TestDrawGraph:
 
         with pytest.warns(
             UserWarning,
-            match="Level requested \\(100\\) is higher than the number of compilation passes present: 2",
+            match="Level requested \\(100\\) is higher than the number of compilation passes",
         ):
             _ = draw_graph(circuit, level=100)()
 
@@ -706,7 +706,7 @@ class TestDrawGraph:
     def test_empty_passpipeline(self):
         """Tests that it works with an empty pass pipeline."""
 
-        @qml.qjit
+        @qml.qjit(skip_preprocess=True)
         @qml.qnode(qml.device("null.qubit", wires=3))
         def circuit():
             qml.H(0)
