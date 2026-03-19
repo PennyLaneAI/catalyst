@@ -552,7 +552,6 @@ class ConstructCircuitDAG:
 
         return final_wire_map
 
-
     # ============
     # DEVICE NODE
     # ============
@@ -634,7 +633,9 @@ class ConstructCircuitDAG:
     def _func_return(self, operation: func.ReturnOp) -> None:
         """Handle func.return to exit FuncOp's cluster scope."""
 
-        self._cluster_uid_stack.pop()
+        if parent_op := operation.parent_op():
+            if not parent_op.sym_name.data.startswith("jit_"):
+                self._cluster_uid_stack.pop()
 
         # Clear seen wires as we are exiting a FuncOp (qnode)
         if parent_op := operation.parent_op():
