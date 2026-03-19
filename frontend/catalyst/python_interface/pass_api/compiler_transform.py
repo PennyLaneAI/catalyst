@@ -14,6 +14,7 @@
 """Core API for registering xDSL transforms for use with PennyLane and Catalyst."""
 
 from collections.abc import Callable
+from copy import copy
 from inspect import signature
 from types import UnionType
 from typing import ClassVar, Union, get_args, get_origin
@@ -124,10 +125,16 @@ class CompilationPass(ModulePass):
         if not hasattr(cls, "name"):
             raise TypeError("All CompilationPasses must have a name.")
 
+        bases = tuple(c for c in cls.__mro__ if issubclass(c, CompilationPass))
+        is_new_action = all(cls.action is not c.action for c in bases)
+
+        old_actions = copy(cls._rewrite_patterns)
         cls._rewrite_patterns = []
 
-        if cls.action is not CompilationPass.action:
+        if is_new_action:
             cls.add_action(cls.action)
+
+        cls._rewrite_patterns += old_actions
 
     def action(self, op: Operation, rewriter: PatternRewriter) -> None:
         """The action that performs the transformation on an input operation (``op``).
@@ -143,17 +150,19 @@ class CompilationPass(ModulePass):
     @classmethod
     def add_action(
         cls, action: Callable[["CompilationPass", Operation, PatternRewriter], None]
-    ) -> None:
+    ) -> Callable[["CompilationPass", Operation, PatternRewriter], None]:
         """Register an additional action that performs a transformation on an input operation.
 
-        The action _must_ type hint which operation is being rewritten. It must have the
-        following signature,
+        The action may type hint which operation is being rewritten. In that case, the action
+        will only act on operations that match the type hint. All other operations will be ignored.
+        It must have the following signature,
 
         .. code-block:: python
 
-            import pennylane as qp
+            class MyPass(CompilationPass):
+                ...
 
-            @qp.CompilationPass.add_action
+            @MyPass.add_action
             def rewrite_myop(self, op: MyOperationType, rewriter: PatternRewriter) -> None:
                 ...
 
@@ -164,7 +173,7 @@ class CompilationPass(ModulePass):
 
         .. code-block:: python
 
-            @qp.CompilationPass.add_action
+            @MyPass.add_action
             def rewrite_myop(
                 self, op: MyOperation1 | MyOperation2 | MyOperation3, rewriter: PatternRewriter
             ) -> None:
@@ -182,6 +191,9 @@ class CompilationPass(ModulePass):
         Args:
             action (Callable): A callable meeting the above constraints that transforms a given
                 operation
+
+        Returns:
+            Callable: Returns the original action being registered
         """
         if cls is CompilationPass:
             raise TypeError(
@@ -207,6 +219,7 @@ class CompilationPass(ModulePass):
         rewrite_pattern = _create_rewrite_pattern(hint, action)
 
         cls._rewrite_patterns.append(rewrite_pattern)
+        return action
 
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:  # pylint: disable=unused-argument
         """Apply the transformation to the input module.
