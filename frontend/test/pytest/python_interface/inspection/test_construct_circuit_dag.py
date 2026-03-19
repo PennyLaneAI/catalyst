@@ -194,9 +194,10 @@ class TestFuncOpVisualization:
         module = builtin.ModuleOp(ops=[external_func])
 
         utility = ConstructCircuitDAG(FakeDAGBuilder())
-        with pytest.raises(
-            VisualizationError, match=r"Calls to functions without a definition are not yet compatible.*test_func"
-        ):
+        expected_error = (
+            r"Calls to functions without a definition are not yet compatible.*test_func"
+        )
+        with pytest.raises(VisualizationError, match=expected_error):
             utility.construct(module)
 
     def test_standard_qnode(self):
