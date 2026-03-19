@@ -22,7 +22,6 @@ from xdsl.dialects.builtin import IndexType, IntegerAttr, UnitAttr
 from xdsl.ir import AttributeCovT, OpResult
 
 from catalyst.python_interface.dialects import qecp
-from catalyst.python_interface.dialects.qecp import QecPhysicalQubitRole
 
 pytestmark = pytest.mark.xdsl
 
@@ -46,6 +45,10 @@ expected_ops_names = {
     "InsertCodeblockOp": "qecp.insert_block",
     "ExtractQubitOp": "qecp.extract",
     "InsertQubitOp": "qecp.insert",
+    "IdentityOp": "qecp.identity",
+    "PauliXOp": "qecp.x",
+    "PauliYOp": "qecp.y",
+    "PauliZOp": "qecp.z",
     "HadamardOp": "qecp.hadamard",
     "SOp": "qecp.s",
     "CnotOp": "qecp.cnot",
@@ -218,6 +221,22 @@ class TestQecPhysicalOps:
         assert insert_op.result_types[0].k == self.k
         assert insert_op.result_types[0].n == self.n
 
+    @pytest.mark.parametrize("op", [qecp.IdentityOp, qecp.PauliXOp, qecp.PauliYOp, qecp.PauliZOp])
+    @pytest.mark.parametrize(
+        "qubit",
+        [
+            create_ssa_value(qecp.QecPhysicalQubitType("data")),
+            create_ssa_value(qecp.QecPhysicalQubitType("aux")),
+        ],
+    )
+    def test_qecp_op_constructor_pauli(self, op, qubit):
+        """Test the constructor of the qecp Pauli gate op."""
+        pauli_op = op(qubit)
+        assert len(pauli_op.operands) == 1
+        assert pauli_op.operand_types[0] == qubit.type
+        assert len(pauli_op.result_types) == 1
+        assert pauli_op.result_types[0] == qubit.type
+
     @pytest.mark.parametrize(
         "qubit",
         [
@@ -321,20 +340,51 @@ def test_assembly_format(run_filecheck, pretty_print):
     // CHECK: [[block1:%.+]] = qecp.insert [[block0]][{{\s*}}0], [[q0]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
     %block1 = qecp.insert %block0[ 0], %q0 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
 
-    // CHECK: [[q_data1:%.+]] = qecp.hadamard [[q_data]] : !qecp.qubit<data>
-    %q_data1 = qecp.hadamard %q_data : !qecp.qubit<data>
+    // CHECK: [[qd0:%.+]] = "test.op"() : () -> !qecp.qubit<data>
+    // CHECK: [[qa0:%.+]] = "test.op"() : () -> !qecp.qubit<aux>
+    %qd0 = "test.op"() : () -> !qecp.qubit<data>
+    %qa0 = "test.op"() : () -> !qecp.qubit<aux>
 
-    // CHECK: [[q_data2:%.+]] = qecp.s [[q_data1]] : !qecp.qubit<data>
-    %q_data2 = qecp.s %q_data1 : !qecp.qubit<data>
+    // CHECK: [[qd1:%.+]] = qecp.identity [[qd0]] : !qecp.qubit<data>
+    // CHECK: [[qa1:%.+]] = qecp.identity [[qa0]] : !qecp.qubit<aux>
+    %qd1 = qecp.identity %qd0 : !qecp.qubit<data>
+    %qa1 = qecp.identity %qa0 : !qecp.qubit<aux>
 
-    // CHECK: [[q_data3:%.+]] = qecp.s [[q_data2]] adj : !qecp.qubit<data>
-    %q_data3 = qecp.s %q_data2 adj : !qecp.qubit<data>
+    // CHECK: [[qd2:%.+]] = qecp.x [[qd1]] : !qecp.qubit<data>
+    // CHECK: [[qa2:%.+]] = qecp.x [[qa1]] : !qecp.qubit<aux>
+    %qd2 = qecp.x %qd1 : !qecp.qubit<data>
+    %qa2 = qecp.x %qa1 : !qecp.qubit<aux>
 
-    // CHECK: [[q_data4:%.+]], [[q_data5:%.+]] = qecp.cnot [[q_data2]], [[q_data3]] : !qecp.qubit<data>, !qecp.qubit<data>
-    %q_data4, %q_data5 = qecp.cnot %q_data2, %q_data3 : !qecp.qubit<data>, !qecp.qubit<data>
+    // CHECK: [[qd3:%.+]] = qecp.y [[qd2]] : !qecp.qubit<data>
+    // CHECK: [[qa3:%.+]] = qecp.y [[qa2]] : !qecp.qubit<aux>
+    %qd3 = qecp.y %qd2 : !qecp.qubit<data>
+    %qa3 = qecp.y %qa2 : !qecp.qubit<aux>
 
-    // CHECK: [[q_data6:%.+]], [[q_aux2:%.+]] = qecp.cnot [[q_data4]], [[q_aux1]] : !qecp.qubit<data>, !qecp.qubit<aux>
-    %q_data6, %q_aux2 = qecp.cnot %q_data4, %q_aux1 : !qecp.qubit<data>, !qecp.qubit<aux>
+    // CHECK: [[qd4:%.+]] = qecp.y [[qd3]] : !qecp.qubit<data>
+    // CHECK: [[qa4:%.+]] = qecp.y [[qa3]] : !qecp.qubit<aux>
+    %qd4 = qecp.y %qd3 : !qecp.qubit<data>
+    %qa4 = qecp.y %qa3 : !qecp.qubit<aux>
+
+    // CHECK: [[qd5:%.+]] = qecp.hadamard [[qd4]] : !qecp.qubit<data>
+    // CHECK: [[qa5:%.+]] = qecp.hadamard [[qa4]] : !qecp.qubit<aux>
+    %qd5 = qecp.hadamard %qd4 : !qecp.qubit<data>
+    %qa5 = qecp.hadamard %qa4 : !qecp.qubit<aux>
+
+    // CHECK: [[qd6:%.+]] = qecp.s [[qd5]] : !qecp.qubit<data>
+    // CHECK: [[qa6:%.+]] = qecp.s [[qa5]] : !qecp.qubit<aux>
+    %qd6 = qecp.s %qd5 : !qecp.qubit<data>
+    %qa6 = qecp.s %qa5 : !qecp.qubit<aux>
+
+    // CHECK: [[qd7:%.+]] = qecp.s [[qd6]] adj : !qecp.qubit<data>
+    // CHECK: [[qa7:%.+]] = qecp.s [[qa6]] adj : !qecp.qubit<aux>
+    %qd7 = qecp.s %qd6 adj : !qecp.qubit<data>
+    %qa7 = qecp.s %qa6 adj : !qecp.qubit<aux>
+
+    // CHECK: [[qd8:%.+]], [[qd9:%.+]] = qecp.cnot [[qd6]], [[qd7]] : !qecp.qubit<data>, !qecp.qubit<data>
+    %qd8, %qd9 = qecp.cnot %qd6, %qd7 : !qecp.qubit<data>, !qecp.qubit<data>
+
+    // CHECK: [[qd10:%.+]], [[qa8:%.+]] = qecp.cnot [[qd8]], [[qa7]] : !qecp.qubit<data>, !qecp.qubit<aux>
+    %qd10, %qa8 = qecp.cnot %qd8, %qa7 : !qecp.qubit<data>, !qecp.qubit<aux>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)

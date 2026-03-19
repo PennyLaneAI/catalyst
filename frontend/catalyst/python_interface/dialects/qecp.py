@@ -476,34 +476,27 @@ class InsertQubitOp(IRDLOperation):
         )
 
 
-@irdl_op_definition
-class HadamardOp(IRDLOperation):
-    """A physical Hadamard gate operation."""
+class SingleQubitPhysicalGateOp(IRDLOperation):
+    """Base class for single-qubit physical gate operations.
+
+    An operation that inherits from this class represents a physical gate operation applied to a QEC
+    physical qubit. For example,
+
+    ```mlir
+    %1 = qecp.hadamard %0 : !qecp.qubit<data>
+    ```
+
+    represents a physical Hadamard operation applied to the physical data qubit `%0`. Single-qubit
+    physical gate operations can be applied to both data and auxiliary qubits.
+
+    Adjoint operations are supported by adding the `adj` unit attribute. For example, a physical S†
+    gate operation is represented as follows:
+
+    ```mlir
+    %1 = qecp.s %0 adj : !qecp.qubit<data>
+    """
 
     T: ClassVar = VarConstraint("T", anyPhysicalQubit)
-
-    name = "qecp.hadamard"
-
-    assembly_format = """
-            $in_qubit attr-dict `:` type($out_qubit)
-        """
-
-    in_qubit = operand_def(T)
-
-    out_qubit = result_def(T)
-
-    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
-        in_qubit_type = get_physical_qubit_type(in_qubit)
-        super().__init__(operands=(in_qubit,), result_types=(in_qubit_type,))
-
-
-@irdl_op_definition
-class SOp(IRDLOperation):
-    """A physical S (π/2 phase) gate operation."""
-
-    T: ClassVar = VarConstraint("T", anyPhysicalQubit)
-
-    name = "qecp.s"
 
     assembly_format = """
             $in_qubit (`adj` $adjoint^)? attr-dict `:` type($out_qubit)
@@ -511,7 +504,7 @@ class SOp(IRDLOperation):
 
     in_qubit = operand_def(T)
 
-    adjoint = adjoint = opt_prop_def(UnitAttr)
+    adjoint = opt_prop_def(UnitAttr)
 
     out_qubit = result_def(T)
 
@@ -525,6 +518,68 @@ class SOp(IRDLOperation):
             properties["adjoint"] = UnitAttr()
 
         super().__init__(operands=(in_qubit,), result_types=(in_qubit_type,), properties=properties)
+
+
+@irdl_op_definition
+class IdentityOp(SingleQubitPhysicalGateOp):
+    """A physical Identity gate operation."""
+
+    name = "qecp.identity"
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        super().__init__(in_qubit)
+
+
+@irdl_op_definition
+class PauliXOp(SingleQubitPhysicalGateOp):
+    """A physical Pauli X gate operation."""
+
+    name = "qecp.x"
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        super().__init__(in_qubit)
+
+
+@irdl_op_definition
+class PauliYOp(SingleQubitPhysicalGateOp):
+    """A physical Pauli Y gate operation."""
+
+    name = "qecp.y"
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        super().__init__(in_qubit)
+
+
+@irdl_op_definition
+class PauliZOp(SingleQubitPhysicalGateOp):
+    """A physical Pauli Z gate operation."""
+
+    name = "qecp.z"
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        super().__init__(in_qubit)
+
+
+@irdl_op_definition
+class HadamardOp(SingleQubitPhysicalGateOp):
+    """A physical Hadamard gate operation."""
+
+    name = "qecp.hadamard"
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        super().__init__(in_qubit)
+
+
+@irdl_op_definition
+class SOp(SingleQubitPhysicalGateOp):
+    """A physical S (π/2 phase) gate operation."""
+
+    name = "qecp.s"
+
+    def __init__(
+        self, in_qubit: QecPhysicalQubitSSAValue | Operation, adjoint: UnitAttr | bool = False
+    ):
+        super().__init__(in_qubit, adjoint)
 
 
 @irdl_op_definition
@@ -573,6 +628,10 @@ QecPhysical = Dialect(
         InsertCodeblockOp,
         ExtractQubitOp,
         InsertQubitOp,
+        IdentityOp,
+        PauliXOp,
+        PauliYOp,
+        PauliZOp,
         HadamardOp,
         SOp,
         CnotOp,
