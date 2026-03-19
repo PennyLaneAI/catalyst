@@ -88,10 +88,13 @@ from catalyst.utils.precompile_decomposition_rules import (
     precompile_decomp_rules,
 )
 
+# we ONLY want to compile on init for dev installs, where the caching should work correctly
 if (
-    not (INSTALLED or os.getenv("DOCUTILSCONFIG") or os.getenv("READTHEDOCS_CANONICAL_URL"))
-    and not BYTECODE_FILE_PATH.exists()
-):
+    not INSTALLED  # do not recompile on user installations
+    or not os.getenv("DOCUTILSCONFIG")  # do not run for docs
+    or not os.getenv("READTHEDOCS_CANONICAL_URL")  # do not run for RTD
+    or not os.getenv("CI")  # do not run in CI
+) and not BYTECODE_FILE_PATH.exists():
     precompile_decomp_rules()
 
 
