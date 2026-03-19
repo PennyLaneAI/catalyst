@@ -32,50 +32,54 @@ BYTECODE_FILE_PATH = Path(__file__).parent.parent / Path("resources/decompositio
 # TODO: Uncomment dynamic size wires ops once they are supported
 # FIXME: Use the Gate class instead of this list of compiler ops
 #              https://github.com/PennyLaneAI/pennylane/pull/8767
-COMPILER_OPS_FOR_DECOMPOSITION = {
-    "CNOT",
-    "ControlledPhaseShift",
-    "CRot",
-    "CRX",
-    "CRY",
-    "CRZ",
-    "CSWAP",
-    "CY",
-    "CZ",
-    "Hadamard",
-    # "Identity",
-    "IsingXX",
-    "IsingXY",
-    "IsingYY",
-    "IsingZZ",
-    "SingleExcitation",
-    "DoubleExcitation",
-    "ISWAP",
-    "PauliX",
-    "PauliY",
-    "PauliZ",
-    # "PauliRot",
-    # "PauliMeasure",
-    "PhaseShift",
-    "PSWAP",
-    "Rot",
-    "RX",
-    "RY",
-    "RZ",
-    "S",
-    "SWAP",
-    "T",
-    "Toffoli",
-    "U1",
-    "U2",
-    "U3",
-    # "MultiRZ",
-    # "GlobalPhase",
-}
+COMPILER_OPS_FOR_DECOMPOSITION = frozenset(
+    {
+        "CNOT",
+        "ControlledPhaseShift",
+        "CRot",
+        "CRX",
+        "CRY",
+        "CRZ",
+        "CSWAP",
+        "CY",
+        "CZ",
+        "Hadamard",
+        # "Identity",
+        "IsingXX",
+        "IsingXY",
+        "IsingYY",
+        "IsingZZ",
+        "SingleExcitation",
+        "DoubleExcitation",
+        "ISWAP",
+        "PauliX",
+        "PauliY",
+        "PauliZ",
+        # "PauliRot",
+        # "PauliMeasure",
+        "PhaseShift",
+        "PSWAP",
+        "Rot",
+        "RX",
+        "RY",
+        "RZ",
+        "S",
+        "SWAP",
+        "T",
+        "Toffoli",
+        "U1",
+        "U2",
+        "U3",
+        # "MultiRZ",
+        # "GlobalPhase",
+    }
+)
 
 
 @lru_cache
-def get_compiler_ops() -> tuple[set[type[Operator]], int]:
+def get_compiler_ops(
+    _supported_compiler_op_names: frozenset[str] = COMPILER_OPS_FOR_DECOMPOSITION,
+) -> tuple[set[type[Operator]], int]:
     """
     Extracts all ops from pennylane that have decompositions in catalyst.
 
@@ -96,15 +100,13 @@ def get_compiler_ops() -> tuple[set[type[Operator]], int]:
     # FIXME: manual override for PauliMeasure
     pl_op_classes.add(qp.ops.PauliMeasure)
 
-    supported_compiler_op_names = COMPILER_OPS_FOR_DECOMPOSITION
-
     compiler_op_classes = set(
-        op_class for op_class in pl_op_classes if op_class.__name__ in supported_compiler_op_names
+        op_class for op_class in pl_op_classes if op_class.__name__ in _supported_compiler_op_names
     )
 
     compiler_op_class_names = set(op_class.__name__ for op_class in compiler_op_classes)
 
-    for class_name in supported_compiler_op_names.difference(compiler_op_class_names):
+    for class_name in _supported_compiler_op_names.difference(compiler_op_class_names):
         warnings.warn(f"failed to collect pennylane op with name {class_name}")
         num_failures += 1
 
@@ -211,13 +213,14 @@ def compile_op_decomp_rules(
     """
     op_decomp_rules = qp.decomposition.decomposition_graph.list_decomps(op_class)
 
-    mlir_modules = {}
+    mlir_modules: dict[str, str | None] = {}
 
     if not hasattr(op_class, "num_wires") or not op_class.num_wires:
         warnings.warn(
             f"Cannot compile decomposition rules for op {op_class.__name__} with an unknown number "
             + "of wires."
         )
+        return mlir_modules
 
     dev = qp.device("null.qubit", wires=op_class.num_wires)
 
@@ -229,10 +232,8 @@ def compile_op_decomp_rules(
             mlir_modules[rule_name] = compile_rule(
                 op_class, abstract_args, op_class.num_wires, rule, dev
             )
-        except TypeError as e:
-            warnings.warn(f"Abstract args failed to compile {rule_name}: {e}")
-        except CompileError as e:
-            warnings.warn(f"failed to compile {rule_name}: {e}")
+        except CompileError as e:  # pragma: no cover
+            warnings.warn(f"Failed to compile {rule_name}: {e}")
         except Exception as e:  # pylint: disable=broad-exception-caught
             warnings.warn(f"Unexpected error while trying to compile {rule_name}: {e}")
         finally:
@@ -253,8 +254,6 @@ def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
     decomp_file_path.parent.mkdir(parents=True, exist_ok=True)
 
     target_ops, num_ops_missed = get_compiler_ops()
-    if num_ops_missed:
-        warnings.warn(f"failed to collect {num_ops_missed} op(s) from PennyLane")
 
     mlir_rules = "".join(
         str(mlir).replace("@rule_wrapper", f"@__builtin_{name}")
@@ -273,5 +272,5 @@ def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
         bytecode_file.write(bytecode)
 
 
-if __name__ == "__main__":
-    precompile_decomp_rules()
+if __name__ == "__main__":  # pragma: no cover
+    precompile_decomp_rules()  # pragma: no cover

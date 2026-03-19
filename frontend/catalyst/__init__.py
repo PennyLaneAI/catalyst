@@ -97,8 +97,8 @@ if (
         or os.getenv("CI")  # do not run in CI
     )
     and not BYTECODE_FILE_PATH.exists()
-):
-    precompile_decomp_rules()
+):  # pragma: no cover
+    precompile_decomp_rules()  # pragma: no cover
 
 
 autograph_ignore_fallbacks = False

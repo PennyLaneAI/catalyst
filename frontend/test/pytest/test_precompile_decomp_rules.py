@@ -15,8 +15,10 @@
 """Tests for the decomposition rule precompilation utilities."""
 
 import pennylane as qp
+import pytest
 
 from catalyst.compiler import _quantum_opt
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.precompile_decomposition_rules import (
     BYTECODE_FILE_PATH,
     COMPILER_OPS_FOR_DECOMPOSITION,
@@ -27,13 +29,21 @@ from catalyst.utils.precompile_decomposition_rules import (
 )
 
 
-def test_get_compiler_ops():
-    """Test that get_compiler_ops succeeds in finding all compiler ops."""
-    ops, failures = get_compiler_ops()
+class TestGetCompilerOps:
+    """Tests for get_compiler_ops."""
 
-    assert len(ops) == len(COMPILER_OPS_FOR_DECOMPOSITION)
+    def test_get_compiler_ops(self):
+        """Test that get_compiler_ops succeeds in finding all compiler ops."""
+        ops, failures = get_compiler_ops()
 
-    assert failures == 0
+        assert len(ops) == len(COMPILER_OPS_FOR_DECOMPOSITION)
+
+        assert failures == 0
+
+    def test_warning(self):
+        """Test that get_compiler_ops warns when an op is not found."""
+        with pytest.warns():
+            get_compiler_ops(frozenset(["fake_op"]))
 
 
 class TestGetAbstractArgs:
@@ -55,6 +65,14 @@ class TestGetAbstractArgs:
         """Test that get_abstract_args correctly handles length > 1 ndim_params."""
         assert get_abstract_args(qp.U3) == [float, float, float]
 
+    def test_dimension_failure(self):
+        """
+        Test that get_abstract_args correctly raises an exception given an op with
+        multi-dimensional params.
+        """
+        with pytest.raises(ValueError, match="Cannot generate arguments"):
+            get_abstract_args(qp.ControlledQubitUnitary)
+
 
 class TestCompileOpDecompRules:
     """Tests for compile_op_decomp_rules."""
@@ -75,6 +93,46 @@ class TestCompileOpDecompRules:
         assert "_rx_to_ry_cliff" in rules
         assert "_rx_to_rz_cliff" in rules
         assert "_rx_to_ppr" in rules
+
+    def test_fails_with_unknown_wires(self):
+        """
+        Test that compile_op_decomp_rules warns when the number of wires is unknown.
+        """
+        with pytest.warns():
+            compile_op_decomp_rules(qp.Identity)
+
+    def test_compile_error(self):
+        """Test that compile_op_decomp_rules warns when compilation fails."""
+
+        class FakeOp(qp.operation.Operator):
+            num_wires = 1
+            num_params = 1
+            ndim_params = (0,)
+
+        @qp.register_resources({})
+        def fake_op_decomp(string):
+            qp.PauliRot(2, string)
+
+        qp.add_decomps(FakeOp, fake_op_decomp)
+
+        with pytest.warns(match="Unexpected error"):
+            compile_op_decomp_rules(FakeOp)
+
+    def test_unexpected_error(self):
+        """Test that compile_op_decomp_rules warns when an unexpected exception is thrown."""
+
+        class FakeOp(qp.operation.Operator):
+            num_wires = 1
+            num_params = 1
+
+        @qp.register_resources({})
+        def fake_op_decomp(string):
+            qp.PauliRot(2, string)
+
+        qp.add_decomps(FakeOp, fake_op_decomp)
+
+        with pytest.warns(match="Unexpected error"):
+            compile_op_decomp_rules(FakeOp)
 
 
 def test_bytecode_file():
