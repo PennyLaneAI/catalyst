@@ -138,6 +138,7 @@ from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
 from pennylane.capture.primitives import quantum_subroutine_prim
 from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
+from pennylane.capture.primitives import for_loop_prim as pl_for_loop_prim
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
@@ -2654,6 +2655,61 @@ def _for_loop_lowering(
     return for_op_scf.results
 
 
+# pylint: disable=too-many-arguments
+def _pl_for_loop_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    start,
+    stop,
+    step,
+    *plxpr_invals,
+    jaxpr_body_fn,
+    consts_slice,
+    args_slice,
+    abstract_shapes_slice,
+):
+    body_consts = plxpr_invals[slice(*consts_slice)]
+    abstract_shapes = plxpr_invals[slice(*abstract_shapes_slice)]
+    args = plxpr_invals[slice(*args_slice)]
+
+    # need later to cast index back to original type
+    start_type = ir.RankedTensorType(start.type).element_type
+
+    start, stop, step = map(_cast_to_index, (start, stop, step))
+    # slicing out index, as passed to block independently
+    loop_args = abstract_shapes + args
+    for_op_scf = ForOp(start, stop, step, iter_args=loop_args)
+
+    name_stack = jax_ctx.name_stack.extend("for")
+    body_block = for_op_scf.body
+    body_ctx = jax_ctx.replace(name_stack=name_stack.extend("body"))
+
+    with ir.InsertionPoint(body_block):
+        # index -> i32 -> tensor<i32>
+        index = body_block.arguments[0]
+        scalar_index = IndexCastOp(start_type, index).result
+        new_dtype = ir.RankedTensorType.get((), start_type)
+        tensor_index = FromElementsOp(new_dtype, scalar_index).result
+
+        inner_shapes = body_block.arguments[1:len(abstract_shapes)+1]
+        inner_args = body_block.arguments[len(abstract_shapes)+1:]
+        loop_params = (*body_consts, *inner_shapes, tensor_index, *inner_args)
+
+        # Recursively generate the mlir for the loop body
+        out, _ = mlir.jaxpr_subcomp(
+            body_ctx.module_context,
+            jaxpr_body_fn,
+            body_ctx.name_stack,
+            mlir.TokenSet(),
+            [mlir.ir_constants(c) for c in body_consts],
+            *loop_params,
+            dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
+        )
+        YieldOp(out)
+
+    return for_op_scf.results
+
+
 #
 # assert
 #
@@ -2922,6 +2978,7 @@ CUSTOM_LOWERING_RULES = (
     (switch_p, _switch_lowering),
     (while_p, _while_loop_lowering),
     (for_p, _for_loop_lowering),
+    (pl_for_loop_prim, _pl_for_loop_lowering),
     (grad_p, _grad_lowering),
     (pl_jac_prim, _capture_grad_lowering),
     (pl_vjp_prim, _capture_vjp_lowering),
