@@ -23,7 +23,6 @@ from jax.core import ShapedArray
 
 import catalyst
 from catalyst import qjit
-from catalyst.from_plxpr import register_transform
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
@@ -427,6 +426,29 @@ class TestCapture:
         expected_result = -1
 
         assert jnp.allclose(capture_result, expected_result)
+
+    @pytest.mark.parametrize("pred", [False, 0.0, 0])
+    def test_measure_as_condition(self, backend, pred):
+        """Test the integration for a circuit with a mid-circuit measurement used as a conditional
+        predicate.
+        """
+        device = qml.device(backend, wires=1)
+
+        qml.capture.enable()
+
+        @qjit(autograph=True)
+        @qml.qnode(device)
+        def captured_circuit():
+            m = qml.measure(wires=0)
+            if m == pred:
+                qml.X(0)
+            return qml.expval(qml.Z(0))
+
+        capture_result = captured_circuit()
+
+        qml.capture.disable()
+
+        assert jnp.allclose(capture_result, -1)
 
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_forloop(self, backend, theta):
@@ -1075,15 +1097,13 @@ class TestCapture:
         assert jnp.allclose(circuit(0.1), capture_result)
 
     @pytest.mark.usefixtures("use_capture")
-    def test_pass_with_options_patch(self, backend):
+    def test_pass_with_setup_input_options(self, backend):
         """Test the integration for a circuit with a pass that takes in options."""
 
-        @qml.transform
-        def my_pass(_tape, my_option=None, my_other_option=None):  # pylint: disable=unused-argument
-            """A dummy qml.transform."""
-            return
+        def my_pass_setup_inputs(my_option=None, my_other_option=None):
+            return (), {"my_option": my_option, "my_other_option": my_other_option}
 
-        register_transform(my_pass, "my-pass", False)
+        my_pass = qml.transform(pass_name="my-pass", setup_inputs=my_pass_setup_inputs)
 
         @qjit(target="mlir")
         @partial(my_pass, my_option="my_option_value", my_other_option=False)

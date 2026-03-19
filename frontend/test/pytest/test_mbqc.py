@@ -242,7 +242,7 @@ def test_explicit_rz_in_mbqc(rz_angle, mbqc_pipeline):
 
     # RZ circuit in the MBQC representation
     @qjit(pipelines=mbqc_pipeline)
-    @qml.qnode(dev, mcm_method="tree-traversal")
+    @qml.qnode(dev)
     def circuit_mbqc(start_state, angle):
         # prep input node
         qml.StatePrep(start_state, wires=[0])
@@ -337,7 +337,7 @@ def test_cnot_in_mbqc_representation(mbqc_pipeline):
 
     # Equivalent CNOT circuit in the MBQC representation
     @qjit(pipelines=mbqc_pipeline)
-    @qml.qnode(dev, mcm_method="tree-traversal")
+    @qml.qnode(dev)
     def circuit_mbqc(start_state):
         # prep input nodes
         qml.StatePrep(start_state, wires=[1, 9])

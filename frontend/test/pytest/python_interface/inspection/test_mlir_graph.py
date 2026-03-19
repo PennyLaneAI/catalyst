@@ -39,149 +39,185 @@ def _chdir_tmp(monkeypatch, tmp_path: Path):
     return tmp_path
 
 
-def collect_files(tmp_path: Path) -> set[str]:
+def collect_files(tmp_path: Path) -> list[str]:
     """Return the set of generated SVG files."""
     out_dir = tmp_path / "mlir_generated_graphs"
-    return {f.name for f in out_dir.glob("*.svg")}
+    return sorted([f.name for f in out_dir.glob("*.svg")])
 
 
-def assert_files(tmp_path: Path, expected: set[str]):
-    """Check that the generated files match the expected set."""
-    files = collect_files(tmp_path)
-    assert files == expected, f"Expected {expected}, got {files}"
-
-
-@pytest.mark.usefixtures("use_capture")
+@pytest.mark.usefixtures("use_both_frontend")
 class TestMLIRGraph:
     """Test the MLIR graph generation"""
 
-    @pytest.mark.parametrize("qjit", [True, False])
-    def test_no_transforms(self, tmp_path: Path, qjit: bool):
+    def test_no_qjit_error(self):
+        """Test that an error is raised if trying to use anything other than QJIT as
+        an input."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f():
+            qml.RX(0.1, 0)
+            qml.RX(2.0, 0)
+            qml.CNOT([0, 2])
+            qml.CNOT([0, 2])
+            return qml.state()
+
+        gen = generate_mlir_graph(f)
+        with pytest.raises(TypeError, match="Cannot generate MLIR module"):
+            gen()
+
+    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    def test_no_transforms(self, tmp_path: Path, skip_preprocess):
         """Test the MLIR graph is still generated when no transforms are applied"""
+        if not qml.capture.enabled() and skip_preprocess:
+            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
+        @qml.qjit(skip_preprocess=skip_preprocess)
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _():
+        def f():
             qml.RX(0.1, 0)
             qml.RX(2.0, 0)
             qml.CNOT([0, 2])
             qml.CNOT([0, 2])
             return qml.state()
 
-        if qjit:
-            _ = qml.qjit(_)
+        generate_mlir_graph(f)()
 
-        generate_mlir_graph(_)()
-        assert collect_files(tmp_path) == {"QNode_level_0_no_transforms.svg"}
+        collected_files = collect_files(tmp_path)
+        assert collected_files[0] == "QNode_level_0_no_transforms.svg"
+        if not qml.capture.enabled() or skip_preprocess:
+            assert len(collected_files) == 1
+        else:
+            assert len(collected_files) > 1
 
-    @pytest.mark.parametrize("qjit", [True, False])
-    def test_xdsl_transforms_no_args(self, tmp_path: Path, qjit: bool):
+    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    def test_xdsl_transforms_no_args(self, tmp_path: Path, skip_preprocess):
         """Test the MLIR graph generation with no arguments to the QNode with and without qjit"""
+        if not qml.capture.enabled() and skip_preprocess:
+            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
+        @qml.qjit(skip_preprocess=skip_preprocess)
         @merge_rotations_pass
         @iterative_cancel_inverses_pass
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _():
+        def f():
             qml.RX(0.1, 0)
             qml.RX(2.0, 0)
             qml.CNOT([0, 2])
             qml.CNOT([0, 2])
             return qml.state()
 
-        if qjit:
-            _ = qml.qjit(_)
+        generate_mlir_graph(f)()
 
-        generate_mlir_graph(_)()
-        assert_files(
-            tmp_path,
-            {
-                "QNode_level_0_no_transforms.svg",
-                "QNode_level_1_after_xdsl-cancel-inverses.svg",
-                "QNode_level_2_after_xdsl-merge-rotations.svg",
-            },
-        )
+        collected_files = collect_files(tmp_path)
+        expected_user = [
+            "QNode_level_0_no_transforms.svg",
+            "QNode_level_1_after_xdsl-cancel-inverses.svg",
+            "QNode_level_2_after_xdsl-merge-rotations.svg",
+        ]
+        if not qml.capture.enabled() or skip_preprocess:
+            assert collected_files == expected_user
+        else:
+            assert collected_files[0 : len(expected_user)] == expected_user
+            assert len(collected_files) > len(expected_user)
 
-    @pytest.mark.parametrize("qjit", [True, False])
-    def test_xdsl_transforms_args(self, tmp_path: Path, qjit: bool):
+    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    def test_xdsl_transforms_args(self, tmp_path: Path, skip_preprocess):
         """Test the MLIR graph generation with arguments to the QNode for xDSL transforms"""
+        if not qml.capture.enabled() and skip_preprocess:
+            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
+        @qml.qjit(skip_preprocess=skip_preprocess)
         @merge_rotations_pass
         @iterative_cancel_inverses_pass
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _(x, y, w1, w2):
+        def f(x, y, w1, w2):
             qml.RX(x, w1)
             qml.RX(y, w2)
             return qml.state()
 
-        if qjit:
-            _ = qml.qjit(_)
+        generate_mlir_graph(f)(0.1, 0.2, 0, 1)
 
-        generate_mlir_graph(_)(0.1, 0.2, 0, 1)
-        assert_files(
-            tmp_path,
-            {
-                "QNode_level_0_no_transforms.svg",
-                "QNode_level_1_after_xdsl-cancel-inverses.svg",
-                "QNode_level_2_after_xdsl-merge-rotations.svg",
-            },
-        )
+        collected_files = collect_files(tmp_path)
+        expected_user = [
+            "QNode_level_0_no_transforms.svg",
+            "QNode_level_1_after_xdsl-cancel-inverses.svg",
+            "QNode_level_2_after_xdsl-merge-rotations.svg",
+        ]
+        if not qml.capture.enabled() or skip_preprocess:
+            assert collected_files == expected_user
+        else:
+            assert collected_files[0 : len(expected_user)] == expected_user
+            assert len(collected_files) > len(expected_user)
 
-    @pytest.mark.parametrize("qjit", [True, False])
-    def test_catalyst_transforms_args(self, tmp_path: Path, qjit: bool):
+    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    def test_catalyst_transforms_args(self, tmp_path: Path, skip_preprocess):
         """Test the MLIR graph generation with arguments to the QNode for catalyst transforms"""
+        if not qml.capture.enabled() and skip_preprocess:
+            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
+        @qml.qjit(skip_preprocess=skip_preprocess)
         @qml.transforms.merge_rotations
         @qml.transforms.cancel_inverses
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _(x, y, w1, w2):
+        def f(x, y, w1, w2):
             qml.RX(x, w1)
             qml.RX(y, w2)
             return qml.state()
 
-        if qjit:
-            _ = qml.qjit(_)
+        generate_mlir_graph(f)(0.1, 0.2, 0, 1)
 
-        generate_mlir_graph(_)(0.1, 0.2, 0, 1)
-        assert_files(
-            tmp_path,
-            {
-                "QNode_level_0_no_transforms.svg",
-                "QNode_level_1_after_cancel-inverses.svg",
-                "QNode_level_2_after_merge-rotations.svg",
-            },
-        )
+        collected_files = collect_files(tmp_path)
+        expected_user = [
+            "QNode_level_0_no_transforms.svg",
+            "QNode_level_1_after_cancel-inverses.svg",
+            "QNode_level_2_after_merge-rotations.svg",
+        ]
+        if not qml.capture.enabled() or skip_preprocess:
+            assert collected_files == expected_user
+        else:
+            assert collected_files[0 : len(expected_user)] == expected_user
+            assert len(collected_files) > len(expected_user)
 
-    @pytest.mark.parametrize("qjit", [True, False])
-    def test_catalyst_xdsl_transforms_args(self, tmp_path: Path, qjit: bool):
+    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    def test_catalyst_xdsl_transforms_args(self, tmp_path: Path, skip_preprocess):
         """Test the MLIR graph generation with arguments to the QNode for catalyst and xDSL
         transforms"""
+        if not qml.capture.enabled() and skip_preprocess:
+            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
+        @qml.qjit(skip_preprocess=skip_preprocess)
         @qml.transforms.merge_rotations
         @iterative_cancel_inverses_pass
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _(x, y, w1, w2):
+        def f(x, y, w1, w2):
             qml.RX(x, w1)
             qml.RX(y, w2)
             return qml.state()
 
-        if qjit:
-            _ = qml.qjit(_)
+        generate_mlir_graph(f)(0.1, 0.2, 0, 1)
 
-        generate_mlir_graph(_)(0.1, 0.2, 0, 1)
-        assert_files(
-            tmp_path,
-            {
-                "QNode_level_0_no_transforms.svg",
-                "QNode_level_1_after_xdsl-cancel-inverses.svg",
-                "QNode_level_2_after_merge-rotations.svg",
-            },
-        )
+        collected_files = collect_files(tmp_path)
+        expected_user = [
+            "QNode_level_0_no_transforms.svg",
+            "QNode_level_1_after_xdsl-cancel-inverses.svg",
+            "QNode_level_2_after_merge-rotations.svg",
+        ]
+        if not qml.capture.enabled() or skip_preprocess:
+            assert collected_files == expected_user
+        else:
+            assert collected_files[0 : len(expected_user)] == expected_user
+            assert len(collected_files) > len(expected_user)
 
-    def test_cond(self, tmp_path: Path):
+    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    def test_cond(self, tmp_path: Path, skip_preprocess):
         """Test the MLIR graph generation for a conditional"""
+        if not qml.capture.enabled() and skip_preprocess:
+            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
+        @qml.qjit(skip_preprocess=skip_preprocess)
         @merge_rotations_pass
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _(pred, arg1, arg2):
+        def f(pred, arg1, arg2):
             """Quantum circuit with conditional branches."""
 
             qml.RX(0.10, wires=0)
@@ -199,17 +235,24 @@ class TestMLIRGraph:
             qml.RX(0.10, wires=0)
             return qml.expval(qml.Z(wires=0))
 
-        generate_mlir_graph(_)(0.5, 0.1, 0.2)
-        assert_files(
-            tmp_path,
-            {
-                "QNode_level_0_no_transforms.svg",
-                "QNode_level_1_after_xdsl-merge-rotations.svg",
-            },
-        )
+        generate_mlir_graph(f)(0.5, 0.1, 0.2)
 
-    def test_cond_with_mcm(self, tmp_path: Path):
+        collected_files = collect_files(tmp_path)
+        expected_user = [
+            "QNode_level_0_no_transforms.svg",
+            "QNode_level_1_after_xdsl-merge-rotations.svg",
+        ]
+        if not qml.capture.enabled() or skip_preprocess:
+            assert collected_files == expected_user
+        else:
+            assert collected_files[0 : len(expected_user)] == expected_user
+            assert len(collected_files) > len(expected_user)
+
+    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    def test_cond_with_mcm(self, tmp_path: Path, skip_preprocess):
         """Test the MLIR graph generation for a conditional with MCM"""
+        if not qml.capture.enabled() and skip_preprocess:
+            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
         def true_fn(arg):
             qml.RX(arg, 0)
@@ -217,9 +260,10 @@ class TestMLIRGraph:
         def false_fn(arg):
             qml.RY(3 * arg, 0)
 
+        @qml.qjit(skip_preprocess=skip_preprocess)
         @merge_rotations_pass
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _(x, y):
+        def f(x, y):
             """Quantum circuit with conditional branches."""
 
             qml.RX(x, 0)
@@ -228,21 +272,29 @@ class TestMLIRGraph:
             qml.cond(m, true_fn, false_fn)(y)
             return qml.expval(qml.Z(0))
 
-        generate_mlir_graph(_)(0.5, 0.1)
-        assert_files(
-            tmp_path,
-            {
-                "QNode_level_0_no_transforms.svg",
-                "QNode_level_1_after_xdsl-merge-rotations.svg",
-            },
-        )
+        generate_mlir_graph(f)(0.5, 0.1)
 
-    def test_for_loop(self, tmp_path: Path):
+        collected_files = collect_files(tmp_path)
+        expected_user = [
+            "QNode_level_0_no_transforms.svg",
+            "QNode_level_1_after_xdsl-merge-rotations.svg",
+        ]
+        if not qml.capture.enabled() or skip_preprocess:
+            assert collected_files == expected_user
+        else:
+            assert collected_files[0 : len(expected_user)] == expected_user
+            assert len(collected_files) > len(expected_user)
+
+    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    def test_for_loop(self, tmp_path: Path, skip_preprocess):
         """Test the MLIR graph generation for a for loop"""
+        if not qml.capture.enabled() and skip_preprocess:
+            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
+        @qml.qjit(skip_preprocess=skip_preprocess)
         @merge_rotations_pass
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _():
+        def f():
             @qml.for_loop(0, 100)
             def loop(_):
                 qml.RX(0.1, 0)
@@ -252,21 +304,29 @@ class TestMLIRGraph:
             loop()
             return qml.state()
 
-        generate_mlir_graph(_)()
-        assert_files(
-            tmp_path,
-            {
-                "QNode_level_0_no_transforms.svg",
-                "QNode_level_1_after_xdsl-merge-rotations.svg",
-            },
-        )
+        generate_mlir_graph(f)()
 
-    def test_while_loop(self, tmp_path: Path):
+        collected_files = collect_files(tmp_path)
+        expected_user = [
+            "QNode_level_0_no_transforms.svg",
+            "QNode_level_1_after_xdsl-merge-rotations.svg",
+        ]
+        if not qml.capture.enabled() or skip_preprocess:
+            assert collected_files == expected_user
+        else:
+            assert collected_files[0 : len(expected_user)] == expected_user
+            assert len(collected_files) > len(expected_user)
+
+    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    def test_while_loop(self, tmp_path: Path, skip_preprocess):
         """Test the MLIR graph generation for a while loop"""
+        if not qml.capture.enabled() and skip_preprocess:
+            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
+        @qml.qjit(skip_preprocess=skip_preprocess)
         @merge_rotations_pass
         @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def _(x):
+        def f(x):
             def cond_fn(x):
                 return x < 2
 
@@ -277,14 +337,18 @@ class TestMLIRGraph:
             loop(x)
             return qml.expval(qml.PauliZ(0))
 
-        generate_mlir_graph(_)(0.5)
-        assert_files(
-            tmp_path,
-            {
-                "QNode_level_0_no_transforms.svg",
-                "QNode_level_1_after_xdsl-merge-rotations.svg",
-            },
-        )
+        generate_mlir_graph(f)(0.5)
+
+        collected_files = collect_files(tmp_path)
+        expected_user = [
+            "QNode_level_0_no_transforms.svg",
+            "QNode_level_1_after_xdsl-merge-rotations.svg",
+        ]
+        if not qml.capture.enabled() or skip_preprocess:
+            assert collected_files == expected_user
+        else:
+            assert collected_files[0 : len(expected_user)] == expected_user
+            assert len(collected_files) > len(expected_user)
 
 
 if __name__ == "__main__":
