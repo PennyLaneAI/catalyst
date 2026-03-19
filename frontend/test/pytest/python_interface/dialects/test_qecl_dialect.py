@@ -181,7 +181,7 @@ class TestQecLogicalOps:
         "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
     )
     def test_qecl_op_constructor_paulis(self, op, idx):
-        """Test the constructor of the qecl.identity op."""
+        """Test the constructors of the qecl Pauli gate ops."""
         pauli_op = op(in_codeblock=self._get_codeblock_value(), idx=idx)
         assert len(pauli_op.result_types) == 1
         assert isinstance(pauli_op.result_types[0], qecl.LogicalCodeblockType)
