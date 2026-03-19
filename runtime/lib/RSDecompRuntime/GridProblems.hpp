@@ -23,6 +23,8 @@
 #include <utility>
 #include <vector>
 
+// #include <iostream>
+
 // Note:
 // The construction of the grid problem solver here are described in https://arxiv.org/pdf/1403.2975
 // Section 4, 5
@@ -60,6 +62,15 @@ inline int bbox_grid_points(const bbox &bbox)
     // \delta_{1/2} \cdot (\lambda - 1)^{k_{1/2}} < 1, where \lambda= 1/√2.
     int k1 = static_cast<int>(std::floor(std::log2(d1) / d_ + 1.0));
     int k2 = static_cast<int>(std::floor(std::log2(d2) / d_ + 1.0));
+
+    double test_scale_1 = (k1 < 0 ? l1 : l2).pow(std::abs(k1)).to_double();
+    if (test_scale_1 * d1 >= 1.0) {
+        k1 += 1;
+    }
+    double test_scale_2 = (k2 < 0 ? l1 : l2).pow(std::abs(k2)).to_double();
+    if (test_scale_2 * d2 >= 1.0) {
+        k2 += 1;
+    }
 
     double current_x0 = x_min, current_x1 = x_max, current_y0 = y_min, current_y1 = y_max;
     // If y-interval is wider than x-interval, swap.
@@ -203,6 +214,17 @@ class one_dim_problem_solution_iterator {
         // \delta_{1/2} \cdot (\lambda - 1)^{k_{1/2}} < 1, where \lambda= 1/√2.
         int local_k1 = static_cast<int>(std::floor(std::log2(d1) / d_ + 1.0));
         int local_k2 = static_cast<int>(std::floor(std::log2(d2) / d_ + 1.0));
+
+        // std::cerr << "Initial k1: " << local_k1 << ", k2: " << local_k2 << std::endl;
+
+        double test_scale_1 = (local_k1 < 0 ? l1 : l2).pow(std::abs(local_k1)).to_double();
+        if (test_scale_1 * d1 >= 1.0) {
+            local_k1 += 1;
+        }
+        double test_scale_2 = (local_k2 < 0 ? l1 : l2).pow(std::abs(local_k2)).to_double();
+        if (test_scale_2 * d2 >= 1.0) {
+            local_k2 += 1;
+        }
 
         k1 = local_k1;
         int k2 = local_k2;
