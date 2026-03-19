@@ -28,7 +28,7 @@ from pennylane.operation import Operator
 from pennylane.ops import GlobalPhase
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region
-
+from xdsl.traits import SymbolTable
 from catalyst.python_interface.dialects import pbc, quantum
 from catalyst.python_interface.inspection.dag_builder import DAGBuilder
 from catalyst.python_interface.inspection.xdsl_conversion import (
@@ -548,6 +548,13 @@ class ConstructCircuitDAG:
 
         self._wire_to_node_uids = final_wire_map
 
+    @_visit_operation.register
+    def _index_switch_op(self, operation: scf.IndexSwitchOp):
+        """Handles the scf.IndexSwitchOp operation."""
+        raise NotImplementedError(
+            "Visualization handling for 'scf.IndexSwitchOp' operations is currently not supported."
+        )
+
     # ============
     # DEVICE NODE
     # ============
@@ -572,15 +579,40 @@ class ConstructCircuitDAG:
     # =======================
 
     @_visit_operation.register
+    def _call_op(self, operation: func.CallOp) -> None:
+        """Visit a CallOp operation."""
+        callee_name = operation.callee.root_reference.data
+        # Look up the callee function in the symbol table to get its body and visualize it as a cluster
+        callee_func = SymbolTable.lookup_symbol(operation, operation.callee)
+
+        # Don't visualize calls to external functions without a body
+        is_external_function = callee_func is None or not callee_func.regions[0].blocks
+        if is_external_function:
+            return
+
+        uid = f"cluster{self._cluster_uid_counter}"
+        self.dag_builder.add_cluster(
+            uid,
+            label=callee_name,
+            labeljust="l",
+            cluster_uid=self._cluster_uid_stack[-1],
+        )
+        self._cluster_uid_stack.append(uid)
+        self._cluster_uid_counter += 1
+
+        self._visit_block(callee_func.regions[0].blocks[0])
+
+    @_visit_operation.register
     def _func_op(self, operation: func.FuncOp) -> None:
         """Visit a FuncOp Operation."""
 
-        if not operation.regions[0].blocks:
-            _ERROR_MSG = (
-                "Calls to functions without a definition are not yet compatible with 'draw_graph'. "
-                f"Found external function call to {operation.sym_name.data}."
-            )
-            raise VisualizationError(_ERROR_MSG)
+        is_external_function = len(operation.regions[0].blocks) == 0
+        qjit = operation.sym_name.data.startswith("jit_")
+        qnode = operation.attributes.get("quantum.node", None) is not None
+
+        # Don't visualize external functions without a body unless they are qjits or qnodes
+        if is_external_function or not (qjit or qnode):
+            return
 
         label: str = (
             "qjit" if operation.sym_name.data.startswith("jit_") else operation.sym_name.data
@@ -604,15 +636,12 @@ class ConstructCircuitDAG:
     def _func_return(self, operation: func.ReturnOp) -> None:
         """Handle func.return to exit FuncOp's cluster scope."""
 
-        # NOTE: Skip first cluster as it is the "base" of the graph diagram.
-        # In our case, it is the `qjit` bounding box.
-        if len(self._cluster_uid_stack) > 1:
-            # If we hit a func.return operation we know we are leaving
-            # the FuncOp's scope and so we can pop the ID off the stack.
-            self._cluster_uid_stack.pop()
+        self._cluster_uid_stack.pop()
 
         # Clear seen wires as we are exiting a FuncOp (qnode)
-        self._wire_to_node_uids = defaultdict(set)
+        if parent_op := operation.parent_op():
+            if parent_op.attributes.get("quantum.node", None) is not None:
+                self._wire_to_node_uids = defaultdict(set)
 
     # =======================
     # NODE CONNECTIVITY
