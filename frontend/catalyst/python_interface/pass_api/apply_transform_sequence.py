@@ -198,8 +198,8 @@ class ApplyTransformSequencePattern(RewritePattern):
 
 class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
     """RewritePattern for applying transform sequences when no callback is provided.
-    This is functionally the same as the ``ApplyTransformSequenceWithCallbackPattern``,
-    but uses a more optimized pathway, which is enabled by the lack of a callback."""
+    This is functionally the same as the ``ApplyTransformSequencePattern``, but uses
+    a more optimized pathway, which is enabled by the lack of a callback."""
 
     def __init__(
         self,
