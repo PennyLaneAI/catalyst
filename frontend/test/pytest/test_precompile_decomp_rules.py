@@ -113,6 +113,7 @@ class TestCompileOpDecompRules:
             @qp.register_resources({})
             def fake_op_decomp(param, wires):
                 _quantum_opt(stdin="module {")
+                return param, wires
 
             qp.add_decomps(FakeOp, fake_op_decomp)
 
