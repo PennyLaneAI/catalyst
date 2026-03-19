@@ -56,13 +56,13 @@ struct MergeGlobalPhasePass : impl::MergeGlobalPhasePassBase<MergeGlobalPhasePas
                     auto remainingPhases = llvm::drop_begin(simplePhases);
 
                     builder.setInsertionPoint(firstPhase);
-                    Value runningSum = firstPhase.getParams();
+                    Value runningSum = firstPhase.getAngle();
                     for (GlobalPhaseOp phaseOp : llvm::make_early_inc_range(remainingPhases)) {
-                        llvm::SmallVector<Value, 2> args{runningSum, phaseOp.getParams()};
+                        llvm::SmallVector<Value, 2> args{runningSum, phaseOp.getAngle()};
                         runningSum = arith::AddFOp::create(builder, phaseOp.getLoc(), args);
                         phaseOp->erase();
                     }
-                    firstPhase.getParamsMutable().assign(runningSum);
+                    firstPhase.getAngleMutable().assign(runningSum);
                 }
             }
         });
