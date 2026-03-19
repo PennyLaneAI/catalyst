@@ -228,6 +228,10 @@ class one_dim_problem_solution_iterator {
         x0_scaled = x_scale * x0;
         x1_scaled = x_scale * x1;
 
+        double width_scaled = x_scale * (x1 - x0);
+        x0_scaled = x_scale * x0;
+        x1_scaled = x0_scaled + width_scaled;
+
         double y_temp0 = y_scale * y0;
         double y_temp1 = y_scale * y1;
         y0_scaled = std::min(y_temp0, y_temp1);
