@@ -78,6 +78,11 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
         # diagonalize measurements before converting to samples
         DiagonalizeFinalMeasurementsPass().apply(_ctx, op)
 
+        pattern_rewriter.PatternRewriteWalker(
+            AddPostProcessingPattern(pass_str="from_samples"),
+            apply_recursively=False,
+        ).rewrite_module(op)
+
         greedy_applier = pattern_rewriter.GreedyRewritePatternApplier(
             [
                 # ExpvalAndVarPattern(shots),
@@ -91,6 +96,76 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
         walker.rewrite_module(op)
 
 measurements_from_samples_pass = compiler_transform(MeasurementsFromSamplesPass)
+
+class AddPostProcessingPattern(RewritePattern):
+    """RewritePattern for making each Qnode intro a classical function that 
+    calls the QNode and performs post-processing."""
+
+    def __init__(self, pass_str: str):
+        super().__init__()
+        self._pass_str = pass_str
+
+    def match_and_rewrite(
+        self, func_op: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter, /
+    ):
+        """Transform a quantum function (qnode) to separate it into a new quantum node
+        and an outer function that calls the quantum node. Subsequent patterns can the apply 
+        postprocessing to the results of the call in the outer function when changes are made 
+        to the quantum node.
+        """
+
+        if "quantum.node" not in func_op.attributes:
+            return
+        
+        self._wrap_qnode_in_classical_post_processing(func_op, rewriter)
+
+    def _get_parent_module(self, op: func.FuncOp) -> builtin.ModuleOp:
+        """Get the first ancestral builtin.ModuleOp op of a given func.func op."""
+        while (op := op.parent_op()) and not isinstance(op, builtin.ModuleOp):
+            pass  # pragma: no cover
+        if op is None:
+            raise RuntimeError(  # pragma: no cover
+                "The given qnode func is not nested within a builtin.module. Please ensure the "
+                "qnode func is defined in a builtin.module."
+            )
+
+        return op
+
+    def _wrap_qnode_in_classical_post_processing(self, quantum_node, rewriter):
+        """Clones some qnode FuncOp (circ_name) as circ_name.from_samples 
+        and inserts it, then replaces circ_name with a FuncOp of the same name 
+        that calls circ_name.from_samples."""
+
+        # this seems circuitous, why not just rename the QNode and then insert an 
+        # empty function right before it?
+        # add a clone of the "qnode" FuncOp named original_name.from_samples to the module
+        # ToDo: if we don't need to do that after all, we could just rename the QNode circ.from_samples and insert an empty FuncOp named circ instead
+        module = self._get_parent_module(quantum_node)
+        new_qnode = quantum_node.clone()
+        qnode_name = new_qnode.sym_name.data + f".{self._pass_str}"
+        new_qnode.sym_name = builtin.StringAttr(qnode_name)
+        rewriter.insert_op(new_qnode, InsertPoint.at_end(module.body.block))
+
+        # create an empty function and replace the original "qnode" FuncOp
+        func_type = quantum_node.function_type
+        outer_fn = func.FuncOp(
+            name=quantum_node.sym_name.data, 
+            function_type=func_type, 
+            visibility="public"
+        )
+        rewriter.replace_op(quantum_node, outer_fn)
+
+        # call the cloned QNode inside the new FuncOp
+        call_args = outer_fn.body.block.args
+        result_types = func_type.outputs.data
+        call_op = func.CallOp(qnode_name, call_args, result_types)
+        outer_fn.body.block.add_op(call_op)
+
+        # add a return op in the new FuncOp returning QNode results
+        qnode_call_results = call_op.results
+        return_op = func.ReturnOp(*qnode_call_results)
+        outer_fn.body.block.add_op(return_op)
+
 
 
 class MeasurementsFromSamplesPattern(RewritePattern):
@@ -404,7 +479,8 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
         if "quantum.node" not in func_op.attributes:
             return
         
-        self._wrap_qnode_in_classical_post_processing(func_op, rewriter)
+        self.qnode = func_op
+        self.call_op = self._get_call_op(func_op)
 
         measurement_processes = [op for op in self.qnode.body.walk() if isinstance(op, MEASUREMENT_PROCESS_TYPES)]
         for mp in measurement_processes:
@@ -430,46 +506,16 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
             )
 
         return op
-
-    def _wrap_qnode_in_classical_post_processing(self, quantum_node, rewriter):
-        """Clones some qnode FuncOp (circ_name) as circ_name.from_samples 
-        and inserts it, then replaces circ_name with a FuncOp of the same name 
-        that calls circ_name.from_samples."""
-
-        # this seems circuitous, why not just rename the QNode and then insert an 
-        # empty function right before it? Something to come back to when tidying up
-
-        # add a clone of the "qnode" FuncOp named original_name.from_samples to the module
-        # we keep the original qnode unmodified for generating post-processing functions later
-        # ToDo: if we don't need to do that after all, we could just rename the QNode circ.from_samples and insert an empty FuncOp named circ instead
-        module = self._get_parent_module(quantum_node)
-        new_qnode = quantum_node.clone()
-        qnode_name = new_qnode.sym_name.data + ".from_samples"
-        new_qnode.sym_name = builtin.StringAttr(qnode_name)
-        rewriter.insert_op(new_qnode, InsertPoint.at_end(module.body.block))
-
-        # create an empty function and replace the original "qnode" FuncOp
-        func_type = quantum_node.function_type
-        outer_fn = func.FuncOp(
-            name=quantum_node.sym_name.data, 
-            function_type=func_type, 
-            visibility="public"
-        )
-        rewriter.replace_op(quantum_node, outer_fn)
-
-        # call the cloned QNode inside the new FuncOp
-        call_args = outer_fn.body.block.args
-        result_types = func_type.outputs.data
-        call_op = func.CallOp(qnode_name, call_args, result_types)
-        outer_fn.body.block.add_op(call_op)
-
-        # add a return op in the new FuncOp returning QNode results
-        qnode_call_results = call_op.results
-        return_op = func.ReturnOp(*qnode_call_results)
-        outer_fn.body.block.add_op(return_op)
-
-        self.qnode = new_qnode
-        self.call_op = call_op
+    
+    def _get_call_op(self, qnode):
+        module = self._get_parent_module(qnode)
+        qnode_name = qnode.sym_name.data
+        all_call_ops = [op for op in module.body.walk() if isinstance(op, func.CallOp)]
+        qnode_call_op = [op for op in all_call_ops if qnode_name in op.callee.string_value()]
+        if not len(qnode_call_op)==1:
+            raise CompileError(f"Expected only one call_op for {qnode_name}, but recieved {qnode_call_op}")
+        
+        return qnode_call_op[0]
 
     # ToDo: clean up this mess!!
     def expval_and_var_to_samples(
@@ -616,7 +662,6 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
         else:
             raise TypeError(f"Expected a quantum.NamedObsOp or quantum.TensorOp, but received {obs}")
 
-
     def insert_postprocessing(self, mp, n_qubits, observable_op):
         # Insert the post-processing function into current module or get handle if already inserted
         match mp:
@@ -657,6 +702,7 @@ class NewMeasurementsFromSamplesPattern(MeasurementsFromSamplesPattern):
             )       
 
         return postprocessing_func_op 
+
 
 def create_postprocessing_obs(obs, num_wires, math_op):
 
@@ -765,27 +811,6 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
         f"{type(shots_extract_op).__name__}"
     )
 
-
-@xdsl_module
-@jax.jit
-def _postprocessing_var(samples):
-    """Post-processing to recover the variance from the given `samples` array for each requested
-    `column` in the array.
-
-    This function assumes that the samples are in the computational basis (0s and 1s) and that the
-    observable operand of the variance has eigenvalues +1 and -1.
-
-    Args:
-        samples (jax.core.ShapedArray): Array of samples, with shape (shots, wires).
-        column (int, jax.core.ShapedArray): Column index (or indices) of the `samples` array over
-            which the variance is computed.
-
-    Returns:
-        jax.core.ShapedArray: The variance for each requested column.
-    """
-    return jnp.var(1.0 - 2.0 * samples[:, 0], axis=0)
-
-
 @xdsl_module
 @jax.jit
 def _postprocessing_probs(samples):
@@ -815,3 +840,6 @@ def _postprocessing_probs(samples):
         counts = counts.at[i].add(1)
 
     return counts / n_samples
+
+
+
