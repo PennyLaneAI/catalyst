@@ -530,12 +530,8 @@ def AdjointOp : Region_Op<"adjoint", [NoTerminator]> {
 
     let regions = (region SizedRegion<1>:$region);
 
-    let arguments = (ins
-        Variadic<AnyTypeOf<[QuregRefType, QubitRefType]>>:$args
-    );
-
     let assemblyFormat = [{
-        `(` $args `)` attr-dict `:` type(operands) $region
+        attr-dict-with-keyword $region
     }];
 
     let hasVerifier = 1;

@@ -228,10 +228,10 @@ func.func @test_qubit_unitary(%q0: !qref.bit, %q1: !qref.bit,
 
 func.func @test_adjoint_op(%r: !qref.reg<2>)
 {
-    qref.adjoint(%r) : !qref.reg<2> {
-    ^bb0(%arg0: !qref.reg<2>):
-        %q0 = qref.get %arg0[0] : !qref.reg<2> -> !qref.bit
-        %q1 = qref.get %arg0[1] : !qref.reg<2> -> !qref.bit
+    qref.adjoint {
+    ^bb0():
+        %q0 = qref.get %r[0] : !qref.reg<2> -> !qref.bit
+        %q1 = qref.get %r[1] : !qref.reg<2> -> !qref.bit
         qref.custom "Hadamard"() %q0 : !qref.bit
         qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
     }
@@ -242,11 +242,11 @@ func.func @test_adjoint_op(%r: !qref.reg<2>)
 
 func.func @test_adjoint_multiple_args(%r: !qref.reg<2>, %q: !qref.bit)
 {
-    qref.adjoint(%r, %q) : !qref.reg<2>, !qref.bit {
-    ^bb0(%arg0: !qref.reg<2>, %arg1: !qref.bit):
-        %q1 = qref.get %arg0[1] : !qref.reg<2> -> !qref.bit
-        qref.custom "Hadamard"() %arg1 : !qref.bit
-        qref.custom "CNOT"() %arg1, %q1 : !qref.bit, !qref.bit
+    qref.adjoint {
+    ^bb0():
+        %q1 = qref.get %r[1] : !qref.reg<2> -> !qref.bit
+        qref.custom "Hadamard"() %q : !qref.bit
+        qref.custom "CNOT"() %q, %q1 : !qref.bit, !qref.bit
     }
     return
 }

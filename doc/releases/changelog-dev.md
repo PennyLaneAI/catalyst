@@ -232,7 +232,7 @@
 
 <h3>Improvements 🛠</h3>
 
-* The `quantum.adjoint` and `qref.adjoint` operations can now take in multiple quantum values, allowing
+* The `quantum.adjoint` operation can now take in multiple quantum values, allowing
   both qubits and registers, as opposed to constraining the operand to be a single quantum register.
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
 
@@ -448,6 +448,7 @@
 * A new dialect `QRef` was created. This dialect is very similar to the existing `Quantum` dialect,
   but it is in reference semantics, whereas the existing `Quantum` dialect is in value semantics.
   [(#2320)](https://github.com/PennyLaneAI/catalyst/pull/2320)
+  [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
