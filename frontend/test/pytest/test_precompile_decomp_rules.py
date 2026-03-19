@@ -33,11 +33,9 @@ class TestGetCompilerOps:
 
     def test_get_compiler_ops(self):
         """Test that get_compiler_ops succeeds in finding all compiler ops."""
-        ops, failures = get_compiler_ops()
+        ops = get_compiler_ops()
 
         assert len(ops) == len(COMPILER_OPS_FOR_DECOMPOSITION)
-
-        assert failures == 0
 
     def test_warning(self):
         """Test that get_compiler_ops warns when an op is not found."""
