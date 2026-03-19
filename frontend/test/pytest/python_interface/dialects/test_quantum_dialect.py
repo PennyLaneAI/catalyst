@@ -120,7 +120,7 @@ int_attr = IntegerAttr(0, 32)
 expected_ops_init_kwargs = {
     "AdjointOp": [
         {
-            "qreg": qreg,
+            "args": (qreg, q0, q1),
             "region": Region(Block((CustomOp(gate_name="CNOT", in_qubits=(q0, q1)),))),
         }
     ],

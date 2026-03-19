@@ -590,6 +590,25 @@ class TestCatalyst:
         observed = qjit(circuit)()
         assert_allclose(expected, observed)
 
+    @pytest.mark.usefixtures("use_both_frontend")
+    def test_adjoint_subroutine_with_classical_args(self, backend):
+        """Test an adjoint on a subroutine, with classical arguments"""
+
+        @qml.templates.Subroutine
+        def f(x, wires):
+            qml.IsingXX(x, wires)
+
+        dev = qml.device(backend, wires=4)
+
+        @qml.qnode(dev)
+        def circuit():
+            qml.adjoint(f)(0.5, (0, 1))
+            return qml.probs(wires=0)
+
+        expected = circuit()
+        observed = qjit(circuit)()
+        assert_allclose(expected, observed)
+
     def test_adjoint_outside_qjit(self, backend):
         """Test that the hybrid adjoint can be used from outside qjit & qnode."""
 
