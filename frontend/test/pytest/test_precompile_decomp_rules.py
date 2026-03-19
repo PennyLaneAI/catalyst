@@ -14,10 +14,9 @@
 
 """Tests for the decomposition rule precompilation utilities."""
 
-import subprocess
-
 import pennylane as qp
 
+from catalyst.compiler import _quantum_opt
 from catalyst.utils.precompile_decomposition_rules import (
     BYTECODE_FILE_PATH,
     COMPILER_OPS_FOR_DECOMPOSITION,
@@ -26,7 +25,6 @@ from catalyst.utils.precompile_decomposition_rules import (
     get_compiler_ops,
     precompile_decomp_rules,
 )
-from catalyst.utils.runtime_environment import DEFAULT_BIN_PATHS
 
 
 def test_get_compiler_ops():
@@ -87,15 +85,8 @@ def test_bytecode_file():
 
     assert BYTECODE_FILE_PATH.exists()
 
-    rules = subprocess.run(
-        (
-            f"{DEFAULT_BIN_PATHS['cli']}/quantum-opt",
-            BYTECODE_FILE_PATH,
-        ),
-        capture_output=True,
-        check=True,
-        text=True,
-    ).stdout
+    # NOTE: empty pass is needed to prevent running default pipeline
+    rules = _quantum_opt("--empty", str(BYTECODE_FILE_PATH))
 
     assert "_isingxy_to_h_cy" in rules
     assert "_doublexcit" in rules

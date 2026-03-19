@@ -14,10 +14,6 @@
 
 """Utilities for AOT compiling PennyLane's decomposition rules to MLIR Bytecode."""
 import inspect
-import os
-import subprocess
-import sys
-import sysconfig
 import warnings
 from functools import lru_cache
 from pathlib import Path
@@ -27,10 +23,9 @@ import pennylane as qp
 from jax._src.lib.mlir import ir
 from pennylane.operation import Operator
 
-from catalyst._configuration import INSTALLED
+from catalyst.compiler import _quantum_opt
 from catalyst.jax_primitives import decomposition_rule
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime_environment import DEFAULT_BIN_PATHS
 
 BYTECODE_FILE_PATH = Path(__file__).parent.parent / Path("resources/decomposition_rules.mlirbc")
 
@@ -267,46 +262,12 @@ def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
         for name, mlir in compile_op_decomp_rules(func).items()
     )
 
-    # FIXME use catalyst.compiler._quantum_opt once the catalyst dangling options are fixed
-    def get_cli_path():
-        """Method to obtain the quantum-opt CLI path packaged via the data_files mechanism."""
-        catalyst_cli = "quantum-opt"
-
-        if not INSTALLED:
-            return os.path.join(
-                os.getenv("CATALYST_BIN_DIR", DEFAULT_BIN_PATHS.get("cli", "")), catalyst_cli
-            )
-
-        # Default path
-        path = os.path.join(sysconfig.get_path("scripts"), catalyst_cli)
-        if os.path.isfile(path):
-            return path
-
-        # User path
-        user_scheme = sysconfig.get_preferred_scheme("user")
-        path = os.path.join(sysconfig.get_path("scripts", scheme=user_scheme), catalyst_cli)
-        if os.path.isfile(path):
-            return path
-
-        # Fallback to python location
-        path = os.path.join(os.path.dirname(sys.executable), catalyst_cli)
-        if os.path.isfile(path):
-            return path
-
-        raise RuntimeError(
-            "Could not locate the quantum-opt executable, please report this issue on GitHub."
-        )
-
-    bytecode = subprocess.run(
-        (
-            get_cli_path(),
-            "--emit-bytecode",
-            "--register-decomp-rule-resource",
-        ),
-        input=mlir_rules.encode("utf-8"),
-        capture_output=True,
-        check=True,
-    ).stdout
+    bytecode = _quantum_opt(
+        "--emit-bytecode",
+        "--register-decomp-rule-resource",
+        stdin=mlir_rules.encode("utf-8"),
+        text=None,
+    )
 
     with open(decomp_file_path, "wb") as bytecode_file:
         bytecode_file.write(bytecode)
