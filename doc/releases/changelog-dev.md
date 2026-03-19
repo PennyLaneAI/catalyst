@@ -236,6 +236,9 @@
   both qubits and registers, as opposed to constraining the operand to be a single quantum register.
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
 
+* `qml.value_and_grad` can now be used with program capture `qml.qjit(capture=True)`.
+  [(#2587)](https://github.com/PennyLaneAI/catalyst/pull/2587)
+
 * Catalyst with program capture now supports device preprocessing. Currently, preprocessing transforms
   that do not have native MLIR or xDSL implementations will be replaced with empty transforms.
   [(#2557)](https://github.com/PennyLaneAI/catalyst/pull/2557)
@@ -341,7 +344,7 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Quantum adjoint can now be used on subroutines with classical arguments.
+* :func:`~pennylane.adjoint` can now be used on subroutines with classical arguments.
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
 
 * Fixed a bug where input array arguments could be mutated during execution when copied inputs

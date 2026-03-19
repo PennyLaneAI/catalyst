@@ -22,14 +22,14 @@ from .apply_transform_sequence import register_pass
 class PassDispatcher(Transform):
     """Wrapper class for applying passes to QJIT-ed workflows."""
 
-    module_pass: ModulePass
+    module_pass: type[ModulePass]
 
-    def __init__(self, module_pass: ModulePass):
+    def __init__(self, module_pass: type[ModulePass]):
         self.module_pass = module_pass
         super().__init__(pass_name=module_pass.name)
 
 
-def compiler_transform(module_pass: ModulePass) -> PassDispatcher:
+def compiler_transform(module_pass: type[ModulePass]) -> PassDispatcher:
     """Wrapper function to register xDSL passes to use with QJIT-ed workflows."""
     dispatcher = PassDispatcher(module_pass)
 
