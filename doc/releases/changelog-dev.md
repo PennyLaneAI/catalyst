@@ -2,6 +2,11 @@
 
 <h3>New features since last release</h3>
 
+* A new `~.CompilationPass` class has been added that abstracts away compiler-level details for
+  seamless compilation pass creation. Used in tandem with :func:`~.compiler_transform`, compilation
+  passes can be created entirely in Python and used on QNodes within a :func:`~.qjit`'d workflow.
+  [(#2211)](https://github.com/PennyLaneAI/catalyst/pull/2211)
+
 * A new MLIR transformation pass `--dynamic-one-shot` is available.
   Devices that natively support mid-circuit measurements can evaluate dynamic circuits by executing
   them one shot at a time, sampling a dynamic execution path for each shot. The `--dynamic-one-shot`
@@ -236,6 +241,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* The `quantum.adjoint` operation can now take in multiple quantum values, allowing
+  both qubits and registers, as opposed to constraining the operand to be a single quantum register.
+  [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
+
 * `qml.value_and_grad` can now be used with program capture `qml.qjit(capture=True)`.
   [(#2587)](https://github.com/PennyLaneAI/catalyst/pull/2587)
 
@@ -344,6 +353,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* :func:`~pennylane.adjoint` can now be used on subroutines with classical arguments.
+  [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
+
 * Fixed a bug where the `catalyst` CLI tool would emit text when called with `--emit-bytecode`.
   [(#2596)](https://github.com/PennyLaneAI/catalyst/pull/2596)
 
@@ -411,6 +423,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `draw_graph` now raises a more informative error when attempting to visualize an unsupported empty external function.
+  [(#2559)](https://github.com/PennyLaneAI/catalyst/pull/2559)
+
 * Catalyst internally uses the new unified transforms API rather than `PassPipelineWrapper`.
   [(#2525)](https://github.com/PennyLaneAI/catalyst/pull/2525)
 
@@ -448,6 +463,7 @@
 * A new dialect `QRef` was created. This dialect is very similar to the existing `Quantum` dialect,
   but it is in reference semantics, whereas the existing `Quantum` dialect is in value semantics.
   [(#2320)](https://github.com/PennyLaneAI/catalyst/pull/2320)
+  [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
