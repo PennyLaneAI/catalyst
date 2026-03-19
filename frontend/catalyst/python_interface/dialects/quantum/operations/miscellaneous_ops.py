@@ -16,6 +16,7 @@ This file contains the definition of miscellaneous operations in the
 Quantum dialect.
 """
 from collections.abc import Sequence
+from typing import ClassVar
 
 from xdsl.dialects.builtin import (
     StringAttr,
@@ -24,8 +25,10 @@ from xdsl.dialects.builtin import (
 )
 from xdsl.ir import Block, Operation, Region
 from xdsl.irdl import (
+    AnyOf,
     IRDLOperation,
     ParsePropInAttrDict,
+    VarConstraint,
     irdl_op_definition,
     lazy_traits_def,
     opt_operand_def,
@@ -53,15 +56,17 @@ from ..attributes import QubitSSAValue, QubitType, QuregSSAValue, QuregType
 class AdjointOp(IRDLOperation):
     """Calculate the adjoint of the enclosed operations"""
 
+    T: ClassVar = VarConstraint("T", AnyOf([QubitType, QuregType]))
+
     name = "quantum.adjoint"
 
     assembly_format = """
-        `(` $args `)` attr-dict `:` type($args) `->` type($outs) $region
+        `(` $args `)` attr-dict `:` type($outs) $region
     """
 
-    args = var_operand_def(QuregType | QubitType)
+    args = var_operand_def(T)
 
-    outs = var_result_def(QuregType | QubitType)
+    outs = var_result_def(T)
 
     region = region_def("single_block")
 
@@ -74,19 +79,6 @@ class AdjointOp(IRDLOperation):
     ):
         result_types = tuple(arg.type for arg in args)
         super().__init__(operands=(args,), result_types=(result_types,), regions=(region,))
-
-
-@irdl_op_definition
-class YieldOp(IRDLOperation):
-    """Return results from quantum program regions"""
-
-    name = "quantum.yield"
-
-    assembly_format = "attr-dict ($retvals^ `:` type($retvals))?"
-
-    retvals = var_operand_def(QuregType | QubitType)
-
-    traits = traits_def(HasParent(AdjointOp), IsTerminator(), Pure(), ReturnLike())
 
 
 @irdl_op_definition
@@ -150,3 +142,16 @@ class NumQubitsOp(IRDLOperation):
     """
 
     num_qubits = result_def(i64)
+
+
+@irdl_op_definition
+class YieldOp(IRDLOperation):
+    """Return results from quantum program regions"""
+
+    name = "quantum.yield"
+
+    assembly_format = "attr-dict ($retvals^ `:` type($retvals))?"
+
+    retvals = var_operand_def(QuregType | QubitType)
+
+    traits = traits_def(HasParent(AdjointOp), IsTerminator(), Pure(), ReturnLike())
