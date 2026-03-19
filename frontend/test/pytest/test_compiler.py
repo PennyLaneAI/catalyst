@@ -280,7 +280,7 @@ class TestCompilerState:
         options = CompileOptions(lower_to_llvm=False, link=False, pipelines=test_pipes)
         compiled = QJIT(f, options)
 
-        compiled.workspace = compiled._get_workspace()
+        compiled.workspace = compiled._get_workspace()  # pylint: disable=protected-access
         compiled.jaxpr, *_ = compiled.capture((0.5,))
         compiled.mlir_module = compiled.generate_ir()
         compiled.compile()
