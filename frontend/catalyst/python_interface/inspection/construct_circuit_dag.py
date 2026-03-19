@@ -633,14 +633,13 @@ class ConstructCircuitDAG:
     def _func_return(self, operation: func.ReturnOp) -> None:
         """Handle func.return to exit FuncOp's cluster scope."""
 
-        if parent_op := operation.parent_op():
-            if not parent_op.sym_name.data.startswith("jit_"):
-                self._cluster_uid_stack.pop()
+        parent_op = operation.parent_op()
 
-        # Clear seen wires as we are exiting a FuncOp (qnode)
-        if parent_op := operation.parent_op():
-            if parent_op.attributes.get("quantum.node", None) is not None:
-                self._wire_to_node_uids = defaultdict(set)
+        if not parent_op.sym_name.data.startswith("jit_"):
+            self._cluster_uid_stack.pop()
+
+        if parent_op.attributes.get("quantum.node", None) is not None:
+            self._wire_to_node_uids = defaultdict(set)
 
     # =======================
     # NODE CONNECTIVITY
