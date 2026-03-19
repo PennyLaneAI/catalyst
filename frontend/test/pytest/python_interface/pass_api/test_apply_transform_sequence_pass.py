@@ -15,7 +15,6 @@
 # pylint: disable=line-too-long
 
 import subprocess
-from io import StringIO
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -25,7 +24,6 @@ from xdsl.context import Context
 from xdsl.dialects import builtin, func, test, transform
 from xdsl.ir import Attribute, SSAValue
 from xdsl.passes import ModulePass
-from xdsl.printer import Printer
 
 from catalyst import qjit
 from catalyst.python_interface import QuantumParser
