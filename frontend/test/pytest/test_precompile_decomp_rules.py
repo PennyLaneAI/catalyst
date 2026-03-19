@@ -18,7 +18,6 @@ import pennylane as qp
 import pytest
 
 from catalyst.compiler import _quantum_opt
-from catalyst.utils.exceptions import CompileError
 from catalyst.utils.precompile_decomposition_rules import (
     BYTECODE_FILE_PATH,
     COMPILER_OPS_FOR_DECOMPOSITION,
@@ -105,6 +104,8 @@ class TestCompileOpDecompRules:
         """Test that compile_op_decomp_rules warns when compilation fails."""
 
         class FakeOp(qp.operation.Operator):
+            """Test class with incompatible decomp rule."""
+
             num_wires = 1
             num_params = 1
             ndim_params = (0,)
@@ -122,6 +123,8 @@ class TestCompileOpDecompRules:
         """Test that compile_op_decomp_rules warns when an unexpected exception is thrown."""
 
         class FakeOp(qp.operation.Operator):
+            """Test class without ndim_params."""
+
             num_wires = 1
             num_params = 1
 
