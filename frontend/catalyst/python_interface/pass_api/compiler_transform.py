@@ -116,7 +116,7 @@ class CompilationPass(ModulePass):
     by default.
     """
 
-    _rewrite_patterns: ClassVar[list[RewritePattern]] = []
+    _rewrite_patterns: ClassVar[list[type[RewritePattern]]] = []
     r"""list[xdsl.pattern_rewriter.RewritePattern]: List of registered actions. The
     stored values are ``RewritePattern``\ s used to implement the registered actions.
     """
