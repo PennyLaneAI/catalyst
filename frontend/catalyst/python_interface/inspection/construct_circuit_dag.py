@@ -444,14 +444,25 @@ class ConstructCircuitDAG:
         self._cluster_uid_stack.pop()
 
     @_visit_operation.register
-    def _if_op(self, operation: scf.IfOp):
-        """Handles the scf.IfOp operation."""
+    def _visit_if_op(self, operation: scf.IfOp) -> None:
+        """Handle an xDSL IfOp operation."""
+        regions = _flatten_if_op(operation)
+        labels = ["if"] + ["elif"] * (len(regions) - 2) + ["else"] if len(regions) > 1 else ["if"]
+        self._wire_to_node_uids = self._visit_branched_op(regions, "conditional", labels)
 
-        # Create cluster for IfOp
-        uid = f"conditional_cluster{self._cluster_uid_counter}"
+    @_visit_operation.register
+    def _visit_switch_op(self, operation: scf.IndexSwitchOp) -> None:
+        """Handle an xDSL IndexSwitchOp operation."""
+        labels = [f"case {i}" for i in range(len(operation.regions))]
+        self._wire_to_node_uids = self._visit_branched_op(operation.regions, "switch", labels)
+
+    def _visit_branched_op(self, regions, cluster_label, branch_labels) -> dict[str | int, set[str]]:
+        """Handles a branched operation."""
+
+        uid = f"{cluster_label}_cluster{self._cluster_uid_counter}"
         self.dag_builder.add_cluster(
             uid,
-            label="conditional",
+            label=cluster_label,
             labeljust="l",
             cluster_uid=self._cluster_uid_stack[-1],
         )
@@ -464,19 +475,12 @@ class ConstructCircuitDAG:
         region_wire_maps: list[dict[int | str, set[str]]] = []
 
         # Loop through each branch and visualize as a cluster
-        flattened_if_op: list[Region] = _flatten_if_op(operation)
-        num_regions = len(flattened_if_op)
-        for i, region in enumerate(flattened_if_op):
-            cluster_label = "elif"
-            if i == 0:
-                cluster_label = "if"
-            elif i == num_regions - 1:
-                cluster_label = "else"
+        for i, region in enumerate(regions):
 
             uid = f"cluster{self._cluster_uid_counter}"
             self.dag_builder.add_cluster(
                 uid,
-                label=cluster_label,
+                label=branch_labels[i],
                 labeljust="l",
                 style="dashed",
                 cluster_uid=self._cluster_uid_stack[-1],
@@ -546,14 +550,8 @@ class ConstructCircuitDAG:
         # Pop IfOp cluster before leaving this handler
         self._last_cluster_uid = self._cluster_uid_stack.pop()
 
-        self._wire_to_node_uids = final_wire_map
+        return final_wire_map
 
-    @_visit_operation.register
-    def _index_switch_op(self, operation: scf.IndexSwitchOp):
-        """Handles the scf.IndexSwitchOp operation."""
-        raise NotImplementedError(
-            "Visualization handling for 'scf.IndexSwitchOp' operations is currently not supported."
-        )
 
     # ============
     # DEVICE NODE
