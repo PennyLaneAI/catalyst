@@ -125,7 +125,7 @@ class CompilationPass(ModulePass):
         if not hasattr(cls, "name"):
             raise TypeError("All CompilationPasses must have a name.")
 
-        bases = tuple(c for c in cls.__mro__ if issubclass(c, CompilationPass))
+        bases = tuple(c for c in cls.__mro__[1:] if issubclass(c, CompilationPass))
         is_new_action = all(cls.action is not c.action for c in bases)
 
         old_actions = copy(cls._rewrite_patterns)
