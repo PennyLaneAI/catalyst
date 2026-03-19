@@ -19,10 +19,11 @@ This module contains the implementation of the xDSL quantum-to-qecl dialect-conv
 
 import math
 from dataclasses import dataclass
+from typing import cast
 
 from xdsl.context import Context
-from xdsl.dialects import builtin
-from xdsl.dialects.builtin import IntegerAttr
+from xdsl.dialects import arith, builtin
+from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType
 from xdsl.ir import Attribute, Operation, SSAValue, TypeAttribute
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
@@ -56,6 +57,7 @@ class AllocOpConversion(RewritePattern):
             )
 
         _assert_attribute_type(nqubits_attr, IntegerAttr, "nqubits_attr", op)
+        nqubits_attr = cast(IntegerAttr, nqubits_attr)
         nqubits = nqubits_attr.value.data
 
         hyper_reg_width = math.ceil(nqubits / self.k)
@@ -75,9 +77,9 @@ class ExtractOpConversion(RewritePattern):
 
         hyper_reg = op.qreg
         _assert_operand_type(hyper_reg, qecl.LogicalHyperRegisterType, "qreg", op)
+        hyper_reg = cast(qecl.LogicalHyperRegisterSSAValue, hyper_reg)
 
-        idx = op.idx if op.idx is not None else op.idx_attr
-        assert idx is not None, "Both idx and idx_attr are null"
+        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
 
         # If we extract immediately after an alloc operation, we must also insert ops to perform
         # encoding and a QEC cycle. Cases where we don't immediately extract are typically around
@@ -90,7 +92,9 @@ class ExtractOpConversion(RewritePattern):
                     in_codeblock=extract_codeblock_op,
                     init_state=qecl.LogicalCodeblockInitState.Zero,
                 ),
-                qecl.QecCycleOp(in_codeblock=encode_op.results[0]),
+                qecl.QecCycleOp(
+                    in_codeblock=cast(qecl.LogicalCodeBlockSSAValue, encode_op.results[0])
+                ),
             ]
         else:
             ops_to_insert = [qecl.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=idx)]
@@ -105,14 +109,15 @@ class InsertOpConversion(RewritePattern):
     def match_and_rewrite(self, op: quantum.InsertOp, rewriter: PatternRewriter):
         """Rewrite pattern for `quantum.insert` ops."""
 
-        idx = op.idx if op.idx is not None else op.idx_attr
-        assert idx is not None, "Both idx and idx_attr are null"
+        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
 
         in_hyper_reg = op.in_qreg
         _assert_operand_type(in_hyper_reg, qecl.LogicalHyperRegisterType, "in_qreg", op)
+        in_hyper_reg = cast(qecl.LogicalHyperRegisterSSAValue, in_hyper_reg)
 
         codeblock = op.qubit
         _assert_operand_type(codeblock, qecl.LogicalCodeblockType, "qubit", op)
+        codeblock = cast(qecl.LogicalCodeBlockSSAValue, codeblock)
 
         rewriter.replace_op(
             op, qecl.InsertCodeblockOp(in_hyper_reg=in_hyper_reg, idx=idx, codeblock=codeblock)
@@ -128,6 +133,7 @@ class DeallocOpConversion(RewritePattern):
 
         hyper_reg = op.qreg
         _assert_operand_type(hyper_reg, qecl.LogicalHyperRegisterType, "qreg", op)
+        hyper_reg = cast(qecl.LogicalHyperRegisterSSAValue, hyper_reg)
 
         rewriter.replace_op(op, qecl.DeallocOp(hyper_reg=hyper_reg))
 
@@ -152,14 +158,18 @@ class CustomOpConversion(RewritePattern):
             case "Hadamard":
                 codeblock = op.in_qubits[0]
                 _assert_operand_type(codeblock, qecl.LogicalCodeblockType, "in_qubits[0]", op)
+                codeblock = cast(qecl.LogicalCodeBlockSSAValue, codeblock)
                 assert codeblock.type.k.value.data == 1
+
                 op_to_insert = qecl.HadamardOp(in_codeblock=codeblock, idx=0)
 
             case "S":
                 codeblock = op.in_qubits[0]
                 _assert_operand_type(codeblock, qecl.LogicalCodeblockType, "in_qubits[0]", op)
+                codeblock = cast(qecl.LogicalCodeBlockSSAValue, codeblock)
                 assert codeblock.type.k.value.data == 1
                 adjoint = True if op.properties.get("adjoint") else False
+
                 op_to_insert = qecl.SOp(in_codeblock=codeblock, idx=0, adjoint=adjoint)
 
             case "CNOT":
@@ -167,8 +177,11 @@ class CustomOpConversion(RewritePattern):
                 trgt_codeblock = op.in_qubits[1]
                 _assert_operand_type(ctrl_codeblock, qecl.LogicalCodeblockType, "in_qubits[0]", op)
                 _assert_operand_type(trgt_codeblock, qecl.LogicalCodeblockType, "in_qubits[1]", op)
+                ctrl_codeblock = cast(qecl.LogicalCodeBlockSSAValue, ctrl_codeblock)
+                trgt_codeblock = cast(qecl.LogicalCodeBlockSSAValue, trgt_codeblock)
                 assert ctrl_codeblock.type.k.value.data == 1
                 assert trgt_codeblock.type.k.value.data == 1
+
                 op_to_insert = qecl.CnotOp(
                     in_ctrl_codeblock=ctrl_codeblock,
                     idx_ctrl=0,
@@ -201,6 +214,7 @@ class MeasureOpConversion(RewritePattern):
         """Rewrite pattern for `quantum.measure` ops."""
         codeblock = op.in_qubit
         _assert_operand_type(codeblock, qecl.LogicalCodeblockType, "in_qubit", op)
+        codeblock = cast(qecl.LogicalCodeBlockSSAValue, codeblock)
         assert codeblock.type.k.value.data == 1
         rewriter.replace_op(op, qecl.MeasureOp(in_codeblock=codeblock, idx=0))
 
@@ -226,6 +240,39 @@ def _assert_attribute_type(
         f"Expected attribute '{attr_name}' of {op.name} op to have type "
         f"'{type(expected_type).__name__}', but got {type(attr)}"
     )
+
+
+def _get_idx_value_or_attr_from_extract_or_insert_op(
+    op: quantum.ExtractOp | quantum.InsertOp, rewriter: PatternRewriter
+) -> IntegerAttr | SSAValue[IndexType]:
+    """Helper function to get the index value 'idx' or attribute 'idx_attr' from a `quantum.extract`
+    or `quantum.insert` op.
+
+    If the index value has type IntegerType, an `arith.cast_index` op is inserted to cast it to type
+    IndexType. We must cast such values because `qecl.extract_block` ops expect an idx operand of
+    type IndexType.
+    """
+    if op.idx is not None:
+        if isinstance(op.idx.type, IndexType):
+            idx = cast(SSAValue[IndexType], op.idx)
+        elif isinstance(op.idx.type, IntegerType):
+            # Insert cast operation integer -> index
+            arith_op = arith.IndexCastOp(op.idx, IndexType())
+            rewriter.insert_op(arith_op)
+            idx = cast(SSAValue[IndexType], arith_op.result)
+        else:
+            assert False, (
+                f"Expected idx value '{op.idx}' to have type 'IndexType' or 'IntegerType', "
+                f"but got {op.idx.type}"
+            )
+
+    elif op.idx_attr is not None:
+        idx = op.idx_attr
+
+    else:
+        assert False, f"Both idx and idx_attr of op '{op}' are None"
+
+    return idx
 
 
 # MARK: Conversion Pass
