@@ -79,7 +79,7 @@ COMPILER_OPS_FOR_DECOMPOSITION = frozenset(
 @lru_cache
 def get_compiler_ops(
     _supported_compiler_op_names: frozenset[str] = COMPILER_OPS_FOR_DECOMPOSITION,
-) -> tuple[set[type[Operator]], int]:
+) -> set[type[Operator]]:
     """
     Extracts all ops from pennylane that have decompositions in catalyst.
 
@@ -88,8 +88,6 @@ def get_compiler_ops(
                         (as defined by COMPILER_OPS_FOR_DECOMPOSITION)
         int: the number of compiler-compatible ops that could not be found in PennyLane
     """
-    num_failures = 0
-
     pl_op_classes = set(
         value
         for _, value in inspect.getmembers(
@@ -108,9 +106,8 @@ def get_compiler_ops(
 
     for class_name in _supported_compiler_op_names.difference(compiler_op_class_names):
         warnings.warn(f"failed to collect pennylane op with name {class_name}")
-        num_failures += 1
 
-    return compiler_op_classes, num_failures
+    return compiler_op_classes
 
 
 def get_abstract_args(op_class: type[Operator]) -> list[type]:
@@ -232,7 +229,7 @@ def compile_op_decomp_rules(
             mlir_modules[rule_name] = compile_rule(
                 op_class, abstract_args, op_class.num_wires, rule, dev
             )
-        except CompileError as e:  # pragma: no cover
+        except CompileError as e:
             warnings.warn(f"Failed to compile {rule_name}: {e}")
         except Exception as e:  # pylint: disable=broad-exception-caught
             warnings.warn(f"Unexpected error while trying to compile {rule_name}: {e}")
@@ -253,7 +250,7 @@ def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
     """
     decomp_file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    target_ops, num_ops_missed = get_compiler_ops()
+    target_ops = get_compiler_ops()
 
     mlir_rules = "".join(
         str(mlir).replace("@rule_wrapper", f"@__builtin_{name}")
