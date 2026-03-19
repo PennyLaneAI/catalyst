@@ -407,6 +407,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `draw_graph` now raises a more informative error when attempting to visualize an unsupported empty external function.
+  [(#2559)](https://github.com/PennyLaneAI/catalyst/pull/2559)
+
 * Catalyst internally uses the new unified transforms API rather than `PassPipelineWrapper`.
   [(#2525)](https://github.com/PennyLaneAI/catalyst/pull/2525)
 
