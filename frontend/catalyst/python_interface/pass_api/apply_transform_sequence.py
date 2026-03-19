@@ -208,7 +208,6 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
     ):
         self.ctx = ctx
         self.passes = passes
-        self.pass_level = 0
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, transformer: builtin.ModuleOp, rewriter: PatternRewriter):
