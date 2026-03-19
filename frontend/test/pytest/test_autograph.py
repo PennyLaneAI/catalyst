@@ -2587,10 +2587,10 @@ class TestJaxIndexOperatorUpdate:
                 test_array_index(x)
 
 
-class TestWithPassPipelineWrapper:
+class TestWithPass:
     """Test with passes"""
 
-    def test_with_pass_pipeline_wrapper(self):
+    def test_with_pass(self):
         """this test should work. So there are no asserts"""
 
         @qjit(autograph=True)

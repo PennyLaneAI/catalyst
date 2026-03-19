@@ -215,6 +215,62 @@ module {
 
 // -----
 
+// Test that composite observable ops have their child NamedObsOps properly cleaned up in groups.
+
+// CHECK-LABEL: func.func public @circ_tensor
+// CHECK-SAME: () -> (f64, f64)
+// CHECK: %[[CALL0:.*]] = call @circ_tensor.group.0
+// CHECK: %[[CALL1:.*]] = call @circ_tensor.group.1
+// CHECK: return %[[CALL0]], %[[CALL1]]
+
+// CHECK-LABEL: func.func private @circ_tensor.group.0
+// CHECK-SAME: () -> f64 attributes {quantum.node}
+// CHECK: %[[SHOTS0:.*]] = arith.constant 50
+// CHECK: quantum.device shots(%[[SHOTS0]])
+// CHECK: quantum.alloc
+// CHECK: %[[OBS_Z0:.*]] = quantum.namedobs %{{.*}}[ PauliZ]
+// CHECK: %[[OBS_Z1:.*]] = quantum.namedobs %{{.*}}[ PauliZ]
+// CHECK: %[[TENSOR:.*]] = quantum.tensor %[[OBS_Z0]], %[[OBS_Z1]]
+// CHECK: %[[EV0:.*]] = quantum.expval %[[TENSOR]]
+// CHECK: quantum.dealloc
+// CHECK: quantum.device_release
+// CHECK: return %[[EV0]]
+
+// CHECK-LABEL: func.func private @circ_tensor.group.1
+// CHECK-SAME: () -> f64 attributes {quantum.node}
+// CHECK: %[[SHOTS1:.*]] = arith.constant 50
+// CHECK: quantum.device shots(%[[SHOTS1]])
+// CHECK: quantum.alloc
+// CHECK-NOT: quantum.namedobs{{.*}}PauliZ
+// CHECK-NOT: quantum.tensor
+// CHECK: %[[OBS_X:.*]] = quantum.namedobs %{{.*}}[ PauliX]
+// CHECK: %[[EV1:.*]] = quantum.expval %[[OBS_X]]
+// CHECK-NOT: quantum.namedobs{{.*}}PauliZ
+// CHECK: quantum.dealloc
+// CHECK: quantum.device_release
+// CHECK: return %[[EV1]]
+
+module {
+  func.func public @circ_tensor() -> (f64, f64) attributes {quantum.node} {
+    %shots = arith.constant 100 : i64
+    quantum.device shots(%shots) ["", "", ""]
+    %reg = quantum.alloc(2) : !quantum.reg
+    %q0 = quantum.extract %reg[0] : !quantum.reg -> !quantum.bit
+    %q1 = quantum.extract %reg[1] : !quantum.reg -> !quantum.bit
+    %obs_z0 = quantum.namedobs %q0[PauliZ] : !quantum.obs
+    %obs_z1 = quantum.namedobs %q1[PauliZ] : !quantum.obs
+    %tensor_obs = quantum.tensor %obs_z0, %obs_z1 : !quantum.obs
+    %expval_tensor = quantum.expval %tensor_obs : f64
+    %obs_x0 = quantum.namedobs %q0[PauliX] : !quantum.obs
+    %expval_x0 = quantum.expval %obs_x0 : f64
+    quantum.dealloc %reg : !quantum.reg
+    quantum.device_release
+    return %expval_tensor, %expval_x0 : f64, f64
+  }
+}
+
+// -----
+
 // Test that an error is raised when a non-expval measurement is included in the return.
 // The split-to-single-terms sub-pass only supports quantum.expval;
 // all other MeasurementProcess ops cause a compile error.

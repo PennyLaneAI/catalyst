@@ -143,13 +143,7 @@ class ConstructCircuitDAG:
     @singledispatchmethod
     def _visit_operation(self, operation: Operation) -> None:
         """Visit an xDSL Operation. Default to visiting each region contained in the operation."""
-        try:
-            self._visualize_operation(operation)
-        except NotImplementedError as e:
-            _ERROR_MSG = (
-                f"'draw_graph' is unable to visualize the operation {operation.name}: {str(e)}"
-            )
-            raise VisualizationError(_ERROR_MSG) from e
+        self._visualize_operation(operation)
 
         for region in operation.regions:
             self._visit_region(region)
@@ -175,9 +169,8 @@ class ConstructCircuitDAG:
             return
         _SKIPPED_OPS = (*_SKIPPED_QUANTUM_OPS, *_SKIPPED_PBC_OPS, *_SKIPPED_MBQC_OPS)
         if not isinstance(op, _SKIPPED_OPS):
-            raise VisualizationError(
-                f"Visualization for operation '{op.name}' is currently not supported."
-            )
+            _ERROR_MSG = f"Visualization for operation '{op.name}' is currently not supported."
+            raise VisualizationError(_ERROR_MSG)
 
     @_visualize_operation.register
     def _gate_op(
@@ -704,6 +697,13 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _func_op(self, operation: func.FuncOp) -> None:
         """Visit a FuncOp Operation."""
+
+        if not operation.regions[0].blocks:
+            _ERROR_MSG = (
+                "Empty function calls are not yet compatible with 'draw_graph'. "
+                f"Found external function call to {operation.sym_name.data}."
+            )
+            raise VisualizationError(_ERROR_MSG)
 
         label: str = (
             "qjit" if operation.sym_name.data.startswith("jit_") else operation.sym_name.data
