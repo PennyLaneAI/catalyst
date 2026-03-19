@@ -27,8 +27,8 @@ from pennylane.measurements import (
 from pennylane.operation import Operator
 from pennylane.ops import GlobalPhase
 from xdsl.dialects import builtin, func, scf
-from xdsl.traits import SymbolTable
 from xdsl.ir import Block, Operation, Region
+from xdsl.traits import SymbolTable
 
 from catalyst.python_interface.dialects import pbc, quantum
 from catalyst.python_interface.inspection.dag_builder import DAGBuilder
