@@ -210,6 +210,11 @@ LogicalResult AdjointOp::verify()
         return emitOpError("quantum measurements are not allowed in the adjoint regions");
     }
 
+    Block &b = this->getRegion().front();
+    if (b.getNumArguments() != 0) {
+        return emitOpError("qref.adjoint op must have no arguments on its block");
+    }
+
     return success();
 }
 
