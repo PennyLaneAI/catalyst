@@ -20,4 +20,4 @@ module {
 // COM: We can't test bytes against text with FileCheck, so we only verify the bytecode header.
 // COM: This header would not be present if bytecode had not been written by mlir-opt, so this 
 // COM: should be sufficient.
-// CHECK: MLIR22.0.0git
+// CHECK: MLIR{{.+}}git
