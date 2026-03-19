@@ -344,6 +344,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where the `catalyst` CLI tool would emit text when called with `--emit-bytecode`.
+  [(#2596)](https://github.com/PennyLaneAI/catalyst/pull/2596)
+
 * Fixed a bug where input array arguments could be mutated during execution when copied inputs
   were updated in-place. Entry-point arguments are now treated as non-writable during bufferization,
   preserving the expected immutability of user inputs.
