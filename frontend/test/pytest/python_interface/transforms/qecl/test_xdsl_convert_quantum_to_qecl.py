@@ -145,7 +145,8 @@ class TestQuantumToQecLogicalPass:
             // CHECK: [[hreg0:%.+]] = qecl.alloc() : !qecl.hyperreg<1 x 1>
             %0 = quantum.alloc(1) : !quantum.reg
 
-            // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]][%arg0] : !qecl.hyperreg<1 x 1> -> !qecl.codeblock<1>
+            // CHECK: [[idx:%.+]] = arith.index_cast %arg0 : i64 to index
+            // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]][[[idx]]] : !qecl.hyperreg<1 x 1> -> !qecl.codeblock<1>
             // CHECK: [[cb1:%.+]] = qecl.encode[zero] [[cb0]] : !qecl.codeblock<1>
             // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
             %1 = quantum.extract %0[%arg0] : !quantum.reg -> !quantum.bit
