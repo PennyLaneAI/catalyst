@@ -2,6 +2,11 @@
 
 <h3>New features since last release</h3>
 
+* A new `~.CompilationPass` class has been added that abstracts away compiler-level details for 
+  seamless compilation pass creation. Used in tandem with :func:`~.compiler_transform`, compilation 
+  passes can be created entirely in Python and used on QNodes within a :func:`~.qjit`'d workflow.
+  [(#2211)](https://github.com/PennyLaneAI/catalyst/pull/2211)
+
 * A new MLIR transformation pass `--dynamic-one-shot` is available.
   Devices that natively support mid-circuit measurements can evaluate dynamic circuits by executing
   them one shot at a time, sampling a dynamic execution path for each shot. The `--dynamic-one-shot`
