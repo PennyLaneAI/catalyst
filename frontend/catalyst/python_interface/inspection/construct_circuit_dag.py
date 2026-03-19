@@ -577,7 +577,7 @@ class ConstructCircuitDAG:
 
         if not operation.regions[0].blocks:
             _ERROR_MSG = (
-                "Empty function calls are not yet compatible with 'draw_graph'. "
+                "Calls to functions without a definition are not yet compatible with 'draw_graph'. "
                 f"Found external function call to {operation.sym_name.data}."
             )
             raise VisualizationError(_ERROR_MSG)
