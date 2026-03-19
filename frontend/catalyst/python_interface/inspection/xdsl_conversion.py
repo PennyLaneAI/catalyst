@@ -230,6 +230,33 @@ def resolve_constant_params(ssa: SSAValue) -> float | int | str:
             )
             return f"({x} - {y})"
 
+        case "stablehlo.multiply":
+            x, y = (
+                resolve_constant_params(op.operands[0]),
+                resolve_constant_params(op.operands[1]),
+            )
+            return f"({x} * {y})"
+
+        case "stablehlo.divide":
+            x, y = (
+                resolve_constant_params(op.operands[0]),
+                resolve_constant_params(op.operands[1]),
+            )
+            return f"({x} / {y})"
+
+        case "stablehlo.atan2":
+            x, y = (
+                resolve_constant_params(op.operands[0]),
+                resolve_constant_params(op.operands[1]),
+            )
+            return f"atan2({x}, {y})"
+
+        case "stablehlo.real":
+            return resolve_constant_params(op.operands[0])
+
+        case "stablehlo.dynamic_slice":
+            return resolve_constant_params(op.operands[0])
+
         case "stablehlo.constant":
             return _extract_dense_constant_value(op)
 
@@ -305,6 +332,9 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
         case _ if op.name == "stablehlo.subtract":
             x, y = (resolve_constant_wire(op.operands[0]), resolve_constant_wire(op.operands[1]))
             return f"({x} - {y})"
+
+        case _ if op.name == "stablehlo.dynamic_slice":
+            return resolve_constant_wire(op.operands[0])
 
         case _ if op.name == "tensor.from_elements":
             return resolve_constant_wire(op.operands[0])
