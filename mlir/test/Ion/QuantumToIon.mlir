@@ -187,7 +187,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-SAME:         detuning = 2.200000e+00 : f64,
     // CHECK-SAME:         polarization = [0, 1, 2],
     // CHECK-SAME:         wavevector = [-2, 3, 4]>,
-    // CHECK-SAME:     phase = 0.000000e+00 : f64}
+    // CHECK-SAME:     phase = 1.5707963267{{[0-9]*}} : f64}
     // CHECK-NEXT:   ion.yield %arg1 : !ion.qubit
     // CHECK-NEXT: }
     // CHECK-NEXT: [[ry1out:%.+]] = builtin.unrealized_conversion_cast [[ry1out_ion]] : !ion.qubit to !quantum.bit
