@@ -494,7 +494,7 @@ class TestIntegrationUsefulErrors:
             circuit(a)
 
         with pytest.raises(
-            ValueError, match="measurements_from_samples pass requires non-zero shots"
+            CompileError, match="using a dynamic number of shots is not supported"
         ):
             workflow(1.2, 100)
 
