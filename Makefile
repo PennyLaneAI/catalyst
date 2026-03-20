@@ -87,7 +87,6 @@ PIP_VERBOSE_FLAG :=
 ifeq ($(VERBOSE),1)
 PIP_VERBOSE_FLAG := --verbose
 endif
-XDSL_JAX_URL ?= git+https://github.com/xdslproject/xdsl-jax@main
 
 .PHONY: help
 help:
@@ -123,8 +122,6 @@ frontend:
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
-	# TODO: Remove once xdsl-jax is released.
-	$(PYTHON) -m pip install --no-deps --force-reinstall $(XDSL_JAX_URL) $(PIP_VERBOSE_FLAG)
 	rm -r frontend/pennylane_catalyst.egg-info
 
 .PHONY: mlir llvm stablehlo enzyme dialects runtime oqc
