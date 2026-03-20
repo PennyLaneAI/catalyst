@@ -117,3 +117,24 @@ func.func @merge_global_phases_data_dep(%arg0: f64, %arg1: f64) {
 
     return
 }
+
+// -----
+
+// CHECK-LABEL: func.func @merge_global_phases_adjoint(
+func.func @merge_global_phases_adjoint(%arg0: f64, %arg1: f64, %arg2: f64) {
+    // CHECK-SAME: [[A:%.+]]: f64, [[B:%.+]]: f64, [[C:%.+]]: f64
+
+    // CHECK-NOT: quantum.gphase
+    // CHECK: [[NEG:%.+]] = arith.negf [[C]]
+    // CHECK-NOT: quantum.gphase
+    // CHECK: [[SUM1:%.+]] = arith.subf [[NEG]], [[A]]
+    // CHECK-NOT: quantum.gphase
+    // CHECK: [[SUM2:%.+]] = arith.addf [[SUM1]], [[B]]
+    // CHECK: quantum.gphase([[SUM2]])
+    // CHECK-NOT: quantum.gphase
+    quantum.gphase(%arg0) adj
+    quantum.gphase(%arg1)
+    quantum.gphase(%arg2) adj
+
+    return
+}

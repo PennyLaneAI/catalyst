@@ -53,9 +53,19 @@ struct CombineGlobalPhasesPass : impl::CombineGlobalPhasesPassBase<CombineGlobal
 
             builder.setInsertionPoint(lastPhase);
             Value runningSum = lastPhase.getAngle();
+            if (lastPhase.getAdjoint()) {
+                runningSum = arith::NegFOp::create(builder, lastPhase->getLoc(), runningSum);
+                lastPhase.setAdjoint(false);
+            }
+
             for (GlobalPhaseOp phaseOp : llvm::make_early_inc_range(remainingPhases)) {
                 llvm::SmallVector<Value, 2> args{runningSum, phaseOp.getAngle()};
-                runningSum = arith::AddFOp::create(builder, phaseOp.getLoc(), args);
+                if (phaseOp.getAdjoint()) {
+                    runningSum = arith::SubFOp::create(builder, phaseOp.getLoc(), args);
+                }
+                else {
+                    runningSum = arith::AddFOp::create(builder, phaseOp.getLoc(), args);
+                }
                 phaseOp->erase();
             }
             lastPhase.getAngleMutable().assign(runningSum);
