@@ -52,7 +52,8 @@ from catalyst.python_interface.transforms.quantum.diagonalize_measurements impor
 class MeasurementsFromSamplesPass(passes.ModulePass):
     """Pass that replaces all terminal measurements in a program with a single
     :func:`pennylane.sample` measurement, and adds postprocessing instructions to recover the
-    original measurement.
+    original measurement. If observables are present in a basis other than Z, the pass
+    diagonalizes them before conversion to samples in the computational basis.
     """
 
     name = "measurements-from-samples"
@@ -554,6 +555,8 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
 
     Raises:
         CompileError: If `module` does not contain a quantum.DeviceInitOp.
+        CompileError: If the operator expected to contain shots values does not have `properties`.
+            This is the immediate issue that is observed when shots are dynamic.
     """
     device_op = None
 
@@ -573,6 +576,11 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
 
     if isinstance(shots_extract_op, tensor.ExtractOp):
         shots_constant_op = shots_extract_op.operands[0].owner
+        if not hasattr(shots_constant_op, "properties"):
+            raise CompileError(
+                "Cannot get number of shots. Note that using a dynamic number of shots is not "
+                "supported with measurements-from-samples."
+            )
         shots_value_attribute: builtin.DenseIntOrFPElementsAttr = shots_constant_op.properties.get(
             "value"
         )
@@ -586,6 +594,11 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
         return shots_int_values[0]
 
     if isinstance(shots_extract_op, arith.ConstantOp):
+        if not hasattr(shots_extract_op, "properties"):
+            raise CompileError(
+                "Cannot get number of shots. Note that using a dynamic number of shots is not "
+                "supported with measurements-from-samples."
+            )
         shots_value_attribute: builtin.IntAttr = shots_extract_op.properties.get("value")
         return shots_value_attribute.value.data
 
