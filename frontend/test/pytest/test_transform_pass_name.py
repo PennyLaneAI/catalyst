@@ -76,11 +76,13 @@ def test_pass_with_complex_options(use_capture, options, backend):
     def captured_circuit():
         return qml.expval(qml.PauliZ(0))
 
+    print(captured_circuit.mlir)
+
     if isinstance(options["option"], list):
-        assert 'with options = {"option" = [1 : i64, 2 : i64, 3 : i64]}' in captured_circuit.mlir
+        assert 'with options = {"option" = [1 : i64, 2 : i64, "blah"]}' in captured_circuit.mlir
 
     if isinstance(options["option"], dict):
-        assert 'with options = {"option" = {blah = "foo"}' in captured_circuit.mlir
+        assert 'with options = {"option" = {"1" = 2 : i64, blah = "foo"}}' in captured_circuit.mlir
 
 
 def test_pass_with_unsupported_options(backend):
