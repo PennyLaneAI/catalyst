@@ -83,10 +83,22 @@ from catalyst.utils.exceptions import (
     DifferentiableCompileError,
     PlxprCaptureCFCompatibilityError,
 )
-from catalyst.utils.precompile_decomposition_rules import precompile_decomp_rules
+from catalyst.utils.precompile_decomposition_rules import (
+    BYTECODE_FILE_PATH,
+    precompile_decomp_rules,
+)
 
-if not (INSTALLED or os.getenv("DOCUTILSCONFIG") or os.getenv("READTHEDOCS_CANONICAL_URL")):
-    precompile_decomp_rules()
+# we ONLY want to compile on init for dev installs, where the caching should work correctly
+if (
+    not (
+        INSTALLED  # do not recompile on user installations
+        or os.getenv("DOCUTILSCONFIG")  # do not run for docs
+        or os.getenv("READTHEDOCS_CANONICAL_URL")  # do not run for RTD
+        or os.getenv("CI")  # do not run in CI
+    )
+    and not BYTECODE_FILE_PATH.exists()
+):  # pragma: no cover
+    precompile_decomp_rules()  # pragma: no cover
 
 
 autograph_ignore_fallbacks = False

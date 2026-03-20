@@ -12,130 +12,77 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Tests for the decomposition rule precompilation utilities.
-"""
+"""Tests for the decomposition rule precompilation utilities."""
 
 import pennylane as qp
-from pennylane.typing import TensorLike
-from pennylane.wires import WiresLike
+import pytest
 
+from catalyst.compiler import _quantum_opt
 from catalyst.utils.precompile_decomposition_rules import (
+    BYTECODE_FILE_PATH,
     COMPILER_OPS_FOR_DECOMPOSITION,
     compile_op_decomp_rules,
     get_abstract_args,
     get_compiler_ops,
+    precompile_decomp_rules,
 )
 
 
-def test_get_compiler_ops():
-    """
-    Test that get_compiler_ops succeeds in finding all compiler ops.
-    """
-    ops, failures = get_compiler_ops()
+class TestGetCompilerOps:
+    """Tests for get_compiler_ops."""
 
-    assert len(ops) == len(COMPILER_OPS_FOR_DECOMPOSITION)
+    def test_get_compiler_ops(self):
+        """Test that get_compiler_ops succeeds in finding all compiler ops."""
+        ops = get_compiler_ops()
 
-    assert failures == 0
+        assert len(ops) == len(COMPILER_OPS_FOR_DECOMPOSITION)
+
+    def test_warning(self):
+        """Test that get_compiler_ops warns when an op is not found."""
+        with pytest.warns():
+            get_compiler_ops(frozenset(["fake_op"]))
 
 
 class TestGetAbstractArgs:
-    """
-    Tests for get_abstract_args.
-    """
-
-    def test_empty_func(self):
-        """
-        Test that get_abstract_args correctly handles funcs with no args.
-        """
-
-        def empty():
-            return
-
-        assert not get_abstract_args(empty)
-
-    def test_int_param(self):
-        """
-        Test that get_abstract_args correctly handles funcs with int params.
-        """
-
-        def int_param(x: int):
-            return x
-
-        assert get_abstract_args(int_param) == [int]
-
-    def test_float_param(self):
-        """
-        Test that get_abstract_args correctly handles funcs with float params.
-        """
-
-        def float_param(x: float):
-            return x * 2
-
-        assert get_abstract_args(float_param) == [float]
-
-    def test_tensorlike_param(self):
-        """
-        Test that get_abstract_args correctly handles funcs with TensorLike params.
-        """
-
-        def tensorlike_param(a: TensorLike):
-            return 3 + a
-
-        assert get_abstract_args(tensorlike_param) == [float]
+    """Tests for get_abstract_args."""
 
     def test_ignore_wires(self):
+        """Test that get_abstract_args correctly ignores WiresLike params."""
+        assert not get_abstract_args(qp.X)
+
+    def test_missing_ndim_params(self):
+        """Test that get_abstract_args correctly handles missing ndim_params properties."""
+        assert not get_abstract_args(qp.H)
+
+    def test_0_in_ndim_params(self):
+        """Test that get_abstract_args correctly handles 0 values in ndim_params."""
+        assert get_abstract_args(qp.RX) == [float]
+
+    def test_multiple_values_in_ndim_params(self):
+        """Test that get_abstract_args correctly handles length > 1 ndim_params."""
+        assert get_abstract_args(qp.U3) == [float, float, float]
+
+    def test_dimension_failure(self):
         """
-        Test that get_abstract_args correctly ignores WiresLike params.
+        Test that get_abstract_args correctly raises an exception given an op with
+        multi-dimensional params.
         """
-
-        def wire_param(wires: WiresLike):
-            return wires
-
-        assert not get_abstract_args(wire_param)
-
-    def test_mixed_params(self):
-        """
-        Test that get_abstract_args correctly handles mixed params.
-        """
-
-        def mixed_params(x: int, y: float, w: WiresLike):
-            return int(x - y), w
-
-        assert get_abstract_args(mixed_params) == [
-            int,
-            float,
-        ]
-
-    def test_named_params(self):
-        """
-        Test that get_abstract_args correctly guesses for named params.
-        """
-
-        def angle_names(theta, phi, omega):
-            return theta + phi + omega
-
-        assert get_abstract_args(angle_names) == [float, float, float]
+        with pytest.raises(ValueError, match="Cannot generate arguments"):
+            get_abstract_args(qp.ControlledQubitUnitary)
 
 
 class TestCompileOpDecompRules:
-    """
-    Tests for compile_op_decomp_rules.
-    """
+    """Tests for compile_op_decomp_rules."""
 
-    def test_hadamard(self):
-        """
-        Test that compile_op_decomp_rules successfully compiles each decomp rule for Hadamards
-        """
+    def test_compile_hadamard_rules(self):
+        """Test that compile_op_decomp_rules successfully compiles each decomp rule for Hadamard."""
         rules = compile_op_decomp_rules(qp.H)
 
         assert "_hadamard_to_rz_rx" in rules
         assert "_hadamard_to_rz_ry" in rules
 
-    def test_rx(self):
-        """
-        Test that compile_op_decomp_rules successfully compiles each decomp rule for Hadamards
-        """
+    def test_compile_rx_rules(self):
+        """Test that compile_op_decomp_rules successfully compiles each decomp rule for RX gates."""
         rules = compile_op_decomp_rules(qp.RX)
 
         assert "_rx_to_rot" in rules
@@ -143,3 +90,69 @@ class TestCompileOpDecompRules:
         assert "_rx_to_ry_cliff" in rules
         assert "_rx_to_rz_cliff" in rules
         assert "_rx_to_ppr" in rules
+
+    def test_fails_with_unknown_wires(self):
+        """
+        Test that compile_op_decomp_rules warns when the number of wires is unknown.
+        """
+        with pytest.warns():
+            compile_op_decomp_rules(qp.Identity)
+
+    def test_compile_error(self):
+        """Test that compile_op_decomp_rules warns when compilation of a rule fails."""
+
+        with pytest.warns(match="Failed to compile"):
+
+            class FakeOp(qp.operation.Operator):
+                """Test class with incompatible decomp rule."""
+
+                num_wires = 3
+                num_params = 1
+                ndim_params = (0,)
+
+            @qp.register_resources({})
+            def fake_op_decomp(param, wires):
+                _quantum_opt(stdin="module {")
+                return param, wires
+
+            qp.add_decomps(FakeOp, fake_op_decomp)
+
+            compile_op_decomp_rules(FakeOp)
+
+    def test_unexpected_error(self):
+        """Test that compile_op_decomp_rules warns when an unexpected exception is thrown."""
+
+        with pytest.warns(match="Unexpected error"):
+
+            class NewFakeOp(qp.operation.Operator):
+                """Test class without ndim_params."""
+
+                num_wires = 1
+                num_params = 1
+
+            @qp.register_resources({})
+            def fake_op_decomp(string):
+                qp.PauliRot(2, string)
+
+            qp.add_decomps(NewFakeOp, fake_op_decomp)
+
+            compile_op_decomp_rules(NewFakeOp)
+
+
+def test_bytecode_file():
+    """Test that the bytecode file is generated correctly."""
+    BYTECODE_FILE_PATH.unlink(missing_ok=True)
+
+    precompile_decomp_rules()
+
+    assert BYTECODE_FILE_PATH.exists()
+
+    # NOTE: empty pass is needed to prevent running default pipeline
+    rules = _quantum_opt("--empty", str(BYTECODE_FILE_PATH))
+
+    assert "_isingxy_to_h_cy" in rules
+    assert "_doublexcit" in rules
+    assert "_toffoli_to_ppr" in rules
+    assert "_pauliz_to_ps" in rules
+    assert "_cphase_to_ppr" in rules
+    assert "_crot" in rules

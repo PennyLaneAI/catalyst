@@ -13,73 +13,73 @@
 # limitations under the License.
 
 """Utilities for AOT compiling PennyLane's decomposition rules to MLIR Bytecode."""
-
 import inspect
-import subprocess
 import warnings
 from functools import lru_cache
 from pathlib import Path
-from types import UnionType
-from typing import Callable, Union, get_args, get_origin
 
 import jax
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from pennylane.operation import Operator
-from pennylane.typing import TensorLike
-from pennylane.wires import Wires
 
+from catalyst.compiler import _quantum_opt
 from catalyst.jax_primitives import decomposition_rule
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime_environment import DEFAULT_BIN_PATHS
 
 BYTECODE_FILE_PATH = Path(__file__).parent.parent / Path("resources/decomposition_rules.mlirbc")
 
-# TODO uncomment dynamic size wires ops once they are supported
-COMPILER_OPS_FOR_DECOMPOSITION = {
-    "CNOT",
-    "ControlledPhaseShift",
-    "CRot",
-    "CRX",
-    "CRY",
-    "CRZ",
-    "CSWAP",
-    "CY",
-    "CZ",
-    "Hadamard",
-    # "Identity",
-    "IsingXX",
-    "IsingXY",
-    "IsingYY",
-    "IsingZZ",
-    "SingleExcitation",
-    "DoubleExcitation",
-    "ISWAP",
-    "PauliX",
-    "PauliY",
-    "PauliZ",
-    # "PauliRot",
-    # "PauliMeasure",
-    "PhaseShift",
-    "PSWAP",
-    "Rot",
-    "RX",
-    "RY",
-    "RZ",
-    "S",
-    "SWAP",
-    "T",
-    "Toffoli",
-    "U1",
-    "U2",
-    "U3",
-    # "MultiRZ",
-    # "GlobalPhase",
-}
+# TODO: Uncomment dynamic size wires ops once they are supported
+# FIXME: Use the Gate class instead of this list of compiler ops
+#              https://github.com/PennyLaneAI/pennylane/pull/8767
+COMPILER_OPS_FOR_DECOMPOSITION = frozenset(
+    {
+        "CNOT",
+        "ControlledPhaseShift",
+        "CRot",
+        "CRX",
+        "CRY",
+        "CRZ",
+        "CSWAP",
+        "CY",
+        "CZ",
+        "Hadamard",
+        # "Identity",
+        "IsingXX",
+        "IsingXY",
+        "IsingYY",
+        "IsingZZ",
+        "SingleExcitation",
+        "DoubleExcitation",
+        "ISWAP",
+        "PauliX",
+        "PauliY",
+        "PauliZ",
+        # "PauliRot",
+        # "PauliMeasure",
+        "PhaseShift",
+        "PSWAP",
+        "Rot",
+        "RX",
+        "RY",
+        "RZ",
+        "S",
+        "SWAP",
+        "T",
+        "Toffoli",
+        "U1",
+        "U2",
+        "U3",
+        # "MultiRZ",
+        # "GlobalPhase",
+    }
+)
 
 
 @lru_cache
-def get_compiler_ops() -> tuple[set[type[Operator]], int]:
+def get_compiler_ops(
+    _supported_compiler_op_names: frozenset[str] = COMPILER_OPS_FOR_DECOMPOSITION,
+) -> set[type[Operator]]:
     """
     Extracts all ops from pennylane that have decompositions in catalyst.
 
@@ -88,8 +88,6 @@ def get_compiler_ops() -> tuple[set[type[Operator]], int]:
                         (as defined by COMPILER_OPS_FOR_DECOMPOSITION)
         int: the number of compiler-compatible ops that could not be found in PennyLane
     """
-    num_failures = 0
-
     pl_op_classes = set(
         value
         for _, value in inspect.getmembers(
@@ -100,57 +98,36 @@ def get_compiler_ops() -> tuple[set[type[Operator]], int]:
     # FIXME: manual override for PauliMeasure
     pl_op_classes.add(qp.ops.PauliMeasure)
 
-    supported_compiler_op_names = COMPILER_OPS_FOR_DECOMPOSITION
-
     compiler_op_classes = set(
-        op_class for op_class in pl_op_classes if op_class.__name__ in supported_compiler_op_names
+        op_class for op_class in pl_op_classes if op_class.__name__ in _supported_compiler_op_names
     )
 
     compiler_op_class_names = set(op_class.__name__ for op_class in compiler_op_classes)
 
-    for class_name in supported_compiler_op_names.difference(compiler_op_class_names):
+    for class_name in _supported_compiler_op_names.difference(compiler_op_class_names):
         warnings.warn(f"failed to collect pennylane op with name {class_name}")
-        num_failures += 1
 
-    return compiler_op_classes, num_failures
+    return compiler_op_classes
 
 
-def get_abstract_args(func: Callable) -> list[type]:
+def get_abstract_args(op_class: type[Operator]) -> list[type]:
     """
-    Create dummy args for a callable.
+    Create jax-compatible abstract args for catalyst DecompositionRules that apply to op_class.
 
     Args:
-        func: callable to create args for
+        op_class: operator to create args for.
 
     Returns:
-        list: dummy args matching the (positional) signature of func.
+        list: abstract args for DecompositionRules.
     """
-    func_sig = inspect.signature(func)
-    abstract_args: list = []
-    for param in func_sig.parameters.values():
-        type_annotation = param.annotation
-        if get_origin(type_annotation) is Union or get_origin(type_annotation) is UnionType:
-            type_annotation = get_args(type_annotation)
-        else:
-            type_annotation = (type_annotation,)
-
-        if param.name == "wires" or Wires in type_annotation:  # wires are handled separately
-            continue
-        if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
-            continue
-
-        if float in type_annotation or TensorLike in type_annotation:
-            abstract_args.append(float)
-        elif int in type_annotation:
-            abstract_args.append(int)
-        elif param.name in ["theta", "phi", "delta", "omega"]:
-            abstract_args.append(float)
-        else:
-            raise ValueError(
-                f"Cannot resolve the {param.name} parameter of the {func} decomposition rule."
-            )
-
-    return abstract_args
+    # decomposition rule signatures are of the form
+    #   (*op_params, wires, **op_resource_params, **hyperparams)
+    # see https://github.com/PennyLaneAI/catalyst/pull/2531#discussion_r2949351413
+    if isinstance(op_class.ndim_params, tuple) and any(dim > 0 for dim in op_class.ndim_params):
+        raise ValueError(
+            f"Cannot generate arguments for {op_class.__name__} with multi-dimensional parameters."
+        )
+    return [float for _ in range(op_class.num_params)]
 
 
 def get_func_from_circuit(module) -> str | None:
@@ -181,6 +158,7 @@ def get_func_from_circuit(module) -> str | None:
 
 def compile_rule(
     op_class,
+    abstract_args,
     op_num_wires,
     rule,
     dev,
@@ -199,14 +177,6 @@ def compile_rule(
     Returns:
         str: string representation of the mlir of the decomposition rule.
     """
-    abstract_args = get_abstract_args(rule._impl)  # pylint: disable=protected-access
-
-    if str in abstract_args:
-        raise ValueError(
-            f"Cannot compile decomposition rule {rule.__name__} for op {op_class.__name__} with "
-            + "string arguments."
-        )
-
     qp.decomposition.enable_graph()
 
     # WARNING: do not rename this function, we use it to extract the rule from the compiled
@@ -240,24 +210,27 @@ def compile_op_decomp_rules(
     """
     op_decomp_rules = qp.decomposition.decomposition_graph.list_decomps(op_class)
 
-    mlir_modules = {}
+    mlir_modules: dict[str, str | None] = {}
 
     if not hasattr(op_class, "num_wires") or not op_class.num_wires:
         warnings.warn(
             f"Cannot compile decomposition rules for op {op_class.__name__} with an unknown number "
             + "of wires."
         )
+        return mlir_modules
 
     dev = qp.device("null.qubit", wires=op_class.num_wires)
+
+    abstract_args = get_abstract_args(op_class)  # pylint: disable=protected-access
 
     for rule in op_decomp_rules:
         try:
             rule_name = rule._impl.__name__  # pylint: disable=protected-access
-            mlir_modules[rule_name] = compile_rule(op_class, op_class.num_wires, rule, dev)
-        except TypeError as e:
-            warnings.warn(f"Abstract args failed to compile {rule_name}: {e}")
+            mlir_modules[rule_name] = compile_rule(
+                op_class, abstract_args, op_class.num_wires, rule, dev
+            )
         except CompileError as e:
-            warnings.warn(f"failed to compile {rule_name}: {e}")
+            warnings.warn(f"Failed to compile {rule_name}: {e}")
         except Exception as e:  # pylint: disable=broad-exception-caught
             warnings.warn(f"Unexpected error while trying to compile {rule_name}: {e}")
         finally:
@@ -277,31 +250,24 @@ def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
     """
     decomp_file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    target_ops, num_ops_missed = get_compiler_ops()
-    if num_ops_missed:
-        warnings.warn(f"failed to collect {num_ops_missed} op(s) from PennyLane")
+    target_ops = get_compiler_ops()
 
     mlir_rules = "".join(
-        str(mlir).replace("@rule_wrapper", f"@{name}")
+        str(mlir).replace("@rule_wrapper", f"@__builtin_{name}")
         for func in target_ops
         for name, mlir in compile_op_decomp_rules(func).items()
     )
 
-    # FIXME use catalyst.compiler._quantum_opt once the catalyst dangling options are fixed
-    bytecode = subprocess.run(
-        (
-            f"{DEFAULT_BIN_PATHS['cli']}/quantum-opt",
-            "--emit-bytecode",
-            "--register-decomp-rule-resource",
-        ),
-        input=mlir_rules.encode("utf-8"),
-        capture_output=True,
-        check=True,
-    ).stdout
+    bytecode = _quantum_opt(
+        "--emit-bytecode",
+        "--register-decomp-rule-resource",
+        stdin=mlir_rules.encode("utf-8"),
+        text=None,
+    )
 
     with open(decomp_file_path, "wb") as bytecode_file:
         bytecode_file.write(bytecode)
 
 
-if __name__ == "__main__":
-    precompile_decomp_rules()
+if __name__ == "__main__":  # pragma: no cover
+    precompile_decomp_rules()  # pragma: no cover
