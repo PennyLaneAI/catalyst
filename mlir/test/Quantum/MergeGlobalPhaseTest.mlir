@@ -51,7 +51,7 @@ func.func @keep_controlled_global_phases(%arg0: f64, %arg1: f64, %arg2: f64, %q:
     // CHECK-NOT: quantum.gphase
     // CHECK: [[SUM:%.+]] = arith.addf [[C]], [[A]]
     // CHECK: quantum.gphase([[SUM]])
-    // CHECK-NOT: quantu.gphase
+    // CHECK-NOT: quantum.gphase
     quantum.gphase(%arg0)
     %true = arith.constant 1 : i1
     quantum.gphase(%arg1) ctrls(%q) ctrlvals(%true) : ctrls !quantum.bit
