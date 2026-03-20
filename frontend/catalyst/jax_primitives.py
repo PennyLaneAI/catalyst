@@ -2700,7 +2700,7 @@ def _pl_for_loop_lowering(
             jaxpr_body_fn,
             body_ctx.name_stack,
             mlir.TokenSet(),
-            [mlir.ir_constants(c) for c in body_consts],
+            [mlir.ir_constant(c) for c in body_consts],
             *loop_params,
             dim_var_values=jax_ctx.dim_var_values,
             const_lowering=jax_ctx.const_lowering,
