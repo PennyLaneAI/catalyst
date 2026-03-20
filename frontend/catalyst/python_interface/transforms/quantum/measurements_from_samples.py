@@ -656,8 +656,12 @@ def _postprocessing_probs(samples):
     # which we currently do not support.
     # If Catalyst PR https://github.com/PennyLaneAI/catalyst/pull/1849 is merged, then we should be
     # able to use bincount.
-    counts = jnp.zeros(dim, dtype=int)
-    for i in indices.astype(int):
-        counts = counts.at[i].add(1)
+    init_counts = jnp.zeros(dim, dtype=int)
+
+    def body_fun(i, counts):
+        idx = indices[i].astype(int)
+        return counts.at[idx].add(1)
+
+    counts = jax.lax.fori_loop(0, n_samples, body_fun, init_counts)
 
     return counts / n_samples
