@@ -330,6 +330,10 @@
 * `catalyst.jax_primitives.subroutine` has been moved to `qml.capture.subroutine`.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
 
+* The `StableHLO` dialect has been removed from Catalyst's Python interface module. 
+  Downstream users should now import StableHLO dialect definitions from `xdsl_jax.dialects.stablehlo` instead.
+  [(#2588)](https://github.com/PennyLaneAI/catalyst/pull/2588)
+
 * (Compiler integrators only) The versions of StableHLO/LLVM/Enzyme used by Catalyst have been updated.
   [(#2415)](https://github.com/PennyLaneAI/catalyst/pull/2415)
   [(#2416)](https://github.com/PennyLaneAI/catalyst/pull/2416)
@@ -427,6 +431,9 @@
   [(#2582)](https://github.com/PennyLaneAI/catalyst/pull/2582)
 
 <h3>Internal changes ⚙️</h3>
+
+* Updated Catalyst's xDSL dependencies to `xdsl` 0.59.0 and `xdsl-jax` 0.5.0.
+  [(#2591)](https://github.com/PennyLaneAI/catalyst/pull/2591)
 
 * Added a optimized pathway to the xDSL `ApplyTransformSequencePass` so that it can schedule consecutive MLIR
   passes together rather than individually. This minimizes the number of round-trips between xDSL and MLIR, improving

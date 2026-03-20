@@ -88,7 +88,7 @@ class TestCombineGlobalPhasesPass:
         Here the control flow is an `if` operation.
         """
         program = """
-            // CHECK: func.func @test_combine_global_phase([[cond:%.+]] : i1, [[arg0:%.+]] : f64, [[arg1:%.+]] : f64)
+            // CHECK: func.func @test_combine_global_phase([[cond:%.+]]: i1, [[arg0:%.+]]: f64, [[arg1:%.+]]: f64)
             func.func @test_combine_global_phase(%cond : i1, %arg0 : f64, %arg1 : f64) {
                 // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
                 %0 = "test.op"() : () -> !quantum.bit
@@ -138,7 +138,7 @@ class TestCombineGlobalPhasesPass:
         Here the control flow is a `for` operation.
         """
         program = """
-            // CHECK: func.func @test_combine_global_phase(%n : index, [[arg0:%.+]] : f64, [[arg1:%.+]] : f64)
+            // CHECK: func.func @test_combine_global_phase(%n: index, [[arg0:%.+]]: f64, [[arg1:%.+]]: f64)
             func.func @test_combine_global_phase(%n : index, %arg0 : f64, %arg1 : f64) {
                 // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
                 // CHECK: [[c0:%.+]] = arith.constant 0 : index
@@ -176,7 +176,7 @@ class TestCombineGlobalPhasesPass:
         Here the control flow is a `while` operation.
         """
         program = """
-            // CHECK: func.func @test_combine_global_phase(%n : i32, [[arg0:%.+]] : f64, [[arg1:%.+]] : f64)
+            // CHECK: func.func @test_combine_global_phase(%n: i32, [[arg0:%.+]]: f64, [[arg1:%.+]]: f64)
             func.func @test_combine_global_phase(%n : i32, %arg0 : f64, %arg1 : f64) {
                 // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
                 %0 = "test.op"() : () -> !quantum.bit
