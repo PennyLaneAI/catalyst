@@ -73,9 +73,6 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
             apply_recursively=False,
         ).rewrite_module(op)
 
-        # diagonalize measurements before converting to samples
-        DiagonalizeFinalMeasurementsPass().apply(_ctx, op)
-
         greedy_applier = pattern_rewriter.GreedyRewritePatternApplier(
             [
                 ExpvalAndVarPattern(),
@@ -752,9 +749,6 @@ def _get_static_shots_value_from_device_op(quantum_node: func.FuncOp) -> int:
         CompileError: If `quantum_node` does not contain a quantum.DeviceInitOp.
         CompileError: If the operator expected to contain shots values does not have `properties`.
             This is the immediate issue that is observed when shots are dynamic.
-        CompileError: If `module` does not contain a quantum.DeviceInitOp.
-        CompileError: If the operator expected to contain shots values does not have `properties`.
-            This is the immediate issue that is observed when shots are dynamic.
     """
     device_op = None
 
@@ -774,11 +768,6 @@ def _get_static_shots_value_from_device_op(quantum_node: func.FuncOp) -> int:
 
     if isinstance(shots_extract_op, tensor.ExtractOp):
         shots_constant_op = shots_extract_op.operands[0].owner
-        if not hasattr(shots_constant_op, "properties"):
-            raise CompileError(
-                "Cannot get number of shots. Note that using a dynamic number of shots is not "
-                "supported with measurements-from-samples."
-            )
         if not hasattr(shots_constant_op, "properties"):
             raise CompileError(
                 "Cannot get number of shots. Note that using a dynamic number of shots is not "
