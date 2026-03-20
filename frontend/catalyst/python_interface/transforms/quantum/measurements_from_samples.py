@@ -47,10 +47,6 @@ from catalyst.python_interface.transforms.quantum.diagonalize_measurements impor
     DiagonalizeFinalMeasurementsPass,
 )
 
-from catalyst.python_interface.transforms.quantum.diagonalize_measurements import (
-    DiagonalizeFinalMeasurementsPass,
-)
-
 
 @dataclass(frozen=True)
 class MeasurementsFromSamplesPass(passes.ModulePass):
