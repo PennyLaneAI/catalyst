@@ -28,7 +28,8 @@ from xdsl.irdl import (
     AnyOf,
     IRDLOperation,
     ParsePropInAttrDict,
-    VarConstraint,
+    RangeOf,
+    RangeVarConstraint,
     irdl_op_definition,
     lazy_traits_def,
     opt_operand_def,
@@ -56,7 +57,7 @@ from ..attributes import QubitSSAValue, QubitType, QuregSSAValue, QuregType
 class AdjointOp(IRDLOperation):
     """Calculate the adjoint of the enclosed operations"""
 
-    T: ClassVar = VarConstraint("T", AnyOf([QubitType, QuregType]))
+    T: ClassVar = RangeVarConstraint("T", RangeOf(AnyOf([QubitType, QuregType])))
 
     name = "quantum.adjoint"
 
