@@ -60,8 +60,8 @@ def test_pass_with_options(options, expected_strings, backend):
 @pytest.mark.parametrize(
     "options",
     [
-        {"option": [1, 2, 3]},
-        {"option": {"blah": "foo"}},
+       {"option": [1, 2, "blah"]},
+       {"option": {1: 2, "blah": "foo"}},
     ],
     ids=["list", "dict"],
 )
