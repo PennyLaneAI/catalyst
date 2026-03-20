@@ -14,8 +14,11 @@
 
 """Unit tests for the xDSL QecLogical dialect."""
 
+from typing import cast
+
 import pytest
-from xdsl.dialects.test import TestOp
+from xdsl.dialects import test
+from xdsl.dialects.builtin import I64, IndexType, IntegerAttr
 from xdsl.ir import AttributeCovT, OpResult
 
 from catalyst.python_interface.dialects import qecl
@@ -26,23 +29,24 @@ pytestmark = pytest.mark.xdsl
 # Test function taken from xdsl/utils/test_value.py
 def create_ssa_value(t: AttributeCovT) -> OpResult[AttributeCovT]:
     """Create a single SSA value with the given type for testing purposes."""
-    op = TestOp(result_types=(t,))
-    return op.results[0]
+    op = test.TestOp(result_types=(t,))
+    return cast(OpResult[AttributeCovT], op.results[0])
 
 
 all_ops = list(qecl.QecLogical.operations)
 all_attrs = list(qecl.QecLogical.attributes)
 
-expected_ops_names = {}
+expected_ops_names = {
+    "AllocOp": "qecl.alloc",
+    "DeallocOp": "qecl.dealloc",
+    "ExtractCodeblockOp": "qecl.extract_block",
+    "InsertCodeblockOp": "qecl.insert_block",
+}
 
 expected_attrs_names = {
     "LogicalCodeblockType": "qecl.codeblock",
     "LogicalHyperRegisterType": "qecl.hyperreg",
 }
-
-
-codeblock = create_ssa_value(qecl.LogicalCodeblockType(1))
-hyperreg = create_ssa_value(qecl.LogicalHyperRegisterType(3, 1))
 
 
 def test_qecl_dialect_name():
@@ -72,6 +76,83 @@ def test_all_attributes_names(attr):
     assert attr.name == expected_name
 
 
+class TestQecLogicalTypes:
+    """Tests relating to the qecl types."""
+
+    @pytest.mark.parametrize("k", [1, 2, IntegerAttr.from_int_and_width(1, 64)])
+    def test_qecl_type_constructor_codeblock(self, k: int | IntegerAttr[I64]):
+        """Test the constructor of qecl.LogicalCodeblockType."""
+        codeblock = qecl.LogicalCodeblockType(k)
+
+        expected_k = k if isinstance(k, IntegerAttr) else IntegerAttr.from_int_and_width(k, 64)
+        assert codeblock.k == expected_k
+
+    @pytest.mark.parametrize("width", [1, 3, IntegerAttr.from_int_and_width(3, 64)])
+    @pytest.mark.parametrize("k", [1, 2, IntegerAttr.from_int_and_width(1, 64)])
+    def test_qecl_type_constructor_hyper_reg(
+        self, width: int | IntegerAttr[I64], k: int | IntegerAttr[I64]
+    ):
+        """Test the constructor of qecl.LogicalHyperRegisterType."""
+        hyper_reg = qecl.LogicalHyperRegisterType(width, k)
+
+        expected_width = (
+            width if isinstance(width, IntegerAttr) else IntegerAttr.from_int_and_width(width, 64)
+        )
+        expected_k = k if isinstance(k, IntegerAttr) else IntegerAttr.from_int_and_width(k, 64)
+        assert hyper_reg.width == expected_width
+        assert hyper_reg.k == expected_k
+
+
+class TestQecLogicalOps:
+    """Tests relating to the qecl ops."""
+
+    width = IntegerAttr.from_int_and_width(3, 64)
+    k = IntegerAttr.from_int_and_width(1, 64)
+    idx_attr = IntegerAttr.from_index_int_value(0)
+
+    def _get_hyper_reg_value(self):
+        return create_ssa_value(qecl.LogicalHyperRegisterType(self.width, self.k))
+
+    def _get_codeblock_value(self):
+        return create_ssa_value(qecl.LogicalCodeblockType(self.k))
+
+    def test_qecl_op_constructor_alloc(self):
+        """Test the constructor of the qecl.alloc op."""
+        alloc_op = qecl.AllocOp(qecl.LogicalHyperRegisterType(self.width, self.k))
+        assert len(alloc_op.result_types) == 1
+        assert isinstance(alloc_op.result_types[0], qecl.LogicalHyperRegisterType)
+        assert alloc_op.result_types[0].width == self.width
+        assert alloc_op.result_types[0].k == self.k
+
+    def test_qecl_op_constructor_dealloc(self):
+        """Test the constructor of the qecl.dealloc op."""
+        dealloc_op = qecl.DeallocOp(self._get_hyper_reg_value())
+        assert len(dealloc_op.result_types) == 0
+
+    @pytest.mark.parametrize(
+        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
+    )
+    def test_qecl_op_constructor_extract_block(self, idx):
+        """Test the constructor of the qecl.extract_block op."""
+        extract_block_op = qecl.ExtractCodeblockOp(hyper_reg=self._get_hyper_reg_value(), idx=idx)
+        assert len(extract_block_op.result_types) == 1
+        assert isinstance(extract_block_op.result_types[0], qecl.LogicalCodeblockType)
+        assert extract_block_op.result_types[0].k == self.k
+
+    @pytest.mark.parametrize(
+        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
+    )
+    def test_qecl_op_constructor_insert_block(self, idx):
+        """Test the constructor of the qecl.insert_block op."""
+        insert_block_op = qecl.InsertCodeblockOp(
+            in_hyper_reg=self._get_hyper_reg_value(), idx=idx, codeblock=self._get_codeblock_value()
+        )
+        assert len(insert_block_op.result_types) == 1
+        assert isinstance(insert_block_op.result_types[0], qecl.LogicalHyperRegisterType)
+        assert insert_block_op.result_types[0].width == self.width
+        assert insert_block_op.result_types[0].k == self.k
+
+
 @pytest.mark.parametrize(
     "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
 )
@@ -83,6 +164,43 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     // CHECK: [[hyperreg:%.+]] = "test.op"() : () -> !qecl.hyperreg<3 x 1>
     %hyperreg = "test.op"() : () -> !qecl.hyperreg<3 x 1>
+
+    // CHECK: [[hreg0:%.+]] = qecl.alloc() : !qecl.hyperreg<3 x 1>
+    %hreg0 = qecl.alloc() : !qecl.hyperreg<3 x 1>
+
+    // CHECK: qecl.dealloc [[hreg0]] : !qecl.hyperreg<3 x 1>
+    qecl.dealloc %hreg0 : !qecl.hyperreg<3 x 1>
+
+    // CHECK: [[block0:%.+]] = qecl.extract_block [[hyperreg]][{{\s*}}0] : !qecl.hyperreg<3 x 1> -> !qecl.codeblock<1>
+    %block0 = qecl.extract_block %hyperreg[ 0] : !qecl.hyperreg<3 x 1> -> !qecl.codeblock<1>
+
+    // CHECK: qecl.insert_block [[hyperreg]][{{\s*}}0], [[block0]] : !qecl.hyperreg<3 x 1>, !qecl.codeblock<1>
+    %hreg1 = qecl.insert_block %hyperreg[ 0], %block0 : !qecl.hyperreg<3 x 1>, !qecl.codeblock<1>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
+
+
+class TestQecLogicalHelpers:
+    """Tests for the QEC logical dialect helper functions"""
+
+    @pytest.mark.parametrize(
+        "in_hyper_reg_type",
+        [
+            qecl.LogicalHyperRegisterType(1, 1),
+            qecl.LogicalHyperRegisterType(1, 3),
+            qecl.LogicalHyperRegisterType(3, 1),
+            qecl.LogicalHyperRegisterType(3, 3),
+        ],
+    )
+    def test_get_logical_hyper_reg_type(self, in_hyper_reg_type):
+        """Test that the qecl.get_logical_hyper_reg_type function returns the correct type when
+        given an SSA value or an operation.
+        """
+        in_hyper_reg_ssa_val = create_ssa_value(in_hyper_reg_type)
+        out_hyper_reg_type_from_ssa = qecl.get_logical_hyper_reg_type(in_hyper_reg_ssa_val)
+        assert in_hyper_reg_type == out_hyper_reg_type_from_ssa
+
+        in_hyper_reg_defining_op = in_hyper_reg_ssa_val.op
+        out_hyper_reg_type_from_op = qecl.get_logical_hyper_reg_type(in_hyper_reg_defining_op)
+        assert in_hyper_reg_type == out_hyper_reg_type_from_op
