@@ -574,8 +574,9 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
         shots_constant_op = shots_extract_op.operands[0].owner
         if not hasattr(shots_constant_op, "properties"):
             raise CompileError(
-                "Cannot get number of shots. Note that using a dynamic number of shots is not " \
-                "supported with measurements-from-samples."          )
+                "Cannot get number of shots. Note that using a dynamic number of shots is not "
+                "supported with measurements-from-samples."
+            )
         shots_value_attribute: builtin.DenseIntOrFPElementsAttr = shots_constant_op.properties.get(
             "value"
         )
@@ -591,7 +592,7 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
     if isinstance(shots_extract_op, arith.ConstantOp):
         if not hasattr(shots_extract_op, "properties"):
             raise CompileError(
-                "Cannot get number of shots. Note that using a dynamic number of shots is not " \
+                "Cannot get number of shots. Note that using a dynamic number of shots is not "
                 "supported with measurements-from-samples."
             )
         shots_value_attribute: builtin.IntAttr = shots_extract_op.properties.get("value")
