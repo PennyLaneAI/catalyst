@@ -15,6 +15,7 @@
 # pylint: disable=line-too-long
 
 from functools import partial
+from pennylane.exceptions import CompileError
 
 import numpy as np
 import pennylane as qml
@@ -462,6 +463,24 @@ class TestMeasurementsFromSamplesIntegration:
             ValueError, match="measurements_from_samples pass requires non-zero shots"
         ):
             circuit(1.2)
+
+    def test_dynamic_shots_raises_error(self):
+        """Test that when dynamic shots are provided, the pass raises an error"""
+
+        @qml.qjit
+        @measurements_from_samples_pass
+        def workflow(a, shots):
+
+            @qml.set_shots(shots)
+            @qml.qnode(qml.device("lightning.qubit", wires=1))
+            def circuit(x):
+                qml.RX(x, 0)
+                return qml.expval(qml.Z(0))
+
+            circuit(a)
+
+        with pytest.raises(CompileError, match="using a dynamic number of shots is not supported"):
+            workflow(1.2, 100)
 
     @pytest.mark.parametrize("shots", [1, 2])
     @pytest.mark.parametrize(
