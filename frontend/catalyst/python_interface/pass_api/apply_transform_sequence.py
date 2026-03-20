@@ -17,6 +17,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import partial
 from io import StringIO
+from itertools import groupby
 from typing import Any, Callable
 
 from xdsl.context import Context
@@ -213,7 +214,8 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
     def match_and_rewrite(self, transformer: builtin.ModuleOp, rewriter: PatternRewriter):
         """Rewrite modules containing transform.named_sequences."""
         payload: builtin.ModuleOp = transformer.parent_op()
-        rewriter.erase_op(transformer)
+        # Detach the transformer from the payload module without destroying it
+        transformer.detach()
 
         pass_ops = []
         for ns in transformer.ops:
@@ -225,35 +227,16 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
         if len(pass_ops) == 0:
             return
 
-        schedule = self._cluster_passes(pass_ops)
-        for subschedule in schedule:
-            if subschedule[0].pass_name.data in self.passes:
-                self._apply_xdsl_pipeline(payload, subschedule)
+        # self.passes maps pass names to xDSL passes. If the pass name is in self.passes, we know
+        # that it is an xDSL pass. Otherwise, we assume that the name corresponds to an MLIR pass.
+        pass_groups = groupby(pass_ops, key=lambda op: is_xdsl_pass(op.pass_name.data))
+
+        for is_xdsl_group, group in pass_groups:
+            group = tuple(group)
+            if is_xdsl_group:
+                self._apply_xdsl_pipeline(payload, group)
             else:
-                payload = self._apply_mlir_pipeline(payload, subschedule, rewriter)
-
-    def _cluster_passes(
-        self, pass_ops: list[transform.ApplyRegisteredPassOp]
-    ) -> list[list[transform.ApplyRegisteredPassOp]]:
-        """Create a schedule that clusters consecutive xDSL/MLIR passes together."""
-        if not pass_ops:  # pragma: no cover
-            return []
-
-        schedule = []
-        cur_schedule = [pass_ops[0]]
-        cur_state = pass_ops[0].pass_name.data in self.passes
-
-        for op in pass_ops[1:]:
-            new_state = op.pass_name.data in self.passes
-            if new_state == cur_state:
-                cur_schedule.append(op)
-            else:
-                schedule.append(cur_schedule)
-                cur_schedule = [op]
-                cur_state = new_state
-
-        schedule.append(cur_schedule)
-        return schedule
+                payload = self._apply_mlir_pipeline(payload, group, rewriter)
 
     def _apply_xdsl_pipeline(
         self, payload: builtin.ModuleOp, pass_ops: list[transform.ApplyRegisteredPassOp]
