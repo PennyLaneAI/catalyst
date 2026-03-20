@@ -95,8 +95,8 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
             else if (auto gate = dyn_cast<quantum::QuantumOperation>(op)) {
                 rewriter.replaceOp(op, gate.getQubitOperands());
             }
-            else if (auto region = dyn_cast<quantum::QuantumRegion>(op)) {
-                rewriter.replaceOp(op, region.getRegisterOperand());
+            else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(op)) {
+                rewriter.replaceOp(op, adjointOp.getArgs());
             }
             else if (isa<quantum::DeallocOp>(op)) {
                 rewriter.eraseOp(op);
@@ -185,8 +185,8 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
             else if (auto gate = dyn_cast<quantum::QuantumOperation>(op)) {
                 rewriter.replaceOp(op, gate.getQubitOperands());
             }
-            else if (auto region = dyn_cast<quantum::QuantumRegion>(op)) {
-                rewriter.replaceOp(op, region.getRegisterOperand());
+            else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(op)) {
+                rewriter.replaceOp(op, adjointOp.getArgs());
             }
             else if (isa<quantum::DeallocOp>(op)) {
                 rewriter.eraseOp(op);
