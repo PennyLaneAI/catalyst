@@ -52,7 +52,8 @@ from catalyst.python_interface.transforms.quantum.diagonalize_measurements impor
 class MeasurementsFromSamplesPass(passes.ModulePass):
     """Pass that replaces all terminal measurements in a program with a single
     :func:`pennylane.sample` measurement, and adds postprocessing instructions to recover the
-    original measurement.
+    original measurement. If observables are present in a basis other than Z, the pass
+    diagonalizes them before conversion to samples in the computational basis.
     """
 
     name = "measurements-from-samples"
