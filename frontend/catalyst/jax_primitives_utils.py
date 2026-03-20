@@ -126,6 +126,7 @@ def get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines, metadata=None, p
         ctx: LoweringRuleContext
         callable_: python function
         call_jaxpr: jaxpr representing callable_
+        pipelines: list of pipelines to be applied to the funcop
         metadata: additional metadata to distinguish different FuncOps
         public: whether the visibility should be marked public
 
