@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2022 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -83,6 +83,23 @@ from catalyst.utils.exceptions import (
     DifferentiableCompileError,
     PlxprCaptureCFCompatibilityError,
 )
+from catalyst.utils.precompile_decomposition_rules import (
+    BYTECODE_FILE_PATH,
+    precompile_decomp_rules,
+)
+
+# we ONLY want to compile on init for dev installs, where the caching should work correctly
+if (
+    not (
+        INSTALLED  # do not recompile on user installations
+        or os.getenv("DOCUTILSCONFIG")  # do not run for docs
+        or os.getenv("READTHEDOCS_CANONICAL_URL")  # do not run for RTD
+        or os.getenv("CI")  # do not run in CI
+    )
+    and not BYTECODE_FILE_PATH.exists()
+):  # pragma: no cover
+    precompile_decomp_rules()  # pragma: no cover
+
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising
@@ -162,7 +179,6 @@ while processing the following with AutoGraph:
   File "<ipython-input-44-dbae11e6d745>", line 7, in f
     for x in params:
 """
-
 
 __all__ = (
     "qjit",

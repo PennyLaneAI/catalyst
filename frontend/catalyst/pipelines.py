@@ -121,6 +121,12 @@ class CompileOptions:
             - ``"global"`` (default): Defer to ``qml.capture.enabled()``
             - ``True``: Force program capture on, regardless of global setting
             - ``False``: Force program capture off (use old frontend)
+        skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
+            If ``True``, transforms used to preprocess and validate the user program before
+            executing on a quantum backend will not be used, and the user is expected to ensure
+            the validity of the program themselves. If ``capture=False``, or ``capture="global"``
+            and ``qml.capture.enabled() == False``, this argument will be ignored. ``False``
+            by default.
     """
 
     verbose: Optional[bool] = False
@@ -144,6 +150,7 @@ class CompileOptions:
     pass_plugins: Optional[Set[Path]] = None
     dialect_plugins: Optional[Set[Path]] = None
     capture: bool | Literal["global"] = "global"
+    skip_preprocess: bool = False
 
     def __post_init__(self):
         # Convert keep_intermediate to Enum
@@ -302,10 +309,12 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         "convert-tensor-to-linalg",  # tensor.pad
         "convert-elementwise-to-linalg",  # Must be run before --one-shot-bufferize
         "gradient-preprocess",
-        # "eliminate-empty-tensors",
         # Keep eliminate-empty-tensors commented out until benchmarks use more structure
         # and produce functions of reasonable size. Otherwise, eliminate-empty-tensors
         # will consume a significant amount of compile time along with one-shot-bufferize.
+        # "eliminate-empty-tensors",
+        # This pass is needed to avoid aliasing of the input buffer with the output buffer.
+        "mark-entry-point-args-non-writable",
         ####################
         "one-shot-bufferize{" + bufferization_options + "}",
         ####################

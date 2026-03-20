@@ -17,7 +17,7 @@
 import numpy as np
 import pennylane as qml
 import pytest
-from pennylane.ftqc.catalyst_pass_aliases import to_ppr as to_ppr_alias
+from pennylane.transforms.decompositions import to_ppr as qml_to_ppr
 
 from catalyst import measure, pipeline, qjit
 from catalyst.passes import (
@@ -147,49 +147,6 @@ def test_pipeline_functionality(theta, backend):
     assert np.allclose(res[0], res[1])
 
 
-### Test bad usages of pass decorators ###
-def test_passes_bad_usages():
-    """
-    Tests that an error is raised when cancel_inverses is not used properly
-    """
-
-    def test_passes_not_on_qnode():
-        def classical_func():
-            return 42.42
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            pipeline({})(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            cancel_inverses(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            merge_rotations(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            disentangle_cnot(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            disentangle_swap(classical_func)
-
-    test_passes_not_on_qnode()
-
-
 def test_chained_passes():
     """
     Test that chained passes are present in the transform passes.
@@ -240,8 +197,8 @@ def test_disentangle_passes():
         return qml.state()
 
     input_mlir_string = circuit_with_disentangle_passes.mlir
-    assert "disentangle-CNOT" in input_mlir_string
-    assert "disentangle-SWAP" in input_mlir_string
+    assert "disentangle-cnot" in input_mlir_string
+    assert "disentangle-swap" in input_mlir_string
 
     # both SWAP and CNOT should be removed by the disentangle passes
     transformed_mlir_string = circuit_with_disentangle_passes.mlir_opt
@@ -363,7 +320,7 @@ def test_ppr_to_ppm_auto_corrected():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=2)()
+    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.gate_types
 
     assert gate_types["GlobalPhase"] == 4
@@ -391,7 +348,7 @@ def test_ppr_to_ppm_inject_magic_state():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=2)()
+    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.gate_types
     assert gate_types["PPR-pi/4-w1"] == 6
     assert gate_types["PPR-pi/4-w2"] == 1
@@ -418,7 +375,7 @@ def test_ppr_to_ppm_pauli_corrected():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=2)()
+    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.gate_types
     assert gate_types["PPR-pi/4-w1"] == 6
     assert gate_types["PPR-pi/4-w2"] == 1
@@ -494,7 +451,7 @@ def test_merge_rotation_ppr():
     @qml.qjit(pipelines=my_pipeline, target="mlir")
     def test_merge_rotation_ppr_workflow():
         @qml.transforms.merge_rotations  # have to use qml to be capture-compatible
-        @to_ppr_alias
+        @qml_to_ppr
         @qml.qnode(qml.device("lightning.qubit", wires=3))
         def circuit():
             qml.PauliRot(np.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
@@ -519,7 +476,7 @@ def test_merge_rotation_arbitrary_angle_ppr():
     @qml.qjit(pipelines=my_pipeline, target="mlir")
     def test_merge_rotation_ppr_workflow():
         @qml.transforms.merge_rotations
-        @to_ppr_alias
+        @qml_to_ppr
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit(x, y):
             qml.PauliRot(x, pauli_word="ZY", wires=[0, 1])

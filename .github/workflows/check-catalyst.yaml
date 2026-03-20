@@ -416,6 +416,17 @@ jobs:
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         make dialects
 
+    - name: Build MLIR Dialect Docs
+      run: |
+        CCACHE_DIR="$(pwd)/.ccache" \
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
+        ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
+        DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
+        make dialect-docs
+
     - name: Build Standalone Plugin
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
@@ -479,7 +490,7 @@ jobs:
 
     - name: Verify Graphviz installation
       run: |
-        dot -V 
+        dot -V
         dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
 
     - name: Get Cached LLVM Build

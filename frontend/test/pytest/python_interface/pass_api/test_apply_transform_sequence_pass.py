@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit tests for the Unified Compiler transform interpreter."""
+# pylint: disable=line-too-long
 
 import subprocess
 from typing import Any
@@ -21,18 +22,16 @@ import pennylane as qml
 import pytest
 from xdsl.context import Context
 from xdsl.dialects import builtin, func, test, transform
-from xdsl.interpreter import Interpreter
-from xdsl.ir import Attribute, Block, Region, SSAValue
+from xdsl.ir import Attribute, SSAValue
 from xdsl.passes import ModulePass
 
 from catalyst import qjit
 from catalyst.python_interface import QuantumParser
-from catalyst.python_interface.conversion import xdsl_from_qjit
-from catalyst.python_interface.dialects.quantum import CustomOp
-from catalyst.python_interface.pass_api.transform_interpreter import (
-    TransformFunctionsExt,
-    TransformInterpreterPass,
-    _create_schedule,
+from catalyst.python_interface.conversion import parse_generic_to_xdsl_module, xdsl_from_qjit
+from catalyst.python_interface.dialects import quantum
+from catalyst.python_interface.pass_api.apply_transform_sequence import (
+    ApplyTransformSequencePass,
+    _create_mlir_schedule,
 )
 from catalyst.python_interface.transforms import merge_rotations_pass
 
@@ -90,13 +89,13 @@ def create_apply_registered_pass_op(
     return pass_op
 
 
-class TestCreateSchedule:
+class TestCreateMLIRSchedule:
     """Unit tests for creating a schedule containing CL args for passes with options."""
 
     def test_pass_no_options(self):
         """Test that passes with no options are parsed correctly."""
         pass_op = create_apply_registered_pass_op("test-pass")
-        schedule = _create_schedule(pass_ops=[pass_op])
+        schedule = _create_mlir_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert schedule[0] == "--test-pass"
 
@@ -112,7 +111,7 @@ class TestCreateSchedule:
                 "str-opt-with-spaces": "foo bar",
             },
         )
-        schedule = _create_schedule(pass_ops=[pass_op])
+        schedule = _create_mlir_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert schedule[0] == (
             "--test-pass=int-opt=1 float-opt=1.5 bool-opt=false str-opt='test_string' "
@@ -122,7 +121,7 @@ class TestCreateSchedule:
     def test_pass_array_options(self):
         """Test that passes with array options are parsed correctly."""
         pass_op = create_apply_registered_pass_op("test-pass", options={"list-opt": (1, 2, 3, 4)})
-        schedule = _create_schedule(pass_ops=[pass_op])
+        schedule = _create_mlir_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert schedule[0] == "--test-pass=list-opt=1,2,3,4"
 
@@ -131,7 +130,7 @@ class TestCreateSchedule:
         pass_op = create_apply_registered_pass_op(
             "test-pass", options={"dict-opt": {"a": 1, "b": 2, "c": 3, "d": 4}}
         )
-        schedule = _create_schedule(pass_ops=[pass_op])
+        schedule = _create_mlir_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert schedule[0] == "--test-pass=dict-opt={a=1 b=2 c=3 d=4}"
 
@@ -144,7 +143,7 @@ class TestCreateSchedule:
                 "dict-opt": {"f": (1, 2), "g": 1},
             },
         )
-        schedule = _create_schedule(pass_ops=[pass_op])
+        schedule = _create_mlir_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert (
             schedule[0]
@@ -158,7 +157,7 @@ class TestCreateSchedule:
         pass_op3 = create_apply_registered_pass_op(
             "test-pass3", options={"list-opt": (False, True, False)}
         )
-        schedule = _create_schedule(pass_ops=[pass_op1, pass_op2, pass_op3])
+        schedule = _create_mlir_schedule(pass_ops=[pass_op1, pass_op2, pass_op3])
         assert len(schedule) == 3
         assert schedule[0] == "--test-pass1"
         assert schedule[1] == "--test-pass2=int-opt=1"
@@ -179,117 +178,77 @@ class OptionsPass(ModulePass):
         return op
 
 
-class TestTransformFunctionsExt:
-    """Unit tests for the TransformFunctionsExt interpreter."""
+class TestApplyTransformSequencePass:
+    """Tests for the ApplyTransformSequencePass."""
 
-    @pytest.mark.parametrize(
-        "pass_options", [{}, {"a": 1, "b": 1.5, "c": (1, 2, 3, 4), "d": "string-input"}]
-    )
-    def test_xdsl_pass(self, pass_options, capsys):
-        """Test that interpreting an xDSL pass works correctly."""
-        ctx = Context()
-        ctx.load_dialect(builtin.Builtin)
-        ctx.load_dialect(transform.Transform)
+    def test_multiple_named_sequences(self, run_filecheck):
+        """Test that a transforms can be interpreted correctly when there
+        are multiple NamedSequences."""
 
-        fns = TransformFunctionsExt(ctx, passes={"options-pass": lambda: OptionsPass})
-        pass_op = create_apply_registered_pass_op(pass_name="options-pass", options=pass_options)
+        program_2_sequences = """
+            // CHECK-LABEL: workflow
+            builtin.module @workflow {
+                builtin.module {
+                    // CHECK-NOT: module attributes {transform.with_named_sequence}
+                    builtin.module attributes {transform.with_named_sequence} {
+                        // CHECK-NOT: transform.named_sequence @__transform_0
+                        // CHECK-NOT: {{%.+}} = transform.apply_registered_pass "xdsl-cancel-inverses" to {{%.+}}
+                        // CHECK-NOT: transform.yield
+                        transform.named_sequence @__transform_0(%t0_arg0 : !transform.op<"builtin.module">) {
+                            %t0_0 = transform.apply_registered_pass "xdsl-cancel-inverses" to %t0_arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            transform.yield
+                        }
 
-        mod = builtin.ModuleOp([])
-        outs = fns.run_apply_registered_pass_op(Interpreter(module=mod), pass_op, (mod,))
-        assert outs.values[0] is mod
-        captured = capsys.readouterr()
-        assert captured.out.strip() == f"Applying options-pass with options {pass_options}"
+                        // CHECK-NOT: transform.named_sequence @__transform_1
+                        // CHECK-NOT: {{%.+}} = transform.apply_registered_pass "xdsl-merge-rotations" to {{%.+}}
+                        // CHECK-NOT: transform.yield
+                        transform.named_sequence @__transform_1(%t1_arg0 : !transform.op<"builtin.module">) {
+                            %t1_0 = transform.apply_registered_pass "xdsl-merge-rotations" to %t1_arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            transform.yield
+                        }
+                    }
 
-    @pytest.mark.parametrize(
-        "pass_options, cl_options",
-        [
-            ({}, " "),
-            (
-                {"a": 1, "b": 1.5, "c": (1, 2, 3, 4), "d": "string-input"},
-                "=a=1 b=1.5 c=1,2,3,4 d='string-input'",
-            ),
-        ],
-    )
-    def test_mlir_pass(self, pass_options, cl_options, mocker):
-        """Test that interpreting an MLIR pass works correctly."""
-        ctx = Context()
-        ctx.load_dialect(builtin.Builtin)
-        ctx.load_dialect(transform.Transform)
-
-        # The passes dict is empty, so when we're interpreting the pass it will be assumed to
-        # be an MLIR pass
-        fns = TransformFunctionsExt(ctx, passes={})
-        pass_op = create_apply_registered_pass_op(pass_name="options-pass", options=pass_options)
-        captured_cmd = None
-
-        def mock_subprocess_run(cmd, **kwargs):
-            """Mock implementation of subprocess.run"""
-            nonlocal captured_cmd
-            captured_cmd = subprocess.list2cmdline(cmd)
-            return MagicMock(args=cmd, stdout=kwargs.get("input", ""), returncode=0)
-
-        mocker.patch("subprocess.run", side_effect=mock_subprocess_run)
-
-        mod = builtin.ModuleOp([])
-        # This is just a silly step needed because the interpreter assumes that we're transforming
-        # a nested module, so `mod` needs to have a parent op to work correctly
-        _ = builtin.ModuleOp([mod])
-        _ = fns.run_apply_registered_pass_op(Interpreter(module=mod), pass_op, (mod,))
-
-        assert captured_cmd is not None
-        assert f"--options-pass{cl_options}" in captured_cmd
-
-
-def create_named_sequence_op(
-    pass_names: list[str],
-    pass_options: list[dict[str, Any]],
-) -> transform.NamedSequenceOp:
-    """Create a NamedSequenceOp using the provided registered pass ops."""
-
-    named_sequence_block = Block(arg_types=(transform.OperationType("builtin.module"),))
-    in_mod = named_sequence_block.args[0]
-    ops: list[transform.ApplyRegisteredPassOp] = []
-
-    for pass_name, options in zip(pass_names, pass_options):
-        pass_op = create_apply_registered_pass_op(pass_name, options=options, in_mod=in_mod)
-        ops.append(pass_op)
-        in_mod = pass_op.results[0]
-    ops.append(transform.YieldOp())
-
-    named_sequence_block.add_ops(ops)
-    named_sequence_region = Region(named_sequence_block)
-    named_sequence_op = transform.NamedSequenceOp(
-        sym_name=TransformInterpreterPass.entry_point,
-        function_type=builtin.FunctionType.from_lists(
-            inputs=[transform.OperationType("builtin.module")], outputs=[]
-        ),
-        body=named_sequence_region,
-    )
-    return named_sequence_op
-
-
-def create_test_module(
-    pass_names: list[str], pass_options: list[dict[str, Any]]
-) -> builtin.ModuleOp:
-    """Create a module containing a NamedSequenceOp with the provided passes."""
-    named_sequence_op = create_named_sequence_op(pass_names, pass_options)
-    # In an integrated setting, a module corresponding to a QNode will have another module
-    # containing the NamedSequenceOp. The QNode module will be inside another module, which
-    # is usually the main workflow entry point.
-    inner_module = builtin.ModuleOp([builtin.ModuleOp([named_sequence_op])])
-    _ = builtin.ModuleOp([inner_module])
-    return inner_module
-
-
-class TestTransformInterpreterPass:
-    """Unit tests for the TransformInterpreterPass."""
+                    // CHECK-LABEL: f
+                    func.func public @f(%arg0: tensor<f64>) -> !quantum.bit {
+                        // CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+                        // CHECK-NOT: quantum.custom
+                        %c_0 = arith.constant 0 : i64
+                        %0 = quantum.alloc( 1) : !quantum.reg
+                        %1 = quantum.extract %0[%c_0] : !quantum.reg -> !quantum.bit
+                        %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
+                        %out_qubits_1 = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
+                        %extracted_arg0 = tensor.extract %arg0[] : tensor<f64>
+                        %out_qubits_2 = quantum.custom "RX"(%extracted_arg0) %out_qubits_1 : !quantum.bit
+                        %out_qubits_3 = quantum.custom "RX"(%extracted_arg0) %out_qubits_2 : !quantum.bit
+                        return %out_qubits_3 : !quantum.bit
+                    }
+                }
+            }
+            """
+        pipeline = (ApplyTransformSequencePass(),)
+        run_filecheck(program_2_sequences, pipeline)
 
     def test_interpret_named_sequence(self, mocker, capsys):
         """Test that a NamedSequenceOp can be interpreted correctly when it contains
         both xDSL and MLIR passes."""
-        pass_names = ["options-pass", "mlir-pass1", "options-pass", "mlir-pass2"]
+        program = """
+            builtin.module @workflow {
+                builtin.module {
+                    builtin.module attributes {transform.with_named_sequence} {
+                        transform.named_sequence @__transform_0(%t0_arg0 : !transform.op<"builtin.module">) {
+                            %t0_0 = transform.apply_registered_pass "options-pass" to %t0_arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            %t0_1 = transform.apply_registered_pass "mlir-pass1" with options = {a = 1 : i64, b = "foo"} to %t0_0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            %t0_2 = transform.apply_registered_pass "options-pass" with options = {c = [1 : i64, 2 : i64, 3 : i64], d = false} to %t0_1 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            %t0_3 = transform.apply_registered_pass "mlir-pass2" to %t0_2 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            transform.yield
+                        }
+                    }
+                }
+            }
+        """
+
         pass_options = [{}, {"a": 1, "b": "foo"}, {"c": (1, 2, 3), "d": False}, {}]
-        mod = create_test_module(pass_names, pass_options)
+        mod = parse_generic_to_xdsl_module(program)
 
         captured_cmds = []
         num_calls = 0
@@ -304,7 +263,7 @@ class TestTransformInterpreterPass:
 
         mocker.patch("subprocess.run", side_effect=mock_subprocess_run)
 
-        _pass = TransformInterpreterPass(
+        _pass = ApplyTransformSequencePass(
             passes={"options-pass": lambda: OptionsPass}, callback=None
         )
         ctx = Context()
@@ -325,9 +284,82 @@ class TestTransformInterpreterPass:
         # We check that there is a space after the pass name to check that no options were specified
         assert "--mlir-pass2 " in captured_cmds[1]
 
+    def test_callback_count_with_passes(self):
+        """Test that the apply function calls the callback the correct number of times."""
+
+        num_calls = 0
+
+        def callback(
+            previous_pass, module, next_pass, pass_level=None
+        ):  # pylint: disable=unused-argument
+            """Mock implementation of the callback function"""
+            nonlocal num_calls
+            num_calls += 1
+
+        program = """
+            builtin.module @workflow {
+                builtin.module {
+                    builtin.module attributes {transform.with_named_sequence} {
+                        transform.named_sequence @__transform_0(%t0_arg0 : !transform.op<"builtin.module">) {
+                            %t0_0 = transform.apply_registered_pass "options-pass" to %t0_arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            transform.yield
+                        }
+                    }
+                }
+            }
+        """
+        mod = parse_generic_to_xdsl_module(program)
+        _pass = ApplyTransformSequencePass(
+            passes={"options-pass": lambda: OptionsPass}, callback=callback
+        )
+
+        ctx = Context()
+        ctx.load_dialect(builtin.Builtin)
+        ctx.load_dialect(transform.Transform)
+        _pass.apply(ctx, mod)
+
+        # Should be 2 calls, 1 for init pass, 1 for "options-pass"
+        assert num_calls == 2
+
+    def test_callback_count_no_passes(self):
+        """Test that the apply function calls the callback the correct number of times."""
+
+        num_calls = 0
+
+        def callback(
+            previous_pass, module, next_pass, pass_level=None
+        ):  # pylint: disable=unused-argument
+            """Mock implementation of the callback function"""
+            nonlocal num_calls
+            num_calls += 1
+
+        program = """
+            builtin.module @workflow {
+                builtin.module {
+                    builtin.module attributes {transform.with_named_sequence} {
+                        transform.named_sequence @__transform_0(%t0_arg0 : !transform.op<"builtin.module">) {
+                            transform.yield
+                        }
+                    }
+                }
+            }
+        """
+        mod = parse_generic_to_xdsl_module(program)
+        _pass = ApplyTransformSequencePass(
+            passes={"options-pass": lambda: OptionsPass}, callback=callback
+        )
+
+        ctx = Context()
+        ctx.load_dialect(builtin.Builtin)
+        ctx.load_dialect(transform.Transform)
+        _pass.apply(ctx, mod)
+
+        # Should be 1 call for init pass
+        assert num_calls == 1
+
     @pytest.mark.usefixtures("use_both_frontend")
     def test_qjit_with_passes_interpreted_correctly(self):
-        """Test that applying the TransformInterpreter to a qjitted qnode's
+        """Test that applying the ApplyTransformSequencePass to a qjitted qnode's
         module correctly transforms it."""
 
         dev = qml.device("null.qubit", wires=4)
@@ -347,21 +379,17 @@ class TestTransformInterpreterPass:
             return qml.state()
 
         mod = circuit()
-        qnode_mod = [op for op in mod.body.ops if isinstance(op, builtin.ModuleOp)][0]
-        _pass = TransformInterpreterPass(
-            passes={merge_rotations_pass.pass_name: lambda: merge_rotations_pass.module_pass},
-            callback=None,
-        )
+        _pass = ApplyTransformSequencePass()
         ctx = Context(allow_unregistered=True)
         _ = QuantumParser(ctx, "")  # This loads necessary dialects into the context
         # The Xs will be cancelled, and the RXs will be merged, so there should only be
         # one RX remaining. We need to find the qnode module again because the original
         # can be replaced by the pass
-        _pass.apply(ctx, qnode_mod)
+        _pass.apply(ctx, mod)
 
         qnode_mod = [op for op in mod.body.ops if isinstance(op, builtin.ModuleOp)][0]
         qnode_fn = [op for op in qnode_mod.body.ops if isinstance(op, func.FuncOp)][0]
-        custom_ops = [op for op in qnode_fn.body.ops if isinstance(op, CustomOp)]
+        custom_ops = [op for op in qnode_fn.body.ops if isinstance(op, quantum.CustomOp)]
         assert len(custom_ops) == 1
         assert custom_ops[0].gate_name.data == "RX"
 

@@ -15,6 +15,7 @@ set(LIBS
     catalyst-stablehlo-transforms
     MLIRQuantum
     quantum-transforms
+    MLIRQRef
     MLIRPBC
     pbc-transforms
     MLIRGradient
@@ -29,6 +30,8 @@ set(LIBS
     ion-transforms
     MLIRRTIO
     rtio-transforms
+    MLIRQecLogical
+    MLIRQecPhysical
     MLIRCatalystTest
     MLIRCatalystUtils
     MLIRTestDialect
