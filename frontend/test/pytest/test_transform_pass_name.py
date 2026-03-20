@@ -59,11 +59,31 @@ def test_pass_with_options(options, expected_strings, backend):
 @pytest.mark.parametrize(
     "options",
     [
-        # {"option": [1, 2, 3]},
-        # {"option": {"blah": "foo"}},
+        {"option": [1, 2, 3]},
+        {"option": {"blah": "foo"}},
+    ],
+    ids=["list", "dict"],
+)
+def test_pass_with_complex_options(options, backend):
+    """Tests that complex options like list, dict are supported."""
+
+    my_pass = qml.transform(pass_name="my-pass")
+
+    @partial(my_pass, **options)
+    @qml.qnode(qml.device(backend, wires=1))
+    def captured_circuit():
+        return qml.expval(qml.PauliZ(0))
+
+    qml.qjit(target="mlir")(captured_circuit)
+
+    # TODO assert exists in IR
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
         {"option": None},
     ],
-    #ids=["list", "dict", "None"],
     ids=["None"],
 )
 def test_pass_with_unsupported_options(options, backend):
@@ -75,7 +95,7 @@ def test_pass_with_unsupported_options(options, backend):
     @qml.qnode(qml.device(backend, wires=1))
     def captured_circuit():
         return qml.expval(qml.PauliZ(0))
-    #breakpoint()
+
     expected_error = CompileError if options["option"] is None else TypeError
     expected_msg = (
         r"Cannot convert Python type <class 'NoneType'> to an MLIR attribute"

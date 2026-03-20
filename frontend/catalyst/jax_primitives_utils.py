@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module contains some helper functions for translating JAX
-primitives to MLIR"""
+"""This module contains some helper functions for translating JAX primitives to MLIR."""
 
 import copy
 import functools
@@ -112,15 +111,6 @@ def lower_callable(ctx, callable_, call_jaxpr, pipelines=(), metadata=None, publ
     """
     if pipelines is None:
         pipelines = tuple()
-    # #breakpoint()
-    # for pipeline in pipelines:
-    #     passes = pipeline[1]
-    #     for _pass in passes:
-    #         #breakpoint()
-    #         _lowered_options(_pass)
-    #         # for key, val in _pass.kwargs.items():
-    #         #     _pass.kwargs[key] = get_mlir_attribute_from_pyval(val)
-    # #breakpoint()
     if isinstance(callable_, qml.QNode):
         return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipelines, metadata=metadata)
     return get_or_create_funcop(
@@ -144,8 +134,7 @@ def get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines, metadata=None, p
     """
     if metadata is None:
         metadata = tuple()
-    breakpoint()
-    key = (callable_, *metadata, *pipelines)
+    key = (callable_, *metadata, *_lowered_pipelines(pipelines))
     if callable_ is not None:
         if func_op := get_cached(ctx, key):
             return func_op
@@ -229,9 +218,7 @@ def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipelines, metadata):
         metadata = tuple()
     if callable_.static_argnums:
         return lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines)
-    breakpoint()
-    lowered_pipelines = _lowered_pipelines(pipelines)
-    key = (callable_, *metadata, *pipelines)
+    key = (callable_, *metadata, *_lowered_pipelines(pipelines))
     if func_op := get_cached(ctx, key):
         return func_op
     func_op = lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines)
@@ -331,26 +318,19 @@ class NestedModule:
 
 
 def _lowered_options(_pass):
-    # print("received ", _pass)
-    # breakpoint()
-    # lowered_options = {}
-    # for key in list(_pass.kwargs.keys()):
-    #     lowered_options[key] = get_mlir_attribute_from_pyval(_pass.kwargs[key])
-    #     if "_" in key:
-    #         new_key = key.replace("_", "-")
-    #         _pass.kwargs[new_key] = _pass.kwargs.pop(key)
-    # print("updated to ", _pass)
-    breakpoint()
-    return {k.replace('_', '-'): get_mlir_attribute_from_pyval(v) for k, v in _pass.kwargs.items()}
+    return get_mlir_attribute_from_pyval(
+        {str(arg).replace("_", "-"): True for arg in _pass.args}
+        | {k.replace("_", "-"): v for k, v in _pass.kwargs.items()}
+    )
+
 
 def _lowered_pipelines(pipelines):
-    lowered_pipelines = tuple()
-    for name, pipeline in pipelines:
-        lowered_pipeline = tuple()
-        breakpoint()
+    return tuple(
+        (name, tuple(_lowered_options(_pass) for _pass in pipeline)) for name, pipeline in pipelines
+    )
 
 
-def transform_module_lowering(jax_ctx: mlir.LoweringRuleContext, pipelines) -> bool:
+def transform_module_lowering(jax_ctx: mlir.LoweringRuleContext, pipelines):
     """Generate a transform module embedded in the current module and schedule
     the transformations in pipeline"""
     module = jax_ctx.module_context.module
@@ -408,13 +388,11 @@ def transform_named_sequence_lowering(pipeline, sym_name):
         target = bb_named_sequence.arguments[0]
         for _pass in pipeline:
             if isinstance(_pass, qml.transforms.core.BoundTransform):
-                #options = _lowered_options(_pass.args, _pass.kwargs)
-                options = _pass.kwargs
+                options = _lowered_options(_pass)
                 name = _pass.pass_name
             else:
                 options = _pass.get_options()
                 name = _pass.name
-            #breakpoint()
             apply_registered_pass_op = ApplyRegisteredPassOp(
                 result=transform_mod_type,
                 target=target,
