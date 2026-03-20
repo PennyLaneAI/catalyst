@@ -2693,14 +2693,15 @@ def _pl_for_loop_lowering(
         inner_shapes = body_block.arguments[1:len(abstract_shapes)+1]
         inner_args = body_block.arguments[len(abstract_shapes)+1:]
         loop_params = (*body_consts, *inner_shapes, tensor_index, *inner_args)
+        new_jaxpr = jaxpr_body_fn.replace(constvars=(), invars=jaxpr_body_fn.constvars + jaxpr_body_fn.invars)
 
         # Recursively generate the mlir for the loop body
         out, _ = mlir.jaxpr_subcomp(
             body_ctx.module_context,
-            jaxpr_body_fn,
+            new_jaxpr,
             body_ctx.name_stack,
             mlir.TokenSet(),
-            [mlir.ir_constant(c) for c in body_consts],
+            [],
             *loop_params,
             dim_var_values=jax_ctx.dim_var_values,
             const_lowering=jax_ctx.const_lowering,
