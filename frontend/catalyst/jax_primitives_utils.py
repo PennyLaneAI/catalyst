@@ -326,14 +326,14 @@ class NestedModule:
         self.ctx.module_context = self.old_module_context
 
 
-def _lowered_options(_pass: qml.transforms.core.BoundTransform):
+def _lowered_options(_pass: BoundTransform):
     return get_mlir_attribute_from_pyval(
         {str(arg).replace("_", "-"): True for arg in _pass.args}
         | {k.replace("_", "-"): v for k, v in _pass.kwargs.items()}
     )
 
 
-def _lowered_pipelines(pipelines):
+def _lowered_pipelines(pipelines: tuple[tuple[str, BoundTransform], ...]):
     return tuple(
         (name, tuple(_lowered_options(_pass) for _pass in pipeline)) for name, pipeline in pipelines
     )
