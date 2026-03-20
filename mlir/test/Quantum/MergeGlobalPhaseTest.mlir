@@ -18,7 +18,8 @@
 func.func @merge_simple_global_phases(%arg0: f64, %arg1: f64) {
     // CHECK-SAME: [[A:%.+]]: f64, [[B:%.+]]: f64
 
-    // CHECK: [[SUM:%.+]] = arith.addf [[A]], [[B]]
+    // CHECK-NOT: quantum.gphase
+    // CHECK: [[SUM:%.+]] = arith.addf [[B]], [[A]]
     // CHECK: quantum.gphase([[SUM]])
     // CHECK-NOT: quantum.gphase
     quantum.gphase(%arg0)
@@ -45,9 +46,11 @@ func.func @dont_rewrite_single_global_phase(%arg0: f64) {
 func.func @keep_controlled_global_phases(%arg0: f64, %arg1: f64, %arg2: f64, %q: !quantum.bit) {
     // CHECK-SAME: [[A:%.+]]: f64, [[B:%.+]]: f64, [[C:%.+]]: f64, [[Q:%.+]]: !quantum.bit
 
-    // CHECK: [[SUM:%.+]] = arith.addf [[A]], [[C]]
-    // CHECK: quantum.gphase([[SUM]])
+    // CHECK-NOT: quantum.gphase
     // CHECK: quantum.gphase([[B]]) ctrls([[Q]])
+    // CHECK-NOT: quantum.gphase
+    // CHECK: [[SUM:%.+]] = arith.addf [[C]], [[A]]
+    // CHECK: quantum.gphase([[SUM]])
     // CHECK-NOT: quantu.gphase
     quantum.gphase(%arg0)
     %true = arith.constant 1 : i1
@@ -61,10 +64,11 @@ func.func @keep_controlled_global_phases(%arg0: f64, %arg1: f64, %arg2: f64, %q:
 
 // CHECK-LABEL: func.func @merge_global_phases_in_scf_if(
 func.func @merge_global_phases_in_scf_if(%cond: i1, %arg0: f64, %arg1: f64) {
-    // CHECK-SAME: [[COND:%.+]]: i1, [[A:%.+]]: f64, [[B:%.+]]: f64)
+    // CHECK-SAME: [[COND:%.+]]: i1, [[A:%.+]]: f64, [[B:%.+]]: f64
 
     // CHECK: [[IF_RES:%.+]] = scf.if [[COND]] -> (f64) {
     %ret = scf.if %cond -> (f64) {
+        // CHECK-NOT: quantum.gphase
         // CHECK: [[THEN_SUM:%.+]] = arith.addf [[A]], [[A]]
         // CHECK: quantum.gphase([[THEN_SUM]])
         // CHECK-NOT: quantum.gphase
@@ -74,6 +78,7 @@ func.func @merge_global_phases_in_scf_if(%cond: i1, %arg0: f64, %arg1: f64) {
         scf.yield %arg0 : f64
     // CHECK: else
     } else {
+        // CHECK-NOT: quantum.gphase
         // CHECK: [[ELSE_SUM:%.+]] = arith.addf [[B]], [[B]]
         // CHECK: quantum.gphase([[ELSE_SUM]])
         // CHECK-NOT: quantum.gphase
@@ -83,11 +88,32 @@ func.func @merge_global_phases_in_scf_if(%cond: i1, %arg0: f64, %arg1: f64) {
         scf.yield %arg1 : f64
     }
 
-    // CHECK: [[OUT_SUM:%.+]] = arith.addf [[A]], [[IF_RES]]
+    // CHECK-NOT: quantum.gphase
+    // CHECK: [[OUT_SUM:%.+]] = arith.addf [[IF_RES]], [[A]]
     // CHECK: quantum.gphase([[OUT_SUM]])
     // CHECK-NOT: quantum.gphase
     quantum.gphase(%arg0)
     quantum.gphase(%ret)
+
+    return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @merge_global_phases_data_dep(
+func.func @merge_global_phases_data_dep(%arg0: f64, %arg1: f64) {
+    // CHECK-SAME: [[A:%.+]]: f64, [[B:%.+]]: f64
+
+    // CHECK-NOT: quantum.gphase
+    // CHECK: [[CONST:%.+]] = arith.mulf
+    // CHECK-NOT: quantum.gphase
+    // CHECK: [[OUT_SUM:%.+]] = arith.addf [[CONST]], [[A]]
+    // CHECK: quantum.gphase([[OUT_SUM]])
+    // CHECK-NOT: quantum.gphase
+    quantum.gphase(%arg0)
+    %c1 = arith.constant 2.0 : f64
+    %c2 = arith.mulf %arg1, %c1 : f64
+    quantum.gphase(%c2)
 
     return
 }

@@ -52,17 +52,17 @@ struct MergeGlobalPhasePass : impl::MergeGlobalPhasePassBase<MergeGlobalPhasePas
                         continue;
                     }
 
-                    GlobalPhaseOp firstPhase = *simplePhases.begin();
-                    auto remainingPhases = llvm::drop_begin(simplePhases);
+                    GlobalPhaseOp lastPhase = *std::prev(simplePhases.end());
+                    auto remainingPhases = llvm::drop_end(simplePhases);
 
-                    builder.setInsertionPoint(firstPhase);
-                    Value runningSum = firstPhase.getAngle();
+                    builder.setInsertionPoint(lastPhase);
+                    Value runningSum = lastPhase.getAngle();
                     for (GlobalPhaseOp phaseOp : llvm::make_early_inc_range(remainingPhases)) {
                         llvm::SmallVector<Value, 2> args{runningSum, phaseOp.getAngle()};
                         runningSum = arith::AddFOp::create(builder, phaseOp.getLoc(), args);
                         phaseOp->erase();
                     }
-                    firstPhase.getAngleMutable().assign(runningSum);
+                    lastPhase.getAngleMutable().assign(runningSum);
                 }
             }
         });
