@@ -31,7 +31,7 @@ from catalyst.python_interface.conversion import parse_generic_to_xdsl_module, x
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.pass_api.apply_transform_sequence import (
     ApplyTransformSequencePass,
-    _create_mlir_schedule,
+    _create_mlir_cli_schedule,
 )
 from catalyst.python_interface.transforms import merge_rotations_pass
 
@@ -95,7 +95,7 @@ class TestCreateMLIRSchedule:
     def test_pass_no_options(self):
         """Test that passes with no options are parsed correctly."""
         pass_op = create_apply_registered_pass_op("test-pass")
-        schedule = _create_mlir_schedule(pass_ops=[pass_op])
+        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert schedule[0] == "--test-pass"
 
@@ -111,7 +111,7 @@ class TestCreateMLIRSchedule:
                 "str-opt-with-spaces": "foo bar",
             },
         )
-        schedule = _create_mlir_schedule(pass_ops=[pass_op])
+        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert schedule[0] == (
             "--test-pass=int-opt=1 float-opt=1.5 bool-opt=false str-opt='test_string' "
@@ -121,7 +121,7 @@ class TestCreateMLIRSchedule:
     def test_pass_array_options(self):
         """Test that passes with array options are parsed correctly."""
         pass_op = create_apply_registered_pass_op("test-pass", options={"list-opt": (1, 2, 3, 4)})
-        schedule = _create_mlir_schedule(pass_ops=[pass_op])
+        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert schedule[0] == "--test-pass=list-opt=1,2,3,4"
 
@@ -130,7 +130,7 @@ class TestCreateMLIRSchedule:
         pass_op = create_apply_registered_pass_op(
             "test-pass", options={"dict-opt": {"a": 1, "b": 2, "c": 3, "d": 4}}
         )
-        schedule = _create_mlir_schedule(pass_ops=[pass_op])
+        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert schedule[0] == "--test-pass=dict-opt={a=1 b=2 c=3 d=4}"
 
@@ -143,7 +143,7 @@ class TestCreateMLIRSchedule:
                 "dict-opt": {"f": (1, 2), "g": 1},
             },
         )
-        schedule = _create_mlir_schedule(pass_ops=[pass_op])
+        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert (
             schedule[0]
@@ -157,7 +157,7 @@ class TestCreateMLIRSchedule:
         pass_op3 = create_apply_registered_pass_op(
             "test-pass3", options={"list-opt": (False, True, False)}
         )
-        schedule = _create_mlir_schedule(pass_ops=[pass_op1, pass_op2, pass_op3])
+        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op1, pass_op2, pass_op3])
         assert len(schedule) == 3
         assert schedule[0] == "--test-pass1"
         assert schedule[1] == "--test-pass2=int-opt=1"
@@ -283,6 +283,93 @@ class TestApplyTransformSequencePass:
         assert "--mlir-pass1=a=1 b='foo'" in captured_cmds[0]
         # We check that there is a space after the pass name to check that no options were specified
         assert "--mlir-pass2 " in captured_cmds[1]
+
+    def test_interpret_named_sequence_consecutive_mlir_passes(self, mocker, capsys):
+        """Test that a NamedSequenceOp can be interpreted correctly when it contains
+        both xDSL and MLIR passes."""
+        program = """
+            builtin.module @workflow {
+                builtin.module {
+                    builtin.module attributes {transform.with_named_sequence} {
+                        transform.named_sequence @__transform_0(%t0_arg0 : !transform.op<"builtin.module">) {
+                            %t0_0 = transform.apply_registered_pass "options-pass" to %t0_arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            %t0_1 = transform.apply_registered_pass "mlir-pass1" with options = {a = 1 : i64, b = "foo"} to %t0_0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            %t0_2 = transform.apply_registered_pass "mlir-pass2" to %t0_1 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            %t0_3 = transform.apply_registered_pass "mlir-pass2" with options = {c = [1 : i64, 2 : i64, 3 : i64], d = false} to %t0_2 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            %t0_4 = transform.apply_registered_pass "mlir-pass1" to %t0_3 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            transform.yield
+                        }
+                    }
+                }
+            }
+        """
+
+        pass_options = [{}, {"a": 1, "b": "foo"}, {}, {"c": (1, 2, 3), "d": False}, {}]
+        mod = parse_generic_to_xdsl_module(program)
+
+        captured_cmds = []
+        num_calls = 0
+
+        def mock_subprocess_run(cmd, **kwargs):
+            """Mock implementation of subprocess.run"""
+            nonlocal captured_cmds
+            nonlocal num_calls
+            captured_cmds.append(subprocess.list2cmdline(cmd))
+            num_calls += 1
+            return MagicMock(args=cmd, stdout=kwargs.get("input", ""), returncode=0)
+
+        mocker.patch("subprocess.run", side_effect=mock_subprocess_run)
+
+        _pass = ApplyTransformSequencePass(
+            passes={"options-pass": lambda: OptionsPass}, callback=None
+        )
+        ctx = Context()
+        ctx.load_dialect(builtin.Builtin)
+        ctx.load_dialect(transform.Transform)
+        _pass.apply(ctx, mod)
+
+        # Assert that xDSL passes were applied correctly
+        captured = capsys.readouterr()
+        assert captured.out.strip().split("\n") == [
+            f"Applying options-pass with options {pass_options[0]}"
+        ]
+
+        # Assert that MLIR passes were applied correctly
+        assert len(captured_cmds) == 1
+        assert (
+            '"--mlir-pass1=a=1 b=\'foo\'" --mlir-pass2 "--mlir-pass2=c=1,2,3 d=false" --mlir-pass1'
+            in captured_cmds[0]
+        )
+
+    def test_interpret_named_sequence_no_passes(self):
+        """Test that a NamedSequenceOp can be interpreted correctly when there are no passes."""
+        program = """
+            builtin.module @workflow {
+                builtin.module {
+                    builtin.module attributes {transform.with_named_sequence} {
+                        transform.named_sequence @__transform_0(%t0_arg0 : !transform.op<"builtin.module">) {
+                            transform.yield
+                        }
+                    }
+                }
+            }
+        """
+        mod = parse_generic_to_xdsl_module(program)
+        _pass = ApplyTransformSequencePass()
+
+        ctx = Context()
+        ctx.load_dialect(builtin.Builtin)
+        ctx.load_dialect(transform.Transform)
+        _pass.apply(ctx, mod)
+
+        expected_program = """
+            builtin.module @workflow {
+                builtin.module {
+                }
+            }
+        """
+        expected_mod = parse_generic_to_xdsl_module(expected_program)
+        assert mod.is_structurally_equivalent(expected_mod)
 
     def test_callback_count_with_passes(self):
         """Test that the apply function calls the callback the correct number of times."""
