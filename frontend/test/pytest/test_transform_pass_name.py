@@ -61,7 +61,7 @@ def test_pass_with_options(options, expected_strings, backend):
     "options",
     [
         {"option": [1, 2, "blah"]},
-        {"option": {1: 2, "blah": "foo"}},
+        {"option": {"1": 2, "blah": "foo"}},
     ],
     ids=["list", "dict"],
 )
