@@ -242,7 +242,8 @@ class CompilationPass(ModulePass):
         """
         if self.greedy:
             pattern = GreedyRewritePatternApplier(
-                rewrite_patterns=[rp(self) for rp in self._rewrite_patterns]
+                rewrite_patterns=[rp(self) for rp in self._rewrite_patterns],
+                dce_enabled=False,
             )
             walker = PatternRewriteWalker(pattern=pattern, apply_recursively=self.recursive)
             walker.rewrite_module(op)
