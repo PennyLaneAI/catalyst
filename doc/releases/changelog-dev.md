@@ -423,7 +423,7 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Updated Catalyst's xDSL dependencies to `xdsl` 0.58.0 and `xdsl-jax` 0.4.0.
+* Updated Catalyst's xDSL dependencies to `xdsl` 0.59.0 and `xdsl-jax` 0.5.0.
   [(#2591)](https://github.com/PennyLaneAI/catalyst/pull/2591)
 
 * `draw_graph` now raises a more informative error when attempting to visualize an unsupported empty external function.
