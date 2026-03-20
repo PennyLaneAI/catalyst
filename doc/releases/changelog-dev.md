@@ -2,8 +2,8 @@
 
 <h3>New features since last release</h3>
 
-* A new `~.CompilationPass` class has been added that abstracts away compiler-level details for 
-  seamless compilation pass creation. Used in tandem with :func:`~.compiler_transform`, compilation 
+* A new `~.CompilationPass` class has been added that abstracts away compiler-level details for
+  seamless compilation pass creation. Used in tandem with :func:`~.compiler_transform`, compilation
   passes can be created entirely in Python and used on QNodes within a :func:`~.qjit`'d workflow.
   [(#2211)](https://github.com/PennyLaneAI/catalyst/pull/2211)
 
@@ -234,8 +234,17 @@
   }
   ```
 
+* Added a cache of pre-compiled PennyLane built-in decomposition rules for use with the C++ graph
+  decomposition system.
+  [(#2531)](https://github.com/PennyLaneAI/catalyst/pull/2531)
+
 
 <h3>Improvements 🛠</h3>
+
+* The `quantum.adjoint` operation can now take in multiple quantum values, allowing
+  both qubits and registers, as opposed to constraining the operand to be a single quantum register.
+  [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
+  [(#2610)](https://github.com/PennyLaneAI/catalyst/pull/2610)
 
 * `qml.value_and_grad` can now be used with program capture `qml.qjit(capture=True)`.
   [(#2587)](https://github.com/PennyLaneAI/catalyst/pull/2587)
@@ -301,10 +310,14 @@
 * Added support for `stopping_condition` in user-defined `qp.decompose` when capture is enabled with both graph enabled and disabled.
   [(#2486)](https://github.com/PennyLaneAI/catalyst/pull/2486)
 
+* A performance issue in the xDSL transform `measurements-from-samples` that was caused by the
+  unrolling of a `for` loop for QNodes returning `probs` has been fixed.
+  [(#2611)](https://github.com/PennyLaneAI/catalyst/pull/2611)
+
 * A more informative error message is now raised when a `measurements-from-samples` xDSL pass encounters a 
   program with dyanamic shots.
   [#2616](https://github.com/PennyLaneAI/catalyst/pull/2616)
-
+  
 <h3>Breaking changes 💔</h3>
 
 * The ``-disentangle-CNOT`` and ``-disentangle-SWAP`` Catalyst CLI commands have been renamed to
@@ -320,6 +333,10 @@
 
 * `catalyst.jax_primitives.subroutine` has been moved to `qml.capture.subroutine`.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
+
+* The `StableHLO` dialect has been removed from Catalyst's Python interface module. 
+  Downstream users should now import StableHLO dialect definitions from `xdsl_jax.dialects.stablehlo` instead.
+  [(#2588)](https://github.com/PennyLaneAI/catalyst/pull/2588)
 
 * (Compiler integrators only) The versions of StableHLO/LLVM/Enzyme used by Catalyst have been updated.
   [(#2415)](https://github.com/PennyLaneAI/catalyst/pull/2415)
@@ -348,6 +365,9 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* :func:`~pennylane.adjoint` can now be used on subroutines with classical arguments.
+  [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
 
 * Fixed a bug where the `catalyst` CLI tool would emit text when called with `--emit-bytecode`.
   [(#2596)](https://github.com/PennyLaneAI/catalyst/pull/2596)
@@ -416,6 +436,14 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Updated Catalyst's xDSL dependencies to `xdsl` 0.59.0 and `xdsl-jax` 0.5.0.
+  [(#2591)](https://github.com/PennyLaneAI/catalyst/pull/2591)
+
+* Added a optimized pathway to the xDSL `ApplyTransformSequencePass` so that it can schedule consecutive MLIR
+  passes together rather than individually. This minimizes the number of round-trips between xDSL and MLIR, improving
+  performance when several consecutive MLIR passes are used when there are also xDSL passes in the pipeline.
+  [(#2592)](https://github.com/PennyLaneAI/catalyst/pull/2592)
+
 * `draw_graph` now raises a more informative error when attempting to visualize an unsupported empty external function.
   [(#2559)](https://github.com/PennyLaneAI/catalyst/pull/2559)
 
@@ -456,6 +484,7 @@
 * A new dialect `QRef` was created. This dialect is very similar to the existing `Quantum` dialect,
   but it is in reference semantics, whereas the existing `Quantum` dialect is in value semantics.
   [(#2320)](https://github.com/PennyLaneAI/catalyst/pull/2320)
+  [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
@@ -523,6 +552,10 @@
 * The quantum dialect MLIR and TableGen source has been refactored to place type and attribute
   definitions in separate file scopes.
   [(#2329)](https://github.com/PennyLaneAI/catalyst/pull/2329)
+
+* Improve speed and reliability of xDSL inspection functionality by only running the necessary
+  compilation steps if the QJIT object does not already have an MLIR representation.
+  [(#2598)](https://github.com/PennyLaneAI/catalyst/pull/2598)
 
 * Added lowering of `pbc.ppm`, `pbc.ppr`, and `quantum.paulirot` to the runtime CAPI and QuantumDevice C++ API.
   [(#2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
