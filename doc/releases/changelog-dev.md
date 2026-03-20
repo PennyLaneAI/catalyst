@@ -238,6 +238,9 @@
   decomposition system.
   [(#2531)](https://github.com/PennyLaneAI/catalyst/pull/2531)
 
+* Added the `graph-decomposition` pass to orchestrate the new MLIR-native graph-based decomposition system.
+  [(#2552)](https://github.com/PennyLaneAI/catalyst/pull/2552)
+
 
 <h3>Improvements 🛠</h3>
 

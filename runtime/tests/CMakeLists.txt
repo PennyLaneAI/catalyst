@@ -152,3 +152,17 @@ target_link_libraries(runner_tests_rsdecomp_runtime PRIVATE
 )
 
 catch_discover_tests(runner_tests_rsdecomp_runtime)
+
+# Decomposition Graph test suite
+add_executable(runner_tests_delightning)
+target_sources(runner_tests_delightning PRIVATE
+    Test_DecompGraphCore.cpp
+    Test_DecompGraphSolver.cpp
+)
+target_link_libraries(runner_tests_delightning PRIVATE
+    Catch2WithMain
+    catalyst_runtime_testing
+    delightning
+)
+
+catch_discover_tests(runner_tests_delightning)
