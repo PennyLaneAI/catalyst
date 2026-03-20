@@ -22,7 +22,6 @@ import pytest
 from pennylane.exceptions import CompileError
 
 from catalyst.python_interface.transforms import (
-    MeasurementsFromSamplesPass,
     measurements_from_samples_pass,
 )
 

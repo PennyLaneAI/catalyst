@@ -14,15 +14,10 @@
 """Unit and integration tests for the unified compiler `measurements_from_samples` transform."""
 # pylint: disable=line-too-long
 
-from functools import partial
-
-import numpy as np
-import pennylane as qml
 import pytest
 
 from catalyst.python_interface.transforms import (
     MeasurementsFromSamplesPass,
-    measurements_from_samples_pass,
 )
 
 pytestmark = pytest.mark.xdsl
