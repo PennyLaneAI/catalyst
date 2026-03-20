@@ -317,7 +317,7 @@ class NestedModule:
         self.ctx.module_context = self.old_module_context
 
 
-def _lowered_options(_pass):
+def _lowered_options(_pass: qml.transforms.core.BoundTransform):
     return get_mlir_attribute_from_pyval(
         {str(arg).replace("_", "-"): True for arg in _pass.args}
         | {k.replace("_", "-"): v for k, v in _pass.kwargs.items()}
