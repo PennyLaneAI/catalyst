@@ -847,6 +847,25 @@ class TestMeasurementsFromSamplesIntegration:
         assert res == 1.0
 
 
+    @pytest.mark.usefixtures("use_capture")
+    def test_integrate_with_diagonalize(self):
+        """Test that the measurements_from_samples pass works correctly when used in combination
+        with the diagonalize-measurements pass."""
+
+        dev = qml.device("lightning.qubit", wires=4)
+
+        @qml.qjit
+        @measurements_from_samples_pass
+        @qml.transform(pass_name="diagonalize-final-measurements")
+        @qml.qnode(dev, shots=3000)
+        def circuit(x):
+            qml.RX(x, 0)
+            return qml.expval(qml.Y(0))
+
+        res = circuit(0.768)
+        assert np.isclose(res, -np.sin(0.768), atol=0.05)
+
+
 def _counts_catalyst_to_pl(basis_states, counts):
     """Helper function to convert counts in the Catalyst format to the PennyLane format.
 
