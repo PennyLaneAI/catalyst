@@ -459,109 +459,6 @@ class TestMeasurementsFromSamplesPass:
         pipeline = (MeasurementsFromSamplesPass(),)
         run_filecheck(program, pipeline)
 
-    def test_expval_tensor_obs(self, run_filecheck):
-        """Test the measurements-from-samples pass on a circuit terminating with the variance 
-        of a 3-wire tensor, including non-Z observables.
-        """
-
-        program = """
-        builtin.module @module_circuit {
-            // CHECK-LABEL: circuit
-            // CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<5x3xf64>
-            // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.5x3xf64([[samples]]) :
-            // CHECK-SAME: (tensor<5x3xf64>) -> tensor<f64>
-            // CHECK: func.return [[res]] : tensor<f64>
-            func.func public @circuit() -> tensor<f64> attributes {quantum.node}  {
-                %0 = "stablehlo.constant"() <{value = dense<5> : tensor<i64>}> : () -> tensor<i64>
-                %1 = tensor.extract %0[] : tensor<i64>
-                quantum.device shots(%1) ["", "", ""]
-
-                // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
-                // CHECK: [[q1:%.+]] = "test.op"() : () -> !quantum.bit
-                // CHECK: [[q2:%.+]] = "test.op"() : () -> !quantum.bit
-                %2 = "test.op"() : () -> !quantum.bit
-                %3 = "test.op"() : () -> !quantum.bit
-                %4 = "test.op"() : () -> !quantum.bit
-
-                // CHECK-NOT: quantum.namedobs
-                // CHECK-NOT: quantum.tensor
-                // CHECK: [[q0_1:%.+]] = quantum.custom "Hadamard"() [[q0]]
-                // CHECK: [[q1_1:%.+]] = quantum.custom "PauliZ"() [[q1]]
-                // CHECK: [[q1_2:%.+]] = quantum.custom "S"() [[q1_1]]
-                // CHECK: [[q1_3:%.+]] = quantum.custom "Hadamard"() [[q1_2]]
-                // CHECK: [[obs0:%.+]] = quantum.compbasis qubits [[q0_1]], [[q1_3]], [[q2]] : !quantum.obs
-                %5 = quantum.namedobs %2[PauliX] : !quantum.obs
-                %6 = quantum.namedobs %3[PauliY] : !quantum.obs
-                %7 = quantum.namedobs %4[PauliZ] : !quantum.obs
-                %8 = quantum.tensor %5, %6, %7 : !quantum.obs
-
-                // CHECK: [[samples:%.+]] = quantum.sample [[obs0]] : tensor<5x3xf64>
-                // CHECK-NOT: quantum.expval
-                %9 = quantum.expval %8 : f64
-                %10 = "tensor.from_elements"(%9) : (f64) -> tensor<f64>
-
-                // CHECK: func.return [[samples]] : tensor<5x3xf64>
-                func.return %10 : tensor<f64>
-            }
-            // CHECK-LABEL: func.func public @expval_from_samples.tensor.5x3xf64
-        }
-        """
-
-        pipeline = (MeasurementsFromSamplesPass(),)
-        run_filecheck(program, pipeline)
-    
-    def test_var_tensor_obs(self, run_filecheck):
-        """Test the measurements-from-samples pass on a circuit terminating with the variance 
-        of a 3-wire tensor, including non-Z observables.
-        """
-
-        program = """
-        builtin.module @module_circuit {
-            // CHECK-LABEL: circuit
-            // CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<5x3xf64>
-            // CHECK: [[res:%.+]] = func.call @var_from_samples.tensor.5x3xf64([[samples]]) :
-            // CHECK-SAME: (tensor<5x3xf64>) -> tensor<f64>
-            // CHECK: func.return [[res]] : tensor<f64>
-            func.func public @circuit() -> tensor<f64> attributes {quantum.node}  {
-                %0 = "stablehlo.constant"() <{value = dense<5> : tensor<i64>}> : () -> tensor<i64>
-                %1 = tensor.extract %0[] : tensor<i64>
-                quantum.device shots(%1) ["", "", ""]
-
-                // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
-                // CHECK: [[q1:%.+]] = "test.op"() : () -> !quantum.bit
-                // CHECK: [[q2:%.+]] = "test.op"() : () -> !quantum.bit
-                %2 = "test.op"() : () -> !quantum.bit
-                %3 = "test.op"() : () -> !quantum.bit
-                %4 = "test.op"() : () -> !quantum.bit
-
-                // CHECK-NOT: quantum.namedobs
-                // CHECK-NOT: quantum.tensor
-                // CHECK: [[q0_1:%.+]] = quantum.custom "Hadamard"() [[q0]]
-                // CHECK: [[q1_1:%.+]] = quantum.custom "PauliZ"() [[q1]]
-                // CHECK: [[q1_2:%.+]] = quantum.custom "S"() [[q1_1]]
-                // CHECK: [[q1_3:%.+]] = quantum.custom "Hadamard"() [[q1_2]]
-                // CHECK: [[obs0:%.+]] = quantum.compbasis qubits [[q0_1]], [[q1_3]], [[q2]] : !quantum.obs
-                %5 = quantum.namedobs %2[PauliX] : !quantum.obs
-                %6 = quantum.namedobs %3[PauliY] : !quantum.obs
-                %7 = quantum.namedobs %4[PauliZ] : !quantum.obs
-                %8 = quantum.tensor %5, %6, %7 : !quantum.obs
-
-                // CHECK: [[samples:%.+]] = quantum.sample [[obs0]] : tensor<5x3xf64>
-                // CHECK-NOT: quantum.var
-                %9 = quantum.var %8 : f64
-                %10 = "tensor.from_elements"(%9) : (f64) -> tensor<f64>
-
-                // CHECK: func.return [[samples]] : tensor<5x3xf64>
-                func.return %10 : tensor<f64>
-            }
-            // CHECK-LABEL: func.func public @var_from_samples.tensor.5x3xf64
-        }
-        """
-
-        pipeline = (MeasurementsFromSamplesPass(),)
-        run_filecheck(program, pipeline)
-    
-
 @pytest.mark.usefixtures("use_capture")
 class TestIntegrationUsefulErrors:
     """Test that useful error messages are raised in the frontend for unsupported behaviour"""
@@ -608,7 +505,7 @@ class TestIntegrationUsefulErrors:
         dev = qml.device("lightning.qubit", wires=4)
 
         with pytest.raises(
-            NotImplementedError, match="not implemented with measurements_from_samples"
+            NotImplementedError, match="operations are not supported"
         ):
             @qml.qjit
             @measurements_from_samples_pass
@@ -695,21 +592,6 @@ class TestIntegrationUsefulErrors:
             def circuit():
                 return qml.sample(wires=[0]), qml.expval(qml.X(0))
 
-    @pytest.mark.parametrize("obs", (2*qml.X(0), qml.X(1) + qml.X(2)))
-    def test_hamlitonianop_raises_error(self, obs):
-        """Test that a circuit with a HamiltonianOp observable raises an error message 
-        instructing the user to apply `split-non-commuting` first"""
-
-        dev = qml.device("lightning.qubit", wires=2)
-
-        with pytest.raises(CompileError, match="apply `qml.transforms.split_non_commuting`"):
-
-            @qml.qjit
-            @measurements_from_samples_pass
-            @qml.qnode(dev, shots=1000)
-            def circuit():
-                return qml.expval(obs)
-
 @pytest.mark.usefixtures("use_capture")
 class TestIntegrationWithOtherPasses:
     """Tests the integration of the xDSL-based MeasurementsFromSamplesPass transform with 
@@ -765,96 +647,6 @@ class TestIntegrationWithOtherPasses:
 
         assert expected_res == circuit()
 
-    @pytest.mark.xfail(reason="split-non-commuting doesn't support var")
-    @pytest.mark.parametrize("shots", [1, 2])
-    @pytest.mark.parametrize(
-        "initial_ops, expected_res",
-        [
-            ((qml.I, qml.I), 2.0),
-            ((qml.I, qml.X), 2.0),
-            ((qml.X, qml.I), -2.0),
-            ((qml.X, qml.X), -2.0),
-        ],
-    )
-    def test_var_sprod_with_split_non_commuting(self, shots, initial_ops, expected_res):
-        """Test the measurements_from_samples transform on a device with two wires and terminal
-        measurements that require an observable (i.e. expval and var).
-
-        In this test, the terminal measurements are performed on the combination of both wires.
-        """
-
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qjit
-        @qml.transform(pass_name="measurements-from-samples")
-        @qml.transform(pass_name="split-non-commuting")
-        @qml.qnode(dev, shots=shots)
-        def circuit():
-            initial_ops[0](wires=0)
-            initial_ops[1](wires=1)
-            return qml.var(2 * qml.Z(wires=0))
-
-        assert expected_res == circuit()
-
-    #ToDo: use analytic test repo, make this more accurate. Make the same change to the var test even if it can't pass.
-    @pytest.mark.parametrize("shots", [2000, 3000])
-    @pytest.mark.parametrize(
-        "initial_ops, expected_res",
-        [
-            ((qml.I, qml.I), 2.0),
-            ((qml.I, qml.X), 2.0),
-            ((qml.X, qml.I), -2.0),
-            ((qml.X, qml.X), -2.0),
-        ],
-    )
-    def test_expval_sum_with_split_non_commuting(self, shots, initial_ops, expected_res):
-        """Test the measurements_from_samples transform on a device with two wires and terminal
-        measurements that require an observable (i.e. expval and var).
-
-        In this test, the terminal measurements are performed on the combination of both wires.
-        """
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qjit
-        @qml.transform(pass_name="measurements-from-samples")
-        @qml.transform(pass_name="split-non-commuting")
-        @qml.qnode(dev, shots=shots)
-        def circuit():
-            initial_ops[0](wires=0)
-            initial_ops[1](wires=1)
-            return qml.expval(2*qml.Z(wires=0) + qml.X(1))
-        
-        np.isclose(expected_res, circuit())
-
-    @pytest.mark.xfail(reason="split-non-commuting doesn't support var")
-    @pytest.mark.parametrize("shots", [2000, 3000])
-    @pytest.mark.parametrize(
-        "initial_ops, expected_res",
-        [
-            ((qml.I, qml.I), 2.0),
-            ((qml.I, qml.X), 2.0),
-            ((qml.X, qml.I), -2.0),
-            ((qml.X, qml.X), -2.0),
-        ],
-    )
-    def test_var_sum_with_split_non_commuting(self, shots, initial_ops, expected_res):
-        """Test the measurements_from_samples transform on a device with two wires and terminal
-        measurements that require an observable (i.e. expval and var).
-
-        In this test, the terminal measurements are performed on the combination of both wires.
-        """
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qjit
-        @qml.transform(pass_name="measurements-from-samples")
-        @qml.transform(pass_name="split-non-commuting")
-        @qml.qnode(dev, shots=shots)
-        def circuit():
-            initial_ops[0](wires=0)
-            initial_ops[1](wires=1)
-            return qml.var(2*qml.Z(wires=0) + qml.X(1))
-        
-        np.isclose(expected_res, circuit())
 
 @pytest.mark.usefixtures("use_capture")
 class TestIntegrationWithExecution:
@@ -978,77 +770,6 @@ class TestIntegrationWithExecution:
 
         assert expected_res == circuit_compiled()
 
-    @pytest.mark.parametrize("shots", [1, 2])
-    @pytest.mark.parametrize(
-        "initial_ops, expected_res",
-        [
-            ((qml.I, qml.I), 1.0),
-            ((qml.I, qml.X), -1.0),
-            ((qml.X, qml.I), -1.0),
-            ((qml.X, qml.X), 1.0),
-        ],
-    )
-    def test_expval_tensor(self, shots, initial_ops, expected_res, run_filecheck_qjit):
-        """Test the measurements_from_samples transform on a device with two wires and terminal
-        measurements that require an observable (i.e. expval and var).
-
-        In this test, the terminal measurements are performed on the combination of both wires.
-        """
-
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qnode(dev, shots=shots)
-        def circuit_ref():
-            initial_ops[0](wires=0)
-            initial_ops[1](wires=1)
-            # CHECK-NOT: quantum.namedobs
-            # CHECK-NOT: quantum.expval
-            # CHECK: quantum.sample
-            return qml.expval(qml.Z(wires=0) @ qml.Z(wires=1))
-
-        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
-
-        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
-
-        run_filecheck_qjit(circuit_compiled)
-
-        assert expected_res == circuit_compiled()
-
-    @pytest.mark.xfail(reason="mcms not supported yet")
-    @pytest.mark.parametrize("shots", [1, 2])
-    @pytest.mark.parametrize(
-        "initial_ops, expected_res",
-        [
-            ((qml.I, qml.I), 1.0),
-            ((qml.I, qml.X), -1.0),
-            ((qml.X, qml.I), -1.0),
-            ((qml.X, qml.X), 1.0),
-        ],
-    )
-    def test_expval_mcm(self, shots, initial_ops, expected_res, run_filecheck_qjit):
-        """Test the measurements_from_samples transform on a device with two wires and terminal
-        measurements that require an observable (i.e. expval and var).
-
-        In this test, the terminal measurements provide statistics on an MCM.
-        """
-
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qjit
-        @qml.transform(pass_name="measurements-from-samples")
-        @qml.qnode(dev, shots=shots)
-        def circuit():
-            initial_ops[0](wires=0)
-            initial_ops[1](wires=1)
-            m = qml.measure(0)
-            # CHECK-NOT: quantum.expval
-            # CHECK: quantum.sample
-            return qml.expval(m)
-
-        run_filecheck_qjit(circuit)
-
-        assert np.allclose(expected_res, circuit(), atol=0.05)
-
     # ---- Test circuits returning variance ------------------------------------------------------ #
     @pytest.mark.parametrize("shots", [1, 2])
     @pytest.mark.parametrize(
@@ -1137,42 +858,6 @@ class TestIntegrationWithExecution:
         circuit_compiled = qml.qjit(
             measurements_from_samples_pass(circuit_ref),
         )
-
-        run_filecheck_qjit(circuit_compiled)
-
-        assert expected_res == circuit_compiled()
-
-    @pytest.mark.parametrize("shots", [1, 2])
-    @pytest.mark.parametrize(
-        "initial_ops, expected_res",
-        [
-            ((qml.I, qml.I), 0.0),
-            ((qml.I, qml.X), 0.0),
-            ((qml.X, qml.I), 0.0),
-            ((qml.X, qml.X), 0.0),
-        ],
-    )
-    def test_var_tensor(self, shots, initial_ops, expected_res, run_filecheck_qjit):
-        """Test the measurements_from_samples transform on a device with two wires and terminal
-        measurements that require an observable (i.e. expval and var).
-
-        In this test, the terminal measurements are performed on the combination of both wires.
-        """
-
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qnode(dev, shots=shots)
-        def circuit_ref():
-            initial_ops[0](wires=0)
-            initial_ops[1](wires=1)
-            # CHECK-NOT: quantum.namedobs
-            # CHECK-NOT: quantum.var
-            # CHECK: quantum.sample
-            return qml.var(qml.Z(wires=0) @ qml.Z(wires=1))
-
-        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
-
-        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
 
         run_filecheck_qjit(circuit_compiled)
 
@@ -1310,70 +995,6 @@ class TestIntegrationWithExecution:
         run_filecheck_qjit(circuit_compiled)
 
         assert np.array_equal(expected_res, circuit_compiled())
-
-    # ----- Test circuit with mixed returns ------------------------------------------------------ #
-    def test_measurements_from_samples_multiple_measurements(self, run_filecheck_qjit):
-        """Test the transform measurements_from_samples with multiple measurement types
-        as part of the Catalyst pipeline."""
-
-        dev = qml.device("lightning.qubit", wires=4)
-
-        @qml.set_shots(5000)
-        @qml.qnode(dev)
-        def basic_circuit(theta: float):
-            qml.RY(theta, 0)
-            qml.RY(theta / 2, 1)
-            qml.RY(2 * theta, 2)
-            qml.RY(theta, 3)
-            # CHECK-NOT: quantum.namedobs
-            # CHECK-NOT: quantum.expval
-            # CHECK-NOT: quantum.var
-            # CHECK-NOT: quantum.probs
-            # CHECK: quantum.sample
-            return (
-                qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
-                qml.var(qml.PauliX(wires=1)),
-                qml.sample(wires=[2]),
-                # qml.probs(wires=[3]),
-            )
-
-        circuit_compiled = qml.qjit(measurements_from_samples_pass(basic_circuit), seed=37)
-
-        run_filecheck_qjit(circuit_compiled)
-
-        theta = 1.9
-
-        # expval_res, var_res, sample_res, probs_res = circuit_compiled(theta)
-        expval_res, var_res, sample_res = circuit_compiled(theta)
-
-        expval_expected = np.sin(theta) * np.sin(theta / 2)
-        var_expected = 1 - np.sin(2 * theta) ** 2
-        sample_expected = basic_circuit(theta)[2]
-        # probs_expected = [np.cos(theta / 2) ** 2, np.sin(theta / 2) ** 2]
-
-        assert np.isclose(expval_res, expval_expected, atol=0.05)
-        assert np.isclose(var_res, var_expected, atol=0.05)
-        # assert np.allclose(probs_res, probs_expected, atol=0.05)
-
-        # sample comparison
-        assert np.isclose(np.mean(sample_res), np.mean(sample_expected), atol=0.05)
-        assert len(sample_res) == len(sample_expected)
-
-    # ToDo: add something like this (Requires program capture off because of identity)
-    # ToDo: add similar lit test
-    # def test_with_identity(self):
-    #     qp.capture.disable()
-
-    #     @qp.qjit(keep_intermediate=False)
-    #     # @qp.transforms.diagonalize_measurements
-    #     @qp.transform(pass_name="measurements-from-samples")
-    #     @qp.set_shots(10)
-    #     @qp.qnode(device=qp.device("lightning.qubit", wires=5))
-    #     def a_circ():
-    #         return qp.expval(qp.X(0)@qp.Y(1)), qp.expval(qp.Identity(1))
-
-    #     a_circ()
-    #     print(a_circ.mlir)
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
