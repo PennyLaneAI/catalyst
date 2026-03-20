@@ -168,9 +168,9 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         return op
 
     def _get_call_op(self, qnode):
-        """Get the CallOp in another module function that calls this quantum_node. Postprocessing will be 
-        called to act on the output of that CallOp"""
-        
+        """Get the CallOp in another module function that calls this quantum_node. Postprocessing 
+        will be called to act on the output of that CallOp"""
+
         module = self._get_parent_module(qnode)
         qnode_name = qnode.sym_name.data
         all_call_ops = [op for op in module.body.walk() if isinstance(op, func.CallOp)]
@@ -700,17 +700,34 @@ class StatePattern(MeasurementsFromSamplesPattern):
         raise NotImplementedError("qml.state() operations are not supported.")
 
 
-def get_shots(quantum_node):
+def get_shots(quantum_node: func.FuncOp) -> int:
+    """Get the shots for a quantum.node. Extracts shots from the device and validates that shots 
+    is a non-zero integer
+    
+        Args:
+        quantum_node (func.FuncOp): The quantum.node FuncOp containing the quantum.DeviceInitOp.
+
+    Returns:
+        int: The number of shots.
+
+    Raises:
+        CompileError: If `quantum_node` does not contain a quantum.DeviceInitOp.
+        CompileError: If the operator expected to contain shots values does not have `properties`.
+            This is the immediate issue that is observed when shots are dynamic.
+        TypeError: if the extracted shots are not an int
+        ValueError: if the extracted shots are zero
+    
+    """
+
     shots = _get_static_shots_value_from_device_op(quantum_node)
-    assert isinstance(
-        shots, int
-    ), f"Expected `shots` to be an integer value but got {type(shots).__name__}"
+    if not isinstance(shots, int):
+        raise TypeError(f"Expected `shots` to be an integer value but got {type(shots).__name__}")
     if shots == 0:
         raise ValueError("The measurements_from_samples pass requires non-zero shots")
     return shots
 
 
-def _get_static_shots_value_from_device_op(quantum_node: builtin.ModuleOp) -> int:
+def _get_static_shots_value_from_device_op(quantum_node: func.FuncOp) -> int:
     """Returns the number of shots as a static (i.e. known at compile time) integer value from the
     device-initialization op (quantum.DeviceInitOp) found in a `FuncOp`.
 
