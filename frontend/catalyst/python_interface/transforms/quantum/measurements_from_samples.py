@@ -749,8 +749,9 @@ def _get_static_shots_value_from_device_op(quantum_node: builtin.ModuleOp) -> in
         shots_constant_op = shots_extract_op.operands[0].owner
         if not hasattr(shots_constant_op, "properties"):
             raise CompileError(
-                "Cannot get concrete number of shots. Note that using a dynamic number of shots is not supported with measurements-from-samples; ensure shots are set to a concrete value."
-            )
+                "Cannot get concrete number of shots. Note that using a dynamic number of " \
+                "shots is not supported with measurements-from-samples; ensure shots are set " \
+                "to a concrete value."            )
         shots_value_attribute: builtin.DenseIntOrFPElementsAttr = shots_constant_op.properties.get(
             "value"
         )
@@ -766,7 +767,9 @@ def _get_static_shots_value_from_device_op(quantum_node: builtin.ModuleOp) -> in
     if isinstance(shots_extract_op, arith.ConstantOp):
         if not hasattr(shots_extract_op, "properties"):
             raise CompileError(
-                "Cannot get concrete number of shots. Note that using a dynamic number of shots is not supported with measurements-from-samples; ensure shots are set to a concrete value."
+                "Cannot get concrete number of shots. Note that using a dynamic number of " \
+                "shots is not supported with measurements-from-samples; ensure shots are set " \
+                "to a concrete value."
             )
         shots_value_attribute: builtin.IntAttr = shots_extract_op.properties.get("value")
         return shots_value_attribute.value.data

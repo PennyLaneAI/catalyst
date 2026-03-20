@@ -15,12 +15,12 @@
 # pylint: disable=line-too-long
 
 from functools import partial
+from pennylane.exceptions import CompileError
 
 import numpy as np
 import pennylane as qml
 import pytest
 
-from pennylane.exceptions import CompileError
 from catalyst.python_interface.transforms import (
     MeasurementsFromSamplesPass,
     measurements_from_samples_pass,
@@ -646,7 +646,7 @@ class TestIntegrationWithOtherPasses:
 
         assert expected_res == circuit()
 
-
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 @pytest.mark.usefixtures("use_capture")
 class TestIntegrationWithExecution:
     """Tests of the execution of simple workloads with the xDSL-based MeasurementsFromSamplesPass
@@ -747,9 +747,8 @@ class TestIntegrationWithExecution:
     )
     def test_expval_2_mps(self, shots, initial_ops, obs, expected_res, run_filecheck_qjit):
         """Test the measurements_from_samples transform on a device with two wires and terminal
-        measurements that require an observable (i.e. expval and var).
-
-        In this test, the terminal measurements are performed separately per wire.
+        measurements that require an observable (i.e. expval and var). In this test, the terminal 
+        measurements are performed separately per wire.
         """
 
         dev = qml.device("lightning.qubit", wires=2)
@@ -840,9 +839,8 @@ class TestIntegrationWithExecution:
     )
     def test_2_variance_mps(self, shots, initial_ops, obs, expected_res, run_filecheck_qjit):
         """Test the measurements_from_samples transform on a device with two wires and terminal
-        measurements that require an observable (i.e. expval and var).
-
-        In this test, the terminal measurements are performed separately per wire.
+        measurements that require an observable (i.e. expval and var). In this test, the terminal 
+        measurements are performed separately per wire.
         """
 
         dev = qml.device("lightning.qubit", wires=2)
@@ -976,9 +974,7 @@ class TestIntegrationWithExecution:
     )
     def test_exec_1_wire_sample(self, shots, initial_op, expected_res_base, run_filecheck_qjit):
         """Test the measurements_from_samples transform on a device with a single wire and terminal
-        sample measurements.
-
-        In this case, the measurements_from_samples pass should effectively be a no-op.
+        sample measurements. In this case, the measurements_from_samples pass should effectively be a no-op.
         """
         dev = qml.device("lightning.qubit", wires=1)
 
