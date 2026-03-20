@@ -227,9 +227,7 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
         if len(pass_ops) == 0:
             return
 
-        # self.passes maps pass names to xDSL passes. If the pass name is in self.passes, we know
-        # that it is an xDSL pass. Otherwise, we assume that the name corresponds to an MLIR pass.
-        pass_groups = groupby(pass_ops, key=lambda op: is_xdsl_pass(op.pass_name.data))
+        pass_groups = groupby(pass_ops, key=self._is_xdsl_pass)
 
         for is_xdsl_group, group in pass_groups:
             group = tuple(group)
@@ -237,6 +235,12 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
                 self._apply_xdsl_pipeline(payload, group)
             else:
                 payload = self._apply_mlir_pipeline(payload, group, rewriter)
+
+    def _is_xdsl_pass(self, op: transform.ApplyRegisteredPassOp) -> bool:
+        """Check whether a registered pass op corresponds to an xDSL or MLIR pass."""
+        # self.passes maps pass names to xDSL passes. If the pass name is in self.passes, we know
+        # that it is an xDSL pass. Otherwise, we assume that the name corresponds to an MLIR pass.
+        return op.pass_name.data in self.passes
 
     def _apply_xdsl_pipeline(
         self, payload: builtin.ModuleOp, pass_ops: list[transform.ApplyRegisteredPassOp]
