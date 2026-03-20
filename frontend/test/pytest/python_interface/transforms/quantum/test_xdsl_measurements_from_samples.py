@@ -846,7 +846,6 @@ class TestMeasurementsFromSamplesIntegration:
         res = circuit()
         assert res == 1.0
 
-
     @pytest.mark.usefixtures("use_capture")
     def test_integrate_with_diagonalize(self):
         """Test that the measurements_from_samples pass works correctly when used in combination
