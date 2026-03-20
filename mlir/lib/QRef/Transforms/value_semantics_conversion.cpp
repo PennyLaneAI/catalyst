@@ -550,6 +550,7 @@ Operation *getLaterOp(Value v1, Value v2, DominanceInfo &domInfo)
  * of the new qref.get op is immediately after the later of the alloc op and the dynamic index op's
  * defining op.
  *
+ * @param builder
  * @param func
  */
 void squashAliasingGetOps(IRRewriter &builder, func::FuncOp func)
@@ -984,7 +985,6 @@ void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTr
         // The vAdjointOp has !quantum.bit/reg as input types now on the region's block
         // We need to overwrite it with the block from the old rAdjointOp, so it can
         // see !qref.bit/reg types on the block
-        // builder.eraseBlock(vAdjointOp.getBody());
         builder.inlineRegionBefore(rAdjointOp.getRegion(), vAdjointOp.getRegion(),
                                    vAdjointOp.getRegion().end());
         builder.setInsertionPointToEnd(&vAdjointOp.getRegion().front());
