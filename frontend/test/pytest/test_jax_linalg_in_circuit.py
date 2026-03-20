@@ -28,10 +28,10 @@ from catalyst import qjit
 class TestExpmInCircuit:
     """Test entire quantum workflows with jax.scipy.linag.expm"""
 
-    def test_expm_in_circuit(self):
+    def test_expm_in_circuit(self, capture_mode):
         """Rotate |0> about Bloch x axis for 180 degrees to get |1>"""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_expm():
             generator = -1j * jnp.pi * jnp.array([[0, 1], [1, 0]]) / 2

@@ -338,13 +338,13 @@ class TestCholesky:
             ),
         ],
     )
-    def test_cholesky_numerical_lower(self, A):
+    def test_cholesky_numerical_lower(self, capture_mode, A):
         """Test basic numerical correctness of jax.scipy.linalg.cholesky with option
         lower=True (giving decomposition in form A = L L†), for various functions and
         matrices of various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(X):
             return jsp.linalg.cholesky(X, lower=True)
 
@@ -374,13 +374,13 @@ class TestCholesky:
             ),
         ],
     )
-    def test_cholesky_numerical_upper(self, A):
+    def test_cholesky_numerical_upper(self, capture_mode, A):
         """Test basic numerical correctness of jax.scipy.linalg.cholesky with option
         lower=False (giving decomposition in form A = U† U), for various functions and
         matrices of various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(X):
             return jsp.linalg.cholesky(X, lower=False)
 
@@ -425,12 +425,12 @@ class TestExpm:
             jnp.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [3.0, 2.0, 1.0]]),
         ],
     )
-    def test_expm_numerical(self, A):
+    def test_expm_numerical(self, capture_mode, A):
         """Test basic numerical correctness of jax.scipy.linalg.expm for matrices of
         various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(X):
             return jsp.linalg.expm(X)
 
@@ -456,12 +456,12 @@ class TestExpm:
             jnp.array(np.triu(MatrixGenerator.random_complex_matrix(3, 3, seed=46))),
         ],
     )
-    def test_expm_numerical_upper_triangular(self, A):
+    def test_expm_numerical_upper_triangular(self, capture_mode, A):
         """Test basic numerical correctness of jax.scipy.linalg.expm for matrices of
         various data types and sizes when using the `upper_triangular=True` option.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(X):
             return jsp.linalg.expm(X, upper_triangular=True)
 
@@ -496,12 +496,12 @@ class TestFunmNumerical:
             jnp.array(np.tril(MatrixGenerator.random_complex_matrix(3, 3, seed=23))),
         ],
     )
-    def test_funm_numerical(self, A):
+    def test_funm_numerical(self, capture_mode, A):
         """Test basic numerical correctness of jax.scipy.linalg.funm for various
         matrices of various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(X):
             def func(X):
                 return jnp.sin(X) + 2 * jnp.cos(X)
@@ -542,14 +542,14 @@ class TestHessenberg:
             jnp.array(np.tril(MatrixGenerator.random_complex_matrix(3, 3, seed=23))),
         ],
     )
-    def test_hessenberg_numerical(self, A):
+    def test_hessenberg_numerical(self, capture_mode, A):
         """Test basic numerical correctness of jax.scipy.linalg.hessenberg for matrices
         of various data types and sizes.
 
         Note that jax does not support integer matrices for this function.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(X):
             return jsp.linalg.hessenberg(X, calc_q=True)
 
@@ -602,12 +602,12 @@ class TestLU:
             jnp.array(np.tril(MatrixGenerator.random_complex_matrix(3, 3, seed=33))),
         ],
     )
-    def test_lu_numerical(self, A):
+    def test_lu_numerical(self, capture_mode, A):
         """Test basic numerical correctness for jax.scipy.linalg.lu for for matrices of
         various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(X):
             return jsp.linalg.lu(X)
 
@@ -651,14 +651,14 @@ class TestLUSolve:
             ),
         ],
     )
-    def test_lu_solve_numerical(self, A, b):
+    def test_lu_solve_numerical(self, capture_mode, A, b):
         """Test basic numerical correctness of jax.scipy.linalg.lu_solve for matrices and
         vectors of various data types and sizes.
 
         Note that jax does not support integer matrices for this function.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(A, b):
             lu_and_piv = jsp.linalg.lu_factor(A)
             return jsp.linalg.lu_solve(lu_and_piv, b)
@@ -705,14 +705,14 @@ class TestPolar:
             jnp.array(MatrixGenerator.random_complex_matrix(7, 5, seed=23)),
         ],
     )
-    def test_polar_numerical_svd(self, A):
+    def test_polar_numerical_svd(self, capture_mode, A):
         """Test basic numerical correctness of jax.scipy.linalg.polar for matrices
         of various data types and sizes using the 'svd' method.
 
         Note that jax does not support integer matrices for this function.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(X):
             return jsp.linalg.polar(X, method="svd")
 
@@ -738,7 +738,7 @@ class TestPolar:
             jnp.array(MatrixGenerator.random_complex_matrix(7, 5, seed=22)),
         ],
     )
-    def test_polar_numerical_qdwh(self, A):
+    def test_polar_numerical_qdwh(self, capture_mode, A):
         """Test basic numerical correctness of jax.scipy.linalg.polar for matrices
         of various data types and sizes using the 'qdwh' method.
 
@@ -746,7 +746,7 @@ class TestPolar:
         """
         print("Start")
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(X):
             return jsp.linalg.polar(X, method="qdwh")
 
@@ -794,14 +794,14 @@ class TestQR:
             jnp.array(MatrixGenerator.random_complex_matrix(7, 5, seed=25)),
         ],
     )
-    def test_qr_numerical(self, A):
+    def test_qr_numerical(self, capture_mode, A):
         """Test basic numerical correctness of jax.scipy.linalg.qr for matrices
         of various data types and sizes.
 
         Note that jax does not support integer matrices for this function.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(X):
             return jsp.linalg.qr(X)
 
@@ -842,14 +842,14 @@ class TestSchur:
             jnp.array(np.tril(MatrixGenerator.random_complex_matrix(3, 3, seed=23))),
         ],
     )
-    def test_schur_numerical_real(self, A):
+    def test_schur_numerical_real(self, capture_mode, A):
         """Test basic numerical correctness of jax.scipy.linalg.schur with output='real'
         for matrices of various data types and sizes.
 
         Note that jax does not support integer matrices for this function.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(X):
             return jsp.linalg.schur(X, output="real")
 
@@ -876,14 +876,14 @@ class TestSchur:
             jnp.array(np.tril(MatrixGenerator.random_complex_matrix(3, 3, seed=23))),
         ],
     )
-    def test_schur_numerical_complex(self, A):
+    def test_schur_numerical_complex(self, capture_mode, A):
         """Test basic numerical correctness of jax.scipy.linalg.schur with output='complex'
         for matrices of various data types and sizes.
 
         Note that jax does not support integer matrices for this function.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(X):
             return jsp.linalg.schur(X, output="complex")
 
@@ -932,12 +932,12 @@ class TestSolve:
             ),
         ],
     )
-    def test_solve_numerical(self, A, b):
+    def test_solve_numerical(self, capture_mode, A, b):
         """Test basic numerical correctness of jax.scipy.linalg.solve for matrices and
         vectors of various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(A, b):
             return jsp.linalg.solve(A, b)
 
@@ -957,13 +957,13 @@ class TestSolve:
             ),
         ],
     )
-    def test_solve_numerical_hermitian(self, A, b):
+    def test_solve_numerical_hermitian(self, capture_mode, A, b):
         """Test basic numerical correctness of jax.scipy.linalg.solve for Hermitian
         matrices and vectors of various data types and sizes to test the `assume_a="her"`
         option.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(A, b):
             return jsp.linalg.solve(A, b, assume_a="her")
 
@@ -1006,12 +1006,12 @@ class TestSqrtm:
             jnp.array(np.tril(MatrixGenerator.random_complex_matrix(3, 3, seed=33))),
         ],
     )
-    def test_sqrtm_numerical(self, A):
+    def test_sqrtm_numerical(self, capture_mode, A):
         """Test basic numerical correctness of jax.scipy.linalg.sqrtm for matrices of
         various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(X):
             return jsp.linalg.sqrtm(X)
 
@@ -1057,12 +1057,12 @@ class TestSVD:
             jnp.array(MatrixGenerator.random_complex_matrix(7, 5, seed=33)),
         ],
     )
-    def test_svd_numerical(self, A):
+    def test_svd_numerical(self, capture_mode, A):
         """Test basic numerical correctness of jax.scipy.linalg.svd for matrices
         of various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(X):
             return jsp.linalg.svd(X)
 
@@ -1095,12 +1095,12 @@ class TestTridiagonal:
             jnp.array(MatrixGenerator.random_complex_hermitian_matrix(5, seed=12)),
         ],
     )
-    def test_tridiagonal_numerical(self, A):
+    def test_tridiagonal_numerical(self, capture_mode, A):
         """Test basic numerical correctness of jax.lax.linalg.tridiagonal for matrices
         of various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def f(X):
             return lax.linalg.tridiagonal(X)
 
