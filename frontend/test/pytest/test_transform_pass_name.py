@@ -75,8 +75,6 @@ def test_pass_with_complex_options(options, backend):
     def captured_circuit():
         return qml.expval(qml.PauliZ(0))
 
-    print(captured_circuit.mlir)
-
     if isinstance(options["option"], list):
         assert 'with options = {"option" = [1 : i64, 2 : i64, 3 : i64]}' in captured_circuit.mlir
 
@@ -84,30 +82,18 @@ def test_pass_with_complex_options(options, backend):
         assert 'with options = {"option" = {blah = "foo"}' in captured_circuit.mlir
 
 
-@pytest.mark.parametrize(
-    "options",
-    [
-        {"option": None},
-    ],
-    ids=["None"],
-)
-def test_pass_with_unsupported_options(options, backend):
+def test_pass_with_unsupported_options(backend):
     """Tests that unsupported option types raise a clear error."""
 
     my_pass = qml.transform(pass_name="my-pass")
 
-    @partial(my_pass, **options)
+    @partial(my_pass, **{"option": None})
     @qml.qnode(qml.device(backend, wires=1))
     def captured_circuit():
         return qml.expval(qml.PauliZ(0))
 
-    expected_error = CompileError if options["option"] is None else TypeError
-    expected_msg = (
-        r"Cannot convert Python type <class 'NoneType'> to an MLIR attribute"
-        if options["option"] is None
-        else "unhashable type"
-    )
-    with pytest.raises(expected_error, match=expected_msg):
+    expected_msg = r"Cannot convert Python type <class 'NoneType'> to an MLIR attribute"
+    with pytest.raises(CompileError, match=expected_msg):
         qml.qjit(target="mlir")(captured_circuit)
 
 
