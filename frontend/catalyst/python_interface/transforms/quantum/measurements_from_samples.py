@@ -168,6 +168,9 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         return op
 
     def _get_call_op(self, qnode):
+        """Get the CallOp in another module function that calls this quantum_node. Postprocessing will be 
+        called to act on the output of that CallOp"""
+        
         module = self._get_parent_module(qnode)
         qnode_name = qnode.sym_name.data
         all_call_ops = [op for op in module.body.walk() if isinstance(op, func.CallOp)]
