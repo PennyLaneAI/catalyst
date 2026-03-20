@@ -15,11 +15,12 @@
 # pylint: disable=line-too-long
 
 from functools import partial
-from pennylane.exceptions import CompileError
 
 import numpy as np
 import pennylane as qml
 import pytest
+from pennylane.exceptions import CompileError
+
 
 from catalyst.python_interface.transforms import (
     MeasurementsFromSamplesPass,
