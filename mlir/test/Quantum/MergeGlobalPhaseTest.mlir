@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --merge-global-phase %s | FileCheck %s
+// RUN: quantum-opt --combine-global-phases %s | FileCheck %s
 
 // CHECK-LABEL: func.func @merge_simple_global_phases(
 func.func @merge_simple_global_phases(%arg0: f64, %arg1: f64) {

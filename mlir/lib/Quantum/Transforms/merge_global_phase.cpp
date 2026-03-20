@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "merge-global-phase"
+#define DEBUG_TYPE "combine-global-phases"
 
 #include <iterator>
 
@@ -28,12 +28,12 @@ using namespace mlir;
 namespace catalyst {
 namespace quantum {
 
-#define GEN_PASS_DECL_MERGEGLOBALPHASEPASS
-#define GEN_PASS_DEF_MERGEGLOBALPHASEPASS
+#define GEN_PASS_DECL_COMBINEGLOBALPHASESPASS
+#define GEN_PASS_DEF_COMBINEGLOBALPHASESPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct MergeGlobalPhasePass : impl::MergeGlobalPhasePassBase<MergeGlobalPhasePass> {
-    using impl::MergeGlobalPhasePassBase<MergeGlobalPhasePass>::MergeGlobalPhasePassBase;
+struct CombineGlobalPhasesPass : impl::CombineGlobalPhasesPassBase<CombineGlobalPhasesPass> {
+    using impl::CombineGlobalPhasesPassBase<CombineGlobalPhasesPass>::CombineGlobalPhasesPassBase;
 
     void runOnOperation() final
     {

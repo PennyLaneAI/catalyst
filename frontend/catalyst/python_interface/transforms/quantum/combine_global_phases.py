@@ -74,10 +74,10 @@ class CombineGlobalPhasesPass(passes.ModulePass):
     within the region.
     """
 
-    name = "combine-global-phases"
+    name = "xdsl-combine-global-phases"
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
-        """Apply the combine-global-phases pass."""
+        """Apply the combine-global-phases pass in Python."""
         pattern_rewriter.PatternRewriteWalker(
             CombineGlobalPhasesPattern(),
             apply_recursively=False,
