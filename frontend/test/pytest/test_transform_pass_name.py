@@ -69,14 +69,19 @@ def test_pass_with_complex_options(options, backend):
 
     my_pass = qml.transform(pass_name="my-pass")
 
+    @qml.qjit(target="mlir")
     @partial(my_pass, **options)
     @qml.qnode(qml.device(backend, wires=1))
     def captured_circuit():
         return qml.expval(qml.PauliZ(0))
 
-    qml.qjit(target="mlir")(captured_circuit)
+    print(captured_circuit.mlir)
 
-    # TODO assert exists in IR
+    if isinstance(options["option"], list):
+        assert 'with options = {"option" = [1 : i64, 2 : i64, 3 : i64]}' in captured_circuit.mlir
+
+    if isinstance(options["option"], dict):
+        assert 'with options = {"option" = {blah = "foo"}' in captured_circuit.mlir
 
 
 @pytest.mark.parametrize(
