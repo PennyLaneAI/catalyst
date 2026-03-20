@@ -244,6 +244,7 @@
 * The `quantum.adjoint` operation can now take in multiple quantum values, allowing
   both qubits and registers, as opposed to constraining the operand to be a single quantum register.
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
+  [(#2610)](https://github.com/PennyLaneAI/catalyst/pull/2610)
 
 * `qml.value_and_grad` can now be used with program capture `qml.qjit(capture=True)`.
   [(#2587)](https://github.com/PennyLaneAI/catalyst/pull/2587)
