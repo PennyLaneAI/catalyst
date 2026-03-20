@@ -478,44 +478,24 @@ class TestMeasurementsFromSamplesIntegration:
                 qml.expval,
                 qml.X,
                 1.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
             pytest.param(
                 partial(qml.RY, phi=-np.pi / 2),
                 qml.expval,
                 qml.X,
                 -1.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
             pytest.param(
                 partial(qml.RY, phi=np.pi / 2),
                 qml.var,
                 qml.X,
                 0.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
             pytest.param(
                 partial(qml.RY, phi=-np.pi / 2),
                 qml.var,
                 qml.X,
                 0.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
             # PauliY observables
             pytest.param(
@@ -523,44 +503,24 @@ class TestMeasurementsFromSamplesIntegration:
                 qml.expval,
                 qml.Y,
                 1.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
             pytest.param(
                 partial(qml.RX, phi=np.pi / 2),
                 qml.expval,
                 qml.Y,
                 -1.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
             pytest.param(
                 partial(qml.RX, phi=-np.pi / 2),
                 qml.var,
                 qml.Y,
                 0.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
             pytest.param(
                 partial(qml.RX, phi=np.pi / 2),
                 qml.var,
                 qml.Y,
                 0.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
         ],
     )
@@ -885,6 +845,24 @@ class TestMeasurementsFromSamplesIntegration:
 
         res = circuit()
         assert res == 1.0
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_integrate_with_diagonalize(self):
+        """Test that the measurements_from_samples pass works correctly when used in combination
+        with the diagonalize-measurements pass."""
+
+        dev = qml.device("lightning.qubit", wires=4)
+
+        @qml.qjit
+        @measurements_from_samples_pass
+        @qml.transform(pass_name="diagonalize-final-measurements")
+        @qml.qnode(dev, shots=3000)
+        def circuit(x):
+            qml.RX(x, 0)
+            return qml.expval(qml.Y(0))
+
+        res = circuit(0.768)
+        assert np.isclose(res, -np.sin(0.768), atol=0.05)
 
 
 def _counts_catalyst_to_pl(basis_states, counts):
