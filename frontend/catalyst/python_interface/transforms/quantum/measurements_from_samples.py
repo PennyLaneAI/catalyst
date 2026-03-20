@@ -551,6 +551,10 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
 
     Raises:
         CompileError: If `module` does not contain a quantum.DeviceInitOp.
+        CompileError: If the operator expected to contain shots values does not have `properties`.
+            This is the immediate issue that is observed when shots are dynamic, for instance as a
+            result of the shots SSA value originating from a block argument rather than from an
+            operation, such as an `arith.constant` op.
     """
     device_op = None
 
@@ -570,6 +574,11 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
 
     if isinstance(shots_extract_op, tensor.ExtractOp):
         shots_constant_op = shots_extract_op.operands[0].owner
+        if not hasattr(shots_constant_op, "properties"):
+            raise CompileError(
+                "Cannot get number of shots. Note that using a dynamic number of shots is not "
+                "supported with measurements-from-samples."
+            )
         shots_value_attribute: builtin.DenseIntOrFPElementsAttr = shots_constant_op.properties.get(
             "value"
         )

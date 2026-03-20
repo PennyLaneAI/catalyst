@@ -314,6 +314,10 @@
   unrolling of a `for` loop for QNodes returning `probs` has been fixed.
   [(#2611)](https://github.com/PennyLaneAI/catalyst/pull/2611)
 
+* A more informative error message is now raised when a `measurements-from-samples` xDSL pass encounters a 
+  program with dyanamic shots.
+  [#2616](https://github.com/PennyLaneAI/catalyst/pull/2616)
+  
 <h3>Breaking changes 💔</h3>
 
 * The ``-disentangle-CNOT`` and ``-disentangle-SWAP`` Catalyst CLI commands have been renamed to
