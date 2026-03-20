@@ -112,7 +112,15 @@ def lower_callable(ctx, callable_, call_jaxpr, pipelines=(), metadata=None, publ
     """
     if pipelines is None:
         pipelines = tuple()
-
+    # #breakpoint()
+    # for pipeline in pipelines:
+    #     passes = pipeline[1]
+    #     for _pass in passes:
+    #         #breakpoint()
+    #         _lowered_options(_pass)
+    #         # for key, val in _pass.kwargs.items():
+    #         #     _pass.kwargs[key] = get_mlir_attribute_from_pyval(val)
+    # #breakpoint()
     if isinstance(callable_, qml.QNode):
         return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipelines, metadata=metadata)
     return get_or_create_funcop(
@@ -136,6 +144,7 @@ def get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines, metadata=None, p
     """
     if metadata is None:
         metadata = tuple()
+    breakpoint()
     key = (callable_, *metadata, *pipelines)
     if callable_ is not None:
         if func_op := get_cached(ctx, key):
@@ -220,6 +229,8 @@ def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipelines, metadata):
         metadata = tuple()
     if callable_.static_argnums:
         return lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines)
+    breakpoint()
+    lowered_pipelines = _lowered_pipelines(pipelines)
     key = (callable_, *metadata, *pipelines)
     if func_op := get_cached(ctx, key):
         return func_op
@@ -319,14 +330,24 @@ class NestedModule:
         self.ctx.module_context = self.old_module_context
 
 
-def _lowered_options(args, kwargs):
-    lowered_options = {}
-    for arg in args:
-        lowered_options[str(arg)] = get_mlir_attribute_from_pyval(True)
-    for option, value in kwargs.items():
-        mlir_option = str(option).replace("_", "-")
-        lowered_options[mlir_option] = get_mlir_attribute_from_pyval(value)
-    return lowered_options
+def _lowered_options(_pass):
+    # print("received ", _pass)
+    # breakpoint()
+    # lowered_options = {}
+    # for key in list(_pass.kwargs.keys()):
+    #     lowered_options[key] = get_mlir_attribute_from_pyval(_pass.kwargs[key])
+    #     if "_" in key:
+    #         new_key = key.replace("_", "-")
+    #         _pass.kwargs[new_key] = _pass.kwargs.pop(key)
+    # print("updated to ", _pass)
+    breakpoint()
+    return {k.replace('_', '-'): get_mlir_attribute_from_pyval(v) for k, v in _pass.kwargs.items()}
+
+def _lowered_pipelines(pipelines):
+    lowered_pipelines = tuple()
+    for name, pipeline in pipelines:
+        lowered_pipeline = tuple()
+        breakpoint()
 
 
 def transform_module_lowering(jax_ctx: mlir.LoweringRuleContext, pipelines) -> bool:
@@ -387,11 +408,13 @@ def transform_named_sequence_lowering(pipeline, sym_name):
         target = bb_named_sequence.arguments[0]
         for _pass in pipeline:
             if isinstance(_pass, qml.transforms.core.BoundTransform):
-                options = _lowered_options(_pass.args, _pass.kwargs)
+                #options = _lowered_options(_pass.args, _pass.kwargs)
+                options = _pass.kwargs
                 name = _pass.pass_name
             else:
                 options = _pass.get_options()
                 name = _pass.name
+            #breakpoint()
             apply_registered_pass_op = ApplyRegisteredPassOp(
                 result=transform_mod_type,
                 target=target,

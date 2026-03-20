@@ -388,7 +388,7 @@ def handle_qnode(
         # with other transforms in between.
         gateset = [_get_operator_name(op) for op in self.decompose_tkwargs.get("gate_set", [])]
         setattr(qnode, "decompose_gatesets", [gateset])
-
+    #breakpoint()
     pipelines = (("main", tuple(self._pass_pipeline)),)
     if not self._skip_preprocess:
         device_preprocessing_pipeline = create_device_preprocessing_pipeline(
@@ -519,7 +519,8 @@ def handle_transform(
     # Apply the corresponding Catalyst pass counterpart
     next_eval = copy(self)
     t = qml.transform(pass_name=catalyst_pass_name)
-    bound_pass = qml.transforms.core.BoundTransform(t, args=targs, kwargs=dict(tkwargs))
+    bound_pass = qml.transforms.core.BoundTransform(t, args=targs, kwargs=pl_tkwargs)
+    #breakpoint()
     next_eval._pass_pipeline.insert(0, bound_pass)
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
