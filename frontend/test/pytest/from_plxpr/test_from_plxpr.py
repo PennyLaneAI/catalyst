@@ -49,6 +49,7 @@ def catalyst_execute_jaxpr(jaxpr):
 
             result_treedef = jax.tree_util.tree_structure((0,) * len(jaxpr.out_avals))
             arg_signature = catalyst.tracing.type_signatures.get_abstract_signature(args)
+
             return jaxpr, None, result_treedef, arg_signature
 
     return JAXPRRunner(fn=lambda: None, compile_options=catalyst.CompileOptions())
@@ -196,6 +197,7 @@ class TestCatalystCompareJaxpr:
         plxpr = jax.make_jaxpr(circuit)(x)
         converted = from_plxpr(plxpr)(x)
         qml.capture.disable()
+
         catalyst_res = catalyst_execute_jaxpr(converted)(x)
         assert len(catalyst_res) == 1
         assert qml.math.allclose(catalyst_res[0], -1)
