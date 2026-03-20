@@ -88,7 +88,7 @@ measurements_from_samples_pass = compiler_transform(MeasurementsFromSamplesPass)
 
 
 class AddPostProcessingPattern(RewritePattern):
-    """RewritePattern for making each Qnode intro a classical function that 
+    """RewritePattern for making each Qnode intro a classical function that
     calls the QNode and performs post-processing."""
 
     def __init__(self, pass_str: str):
@@ -99,32 +99,28 @@ class AddPostProcessingPattern(RewritePattern):
         self, func_op: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter, /
     ):
         """Transform a quantum node (qnode) to separate it into a quantum node
-        and an outer function that calls the quantum node. Subsequent patterns can the apply 
-        postprocessing to the results of the call in the outer function when changes are made 
+        and an outer function that calls the quantum node. Subsequent patterns can the apply
+        postprocessing to the results of the call in the outer function when changes are made
         to the quantum node.
 
-        The name of the quantum node is changed to original_name.pass_str, and the new outer 
+        The name of the quantum node is changed to original_name.pass_str, and the new outer
         postprocessing function is given the original name.
         """
 
         if "quantum.node" not in func_op.attributes:
             return
-        
+
         # get names of the postprocessing and quantum_node functions
         outer_fn_name = func_op.sym_name.data
         qnode_name = outer_fn_name + f".{self._pass_str}"
-        
+
         # update quantum_node name to include pass string
         func_op.sym_name = builtin.StringAttr(qnode_name)
         rewriter.notify_op_modified(func_op)
 
         # create the outer (postprocessing) fn with the original node name
         func_type = func_op.function_type
-        outer_fn = func.FuncOp(
-            name=outer_fn_name, 
-            function_type=func_type, 
-            visibility="public"
-        )
+        outer_fn = func.FuncOp(name=outer_fn_name, function_type=func_type, visibility="public")
         rewriter.insert_op(outer_fn, InsertPoint.before(func_op))
 
         # call the renamed quantum_node inside the new outer FuncOp
@@ -170,15 +166,17 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             )
 
         return op
-    
+
     def _get_call_op(self, qnode):
         module = self._get_parent_module(qnode)
         qnode_name = qnode.sym_name.data
         all_call_ops = [op for op in module.body.walk() if isinstance(op, func.CallOp)]
         qnode_call_op = [op for op in all_call_ops if qnode_name in op.callee.string_value()]
-        if not len(qnode_call_op)==1:
-            raise CompileError(f"Expected only one call_op for {qnode_name}, but recieved {qnode_call_op}")
-        
+        if not len(qnode_call_op) == 1:
+            raise CompileError(
+                f"Expected only one call_op for {qnode_name}, but recieved {qnode_call_op}"
+            )
+
         return qnode_call_op[0]
 
     @classmethod
@@ -447,20 +445,20 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         return n_qubits
 
     def update_returns(self, mp_index, sample_op, postprocessing_func_call_op, rewriter):
-        """Update the return structure so that the qnode returns the output of sample 
-        instead of the original output, and the outer function returns the output of 
+        """Update the return structure so that the qnode returns the output of sample
+        instead of the original output, and the outer function returns the output of
         post-processing instead of directly returning the output of calling the qnode.
 
-        Also update result shapes in the CallOp for the Qnode call to reflect this change, 
+        Also update result shapes in the CallOp for the Qnode call to reflect this change,
         since this is not updated when modifying the ReturnOps.
 
         This function updates the self.qnode and self.call_op attributes on the Pattern.
 
         Args:
-            mp_index (int): The index of the measurement process to be updated. The 
+            mp_index (int): The index of the measurement process to be updated. The
                 relevant function returns will be updated at this index.
             sample_op (quantum.SampleOp): The operation whose results the Qnode should return.
-            postprocessing_func_call_op (func.CallOp): The postprocessing CallOp whose results 
+            postprocessing_func_call_op (func.CallOp): The postprocessing CallOp whose results
                 the outer function should return.
             rewriter (PatternRewriter): The xDSL pattern rewriter.
         """
@@ -470,7 +468,11 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         rewriter.notify_op_modified(return_op)
 
         # update the outer function return to return postprocessed data instead of the raw data
-        final_return = [use.operation for use in list(self.call_op.results[mp_index].uses) if isinstance(use.operation, func.ReturnOp)][0]
+        final_return = [
+            use.operation
+            for use in list(self.call_op.results[mp_index].uses)
+            if isinstance(use.operation, func.ReturnOp)
+        ][0]
         final_return.operands[mp_index] = postprocessing_func_call_op.results[0]
         rewriter.notify_op_modified(final_return)
 
@@ -491,19 +493,21 @@ class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
     """
 
     @pattern_rewriter.op_type_rewrite_pattern
-    def match_and_rewrite(
-        self, func_op: func.FuncOp, rewriter: PatternRewriter, /
-    ):
+    def match_and_rewrite(self, func_op: func.FuncOp, rewriter: PatternRewriter, /):
         """Match and rewrite for quantum.ExpvalOp."""
 
         if "quantum.node" not in func_op.attributes:
             return
-        
+
         self._shots = get_shots(func_op)
         self.qnode = func_op
         self.call_op = self._get_call_op(func_op)
 
-        measurement_processes = [op for op in self.qnode.body.walk() if isinstance(op, (quantum.VarianceOp, quantum.ExpvalOp))]
+        measurement_processes = [
+            op
+            for op in self.qnode.body.walk()
+            if isinstance(op, (quantum.VarianceOp, quantum.ExpvalOp))
+        ]
 
         for matched_op in measurement_processes:
 
@@ -557,9 +561,11 @@ class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
                 arguments=[self.call_op.results[mp_index]],
                 return_types=[builtin.TensorType(builtin.Float64Type(), shape=())],
             )
-            rewriter.insert_op(postprocessing_func_call_op, insertion_point=InsertPoint.after(self.call_op))
+            rewriter.insert_op(
+                postprocessing_func_call_op, insertion_point=InsertPoint.after(self.call_op)
+            )
 
-            # update the returns of the QNode (to return the raw samples) and the 
+            # update the returns of the QNode (to return the raw samples) and the
             # outer function (to return the post-processed values)
             self.update_returns(mp_index, sample_op, postprocessing_func_call_op, rewriter)
 
@@ -583,7 +589,7 @@ class ProbsPattern(MeasurementsFromSamplesPattern):
 
         if "quantum.node" not in func_op.attributes:
             return
-        
+
         self._shots = get_shots(func_op)
         self.qnode = func_op
         self.call_op = self._get_call_op(func_op)
@@ -643,14 +649,17 @@ class ProbsPattern(MeasurementsFromSamplesPattern):
                 arguments=[self.call_op.results[result_index]],
                 return_types=[builtin.TensorType(builtin.Float64Type(), shape=(2**n_qubits,))],
             )
-            rewriter.insert_op(postprocessing_func_call_op, insertion_point=InsertPoint.after(self.call_op))
+            rewriter.insert_op(
+                postprocessing_func_call_op, insertion_point=InsertPoint.after(self.call_op)
+            )
 
-            # update the returns of the QNode (to return raw samples) and the 
+            # update the returns of the QNode (to return raw samples) and the
             # outer function (to return post-processed values)
             self.update_returns(result_index, sample_op, postprocessing_func_call_op, rewriter)
 
             # delete now ununsed probs_op
             rewriter.erase_op(probs_op)
+
 
 class CountsPattern(MeasurementsFromSamplesPattern):
     """A rewrite pattern for the ``measurements_from_samples`` transform that matches and rewrites
@@ -669,6 +678,7 @@ class CountsPattern(MeasurementsFromSamplesPattern):
         """Match and rewrite for quantum.CountsOp."""
         raise NotImplementedError("qml.counts() operations are not supported.")
 
+
 class StatePattern(MeasurementsFromSamplesPattern):
     """A rewrite pattern for the ``measurements_from_samples`` transform that matches and rewrites
     ``qml.state()`` operations.
@@ -686,20 +696,22 @@ class StatePattern(MeasurementsFromSamplesPattern):
         """Match and rewrite for quantum.StateOp."""
         raise NotImplementedError("qml.state() operations are not supported.")
 
+
 def get_shots(quantum_node):
-        shots = _get_static_shots_value_from_device_op(quantum_node)
-        assert isinstance(
-            shots, int
-        ), f"Expected `shots` to be an integer value but got {type(shots).__name__}"
-        if shots == 0:
-            raise ValueError("The measurements_from_samples pass requires non-zero shots")
-        return shots
+    shots = _get_static_shots_value_from_device_op(quantum_node)
+    assert isinstance(
+        shots, int
+    ), f"Expected `shots` to be an integer value but got {type(shots).__name__}"
+    if shots == 0:
+        raise ValueError("The measurements_from_samples pass requires non-zero shots")
+    return shots
+
 
 def _get_static_shots_value_from_device_op(quantum_node: builtin.ModuleOp) -> int:
     """Returns the number of shots as a static (i.e. known at compile time) integer value from the
     device-initialization op (quantum.DeviceInitOp) found in a `FuncOp`.
 
-    This function is meant to act on a FuncOp with the `quantum.node` attribute, which should only 
+    This function is meant to act on a FuncOp with the `quantum.node` attribute, which should only
     contain a single quantum.DeviceInitOp op.
 
     This function expects the number of shots to be an SSA value given as an operand to the
@@ -714,7 +726,7 @@ def _get_static_shots_value_from_device_op(quantum_node: builtin.ModuleOp) -> in
 
     Raises:
         CompileError: If `quantum_node` does not contain a quantum.DeviceInitOp.
-        CompileError: If the operator expected to contain shots values does not have `properties`. 
+        CompileError: If the operator expected to contain shots values does not have `properties`.
             This is the immediate issue that is observed when shots are dynamic.
     """
     device_op = None
@@ -737,7 +749,8 @@ def _get_static_shots_value_from_device_op(quantum_node: builtin.ModuleOp) -> in
         shots_constant_op = shots_extract_op.operands[0].owner
         if not hasattr(shots_constant_op, "properties"):
             raise CompileError(
-                "Cannot get concrete number of shots. Note that using a dynamic number of shots is not supported with measurements-from-samples; ensure shots are set to a concrete value.")
+                "Cannot get concrete number of shots. Note that using a dynamic number of shots is not supported with measurements-from-samples; ensure shots are set to a concrete value."
+            )
         shots_value_attribute: builtin.DenseIntOrFPElementsAttr = shots_constant_op.properties.get(
             "value"
         )
@@ -753,7 +766,8 @@ def _get_static_shots_value_from_device_op(quantum_node: builtin.ModuleOp) -> in
     if isinstance(shots_extract_op, arith.ConstantOp):
         if not hasattr(shots_extract_op, "properties"):
             raise CompileError(
-                "Cannot get concrete number of shots. Note that using a dynamic number of shots is not supported with measurements-from-samples; ensure shots are set to a concrete value.")
+                "Cannot get concrete number of shots. Note that using a dynamic number of shots is not supported with measurements-from-samples; ensure shots are set to a concrete value."
+            )
         shots_value_attribute: builtin.IntAttr = shots_extract_op.properties.get("value")
         return shots_value_attribute.value.data
 
