@@ -313,7 +313,7 @@ class TestMeasurementsFromSamplesIntegration:
         ],
     )
     # pylint: disable=too-many-arguments,too-many-positional-arguments
-    def test_exec_1_wire_mp_with_obs(self, shots, initial_op, mp, obs, expected_res):
+    def test_exec_1_wire_mp_with_obs(self, shots, initial_op, mp, obs, expected_res, run_filecheck_qjit):
         """Test the measurements_from_samples transform on a device with a single wire and terminal
         measurements that require an observable (i.e. expval and var).
         """
@@ -323,12 +323,18 @@ class TestMeasurementsFromSamplesIntegration:
         @qml.qnode(dev, shots=shots)
         def circuit_ref():
             initial_op(wires=0)
+            # CHECK-NOT: quantum.namedobs
+            # CHECK-NOT: quantum.var
+            # CHECK-NOT: quantum.expval
+            # CHECK: quantum.sample
             return mp(obs(wires=0))
 
         assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
         circuit_compiled = qml.qjit(
             measurements_from_samples_pass(circuit_ref),
         )
+
+        run_filecheck_qjit(circuit_compiled)
 
         assert expected_res == circuit_compiled()
 
