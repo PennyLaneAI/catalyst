@@ -792,7 +792,7 @@ class TestAssemblyFormat:
 
         //////////// **AdjointOp and YieldOp tests** ////////////
         // CHECK:      quantum.adjoint([[QREG]], [[QUBIT]]) : !quantum.reg, !quantum.bit {
-        // CHECK-NEXT: ^bb0([[ARG_QREG:%.+]] : !quantum.reg, [[ARG_QUBIT:%.+]] : !quantum.bit):
+        // CHECK-NEXT: ^bb0([[ARG_QREG:%.+]]: !quantum.reg, [[ARG_QUBIT:%.+]]: !quantum.bit):
         // CHECK-NEXT:   quantum.yield [[ARG_QREG]], [[ARG_QUBIT]] : !quantum.reg, !quantum.bit
         // CHECK-NEXT: }
         %qreg1, %qubit1 = quantum.adjoint(%qreg, %qubit) : !quantum.reg, !quantum.bit {

@@ -322,7 +322,7 @@ class TestParitySynthPass:
         """Test that a phase polynomial of two CNOTs separated by a rotation on the control
         is reduced when there are operations with regions (such as control flow)."""
         program = """
-            // CHECK: func.func @test_func([[ARG0:%.+]] : f64
+            // CHECK: func.func @test_func([[ARG0:%.+]]: f64
             func.func @test_func(%arg0: f64) {
                 %0 = INIT_QUBIT
                 %1 = INIT_QUBIT
@@ -614,7 +614,7 @@ class TestParitySynthIntegration:
         @qml.qnode(dev)
         def circuit(x: float):
             # Phase tensor
-            # CHECK: func.func public @circuit([[FLOAT_ARG:%.+]] : tensor<f64>)
+            # CHECK: func.func public @circuit([[FLOAT_ARG:%.+]]: tensor<f64>)
 
             # Qubit extraction for wire 0
             # CHECK: [[ZERO:%.+]] = stablehlo.constant dense<0> : tensor<i64>
