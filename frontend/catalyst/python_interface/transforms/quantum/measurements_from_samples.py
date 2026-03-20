@@ -590,11 +590,6 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
         return shots_int_values[0]
 
     if isinstance(shots_extract_op, arith.ConstantOp):
-        if not hasattr(shots_extract_op, "properties"):
-            raise CompileError(
-                "Cannot get number of shots. Note that using a dynamic number of shots is not "
-                "supported with measurements-from-samples."
-            )
         shots_value_attribute: builtin.IntAttr = shots_extract_op.properties.get("value")
         return shots_value_attribute.value.data
 
