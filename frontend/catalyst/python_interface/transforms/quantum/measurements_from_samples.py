@@ -18,9 +18,6 @@ written using xDSL.
 Known Limitations
 -----------------
 
-  * Only measurements in the computational basis (or where the observable is a Pauli Z op) are
-    currently supported; for arbitrary observables we require an equivalent compilation pass of the
-    diagonalize_measurements transform.
   * The compilation pass assumes a static number of shots.
   * Usage patterns that are not yet supported with program capture are also not supported in the
     compilation pass. For example, operator arithmetic is not currently supported, such as
@@ -47,6 +44,10 @@ from catalyst.python_interface.conversion import xdsl_module
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.pass_api import compiler_transform
 
+from catalyst.python_interface.transforms.quantum.diagonalize_measurements import (
+    DiagonalizeFinalMeasurementsPass,
+)
+
 
 @dataclass(frozen=True)
 class MeasurementsFromSamplesPass(passes.ModulePass):
@@ -60,6 +61,9 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the measurements-from-samples pass."""
         shots = _get_static_shots_value_from_first_device_op(op)
+
+        # diagonalize measurements before converting to samples
+        DiagonalizeFinalMeasurementsPass().apply(_ctx, op)
 
         greedy_applier = pattern_rewriter.GreedyRewritePatternApplier(
             [
