@@ -44,33 +44,9 @@ struct CombineGlobalPhasesPass : impl::CombineGlobalPhasesPassBase<CombineGlobal
             auto phases = block->getOps<GlobalPhaseOp>();
             auto simplePhases = llvm::make_filter_range(
                 phases, [](GlobalPhaseOp phaseOp) { return phaseOp.getInCtrlQubits().empty(); });
-            if (simplePhases.empty() || std::next(simplePhases.begin()) == simplePhases.end()) {
-                return WalkResult::advance();
-            }
-
-            GlobalPhaseOp lastPhase = *std::prev(simplePhases.end());
-            auto remainingPhases = llvm::drop_end(simplePhases);
-
-            builder.setInsertionPoint(lastPhase);
-            Value runningSum = lastPhase.getAngle();
-            if (lastPhase.getAdjoint()) {
-                runningSum = arith::NegFOp::create(builder, lastPhase->getLoc(), runningSum);
-                lastPhase.setAdjoint(false);
-            }
-
-            for (GlobalPhaseOp phaseOp : llvm::make_early_inc_range(remainingPhases)) {
-                llvm::SmallVector<Value, 2> args{runningSum, phaseOp.getAngle()};
-                if (phaseOp.getAdjoint()) {
-                    runningSum = arith::SubFOp::create(builder, phaseOp.getLoc(), args);
-                }
-                else {
-                    runningSum = arith::AddFOp::create(builder, phaseOp.getLoc(), args);
-                }
+            for (GlobalPhaseOp phaseOp : llvm::make_early_inc_range(simplePhases)) {
                 phaseOp->erase();
             }
-            lastPhase.getAngleMutable().assign(runningSum);
-
-            return WalkResult::advance();
         });
     }
 };
