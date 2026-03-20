@@ -24,6 +24,7 @@ from jaxlib.mlir.dialects.builtin import ModuleOp
 from jaxlib.mlir.dialects.func import CallOp
 from mlir_quantum.dialects._transform_ops_gen import ApplyRegisteredPassOp, NamedSequenceOp, YieldOp
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
+from pennylane.transforms.core import BoundTransform
 
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
@@ -119,14 +120,21 @@ def lower_callable(ctx, callable_, call_jaxpr, pipelines=(), metadata=None, publ
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
-def get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines, metadata=None, public=False):
+def get_or_create_funcop(
+    ctx,
+    callable_,
+    call_jaxpr,
+    pipelines: tuple[tuple[str, BoundTransform], ...],
+    metadata=None,
+    public=False,
+):
     """Get funcOp from cache, or create it from scratch
 
     Args:
         ctx: LoweringRuleContext
         callable_: python function
         call_jaxpr: jaxpr representing callable_
-        pipelines: list of pipelines to be applied to the funcop
+        pipelines (tuple[tuple[str, BoundTransform], ...]): pipelines to be applied to the funcop
         metadata: additional metadata to distinguish different FuncOps
         public: whether the visibility should be marked public
 
