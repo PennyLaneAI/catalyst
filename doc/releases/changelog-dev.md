@@ -501,6 +501,9 @@
   to inner PPM ops.
   [(#2511)](https://github.com/PennyLaneAI/catalyst/pull/2511)
 
+* A :class:`~.QJIT`'s ``compile`` method can now be used to run MLIR compilation without having
+  to generate LLVM IR and object code. Use with ``CompileOptions(lower_to_llvm=False, link=False)``.
+  [(#2599)](https://github.com/PennyLaneAI/catalyst/pull/2599)
 
 * Update `mlir_specs` to account for new `marker` functionality in PennyLane.
   [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)

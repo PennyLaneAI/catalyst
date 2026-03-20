@@ -29,7 +29,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import qjit
+from catalyst import QJIT, qjit
 from catalyst.compiler import CompileOptions, Compiler, LinkerDriver, _options_to_cli_flags
 from catalyst.debug import instrumentation
 from catalyst.pipelines import KeepIntermediateLevel
@@ -269,6 +269,32 @@ class TestCompilerState:
         assert f.mlir is None
         assert f.llvmir is None
         assert f.compiled_function is None
+
+    def test_mlir_only_qjit_compile(self):
+        """Test that QJIT compilation succeeds without LLVM lowering (or linking)."""
+
+        def f(x):
+            return x + 1.0
+
+        test_pipes = [("test_pipe", ["canonicalize"])]
+        options = CompileOptions(lower_to_llvm=False, link=False, pipelines=test_pipes)
+        compiled = QJIT(f, options)
+
+        compiled.workspace = compiled._get_workspace()  # pylint: disable=protected-access
+        compiled.jaxpr, *_ = compiled.capture((0.5,))
+        compiled.mlir_module = compiled.generate_ir()
+        compiled.compile()
+
+        assert compiled.jaxpr is not None
+        assert compiled.mlir is not None
+        assert compiled.mlir_opt is not None
+
+        assert compiled.llvm_ir is None
+        assert compiled.compiled_function is None
+
+        # since these are not advertised options, an assertion should be okay
+        with pytest.raises(AssertionError, match="invalid options for jit_compile"):
+            compiled(0.5)
 
     def test_callable_without_name(self):
         """Test that a callable without __name__ property can be compiled, if it is otherwise
