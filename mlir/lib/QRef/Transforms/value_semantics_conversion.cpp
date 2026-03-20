@@ -20,6 +20,7 @@
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/TypeRange.h"
@@ -509,122 +510,100 @@ void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValu
     });
 }
 
-/**
- * @brief Hoist all rQubit Values in `rValuesUsedByRegion` from qref.get operations that alias each
- * other before the `insertionPoint` operation. The aliasing qref.get op results in
- * `rValuesUsedByRegion` are replaced by the newly created qref.get op.
- *
- * This function is used to hoist qref.get operations on neighboring scopes that do not parent each
- * other, for example the "then" and "else" regions of an scf.if op, or the "condition" and "do"
- * regions of an scf.while op.
- *
- * @param builder
- * @param rValuesUsedByRegion
- * @param insertionPoint
- */
-void hoistAliasingGetOps(IRRewriter &builder, SetVector<Value> &rValuesUsedByRegion,
-                         Operation *insertionPoint)
+Operation *getLaterOp(Value v1, Value v2, DominanceInfo &domInfo)
 {
-    OpBuilder::InsertionGuard guard(builder);
+    // Get the defining points (op or block arg)
+    auto getDefPoint = [](Value v) -> Operation * {
+        if (auto *op = v.getDefiningOp()) {
+            return op;
+        }
+        // For block arguments, the first op in the block is the "start of life"
+        return &v.getParentBlock()->front();
+    };
 
-    llvm::DenseMap<Value, Value> replacementMap;
+    Operation *op1 = getDefPoint(v1);
+    Operation *op2 = getDefPoint(v2);
 
+    // If they are in the same block, just check directly
+    if (op1->getBlock() == op2->getBlock()) {
+        return op1->isBeforeInBlock(op2) ? op2 : op1;
+    }
+
+    // If op1 dominates op2, then op2 is defined "later"
+    if (domInfo.properlyDominates(op1, op2)) {
+        return op2;
+    }
+
+    // If op2 dominates op1, then op1 is "later".
+    if (domInfo.properlyDominates(op2, op1)) {
+        return op1;
+    }
+
+    assert(false && "On a qref.get op with a dynamic index, the qreg SSA value and the index SSA "
+                    "value must be simultaneously visible");
+    return nullptr;
+}
+
+/**
+ * @brief Replace all uses of equivalent qref.get operations with a newly created equivalent one
+ * immediately after the allocation of the register. If the index is dynamic, the insertion point
+ * of the new qref.get op is immediately after the later of the alloc op and the dynamic index op's
+ * defining op.
+ *
+ * @param func
+ */
+void squashAliasingGetOps(IRRewriter &builder, func::FuncOp func)
+{
     // 1. Place the aliasing qref.get ops into groups
-    SmallVector<SmallVector<Value>> equivalenceGroups;
+    SmallVector<SmallVector<qref::GetOp>> equivalenceGroups;
 
-    for (Value val : rValuesUsedByRegion) {
-        Operation *defOp = val.getDefiningOp();
-        if (!defOp || !isa<qref::GetOp>(defOp)) {
-            continue;
-        }
-
-        Value dynamicGetIdx = cast<qref::GetOp>(defOp).getIdx();
-        if (dynamicGetIdx &&
-            insertionPoint->getParentRegion()->isProperAncestor(dynamicGetIdx.getParentRegion())) {
-            // A get op with an index Value defined in an inner region, don't hoist
-            continue;
-        }
-
+    func->walk<WalkOrder::PreOrder>([&](qref::GetOp getOp) {
         bool placedInGroup = false;
         for (auto &group : equivalenceGroups) {
             // Compare against the 'leader' of the group
-            if (OperationEquivalence::isEquivalentTo(defOp, group[0].getDefiningOp(),
+            if (OperationEquivalence::isEquivalentTo(getOp, group[0],
                                                      OperationEquivalence::IgnoreLocations)) {
-                group.push_back(val);
+                group.push_back(getOp);
                 placedInGroup = true;
                 break;
             }
         }
 
         if (!placedInGroup) {
-            equivalenceGroups.push_back({val});
+            equivalenceGroups.push_back({getOp});
         }
-    }
+    });
 
     // 2. For each group, create one new Op and replace all
+    mlir::DominanceInfo domInfo;
     for (auto &group : equivalenceGroups) {
-        auto groupRepresentative = cast<qref::GetOp>(group[0].getDefiningOp());
-        builder.setInsertionPoint(insertionPoint);
+        qref::GetOp groupRepresentative = group[0];
+        Operation *insertionPoint;
+
+        Value dynamicGetIdx = groupRepresentative.getIdx();
+        Value qreg = groupRepresentative.getQreg();
+        if (dynamicGetIdx) {
+            insertionPoint = getLaterOp(qreg, dynamicGetIdx, domInfo);
+        }
+        else {
+            if (qreg.getDefiningOp()) {
+                insertionPoint = qreg.getDefiningOp();
+            }
+            else {
+                insertionPoint = &qreg.getParentBlock()->front();
+            }
+        }
+        builder.setInsertionPointAfter(insertionPoint);
 
         auto newGetOp = qref::GetOp::create(
             builder, groupRepresentative.getLoc(),
             qref::QubitType::get(groupRepresentative->getContext()), groupRepresentative.getQreg(),
             groupRepresentative.getIdx(), groupRepresentative.getIdxAttrAttr());
 
-        for (Value oldVal : group) {
-            oldVal.replaceAllUsesWith(newGetOp.getResult());
-            replacementMap[oldVal] = newGetOp.getResult();
+        for (qref::GetOp oldGetOp : group) {
+            builder.replaceAllOpUsesWith(oldGetOp, newGetOp);
+            builder.eraseOp(oldGetOp);
         }
-    }
-
-    // 3. Replace occurrences in the rValuesUsedByRegion input
-    SetVector<Value> newRValuesUsedByRegion;
-    for (Value v : rValuesUsedByRegion) {
-        if (replacementMap.count(v)) {
-            newRValuesUsedByRegion.insert(replacementMap[v]);
-        }
-        else {
-            newRValuesUsedByRegion.insert(v);
-        }
-    }
-    rValuesUsedByRegion = std::move(newRValuesUsedByRegion);
-
-    for (auto &pair : replacementMap) {
-        Operation *oldOp = pair.first.getDefiningOp();
-        oldOp->erase();
-    }
-}
-
-/**
- * @brief Replace all uses of qref.get operations in inner scopes with an aliasing one from an
- * outer scope, if one exists.
- *
- * @param func
- */
-void squashAliasingGetOps(func::FuncOp func)
-{
-    SmallVector<qref::GetOp> uniqueGetOps;
-    SmallVector<qref::GetOp> aliasingGetOps;
-
-    func->walk<WalkOrder::PreOrder>([&](qref::GetOp getOp) {
-        for (auto visited : uniqueGetOps) {
-            bool equivalent = OperationEquivalence::isEquivalentTo(
-                getOp, visited, OperationEquivalence::IgnoreLocations);
-            bool visibleViaClosure = visited.getQubit().getParentRegion()->isAncestor(
-                getOp.getQubit().getParentRegion());
-
-            if (equivalent && visibleViaClosure) {
-                getOp.getQubit().replaceAllUsesWith(visited.getQubit());
-                aliasingGetOps.push_back(getOp);
-                return WalkResult::advance();
-            }
-        }
-        uniqueGetOps.push_back(getOp);
-        return WalkResult::advance();
-    });
-
-    for (auto getOp : aliasingGetOps) {
-        getOp.erase();
     }
 }
 
@@ -655,7 +634,7 @@ DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumGate r
  * This is necessary since qref operations do not return quantum values.
  *
  * @param r
- * @param trackervoid squashAliasingGetOps(func::FuncOp func);
+ * @param tracker
  * @return Operation*
  */
 Operation *addRootVValuesToRetOp(Region &r, QubitValueTracker &tracker)
@@ -675,6 +654,9 @@ Operation *addRootVValuesToRetOp(Region &r, QubitValueTracker &tracker)
         else {
             retOp = whileOp.getYieldOp();
         }
+    }
+    else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(r.getParentOp())) {
+        retOp = adjointOp.getRegion().front().getTerminator();
     }
     else {
         assert(false && "Unexpected region!");
@@ -955,6 +937,89 @@ void handleHermitian(IRRewriter &builder, qref::HermitianOp rHermitianOp,
     builder.replaceOp(rHermitianOp, vHermitianOp);
 }
 
+void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTracker &tracker)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(rAdjointOp);
+    Location loc = rAdjointOp->getLoc();
+
+    SetVector<Value> rValuesUsedByRegion;
+    getNecessaryRegionRValues(rAdjointOp.getRegion(), rValuesUsedByRegion);
+
+    if (rValuesUsedByRegion.size() == 0) {
+        return;
+    }
+
+    quantum::AdjointOp vAdjointOp;
+    {
+        // 1. Send in the vValues from above as arguments
+        // This handles the flow from outside the vAdjointOp into the vAdjointOp
+        // i.e. the extract op results are sent in as operands to the vAdjointOp
+        SmallVector<Value> regionOperands;
+        regionOperands.append(rValuesUsedByRegion.begin(), rValuesUsedByRegion.end());
+        TransientQubitExtractor extractor(rAdjointOp, regionOperands, tracker, builder);
+        SmallVector<Value> vAdjointOperands;
+
+        for (Value rValue : rValuesUsedByRegion) {
+            if (isa<qref::QubitType>(rValue.getType()) && tracker.isRootRQubit(rValue)) {
+                vAdjointOperands.push_back(tracker.getCurrentVQubit(rValue));
+            }
+            else if (isa<qref::QuregType>(rValue.getType())) {
+                vAdjointOperands.push_back(tracker.getCurrentVQreg(rValue));
+            }
+            else {
+                // To be replaced with extracted vQubits
+                vAdjointOperands.push_back(rValue);
+            }
+        }
+        for (auto [vQubit, idx] : llvm::zip_equal(extractor.getExtractedVQubits(),
+                                                  extractor.getNonRootQubitOperandIndices())) {
+            vAdjointOperands[idx] = vQubit;
+        }
+
+        vAdjointOp =
+            quantum::AdjointOp::create(builder, loc, TypeRange(vAdjointOperands), vAdjointOperands);
+
+        // 2. Move operations from old body to new body
+        // The vAdjointOp has !quantum.bit/reg as input types now on the region's block
+        // We need to overwrite it with the block from the old rAdjointOp, so it can
+        // see !qref.bit/reg types on the block
+        // builder.eraseBlock(vAdjointOp.getBody());
+        builder.inlineRegionBefore(rAdjointOp.getRegion(), vAdjointOp.getRegion(),
+                                   vAdjointOp.getRegion().end());
+        builder.setInsertionPointToEnd(&vAdjointOp.getRegion().front());
+        quantum::YieldOp::create(builder, loc, {});
+
+        // 3. Massage the "subroutine region block" of the new vAdjointOp to take in all closure
+        // Values as args, so we can handle the region as a standalone subroutine The block moved
+        // over from the old rAdjointOp will not have any quantum arguments yet, neither !qref nor
+        // !quantum.
+        for (auto rValue : rValuesUsedByRegion) {
+            Value newArg = vAdjointOp.getRegion().front().addArgument(rValue.getType(), loc);
+            builder.replaceUsesWithIf(rValue, newArg, [&](OpOperand &use) {
+                return vAdjointOp.getRegion().isAncestor(use.getOwner()->getParentRegion());
+            });
+        }
+
+        handleRegion(builder, vAdjointOp.getRegion());
+
+        // Update tracker with results
+        for (auto [i, j] :
+             llvm::zip_equal(extractor.getQRegOperandIndices(), extractor.getQRegResultIndices())) {
+            tracker.setCurrentVQreg(rValuesUsedByRegion[i], vAdjointOp->getResult(j));
+        }
+
+        for (auto [i, j] : llvm::zip_equal(extractor.getRootQubitOperandIndices(),
+                                           extractor.getRootQubitResultIndices())) {
+            tracker.setCurrentVQubit(rValuesUsedByRegion[i], vAdjointOp->getResult(j));
+        }
+
+        extractor.setVOp(vAdjointOp);
+    }
+
+    builder.eraseOp(rAdjointOp);
+}
+
 void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
 {
     OpBuilder::InsertionGuard guard(builder);
@@ -968,7 +1033,6 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
     if (hasElseRegion) {
         getNecessaryRegionRValues(ifOp.getElseRegion(), rValuesUsedByRegion);
     }
-    hoistAliasingGetOps(builder, rValuesUsedByRegion, ifOp);
 
     if (rValuesUsedByRegion.size() == 0) {
         return;
@@ -1120,7 +1184,6 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
         getNecessaryRegionRValues(r, rValuesUsedByRegion);
     }
     getNecessaryRegionRValues(switchOp.getDefaultRegion(), rValuesUsedByRegion);
-    hoistAliasingGetOps(builder, rValuesUsedByRegion, switchOp);
 
     if (rValuesUsedByRegion.size() == 0) {
         return;
@@ -1337,7 +1400,6 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
     SetVector<Value> rValuesUsedByRegion;
     getNecessaryRegionRValues(whileOp.getBefore(), rValuesUsedByRegion);
     getNecessaryRegionRValues(whileOp.getAfter(), rValuesUsedByRegion);
-    hoistAliasingGetOps(builder, rValuesUsedByRegion, whileOp);
 
     if (rValuesUsedByRegion.size() == 0) {
         return;
@@ -1468,6 +1530,9 @@ void walkRegionAndHandle(IRRewriter &builder, Region &r, QubitValueTracker &trac
         else if (auto rMeasureOp = dyn_cast<qref::MeasureOp>(op)) {
             handleMeasure(builder, rMeasureOp, tracker);
         }
+        else if (auto adjointOp = dyn_cast<qref::AdjointOp>(op)) {
+            handleAdjoint(builder, adjointOp, tracker);
+        }
         else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
             handleIf(builder, ifOp, tracker);
         }
@@ -1580,7 +1645,7 @@ struct ValueSemanticsConversionPass
         });
 
         for (auto targetFunc : targetFuncs) {
-            ReferenceToValueSemanticsConversion::squashAliasingGetOps(targetFunc);
+            ReferenceToValueSemanticsConversion::squashAliasingGetOps(builder, targetFunc);
             ReferenceToValueSemanticsConversion::handleRegion(builder, targetFunc.getBody());
 
             // Clean up: erase remaining qref dialect ops

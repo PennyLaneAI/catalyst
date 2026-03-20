@@ -39,9 +39,7 @@ struct TransientQubitExtractor;
 // Misc helper functions
 Value getRSourceRegisterValue(Value rQubit);
 void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValues);
-void hoistAliasingGetOps(IRRewriter &builder, SetVector<Value> &rValuesUsedByRegion,
-                         Operation *insertionPoint);
-void squashAliasingGetOps(func::FuncOp func);
+void squashAliasingGetOps(IRRewriter &builder, func::FuncOp func);
 DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumGate rGateOp);
 Operation *addRootVValuesToRetOp(Region &r, QubitValueTracker &tracker);
 
@@ -65,6 +63,7 @@ void handleCompbasis(IRRewriter &builder, qref::ComputationalBasisOp rCompbasisO
 void handleNamedObs(IRRewriter &builder, qref::NamedObsOp rNamedObsOp, QubitValueTracker &tracker);
 void handleHermitian(IRRewriter &builder, qref::HermitianOp rHermitianOp,
                      QubitValueTracker &tracker);
+void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTracker &tracker);
 void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker);
 void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker);
 void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker);
