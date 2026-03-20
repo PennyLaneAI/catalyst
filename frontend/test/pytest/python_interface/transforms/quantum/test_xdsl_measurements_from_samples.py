@@ -497,44 +497,24 @@ class TestMeasurementsFromSamplesIntegration:
                 qml.expval,
                 qml.X,
                 1.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
             pytest.param(
                 partial(qml.RY, phi=-np.pi / 2),
                 qml.expval,
                 qml.X,
                 -1.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
             pytest.param(
                 partial(qml.RY, phi=np.pi / 2),
                 qml.var,
                 qml.X,
                 0.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
             pytest.param(
                 partial(qml.RY, phi=-np.pi / 2),
                 qml.var,
                 qml.X,
                 0.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
             # PauliY observables
             pytest.param(
@@ -542,44 +522,24 @@ class TestMeasurementsFromSamplesIntegration:
                 qml.expval,
                 qml.Y,
                 1.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
             pytest.param(
                 partial(qml.RX, phi=np.pi / 2),
                 qml.expval,
                 qml.Y,
                 -1.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
             pytest.param(
                 partial(qml.RX, phi=-np.pi / 2),
                 qml.var,
                 qml.Y,
                 0.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
             pytest.param(
                 partial(qml.RX, phi=np.pi / 2),
                 qml.var,
                 qml.Y,
                 0.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
             ),
         ],
     )

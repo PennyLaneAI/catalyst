@@ -124,7 +124,7 @@ frontend:
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
 	rm -r frontend/pennylane_catalyst.egg-info
 
-.PHONY: mlir llvm stablehlo enzyme dialects runtime oqc
+.PHONY: mlir llvm stablehlo enzyme dialects runtime oqc builtin-decomp-rules
 mlir:
 	$(MAKE) -C mlir all
 
@@ -139,6 +139,10 @@ enzyme:
 
 dialects:
 	$(MAKE) -C mlir dialects
+
+builtin-decomp-rules: dialects runtime frontend
+	$(PYTHON) -m frontend.catalyst.utils.precompile_decomposition_rules
+
 
 .PHONY: dialect-docs
 dialect-docs:
