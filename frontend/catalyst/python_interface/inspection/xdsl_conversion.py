@@ -212,6 +212,27 @@ def resolve_constant_params(ssa: SSAValue) -> float | int | str:
         case "arith.addf":
             return sum(resolve_constant_params(o) for o in op.operands)
 
+        case "arith.subf":
+            x, y = (
+                resolve_constant_params(op.operands[0]),
+                resolve_constant_params(op.operands[1]),
+            )
+            return f"({x} - {y})"
+
+        case "arith.mulf":
+            x, y = (
+                resolve_constant_params(op.operands[0]),
+                resolve_constant_params(op.operands[1]),
+            )
+            return f"({x} * {y})"
+
+        case "arith.divf":
+            x, y = (
+                resolve_constant_params(op.operands[0]),
+                resolve_constant_params(op.operands[1]),
+            )
+            return f"({x} / {y})"
+
         case "arith.constant":
             return op.value.value.data  # Catalyst
 
@@ -292,7 +313,8 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
                 x = resolve_constant_params(op.operands[0])
                 y = resolve_constant_params(op.operands[1])
                 return f"({x} % {y})"
-            raise NotImplementedError(f"Function call to {op.callee} not supported")
+            else:
+                return resolve_constant_wire(op.operands[0])
 
         case _ if op.name == "stablehlo.reshape":
             return resolve_constant_wire(op.operands[0])
