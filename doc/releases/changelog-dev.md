@@ -309,6 +309,10 @@
 * Added support for `stopping_condition` in user-defined `qp.decompose` when capture is enabled with both graph enabled and disabled.
   [(#2486)](https://github.com/PennyLaneAI/catalyst/pull/2486)
 
+* A performance issue in the xDSL transform `measurements-from-samples` that was caused by the
+  unrolling of a `for` loop for QNodes returning `probs` has been fixed.
+  [(#2611)](https://github.com/PennyLaneAI/catalyst/pull/2611)
+
 <h3>Breaking changes 💔</h3>
 
 * The ``-disentangle-CNOT`` and ``-disentangle-SWAP`` Catalyst CLI commands have been renamed to
