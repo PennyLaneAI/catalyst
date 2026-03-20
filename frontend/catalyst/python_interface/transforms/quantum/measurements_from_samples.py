@@ -43,7 +43,6 @@ from xdsl.rewriter import InsertPoint
 from catalyst.python_interface.conversion import xdsl_module
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.pass_api import compiler_transform
-
 from catalyst.python_interface.transforms.quantum.diagonalize_measurements import (
     DiagonalizeFinalMeasurementsPass,
 )
