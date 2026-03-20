@@ -41,7 +41,7 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) {
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node} {
                 %0 = arith.constant 0 : i64
                 quantum.device shots(%0) ["", "", ""]
             }

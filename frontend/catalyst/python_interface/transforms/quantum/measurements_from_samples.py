@@ -63,7 +63,6 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the measurements-from-samples pass."""
-        shots = _get_static_shots_value_from_first_device_op(op)
 
         # diagonalize measurements before converting to samples
         DiagonalizeFinalMeasurementsPass().apply(_ctx, op)
@@ -75,10 +74,10 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
 
         greedy_applier = pattern_rewriter.GreedyRewritePatternApplier(
             [
-                ExpvalAndVarPattern(shots),
-                ProbsPattern(shots),
-                CountsPattern(shots),
-                StatePattern(shots),
+                ExpvalAndVarPattern(),
+                ProbsPattern(),
+                CountsPattern(),
+                StatePattern(),
             ]
         )
         walker = pattern_rewriter.PatternRewriteWalker(greedy_applier, apply_recursively=False)
@@ -149,15 +148,10 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         shots (int): The number of shots (e.g. as retrieved from the DeviceInitOp).
     """
 
-    def __init__(self, shots: int):
+    def __init__(self):
         super().__init__()
-        assert isinstance(
-            shots, int
-        ), f"Expected `shots` to be an integer value but got {type(shots).__name__}"
-        if shots == 0:
-            raise ValueError("The measurements_from_samples pass requires non-zero shots")
-        self._shots = shots
 
+        self._shots = None
         self.qnode: func.FuncOp = None
         self.call_op: func.CallOp = None
 
@@ -487,6 +481,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         rewriter.replace_op(self.call_op, new_call_op)
         self.call_op = new_call_op
 
+
 class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
     """A rewrite pattern for the ``measurements_from_samples`` transform that matches and rewrites
     ``qml.expval()`` and ``qml.var()`` operations.
@@ -504,6 +499,7 @@ class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
         if "quantum.node" not in func_op.attributes:
             return
         
+        self._shots = get_shots(func_op)
         self.qnode = func_op
         self.call_op = self._get_call_op(func_op)
 
@@ -588,6 +584,7 @@ class ProbsPattern(MeasurementsFromSamplesPattern):
         if "quantum.node" not in func_op.attributes:
             return
         
+        self._shots = get_shots(func_op)
         self.qnode = func_op
         self.call_op = self._get_call_op(func_op)
 
@@ -672,7 +669,6 @@ class CountsPattern(MeasurementsFromSamplesPattern):
         """Match and rewrite for quantum.CountsOp."""
         raise NotImplementedError("qml.counts() operations are not supported.")
 
-
 class StatePattern(MeasurementsFromSamplesPattern):
     """A rewrite pattern for the ``measurements_from_samples`` transform that matches and rewrites
     ``qml.state()`` operations.
@@ -690,30 +686,40 @@ class StatePattern(MeasurementsFromSamplesPattern):
         """Match and rewrite for quantum.StateOp."""
         raise NotImplementedError("qml.state() operations are not supported.")
 
+def get_shots(quantum_node):
+        shots = _get_static_shots_value_from_device_op(quantum_node)
+        assert isinstance(
+            shots, int
+        ), f"Expected `shots` to be an integer value but got {type(shots).__name__}"
+        if shots == 0:
+            raise ValueError("The measurements_from_samples pass requires non-zero shots")
+        return shots
 
-def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> int:
+def _get_static_shots_value_from_device_op(quantum_node: builtin.ModuleOp) -> int:
     """Returns the number of shots as a static (i.e. known at compile time) integer value from the
-    first instance of a device-initialization op (quantum.DeviceInitOp) found in `module`.
+    device-initialization op (quantum.DeviceInitOp) found in a `FuncOp`.
 
-    If `module` contains multiple quantum.DeviceInitOp ops, only the number of shots from the
-    *first* instance is used, and the others are ignored.
+    This function is meant to act on a FuncOp with the `quantum.node` attribute, which should only 
+    contain a single quantum.DeviceInitOp op.
 
     This function expects the number of shots to be an SSA value given as an operand to the
     quantum.DeviceInitOp op. It also assumes that the number of shots is static, retrieving it from
     the 'value' attribute of its corresponding constant op.
 
     Args:
-        module (builtin.ModuleOp): The MLIR module containing the quantum.DeviceInitOp.
+        quantum_node (func.FuncOp): The quantum.node FuncOp containing the quantum.DeviceInitOp.
 
     Returns:
         int: The number of shots.
 
     Raises:
-        CompileError: If `module` does not contain a quantum.DeviceInitOp.
+        CompileError: If `quantum_node` does not contain a quantum.DeviceInitOp.
+        CompileError: If the operator expected to contain shots values does not have `properties`. 
+            This is the immediate issue that is observed when shots are dynamic.
     """
     device_op = None
 
-    for op in module.body.walk():
+    for op in quantum_node.body.walk():
         if isinstance(op, quantum.DeviceInitOp):
             device_op = op
             break
