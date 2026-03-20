@@ -552,7 +552,9 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
     Raises:
         CompileError: If `module` does not contain a quantum.DeviceInitOp.
         CompileError: If the operator expected to contain shots values does not have `properties`.
-            This is the immediate issue that is observed when shots are dynamic.
+            This is the immediate issue that is observed when shots are dynamic, for instance as a
+            result of the shots SSA value originating from a block argument rather than from an
+            operation, such as an `arith.constant` op.
     """
     device_op = None
 
