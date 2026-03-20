@@ -135,6 +135,9 @@ class ApplyTransformSequencePattern(RewritePattern):
     def match_and_rewrite(self, transformer: builtin.ModuleOp, rewriter: PatternRewriter):
         """Rewrite modules containing transform.named_sequences."""
         payload: builtin.ModuleOp = transformer.parent_op()
+        # Erase the transformer from the payload module. Note that PatternRewriter.erase_op
+        # erases the operation from its parent block without destroying the object. Hence,
+        # we can keep interacting with the transformer after the erasure.
         rewriter.erase_op(transformer)
 
         pass_ops = []
@@ -214,8 +217,10 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
     def match_and_rewrite(self, transformer: builtin.ModuleOp, rewriter: PatternRewriter):
         """Rewrite modules containing transform.named_sequences."""
         payload: builtin.ModuleOp = transformer.parent_op()
-        # Detach the transformer from the payload module without destroying it
-        transformer.detach()
+        # Erase the transformer from the payload module. Note that PatternRewriter.erase_op
+        # erases the operation from its parent block without destroying the object. Hence,
+        # we can keep interacting with the transformer after the erasure.
+        rewriter.erase_op(transformer)
 
         pass_ops = []
         for ns in transformer.ops:
