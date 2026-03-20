@@ -23,7 +23,6 @@ import pytest
 
 from catalyst.python_interface.transforms import (
     MeasurementsFromSamplesPass,
-    measurements_from_samples_pass,
 )
 
 pytestmark = pytest.mark.xdsl

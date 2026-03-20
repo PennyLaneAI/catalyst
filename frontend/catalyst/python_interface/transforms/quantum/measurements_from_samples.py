@@ -18,9 +18,6 @@ written using xDSL.
 Known Limitations
 -----------------
 
-  * Only measurements in the computational basis (or where the observable is a Pauli Z op) are
-    currently supported; for arbitrary observables we require an equivalent compilation pass of the
-    diagonalize_measurements transform.
   * The compilation pass assumes a static number of shots.
   * Usage patterns that are not yet supported with program capture are also not supported in the
     compilation pass. For example, operator arithmetic is not currently supported, such as
@@ -46,6 +43,9 @@ from xdsl.rewriter import InsertPoint
 from catalyst.python_interface.conversion import xdsl_module
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.pass_api import compiler_transform
+from catalyst.python_interface.transforms.quantum.diagonalize_measurements import (
+    DiagonalizeFinalMeasurementsPass,
+)
 
 from catalyst.python_interface.transforms.quantum.diagonalize_measurements import (
     DiagonalizeFinalMeasurementsPass,
@@ -56,7 +56,8 @@ from catalyst.python_interface.transforms.quantum.diagonalize_measurements impor
 class MeasurementsFromSamplesPass(passes.ModulePass):
     """Pass that replaces all terminal measurements in a program with a single
     :func:`pennylane.sample` measurement, and adds postprocessing instructions to recover the
-    original measurement.
+    original measurement. If observables are present in a basis other than Z, the pass
+    diagonalizes them before conversion to samples in the computational basis.
     """
 
     name = "measurements-from-samples"
@@ -71,6 +72,9 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
             AddPostProcessingPattern(pass_str="from_samples"),
             apply_recursively=False,
         ).rewrite_module(op)
+
+        # diagonalize measurements before converting to samples
+        DiagonalizeFinalMeasurementsPass().apply(_ctx, op)
 
         greedy_applier = pattern_rewriter.GreedyRewritePatternApplier(
             [
@@ -748,6 +752,9 @@ def _get_static_shots_value_from_device_op(quantum_node: func.FuncOp) -> int:
         CompileError: If `quantum_node` does not contain a quantum.DeviceInitOp.
         CompileError: If the operator expected to contain shots values does not have `properties`.
             This is the immediate issue that is observed when shots are dynamic.
+        CompileError: If `module` does not contain a quantum.DeviceInitOp.
+        CompileError: If the operator expected to contain shots values does not have `properties`.
+            This is the immediate issue that is observed when shots are dynamic.
     """
     device_op = None
 
@@ -769,9 +776,14 @@ def _get_static_shots_value_from_device_op(quantum_node: func.FuncOp) -> int:
         shots_constant_op = shots_extract_op.operands[0].owner
         if not hasattr(shots_constant_op, "properties"):
             raise CompileError(
-                "Cannot get concrete number of shots. Note that using a dynamic number of " \
-                "shots is not supported with measurements-from-samples; ensure shots are set " \
-                "to a concrete value."            )
+                "Cannot get number of shots. Note that using a dynamic number of shots is not "
+                "supported with measurements-from-samples."
+            )
+        if not hasattr(shots_constant_op, "properties"):
+            raise CompileError(
+                "Cannot get number of shots. Note that using a dynamic number of shots is not "
+                "supported with measurements-from-samples."
+            )
         shots_value_attribute: builtin.DenseIntOrFPElementsAttr = shots_constant_op.properties.get(
             "value"
         )
@@ -787,9 +799,8 @@ def _get_static_shots_value_from_device_op(quantum_node: func.FuncOp) -> int:
     if isinstance(shots_extract_op, arith.ConstantOp):
         if not hasattr(shots_extract_op, "properties"):
             raise CompileError(
-                "Cannot get concrete number of shots. Note that using a dynamic number of " \
-                "shots is not supported with measurements-from-samples; ensure shots are set " \
-                "to a concrete value."
+                "Cannot get number of shots. Note that using a dynamic number of shots is not "
+                "supported with measurements-from-samples."
             )
         shots_value_attribute: builtin.IntAttr = shots_extract_op.properties.get("value")
         return shots_value_attribute.value.data
