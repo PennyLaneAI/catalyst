@@ -424,6 +424,11 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Added a optimized pathway to the xDSL `ApplyTransformSequencePass` so that it can schedule consecutive MLIR
+  passes together rather than individually. This minimizes the number of round-trips between xDSL and MLIR, improving
+  performance when several consecutive MLIR passes are used when there are also xDSL passes in the pipeline.
+  [(#2592)](https://github.com/PennyLaneAI/catalyst/pull/2592)
+
 * `draw_graph` now raises a more informative error when attempting to visualize an unsupported empty external function.
   [(#2559)](https://github.com/PennyLaneAI/catalyst/pull/2559)
 
