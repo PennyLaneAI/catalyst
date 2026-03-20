@@ -36,7 +36,6 @@ struct MergeGlobalPhasePass : impl::MergeGlobalPhasePassBase<MergeGlobalPhasePas
     void runOnOperation() final
     {
         ModuleOp mod = getOperation();
-        MLIRContext *ctx = mod->getContext();
         OpBuilder builder(mod->getContext());
 
         mod.walk([&](Operation *op) {
@@ -46,22 +45,6 @@ struct MergeGlobalPhasePass : impl::MergeGlobalPhasePassBase<MergeGlobalPhasePas
                     auto simplePhases = llvm::make_filter_range(phases, [](GlobalPhaseOp phaseOp) {
                         return phaseOp.getInCtrlQubits().empty();
                     });
-                    if (simplePhases.empty()) {
-                        continue;
-                    }
-
-                    GlobalPhaseOp firstPhase = *simplePhases.begin();
-                    builder.setInsertionPoint(firstPhase);
-
-                    Value runningSum = arith::ConstantFloatOp::create(
-                        builder, firstPhase->getLoc(), Float64Type::get(ctx), llvm::APFloat(0.0));
-                    for (GlobalPhaseOp phaseOp : simplePhases) {
-                        llvm::SmallVector<Value, 2> args{runningSum, phaseOp.getParams()};
-                        runningSum = arith::AddFOp::create(builder, phaseOp.getLoc(), args);
-                    }
-                    GlobalPhaseOp::create(builder, firstPhase.getLoc(), {}, runningSum, false, {},
-                                          {});
-
                     for (GlobalPhaseOp phaseOp : llvm::make_early_inc_range(simplePhases)) {
                         phaseOp->erase();
                     }

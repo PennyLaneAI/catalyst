@@ -155,7 +155,7 @@ def DynamicOneShotPass : Pass<"dynamic-one-shot", "mlir::ModuleOp"> {
     ];
 }
 
-def MergeGlobalPhasePass : Pass<"merge-global-phase", "mlir::ModuleOp"> {
+def MergeGlobalPhasePass : Pass<"delete-global-phase", "mlir::ModuleOp"> {
     let summary = "Scope-wise merging of global phase operators (safe).";
 }
 
