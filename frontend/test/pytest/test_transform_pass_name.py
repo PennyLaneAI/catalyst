@@ -56,33 +56,46 @@ def test_pass_with_options(options, expected_strings, backend):
         assert expected_str in str(capture_mlir), f"Expected {expected_str} in MLIR: {capture_mlir}"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "options",
     [
-        {"option": [1, 2, 3]},
-        {"option": {"blah": "foo"}},
-        {"option": None},
+        {"option": [1, 2, "blah"]},
+        {"option": {"1": 2, "blah": "foo"}},
     ],
-    ids=["list", "dict", "None"],
+    ids=["list", "dict"],
 )
-def test_pass_with_unsupported_options(options, backend):
-    """Tests that unsupported option types raise a clear error."""
+def test_pass_with_complex_options(options, backend):
+    """Tests that complex options like list, dict are supported."""
 
     my_pass = qml.transform(pass_name="my-pass")
 
+    @qml.qjit(target="mlir")
     @partial(my_pass, **options)
     @qml.qnode(qml.device(backend, wires=1))
     def captured_circuit():
         return qml.expval(qml.PauliZ(0))
 
-    expected_error = CompileError if options["option"] is None else TypeError
-    expected_msg = (
-        r"Cannot convert Python type <class 'NoneType'> to an MLIR attribute"
-        if options["option"] is None
-        else "unhashable type"
-    )
-    with pytest.raises(expected_error, match=expected_msg):
-        qml.qjit(captured_circuit)
+    if isinstance(options["option"], list):
+        assert 'with options = {"option" = [1 : i64, 2 : i64, "blah"]}' in captured_circuit.mlir
+
+    if isinstance(options["option"], dict):
+        assert 'with options = {"option" = {"1" = 2 : i64, blah = "foo"}}' in captured_circuit.mlir
+
+
+def test_pass_with_unsupported_options(backend):
+    """Tests that unsupported option types raise a clear error."""
+
+    my_pass = qml.transform(pass_name="my-pass")
+
+    @partial(my_pass, **{"option": None})
+    @qml.qnode(qml.device(backend, wires=1))
+    def captured_circuit():
+        return qml.expval(qml.PauliZ(0))
+
+    expected_msg = r"Cannot convert Python type <class 'NoneType'> to an MLIR attribute"
+    with pytest.raises(CompileError, match=expected_msg):
+        qml.qjit(target="mlir")(captured_circuit)
 
 
 def test_pass_before_tape_transform(backend):
