@@ -370,17 +370,17 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [ParametrizedGate, AttrSizedOperand
     }];
 
     let arguments = (ins
-        F64:$params,
+        F64:$angle,
         UnitAttr:$adjoint,
         Variadic<QubitRefType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values
     );
 
     let assemblyFormat = [{
-        `(` $params `)` (`adj` $adjoint^)? attr-dict
+        `(` $angle `)` (`adj` $adjoint^)? attr-dict
         ( `ctrls` `(` $ctrl_qubits^ `)` )?
         ( `ctrlvals` `(` $ctrl_values^ `)` )?
-        `:` type($params) (`ctrls` type($ctrl_qubits)^ )?
+        ( `:` `ctrls` type($ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{

@@ -55,11 +55,19 @@ class CombineGlobalPhasesPattern(
 
             prev = global_phases[0]
             phi_sum = prev.operands[0]
+            if prev.adjoint is not None:
+                negOp = arith.NegfOp(phi_sum)
+                rewriter.insert(negOp, InsertPoint.before(prev))
+                phi_sum = negOp.result
+
             for current in global_phases[1:]:
                 phi = current.operands[0]
-                addOp = arith.AddfOp(phi, phi_sum)
-                rewriter.insert_op(addOp, InsertPoint.before(current))
-                phi_sum = addOp.result
+                if current.adjoint is None:
+                    sumOp = arith.AddfOp(phi, phi_sum)
+                else:
+                    sumOp = arith.SubfOp(phi, phi_sum)
+                rewriter.insert_op(sumOp, InsertPoint.before(current))
+                phi_sum = sumOp.result
 
                 rewriter.erase_op(prev)
                 prev = current
@@ -74,10 +82,10 @@ class CombineGlobalPhasesPass(passes.ModulePass):
     within the region.
     """
 
-    name = "combine-global-phases"
+    name = "xdsl-combine-global-phases"
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
-        """Apply the combine-global-phases pass."""
+        """Apply the combine-global-phases pass in Python."""
         pattern_rewriter.PatternRewriteWalker(
             CombineGlobalPhasesPattern(),
             apply_recursively=False,
