@@ -20,6 +20,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
+from pennylane.exceptions import CompileError
 from catalyst.python_interface.transforms import (
     MeasurementsFromSamplesPass,
     measurements_from_samples_pass,
@@ -31,6 +32,10 @@ pytestmark = pytest.mark.xdsl
 class TestMeasurementsFromSamplesPass:
     """Unit tests for the measurements-from-samples pass."""
 
+    # ToDo: is it bad that this pass doesn't require a qnode attribute to pass? 
+    # We should be pulling shots by qnode, not for the whole workflow (technically 
+    # not needed now because no weighted shot distribution, but something to be 
+    # aware of)
     def test_no_shots_raises_error(self, run_filecheck):
         """Test that when no shots are provided, the pass raises an error"""
         program = """
@@ -56,8 +61,12 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) {
-                %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
+            // CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<5x1xf64>
+            // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.5x1xf64([[samples]]) :
+            // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
+            // CHECK: func.return [[res]] : tensor<f64>
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
+                %0 = "stablehlo.constant"() <{value = dense<5> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
 
@@ -68,18 +77,15 @@ class TestMeasurementsFromSamplesPass:
                 %3 = quantum.namedobs %2[PauliZ] : !quantum.obs
 
                 // CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q0]] : !quantum.obs
-                // CHECK: [[samples:%.+]] = quantum.sample [[obs]] : tensor<1x1xf64>
-                // CHECK: [[c0:%.+]] = arith.constant dense<0> : tensor<i64>
-                // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.1x1xf64([[samples]], [[c0]]) :
-                // CHECK-SAME: (tensor<1x1xf64>, tensor<i64>) -> tensor<f64>
+                // CHECK: [[samples:%.+]] = quantum.sample [[obs]] : tensor<5x1xf64>
                 // CHECK-NOT: quantum.expval
                 %4 = quantum.expval %3 : f64
                 %5 = "tensor.from_elements"(%4) : (f64) -> tensor<f64>
 
-                // CHECK: func.return [[res]] : tensor<f64>
+                // CHECK: func.return [[samples]] : tensor<5x1xf64>
                 func.return %5 : tensor<f64>
             }
-            // CHECK-LABEL: func.func public @expval_from_samples.tensor.1x1xf64
+            // CHECK-LABEL: func.func public @expval_from_samples.tensor.5x1xf64
         }
         """
 
@@ -91,8 +97,12 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) {
-                %0 = arith.constant 1 : i64
+            // CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<5x1xf64>
+            // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.5x1xf64([[samples]]) :
+            // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
+            // CHECK: func.return [[res]] : tensor<f64>
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
+                %0 = arith.constant 5 : i64
                 quantum.device shots(%0) ["", "", ""]
 
                 // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
@@ -102,18 +112,15 @@ class TestMeasurementsFromSamplesPass:
                 %2 = quantum.namedobs %1[PauliZ] : !quantum.obs
 
                 // CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q0]] : !quantum.obs
-                // CHECK: [[samples:%.+]] = quantum.sample [[obs]] : tensor<1x1xf64>
-                // CHECK: [[c0:%.+]] = arith.constant dense<0> : tensor<i64>
-                // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.1x1xf64([[samples]], [[c0]]) :
-                // CHECK-SAME: (tensor<1x1xf64>, tensor<i64>) -> tensor<f64>
+                // CHECK: [[samples:%.+]] = quantum.sample [[obs]] : tensor<5x1xf64>
                 // CHECK-NOT: quantum.expval
                 %3 = quantum.expval %2 : f64
                 %4 = "tensor.from_elements"(%3) : (f64) -> tensor<f64>
 
-                // CHECK: func.return [[res]] : tensor<f64>
+                // CHECK: func.return [[samples]] : tensor<5x1xf64>
                 func.return %4 : tensor<f64>
             }
-            // CHECK-LABEL: func.func public @expval_from_samples.tensor.1x1xf64
+            // CHECK-LABEL: func.func public @expval_from_samples.tensor.5x1xf64
         }
         """
 
@@ -127,8 +134,12 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) {
-                %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
+            // CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<3x1xf64>
+            // CHECK: [[res:%.+]] = func.call @var_from_samples.tensor.3x1xf64([[samples]]) :
+            // CHECK-SAME: (tensor<3x1xf64>) -> tensor<f64>
+            // CHECK: func.return [[res]] : tensor<f64>
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
+                %0 = "stablehlo.constant"() <{value = dense<3> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
 
@@ -139,18 +150,15 @@ class TestMeasurementsFromSamplesPass:
                 %3 = quantum.namedobs %2[PauliZ] : !quantum.obs
 
                 // CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q0]] : !quantum.obs
-                // CHECK: [[samples:%.+]] = quantum.sample [[obs]] : tensor<1x1xf64>
-                // CHECK: [[c0:%.+]] = arith.constant dense<0> : tensor<i64>
-                // CHECK: [[res:%.+]] = func.call @var_from_samples.tensor.1x1xf64([[samples]], [[c0]]) :
-                // CHECK-SAME: (tensor<1x1xf64>, tensor<i64>) -> tensor<f64>
+                // CHECK: [[samples:%.+]] = quantum.sample [[obs]] : tensor<3x1xf64>
                 // CHECK-NOT: quantum.var
                 %4 = quantum.var %3 : f64
                 %5 = "tensor.from_elements"(%4) : (f64) -> tensor<f64>
 
-                // CHECK: func.return [[res]] : tensor<f64>
+                // CHECK: func.return [[samples]] : tensor<3x1xf64>
                 func.return %5 : tensor<f64>
             }
-            // CHECK-LABEL: func.func public @var_from_samples.tensor.1x1xf64
+            // CHECK-LABEL: func.func public @var_from_samples.tensor.3x1xf64
         }
         """
 
@@ -164,8 +172,12 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) {
-                %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
+            // CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<3x1xf64>
+            // CHECK: [[res:%.+]] = func.call @probs_from_samples.tensor.3x1xf64([[samples]]) :
+            // CHECK-SAME: (tensor<3x1xf64>) -> tensor<2xf64>
+            // CHECK: func.return [[res]] : tensor<2xf64>
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
+                %0 = "stablehlo.constant"() <{value = dense<3> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
 
@@ -175,16 +187,14 @@ class TestMeasurementsFromSamplesPass:
                 // CHECK: [[compbasis:%.+]] = quantum.compbasis qreg [[q0]] : !quantum.obs
                 %3 = quantum.compbasis qreg %2 : !quantum.obs
 
-                // CHECK: [[samples:%.+]] = quantum.sample [[compbasis]] : tensor<1x1xf64>
-                // CHECK: [[res:%.+]] = func.call @probs_from_samples.tensor.1x1xf64([[samples]]) :
-                // CHECK-SAME: (tensor<1x1xf64>) -> tensor<2xf64>
+                // CHECK: [[samples:%.+]] = quantum.sample [[compbasis]] : tensor<3x1xf64>
                 // CHECK-NOT: quantum.probs
                 %4 = quantum.probs %3 : tensor<2xf64>
 
-                // CHECK: func.return [[res]] : tensor<2xf64>
+                // CHECK: func.return [[samples]] : tensor<3x1xf64>
                 func.return %4 : tensor<2xf64>
             }
-            // CHECK-LABEL: func.func public @probs_from_samples.tensor.1x1xf64
+            // CHECK-LABEL: func.func public @probs_from_samples.tensor.3x1xf64
         }
         """
 
@@ -200,8 +210,10 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) {
-                %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
+            // CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<7x1xf64>
+            // CHECK: func.return [[samples]] : tensor<7x1xf64>
+            func.func public @circuit() -> (tensor<7x1xf64>) attributes {quantum.node}  {
+                %0 = "stablehlo.constant"() <{value = dense<7> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
 
@@ -211,11 +223,11 @@ class TestMeasurementsFromSamplesPass:
                 // CHECK: [[compbasis:%.+]] = quantum.compbasis qreg [[q0]] : !quantum.obs
                 %3 = quantum.compbasis qreg %2 : !quantum.obs
 
-                // CHECK: [[samples:%.+]] = quantum.sample [[compbasis]] : tensor<1x1xf64>
-                %4 = quantum.sample %3 : tensor<1x1xf64>
+                // CHECK: [[samples:%.+]] = quantum.sample [[compbasis]] : tensor<7x1xf64>
+                %4 = quantum.sample %3 : tensor<7x1xf64>
 
-                // CHECK: func.return [[samples]] : tensor<1x1xf64>
-                func.return %4 : tensor<1x1xf64>
+                // CHECK: func.return [[samples]] : tensor<7x1xf64>
+                func.return %4 : tensor<7x1xf64>
             }
         }
         """
@@ -231,7 +243,7 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) {
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
@@ -264,46 +276,47 @@ class TestMeasurementsFromSamplesPass:
 
     def test_2_wire_expval(self, run_filecheck):
         """Test the measurements-from-samples pass on a 2-wire circuit terminating with an expval(Z)
-        measurement on each wire.
+        measurement on each wire. Includes a non-diagonalized operation (pass inserts diagonalizing gate).
         """
+
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) {
-                %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
+            // CHECK: [[samples0:%.+]], [[samples1:%.+]] = func.call @circuit.from_samples() : () -> (tensor<5x1xf64>, tensor<5x1xf64>)
+            // CHECK: [[res1:%.+]] = func.call @expval_from_samples.tensor.5x1xf64([[samples1]]) :
+            // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
+            // CHECK: [[res0:%.+]] = func.call @expval_from_samples.tensor.5x1xf64([[samples0]]) :
+            // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
+            // CHECK: func.return [[res0]], [[res1]] : tensor<f64>, tensor<f64>
+            func.func public @circuit() -> (tensor<f64>, tensor<f64>) attributes {quantum.node}  {
+                %0 = "stablehlo.constant"() <{value = dense<5> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
 
                 // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
-                %2 = "test.op"() : () -> !quantum.bit
-
                 // CHECK: [[q1:%.+]] = "test.op"() : () -> !quantum.bit
+                %2 = "test.op"() : () -> !quantum.bit
                 %3 = "test.op"() : () -> !quantum.bit
 
                 // CHECK-NOT: quantum.namedobs
-                %4 = quantum.namedobs %2[PauliZ] : !quantum.obs
+                // CHECK: [[q0_1:%.+]] = quantum.custom "Hadamard"() [[q0]]
+                %4 = quantum.namedobs %2[PauliX] : !quantum.obs
                 %5 = quantum.namedobs %3[PauliZ] : !quantum.obs
 
-                // CHECK: [[obs0:%.+]] = quantum.compbasis qubits [[q0]] : !quantum.obs
-                // CHECK: [[samples0:%.+]] = quantum.sample [[obs0]] : tensor<1x1xf64>
-                // CHECK: [[c0:%.+]] = arith.constant dense<0> : tensor<i64>
+                // CHECK: [[obs0:%.+]] = quantum.compbasis qubits [[q0_1]] : !quantum.obs
+                // CHECK: [[samples0:%.+]] = quantum.sample [[obs0]] : tensor<5x1xf64>
                 // CHECK: [[obs1:%.+]] = quantum.compbasis qubits [[q1]] : !quantum.obs
-                // CHECK: [[samples1:%.+]] = quantum.sample [[obs1]] : tensor<1x1xf64>
-                // CHECK: [[c1:%.+]] = arith.constant dense<0> : tensor<i64>
-                // CHECK: [[res0:%.+]] = func.call @expval_from_samples.tensor.1x1xf64([[samples0]], [[c0]]) :
-                // CHECK-SAME: (tensor<1x1xf64>, tensor<i64>) -> tensor<f64>
-                // CHECK: [[res1:%.+]] = func.call @expval_from_samples.tensor.1x1xf64([[samples1]], [[c1]]) :
-                // CHECK-SAME: (tensor<1x1xf64>, tensor<i64>) -> tensor<f64>
+                // CHECK: [[samples1:%.+]] = quantum.sample [[obs1]] : tensor<5x1xf64>
                 // CHECK-NOT: quantum.expval
                 %6 = quantum.expval %4 : f64
                 %7 = "tensor.from_elements"(%6) : (f64) -> tensor<f64>
                 %8 = quantum.expval %5 : f64
                 %9 = "tensor.from_elements"(%8) : (f64) -> tensor<f64>
 
-                // CHECK: func.return [[res0]], [[res1]] : tensor<f64>, tensor<f64>
+                // CHECK: func.return [[samples0]], [[samples1]] : tensor<5x1xf64>, tensor<5x1xf64>
                 func.return %7, %9 : tensor<f64>, tensor<f64>
             }
-            // CHECK-LABEL: func.func public @expval_from_samples.tensor.1x1xf64
+            // CHECK-LABEL: func.func public @expval_from_samples.tensor.5x1xf64
         }
         """
 
@@ -317,8 +330,14 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) {
-                %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
+            // CHECK: [[samples0:%.+]], [[samples1:%.+]] = func.call @circuit.from_samples() : () -> (tensor<5x1xf64>, tensor<5x1xf64>)
+            // CHECK: [[res1:%.+]] = func.call @var_from_samples.tensor.5x1xf64([[samples1]]) :
+            // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
+            // CHECK: [[res0:%.+]] = func.call @var_from_samples.tensor.5x1xf64([[samples0]]) :
+            // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
+            // CHECK: func.return [[res0]], [[res1]] : tensor<f64>, tensor<f64>
+            func.func public @circuit() -> (tensor<f64>, tensor<f64>) attributes {quantum.node}  {
+                %0 = "stablehlo.constant"() <{value = dense<5> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
 
@@ -329,29 +348,24 @@ class TestMeasurementsFromSamplesPass:
                 %3 = "test.op"() : () -> !quantum.bit
 
                 // CHECK-NOT: quantum.namedobs
-                %4 = quantum.namedobs %2[PauliZ] : !quantum.obs
+                // CHECK: [[q0_1:%.+]] = quantum.custom "Hadamard"() [[q0]]
+                %4 = quantum.namedobs %2[PauliX] : !quantum.obs
                 %5 = quantum.namedobs %3[PauliZ] : !quantum.obs
 
-                // CHECK: [[obs0:%.+]] = quantum.compbasis qubits [[q0]] : !quantum.obs
-                // CHECK: [[samples0:%.+]] = quantum.sample [[obs0]] : tensor<1x1xf64>
-                // CHECK: [[c0:%.+]] = arith.constant dense<0> : tensor<i64>
+                // CHECK: [[obs0:%.+]] = quantum.compbasis qubits [[q0_1]] : !quantum.obs
+                // CHECK: [[samples0:%.+]] = quantum.sample [[obs0]] : tensor<5x1xf64>
                 // CHECK: [[obs1:%.+]] = quantum.compbasis qubits [[q1]] : !quantum.obs
-                // CHECK: [[samples1:%.+]] = quantum.sample [[obs1]] : tensor<1x1xf64>
-                // CHECK: [[c1:%.+]] = arith.constant dense<0> : tensor<i64>
-                // CHECK: [[res0:%.+]] = func.call @var_from_samples.tensor.1x1xf64([[samples0]], [[c0]]) :
-                // CHECK-SAME: (tensor<1x1xf64>, tensor<i64>) -> tensor<f64>
-                // CHECK: [[res1:%.+]] = func.call @var_from_samples.tensor.1x1xf64([[samples1]], [[c1]]) :
-                // CHECK-SAME: (tensor<1x1xf64>, tensor<i64>) -> tensor<f64>
+                // CHECK: [[samples1:%.+]] = quantum.sample [[obs1]] : tensor<5x1xf64>
                 // CHECK-NOT: quantum.var
                 %6 = quantum.var %4 : f64
                 %7 = "tensor.from_elements"(%6) : (f64) -> tensor<f64>
                 %8 = quantum.var %5 : f64
                 %9 = "tensor.from_elements"(%8) : (f64) -> tensor<f64>
 
-                // CHECK: func.return [[res0]], [[res1]] : tensor<f64>, tensor<f64>
+                // CHECK: func.return [[samples0]], [[samples1]] : tensor<5x1xf64>, tensor<5x1xf64>
                 func.return %7, %9 : tensor<f64>, tensor<f64>
             }
-            // CHECK-LABEL: func.func public @var_from_samples.tensor.1x1xf64
+            // CHECK-LABEL: func.func public @var_from_samples.tensor.5x1xf64
         }
         """
 
@@ -365,8 +379,12 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) {
-                %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
+            // CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<3x2xf64>
+            // CHECK: [[res:%.+]] = func.call @probs_from_samples.tensor.3x2xf64([[samples]]) :
+            // CHECK-SAME: (tensor<3x2xf64>) -> tensor<4xf64>
+            // CHECK: func.return [[res]] : tensor<4xf64>
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
+                %0 = "stablehlo.constant"() <{value = dense<3> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
 
@@ -376,16 +394,14 @@ class TestMeasurementsFromSamplesPass:
                 // CHECK: [[compbasis:%.+]] = quantum.compbasis qreg [[qreg]] : !quantum.obs
                 %3 = quantum.compbasis qreg %2 : !quantum.obs
 
-                // CHECK: [[samples:%.+]] = quantum.sample [[compbasis]] : tensor<1x2xf64>
-                // CHECK: [[res:%.+]] = func.call @probs_from_samples.tensor.1x2xf64([[samples]]) :
-                // CHECK-SAME: (tensor<1x2xf64>) -> tensor<4xf64>
+                // CHECK: [[samples:%.+]] = quantum.sample [[compbasis]] : tensor<3x2xf64>
                 // CHECK-NOT: quantum.probs
                 %4 = quantum.probs %3 : tensor<4xf64>
 
-                // CHECK: func.return [[res]] : tensor<4xf64>
+                // CHECK: func.return [[samples]] : tensor<3x2xf64>
                 func.return %4 : tensor<4xf64>
             }
-            // CHECK-LABEL: func.func public @probs_from_samples.tensor.1x2xf64
+            // CHECK-LABEL: func.func public @probs_from_samples.tensor.3x2xf64
         }
         """
 
@@ -399,8 +415,14 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            func.func public @circuit() -> (tensor<f64>) {
-                %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
+            // CHECK: [[samples0:%.+]], [[samples1:%.+]] = func.call @circuit.from_samples() : () -> (tensor<3x1xf64>, tensor<3x1xf64>)
+            // CHECK: [[res1:%.+]] = func.call @probs_from_samples.tensor.3x1xf64([[samples1]]) :
+            // CHECK-SAME: (tensor<3x1xf64>) -> tensor<2xf64>
+            // CHECK: [[res0:%.+]] = func.call @probs_from_samples.tensor.3x1xf64([[samples0]]) :
+            // CHECK-SAME: (tensor<3x1xf64>) -> tensor<2xf64>
+            // CHECK: func.return [[res0]], [[res1]] : tensor<2xf64>, tensor<2xf64>
+            func.func public @circuit() -> (tensor<f64>, tensor<f64>) attributes {quantum.node}  {
+                %0 = "stablehlo.constant"() <{value = dense<3> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
                 quantum.device shots(%1) ["", "", ""]
 
@@ -413,9 +435,7 @@ class TestMeasurementsFromSamplesPass:
                 // CHECK: [[compbasis0:%.+]] = quantum.compbasis qubits [[q0]] : !quantum.obs
                 %4 = quantum.compbasis qubits %3 : !quantum.obs
 
-                // CHECK: [[samples0:%.+]] = quantum.sample [[compbasis0]] : tensor<1x1xf64>
-                // CHECK: [[res0:%.+]] = func.call @probs_from_samples.tensor.1x1xf64([[samples0]]) :
-                // CHECK-SAME: (tensor<1x1xf64>) -> tensor<2xf64>
+                // CHECK: [[samples0:%.+]] = quantum.sample [[compbasis0]] : tensor<3x1xf64>
                 // CHECK-NOT: quantum.probs
                 %5 = quantum.probs %4 : tensor<2xf64>
 
@@ -425,28 +445,126 @@ class TestMeasurementsFromSamplesPass:
                 // CHECK: [[compbasis1:%.+]] = quantum.compbasis qubits [[q1]] : !quantum.obs
                 %7 = quantum.compbasis qubits %6 : !quantum.obs
 
-                // CHECK: [[samples1:%.+]] = quantum.sample [[compbasis1]] : tensor<1x1xf64>
-                // CHECK: [[res1:%.+]] = func.call @probs_from_samples.tensor.1x1xf64([[samples1]]) :
-                // CHECK-SAME: (tensor<1x1xf64>) -> tensor<2xf64>
+                // CHECK: [[samples1:%.+]] = quantum.sample [[compbasis1]] : tensor<3x1xf64>
                 // CHECK-NOT: quantum.probs
                 %8 = quantum.probs %7 : tensor<2xf64>
 
-                // CHECK: func.return [[res0]], [[res1]] : tensor<2xf64>, tensor<2xf64>
+                // CHECK: func.return [[samples0]], [[samples1]] : tensor<3x1xf64>, tensor<3x1xf64>
                 func.return %5, %8 : tensor<2xf64>, tensor<2xf64>
             }
-            // CHECK-LABEL: func.func public @probs_from_samples.tensor.1x1xf64
+            // CHECK-LABEL: func.func public @probs_from_samples.tensor.3x1xf64
         }
         """
 
         pipeline = (MeasurementsFromSamplesPass(),)
         run_filecheck(program, pipeline)
 
+    def test_expval_tensor_obs(self, run_filecheck):
+        """Test the measurements-from-samples pass on a circuit terminating with the variance 
+        of a 3-wire tensor, including non-Z observables.
+        """
+
+        program = """
+        builtin.module @module_circuit {
+            // CHECK-LABEL: circuit
+            // CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<5x3xf64>
+            // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.5x3xf64([[samples]]) :
+            // CHECK-SAME: (tensor<5x3xf64>) -> tensor<f64>
+            // CHECK: func.return [[res]] : tensor<f64>
+            func.func public @circuit() -> tensor<f64> attributes {quantum.node}  {
+                %0 = "stablehlo.constant"() <{value = dense<5> : tensor<i64>}> : () -> tensor<i64>
+                %1 = tensor.extract %0[] : tensor<i64>
+                quantum.device shots(%1) ["", "", ""]
+
+                // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
+                // CHECK: [[q1:%.+]] = "test.op"() : () -> !quantum.bit
+                // CHECK: [[q2:%.+]] = "test.op"() : () -> !quantum.bit
+                %2 = "test.op"() : () -> !quantum.bit
+                %3 = "test.op"() : () -> !quantum.bit
+                %4 = "test.op"() : () -> !quantum.bit
+
+                // CHECK-NOT: quantum.namedobs
+                // CHECK-NOT: quantum.tensor
+                // CHECK: [[q0_1:%.+]] = quantum.custom "Hadamard"() [[q0]]
+                // CHECK: [[q1_1:%.+]] = quantum.custom "PauliZ"() [[q1]]
+                // CHECK: [[q1_2:%.+]] = quantum.custom "S"() [[q1_1]]
+                // CHECK: [[q1_3:%.+]] = quantum.custom "Hadamard"() [[q1_2]]
+                // CHECK: [[obs0:%.+]] = quantum.compbasis qubits [[q0_1]], [[q1_3]], [[q2]] : !quantum.obs
+                %5 = quantum.namedobs %2[PauliX] : !quantum.obs
+                %6 = quantum.namedobs %3[PauliY] : !quantum.obs
+                %7 = quantum.namedobs %4[PauliZ] : !quantum.obs
+                %8 = quantum.tensor %5, %6, %7 : !quantum.obs
+
+                // CHECK: [[samples:%.+]] = quantum.sample [[obs0]] : tensor<5x3xf64>
+                // CHECK-NOT: quantum.expval
+                %9 = quantum.expval %8 : f64
+                %10 = "tensor.from_elements"(%9) : (f64) -> tensor<f64>
+
+                // CHECK: func.return [[samples]] : tensor<5x3xf64>
+                func.return %10 : tensor<f64>
+            }
+            // CHECK-LABEL: func.func public @expval_from_samples.tensor.5x3xf64
+        }
+        """
+
+        pipeline = (MeasurementsFromSamplesPass(),)
+        run_filecheck(program, pipeline)
+    
+    def test_var_tensor_obs(self, run_filecheck):
+        """Test the measurements-from-samples pass on a circuit terminating with the variance 
+        of a 3-wire tensor, including non-Z observables.
+        """
+
+        program = """
+        builtin.module @module_circuit {
+            // CHECK-LABEL: circuit
+            // CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<5x3xf64>
+            // CHECK: [[res:%.+]] = func.call @var_from_samples.tensor.5x3xf64([[samples]]) :
+            // CHECK-SAME: (tensor<5x3xf64>) -> tensor<f64>
+            // CHECK: func.return [[res]] : tensor<f64>
+            func.func public @circuit() -> tensor<f64> attributes {quantum.node}  {
+                %0 = "stablehlo.constant"() <{value = dense<5> : tensor<i64>}> : () -> tensor<i64>
+                %1 = tensor.extract %0[] : tensor<i64>
+                quantum.device shots(%1) ["", "", ""]
+
+                // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
+                // CHECK: [[q1:%.+]] = "test.op"() : () -> !quantum.bit
+                // CHECK: [[q2:%.+]] = "test.op"() : () -> !quantum.bit
+                %2 = "test.op"() : () -> !quantum.bit
+                %3 = "test.op"() : () -> !quantum.bit
+                %4 = "test.op"() : () -> !quantum.bit
+
+                // CHECK-NOT: quantum.namedobs
+                // CHECK-NOT: quantum.tensor
+                // CHECK: [[q0_1:%.+]] = quantum.custom "Hadamard"() [[q0]]
+                // CHECK: [[q1_1:%.+]] = quantum.custom "PauliZ"() [[q1]]
+                // CHECK: [[q1_2:%.+]] = quantum.custom "S"() [[q1_1]]
+                // CHECK: [[q1_3:%.+]] = quantum.custom "Hadamard"() [[q1_2]]
+                // CHECK: [[obs0:%.+]] = quantum.compbasis qubits [[q0_1]], [[q1_3]], [[q2]] : !quantum.obs
+                %5 = quantum.namedobs %2[PauliX] : !quantum.obs
+                %6 = quantum.namedobs %3[PauliY] : !quantum.obs
+                %7 = quantum.namedobs %4[PauliZ] : !quantum.obs
+                %8 = quantum.tensor %5, %6, %7 : !quantum.obs
+
+                // CHECK: [[samples:%.+]] = quantum.sample [[obs0]] : tensor<5x3xf64>
+                // CHECK-NOT: quantum.var
+                %9 = quantum.var %8 : f64
+                %10 = "tensor.from_elements"(%9) : (f64) -> tensor<f64>
+
+                // CHECK: func.return [[samples]] : tensor<5x3xf64>
+                func.return %10 : tensor<f64>
+            }
+            // CHECK-LABEL: func.func public @var_from_samples.tensor.5x3xf64
+        }
+        """
+
+        pipeline = (MeasurementsFromSamplesPass(),)
+        run_filecheck(program, pipeline)
+    
 
 @pytest.mark.usefixtures("use_capture")
-class TestMeasurementsFromSamplesIntegration:
-    """Tests of the execution of simple workloads with the xDSL-based MeasurementsFromSamplesPass
-    transform.
-    """
+class TestIntegrationUsefulErrors:
+    """Test that useful error messages are raised in the frontend for unsupported behaviour"""
 
     def test_no_shots_raises_error(self):
         """Test that when no shots are provided, the pass raises an error"""
@@ -463,410 +581,141 @@ class TestMeasurementsFromSamplesIntegration:
         ):
             circuit(1.2)
 
-    @pytest.mark.parametrize("shots", [1, 2])
-    @pytest.mark.parametrize(
-        "initial_op, mp, obs, expected_res",
-        [
-            # PauliZ observables
-            (qml.I, qml.expval, qml.Z, 1.0),
-            (qml.X, qml.expval, qml.Z, -1.0),
-            (qml.I, qml.var, qml.Z, 0.0),
-            (qml.X, qml.var, qml.Z, 0.0),
-            # PauliX observables
-            pytest.param(
-                partial(qml.RY, phi=np.pi / 2),
-                qml.expval,
-                qml.X,
-                1.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
-            ),
-            pytest.param(
-                partial(qml.RY, phi=-np.pi / 2),
-                qml.expval,
-                qml.X,
-                -1.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
-            ),
-            pytest.param(
-                partial(qml.RY, phi=np.pi / 2),
-                qml.var,
-                qml.X,
-                0.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
-            ),
-            pytest.param(
-                partial(qml.RY, phi=-np.pi / 2),
-                qml.var,
-                qml.X,
-                0.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
-            ),
-            # PauliY observables
-            pytest.param(
-                partial(qml.RX, phi=-np.pi / 2),
-                qml.expval,
-                qml.Y,
-                1.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
-            ),
-            pytest.param(
-                partial(qml.RX, phi=np.pi / 2),
-                qml.expval,
-                qml.Y,
-                -1.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
-            ),
-            pytest.param(
-                partial(qml.RX, phi=-np.pi / 2),
-                qml.var,
-                qml.Y,
-                0.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
-            ),
-            pytest.param(
-                partial(qml.RX, phi=np.pi / 2),
-                qml.var,
-                qml.Y,
-                0.0,
-                marks=pytest.mark.xfail(
-                    reason="Only PauliZ-basis measurements supported",
-                    strict=True,
-                    raises=NotImplementedError,
-                ),
-            ),
-        ],
-    )
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
-    def test_exec_1_wire_mp_with_obs(self, shots, initial_op, mp, obs, expected_res):
-        """Test the measurements_from_samples transform on a device with a single wire and terminal
-        measurements that require an observable (i.e. expval and var).
-        """
-
-        dev = qml.device("lightning.qubit", wires=1)
-
-        @qml.qnode(dev, shots=shots)
-        def circuit_ref():
-            initial_op(wires=0)
-            return mp(obs(wires=0))
-
-        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
-        circuit_compiled = qml.qjit(
-            measurements_from_samples_pass(circuit_ref),
-        )
-
-        assert expected_res == circuit_compiled()
-
-    # -------------------------------------------------------------------------------------------- #
-
-    @pytest.mark.parametrize("shots", [1, 2])
-    @pytest.mark.parametrize(
-        "initial_op, expected_res",
-        [
-            (qml.I, [1.0, 0.0]),
-            (qml.X, [0.0, 1.0]),
-        ],
-    )
-    def test_exec_1_wire_probs(self, shots, initial_op, expected_res):
-        """Test the measurements_from_samples transform on a device with a single wire and terminal
-        probs measurements.
-        """
-
-        dev = qml.device("lightning.qubit", wires=1)
-
-        @qml.qnode(dev, shots=shots)
-        def circuit_ref():
-            initial_op(wires=0)
-            return qml.probs(wires=0)
-
-        assert np.array_equal(
-            expected_res, circuit_ref()
-        ), "Sanity check failed, is expected_res correct?"
-        circuit_compiled = qml.qjit(
-            measurements_from_samples_pass(circuit_ref),
-        )
-
-        assert np.array_equal(expected_res, circuit_compiled())
-
-    # -------------------------------------------------------------------------------------------- #
-
-    @pytest.mark.xfail(
-        reason="Counts not supported in Catalyst with program capture",
-        strict=True,
-        raises=NotImplementedError,
-    )
-    @pytest.mark.parametrize("shots", [1, 2])
-    @pytest.mark.parametrize(
-        "initial_op, expected_res",
-        [
-            (qml.I, {"0": 10, "1": 0}),
-            (qml.X, {"0": 0, "1": 10}),
-        ],
-    )
-    def test_exec_1_wire_counts(self, shots, initial_op, expected_res):
-        """Test the measurements_from_samples transform on a device with a single wire and terminal
-        counts measurements.
-        """
-
-        dev = qml.device("lightning.qubit", wires=1)
-
-        @qml.qnode(dev, shots=shots)
-        def circuit_ref():
-            initial_op(wires=0)
-            return qml.counts(wires=0, all_outcomes=True)
-
-        assert np.array_equal(
-            expected_res, circuit_ref()
-        ), "Sanity check failed, is expected_res correct?"
-
-        circuit_compiled = qml.qjit(
-            measurements_from_samples_pass(circuit_ref),
-        )
-
-        assert np.array_equal(expected_res, _counts_catalyst_to_pl(*circuit_compiled()))
-
-    # -------------------------------------------------------------------------------------------- #
-
-    @pytest.mark.parametrize("shots", [1, 2])
-    @pytest.mark.parametrize(
-        "initial_op, expected_res_base",
-        [
-            (qml.I, 0),
-            (qml.X, 1),
-        ],
-    )
-    def test_exec_1_wire_sample(self, shots, initial_op, expected_res_base):
-        """Test the measurements_from_samples transform on a device with a single wire and terminal
-        sample measurements.
-
-        In this case, the measurements_from_samples pass should effectively be a no-op.
-        """
-        dev = qml.device("lightning.qubit", wires=1)
-
-        @qml.qnode(dev, shots=shots)
-        def circuit_ref():
-            initial_op(wires=0)
-            return qml.sample(wires=0)
-
-        circuit_compiled = qml.qjit(
-            measurements_from_samples_pass(circuit_ref),
-        )
-
-        expected_res = expected_res_base * np.ones(shape=(shots, 1), dtype=int)
-
-        assert np.array_equal(expected_res, circuit_compiled())
-
-    # -------------------------------------------------------------------------------------------- #
-
-    @pytest.mark.parametrize("shots", [1, 2])
-    @pytest.mark.parametrize(
-        "initial_ops, mp, obs, expected_res",
-        [
-            ((qml.I, qml.I), qml.expval, qml.Z, (1.0, 1.0)),
-            ((qml.I, qml.X), qml.expval, qml.Z, (1.0, -1.0)),
-            ((qml.X, qml.I), qml.expval, qml.Z, (-1.0, 1.0)),
-            ((qml.X, qml.X), qml.expval, qml.Z, (-1.0, -1.0)),
-            ((qml.I, qml.I), qml.var, qml.Z, (0.0, 0.0)),
-            ((qml.I, qml.X), qml.var, qml.Z, (0.0, 0.0)),
-            ((qml.X, qml.I), qml.var, qml.Z, (0.0, 0.0)),
-            ((qml.X, qml.X), qml.var, qml.Z, (0.0, 0.0)),
-        ],
-    )
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
-    def test_exec_2_wire_with_obs_separate(self, shots, initial_ops, mp, obs, expected_res):
-        """Test the measurements_from_samples transform on a device with two wires and terminal
-        measurements that require an observable (i.e. expval and var).
-
-        In this test, the terminal measurements are performed separately per wire.
-        """
-
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qnode(dev, shots=shots)
-        def circuit_ref():
-            initial_ops[0](wires=0)
-            initial_ops[1](wires=1)
-            return mp(obs(wires=0)), mp(obs(wires=1))
-
-        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
-        circuit_compiled = qml.qjit(
-            measurements_from_samples_pass(circuit_ref),
-        )
-
-        assert expected_res == circuit_compiled()
-
-    # -------------------------------------------------------------------------------------------- #
-
-    @pytest.mark.xfail(
-        reason="Operator arithmetic not yet supported with capture enabled", strict=True
-    )
-    @pytest.mark.parametrize("shots", [1, 2])
-    @pytest.mark.parametrize(
-        "initial_ops, mp, expected_res",
-        [
-            ((qml.I, qml.I), qml.expval, 1.0),
-            ((qml.I, qml.X), qml.expval, -1.0),
-            ((qml.X, qml.I), qml.expval, -1.0),
-            ((qml.X, qml.X), qml.expval, 1.0),
-            ((qml.I, qml.I), qml.var, 0.0),
-            ((qml.I, qml.X), qml.var, 0.0),
-            ((qml.X, qml.I), qml.var, 0.0),
-            ((qml.X, qml.X), qml.var, 0.0),
-        ],
-    )
-    def test_exec_2_wire_with_obs_combined(self, shots, initial_ops, mp, expected_res):
-        """Test the measurements_from_samples transform on a device with two wires and terminal
-        measurements that require an observable (i.e. expval and var).
-
-        In this test, the terminal measurements are performed on the combination of both wires.
-        """
-
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qnode(dev, shots=shots)
-        def circuit_ref():
-            initial_ops[0](wires=0)
-            initial_ops[1](wires=1)
-            return mp(qml.Z(wires=0) @ qml.Z(wires=1))
-
-        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
-
-        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
-
-        assert expected_res == circuit_compiled()
-
-    # -------------------------------------------------------------------------------------------- #
-
-    @pytest.mark.parametrize("shots", [1, 2])
-    @pytest.mark.parametrize(
-        "initial_ops, expected_res",
-        [
-            ((qml.I, qml.I), [1.0, 0.0, 0.0, 0.0]),
-            ((qml.I, qml.X), [0.0, 1.0, 0.0, 0.0]),
-            ((qml.X, qml.I), [0.0, 0.0, 1.0, 0.0]),
-            ((qml.X, qml.X), [0.0, 0.0, 0.0, 1.0]),
-        ],
-    )
-    def test_exec_2_wire_probs_global(self, shots, initial_ops, expected_res):
-        """Test the measurements_from_samples transform on a device with two wires and a terminal,
-        "global" probs measurements (one that implicitly acts on all wires).
-        """
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qnode(dev, shots=shots)
-        def circuit_ref():
-            initial_ops[0](wires=0)
-            initial_ops[1](wires=1)
-            return qml.probs()
-
-        assert np.array_equal(
-            expected_res, circuit_ref()
-        ), "Sanity check failed, is expected_res correct?"
-        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
-
-        assert np.array_equal(expected_res, circuit_compiled())
-
-    # -------------------------------------------------------------------------------------------- #
-
-    @pytest.mark.parametrize("shots", [1, 2])
-    @pytest.mark.parametrize(
-        "initial_ops, expected_res",
-        [
-            ((qml.I, qml.I), ([1.0, 0.0], [1.0, 0.0])),
-            ((qml.I, qml.X), ([1.0, 0.0], [0.0, 1.0])),
-            ((qml.X, qml.I), ([0.0, 1.0], [1.0, 0.0])),
-            ((qml.X, qml.X), ([0.0, 1.0], [0.0, 1.0])),
-        ],
-    )
-    def test_exec_2_wire_probs_per_wire(self, shots, initial_ops, expected_res):
-        """Test the measurements_from_samples transform on a device with two wires and a terminal,
-        "global" probs measurements (one that implicitly acts on all wires).
-        """
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qnode(dev, shots=shots)
-        def circuit_ref():
-            initial_ops[0](wires=0)
-            initial_ops[1](wires=1)
-            return qml.probs(wires=0), qml.probs(wires=1)
-
-        assert np.array_equal(
-            expected_res, circuit_ref()
-        ), "Sanity check failed, is expected_res correct?"
-        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
-
-        assert np.array_equal(expected_res, circuit_compiled())
-
-    # -------------------------------------------------------------------------------------------- #
-
-    @pytest.mark.xfail(reason="Dynamic shots not supported")
-    def test_exec_expval_dynamic_shots(self):
-        """Test the measurements_from_samples transform where the number of shots is dynamic.
-
-        This use case is not currently supported.
-        """
+    def test_dynamic_shots_raises_useful_error(self):
+        """Test that when dynamic shots are provided, the pass raises an error"""
 
         @qml.qjit
-        def workload(shots):
-            dev = qml.device("lightning.qubit", wires=1)
+        @measurements_from_samples_pass
+        def workflow(a, shots):
+            
+            @qml.set_shots(shots)
+            @qml.qnode(qml.device("lightning.qubit", wires=1))
+            def circuit(x):
+                qml.RX(x, 0)
+                return qml.expval(qml.Z(0))
+            
+            circuit(a)
 
+        with pytest.raises(
+            ValueError, match="measurements_from_samples pass requires non-zero shots"
+        ):
+            workflow(1.2, 100)
+
+    def test_counts_raises_not_implemented(self):
+        """Test that a circuit with counts causes measurements_from_samples_pass 
+        to raise a NotImplementedError"""
+
+        dev = qml.device("lightning.qubit", wires=4)
+
+        with pytest.raises(
+            NotImplementedError, match="not implemented with measurements_from_samples"
+        ):
+            @qml.qjit
             @measurements_from_samples_pass
-            @qml.qnode(dev, shots=shots)
-            def circuit():
-                return qml.expval(qml.Z(wires=0))
+            @qml.set_shots(1000)
+            @qml.qnode(dev)
+            def circuit(theta: float):
+                qml.RX(theta, 0)
+                return qml.counts()
 
-            return circuit()
+    @pytest.mark.parametrize("mp", (qml.expval, qml.var))
+    def test_overlapping_tensor(self, mp):
+        """Check that an error is raised if the circuit returns a tensor with overlapping wires."""
+        
+        # Note: This error is raised by the diagonalize pass that measurements_from_samples 
+        # calls, not by measurements_from_samples directly. However, the logic in this pass 
+        # relies on the validation being performed, so its tested here. If this test ever breaks 
+        # because of changes in diagonalize_measurements, the logic in measurements_from_samples 
+        # should be re-evaluated.  
 
-        result = workload(2)
-        assert result == 1.0
-
-    def test_qjit_filecheck(self, run_filecheck_qjit):
-        """Test that the measurements_from_samples_pass works correctly with qjit."""
         dev = qml.device("lightning.qubit", wires=2)
 
-        @qml.qjit(target="mlir")
-        @measurements_from_samples_pass
-        @qml.qnode(dev, shots=25)
-        def circuit():
-            # CHECK-NOT: quantum.namedobs
-            # CHECK: [[obs:%.+]] = quantum.compbasis
-            # CHECK: [[samples:%.+]] = quantum.sample [[obs]] : tensor<25x1xf64>
-            # CHECK: [[c0:%.+]] = arith.constant dense<0> : tensor<i64>
-            # CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.25x1xf64([[samples]], [[c0]]) :
-            # CHECK-SAME: (tensor<25x1xf64>, tensor<i64>) -> tensor<f64>
-            # CHECK-NOT: quantum.expval
-            return qml.expval(qml.Z(wires=0))
+        with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
+            @qml.qjit
+            @measurements_from_samples_pass
+            @qml.qnode(dev, shots=1000)
+            def circuit():
+                return mp(qml.Z(0) @ qml.X(0))
+            
+    @pytest.mark.parametrize("mp", (qml.expval, qml.var))
+    def test_overlapping_sum(self, mp):
+        """Check that an error is raised if the circuit returns a sum with overlapping wires."""
+        
+        # Note: This error is raised by the diagonalize pass that measurements_from_samples 
+        # calls, not by measurements_from_samples directly. However, the logic in this pass 
+        # relies on the validation being performed, so its tested here. If this test ever breaks 
+        # because of changes in diagonalize_measurements, the logic in measurements_from_samples 
+        # should be re-evaluated.  
 
-        run_filecheck_qjit(circuit)
+        dev = qml.device("lightning.qubit", wires=2)
 
-    @pytest.mark.usefixtures("use_capture")
+        with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
+            @qml.qjit
+            @measurements_from_samples_pass
+            @qml.qnode(dev, shots=1000)
+            def circuit():
+                return mp(2*qml.Z(0) + qml.X(0))
+
+    @pytest.mark.parametrize("mp", (qml.expval, qml.var))
+    def test_overlapping_mps(self, mp):
+        """Check that an error is raised if the circuit returns different mps 
+        containing observables with overlapping wires."""
+        
+        # Note: This error is raised by the diagonalize pass that measurements_from_samples 
+        # calls, not by measurements_from_samples directly. However, the logic in this pass 
+        # relies on the validation being performed, so its tested here. If this test ever breaks 
+        # because of changes in diagonalize_measurements, the logic in measurements_from_samples 
+        # should be re-evaluated.  
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
+            @qml.qjit
+            @measurements_from_samples_pass
+            @qml.qnode(dev, shots=1000)
+            def circuit():
+                return mp(qml.Z(0)), mp(qml.X(0))
+
+    def test_overlapping_obs_and_sample(self):
+        """Check that an error is raised if the circuit returns an mp with an observable that
+        overlaps with an mp in the computational basis."""
+        
+        # Note: This error is raised by the diagonalize pass that measurements_from_samples 
+        # calls, not by measurements_from_samples directly. However, the logic in this pass 
+        # relies on the validation being performed, so its tested here. If this test ever breaks 
+        # because of changes in diagonalize_measurements, the logic in measurements_from_samples 
+        # should be re-evaluated.        
+                
+        dev = qml.device("lightning.qubit", wires=2)
+
+        with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
+            @qml.qjit
+            @measurements_from_samples_pass
+            @qml.qnode(dev, shots=1000)
+            def circuit():
+                return qml.sample(wires=[0]), qml.expval(qml.X(0))
+
+    @pytest.mark.parametrize("obs", (2*qml.X(0), qml.X(1) + qml.X(2)))
+    def test_hamlitonianop_raises_error(self, obs):
+        """Test that a circuit with a HamiltonianOp observable raises an error message 
+        instructing the user to apply `split-non-commuting` first"""
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        with pytest.raises(CompileError, match="apply `qml.transforms.split_non_commuting`"):
+
+            @qml.qjit
+            @measurements_from_samples_pass
+            @qml.qnode(dev, shots=1000)
+            def circuit():
+                return qml.expval(obs)
+
+@pytest.mark.usefixtures("use_capture")
+class TestIntegrationWithOtherPasses:
+    """Tests the integration of the xDSL-based MeasurementsFromSamplesPass transform with 
+    other key passes.
+    """
+
     def test_integrate_with_decompose(self):
         """Test that the measurements_from_samples pass works correctly when used in combination
         with the decompose pass."""
@@ -886,18 +735,646 @@ class TestMeasurementsFromSamplesIntegration:
         res = circuit()
         assert res == 1.0
 
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), 2.0),
+            ((qml.I, qml.X), 2.0),
+            ((qml.X, qml.I), -2.0),
+            ((qml.X, qml.X), -2.0),
+        ],
+    )
+    def test_expval_sprod_with_split_non_commuting(self, shots, initial_ops, expected_res):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
 
-def _counts_catalyst_to_pl(basis_states, counts):
-    """Helper function to convert counts in the Catalyst format to the PennyLane format.
+        In this test, the terminal measurements are performed on the combination of both wires.
+        """
 
-    Example:
+        dev = qml.device("lightning.qubit", wires=2)
 
-    >>> basis_states, counts = ([0, 1], [6, 4])
-    >>> _counts_catalyst_to_pl(basis_states, counts)
-    {'0': 6, '1': 4}
+        @qml.qjit
+        @qml.transform(pass_name="measurements-from-samples")
+        @qml.transform(pass_name="split-non-commuting")
+        @qml.qnode(dev, shots=shots)
+        def circuit():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            return qml.expval(2 * qml.Z(wires=0))
+
+        assert expected_res == circuit()
+
+    @pytest.mark.xfail(reason="split-non-commuting doesn't support var")
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), 2.0),
+            ((qml.I, qml.X), 2.0),
+            ((qml.X, qml.I), -2.0),
+            ((qml.X, qml.X), -2.0),
+        ],
+    )
+    def test_var_sprod_with_split_non_commuting(self, shots, initial_ops, expected_res):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed on the combination of both wires.
+        """
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit
+        @qml.transform(pass_name="measurements-from-samples")
+        @qml.transform(pass_name="split-non-commuting")
+        @qml.qnode(dev, shots=shots)
+        def circuit():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            return qml.var(2 * qml.Z(wires=0))
+
+        assert expected_res == circuit()
+
+    #ToDo: use analytic test repo, make this more accurate. Make the same change to the var test even if it can't pass.
+    @pytest.mark.parametrize("shots", [2000, 3000])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), 2.0),
+            ((qml.I, qml.X), 2.0),
+            ((qml.X, qml.I), -2.0),
+            ((qml.X, qml.X), -2.0),
+        ],
+    )
+    def test_expval_sum_with_split_non_commuting(self, shots, initial_ops, expected_res):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed on the combination of both wires.
+        """
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit
+        @qml.transform(pass_name="measurements-from-samples")
+        @qml.transform(pass_name="split-non-commuting")
+        @qml.qnode(dev, shots=shots)
+        def circuit():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            return qml.expval(2*qml.Z(wires=0) + qml.X(1))
+        
+        np.isclose(expected_res, circuit())
+
+    @pytest.mark.xfail(reason="split-non-commuting doesn't support var")
+    @pytest.mark.parametrize("shots", [2000, 3000])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), 2.0),
+            ((qml.I, qml.X), 2.0),
+            ((qml.X, qml.I), -2.0),
+            ((qml.X, qml.X), -2.0),
+        ],
+    )
+    def test_var_sum_with_split_non_commuting(self, shots, initial_ops, expected_res):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed on the combination of both wires.
+        """
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit
+        @qml.transform(pass_name="measurements-from-samples")
+        @qml.transform(pass_name="split-non-commuting")
+        @qml.qnode(dev, shots=shots)
+        def circuit():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            return qml.var(2*qml.Z(wires=0) + qml.X(1))
+        
+        np.isclose(expected_res, circuit())
+
+@pytest.mark.usefixtures("use_capture")
+class TestIntegrationWithExecution:
+    """Tests of the execution of simple workloads with the xDSL-based MeasurementsFromSamplesPass
+    transform and compare to expected results. The run_filecheck function is used to verify that the
+    expected changes to the IR were applied, as a sanity check.
     """
-    return {format(int(state), "01b"): count for state, count in zip(basis_states, counts)}
 
+    @pytest.mark.parametrize("transform", [measurements_from_samples_pass, qml.transform(pass_name="measurements-from-samples")])
+    def test_qjit_filecheck(self, transform, run_filecheck_qjit):
+        """Test that the measurements_from_samples_pass works correctly with qjit when 
+        applied directly and as a qml.transform."""
+
+        dev = qml.device("lightning.qubit", wires=2)
+    
+        #ToDo: (I think its CHECK-LABEL, see above) I believe there was a way with the list tests to test that the first part is inside func.func public @circuit and the rest inside circuit.from_samples
+        @qml.qjit(target="mlir")
+        @transform
+        @qml.qnode(dev, shots=25)
+        def circuit():
+            # CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<25x1xf64>
+            # CHECK: func.call @expval_from_samples.tensor.25x1xf64([[samples]]) :
+            # CHECK-SAME: (tensor<25x1xf64>) -> tensor<f64>
+            # CHECK-NOT: quantum.namedobs
+            # CHECK: [[obs:%.+]] = quantum.compbasis
+            # CHECK: [[samples:%.+]] = quantum.sample [[obs]] : tensor<25x1xf64>
+            # CHECK-NOT: quantum.expval
+            return qml.expval(qml.Z(wires=0))
+
+        run_filecheck_qjit(circuit)
+
+    # ---- Test circuits returning expectation values -------------------------------------------- #
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_op, obs, expected_res",
+        [
+            # PauliZ observables
+            (qml.I, qml.Z, 1.0),
+            (qml.X, qml.Z, -1.0),
+            # PauliX observables
+            pytest.param(
+                partial(qml.RY, phi=np.pi / 2),
+                qml.X,
+                1.0,
+            ),
+            pytest.param(
+                partial(qml.RY, phi=-np.pi / 2),
+                qml.X,
+                -1.0,
+            ),
+            # PauliY observables
+            pytest.param(
+                partial(qml.RX, phi=-np.pi / 2),
+                qml.Y,
+                1.0,
+            ),
+            pytest.param(
+                partial(qml.RX, phi=np.pi / 2),
+                qml.Y,
+                -1.0,
+            ),
+        ],
+    )
+    def test_expval_single_wire(self, shots, initial_op, obs, expected_res, run_filecheck_qjit):
+        """Test the measurements_from_samples transform on a circuit that measures an 
+        expval of an observable on the single wire.
+        """
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_op(wires=0)
+            # CHECK-NOT: quantum.namedobs
+            # CHECK: quantum.sample
+            return qml.expval(obs(wires=0))
+
+        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
+        circuit_compiled = qml.qjit(
+            measurements_from_samples_pass(circuit_ref),
+        )
+
+        run_filecheck_qjit(circuit_compiled)
+
+        assert expected_res == circuit_compiled()
+
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, obs, expected_res",
+        [
+            ((qml.I, qml.I), qml.Z, (1.0, 1.0)),
+            ((qml.I, qml.X), qml.Z, (1.0, -1.0)),
+            ((qml.X, qml.I), qml.Z, (-1.0, 1.0)),
+            ((qml.X, qml.X), qml.Z, (-1.0, -1.0)),
+        ],
+    )
+    def test_expval_2_mps(self, shots, initial_ops, obs, expected_res, run_filecheck_qjit):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed separately per wire.
+        """
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            # CHECK-NOT: quantum.namedobs
+            # CHECK-NOT: quantum.expval
+            # CHECK: quantum.sample
+            return qml.expval(obs(wires=0)), qml.expval(obs(wires=1))
+
+        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
+        circuit_compiled = qml.qjit(
+            measurements_from_samples_pass(circuit_ref),
+        )
+
+        run_filecheck_qjit(circuit_compiled)
+
+        assert expected_res == circuit_compiled()
+
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), 1.0),
+            ((qml.I, qml.X), -1.0),
+            ((qml.X, qml.I), -1.0),
+            ((qml.X, qml.X), 1.0),
+        ],
+    )
+    def test_expval_tensor(self, shots, initial_ops, expected_res, run_filecheck_qjit):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed on the combination of both wires.
+        """
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            # CHECK-NOT: quantum.namedobs
+            # CHECK-NOT: quantum.expval
+            # CHECK: quantum.sample
+            return qml.expval(qml.Z(wires=0) @ qml.Z(wires=1))
+
+        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
+
+        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
+
+        run_filecheck_qjit(circuit_compiled)
+
+        assert expected_res == circuit_compiled()
+
+    @pytest.mark.xfail(reason="mcms not supported yet")
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), 1.0),
+            ((qml.I, qml.X), -1.0),
+            ((qml.X, qml.I), -1.0),
+            ((qml.X, qml.X), 1.0),
+        ],
+    )
+    def test_expval_mcm(self, shots, initial_ops, expected_res, run_filecheck_qjit):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements provide statistics on an MCM.
+        """
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit
+        @qml.transform(pass_name="measurements-from-samples")
+        @qml.qnode(dev, shots=shots)
+        def circuit():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            m = qml.measure(0)
+            # CHECK-NOT: quantum.expval
+            # CHECK: quantum.sample
+            return qml.expval(m)
+
+        run_filecheck_qjit(circuit)
+
+        assert np.allclose(expected_res, circuit(), atol=0.05)
+
+    # ---- Test circuits returning variance ------------------------------------------------------ #
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_op, obs, expected_res",
+        [
+            # PauliZ observables
+            (qml.I, qml.Z, 0.0),
+            (qml.X, qml.Z, 0.0),
+            # PauliX observables
+            pytest.param(
+                partial(qml.RY, phi=np.pi / 2),
+                qml.X,
+                0.0,
+            ),
+            pytest.param(
+                partial(qml.RY, phi=-np.pi / 2),
+                qml.X,
+                0.0,
+            ),
+            # PauliY observables
+            pytest.param(
+                partial(qml.RX, phi=-np.pi / 2),
+                qml.Y,
+                0.0,
+            ),
+            pytest.param(
+                partial(qml.RX, phi=np.pi / 2),
+                qml.Y,
+                0.0,
+            ),
+        ],
+    )
+    def test_single_wire_var(self, shots, initial_op, obs, expected_res, run_filecheck_qjit):
+        """Test the measurements_from_samples transform on a circuit that measures an 
+        variance of an observable on the single wire.
+        """
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_op(wires=0)
+            # CHECK-NOT: quantum.namedobs
+            # CHECK-NOT: quantum.var
+            # CHECK: quantum.sample
+            return qml.var(obs(wires=0))
+
+        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
+        circuit_compiled = qml.qjit(
+            measurements_from_samples_pass(circuit_ref),
+        )
+
+        run_filecheck_qjit(circuit_compiled)
+
+        assert expected_res == circuit_compiled()
+
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, obs, expected_res",
+        [
+            ((qml.I, qml.I), qml.Z, (0.0, 0.0)),
+            ((qml.I, qml.X), qml.Z, (0.0, 0.0)),
+            ((qml.X, qml.I), qml.Z, (0.0, 0.0)),
+            ((qml.X, qml.X), qml.Z, (0.0, 0.0)),
+        ],
+    )
+    def test_2_variance_mps(self, shots, initial_ops, obs, expected_res, run_filecheck_qjit):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed separately per wire.
+        """
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            # CHECK-NOT: quantum.namedobs
+            # CHECK-NOT: quantum.var
+            # CHECK: quantum.sample
+            return qml.var(obs(wires=0)), qml.var(obs(wires=1))
+
+        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
+        circuit_compiled = qml.qjit(
+            measurements_from_samples_pass(circuit_ref),
+        )
+
+        run_filecheck_qjit(circuit_compiled)
+
+        assert expected_res == circuit_compiled()
+
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), 0.0),
+            ((qml.I, qml.X), 0.0),
+            ((qml.X, qml.I), 0.0),
+            ((qml.X, qml.X), 0.0),
+        ],
+    )
+    def test_var_tensor(self, shots, initial_ops, expected_res, run_filecheck_qjit):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed on the combination of both wires.
+        """
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            # CHECK-NOT: quantum.namedobs
+            # CHECK-NOT: quantum.var
+            # CHECK: quantum.sample
+            return qml.var(qml.Z(wires=0) @ qml.Z(wires=1))
+
+        assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
+
+        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
+
+        run_filecheck_qjit(circuit_compiled)
+
+        assert expected_res == circuit_compiled()
+
+    # ---- Test circuits returning probability --------------------------------------------------- #
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_op, expected_res",
+        [
+            (qml.I, [1.0, 0.0]),
+            (qml.X, [0.0, 1.0]),
+        ],
+    )
+    def test_exec_1_wire_probs(self, shots, initial_op, expected_res, run_filecheck_qjit):
+        """Test the measurements_from_samples transform on a device with a single wire and terminal
+        probs measurements.
+        """
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_op(wires=0)
+            # CHECK-NOT: quantum.probs
+            # CHECK: quantum.sample
+            return qml.probs(wires=0)
+
+        assert np.array_equal(
+            expected_res, circuit_ref()
+        ), "Sanity check failed, is expected_res correct?"
+        circuit_compiled = qml.qjit(
+            measurements_from_samples_pass(circuit_ref),
+        )
+
+        run_filecheck_qjit(circuit_compiled)
+
+        assert np.array_equal(expected_res, circuit_compiled())
+
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), [1.0, 0.0, 0.0, 0.0]),
+            ((qml.I, qml.X), [0.0, 1.0, 0.0, 0.0]),
+            ((qml.X, qml.I), [0.0, 0.0, 1.0, 0.0]),
+            ((qml.X, qml.X), [0.0, 0.0, 0.0, 1.0]),
+        ],
+    )
+    def test_exec_2_wire_probs_global(self, shots, initial_ops, expected_res, run_filecheck_qjit):
+        """Test the measurements_from_samples transform on a device with two wires and a terminal,
+        "global" probs measurements (one that implicitly acts on all wires).
+        """
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            # CHECK-NOT: quantum.probs
+            # CHECK: quantum.sample
+            return qml.probs()
+
+        assert np.array_equal(
+            expected_res, circuit_ref()
+        ), "Sanity check failed, is expected_res correct?"
+        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
+
+        run_filecheck_qjit(circuit_compiled)
+
+        assert np.array_equal(expected_res, circuit_compiled())
+
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), ([1.0, 0.0], [1.0, 0.0])),
+            ((qml.I, qml.X), ([1.0, 0.0], [0.0, 1.0])),
+            ((qml.X, qml.I), ([0.0, 1.0], [1.0, 0.0])),
+            ((qml.X, qml.X), ([0.0, 1.0], [0.0, 1.0])),
+        ],
+    )
+    def test_exec_2_wire_probs_per_wire(self, shots, initial_ops, expected_res, run_filecheck_qjit):
+        """Test the measurements_from_samples transform on a device with two wires and a terminal,
+        "global" probs measurements (one that implicitly acts on all wires).
+        """
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            # CHECK-NOT: quantum.probs
+            # CHECK: quantum.sample
+            return qml.probs(wires=0), qml.probs(wires=1)
+
+        assert np.array_equal(
+            expected_res, circuit_ref()
+        ), "Sanity check failed, is expected_res correct?"
+        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
+
+        run_filecheck_qjit(circuit_compiled)
+
+        assert np.array_equal(expected_res, circuit_compiled())
+
+    # ---- Test circuits returning samples ------------------------------------------------------- #
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_op, expected_res_base",
+        [
+            (qml.I, 0),
+            (qml.X, 1),
+        ],
+    )
+    def test_exec_1_wire_sample(self, shots, initial_op, expected_res_base, run_filecheck_qjit):
+        """Test the measurements_from_samples transform on a device with a single wire and terminal
+        sample measurements.
+
+        In this case, the measurements_from_samples pass should effectively be a no-op.
+        """
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev, shots=shots)
+        def circuit_ref():
+            initial_op(wires=0)
+            # CHECK: quantum.sample
+            return qml.sample(wires=0)
+
+        circuit_compiled = qml.qjit(
+            measurements_from_samples_pass(circuit_ref),
+        )
+
+        expected_res = expected_res_base * np.ones(shape=(shots, 1), dtype=int)
+
+        run_filecheck_qjit(circuit_compiled)
+
+        assert np.array_equal(expected_res, circuit_compiled())
+
+    # ----- Test circuit with mixed returns ------------------------------------------------------ #
+    def test_measurements_from_samples_multiple_measurements(self, run_filecheck_qjit):
+        """Test the transform measurements_from_samples with multiple measurement types
+        as part of the Catalyst pipeline."""
+
+        dev = qml.device("lightning.qubit", wires=4)
+
+        @qml.set_shots(5000)
+        @qml.qnode(dev)
+        def basic_circuit(theta: float):
+            qml.RY(theta, 0)
+            qml.RY(theta / 2, 1)
+            qml.RY(2 * theta, 2)
+            qml.RY(theta, 3)
+            # CHECK-NOT: quantum.namedobs
+            # CHECK-NOT: quantum.expval
+            # CHECK-NOT: quantum.var
+            # CHECK-NOT: quantum.probs
+            # CHECK: quantum.sample
+            return (
+                # qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
+                qml.var(qml.PauliX(wires=1)),
+                # qml.sample(wires=[2]),
+                # qml.sample(qml.Pagit uliX(wires=0) @ qml.PauliX(wires=1) @ qml.PauliX(wires=2)),
+                # qml.probs(wires=[3]),
+            )
+
+        circuit_compiled = qml.qjit(measurements_from_samples_pass(basic_circuit), seed=37)
+
+        run_filecheck_qjit(circuit_compiled)
+
+        theta = 1.9
+
+        expval_res, var_res, sample_res, probs_res = circuit_compiled(theta)
+
+        expval_expected = np.sin(theta) * np.sin(theta / 2)
+        var_expected = 1 - np.sin(2 * theta) ** 2
+        sample_expected = basic_circuit(theta)[2]
+        probs_expected = [np.cos(theta / 2) ** 2, np.sin(theta / 2) ** 2]
+
+        assert np.isclose(expval_res, expval_expected, atol=0.05)
+        assert np.isclose(var_res, var_expected, atol=0.05)
+        assert np.allclose(probs_res, probs_expected, atol=0.05)
+
+        # sample comparison
+        assert np.isclose(np.mean(sample_res), np.mean(sample_expected), atol=0.05)
+        assert len(sample_res) == len(sample_expected)
+        assert set(np.array(sample_res)) == set(sample_expected)
+
+    # ToDo: add something like this (Requires program capture off because of identity)
+    # ToDo: add similar lit test
+    # def test_with_identity(self):
+    #     qp.capture.disable()
+
+    #     @qp.qjit(keep_intermediate=False)
+    #     # @qp.transforms.diagonalize_measurements
+    #     @qp.transform(pass_name="measurements-from-samples")
+    #     @qp.set_shots(10)
+    #     @qp.qnode(device=qp.device("lightning.qubit", wires=5))
+    #     def a_circ():
+    #         return qp.expval(qp.X(0)@qp.Y(1)), qp.expval(qp.Identity(1))
+
+    #     a_circ()
+    #     print(a_circ.mlir)
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
