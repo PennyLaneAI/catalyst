@@ -177,7 +177,7 @@ LogicalResult ExtractCodeblockOp::canonicalize(ExtractCodeblockOp extract,
  *
  *   %r0 = ... : !qecl.hyperreg<3 x 1>
  *   %b0 = extract_block %r0[0]
- *   %r1 = insert_block %r1[0], %b0
+ *   %r1 = insert_block %r0[0], %b0
  *   %r2 = test.op %r1
  *
  * and converts to:

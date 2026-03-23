@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """Unit and integration tests for the unified compiler `measurements_from_samples` transform."""
 # pylint: disable=line-too-long
 
@@ -19,6 +20,7 @@ from functools import partial
 import numpy as np
 import pennylane as qml
 import pytest
+from pennylane.exceptions import CompileError
 
 from catalyst.python_interface.transforms import (
     MeasurementsFromSamplesPass,
@@ -87,12 +89,50 @@ class TestMeasurementsFromSamplesPass:
         run_filecheck(program, pipeline)
 
     def test_1_wire_expval_shots_from_arith_constantop(self, run_filecheck):
-        """Test the measurements-from-samples pass on a 1-wire circuit with shots from an arith.constant op and an expval(Z) measurement."""
+        """Test the measurements-from-samples pass on a 1-wire circuit with shots from an
+        arith.constant op and an expval(Z) measurement."""
+
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
             func.func public @circuit() -> (tensor<f64>) {
                 %0 = arith.constant 1 : i64
+                quantum.device shots(%0) ["", "", ""]
+
+                // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
+                %1 = "test.op"() : () -> !quantum.bit
+
+                // CHECK-NOT: quantum.namedobs
+                %2 = quantum.namedobs %1[PauliZ] : !quantum.obs
+
+                // CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q0]] : !quantum.obs
+                // CHECK: [[samples:%.+]] = quantum.sample [[obs]] : tensor<1x1xf64>
+                // CHECK: [[c0:%.+]] = arith.constant dense<0> : tensor<i64>
+                // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.1x1xf64([[samples]], [[c0]]) :
+                // CHECK-SAME: (tensor<1x1xf64>, tensor<i64>) -> tensor<f64>
+                // CHECK-NOT: quantum.expval
+                %3 = quantum.expval %2 : f64
+                %4 = "tensor.from_elements"(%3) : (f64) -> tensor<f64>
+
+                // CHECK: func.return [[res]] : tensor<f64>
+                func.return %4 : tensor<f64>
+            }
+            // CHECK-LABEL: func.func public @expval_from_samples.tensor.1x1xf64
+        }
+        """
+
+        pipeline = (MeasurementsFromSamplesPass(),)
+        run_filecheck(program, pipeline)
+
+    def test_1_wire_expval_shots_from_stablehlo_constop(self, run_filecheck):
+        """Test the measurements-from-samples pass on a 1-wire circuit with shots from a
+        stablehlo.constant op and an expval(Z) measurement."""
+
+        program = """
+        builtin.module @module_circuit {
+            // CHECK-LABEL: circuit
+            func.func public @circuit() -> (tensor<f64>) {
+                %0 = "stablehlo.constant"() <{value = 1 : i64}> : () -> i64
                 quantum.device shots(%0) ["", "", ""]
 
                 // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
@@ -462,6 +502,24 @@ class TestMeasurementsFromSamplesIntegration:
             ValueError, match="measurements_from_samples pass requires non-zero shots"
         ):
             circuit(1.2)
+
+    def test_dynamic_shots_raises_error(self):
+        """Test that when dynamic shots are provided, the pass raises an error"""
+
+        @qml.qjit
+        @measurements_from_samples_pass
+        def workflow(a, shots):
+
+            @qml.set_shots(shots)
+            @qml.qnode(qml.device("lightning.qubit", wires=1))
+            def circuit(x):
+                qml.RX(x, 0)
+                return qml.expval(qml.Z(0))
+
+            circuit(a)
+
+        with pytest.raises(CompileError, match="using a dynamic number of shots is not supported"):
+            workflow(1.2, 100)
 
     @pytest.mark.parametrize("shots", [1, 2])
     @pytest.mark.parametrize(
