@@ -315,6 +315,11 @@
   unrolling of a `for` loop for QNodes returning `probs` has been fixed.
   [(#2611)](https://github.com/PennyLaneAI/catalyst/pull/2611)
 
+* The `measurements-from-samples` pass now diagonalizes observables automatically before converting 
+  to samples in the computational basis, removing the need to apply a diagonalization pass separately.
+  This behaviour matches the behaviour of the tape transform `measurements_from_samples` in PennyLane.
+  [(#2617)](https://github.com/PennyLaneAI/catalyst/pull/2617)
+
 * A more informative error message is now raised when a `measurements-from-samples` xDSL pass encounters a 
   program with dyanamic shots.
   [#2616](https://github.com/PennyLaneAI/catalyst/pull/2616)
