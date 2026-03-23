@@ -39,6 +39,7 @@ from xdsl import context, ir, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin, func, tensor
 from xdsl.pattern_rewriter import PatternRewriter, RewritePattern
 from xdsl.rewriter import InsertPoint
+from xdsl_jax.dialects import stablehlo
 
 from catalyst.python_interface.conversion import xdsl_module
 from catalyst.python_interface.dialects import quantum
@@ -556,7 +557,13 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
     Raises:
         CompileError: If `module` does not contain a quantum.DeviceInitOp.
         CompileError: If the operator expected to contain shots values does not have `properties`.
+<<<<<<< HEAD
             This is the immediate issue that is observed when shots are dynamic.
+=======
+            This is the immediate issue that is observed when shots are dynamic, for instance as a
+            result of the shots SSA value originating from a block argument rather than from an
+            operation, such as an `arith.constant` op.
+>>>>>>> mfs_add_diagonalization
     """
     device_op = None
 
@@ -593,12 +600,13 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
 
         return shots_int_values[0]
 
-    if isinstance(shots_extract_op, arith.ConstantOp):
+    if isinstance(shots_extract_op, (arith.ConstantOp, stablehlo.ConstantOp)):
         shots_value_attribute: builtin.IntAttr = shots_extract_op.properties.get("value")
         return shots_value_attribute.value.data
 
     raise ValueError(
-        f"Expected owner of shots operand to be a tensor.ExtractOp or arith.ConstantOp but got "
+        "Expected owner of shots operand to be a tensor.ExtractOp, arith.ConstantOp or"
+        "stablehlo.ConstantOp but got "
         f"{type(shots_extract_op).__name__}"
     )
 
