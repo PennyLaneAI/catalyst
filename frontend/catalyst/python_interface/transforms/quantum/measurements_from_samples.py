@@ -37,6 +37,7 @@ from itertools import islice
 
 import jax
 import jax.numpy as jnp
+from xdsl_jax.dialects import stablehlo
 from pennylane.exceptions import CompileError
 from xdsl import context, ir, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin, func, tensor
@@ -591,12 +592,12 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
 
         return shots_int_values[0]
 
-    if isinstance(shots_extract_op, arith.ConstantOp):
+    if isinstance(shots_extract_op, (arith.ConstantOp, stablehlo.ConstantOp)):
         shots_value_attribute: builtin.IntAttr = shots_extract_op.properties.get("value")
         return shots_value_attribute.value.data
 
     raise ValueError(
-        f"Expected owner of shots operand to be a tensor.ExtractOp or arith.ConstantOp but got "
+        f"Expected owner of shots operand to be a tensor.ExtractOp, arith.ConstantOp or stablehlo.ConstantOp but got "
         f"{type(shots_extract_op).__name__}"
     )
 
