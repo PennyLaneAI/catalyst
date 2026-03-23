@@ -42,6 +42,7 @@ expected_ops_names = {
     "ExtractCodeblockOp": "qecl.extract_block",
     "InsertCodeblockOp": "qecl.insert_block",
     "EncodeOp": "qecl.encode",
+    "QecCycleOp": "qecl.qec",
 }
 
 expected_attrs_names = {
@@ -156,6 +157,12 @@ class TestQecLogicalOps:
         assert isinstance(encode_op.result_types[0], qecl.LogicalCodeblockType)
         assert encode_op.result_types[0].k == self.k
 
+    def test_qecl_op_constructor_qec(self):
+        qec_op = qecl.QecCycleOp(in_codeblock=self._get_codeblock_value())
+        assert len(qec_op.result_types) == 1
+        assert isinstance(qec_op.result_types[0], qecl.LogicalCodeblockType)
+        assert qec_op.result_types[0].k == self.k
+
 
 @pytest.mark.parametrize(
     "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
@@ -183,6 +190,9 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     // CHECK: [[block1:%.+]] = qecl.encode{{\s*}}[zero] [[block0]] : !qecl.codeblock<1>
     %block1 = qecl.encode [zero] %block0 : !qecl.codeblock<1>
+
+    // CHECK: [[block2:%.+]] = qecl.qec [[block1]] : !qecl.codeblock<1>
+    %block2 = qecl.qec %block1 : !qecl.codeblock<1>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
