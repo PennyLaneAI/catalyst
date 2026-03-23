@@ -51,7 +51,7 @@ class OQDDatabaseManager {
 
     const std::vector<Beam> &getBeams1Params() const { return beams1; }
     const std::vector<Beam> &getBeams2Params() const { return beams2; }
-    const std::vector<DetectionBeam> &getDetectionBeamParams() const { return detectionBeams; }
+    const std::vector<Beam> &getDetectionBeamParams() const { return detectionBeams; }
 
     const std::vector<Phonon> &getPhononParams() const { return phonons; }
 
@@ -66,7 +66,7 @@ class OQDDatabaseManager {
 
     std::vector<Beam> beams1;
     std::vector<Beam> beams2;
-    std::vector<DetectionBeam> detectionBeams;
+    std::vector<Beam> detectionBeams;
 
     std::vector<Phonon> phonons;
 

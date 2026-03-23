@@ -557,7 +557,7 @@ static std::optional<int64_t> walkBackSingleQubitSSA(Value qubit)
 }
 
 struct MeasureOpToMeasurePulsePattern : public mlir::OpRewritePattern<MeasureOp> {
-    std::vector<DetectionBeam> detectionBeams;
+    std::vector<Beam> detectionBeams;
     double measurementDuration;
 
     MeasureOpToMeasurePulsePattern(mlir::MLIRContext *ctx, const OQDDatabaseManager &dataManager)
@@ -570,11 +570,14 @@ struct MeasureOpToMeasurePulsePattern : public mlir::OpRewritePattern<MeasureOp>
     LogicalResult matchAndRewrite(MeasureOp op, PatternRewriter &rewriter) const override
     {
         if (detectionBeams.empty()) {
+            op.emitError() << "no detection_beam entries in gate decomposition configuration, "
+                              "cannot lower measure";
             return failure();
         }
 
         auto qubitIndex = walkBackSingleQubitSSA(op.getInQubit());
         if (!qubitIndex.has_value()) {
+            op.emitError() << "could not resolve static qubit index for measurement";
             return failure();
         }
 
@@ -587,11 +590,16 @@ struct MeasureOpToMeasurePulsePattern : public mlir::OpRewritePattern<MeasureOp>
             return failure();
         }
 
-        const DetectionBeam &beam = detectionBeams[beamIdx];
+        const Beam &beam = detectionBeams[beamIdx];
         auto loc = op.getLoc();
         MLIRContext *ctx = op.getContext();
 
-        auto beamAttr = BeamAttr::get(ctx, rewriter.getI64IntegerAttr(beam.transition_index),
+        if (!beam.transition_index.has_value()) {
+            op.emitError() << "detection beam entry is missing transition index";
+            return failure();
+        }
+
+        auto beamAttr = BeamAttr::get(ctx, rewriter.getI64IntegerAttr(*beam.transition_index),
                                       rewriter.getF64FloatAttr(beam.rabi),
                                       rewriter.getF64FloatAttr(beam.detuning),
                                       rewriter.getDenseI64ArrayAttr(beam.polarization),
