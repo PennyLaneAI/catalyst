@@ -687,8 +687,8 @@ def handle_state_prep(self, *invals, n_wires, **kwargs):
         n_states = state_inval.shape[-1]
         dim = 2**n_wires
         if n_states < dim:
-            padding = jnp.full((dim - n_states,), pad_with, dtype=state_inval.dtype)
-            state_inval = jnp.concatenate([state_inval, padding])
+            pad_with = jnp.array(pad_with, dtype=state_inval.dtype)
+            state_inval = jax.lax.pad(state_inval, pad_with, [(0, dim - n_states, 0)])
 
     if normalize:
         norm = jnp.linalg.norm(state_inval)
