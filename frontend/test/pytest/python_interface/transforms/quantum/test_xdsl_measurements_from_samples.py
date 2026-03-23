@@ -443,7 +443,7 @@ class TestMeasurementsFromSamplesPass:
 
     def test_expval_from_sample_with_diagonalize(self, run_filecheck):
         """Test that diagonalization is performed as expected when the circuit contains non-Z observables"""
-        
+
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
@@ -477,6 +477,7 @@ class TestMeasurementsFromSamplesPass:
 
         pipeline = (MeasurementsFromSamplesPass(),)
         run_filecheck(program, pipeline)
+
 
 @pytest.mark.usefixtures("use_capture")
 class TestMeasurementsFromSamplesIntegration:
