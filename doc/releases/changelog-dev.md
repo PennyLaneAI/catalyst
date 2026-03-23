@@ -746,6 +746,9 @@
   been added for compatibility with the Python interface to Catalyst.
   [(#2519)](https://github.com/PennyLaneAI/catalyst/pull/2519)
 
+* A number of deprecation warnings have been fixed in the compiler python interface.
+  [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
+
 <h3>Documentation 📝</h3>
 
 * Docstrings for :func:`~.passes.disentangle_cnot` and :func:`~.passes.disentangle_swap` have been improved
