@@ -496,8 +496,8 @@ void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValu
                     Value rQreg = getRSourceRegisterValue(v);
                     if (rQreg.getParentRegion()->isProperAncestor(&r)) {
                         auto getOp = cast<qref::GetOp>(v.getDefiningOp());
-                        if (getOp.getIdx() && r.isAncestor(getOp.getIdx().getParentRegion())) {
-                            // dynamic extract index is from within the region, must take in the reg
+                        if (getOp.getIdx()) {
+                            // dynamic extract index, must take in the reg
                             necessaryRegionRValues.insert(rQreg);
                         }
                         else {
@@ -508,40 +508,6 @@ void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValu
             }
         }
     });
-}
-
-Operation *getLaterOp(Value v1, Value v2, DominanceInfo &domInfo)
-{
-    // Get the defining points (op or block arg)
-    auto getDefPoint = [](Value v) -> Operation * {
-        if (auto *op = v.getDefiningOp()) {
-            return op;
-        }
-        // For block arguments, the first op in the block is the "start of life"
-        return &v.getParentBlock()->front();
-    };
-
-    Operation *op1 = getDefPoint(v1);
-    Operation *op2 = getDefPoint(v2);
-
-    // If they are in the same block, just check directly
-    if (op1->getBlock() == op2->getBlock()) {
-        return op1->isBeforeInBlock(op2) ? op2 : op1;
-    }
-
-    // If op1 dominates op2, then op2 is defined "later"
-    if (domInfo.properlyDominates(op1, op2)) {
-        return op2;
-    }
-
-    // If op2 dominates op1, then op1 is "later".
-    if (domInfo.properlyDominates(op2, op1)) {
-        return op1;
-    }
-
-    assert(false && "On a qref.get op with a dynamic index, the qreg SSA value and the index SSA "
-                    "value must be simultaneously visible");
-    return nullptr;
 }
 
 /**
@@ -582,17 +548,17 @@ void squashAliasingGetOps(IRRewriter &builder, func::FuncOp func)
         Operation *insertionPoint;
 
         Value dynamicGetIdx = groupRepresentative.getIdx();
-        Value qreg = groupRepresentative.getQreg();
         if (dynamicGetIdx) {
-            insertionPoint = getLaterOp(qreg, dynamicGetIdx, domInfo);
+            continue;
+        }
+
+        Value qreg = groupRepresentative.getQreg();
+
+        if (qreg.getDefiningOp()) {
+            insertionPoint = qreg.getDefiningOp();
         }
         else {
-            if (qreg.getDefiningOp()) {
-                insertionPoint = qreg.getDefiningOp();
-            }
-            else {
-                insertionPoint = &qreg.getParentBlock()->front();
-            }
+            insertionPoint = &qreg.getParentBlock()->front();
         }
         builder.setInsertionPointAfter(insertionPoint);
 
