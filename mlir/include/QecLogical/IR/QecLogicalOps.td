@@ -124,5 +124,21 @@ def EncodeOp : QecLogical_Op<"encode", [AllTypesMatch<["in_codeblock", "out_code
     }];
 }
 
+def QecCycleOp : QecLogical_Op<"qec", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
+    let summary = "Perform a single cycle of a quantum error-correction protocol.";
+
+    let arguments = (ins
+        LogicalCodeblockType:$in_codeblock
+    );
+
+    let results = (outs
+        LogicalCodeblockType:$out_codeblock
+    );
+
+    let assemblyFormat = [{
+        $in_codeblock attr-dict `:` qualified(type($in_codeblock))
+    }];
+}
+
 
 #endif // QEC_LOGICAL_OPS
