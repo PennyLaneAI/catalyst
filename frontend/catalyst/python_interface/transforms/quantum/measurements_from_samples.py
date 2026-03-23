@@ -597,7 +597,8 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
         return shots_value_attribute.value.data
 
     raise ValueError(
-        f"Expected owner of shots operand to be a tensor.ExtractOp, arith.ConstantOp or stablehlo.ConstantOp but got "
+        "Expected owner of shots operand to be a tensor.ExtractOp, arith.ConstantOp or" 
+        "stablehlo.ConstantOp but got "
         f"{type(shots_extract_op).__name__}"
     )
 

@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """Unit and integration tests for the unified compiler `measurements_from_samples` transform."""
 # pylint: disable=line-too-long
 
@@ -88,7 +89,9 @@ class TestMeasurementsFromSamplesPass:
         run_filecheck(program, pipeline)
 
     def test_1_wire_expval_shots_from_arith_constantop(self, run_filecheck):
-        """Test the measurements-from-samples pass on a 1-wire circuit with shots from an arith.constant op and an expval(Z) measurement."""
+        """Test the measurements-from-samples pass on a 1-wire circuit with shots from an 
+        arith.constant op and an expval(Z) measurement."""
+
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
@@ -122,6 +125,8 @@ class TestMeasurementsFromSamplesPass:
         run_filecheck(program, pipeline)
 
     def test_1_wire_expval_shots_from_stablehlo_constop(self, run_filecheck):
+        """Test the measurements-from-samples pass on a 1-wire circuit with shots from a 
+        stablehlo.constant op and an expval(Z) measurement."""
 
         program = """
         builtin.module @module_circuit {
