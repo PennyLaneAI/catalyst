@@ -690,24 +690,22 @@ class MeasureOp(IRDLOperation):
         in_codeblock: LogicalCodeBlockSSAValue | Operation,
         idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
     ):
+        properties: dict[str, Attribute | None] = {}
+
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, 64)
 
         if isinstance(idx, IntegerAttr):
             operands = (in_codeblock, None)
             properties = {"idx_attr": idx}
         else:
             operands = (in_codeblock, idx)
-            properties = {}
 
         in_codeblock_type = get_logical_codeblock_type(in_codeblock)
 
         super().__init__(
             operands=operands,
-            result_types=(
-                i1,
-                in_codeblock_type,
-            ),
+            result_types=(i1, in_codeblock_type),
             properties=properties,
         )
 

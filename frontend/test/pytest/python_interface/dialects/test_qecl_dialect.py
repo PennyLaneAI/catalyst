@@ -233,6 +233,7 @@ class TestQecLogicalOps:
         "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
     )
     def test_qecl_op_constructor_measure(self, idx):
+        """Test the constructor of the qecl.measure op."""
         measure_op = qecl.MeasureOp(in_codeblock=self._get_codeblock_value(), idx=idx)
         assert len(measure_op.result_types) == 2
         assert measure_op.result_types[0] == IntegerType(1)
