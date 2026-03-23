@@ -89,7 +89,7 @@ class TestMeasurementsFromSamplesPass:
         run_filecheck(program, pipeline)
 
     def test_1_wire_expval_shots_from_arith_constantop(self, run_filecheck):
-        """Test the measurements-from-samples pass on a 1-wire circuit with shots from an 
+        """Test the measurements-from-samples pass on a 1-wire circuit with shots from an
         arith.constant op and an expval(Z) measurement."""
 
         program = """
@@ -125,7 +125,7 @@ class TestMeasurementsFromSamplesPass:
         run_filecheck(program, pipeline)
 
     def test_1_wire_expval_shots_from_stablehlo_constop(self, run_filecheck):
-        """Test the measurements-from-samples pass on a 1-wire circuit with shots from a 
+        """Test the measurements-from-samples pass on a 1-wire circuit with shots from a
         stablehlo.constant op and an expval(Z) measurement."""
 
         program = """
