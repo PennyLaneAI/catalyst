@@ -749,10 +749,6 @@
   been added for compatibility with the Python interface to Catalyst.
   [(#2519)](https://github.com/PennyLaneAI/catalyst/pull/2519)
 
-* The tests for the `measurements-from-samples` xDSL pass have been reorganized and split into 
-  separate files for lit tests and system and integration tests. 
-  [(#2618)](https://github.com/PennyLaneAI/catalyst/pull/2618)
-
 <h3>Documentation 📝</h3>
 
 * Docstrings for :func:`~.passes.disentangle_cnot` and :func:`~.passes.disentangle_swap` have been improved
