@@ -471,3 +471,38 @@ class TestMeasurementsFromSamplesPass:
 
         pipeline = (MeasurementsFromSamplesPass(),)
         run_filecheck(program, pipeline)
+
+    def test_expval_from_sample_with_diagonalize(self, run_filecheck):
+        program = """
+        builtin.module @module_circuit {
+            // CHECK-LABEL: circuit
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node} {
+                %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
+                %1 = tensor.extract %0[] : tensor<i64>
+                quantum.device shots(%1) ["", "", ""]
+
+                // CHECK: [[qreg:%.+]] = quantum.alloc
+                %2 = quantum.alloc(1) : !quantum.reg
+
+                // CHECK: [[q0:%.+]] = quantum.extract [[qreg]][0]
+                %3 = quantum.extract %2[0] : !quantum.reg -> !quantum.bit
+
+                // CHECK: [[q1:%.+]] = quantum.custom "Hadamard"() [[q0]]
+                // CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q1]]
+                %4 = quantum.namedobs %3[PauliX] : !quantum.obs
+
+                // CHECK: [[samples:%.+]] = quantum.sample [[obs]] : tensor<1x1xf64>
+                // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.1x1xf64
+                // CHECK-NOT: quantum.expval
+                %5 = quantum.expval %4 : f64
+                %6 = tensor.from_elements %5 : tensor<f64>
+
+                // CHECK: return [[res]] : tensor<f64>
+                func.return %6 : tensor<f64>
+            }
+            // CHECK-LABEL: func.func public @expval_from_samples.tensor.1x1xf64
+        }
+        """
+
+        pipeline = (MeasurementsFromSamplesPass(),)
+        run_filecheck(program, pipeline)
