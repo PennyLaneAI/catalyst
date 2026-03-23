@@ -35,6 +35,11 @@ void QecLogicalDialect::initialize()
 #include "QecLogical/IR/QecLogicalOpsTypes.cpp.inc"
         >();
 
+    addAttributes<
+#define GET_ATTRDEF_LIST
+#include "QecLogical/IR/QecLogicalAttributes.cpp.inc"
+        >();
+
     addOperations<
 #define GET_OP_LIST
 #include "QecLogical/IR/QecLogicalOps.cpp.inc"
@@ -45,5 +50,10 @@ void QecLogicalDialect::initialize()
 // QecLogical type definitions.
 //===----------------------------------------------------------------------===//
 
+#include "QecLogical/IR/QecLogicalEnums.cpp.inc"
+
 #define GET_TYPEDEF_CLASSES
 #include "QecLogical/IR/QecLogicalOpsTypes.cpp.inc"
+
+#define GET_ATTRDEF_CLASSES
+#include "QecLogical/IR/QecLogicalAttributes.cpp.inc"

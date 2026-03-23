@@ -47,7 +47,9 @@ void __catalyst__oqd__rt__finalize(const std::string &openapl_file_name);
 void __catalyst__oqd__ion(const std::string &ion_specs);
 void __catalyst__oqd__modes(const std::vector<std::string> &phonon_specs);
 Pulse *__catalyst__oqd__pulse(QUBIT *qubit, double duration, double phase, Beam *beam);
+Pulse *__catalyst__oqd__measure_pulse(QUBIT *qubit, double duration, double phase, Beam *beam);
 void __catalyst__oqd__ParallelProtocol(Pulse **pulses, size_t n);
+bool __catalyst__oqd__readout_bit(QUBIT *qubit);
 
 #ifdef __cplusplus
 } // extern "C"
