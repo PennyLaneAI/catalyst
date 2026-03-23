@@ -469,7 +469,7 @@ void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValu
     auto *qrefDialect = r.getContext()->getLoadedDialect<qref::QRefDialect>();
 
     r.walk([&](Operation *op) {
-        if (op->getDialect() != qrefDialect) {
+        if (op->getDialect() != qrefDialect && !isa<func::CallOp>(op)) {
             return;
         }
         if (isa<qref::GetOp>(op)) {
