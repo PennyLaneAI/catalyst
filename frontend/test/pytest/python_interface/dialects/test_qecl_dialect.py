@@ -89,26 +89,24 @@ def test_all_attributes_names(attr):
 class TestQecLogicalTypes:
     """Tests relating to the qecl types."""
 
-    @pytest.mark.parametrize("k", [1, 2, IntegerAttr.from_int_and_width(1, 64)])
+    @pytest.mark.parametrize("k", [1, 2, IntegerAttr(1, 64)])
     def test_qecl_type_constructor_codeblock(self, k: int | IntegerAttr[I64]):
         """Test the constructor of qecl.LogicalCodeblockType."""
         codeblock = qecl.LogicalCodeblockType(k)
 
-        expected_k = k if isinstance(k, IntegerAttr) else IntegerAttr.from_int_and_width(k, 64)
+        expected_k = k if isinstance(k, IntegerAttr) else IntegerAttr(k, 64)
         assert codeblock.k == expected_k
 
-    @pytest.mark.parametrize("width", [1, 3, IntegerAttr.from_int_and_width(3, 64)])
-    @pytest.mark.parametrize("k", [1, 2, IntegerAttr.from_int_and_width(1, 64)])
+    @pytest.mark.parametrize("width", [1, 3, IntegerAttr(3, 64)])
+    @pytest.mark.parametrize("k", [1, 2, IntegerAttr(1, 64)])
     def test_qecl_type_constructor_hyper_reg(
         self, width: int | IntegerAttr[I64], k: int | IntegerAttr[I64]
     ):
         """Test the constructor of qecl.LogicalHyperRegisterType."""
         hyper_reg = qecl.LogicalHyperRegisterType(width, k)
 
-        expected_width = (
-            width if isinstance(width, IntegerAttr) else IntegerAttr.from_int_and_width(width, 64)
-        )
-        expected_k = k if isinstance(k, IntegerAttr) else IntegerAttr.from_int_and_width(k, 64)
+        expected_width = width if isinstance(width, IntegerAttr) else IntegerAttr(width, 64)
+        expected_k = k if isinstance(k, IntegerAttr) else IntegerAttr(k, 64)
         assert hyper_reg.width == expected_width
         assert hyper_reg.k == expected_k
 
@@ -116,9 +114,9 @@ class TestQecLogicalTypes:
 class TestQecLogicalOps:
     """Tests relating to the qecl ops."""
 
-    width = IntegerAttr.from_int_and_width(3, 64)
-    k = IntegerAttr.from_int_and_width(1, 64)
-    idx_attr = IntegerAttr.from_index_int_value(0)
+    width = IntegerAttr(3, 64)
+    k = IntegerAttr(1, 64)
+    idx_attr = IntegerAttr(0, IndexType())
 
     def _get_hyper_reg_value(self):
         return create_ssa_value(qecl.LogicalHyperRegisterType(self.width, self.k))
@@ -139,9 +137,7 @@ class TestQecLogicalOps:
         dealloc_op = qecl.DeallocOp(self._get_hyper_reg_value())
         assert len(dealloc_op.result_types) == 0
 
-    @pytest.mark.parametrize(
-        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
-    )
+    @pytest.mark.parametrize("idx", [0, IntegerAttr(0, IndexType()), create_ssa_value(IndexType())])
     def test_qecl_op_constructor_extract_block(self, idx):
         """Test the constructor of the qecl.extract_block op."""
         extract_block_op = qecl.ExtractCodeblockOp(hyper_reg=self._get_hyper_reg_value(), idx=idx)
@@ -149,9 +145,7 @@ class TestQecLogicalOps:
         assert isinstance(extract_block_op.result_types[0], qecl.LogicalCodeblockType)
         assert extract_block_op.result_types[0].k == self.k
 
-    @pytest.mark.parametrize(
-        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
-    )
+    @pytest.mark.parametrize("idx", [0, IntegerAttr(0, IndexType()), create_ssa_value(IndexType())])
     def test_qecl_op_constructor_insert_block(self, idx):
         """Test the constructor of the qecl.insert_block op."""
         insert_block_op = qecl.InsertCodeblockOp(

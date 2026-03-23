@@ -21,7 +21,7 @@ For a complete description of this dialect, please see
     mlir/include/QecLogical/IR/QecLogicalDialect.td
 """
 from collections.abc import Sequence
-from typing import ClassVar, Mapping, TypeAlias
+from typing import ClassVar, TypeAlias
 
 from xdsl.dialects.builtin import I64, ContainerOf, IndexType, IntegerAttr, UnitAttr
 from xdsl.ir import (
@@ -241,7 +241,7 @@ class ExtractCodeblockOp(IRDLOperation):
         idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (hyper_reg, None)
@@ -289,7 +289,7 @@ class InsertCodeblockOp(IRDLOperation):
         codeblock: LogicalCodeBlockSSAValue | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (in_hyper_reg, None, codeblock)
