@@ -237,6 +237,7 @@
 * Added a cache of pre-compiled PennyLane built-in decomposition rules for use with the C++ graph
   decomposition system.
   [(#2531)](https://github.com/PennyLaneAI/catalyst/pull/2531)
+  [(#2619)](https://github.com/PennyLaneAI/catalyst/pull/2531)
 
 * Added the `graph-decomposition` pass to orchestrate the new MLIR-native graph-based decomposition system.
   [(#2552)](https://github.com/PennyLaneAI/catalyst/pull/2552)
@@ -247,6 +248,7 @@
 * The `quantum.adjoint` operation can now take in multiple quantum values, allowing
   both qubits and registers, as opposed to constraining the operand to be a single quantum register.
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
+  [(#2610)](https://github.com/PennyLaneAI/catalyst/pull/2610)
 
 * `qml.value_and_grad` can now be used with program capture `qml.qjit(capture=True)`.
   [(#2587)](https://github.com/PennyLaneAI/catalyst/pull/2587)
@@ -312,6 +314,10 @@
 * Added support for `stopping_condition` in user-defined `qp.decompose` when capture is enabled with both graph enabled and disabled.
   [(#2486)](https://github.com/PennyLaneAI/catalyst/pull/2486)
 
+* A performance issue in the xDSL transform `measurements-from-samples` that was caused by the
+  unrolling of a `for` loop for QNodes returning `probs` has been fixed.
+  [(#2611)](https://github.com/PennyLaneAI/catalyst/pull/2611)
+
 <h3>Breaking changes 💔</h3>
 
 * The ``-disentangle-CNOT`` and ``-disentangle-SWAP`` Catalyst CLI commands have been renamed to
@@ -327,6 +333,10 @@
 
 * `catalyst.jax_primitives.subroutine` has been moved to `qml.capture.subroutine`.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
+
+* The `StableHLO` dialect has been removed from Catalyst's Python interface module. 
+  Downstream users should now import StableHLO dialect definitions from `xdsl_jax.dialects.stablehlo` instead.
+  [(#2588)](https://github.com/PennyLaneAI/catalyst/pull/2588)
 
 * (Compiler integrators only) The versions of StableHLO/LLVM/Enzyme used by Catalyst have been updated.
   [(#2415)](https://github.com/PennyLaneAI/catalyst/pull/2415)
@@ -426,11 +436,20 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Updated Catalyst's xDSL dependencies to `xdsl` 0.59.0 and `xdsl-jax` 0.5.0.
+  [(#2591)](https://github.com/PennyLaneAI/catalyst/pull/2591)
+
+* Added a optimized pathway to the xDSL `ApplyTransformSequencePass` so that it can schedule consecutive MLIR
+  passes together rather than individually. This minimizes the number of round-trips between xDSL and MLIR, improving
+  performance when several consecutive MLIR passes are used when there are also xDSL passes in the pipeline.
+  [(#2592)](https://github.com/PennyLaneAI/catalyst/pull/2592)
+
 * `draw_graph` now raises a more informative error when attempting to visualize an unsupported empty external function.
   [(#2559)](https://github.com/PennyLaneAI/catalyst/pull/2559)
 
 * Catalyst internally uses the new unified transforms API rather than `PassPipelineWrapper`.
   [(#2525)](https://github.com/PennyLaneAI/catalyst/pull/2525)
+  [(#2614)](https://github.com/PennyLaneAI/catalyst/pull/2614)
 
 * Added an `EmptyPass` MLIR pass that does not transform the program for debugging and standing in for
   unimplemented transforms.
