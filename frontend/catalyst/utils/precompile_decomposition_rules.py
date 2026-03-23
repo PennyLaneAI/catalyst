@@ -13,9 +13,7 @@
 # limitations under the License.
 
 """Utilities for AOT compiling PennyLane's decomposition rules to MLIR Bytecode."""
-import inspect
 import warnings
-from functools import lru_cache
 from pathlib import Path
 
 import jax
@@ -32,82 +30,46 @@ BYTECODE_FILE_PATH = Path(__file__).parent.parent / Path("resources/decompositio
 # TODO: Uncomment dynamic size wires ops once they are supported
 # FIXME: Use the Gate class instead of this list of compiler ops
 #              https://github.com/PennyLaneAI/pennylane/pull/8767
-COMPILER_OPS_FOR_DECOMPOSITION = frozenset(
-    {
-        "CNOT",
-        "ControlledPhaseShift",
-        "CRot",
-        "CRX",
-        "CRY",
-        "CRZ",
-        "CSWAP",
-        "CY",
-        "CZ",
-        "Hadamard",
-        # "Identity",
-        "IsingXX",
-        "IsingXY",
-        "IsingYY",
-        "IsingZZ",
-        "SingleExcitation",
-        "DoubleExcitation",
-        "ISWAP",
-        "PauliX",
-        "PauliY",
-        "PauliZ",
-        # "PauliRot",
-        # "PauliMeasure",
-        "PhaseShift",
-        "PSWAP",
-        "Rot",
-        "RX",
-        "RY",
-        "RZ",
-        "S",
-        "SWAP",
-        "T",
-        "Toffoli",
-        "U1",
-        "U2",
-        "U3",
-        # "MultiRZ",
-        # "GlobalPhase",
-    }
-)
-
-
-@lru_cache
-def get_compiler_ops(
-    _supported_compiler_op_names: frozenset[str] = COMPILER_OPS_FOR_DECOMPOSITION,
-) -> set[type[Operator]]:
-    """
-    Extracts all ops from pennylane that have decompositions in catalyst.
-
-    Returns:
-        set[Operation]: the set of PennyLane ops that are compiler-compatible
-                        (as defined by COMPILER_OPS_FOR_DECOMPOSITION)
-        int: the number of compiler-compatible ops that could not be found in PennyLane
-    """
-    pl_op_classes = set(
-        value
-        for _, value in inspect.getmembers(
-            qp, lambda obj: inspect.isclass(obj) and issubclass(obj, Operator)
-        )
-    )
-
-    # FIXME: manual override for PauliMeasure
-    pl_op_classes.add(qp.ops.PauliMeasure)
-
-    compiler_op_classes = set(
-        op_class for op_class in pl_op_classes if op_class.__name__ in _supported_compiler_op_names
-    )
-
-    compiler_op_class_names = set(op_class.__name__ for op_class in compiler_op_classes)
-
-    for class_name in _supported_compiler_op_names.difference(compiler_op_class_names):
-        warnings.warn(f"failed to collect pennylane op with name {class_name}")
-
-    return compiler_op_classes
+COMPILER_OPS_FOR_DECOMPOSITION = {
+    qp.CNOT,
+    qp.ControlledPhaseShift,
+    qp.CRot,
+    qp.CRX,
+    qp.CRY,
+    qp.CRZ,
+    qp.CSWAP,
+    qp.CY,
+    qp.CZ,
+    qp.H,
+    # qp.I,
+    qp.IsingXX,
+    qp.IsingXY,
+    qp.IsingYY,
+    qp.IsingZZ,
+    qp.SingleExcitation,
+    qp.DoubleExcitation,
+    qp.ISWAP,
+    qp.PauliX,
+    qp.PauliY,
+    qp.PauliZ,
+    # qp.PauliRot,
+    # qp.PauliMeasure,
+    qp.PhaseShift,
+    qp.PSWAP,
+    qp.Rot,
+    qp.RX,
+    qp.RY,
+    qp.RZ,
+    qp.S,
+    qp.SWAP,
+    qp.T,
+    qp.Toffoli,
+    qp.U1,
+    qp.U2,
+    qp.U3,
+    # qp.MultiRZ,
+    # qp.GlobalPhase,
+}
 
 
 def get_abstract_args(op_class: type[Operator]) -> list[type]:
@@ -250,11 +212,9 @@ def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
     """
     decomp_file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    target_ops = get_compiler_ops()
-
     mlir_rules = "".join(
         str(mlir).replace("@rule_wrapper", f"@__builtin_{name}")
-        for func in target_ops
+        for func in COMPILER_OPS_FOR_DECOMPOSITION
         for name, mlir in compile_op_decomp_rules(func).items()
     )
 
