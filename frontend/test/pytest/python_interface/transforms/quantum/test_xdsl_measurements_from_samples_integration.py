@@ -81,7 +81,6 @@ class TestIntegrationUsefulErrors:
                 qml.RX(theta, 0)
                 return qml.counts()
 
-
     @pytest.mark.parametrize("mp", (qml.expval, qml.var))
     def test_overlapping_tensor(self, mp):
         """Check that an error is raised if the circuit returns a tensor with overlapping wires."""
@@ -217,6 +216,7 @@ class TestIntegrationWithOtherPasses:
             return qml.expval(2 * qml.Z(wires=0))
 
         assert expected_res == circuit()
+
     @pytest.mark.usefixtures("use_capture")
     def test_integrate_with_diagonalize(self):
         """Test that the measurements_from_samples pass works correctly when used in combination
@@ -328,7 +328,9 @@ class TestMeasurementsFromSamplesIntegration:
         ],
     )
     # pylint: disable=too-many-arguments,too-many-positional-arguments
-    def test_exec_1_wire_mp_with_obs(self, shots, initial_op, mp, obs, expected_res, run_filecheck_qjit):
+    def test_exec_1_wire_mp_with_obs(
+        self, shots, initial_op, mp, obs, expected_res, run_filecheck_qjit
+    ):
         """Test the measurements_from_samples transform on a device with a single wire and terminal
         measurements that require an observable (i.e. expval and var).
         """
@@ -473,7 +475,9 @@ class TestMeasurementsFromSamplesIntegration:
         ],
     )
     # pylint: disable=too-many-arguments,too-many-positional-arguments
-    def test_exec_2_wire_with_obs_separate(self, shots, initial_ops, mp, obs, expected_res, run_filecheck_qjit):
+    def test_exec_2_wire_with_obs_separate(
+        self, shots, initial_ops, mp, obs, expected_res, run_filecheck_qjit
+    ):
         """Test the measurements_from_samples transform on a device with two wires and terminal
         measurements that require an observable (i.e. expval and var).
 

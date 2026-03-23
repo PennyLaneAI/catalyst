@@ -166,7 +166,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         return op
 
     def _get_call_op(self, qnode):
-        """Get the CallOp in another module function that calls this quantum_node. Postprocessing 
+        """Get the CallOp in another module function that calls this quantum_node. Postprocessing
         will be called to act on the output of that CallOp"""
 
         module = self._get_parent_module(qnode)
@@ -699,9 +699,9 @@ class StatePattern(MeasurementsFromSamplesPattern):
 
 
 def get_shots(quantum_node: func.FuncOp) -> int:
-    """Get the shots for a quantum.node. Extracts shots from the device and validates that shots 
+    """Get the shots for a quantum.node. Extracts shots from the device and validates that shots
     is a non-zero integer
-    
+
         Args:
         quantum_node (func.FuncOp): The quantum.node FuncOp containing the quantum.DeviceInitOp.
 
@@ -714,7 +714,7 @@ def get_shots(quantum_node: func.FuncOp) -> int:
             This is the immediate issue that is observed when shots are dynamic.
         TypeError: if the extracted shots are not an int
         ValueError: if the extracted shots are zero
-    
+
     """
 
     shots = _get_static_shots_value_from_device_op(quantum_node)
