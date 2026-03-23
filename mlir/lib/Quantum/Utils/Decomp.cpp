@@ -25,22 +25,28 @@ namespace quantum {
 std::vector<mlir::OwningOpRef<mlir::func::FuncOp>> getRulesFromBytecode(llvm::StringRef filename,
                                                                         mlir::MLIRContext *context)
 {
+    llvm::errs() << "getting rules from bytecode\n";
     mlir::ParserConfig config(context);
+    llvm::errs() << "got parser config from context\n";
+    llvm::errs() << filename << "\n";
     mlir::OwningOpRef<mlir::ModuleOp> moduleOp =
         mlir::parseSourceFile<mlir::ModuleOp>(filename, config);
+    llvm::errs() << "parsed file\n";
 
     std::vector<mlir::OwningOpRef<mlir::func::FuncOp>> funcOps;
 
     if (!moduleOp) {
+        llvm::errs() << "failed to find module\n";
         return funcOps;
     }
 
-    for (mlir::ModuleOp module : moduleOp->getOps<mlir::ModuleOp>()) {
-        for (auto func : module.getOps<mlir::func::FuncOp>()) {
-            func->remove();
-            funcOps.push_back(mlir::OwningOpRef<mlir::func::FuncOp>(func));
-        }
+    llvm::errs() << "collecting funcops\n";
+    for (auto func : moduleOp->getOps<mlir::func::FuncOp>()) {
+        func->remove();
+        funcOps.push_back(mlir::OwningOpRef<mlir::func::FuncOp>(func));
     }
+
+    llvm::errs() << "got funcops\n";
 
     return funcOps;
 }

@@ -14,10 +14,19 @@
 
 #define DEBUG_TYPE "graph-decomposition"
 
-#include "mlir/Pass/PassManager.h"
 #include "llvm/ADT/StringExtras.h"
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "stablehlo/dialect/StablehloOps.h"
+
+#include "mlir/Pass/PassManager.h"
+
 #include "Catalyst/Transforms/Passes.h"
+#include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Quantum/Utils/Decomp.h"
@@ -36,8 +45,23 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
     void runOnOperation() final
     {
-        // Registry of custom decomposition rules defined in the main module, mapping from target
-        // gate name to the corresponding function.
+        llvm::errs() << "Parsed options from CLI:\n";
+        llvm::errs() << "\tgate-set:\n";
+        for (auto gate : targetGateSetOption) {
+            llvm::errs() << "\t\t" << gate << "\n";
+        }
+        llvm::errs() << "\tfixed-decomps:\n";
+        for (auto rule : fixedDecompsOption) {
+            llvm::errs() << "\t\t" << rule << "\n";
+        }
+        llvm::errs() << "\talt-decomps:\n";
+        for (auto rule : altDecompsOption) {
+            llvm::errs() << "\t\t" << rule << "\n";
+        }
+        llvm::errs() << "\tbytecode-rules: " << bytecodeRulesFile << "\n";
+
+        // Registry of custom decomposition rules defined in the main module, mapping from
+        // target gate name to the corresponding function.
         llvm::StringMap<func::FuncOp> customRules;
 
         llvm::StringMap<llvm::StringRef> fixedDecomps;
@@ -72,6 +96,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // Step 1: annotate the user-defined (custom) rules with resources
         // and register them for later use in the graph decomposition.
         registerCustomDecompositionRules(module, customRules);
+        llvm::errs() << "registered user rules\n";
 
         ///////////////////////////
         // Step 2: Get the target gateset for decomposition from the module attribute
@@ -93,22 +118,26 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         ///////////////////////////
         // Step 3: Get and convert operators in the module required for creating the graph
         getOperators(module, setOfOps);
+        llvm::errs() << "got ops for graph\n";
 
         ///////////////////////////
         // Step 4: Get the resources for all the rules (both built-in and custom)
         // and convert them to RuleNodes for later use in the graph decomposition
         // TODO get nodes from user rules
         getRuleNodes(module, bytecodeRulesFile, customRules, setOfResources);
+        llvm::errs() << "got rules for graph\n";
 
         ///////////////////////////
         // Step 5: Build and solve the decomposition graph
         auto solution = GraphDecompositionSolver::Solve(setOfOps, setOfResources, targetGateToCost);
+        llvm::errs() << "got solution from graph\n";
 
         ///////////////////////////
         // Step 6: Insert decomposition rules picked by the graph solver (solution) into the
         // module and then run the decompose-lowering patterns to apply the decomposition rules
         // and rewrite the quantum operations.
         insertChosenRules(solution, module);
+        llvm::errs() << "inserted chosen rules\n";
 
         ///////////////////////////
         // Step 7: Run decompose-lowering patterns to apply the decomposition rules
@@ -118,6 +147,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         if (failed(pm.run(module))) {
             return signalPassFailure();
         }
+        llvm::errs() << "ran decompose-lowering\n";
     }
 
   private:
@@ -168,6 +198,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         std::vector<mlir::OwningOpRef<mlir::func::FuncOp>> builtinRules =
             getRulesFromBytecode(filename, module.getContext());
 
+        llvm::errs() << "read bytecode\n";
+
         for (auto &ruleOpRef : builtinRules) {
             RuleNode ruleNode;
             mlir::func::FuncOp func = ruleOpRef.get(); // access the op
@@ -178,6 +210,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             rules.push_back(std::move(ruleNode));
         }
+        llvm::errs() << "registered rules\n";
 
         return;
     }

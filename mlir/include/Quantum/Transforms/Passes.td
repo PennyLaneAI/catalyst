@@ -139,8 +139,17 @@ def GraphDecompositionPass : Pass<"graph-decomposition"> {
     /*C++ name*/"bytecodeRulesFile", 
     /*CLI name*/"bytecode-rules", 
     /*Type*/"std::string", 
-    /*Default*/[{ "./decomposition_rules.mlirbc" }],
+    /*Default*/[{ "./frontend/catalyst/resources/decomposition_rules.mlirbc" }],
     /*Description*/"A map of operators to alternative decomposition rules that will be considered alongside any built-in rules.">
+    ];
+
+    let dependentDialects = [
+        "memref::MemRefDialect",
+        "func::FuncDialect",
+        "scf::SCFDialect",
+        "LLVM::LLVMDialect",
+        "stablehlo::StablehloDialect",
+        "tensor::TensorDialect",
     ];
 }
 
