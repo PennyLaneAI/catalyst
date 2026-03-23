@@ -290,7 +290,7 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
                         .getResult(0);
                 quantum::YieldOp::create(builder, loc, fnWithoutMeasurementsAdjointQreg);
                 builder.setInsertionPointAfter(adjointOp);
-                scf::YieldOp::create(builder, loc, adjointOp.getResult());
+                scf::YieldOp::create(builder, loc, adjointOp.getResults());
             })
             .getResult(0);
     std::vector<Value> argsAndRegMeasurement(fnFoldedOp.getArguments().begin(),
