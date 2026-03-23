@@ -56,7 +56,6 @@ def test_pass_with_options(options, expected_strings, backend):
         assert expected_str in str(capture_mlir), f"Expected {expected_str} in MLIR: {capture_mlir}"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "options",
     [
@@ -65,12 +64,12 @@ def test_pass_with_options(options, expected_strings, backend):
     ],
     ids=["list", "dict"],
 )
-def test_pass_with_complex_options(options, backend):
+def test_pass_with_complex_options(options, backend, capture_mode):
     """Tests that complex options like list, dict are supported."""
 
     my_pass = qml.transform(pass_name="my-pass")
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=capture_mode)
     @partial(my_pass, **options)
     @qml.qnode(qml.device(backend, wires=1))
     def captured_circuit():
