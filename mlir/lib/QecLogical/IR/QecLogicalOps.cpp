@@ -91,47 +91,40 @@ LogicalResult InsertCodeblockOp::verify()
     return success();
 }
 
-LogicalResult HadamardOp::verify()
+template <typename OpTy> static LogicalResult verifySingleQubitLogicalGateOp(OpTy op)
 {
-    if (!(getIdx() || getIdxAttr().has_value())) {
-        return emitOpError() << "expected to have a non-null index";
+    if (!(op.getIdx() || op.getIdxAttr().has_value())) {
+        return op.emitOpError() << "expected to have a non-null index";
     }
 
     // In and out codeblocks types are already constrained to be the same
-    const auto codeblockType = getInCodeblock().getType();
+    const auto codeblockType = op.getInCodeblock().getType();
 
-    if (getIdxAttr().has_value()) {
-        auto idx = getIdxAttr()->getSExtValue();
-        if (idx < 0 || idx >= codeblockType.getK()) {
-            return emitOpError()
+    if (auto idxAttr = op.getIdxAttr()) {
+        int64_t idx = idxAttr->getSExtValue();
+        int64_t k = codeblockType.getK();
+
+        if (idx < 0 || idx >= k) {
+            return op.emitOpError()
                    << "has out-of-bounds index attribute: applying gate to logical qubit at index "
-                   << idx << " in codeblock with k = " << codeblockType.getK();
+                   << idx << " in codeblock with k = " << k;
         }
     }
 
     return success();
 }
 
-LogicalResult SOp::verify()
-{
-    if (!(getIdx() || getIdxAttr().has_value())) {
-        return emitOpError() << "expected to have a non-null index";
-    }
+LogicalResult IdentityOp::verify() { return verifySingleQubitLogicalGateOp(*this); }
 
-    // In and out codeblocks types are already constrained to be the same
-    const auto codeblockType = getInCodeblock().getType();
+LogicalResult PauliXOp::verify() { return verifySingleQubitLogicalGateOp(*this); }
 
-    if (getIdxAttr().has_value()) {
-        auto idx = getIdxAttr()->getSExtValue();
-        if (idx < 0 || idx >= codeblockType.getK()) {
-            return emitOpError()
-                   << "has out-of-bounds index attribute: applying gate to logical qubit at index "
-                   << idx << " in codeblock with k = " << codeblockType.getK();
-        }
-    }
+LogicalResult PauliYOp::verify() { return verifySingleQubitLogicalGateOp(*this); }
 
-    return success();
-}
+LogicalResult PauliZOp::verify() { return verifySingleQubitLogicalGateOp(*this); }
+
+LogicalResult HadamardOp::verify() { return verifySingleQubitLogicalGateOp(*this); }
+
+LogicalResult SOp::verify() { return verifySingleQubitLogicalGateOp(*this); }
 
 LogicalResult CnotOp::verify()
 {
@@ -275,7 +268,7 @@ LogicalResult ExtractCodeblockOp::canonicalize(ExtractCodeblockOp extract,
  *
  *   %r0 = ... : !qecl.hyperreg<3 x 1>
  *   %b0 = extract_block %r0[0]
- *   %r1 = insert_block %r1[0], %b0
+ *   %r1 = insert_block %r0[0], %b0
  *   %r2 = test.op %r1
  *
  * and converts to:
