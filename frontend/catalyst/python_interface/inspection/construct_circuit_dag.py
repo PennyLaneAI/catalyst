@@ -168,9 +168,8 @@ class ConstructCircuitDAG:
             return
         _SKIPPED_OPS = (*_SKIPPED_QUANTUM_OPS, *_SKIPPED_PBC_OPS, *_SKIPPED_MBQC_OPS)
         if not isinstance(op, _SKIPPED_OPS):
-            raise VisualizationError(
-                f"Visualization for operation '{op.name}' is currently not supported."
-            )
+            _ERROR_MSG = f"Visualization for operation '{op.name}' is currently not supported."
+            raise VisualizationError(_ERROR_MSG)
 
     @_visualize_operation.register
     def _gate_op(
@@ -576,10 +575,18 @@ class ConstructCircuitDAG:
     def _func_op(self, operation: func.FuncOp) -> None:
         """Visit a FuncOp Operation."""
 
-        label = operation.sym_name.data
-        if "jit_" in operation.sym_name.data:
-            label = "qjit"
+        if not operation.regions[0].blocks:
+            _ERROR_MSG = (
+                "Calls to functions without a definition are not yet compatible with 'draw_graph'. "
+                f"Found external function call to {operation.sym_name.data}."
+            )
+            raise VisualizationError(_ERROR_MSG)
 
+        label: str = (
+            "qjit" if operation.sym_name.data.startswith("jit_") else operation.sym_name.data
+        )
+
+        # Create cluster representing the func
         uid = f"cluster{self._cluster_uid_counter}"
         parent_cluster_uid = None if not self._cluster_uid_stack else self._cluster_uid_stack[-1]
         self.dag_builder.add_cluster(

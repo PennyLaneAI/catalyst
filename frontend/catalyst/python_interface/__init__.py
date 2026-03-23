@@ -16,9 +16,10 @@
 from .compiler import Compiler
 from .inspection import QMLCollector, mlir_specs
 from .parser import QuantumParser
-from .pass_api import compiler_transform
+from .pass_api import CompilationPass, compiler_transform
 
 __all__ = [
+    "CompilationPass",
     "Compiler",
     "compiler_transform",
     "QuantumParser",
