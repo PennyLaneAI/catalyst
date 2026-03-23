@@ -65,6 +65,7 @@ class TestIntegrationUsefulErrors:
         with pytest.raises(CompileError, match="using a dynamic number of shots is not supported"):
             workflow(1.2, 100)
 
+<<<<<<< HEAD
     def test_counts_raises_not_implemented(self):
         """Test that a circuit with counts causes measurements_from_samples_pass
         to raise a NotImplementedError"""
@@ -163,6 +164,8 @@ class TestIntegrationUsefulErrors:
             def circuit():
                 return qml.sample(wires=[0]), qml.expval(qml.X(0))
 
+=======
+>>>>>>> mfs_reorganize_tests
 
 @pytest.mark.usefixtures("use_capture")
 class TestIntegrationWithOtherPasses:
@@ -188,6 +191,7 @@ class TestIntegrationWithOtherPasses:
         res = circuit()
         assert res == 1.0
 
+<<<<<<< HEAD
     @pytest.mark.parametrize("shots", [1, 2])
     @pytest.mark.parametrize(
         "initial_ops, expected_res",
@@ -217,6 +221,25 @@ class TestIntegrationWithOtherPasses:
             return qml.expval(2 * qml.Z(wires=0))
 
         assert expected_res == circuit()
+=======
+    @pytest.mark.usefixtures("use_capture")
+    def test_integrate_with_diagonalize(self):
+        """Test that the measurements_from_samples pass works correctly when used in combination
+        with the diagonalize-measurements pass."""
+
+        dev = qml.device("lightning.qubit", wires=4)
+
+        @qml.qjit
+        @measurements_from_samples_pass
+        @qml.transform(pass_name="diagonalize-final-measurements")
+        @qml.qnode(dev, shots=3000)
+        def circuit(x):
+            qml.RX(x, 0)
+            return qml.expval(qml.Y(0))
+
+        res = circuit(0.768)
+        assert np.isclose(res, -np.sin(0.768), atol=0.05)
+>>>>>>> mfs_reorganize_tests
 
 
 @pytest.mark.usefixtures("use_capture")
@@ -618,6 +641,7 @@ class TestMeasurementsFromSamplesIntegration:
 
         result = workload(2)
         assert result == 1.0
+
 
 def _counts_catalyst_to_pl(basis_states, counts):
     """Helper function to convert counts in the Catalyst format to the PennyLane format.
