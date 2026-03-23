@@ -18,7 +18,7 @@ from typing import cast
 
 import pytest
 from xdsl.dialects import test
-from xdsl.dialects.builtin import I64, IndexType, IntegerAttr
+from xdsl.dialects.builtin import I64, IndexType, IntegerAttr, UnitAttr
 from xdsl.ir import AttributeCovT, OpResult
 
 from catalyst.python_interface.dialects import qecl
@@ -43,6 +43,13 @@ expected_ops_names = {
     "InsertCodeblockOp": "qecl.insert_block",
     "EncodeOp": "qecl.encode",
     "QecCycleOp": "qecl.qec",
+    "IdentityOp": "qecl.identity",
+    "PauliXOp": "qecl.x",
+    "PauliYOp": "qecl.y",
+    "PauliZOp": "qecl.z",
+    "HadamardOp": "qecl.hadamard",
+    "SOp": "qecl.s",
+    "CnotOp": "qecl.cnot",
 }
 
 expected_attrs_names = {
@@ -158,10 +165,68 @@ class TestQecLogicalOps:
         assert encode_op.result_types[0].k == self.k
 
     def test_qecl_op_constructor_qec(self):
+        """Test the constructor of the qecl.qec op."""
         qec_op = qecl.QecCycleOp(in_codeblock=self._get_codeblock_value())
         assert len(qec_op.result_types) == 1
         assert isinstance(qec_op.result_types[0], qecl.LogicalCodeblockType)
         assert qec_op.result_types[0].k == self.k
+
+    @pytest.mark.parametrize("op", [qecl.IdentityOp, qecl.PauliXOp, qecl.PauliYOp, qecl.PauliZOp])
+    @pytest.mark.parametrize(
+        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
+    )
+    def test_qecl_op_constructor_paulis(self, op, idx):
+        """Test the constructors of the qecl Pauli gate ops."""
+        pauli_op = op(in_codeblock=self._get_codeblock_value(), idx=idx)
+        assert len(pauli_op.result_types) == 1
+        assert isinstance(pauli_op.result_types[0], qecl.LogicalCodeblockType)
+        assert pauli_op.result_types[0].k == self.k
+
+    @pytest.mark.parametrize(
+        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
+    )
+    def test_qecl_op_constructor_hadamard(self, idx):
+        """Test the constructor of the qecl.hadamard op."""
+        hadamard_op = qecl.HadamardOp(in_codeblock=self._get_codeblock_value(), idx=idx)
+        assert len(hadamard_op.result_types) == 1
+        assert isinstance(hadamard_op.result_types[0], qecl.LogicalCodeblockType)
+        assert hadamard_op.result_types[0].k == self.k
+
+    @pytest.mark.parametrize(
+        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
+    )
+    @pytest.mark.parametrize("adj", [False, True, UnitAttr()])
+    def test_qecl_op_constructor_s(self, idx, adj):
+        """Test the constructor of the qecl.s op."""
+        s_op = qecl.SOp(in_codeblock=self._get_codeblock_value(), idx=idx, adjoint=adj)
+        assert len(s_op.result_types) == 1
+        assert isinstance(s_op.result_types[0], qecl.LogicalCodeblockType)
+        assert s_op.result_types[0].k == self.k
+
+        if adj:
+            assert s_op.properties.get("adjoint") == UnitAttr()
+        else:
+            assert s_op.properties.get("adjoint") is None
+
+    @pytest.mark.parametrize(
+        "idx_ctrl", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
+    )
+    @pytest.mark.parametrize(
+        "idx_trgt", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
+    )
+    def test_qecl_op_constructor_cnot(self, idx_ctrl, idx_trgt):
+        """Test the constructor of the qecl.cnot op."""
+        cnot_op = qecl.CnotOp(
+            in_ctrl_codeblock=self._get_codeblock_value(),
+            idx_ctrl=idx_ctrl,
+            in_trgt_codeblock=self._get_codeblock_value(),
+            idx_trgt=idx_trgt,
+        )
+        assert len(cnot_op.result_types) == 2
+        assert isinstance(cnot_op.result_types[0], qecl.LogicalCodeblockType)
+        assert cnot_op.result_types[0].k == self.k
+        assert isinstance(cnot_op.result_types[1], qecl.LogicalCodeblockType)
+        assert cnot_op.result_types[1].k == self.k
 
 
 @pytest.mark.parametrize(
@@ -193,6 +258,35 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     // CHECK: [[block2:%.+]] = qecl.qec [[block1]] : !qecl.codeblock<1>
     %block2 = qecl.qec %block1 : !qecl.codeblock<1>
+
+    // CHECK: [[block3:%.+]] = qecl.identity [[block2]][{{\s*}}0] : !qecl.codeblock<1>
+    %block3 = qecl.identity %block2[0] : !qecl.codeblock<1>
+
+    // CHECK: [[block4:%.+]] = qecl.x [[block3]][{{\s*}}0] : !qecl.codeblock<1>
+    %block4 = qecl.x %block3[0] : !qecl.codeblock<1>
+
+    // CHECK: [[block5:%.+]] = qecl.x [[block4]][{{\s*}}0] : !qecl.codeblock<1>
+    %block5 = qecl.x %block4[0] : !qecl.codeblock<1>
+
+    // CHECK: [[block6:%.+]] = qecl.y [[block5]][{{\s*}}0] : !qecl.codeblock<1>
+    %block6 = qecl.y %block5[0] : !qecl.codeblock<1>
+
+    // CHECK: [[block7:%.+]] = qecl.z [[block6]][{{\s*}}0] : !qecl.codeblock<1>
+    %block7 = qecl.z %block6[0] : !qecl.codeblock<1>
+
+    // CHECK: [[block8:%.+]] = qecl.hadamard [[block7]][{{\s*}}0] : !qecl.codeblock<1>
+    %block8 = qecl.hadamard %block7[0] : !qecl.codeblock<1>
+
+    // CHECK: [[block9:%.+]] = qecl.s [[block8]][{{\s*}}0] : !qecl.codeblock<1>
+    %block9 = qecl.s %block8[0] : !qecl.codeblock<1>
+
+    // CHECK: [[block10:%.+]] = qecl.s [[block9]][{{\s*}}0] adj : !qecl.codeblock<1>
+    %block10 = qecl.s %block9[0] adj : !qecl.codeblock<1>
+
+    // CHECK: [[block_ctrl:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+    // CHECK: [[block11:%.+]], [[block12:%.+]] = qecl.cnot [[block_ctrl]][{{\s*}}0], [[block10]][{{\s*}}0]
+    %block_ctrl = "test.op"() : () -> !qecl.codeblock<1>
+    %block11, %block12 = qecl.cnot %block_ctrl[0], %block10[0] : !qecl.codeblock<1>, !qecl.codeblock<1>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
