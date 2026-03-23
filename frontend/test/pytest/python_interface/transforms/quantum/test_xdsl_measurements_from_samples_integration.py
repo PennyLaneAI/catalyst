@@ -266,8 +266,6 @@ class TestMeasurementsFromSamplesIntegration:
 
         run_filecheck_qjit(circuit)
 
-
-
     @pytest.mark.parametrize("shots", [1, 2])
     @pytest.mark.parametrize(
         "initial_op, mp, obs, expected_res",

@@ -91,6 +91,75 @@ LogicalResult InsertCodeblockOp::verify()
     return success();
 }
 
+template <typename OpTy> static LogicalResult verifySingleQubitLogicalGateOp(OpTy op)
+{
+    if (!(op.getIdx() || op.getIdxAttr().has_value())) {
+        return op.emitOpError() << "expected to have a non-null index";
+    }
+
+    // In and out codeblocks types are already constrained to be the same
+    const auto codeblockType = op.getInCodeblock().getType();
+
+    if (auto idxAttr = op.getIdxAttr()) {
+        int64_t idx = idxAttr->getSExtValue();
+        int64_t k = codeblockType.getK();
+
+        if (idx < 0 || idx >= k) {
+            return op.emitOpError()
+                   << "has out-of-bounds index attribute: applying gate to logical qubit at index "
+                   << idx << " in codeblock with k = " << k;
+        }
+    }
+
+    return success();
+}
+
+LogicalResult IdentityOp::verify() { return verifySingleQubitLogicalGateOp(*this); }
+
+LogicalResult PauliXOp::verify() { return verifySingleQubitLogicalGateOp(*this); }
+
+LogicalResult PauliYOp::verify() { return verifySingleQubitLogicalGateOp(*this); }
+
+LogicalResult PauliZOp::verify() { return verifySingleQubitLogicalGateOp(*this); }
+
+LogicalResult HadamardOp::verify() { return verifySingleQubitLogicalGateOp(*this); }
+
+LogicalResult SOp::verify() { return verifySingleQubitLogicalGateOp(*this); }
+
+LogicalResult CnotOp::verify()
+{
+    if (!(getIdxCtrl() || getIdxCtrlAttr().has_value())) {
+        return emitOpError() << "expected to have a non-null ctrl index";
+    }
+    if (!(getIdxTrgt() || getIdxTrgtAttr().has_value())) {
+        return emitOpError() << "expected to have a non-null target index";
+    }
+
+    // In and out codeblocks types are already constrained to be the same
+    const auto ctrlCodeblockType = getInCtrlCodeblock().getType();
+    const auto trgtCodeblockType = getInTrgtCodeblock().getType();
+
+    if (getIdxCtrlAttr().has_value()) {
+        auto idx = getIdxCtrlAttr()->getSExtValue();
+        if (idx < 0 || idx >= ctrlCodeblockType.getK()) {
+            return emitOpError()
+                   << "has out-of-bounds index attribute: applying gate to logical qubit at index "
+                   << idx << " in ctrl codeblock with k = " << ctrlCodeblockType.getK();
+        }
+    }
+
+    if (getIdxTrgtAttr().has_value()) {
+        auto idx = getIdxTrgtAttr()->getSExtValue();
+        if (idx < 0 || idx >= trgtCodeblockType.getK()) {
+            return emitOpError()
+                   << "has out-of-bounds index attribute: applying gate to logical qubit at index "
+                   << idx << " in target codeblock with k = " << trgtCodeblockType.getK();
+        }
+    }
+
+    return success();
+}
+
 //===----------------------------------------------------------------------===//
 // QecLogical op canonicalizers.
 //===----------------------------------------------------------------------===//

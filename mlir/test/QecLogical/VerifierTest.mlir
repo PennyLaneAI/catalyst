@@ -75,3 +75,67 @@ func.func @test_insert_type_mismatch(%r : !qecl.hyperreg<3 x 1>, %b : !qecl.code
     %b1 = qecl.insert_block %r[0], %b : !qecl.hyperreg<3 x 1>, !qecl.codeblock<2>
     return
 }
+
+// -----
+
+func.func @test_gate_op_index_out_of_bounds_identity(%b : !qecl.codeblock<1>) {
+    // expected-error@below {{out-of-bounds index attribute}}
+    %b1 = qecl.identity %b[1] : !qecl.codeblock<1>
+    return
+}
+
+// -----
+
+func.func @test_gate_op_index_out_of_bounds_pauli_x(%b : !qecl.codeblock<1>) {
+    // expected-error@below {{out-of-bounds index attribute}}
+    %b1 = qecl.x %b[1] : !qecl.codeblock<1>
+    return
+}
+
+// -----
+
+func.func @test_gate_op_index_out_of_bounds_pauli_y(%b : !qecl.codeblock<1>) {
+    // expected-error@below {{out-of-bounds index attribute}}
+    %b1 = qecl.y %b[1] : !qecl.codeblock<1>
+    return
+}
+
+// -----
+
+func.func @test_gate_op_index_out_of_bounds_pauli_z(%b : !qecl.codeblock<1>) {
+    // expected-error@below {{out-of-bounds index attribute}}
+    %b1 = qecl.z %b[1] : !qecl.codeblock<1>
+    return
+}
+
+// -----
+
+func.func @test_gate_op_index_out_of_bounds_hadamard(%b : !qecl.codeblock<1>) {
+    // expected-error@below {{out-of-bounds index attribute}}
+    %b1 = qecl.hadamard %b[1] : !qecl.codeblock<1>
+    return
+}
+
+// -----
+
+func.func @test_gate_op_index_out_of_bounds_s(%b : !qecl.codeblock<1>) {
+    // expected-error@below {{out-of-bounds index attribute}}
+    %b1 = qecl.s %b[1] : !qecl.codeblock<1>
+    return
+}
+
+// -----
+
+func.func @test_gate_op_index_out_of_bounds_cnot_ctrl(%b0 : !qecl.codeblock<1>, %b1 : !qecl.codeblock<1>) {
+    // expected-error@below {{out-of-bounds index attribute}}
+    %b2, %b3 = qecl.cnot %b0[1], %b1[0] : !qecl.codeblock<1>, !qecl.codeblock<1>
+    return
+}
+
+// -----
+
+func.func @test_gate_op_index_out_of_bounds_cnot_trgt(%b0 : !qecl.codeblock<1>, %b1 : !qecl.codeblock<1>) {
+    // expected-error@below {{out-of-bounds index attribute}}
+    %b2, %b3 = qecl.cnot %b0[0], %b1[1] : !qecl.codeblock<1>, !qecl.codeblock<1>
+    return
+}
