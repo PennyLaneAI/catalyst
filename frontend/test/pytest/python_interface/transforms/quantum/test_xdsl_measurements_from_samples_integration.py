@@ -65,10 +65,10 @@ class TestIntegrationUsefulErrors:
         with pytest.raises(CompileError, match="using a dynamic number of shots is not supported"):
             workflow(1.2, 100)
 
+
 @pytest.mark.usefixtures("use_capture")
 class TestIntegrationWithOtherPasses:
     """Tests the integration of the xDSL-basd MeasurementsFromSamplesPass with other key passes"""
-
 
     @pytest.mark.usefixtures("use_capture")
     def test_integrate_with_decompose(self):
@@ -107,6 +107,7 @@ class TestIntegrationWithOtherPasses:
 
         res = circuit(0.768)
         assert np.isclose(res, -np.sin(0.768), atol=0.05)
+
 
 @pytest.mark.usefixtures("use_capture")
 class TestMeasurementsFromSamplesIntegration:
@@ -476,6 +477,7 @@ class TestMeasurementsFromSamplesIntegration:
 
         result = workload(2)
         assert result == 1.0
+
 
 def _counts_catalyst_to_pl(basis_states, counts):
     """Helper function to convert counts in the Catalyst format to the PennyLane format.
