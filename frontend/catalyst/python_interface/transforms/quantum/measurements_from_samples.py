@@ -37,12 +37,12 @@ from itertools import islice
 
 import jax
 import jax.numpy as jnp
-from xdsl_jax.dialects import stablehlo
 from pennylane.exceptions import CompileError
 from xdsl import context, ir, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin, func, tensor
 from xdsl.pattern_rewriter import PatternRewriter, RewritePattern
 from xdsl.rewriter import InsertPoint
+from xdsl_jax.dialects import stablehlo
 
 from catalyst.python_interface.conversion import xdsl_module
 from catalyst.python_interface.dialects import quantum
