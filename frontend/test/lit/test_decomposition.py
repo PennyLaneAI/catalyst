@@ -1703,8 +1703,8 @@ def test_cpp_decomp_args():
         qml.RY(np.pi, wire)
 
     def h_to_rx_ry(wire):
-        qml.RX(np.pi / 2)
-        qml.RY(np.pi / 2)
+        qml.RX(np.pi / 2, wire)
+        qml.RY(np.pi / 2, wire)
 
     @qjit(target="mlir")
     # CHECK: "graph-decomposition" with options = {
@@ -1766,7 +1766,7 @@ test_cpp_decomp_empty_args()
 def test_cpp_decomp_string_op_names():
     """Test that cpp decomp args work with string op names."""
 
-    def y_to_xz(op, wires):
+    def y_to_xz(wires):
         qml.RX(np.pi, wires)
         qml.RZ(np.pi, wires)
 
@@ -1781,7 +1781,12 @@ def test_cpp_decomp_string_op_names():
             "X": lambda wires: qml.RX(np.pi, wires),
             "PauliZ": lambda wires: qml.RZ(np.pi, wires),
         },
-        alt_decomps={"PauliY": [lambda wires: qml.RY(np.pi, wires), y_to_xz]},
+        alt_decomps={
+            "PauliY": [
+                lambda wires: qml.RY(np.pi, wires),
+                y_to_xz,
+            ]
+        },
     )
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def circuit():

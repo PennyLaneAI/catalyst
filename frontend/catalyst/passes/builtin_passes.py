@@ -25,7 +25,7 @@ from pennylane.decomposition.utils import to_name
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.precompile_decomposition_rules import BYTECODE_FILE_NAME, DEFAULT_RULE_DIR
+from catalyst.utils.precompile_decomposition_rules import BYTECODE_FILE_PATH
 
 # pylint: disable=line-too-long, too-many-lines
 
@@ -1452,7 +1452,7 @@ def graph_decomposition(
     gate_set: Iterable[type | str] | dict[type | str, float],
     fixed_decomps: dict | None = None,
     alt_decomps: dict | None = None,
-    _builtin_rule_path: Path = DEFAULT_RULE_DIR / BYTECODE_FILE_NAME,
+    _builtin_rule_path: Path = BYTECODE_FILE_PATH,
 ):
     R"""
     Specify that the ``-graph-decomposition`` MLIR compiler pass for applying optimal gate
@@ -1510,7 +1510,10 @@ def graph_decomposition(
     else:
         gate_set = {to_name(op): cost for op, cost in gate_set.items()}
 
-    options = {"gate-set": gate_set, "bytecode-rules": str(_builtin_rule_path)}
+    options: dict[str, dict | tuple | str] = {
+        "gate-set": gate_set,
+        "bytecode-rules": str(_builtin_rule_path),
+    }
 
     if fixed_decomps:
         options |= {
@@ -1527,4 +1530,4 @@ def graph_decomposition(
 
     graph_decomposition_pass = {"graph-decomposition": options}
 
-    return qml.transform(pass_name="decompose-arbitrary-ppr", **graph_decomposition_pass)(qnode)
+    return qml.transform(pass_name="graph-decomposition")(qnode, **graph_decomposition_pass)
