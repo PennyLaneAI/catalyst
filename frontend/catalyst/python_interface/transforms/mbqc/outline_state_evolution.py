@@ -154,7 +154,7 @@ class OutlineStateEvolutionPattern(pattern_rewriter.RewritePattern):
         for qb, idx in list(qubit_to_reg_idx.items()):
             extract_op = quantum.ExtractOp(current_reg, idx)
             rewriter.insert_op(extract_op, insertion_point=insertion_point)
-            qb.replace_by_if(extract_op.qubit, lambda use: use.operation not in insert_ops)
+            qb.replace_uses_with_if(extract_op.qubit, lambda use: use.operation not in insert_ops)
             for use in qb.uses:
                 rewriter.notify_op_modified(use.operation)
             # update the qubit_to_reg_idx dict
