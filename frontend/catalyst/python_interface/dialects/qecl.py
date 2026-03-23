@@ -417,7 +417,7 @@ class SingleQubitLogicalGateOp(IRDLOperation):
         properties: dict[str, Attribute | None] = {}
 
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, 64)
 
         if isinstance(idx, IntegerAttr):
             operands = (in_codeblock, None)
@@ -624,9 +624,9 @@ class CnotOp(IRDLOperation):
         idx_trgt: int | IntegerAttr | SSAValue[IndexType] | Operation,
     ):
         if isinstance(idx_ctrl, int):
-            idx_ctrl = IntegerAttr.from_int_and_width(idx_ctrl, 64)
+            idx_ctrl = IntegerAttr(idx_ctrl, 64)
         if isinstance(idx_trgt, int):
-            idx_trgt = IntegerAttr.from_int_and_width(idx_trgt, 64)
+            idx_trgt = IntegerAttr(idx_trgt, 64)
 
         if isinstance(idx_ctrl, IntegerAttr) and isinstance(idx_trgt, IntegerAttr):
             operands = (in_ctrl_codeblock, None, in_trgt_codeblock, None)
