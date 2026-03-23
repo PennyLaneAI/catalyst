@@ -473,6 +473,7 @@ class TestMeasurementsFromSamplesPass:
         run_filecheck(program, pipeline)
 
     def test_expval_from_sample_with_diagonalize(self, run_filecheck):
+        """Test that diagonalization is performed as expected when the circuit contains non-Z observables"""
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
