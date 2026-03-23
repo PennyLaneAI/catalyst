@@ -144,9 +144,8 @@ def get_or_create_funcop(
     if metadata is None:
         metadata = tuple()
     key = (callable_, *metadata, *_lowered_pipelines(pipelines))
-    if callable_ is not None:
-        if func_op := get_cached(ctx, key):
-            return func_op
+    if func_op := get_cached(ctx, key):
+        return func_op
     func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=public)
     cache(ctx, key, func_op)
     return func_op
@@ -396,12 +395,8 @@ def transform_named_sequence_lowering(pipeline, sym_name):
     with ir.InsertionPoint(bb_named_sequence):
         target = bb_named_sequence.arguments[0]
         for _pass in pipeline:
-            if isinstance(_pass, BoundTransform):
-                options = _lowered_options(_pass)
-                name = _pass.pass_name
-            else:
-                options = _pass.get_options()
-                name = _pass.name
+            options = _lowered_options(_pass)
+            name = _pass.pass_name
             apply_registered_pass_op = ApplyRegisteredPassOp(
                 result=transform_mod_type,
                 target=target,
