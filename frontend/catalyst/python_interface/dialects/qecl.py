@@ -557,14 +557,6 @@ class SOp(SingleQubitLogicalGateOp):
 
     name = "qecl.s"
 
-    def __init__(
-        self,
-        in_codeblock: LogicalCodeBlockSSAValue | Operation,
-        idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
-        adjoint: UnitAttr | bool = False,
-    ):
-        super().__init__(in_codeblock, idx, adjoint)
-
 
 @irdl_op_definition
 class CnotOp(IRDLOperation):

@@ -165,6 +165,7 @@ class TestQecLogicalOps:
         assert encode_op.result_types[0].k == self.k
 
     def test_qecl_op_constructor_qec(self):
+        """Test the constructor of the qecl.qec op."""
         qec_op = qecl.QecCycleOp(in_codeblock=self._get_codeblock_value())
         assert len(qec_op.result_types) == 1
         assert isinstance(qec_op.result_types[0], qecl.LogicalCodeblockType)
@@ -197,7 +198,7 @@ class TestQecLogicalOps:
     @pytest.mark.parametrize("adj", [False, True, UnitAttr()])
     def test_qecl_op_constructor_s(self, idx, adj):
         """Test the constructor of the qecl.s op."""
-        s_op = qecl.SOp(in_codeblock=self._get_codeblock_value(), idx=0, adjoint=adj)
+        s_op = qecl.SOp(in_codeblock=self._get_codeblock_value(), idx=idx, adjoint=adj)
         assert len(s_op.result_types) == 1
         assert isinstance(s_op.result_types[0], qecl.LogicalCodeblockType)
         assert s_op.result_types[0].k == self.k
