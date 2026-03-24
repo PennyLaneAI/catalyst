@@ -665,6 +665,9 @@ class MeasureOp(IRDLOperation):
     represents a measurement of the logical qubit at index `1` in the codeblock `%0`, which
     encodes k = 3 logical qubits. The result of the measurement is returned as the value
     `%mres`.
+
+    Note that unlike the `quantum.measure` operation, this operation does not currently support
+    the `postselect` attribute to select the basis state of the qubit post-measurement.
     """
 
     T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
