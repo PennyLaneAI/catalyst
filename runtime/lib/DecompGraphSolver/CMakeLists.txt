@@ -1,12 +1,12 @@
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library(delightning SHARED DecompositionGraph.cpp DecompositionSolver.cpp)
+add_library(decompsolver SHARED DGBuilder.cpp DGSolver.cpp)
 
 # This is the version tested and shipped with Ubuntu 24 apt.
 # Using older versions (e.g. 1.66 on rhel8 or 1.74 on Ubuntu 22)
 # can cause failure, or will require linking the Boost random library
-# explicitly. When using 1.83 or newer, the delightning target
+# explicitly. When using 1.83 or newer, the decompsolver target
 # will not require external linking to Boost libraries.
 set(MIN_BOOST_VERSION 1.83.0)
 
@@ -20,7 +20,7 @@ find_package(Boost ${MIN_BOOST_VERSION} COMPONENTS random graph QUIET)
 if (Boost_FOUND)
     message(STATUS "Found System Boost ${Boost_VERSION}")
 
-    target_link_libraries(delightning PUBLIC Boost::random Boost::graph)
+    target_link_libraries(decompsolver PUBLIC Boost::random Boost::graph)
 
 else()
     message(STATUS "Boost not found. Fetching...")
@@ -37,13 +37,13 @@ else()
 
     FetchContent_MakeAvailable(Boost)
 
-    target_link_libraries(delightning PUBLIC Boost::multiprecision Boost::random Boost::graph)
+    target_link_libraries(decompsolver PUBLIC Boost::multiprecision Boost::random Boost::graph)
 endif()
 
-target_include_directories(delightning
+target_include_directories(decompsolver
     PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
 )
 
-set_property(TARGET delightning PROPERTY POSITION_INDEPENDENT_CODE ON)
+set_property(TARGET decompsolver PROPERTY POSITION_INDEPENDENT_CODE ON)

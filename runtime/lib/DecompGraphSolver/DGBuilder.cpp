@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /**
- * @file DecompositionGraph.cpp
+ * @file DGBuilder.cpp
  */
 
 #include <boost/graph/adjacency_list.hpp>
@@ -21,7 +21,7 @@
 #include <iostream>
 #include <variant>
 
-#include "DecompositionGraph.hpp"
+#include "DGBuilder.hpp"
 
 namespace DecompGraph::Solver {
 

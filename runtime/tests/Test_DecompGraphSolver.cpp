@@ -17,9 +17,10 @@
 #include <catch2/generators/catch_generators_all.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
-#include "DecompositionGraph.hpp"
-#include "DecompositionSolver.hpp"
-#include "DecompositionTypes.hpp"
+#include "DGBuilder.hpp"
+#include "DGSolver.hpp"
+#include "DGTypes.hpp"
+#include "DGUtils.hpp"
 
 using namespace Catch::Matchers;
 using namespace DecompGraph::Core;
@@ -241,4 +242,37 @@ TEST_CASE("Test the graph solver with intermediate ops and multiple rules", "[De
     const auto &chosen_rule_h = result.optimizedMap.at(h);
     REQUIRE_FALSE(chosen_rule_h.isBasis);
     REQUIRE(chosen_rule_h.ruleName == "h_to_rz_rx_rz");
+}
+
+TEST_CASE("Test GraphSolveError for unsolvable operator", "[DecompGraph::Solver]")
+{
+    const OperatorNode h{"H", 1, 0, false};
+    const OperatorNode rz{"RZ", 1, 1, false};
+
+    const WeightedGateset gateset{{{rz, 1.0}}};
+
+    const std::vector<RuleNode> rules{
+        {"rz_to_rz", rz, {{rz, 1}}},
+    };
+
+    const DecompositionGraph graph({h}, gateset, rules);
+    DecompositionSolver solver(graph);
+
+    REQUIRE_THROWS_AS(solver.solve(), GraphSolverFailedError);
+}
+
+TEST_CASE(" Test GraphSolveError for cyclic decomposition", "[DecompGraph::Solver]")
+{
+    const OperatorNode h{"H", 1, 0, false};
+
+    const WeightedGateset gateset{};
+
+    const std::vector<RuleNode> rules{
+        {"h_to_h", h, {{h, 1}}},
+    };
+
+    const DecompositionGraph graph({h}, gateset, rules);
+    DecompositionSolver solver(graph);
+
+    REQUIRE_THROWS_AS(solver.solve(), CyclicDecompositionError);
 }

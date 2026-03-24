@@ -13,7 +13,8 @@
 // limitations under the License.
 
 /**
- * @file DecompositionTypes.hpp
+ * @file DGTypes.hpp
+ *
  * @brief This file defines the core data structures for representing operators and rules
  * in the decomposition framework.
  */
@@ -21,11 +22,11 @@
 
 #include <limits>
 #include <optional>
+#include <sstream>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-// #include "Exception.hpp"
 
 namespace DecompGraph::Core {
 
@@ -117,7 +118,7 @@ struct WeightedGateset {
             return it->second;
         }
 
-        // RT_FAIL("Operator is not in the target gateset");
+        return std::numeric_limits<double>::infinity();
     }
 };
 

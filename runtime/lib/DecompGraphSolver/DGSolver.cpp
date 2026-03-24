@@ -13,22 +13,20 @@
 // limitations under the License.
 
 /**
- * @file DecompositionSolver.cpp
+ * @file DGSolver.cpp
  */
 
 #include <algorithm>
 
-#include "Utils.hpp"
-
-#include "DecompositionSolver.hpp"
+#include "DGSolver.hpp"
+#include "DGTypes.hpp"
 
 namespace DecompGraph::Solver {
 
 Core::ChosenDecompRule DecompositionSolver::basisRule(const Core::OperatorNode &op)
 {
     if (!graph.isTargetGate(op)) {
-        throw Utils::GraphSolveError("Operator " + Utils::print_op(op) +
-                                     " is not a target gate in the gateset");
+        throw Core::GraphSolveError("Operator is not a target gate in the gateset");
     }
 
     Core::ChosenDecompRule solution;
@@ -99,7 +97,7 @@ Core::ChosenDecompRule DecompositionSolver::solveOperator(const Core::OperatorNo
     }
 
     if (visited.find(op) != visited.end()) {
-        throw Utils::CyclicDecompositionError(solvingStack);
+        throw Core::CyclicDecompositionError(solvingStack);
     }
 
     // RAII guard for the visited set to check/solve the graph recursively
@@ -144,7 +142,7 @@ Core::GraphResult DecompositionSolver::solve()
     for (const auto &root : result.solvedRoots) {
         const auto chosen_rule = solveOperator(root);
         if (chosen_rule.ruleName.empty()) {
-            throw Utils::GraphSolverFailedError(root, {}); // no valid rules
+            throw Core::GraphSolverFailedError(root, {}); // no valid rules
         }
     }
 

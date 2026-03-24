@@ -13,7 +13,14 @@
 // limitations under the License.
 
 /**
- * @file DecompositionSolver.hpp
+ * @file DGSolver.hpp
+ *
+ * @brief This file defines the DecompositionSolver class, which implements the graph decomp
+ * algorithm to find optimal decompositions of quantum operators based on a given decomp graph.
+ * The solver uses a recursive approach with memoization to efficiently explore the decomposition
+ * rules and find the best decomposition for each operator node in the graph. The result includes
+ * the mapping from operator nodes to their chosen decomposition rules, as well as the list of
+ * solved root nodes in the graph.
  */
 
 #pragma once
@@ -23,8 +30,9 @@
 #include <unordered_set>
 #include <vector>
 
-#include "DecompositionGraph.hpp"
-#include "DecompositionTypes.hpp"
+#include "DGBuilder.hpp"
+#include "DGTypes.hpp"
+#include "DGUtils.hpp"
 
 namespace DecompGraph::Solver {
 
@@ -117,5 +125,4 @@ class DecompositionSolver {
      */
     Core::ChosenDecompRule solveOperator(const Core::OperatorNode &op);
 };
-
 } // namespace DecompGraph::Solver

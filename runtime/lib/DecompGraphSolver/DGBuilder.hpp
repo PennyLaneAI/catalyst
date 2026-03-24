@@ -13,7 +13,13 @@
 // limitations under the License.
 
 /**
- * @file DecompositionGraph.hpp
+ * @file DGBuilder.hpp
+ *
+ * @brief This file implements the DecompositionGraph class, which constructs a graph representation
+ * of the decomposition problem based on the provided operators, gateset, and rules. The graph
+ * is built using the Boost Graph Library, where vertices represent operators and rules, and edges
+ * represent the relationships between them according to the decomposition rules.
+
  */
 
 #pragma once
@@ -21,7 +27,7 @@
 #include <memory>
 #include <vector>
 
-#include "DecompositionTypes.hpp"
+#include "DGTypes.hpp"
 
 namespace DecompGraph::Solver {
 
