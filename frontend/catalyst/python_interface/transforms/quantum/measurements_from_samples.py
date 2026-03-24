@@ -86,7 +86,7 @@ measurements_from_samples_pass = compiler_transform(MeasurementsFromSamplesPass)
 
 
 class AddPostProcessingPattern(RewritePattern):
-    """RewritePattern for making each Qnode intro a classical function that
+    """RewritePattern for making each QNode into a classical function that
     calls the QNode and performs post-processing."""
 
     def __init__(self, pass_str: str):
@@ -97,7 +97,7 @@ class AddPostProcessingPattern(RewritePattern):
         self, func_op: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter, /
     ):
         """Transform a quantum node (qnode) to separate it into a quantum node
-        and an outer function that calls the quantum node. Subsequent patterns can the apply
+        and an outer function that calls the quantum node. Subsequent patterns can then apply
         postprocessing to the results of the call in the outer function when changes are made
         to the quantum node.
 
@@ -165,7 +165,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
 
         return op
 
-    def _get_call_op(self, qnode):
+    def _get_call_op(self, qnode: func.FuncOp):
         """Get the CallOp in another module function that calls this quantum_node. Postprocessing
         will be called to act on the output of that CallOp"""
 
@@ -175,7 +175,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         qnode_call_op = [op for op in all_call_ops if qnode_name in op.callee.string_value()]
         if not len(qnode_call_op) == 1:
             raise CompileError(
-                f"Expected only one call_op for {qnode_name}, but recieved {qnode_call_op}"
+                f"Expected only one call_op for {qnode_name}, but received {qnode_call_op}"
             )
 
         return qnode_call_op[0]
@@ -558,7 +558,7 @@ class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
 
             # Insert the call to the post-processing function
             postprocessing_func_call_op = func.CallOp(
-                callee=builtin.FlatSymbolRefAttr(postprocessing_func_op.sym_name),
+                callee=builtin.SymbolRefAttr(postprocessing_func_op.sym_name),
                 arguments=[self.call_op.results[mp_index]],
                 return_types=[builtin.TensorType(builtin.Float64Type(), shape=())],
             )
@@ -570,7 +570,7 @@ class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
             # outer function (to return the post-processed values)
             self.update_returns(mp_index, sample_op, postprocessing_func_call_op, rewriter)
 
-            # delete now ununsed obs --> mp --> tensor chain
+            # delete now unused obs --> mp --> tensor chain
             rewriter.erase_op(tensor_op)
             rewriter.erase_op(matched_op)
             rewriter.erase_op(observable_op)
@@ -636,7 +636,7 @@ class ProbsPattern(MeasurementsFromSamplesPattern):
 
             # Insert the call to the post-processing function
             postprocessing_func_call_op = func.CallOp(
-                callee=builtin.FlatSymbolRefAttr(postprocessing_func_op.sym_name),
+                callee=builtin.SymbolRefAttr(postprocessing_func_op.sym_name),
                 arguments=[sample_op.results[0]],
                 return_types=[builtin.TensorType(builtin.Float64Type(), shape=(2**n_qubits,))],
             )
@@ -646,7 +646,7 @@ class ProbsPattern(MeasurementsFromSamplesPattern):
 
             # Insert the call to the post-processing function
             postprocessing_func_call_op = func.CallOp(
-                callee=builtin.FlatSymbolRefAttr(postprocessing_func_op.sym_name),
+                callee=builtin.SymbolRefAttr(postprocessing_func_op.sym_name),
                 arguments=[self.call_op.results[result_index]],
                 return_types=[builtin.TensorType(builtin.Float64Type(), shape=(2**n_qubits,))],
             )
@@ -658,7 +658,7 @@ class ProbsPattern(MeasurementsFromSamplesPattern):
             # outer function (to return post-processed values)
             self.update_returns(result_index, sample_op, postprocessing_func_call_op, rewriter)
 
-            # delete now ununsed probs_op
+            # delete now unused probs_op
             rewriter.erase_op(probs_op)
 
 

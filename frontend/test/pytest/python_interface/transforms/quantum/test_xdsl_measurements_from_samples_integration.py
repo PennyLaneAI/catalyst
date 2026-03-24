@@ -87,7 +87,7 @@ class TestIntegrationUsefulErrors:
 
         # Note: This error is raised by the diagonalize pass that measurements_from_samples
         # calls, not by measurements_from_samples directly. However, the logic in this pass
-        # relies on the validation being performed, so its tested here. If this test ever breaks
+        # relies on the validation being performed, so it's tested here. If this test ever breaks
         # because of changes in diagonalize_measurements, the logic in measurements_from_samples
         # should be re-evaluated.
 
