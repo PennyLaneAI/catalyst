@@ -47,4 +47,6 @@ target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 target_include_directories(${LIBRARY_NAME} PUBLIC
                            .
                            ${PROJECT_SOURCE_DIR}/include
+                           ${PROJECT_SOURCE_DIR}/../runtime/include
+                           ${PROJECT_SOURCE_DIR}/../runtime/lib/DecompGraphSolver
                            ${CMAKE_BINARY_DIR}/include)

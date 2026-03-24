@@ -25,7 +25,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "Exception.hpp"
+// #include "Exception.hpp"
 
 namespace DecompGraph::Core {
 
@@ -117,7 +117,7 @@ struct WeightedGateset {
             return it->second;
         }
 
-        RT_FAIL("Operator is not in the target gateset");
+        // RT_FAIL("Operator is not in the target gateset");
     }
 };
 
