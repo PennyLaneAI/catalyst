@@ -37,6 +37,7 @@ class TestMergeRotationsPass:
                 // CHECK: quantum.custom "RY"(%arg1) [[q1]] : !quantum.bit
                 %1 = quantum.custom "RX"(%arg0) %0 : !quantum.bit
                 %2 = quantum.custom "RY"(%arg1) %1 : !quantum.bit
+                quantum.dealloc_qb %2 : !quantum.bit
                 return
             }
         """
@@ -54,6 +55,7 @@ class TestMergeRotationsPass:
                 // CHECK-NOT: "quantum.custom"
                 %1 = quantum.custom "RX"(%arg0) %0 : !quantum.bit
                 %2 = quantum.custom "RX"(%arg1) %1 : !quantum.bit
+                quantum.dealloc_qb %2 : !quantum.bit
                 return
             }
         """
@@ -75,6 +77,7 @@ class TestMergeRotationsPass:
                 %2 = quantum.custom "RX"(%arg1) %1 : !quantum.bit
                 %3 = quantum.custom "RX"(%arg2) %2 : !quantum.bit
                 %4 = quantum.custom "RX"(%arg3) %3 : !quantum.bit
+                quantum.dealloc_qb %4 : !quantum.bit
                 return
             }
         """
@@ -93,6 +96,7 @@ class TestMergeRotationsPass:
                 %1 = quantum.custom "RX"(%arg0) %0 : !quantum.bit
                 %2 = quantum.custom "RY"(%arg0) %1 : !quantum.bit
                 %3 = quantum.custom "RX"(%arg1) %2 : !quantum.bit
+                quantum.dealloc_qb %3 : !quantum.bit
                 return
             }
         """
@@ -111,6 +115,8 @@ class TestMergeRotationsPass:
                 // CHECK: quantum.custom "RX"(%arg1) [[q1]] : !quantum.bit
                 %2 = quantum.custom "RX"(%arg0) %0 : !quantum.bit
                 %3 = quantum.custom "RX"(%arg1) %1 : !quantum.bit
+                quantum.dealloc_qb %2 : !quantum.bit
+                quantum.dealloc_qb %3 : !quantum.bit
                 return
             }
         """
@@ -133,6 +139,9 @@ class TestMergeRotationsPass:
                 // CHECK-NOT: "quantum.custom"
                 %3, %4, %5 = quantum.custom "RX"(%arg0) %0 ctrls(%1, %2) ctrlvals(%cst, %cst) : !quantum.bit ctrls !quantum.bit, !quantum.bit
                 %6, %7, %8 = quantum.custom "RX"(%arg1) %3 ctrls(%4, %5) ctrlvals(%cst, %cst) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+                quantum.dealloc_qb %6 : !quantum.bit
+                quantum.dealloc_qb %7 : !quantum.bit
+                quantum.dealloc_qb %8 : !quantum.bit
                 return
             }
         """
@@ -157,6 +166,9 @@ class TestMergeRotationsPass:
                 // CHECK-NOT: quantum.custom
                 %3, %4, %5 = quantum.custom "RX"(%arg0) %0 ctrls(%1, %2) ctrlvals(%cst0, %cst1) : !quantum.bit ctrls !quantum.bit, !quantum.bit
                 %6, %7, %8 = quantum.custom "RX"(%arg1) %3 ctrls(%4, %5) ctrlvals(%cst0, %cst1) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+                quantum.dealloc_qb %6 : !quantum.bit
+                quantum.dealloc_qb %7 : !quantum.bit
+                quantum.dealloc_qb %8 : !quantum.bit
                 return
             }
         """
@@ -180,6 +192,9 @@ class TestMergeRotationsPass:
                 // CHECK: quantum.custom "RX"(%arg1) [[q3]] ctrls([[q4]], [[q5]]) ctrlvals(%cst0, %cst1) : !quantum.bit ctrls !quantum.bit, !quantum.bit
                 %3, %4, %5 = quantum.custom "RX"(%arg0) %0 ctrls(%1, %2) ctrlvals(%cst1, %cst0) : !quantum.bit ctrls !quantum.bit, !quantum.bit
                 %6, %7, %8 = quantum.custom "RX"(%arg1) %3 ctrls(%4, %5) ctrlvals(%cst0, %cst1) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+                quantum.dealloc_qb %6 : !quantum.bit
+                quantum.dealloc_qb %7 : !quantum.bit
+                quantum.dealloc_qb %8 : !quantum.bit
                 return
             }
         """
@@ -209,6 +224,7 @@ class TestMergeRotationsPass:
                 // CHECK-NOT: "quantum.custom"
                 %1 = quantum.custom "RX"(%arg0) %0 {adj_string_0}: !quantum.bit
                 %2 = quantum.custom "RX"(%arg1) %1 {adj_string_1}: !quantum.bit
+                quantum.dealloc_qb %2 : !quantum.bit
                 return
             }}
         """
