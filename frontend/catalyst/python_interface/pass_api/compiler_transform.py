@@ -45,7 +45,7 @@ class CompilerTransform(Transform):
         super().__init__(pass_name=module_pass.name)
 
 
-def compiler_transform(module_pass: ModulePass) -> CompilerTransform:
+def compiler_transform(module_pass: type[ModulePass]) -> CompilerTransform:
     """Function to register compilation passes to use within :func:`~.qjit`'d workflows as
     decorators on top of QNodes.
 
@@ -242,7 +242,8 @@ class CompilationPass(ModulePass):
         """
         if self.greedy:
             pattern = GreedyRewritePatternApplier(
-                rewrite_patterns=[rp(self) for rp in self._rewrite_patterns]
+                rewrite_patterns=[rp(self) for rp in self._rewrite_patterns],
+                dce_enabled=False,
             )
             walker = PatternRewriteWalker(pattern=pattern, apply_recursively=self.recursive)
             walker.rewrite_module(op)
@@ -272,7 +273,7 @@ def _update_op_type_hint(hint: type[Operation]) -> Callable:
     return _update_match_and_rewrite
 
 
-def _create_rewrite_pattern(hint: type[Operation], action: Callable) -> RewritePattern:
+def _create_rewrite_pattern(hint: type[Operation], action: Callable) -> type[RewritePattern]:
     """Given an action defined as a function, create a ``RewritePattern`` which
     can be used with xDSL's pass API."""
 

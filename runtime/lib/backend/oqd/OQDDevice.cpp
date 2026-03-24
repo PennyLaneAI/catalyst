@@ -77,7 +77,12 @@ void OQDDevice::PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
 
 auto OQDDevice::Measure(QubitIdType, std::optional<int32_t>) -> Result
 {
-    RT_FAIL("Measure unsupported by device");
+    // Mid-circuit measurements are recorded into the OpenAPL JSON as MeasurePulse
+    // entries (via __catalyst__oqd__measure_pulse).
+    // The classical result returned here is a placeholder; actual measurement outcomes
+    // are determined at runtime by the trapped-ion hardware executing the OpenAPL program.
+    static constexpr bool RESULT_PLACEHOLDER = false;
+    return const_cast<Result>(&RESULT_PLACEHOLDER);
 }
 
 } // namespace Catalyst::Runtime::Device

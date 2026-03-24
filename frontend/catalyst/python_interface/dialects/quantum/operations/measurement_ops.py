@@ -73,7 +73,7 @@ class MeasureOp(IRDLOperation):
         self, in_qubit: QubitSSAValue | Operation, postselect: int | IntegerAttr | None = None
     ):
         if isinstance(postselect, int):
-            postselect = IntegerAttr.from_int_and_width(postselect, 32)
+            postselect = IntegerAttr(postselect, 32)
 
         if postselect is None:
             properties = {}
