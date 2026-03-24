@@ -659,6 +659,26 @@ class QJIT(CatalystCallable):
             dynamic_args = filter_static_args(args, self.compile_options.static_argnums)
             args = promote_arguments(self.c_sig, dynamic_args)
 
+        print(
+            "┌───────────────────────────────────────────────────────────────────────────────────────────────┐\n"
+            "│                These PennyLane+Catalyst results are brought to you by Xanadu™                 │\n"
+            "│                                                                                               │\n"
+            "│         ########                                                                              │\n"
+            "│     ###          ###                                                                          │\n"
+            "│    #               ##                                                                         │\n"
+            "│  ##                  ##                                                                       │\n"
+            "│  #     ##      ##     #      #    #        #       ##    #        #        #####       #    # │\n"
+            "│ ##       ##  ##       ##      ## #        # #      # #   #       # #       #    ##     #    # │\n"
+            "│ #          ##         ##       ##        #   #     #  ## #      #   #      #     #     #    # │\n"
+            "│ ##       ##  ##       ##      #  #      #     #    #    ##     #     #     #    ##     #    # │\n"
+            "│  #     ###    ###     #      #    ##   #       #   #     #    #       #    #####        ####  │\n"
+            "│  ##    #        ##   #                                                                        │\n"
+            "│   ##             ###                                                                          │\n"
+            "│     ###          ## ##                                                                        │\n"
+            "│         ########      ##                                                                      │\n"
+            "└───────────────────────────────────────────────────────────────────────────────────────────────┘\n"
+        )
+
         return self.run(args, kwargs)
 
     @debug_logger
