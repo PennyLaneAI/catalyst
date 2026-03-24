@@ -18,13 +18,19 @@
 
 #include <algorithm>
 
+#include "Utils.hpp"
+
 #include "DecompositionSolver.hpp"
 
 namespace DecompGraph::Solver {
 
 Core::ChosenDecompRule DecompositionSolver::basisRule(const Core::OperatorNode &op)
 {
-    RT_ASSERT(graph.isTargetGate(op) && "Operator is not a target gate in the gateset");
+    if (!graph.isTargetGate(op)) {
+        throw Utils::GraphSolveError("Operator " + Utils::print_op(op) +
+                                     " is not a target gate in the gateset");
+    }
+
     Core::ChosenDecompRule solution;
     solution.op = op;
     solution.isBasis = true;
@@ -93,7 +99,7 @@ Core::ChosenDecompRule DecompositionSolver::solveOperator(const Core::OperatorNo
     }
 
     if (visited.find(op) != visited.end()) {
-        RT_FAIL("Cycle detected in the decomposition graph");
+        throw Utils::CyclicDecompositionError(solvingStack);
     }
 
     // RAII guard for the visited set to check/solve the graph recursively
@@ -138,7 +144,7 @@ Core::GraphResult DecompositionSolver::solve()
     for (const auto &root : result.solvedRoots) {
         const auto chosen_rule = solveOperator(root);
         if (chosen_rule.ruleName.empty()) {
-            RT_FAIL("Failed to solve the root operator");
+            throw Utils::GraphSolverFailedError(root, {}); // no valid rules
         }
     }
 

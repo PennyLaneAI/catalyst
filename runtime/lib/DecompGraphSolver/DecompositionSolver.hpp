@@ -23,8 +23,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "Exception.hpp"
-
 #include "DecompositionGraph.hpp"
 #include "DecompositionTypes.hpp"
 
