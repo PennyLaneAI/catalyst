@@ -487,6 +487,7 @@ jobs:
         # Install graphviz for testing the mlir-op-graph integration
         sudo apt-get install -y graphviz
         make frontend
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@revert/revert_qft
 
     - name: Verify Graphviz installation
       run: |
@@ -575,6 +576,7 @@ jobs:
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@revert/revert_qft
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -638,6 +640,7 @@ jobs:
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@revert/revert_qft
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
