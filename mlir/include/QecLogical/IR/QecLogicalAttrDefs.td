@@ -12,17 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef QEC_LOGICAL_ATTR_DEFS
+#define QEC_LOGICAL_ATTR_DEFS
 
-#include "mlir/Bytecode/BytecodeOpInterface.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/PatternMatch.h"
+include "mlir/IR/EnumAttr.td"
 
-#include "QecLogical/IR/QecLogicalDialect.h"
+include "QecLogical/IR/QecLogicalDialect.td"
 
 //===----------------------------------------------------------------------===//
-// QecLogical ops declarations.
+// QecLogical dialect enums and attributes.
 //===----------------------------------------------------------------------===//
 
-#define GET_OP_CLASSES
-#include "QecLogical/IR/QecLogicalOps.h.inc"
+def LogicalCodeblockInitState : I32EnumAttr<"LogicalCodeblockInitState",
+    "logical codeblock initial state",
+    [
+        I32EnumAttrCase<"Zero", 0, "zero">  // |0⟩
+        // Add other supported codeblock initial states here
+    ]> {
+    let cppNamespace = "catalyst::qecl";
+    let genSpecializedAttr = 0;
+}
+
+def LogicalCodeblockInitStateAttr : EnumAttr<
+    QecLogical_Dialect, LogicalCodeblockInitState, "codeblock_init_state">;
+
+#endif // QEC_LOGICAL_ATTR_DEFS

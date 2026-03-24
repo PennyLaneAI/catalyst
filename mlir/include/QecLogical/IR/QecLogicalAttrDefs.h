@@ -14,15 +14,8 @@
 
 #pragma once
 
-#include "mlir/Bytecode/BytecodeOpInterface.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Attributes.h"
 
-#include "QecLogical/IR/QecLogicalDialect.h"
-
-//===----------------------------------------------------------------------===//
-// QecLogical ops declarations.
-//===----------------------------------------------------------------------===//
-
-#define GET_OP_CLASSES
-#include "QecLogical/IR/QecLogicalOps.h.inc"
+#include "QecLogical/IR/QecLogicalEnums.h.inc"
+#define GET_ATTRDEF_CLASSES
+#include "QecLogical/IR/QecLogicalAttributes.h.inc"
