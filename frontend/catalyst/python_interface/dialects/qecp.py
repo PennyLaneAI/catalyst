@@ -325,7 +325,7 @@ class ExtractCodeblockOp(IRDLOperation):
         idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (hyper_reg, None)
@@ -373,7 +373,7 @@ class InsertCodeblockOp(IRDLOperation):
         codeblock: PhysicalCodeBlockSSAValue | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (in_hyper_reg, None, codeblock)
@@ -418,7 +418,7 @@ class ExtractQubitOp(IRDLOperation):
         idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (codeblock, None)
@@ -470,7 +470,7 @@ class InsertQubitOp(IRDLOperation):
         qubit: QecPhysicalQubitSSAValue | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (in_codeblock, None, qubit)

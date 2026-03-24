@@ -94,27 +94,25 @@ class TestQecPhysicalTypes:
         expected_role = qecp.QecPhysicalQubitRoleAttr(role)
         assert q_data.role == expected_role
 
-    @pytest.mark.parametrize("k", [1, 2, IntegerAttr.from_int_and_width(1, 64)])
-    @pytest.mark.parametrize("n", [1, 7, IntegerAttr.from_int_and_width(7, 64)])
+    @pytest.mark.parametrize("k", [1, 2, IntegerAttr(1, 64)])
+    @pytest.mark.parametrize("n", [1, 7, IntegerAttr(7, 64)])
     def test_qecp_type_constructor_codeblock(self, k, n):
         """Test the constructor of qecp.PhysicalCodeblockType."""
         codeblock = qecp.PhysicalCodeblockType(k, n)
-        expected_k = k if isinstance(k, IntegerAttr) else IntegerAttr.from_int_and_width(k, 64)
-        expected_n = n if isinstance(n, IntegerAttr) else IntegerAttr.from_int_and_width(n, 64)
+        expected_k = k if isinstance(k, IntegerAttr) else IntegerAttr(k, 64)
+        expected_n = n if isinstance(n, IntegerAttr) else IntegerAttr(n, 64)
         assert codeblock.k == expected_k
         assert codeblock.n == expected_n
 
-    @pytest.mark.parametrize("width", [1, 3, IntegerAttr.from_int_and_width(3, 64)])
-    @pytest.mark.parametrize("k", [1, 2, IntegerAttr.from_int_and_width(1, 64)])
-    @pytest.mark.parametrize("n", [1, 7, IntegerAttr.from_int_and_width(7, 64)])
+    @pytest.mark.parametrize("width", [1, 3, IntegerAttr(3, 64)])
+    @pytest.mark.parametrize("k", [1, 2, IntegerAttr(1, 64)])
+    @pytest.mark.parametrize("n", [1, 7, IntegerAttr(7, 64)])
     def test_qecp_type_constructor_hyper_reg(self, width, k, n):
         """Test the constructor of qecp.PhysicalHyperRegisterType."""
         hyper_reg = qecp.PhysicalHyperRegisterType(width, k, n)
-        expected_width = (
-            width if isinstance(width, IntegerAttr) else IntegerAttr.from_int_and_width(width, 64)
-        )
-        expected_k = k if isinstance(k, IntegerAttr) else IntegerAttr.from_int_and_width(k, 64)
-        expected_n = n if isinstance(n, IntegerAttr) else IntegerAttr.from_int_and_width(n, 64)
+        expected_width = width if isinstance(width, IntegerAttr) else IntegerAttr(width, 64)
+        expected_k = k if isinstance(k, IntegerAttr) else IntegerAttr(k, 64)
+        expected_n = n if isinstance(n, IntegerAttr) else IntegerAttr(n, 64)
         assert hyper_reg.width == expected_width
         assert hyper_reg.k == expected_k
         assert hyper_reg.n == expected_n
@@ -123,10 +121,10 @@ class TestQecPhysicalTypes:
 class TestQecPhysicalOps:
     """Tests relating to the qecp ops."""
 
-    width = IntegerAttr.from_int_and_width(3, 64)
-    k = IntegerAttr.from_int_and_width(1, 64)
-    n = IntegerAttr.from_int_and_width(7, 64)
-    idx_attr = IntegerAttr.from_index_int_value(0)
+    width = IntegerAttr(3, 64)
+    k = IntegerAttr(1, 64)
+    n = IntegerAttr(7, 64)
+    idx_attr = IntegerAttr(0, IndexType())
 
     def _get_hyper_reg_value(self):
         return create_ssa_value(qecp.PhysicalHyperRegisterType(self.width, self.k, self.n))
