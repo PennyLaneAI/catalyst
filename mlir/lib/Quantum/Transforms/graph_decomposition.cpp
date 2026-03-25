@@ -32,9 +32,13 @@
 #include "Quantum/Utils/Decomp.h"
 
 #include "graph_decomp_solver.hpp"
+#include "DGTypes.hpp"
+#include "DGBuilder.hpp"
+#include "DGSolver.hpp"
 
 using namespace mlir;
 using namespace catalyst::quantum;
+using namespace DecompGraph::Core;
 
 namespace catalyst {
 namespace quantum {
@@ -43,6 +47,7 @@ namespace quantum {
 
 struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDecompositionPass> {
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
+
     void runOnOperation() final
     {
         llvm::errs() << "Parsed options from CLI:\n";
@@ -90,6 +95,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         // List of all resources both built-in and custom rules
         std::vector<RuleNode> setOfResources = {};
+        std::unordered_map<std::string, mlir::OwningOpRef<func::FuncOp>> ruleNameToFuncOp = {};
+
         ModuleOp module = cast<ModuleOp>(getOperation());
 
         ///////////////////////////
@@ -124,12 +131,12 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // Step 4: Get the resources for all the rules (both built-in and custom)
         // and convert them to RuleNodes for later use in the graph decomposition
         // TODO get nodes from user rules
-        getRuleNodes(module, bytecodeRulesFile, customRules, setOfResources);
+        getRuleNodes(module, bytecodeRulesFile, customRules, setOfResources, ruleNameToFuncOp);
         llvm::errs() << "got rules for graph\n";
 
         ///////////////////////////
         // Step 5: Build and solve the decomposition graph
-        auto solution = GraphDecompositionSolver::Solve(setOfOps, setOfResources, targetGateToCost);
+        // auto solution = GraphDecompositionSolver::Solve(setOfOps, setOfResources, targetGateToCost);
         llvm::errs() << "got solution from graph\n";
 
         ///////////////////////////
@@ -181,16 +188,20 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         module.walk([&](CustomOp op) {
             OperatorNode node;
-            node.op = op;
-            node.name = op->getName().getStringRef();
-            node.weight = 1.0; // TODO: gates could be lowered by some weights
+            node.name = op.getGateName().str();
+            auto inQubits = op.getInQubits();
+            node.numWires = inQubits.size();
+            auto inParams = op.getParams();
+            node.numParams = inParams.size();
+            node.adjoint = op.getAdjoint();
             operators.push_back(node);
         });
     }
 
     void getRuleNodes([[maybe_unused]] ModuleOp module, llvm::StringRef filename,
                       [[maybe_unused]] const llvm::StringMap<func::FuncOp> &custom_rules,
-                      [[maybe_unused]] std::vector<RuleNode> &rules)
+                      [[maybe_unused]] std::vector<RuleNode> &rules,
+                      [[maybe_unused]] std::unordered_map<std::string, mlir::OwningOpRef<func::FuncOp>> &ruleNameToFuncOp)
     {
 
         // TODO user nodes
@@ -203,10 +214,50 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         for (auto &ruleOpRef : builtinRules) {
             RuleNode ruleNode;
             mlir::func::FuncOp func = ruleOpRef.get(); // access the op
+            ruleNode.name = func.getName().str();
+            ruleNameToFuncOp[ruleNode.name] = std::move(ruleOpRef);
 
-            ruleNode.name = func.getName();
-            ruleNode.funcOp = std::move(ruleOpRef);
-            ruleNode.resource = func->getAttrOfType<DictionaryAttr>("Resources");
+            // Set output OperatorNode
+            if (auto outputGateAttr = func->getAttrOfType<StringAttr>("target_gate")) {
+                OperatorNode outputNode;
+                outputNode.name = outputGateAttr.getValue().str();
+                if (outputNode.name.starts_with("Adjoint(") && outputNode.name.ends_with(")")) {
+                    outputNode.adjoint = true;
+                    outputNode.name = outputNode.name.drop_front(strlen("Adjoint(")).drop_back(1);
+                }
+                ruleNode.output = outputNode;
+            } else {
+                llvm::errs() << "Rule " << ruleNode.name
+                             << " is missing 'target_gate' attribute. Skipping this rule.\n";
+                continue; // skip this rule if target_gate attribute is missing
+            }
+
+            // Convert "resources" attribute to std::vector<RuleTerm> and set as inputs of the rule node
+            // ruleNode.resource = func->getAttrOfType<DictionaryAttr>("Resources");
+            if (auto resourcesAttr = func->getAttrOfType<DictionaryAttr>("resources")) {
+                for (const auto &resource : resourcesAttr) {
+                    RuleTerm term;
+                    term.op.name = resource.first.str();
+                    if (term.op.name.starts_with("Adjoint(") && term.op.name.ends_with(")")) {
+                        term.op.adjoint = true;
+                        term.op.name = term.op.name.drop_front(strlen("Adjoint(")).drop_back(1);
+                    }
+                    if (auto multiplicityAttr = resource.second.dyn_cast<IntegerAttr>()) {
+                        term.multiplicity = multiplicityAttr.getInt();
+                    } else {
+                        llvm::errs() << "Resource " << resource.first
+                                     << " in rule " << ruleNode.name
+                                     << " is missing 'multiplicity' integer attribute. Skipping this resource.\n";
+                        continue; // skip this resource if multiplicity attribute is missing or not an integer
+                    }
+                    ruleNode.inputs.push_back(term);
+                }
+            } else {
+                llvm::errs() << "Rule " << ruleNode.name
+                             << " is missing 'resources' attribute. Skipping this rule.\n";
+                continue; // skip this rule if resources attribute is missing
+            }            
+
 
             rules.push_back(std::move(ruleNode));
         }

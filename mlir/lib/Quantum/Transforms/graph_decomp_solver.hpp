@@ -21,7 +21,7 @@
 
 #include "Quantum/IR/QuantumOps.h"
 
-#include "DecompositionTypes.hpp"
+#include "DGTypes.hpp"
 
 using namespace mlir;
 using namespace catalyst;
@@ -31,11 +31,6 @@ namespace catalyst {
 namespace quantum {
 
 
-struct FuncOpRuleNode {
-    StringRef name;
-    mlir::OwningOpRef<func::FuncOp> funcOp;
-    DictionaryAttr resource;
-};
 
 struct GraphDecompositionSolver {
 
@@ -52,12 +47,12 @@ struct GraphDecompositionSolver {
      * graph decomposition.
      *
      */
-    static std::vector<FuncOpRuleNode> Solve(const std::vector<OperatorNode> &operators,
-                                       const std::vector<FuncOpRuleNode> &rules,
-                                       const std::unordered_map<std::string, float> &gateset)
-    {
-        return {};
-    }
+    // static std::vector<FuncOpRuleNode> Solve(const std::vector<OperatorNode> &operators,
+    //                                    const std::vector<FuncOpRuleNode> &rules,
+    //                                    const std::unordered_map<std::string, float> &gateset)
+    // {
+    //     return {};
+    // }
 };
 
 } // namespace quantum

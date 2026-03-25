@@ -101,6 +101,11 @@ struct RuleNode {
     std::string name;
     OperatorNode output;
     std::vector<RuleTerm> inputs;
+
+    bool operator==(const RuleNode &other) const
+    {
+        return name == other.name && output == other.output;
+    }
 };
 
 /**

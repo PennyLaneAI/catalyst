@@ -34,13 +34,13 @@ static inline auto print_op(const OperatorNode &op) -> std::string
     std::ostringstream oss;
     oss << op.name;
     if (op.numWires != 0U) {
-        oss << " [w:" << op.numWires << "]";
+        oss << "[w:" << op.numWires << "]";
     }
     if (op.numParams != 0U) {
-        oss << " [p:" << op.numParams << "]";
+        oss << "[p:" << op.numParams << "]";
     }
     if (op.adjoint) {
-        oss << " [adj]";
+        oss << "[adj]";
     }
     return oss.str();
 }
@@ -49,7 +49,7 @@ static inline auto cycle_message(const std::vector<OperatorNode> &cycle) -> std:
 {
     std::ostringstream oss;
     oss << "Cyclic decomposition detected: ";
-    for (auto i = 0; i < cycle.size(); i++) {
+    for (std::size_t i = 0; i < cycle.size(); i++) {
         if (i != 0U) {
             oss << " -> ";
         }
@@ -62,7 +62,7 @@ static inline auto graph_failed_message(const OperatorNode &op,
                                         const std::vector<std::string> &rule_errors) -> std::string
 {
     std::ostringstream oss;
-    oss << "Graph is failed for operator '" << print_op(op) << "'";
+    oss << "Decomposition rule not found for operator '" << print_op(op) << "'";
     if (!rule_errors.empty()) {
         oss << ". Tried rules:";
         for (const auto &error : rule_errors) {
