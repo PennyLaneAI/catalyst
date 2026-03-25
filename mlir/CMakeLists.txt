@@ -68,6 +68,8 @@ set(STABLEHLO_LIBS
     VhloTypes
 )
 
+set(CATALYST_RT_LIBS decompsolver)
+
 foreach(STABLEHLO_LIB IN LISTS STABLEHLO_LIBS)
     add_library(${STABLEHLO_LIB} STATIC IMPORTED GLOBAL)
     set_property(TARGET ${STABLEHLO_LIB} PROPERTY

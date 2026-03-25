@@ -17,6 +17,8 @@
 #include <catch2/generators/catch_generators_all.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
+#include <iostream>
+
 #include "DGBuilder.hpp"
 #include "DGSolver.hpp"
 #include "DGTypes.hpp"
@@ -242,6 +244,30 @@ TEST_CASE("Test the graph solver with intermediate ops and multiple rules", "[De
     const auto &chosen_rule_h = result.optimizedMap.at(h);
     REQUIRE_FALSE(chosen_rule_h.isBasis);
     REQUIRE(chosen_rule_h.ruleName == "h_to_rz_rx_rz");
+
+    std::vector<std::string> expected_rule_names{"bell_to_cnot_h", "h_to_rz_rx_rz", "swap_to_cnot"};
+    for (const auto &[op, entry] : solver.getSolvedMap()) {
+        if (op == customBellOp) {
+            REQUIRE(std::find(expected_rule_names.begin(), expected_rule_names.end(),
+                              entry.ruleName) != expected_rule_names.end());
+        }
+        else if (op == h) {
+            REQUIRE(std::find(expected_rule_names.begin(), expected_rule_names.end(),
+                              entry.ruleName) != expected_rule_names.end());
+        }
+        else if (op == swap) {
+            REQUIRE(std::find(expected_rule_names.begin(), expected_rule_names.end(),
+                              entry.ruleName) != expected_rule_names.end());
+        }
+        else if (op == rz || op == rx) {
+            REQUIRE(entry.isBasis);
+            REQUIRE(entry.ruleName == "BasisRule");
+        }
+        else if (op == ry) {
+            REQUIRE(entry.isBasis);
+            REQUIRE(entry.ruleName == "BasisRule");
+        }
+    }
 }
 
 TEST_CASE("Test GraphSolveError for unsolvable operator", "[DecompGraph::Solver]")

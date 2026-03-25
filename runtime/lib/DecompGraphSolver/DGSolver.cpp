@@ -153,4 +153,12 @@ Core::GraphResult DecompositionSolver::solve()
     return result;
 }
 
+DecompositionSolver::SolutionType DecompositionSolver::getSolvedMap()
+{
+    if (solvedMap.empty()) {
+        solve();
+    }
+    return solvedMap;
+}
+
 } // namespace DecompGraph::Solver

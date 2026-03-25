@@ -38,6 +38,7 @@
 using namespace mlir;
 using namespace catalyst::quantum;
 using namespace DecompGraph::Core;
+using namespace DecompGraph::Solver;
 
 namespace catalyst {
 namespace quantum {
@@ -107,19 +108,32 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         ///////////////////////////
         // Step 2: Get the target gateset for decomposition from the module attribute
         // To sync with the graph solver branch, targetGateset should be DictionaryAttr
-        std::unordered_map<std::string, float> targetGateToCost;
-        llvm::errs() << "gate set:\n";
+        WeightedGateset targetGateSet;
+        llvm::errs() << "target gate set:\n";
         for (const std::string &opCostPair : targetGateSetOption) {
             llvm::StringRef pairRef(opCostPair);
 
             auto [opName, cost] = pairRef.split("=");
-            bool success = to_float(cost, targetGateToCost[opName.str()]);
+            bool success = to_float(cost, targetGateSet.ops[OperatorNode{opName.str()}]);
 
             if (!success) {
                 return signalPassFailure();
             }
             llvm::errs() << "\t" << opName << ": " << cost << ",\n";
         }
+        // std::unordered_map<std::string, float> targetGateToCost;
+        // llvm::errs() << "gate set:\n";
+        // for (const std::string &opCostPair : targetGateSetOption) {
+        //     llvm::StringRef pairRef(opCostPair);
+
+        //     auto [opName, cost] = pairRef.split("=");
+        //     bool success = to_float(cost, targetGateToCost[opName.str()]);
+
+        //     if (!success) {
+        //         return signalPassFailure();
+        //     }
+        //     llvm::errs() << "\t" << opName << ": " << cost << ",\n";
+        // }
 
         ///////////////////////////
         // Step 3: Get and convert operators in the module required for creating the graph
@@ -135,6 +149,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 5: Build and solve the decomposition graph
+        DecompositionGraph graph(setOfOps, targetGateSet, setOfResources);
+        DecompositionSolver solver(graph);
+        auto solution = solver.getSolvedMap();
         // auto solution = GraphDecompositionSolver::Solve(setOfOps, setOfResources,
         // targetGateToCost);
         llvm::errs() << "got solution from graph\n";
@@ -143,7 +160,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // Step 6: Insert decomposition rules picked by the graph solver (solution) into the
         // module and then run the decompose-lowering patterns to apply the decomposition rules
         // and rewrite the quantum operations.
-        insertChosenRules(solution, module);
+        insertChosenRules(module, solution, ruleNameToFuncOp);
         llvm::errs() << "inserted chosen rules\n";
 
         ///////////////////////////
@@ -199,11 +216,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     }
 
     void
-    getRuleNodes([[maybe_unused]] ModuleOp module, llvm::StringRef filename,
-                 [[maybe_unused]] const llvm::StringMap<func::FuncOp> &custom_rules,
-                 [[maybe_unused]] std::vector<RuleNode> &rules,
-                 [[maybe_unused]] std::unordered_map<std::string, mlir::OwningOpRef<func::FuncOp>>
-                     &ruleNameToFuncOp)
+    getRuleNodes(ModuleOp module, llvm::StringRef filename,
+                 const llvm::StringMap<func::FuncOp> &custom_rules, std::vector<RuleNode> &rules,
+                 std::unordered_map<std::string, mlir::OwningOpRef<func::FuncOp>> &ruleNameToFuncOp)
     {
 
         // TODO user nodes
@@ -225,7 +240,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 outputNode.name = outputGateAttr.getValue().str();
                 if (outputNode.name.starts_with("Adjoint(") && outputNode.name.ends_with(")")) {
                     outputNode.adjoint = true;
-                    outputNode.name = outputNode.name.drop_front(strlen("Adjoint(")).drop_back(1);
+                    outputNode.name =
+                        llvm::StringRef(outputNode.name).drop_front(8).drop_back(1).str();
                 }
                 ruleNode.output = outputNode;
             }
@@ -235,28 +251,27 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 continue; // skip this rule if target_gate attribute is missing
             }
 
-            // Convert "resources" attribute to std::vector<RuleTerm> and set as inputs of the rule
-            // node ruleNode.resource = func->getAttrOfType<DictionaryAttr>("Resources");
+            // Convert resources attribute
             if (auto resourcesAttr = func->getAttrOfType<DictionaryAttr>("resources")) {
                 for (const auto &resource : resourcesAttr) {
                     RuleTerm term;
-                    term.op.name = resource.first.str();
-                    if (term.op.name.starts_with("Adjoint(") && term.op.name.ends_with(")")) {
-                        term.op.adjoint = true;
-                        term.op.name = term.op.name.drop_front(strlen("Adjoint(")).drop_back(1);
-                    }
-                    if (auto multiplicityAttr = resource.second.dyn_cast<IntegerAttr>()) {
-                        term.multiplicity = multiplicityAttr.getInt();
+                    auto res_int = resource.getValue();
+                    if (auto intAttr = mlir::dyn_cast<IntegerAttr>(res_int)) {
+                        term.op.name = resource.getName().str();
+                        if (term.op.name.starts_with("Adjoint(") && term.op.name.ends_with(")")) {
+                            term.op.adjoint = true;
+                            term.op.name =
+                                llvm::StringRef(term.op.name).drop_front(8).drop_back(1).str();
+                        }
+                        term.multiplicity = intAttr.getInt();
+                        ruleNode.inputs.push_back(term);
                     }
                     else {
                         llvm::errs()
-                            << "Resource " << resource.first << " in rule " << ruleNode.name
-                            << " is missing 'multiplicity' integer attribute. Skipping this "
-                               "resource.\n";
-                        continue; // skip this resource if multiplicity attribute is missing or not
-                                  // an integer
+                            << "Resource " << resource.getName() << " in rule " << ruleNode.name
+                            << " has non-integer multiplicity. Skipping this resource.\n";
+                        continue; // skip this resource if multiplicity is not an integer
                     }
-                    ruleNode.inputs.push_back(term);
                 }
             }
             else {
@@ -272,10 +287,26 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         return;
     }
 
-    void insertChosenRules(std::vector<RuleNode> &solution, mlir::ModuleOp module)
+    /**
+     * @brief Insert the decomposition rules picked by the graph solver into the module for later
+     * use in the decompose-lowering patterns to apply the decomposition rules and rewrite the
+     * quantum operations.
+     *
+     * @param module The MLIR module to insert the chosen decomposition rules into.
+     * @param solution The chosen decomposition rules from the graph solver.
+     * @param ruleNameToFuncOp A mapping from rule names to their corresponding function operations.
+     */
+    void insertChosenRules(
+        mlir::ModuleOp module, DecompositionSolver::SolutionType &solution,
+        std::unordered_map<std::string, mlir::OwningOpRef<func::FuncOp>> &ruleNameToFuncOp)
     {
-        for (RuleNode &ruleNode : solution) {
-            module.push_back(ruleNode.funcOp.release());
+        for (const auto &[_, ruleNode] : solution) {
+            if (ruleNode.isBasis) {
+                continue; // skip basis rules as they don't correspond to actual decomposition
+                          // functions to insert
+            }
+            llvm::errs() << "inserting rule: " << ruleNode.ruleName << "\n";
+            module.push_back(ruleNameToFuncOp.at(ruleNode.op.name).release());
         }
     };
 };
