@@ -331,6 +331,10 @@ class TestMidCircuitMeasurement:
         if postselect_mode == "hw-like" and mcm_method == "single-branch-statistics":
             pytest.skip("Invalid MCM configuration")
 
+        # Capture gap: postselect_mode='hw-like' not yet supported in _mcm_preprocessing (only fill-shots/None allowed).
+        if capture_mode and postselect_mode == "hw-like":
+            pytest.xfail("postselect_mode='hw-like' not yet supported with capture=True")
+
         dev = qml.device(backend, wires=2)
 
         original_config = qml.devices.MCMConfig(
@@ -377,6 +381,10 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize("mcm_method", [None, "one-shot"])
     def test_mcm_method_with_dict_output(self, backend, postselect_mode, mcm_method, capture_mode):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
+        # Capture gap: postselect_mode='hw-like' not yet supported in _mcm_preprocessing (only fill-shots/None allowed).
+        if capture_mode and postselect_mode == "hw-like":
+            pytest.xfail("postselect_mode='hw-like' not yet supported with capture=True")
+
         dev = qml.device(backend, wires=1)
 
         @qjit(capture=capture_mode)
@@ -397,6 +405,10 @@ class TestMidCircuitMeasurement:
         self, backend, postselect_mode, mcm_method, capture_mode
     ):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
+        # Capture gap: postselect_mode='hw-like' not yet supported in _mcm_preprocessing (only fill-shots/None allowed).
+        if capture_mode and postselect_mode == "hw-like":
+            pytest.xfail("postselect_mode='hw-like' not yet supported with capture=True")
+
         dev = qml.device(backend, wires=1)
 
         @qjit(capture=capture_mode)
