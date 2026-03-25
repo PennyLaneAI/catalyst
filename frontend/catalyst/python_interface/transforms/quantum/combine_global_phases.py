@@ -64,7 +64,7 @@ class CombineGlobalPhasesPattern(
                 rewriter.erase_op(prev)
                 prev = current
 
-            prev.operands[0].replace_by_if(phi_sum, lambda use: use.operation == prev)
+            prev.operands[0].replace_uses_with_if(phi_sum, lambda use: use.operation == prev)
             rewriter.notify_op_modified(prev)
 
 
