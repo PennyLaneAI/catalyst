@@ -510,7 +510,11 @@ def get_source_code_info(tb_frame):
 module_allowlist = (
     ag_config.DoNotConvert("pennylane"),
     ag_config.DoNotConvert("catalyst"),
+    ag_config.DoNotConvert("autoray"),
+    ag_config.DoNotConvert("numpy"),
     ag_config.DoNotConvert("optax"),
+    ag_config.DoNotConvert("pyscf"),
+    ag_config.DoNotConvert("tqdm"),
     ag_config.DoNotConvert("jax"),
     *ag_config.CONVERSION_RULES,
 )
