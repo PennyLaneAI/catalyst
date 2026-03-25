@@ -190,7 +190,6 @@ class TestJAXAD:
     # jax.pure_callback.
     # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
     # AD lowering.
-    @pytest.mark.capture_todo
     def test_simple_circuit(self, backend, capture_mode):
         """Test a basic use case of jax.grad on top of qjit."""
 
@@ -217,7 +216,6 @@ class TestJAXAD:
     # jax.pure_callback.
     # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
     # AD lowering.
-    @pytest.mark.capture_todo
     @pytest.mark.parametrize("argnums", (0, 1, [0, 1]))
     def test_multiple_arguments(self, backend, argnums, capture_mode):
         """Test a circuit with multiple arguments using jax.grad on top of qjit."""
@@ -249,7 +247,6 @@ class TestJAXAD:
     # jax.pure_callback.
     # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
     # AD lowering.
-    @pytest.mark.capture_todo
     def test_multiple_results(self, backend, capture_mode):
         """Test a circuit with multiple results using jax.grad on top of qjit."""
 
@@ -280,7 +277,6 @@ class TestJAXAD:
     # jax.pure_callback.
     # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
     # AD lowering.
-    @pytest.mark.capture_todo
     def test_jacobian(self, backend, capture_mode):
         """Test a circuit with vector return type using jax.jacobian on top of qjit."""
 
@@ -311,7 +307,6 @@ class TestJAXAD:
     # jax.pure_callback.
     # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
     # AD lowering.
-    @pytest.mark.capture_todo
     def test_without_precompilation(self, backend, capture_mode):
         """Test a function without type hints (pre-compilation) using jax.grad on top of qjit."""
 
@@ -340,7 +335,6 @@ class TestJAXAD:
     # jax.pure_callback.
     # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
     # AD lowering.
-    @pytest.mark.capture_todo
     def test_non_differentiable_arguments(self, backend, capture_mode):
         """Test a circuit with non-differentiable arguments using jax.grad on top of qjit."""
 
@@ -367,7 +361,6 @@ class TestJAXAD:
     # jax.pure_callback.
     # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
     # AD lowering.
-    @pytest.mark.capture_todo
     def test_multiple_calls(self, backend, capture_mode):
         """Test a jax.grad function which repeatedly calls a qjit function."""
 
@@ -392,7 +385,6 @@ class TestJAXAD:
     # jax.pure_callback.
     # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
     # AD lowering.
-    @pytest.mark.capture_todo
     @pytest.mark.parametrize("shape", ([2, 3], [3, 2], [1, 6]))
     def test_multiD_calls(self, shape, capture_mode):
         """Test a jax.grad in combination with qjit on non-1D input parameters."""
@@ -421,7 +413,6 @@ class TestJAXAD:
     # jax.pure_callback.
     # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
     # AD lowering.
-    @pytest.mark.capture_todo
     def test_efficient_Jacobian(self, backend, capture_mode):
         """Test a jax.grad function does not compute Jacobians for arguments not in argnums."""
 
@@ -446,7 +437,6 @@ class TestJAXAD:
     # jax.pure_callback.
     # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
     # AD lowering.
-    @pytest.mark.capture_todo
     def test_jit_and_grad(self, backend, capture_mode):
         """Test that argnums determination works correctly when combining jax.jit with jax.grad.
         This was fixed by the introduction of symbolic zero detection for tangent vectors."""
@@ -472,7 +462,6 @@ class TestJAXAD:
     # qjit callback.
     # Classification: Catalyst-JAX integration gap; fix by preventing recursive derivative callback
     # compilation.
-    @pytest.mark.capture_todo
     def test_argnums_passed(self, backend, monkeypatch, capture_mode):
         """Test that when combining jax.jit and jax.grad, the internal argnums are correctly
         passed to the custom quantum JVP"""
@@ -514,7 +503,6 @@ class TestJAXRecompilation:
     # jax.pure_callback.
     # Classification: Catalyst-JAX integration gap; fix by making AD recompilation path
     # capture-safe.
-    @pytest.mark.capture_todo
     def test_jax_function_has_not_been_jit_compiled(self, backend, capture_mode):
         """Test if function can be used by jax.grad even if it has not been JIT compiled"""
 
@@ -540,7 +528,6 @@ class TestJAXRecompilation:
     # jax.pure_callback.
     # Classification: Catalyst-JAX integration gap; fix by making AD recompilation path
     # capture-safe.
-    @pytest.mark.capture_todo
     def test_jax_function_needs_recompilation(self, backend, capture_mode):
         """Test if function can be used by jax.grad but it needs recompilation"""
 

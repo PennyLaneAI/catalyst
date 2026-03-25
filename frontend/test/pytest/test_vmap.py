@@ -104,7 +104,6 @@ class TestVectorizeMap:
         with pytest.raises(NotImplementedError, match=msg):
             workflow(x)
 
-    @pytest.mark.capture_todo
     def test_vmap_circuit_inside(self, backend, capture_mode):
         """Test catalyst.vmap of a hybrid workflow inside QJIT."""
 
@@ -136,7 +135,6 @@ class TestVectorizeMap:
         assert jnp.allclose(result[1], expected)
         assert jnp.allclose(result[2], expected)
 
-    @pytest.mark.capture_todo
     def test_vmap_circuit_inside_without_jax_dispatch(self, backend, capture_mode):
         """Test catalyst.vmap of a hybrid workflow inside QJIT."""
 
@@ -161,7 +159,6 @@ class TestVectorizeMap:
         assert jnp.allclose(result0, expected)
         assert jnp.allclose(result1, expected)
 
-    @pytest.mark.capture_todo
     def test_vmap_circuit_in_axes_int(self, backend, capture_mode):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with `in_axes:int`."""
 
@@ -191,7 +188,6 @@ class TestVectorizeMap:
         assert jnp.allclose(result[0], expected)
         assert jnp.allclose(result[1], expected)
 
-    @pytest.mark.capture_todo
     def test_vmap_nonzero_axes(self, backend, capture_mode):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with axes > 0."""
 
@@ -221,7 +217,6 @@ class TestVectorizeMap:
         assert jnp.allclose(result[0], expected)
         assert jnp.allclose(result[1], expected)
 
-    @pytest.mark.capture_todo
     def test_vmap_nonzero_axes_2(self, backend, capture_mode):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with axes > 0."""
 
@@ -273,7 +268,6 @@ class TestVectorizeMap:
         ):
             qjit(workflow, capture=capture_mode)(0.1)
 
-    @pytest.mark.capture_todo
     def test_vmap_failed_len_check(self, backend, capture_mode):
         """Test catalyst.vmap with invalid length of in_axes and args."""
 
@@ -311,7 +305,6 @@ class TestVectorizeMap:
         ):
             qjit(workflow, capture=capture_mode)(0.1)
 
-    @pytest.mark.capture_todo
     def test_vmap_failed_invalid_out_axes(self, backend, capture_mode):
         """Test catalyst.vmap with invalid out_axes."""
 
@@ -339,7 +332,6 @@ class TestVectorizeMap:
         ):
             qjit(workflow, capture=capture_mode)(x)
 
-    @pytest.mark.capture_todo
     def test_vmap_tuple_in_axes(self, backend, capture_mode):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with a tuple in_axes."""
 
@@ -383,7 +375,6 @@ class TestVectorizeMap:
         assert jnp.allclose(result[2], expected)
         assert jnp.allclose(result[3], expected[:2])
 
-    @pytest.mark.capture_todo
     def test_vmap_tuple_in_axes_multiple_nonuniform(self, backend, capture_mode):
         """Test expected ValueError with non-uniform batch sizes."""
 
@@ -411,7 +402,6 @@ class TestVectorizeMap:
         ):
             qjit(workflow, capture=capture_mode)(x, y1)
 
-    @pytest.mark.capture_todo
     def test_vmap_tuple_in_axes_multiple(self, backend, capture_mode):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with a tuple in_axes
         and multiple non-zero axes."""
@@ -466,7 +456,6 @@ class TestVectorizeMap:
         assert jnp.allclose(result[3], expected[:2])
         assert jnp.allclose(result[4], expected)
 
-    @pytest.mark.capture_todo
     def test_vmap_incomp_in_axes_pytree(self, capture_mode):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with
         incompatible PyTrees for in_axes and args."""
@@ -495,7 +484,6 @@ class TestVectorizeMap:
         ):
             qjit(capture=capture_mode)(lambda: vmap(f, in_axes=[0, {"bi": 0}])(xx, {"hi": xx}))()
 
-    @pytest.mark.capture_todo
     def test_vmap_pytree_in_axes(self, backend, capture_mode):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with a PyTree in_axes."""
 
@@ -542,7 +530,6 @@ class TestVectorizeMap:
         assert jnp.allclose(result[2], expected)
         assert jnp.allclose(result[3], expected)
 
-    @pytest.mark.capture_todo
     def test_vmap_circuit_return_tensor(self, backend, capture_mode):
         """Test catalyst.vmap of a hybrid workflow inside QJIT returning tensors."""
 
@@ -571,7 +558,6 @@ class TestVectorizeMap:
         assert jnp.allclose(result[0], expected)
         assert jnp.allclose(result[1], expected)
 
-    @pytest.mark.capture_todo
     def test_vmap_circuit_return_tensor_out_axes(self, backend, capture_mode):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with out_axes."""
 
@@ -600,7 +586,6 @@ class TestVectorizeMap:
         assert jnp.allclose(result[0], expected)
         assert jnp.allclose(jnp.transpose(result[1], (1, 0)), expected)
 
-    @pytest.mark.capture_todo
     def test_vmap_circuit_return_tensor_out_axes_multiple(self, backend, capture_mode):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with multiple out_axes."""
 
@@ -631,7 +616,6 @@ class TestVectorizeMap:
         assert jnp.allclose(result[1][0], expected)
         assert jnp.allclose(jnp.transpose(result[1][1], (1, 0)), expected)
 
-    @pytest.mark.capture_todo
     def test_vmap_circuit_return_tensor_pytree(self, backend, capture_mode):
         """Test catalyst.vmap of a hybrid workflow inside QJIT returning PyTrees."""
 
@@ -695,7 +679,6 @@ class TestVectorizeMap:
         assert jnp.allclose(result["b"]["d"], expected_expval)
         assert jnp.allclose(result["b"]["e"], x)
 
-    @pytest.mark.capture_todo
     def test_vmap_incomp_out_axes_pytree(self, capture_mode):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with
         incompatible PyTrees for out_axes and return values."""
@@ -724,7 +707,6 @@ class TestVectorizeMap:
         ):
             qjit(capture=capture_mode)(lambda: vmap(f, out_axes=[0, {"bi": 0}])(xx, {"hi": xx}))()
 
-    @pytest.mark.capture_todo
     def test_vmap_invalid_axis_size(self, backend, capture_mode):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with an invalid axis_size."""
 
@@ -758,7 +740,6 @@ class TestVectorizeMap:
         ):
             qjit(workflow, capture=capture_mode)(x, y, 1)
 
-    @pytest.mark.capture_todo
     def test_vmap_zero_axis_size(self, backend, capture_mode):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with an invalid zero axis_size."""
 
@@ -780,7 +761,6 @@ class TestVectorizeMap:
         ):
             qjit(workflow, capture=capture_mode)(x)
 
-    @pytest.mark.capture_todo
     def test_vmap_usage_patterns(self, backend, capture_mode):
         """Test usage patterns of catalyst.vmap."""
 
@@ -843,7 +823,6 @@ class TestVectorizeMap:
 
         assert f.mlir is None
 
-    @pytest.mark.capture_todo
     def test_vmap_dynamic_batch(self, capture_mode):
         """Test unsupported case of a dynamic batch dimension."""
 

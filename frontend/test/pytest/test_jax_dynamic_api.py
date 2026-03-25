@@ -43,7 +43,6 @@ def assert_array_and_dtype_equal(a, b):
 # Capture gap: AssertionError in from_plxpr/jaxpr conversion on dynamic abstracted axes.
 # Classification: Catalyst integration gap. Fix: align dynamic aval conversion and from_plxpr
 # lowering.
-@pytest.mark.capture_todo
 def test_qjit_abstracted_axes(capture_mode):
     """Test that qjit accepts dynamical arguments."""
 
@@ -61,7 +60,6 @@ def test_qjit_abstracted_axes(capture_mode):
 # returns.
 # Classification: missing PL capture feature. Fix: support classical QNode returns or rewrite to
 # measurement-process outputs.
-@pytest.mark.capture_todo
 def test_qnode_abstracted_axis(capture_mode):
     """Test that qnode accepts dynamical arguments."""
 
@@ -84,7 +82,6 @@ def test_qnode_abstracted_axis(capture_mode):
 # returns.
 # Classification: missing PL capture feature. Fix: support classical QNode returns or rewrite to
 # measurement-process outputs.
-@pytest.mark.capture_todo
 def test_qnode_dynamic_structured_args(capture_mode):
     """Test that qnode accepts dynamically-shaped structured args"""
 
@@ -106,7 +103,6 @@ def test_qnode_dynamic_structured_args(capture_mode):
 # returns.
 # Classification: missing PL capture feature. Fix: support classical QNode returns or rewrite to
 # measurement-process outputs.
-@pytest.mark.capture_todo
 def test_qnode_dynamic_structured_results(capture_mode):
     """Test that qnode returns dynamically-shaped results"""
 
@@ -293,7 +289,6 @@ def test_classical_tracing_2(capture_mode):
 # returns.
 # Classification: missing PL capture feature. Fix: support classical QNode returns or rewrite to
 # measurement-process outputs.
-@pytest.mark.capture_todo
 def test_quantum_tracing_1(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
 
@@ -324,7 +319,6 @@ def test_quantum_tracing_1(capture_mode):
 # returns.
 # Classification: missing PL capture feature. Fix: support classical QNode returns or rewrite to
 # measurement-process outputs.
-@pytest.mark.capture_todo
 def test_quantum_tracing_2(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
 
@@ -396,7 +390,6 @@ def test_accessing_shapes(capture_mode):
 # Capture gap: AssertionError in from_plxpr/jaxpr conversion on dynamic abstracted axes.
 # Classification: Catalyst integration gap. Fix: align dynamic aval conversion and from_plxpr
 # lowering.
-@pytest.mark.capture_todo
 def test_no_recompilation(capture_mode):
     """Test that the function is not recompiled when changing the argument shape across
     invocations."""
@@ -441,7 +434,6 @@ def test_array_assignment(capture_mode):
 # Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
 # Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr
 # conversion.
-@pytest.mark.capture_todo
 def test_qjit_forloop_identity(capture_mode):
     """Test simple for-loop primitive vs dynamic dimensions"""
 
@@ -487,7 +479,6 @@ def test_qjit_forloop_capture(capture_mode):
 # Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
 # Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr
 # conversion.
-@pytest.mark.capture_todo
 def test_qjit_forloop_shared_indbidx(capture_mode):
     """Test for-loops with shared dynamic input dimensions in classical tracing mode"""
 
@@ -511,7 +502,6 @@ def test_qjit_forloop_shared_indbidx(capture_mode):
 
 
 # PL capture gap: dynamic output resizing in qml.for_loop fails in from_plxpr (zip invars mismatch).
-@pytest.mark.capture_todo
 # Fix direction: align qml.for_loop dynamic-shape jaxpr outputs with Catalyst from_plxpr conversion.
 def test_qjit_forloop_indbidx_outdbidx(capture_mode):
     """Test for-loops with shared dynamic output dimensions in classical tracing mode"""
@@ -540,7 +530,6 @@ def test_qjit_forloop_indbidx_outdbidx(capture_mode):
 # Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
 # Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr
 # conversion.
-@pytest.mark.capture_todo
 def test_qjit_forloop_index_indbidx(capture_mode):
     """Test for-loops referring loop return new dimension variable."""
 
@@ -565,7 +554,6 @@ def test_qjit_forloop_index_indbidx(capture_mode):
 # Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
 # Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr
 # conversion.
-@pytest.mark.capture_todo
 def test_qjit_forloop_indbidx_const(capture_mode):
     """Test for-loops preserve type information in the presence of a constant."""
 
@@ -590,7 +578,6 @@ def test_qjit_forloop_indbidx_const(capture_mode):
 # Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
 # Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr
 # conversion.
-@pytest.mark.capture_todo
 def test_qjit_forloop_shared_dimensions(capture_mode):
     """Test catalyst for-loop primitive's experimental_preserve_dimensions option"""
 
@@ -618,7 +605,6 @@ def test_qjit_forloop_shared_dimensions(capture_mode):
 # Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
 # Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr
 # conversion.
-@pytest.mark.capture_todo
 def test_qnode_forloop_identity(capture_mode):
     """Test simple for-loops with dynamic dimensions while doing quantum tracing."""
 
@@ -644,7 +630,6 @@ def test_qnode_forloop_identity(capture_mode):
 # Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
 # Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr
 # conversion.
-@pytest.mark.capture_todo
 def test_qnode_forloop_capture(capture_mode):
     """Test simple for-loops with dynamic dimensions while doing quantum tracing."""
 
@@ -670,7 +655,6 @@ def test_qnode_forloop_capture(capture_mode):
 # Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
 # Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr
 # conversion.
-@pytest.mark.capture_todo
 def test_qnode_forloop_shared_indbidx(capture_mode):
     """Tests that for-loops preserve equality of output dynamic dimensions."""
 
@@ -697,7 +681,6 @@ def test_qnode_forloop_shared_indbidx(capture_mode):
 # Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
 # Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr
 # conversion.
-@pytest.mark.capture_todo
 def test_qnode_forloop_indbidx_outdbidx(capture_mode):
     """Test for-loops with mixed input and output dimension variables during the quantum tracing."""
 
@@ -725,7 +708,6 @@ def test_qnode_forloop_indbidx_outdbidx(capture_mode):
 # Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
 # Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr
 # conversion.
-@pytest.mark.capture_todo
 def test_qnode_forloop_abstracted_axes(capture_mode):
     """Test for-loops with mixed input and output dimension variables during the quantum tracing.
     Use abstracted_axes as the source of dynamism."""
@@ -753,7 +735,6 @@ def test_qnode_forloop_abstracted_axes(capture_mode):
 # Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
 # Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr
 # conversion.
-@pytest.mark.capture_todo
 def test_qnode_forloop_index_indbidx(capture_mode):
     """Test for-loops referring loop index as a dimension during the quantum tracing."""
 
@@ -779,7 +760,6 @@ def test_qnode_forloop_index_indbidx(capture_mode):
 # Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
 # Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop
 # abstract-axis handling.
-@pytest.mark.capture_todo
 def test_qnode_whileloop_1(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -806,7 +786,6 @@ def test_qnode_whileloop_1(capture_mode):
 # Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
 # Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop
 # abstract-axis handling.
-@pytest.mark.capture_todo
 def test_qnode_whileloop_2(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -834,7 +813,6 @@ def test_qnode_whileloop_2(capture_mode):
 # Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
 # Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop
 # abstract-axis handling.
-@pytest.mark.capture_todo
 def test_qnode_whileloop_capture(capture_mode):
     """Tests that while-loop primitive can capture variables from the outer scope"""
 
@@ -860,7 +838,6 @@ def test_qnode_whileloop_capture(capture_mode):
 # Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
 # Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop
 # abstract-axis handling.
-@pytest.mark.capture_todo
 def test_qnode_whileloop_abstracted_axes(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while. Use abstracted_axes as
     the source of dynamism."""
@@ -888,7 +865,6 @@ def test_qnode_whileloop_abstracted_axes(capture_mode):
 # Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
 # Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop
 # abstract-axis handling.
-@pytest.mark.capture_todo
 def test_qnode_whileloop_shared_indbidx(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -916,7 +892,6 @@ def test_qnode_whileloop_shared_indbidx(capture_mode):
 # Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
 # Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop
 # abstract-axis handling.
-@pytest.mark.capture_todo
 def test_qnode_whileloop_indbidx_outdbidx(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -945,7 +920,6 @@ def test_qnode_whileloop_indbidx_outdbidx(capture_mode):
 # Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
 # Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop
 # abstract-axis handling.
-@pytest.mark.capture_todo
 def test_qnode_whileloop_outer(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -971,7 +945,6 @@ def test_qnode_whileloop_outer(capture_mode):
 # Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
 # Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop
 # abstract-axis handling.
-@pytest.mark.capture_todo
 def test_qjit_whileloop_1(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -998,7 +971,6 @@ def test_qjit_whileloop_1(capture_mode):
 # Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
 # Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop
 # abstract-axis handling.
-@pytest.mark.capture_todo
 def test_qjit_whileloop_2(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -1023,7 +995,6 @@ def test_qjit_whileloop_2(capture_mode):
 
 
 # PL capture gap: qml.while_loop abstract-axes path rejects scalar bool loop state.
-@pytest.mark.capture_todo
 # Fix direction: support scalar loop-carried states in loop abstract-axis handling.
 def test_qjit_whileloop_shared_dimensions(capture_mode):
     """Test catalyst while loop primitive's preserve dimensions option"""
@@ -1052,7 +1023,6 @@ def test_qjit_whileloop_shared_dimensions(capture_mode):
 # Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
 # Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop
 # abstract-axis handling.
-@pytest.mark.capture_todo
 def test_qjit_whileloop_shared_indbidx(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -1077,7 +1047,6 @@ def test_qjit_whileloop_shared_indbidx(capture_mode):
 
 
 # PL capture gap: qml.while_loop abstract-axes path rejects scalar int loop state.
-@pytest.mark.capture_todo
 # Fix direction: handle scalar loop indices in _loop_abstract_axes/get_dummy_arg.
 def test_qjit_whileloop_indbidx_outdbidx(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
@@ -1106,7 +1075,6 @@ def test_qjit_whileloop_indbidx_outdbidx(capture_mode):
 # Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
 # Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop
 # abstract-axis handling.
-@pytest.mark.capture_todo
 def test_qjit_whileloop_outer(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -1132,7 +1100,6 @@ def test_qjit_whileloop_outer(capture_mode):
 # Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
 # Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop
 # abstract-axis handling.
-@pytest.mark.capture_todo
 def test_qjit_whileloop_capture(capture_mode):
     """Tests that while-loop primitive can capture variables from the outer scope"""
 
@@ -1158,7 +1125,6 @@ def test_qjit_whileloop_capture(capture_mode):
 # mismatch).
 # Classification: PL/Catalyst integration gap. Fix: stabilize qml.cond dynamic-shape lowering in
 # from_plxpr.
-@pytest.mark.capture_todo
 def test_qnode_cond_identity(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
@@ -1191,7 +1157,6 @@ def test_qnode_cond_identity(capture_mode):
 # mismatch).
 # Classification: PL/Catalyst integration gap. Fix: stabilize qml.cond dynamic-shape lowering in
 # from_plxpr.
-@pytest.mark.capture_todo
 def test_qnode_cond_abstracted_axes(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum conditional. Use
     abstracted_axes as the source of dynamism."""
@@ -1227,7 +1192,6 @@ def test_qnode_cond_abstracted_axes(capture_mode):
 # mismatch).
 # Classification: PL/Catalyst integration gap. Fix: stabilize qml.cond dynamic-shape lowering in
 # from_plxpr.
-@pytest.mark.capture_todo
 def test_qnode_cond_capture(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
@@ -1259,7 +1223,6 @@ def test_qnode_cond_capture(capture_mode):
 # mismatch).
 # Classification: PL/Catalyst integration gap. Fix: stabilize qml.cond dynamic-shape lowering in
 # from_plxpr.
-@pytest.mark.capture_todo
 def test_qjit_cond_identity(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
@@ -1291,7 +1254,6 @@ def test_qjit_cond_identity(capture_mode):
 # mismatch).
 # Classification: PL/Catalyst integration gap. Fix: stabilize qml.cond dynamic-shape lowering in
 # from_plxpr.
-@pytest.mark.capture_todo
 def test_qjit_cond_outdbidx(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
@@ -1317,7 +1279,6 @@ def test_qjit_cond_outdbidx(capture_mode):
 # mismatch).
 # Classification: PL/Catalyst integration gap. Fix: stabilize qml.cond dynamic-shape lowering in
 # from_plxpr.
-@pytest.mark.capture_todo
 def test_qjit_cond_capture(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
@@ -1383,7 +1344,6 @@ def test_trace_to_jaxpr(capture_mode):
 # Capture gap: AssertionError in from_plxpr/jaxpr conversion on dynamic abstracted axes.
 # Classification: Catalyst integration gap. Fix: align dynamic aval conversion and from_plxpr
 # lowering.
-@pytest.mark.capture_todo
 def test_abstracted_axis_no_recompilation(capture_mode):
     """Test that a function that does not need recompilation can be executed a second time"""
 
