@@ -930,6 +930,9 @@ class CondCallable:
         self.branch_fns = [_make_argless_function(fn, args, kwargs) for fn in self.branch_fns]
         self.otherwise_fn = _make_argless_function(self.otherwise_fn, args, kwargs)
 
+        if not any(isinstance(pred, jax.core.Tracer) for pred in self.preds):
+            return self._call_during_interpretation()
+
         mode = EvaluationContext.get_evaluation_mode()
         if mode == EvaluationMode.QUANTUM_COMPILATION:
             return self._call_with_quantum_ctx()
@@ -1118,6 +1121,11 @@ class ForLoopCallable:
         return fn_res
 
     def __call__(self, *init_state):
+        if not any(
+            isinstance(b, jax.core.Tracer) for b in (self.lower_bound, self.upper_bound, self.step)
+        ):
+            return self._call_during_interpretation(*init_state)
+
         mode = EvaluationContext.get_evaluation_mode()
         if mode == EvaluationMode.QUANTUM_COMPILATION:
             return self._call_with_quantum_ctx(*init_state)
