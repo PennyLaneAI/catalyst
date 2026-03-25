@@ -279,6 +279,7 @@ static int getSlotSizeForReturnCode(char code)
     switch (code) {
     case 'i':
         return 4;
+    case 'n':
     case 'I':
     case 'f':
     case 's':
@@ -372,7 +373,7 @@ struct RPCOpLowering : public OpConversionPattern<RTIORPCOp> {
 
             // Determine return-type tag code for recv slot sizing
             char retCode = tag[0];
-            int slotSize = (retCode == 'n') ? 8 : getSlotSizeForReturnCode(retCode);
+            int slotSize = getSlotSizeForReturnCode(retCode);
             auto slotTy = LLVM::LLVMArrayType::get(i8Ty, slotSize);
             Value resultSlot = LLVM::AllocaOp::create(rewriter, loc, ptrTy, slotTy, one);
             artiq.rpcRecv(resultSlot);
