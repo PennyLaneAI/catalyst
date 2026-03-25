@@ -174,31 +174,30 @@ def RTIORPCOp : RTIO_Op<"rpc"> {
 
         Attributes:
         - callee:    The symbolic name of the host-side callable to invoke.
-        - tag:       type-tag string encoding the return and argument types,
-                     which is compatiable with the ARTIQ RPC wire protocol.
-                     (e.g. "n:" for void no-arg, "n:si" for void(str,i32)).
         - is_async:  If present the call is async.
-        - rpc_id:    Populated by the RPC-ID assignment sub-pass.
+        - rpc_id:    A unique integer identifier for each RPC function.
+                     Every distinct RPC function must map to a unique rpc_id.
+                     This is used to identify which RPC function is being invoked when
+                     communicating with the server.
 
         Example (sync, no args):
         ```mlir
-        rtio.rpc @program_awg tag("n:")
+        rtio.rpc @program_awg rpc_id(1)
         ```
 
         Example (sync, with args):
         ```mlir
-        rtio.rpc @set_dataset tag("n:sO") (%key, %val : !llvm.ptr, !llvm.ptr)
+        rtio.rpc @set_dataset rpc_id(2) (%key, %val : i64, f64)
         ```
 
         Example (sync, with return value):
         ```mlir
-        %x = rtio.rpc @get_value tag("I:") -> i64
+        %x = rtio.rpc @get_value rpc_id(3) -> i64
         ```
     }];
 
     let arguments = (ins
         SymbolRefAttr:$callee,
-        StrAttr:$tag,
         UnitAttr:$is_async,
         OptionalAttr<I32Attr>:$rpc_id,
         Variadic<AnyType>:$args
@@ -207,7 +206,7 @@ def RTIORPCOp : RTIO_Op<"rpc"> {
     let results = (outs Variadic<AnyType>:$results);
 
     let assemblyFormat = [{
-        $callee `tag` `(` $tag `)` (`async` $is_async^)? (`(` $args^ `:` type($args) `)`)?
+        $callee (`rpc_id` `(` $rpc_id^ `)`)? (`async` $is_async^)? (`(` $args^ `:` type($args) `)`)?
         (`->` type($results)^)? attr-dict
     }];
 

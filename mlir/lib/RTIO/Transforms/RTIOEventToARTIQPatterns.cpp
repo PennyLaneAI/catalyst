@@ -35,24 +35,62 @@ namespace {
 // RPC helpers
 //===----------------------------------------------------------------------===//
 
-/// Ensure a null-terminated LLVM global constant for the given string exists in the module.
+/// Map an MLIR type to its ARTIQ RPC wire-protocol tag character.
+/// i32 -> 'i',  i64 -> 'I',  f64/f32 -> 'f',  everything else -> 'O'
+static char tagCodeForType(Type ty)
+{
+    if (auto intTy = dyn_cast<IntegerType>(ty)) {
+        if (intTy.getWidth() <= 32) {
+            return 'i';
+        }
+        return 'I';
+    }
+    if (isa<Float64Type>(ty) || isa<Float32Type>(ty)) {
+        return 'f';
+    }
+    return 'O';
+}
+
+/// Build the ARTIQ tag string from operand and result MLIR types.
+/// e.g. (i64, i64, f64) -> void  =>  "n:IIf"
+///      () -> i64                =>  "I:"
+///      () -> void               =>  "n:"
+static std::string buildTagFromTypes(TypeRange argTypes, TypeRange resultTypes)
+{
+    std::string tag;
+    if (resultTypes.empty()) {
+        tag += 'n';
+    }
+    else {
+        tag += tagCodeForType(resultTypes[0]);
+    }
+    tag += ':';
+    for (Type t : argTypes) {
+        tag += tagCodeForType(t);
+    }
+    return tag;
+}
+
+/// Ensure a null-terminated LLVM global constant for the given string exists
+/// in the module.
 ///
-/// The global is inserted at the start of the module body; the AddressOf/GEP
-/// are emitted at the caller's insertion point.
+/// The global is inserted at the start of the module body.
+//  The AddressOf/GEPs are emitted at the caller's insertion point.
+///
 /// Example:
 /// Given a rtio.rpc operation:
 /// ```mlir
-/// rtio.rpc @foo tag("n:si") (%a, %b : i32, i32)
+/// rtio.rpc @foo rpc_id(1) (%a, %b : i32, i64)
 /// ```
 ///
-/// What we expect to get:
+/// The lowering produces:
 /// ┌───────────────────────────────────────────────────────────────────┐
-/// │ 1. tagPtr = __rtio_str_n_si (global)                              │
+/// │ 1. tag = "n:iI" (derived from arg/result MLIR types)              │
+/// │    tagPtr = __rtio_str_n_iI (global)                              │
 /// │                                                                   │
 /// │ 2. argsArray = alloca [3 x ptr]                                   │
-/// │    Create 3 argSlot alloca on the stack                           │
 /// │    argSlot[0] = alloca i32; store %a; argsArray[0] = &argSlot[0]  │
-/// │    argSlot[1] = alloca i32; store %b; argsArray[1] = &argSlot[1]  │
+/// │    argSlot[1] = alloca i64; store %b; argsArray[1] = &argSlot[1]  │
 /// │    argsArray[2] = nullptr                                         │
 /// │                                                                   │
 /// │ 3. rpc_send(rpc_id, tagPtr, argsArray)                            │
@@ -254,7 +292,7 @@ static int getSlotSizeForReturnCode(char code)
 /// Lower `rtio.rpc` to ARTIQ `rpc_send` / `rpc_recv` calls.
 ///
 /// Protocol:
-///   1. Create tag string global.
+///   1. Derive the ARTIQ tag string from MLIR operand/result types.
 ///   2. Build args array.
 ///   3. Call rpc_send(id, tag_ptr, args_ptr) (or rpc_send_async for async).
 ///   4. For sync calls, call rpc_recv(slot_ptr) to wait for the host reply.
@@ -280,9 +318,9 @@ struct RPCOpLowering : public OpConversionPattern<RTIORPCOp> {
 
         ARTIQRuntimeBuilder artiq(rewriter, op);
 
-        // 1. Get or create the `tag` string global
-        // e.g. tag = "n:IIf" -> string global "__rtio_str_n_IIf"
-        Value tagPtr = getOrCreateStringGlobal(rewriter, module, loc, op.getTag());
+        // 1. Derive tag from MLIR types and create a string global
+        std::string tag = buildTagFromTypes(op.getArgs().getTypes(), op.getResultTypes());
+        Value tagPtr = getOrCreateStringGlobal(rewriter, module, loc, tag);
         rewriter.setInsertionPoint(op);
 
         // 2. Build args array (null-terminated void*[N+1] alloca on the stack)
@@ -330,21 +368,16 @@ struct RPCOpLowering : public OpConversionPattern<RTIORPCOp> {
             artiq.rpcSendAsync(serviceId, tagPtr, argsArray);
         }
         else {
-            // 4. For sync calls, call rpc_send(id, tag_ptr, args_ptr) and rpc_recv(slot_ptr)
             artiq.rpcSend(serviceId, tagPtr, argsArray);
 
-            // Parse tag for return type
-            StringRef tag = op.getTag();
-            size_t colon = tag.find(':');
-            StringRef returnPart = colon != StringRef::npos ? tag.take_front(colon) : "n";
-
-            int slotSize = (returnPart == "n") ? 8 : getSlotSizeForReturnCode(returnPart[0]);
+            // Determine return-type tag code for recv slot sizing
+            char retCode = tag[0];
+            int slotSize = (retCode == 'n') ? 8 : getSlotSizeForReturnCode(retCode);
             auto slotTy = LLVM::LLVMArrayType::get(i8Ty, slotSize);
             Value resultSlot = LLVM::AllocaOp::create(rewriter, loc, ptrTy, slotTy, one);
             artiq.rpcRecv(resultSlot);
 
-            // For non-void return, load from slot and provide as replacement
-            if (returnPart != "n" && op.getNumResults() == 1) {
+            if (retCode != 'n' && op.getNumResults() == 1) {
                 Type resultTy = getTypeConverter()->convertType(op.getResult(0).getType());
                 Value loaded = LLVM::LoadOp::create(rewriter, loc, resultTy, resultSlot);
                 replacementValues.push_back(loaded);

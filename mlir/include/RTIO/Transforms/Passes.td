@@ -25,7 +25,7 @@ def RTIOEventToARTIQPass : Pass<"convert-rtio-event-to-artiq", "mlir::ModuleOp">
         - rtio.sync    -> maximum the timestamp of the input events + at_mu() + now_mu()
         - rtio.channel -> channel ID
         - rtio.empty   -> just return now_mu()
-        - rtio.rpc     -> rpc_send(id, tag, args) [+ rpc_recv() if synchronous]
+        - rtio.rpc     -> rpc_send(id, tag_from_types, args) [+ rpc_recv() if sync]
 
         And this pass generates LLVM IR that directly calls ARTIQ runtime functions
     }];

@@ -16,23 +16,22 @@
 
 // -----
 
-// Valid: no args, tag n:
+// Valid: no args, no return
 // CHECK-LABEL: module @valid_no_args
 module @valid_no_args {
   func.func @__kernel__() {
-    rtio.rpc @foo tag("n:")
+    rtio.rpc @foo
     return
   }
 }
 
-
 // -----
 
-// Valid: args match tag n:IIf
+// Valid: with args
 // CHECK-LABEL: module @valid_with_args
 module @valid_with_args {
   func.func @__kernel__(%key: i64, %idx: i64, %val: f64) {
-    rtio.rpc @bar tag("n:IIf") (%key, %idx, %val : i64, i64, f64)
+    rtio.rpc @bar (%key, %idx, %val : i64, i64, f64)
     return
   }
 }
@@ -43,38 +42,29 @@ module @valid_with_args {
 // CHECK-LABEL: module @valid_with_return
 module @valid_with_return {
   func.func @__kernel__() -> i64 {
-    %x = rtio.rpc @get_value tag("I:") -> i64
+    %x = rtio.rpc @get_value -> i64
     return %x : i64
   }
 }
 
-
 // -----
 
-module @invalid_tag_format {
-  func.func @__kernel__() {
-    // expected-error@+1 {{tag must be in format '<return>:<args>' (e.g. n:IIf)}}
-    rtio.rpc @foo tag("n")
-    return
-  }
-}
-
-// -----
-
-module @invalid_arg_count {
+// Valid: async RPC with args
+// CHECK-LABEL: module @valid_async
+module @valid_async {
   func.func @__kernel__(%x: i64) {
-    // expected-error@+1 {{tag has 2 arg type code(s) but 1 argument(s) provided}}
-    rtio.rpc @foo tag("n:II") (%x : i64)
+    rtio.rpc @send_data async (%x : i64)
     return
   }
 }
 
 // -----
 
-module @invalid_type_mismatch {
-  func.func @__kernel__(%x: f64) {
-    // expected-error@+1 {{argument 0 has type 'f64' which is incompatible with tag code 'I'}}
-    rtio.rpc @foo tag("n:I") (%x : f64)
-    return
+// Invalid: async RPC cannot have return values
+module @invalid_async_with_return {
+  func.func @__kernel__() -> i64 {
+    // expected-error@+1 {{async RPC cannot have return values}}
+    %x = rtio.rpc @get_value async -> i64
+    return %x : i64
   }
 }
