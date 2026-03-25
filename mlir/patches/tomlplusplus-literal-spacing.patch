@@ -1,0 +1,35 @@
+diff --git a/include/toml++/impl/parser.hpp b/include/toml++/impl/parser.hpp
+index c794c5e..7651820 100644
+--- a/include/toml++/impl/parser.hpp
++++ b/include/toml++/impl/parser.hpp
+@@ -345,7 +345,7 @@ TOML_NAMESPACE_START
+ 		///				A toml::parse_result.
+ 		TOML_NODISCARD
+ 		TOML_ALWAYS_INLINE
+-		parse_result operator"" _toml(const char* str, size_t len)
++		parse_result operator""_toml(const char* str, size_t len)
+ 		{
+ 			return parse(std::string_view{ str, len });
+ 		}
+@@ -374,7 +374,7 @@ TOML_NAMESPACE_START
+ 		///				A toml::parse_result.
+ 		TOML_NODISCARD
+ 		TOML_ALWAYS_INLINE
+-		parse_result operator"" _toml(const char8_t* str, size_t len)
++		parse_result operator""_toml(const char8_t* str, size_t len)
+ 		{
+ 			return parse(std::u8string_view{ str, len });
+ 		}
+diff --git a/include/toml++/impl/path.hpp b/include/toml++/impl/path.hpp
+index 5bd0ef3..831c0bc 100644
+--- a/include/toml++/impl/path.hpp
++++ b/include/toml++/impl/path.hpp
+@@ -790,7 +790,7 @@ TOML_NAMESPACE_START
+ 		/// \returns	A #toml::path generated from the string literal.
+ 		TOML_NODISCARD
+ 		TOML_ALWAYS_INLINE
+-		path operator"" _tpath(const char* str, size_t len)
++		path operator""_tpath(const char* str, size_t len)
+ 		{
+ 			return path(std::string_view{ str, len });
+ 		}

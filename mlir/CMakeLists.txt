@@ -139,6 +139,7 @@ FetchContent_Declare(tomlplusplus
     GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
     GIT_TAG v3.4.0
     SYSTEM
+    PATCH_COMMAND git apply "${PROJECT_SOURCE_DIR}/patches/tomlplusplus-literal-spacing.patch"
 )
 FetchContent_MakeAvailable(tomlplusplus)
 
