@@ -190,7 +190,6 @@ def test_jacobian_outside_qjit_argnums(argnums):
     assert np.allclose(expected[1], result[1])
 
 
-@pytest.mark.capture_todo
 def test_non_differentiable_qnode(capture_mode):
     """Check for an error message when the QNode is explicitly marked non-differentiable."""
 
@@ -213,7 +212,6 @@ def test_non_differentiable_qnode(capture_mode):
         grad_f(1.0)
 
 
-@pytest.mark.capture_todo
 def test_param_shift_on_non_expval(capture_mode, backend):
     """Check for an error message when parameter-shift is used on QNodes that return anything but
     qml.expval or qml.probs.
@@ -234,7 +232,6 @@ def test_param_shift_on_non_expval(capture_mode, backend):
         qjit(workflow, capture=capture_mode)
 
 
-@pytest.mark.capture_todo
 def test_adjoint_on_non_expval(capture_mode, backend):
     """Check for an error message when adjoint is used on QNodes that return anything but
     qml.expval or qml.probs.
@@ -253,7 +250,6 @@ def test_adjoint_on_non_expval(capture_mode, backend):
         qjit(workflow, capture=capture_mode)
 
 
-@pytest.mark.capture_todo
 def test_grad_on_qjit(capture_mode):
     """Check that grad works when called on an existing qjit object that does not wrap a QNode."""
 
@@ -936,7 +932,6 @@ def test_ps_probs(backend):
 
 
 @pytest.mark.parametrize("gate_n_inputs", [(qml.CRX, [1]), (qml.CRot, [1, 2, 3])])
-@pytest.mark.capture_todo
 def test_ps_four_term_rule(capture_mode, backend, gate_n_inputs):
     """Operations with the 4-term shift rule need to be decomposed to be differentiated."""
     gate, inputs = gate_n_inputs
@@ -1131,7 +1126,6 @@ def test_adjoint_grad_range_change(inp, backend):
 
 
 @pytest.mark.parametrize("method", [("parameter-shift"), ("adjoint")])
-@pytest.mark.capture_todo
 def test_assert_no_higher_order_without_fd(capture_mode, method, backend):
     """Test input validation for gradients"""
 
@@ -1150,7 +1144,6 @@ def test_assert_no_higher_order_without_fd(capture_mode, method, backend):
             return i(x)
 
 
-@pytest.mark.capture_todo
 def test_assert_invalid_diff_method(capture_mode):
     """Test invalid diff method detection"""
 
@@ -1279,7 +1272,6 @@ def test_jax_consts(h_coeffs, g_method, backend):
     assert np.allclose(compile_grad(jnp.array(inp)), expected)
 
 
-@pytest.mark.capture_todo
 def test_non_float_arg(capture_mode, backend):
     """Test a function which attempts to differentiate non-floating point arguments."""
 
@@ -1300,7 +1292,6 @@ def test_non_float_arg(capture_mode, backend):
         cost_fn(1j, 2.0)
 
 
-@pytest.mark.capture_todo
 def test_non_float_res(capture_mode, backend):
     """Test a function which attempts to differentiate non-floating point results."""
 
@@ -1358,7 +1349,6 @@ def test_finite_diff_multiple_devices(inp, diff_method, backend):
     assert np.allclose(result[0], result[1])
 
 
-@pytest.mark.capture_todo
 def test_grad_on_non_scalar_output(capture_mode, backend):
     """Test a function which attempts to use `grad` on a function that returns a non-scalar."""
 
@@ -1375,7 +1365,6 @@ def test_grad_on_non_scalar_output(capture_mode, backend):
         compiled(1.0)
 
 
-@pytest.mark.capture_todo
 def test_grad_on_multi_result_function(capture_mode, backend):
     """Test a function which attempts to use `grad` on a function that returns multiple values."""
 
@@ -1451,7 +1440,6 @@ def test_loop_with_dyn_wires(backend, diff_method):
     assert np.allclose(result, expected)
 
 
-@pytest.mark.capture_todo
 def test_classical_kwargs(capture_mode):
     """Test the gradient on a classical function with keyword arguments"""
 
@@ -1923,7 +1911,6 @@ class TestGradientErrors:
     """Test errors when an operation which does not have a valid gradient is reachable
     from the grad op"""
 
-    @pytest.mark.capture_todo
     def test_measure_error(self, capture_mode):
         """Test with measure"""
 
@@ -1955,7 +1942,6 @@ class TestGradientErrors:
             def cir(x: float):
                 return grad(f)(x)
 
-    @pytest.mark.capture_todo
     def test_with_zne(self, capture_mode):
         """Test with ZNE"""
 
@@ -2026,7 +2012,6 @@ class TestGradientUsagePatterns:
 
 
 @pytest.mark.parametrize("argnums", [0, 1, (0, 1)])
-@pytest.mark.capture_todo
 def test_grad_argnums(capture_mode, argnums):
     """Tests https://github.com/PennyLaneAI/catalyst/issues/1477"""
 
@@ -2097,7 +2082,6 @@ class TestGradientMethodErrors:
 
         return CustomDevice(**kwargs)
 
-    @pytest.mark.capture_todo
     def test_device_grad_method_error(self, capture_mode):
         """Test that using 'device' grad method raises appropriate error."""
 
@@ -2111,7 +2095,6 @@ class TestGradientMethodErrors:
         ):
             qjit(grad(f), capture=capture_mode)(0.5)
 
-    @pytest.mark.capture_todo
     def test_finite_diff_grad_method_error(self, capture_mode):
         """Test that using 'finite-diff' grad method raises appropriate error."""
 
@@ -2125,7 +2108,6 @@ class TestGradientMethodErrors:
         ):
             qjit(grad(f), capture=capture_mode)(0.5)
 
-    @pytest.mark.capture_todo
     def test_invalid_grad_method_error(self, capture_mode):
         """Test that using an invalid grad method raises appropriate error."""
 
@@ -2312,7 +2294,6 @@ class TestParameterShiftVerificationIntegrationTests:
     Source of truth obtained from shortcut story: 84819
     """
 
-    @pytest.mark.capture_todo
     def test_is_mcm(self, capture_mode, backend):
         """No mcm"""
 
@@ -2343,7 +2324,6 @@ class TestParameterShiftVerificationIntegrationTests:
             qml.RX(0.0, wires=[0])
             return qml.expval(qml.PauliZ(wires=0))
 
-    @pytest.mark.capture_todo
     def test_grad_recipe_dynamic(self, capture_mode, backend):
         """Raise exception when there is an op with a grad_recipe that's dynamic"""
         device = qml.device(backend, wires=1)
@@ -2364,7 +2344,6 @@ class TestParameterShiftVerificationIntegrationTests:
                 RX(x, wires=[0])
                 return qml.expval(qml.PauliZ(wires=0))
 
-    @pytest.mark.capture_todo
     def test_grad_recipe_static(self, capture_mode, backend):
         """Raise exception when there is an op with a mismatching grad_recipe"""
         device = qml.device(backend, wires=1)
@@ -2383,7 +2362,6 @@ class TestParameterShiftVerificationIntegrationTests:
                 RX(x, wires=[0])
                 return qml.expval(qml.PauliZ(wires=0))
 
-    @pytest.mark.capture_todo
     def test_parameter_frequencies(self, capture_mode, backend):
         """Raise exception when when there is an lengths are mismatched."""
         device = qml.device(backend, wires=1)
@@ -2405,7 +2383,6 @@ class TestParameterShiftVerificationIntegrationTests:
 
             circuit(0.5)
 
-    @pytest.mark.capture_todo
     def test_parameter_frequencies_not_one(self, capture_mode, backend):
         """When there is an op without parameter_frequencies, ps gradient should fail"""
         device = qml.device(backend, wires=1)

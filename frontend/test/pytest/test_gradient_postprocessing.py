@@ -25,7 +25,6 @@ SUPPORTED_DIFF_METHODS = ["parameter-shift", "adjoint"]
 
 
 @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
-@pytest.mark.capture_todo
 def test_scalar_scalar(capture_mode, backend, diff_method):
     """Test a hybrid scalar -> scalar (internally a point tensor -> point tensor) workflow"""
 
@@ -48,7 +47,6 @@ def test_scalar_scalar(capture_mode, backend, diff_method):
 
 
 @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
-@pytest.mark.capture_todo
 def test_one_to_many(capture_mode, backend, diff_method):
     """Test a tall Jacobian (one input to many outputs)"""
 
@@ -71,7 +69,6 @@ def test_one_to_many(capture_mode, backend, diff_method):
 
 
 @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
-@pytest.mark.capture_todo
 def test_many_to_one(capture_mode, backend, diff_method):
     """Test a wide Jacobian (many inputs to one output)"""
 
@@ -97,7 +94,6 @@ def test_many_to_one(capture_mode, backend, diff_method):
     assert catalyst_jacobian == pytest.approx(jax_jacobian)
 
 
-@pytest.mark.capture_todo
 def test_tensor_measure(capture_mode, backend):
     """Tests correctness of a derivative of a qnode that returns a tensor"""
 
@@ -120,7 +116,6 @@ def test_tensor_measure(capture_mode, backend):
     assert catalyst_jacobian == pytest.approx(jax_jacobian)
 
 
-@pytest.mark.capture_todo
 def test_multi_measure(capture_mode, backend):
     """Tests correctness of a derivative of a qnode with multiple measurements"""
 
@@ -156,7 +151,6 @@ def test_purely_classical(capture_mode):
 
 
 @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
-@pytest.mark.capture_todo
 def test_jacobian(capture_mode, backend, diff_method):
     """Tests correctness of a full Jacobian with multiple inputs and outputs"""
 
@@ -181,7 +175,6 @@ def test_jacobian(capture_mode, backend, diff_method):
 
 
 @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
-@pytest.mark.capture_todo
 def test_multi_result(capture_mode, backend, diff_method):
     """Tests the correctness of multiple Jacobians from multiple results"""
 
@@ -205,7 +198,6 @@ def test_multi_result(capture_mode, backend, diff_method):
 
 
 @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
-@pytest.mark.capture_todo
 def test_multi_arg_multi_result(capture_mode, backend, diff_method):
     """Tests multiple tensor arguments and results"""
 
@@ -232,7 +224,6 @@ def test_multi_arg_multi_result(capture_mode, backend, diff_method):
             assert jax_jacobian[i][j] == pytest.approx(catalyst_jacobian[i][j])
 
 
-@pytest.mark.capture_todo
 def test_multi_qnode(capture_mode, backend):
     """Test a multi-QNode workflow where each QNode has a different diff_method"""
     device = qml.device(backend, wires=2)
@@ -261,7 +252,6 @@ def test_multi_qnode(capture_mode, backend):
     assert grad_workflow(x) == pytest.approx(jax.jacobian(postprocess)(x))
 
 
-@pytest.mark.capture_todo
 def test_qnode_different_returns(capture_mode, backend):
     """Test a multi-QNode workflow where the QNodes have different diff_methods and return
     different shapes.
@@ -288,7 +278,6 @@ def test_qnode_different_returns(capture_mode, backend):
     assert grad_loss(x) == pytest.approx(jax.jacobian(loss)(x))
 
 
-@pytest.mark.capture_todo
 def test_no_nested_grad_without_fd(capture_mode):
     """Test input validation for higher order derivatives where outer grad ops don't have
     method='fd'.
