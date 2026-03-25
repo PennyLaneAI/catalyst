@@ -31,10 +31,10 @@
 #include "Quantum/Transforms/Passes.h"
 #include "Quantum/Utils/Decomp.h"
 
-#include "graph_decomp_solver.hpp"
-#include "DGTypes.hpp"
 #include "DGBuilder.hpp"
 #include "DGSolver.hpp"
+#include "DGTypes.hpp"
+#include "graph_decomp_solver.hpp"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -136,7 +136,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 5: Build and solve the decomposition graph
-        // auto solution = GraphDecompositionSolver::Solve(setOfOps, setOfResources, targetGateToCost);
+        // auto solution = GraphDecompositionSolver::Solve(setOfOps, setOfResources,
+        // targetGateToCost);
         llvm::errs() << "got solution from graph\n";
 
         ///////////////////////////
@@ -198,10 +199,12 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         });
     }
 
-    void getRuleNodes([[maybe_unused]] ModuleOp module, llvm::StringRef filename,
-                      [[maybe_unused]] const llvm::StringMap<func::FuncOp> &custom_rules,
-                      [[maybe_unused]] std::vector<RuleNode> &rules,
-                      [[maybe_unused]] std::unordered_map<std::string, mlir::OwningOpRef<func::FuncOp>> &ruleNameToFuncOp)
+    void
+    getRuleNodes([[maybe_unused]] ModuleOp module, llvm::StringRef filename,
+                 [[maybe_unused]] const llvm::StringMap<func::FuncOp> &custom_rules,
+                 [[maybe_unused]] std::vector<RuleNode> &rules,
+                 [[maybe_unused]] std::unordered_map<std::string, mlir::OwningOpRef<func::FuncOp>>
+                     &ruleNameToFuncOp)
     {
 
         // TODO user nodes
@@ -226,14 +229,15 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                     outputNode.name = outputNode.name.drop_front(strlen("Adjoint(")).drop_back(1);
                 }
                 ruleNode.output = outputNode;
-            } else {
+            }
+            else {
                 llvm::errs() << "Rule " << ruleNode.name
                              << " is missing 'target_gate' attribute. Skipping this rule.\n";
                 continue; // skip this rule if target_gate attribute is missing
             }
 
-            // Convert "resources" attribute to std::vector<RuleTerm> and set as inputs of the rule node
-            // ruleNode.resource = func->getAttrOfType<DictionaryAttr>("Resources");
+            // Convert "resources" attribute to std::vector<RuleTerm> and set as inputs of the rule
+            // node ruleNode.resource = func->getAttrOfType<DictionaryAttr>("Resources");
             if (auto resourcesAttr = func->getAttrOfType<DictionaryAttr>("resources")) {
                 for (const auto &resource : resourcesAttr) {
                     RuleTerm term;
@@ -244,20 +248,23 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                     }
                     if (auto multiplicityAttr = resource.second.dyn_cast<IntegerAttr>()) {
                         term.multiplicity = multiplicityAttr.getInt();
-                    } else {
-                        llvm::errs() << "Resource " << resource.first
-                                     << " in rule " << ruleNode.name
-                                     << " is missing 'multiplicity' integer attribute. Skipping this resource.\n";
-                        continue; // skip this resource if multiplicity attribute is missing or not an integer
+                    }
+                    else {
+                        llvm::errs()
+                            << "Resource " << resource.first << " in rule " << ruleNode.name
+                            << " is missing 'multiplicity' integer attribute. Skipping this "
+                               "resource.\n";
+                        continue; // skip this resource if multiplicity attribute is missing or not
+                                  // an integer
                     }
                     ruleNode.inputs.push_back(term);
                 }
-            } else {
+            }
+            else {
                 llvm::errs() << "Rule " << ruleNode.name
                              << " is missing 'resources' attribute. Skipping this rule.\n";
                 continue; // skip this rule if resources attribute is missing
-            }            
-
+            }
 
             rules.push_back(std::move(ruleNode));
         }

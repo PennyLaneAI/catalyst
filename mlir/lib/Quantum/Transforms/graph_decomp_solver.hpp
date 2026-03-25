@@ -30,8 +30,6 @@ using namespace DecompGraph::Core;
 namespace catalyst {
 namespace quantum {
 
-
-
 struct GraphDecompositionSolver {
 
     /**
