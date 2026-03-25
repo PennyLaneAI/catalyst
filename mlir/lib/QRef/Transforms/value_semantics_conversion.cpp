@@ -1015,7 +1015,6 @@ void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTr
     builder.eraseOp(rAdjointOp);
 }
 
-// LCOV_EXCL_START
 void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
 {
     OpBuilder::InsertionGuard guard(builder);
@@ -1139,7 +1138,6 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
 
     builder.eraseOp(ifOp);
 }
-// LCOV_EXCL_STOP
 
 void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker)
 {
@@ -1329,7 +1327,6 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
     builder.eraseOp(forOp);
 }
 
-// LCOV_EXCL_START
 void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker)
 {
     OpBuilder::InsertionGuard guard(builder);
@@ -1442,7 +1439,6 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
 
     builder.eraseOp(whileOp);
 }
-// LCOV_EXCL_STOP
 
 // Driver
 void handleSubroutine(IRRewriter &builder, func::FuncOp f)
@@ -1497,7 +1493,6 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f)
                                         f.front().getTerminator()->getOperandTypes()));
 }
 
-// LCOV_EXCL_START
 void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
 {
     r.walk<WalkOrder::PreOrder>([&](Operation *op) {
@@ -1548,7 +1543,6 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
         }
     });
 }
-// LCOV_EXCL_STOP
 
 } // namespace ReferenceToValueSemanticsConversion
 
