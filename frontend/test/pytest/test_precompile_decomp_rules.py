@@ -23,24 +23,8 @@ from catalyst.utils.precompile_decomposition_rules import (
     COMPILER_OPS_FOR_DECOMPOSITION,
     compile_op_decomp_rules,
     get_abstract_args,
-    get_compiler_ops,
     precompile_decomp_rules,
 )
-
-
-class TestGetCompilerOps:
-    """Tests for get_compiler_ops."""
-
-    def test_get_compiler_ops(self):
-        """Test that get_compiler_ops succeeds in finding all compiler ops."""
-        ops = get_compiler_ops()
-
-        assert len(ops) == len(COMPILER_OPS_FOR_DECOMPOSITION)
-
-    def test_warning(self):
-        """Test that get_compiler_ops warns when an op is not found."""
-        with pytest.warns():
-            get_compiler_ops(frozenset(["fake_op"]))
 
 
 class TestGetAbstractArgs:
