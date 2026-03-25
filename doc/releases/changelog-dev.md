@@ -330,7 +330,7 @@
 * `catalyst.jax_primitives.subroutine` has been moved to `qml.capture.subroutine`.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
 
-* The `StableHLO` dialect has been removed from Catalyst's Python interface module. 
+* The `StableHLO` dialect has been removed from Catalyst's Python interface module.
   Downstream users should now import StableHLO dialect definitions from `xdsl_jax.dialects.stablehlo` instead.
   [(#2588)](https://github.com/PennyLaneAI/catalyst/pull/2588)
 
@@ -481,6 +481,7 @@
   but it is in reference semantics, whereas the existing `Quantum` dialect is in value semantics.
   [(#2320)](https://github.com/PennyLaneAI/catalyst/pull/2320)
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
+  [(#2492)](https://github.com/PennyLaneAI/catalyst/pull/2492)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
@@ -505,6 +506,10 @@
   ```
 
   Notice that qubit reference values are reusable.
+
+  An MLIR program in the `QRef` dialect can be converted to the `Quantum` dialect with the new pass
+  `--convert-to-value-semantics`, optionally followed by `--canonicalize` for removing pairs of
+  neighboring inverse `quantum.extract` and `quantum.insert` operations.
 
 * Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
   Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
