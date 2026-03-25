@@ -31,13 +31,12 @@ file(GLOB SRC
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
-get_property(catalyst_rt_libs GLOBAL PROPERTY CATALYST_RT_LIBS)
 set(LIBS
     ${dialect_libs}
     ${conversion_libs}
-    ${catalyst_rt_libs}
     MLIRQuantum
     ExternalStablehloLib
+    decompsolver
 )
 
 set(DEPENDS
@@ -49,6 +48,4 @@ target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 target_include_directories(${LIBRARY_NAME} PUBLIC
                            .
                            ${PROJECT_SOURCE_DIR}/include
-                           ${PROJECT_SOURCE_DIR}/../runtime/include
-                           ${PROJECT_SOURCE_DIR}/../runtime/lib/DecompGraphSolver
                            ${CMAKE_BINARY_DIR}/include)
