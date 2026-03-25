@@ -34,7 +34,6 @@
 #include "DGBuilder.hpp"
 #include "DGSolver.hpp"
 #include "DGTypes.hpp"
-#include "graph_decomp_solver.hpp"
 
 using namespace mlir;
 using namespace catalyst::quantum;
