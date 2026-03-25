@@ -42,6 +42,19 @@
  */
 #define RT_ASSERT(expression) RT_FAIL_IF(!(expression), "Assertion: " #expression)
 
+/**
+ * @brief Macro that emits a non-fatal warning message to stderr.
+ */
+#define RT_WARN(message) std::cerr << "[Warning] Catalyst Runtime: " << (message) << "\n"
+
+/**
+ * @brief Macro that emits a non-fatal warning message to stderr if expression evaluates to true.
+ */
+#define RT_WARN_IF(expression, message)                                                            \
+    if ((expression)) {                                                                            \
+        RT_WARN(message);                                                                          \
+    }
+
 namespace Catalyst::Runtime {
 
 /**
