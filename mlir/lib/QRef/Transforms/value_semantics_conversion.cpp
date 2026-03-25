@@ -1063,6 +1063,35 @@ void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTr
     builder.eraseOp(rAdjointOp);
 }
 
+void createElseBranchWithDefaultYields(IRRewriter &builder,
+                                       const SetVector<Value> &rValuesUsedByRegion,
+                                       TransientQubitExtractor &extractor,
+                                       QubitValueTracker &outerTracker, scf::IfOp ifOp)
+{
+    // no explicit "else" region on the original if op, just yield whatever the closure
+    // variables were from the outer scope, and yield the extracted qubits from before entering the
+    // ifOp directly
+    OpBuilder::InsertionGuard guard(builder);
+    SmallVector<Value> elseYieldVals;
+    for (Value v : rValuesUsedByRegion) {
+        if (isa<qref::QuregType>(v.getType())) {
+            elseYieldVals.push_back(outerTracker.getCurrentVQreg(v));
+        }
+        else if (isa<qref::QubitType>(v.getType()) && outerTracker.isRootRQubit(v)) {
+            elseYieldVals.push_back(outerTracker.getCurrentVQubit(v));
+        }
+        else {
+            elseYieldVals.push_back(v);
+        }
+    }
+    for (auto [extractedVQubit, idx] : llvm::zip_equal(extractor.getExtractedVQubits(),
+                                                       extractor.getNonRootQubitOperandIndices())) {
+        elseYieldVals[idx] = extractedVQubit;
+    }
+    builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
+    scf::YieldOp::create(builder, ifOp->getLoc(), elseYieldVals);
+}
+
 void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
 {
     OpBuilder::InsertionGuard guard(builder);
@@ -1125,26 +1154,9 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
         }
         else {
             // no explicit "else" region on the original if op, just yield whatever the closure
-            // variables were
-            OpBuilder::InsertionGuard nested_guard(builder);
-            SmallVector<Value> elseYieldVals;
-            for (Value v : rValuesUsedByRegion) {
-                if (isa<qref::QuregType>(v.getType())) {
-                    elseYieldVals.push_back(tracker.getCurrentVQreg(v));
-                }
-                else if (isa<qref::QubitType>(v.getType()) && tracker.isRootRQubit(v)) {
-                    elseYieldVals.push_back(tracker.getCurrentVQubit(v));
-                }
-                else {
-                    elseYieldVals.push_back(v);
-                }
-            }
-            for (auto [extractedVQubit, idx] : llvm::zip_equal(
-                     extractor.getExtractedVQubits(), extractor.getNonRootQubitOperandIndices())) {
-                elseYieldVals[idx] = extractedVQubit;
-            }
-            builder.setInsertionPointToStart(&newIfOp.getElseRegion().front());
-            scf::YieldOp::create(builder, loc, elseYieldVals);
+            // variables were, and yield the extracted qubits from before entering the ifOp directly
+            createElseBranchWithDefaultYields(builder, rValuesUsedByRegion, extractor, tracker,
+                                              newIfOp);
         }
 
         // Update outer tracker with results
