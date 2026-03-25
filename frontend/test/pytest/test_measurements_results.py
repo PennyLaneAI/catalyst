@@ -1098,7 +1098,6 @@ class TestDensityMatrixMP:
 
     # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
     # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
-    @pytest.mark.capture_todo
     def test_error(self, capture_mode):
         """Test that tracing density matrix produces an error"""
 

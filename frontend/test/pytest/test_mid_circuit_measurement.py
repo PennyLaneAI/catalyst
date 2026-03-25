@@ -50,9 +50,6 @@ class TestMidCircuitMeasurement:
         with pytest.raises(CompileError, match="can only be used from within @qjit"):
             circuit()
 
-    # Capture gap: capture path raises tracing/lowering errors (e.g., invalid JAX type or missing measure lowering) before expected validation error.
-    # Classification: Catalyst integration gap. Fix: preserve user-facing measure validation order under capture-enabled qjit.
-    @pytest.mark.capture_todo
     def test_measure_outside_qnode(self, capture_mode):
         """Test measure outside qnode."""
 
@@ -62,9 +59,6 @@ class TestMidCircuitMeasurement:
         with pytest.raises(CompileError, match="can only be used from within a qml.qnode"):
             qjit(circuit, capture=capture_mode)()
 
-    # Capture gap: capture path raises tracing/lowering errors (e.g., invalid JAX type or missing measure lowering) before expected validation error.
-    # Classification: Catalyst integration gap. Fix: preserve user-facing measure validation order under capture-enabled qjit.
-    @pytest.mark.capture_todo
     def test_invalid_arguments(self, backend, capture_mode):
         """Test too many arguments to the wires parameter."""
 
@@ -79,9 +73,6 @@ class TestMidCircuitMeasurement:
         ):
             qjit(circuit, capture=capture_mode)()
 
-    # Capture gap: capture path raises tracing/lowering errors (e.g., invalid JAX type or missing measure lowering) before expected validation error.
-    # Classification: Catalyst integration gap. Fix: preserve user-facing measure validation order under capture-enabled qjit.
-    @pytest.mark.capture_todo
     def test_invalid_arguments2(self, backend, capture_mode):
         """Test too large array for the wires parameter."""
 
@@ -94,7 +85,6 @@ class TestMidCircuitMeasurement:
         with pytest.raises(TypeError, match="Measure is only supported on 1 qubit"):
             qjit(circuit, capture=capture_mode)()
 
-    @pytest.mark.capture_todo  # Capture gap: returning MCM-derived sample(op=m) still raises "Measurements of mcms are not yet supported".
     # Fix direction: add program-capture execution support for MCM-valued measurement processes.
     def test_basic(self, backend, capture_mode):
         """Test measure (basic)."""
@@ -111,9 +101,6 @@ class TestMidCircuitMeasurement:
         assert circuit(jnp.pi)[0] == 1
         assert circuit(0.0)[0] == 0
 
-    # Capture gap: MCM capture execution still unsupported (e.g., "Measurements of mcms are not yet supported").
-    # Classification: missing PL feature/integration gap. Fix: add capture-time lowering/execution for MCM-derived measurements.
-    @pytest.mark.capture_todo
     def test_scalar_array_wire(self, backend, capture_mode):
         """Test a scalar array wire."""
 
@@ -126,9 +113,6 @@ class TestMidCircuitMeasurement:
 
         assert circuit(jnp.array(0)) == 1
 
-    # Capture gap: MCM capture execution still unsupported (e.g., "Measurements of mcms are not yet supported").
-    # Classification: missing PL feature/integration gap. Fix: add capture-time lowering/execution for MCM-derived measurements.
-    @pytest.mark.capture_todo
     def test_1element_array_wire(self, backend, capture_mode):
         """Test a 1D single-element array wire."""
 
@@ -141,9 +125,6 @@ class TestMidCircuitMeasurement:
 
         assert circuit(jnp.array([0])) == 1
 
-    # Capture gap: MCM capture execution still unsupported (e.g., "Measurements of mcms are not yet supported").
-    # Classification: missing PL feature/integration gap. Fix: add capture-time lowering/execution for MCM-derived measurements.
-    @pytest.mark.capture_todo
     def test_more_complex(self, backend, capture_mode):
         """Test measure (more complex)."""
 
@@ -160,9 +141,6 @@ class TestMidCircuitMeasurement:
         assert circuit(jnp.pi)  # m will be equal to True if wire 0 is measured in 1 state
         assert not circuit(0.0)
 
-    # Capture gap: MCM capture execution still unsupported (e.g., "Measurements of mcms are not yet supported").
-    # Classification: missing PL feature/integration gap. Fix: add capture-time lowering/execution for MCM-derived measurements.
-    @pytest.mark.capture_todo
     def test_with_postselect_zero(self, backend, capture_mode):
         """Test measure (postselect = 0)."""
 
@@ -175,9 +153,6 @@ class TestMidCircuitMeasurement:
 
         assert not circuit(0.0)  # m will be equal to False
 
-    # Capture gap: MCM capture execution still unsupported (e.g., "Measurements of mcms are not yet supported").
-    # Classification: missing PL feature/integration gap. Fix: add capture-time lowering/execution for MCM-derived measurements.
-    @pytest.mark.capture_todo
     def test_with_postselect_one(self, backend, capture_mode):
         """Test measure (postselect = 1)."""
 
@@ -190,9 +165,6 @@ class TestMidCircuitMeasurement:
 
         assert circuit(jnp.pi)  # m will be equal to True
 
-    # Capture gap: MCM capture execution still unsupported (e.g., "Measurements of mcms are not yet supported").
-    # Classification: missing PL feature/integration gap. Fix: add capture-time lowering/execution for MCM-derived measurements.
-    @pytest.mark.capture_todo
     def test_with_reset_false(self, backend, capture_mode):
         """Test measure (reset = False)."""
 
@@ -206,9 +178,6 @@ class TestMidCircuitMeasurement:
 
         assert circuit()  # both measures are the same
 
-    # Capture gap: MCM capture execution still unsupported (e.g., "Measurements of mcms are not yet supported").
-    # Classification: missing PL feature/integration gap. Fix: add capture-time lowering/execution for MCM-derived measurements.
-    @pytest.mark.capture_todo
     def test_with_reset_true(self, backend, capture_mode):
         """Test measure (reset = True)."""
 
@@ -222,9 +191,6 @@ class TestMidCircuitMeasurement:
 
         assert circuit()  # measures are different
 
-    # Capture gap: MCM capture execution still unsupported (e.g., "Measurements of mcms are not yet supported").
-    # Classification: missing PL feature/integration gap. Fix: add capture-time lowering/execution for MCM-derived measurements.
-    @pytest.mark.capture_todo
     def test_return_mcm_with_sample_single(self, backend, capture_mode):
         """Test that a measurement result can be returned with qml.sample and shots."""
 
@@ -242,9 +208,6 @@ class TestMidCircuitMeasurement:
         assert circuit(0.0) == 0
         assert circuit(jnp.pi) == 1
 
-    # Capture gap: MCM capture execution still unsupported (e.g., "Measurements of mcms are not yet supported").
-    # Classification: missing PL feature/integration gap. Fix: add capture-time lowering/execution for MCM-derived measurements.
-    @pytest.mark.capture_todo
     def test_return_mcm_with_sample_multiple(self, backend, capture_mode):
         """Test that a measurement result can be returned with qml.sample and shots."""
 
@@ -262,9 +225,6 @@ class TestMidCircuitMeasurement:
         assert jnp.allclose(circuit(0.0), 0)
         assert jnp.allclose(circuit(jnp.pi), 1)
 
-    # Capture gap: MCM capture execution still unsupported (e.g., "Measurements of mcms are not yet supported").
-    # Classification: missing PL feature/integration gap. Fix: add capture-time lowering/execution for MCM-derived measurements.
-    @pytest.mark.capture_todo
     def test_mcm_method_deferred_error(self, backend, capture_mode):
         """Test that an error is raised if trying to execute with mcm_method="deferred"."""
         dev = qml.device(backend, wires=1)
@@ -281,9 +241,6 @@ class TestMidCircuitMeasurement:
         ):
             _ = circuit(1.8)
 
-    # Capture gap: dynamic-one-shot path raises NotImplementedError for captured MCM-valued measurements.
-    # Classification: missing PL feature. Fix: implement capture execution support for dynamic_one_shot measurement processes.
-    @pytest.mark.capture_todo
     def test_mcm_method_one_shot_analytic_error(self, backend, capture_mode):
         """Test that an error is raised if using mcm_method="one-shot" without shots."""
         dev = qml.device(backend, wires=1)
@@ -301,9 +258,6 @@ class TestMidCircuitMeasurement:
         ):
             _ = circuit(1.8)
 
-    # Capture gap: MCM capture execution still unsupported (e.g., "Measurements of mcms are not yet supported").
-    # Classification: missing PL feature/integration gap. Fix: add capture-time lowering/execution for MCM-derived measurements.
-    @pytest.mark.capture_todo
     def test_single_branch_statistics_hw_like_error(self, backend, capture_mode):
         """Test that an error is raised if using `mcm_method="single-branch-statistics"` and
         `postselect_mode="hw-like"`"""
@@ -353,9 +307,6 @@ class TestMidCircuitMeasurement:
         assert circuit.execute_kwargs["postselect_mode"] == original_config.postselect_mode
         assert circuit.execute_kwargs["mcm_method"] == original_config.mcm_method
 
-    # Capture gap: MCM capture execution still unsupported (e.g., "Measurements of mcms are not yet supported").
-    # Classification: missing PL feature/integration gap. Fix: add capture-time lowering/execution for MCM-derived measurements.
-    @pytest.mark.capture_todo
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     def test_default_mcm_method(self, backend, postselect_mode, mocker, capture_mode):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
@@ -429,9 +380,6 @@ class TestMidCircuitMeasurement:
         _, observed_shape = tree_flatten(observed)
         assert expected_shape == observed_shape
 
-    # Capture gap: MCM capture execution still unsupported (e.g., "Measurements of mcms are not yet supported").
-    # Classification: missing PL feature/integration gap. Fix: add capture-time lowering/execution for MCM-derived measurements.
-    @pytest.mark.capture_todo
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     @pytest.mark.parametrize("mcm_method", [None, "one-shot"])
     def test_mcm_method_with_dict_output_used_measurements(
@@ -468,9 +416,6 @@ class TestMidCircuitMeasurement:
         _, observed_shape = tree_flatten(observed)
         assert expected_shape == observed_shape
 
-    # Capture gap: MCM capture execution still unsupported (e.g., "Measurements of mcms are not yet supported").
-    # Classification: missing PL feature/integration gap. Fix: add capture-time lowering/execution for MCM-derived measurements.
-    @pytest.mark.capture_todo
     @pytest.mark.parametrize("mcm_method", [None, "single-branch-statistics", "one-shot"])
     def test_invalid_postselect_error(self, backend, mcm_method, capture_mode):
         """Test that an error is raised if postselecting on an invalid value"""
@@ -487,9 +432,6 @@ class TestMidCircuitMeasurement:
         with pytest.raises(TypeError, match="postselect must be '0' or '1'"):
             _ = circuit(1.8)
 
-    # Capture gap: MCM capture execution still unsupported (e.g., "Measurements of mcms are not yet supported").
-    # Classification: missing PL feature/integration gap. Fix: add capture-time lowering/execution for MCM-derived measurements.
-    @pytest.mark.capture_todo
     @pytest.mark.parametrize("measurement_process", [qml.counts, qml.var, qml.expval, qml.probs])
     def test_single_branch_statistics_not_implemented_error(
         self, backend, measurement_process, capture_mode
@@ -536,9 +478,6 @@ class TestDynamicOneShotIntegration:
         assert np.allclose(workflow(shots), [1 if i == 0 else 0 for i in range(2**shots)])
 
     # pylint: disable=too-many-arguments
-    # Capture gap: dynamic-one-shot path raises NotImplementedError for captured MCM-valued measurements.
-    # Classification: missing PL feature. Fix: implement capture execution support for dynamic_one_shot measurement processes.
-    @pytest.mark.capture_todo
     @pytest.mark.parametrize(
         "postselect, reset, expected",
         [
@@ -588,9 +527,6 @@ class TestDynamicOneShotIntegration:
         else:
             assert qml.math.allclose(res, expected)
 
-    # Capture gap: dynamic-one-shot path raises NotImplementedError for captured MCM-valued measurements.
-    # Classification: missing PL feature. Fix: implement capture execution support for dynamic_one_shot measurement processes.
-    @pytest.mark.capture_todo
     @pytest.mark.parametrize("shots", [1, 10])
     def test_dynamic_one_shot_only_called_once(self, backend, shots, mocker, capture_mode):
         """Test that when using mcm_method="one-shot", dynamic_one_shot does not get
@@ -611,9 +547,6 @@ class TestDynamicOneShotIntegration:
 
         assert spy.call_count == 1
 
-    # Capture gap: dynamic-one-shot path raises NotImplementedError for captured MCM-valued measurements.
-    # Classification: missing PL feature. Fix: implement capture execution support for dynamic_one_shot measurement processes.
-    @pytest.mark.capture_todo
     def test_dynamic_one_shot_unsupported_measurement(self, backend, capture_mode):
         """Test that circuits with unsupported measurements raise an error."""
         shots = 10
@@ -653,9 +586,6 @@ class TestDynamicOneShotIntegration:
                 qml.RX(y, wires=0)
                 return qml.probs(wires=0)
 
-    # Capture gap: dynamic-one-shot path raises NotImplementedError for captured MCM-valued measurements.
-    # Classification: missing PL feature. Fix: implement capture execution support for dynamic_one_shot measurement processes.
-    @pytest.mark.capture_todo
     def test_dynamic_one_shot_unsupported_broadcast(self, backend, capture_mode):
         """Test that `dynamic_one_shot` raises when used with parameter broadcasting."""
         shots = 10
@@ -677,9 +607,6 @@ class TestDynamicOneShotIntegration:
         ):
             func(param, param)
 
-    # Capture gap: dynamic-one-shot path raises NotImplementedError for captured MCM-valued measurements.
-    # Classification: missing PL feature. Fix: implement capture execution support for dynamic_one_shot measurement processes.
-    @pytest.mark.capture_todo
     @pytest.mark.parametrize("param, expected", [(0.0, 0.0), (jnp.pi, 1.0)])
     def test_dynamic_one_shot_with_sample_single(self, backend, param, expected, capture_mode):
         """Test that a measurement result can be returned with qml.sample and shots."""
@@ -699,9 +626,6 @@ class TestDynamicOneShotIntegration:
         assert result.shape == (shots,)
         assert jnp.allclose(result, expected)
 
-    # Capture gap: dynamic-one-shot path raises NotImplementedError for captured MCM-valued measurements.
-    # Classification: missing PL feature. Fix: implement capture execution support for dynamic_one_shot measurement processes.
-    @pytest.mark.capture_todo
     @pytest.mark.parametrize("shots", [10000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
@@ -794,9 +718,6 @@ class TestDynamicOneShotIntegration:
         validate_measurements(measure_f, shots, results1, results0)
 
     # pylint: disable=too-many-arguments
-    # Capture gap: dynamic-one-shot path raises NotImplementedError for captured MCM-valued measurements.
-    # Classification: missing PL feature. Fix: implement capture execution support for dynamic_one_shot measurement processes.
-    @pytest.mark.capture_todo
     @pytest.mark.parametrize("shots", [10000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("reset", [False, True])
@@ -912,9 +833,6 @@ class TestDynamicOneShotIntegration:
         result = cost()
         assert jnp.array(result).shape == (qubits,)
 
-    # Capture gap: ValueError "Only Measurement Processes can be returned from QNode's" for MCM/classical returns.
-    # Classification: missing PL capture feature. Fix: support classical/MCM return pathways or rewrite to measurement-process outputs.
-    @pytest.mark.capture_todo
     def test_dynamic_one_shot_mcm_result(self, capture_mode):
         """Test mcm result with one-shot"""
         dev = qml.device("lightning.qubit", wires=1)
@@ -929,9 +847,6 @@ class TestDynamicOneShotIntegration:
         result = circuit()
         assert result.shape == (10,)
 
-    # Capture gap: ValueError "Only Measurement Processes can be returned from QNode's" for MCM/classical returns.
-    # Classification: missing PL capture feature. Fix: support classical/MCM return pathways or rewrite to measurement-process outputs.
-    @pytest.mark.capture_todo
     def test_dynamic_one_shot_classical_return_values_with_mcm(self, capture_mode):
         """Test classical return value with one-shot"""
 
@@ -948,9 +863,6 @@ class TestDynamicOneShotIntegration:
         result = circuit()
         assert result.shape == (10,)  # pylint: disable=no-member
 
-    # Capture gap: ValueError "Only Measurement Processes can be returned from QNode's" for MCM/classical returns.
-    # Classification: missing PL capture feature. Fix: support classical/MCM return pathways or rewrite to measurement-process outputs.
-    @pytest.mark.capture_todo
     def test_dynamic_one_shot_with_classical_return_values(self, capture_mode):
         """Test classical return values with one-shot"""
         dev = qml.device("lightning.qubit", wires=1)

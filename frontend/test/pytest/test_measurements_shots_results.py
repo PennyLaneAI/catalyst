@@ -597,7 +597,6 @@ class TestOtherMeasurements:
 
     # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
     # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
-    @pytest.mark.capture_todo
     @pytest.mark.parametrize("meas_fun", (qml.sample, qml.counts))
     def test_missing_shots_value(self, backend, meas_fun, capture_mode):
         """Test error for missing shots value."""
