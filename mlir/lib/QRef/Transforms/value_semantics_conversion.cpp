@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <mlir/IR/Location.h>
+#include <mlir/IR/PatternMatch.h>
 #define DEBUG_TYPE "value-semantics-conversion"
 
 #include <cstdint>
@@ -929,6 +930,14 @@ void handleHermitian(IRRewriter &builder, qref::HermitianOp rHermitianOp,
     builder.replaceOp(rHermitianOp, vHermitianOp);
 }
 
+/**
+ * @brief Add value semantics arguments to the region, one for each rValue used by the region, and
+ * handle the region. The newly added arguments are all considered root for the region.
+ *
+ * @param builder
+ * @param rValuesUsedByRegion
+ * @param r
+ */
 void addVArgsToRegionAndHandle(IRRewriter &builder, const SetVector<Value> &rValuesUsedByRegion,
                                Region &r)
 {
@@ -946,6 +955,38 @@ void addVArgsToRegionAndHandle(IRRewriter &builder, const SetVector<Value> &rVal
             newArg = r.front().addArgument(quantum::QuregType::get(ctx), loc);
             regionTracker.setCurrentVQreg(rValue, newArg);
         }
+    }
+
+    handleRegion(builder, r, regionTracker);
+    addRootVValuesToRetOp(r.front().getTerminator(), rValuesUsedByRegion.getArrayRef(),
+                          regionTracker);
+}
+
+/**
+ * @brief Handle the region with all current vValues kept alive from above, and with the extracted
+ * vQubits from the extractor treated as root qubit values for the region.
+ *
+ * This method is needed to handle scf.if and scf.index_switch, where an explicit list of operands
+ * is not available.
+ *
+ * @param builder
+ * @param rValuesUsedByRegion
+ * @param extractor
+ * @param outerTracker
+ * @param r
+ */
+void addPretendedArgsToRegionAndHandle(IRRewriter &builder,
+                                       const SetVector<Value> &rValuesUsedByRegion,
+                                       TransientQubitExtractor &extractor,
+                                       QubitValueTracker &outerTracker, Region &r)
+{
+    // Copy over all the existing root Value maps in the outer scope
+    QubitValueTracker regionTracker = outerTracker;
+
+    // newly extracted qubits, though non-root outside, are considered root inside!
+    for (auto [vQubit, idx] : llvm::zip_equal(extractor.getExtractedVQubits(),
+                                              extractor.getNonRootQubitOperandIndices())) {
+        regionTracker.setCurrentVQubit(rValuesUsedByRegion[idx], vQubit);
     }
 
     handleRegion(builder, r, regionTracker);
@@ -1069,19 +1110,8 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
         builder.eraseBlock(newIfOp.thenBlock());
         builder.inlineRegionBefore(ifOp.getThenRegion(), newIfOp.getThenRegion(),
                                    newIfOp.getThenRegion().end());
-
-        // Copy over all the existing root Value maps in the outer scope
-        QubitValueTracker thenRegionTracker = tracker;
-
-        // newly extracted qubits, though non-root outside, are considered root inside!
-        for (auto [vQubit, idx] : llvm::zip_equal(extractor.getExtractedVQubits(),
-                                                  extractor.getNonRootQubitOperandIndices())) {
-            thenRegionTracker.setCurrentVQubit(rValuesUsedByRegion[idx], vQubit);
-        }
-
-        handleRegion(builder, newIfOp.getThenRegion(), thenRegionTracker);
-        addRootVValuesToRetOp(newIfOp.thenYield(), rValuesUsedByRegion.getArrayRef(),
-                              thenRegionTracker);
+        addPretendedArgsToRegionAndHandle(builder, rValuesUsedByRegion, extractor, tracker,
+                                          newIfOp.getThenRegion());
 
         // 3. Handle "else" region
         // If none existed before, we need to create an empty "else" region, just for the yield
@@ -1090,16 +1120,8 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
             builder.eraseBlock(newIfOp.elseBlock());
             builder.inlineRegionBefore(ifOp.getElseRegion(), newIfOp.getElseRegion(),
                                        newIfOp.getElseRegion().end());
-
-            QubitValueTracker elseRegionTracker = tracker;
-            for (auto [vQubit, idx] : llvm::zip_equal(extractor.getExtractedVQubits(),
-                                                      extractor.getNonRootQubitOperandIndices())) {
-                elseRegionTracker.setCurrentVQubit(rValuesUsedByRegion[idx], vQubit);
-            }
-
-            handleRegion(builder, newIfOp.getElseRegion(), elseRegionTracker);
-            addRootVValuesToRetOp(newIfOp.elseYield(), rValuesUsedByRegion.getArrayRef(),
-                                  elseRegionTracker);
+            addPretendedArgsToRegionAndHandle(builder, rValuesUsedByRegion, extractor, tracker,
+                                              newIfOp.getElseRegion());
         }
         else {
             // no explicit "else" region on the original if op, just yield whatever the closure
@@ -1190,34 +1212,15 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
         // 2. Handle the "default" region
         builder.inlineRegionBefore(switchOp.getDefaultRegion(), newSwitchOp.getDefaultRegion(),
                                    newSwitchOp.getDefaultRegion().end());
-
-        // Copy over all the existing root Value maps in the outer scope
-        QubitValueTracker defaultRegionTracker = tracker;
-
-        // newly extracted qubits, though non-root outside, are considered root inside!
-        for (auto [vQubit, idx] : llvm::zip_equal(extractor.getExtractedVQubits(),
-                                                  extractor.getNonRootQubitOperandIndices())) {
-            defaultRegionTracker.setCurrentVQubit(rValuesUsedByRegion[idx], vQubit);
-        }
-
-        handleRegion(builder, newSwitchOp.getDefaultRegion(), defaultRegionTracker);
-        addRootVValuesToRetOp(newSwitchOp.getDefaultBlock().getTerminator(),
-                              rValuesUsedByRegion.getArrayRef(), defaultRegionTracker);
+        addPretendedArgsToRegionAndHandle(builder, rValuesUsedByRegion, extractor, tracker,
+                                          newSwitchOp.getDefaultRegion());
 
         // 3. Handle the case regions
         for (auto [oldCaseRegion, newCaseRegion] :
              llvm::zip_equal(switchOp.getCaseRegions(), newSwitchOp.getCaseRegions())) {
             builder.inlineRegionBefore(oldCaseRegion, newCaseRegion, newCaseRegion.end());
-
-            QubitValueTracker caseRegionTracker = tracker;
-            for (auto [vQubit, idx] : llvm::zip_equal(extractor.getExtractedVQubits(),
-                                                      extractor.getNonRootQubitOperandIndices())) {
-                caseRegionTracker.setCurrentVQubit(rValuesUsedByRegion[idx], vQubit);
-            }
-
-            handleRegion(builder, newCaseRegion, caseRegionTracker);
-            addRootVValuesToRetOp(newCaseRegion.front().getTerminator(),
-                                  rValuesUsedByRegion.getArrayRef(), caseRegionTracker);
+            addPretendedArgsToRegionAndHandle(builder, rValuesUsedByRegion, extractor, tracker,
+                                              newCaseRegion);
         }
 
         // Update outer tracker with results
