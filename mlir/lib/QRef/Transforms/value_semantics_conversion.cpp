@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <mlir/IR/Location.h>
 #define DEBUG_TYPE "value-semantics-conversion"
 
 #include <cstdint>
@@ -928,12 +929,35 @@ void handleHermitian(IRRewriter &builder, qref::HermitianOp rHermitianOp,
     builder.replaceOp(rHermitianOp, vHermitianOp);
 }
 
+void addVArgsToRegionAndHandle(IRRewriter &builder, const SetVector<Value> &rValuesUsedByRegion,
+                               Region &r)
+{
+    MLIRContext *ctx = r.getContext();
+    Location loc = r.getLoc();
+
+    QubitValueTracker regionTracker;
+    for (auto rValue : rValuesUsedByRegion) {
+        Value newArg;
+        if (isa<qref::QubitType>(rValue.getType())) {
+            newArg = r.front().addArgument(quantum::QubitType::get(ctx), loc);
+            regionTracker.setCurrentVQubit(rValue, newArg);
+        }
+        else if (isa<qref::QuregType>(rValue.getType())) {
+            newArg = r.front().addArgument(quantum::QuregType::get(ctx), loc);
+            regionTracker.setCurrentVQreg(rValue, newArg);
+        }
+    }
+
+    handleRegion(builder, r, regionTracker);
+    addRootVValuesToRetOp(r.front().getTerminator(), rValuesUsedByRegion.getArrayRef(),
+                          regionTracker);
+}
+
 void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTracker &tracker)
 {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(rAdjointOp);
     Location loc = rAdjointOp->getLoc();
-    MLIRContext *ctx = rAdjointOp.getContext();
 
     SetVector<Value> rValuesUsedByRegion;
     getNecessaryRegionRValues(rAdjointOp.getRegion(), rValuesUsedByRegion);
@@ -979,24 +1003,7 @@ void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTr
         quantum::YieldOp::create(builder, loc, {});
 
         // 3. Create new args with quantum.bit/reg types and set them as root for the new region
-        QubitValueTracker vAdjointTracker;
-        for (auto rValue : rValuesUsedByRegion) {
-            Value newArg;
-            if (isa<qref::QubitType>(rValue.getType())) {
-                newArg =
-                    vAdjointOp.getRegion().front().addArgument(quantum::QubitType::get(ctx), loc);
-                vAdjointTracker.setCurrentVQubit(rValue, newArg);
-            }
-            else if (isa<qref::QuregType>(rValue.getType())) {
-                newArg =
-                    vAdjointOp.getRegion().front().addArgument(quantum::QuregType::get(ctx), loc);
-                vAdjointTracker.setCurrentVQreg(rValue, newArg);
-            }
-        }
-
-        handleRegion(builder, vAdjointOp.getRegion(), vAdjointTracker);
-        addRootVValuesToRetOp(vAdjointOp.getRegion().front().getTerminator(),
-                              rValuesUsedByRegion.getArrayRef(), vAdjointTracker);
+        addVArgsToRegionAndHandle(builder, rValuesUsedByRegion, vAdjointOp.getRegion());
 
         // Update tracker with results
         for (auto [i, j] :
@@ -1239,7 +1246,6 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(forOp);
     Location loc = forOp->getLoc();
-    MLIRContext *ctx = forOp.getContext();
 
     SetVector<Value> rValuesUsedByRegion;
     getNecessaryRegionRValues(forOp.getRegion(), rValuesUsedByRegion);
@@ -1285,22 +1291,7 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
                                    newLoop.getRegion().end());
 
         // 3. Create new args with quantum.bit/reg types and set them as root for the new region
-        QubitValueTracker newLoopTracker;
-        for (auto rValue : rValuesUsedByRegion) {
-            Value newArg;
-            if (isa<qref::QubitType>(rValue.getType())) {
-                newArg = newLoop.getRegion().front().addArgument(quantum::QubitType::get(ctx), loc);
-                newLoopTracker.setCurrentVQubit(rValue, newArg);
-            }
-            else if (isa<qref::QuregType>(rValue.getType())) {
-                newArg = newLoop.getRegion().front().addArgument(quantum::QuregType::get(ctx), loc);
-                newLoopTracker.setCurrentVQreg(rValue, newArg);
-            }
-        }
-
-        handleRegion(builder, newLoop.getRegion(), newLoopTracker);
-        addRootVValuesToRetOp(newLoop.getRegion().front().getTerminator(),
-                              rValuesUsedByRegion.getArrayRef(), newLoopTracker);
+        addVArgsToRegionAndHandle(builder, rValuesUsedByRegion, newLoop.getRegion());
 
         // Update tracker with results
         // Again, The loop's block always takes in the iteration variable (the `i`) as a block
@@ -1385,37 +1376,8 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
                                    newLoop.getAfter().end());
 
         // 3. Create new args with quantum.bit/reg types and set them as root for the new region
-        QubitValueTracker newBeforeRegionTracker;
-        for (auto rValue : rValuesUsedByRegion) {
-            Value newArg;
-            if (isa<qref::QubitType>(rValue.getType())) {
-                newArg = newLoop.getBefore().front().addArgument(quantum::QubitType::get(ctx), loc);
-                newBeforeRegionTracker.setCurrentVQubit(rValue, newArg);
-            }
-            else if (isa<qref::QuregType>(rValue.getType())) {
-                newArg = newLoop.getBefore().front().addArgument(quantum::QuregType::get(ctx), loc);
-                newBeforeRegionTracker.setCurrentVQreg(rValue, newArg);
-            }
-        }
-        handleRegion(builder, newLoop.getBefore(), newBeforeRegionTracker);
-        addRootVValuesToRetOp(newLoop.getBefore().front().getTerminator(),
-                              rValuesUsedByRegion.getArrayRef(), newBeforeRegionTracker);
-
-        QubitValueTracker newAfterRegionTracker;
-        for (auto rValue : rValuesUsedByRegion) {
-            Value newArg;
-            if (isa<qref::QubitType>(rValue.getType())) {
-                newArg = newLoop.getAfter().front().addArgument(quantum::QubitType::get(ctx), loc);
-                newAfterRegionTracker.setCurrentVQubit(rValue, newArg);
-            }
-            else if (isa<qref::QuregType>(rValue.getType())) {
-                newArg = newLoop.getAfter().front().addArgument(quantum::QuregType::get(ctx), loc);
-                newAfterRegionTracker.setCurrentVQreg(rValue, newArg);
-            }
-        }
-        handleRegion(builder, newLoop.getAfter(), newAfterRegionTracker);
-        addRootVValuesToRetOp(newLoop.getAfter().front().getTerminator(),
-                              rValuesUsedByRegion.getArrayRef(), newAfterRegionTracker);
+        addVArgsToRegionAndHandle(builder, rValuesUsedByRegion, newLoop.getBefore());
+        addVArgsToRegionAndHandle(builder, rValuesUsedByRegion, newLoop.getAfter());
 
         // Update tracker with results
         for (auto [i, j] :
