@@ -131,7 +131,6 @@ class TestSourceCodeInfo:
         assert result.split("\n")[1] == '    raise RuntimeError("Test failure")'
 
     # ROOT-CAUSE: AG-CACHE: check_cache queries wrong transformer under capture
-    @pytest.mark.capture_todo
     def test_qjit(self, capture_mode):
         """Test source info retrieval for a qjit function."""
 
@@ -153,7 +152,6 @@ class TestSourceCodeInfo:
                 assert e.args == ("Test failure",)
 
     # ROOT-CAUSE: AG-CACHE: check_cache queries wrong transformer under capture
-    @pytest.mark.capture_todo
     def test_qnode(self, capture_mode):
         """Test source info retrieval for a qnode function."""
 
@@ -176,7 +174,6 @@ class TestSourceCodeInfo:
                 assert e.args == ("Test failure",)
 
     # ROOT-CAUSE: AG-SRCWARN: CaptureWarning format mismatch (PL emits different format than test expects)
-    @pytest.mark.capture_todo
     def test_func(self, capture_mode):
         """Test source info retrieval for a nested function."""
 
@@ -234,7 +231,6 @@ class TestIntegration:
         assert qjit(autograph=True, capture=capture_mode)(fn)(3) == 9
 
     # ROOT-CAUSE: AG-CACHE: PL TRANSFORMER caches converted function, not Catalyst's
-    @pytest.mark.capture_todo
     def test_lambda(self, capture_mode):
         """Test autograph on a lambda function."""
 
@@ -246,7 +242,6 @@ class TestIntegration:
         assert fn(4) == 16
 
     # ROOT-CAUSE: AG-CACHE: same check_cache miss under capture
-    @pytest.mark.capture_todo
     def test_classical_function(self, capture_mode):
         """Test autograph on a purely classical function."""
 
@@ -259,7 +254,6 @@ class TestIntegration:
         assert fn(4) == 16
 
     # ROOT-CAUSE: AG-CACHE: same check_cache miss for outer and inner
-    @pytest.mark.capture_todo
     def test_nested_function(self, capture_mode):
         """Test autograph on nested classical functions."""
 
@@ -276,7 +270,6 @@ class TestIntegration:
         assert fn(4) == 16
 
     # ROOT-CAUSE: AG-CACHE: same check_cache miss for QNode func
-    @pytest.mark.capture_todo
     def test_qnode(self, capture_mode):
         """Test autograph on a QNode."""
 
@@ -291,7 +284,6 @@ class TestIntegration:
         assert fn(np.pi) == -1
 
     # ROOT-CAUSE: AG-CACHE: same check_cache miss for indirect QNode
-    @pytest.mark.capture_todo
     def test_indirect_qnode(self, capture_mode):
         """Test autograph on a QNode called from within a classical function."""
 
@@ -310,7 +302,6 @@ class TestIntegration:
         assert fn(np.pi) == -1
 
     # ROOT-CAUSE: AG-CACHE: same check_cache miss for multiple QNodes
-    @pytest.mark.capture_todo
     def test_multiple_qnode(self, capture_mode):
         """Test autograph on multiple QNodes called from different classical functions."""
 
@@ -335,7 +326,6 @@ class TestIntegration:
         assert fn(np.pi) == -2
 
     # ROOT-CAUSE: AG-CACHE: nested QJIT check_cache fails under capture
-    @pytest.mark.capture_todo
     def test_nested_qjit(self, capture_mode):
         """Test autograph on a QJIT function called from within the compilation entry point."""
 
@@ -355,7 +345,6 @@ class TestIntegration:
         assert fn(np.pi) == -1
 
     # ROOT-CAUSE: AG-CACHE: qml.adjoint wrapper — check_cache queries wrong transformer
-    @pytest.mark.capture_todo
     @pytest.mark.parametrize("adjoint_fn", [adjoint, qml.adjoint])
     def test_adjoint_wrapper(self, adjoint_fn, capture_mode):
         """Test conversion is happening succesfully on functions wrapped with 'adjoint'."""
@@ -374,7 +363,6 @@ class TestIntegration:
         assert np.allclose(fn(np.pi), [0.0, 1.0])
 
     # ROOT-CAUSE: AG-CACHE: qml.ctrl wrapper — check_cache queries wrong transformer
-    @pytest.mark.capture_todo
     @pytest.mark.parametrize("ctrl_fn", [ctrl, qml.ctrl])
     def test_ctrl_wrapper(self, ctrl_fn, capture_mode):
         """Test conversion is happening succesfully on functions wrapped with 'ctrl'."""
@@ -393,7 +381,6 @@ class TestIntegration:
         assert np.allclose(fn(np.pi), [1.0, 0.0, 0.0, 0.0])
 
     # ROOT-CAUSE: AG-CACHE: catalyst.grad wrapper — inner cached in PL transformer
-    @pytest.mark.capture_todo
     def test_grad_wrapper(self, capture_mode):
         """Test conversion is happening succesfully on functions wrapped with 'grad'."""
 
@@ -409,7 +396,6 @@ class TestIntegration:
         assert fn(3) == 2.0
 
     # ROOT-CAUSE: AG-CACHE: catalyst.jacobian wrapper — same cache miss
-    @pytest.mark.capture_todo
     def test_jacobian_wrapper(self, capture_mode):
         """Test conversion is happening succesfully on functions wrapped with 'jacobian'."""
 
@@ -447,7 +433,6 @@ class TestIntegration:
         assert np.allclose(fn(3)[1], jnp.array(8.0))
 
     # ROOT-CAUSE: AG-CACHE: catalyst.jvp wrapper — check_cache queries wrong transformer
-    @pytest.mark.capture_todo
     @pytest.mark.parametrize("jvp_func", [jvp, qml.jvp])
     def test_jvp_wrapper(self, jvp_func, capture_mode):
         """Test conversion is happening succesfully on functions wrapped with 'jvp'."""
@@ -543,7 +528,6 @@ class TestIntegration:
             f(0.5)
 
     # ROOT-CAUSE: MCM-CONTEXT: catalyst.measure cannot be used from within capture-mode @qjit
-    @pytest.mark.capture_todo
     def test_mcm_one_shot(self, capture_mode):
         """Test if mcm one-shot miss transforms."""
         dev = qml.device("lightning.qubit", wires=5)
@@ -574,7 +558,6 @@ class TestCodePrinting:
             autograph_source(fn)
 
     # ROOT-CAUSE: AG-SOURCE: autograph_source misses PL transformer cache
-    @pytest.mark.capture_todo
     def test_lambda(self, capture_mode):
         """Test printing on a lambda function."""
 
@@ -584,7 +567,6 @@ class TestCodePrinting:
         assert autograph_source(fn)
 
     # ROOT-CAUSE: AG-SOURCE: autograph_source misses PL transformer cache
-    @pytest.mark.capture_todo
     def test_classical_function(self, capture_mode):
         """Test printing on a purely classical function."""
 
@@ -595,7 +577,6 @@ class TestCodePrinting:
         assert autograph_source(fn)
 
     # ROOT-CAUSE: AG-SOURCE: autograph_source misses PL transformer cache
-    @pytest.mark.capture_todo
     def test_nested_function(self, capture_mode):
         """Test printing on nested classical functions."""
 
@@ -610,7 +591,6 @@ class TestCodePrinting:
         assert autograph_source(inner)
 
     # ROOT-CAUSE: AG-SOURCE: autograph_source misses PL transformer cache
-    @pytest.mark.capture_todo
     def test_qnode(self, capture_mode):
         """Test printing on a QNode."""
 
@@ -623,7 +603,6 @@ class TestCodePrinting:
         assert autograph_source(fn)
 
     # ROOT-CAUSE: AG-SOURCE: autograph_source misses PL transformer cache
-    @pytest.mark.capture_todo
     def test_indirect_qnode(self, capture_mode):
         """Test printing on a QNode called from within a classical function."""
 
@@ -640,7 +619,6 @@ class TestCodePrinting:
         assert autograph_source(inner)
 
     # ROOT-CAUSE: AG-SOURCE: autograph_source misses PL transformer cache
-    @pytest.mark.capture_todo
     def test_multiple_qnode(self, capture_mode):
         """Test printing on multiple QNodes called from different classical functions."""
 
@@ -663,7 +641,6 @@ class TestCodePrinting:
         assert autograph_source(inner2)
 
     # ROOT-CAUSE: AG-SOURCE: autograph_source misses PL transformer cache (nested QJIT)
-    @pytest.mark.capture_todo
     def test_nested_qjit(self, capture_mode):
         """Test printing on a QJIT function called from within the compilation entry point."""
 
@@ -745,7 +722,6 @@ class TestConditionals:
         assert circuit(-3) == -3
 
     # ROOT-CAUSE: MCM-CONTEXT: catalyst.measure cannot be used from within capture-mode @qjit
-    @pytest.mark.capture_todo
     def test_qubit_manipulation_cond(self, capture_mode, backend):
         """Test conditional with quantum operation."""
 
@@ -785,7 +761,6 @@ class TestConditionals:
             )
 
     # ROOT-CAUSE: QNODE-RETURN: QNode returns non-measurement type under capture (int64[])
-    @pytest.mark.capture_todo
     def test_branch_no_multi_return_mismatch(self, capture_mode, backend):
         """Test that case when the return types of all branches do not match."""
         # pylint: disable=using-constant-test
@@ -819,7 +794,6 @@ class TestConditionals:
         assert f(0) == 60
 
     # ROOT-CAUSE: QNODE-RETURN: multiple return early path returns non-measurement type
-    @pytest.mark.capture_todo
     def test_multiple_return_early(self, capture_mode, backend, capfd):
         """Test that returning early is possible."""
 
@@ -848,7 +822,6 @@ class TestConditionals:
         assert capfd.readouterr() == ("illegal fruit\n", "")
 
     # ROOT-CAUSE: ERROR-DRIFT: PL capture does not raise TypeError for mismatched return types
-    @pytest.mark.capture_todo
     def test_multiple_return_mismatched_type(self, capture_mode):
         """Test that different obervables cannot be used in different branches."""
 
@@ -936,7 +909,6 @@ class TestForLoops:
         assert np.allclose(result, jnp.sqrt(2) / 2)
 
     # ROOT-CAUSE: FOR-LOOP-ITER: PL AG cannot convert string list to array target
-    @pytest.mark.capture_todo
     def test_for_in_object_list(self, capture_mode):
         """Test for loop over a Python list that is *not* convertible to an array.
         The behaviour should fall back to standard Python."""
@@ -999,7 +971,6 @@ class TestForLoops:
     # objects accessed via loop iteration indices into arrays (see test case above).
     # The warning here is actionable.
     # ROOT-CAUSE: WARN-CONTRACT: CaptureWarning format doesn't match expected UserWarning regex
-    @pytest.mark.capture_todo
     def test_for_in_static_range_indexing_numeric_list(self, capture_mode):
         """Test for loop over a Python range with static bounds that is used to index an
         array-compatible Python list. This should fall back to Python with a warning."""
@@ -1020,7 +991,6 @@ class TestForLoops:
     # loop correctly. Fallback to a Python loop is always necessary, and will result in a warning.
     # The warning here is not actionable.
     # ROOT-CAUSE: WARN-CONTRACT: CaptureWarning format doesn't match expected UserWarning regex
-    @pytest.mark.capture_todo
     def test_for_in_static_range_indexing_object_list(self, capture_mode):
         """Test for loop over a Python range with static bounds that is used to index an
         array-incompatible Python list. This should fall back to Python with a warning."""
@@ -1070,7 +1040,6 @@ class TestForLoops:
     # Raising the warning is vital here to notify the user that this use case is actually supported,
     # but requires a modification. Without it, the user may simply conclude it is unsupported.
     # ROOT-CAUSE: WARN-CONTRACT: CaptureWarning format mismatch AND error type differs (CaptureError vs TracerIntegerConversion)
-    @pytest.mark.capture_todo
     def test_for_in_dynamic_range_indexing_numeric_list(self, capture_mode):
         """Test for loop over a Python range with dynamic bounds that is used to index an
         array-compatible Python list. The fallback to Python will first raise a warning,
@@ -1091,7 +1060,6 @@ class TestForLoops:
 
     # This use case is never possible, regardless of whether AutoGraph is used or not.
     # ROOT-CAUSE: WARN-CONTRACT: same format mismatch and error type difference
-    @pytest.mark.capture_todo
     def test_for_in_dynamic_range_indexing_object_list(self, capture_mode):
         """Test for loop over a Python range with dynamic bounds that is used to index an
         array-incompatible Python list. The fallback to Python will first raise a warning,
@@ -1182,7 +1150,6 @@ class TestForLoops:
         assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
 
     # ROOT-CAUSE: FOR-LOOP-ITER: PL AG cannot convert enumerate of object list
-    @pytest.mark.capture_todo
     def test_for_in_enumerate_object_list(self, capture_mode):
         """Test for loop over a Python enumeration on a list that is *not* convertible to an array.
         The behaviour should fall back to standard Python."""
@@ -1199,7 +1166,6 @@ class TestForLoops:
         assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
 
     # ROOT-CAUSE: FOR-LOOP-ITER: PL AG cannot handle itertools.product target
-    @pytest.mark.capture_todo
     def test_for_in_other_iterable_object(self, capture_mode):
         """Test for loop over arbitrary iterable Python objects.
         The behaviour should fall back to standard Python."""
@@ -1290,7 +1256,6 @@ class TestForLoops:
 
     @pytest.mark.xfail(reason="currently unsupported, but we may find a way to do so in the future")
     # ROOT-CAUSE: UNINIT-VAR: uninitialized variable detection differs between frontends
-    @pytest.mark.capture_todo
     def test_iteration_element_access_no_init(self, capture_mode, monkeypatch):
         """Test that access to the iteration index/elements is possible after the loop executed
         even without prior initialization."""
@@ -1354,7 +1319,6 @@ class TestForLoops:
         assert f2() == 18
 
     # ROOT-CAUSE: UNINIT-VAR: PL raises pennylane.AutoGraphError instead of catalyst.AutoGraphError
-    @pytest.mark.capture_todo
     def test_uninitialized_variables(self, capture_mode, monkeypatch):
         """Verify errors for (potentially) uninitialized loop variables."""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
@@ -1424,7 +1388,6 @@ class TestForLoops:
 
     @pytest.mark.filterwarnings("error::UserWarning")
     # ROOT-CAUSE: WARN-CONTRACT: CaptureWarning not suppressed by Catalyst ignore_fallbacks flag
-    @pytest.mark.capture_todo
     def test_ignore_warnings(self, capture_mode, monkeypatch):
         """Test the AutoGraph config flag properly silences warnings."""
         monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
@@ -1441,7 +1404,6 @@ class TestForLoops:
         assert f() == 9
 
     # ROOT-CAUSE: FOR-LOOP-ITER: itertools.product fallback path not supported under capture
-    @pytest.mark.capture_todo
     def test_fallback_itertools(self, capture_mode):
         """Test the AutoGraph fallback when the iteration target has no length, as is for example
         the case with an itertools.product with constant arguments."""
@@ -1614,7 +1576,6 @@ class TestWhileLoops:
             qjit(autograph=True, capture=capture_mode)(f)
 
     # ROOT-CAUSE: FOR-LOOP-TYPE: for_p type assertion mismatch under capture
-    @pytest.mark.capture_todo
     def test_init_with_mismatched_type(self, capture_mode, monkeypatch):
         """Test loop carried values initialized with a mismatched type compared to the values used
         inside the loop."""
@@ -1642,7 +1603,6 @@ class TestFallback:
     """Test that Python fallbacks still produce correct results."""
 
     # ROOT-CAUSE: WARN-CONTRACT: PL for_stmt post-binding fallback does not emit UserWarning
-    @pytest.mark.capture_todo
     def test_postbinding_errors_for(self, capture_mode, execution_context):
         """Test that errors are handled correctly if they trigger after the JAX primitive binding
         step (e.g. during result verification), and that no errors occur after the AG tracing step
@@ -1670,7 +1630,6 @@ class TestFallback:
         assert np.allclose(f_jit(), expected)
 
     # ROOT-CAUSE: WARN-CONTRACT: PL for_stmt pre-binding error doesn't fall back with UserWarning
-    @pytest.mark.capture_todo
     def test_prebinding_errors_for(self, capture_mode, execution_context):
         """Test that errors are handled correctly if they trigger before the JAX primitive binding
         step (e.g. during argument verification).
@@ -1698,7 +1657,6 @@ class TestFallback:
         assert results[1] == (2) * 1 * 2 * 3  # i = range(1, 4)
 
     # ROOT-CAUSE: WARN-CONTRACT: PL while_stmt post-binding fallback does not emit UserWarning
-    @pytest.mark.capture_todo
     def test_postbinding_errors_while(self, capture_mode, execution_context):
         """Test that errors are handled correctly if they trigger after the JAX primitive binding
         step (e.g. during result verification), and that no errors occur after the AG tracing step
@@ -1723,7 +1681,6 @@ class TestFallback:
         assert np.allclose(result, expected)
 
     # ROOT-CAUSE: WARN-CONTRACT: PL while_stmt pre-binding error doesn't fall back with UserWarning
-    @pytest.mark.capture_todo
     def test_prebinding_errors_while(self, capture_mode, execution_context):
         """Test that errors are handled correctly if they trigger before the JAX primitive binding
         step (e.g. during argument verification).
@@ -1812,7 +1769,6 @@ class TestLogicalOps:
         assert_allclose(qjit(autograph=True, capture=capture_mode)(f_not)(a), jnp.logical_not(a))
 
     # ROOT-CAUSE: ERROR-DRIFT: PL capture does not raise TracerBoolConversionError for mixed logical ops
-    @pytest.mark.capture_todo
     @pytest.mark.parametrize("s,d", [(True, True), (True, False), (False, True), (False, False)])
     def test_logical_mixture_static_dynamic_default(self, capture_mode, s, d):
         """Test the useage of a mixture of static(s) and dynamic(d) variables."""
@@ -1836,7 +1792,6 @@ class TestMixed:
     """Test a mix of supported autograph conversions and Catalyst control flow."""
 
     # ROOT-CAUSE: WARN-CONTRACT: PL while_stmt has no Python fallback; exception propagates uncaught
-    @pytest.mark.capture_todo
     def test_force_python_fallbacks(self, capture_mode):
         """Test fallback modes of control-flow primitives."""
 
@@ -2012,7 +1967,6 @@ class TestAutographInclude:
                 return x
 
     # ROOT-CAUSE: FEATURE-GAP: capture autograph does not yet support autograph_include
-    @pytest.mark.capture_todo
     def test_autograph_included_module(self, capture_mode):
         """Test autograph included module."""
 
@@ -2241,7 +2195,6 @@ class TestDecorators:
         assert qjit(loop, autograph=True, capture=capture_mode)(0) == 30
 
     # ROOT-CAUSE: COMPILE-GAP: BufferizationStage error for while_loop under capture
-    @pytest.mark.capture_todo
     def test_while_loop(self, capture_mode):
         """Test if Autograph works when applied to a decorated function with while_loop"""
 
@@ -2254,7 +2207,6 @@ class TestDecorators:
         assert qjit(loop, autograph=True, capture=capture_mode)(0) == n
 
     # ROOT-CAUSE: COMPILE-GAP: BufferizationStage error for product loop under capture
-    @pytest.mark.capture_todo
     def test_prod(self, capture_mode):
         """Test that AutoGraph doesn't fail in the presence of the qml.prod operator within
         functional wrappers."""
@@ -2545,7 +2497,6 @@ class TestJaxIndexOperatorUpdate:
         assert jnp.allclose(result, expected)
 
     # ROOT-CAUSE: WARN-SUPPRESS: warning suppression regression — CaptureWarning shows up again
-    @pytest.mark.capture_todo
     def test_iterating_lists_inside_a_loop(self, capture_mode):
         """Test support for iterating lists inside a loop."""
 
@@ -2570,7 +2521,6 @@ class TestJaxIndexOperatorUpdate:
                 assert False, "This warning should not show up again"
 
     # ROOT-CAUSE: WARN-SUPPRESS: warning suppression regression — CaptureWarning shows up again
-    @pytest.mark.capture_todo
     def test_iterating_tuples_inside_a_loop(self, capture_mode):
         """Test support for iterating tuples inside a loop."""
 
@@ -2595,7 +2545,6 @@ class TestJaxIndexOperatorUpdate:
                 assert False, "This warning should not show up again"
 
     # ROOT-CAUSE: WARN-SUPPRESS: warning suppression regression — CaptureWarning shows up again
-    @pytest.mark.capture_todo
     def test_iterating_dictionaries_inside_a_loop(self, capture_mode):
         """Test support for iterating dictionaries inside a loop."""
 
