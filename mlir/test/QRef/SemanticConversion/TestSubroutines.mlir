@@ -18,8 +18,8 @@
 
 
 // CHECK: func.func @test_qubit_args(%arg0: !quantum.bit, %arg1: !quantum.bit, %arg2: i1) ->
-// CHECK-SAME:   (!quantum.obs, !quantum.bit, !quantum.bit) attributes {quantum.node}
-func.func @test_qubit_args(%q0: !qref.bit, %q1: !qref.bit, %arg2: i1) -> !quantum.obs attributes {quantum.node} {
+// CHECK-SAME:   (!quantum.obs, !quantum.bit, !quantum.bit)
+func.func @test_qubit_args(%q0: !qref.bit, %q1: !qref.bit, %arg2: i1) -> !quantum.obs {
 
     // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() %arg0, %arg1 : !quantum.bit, !quantum.bit
     qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
@@ -42,8 +42,8 @@ func.func @test_qubit_args(%q0: !qref.bit, %q1: !qref.bit, %arg2: i1) -> !quantu
 
 
 // CHECK: func.func @test_qreg_args(%arg0: !quantum.reg, %arg1: !quantum.reg, %arg2: f64) ->
-// CHECK-SAME:   (!quantum.reg, !quantum.reg) attributes {quantum.node}
-func.func @test_qreg_args(%r0: !qref.reg<2>, %r1: !qref.reg<?>, %arg2: f64) attributes {quantum.node} {
+// CHECK-SAME:   (!quantum.reg, !quantum.reg)
+func.func @test_qreg_args(%r0: !qref.reg<2>, %r1: !qref.reg<?>, %arg2: f64) {
 
     %q00 = qref.get %r0[0] : !qref.reg<2> -> !qref.bit
     %q01 = qref.get %r0[1] : !qref.reg<2> -> !qref.bit
@@ -73,8 +73,8 @@ func.func @test_qreg_args(%r0: !qref.reg<2>, %r1: !qref.reg<?>, %arg2: f64) attr
 
 
 // CHECK: func.func @test_qreg_and_qubit_args(%arg0: f64, %arg1: !quantum.reg, %arg2: !quantum.bit, %arg3: !quantum.bit) ->
-// CHECK-SAME:   (!quantum.reg, !quantum.bit, !quantum.bit) attributes {quantum.node}
-func.func @test_qreg_and_qubit_args(%arg0: f64, %r0: !qref.reg<2>, %q0: !qref.bit, %q1: !qref.bit) attributes {quantum.node} {
+// CHECK-SAME:   (!quantum.reg, !quantum.bit, !quantum.bit)
+func.func @test_qreg_and_qubit_args(%arg0: f64, %r0: !qref.reg<2>, %q0: !qref.bit, %q1: !qref.bit) {
 
     %q00 = qref.get %r0[0] : !qref.reg<2> -> !qref.bit
 
@@ -92,7 +92,7 @@ func.func @test_qreg_and_qubit_args(%arg0: f64, %r0: !qref.reg<2>, %q0: !qref.bi
 
 
 // CHECK: func.func @test_with_loop(%arg0: !quantum.bit) -> !quantum.bit
-func.func @test_with_loop(%q: !qref.bit) attributes {quantum.node} {
+func.func @test_with_loop(%q: !qref.bit) {
     %start = arith.constant 0 : index
     %step = arith.constant 1 : index
     %stop = arith.constant 37 : index
@@ -115,7 +115,7 @@ func.func @test_with_loop(%q: !qref.bit) attributes {quantum.node} {
 
 
 // CHECK: func.func @test_with_if(%arg0: !quantum.bit, %arg1: i1) -> !quantum.bit
-func.func @test_with_if(%q: !qref.bit, %cond: i1) attributes {quantum.node} {
+func.func @test_with_if(%q: !qref.bit, %cond: i1) {
     scf.if %cond {
         qref.custom "Hadamard"() %q : !qref.bit
     }

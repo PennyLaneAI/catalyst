@@ -14,7 +14,10 @@
 
 #pragma once
 
+#include <cstdint>
 #include <optional>
+
+#include "llvm/ADT/DenseMapInfo.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -36,12 +39,29 @@ namespace ReferenceToValueSemanticsConversion {
 struct QubitValueTracker;
 struct TransientQubitExtractor;
 
+// A struct to store the register and the index of rQubits from a qref.get operation.
+// This struct is intended to be the keys in `llvm::DenseMap`s.
+struct rQubitGetOpInfo {
+    Value reg;
+    int64_t idxAttr;
+    Value idx;
+
+    rQubitGetOpInfo(Value _reg, Value _idx) : reg(_reg), idxAttr(-1), idx(_idx) {}
+
+    rQubitGetOpInfo(Value _reg, int64_t _idxAttr) : reg(_reg), idxAttr(_idxAttr), idx(nullptr) {}
+
+    bool operator==(const rQubitGetOpInfo &other) const
+    {
+        return reg == other.reg && idxAttr == other.idxAttr && idx == other.idx;
+    }
+};
+
 // Misc helper functions
 Value getRSourceRegisterValue(Value rQubit);
 void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValues);
-void squashAliasingGetOps(IRRewriter &builder, func::FuncOp func);
 DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumGate rGateOp);
-Operation *addRootVValuesToRetOp(Region &r, QubitValueTracker &tracker);
+void addRootVValuesToRetOp(Operation *retOp, ArrayRef<Value> rValuesToReturn,
+                           QubitValueTracker &tracker);
 
 // The main converter function
 template <typename OpTy>
@@ -68,8 +88,38 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker);
 void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker);
 void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker);
 void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker);
+void handleSubroutine(IRRewriter &builder, Region &r);
 
 // Main driver
-void walkRegionAndHandle(IRRewriter &builder, Region &r, QubitValueTracker &tracker);
-void handleRegion(IRRewriter &builder, Region &r);
+void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker);
 } // namespace ReferenceToValueSemanticsConversion
+
+namespace llvm {
+
+// Boilerplate to enable using `rQubitGetOpInfo` as DenseMap keys.
+template <> struct DenseMapInfo<ReferenceToValueSemanticsConversion::rQubitGetOpInfo> {
+    using rQubitGetOpInfo = ReferenceToValueSemanticsConversion::rQubitGetOpInfo;
+
+    static inline rQubitGetOpInfo getEmptyKey()
+    {
+        return rQubitGetOpInfo(DenseMapInfo<Value>::getEmptyKey(), -1);
+    }
+
+    static inline rQubitGetOpInfo getTombstoneKey()
+    {
+        return rQubitGetOpInfo(DenseMapInfo<Value>::getTombstoneKey(), -2);
+    }
+
+    static unsigned getHashValue(const rQubitGetOpInfo &val)
+    {
+        return hash_combine(hash_value(val.reg.getAsOpaquePointer()), val.idxAttr,
+                            val.idx ? static_cast<size_t>(hash_value(val.idx.getAsOpaquePointer()))
+                                    : 0);
+    }
+
+    static bool isEqual(const rQubitGetOpInfo &lhs, const rQubitGetOpInfo &rhs)
+    {
+        return lhs == rhs;
+    }
+};
+} // namespace llvm

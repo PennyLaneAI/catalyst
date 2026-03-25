@@ -104,48 +104,52 @@ func.func @main(%arg0: i1, %arg1: i64, %arg2: f64) -> tensor<64xf64> attributes 
     // CHECK: [[q0:%.+]] = quantum.extract [[forOut]]#0[ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[SWAP:%.+]]:2 = quantum.custom "SWAP"() [[q3]], [[q0]] : !quantum.bit, !quantum.bit
     qref.custom "SWAP"() %q3, %q0 : !qref.bit, !qref.bit
-    // CHECK: [[reg6_afterSWAPInsert:%.+]] = quantum.insert [[forOut]]#0[ 3], [[SWAP]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert3_swap:%.+]] = quantum.insert [[forOut]]#0[ 3], [[SWAP]]#0 : !quantum.reg, !quantum.bit
 
     %q0_again = qref.get %reg[ 0] : !qref.reg<6> -> !qref.bit
 
     // CHECK: [[mres_init:%.+]], [[MEASURE_init:%.+]] = quantum.measure [[SWAP]]#1 : i1, !quantum.bit
     %mres_init = qref.measure %q0_again : i1
+    // CHECK: [[insert0_swap:%.+]] = quantum.insert [[insert3_swap]][ 0], [[MEASURE_init]] : !quantum.reg, !quantum.bit
 
-    // CHECK: [[whileOut:%.+]]:2 = scf.while (%arg3 = [[mres_init]], %arg4 = [[MEASURE_init]], %arg5 = [[reg6_afterSWAPInsert]])
-    // CHECK-SAME: (i1, !quantum.bit, !quantum.reg) -> (!quantum.bit, !quantum.reg) {
+    // CHECK: [[whileOut:%.+]] = scf.while (%arg3 = [[mres_init]], %arg4 = [[insert0_swap]])
+    // CHECK-SAME: (i1, !quantum.reg) -> !quantum.reg {
     scf.while (%mres = %mres_init) : (i1) -> () {
 
-        // CHECK: scf.condition(%arg3) %arg4, %arg5 : !quantum.bit, !quantum.reg
+        // CHECK: scf.condition(%arg3) %arg4 : !quantum.reg
         scf.condition(%mres)
 
     // CHECK: do
-    // CHECK: ^bb0([[MEASURE_init:%.+]]: !quantum.bit, [[reg6_whileArg:%.+]]: !quantum.reg):
+    // CHECK: ^bb0([[reg6_whileArg:%.+]]: !quantum.reg):
     } do {
         ^bb0():
         %q0_again_again = qref.get %reg[0] : !qref.reg<6> -> !qref.bit
-        // CHECK: [[mres_0:%.+]], [[MEASURE_0:%.+]] = quantum.measure [[MEASURE_init]] : i1, !quantum.bit
+
+        // CHECK: [[extract:%.+]] = quantum.extract [[reg6_whileArg]][ 0] : !quantum.reg -> !quantum.bit
+        // CHECK: [[mres_0:%.+]], [[MEASURE_0:%.+]] = quantum.measure [[extract]] : i1, !quantum.bit
         %mres_0 = qref.measure %q0_again_again : i1
+        // CHECK: [[insert:%.+]] = quantum.insert [[reg6_whileArg]][ 0], [[MEASURE_0]] : !quantum.reg, !quantum.bit
 
         %q_arg1_again = qref.get %reg[%arg1] : !qref.reg<6>, i64 -> !qref.bit
-        // CHECK: [[extract_arg1:%.+]] = quantum.extract [[reg6_whileArg]][%arg1] : !quantum.reg -> !quantum.bit
-        // CHECK: [[mres_1:%.+]], [[MEASURE_1:%.+]] = quantum.measure [[extract_arg1]] : i1, !quantum.bit
+
+        // CHECK: [[extract:%.+]] = quantum.extract [[insert]][%arg1] : !quantum.reg -> !quantum.bit
+        // CHECK: [[mres_1:%.+]], [[MEASURE_1:%.+]] = quantum.measure [[extract]] : i1, !quantum.bit
         %mres_1 = qref.measure %q_arg1_again : i1
-        // CHECK: [[insert_arg1:%.+]] = quantum.insert [[reg6_whileArg]][%arg1], [[MEASURE_1]] : !quantum.reg, !quantum.bit
+        // CHECK: [[insert_arg1:%.+]] = quantum.insert [[insert]][%arg1], [[MEASURE_1]] : !quantum.reg, !quantum.bit
 
         // CHECK: [[and:%.+]] = arith.andi [[mres_0]], [[mres_1]] : i1
         %and = arith.andi %mres_0, %mres_1 : i1
 
-        // CHECK: scf.yield [[and]], [[MEASURE_0]], [[insert_arg1]] : i1, !quantum.bit, !quantum.reg
+        // CHECK: scf.yield [[and]], [[insert_arg1]] : i1, !quantum.reg
         scf.yield %and : i1
     }
-    // CHECK: [[insert_0:%.+]] = quantum.insert [[whileOut]]#1[ 0], [[whileOut]]#0 : !quantum.reg, !quantum.bit
 
-    // CHECK: [[obs:%.+]] = quantum.compbasis qreg [[insert_0]] : !quantum.obs
+    // CHECK: [[obs:%.+]] = quantum.compbasis qreg [[whileOut]] : !quantum.obs
     // CHECK: [[probs:%.+]] = quantum.probs [[obs]] : tensor<64xf64>
     %obs = qref.compbasis (qreg %reg : !qref.reg<6>) : !quantum.obs
     %probs = quantum.probs %obs : tensor<64xf64>
 
-    // CHECK: quantum.dealloc [[insert_0]] : !quantum.reg
+    // CHECK: quantum.dealloc [[whileOut]] : !quantum.reg
     qref.dealloc %reg : !qref.reg<6>
 
     // CHECK: return [[probs]] : tensor<64xf64>

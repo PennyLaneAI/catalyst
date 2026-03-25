@@ -16,11 +16,17 @@
 
 #include <cstdint>
 #include <optional>
+#include <utility>
 #include <vector>
+
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/IR/Dominance.h"
+#include "mlir/IR/Block.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/TypeRange.h"
@@ -57,13 +63,9 @@ namespace ReferenceToValueSemanticsConversion {
  * - An argument, e.g. arguments to a subroutine or control flow region
  *
  * These Values are considered "root" because they are guaranteed to be uniquely defined: different
- * allocations and arguments are semantically distinct.
- *
- * By contrast, rQubit Values returned from qref.get operations are not considered root values,
- * because multiple qref.get operations can alias each other, making two rQubit values effectively
- * the same. This creates a problem of aliasing: if we were to track the current vQubit Values of
- * all rQubit Values in the program, a new vQubit Value would need to be updated across all aliasing
- * rQubit Values. This is not so simple to do.
+ * allocations and arguments are semantically distinct. By contrast, rQubit Values returned from
+ * qref.get operations are not considered root values, because multiple qref.get operations can
+ * alias each other.
  *
  * Importantly, vQubit Values extracted from a vQreg are not tracked. Instead, each usage of the
  * corresponding rQubit Value (from a qref.get operation) will extract the vQubit Values before the
@@ -77,6 +79,11 @@ namespace ReferenceToValueSemanticsConversion {
  *
  * The actual source of truth for the distinction is, if an rValue is recorded in the Tracker's
  * maps, then it is considered root.
+ *
+ * For root rQubits coming from qref.get operations, the map key is their `rQubitGetOpInfo` objects,
+ * as opposed to their SSA Value themselves. This ensures the multiple aliasing qref.get operations
+ * get mapped to the same current vQubit SSA Value.
+ *
  * It is up to the callers of this Tracker class to decide which rValues are root in their specific
  * circumstances.
  */
@@ -128,7 +135,16 @@ struct QubitValueTracker {
         assert(isa<qref::QubitType>(rQubit.getType()) && "Expected qref.bit type");
         assert(this->isRootRQubit(rQubit) && "The provided qref.bit value is not root");
 
-        Value vQubit = this->qubit_map.at(rQubit);
+        std::optional<rQubitGetOpInfo> getOpInfo = this->getGetOpInfo(rQubit);
+
+        Value vQubit;
+        if (!getOpInfo.has_value()) {
+            vQubit = this->qubit_map.at(rQubit);
+        }
+        else {
+            vQubit = this->getOp_qubit_map.at(getOpInfo.value());
+        }
+
         assert(isa<quantum::QubitType>(vQubit.getType()) && "Expected quantum.bit type");
         return vQubit;
     }
@@ -144,18 +160,38 @@ struct QubitValueTracker {
         assert(isa<qref::QubitType>(rQubit.getType()) && "Expected qref.bit type");
         assert(isa<quantum::QubitType>(vQubit.getType()) && "Expected quantum.bit type");
 
-        if (this->qubit_map.contains(rQubit)) {
-            this->qubit_map[rQubit] = vQubit;
+        std::optional<rQubitGetOpInfo> getOpInfo = this->getGetOpInfo(rQubit);
+
+        if (!getOpInfo.has_value()) {
+            if (this->qubit_map.contains(rQubit)) {
+                this->qubit_map[rQubit] = vQubit;
+            }
+            else {
+                this->qubit_map.insert({rQubit, vQubit});
+            }
         }
         else {
-            this->qubit_map.insert({rQubit, vQubit});
+            if (this->getOp_qubit_map.contains(getOpInfo.value())) {
+                this->getOp_qubit_map[getOpInfo.value()] = vQubit;
+            }
+            else {
+                this->getOp_qubit_map.insert({getOpInfo.value(), vQubit});
+            }
         }
     }
 
     bool isRootRQubit(Value rQubit)
     {
         assert(isa<qref::QubitType>(rQubit.getType()) && "Expected qref.bit type");
-        return this->qubit_map.contains(rQubit);
+
+        std::optional<rQubitGetOpInfo> getOpInfo = this->getGetOpInfo(rQubit);
+
+        if (!getOpInfo) {
+            return this->qubit_map.contains(rQubit);
+        }
+        else {
+            return this->getOp_qubit_map.contains(getOpInfo.value());
+        }
     }
 
   private:
@@ -164,6 +200,28 @@ struct QubitValueTracker {
 
     // The map is from root qref.bit values of a region to the current quantum.bit values.
     llvm::DenseMap<Value, Value> qubit_map;
+
+    // This map records the root qubits coming from qref.get ops.
+    // The key is a pair of the register and the index on the get op, so that we can handle aliasing
+    llvm::DenseMap<rQubitGetOpInfo, Value> getOp_qubit_map;
+
+    std::optional<rQubitGetOpInfo> getGetOpInfo(Value rQubit)
+    {
+        bool isGetOp = rQubit.getDefiningOp() && isa<qref::GetOp>(rQubit.getDefiningOp());
+        if (!isGetOp) {
+            return std::nullopt;
+        }
+
+        auto getOp = cast<qref::GetOp>(rQubit.getDefiningOp());
+        Value reg = getOp.getQreg();
+        if (getOp.getIdxAttr().has_value()) {
+            return rQubitGetOpInfo(reg, getOp.getIdxAttr().value());
+        }
+        else {
+            return rQubitGetOpInfo(reg, getOp.getIdx());
+        }
+    }
+
 }; // struct QubitValueTracker
 
 /**
@@ -461,12 +519,20 @@ Value getRSourceRegisterValue(Value rQubit)
  * When converting to value semantics, the vQregs and vQubits need to be taken in by the region-ed
  * operations explicitly.
  *
+ * The collected rValues satisfy the following properties:
+ * - If any rQubit Values are `qref.get`-ed from a dynamic index, the rQreg Value is collected
+ * instead of the rQubit Value.
+ * - If any rQreg Values are collected, none of the collected rQubit Values will be belonging to
+ * the rQreg Values.
+ * - All collected rQubit Values are guaranteed to not alias each other.
+ *
  * @param r
  * @param necessaryRegionRValues
  */
 void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValues)
 {
     auto *qrefDialect = r.getContext()->getLoadedDialect<qref::QRefDialect>();
+    llvm::SmallDenseSet<Value, 8> rQregsTakenIn;
 
     r.walk([&](Operation *op) {
         if (op->getDialect() != qrefDialect && !isa<func::CallOp>(op)) {
@@ -483,6 +549,7 @@ void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValu
                 // Ignore allocations from inside the region itself
                 if (v.getParentRegion()->isProperAncestor(&r)) {
                     necessaryRegionRValues.insert(v);
+                    rQregsTakenIn.insert(v);
                 }
             }
             else if (isa<qref::QubitType>(v.getType())) {
@@ -499,6 +566,7 @@ void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValu
                         if (getOp.getIdx()) {
                             // dynamic extract index, must take in the reg
                             necessaryRegionRValues.insert(rQreg);
+                            rQregsTakenIn.insert(rQreg);
                         }
                         else {
                             necessaryRegionRValues.insert(v);
@@ -508,69 +576,51 @@ void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValu
             }
         }
     });
-}
 
-/**
- * @brief Replace all uses of equivalent qref.get operations with a newly created equivalent one
- * immediately after the allocation of the register. If the index is dynamic, the insertion point
- * of the new qref.get op is immediately after the later of the alloc op and the dynamic index op's
- * defining op.
- *
- * @param builder
- * @param func
- */
-void squashAliasingGetOps(IRRewriter &builder, func::FuncOp func)
-{
-    // 1. Place the aliasing qref.get ops into groups
-    SmallVector<SmallVector<qref::GetOp>> equivalenceGroups;
-
-    func->walk<WalkOrder::PreOrder>([&](qref::GetOp getOp) {
-        bool placedInGroup = false;
-        for (auto &group : equivalenceGroups) {
-            // Compare against the 'leader' of the group
-            if (OperationEquivalence::isEquivalentTo(getOp, group[0],
-                                                     OperationEquivalence::IgnoreLocations)) {
-                group.push_back(getOp);
-                placedInGroup = true;
-                break;
-            }
-        }
-
-        if (!placedInGroup) {
-            equivalenceGroups.push_back({getOp});
-        }
-    });
-
-    // 2. For each group, create one new Op and replace all
-    mlir::DominanceInfo domInfo;
-    for (auto &group : equivalenceGroups) {
-        qref::GetOp groupRepresentative = group[0];
-        Operation *insertionPoint;
-
-        Value dynamicGetIdx = groupRepresentative.getIdx();
-        if (dynamicGetIdx) {
+    // If any rQregs are taken in, any rQubits belonging to them must not be taken in separately
+    SmallVector<Value> unnecessaryRQubits;
+    for (const Value &v : necessaryRegionRValues) {
+        if (isa<BlockArgument>(v)) {
             continue;
         }
 
-        Value qreg = groupRepresentative.getQreg();
-
-        if (qreg.getDefiningOp()) {
-            insertionPoint = qreg.getDefiningOp();
+        if (auto getOp = dyn_cast<qref::GetOp>(v.getDefiningOp())) {
+            if (rQregsTakenIn.contains(getOp.getQreg())) {
+                unnecessaryRQubits.push_back(v);
+            }
         }
-        else {
-            insertionPoint = &qreg.getParentBlock()->front();
-        }
-        builder.setInsertionPointAfter(insertionPoint);
+    }
 
-        auto newGetOp = qref::GetOp::create(
-            builder, groupRepresentative.getLoc(),
-            qref::QubitType::get(groupRepresentative->getContext()), groupRepresentative.getQreg(),
-            groupRepresentative.getIdx(), groupRepresentative.getIdxAttrAttr());
+    for (const Value &v : unnecessaryRQubits) {
+        necessaryRegionRValues.remove(v);
+    }
 
-        for (qref::GetOp oldGetOp : group) {
-            builder.replaceAllOpUsesWith(oldGetOp, newGetOp);
-            builder.eraseOp(oldGetOp);
+    // Remove aliasing get ops
+    SetVector<Value> aliasingGetOpRemovalWorklist;
+    SmallVector<Value> rQubitsFromGetOps;
+    for (const Value &v : necessaryRegionRValues) {
+        if (isa<BlockArgument>(v) || !isa<qref::GetOp>(v.getDefiningOp())) {
+            continue;
         }
+        rQubitsFromGetOps.push_back(v);
+    }
+
+    for (size_t i = 0; i < rQubitsFromGetOps.size(); i++) {
+        if (aliasingGetOpRemovalWorklist.contains(rQubitsFromGetOps[i])) {
+            continue;
+        }
+
+        for (size_t j = i + 1; j < rQubitsFromGetOps.size(); j++) {
+            if (OperationEquivalence::isEquivalentTo(rQubitsFromGetOps[i].getDefiningOp(),
+                                                     rQubitsFromGetOps[j].getDefiningOp(),
+                                                     OperationEquivalence::IgnoreLocations)) {
+                aliasingGetOpRemovalWorklist.insert(rQubitsFromGetOps[j]);
+            }
+        }
+    }
+
+    for (const Value &v : aliasingGetOpRemovalWorklist) {
+        necessaryRegionRValues.remove(v);
     }
 }
 
@@ -595,52 +645,27 @@ DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumGate r
 
 /**
  * @brief Append the current root vQreg and vQubit values to the terminator operation of a region,
- * assuming the root rQreg and rQubit values are the arguments to the (unique) block in the region.
- * Returns the new terminator operation, with the newly added returns.
+ * with the root rQreg and rQubit values being the ones passed in in `rValuesToReturn`.
  *
  * This is necessary since qref operations do not return quantum values.
  *
  * @param r
+ * @param rValuesToReturn
  * @param tracker
- * @return Operation*
  */
-Operation *addRootVValuesToRetOp(Region &r, QubitValueTracker &tracker)
+void addRootVValuesToRetOp(Operation *retOp, ArrayRef<Value> rValuesToReturn,
+                           QubitValueTracker &tracker)
 {
-    Block &block = r.front();
-    Operation *retOp;
-    if (auto funcOp = dyn_cast<func::FuncOp>(r.getParentOp())) {
-        retOp = funcOp.getBody().back().getTerminator();
-    }
-    else if (auto forOp = dyn_cast<scf::ForOp>(r.getParentOp())) {
-        retOp = forOp.getRegion().front().getTerminator();
-    }
-    else if (auto whileOp = dyn_cast<scf::WhileOp>(r.getParentOp())) {
-        if (r.getRegionNumber() == 0) {
-            retOp = whileOp.getConditionOp();
-        }
-        else {
-            retOp = whileOp.getYieldOp();
-        }
-    }
-    else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(r.getParentOp())) {
-        retOp = adjointOp.getRegion().front().getTerminator();
-    }
-    else {
-        assert(false && "Unexpected region!");
-    }
-
     SmallVector<Value> retVals(retOp->getOperands());
-    for (auto arg : block.getArguments()) {
-        if (isa<qref::QubitType>(arg.getType())) {
-            retVals.push_back(tracker.getCurrentVQubit(arg));
+    for (auto rValue : rValuesToReturn) {
+        if (isa<qref::QubitType>(rValue.getType())) {
+            retVals.push_back(tracker.getCurrentVQubit(rValue));
         }
-        else if (isa<qref::QuregType>(arg.getType())) {
-            retVals.push_back(tracker.getCurrentVQreg(arg));
+        else if (isa<qref::QuregType>(rValue.getType())) {
+            retVals.push_back(tracker.getCurrentVQreg(rValue));
         }
     }
     retOp->setOperands(retVals);
-
-    return retOp;
 }
 
 /**
@@ -909,6 +934,7 @@ void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTr
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(rAdjointOp);
     Location loc = rAdjointOp->getLoc();
+    MLIRContext *ctx = rAdjointOp.getContext();
 
     SetVector<Value> rValuesUsedByRegion;
     getNecessaryRegionRValues(rAdjointOp.getRegion(), rValuesUsedByRegion);
@@ -948,26 +974,30 @@ void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTr
             quantum::AdjointOp::create(builder, loc, TypeRange(vAdjointOperands), vAdjointOperands);
 
         // 2. Move operations from old body to new body
-        // The vAdjointOp has !quantum.bit/reg as input types now on the region's block
-        // We need to overwrite it with the block from the old rAdjointOp, so it can
-        // see !qref.bit/reg types on the block
         builder.inlineRegionBefore(rAdjointOp.getRegion(), vAdjointOp.getRegion(),
                                    vAdjointOp.getRegion().end());
         builder.setInsertionPointToEnd(&vAdjointOp.getRegion().front());
         quantum::YieldOp::create(builder, loc, {});
 
-        // 3. Massage the "subroutine region block" of the new vAdjointOp to take in all closure
-        // Values as args, so we can handle the region as a standalone subroutine The block moved
-        // over from the old rAdjointOp will not have any quantum arguments yet, neither !qref nor
-        // !quantum.
+        // 3. Create new args with quantum.bit/reg types and set them as root for the new region
+        QubitValueTracker vAdjointTracker;
         for (auto rValue : rValuesUsedByRegion) {
-            Value newArg = vAdjointOp.getRegion().front().addArgument(rValue.getType(), loc);
-            builder.replaceUsesWithIf(rValue, newArg, [&](OpOperand &use) {
-                return vAdjointOp.getRegion().isAncestor(use.getOwner()->getParentRegion());
-            });
+            Value newArg;
+            if (isa<qref::QubitType>(rValue.getType())) {
+                newArg =
+                    vAdjointOp.getRegion().front().addArgument(quantum::QubitType::get(ctx), loc);
+                vAdjointTracker.setCurrentVQubit(rValue, newArg);
+            }
+            else if (isa<qref::QuregType>(rValue.getType())) {
+                newArg =
+                    vAdjointOp.getRegion().front().addArgument(quantum::QuregType::get(ctx), loc);
+                vAdjointTracker.setCurrentVQreg(rValue, newArg);
+            }
         }
 
-        handleRegion(builder, vAdjointOp.getRegion());
+        handleRegion(builder, vAdjointOp.getRegion(), vAdjointTracker);
+        addRootVValuesToRetOp(vAdjointOp.getRegion().front().getTerminator(),
+                              rValuesUsedByRegion.getArrayRef(), vAdjointTracker);
 
         // Update tracker with results
         for (auto [i, j] :
@@ -1030,8 +1060,6 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
                                     /*withElseRegion=*/true);
 
         // 2. Handle the "then" region
-        // We are effectively treating the region as a subroutine, so all input rValues are root
-        // The subroutine needs its own tracker with its own root values
         builder.eraseBlock(newIfOp.thenBlock());
         builder.inlineRegionBefore(ifOp.getThenRegion(), newIfOp.getThenRegion(),
                                    newIfOp.getThenRegion().end());
@@ -1045,20 +1073,9 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
             thenRegionTracker.setCurrentVQubit(rValuesUsedByRegion[idx], vQubit);
         }
 
-        walkRegionAndHandle(builder, newIfOp.getThenRegion(), thenRegionTracker);
-
-        // Yield the new quantum results
-        scf::YieldOp thenYieldOp = newIfOp.thenYield();
-        SmallVector<Value> thenYieldVals(thenYieldOp->getOperands());
-        for (Value v : rValuesUsedByRegion) {
-            if (isa<qref::QubitType>(v.getType())) {
-                thenYieldVals.push_back(thenRegionTracker.getCurrentVQubit(v));
-            }
-            else if (isa<qref::QuregType>(v.getType())) {
-                thenYieldVals.push_back(thenRegionTracker.getCurrentVQreg(v));
-            }
-        }
-        thenYieldOp->setOperands(thenYieldVals);
+        handleRegion(builder, newIfOp.getThenRegion(), thenRegionTracker);
+        addRootVValuesToRetOp(newIfOp.thenYield(), rValuesUsedByRegion.getArrayRef(),
+                              thenRegionTracker);
 
         // 3. Handle "else" region
         // If none existed before, we need to create an empty "else" region, just for the yield
@@ -1074,19 +1091,9 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
                 elseRegionTracker.setCurrentVQubit(rValuesUsedByRegion[idx], vQubit);
             }
 
-            walkRegionAndHandle(builder, newIfOp.getElseRegion(), elseRegionTracker);
-
-            scf::YieldOp elseYieldOp = newIfOp.elseYield();
-            SmallVector<Value> elseYieldVals(elseYieldOp->getOperands());
-            for (Value v : rValuesUsedByRegion) {
-                if (isa<qref::QubitType>(v.getType())) {
-                    elseYieldVals.push_back(elseRegionTracker.getCurrentVQubit(v));
-                }
-                else if (isa<qref::QuregType>(v.getType())) {
-                    elseYieldVals.push_back(elseRegionTracker.getCurrentVQreg(v));
-                }
-            }
-            elseYieldOp->setOperands(elseYieldVals);
+            handleRegion(builder, newIfOp.getElseRegion(), elseRegionTracker);
+            addRootVValuesToRetOp(newIfOp.elseYield(), rValuesUsedByRegion.getArrayRef(),
+                                  elseRegionTracker);
         }
         else {
             // no explicit "else" region on the original if op, just yield whatever the closure
@@ -1130,11 +1137,6 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
         builder.replaceAllUsesWith(v, newIfOp->getResult(i));
     }
 
-    newIfOp.walk([&](qref::GetOp getOp) {
-        assert(getOp.use_empty() &&
-               "qref.bit Values must have no uses after the semantic conversion");
-        builder.eraseOp(getOp);
-    });
     builder.eraseOp(ifOp);
 }
 
@@ -1180,8 +1182,6 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
                                                  switchOp.getCases(), switchOp.getNumCases());
 
         // 2. Handle the "default" region
-        // We are effectively treating the region as a subroutine, so all input rValues are root
-        // The subroutine needs its own tracker with its own root values
         builder.inlineRegionBefore(switchOp.getDefaultRegion(), newSwitchOp.getDefaultRegion(),
                                    newSwitchOp.getDefaultRegion().end());
 
@@ -1194,22 +1194,9 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
             defaultRegionTracker.setCurrentVQubit(rValuesUsedByRegion[idx], vQubit);
         }
 
-        walkRegionAndHandle(builder, newSwitchOp.getDefaultRegion(), defaultRegionTracker);
-
-        // Yield the new quantum results
-        auto defaultYieldOp = dyn_cast<scf::YieldOp>(newSwitchOp.getDefaultBlock().getTerminator());
-        assert(defaultYieldOp &&
-               "Expected scf.index_switch regions to terminate with scf.yield ops");
-        SmallVector<Value> defaultYieldVals(defaultYieldOp->getOperands());
-        for (Value v : rValuesUsedByRegion) {
-            if (isa<qref::QubitType>(v.getType())) {
-                defaultYieldVals.push_back(defaultRegionTracker.getCurrentVQubit(v));
-            }
-            else if (isa<qref::QuregType>(v.getType())) {
-                defaultYieldVals.push_back(defaultRegionTracker.getCurrentVQreg(v));
-            }
-        }
-        defaultYieldOp->setOperands(defaultYieldVals);
+        handleRegion(builder, newSwitchOp.getDefaultRegion(), defaultRegionTracker);
+        addRootVValuesToRetOp(newSwitchOp.getDefaultBlock().getTerminator(),
+                              rValuesUsedByRegion.getArrayRef(), defaultRegionTracker);
 
         // 3. Handle the case regions
         for (auto [oldCaseRegion, newCaseRegion] :
@@ -1222,21 +1209,9 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
                 caseRegionTracker.setCurrentVQubit(rValuesUsedByRegion[idx], vQubit);
             }
 
-            walkRegionAndHandle(builder, newCaseRegion, caseRegionTracker);
-
-            auto caseYieldOp = dyn_cast<scf::YieldOp>(newCaseRegion.front().getTerminator());
-            assert(defaultYieldOp &&
-                   "Expected scf.index_switch regions to terminate with scf.yield ops");
-            SmallVector<Value> caseYieldVals(caseYieldOp->getOperands());
-            for (Value v : rValuesUsedByRegion) {
-                if (isa<qref::QubitType>(v.getType())) {
-                    caseYieldVals.push_back(caseRegionTracker.getCurrentVQubit(v));
-                }
-                else if (isa<qref::QuregType>(v.getType())) {
-                    caseYieldVals.push_back(caseRegionTracker.getCurrentVQreg(v));
-                }
-            }
-            caseYieldOp->setOperands(caseYieldVals);
+            handleRegion(builder, newCaseRegion, caseRegionTracker);
+            addRootVValuesToRetOp(newCaseRegion.front().getTerminator(),
+                                  rValuesUsedByRegion.getArrayRef(), caseRegionTracker);
         }
 
         // Update outer tracker with results
@@ -1257,11 +1232,6 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
         builder.replaceAllUsesWith(v, newSwitchOp->getResult(i));
     }
 
-    newSwitchOp.walk([&](qref::GetOp getOp) {
-        assert(getOp.use_empty() &&
-               "qref.bit Values must have no uses after the semantic conversion");
-        builder.eraseOp(getOp);
-    });
     builder.eraseOp(switchOp);
 }
 
@@ -1270,6 +1240,7 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(forOp);
     Location loc = forOp->getLoc();
+    MLIRContext *ctx = forOp.getContext();
 
     SetVector<Value> rValuesUsedByRegion;
     getNecessaryRegionRValues(forOp.getRegion(), rValuesUsedByRegion);
@@ -1283,7 +1254,6 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
         // 1. Send in the vValues from above as arguments
         // This handles the flow from outside the new loop into the new loop
         // i.e. the extract op results are sent in as operands to the new for loop
-        // Note that in this step the old loop is not edited at all
         SmallVector<Value> regionOperands(forOp.getRegion().front().getArguments());
         regionOperands.append(rValuesUsedByRegion.begin(), rValuesUsedByRegion.end());
         TransientQubitExtractor extractor(forOp, regionOperands, tracker, builder);
@@ -1311,25 +1281,27 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
                                      forOp.getStep(), newIterArgs);
 
         // 2. Move operations from old body to new body
-        // The new loop has !quantum.bit/reg as input types now on the region's block
-        // We need to overwrite it with the block from the old loop, so it can
-        // see !qref.bit/reg types on the block
         builder.eraseBlock(newLoop.getBody());
         builder.inlineRegionBefore(forOp.getRegion(), newLoop.getRegion(),
                                    newLoop.getRegion().end());
 
-        // 3. Massage the "subroutine region block" of the new for op to take in all closure Values
-        // as args, so we can handle the region as a standalone subroutine
-        // The block moved over from the old loop will not have any quantum arguments yet, neither
-        // !qref nor !quantum.
+        // 3. Create new args with quantum.bit/reg types and set them as root for the new region
+        QubitValueTracker newLoopTracker;
         for (auto rValue : rValuesUsedByRegion) {
-            Value newArg = newLoop.getRegion().front().addArgument(rValue.getType(), loc);
-            builder.replaceUsesWithIf(rValue, newArg, [&](OpOperand &use) {
-                return newLoop.getRegion().isAncestor(use.getOwner()->getParentRegion());
-            });
+            Value newArg;
+            if (isa<qref::QubitType>(rValue.getType())) {
+                newArg = newLoop.getRegion().front().addArgument(quantum::QubitType::get(ctx), loc);
+                newLoopTracker.setCurrentVQubit(rValue, newArg);
+            }
+            else if (isa<qref::QuregType>(rValue.getType())) {
+                newArg = newLoop.getRegion().front().addArgument(quantum::QuregType::get(ctx), loc);
+                newLoopTracker.setCurrentVQreg(rValue, newArg);
+            }
         }
 
-        handleRegion(builder, newLoop.getRegion());
+        handleRegion(builder, newLoop.getRegion(), newLoopTracker);
+        addRootVValuesToRetOp(newLoop.getRegion().front().getTerminator(),
+                              rValuesUsedByRegion.getArrayRef(), newLoopTracker);
 
         // Update tracker with results
         // Again, The loop's block always takes in the iteration variable (the `i`) as a block
@@ -1378,9 +1350,6 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
         // 1. Send in the vValues from above as arguments
         // This handles the flow from outside the new loop into the new loop
         // i.e. the extract op results are sent in as operands to the new loop
-        // Note that in this step the old loop is not edited at all
-        // We just do the safe strategy, which is just taking in all closure rValues as args
-        // and pass it to both regions.
         SmallVector<Value> regionOperands(whileOp.getBefore().front().getArguments());
         regionOperands.append(rValuesUsedByRegion.begin(), rValuesUsedByRegion.end());
         TransientQubitExtractor extractor(whileOp, regionOperands, tracker, builder);
@@ -1411,33 +1380,43 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
         newLoop = scf::WhileOp::create(builder, loc, newResultTypes, newIterArgs);
 
         // 2. Move operations from old body to new body
-        // The new loop has !quantum.bit/reg as input types now on the region's block
-        // We need to overwrite it with the block from the old loop, so it can
-        // see !qref.bit/reg types on the block
         builder.inlineRegionBefore(whileOp.getBefore(), newLoop.getBefore(),
                                    newLoop.getBefore().end());
         builder.inlineRegionBefore(whileOp.getAfter(), newLoop.getAfter(),
                                    newLoop.getAfter().end());
 
-        // 3. Massage the "subroutine region block" of the new for op to take in all closure Values
-        // as args, so we can handle the region as a standalone subroutine
-        // The block moved over from the old loop will not have any quantum arguments yet, neither
-        // !qref nor !quantum.
+        // 3. Create new args with quantum.bit/reg types and set them as root for the new region
+        QubitValueTracker newBeforeRegionTracker;
         for (auto rValue : rValuesUsedByRegion) {
-            Value newArg = newLoop.getBefore().front().addArgument(rValue.getType(), loc);
-            builder.replaceUsesWithIf(rValue, newArg, [&](OpOperand &use) {
-                return newLoop.getBefore().isAncestor(use.getOwner()->getParentRegion());
-            });
+            Value newArg;
+            if (isa<qref::QubitType>(rValue.getType())) {
+                newArg = newLoop.getBefore().front().addArgument(quantum::QubitType::get(ctx), loc);
+                newBeforeRegionTracker.setCurrentVQubit(rValue, newArg);
+            }
+            else if (isa<qref::QuregType>(rValue.getType())) {
+                newArg = newLoop.getBefore().front().addArgument(quantum::QuregType::get(ctx), loc);
+                newBeforeRegionTracker.setCurrentVQreg(rValue, newArg);
+            }
         }
-        handleRegion(builder, newLoop.getBefore());
+        handleRegion(builder, newLoop.getBefore(), newBeforeRegionTracker);
+        addRootVValuesToRetOp(newLoop.getBefore().front().getTerminator(),
+                              rValuesUsedByRegion.getArrayRef(), newBeforeRegionTracker);
 
+        QubitValueTracker newAfterRegionTracker;
         for (auto rValue : rValuesUsedByRegion) {
-            Value newArg = newLoop.getAfter().front().addArgument(rValue.getType(), loc);
-            builder.replaceUsesWithIf(rValue, newArg, [&](OpOperand &use) {
-                return newLoop.getAfter().isAncestor(use.getOwner()->getParentRegion());
-            });
+            Value newArg;
+            if (isa<qref::QubitType>(rValue.getType())) {
+                newArg = newLoop.getAfter().front().addArgument(quantum::QubitType::get(ctx), loc);
+                newAfterRegionTracker.setCurrentVQubit(rValue, newArg);
+            }
+            else if (isa<qref::QuregType>(rValue.getType())) {
+                newArg = newLoop.getAfter().front().addArgument(quantum::QuregType::get(ctx), loc);
+                newAfterRegionTracker.setCurrentVQreg(rValue, newArg);
+            }
         }
-        handleRegion(builder, newLoop.getAfter());
+        handleRegion(builder, newLoop.getAfter(), newAfterRegionTracker);
+        addRootVValuesToRetOp(newLoop.getAfter().front().getTerminator(),
+                              rValuesUsedByRegion.getArrayRef(), newAfterRegionTracker);
 
         // Update tracker with results
         for (auto [i, j] :
@@ -1463,7 +1442,59 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
 }
 
 // Driver
-void walkRegionAndHandle(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
+void handleSubroutine(IRRewriter &builder, func::FuncOp f)
+{
+    QubitValueTracker tracker;
+    Location loc = f.getLoc();
+    MLIRContext *ctx = f.getContext();
+
+    // Set up the root values in the tracker if there are any arguments to the region
+    // FuncOp args are block arguments on the first block of the region.
+    Block &block = f.front();
+    std::vector<unsigned> rArgsErasureIndices;
+    SmallVector<BlockArgument> funcArgs(block.getArguments());
+    SmallVector<Value> originalRValueArgs;
+    unsigned _numCreatedNewArgs = 0;
+    for (auto [i, arg] : llvm::enumerate(funcArgs)) {
+        if (!isa<qref::QubitType, qref::QuregType>(arg.getType())) {
+            continue;
+        }
+        originalRValueArgs.push_back(arg);
+        unsigned newArgIdx = i + _numCreatedNewArgs;
+        if (isa<qref::QubitType>(arg.getType())) {
+            Value vQubit = block.insertArgument(newArgIdx, quantum::QubitType::get(ctx), loc);
+            tracker.setCurrentVQubit(arg, vQubit);
+        }
+        else if (isa<qref::QuregType>(arg.getType())) {
+            Value vQreg = block.insertArgument(newArgIdx, quantum::QuregType::get(ctx), loc);
+            tracker.setCurrentVQreg(arg, vQreg);
+        }
+        _numCreatedNewArgs++;
+        rArgsErasureIndices.push_back(newArgIdx + 1);
+    }
+
+    handleRegion(builder, f.getBody(), tracker);
+    addRootVValuesToRetOp(f.front().getTerminator(), originalRValueArgs, tracker);
+
+    f.walk([&](qref::GetOp getOp) {
+        assert(getOp.use_empty() &&
+               "qref.bit Values must have no uses after the semantic conversion");
+        builder.eraseOp(getOp);
+    });
+
+    for (unsigned i : llvm::reverse(rArgsErasureIndices)) {
+        // A note on the reverse: if we want to erase args at indices 0 and 1, and the original
+        // args are [a, b, c, d], we need to erase 1 (b) first, then 0 (a). Because if we erase
+        // arg0 (a) first, then after that erasure iteration, the 3 new args are [b, c, d], and
+        // the arg now at index 1 was the original arg2 (c)!
+        f.front().eraseArgument(i);
+    }
+
+    f.setFunctionType(FunctionType::get(ctx, block.getArgumentTypes(),
+                                        f.front().getTerminator()->getOperandTypes()));
+}
+
+void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
 {
     r.walk<WalkOrder::PreOrder>([&](Operation *op) {
         if (auto rAllocOp = dyn_cast<qref::AllocOp>(op)) {
@@ -1514,60 +1545,6 @@ void walkRegionAndHandle(IRRewriter &builder, Region &r, QubitValueTracker &trac
     });
 }
 
-void handleRegion(IRRewriter &builder, Region &r)
-{
-    QubitValueTracker tracker;
-    Location loc = r.getLoc();
-    MLIRContext *ctx = r.getContext();
-
-    // Set up the root values in the tracker if there are any arguments to the region
-    assert(r.hasOneBlock() && "Expected single block region");
-    Block &block = r.front();
-    std::vector<unsigned> rArgsErasureIndices;
-    SmallVector<BlockArgument> regionArgs(block.getArguments());
-    unsigned _numCreatedNewArgs = 0;
-    for (auto [i, arg] : llvm::enumerate(regionArgs)) {
-        if (!isa<qref::QubitType, qref::QuregType>(arg.getType())) {
-            continue;
-        }
-        unsigned newArgIdx = i + _numCreatedNewArgs;
-        if (isa<qref::QubitType>(arg.getType())) {
-            Value vQubit = block.insertArgument(newArgIdx, quantum::QubitType::get(ctx), loc);
-            tracker.setCurrentVQubit(arg, vQubit);
-        }
-        else if (isa<qref::QuregType>(arg.getType())) {
-            Value vQreg = block.insertArgument(newArgIdx, quantum::QuregType::get(ctx), loc);
-            tracker.setCurrentVQreg(arg, vQreg);
-        }
-        _numCreatedNewArgs++;
-        rArgsErasureIndices.push_back(newArgIdx + 1);
-    }
-
-    walkRegionAndHandle(builder, r, tracker);
-    r.walk([&](qref::GetOp getOp) {
-        assert(getOp.use_empty() &&
-               "qref.bit Values must have no uses after the semantic conversion");
-        builder.eraseOp(getOp);
-    });
-
-    Operation *retOp = addRootVValuesToRetOp(r, tracker);
-
-    for (unsigned i : llvm::reverse(rArgsErasureIndices)) {
-        // A note on the reverse: if we want to erase args at indices 0 and 1, and the original
-        // args are [a, b, c, d], we need to erase 1 (b) first, then 0 (a). Because if we erase
-        // arg0 (a) first, then after that erasure iteration, the 3 new args are [b, c, d], and
-        // the arg now at index 1 was the original arg2 (c)!
-        r.front().eraseArgument(i);
-    }
-
-    // Special: Need to edit function type and return vQubits if the region comes from a funcop
-    // Since we don't do a designated handler for func ops, unlike the other control flow ops
-    if (auto funcOp = dyn_cast<func::FuncOp>(r.getParentOp())) {
-        funcOp.setFunctionType(
-            FunctionType::get(r.getContext(), block.getArgumentTypes(), retOp->getOperandTypes()));
-    }
-}
-
 } // namespace ReferenceToValueSemanticsConversion
 
 namespace catalyst {
@@ -1591,6 +1568,7 @@ struct ValueSemanticsConversionPass
         // Collect all functions that need to be converted
         // This includes qnode functions, and any subroutine functions
         SetVector<func::FuncOp> targetFuncs;
+        SetVector<func::FuncOp> targetSubroutines;
         mod->walk([&](func::FuncOp f) {
             if (f->hasAttrOfType<UnitAttr>("quantum.node")) {
                 targetFuncs.insert(f);
@@ -1604,28 +1582,26 @@ struct ValueSemanticsConversionPass
                 return WalkResult::advance();
             });
             if (wr_subroutine.wasInterrupted()) {
-                targetFuncs.insert(f);
+                targetSubroutines.insert(f);
             }
 
             return WalkResult::advance();
         });
 
-        for (auto targetFunc : targetFuncs) {
-            ReferenceToValueSemanticsConversion::squashAliasingGetOps(builder, targetFunc);
-            ReferenceToValueSemanticsConversion::handleRegion(builder, targetFunc.getBody());
+        for (auto subroutine : targetSubroutines) {
+            ReferenceToValueSemanticsConversion::handleSubroutine(builder, subroutine);
+        }
 
-            // Clean up: erase remaining qref dialect ops
-            // Due to the nature of the reference semantics dialect, qref ops all have full side
-            // effects, and will not delete themselves.
-            SmallVector<Operation *> toErase;
-            targetFunc->walk([&](Operation *op) {
-                if (op->getDialect() == qrefDialect) {
-                    toErase.push_back(op);
-                }
+        for (auto targetFunc : targetFuncs) {
+            ReferenceToValueSemanticsConversion::QubitValueTracker tracker;
+            ReferenceToValueSemanticsConversion::handleRegion(builder, targetFunc.getBody(),
+                                                              tracker);
+
+            targetFunc.walk([&](qref::GetOp getOp) {
+                assert(getOp.use_empty() &&
+                       "qref.bit Values must have no uses after the semantic conversion");
+                builder.eraseOp(getOp);
             });
-            for (Operation *op : llvm::reverse(toErase)) {
-                op->erase();
-            }
         }
     }
 };
