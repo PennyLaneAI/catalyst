@@ -799,7 +799,10 @@ class CondCallable:
 
         if not self._is_any_boolean(pred):
             try:
-                pred = jnp.astype(pred, bool, copy=False)
+                if isinstance(pred, jax.core.Tracer):
+                    pred = jnp.astype(pred, bool, copy=False)
+                else:
+                    pred = bool(pred)
             except TypeError as e:
                 raise TypeError(
                     "Conditional predicates are required to be of bool, integer or float type"
