@@ -88,7 +88,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             auto [opName, rulesString] = pairRef.split("=");
 
-            // TODO collect names from list
             rulesString.split(altDecomps[opName], ",");
             llvm::errs() << "\t" << opName << ": ";
             for (auto ruleName : altDecomps[opName]) {
@@ -102,7 +101,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         // List of all resources both built-in and custom rules
         std::vector<RuleNode> setOfResources = {};
-        std::unordered_map<std::string, mlir::OwningOpRef<func::FuncOp>> ruleNameToFuncOp = {};
+        llvm::StringMap<mlir::OwningOpRef<func::FuncOp>> ruleNameToFuncOp = {};
 
         ModuleOp module = cast<ModuleOp>(getOperation());
 
@@ -121,7 +120,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             llvm::StringRef pairRef(opCostPair);
 
             auto [opName, cost] = pairRef.split(" = ");
-            bool success = to_float(cost.drop_back(6), // remove the type info
+
+            cost.consume_back(" : f64");
+            bool success = to_float(cost, // remove the type info
                                     targetGateSet.ops[OperatorNode{opName.str()}]);
             llvm::errs() << "\t" << opName << ": " << cost << ", parsing: " << success << ",\n";
 
@@ -237,10 +238,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         });
     }
 
-    void
-    getRuleNodes(ModuleOp module, llvm::StringRef filename,
-                 const llvm::StringMap<func::FuncOp> &custom_rules, std::vector<RuleNode> &rules,
-                 std::unordered_map<std::string, mlir::OwningOpRef<func::FuncOp>> &ruleNameToFuncOp)
+    void getRuleNodes(ModuleOp module, llvm::StringRef filename,
+                      const llvm::StringMap<func::FuncOp> &custom_rules,
+                      std::vector<RuleNode> &rules,
+                      llvm::StringMap<mlir::OwningOpRef<func::FuncOp>> &ruleNameToFuncOp)
     {
         // TODO user nodes
         std::vector<mlir::OwningOpRef<mlir::func::FuncOp>> builtinRules{};
@@ -315,17 +316,26 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * @param ruleNameToFuncOp A mapping from rule names to their corresponding function
      * operations.
      */
-    void insertChosenRules(
-        mlir::ModuleOp module, DecompositionSolver::SolutionType &solution,
-        std::unordered_map<std::string, mlir::OwningOpRef<func::FuncOp>> &ruleNameToFuncOp)
+    void insertChosenRules(mlir::ModuleOp module, DecompositionSolver::SolutionType &solution,
+                           llvm::StringMap<mlir::OwningOpRef<func::FuncOp>> &ruleNameToFuncOp)
     {
-        for (const auto &[_, ruleNode] : solution) {
-            if (ruleNode.isBasis) {
+        for (const auto &[_, chosenRule] : solution) {
+            if (chosenRule.isBasis) {
                 continue; // skip basis rules as they don't correspond to actual decomposition
                           // functions to insert
             }
-            llvm::errs() << "inserting rule: " << ruleNode.ruleName << "\n";
-            module.push_back(ruleNameToFuncOp.at(ruleNode.op.name).release());
+            llvm::errs() << "inserting rule: " << chosenRule.ruleName << " for op "
+                         << chosenRule.op.name << "\n";
+
+            auto it = ruleNameToFuncOp.find(chosenRule.ruleName);
+
+            if (it == ruleNameToFuncOp.end()) {
+                llvm::errs() << "Rule " << chosenRule.ruleName << " not found\n";
+            }
+            if (!it->second) {
+                llvm::errs() << "Rule " << chosenRule.ruleName << " has already been added!\n";
+            }
+            module.push_back(it->second.release());
         }
     };
 };
