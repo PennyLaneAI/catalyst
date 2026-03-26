@@ -534,6 +534,7 @@ class InsertQubitOp(IRDLOperation):
     ):
         if isinstance(idx, int):
             idx = IntegerAttr(idx, IndexType())
+
         if isinstance(idx, IntegerAttr):
             operands = (in_codeblock, None, qubit)
             properties = {"idx_attr": idx}
