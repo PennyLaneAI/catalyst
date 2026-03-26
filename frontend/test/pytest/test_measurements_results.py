@@ -28,15 +28,16 @@ from catalyst.utils.runtime_environment import get_lib_path
 # pylint: disable=too-many-lines
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestSample:
     """Test sample."""
 
-    def test_sample_on_0qbits(self, capture_mode):
+    def test_sample_on_0qbits(self):
         """Test sample on 0 qubits."""
 
         device = qml.device("lightning.qubit", wires=0)
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(device, shots=10)
         def sample_0qbit():
             return qml.sample()
@@ -45,12 +46,12 @@ class TestSample:
         observed = sample_0qbit()
         assert np.array_equal(observed, expected)
 
-    def test_sample_on_1qbit(self, backend, capture_mode):
+    def test_sample_on_1qbit(self, backend):
         """Test sample on 1 qubit."""
 
         device = qml.device(backend, wires=1)
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(device, shots=1000)
         def sample_1qbit(x: float):
             qml.RX(x, wires=0)
@@ -64,12 +65,12 @@ class TestSample:
         observed = sample_1qbit(np.pi)
         assert np.array_equal(observed, expected)
 
-    def test_sample_on_2qbits(self, backend, capture_mode):
+    def test_sample_on_2qbits(self, backend):
         """Test sample on 2 qubits."""
 
         device = qml.device(backend, wires=2)
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(device, shots=1000)
         def sample_2qbits(x: float):
             qml.RX(x, wires=0)
@@ -83,10 +84,14 @@ class TestSample:
         observed = sample_2qbits(np.pi)
         assert np.array_equal(observed, expected)
 
-    @pytest.mark.old_frontend  # dynamic wires not supported with capture
     @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
-    def test_sample_on_empty_wires(self, mcm_method, capture_mode):
+    def test_sample_on_empty_wires(self, mcm_method):
         """Test sample on dynamic wires."""
+
+        # Devices must specify wires for integration with program capture
+        # Since this test is used to test dynamic wires, we skip it if capture is enabled
+        if qml.capture.enabled():
+            return
 
         @qml.set_shots(10)
         @qml.qnode(qml.device("lightning.qubit"), mcm_method=mcm_method)
@@ -99,18 +104,19 @@ class TestSample:
                 NotImplementedError,
                 match="cannot be used without wires and a dynamic number of device wires",
             ):
-                qjit(sample_dynamic_wires, capture=capture_mode)()
+                qjit(sample_dynamic_wires)()
         else:
-            qjit(sample_dynamic_wires, capture=capture_mode)()
+            qjit(sample_dynamic_wires)()
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestCounts:
     """Test counts."""
 
-    def test_counts_on_0qbits(self, capture_mode):
+    def test_counts_on_0qbits(self):
         """Test counts on 0 qubits."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.set_shots(10)
         @qml.qnode(qml.device("lightning.qubit", wires=0))
         def counts_0qbit():
@@ -121,10 +127,10 @@ class TestCounts:
         assert np.array_equal(observed, expected)
 
     @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
-    def test_count_on_1qbit(self, backend, mcm_method, capture_mode):
+    def test_count_on_1qbit(self, backend, mcm_method):
         """Test counts on 1 qubits."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.set_shots(1000)
         @qml.qnode(qml.device(backend, wires=1), mcm_method=mcm_method)
         def counts_1qbit(x: float):
@@ -140,10 +146,10 @@ class TestCounts:
         assert np.array_equal(observed, expected)
 
     @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
-    def test_count_on_2qbits(self, backend, mcm_method, capture_mode):
+    def test_count_on_2qbits(self, backend, mcm_method):
         """Test counts on 2 qubits."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.set_shots(1000)
         @qml.qnode(qml.device(backend, wires=2), mcm_method=mcm_method)
         def counts_2qbit(x: float):
@@ -159,10 +165,10 @@ class TestCounts:
         observed = counts_2qbit(np.pi)
         assert np.array_equal(observed, expected)
 
-    def test_count_on_2qbits_endianness(self, backend, capture_mode):
+    def test_count_on_2qbits_endianness(self, backend):
         """Test counts on 2 qubits with check for endianness."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.set_shots(1000)
         @qml.qnode(qml.device(backend, wires=2))
         def counts_2qbit(x: float, y: float):
@@ -179,10 +185,10 @@ class TestCounts:
         assert np.array_equal(observed, expected)
 
     @pytest.mark.xfail(reason="Not supported by Catalyst")
-    def test_counts_all_outcomes(self, backend, capture_mode):
+    def test_counts_all_outcomes(self, backend):
         """Test counts with all_outcomes=True."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.set_shots(1000)
         @qml.qnode(qml.device(backend, wires=2))
         def counts_2qbit(x: float):
@@ -198,9 +204,8 @@ class TestCounts:
         observed = counts_2qbit(np.pi)
         assert np.array_equal(observed, expected)
 
-    @pytest.mark.old_frontend  # dynamic wires not supported with capture
     @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
-    def test_counts_on_empty_wires(self, mcm_method, capture_mode):
+    def test_counts_on_empty_wires(self, mcm_method):
         """Test counts on dynamic wires."""
 
         @qml.set_shots(10)
@@ -209,22 +214,30 @@ class TestCounts:
             qml.Hadamard(wires=1)
             return qml.counts(all_outcomes=True)
 
-        if mcm_method == "one-shot":
+        if qml.capture.enabled():
             with pytest.raises(
                 NotImplementedError,
-                match="cannot be used without wires and a dynamic number of device wires",
+                match="devices must specify wires for integration with program capture",
             ):
-                qjit(counts_dynamic_wires, capture=capture_mode)()
+                qjit(counts_dynamic_wires)()
         else:
-            qjit(counts_dynamic_wires, capture=capture_mode)()
+            if mcm_method == "one-shot":
+                with pytest.raises(
+                    NotImplementedError,
+                    match="cannot be used without wires and a dynamic number of device wires",
+                ):
+                    qjit(counts_dynamic_wires)()
+            else:
+                qjit(counts_dynamic_wires)()
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestExpval:
 
-    def test_named(self, backend, capture_mode):
+    def test_named(self, backend):
         """Test expval for named observables."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def expval1(x: float):
             qml.RX(x, wires=0)
@@ -238,10 +251,10 @@ class TestExpval:
         observed = expval1(np.pi)
         assert np.isclose(observed, expected)
 
-    def test_hermitian_1(self, backend, capture_mode):
+    def test_hermitian_1(self, backend):
         """Test expval for Hermitian observable."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def expval2(x: float):
             qml.RY(x, wires=0)
@@ -258,10 +271,10 @@ class TestExpval:
         observed = expval2(np.pi / 2)
         assert np.isclose(observed, expected)
 
-    def test_hermitian_2(self, backend, capture_mode):
+    def test_hermitian_2(self, backend):
         """Test expval for Hermitian observable."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def expval3(x: float):
             qml.RX(x, wires=1)
@@ -283,10 +296,10 @@ class TestExpval:
         observed = expval3(np.pi)
         assert np.isclose(observed, expected)
 
-    def test_tensor_1(self, backend, capture_mode):
+    def test_tensor_1(self, backend):
         """Test expval for Tensor observable."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def expval4(x: float, y: float):
             qml.RX(x, wires=0)
@@ -302,10 +315,10 @@ class TestExpval:
         observed = expval4(np.pi / 2, np.pi / 2)
         assert np.isclose(observed, expected)
 
-    def test_tensor_2(self, backend, capture_mode):
+    def test_tensor_2(self, backend):
         """Test expval for Tensor observable."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def expval5(x: float, y: float):
             qml.RX(x, wires=0)
@@ -325,10 +338,10 @@ class TestExpval:
         observed = expval5(np.pi / 2, np.pi / 2)
         assert np.isclose(observed, expected)
 
-    def test_hamiltonian_1(self, backend, capture_mode):
+    def test_hamiltonian_1(self, backend):
         """Test expval for Hamiltonian observable."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def expval(x: float, y: float):
             qml.RX(x, wires=0)
@@ -348,10 +361,10 @@ class TestExpval:
         observed = expval(0.5, 0.8)
         assert np.isclose(observed, expected)
 
-    def test_hamiltonian_2(self, backend, capture_mode):
+    def test_hamiltonian_2(self, backend):
         """Test expval for Hamiltonian observable."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def expval(x: float):
             qml.RX(x, wires=0)
@@ -377,10 +390,10 @@ class TestExpval:
         observed = expval(np.pi / 2)
         assert np.isclose(observed, expected)
 
-    def test_hamiltonian_3(self, backend, capture_mode):
+    def test_hamiltonian_3(self, backend):
         """Test expval for nested Hamiltonian observable."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def expval(x: float):
             qml.RX(x, wires=0)
@@ -410,7 +423,7 @@ class TestExpval:
         observed = expval(np.pi / 2)
         assert np.isclose(observed, expected)
 
-    def test_hamiltonian_4(self, backend, capture_mode):
+    def test_hamiltonian_4(self, backend):
         """Test expval with TensorObs and nested Hamiltonian observables."""
 
         obs_matrix = np.array(
@@ -426,7 +439,7 @@ class TestExpval:
         obs2 = qml.Hamiltonian(coeff, [obs, qml.Hamiltonian([1, 1], [qml.X(0), qml.Z(1)])])
         obs3 = obs2 @ qml.Z(2)
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def expval(x: float):
             qml.RX(x, wires=0)
@@ -443,12 +456,13 @@ class TestExpval:
         assert np.isclose(observed, expected)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestVar:
 
-    def test_rx(self, backend, capture_mode):
+    def test_rx(self, backend):
         """Test var with RX."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def var1(x: float):
             qml.RX(x, wires=0)
@@ -460,10 +474,10 @@ class TestVar:
         observed = var1(np.pi)
         assert np.isclose(observed, expected)
 
-    def test_hadamard(self, backend, capture_mode):
+    def test_hadamard(self, backend):
         """Test var with Hadamard."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def var2(x: float):
             qml.Hadamard(wires=0)
@@ -475,10 +489,10 @@ class TestVar:
         observed = var2(np.pi)
         assert np.isclose(observed, expected)
 
-    def test_hermitian_1(self, backend, capture_mode):
+    def test_hermitian_1(self, backend):
         """Test variance for Hermitian observable."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
             qml.RY(x, wires=0)
@@ -495,10 +509,10 @@ class TestVar:
         observed = circuit(np.pi / 2)
         assert np.isclose(observed, expected)
 
-    def test_hermitian_2(self, backend, capture_mode):
+    def test_hermitian_2(self, backend):
         """Test variance for Hermitian observable."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: float):
             qml.RX(x, wires=1)
@@ -520,10 +534,10 @@ class TestVar:
         observed = circuit(np.pi)
         assert np.isclose(observed, expected)
 
-    def test_tensor_1(self, backend, capture_mode):
+    def test_tensor_1(self, backend):
         """Test variance for Tensor observable."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: float, y: float):
             qml.RX(x, wires=0)
@@ -539,10 +553,10 @@ class TestVar:
         observed = circuit(np.pi / 2, np.pi / 2)
         assert np.isclose(observed, expected)
 
-    def test_tensor_2(self, backend, capture_mode):
+    def test_tensor_2(self, backend):
         """Test variance for Tensor observable."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(x: float, y: float):
             qml.RX(x, wires=0)
@@ -562,10 +576,10 @@ class TestVar:
         observed = circuit(np.pi / 2, np.pi / 2)
         assert np.isclose(observed, expected)
 
-    def test_hamiltonian_1(self, backend, capture_mode):
+    def test_hamiltonian_1(self, backend):
         """Test variance for Hamiltonian observable."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(x: float, y: float):
             qml.RX(x, wires=0)
@@ -585,10 +599,10 @@ class TestVar:
         observed = circuit(0.5, 0.8)
         assert np.isclose(observed, expected)
 
-    def test_hamiltonian_2(self, backend, capture_mode):
+    def test_hamiltonian_2(self, backend):
         """Test variance for Hamiltonian observable."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: float):
             qml.RX(x, wires=0)
@@ -622,10 +636,10 @@ class TestVar:
             jnp.array([1, 1], dtype=np.int64),
         ],
     )
-    def test_hamiltonian_3(self, coeffs, backend, capture_mode):
+    def test_hamiltonian_3(self, coeffs, backend):
         """Test variance for Hamiltonian observable with integer coefficients."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(x: float, y: float):
             qml.RX(x, wires=0)
@@ -651,11 +665,11 @@ class TestVar:
             jnp.array([1, 1], dtype=np.int64),
         ],
     )
-    def test_hamiltonian_4(self, coeffs, backend, capture_mode):
+    def test_hamiltonian_4(self, coeffs, backend):
         """Test variance for Hamiltonian observable with integer coefficients
         as the circuit parameters."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(x, y, coeffs):
             qml.RX(x, wires=0)
@@ -673,10 +687,10 @@ class TestVar:
             expected,
         )
 
-    def test_hamiltonian_5(self, backend, capture_mode):
+    def test_hamiltonian_5(self, backend):
         """Test variance with nested Hamiltonian observable."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(x, y, coeffs):
             qml.RX(x, wires=0)
@@ -698,10 +712,10 @@ class TestVar:
             expected,
         )
 
-    def test_hamiltonian_6(self, backend, capture_mode):
+    def test_hamiltonian_6(self, backend):
         """Test variance with TensorObs and nested Hamiltonian observables."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(x, y, coeffs):
             qml.RX(x, wires=0)
@@ -728,13 +742,17 @@ class TestVar:
         )
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestState:
     """Test state measurement processes."""
 
-    def test_state_on_0qbits(self, capture_mode):
+    def test_state_on_0qbits(self):
         """Test state on 0 qubits."""
 
-        @qjit(capture=capture_mode)
+        if qml.capture.enabled():
+            pytest.xfail("capture doesn't currently support 0 wires.")
+
+        @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=0))
         def state_0qbit():
             return qml.state()
@@ -743,10 +761,10 @@ class TestState:
         observed = state_0qbit()
         assert np.array_equal(observed, expected)
 
-    def test_state_on_1qubit(self, backend, capture_mode):
+    def test_state_on_1qubit(self, backend):
         """Test state on 1 qubit."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def state(x: float):
             qml.RX(x, wires=0)
@@ -757,13 +775,17 @@ class TestState:
         assert np.allclose(observed, expected)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestProbs:
     """Test probabilities measurement processes."""
 
-    def test_probs_on_0qbits(self, capture_mode):
+    def test_probs_on_0qbits(self):
         """Test probs on 0 qubits."""
 
-        @qjit(capture=capture_mode)
+        if qml.capture.enabled():
+            pytest.xfail("capture doesn't currently support 0 wires.")
+
+        @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=0))
         def probs_0qbit():
             return qml.probs()
@@ -772,10 +794,10 @@ class TestProbs:
         observed = probs_0qbit()
         assert np.array_equal(observed, expected)
 
-    def test_probs_on_1qubit(self, backend, capture_mode):
+    def test_probs_on_1qubit(self, backend):
         """Test probs on 1 qubit."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def probs(x: float):
             qml.RX(x, wires=0)
@@ -786,6 +808,7 @@ class TestProbs:
         assert np.allclose(observed, expected)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestNewArithmeticOps:
     "Test PennyLane new arithmetic operators"
 
@@ -793,10 +816,10 @@ class TestNewArithmeticOps:
         "meas, expected",
         [[qml.expval, np.array(-0.70710678)], [qml.var, np.array(0.5)]],
     )
-    def test_prod_xzi(self, meas, expected, backend, capture_mode):
+    def test_prod_xzi(self, meas, expected, backend):
         """Test ``qml.ops.op_math.Prod`` converting to TensorObs."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(x: float, y: float):
             qml.RX(x, wires=0)
@@ -841,11 +864,11 @@ class TestNewArithmeticOps:
             ],
         ],
     )
-    def test_sum_xyz(self, meas_fn, expected, backend, capture_mode):
+    def test_sum_xyz(self, meas_fn, expected, backend):
         """Test ``qml.ops.op_math.Sum`` and ``+`` converting to HamiltonianObs.
         with integer coefficients."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(x: float, y: float):
             qml.RX(x, wires=0)
@@ -896,10 +919,10 @@ class TestNewArithmeticOps:
             ],
         ],
     )
-    def test_sum_sprod_xyz(self, meas_fn, expected, backend, capture_mode):
+    def test_sum_sprod_xyz(self, meas_fn, expected, backend):
         """Test ``qml.ops.op_math.Sum`` (``+``) and ``qml.ops.op_math.SProd`` (``*``)."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(x: float, y: float):
             qml.RX(x, wires=0)
@@ -911,10 +934,10 @@ class TestNewArithmeticOps:
         result = circuit(np.pi / 4, np.pi / 2)
         assert np.allclose(expected, result)
 
-    def test_mix_dunder(self, backend, capture_mode):
+    def test_mix_dunder(self, backend):
         """Test ``*`` and ``@`` dunder methods."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x, y):
             qml.RX(x, wires=0)
@@ -926,10 +949,10 @@ class TestNewArithmeticOps:
         expected = np.array(0.25)
         assert np.allclose(expected, result)
 
-    def test_sum_hermitian(self, backend, capture_mode):
+    def test_sum_hermitian(self, backend):
         """Test ``+`` with Hermitian observables."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(x, y):
             qml.RX(x, wires=0)
@@ -944,10 +967,10 @@ class TestNewArithmeticOps:
         expected = np.array(2.0)
         assert np.allclose(expected, result)
 
-    def test_prod_hermitian(self, backend, capture_mode):
+    def test_prod_hermitian(self, backend):
         """Test ``@`` with Hermitian observables."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=4))
         def circuit(x, y):
             qml.RX(x, wires=0)
@@ -969,10 +992,10 @@ class TestNewArithmeticOps:
         expected = np.array(0.20710678)
         assert np.allclose(expected, result)
 
-    def test_sprod_hermitian(self, backend, capture_mode):
+    def test_sprod_hermitian(self, backend):
         """Test ``*`` and ``@`` with Hermitian observable."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x, y):
             qml.RX(x, wires=0)
@@ -987,10 +1010,10 @@ class TestNewArithmeticOps:
         expected = np.array(0.14142136)
         assert np.allclose(expected, result)
 
-    def test_sum_sprod_prod_hermitian(self, backend, capture_mode):
+    def test_sum_sprod_prod_hermitian(self, backend):
         """Test ``+`` of ``@`` with Hermitian observable."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x, y):
             qml.RX(x, wires=0)
@@ -1005,10 +1028,10 @@ class TestNewArithmeticOps:
         expected = np.array(1.0)
         assert np.allclose(expected, result)
 
-    def test_dunder_hermitian_1(self, backend, capture_mode):
+    def test_dunder_hermitian_1(self, backend):
         """Test dunder methods with Hermitian observable to a HamiltonianObs."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=4))
         def circuit(x, y):
             qml.RX(x, wires=0)
@@ -1032,10 +1055,10 @@ class TestNewArithmeticOps:
         expected = np.array(0.34142136)
         assert np.allclose(expected, result)
 
-    def test_dunder_hermitian_2(self, backend, capture_mode):
+    def test_dunder_hermitian_2(self, backend):
         """Test dunder methods with Hermitian observable to a TensorObs."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=4))
         def circuit(x, y):
             qml.RX(x, wires=0)
@@ -1110,16 +1133,17 @@ class TestDensityMatrixMP:
                 return qml.density_matrix([0])
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestVnEntropy:
     """Test vnentropy."""
 
     @pytest.mark.xfail(reason="Not supported on lightning.")
-    def test_vn_entropy(self, capture_mode):
+    def test_vn_entropy(self):
         """Test that VnEntropy can be used with Catalyst."""
 
         dev = qml.device("lightning.qubit", wires=2)
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(dev)
         def circuit_entropy(x):
             qml.IsingXX(x, wires=[0, 1])
@@ -1129,16 +1153,17 @@ class TestVnEntropy:
         assert circuit_entropy(np.pi / 2) == expected
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestMutualInfo:
     """Test mutualinfo."""
 
     @pytest.mark.xfail(reason="Not supported on lightning.")
-    def test_mutual_info(self, capture_mode):
+    def test_mutual_info(self):
         """Test that MutualInfo can be used with Catalyst."""
 
         dev = qml.device("lightning.qubit", wires=range(2))
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(dev)
         def mutual_info_circuit():
             qml.Hadamard(0)
@@ -1150,16 +1175,17 @@ class TestMutualInfo:
         assert mutual_info_circuit() == expected
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestShadow:
     """Test shadow."""
 
     @pytest.mark.xfail(reason="Not supported on lightning.")
-    def test_shadow(self, capture_mode):
+    def test_shadow(self):
         """Test that Shadow can be used with Catalyst."""
 
         dev = qml.device("lightning.qubit", wires=range(2))
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(dev)
         def classical_shadow_circuit():
             qml.Hadamard(0)
@@ -1173,16 +1199,17 @@ class TestShadow:
         assert expected_recipes == actual_recipes
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestShadowExpval:
     """Test shadowexpval."""
 
     @pytest.mark.xfail(reason="Not supported on lightning.")
-    def test_shadow_expval(self, capture_mode):
+    def test_shadow_expval(self):
         """Test that ShadowExpVal can be used with Catalyst."""
 
         dev = qml.device("lightning.qubit", wires=range(2))
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(dev)
         def shadow_expval_circuit(x, obs):
             qml.Hadamard(0)
@@ -1195,16 +1222,17 @@ class TestShadowExpval:
         assert shadow_expval_circuit(0, H) == expected
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestPurity:
     """Test purity."""
 
     @pytest.mark.xfail(reason="Not supported on lightning.")
-    def test_purity(self, capture_mode):
+    def test_purity(self):
         """Test that Purity can be used with Catalyst."""
 
         dev = qml.device("lightning.qubit", wires=[0])
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(dev)
         def purity_circuit():
             return qml.purity(wires=[0])

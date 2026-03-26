@@ -277,6 +277,7 @@ class TestMidCircuitMeasurement:
         ):
             _ = circuit(1.8)
 
+    # Capture gap: postselect_mode='hw-like' not yet supported in _mcm_preprocessing (only fill-shots/None allowed).
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     @pytest.mark.parametrize("mcm_method", [None, "one-shot", "single-branch-statistics"])
     def test_mcm_config_not_mutated(self, backend, postselect_mode, mcm_method, capture_mode):
@@ -284,10 +285,6 @@ class TestMidCircuitMeasurement:
         config."""
         if postselect_mode == "hw-like" and mcm_method == "single-branch-statistics":
             pytest.skip("Invalid MCM configuration")
-
-        # Capture gap: postselect_mode='hw-like' not yet supported in _mcm_preprocessing (only fill-shots/None allowed).
-        if capture_mode and postselect_mode == "hw-like":
-            pytest.xfail("postselect_mode='hw-like' not yet supported with capture=True")
 
         dev = qml.device(backend, wires=2)
 
@@ -324,6 +321,7 @@ class TestMidCircuitMeasurement:
         _ = circuit(1.8)
         assert spy.call_count == 1
 
+    # Capture gap: postselect_mode='hw-like' not yet supported in _mcm_preprocessing (only fill-shots/None allowed).
     @pytest.mark.xfail(
         reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky",
         strict=False,
@@ -332,10 +330,6 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize("mcm_method", [None, "one-shot"])
     def test_mcm_method_with_dict_output(self, backend, postselect_mode, mcm_method, capture_mode):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
-        # Capture gap: postselect_mode='hw-like' not yet supported in _mcm_preprocessing (only fill-shots/None allowed).
-        if capture_mode and postselect_mode == "hw-like":
-            pytest.xfail("postselect_mode='hw-like' not yet supported with capture=True")
-
         dev = qml.device(backend, wires=1)
 
         @qjit(capture=capture_mode)
@@ -350,16 +344,13 @@ class TestMidCircuitMeasurement:
         expected = {"hi": jnp.array(-1.0, dtype=jnp.float64)}
         assert np.allclose(expected["hi"], observed["hi"])
 
+    # Capture gap: postselect_mode='hw-like' not yet supported in _mcm_preprocessing (only fill-shots/None allowed).
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     @pytest.mark.parametrize("mcm_method", ["one-shot"])
     def test_mcm_method_with_count_mesurement(
         self, backend, postselect_mode, mcm_method, capture_mode
     ):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
-        # Capture gap: postselect_mode='hw-like' not yet supported in _mcm_preprocessing (only fill-shots/None allowed).
-        if capture_mode and postselect_mode == "hw-like":
-            pytest.xfail("postselect_mode='hw-like' not yet supported with capture=True")
-
         dev = qml.device(backend, wires=1)
 
         @qjit(capture=capture_mode)
