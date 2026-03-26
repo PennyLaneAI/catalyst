@@ -123,6 +123,69 @@ func.func @test_dealloc_aux(%arg0 : !qecp.qubit<aux>) {
 
 // -----
 
+func.func @test_gate_op_identity(%arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<aux>) {
+    %0 = qecp.identity %arg0 : !qecp.qubit<data>
+    %1 = qecp.identity %arg1 : !qecp.qubit<aux>
+    func.return
+}
+
+// -----
+
+func.func @test_gate_op_pauli_x(%arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<aux>) {
+    %0 = qecp.x %arg0 : !qecp.qubit<data>
+    %1 = qecp.x %arg1 : !qecp.qubit<aux>
+    func.return
+}
+
+// -----
+
+func.func @test_gate_op_pauli_y(%arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<aux>) {
+    %0 = qecp.y %arg0 : !qecp.qubit<data>
+    %1 = qecp.y %arg1 : !qecp.qubit<aux>
+    func.return
+}
+
+// -----
+
+func.func @test_gate_op_pauli_z(%arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<aux>) {
+    %0 = qecp.z %arg0 : !qecp.qubit<data>
+    %1 = qecp.z %arg1 : !qecp.qubit<aux>
+    func.return
+}
+
+// -----
+
+func.func @test_gate_op_hadamard(%arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<aux>) {
+    %0 = qecp.hadamard %arg0 : !qecp.qubit<data>
+    %1 = qecp.hadamard %arg1 : !qecp.qubit<aux>
+    func.return
+}
+
+// -----
+
+func.func @test_gate_op_s(%arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<aux>) {
+    %0 = qecp.s %arg0 : !qecp.qubit<data>
+    %1 = qecp.s %0 adj : !qecp.qubit<data>
+    %2 = qecp.s %arg1 : !qecp.qubit<aux>
+    %3 = qecp.s %2 adj : !qecp.qubit<aux>
+    func.return
+}
+
+// -----
+
+func.func @test_gate_op_cnot(
+    %arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<data>,
+    %arg2 : !qecp.qubit<aux>, %arg3 : !qecp.qubit<aux>
+) {
+    %0, %1 = qecp.cnot %arg0, %arg1 : !qecp.qubit<data>, !qecp.qubit<data>
+    %2, %3 = qecp.cnot %arg2, %arg3 : !qecp.qubit<aux>, !qecp.qubit<aux>
+    %4, %5 = qecp.cnot %0, %2 : !qecp.qubit<data>, !qecp.qubit<aux>
+    %6, %7 = qecp.cnot %3, %1 : !qecp.qubit<aux>, !qecp.qubit<data>
+    func.return
+}
+
+// -----
+
 func.func @test_tanner_graph_type(%arg0 : !qecp.tanner_graph<8, 6, i32>) {
     func.return
 }
