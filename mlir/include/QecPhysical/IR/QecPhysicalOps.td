@@ -139,6 +139,12 @@ def InsertCodeblockOp : QecPhysical_Op<"insert_block", [AllTypesMatch<["in_hyper
 def ExtractQubitOp : QecPhysical_Op<"extract"> {
     let summary = "Extract a physical qubit value from a codeblock.";
 
+    let description = [{
+        This operation extracts a QEC physical qubit value from a physical codeblock. The qubit
+        value is restricted to have the 'data' role; in other words, an auxiliary qubit cannot be
+        extracted from a physical codeblock.
+    }];
+
     let arguments = (ins
         PhysicalCodeblockType:$codeblock,
         Optional<Index>:$idx,
@@ -160,6 +166,12 @@ def ExtractQubitOp : QecPhysical_Op<"extract"> {
 
 def InsertQubitOp : QecPhysical_Op<"insert", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
     let summary = "Update the physical qubit value of a codeblock.";
+
+    let description = [{
+        This operation updates the value of a QEC physical qubit in a physical codeblock. The qubit
+        value is restricted to have the 'data' role; in other words, an auxiliary qubit cannot be
+        inserted into a physical codeblock.
+    }];
 
     let arguments = (ins
         PhysicalCodeblockType:$in_codeblock,

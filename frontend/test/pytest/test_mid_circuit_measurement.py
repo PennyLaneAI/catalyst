@@ -1268,7 +1268,7 @@ class TestDynamicOneShotMLIRPass:
             @qml.qnode(qml.device(backend, wires=2), shots=shots)
             def circuit():
                 qml.Hadamard(wires=0)
-                return qml.counts()
+                return qml.counts(all_outcomes=True)
 
             return circuit()
 

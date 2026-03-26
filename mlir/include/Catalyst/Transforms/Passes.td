@@ -130,6 +130,15 @@ def MemrefToLLVMWithTBAAPass : Pass<"memref-to-llvm-tbaa", "mlir::ModuleOp"> {
   ];
 }
 
+def MarkEntryPointArgsNonWritablePass : Pass<"mark-entry-point-args-non-writable", "mlir::ModuleOp"> {
+    let summary = "Mark entry-point arguments as non-writable for bufferization.";
+
+    let dependentDialects = [
+        "bufferization::BufferizationDialect",
+        "func::FuncDialect"
+    ];
+}
+
 def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
     let summary = "Apply the passes scheduled with the transform dialect.";
 }

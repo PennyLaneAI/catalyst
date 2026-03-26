@@ -16,6 +16,7 @@
 
 #include "mlir/IR/Dialect.h"
 
+#include "QecLogical/IR/QecLogicalAttrDefs.h"
 #include "QecLogical/IR/QecLogicalTypes.h"
 
 //===----------------------------------------------------------------------===//
