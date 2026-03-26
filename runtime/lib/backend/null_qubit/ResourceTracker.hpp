@@ -53,11 +53,9 @@ struct ResourceTracker final {
      *
      * Updates the gate type and size counts, and if depth tracking is enabled,
      * updates the circuit depth of the wires involved in an operation.
-     * All participating wires are synchronized to one past the maximum
-     * current depth among them.
      *
-     * @param wires The target wires of the operation
-     * @param controlled_wires The control wires of the operation (empty by default)
+     * @param wires The wires the operation is being applied to
+     * @param controlled_wires The control wires the operation is being applied to
      */
     void UpdateDepth(const std::vector<QubitIdType> &wires,
                      const std::vector<QubitIdType> &controlled_wires = {})

@@ -541,6 +541,13 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
     }
 
+    /**
+     * @brief Performs a dummy Pauli-basis measurement that always returns false
+     *
+     * @param pauli_word The Pauli basis to measure in (e.g. "XZ", "XYZ") (ignored)
+     * @param wires The qubits to measure (ignored)
+     * @return Result Always returns a reference to the global false constant
+     */
     auto PauliMeasure(const std::string &pauli_word, const std::vector<QubitIdType> &wires)
         -> Result
     {
