@@ -167,8 +167,8 @@ expected_ops_init_kwargs = {
     ],
     "FinalizeOp": [{}],
     "GlobalPhaseOp": [
-        {"params": theta, "in_ctrl_qubits": (q0,), "in_ctrl_values": (bool_ssa,)},
-        {"params": theta, "in_ctrl_qubits": q0, "in_ctrl_values": bool_ssa},
+        {"angle": theta, "in_ctrl_qubits": (q0,), "in_ctrl_values": (bool_ssa,)},
+        {"angle": theta, "in_ctrl_qubits": q0, "in_ctrl_values": bool_ssa},
     ],
     "HamiltonianOp": [{"operands": (coeffs, (obs,)), "result_types": (obs,)}],
     "HermitianOp": [{"operands": (matrix, (q0, q1)), "result_types": (obs,)}],
@@ -447,16 +447,16 @@ class TestAssemblyFormat:
 
         ////////////////// **GlobalPhaseOp tests** //////////////////
         // No control wires
-        // CHECK: quantum.gphase([[PARAM1]]) :
-        quantum.gphase(%param1) :
+        // CHECK: quantum.gphase([[PARAM1]])
+        quantum.gphase(%param1)
 
         // Control wires and values
         // CHECK: {{%.+}}, {{%.+}} = quantum.gphase([[PARAM1]]) ctrls([[Q0]], [[Q1]]) ctrlvals([[FALSE_CST]], [[TRUE_CST]]) : ctrls !quantum.bit, !quantum.bit
         %qg1, %qg2 = quantum.gphase(%param1) ctrls(%q0, %q1) ctrlvals(%false_cst, %true_cst) : ctrls !quantum.bit, !quantum.bit
 
         // Adjoint
-        // CHECK: {{%.+}} = quantum.gphase([[PARAM1]]) {adjoint} ctrls([[Q0]]) ctrlvals([[TRUE_CST]]) : ctrls !quantum.bit
-        %qg3 = quantum.gphase(%param1) {adjoint} ctrls(%q0) ctrlvals(%true_cst) : ctrls !quantum.bit
+        // CHECK: {{%.+}} = quantum.gphase([[PARAM1]]) adj ctrls([[Q0]]) ctrlvals([[TRUE_CST]]) : ctrls !quantum.bit
+        %qg3 = quantum.gphase(%param1) adj ctrls(%q0) ctrlvals(%true_cst) : ctrls !quantum.bit
 
         ////////////////// **MultiRZOp tests** //////////////////
         // No control wires
