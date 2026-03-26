@@ -287,7 +287,7 @@ TEST_CASE("Test GraphSolveError for unsolvable operator", "[DecompGraph::Solver]
     REQUIRE_THROWS_AS(solver.solve(), GraphSolverFailedError);
 }
 
-TEST_CASE(" Test GraphSolveError for cyclic decomposition", "[DecompGraph::Solver]")
+TEST_CASE("Test GraphSolveError for cyclic decomposition", "[DecompGraph::Solver]")
 {
     const OperatorNode h{"H", 1, 0, false};
 
@@ -301,4 +301,35 @@ TEST_CASE(" Test GraphSolveError for cyclic decomposition", "[DecompGraph::Solve
     DecompositionSolver solver(graph);
 
     REQUIRE_THROWS_AS(solver.solve(), CyclicDecompositionError);
+}
+
+TEST_CASE("Test PauliX -> GlobalPhase(1), RX(1) decomposition", "[DecompGraph::Solver]")
+{
+    const OperatorNode x{"X"};
+    const OperatorNode globalPhase{"GlobalPhase"};
+    const OperatorNode rx{"RX"};
+
+    const WeightedGateset gateset{{{globalPhase, 1.0}, {rx, 1.0}}};
+
+    const std::vector<RuleNode> rules{
+        {"x_to_globalPhase_rx", x, {{globalPhase, 1}, {rx, 1}}},
+        {"globalPhase_rx", globalPhase, {{rx, 1}}},
+    };
+
+    const DecompositionGraph graph({x}, gateset, rules);
+    DecompositionSolver solver(graph);
+
+    const auto result = solver.solve();
+    REQUIRE(result.solvedRoots.size() == 1);
+    REQUIRE(result.solvedRoots[0] == x);
+    REQUIRE(result.optimizedMap.size() == 3);
+    const auto &chosen_rule = result.optimizedMap.at(x);
+    REQUIRE_FALSE(chosen_rule.isBasis);
+    REQUIRE(chosen_rule.ruleName == "x_to_globalPhase_rx");
+    REQUIRE(chosen_rule.inputs.size() == 2);
+    REQUIRE(chosen_rule.inputs[0].op == globalPhase);
+    REQUIRE(chosen_rule.inputs[0].multiplicity == 1);
+    REQUIRE(chosen_rule.inputs[1].op == rx);
+    REQUIRE(chosen_rule.inputs[1].multiplicity == 1);
+    REQUIRE(chosen_rule.totalCost == 1.0 * 1 + 1.0 * 1);
 }

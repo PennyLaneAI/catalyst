@@ -28,6 +28,7 @@ namespace DecompGraph::Solver {
 Core::ChosenDecompRule DecompositionSolver::basisRule(const Core::OperatorNode &op)
 {
     if (!graph.isTargetGate(op)) {
+        graph.showGraph(); // Debug: show the graph structure
         throw Core::GraphSolveError("Operator is not a target gate in the gateset");
     }
 
@@ -99,6 +100,7 @@ Core::ChosenDecompRule DecompositionSolver::solveOperator(const Core::OperatorNo
     }
 
     if (visited.find(op) != visited.end()) {
+        graph.showGraph(); // Debug: show the graph structure
         throw Core::CyclicDecompositionError(solvingStack);
     }
 
@@ -129,6 +131,8 @@ Core::ChosenDecompRule DecompositionSolver::solveOperator(const Core::OperatorNo
     } visitGuard(visited, solvingStack, op);
 
     auto chosen = graph.isTargetGate(op) ? basisRule(op) : bestRule(op);
+    std::cerr << "Chosen rule for operator " << op.name << ": " << chosen.ruleName << " with cost "
+              << chosen.totalCost << "\n"; // FIXME: remove after debugging
     if (!chosen.ruleName.empty()) {
         solvedMap.emplace(op, chosen);
     }
@@ -142,11 +146,9 @@ Core::GraphResult DecompositionSolver::solve()
     result.solvedRoots = graph.getRoots();
 
     for (const auto &root : result.solvedRoots) {
-        std::cerr << "Solving for root operator: " << root.name << "\n";
         const auto chosen_rule = solveOperator(root);
-        std::cerr << "Chosen rule for operator " << root.name << ": " << chosen_rule.ruleName
-                  << " with cost " << chosen_rule.totalCost << "\n";
         if (chosen_rule.ruleName.empty()) {
+            graph.showGraph();                            // Debug: show the graph structure
             throw Core::GraphSolverFailedError(root, {}); // no valid rules
         }
     }
@@ -160,8 +162,6 @@ Core::GraphResult DecompositionSolver::solve()
 
 DecompositionSolver::SolutionType DecompositionSolver::getSolvedMap()
 {
-    graph.showGraph(); // Debug: show the graph structure
-
     if (solvedMap.empty()) {
         solve();
     }

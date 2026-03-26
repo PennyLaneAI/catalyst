@@ -47,9 +47,9 @@ struct OperatorNode {
 
     bool operator==(const OperatorNode &other) const
     {
-        return name == other.name && numWires == other.numWires && numParams == other.numParams &&
-               adjoint == other.adjoint;
+        return name == other.name && adjoint == other.adjoint;
     }
+    bool operator!=(const OperatorNode &other) const { return !(*this == other); }
 };
 
 /**
@@ -63,12 +63,13 @@ struct OperatorNodeHash {
     std::size_t operator()(const OperatorNode &node) const
     {
         std::size_t h1 = std::hash<std::string>{}(node.name);
-        std::size_t h2 = std::hash<std::size_t>{}(node.numWires);
-        std::size_t h3 = std::hash<std::size_t>{}(node.numParams);
+        // TODO: commented out when we capture numWires and numParams for the target gateset
+        // std::size_t h2 = std::hash<std::size_t>{}(node.numWires);
+        // std::size_t h3 = std::hash<std::size_t>{}(node.numParams);
         std::size_t h4 = std::hash<bool>{}(node.adjoint);
 
         // Combine the hash values
-        return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3);
+        return h1 ^ (h4 << 3);
     }
 };
 

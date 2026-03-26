@@ -33,12 +33,8 @@ static inline auto print_op(const OperatorNode &op) -> std::string
 {
     std::ostringstream oss;
     oss << op.name;
-    if (op.numWires != 0U) {
-        oss << "[w:" << op.numWires << "]";
-    }
-    if (op.numParams != 0U) {
-        oss << "[p:" << op.numParams << "]";
-    }
+    oss << "[w:" << op.numWires << "]";
+    oss << "[p:" << op.numParams << "]";
     if (op.adjoint) {
         oss << "[adj]";
     }

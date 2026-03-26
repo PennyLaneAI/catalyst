@@ -22,6 +22,7 @@
 #include <variant>
 
 #include "DGBuilder.hpp"
+#include "DGUtils.hpp"
 
 namespace DecompGraph::Solver {
 
@@ -199,7 +200,7 @@ void DecompositionGraph::showGraph() const
     // Show all operators by their names
     std::cerr << "Operators:\n";
     for (const auto &[op, id] : impl->opToId) {
-        std::cerr << "  ID " << id << ": " << op.name << "\n";
+        std::cerr << "  ID " << id << ": " << Core::print_op(op) << "\n";
     }
 
     // Show all rules by their names and their input/output operators
@@ -207,18 +208,18 @@ void DecompositionGraph::showGraph() const
     for (const auto &[ruleId, vertex] : impl->ruleIdToVertex) {
         const auto &rule = impl->rules[ruleId];
         std::cerr << "  Rule ID " << ruleId << ": " << rule.name << "\n";
-        std::cerr << "    Output: " << rule.output.name << "\n";
+        std::cerr << "    Output: " << Core::print_op(rule.output) << "\n";
         std::cerr << "    Inputs:\n";
         for (const auto &input : rule.inputs) {
-            std::cerr << "      - " << input.op.name << " (multiplicity: " << input.multiplicity
-                      << ")\n";
+            std::cerr << "      - " << Core::print_op(input.op)
+                      << " (multiplicity: " << input.multiplicity << ")\n";
         }
     }
 
     // Show target gateset
     std::cerr << "Target Gateset:\n";
     for (const auto &[op, cost] : impl->gateset.ops) {
-        std::cerr << "  " << op.name << " with cost " << cost << "\n";
+        std::cerr << "  " << Core::print_op(op) << " with cost " << cost << "\n";
     }
 }
 

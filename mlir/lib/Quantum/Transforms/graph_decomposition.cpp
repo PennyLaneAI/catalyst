@@ -118,7 +118,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         for (const std::string &opCostPair : targetGateSetOption) {
             llvm::StringRef pairRef(opCostPair);
 
-            auto [opName, cost] = pairRef.split("=");
+            auto [opName, cost] = pairRef.split(" = ");
             bool success = to_float(cost.drop_back(6), // remove the type info
                                     targetGateSet.ops[OperatorNode{opName.str()}]);
             llvm::errs() << "\t" << opName << ": " << cost << ", parsing: " << success << ",\n";
@@ -247,8 +247,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 ruleNode.output = outputNode;
             }
             else {
-                llvm::errs() << "Rule " << ruleNode.name
-                             << " is missing 'target_gate' attribute. Skipping this rule.\n";
                 continue; // skip this rule if target_gate attribute is missing
             }
 
@@ -261,10 +259,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                     auto res_int = operation.getValue();
                     if (auto intAttr = mlir::dyn_cast<IntegerAttr>(res_int)) {
                         term.op.name = operation.getName().str();
-                        if (term.op.name.starts_with("Adjoint(") && term.op.name.ends_with(")")) {
-                            term.op.adjoint = true;
-                            term.op.name =
-                                llvm::StringRef(term.op.name).drop_front(8).drop_back(1).str();
+                        if (term.op.name.find("(") != std::string::npos) {
+                            term.op.name = term.op.name.substr(0, term.op.name.find("("));
                         }
                         term.multiplicity = intAttr.getInt();
                         ruleNode.inputs.push_back(term);
