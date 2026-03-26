@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <mlir/IR/Location.h>
-#include <mlir/IR/PatternMatch.h>
 #define DEBUG_TYPE "value-semantics-conversion"
 
 #include <cstdint>
@@ -34,10 +32,8 @@
 #include "mlir/IR/TypeRange.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h" // for PassManager
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/WalkResult.h"
-// #include "mlir/Transforms/Passes.h" // for createCSEPass
 
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
@@ -228,9 +224,8 @@ struct QubitValueTracker {
 /**
  * @brief This struct is responsible for extracting and inserting vQubits before and after uses.
  *
- * @details This struct is responsible for extracting and inserting vQubits before and after uses.
- *
- * This class must be the sole source of the creation of quantum.extract and insert operations.
+ * @details This class must be the sole source of the creation of quantum.extract and insert
+ * operations.
  *
  * We follow a very simple strategy in this semantics conversion, which we now describe.
  *
@@ -315,7 +310,7 @@ struct TransientQubitExtractor {
         OpBuilder::InsertionGuard guard(this->builder);
         this->builder.setInsertionPoint(this->rOp);
 
-        this->analyzeROpQuantumOperandPatterns(&operands);
+        this->analyzeROpQuantumOperandPatterns(operands);
 
         for (auto [i, operand] : llvm::enumerate(operands)) {
             if (!isa<qref::QubitType>(operand.getType()) || this->tracker.isRootRQubit(operand)) {
@@ -426,17 +421,18 @@ struct TransientQubitExtractor {
     SmallVector<Value> sourceRQregs;
     SmallVector<quantum::ExtractOp> extractOps;
 
-    void analyzeROpQuantumOperandPatterns(SmallVector<Value> *regionOperands = nullptr)
+    void
+    analyzeROpQuantumOperandPatterns(std::optional<ArrayRef<Value>> regionOperands = std::nullopt)
     {
         unsigned resIdx = 0;
         unsigned existingNumResults = this->rOp->getNumResults();
 
         SmallVector<Value> operands;
-        if (regionOperands == nullptr) {
+        if (!regionOperands.has_value()) {
             operands.append(this->rOp->getOperands().begin(), this->rOp->getOperands().end());
         }
         else {
-            operands.append(regionOperands->begin(), regionOperands->end());
+            operands.append(regionOperands.value().begin(), regionOperands.value().end());
         }
 
         for (auto [i, operand] : llvm::enumerate(operands)) {
@@ -904,8 +900,6 @@ void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tra
 void handleCompbasis(IRRewriter &builder, qref::ComputationalBasisOp rCompbasisOp,
                      QubitValueTracker &tracker)
 {
-    OpBuilder::InsertionGuard guard(builder);
-
     auto vCompbasisOp =
         migrateOpToValueSemantics<quantum::ComputationalBasisOp>(builder, rCompbasisOp, tracker);
     builder.replaceOp(rCompbasisOp, vCompbasisOp);
@@ -913,8 +907,6 @@ void handleCompbasis(IRRewriter &builder, qref::ComputationalBasisOp rCompbasisO
 
 void handleNamedObs(IRRewriter &builder, qref::NamedObsOp rNamedObsOp, QubitValueTracker &tracker)
 {
-    OpBuilder::InsertionGuard guard(builder);
-
     auto vNamedObsOp =
         migrateOpToValueSemantics<quantum::NamedObsOp>(builder, rNamedObsOp, tracker);
     builder.replaceOp(rNamedObsOp, vNamedObsOp);
@@ -923,8 +915,6 @@ void handleNamedObs(IRRewriter &builder, qref::NamedObsOp rNamedObsOp, QubitValu
 void handleHermitian(IRRewriter &builder, qref::HermitianOp rHermitianOp,
                      QubitValueTracker &tracker)
 {
-    OpBuilder::InsertionGuard guard(builder);
-
     auto vHermitianOp =
         migrateOpToValueSemantics<quantum::HermitianOp>(builder, rHermitianOp, tracker);
     builder.replaceOp(rHermitianOp, vHermitianOp);
