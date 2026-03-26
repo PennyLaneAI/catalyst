@@ -21,6 +21,9 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/OwningOpRef.h"
+#include "mlir/Parser/Parser.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 #include "mlir/Pass/PassManager.h"
@@ -29,7 +32,6 @@
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Passes.h"
-#include "Quantum/Utils/Decomp.h"
 
 #include "DGBuilder.hpp"
 #include "DGSolver.hpp"
@@ -168,8 +170,26 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     }
 
   private:
-    void loadBuiltInDecompositionRules([[maybe_unused]] ModuleOp module /*, ...*/) { return; }
+    void loadBuiltInDecompositionRules(llvm::StringRef filename, mlir::MLIRContext *context,
+                                       std::vector<mlir::OwningOpRef<mlir::func::FuncOp>> &funcOps)
+    {
+        mlir::ParserConfig config(context);
+        llvm::errs() << filename << "\n";
+        mlir::OwningOpRef<mlir::ModuleOp> moduleOp =
+            mlir::parseSourceFile<mlir::ModuleOp>(filename, config);
 
+        if (!moduleOp) {
+            llvm::errs() << "failed to find module\n";
+            return;
+        }
+
+        for (auto func : llvm::make_early_inc_range(moduleOp.get().getOps<mlir::func::FuncOp>())) {
+            llvm::errs() << func.getName() << ", ";
+            func->remove();
+            funcOps.push_back(mlir::OwningOpRef<mlir::func::FuncOp>(func));
+        }
+        return;
+    }
     void registerCustomDecompositionRules(
         ModuleOp module, llvm::StringMap<llvm::StringRef> &fixed_decomps,
         llvm::StringMap<llvm::SmallVector<llvm::StringRef>> &alt_decomps,
@@ -223,17 +243,16 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                  std::unordered_map<std::string, mlir::OwningOpRef<func::FuncOp>> &ruleNameToFuncOp)
     {
         // TODO user nodes
-        std::vector<mlir::OwningOpRef<mlir::func::FuncOp>> builtinRules =
-            getRulesFromBytecode(filename, module.getContext());
+        std::vector<mlir::OwningOpRef<mlir::func::FuncOp>> builtinRules{};
+        loadBuiltInDecompositionRules(filename, module.getContext(), builtinRules);
 
-        llvm::errs() << "read bytecode\n";
+        llvm::errs() << "writing rules\n";
 
         for (auto &ruleOpRef : builtinRules) {
             RuleNode ruleNode;
             mlir::func::FuncOp func = ruleOpRef.get(); // access the op
             ruleNode.name = func.getName().str();
             ruleNameToFuncOp[ruleNode.name] = std::move(ruleOpRef);
-            llvm::errs() << "wrote rule " << ruleNode.name << " to map\n";
 
             // Set output OperatorNode
             if (auto outputGateAttr = func->getAttrOfType<StringAttr>("target_gate")) {
@@ -278,23 +297,23 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                              << " is missing 'resources' attribute. Skipping this rule.\n";
                 continue; // skip this rule if resources attribute is missing
             }
-            llvm::errs() << "registered rule " << ruleNode.name << " for op "
-                         << ruleNode.output.name << "\n";
+            llvm::errs() << ruleNode.name << " for " << ruleNode.output.name << ", ";
             rules.push_back(std::move(ruleNode));
         }
-        llvm::errs() << "registered rules\n";
+        llvm::errs() << "\nregistered rules\n";
 
         return;
     }
 
     /**
-     * @brief Insert the decomposition rules picked by the graph solver into the module for later
-     * use in the decompose-lowering patterns to apply the decomposition rules and rewrite the
-     * quantum operations.
+     * @brief Insert the decomposition rules picked by the graph solver into the module for
+     * later use in the decompose-lowering patterns to apply the decomposition rules and rewrite
+     * the quantum operations.
      *
      * @param module The MLIR module to insert the chosen decomposition rules into.
      * @param solution The chosen decomposition rules from the graph solver.
-     * @param ruleNameToFuncOp A mapping from rule names to their corresponding function operations.
+     * @param ruleNameToFuncOp A mapping from rule names to their corresponding function
+     * operations.
      */
     void insertChosenRules(
         mlir::ModuleOp module, DecompositionSolver::SolutionType &solution,
