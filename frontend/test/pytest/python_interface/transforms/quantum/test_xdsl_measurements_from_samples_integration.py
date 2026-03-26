@@ -162,6 +162,20 @@ class TestIntegrationUsefulErrors:
             def circuit():
                 return qml.sample(wires=[0]), qml.expval(qml.X(0))
 
+    @pytest.mark.parametrize("obs", (2*qml.X(0), qml.X(1) + qml.X(2)))
+    def test_hamlitonianop_raises_error(self, obs):
+        """Test that a circuit with a HamiltonianOp observable raises an error message 
+        instructing the user to apply `split-non-commuting` first"""
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        with pytest.raises(CompileError, match="apply `qml.transforms.split_non_commuting`"):
+
+            @qml.qjit
+            @measurements_from_samples_pass
+            @qml.qnode(dev, shots=1000)
+            def circuit():
+                return qml.expval(obs)
 
 @pytest.mark.usefixtures("use_capture")
 class TestIntegrationWithOtherPasses:
@@ -216,6 +230,97 @@ class TestIntegrationWithOtherPasses:
             return qml.expval(2 * qml.Z(wires=0))
 
         assert expected_res == circuit()
+
+    @pytest.mark.xfail(reason="split-non-commuting doesn't support var")
+    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), 2.0),
+            ((qml.I, qml.X), 2.0),
+            ((qml.X, qml.I), -2.0),
+            ((qml.X, qml.X), -2.0),
+        ],
+    )
+    def test_var_sprod_with_split_non_commuting(self, shots, initial_ops, expected_res):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed on the combination of both wires.
+        """
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit
+        @qml.transform(pass_name="measurements-from-samples")
+        @qml.transform(pass_name="split-non-commuting")
+        @qml.qnode(dev, shots=shots)
+        def circuit():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            return qml.var(2 * qml.Z(wires=0))
+
+        assert expected_res == circuit()
+
+    #ToDo: use analytic test repo, make this more accurate. Make the same change to the var test even if it can't pass.
+    @pytest.mark.parametrize("shots", [2000, 3000])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), 2.0),
+            ((qml.I, qml.X), 2.0),
+            ((qml.X, qml.I), -2.0),
+            ((qml.X, qml.X), -2.0),
+        ],
+    )
+    def test_expval_sum_with_split_non_commuting(self, shots, initial_ops, expected_res):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed on the combination of both wires.
+        """
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit
+        @qml.transform(pass_name="measurements-from-samples")
+        @qml.transform(pass_name="split-non-commuting")
+        @qml.qnode(dev, shots=shots)
+        def circuit():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            return qml.expval(2*qml.Z(wires=0) + qml.X(1))
+        
+        np.isclose(expected_res, circuit())
+
+    @pytest.mark.xfail(reason="split-non-commuting doesn't support var")
+    @pytest.mark.parametrize("shots", [2000, 3000])
+    @pytest.mark.parametrize(
+        "initial_ops, expected_res",
+        [
+            ((qml.I, qml.I), 2.0),
+            ((qml.I, qml.X), 2.0),
+            ((qml.X, qml.I), -2.0),
+            ((qml.X, qml.X), -2.0),
+        ],
+    )
+    def test_var_sum_with_split_non_commuting(self, shots, initial_ops, expected_res):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed on the combination of both wires.
+        """
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit
+        @qml.transform(pass_name="measurements-from-samples")
+        @qml.transform(pass_name="split-non-commuting")
+        @qml.qnode(dev, shots=shots)
+        def circuit():
+            initial_ops[0](wires=0)
+            initial_ops[1](wires=1)
+            return qml.var(2*qml.Z(wires=0) + qml.X(1))
+        
+        np.isclose(expected_res, circuit())
 
     @pytest.mark.usefixtures("use_capture")
     def test_integrate_with_diagonalize(self):
@@ -507,9 +612,6 @@ class TestMeasurementsFromSamplesIntegration:
 
     # -------------------------------------------------------------------------------------------- #
 
-    @pytest.mark.xfail(
-        reason="Operator arithmetic not yet supported with capture enabled", strict=True
-    )
     @pytest.mark.parametrize("shots", [1, 2])
     @pytest.mark.parametrize(
         "initial_ops, mp, expected_res",
@@ -524,7 +626,7 @@ class TestMeasurementsFromSamplesIntegration:
             ((qml.X, qml.X), qml.var, 0.0),
         ],
     )
-    def test_exec_2_wire_with_obs_combined(self, shots, initial_ops, mp, expected_res):
+    def test_exec_2_wire_with_tensor_obs(self, shots, initial_ops, mp, expected_res):
         """Test the measurements_from_samples transform on a device with two wires and terminal
         measurements that require an observable (i.e. expval and var).
 
@@ -617,27 +719,52 @@ class TestMeasurementsFromSamplesIntegration:
 
     # -------------------------------------------------------------------------------------------- #
 
-    @pytest.mark.xfail(reason="Dynamic shots not supported")
-    def test_exec_expval_dynamic_shots(self):
-        """Test the measurements_from_samples transform where the number of shots is dynamic.
+    def test_measurements_from_samples_multiple_measurements(self, run_filecheck_qjit):
+        """Test the transform measurements_from_samples with multiple measurement types
+        as part of the Catalyst pipeline."""
 
-        This use case is not currently supported.
-        """
+        dev = qml.device("lightning.qubit", wires=4)
 
-        @qml.qjit
-        def workload(shots):
-            dev = qml.device("lightning.qubit", wires=1)
+        @qml.set_shots(5000)
+        @qml.qnode(dev)
+        def basic_circuit(theta: float):
+            qml.RY(theta, 0)
+            qml.RY(theta / 2, 1)
+            qml.RY(2 * theta, 2)
+            qml.RY(theta, 3)
+            # CHECK-NOT: quantum.namedobs
+            # CHECK-NOT: quantum.expval
+            # CHECK-NOT: quantum.var
+            # CHECK-NOT: quantum.probs
+            # CHECK: quantum.sample
+            return (
+                qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
+                qml.var(qml.PauliX(wires=1)),
+                qml.sample(qml.PauliX(wires=0) @ qml.PauliX(wires=1) @ qml.PauliX(wires=2)),
+                qml.probs(wires=[3]),
+            )
 
-            @measurements_from_samples_pass
-            @qml.qnode(dev, shots=shots)
-            def circuit():
-                return qml.expval(qml.Z(wires=0))
+        circuit_compiled = qml.qjit(measurements_from_samples_pass(basic_circuit), seed=37)
 
-            return circuit()
+        run_filecheck_qjit(circuit_compiled)
 
-        result = workload(2)
-        assert result == 1.0
+        theta = 1.9
 
+        expval_res, var_res, sample_res, probs_res = circuit_compiled(theta)
+
+        expval_expected = np.sin(theta) * np.sin(theta / 2)
+        var_expected = 1 - np.sin(2 * theta) ** 2
+        sample_expected = basic_circuit(theta)[2]
+        probs_expected = [np.cos(theta / 2) ** 2, np.sin(theta / 2) ** 2]
+
+        assert np.isclose(expval_res, expval_expected, atol=0.05)
+        assert np.isclose(var_res, var_expected, atol=0.05)
+        assert np.allclose(probs_res, probs_expected, atol=0.05)
+
+        # sample comparison
+        assert np.isclose(np.mean(sample_res), np.mean(sample_expected), atol=0.05)
+        assert len(sample_res) == len(sample_expected)
+        assert set(np.array(sample_res)) == set(sample_expected)
 
 def _counts_catalyst_to_pl(basis_states, counts):
     """Helper function to convert counts in the Catalyst format to the PennyLane format.
