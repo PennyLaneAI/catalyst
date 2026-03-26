@@ -121,19 +121,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
             llvm::errs() << "\t" << opName << ": " << cost << ",\n";
         }
-        // std::unordered_map<std::string, float> targetGateToCost;
-        // llvm::errs() << "gate set:\n";
-        // for (const std::string &opCostPair : targetGateSetOption) {
-        //     llvm::StringRef pairRef(opCostPair);
-
-        //     auto [opName, cost] = pairRef.split("=");
-        //     bool success = to_float(cost, targetGateToCost[opName.str()]);
-
-        //     if (!success) {
-        //         return signalPassFailure();
-        //     }
-        //     llvm::errs() << "\t" << opName << ": " << cost << ",\n";
-        // }
 
         ///////////////////////////
         // Step 3: Get and convert operators in the module required for creating the graph

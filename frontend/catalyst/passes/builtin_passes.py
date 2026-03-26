@@ -21,9 +21,9 @@ from pathlib import Path
 from typing import Iterable
 
 import pennylane as qml
-from pennylane.decomposition.utils import to_name
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
+from catalyst.passes.utils import prepare_decomposition_options
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.precompile_decomposition_rules import BYTECODE_FILE_PATH
 
@@ -1505,28 +1505,12 @@ def graph_decomposition(
             _builtin_rule_path=_builtin_rule_path,
         )
 
-    if not isinstance(gate_set, dict):
-        gate_set = {to_name(op): 1.0 for op in gate_set}
-    else:
-        gate_set = {to_name(op): cost for op, cost in gate_set.items()}
-
-    options: dict[str, dict | tuple | str] = {
-        "gate-set": gate_set,
-        "bytecode-rules": str(_builtin_rule_path),
-    }
-
-    if fixed_decomps:
-        options |= {
-            "fixed-decomps": {to_name(op): rule.__name__ for op, rule in fixed_decomps.items()}
-        }
-
-    if alt_decomps:
-        options |= {
-            "alt-decomps": {
-                to_name(op): tuple(rule.__name__ for rule in rules)
-                for op, rules in alt_decomps.items()
-            }
-        }
+    options = prepare_decomposition_options(
+        gate_set=gate_set,
+        fixed_decomps=fixed_decomps,
+        alt_decomps=alt_decomps,
+        _builtin_rule_path=_builtin_rule_path,
+    )
 
     graph_decomposition_pass = {"graph-decomposition": options}
 
