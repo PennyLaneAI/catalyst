@@ -26,7 +26,7 @@ from pennylane import exceptions, measure
 from pennylane.transforms.dynamic_one_shot import fill_in_value
 
 import catalyst
-from catalyst import CompileError, cond, grad
+from catalyst import CompileError, grad
 from catalyst import jvp as C_jvp
 from catalyst import qjit, value_and_grad
 from catalyst import vjp as C_vjp
@@ -668,7 +668,7 @@ class TestDynamicOneShotIntegration:
             qml.RX(0.5 * x, 1)
             m1 = measure(1, postselect=postselect)
 
-            @cond(m0 & m1)
+            @qml.cond(m0 & m1)
             def cfun0():
                 qml.RY(2.0 * y, 0)
 
@@ -757,7 +757,7 @@ class TestDynamicOneShotIntegration:
             qml.RX(0.5 * x, 1)
             m1 = measure(1, reset=reset, postselect=postselect)
 
-            @cond(m0 & m1)
+            @qml.cond(m0 & m1)
             def cfun0():
                 qml.RY(2.0 * y, 0)
 

@@ -105,7 +105,7 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd, capture_mode):
 
         @qml.qnode(dev)
         def circ():
-            @catalyst.for_loop(0, num_qubits, 1)
+            @qml.for_loop(0, num_qubits, 1)
             def loop_0(i):
                 qml.RY(2.2, wires=i)
 
@@ -140,7 +140,7 @@ def test_dynamic_wires_statebased_with_wires(readout, backend, capfd, capture_mo
 
         @qml.qnode(dev)
         def circ():
-            @catalyst.for_loop(0, num_qubits, 1)
+            @qml.for_loop(0, num_qubits, 1)
             def loop_0(i):
                 qml.RY(2.2, wires=i)
 
@@ -175,7 +175,7 @@ def test_dynamic_wires_statebased_without_wires(readout, backend, capfd, capture
 
         @qml.qnode(dev)
         def circ(x):
-            @catalyst.for_loop(0, num_qubits, 1)
+            @qml.for_loop(0, num_qubits, 1)
             def loop_0(i):
                 qml.RY(2.2, wires=i)
 
@@ -209,7 +209,7 @@ def test_dynamic_wires_sample_with_wires(shots, backend, capfd, capture_mode):
         @qml.set_shots(shots)
         @qml.qnode(dev)
         def circ():
-            @catalyst.for_loop(0, num_qubits, 1)
+            @qml.for_loop(0, num_qubits, 1)
             def loop_0(i):
                 qml.RY(0.0, wires=i)
 
@@ -246,7 +246,7 @@ def test_dynamic_wires_sample_without_wires(shots, backend, capfd, capture_mode)
         @qml.set_shots(shots)
         @qml.qnode(dev)
         def circ():
-            @catalyst.for_loop(0, num_qubits, 1)
+            @qml.for_loop(0, num_qubits, 1)
             def loop_0(i):
                 qml.RY(0.0, wires=i)
 
@@ -373,16 +373,16 @@ def test_dynamic_shots_and_wires(capfd, capture_mode):
         @qml.qnode(device)
         def circuit():
             # Apply Hadamard to all wires
-            @catalyst.for_loop(0, num_wires, 1)
+            @qml.for_loop(0, num_wires, 1)
             def apply_hadamards(i):
                 qml.Hadamard(i)
 
             apply_hadamards()
 
             # Apply some entangling gates if we have multiple wires
-            @catalyst.cond(num_wires > 1)
+            @qml.cond(num_wires > 1)
             def add_entanglement():
-                @catalyst.for_loop(0, num_wires - 1, 1)
+                @qml.for_loop(0, num_wires - 1, 1)
                 def apply_cnots(i):
                     qml.CNOT([i, i + 1])
 
