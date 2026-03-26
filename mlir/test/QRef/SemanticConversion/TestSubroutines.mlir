@@ -177,3 +177,29 @@ func.func @subroutine(%r: !qref.reg<3>, %q: !qref.bit, %param: f64) -> (i1) {
     // CHECK: return [[mres]], [[insert]], [[GATE]]#1 : i1, !quantum.reg, !quantum.bit
     return %mres : i1
 }
+
+
+// -----
+
+// test subroutines calling other subroutines
+
+// CHECK: func.func @callee(%arg0: !quantum.reg) -> !quantum.reg {
+func.func @callee(%r: !qref.reg<1>) {
+    %q = qref.get %r[0] : !qref.reg<1> -> !qref.bit
+    qref.custom "PauliX"() %q : !qref.bit
+    return
+
+    // CHECK: [[extract:%.+]] = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[X:%.+]] = quantum.custom "PauliX"() [[extract]] : !quantum.bit
+    // CHECK: [[insert:%.+]] = quantum.insert %arg0[ 0], [[X]] : !quantum.reg, !quantum.bit
+    // CHECK: return [[insert]] : !quantum.reg
+}
+
+// CHECK: func.func @caller(%arg0: !quantum.reg) -> !quantum.reg {
+func.func @caller(%r: !qref.reg<1>) {
+    func.call @callee(%r) : (!qref.reg<1>) -> ()
+    return
+
+    // CHECK: [[call:%.+]] = call @callee(%arg0) : (!quantum.reg) -> !quantum.reg
+    // CHECK: return [[call]] : !quantum.reg
+}

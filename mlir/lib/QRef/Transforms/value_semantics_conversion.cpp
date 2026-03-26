@@ -22,6 +22,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Casting.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -1524,6 +1525,12 @@ struct ValueSemanticsConversionPass
         mod->walk([&](func::FuncOp f) {
             if (f->hasAttrOfType<UnitAttr>("quantum.node")) {
                 targetFuncs.insert(f);
+                return WalkResult::advance();
+            }
+
+            if (llvm::any_of(f.getArgumentTypes(),
+                             llvm::IsaPred<qref::QubitType, qref::QuregType>)) {
+                targetSubroutines.insert(f);
                 return WalkResult::advance();
             }
 
