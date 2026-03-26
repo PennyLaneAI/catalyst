@@ -47,3 +47,9 @@ target_include_directories(decompsolver
 )
 
 set_property(TARGET decompsolver PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+if(NOT APPLE)
+    set_property(TARGET decompsolver APPEND PROPERTY BUILD_RPATH $ORIGIN)
+else()
+    set_property(TARGET decompsolver APPEND PROPERTY BUILD_RPATH @loader_path)
+endif()
