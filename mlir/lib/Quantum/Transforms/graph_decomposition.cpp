@@ -69,7 +69,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         llvm::StringMap<func::FuncOp> customRules;
 
         llvm::StringMap<llvm::StringRef> fixedDecomps;
-        llvm::StringMap<llvm::StringRef> altDecomps;
+        llvm::StringMap<llvm::SmallVector<llvm::StringRef>> altDecomps;
 
         llvm::errs() << "fixed decomps:\n";
         for (const std::string &opRulePair : fixedDecompsOption) {
@@ -84,9 +84,15 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         for (const std::string &opRulePair : altDecompsOption) {
             llvm::StringRef pairRef(opRulePair);
 
-            auto [opName, ruleName] = pairRef.split("=");
-            altDecomps[opName] = ruleName;
-            llvm::errs() << "\t" << opName << ": " << ruleName << ",\n";
+            auto [opName, rulesString] = pairRef.split("=");
+
+            // TODO collect names from list
+            rulesString.split(altDecomps[opName], ",");
+            llvm::errs() << "\t" << opName << ": ";
+            for (auto ruleName : altDecomps[opName]) {
+                llvm::errs() << ruleName << ", ";
+            }
+            llvm::errs() << "\n";
         }
 
         // List of operators
@@ -101,7 +107,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         ///////////////////////////
         // Step 1: annotate the user-defined (custom) rules with resources
         // and register them for later use in the graph decomposition.
-        registerCustomDecompositionRules(module, customRules);
+        registerCustomDecompositionRules(module, fixedDecomps, altDecomps, customRules);
         llvm::errs() << "registered user rules\n";
 
         ///////////////////////////
@@ -164,8 +170,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
   private:
     void loadBuiltInDecompositionRules([[maybe_unused]] ModuleOp module /*, ...*/) { return; }
 
-    void registerCustomDecompositionRules(ModuleOp module,
-                                          llvm::StringMap<func::FuncOp> &custom_rules)
+    void registerCustomDecompositionRules(
+        ModuleOp module, llvm::StringMap<llvm::StringRef> &fixed_decomps,
+        llvm::StringMap<llvm::SmallVector<llvm::StringRef>> &alt_decomps,
+        llvm::StringMap<func::FuncOp> &custom_rules)
     {
         PassManager pm(&getContext());
         pm.addPass(createRegisterDecompRuleResourcePass());
@@ -174,13 +182,21 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         }
 
         module.walk([&](func::FuncOp func) {
-            if (StringRef funcName = func.getName();
+            if (StringRef func_name = func.getName();
                 func->getAttrOfType<StringAttr>("target_gate")) {
-                // TODO: Update this to only register rules that are customly defined for this
-                // specific qp.decompose HOW? it requires updates to the lowering patterns from
-                // the frontend ...
+                for (auto &[_, rule_name] : fixed_decomps) {
+                    if (rule_name == func.getName()) {
+                        custom_rules[func_name] = func;
+                    }
+                }
 
-                custom_rules[funcName] = func;
+                for (auto &[_, alt_rules] : alt_decomps) {
+                    for (auto rule_name : alt_rules) {
+                        if (rule_name == func.getName()) {
+                            custom_rules[func_name] = func;
+                        }
+                    }
+                }
             }
             return WalkResult::skip();
         });
