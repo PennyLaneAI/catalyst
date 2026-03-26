@@ -18,7 +18,7 @@ from typing import cast
 
 import pytest
 from xdsl.dialects import test
-from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType, TensorType, i32
+from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType, TensorType, i32, i64
 from xdsl.ir import AttributeCovT, OpResult
 
 from catalyst.python_interface.dialects import qecp
@@ -119,15 +119,15 @@ class TestQecPhysicalTypes:
         assert hyper_reg.k == expected_k
         assert hyper_reg.n == expected_n
 
-    tanner_graph = qecp.TannerGraphType(8, 6, i32)
-    assert isinstance(tanner_graph.row_idx_size, IntegerAttr)
-    assert tanner_graph.row_idx_size.value.data == 8
-    assert tanner_graph.row_idx_size.type == IntegerType(64)
-    assert isinstance(tanner_graph.col_ptr_size, IntegerAttr)
-    assert tanner_graph.col_ptr_size.value.data == 6
-    assert tanner_graph.col_ptr_size.type == IntegerType(64)
-    assert isinstance(tanner_graph.element_type, IntegerType)
-    assert tanner_graph.element_type.width.data == 32
+    @pytest.mark.parametrize("row_idx_size", [8, 10])
+    @pytest.mark.parametrize("col_ptr_size", [6, 8])
+    @pytest.mark.parametrize("element_type", [i32, i64])
+    def test_qecp_type_constructor_tanner_graph(self, row_idx_size, col_ptr_size, element_type):
+        """Test the constructor of qecp.TannerGraphType."""
+        tanner_graph = qecp.TannerGraphType(row_idx_size, col_ptr_size, element_type)
+        assert tanner_graph.row_idx_size == IntegerAttr(row_idx_size, IntegerType(64))
+        assert tanner_graph.col_ptr_size == IntegerAttr(col_ptr_size, IntegerType(64))
+        assert tanner_graph.element_type == element_type
 
 
 class TestQecPhysicalOps:
