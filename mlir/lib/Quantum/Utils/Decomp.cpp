@@ -27,11 +27,9 @@ std::vector<mlir::OwningOpRef<mlir::func::FuncOp>> getRulesFromBytecode(llvm::St
 {
     llvm::errs() << "getting rules from bytecode\n";
     mlir::ParserConfig config(context);
-    llvm::errs() << "got parser config from context\n";
     llvm::errs() << filename << "\n";
     mlir::OwningOpRef<mlir::ModuleOp> moduleOp =
         mlir::parseSourceFile<mlir::ModuleOp>(filename, config);
-    llvm::errs() << "parsed file\n";
 
     std::vector<mlir::OwningOpRef<mlir::func::FuncOp>> funcOps;
 
@@ -41,7 +39,8 @@ std::vector<mlir::OwningOpRef<mlir::func::FuncOp>> getRulesFromBytecode(llvm::St
     }
 
     llvm::errs() << "collecting funcops\n";
-    for (auto func : moduleOp->getOps<mlir::func::FuncOp>()) {
+    for (auto func : llvm::make_early_inc_range(moduleOp.get().getOps<mlir::func::FuncOp>())) {
+        llvm::errs() << "collected " << func.getName() << "\n";
         func->remove();
         funcOps.push_back(mlir::OwningOpRef<mlir::func::FuncOp>(func));
     }
