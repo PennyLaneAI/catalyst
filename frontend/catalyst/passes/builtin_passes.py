@@ -1528,6 +1528,4 @@ def graph_decomposition(
             }
         }
 
-    graph_decomposition_pass = {"graph-decomposition": options}
-
-    return qml.transform(pass_name="graph-decomposition")(qnode, **graph_decomposition_pass)
+    return qml.transform(pass_name="graph-decomposition")(qnode, **options)
