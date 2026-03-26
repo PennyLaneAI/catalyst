@@ -887,6 +887,10 @@ void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tra
         }
     }
 
+    if (newResultTypes.size() == 0) {
+        return;
+    }
+
     auto newCallOp =
         migrateOpToValueSemantics<func::CallOp>(builder, callOp, tracker, newResultTypes);
 
@@ -1407,7 +1411,6 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
     builder.eraseOp(whileOp);
 }
 
-// Driver
 void handleSubroutine(IRRewriter &builder, func::FuncOp f)
 {
     QubitValueTracker tracker;
@@ -1417,7 +1420,6 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f)
     // Set up the root values in the tracker if there are any arguments to the region
     // FuncOp args are block arguments on the first block of the region.
     Block &block = f.front();
-    std::vector<unsigned> rArgsErasureIndices;
     SmallVector<BlockArgument> funcArgs(block.getArguments());
     SmallVector<Value> originalRValueArgs;
     unsigned _numCreatedNewArgs = 0;
@@ -1436,7 +1438,6 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f)
             tracker.setCurrentVQreg(arg, vQreg);
         }
         _numCreatedNewArgs++;
-        rArgsErasureIndices.push_back(newArgIdx + 1);
     }
 
     handleRegion(builder, f.getBody(), tracker);
@@ -1448,13 +1449,8 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f)
         builder.eraseOp(getOp);
     });
 
-    for (unsigned i : llvm::reverse(rArgsErasureIndices)) {
-        // A note on the reverse: if we want to erase args at indices 0 and 1, and the original
-        // args are [a, b, c, d], we need to erase 1 (b) first, then 0 (a). Because if we erase
-        // arg0 (a) first, then after that erasure iteration, the 3 new args are [b, c, d], and
-        // the arg now at index 1 was the original arg2 (c)!
-        f.front().eraseArgument(i);
-    }
+    block.eraseArguments(
+        [](BlockArgument arg) { return isa<qref::QubitType, qref::QuregType>(arg.getType()); });
 
     f.setFunctionType(FunctionType::get(ctx, block.getArgumentTypes(),
                                         f.front().getTerminator()->getOperandTypes()));
