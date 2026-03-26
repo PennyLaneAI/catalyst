@@ -47,7 +47,6 @@ namespace quantum {
 
 struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDecompositionPass> {
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
-
     void runOnOperation() final
     {
         llvm::errs() << "Parsed options from CLI:\n";
@@ -190,7 +189,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     void getOperators([[maybe_unused]] ModuleOp module,
                       [[maybe_unused]] std::vector<OperatorNode> &operators)
     {
-
         module.walk([&](CustomOp op) {
             OperatorNode node;
             node.name = op.getGateName().str();
@@ -208,9 +206,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                  const llvm::StringMap<func::FuncOp> &custom_rules, std::vector<RuleNode> &rules,
                  std::unordered_map<std::string, mlir::OwningOpRef<func::FuncOp>> &ruleNameToFuncOp)
     {
-
         // TODO user nodes
-
         std::vector<mlir::OwningOpRef<mlir::func::FuncOp>> builtinRules =
             getRulesFromBytecode(filename, module.getContext());
 
