@@ -414,7 +414,7 @@ jobs:
         STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
-        RUNTIME_BUILD_DIR="$(pwd)/runtime-build" \
+        RUNTIME_LIB_DIR="$(pwd)/runtime-build/lib" \
         make dialects
 
     - name: Build MLIR Dialect Docs
@@ -426,7 +426,7 @@ jobs:
         STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
-        RUNTIME_BUILD_DIR="$(pwd)/runtime-build" \
+        RUNTIME_LIB_DIR="$(pwd)/runtime-build/lib" \
         make dialect-docs
 
     - name: Build Standalone Plugin
