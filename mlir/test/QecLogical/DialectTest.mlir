@@ -140,3 +140,11 @@ func.func @test_gate_op_cnot(
     %2, %3 = qecl.cnot %arg0[%arg2], %arg1[%arg3] : !qecl.codeblock<1>, !qecl.codeblock<1>
     func.return
 }
+
+// -----
+
+func.func @test_measure_op(%arg0 : !qecl.codeblock<1>, %arg1 : index) {
+    %mres0, %0 = qecl.measure %arg0[0] : i1, !qecl.codeblock<1>
+    %mres1, %1 = qecl.measure %arg0[%arg1] : i1, !qecl.codeblock<1>
+    func.return
+}
