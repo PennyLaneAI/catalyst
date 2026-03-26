@@ -30,7 +30,8 @@ from catalyst import measure
 class TestPyTreesReturnValues:
     """Test QJIT workflows with different return value data-types."""
 
-    def test_return_value_float(self, backend, capture_mode):
+    @pytest.mark.usefixtures("use_both_frontend")
+    def test_return_value_float(self, backend):
         """Test constant."""
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -39,7 +40,7 @@ class TestPyTreesReturnValues:
             qml.RX(params[1], wires=1)
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
 
-        jitted_fn = qjit(circuit1, capture=capture_mode)
+        jitted_fn = qjit(circuit1)
 
         params = [0.4, 0.8]
         expected = jnp.cos(params[0]) * jnp.cos(params[1])
@@ -173,7 +174,8 @@ class TestPyTreesReturnValues:
         assert result[0] == 4.0
         assert result[1] == 6.0
 
-    def test_return_value_hybrid(self, backend, capture_mode):
+    @pytest.mark.usefixtures("use_both_frontend")
+    def test_return_value_hybrid(self, backend):
         """Test tuples."""
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -182,7 +184,7 @@ class TestPyTreesReturnValues:
             qml.CNOT(wires=[0, 1])
             return qml.var(qml.PauliZ(1))
 
-        @qjit(capture=capture_mode)
+        @qjit
         def workflow1(param):
             a = circuit1()
             return (a, [jnp.sin(param) ** 2, jnp.cos(param) ** 2], a)
@@ -453,10 +455,11 @@ class TestPyTreesFuncArgs:
         }
         result = jitted_fn(params)
 
-    def test_args_workflow(self, backend, capture_mode):
+    @pytest.mark.usefixtures("use_both_frontend")
+    def test_args_workflow(self, backend):
         """Test arguments with workflows."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         def workflow1(params1, params2):
             """A classical workflow"""
             res1 = params1["a"][0][0] + params2[1]
@@ -470,7 +473,7 @@ class TestPyTreesFuncArgs:
         result = workflow1(params1, params2)
         assert jnp.allclose(result, expected)
 
-        @qjit(capture=capture_mode)
+        @qjit
         def workflow2(params1, params2):
             """A hybrid workflow"""
 
@@ -542,11 +545,12 @@ class TestPyTreesFuncArgs:
         assert np.allclose(result_flatten, result_flatten_expected)
         assert tree == tree_expected
 
+    @pytest.mark.usefixtures("use_both_frontend")
     @pytest.mark.parametrize("inp", [(np.array([0.2, 0.5])), (jnp.array([0.2, 0.5]))])
-    def test_args_control_flow(self, backend, inp, capture_mode):
+    def test_args_control_flow(self, backend, inp):
         """Test arguments with control-flows operations."""
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit1(n, params):
             @for_loop(0, n, 1)
@@ -591,7 +595,8 @@ class TestPyTreesFuncArgs:
         result = circuit({"wire": 1})
         assert jnp.allclose(result, True)
 
-    def test_dev_wires_have_pytree(self, backend, capture_mode):
+    @pytest.mark.usefixtures("use_both_frontend")
+    def test_dev_wires_have_pytree(self, backend):
         """Device wires are pytree-compatible."""
 
         def subroutine(wires):
@@ -600,7 +605,7 @@ class TestPyTreesFuncArgs:
 
         dev = qml.device(backend, wires=3)
 
-        @qjit(capture=capture_mode)
+        @qjit
         @qml.qnode(dev)
         def test_function():
             adjoint(subroutine)(dev.wires)
@@ -609,10 +614,11 @@ class TestPyTreesFuncArgs:
         test_function()
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestAuxiliaryData:
     """Test PyTrees with Auxiliary data."""
 
-    def test_auxiliary_data(self, capture_mode):
+    def test_auxiliary_data(self):
         """Make sure that we are able to return arbitrary PyTrees.
 
         The example below was taken from:
@@ -642,7 +648,7 @@ class TestAuxiliaryData:
 
         jax.tree_util.register_pytree_node(MyContainer, flatten_MyContainer, unflatten_MyContainer)
 
-        @qjit(capture=capture_mode)
+        @qjit
         def classical(x):
             return MyContainer("aux_data", x * x)
 
