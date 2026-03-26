@@ -670,6 +670,7 @@
   been added for compatibility with the Python interface to Catalyst.
   [(#2519)](https://github.com/PennyLaneAI/catalyst/pull/2519)
   [(#2537)](https://github.com/PennyLaneAI/catalyst/pull/2537)
+  [(#2574)](https://github.com/PennyLaneAI/catalyst/pull/2574)
 
 
 <h3>Documentation 📝</h3>
