@@ -123,6 +123,16 @@ class DecompositionGraph {
      * either as a root operator or as an operator appearing in the decomposition rules.
      */
     bool hasOperator(const Core::OperatorNode &op) const;
+
+    /**
+     * @brief Prints the graph structure for debugging purposes.
+     *
+     * This method can be used to visualize the graph structure, including the operators, rules, and
+     * their relationships. It can help in understanding how the graph is constructed and how the
+     * decomposition rules are connected to the operators. The exact format of the output can be
+     * designed to be human-readable and informative for debugging.
+     */
+    void showGraph() const;
 };
 
 } // namespace DecompGraph::Solver

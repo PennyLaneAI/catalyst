@@ -18,6 +18,8 @@
 
 #include <algorithm>
 
+#include <iostream>
+
 #include "DGSolver.hpp"
 #include "DGTypes.hpp"
 
@@ -140,7 +142,10 @@ Core::GraphResult DecompositionSolver::solve()
     result.solvedRoots = graph.getRoots();
 
     for (const auto &root : result.solvedRoots) {
+        std::cerr << "Solving for root operator: " << root.name << "\n";
         const auto chosen_rule = solveOperator(root);
+        std::cerr << "Chosen rule for operator " << root.name << ": " << chosen_rule.ruleName
+                  << " with cost " << chosen_rule.totalCost << "\n";
         if (chosen_rule.ruleName.empty()) {
             throw Core::GraphSolverFailedError(root, {}); // no valid rules
         }
@@ -155,6 +160,8 @@ Core::GraphResult DecompositionSolver::solve()
 
 DecompositionSolver::SolutionType DecompositionSolver::getSolvedMap()
 {
+    graph.showGraph(); // Debug: show the graph structure
+
     if (solvedMap.empty()) {
         solve();
     }

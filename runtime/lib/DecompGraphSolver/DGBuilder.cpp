@@ -193,4 +193,33 @@ bool DecompositionGraph::hasOperator(const Core::OperatorNode &op) const
     return impl->opToId.find(op) != impl->opToId.end();
 }
 
+void DecompositionGraph::showGraph() const
+{
+    std::cerr << "Decomposition Graph:\n";
+    // Show all operators by their names
+    std::cerr << "Operators:\n";
+    for (const auto &[op, id] : impl->opToId) {
+        std::cerr << "  ID " << id << ": " << op.name << "\n";
+    }
+
+    // Show all rules by their names and their input/output operators
+    std::cerr << "Rules:\n";
+    for (const auto &[ruleId, vertex] : impl->ruleIdToVertex) {
+        const auto &rule = impl->rules[ruleId];
+        std::cerr << "  Rule ID " << ruleId << ": " << rule.name << "\n";
+        std::cerr << "    Output: " << rule.output.name << "\n";
+        std::cerr << "    Inputs:\n";
+        for (const auto &input : rule.inputs) {
+            std::cerr << "      - " << input.op.name << " (multiplicity: " << input.multiplicity
+                      << ")\n";
+        }
+    }
+
+    // Show target gateset
+    std::cerr << "Target Gateset:\n";
+    for (const auto &[op, cost] : impl->gateset.ops) {
+        std::cerr << "  " << op.name << " with cost " << cost << "\n";
+    }
+}
+
 } // namespace DecompGraph::Solver
