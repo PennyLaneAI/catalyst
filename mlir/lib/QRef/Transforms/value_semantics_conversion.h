@@ -57,6 +57,7 @@ struct rQubitGetOpInfo {
 };
 
 // Misc helper functions
+std::optional<rQubitGetOpInfo> getGetOpInfo(Value rQubit);
 Value getRSourceRegisterValue(Value rQubit);
 void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValues);
 DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumGate rGateOp);

@@ -134,7 +134,7 @@ struct QubitValueTracker {
         assert(isa<qref::QubitType>(rQubit.getType()) && "Expected qref.bit type");
         assert(this->isRootRQubit(rQubit) && "The provided qref.bit value is not root");
 
-        std::optional<rQubitGetOpInfo> getOpInfo = this->getGetOpInfo(rQubit);
+        std::optional<rQubitGetOpInfo> getOpInfo = getGetOpInfo(rQubit);
 
         Value vQubit;
         if (!getOpInfo.has_value()) {
@@ -159,7 +159,7 @@ struct QubitValueTracker {
         assert(isa<qref::QubitType>(rQubit.getType()) && "Expected qref.bit type");
         assert(isa<quantum::QubitType>(vQubit.getType()) && "Expected quantum.bit type");
 
-        std::optional<rQubitGetOpInfo> getOpInfo = this->getGetOpInfo(rQubit);
+        std::optional<rQubitGetOpInfo> getOpInfo = getGetOpInfo(rQubit);
 
         if (!getOpInfo.has_value()) {
             if (this->qubit_map.contains(rQubit)) {
@@ -183,7 +183,7 @@ struct QubitValueTracker {
     {
         assert(isa<qref::QubitType>(rQubit.getType()) && "Expected qref.bit type");
 
-        std::optional<rQubitGetOpInfo> getOpInfo = this->getGetOpInfo(rQubit);
+        std::optional<rQubitGetOpInfo> getOpInfo = getGetOpInfo(rQubit);
 
         if (!getOpInfo) {
             return this->qubit_map.contains(rQubit);
@@ -203,23 +203,6 @@ struct QubitValueTracker {
     // This map records the root qubits coming from qref.get ops.
     // The key is a pair of the register and the index on the get op, so that we can handle aliasing
     llvm::DenseMap<rQubitGetOpInfo, Value> getOp_qubit_map;
-
-    std::optional<rQubitGetOpInfo> getGetOpInfo(Value rQubit)
-    {
-        bool isGetOp = rQubit.getDefiningOp() && isa<qref::GetOp>(rQubit.getDefiningOp());
-        if (!isGetOp) {
-            return std::nullopt;
-        }
-
-        auto getOp = cast<qref::GetOp>(rQubit.getDefiningOp());
-        Value reg = getOp.getQreg();
-        if (getOp.getIdxAttr().has_value()) {
-            return rQubitGetOpInfo(reg, getOp.getIdxAttr().value());
-        }
-        else {
-            return rQubitGetOpInfo(reg, getOp.getIdx());
-        }
-    }
 }; // struct QubitValueTracker
 
 /**
@@ -479,6 +462,23 @@ struct TransientQubitExtractor {
     }
 }; // struct TransientQubitExtractor
 
+std::optional<rQubitGetOpInfo> getGetOpInfo(Value rQubit)
+{
+    bool isGetOp = rQubit.getDefiningOp() && isa<qref::GetOp>(rQubit.getDefiningOp());
+    if (!isGetOp) {
+        return std::nullopt;
+    }
+
+    auto getOp = cast<qref::GetOp>(rQubit.getDefiningOp());
+    Value reg = getOp.getQreg();
+    if (getOp.getIdxAttr().has_value()) {
+        return rQubitGetOpInfo(reg, getOp.getIdxAttr().value());
+    }
+    else {
+        return rQubitGetOpInfo(reg, getOp.getIdx());
+    }
+}
+
 /**
  * @brief Given a non-root rQubit Value, return the rQreg Value that it belongs to.
  * The non-root rQubit Value must be the result of a qref.get op.
@@ -582,25 +582,18 @@ void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValu
 
     // Remove aliasing get ops
     SetVector<Value> aliasingGetOpRemovalWorklist;
-    SmallVector<Value> rQubitsFromGetOps;
+    DenseSet<rQubitGetOpInfo> seenGetInfos;
     for (const Value &v : necessaryRegionRValues) {
         if (isa<BlockArgument>(v) || !isa<qref::GetOp>(v.getDefiningOp())) {
             continue;
         }
-        rQubitsFromGetOps.push_back(v);
-    }
 
-    for (size_t i = 0; i < rQubitsFromGetOps.size(); i++) {
-        if (aliasingGetOpRemovalWorklist.contains(rQubitsFromGetOps[i])) {
-            continue;
+        rQubitGetOpInfo info = getGetOpInfo(v).value();
+        if (seenGetInfos.contains(info)) {
+            aliasingGetOpRemovalWorklist.insert(v);
         }
-
-        for (size_t j = i + 1; j < rQubitsFromGetOps.size(); j++) {
-            if (OperationEquivalence::isEquivalentTo(rQubitsFromGetOps[i].getDefiningOp(),
-                                                     rQubitsFromGetOps[j].getDefiningOp(),
-                                                     OperationEquivalence::IgnoreLocations)) {
-                aliasingGetOpRemovalWorklist.insert(rQubitsFromGetOps[j]);
-            }
+        else {
+            seenGetInfos.insert(info);
         }
     }
 
