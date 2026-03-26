@@ -193,5 +193,86 @@ def InsertQubitOp : QecPhysical_Op<"insert", [AllTypesMatch<["in_codeblock", "ou
     let hasFolder = 1;
 }
 
+/**
+ * Base class for single-qubit physical gate operations.
+ *
+ * An operation that inherits from this class represents a physical gate operation applied to a QEC
+ * physical qubit. For example,
+ *
+ * ```mlir
+ * %1 = qecp.hadamard %0 : !qecp.qubit<data>
+ * ```
+ *
+ * represents a physical Hadamard operation applied to the physical data qubit `%0`. Single-qubit
+ * physical gate operations can be applied to both data and auxiliary qubits.
+ *
+ * Adjoint operations are supported by adding the `adj` unit attribute. For example, a physical S†
+ * gate operation is represented as follows:
+ *
+ * ```mlir
+ * %1 = qecp.s %0 adj : !qecp.qubit<data>
+ * ```
+ */
+class SingleQubitPhysicalGate_Op<string mnemonic, list<Trait> traits = []> :
+        QecPhysical_Op<mnemonic, traits> {
+    let arguments = (ins
+        QecPhysicalQubitType:$in_qubit,
+        UnitAttr:$adjoint
+    );
+
+    let results = (outs
+        QecPhysicalQubitType:$out_qubit
+    );
+
+    let assemblyFormat = [{
+        $in_qubit (`adj` $adjoint^)? attr-dict `:` qualified(type($in_qubit))
+    }];
+}
+
+def IdentityOp : SingleQubitPhysicalGate_Op<"identity", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical Identity gate operation.";
+}
+
+def PauliXOp : SingleQubitPhysicalGate_Op<"x", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical Pauli X gate operation.";
+}
+
+def PauliYOp : SingleQubitPhysicalGate_Op<"y", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical Pauli Y gate operation.";
+}
+
+def PauliZOp : SingleQubitPhysicalGate_Op<"z", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical Pauli Z gate operation.";
+}
+
+def HadamardOp : SingleQubitPhysicalGate_Op<"hadamard", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical Hadamard gate operation.";
+}
+
+def SOp : SingleQubitPhysicalGate_Op<"s", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical S (π/2 phase) gate operation.";
+}
+
+def CnotOp : QecPhysical_Op<"cnot", [
+    AllTypesMatch<["in_ctrl_qubit", "out_ctrl_qubit"]>,
+    AllTypesMatch<["in_trgt_qubit", "out_trgt_qubit"]>
+]> {
+    let summary = "A physical CNOT gate operation.";
+
+    let arguments = (ins
+        QecPhysicalQubitType:$in_ctrl_qubit,
+        QecPhysicalQubitType:$in_trgt_qubit
+    );
+
+    let results = (outs
+        QecPhysicalQubitType:$out_ctrl_qubit,
+        QecPhysicalQubitType:$out_trgt_qubit
+    );
+
+    let assemblyFormat = [{
+        $in_ctrl_qubit `,` $in_trgt_qubit attr-dict `:` qualified(type($in_ctrl_qubit)) `,` qualified(type($in_trgt_qubit))
+    }];
+}
+
 
 #endif // QEC_PHYSICAL_OPS
