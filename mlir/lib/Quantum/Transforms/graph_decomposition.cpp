@@ -114,12 +114,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             llvm::StringRef pairRef(opCostPair);
 
             auto [opName, cost] = pairRef.split("=");
-            bool success = to_float(cost, targetGateSet.ops[OperatorNode{opName.str()}]);
+            bool success = to_float(cost.drop_back(6), // remove the type info
+                                    targetGateSet.ops[OperatorNode{opName.str()}]);
+            llvm::errs() << "\t" << opName << ": " << cost << ", parsing: " << success << ",\n";
 
             if (!success) {
                 return signalPassFailure();
             }
-            llvm::errs() << "\t" << opName << ": " << cost << ",\n";
         }
 
         ///////////////////////////
