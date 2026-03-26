@@ -31,8 +31,7 @@ from xdsl.dialects.builtin import (
 )
 from xdsl.dialects.tensor import ExtractOp as tensorExtractOp
 from xdsl.ir import Attribute, SSAValue
-
-from catalyst.python_interface.dialects.stablehlo import ConstantOp as hloConstantOp
+from xdsl_jax.dialects.stablehlo import ConstantOp as hloConstantOp
 
 
 def get_constant_from_ssa(value: SSAValue) -> Number | None:

@@ -786,16 +786,18 @@ class TestAssemblyFormat:
         //////////// Quantum register ////////////
         //////////////////////////////////////////
         // CHECK: [[QREG:%.+]] = "test.op"() : () -> !quantum.reg
+        // CHECK: [[QUBIT:%.+]] = "test.op"() : () -> !quantum.bit
         %qreg = "test.op"() : () -> !quantum.reg
+        %qubit = "test.op"() : () -> !quantum.bit
 
         //////////// **AdjointOp and YieldOp tests** ////////////
-        // CHECK:      quantum.adjoint([[QREG]]) : !quantum.reg {
-        // CHECK-NEXT: ^bb0([[ARG_QREG:%.+]] : !quantum.reg):
-        // CHECK-NEXT:   quantum.yield [[ARG_QREG]] : !quantum.reg
+        // CHECK:      quantum.adjoint([[QREG]], [[QUBIT]]) : !quantum.reg, !quantum.bit {
+        // CHECK-NEXT: ^bb0([[ARG_QREG:%.+]]: !quantum.reg, [[ARG_QUBIT:%.+]]: !quantum.bit):
+        // CHECK-NEXT:   quantum.yield [[ARG_QREG]], [[ARG_QUBIT]] : !quantum.reg, !quantum.bit
         // CHECK-NEXT: }
-        %qreg1 = quantum.adjoint(%qreg) : !quantum.reg {
-        ^bb0(%arg_qreg: !quantum.reg):
-          quantum.yield %arg_qreg : !quantum.reg
+        %qreg1, %qubit1 = quantum.adjoint(%qreg, %qubit) : !quantum.reg, !quantum.bit {
+        ^bb0(%arg_qreg: !quantum.reg, %arg_qubit: !quantum.bit):
+          quantum.yield %arg_qreg, %arg_qubit : !quantum.reg, !quantum.bit
         }
 
         //////////// **DeviceInitOp tests** ////////////
