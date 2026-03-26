@@ -360,10 +360,10 @@ def test_assembly_format(run_filecheck, pretty_print):
     %qd3 = qecp.y %qd2 : !qecp.qubit<data>
     %qa3 = qecp.y %qa2 : !qecp.qubit<aux>
 
-    // CHECK: [[qd4:%.+]] = qecp.y [[qd3]] : !qecp.qubit<data>
-    // CHECK: [[qa4:%.+]] = qecp.y [[qa3]] : !qecp.qubit<aux>
-    %qd4 = qecp.y %qd3 : !qecp.qubit<data>
-    %qa4 = qecp.y %qa3 : !qecp.qubit<aux>
+    // CHECK: [[qd4:%.+]] = qecp.z [[qd3]] : !qecp.qubit<data>
+    // CHECK: [[qa4:%.+]] = qecp.z [[qa3]] : !qecp.qubit<aux>
+    %qd4 = qecp.z %qd3 : !qecp.qubit<data>
+    %qa4 = qecp.z %qa3 : !qecp.qubit<aux>
 
     // CHECK: [[qd5:%.+]] = qecp.hadamard [[qd4]] : !qecp.qubit<data>
     // CHECK: [[qa5:%.+]] = qecp.hadamard [[qa4]] : !qecp.qubit<aux>
