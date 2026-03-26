@@ -586,11 +586,6 @@ class SOp(SingleQubitPhysicalGateOp):
 
     name = "qecp.s"
 
-    def __init__(
-        self, in_qubit: QecPhysicalQubitSSAValue | Operation, adjoint: UnitAttr | bool = False
-    ):
-        super().__init__(in_qubit, adjoint)
-
 
 @irdl_op_definition
 class CnotOp(IRDLOperation):
