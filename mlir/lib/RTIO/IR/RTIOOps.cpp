@@ -44,6 +44,13 @@ LogicalResult RTIORPCOp::verify()
         return emitOpError("RPC can return at most one value");
     }
 
+    if (auto kwNames = (*this)->getAttrOfType<ArrayAttr>("keyword_names")) {
+        if (kwNames.size() > getArgs().size()) {
+            return emitOpError("keyword_names has more entries (")
+                   << kwNames.size() << ") than arguments (" << getArgs().size() << ")";
+        }
+    }
+
     return success();
 }
 

@@ -531,9 +531,18 @@ struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToA
 
         OpBuilder::InsertionGuard guard(builder);
 
-        // Ensure helper functions are defined in the module
         ARTIQRuntimeBuilder artiq(builder, kernelFunc);
-        artiq.ensureHelperFunctions();
+
+        // DDS/SPI helper functions are only needed when the module has pulse ops.
+        // Skip them if there are no pulse ops to avoid requiring hardware device_db entries.
+        bool hasPulses = false;
+        module.walk([&](rtio::RTIOPulseOp) {
+            hasPulses = true;
+            return WalkResult::interrupt();
+        });
+        if (hasPulses) {
+            artiq.ensureHelperFunctions();
+        }
 
         builder.setInsertionPointToStart(&kernelFunc.getBody().front());
         artiq.rtioInit();
@@ -584,6 +593,7 @@ struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToA
 
         RewritePatternSet patterns(ctx);
         populateRTIOToARTIQConversionPatterns(typeConverter, patterns);
+        populateRTIORPCConversionPatterns(typeConverter, patterns);
 
         ConversionTarget target(*ctx);
         target.addIllegalDialect<rtio::RTIODialect>();

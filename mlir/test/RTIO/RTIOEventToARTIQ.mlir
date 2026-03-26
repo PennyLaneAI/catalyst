@@ -142,19 +142,20 @@ module @simple_sequential attributes {rtio.config = #rtio.config<{core_addr = "1
 
 // Synchronous RPC with no arguments (program_awg, awg_close).
 // CHECK-DAG: llvm.func @rpc_send(i32, !llvm.ptr, !llvm.ptr)
-// CHECK-DAG: llvm.func @rpc_recv(!llvm.ptr)
-// CHECK-DAG: llvm.mlir.global private constant @__rtio_str_n_
+// CHECK-DAG: llvm.func @rpc_recv(!llvm.ptr) -> i32
+// CHECK-DAG: llvm.mlir.global private constant @__rtio_str__n
 module @rpc_no_args attributes {rtio.config = #rtio.config<{core_addr = "172.31.9.64", device_db = {core = {arguments = {host = "172.31.9.64", ref_period = 1.000000e-09 : f64, target = "cortexa9"}, class = "Core", module = "artiq.coredevice.core", type = "local"}, spi_urukul0 = {arguments = {channel = 17 : i64}, class = "SPIMaster", module = "artiq.coredevice.spi2", type = "local"}, ttl_urukul0_io_update = {arguments = {channel = 18 : i64}, class = "TTLOut", module = "artiq.coredevice.ttl", type = "local"}, ttl_urukul0_sw0 = {arguments = {channel = 19 : i64}, class = "TTLOut", module = "artiq.coredevice.ttl", type = "local"}, urukul0_ch0 = {arguments = {chip_select = 4 : i64, cpld_device = "urukul0_cpld", pll_en = 1 : i64, pll_n = 32 : i64, sw_device = "ttl_urukul0_sw0"}, class = "AD9910", module = "artiq.coredevice.ad9910", type = "local"}, urukul0_cpld = {arguments = {clk_div = 0 : i64, clk_sel = 2 : i64, io_update_device = "ttl_urukul0_io_update", refclk = 125000000 : i64, spi_device = "spi_urukul0", sync_device}, class = "CPLD", module = "artiq.coredevice.urukul", type = "local"}}}>} {
 
   // CHECK-LABEL: func.func @__kernel__()
   func.func @__kernel__() {
 
-    // CHECK: llvm.call @rpc_send({{.*}} : (i32, !llvm.ptr, !llvm.ptr)
-    // CHECK: llvm.call @rpc_recv({{.*}}) : (!llvm.ptr)
+    // CHECK: llvm.call @rpc_send({{.*}}) : (i32, !llvm.ptr, !llvm.ptr) -> ()
+    // CHECK: %[[SZ0:.*]] = llvm.call @rpc_recv({{.*}}) : (!llvm.ptr) -> i32
+    // CHECK: scf.while
     rtio.rpc @program_awg
 
-    // CHECK: llvm.call @rpc_send({{.*}} : (i32, !llvm.ptr, !llvm.ptr)
-    // CHECK: llvm.call @rpc_recv({{.*}}) : (!llvm.ptr)
+    // CHECK: llvm.call @rpc_send({{.*}}) : (i32, !llvm.ptr, !llvm.ptr) -> ()
+    // CHECK: llvm.call @rpc_recv({{.*}}) : (!llvm.ptr) -> i32
     rtio.rpc @awg_close
     return
   }
@@ -164,11 +165,11 @@ module @rpc_no_args attributes {rtio.config = #rtio.config<{core_addr = "172.31.
 
 // Async RPC with args (i64, i64, f64) -> void.
 // CHECK-DAG: llvm.func @rpc_send_async(i32, !llvm.ptr, !llvm.ptr)
-// CHECK-DAG: llvm.mlir.global private constant @__rtio_str_n_IIf
+// CHECK-DAG: llvm.mlir.global private constant @__rtio_str_IIf_n
 module @rpc_async_with_args attributes {rtio.config = #rtio.config<{core_addr = "172.31.9.64", device_db = {core = {arguments = {host = "172.31.9.64", ref_period = 1.000000e-09 : f64, target = "cortexa9"}, class = "Core", module = "artiq.coredevice.core", type = "local"}, spi_urukul0 = {arguments = {channel = 17 : i64}, class = "SPIMaster", module = "artiq.coredevice.spi2", type = "local"}, ttl_urukul0_io_update = {arguments = {channel = 18 : i64}, class = "TTLOut", module = "artiq.coredevice.ttl", type = "local"}, ttl_urukul0_sw0 = {arguments = {channel = 19 : i64}, class = "TTLOut", module = "artiq.coredevice.ttl", type = "local"}, urukul0_ch0 = {arguments = {chip_select = 4 : i64, cpld_device = "urukul0_cpld", pll_en = 1 : i64, pll_n = 32 : i64, sw_device = "ttl_urukul0_sw0"}, class = "AD9910", module = "artiq.coredevice.ad9910", type = "local"}, urukul0_cpld = {arguments = {clk_div = 0 : i64, clk_sel = 2 : i64, io_update_device = "ttl_urukul0_io_update", refclk = 125000000 : i64, spi_device = "spi_urukul0", sync_device}, class = "CPLD", module = "artiq.coredevice.urukul", type = "local"}}}>} {
   // CHECK-LABEL: func.func @__kernel__
   func.func @__kernel__(%key: i64, %idx: i64, %val: f64) {
-    // CHECK: llvm.call @rpc_send_async({{.*}} : (i32, !llvm.ptr, !llvm.ptr)
+    // CHECK: llvm.call @rpc_send_async({{.*}}) : (i32, !llvm.ptr, !llvm.ptr) -> ()
     // CHECK-NOT: llvm.call @rpc_recv
     rtio.rpc @transfer_data async (%key, %idx, %val : i64, i64, f64)
     return
@@ -184,19 +185,19 @@ module @rpc_id_deduplication attributes {rtio.config = #rtio.config<{core_addr =
     // set_dataset -> rpc_id = 1
 
     // CHECK: arith.constant 1 : i32
-    // CHECK: llvm.call @rpc_send({{.*}} : (i32, !llvm.ptr, !llvm.ptr)
-    // CHECK: llvm.call @rpc_recv({{.*}}) : (!llvm.ptr)
+    // CHECK: llvm.call @rpc_send({{.*}}) : (i32, !llvm.ptr, !llvm.ptr) -> ()
+    // CHECK: llvm.call @rpc_recv({{.*}}) : (!llvm.ptr) -> i32
     // CHECK: arith.constant 1 : i32
-    // CHECK: llvm.call @rpc_send({{.*}} : (i32, !llvm.ptr, !llvm.ptr)
-    // CHECK: llvm.call @rpc_recv({{.*}}) : (!llvm.ptr)
+    // CHECK: llvm.call @rpc_send({{.*}}) : (i32, !llvm.ptr, !llvm.ptr) -> ()
+    // CHECK: llvm.call @rpc_recv({{.*}}) : (!llvm.ptr) -> i32
     rtio.rpc @set_dataset (%key, %val : i64, i64)
     rtio.rpc @set_dataset (%key, %val : i64, i64)
 
     // program_awg -> rpc_id = 2
 
     // CHECK: arith.constant 2 : i32
-    // CHECK: llvm.call @rpc_send({{.*}} : (i32, !llvm.ptr, !llvm.ptr)
-    // CHECK: llvm.call @rpc_recv({{.*}}) : (!llvm.ptr)
+    // CHECK: llvm.call @rpc_send({{.*}}) : (i32, !llvm.ptr, !llvm.ptr) -> ()
+    // CHECK: llvm.call @rpc_recv({{.*}}) : (!llvm.ptr) -> i32
     rtio.rpc @program_awg
     return
   }
@@ -205,12 +206,13 @@ module @rpc_id_deduplication attributes {rtio.config = #rtio.config<{core_addr =
 // -----
 
 // Sync RPC with return value (i64 return, no args).
-// CHECK-DAG: llvm.mlir.global private constant @__rtio_str_I_
+// CHECK-DAG: llvm.mlir.global private constant @__rtio_str__I
 module @rpc_with_return attributes {rtio.config = #rtio.config<{core_addr = "172.31.9.64", device_db = {core = {arguments = {host = "172.31.9.64", ref_period = 1.000000e-09 : f64, target = "cortexa9"}, class = "Core", module = "artiq.coredevice.core", type = "local"}, spi_urukul0 = {arguments = {channel = 17 : i64}, class = "SPIMaster", module = "artiq.coredevice.spi2", type = "local"}, ttl_urukul0_io_update = {arguments = {channel = 18 : i64}, class = "TTLOut", module = "artiq.coredevice.ttl", type = "local"}, ttl_urukul0_sw0 = {arguments = {channel = 19 : i64}, class = "TTLOut", module = "artiq.coredevice.ttl", type = "local"}, urukul0_ch0 = {arguments = {chip_select = 4 : i64, cpld_device = "urukul0_cpld", pll_en = 1 : i64, pll_n = 32 : i64, sw_device = "ttl_urukul0_sw0"}, class = "AD9910", module = "artiq.coredevice.ad9910", type = "local"}, urukul0_cpld = {arguments = {clk_div = 0 : i64, clk_sel = 2 : i64, io_update_device = "ttl_urukul0_io_update", refclk = 125000000 : i64, spi_device = "spi_urukul0", sync_device}, class = "CPLD", module = "artiq.coredevice.urukul", type = "local"}}}>} {
   // CHECK-LABEL: func.func @__kernel__
   func.func @__kernel__() -> i64 {
-    // CHECK: llvm.call @rpc_send({{.*}} : (i32, !llvm.ptr, !llvm.ptr)
-    // CHECK: llvm.call @rpc_recv(%[[BUF:.*]]) : (!llvm.ptr)
+    // CHECK: llvm.call @rpc_send({{.*}}) : (i32, !llvm.ptr, !llvm.ptr) -> ()
+    // CHECK: %[[SZ:.*]] = llvm.call @rpc_recv(%[[BUF:.*]]) : (!llvm.ptr) -> i32
+    // CHECK: scf.while
     // CHECK: llvm.load %[[BUF]] : !llvm.ptr -> i64
     %x = rtio.rpc @get_counter -> i64
     return %x : i64

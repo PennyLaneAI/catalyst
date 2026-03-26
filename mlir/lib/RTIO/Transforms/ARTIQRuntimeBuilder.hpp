@@ -179,31 +179,32 @@ class ARTIQRuntimeBuilder {
     }
 
     // RPC calls
-    // void rpc_send(int32_t service, const char *tag, void **args)
-    void rpcSend(Value serviceId, Value tagPtr, Value argsPtr)
+    // void rpc_send(int32_t service, {ptr,i32}* tag, void **args)
+    void rpcSend(Value serviceId, Value tagStructPtr, Value argsPtr)
     {
         Type ptrTy = LLVM::LLVMPointerType::get(ctx);
         auto func = ensureFunc(ARTIQFuncNames::rpcSend,
                                LLVM::LLVMFunctionType::get(voidTy, {i32Ty, ptrTy, ptrTy}));
-        LLVM::CallOp::create(builder, getLoc(), func, ValueRange{serviceId, tagPtr, argsPtr});
+        LLVM::CallOp::create(builder, getLoc(), func, ValueRange{serviceId, tagStructPtr, argsPtr});
     }
 
-    // void rpc_send_async(int32_t service, const char *tag, void **args)
-    void rpcSendAsync(Value serviceId, Value tagPtr, Value argsPtr)
+    // void rpc_send_async(int32_t service, {ptr,i32}* tag, void **args)
+    void rpcSendAsync(Value serviceId, Value tagStructPtr, Value argsPtr)
     {
         Type ptrTy = LLVM::LLVMPointerType::get(ctx);
         auto func = ensureFunc(ARTIQFuncNames::rpcSendAsync,
                                LLVM::LLVMFunctionType::get(voidTy, {i32Ty, ptrTy, ptrTy}));
-        LLVM::CallOp::create(builder, getLoc(), func, ValueRange{serviceId, tagPtr, argsPtr});
+        LLVM::CallOp::create(builder, getLoc(), func, ValueRange{serviceId, tagStructPtr, argsPtr});
     }
 
-    // void rpc_recv(void *slot)
-    void rpcRecv(Value slot)
+    // i32 rpc_recv(void *slot)
+    Value rpcRecv(Value slot)
     {
         Type ptrTy = LLVM::LLVMPointerType::get(ctx);
         auto func =
-            ensureFunc(ARTIQFuncNames::rpcRecv, LLVM::LLVMFunctionType::get(voidTy, {ptrTy}));
-        LLVM::CallOp::create(builder, getLoc(), func, ValueRange{slot});
+            ensureFunc(ARTIQFuncNames::rpcRecv, LLVM::LLVMFunctionType::get(i32Ty, {ptrTy}));
+        auto call = LLVM::CallOp::create(builder, getLoc(), func, ValueRange{slot});
+        return call.getResult();
     }
 
     // TTL operations
