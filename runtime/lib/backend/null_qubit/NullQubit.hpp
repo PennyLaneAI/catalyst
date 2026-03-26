@@ -541,6 +541,15 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
     }
 
+    auto PauliMeasure(const std::string &pauli_word, const std::vector<QubitIdType> &wires)
+        -> Result
+    {
+        if (this->track_resources_) {
+            this->resource_tracker_.PauliMeasurement(pauli_word, wires);
+        }
+        return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
+    }
+
     /**
      * @brief No-op implementation for gradient computation
      *

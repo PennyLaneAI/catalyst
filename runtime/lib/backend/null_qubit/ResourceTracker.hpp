@@ -52,41 +52,48 @@ struct ResourceTracker final {
      * @brief Internal method to record an operation being applied to the device
      *
      * Updates the gate type and size counts, and if depth tracking is enabled,
-     * updates the depth of the wires involved in the operation.
+     * updates the circuit depth of the wires involved in an operation.
+     * All participating wires are synchronized to one past the maximum
+     * current depth among them.
      *
-     * @param name The name of the operation being applied
-     * @param wires The wires the operation is being applied to
-     * @param controlled_wires The control wires the operation is being applied to
+     * @param wires The target wires of the operation
+     * @param controlled_wires The control wires of the operation (empty by default)
      */
+    void UpdateDepth(const std::vector<QubitIdType> &wires,
+                     const std::vector<QubitIdType> &controlled_wires = {})
+    {
+        if (!compute_depth_) {
+            return;
+        }
+
+        std::size_t max_depth = 0;
+        for (const auto &i : wires) {
+            auto curr_depth = wire_depths_.find(i);
+            RT_FAIL_IF(curr_depth == wire_depths_.end(),
+                       ("Wire index " + std::to_string(i) + " is not an allocated wire").c_str());
+            max_depth = std::max(max_depth, curr_depth->second);
+        }
+        for (const auto &i : controlled_wires) {
+            auto curr_depth = wire_depths_.find(i);
+            RT_FAIL_IF(
+                curr_depth == wire_depths_.end(),
+                ("Control wire index " + std::to_string(i) + " is not an allocated wire").c_str());
+            max_depth = std::max(max_depth, curr_depth->second);
+        }
+
+        max_depth++;
+        for (const auto &i : wires) {
+            wire_depths_[i] = max_depth;
+        }
+        for (const auto &i : controlled_wires) {
+            wire_depths_[i] = max_depth;
+        }
+    }
+
     void RecordOperation(const std::string &name, const std::vector<QubitIdType> &wires,
                          const std::vector<QubitIdType> &controlled_wires)
     {
-        if (compute_depth_) {
-            std::size_t max_depth = 0;
-            for (const auto &i : wires) {
-                auto curr_depth = wire_depths_.find(i);
-                RT_FAIL_IF(
-                    curr_depth == wire_depths_.end(),
-                    ("Wire index " + std::to_string(i) + " is not an allocated wire").c_str());
-                max_depth = std::max(max_depth, curr_depth->second);
-            }
-            for (const auto &i : controlled_wires) {
-                auto curr_depth = wire_depths_.find(i);
-                RT_FAIL_IF(curr_depth == wire_depths_.end(),
-                           ("Control wire index " + std::to_string(i) + " is not an allocated wire")
-                               .c_str());
-                max_depth = std::max(max_depth, curr_depth->second);
-            }
-
-            // ALL wires used in this operation must have their depth set, including control wires
-            max_depth++;
-            for (const auto &i : wires) {
-                wire_depths_[i] = max_depth;
-            }
-            for (const auto &i : controlled_wires) {
-                wire_depths_[i] = max_depth;
-            }
-        }
+        UpdateDepth(wires, controlled_wires);
 
         std::size_t total_wires = wires.size() + controlled_wires.size();
 
@@ -452,6 +459,14 @@ struct ResourceTracker final {
      * Increments the count of mid-circuit measurements performed.
      */
     void MidMeasurement() { measurements_["MidMeasure"]++; }
+
+    void PauliMeasurement(const std::string &pauli_word, const std::vector<QubitIdType> &wires)
+    {
+        std::string full_meas_name =
+            "PauliMeasure(" + pauli_word + ", " + std::to_string(wires.size()) + " wires)";
+        measurements_[full_meas_name]++;
+        UpdateDepth(wires);
+    }
 
     /**
      * @brief Prints resource usage statistics in JSON format to the specified file
