@@ -387,7 +387,7 @@ def test_assembly_format(run_filecheck, pretty_print):
     %qa10 = "test.op"() : () -> !qecp.qubit<aux>
     %qa20 = "test.op"() : () -> !qecp.qubit<aux>
 
-    // CHECK: [[qd8:%.+]], [[qd9:%.+]] = qecp.cnot [[qd10]], [[qd20]] : !qecp.qubit<data>, !qecp.qubit<data>
+    // CHECK: [[qd11:%.+]], [[qd21:%.+]] = qecp.cnot [[qd10]], [[qd20]] : !qecp.qubit<data>, !qecp.qubit<data>
     %qd11, %qd21 = qecp.cnot %qd10, %qd20 : !qecp.qubit<data>, !qecp.qubit<data>
 
     // CHECK: [[qd12:%.+]], [[qa21:%.+]] = qecp.cnot [[qd11]], [[qa20]] : !qecp.qubit<data>, !qecp.qubit<aux>
@@ -396,7 +396,7 @@ def test_assembly_format(run_filecheck, pretty_print):
     // CHECK: [[qa11:%.+]], [[qd22:%.+]] = qecp.cnot [[qa10]], [[qd21]] : !qecp.qubit<aux>, !qecp.qubit<data>
     %qa11, %qd22 = qecp.cnot %qa10, %qd21 : !qecp.qubit<aux>, !qecp.qubit<data>
 
-    // CHECK: [[qa13:%.+]], [[qa22:%.+]] = qecp.cnot [[qa11]], [[qa21]] : !qecp.qubit<aux>, !qecp.qubit<aux>
+    // CHECK: [[qa12:%.+]], [[qa22:%.+]] = qecp.cnot [[qa11]], [[qa21]] : !qecp.qubit<aux>, !qecp.qubit<aux>
     %qa12, %qa22 = qecp.cnot %qa11, %qa21 : !qecp.qubit<aux>, !qecp.qubit<aux>
     """
 
