@@ -386,7 +386,7 @@ class ExtractCodeblockOp(IRDLOperation):
         idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (hyper_reg, None)
@@ -434,7 +434,7 @@ class InsertCodeblockOp(IRDLOperation):
         codeblock: PhysicalCodeBlockSSAValue | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (in_hyper_reg, None, codeblock)
@@ -452,7 +452,12 @@ class InsertCodeblockOp(IRDLOperation):
 
 @irdl_op_definition
 class ExtractQubitOp(IRDLOperation):
-    """Extract a physical qubit value from a codeblock."""
+    """Extract a physical qubit value from a codeblock.
+
+    This operation extracts a QEC physical qubit value from a physical codeblock. The qubit value is
+    restricted to have the 'data' role; in other words, an auxiliary qubit cannot be extracted from
+    a physical codeblock.
+    """
 
     name = "qecp.extract"
 
@@ -474,7 +479,7 @@ class ExtractQubitOp(IRDLOperation):
         idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (codeblock, None)
@@ -494,7 +499,12 @@ class ExtractQubitOp(IRDLOperation):
 
 @irdl_op_definition
 class InsertQubitOp(IRDLOperation):
-    """Update the physical qubit value of a codeblock."""
+    """Update the physical qubit value of a codeblock.
+
+    This operation updates the value of a QEC physical qubit in a physical codeblock. The qubit
+    value is restricted to have the 'data' role; in other words, an auxiliary qubit cannot be
+    inserted into a physical codeblock.
+    """
 
     T: ClassVar = VarConstraint("T", anyPhysicalCodeblock)
 
@@ -521,8 +531,7 @@ class InsertQubitOp(IRDLOperation):
         qubit: QecPhysicalQubitSSAValue | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
-
+            idx = IntegerAttr(idx, IndexType())
         if isinstance(idx, IntegerAttr):
             operands = (in_codeblock, None, qubit)
             properties = {"idx_attr": idx}

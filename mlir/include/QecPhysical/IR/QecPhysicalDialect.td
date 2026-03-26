@@ -48,13 +48,20 @@ def QecPhysical_Dialect : Dialect {
         #### Example
 
         ```mlir
-        %0 = qecp.alloc() : !qecp.hyperreg<3 x 1 x 7>
-        %1 = qecp.extract_block %0[0] : !qecp.hyperreg<3 x 1 x 7> -> !qecp.codeblock<1 x 7>
-        %2 = qecp.extract %1[0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-        %3 = ... %2 : !qecp.qubit<data>  // Ops on QEC physical qubit
-        %4 = qecp.insert %1[0], %3 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
-        %5 = qecp.insert_block %0[0], %4 : !qecp.hyperreg<3 x 1 x 7>, !qecp.codeblock<1 x 7>
-        qecp.dealloc %r : !qecp.hyperreg<3 x 1 x 7>
+        %hr = qecp.alloc() : !qecp.hyperreg<3 x 1 x 7>
+        %c0 = qecp.extract_block %hr[0] : !qecp.hyperreg<3 x 1 x 7> -> !qecp.codeblock<1 x 7>
+
+        %q0 = qecp.extract %c0[0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+        %q6 = qecp.extract %c0[6] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+
+        %q7 = ... %q0 : !qecp.qubit<data>  // Ops on QEC physical qubits
+        %q8 = ... %q6 : !qecp.qubit<data>
+
+        %c1 = qecp.insert %c0[0], %q7 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        %c2 = qecp.insert %c1[0], %q8 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+
+        %hr1 = qecp.insert_block %hr[0], %c2 : !qecp.hyperreg<3 x 1 x 7>, !qecp.codeblock<1 x 7>
+        qecp.dealloc %hr1 : !qecp.hyperreg<3 x 1 x 7>
         ```
     }];
 
