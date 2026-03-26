@@ -130,11 +130,11 @@ func.func @test_gphase(%arg0: f64, %arg1: i1) attributes {quantum.node} {
     %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit
 
     // CHECK: quantum.gphase(%arg0)
-    qref.gphase(%arg0) : f64
+    qref.gphase(%arg0)
 
     // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[GPHASEctrl:%.+]] = quantum.gphase(%arg0) ctrls([[bit0]]) ctrlvals(%arg1) : ctrls !quantum.bit
-    qref.gphase(%arg0) ctrls (%q0) ctrlvals (%arg1) : f64 ctrls !qref.bit
+    qref.gphase(%arg0) ctrls (%q0) ctrlvals (%arg1) : ctrls !qref.bit
 
     // CHECK: [[insert:%.+]] = quantum.insert [[qreg]][ 0], [[GPHASEctrl]] : !quantum.reg, !quantum.bit
     // CHECK: quantum.dealloc [[insert]] : !quantum.reg
