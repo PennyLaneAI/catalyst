@@ -7,5 +7,6 @@ add_mlir_library(MLIRQecLogical
     ${PROJECT_SOURCE_DIR}/include/QecLogical
 
     DEPENDS
+    MLIRQecLogicalAttrDefsIncGen
     MLIRQecLogicalOpsIncGen
 )
