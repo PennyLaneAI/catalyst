@@ -208,6 +208,7 @@ class TannerGraphType(ParametrizedAttribute, TypeAttribute, ContainerType[Attrib
         super().__init__(row_idx_size_attr, col_ptr_size_attr, element_type)
 
     def get_element_type(self) -> AttributeCovT:
+        """Return the element type of the Tanner graph's adjacency matrix."""
         return self.element_type
 
     def print_parameters(self, printer: Printer) -> None:
