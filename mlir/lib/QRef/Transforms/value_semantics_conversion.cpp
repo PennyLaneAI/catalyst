@@ -351,10 +351,13 @@ struct TransientQubitExtractor {
             Value sourceRQreg = std::get<1>(triplet);
             unsigned resultIdx = std::get<2>(triplet);
 
-            Value qubitToInsert =
-                resultIdx >= (vOp->getNumResults())
-                    ? extractOp.getQubit()
-                    : dyn_cast<TypedValue<quantum::QubitType>>(vOp->getResult(resultIdx));
+            Value qubitToInsert;
+            if (resultIdx >= vOp->getNumResults()) {
+                qubitToInsert = extractOp.getQubit();
+            }
+            else {
+                qubitToInsert = vOp->getResult(resultIdx);
+            }
 
             auto insertOp = quantum::InsertOp::create(
                 this->builder, extractOp->getLoc(), quantum::QuregType::get(extractOp.getContext()),
@@ -856,6 +859,9 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, QubitValueT
     else if (auto rSetBasisStateOp = dyn_cast<qref::SetBasisStateOp>(_rGateOp)) {
         vGateOp = migrateOpToValueSemantics<quantum::SetBasisStateOp>(builder, rSetBasisStateOp,
                                                                       tracker, qubitResultsType);
+    }
+    else {
+        rGateOp->emitOpError("unknown gate op in qref dialect");
     }
 
     builder.eraseOp(rGateOp);

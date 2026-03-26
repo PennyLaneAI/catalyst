@@ -88,7 +88,7 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker);
 void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker);
 void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker);
 void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker);
-void handleSubroutine(IRRewriter &builder, Region &r);
+void handleSubroutine(IRRewriter &builder, func::FuncOp f);
 
 // Main driver
 void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker);
