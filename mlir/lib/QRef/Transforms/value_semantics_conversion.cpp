@@ -285,33 +285,18 @@ struct QubitValueTracker {
  */
 struct TransientQubitExtractor {
   public:
-    TransientQubitExtractor(Operation *_rOp, QubitValueTracker &_tracker, IRRewriter &_builder)
+    TransientQubitExtractor(QubitValueTracker &_tracker, IRRewriter &_builder, Operation *_rOp,
+                            std::optional<ArrayRef<Value>> explicit_operands = std::nullopt)
         : rOp(_rOp), tracker(_tracker), builder(_builder)
     {
         OpBuilder::InsertionGuard guard(this->builder);
         this->builder.setInsertionPoint(this->rOp);
 
-        this->analyzeROpQuantumOperandPatterns();
+        this->analyzeROpQuantumOperandPatterns(explicit_operands);
 
-        for (auto [i, operand] : llvm::enumerate(this->rOp->getOperands())) {
-            if (!isa<qref::QubitType>(operand.getType()) || this->tracker.isRootRQubit(operand)) {
-                continue;
-            }
-
-            this->sourceRQregs.push_back(getRSourceRegisterValue(operand));
-            this->extractOps.push_back(this->createExtractOp(operand));
-        }
-    }
-
-    TransientQubitExtractor(Operation *_rOp, SmallVector<Value> &operands,
-                            QubitValueTracker &_tracker, IRRewriter &_builder)
-        : rOp(_rOp), tracker(_tracker), builder(_builder)
-    {
-        OpBuilder::InsertionGuard guard(this->builder);
-        this->builder.setInsertionPoint(this->rOp);
-
-        this->analyzeROpQuantumOperandPatterns(operands);
-
+        ValueRange rOpOperands = this->rOp->getOperands();
+        ValueRange operands =
+            explicit_operands.has_value() ? explicit_operands.value() : rOpOperands;
         for (auto [i, operand] : llvm::enumerate(operands)) {
             if (!isa<qref::QubitType>(operand.getType()) || this->tracker.isRootRQubit(operand)) {
                 continue;
@@ -424,18 +409,17 @@ struct TransientQubitExtractor {
     SmallVector<Value> sourceRQregs;
     SmallVector<quantum::ExtractOp> extractOps;
 
-    void
-    analyzeROpQuantumOperandPatterns(std::optional<ArrayRef<Value>> regionOperands = std::nullopt)
+    void analyzeROpQuantumOperandPatterns(std::optional<ArrayRef<Value>> explicit_operands)
     {
         unsigned resIdx = 0;
         unsigned existingNumResults = this->rOp->getNumResults();
 
         SmallVector<Value> operands;
-        if (!regionOperands.has_value()) {
+        if (!explicit_operands.has_value()) {
             operands.append(this->rOp->getOperands().begin(), this->rOp->getOperands().end());
         }
         else {
-            operands.append(regionOperands.value().begin(), regionOperands.value().end());
+            operands.append(explicit_operands.value().begin(), explicit_operands.value().end());
         }
 
         for (auto [i, operand] : llvm::enumerate(operands)) {
@@ -701,7 +685,7 @@ OpTy migrateOpToValueSemantics(IRRewriter &builder, Operation *qrefOp, QubitValu
     builder.setInsertionPoint(qrefOp);
     Location loc = qrefOp->getLoc();
 
-    TransientQubitExtractor extractor(qrefOp, tracker, builder);
+    TransientQubitExtractor extractor(tracker, builder, qrefOp);
 
     // Create the new op using the generic state-based approach
     // We cannot just clone, since we are changing the op type
@@ -1014,7 +998,7 @@ void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTr
         // i.e. the extract op results are sent in as operands to the vAdjointOp
         SmallVector<Value> regionOperands;
         regionOperands.append(rValuesUsedByRegion.begin(), rValuesUsedByRegion.end());
-        TransientQubitExtractor extractor(rAdjointOp, regionOperands, tracker, builder);
+        TransientQubitExtractor extractor(tracker, builder, rAdjointOp, regionOperands);
         SmallVector<Value> vAdjointOperands;
 
         for (Value rValue : rValuesUsedByRegion) {
@@ -1119,7 +1103,7 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker)
         // extracted vQubits are "root".
         SmallVector<Value> regionOperands;
         regionOperands.append(rValuesUsedByRegion.begin(), rValuesUsedByRegion.end());
-        TransientQubitExtractor extractor(ifOp, regionOperands, tracker, builder);
+        TransientQubitExtractor extractor(tracker, builder, ifOp, regionOperands);
 
         SmallVector<Type> newResultTypes(ifOp->getResultTypes());
         for (Value rValue : rValuesUsedByRegion) {
@@ -1206,7 +1190,7 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
         // extracted vQubits are "root".
         SmallVector<Value> regionOperands;
         regionOperands.append(rValuesUsedByRegion.begin(), rValuesUsedByRegion.end());
-        TransientQubitExtractor extractor(switchOp, regionOperands, tracker, builder);
+        TransientQubitExtractor extractor(tracker, builder, switchOp, regionOperands);
 
         SmallVector<Type> newResultTypes(switchOp->getResultTypes());
         for (Value rValue : rValuesUsedByRegion) {
@@ -1276,7 +1260,7 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
         // i.e. the extract op results are sent in as operands to the new for loop
         SmallVector<Value> regionOperands(forOp.getRegion().front().getArguments());
         regionOperands.append(rValuesUsedByRegion.begin(), rValuesUsedByRegion.end());
-        TransientQubitExtractor extractor(forOp, regionOperands, tracker, builder);
+        TransientQubitExtractor extractor(tracker, builder, forOp, regionOperands);
         SmallVector<Value> newIterArgs(forOp.getInitArgs());
 
         for (Value rValue : rValuesUsedByRegion) {
@@ -1357,7 +1341,7 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
         // i.e. the extract op results are sent in as operands to the new loop
         SmallVector<Value> regionOperands(whileOp.getBefore().front().getArguments());
         regionOperands.append(rValuesUsedByRegion.begin(), rValuesUsedByRegion.end());
-        TransientQubitExtractor extractor(whileOp, regionOperands, tracker, builder);
+        TransientQubitExtractor extractor(tracker, builder, whileOp, regionOperands);
         SmallVector<Value> newIterArgs(whileOp.getInits());
         SmallVector<Type> newResultTypes(whileOp->getResultTypes());
 
