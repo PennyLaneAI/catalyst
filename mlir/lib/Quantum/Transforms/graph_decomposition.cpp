@@ -217,6 +217,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             mlir::func::FuncOp func = ruleOpRef.get(); // access the op
             ruleNode.name = func.getName().str();
             ruleNameToFuncOp[ruleNode.name] = std::move(ruleOpRef);
+            llvm::errs() << "wrote rule " << ruleNode.name << " to map\n";
 
             // Set output OperatorNode
             if (auto outputGateAttr = func->getAttrOfType<StringAttr>("target_gate")) {
@@ -237,11 +238,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             // Convert resources attribute
             if (auto resourcesAttr = func->getAttrOfType<DictionaryAttr>("resources")) {
-                for (const auto &resource : resourcesAttr) {
+                DictionaryAttr operations =
+                    mlir::dyn_cast<DictionaryAttr>(resourcesAttr.get("operations"));
+                for (const auto &operation : operations) {
                     RuleTerm term;
-                    auto res_int = resource.getValue();
+                    auto res_int = operation.getValue();
                     if (auto intAttr = mlir::dyn_cast<IntegerAttr>(res_int)) {
-                        term.op.name = resource.getName().str();
+                        term.op.name = operation.getName().str();
                         if (term.op.name.starts_with("Adjoint(") && term.op.name.ends_with(")")) {
                             term.op.adjoint = true;
                             term.op.name =
@@ -251,9 +254,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                         ruleNode.inputs.push_back(term);
                     }
                     else {
-                        llvm::errs()
-                            << "Resource " << resource.getName() << " in rule " << ruleNode.name
-                            << " has non-integer multiplicity. Skipping this resource.\n";
+                        llvm::errs() << "Resource " << operation.getName() << " in rule "
+                                     << ruleNode.name << " has non-integer multiplicity "
+                                     << operation.getValue() << ". Skipping this resource.\n";
                         continue; // skip this resource if multiplicity is not an integer
                     }
                 }
@@ -263,7 +266,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                              << " is missing 'resources' attribute. Skipping this rule.\n";
                 continue; // skip this rule if resources attribute is missing
             }
-
+            llvm::errs() << "registered rule " << ruleNode.name << " for op "
+                         << ruleNode.output.name << "\n";
             rules.push_back(std::move(ruleNode));
         }
         llvm::errs() << "registered rules\n";
