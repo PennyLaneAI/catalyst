@@ -151,7 +151,7 @@ func.func @test_canonicalize_no_dce(%arg0: tensor<2xcomplex<f64>>, %arg1 : tenso
     qref.paulirot ["Z"](%arg2) %q0 : !qref.bit
 
     // CHECK: qref.gphase
-    qref.gphase(%arg2) : f64
+    qref.gphase(%arg2)
 
     // CHECK: qref.multirz
     qref.multirz (%arg2) %q0, %q1 : !qref.bit, !qref.bit

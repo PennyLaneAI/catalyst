@@ -1055,7 +1055,7 @@ def test_decompose_lowering_with_gphase():
     @qml.qnode(qml.device("lightning.qubit", wires=3))
     # CHECK:  %0 = transform.apply_registered_pass "decompose-lowering"
     def circuit_22():
-        # CHECK:  quantum.gphase(%cst_0) :
+        # CHECK:  quantum.gphase(%cst_0)
         # CHECK-NEXT:  [[EXTRACTED:%.+]] = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
         # CHECK-NEXT:  [[OUT_QUBITS:%.+]] = quantum.custom "PhaseShift"(%cst) [[EXTRACTED]] : !quantum.bit
         # CHECK-NEXT:  {{%.+}} = quantum.custom "PhaseShift"(%cst) [[OUT_QUBITS]] : !quantum.bit
