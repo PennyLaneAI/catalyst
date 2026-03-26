@@ -1336,7 +1336,7 @@ def _gphase_lowering(
         ctrl_values_i1.append(p)
 
     GlobalPhaseOp(
-        params=param,
+        angle=param,
         out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,

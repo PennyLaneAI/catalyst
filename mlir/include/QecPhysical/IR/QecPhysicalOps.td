@@ -29,5 +29,169 @@ include "QecPhysical/IR/QecPhysicalTypes.td"
 class QecPhysical_Op<string mnemonic, list<Trait> traits = []> :
         Op<QecPhysical_Dialect, mnemonic, traits>;
 
+def AllocOp : QecPhysical_Op<"alloc"> {
+    let summary = "Allocate a physical hyper-register containing a sequence of physical codeblocks.";
+
+    let results = (outs
+        PhysicalHyperRegisterType:$hyper_reg
+    );
+
+    // The width of the hyper-register is inferred from the type.
+    // The empty parentheses `()` are to mirror the syntax of the memref.alloc and similar ops.
+    // Currently we do not support dynamic-width hyper-registers, but if we do in the future, the
+    // value specifying the width can be placed in-between the parentheses.
+    let assemblyFormat = [{
+        `(` `)` attr-dict `:` qualified(type($hyper_reg))
+    }];
+
+    let hasCanonicalizeMethod = 1;
+}
+
+def DeallocOp : QecPhysical_Op<"dealloc"> {
+    let summary = "Deallocate a physical hyper-register.";
+
+    let arguments = (ins
+        PhysicalHyperRegisterType:$hyper_reg
+    );
+
+    let assemblyFormat = [{
+        $hyper_reg attr-dict `:` qualified(type($hyper_reg))
+    }];
+
+    let hasCanonicalizeMethod = 1;
+}
+
+def AllocAuxQubitOp : QecPhysical_Op<"alloc_aux"> {
+    let summary = "Allocate a single auxiliary QEC physical qubit.";
+
+    let results = (outs
+        QecPhysicalQubitType:$qubit
+    );
+
+    let assemblyFormat = [{
+        attr-dict `:` qualified(type($qubit))
+    }];
+
+    let hasVerifier = 1;
+    let hasCanonicalizeMethod = 1;
+}
+
+def DeallocAuxQubitOp : QecPhysical_Op<"dealloc_aux"> {
+    let summary = "Deallocate a single auxiliary QEC physical qubit.";
+
+    let arguments = (ins
+        QecPhysicalQubitType:$qubit
+    );
+
+    let assemblyFormat = [{
+        $qubit attr-dict `:` qualified(type($qubit))
+    }];
+
+    let hasVerifier = 1;
+    let hasCanonicalizeMethod = 1;
+}
+
+def ExtractCodeblockOp : QecPhysical_Op<"extract_block"> {
+    let summary = "Extract a physical codeblock value from a hyper-register.";
+
+    let arguments = (ins
+        PhysicalHyperRegisterType:$hyper_reg,
+        Optional<Index>:$idx,
+        OptionalAttr<ConfinedAttr<IndexAttr, [IntNonNegative]>>:$idx_attr
+    );
+
+    let results = (outs
+        PhysicalCodeblockType:$codeblock
+    );
+
+    let assemblyFormat = [{
+        $hyper_reg `[` ($idx^):($idx_attr)? `]` attr-dict `:` qualified(type($hyper_reg)) `->` qualified(type($codeblock))
+    }];
+
+    let hasVerifier = 1;
+    let hasCanonicalizeMethod = 1;
+    let hasFolder = 1;
+}
+
+def InsertCodeblockOp : QecPhysical_Op<"insert_block", [AllTypesMatch<["in_hyper_reg", "out_hyper_reg"]>]> {
+    let summary = "Update the physical codeblock value of a hyper-register.";
+
+    let arguments = (ins
+        PhysicalHyperRegisterType:$in_hyper_reg,
+        Optional<Index>:$idx,
+        OptionalAttr<ConfinedAttr<IndexAttr, [IntNonNegative]>>:$idx_attr,
+        PhysicalCodeblockType:$codeblock
+    );
+
+    let results = (outs
+        PhysicalHyperRegisterType:$out_hyper_reg
+    );
+
+    let assemblyFormat = [{
+        $in_hyper_reg `[` ($idx^):($idx_attr)? `]` `,` $codeblock attr-dict `:` qualified(type($in_hyper_reg)) `,` qualified(type($codeblock))
+    }];
+
+    let hasVerifier = 1;
+    let hasCanonicalizeMethod = 1;
+    let hasFolder = 1;
+}
+
+def ExtractQubitOp : QecPhysical_Op<"extract"> {
+    let summary = "Extract a physical qubit value from a codeblock.";
+
+    let description = [{
+        This operation extracts a QEC physical qubit value from a physical codeblock. The qubit
+        value is restricted to have the 'data' role; in other words, an auxiliary qubit cannot be
+        extracted from a physical codeblock.
+    }];
+
+    let arguments = (ins
+        PhysicalCodeblockType:$codeblock,
+        Optional<Index>:$idx,
+        OptionalAttr<ConfinedAttr<IndexAttr, [IntNonNegative]>>:$idx_attr
+    );
+
+    let results = (outs
+        QecPhysicalQubitType:$qubit
+    );
+
+    let assemblyFormat = [{
+        $codeblock `[` ($idx^):($idx_attr)? `]` attr-dict `:` qualified(type($codeblock)) `->` qualified(type($qubit))
+    }];
+
+    let hasVerifier = 1;
+    let hasCanonicalizeMethod = 1;
+    let hasFolder = 1;
+}
+
+def InsertQubitOp : QecPhysical_Op<"insert", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
+    let summary = "Update the physical qubit value of a codeblock.";
+
+    let description = [{
+        This operation updates the value of a QEC physical qubit in a physical codeblock. The qubit
+        value is restricted to have the 'data' role; in other words, an auxiliary qubit cannot be
+        inserted into a physical codeblock.
+    }];
+
+    let arguments = (ins
+        PhysicalCodeblockType:$in_codeblock,
+        Optional<Index>:$idx,
+        OptionalAttr<ConfinedAttr<IndexAttr, [IntNonNegative]>>:$idx_attr,
+        QecPhysicalQubitType:$qubit
+    );
+
+    let results = (outs
+        PhysicalCodeblockType:$out_codeblock
+    );
+
+    let assemblyFormat = [{
+        $in_codeblock `[` ($idx^):($idx_attr)? `]` `,` $qubit attr-dict `:` qualified(type($in_codeblock)) `,` qualified(type($qubit))
+    }];
+
+    let hasVerifier = 1;
+    let hasCanonicalizeMethod = 1;
+    let hasFolder = 1;
+}
+
 
 #endif // QEC_PHYSICAL_OPS

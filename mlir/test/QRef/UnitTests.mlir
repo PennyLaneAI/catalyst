@@ -135,16 +135,16 @@ func.func @test_paulirot_op(%q0: !qref.bit, %q1: !qref.bit,
 func.func @test_global_phase(%q0: !qref.bit, %cv: i1, %param: f64) {
 
     // Basic
-    qref.gphase(%param) : f64
+    qref.gphase(%param)
 
     // With adjoint
-    qref.gphase(%param) adj : f64
+    qref.gphase(%param) adj
 
     // With control
-    qref.gphase(%param) ctrls (%q0) ctrlvals (%cv) : f64 ctrls !qref.bit
+    qref.gphase(%param) ctrls (%q0) ctrlvals (%cv) : ctrls !qref.bit
 
     // With control and adjoint
-    qref.gphase(%param) adj ctrls (%q0) ctrlvals (%cv) : f64 ctrls !qref.bit
+    qref.gphase(%param) adj ctrls (%q0) ctrlvals (%cv) : ctrls !qref.bit
 
     return
 }
