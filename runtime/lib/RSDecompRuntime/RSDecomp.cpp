@@ -293,9 +293,7 @@ extern "C" {
 
 size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis)
 {
-    static bool warned_small_epsilon = false;
-    if (epsilon < 1e-6 && !warned_small_epsilon) {
-        warned_small_epsilon = true;
+    if (epsilon < 1e-6) {
         std::ostringstream oss;
         oss << std::scientific << epsilon;
         RT_WARN("Gridsynth received epsilon=" + oss.str() +
