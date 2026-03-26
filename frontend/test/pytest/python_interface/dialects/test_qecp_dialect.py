@@ -380,11 +380,26 @@ def test_assembly_format(run_filecheck, pretty_print):
     %qd7 = qecp.s %qd6 adj : !qecp.qubit<data>
     %qa7 = qecp.s %qa6 adj : !qecp.qubit<aux>
 
-    // CHECK: [[qd8:%.+]], [[qd9:%.+]] = qecp.cnot [[qd6]], [[qd7]] : !qecp.qubit<data>, !qecp.qubit<data>
-    %qd8, %qd9 = qecp.cnot %qd6, %qd7 : !qecp.qubit<data>, !qecp.qubit<data>
+    // CHECK: [[qd10:%.+]] = "test.op"() : () -> !qecp.qubit<data>
+    // CHECK: [[qd20:%.+]] = "test.op"() : () -> !qecp.qubit<data>
+    // CHECK: [[qa10:%.+]] = "test.op"() : () -> !qecp.qubit<aux>
+    // CHECK: [[qa20:%.+]] = "test.op"() : () -> !qecp.qubit<aux>
+    %qd10 = "test.op"() : () -> !qecp.qubit<data>
+    %qd20 = "test.op"() : () -> !qecp.qubit<data>
+    %qa10 = "test.op"() : () -> !qecp.qubit<aux>
+    %qa20 = "test.op"() : () -> !qecp.qubit<aux>
 
-    // CHECK: [[qd10:%.+]], [[qa8:%.+]] = qecp.cnot [[qd8]], [[qa7]] : !qecp.qubit<data>, !qecp.qubit<aux>
-    %qd10, %qa8 = qecp.cnot %qd8, %qa7 : !qecp.qubit<data>, !qecp.qubit<aux>
+    // CHECK: [[qd8:%.+]], [[qd9:%.+]] = qecp.cnot [[qd10]], [[qd20]] : !qecp.qubit<data>, !qecp.qubit<data>
+    %qd11, %qd21 = qecp.cnot %qd10, %qd20 : !qecp.qubit<data>, !qecp.qubit<data>
+
+    // CHECK: [[qd12:%.+]], [[qa21:%.+]] = qecp.cnot [[qd11]], [[qa20]] : !qecp.qubit<data>, !qecp.qubit<aux>
+    %qd12, %qa21 = qecp.cnot %qd11, %qa20 : !qecp.qubit<data>, !qecp.qubit<aux>
+
+    // CHECK: [[qa11:%.+]], [[qd22:%.+]] = qecp.cnot [[qa10]], [[qd21]] : !qecp.qubit<aux>, !qecp.qubit<data>
+    %qa11, %qd22 = qecp.cnot %qa10, %qd21 : !qecp.qubit<aux>, !qecp.qubit<data>
+
+    // CHECK: [[qa13:%.+]], [[qa22:%.+]] = qecp.cnot [[qa11]], [[qa21]] : !qecp.qubit<aux>, !qecp.qubit<aux>
+    %qa12, %qa22 = qecp.cnot %qa11, %qa21 : !qecp.qubit<aux>, !qecp.qubit<aux>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
