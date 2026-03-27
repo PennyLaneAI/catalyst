@@ -13,12 +13,16 @@
 // limitations under the License.
 
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/PatternMatch.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/LogicalResult.h"
 
 #include "QecPhysical/IR/QecPhysicalAttrDefs.h"
 #include "QecPhysical/IR/QecPhysicalDialect.h"
 #include "QecPhysical/IR/QecPhysicalOps.h"
+#include "QecPhysical/IR/QecPhysicalTypes.h"
 
 using namespace mlir;
 using namespace catalyst::qecp;
@@ -178,6 +182,46 @@ LogicalResult InsertQubitOp::verify()
                              << stringifyQecPhysicalQubitRole(QecPhysicalQubitRole::Data)
                              << "' should be inserted into a physical codeblock, but got '"
                              << stringifyQecPhysicalQubitRole(qubitTypeRole) << "'";
+    }
+
+    return success();
+}
+
+LogicalResult AssembleTannerGraphOp::verify()
+{
+    const auto rowIdxType = dyn_cast<ShapedType>(getRowIdx().getType());
+    const auto colPtrType = dyn_cast<ShapedType>(getColPtr().getType());
+    const auto tannerGraphType = getTannerGraph().getType();
+
+    const auto rowIdxElementType = rowIdxType.getElementType();
+    const auto colPtrElementType = colPtrType.getElementType();
+    const auto tannerGraphElementType = tannerGraphType.getElementType();
+
+    if (rowIdxElementType != colPtrElementType) {
+        return emitOpError()
+               << "expected row_idx and col_ptr types to have same element type, but got "
+               << rowIdxElementType << " and " << colPtrElementType << ", respectively";
+    }
+
+    if (rowIdxElementType != tannerGraphElementType) {
+        return emitOpError()
+               << "expected input operands and returned Tanner graph to have same element types, "
+                  "but got "
+               << rowIdxElementType << ", " << colPtrElementType << " and "
+               << tannerGraphElementType << ", respectively";
+    }
+
+    const auto rowIdxSize = rowIdxType.getDimSize(0);
+    const auto colPtrSize = colPtrType.getDimSize(0);
+    const auto tannerGraphRowIdxSize = tannerGraphType.getRowIdxSize();
+    const auto tannerGraphColPtrSize = tannerGraphType.getColPtrSize();
+
+    if (rowIdxSize != tannerGraphRowIdxSize || colPtrSize != tannerGraphColPtrSize) {
+        return emitOpError() << "expected input row_idx and col_ptr sizes to match returned Tanner "
+                                "graph sizes, but got row_idx sizes "
+                             << rowIdxSize << " (in), " << tannerGraphRowIdxSize
+                             << " (out), and col_ptr sizes " << colPtrSize << " (in), "
+                             << tannerGraphColPtrSize << " (out)";
     }
 
     return success();

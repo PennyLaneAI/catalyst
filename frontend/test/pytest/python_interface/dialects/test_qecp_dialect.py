@@ -18,7 +18,15 @@ from typing import cast
 
 import pytest
 from xdsl.dialects import test
-from xdsl.dialects.builtin import IndexType, IntegerAttr
+from xdsl.dialects.builtin import (
+    IndexType,
+    IntegerAttr,
+    IntegerType,
+    TensorType,
+    UnitAttr,
+    i32,
+    i64,
+)
 from xdsl.ir import AttributeCovT, OpResult
 
 from catalyst.python_interface.dialects import qecp
@@ -45,6 +53,17 @@ expected_ops_names = {
     "InsertCodeblockOp": "qecp.insert_block",
     "ExtractQubitOp": "qecp.extract",
     "InsertQubitOp": "qecp.insert",
+    "IdentityOp": "qecp.identity",
+    "PauliXOp": "qecp.x",
+    "PauliYOp": "qecp.y",
+    "PauliZOp": "qecp.z",
+    "HadamardOp": "qecp.hadamard",
+    "SOp": "qecp.s",
+    "CnotOp": "qecp.cnot",
+    "MeasureOp": "qecp.measure",
+    "AssembleTannerGraphOp": "qecp.assemble_tanner",
+    "DecodeEsmCssOp": "qecp.decode_esm_css",
+    "DecodePhysicalMeasurementOp": "qecp.decode_physical_meas",
 }
 
 expected_attrs_names = {
@@ -52,6 +71,7 @@ expected_attrs_names = {
     "QecPhysicalQubitType": "qecp.qubit",
     "PhysicalCodeblockType": "qecp.codeblock",
     "PhysicalHyperRegisterType": "qecp.hyperreg",
+    "TannerGraphType": "qecp.tanner_graph",
 }
 
 
@@ -116,6 +136,16 @@ class TestQecPhysicalTypes:
         assert hyper_reg.width == expected_width
         assert hyper_reg.k == expected_k
         assert hyper_reg.n == expected_n
+
+    @pytest.mark.parametrize("row_idx_size", [8, 10])
+    @pytest.mark.parametrize("col_ptr_size", [6, 8])
+    @pytest.mark.parametrize("element_type", [i32, i64])
+    def test_qecp_type_constructor_tanner_graph(self, row_idx_size, col_ptr_size, element_type):
+        """Test the constructor of qecp.TannerGraphType."""
+        tanner_graph = qecp.TannerGraphType(row_idx_size, col_ptr_size, element_type)
+        assert tanner_graph.row_idx_size == IntegerAttr(row_idx_size, IntegerType(64))
+        assert tanner_graph.col_ptr_size == IntegerAttr(col_ptr_size, IntegerType(64))
+        assert tanner_graph.element_type == element_type
 
 
 class TestQecPhysicalOps:
@@ -212,6 +242,134 @@ class TestQecPhysicalOps:
         assert insert_op.result_types[0].k == self.k
         assert insert_op.result_types[0].n == self.n
 
+    @pytest.mark.parametrize("op", [qecp.IdentityOp, qecp.PauliXOp, qecp.PauliYOp, qecp.PauliZOp])
+    @pytest.mark.parametrize(
+        "qubit",
+        [
+            create_ssa_value(qecp.QecPhysicalQubitType("data")),
+            create_ssa_value(qecp.QecPhysicalQubitType("aux")),
+        ],
+    )
+    def test_qecp_op_constructor_pauli(self, op, qubit):
+        """Test the constructor of the qecp Pauli gate op."""
+        pauli_op = op(qubit)
+        assert len(pauli_op.operands) == 1
+        assert pauli_op.operand_types[0] == qubit.type
+        assert len(pauli_op.result_types) == 1
+        assert pauli_op.result_types[0] == qubit.type
+
+    @pytest.mark.parametrize(
+        "qubit",
+        [
+            create_ssa_value(qecp.QecPhysicalQubitType("data")),
+            create_ssa_value(qecp.QecPhysicalQubitType("aux")),
+        ],
+    )
+    def test_qecp_op_constructor_hadamard(self, qubit):
+        """Test the constructor of the qecp.hadamard op."""
+        hadamard_op = qecp.HadamardOp(qubit)
+        assert len(hadamard_op.operands) == 1
+        assert hadamard_op.operand_types[0] == qubit.type
+        assert len(hadamard_op.result_types) == 1
+        assert hadamard_op.result_types[0] == qubit.type
+
+    @pytest.mark.parametrize(
+        "qubit",
+        [
+            create_ssa_value(qecp.QecPhysicalQubitType("data")),
+            create_ssa_value(qecp.QecPhysicalQubitType("aux")),
+        ],
+    )
+    @pytest.mark.parametrize("adj", [False, True, UnitAttr()])
+    def test_qecp_op_constructor_s(self, qubit, adj):
+        """Test the constructor of the qecp.s op."""
+        s_op = qecp.SOp(qubit, adjoint=adj)
+        assert len(s_op.operands) == 1
+        assert s_op.operand_types[0] == qubit.type
+        assert len(s_op.result_types) == 1
+        assert s_op.result_types[0] == qubit.type
+
+        if adj:
+            assert s_op.properties.get("adjoint") == UnitAttr()
+        else:
+            assert s_op.properties.get("adjoint") is None
+
+    @pytest.mark.parametrize(
+        "qubit_ctrl",
+        [
+            create_ssa_value(qecp.QecPhysicalQubitType("data")),
+            create_ssa_value(qecp.QecPhysicalQubitType("aux")),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "qubit_trgt",
+        [
+            create_ssa_value(qecp.QecPhysicalQubitType("data")),
+            create_ssa_value(qecp.QecPhysicalQubitType("aux")),
+        ],
+    )
+    def test_qecp_op_constructor_cnot(self, qubit_ctrl, qubit_trgt):
+        """Test the constructor of the qecp.cnot op."""
+        cnot_op = qecp.CnotOp(qubit_ctrl, qubit_trgt)
+        assert len(cnot_op.operands) == 2
+        assert cnot_op.operand_types[0] == qubit_ctrl.type
+        assert cnot_op.operand_types[1] == qubit_trgt.type
+        assert len(cnot_op.result_types) == 2
+        assert cnot_op.result_types[0] == qubit_ctrl.type
+        assert cnot_op.result_types[1] == qubit_trgt.type
+
+    @pytest.mark.parametrize(
+        "qubit",
+        [
+            create_ssa_value(qecp.QecPhysicalQubitType("data")),
+            create_ssa_value(qecp.QecPhysicalQubitType("aux")),
+        ],
+    )
+    def test_qecp_op_constructor_measure(self, qubit):
+        """Test the constructor of the qecp.measure op."""
+        measure_op = qecp.MeasureOp(qubit)
+        assert len(measure_op.result_types) == 2
+        assert measure_op.result_types[0] == IntegerType(1)
+        assert measure_op.result_types[1] == qubit.type
+
+    def test_qecp_op_constructor_assemble_tanner(self):
+        """Test the constructor of the qecp.assemble_tanner op."""
+        row_idx_val = create_ssa_value(TensorType(i32, (8,)))
+        col_ptr_val = create_ssa_value(TensorType(i32, (6,)))
+        assemble_tanner_op = qecp.AssembleTannerGraphOp(
+            row_idx=row_idx_val,
+            col_ptr=col_ptr_val,
+            tanner_graph_type=qecp.TannerGraphType(8, 6, i32),
+        )
+        assert len(assemble_tanner_op.operands) == 2
+        assert len(assemble_tanner_op.result_types) == 1
+        assert isinstance(assemble_tanner_op.result_types[0], qecp.TannerGraphType)
+
+    def test_qecp_op_constructor_decode_esm_css(self):
+        """Test the constructor of the qecp.decode_esm_css op."""
+        tanner_graph = create_ssa_value(qecp.TannerGraphType(8, 6, i32))
+        esm = create_ssa_value(TensorType(IntegerType(1), shape=(3,)))
+        decode_esm_css_op = qecp.DecodeEsmCssOp(
+            tanner_graph, esm, TensorType(IndexType(), shape=(2,))
+        )
+        assert len(decode_esm_css_op.operands) == 2
+        assert isinstance(decode_esm_css_op.operands[0].type, qecp.TannerGraphType)
+        assert isinstance(decode_esm_css_op.operands[1].type, TensorType)
+        assert len(decode_esm_css_op.result_types) == 1
+        assert isinstance(decode_esm_css_op.result_types[0], TensorType)
+
+    def test_qecp_op_constructor_decode_physical_meas(self):
+        """Test the constructor of the qecp.decode_physical_meas op."""
+        physical_measurements = create_ssa_value(TensorType(IntegerType(1), shape=(7,)))
+        result_type = TensorType(IntegerType(1), shape=(1,))
+        decode_physical_meas_op = qecp.DecodePhysicalMeasurementOp(
+            physical_measurements, result_type
+        )
+        assert len(decode_physical_meas_op.operands) == 1
+        assert decode_physical_meas_op.operands[0].type == physical_measurements.type
+        assert len(decode_physical_meas_op.result_types) == 1
+        assert decode_physical_meas_op.result_types[0] == result_type
+
 
 @pytest.mark.parametrize(
     "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
@@ -248,12 +406,95 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     // CHECK: qecp.insert_block [[hyperreg]][{{\s*}}0], [[block0]] : !qecp.hyperreg<3 x 1 x 7>, !qecp.codeblock<1 x 7>
     %hreg1 = qecp.insert_block %hyperreg[ 0], %block0 : !qecp.hyperreg<3 x 1 x 7>, !qecp.codeblock<1 x 7>
-    
     // CHECK: [[q0:%.+]] = qecp.extract [[block0]][{{\s*}}0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
     %q0 = qecp.extract %block0[ 0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
 
     // CHECK: [[block1:%.+]] = qecp.insert [[block0]][{{\s*}}0], [[q0]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
     %block1 = qecp.insert %block0[ 0], %q0 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+
+    // CHECK: [[qd0:%.+]] = "test.op"() : () -> !qecp.qubit<data>
+    // CHECK: [[qa0:%.+]] = "test.op"() : () -> !qecp.qubit<aux>
+    %qd0 = "test.op"() : () -> !qecp.qubit<data>
+    %qa0 = "test.op"() : () -> !qecp.qubit<aux>
+
+    // CHECK: [[qd1:%.+]] = qecp.identity [[qd0]] : !qecp.qubit<data>
+    // CHECK: [[qa1:%.+]] = qecp.identity [[qa0]] : !qecp.qubit<aux>
+    %qd1 = qecp.identity %qd0 : !qecp.qubit<data>
+    %qa1 = qecp.identity %qa0 : !qecp.qubit<aux>
+
+    // CHECK: [[qd2:%.+]] = qecp.x [[qd1]] : !qecp.qubit<data>
+    // CHECK: [[qa2:%.+]] = qecp.x [[qa1]] : !qecp.qubit<aux>
+    %qd2 = qecp.x %qd1 : !qecp.qubit<data>
+    %qa2 = qecp.x %qa1 : !qecp.qubit<aux>
+
+    // CHECK: [[qd3:%.+]] = qecp.y [[qd2]] : !qecp.qubit<data>
+    // CHECK: [[qa3:%.+]] = qecp.y [[qa2]] : !qecp.qubit<aux>
+    %qd3 = qecp.y %qd2 : !qecp.qubit<data>
+    %qa3 = qecp.y %qa2 : !qecp.qubit<aux>
+
+    // CHECK: [[qd4:%.+]] = qecp.z [[qd3]] : !qecp.qubit<data>
+    // CHECK: [[qa4:%.+]] = qecp.z [[qa3]] : !qecp.qubit<aux>
+    %qd4 = qecp.z %qd3 : !qecp.qubit<data>
+    %qa4 = qecp.z %qa3 : !qecp.qubit<aux>
+
+    // CHECK: [[qd5:%.+]] = qecp.hadamard [[qd4]] : !qecp.qubit<data>
+    // CHECK: [[qa5:%.+]] = qecp.hadamard [[qa4]] : !qecp.qubit<aux>
+    %qd5 = qecp.hadamard %qd4 : !qecp.qubit<data>
+    %qa5 = qecp.hadamard %qa4 : !qecp.qubit<aux>
+
+    // CHECK: [[qd6:%.+]] = qecp.s [[qd5]] : !qecp.qubit<data>
+    // CHECK: [[qa6:%.+]] = qecp.s [[qa5]] : !qecp.qubit<aux>
+    %qd6 = qecp.s %qd5 : !qecp.qubit<data>
+    %qa6 = qecp.s %qa5 : !qecp.qubit<aux>
+
+    // CHECK: [[qd7:%.+]] = qecp.s [[qd6]] adj : !qecp.qubit<data>
+    // CHECK: [[qa7:%.+]] = qecp.s [[qa6]] adj : !qecp.qubit<aux>
+    %qd7 = qecp.s %qd6 adj : !qecp.qubit<data>
+    %qa7 = qecp.s %qa6 adj : !qecp.qubit<aux>
+
+    // CHECK: [[qd10:%.+]] = "test.op"() : () -> !qecp.qubit<data>
+    // CHECK: [[qd20:%.+]] = "test.op"() : () -> !qecp.qubit<data>
+    // CHECK: [[qa10:%.+]] = "test.op"() : () -> !qecp.qubit<aux>
+    // CHECK: [[qa20:%.+]] = "test.op"() : () -> !qecp.qubit<aux>
+    %qd10 = "test.op"() : () -> !qecp.qubit<data>
+    %qd20 = "test.op"() : () -> !qecp.qubit<data>
+    %qa10 = "test.op"() : () -> !qecp.qubit<aux>
+    %qa20 = "test.op"() : () -> !qecp.qubit<aux>
+
+    // CHECK: [[qd11:%.+]], [[qd21:%.+]] = qecp.cnot [[qd10]], [[qd20]] : !qecp.qubit<data>, !qecp.qubit<data>
+    %qd11, %qd21 = qecp.cnot %qd10, %qd20 : !qecp.qubit<data>, !qecp.qubit<data>
+
+    // CHECK: [[qd12:%.+]], [[qa21:%.+]] = qecp.cnot [[qd11]], [[qa20]] : !qecp.qubit<data>, !qecp.qubit<aux>
+    %qd12, %qa21 = qecp.cnot %qd11, %qa20 : !qecp.qubit<data>, !qecp.qubit<aux>
+
+    // CHECK: [[qa11:%.+]], [[qd22:%.+]] = qecp.cnot [[qa10]], [[qd21]] : !qecp.qubit<aux>, !qecp.qubit<data>
+    %qa11, %qd22 = qecp.cnot %qa10, %qd21 : !qecp.qubit<aux>, !qecp.qubit<data>
+
+    // CHECK: [[qa12:%.+]], [[qa22:%.+]] = qecp.cnot [[qa11]], [[qa21]] : !qecp.qubit<aux>, !qecp.qubit<aux>
+    %qa12, %qa22 = qecp.cnot %qa11, %qa21 : !qecp.qubit<aux>, !qecp.qubit<aux>
+
+    // CHECK: [[row_idx:%.+]] = "test.op"() : () -> tensor<8xi32>
+    // CHECK: [[col_ptr:%.+]] = "test.op"() : () -> tensor<6xi32>
+    %row_idx = "test.op"() : () -> tensor<8xi32>
+    %col_ptr = "test.op"() : () -> tensor<6xi32>
+
+    // CHECK: [[mres0:%.+]], [[qd8:%.+]] = qecp.measure [[qd7]] : i1, !qecp.qubit<data>
+    // CHECK: [[mres1:%.+]], [[qa8:%.+]] = qecp.measure [[qa7]] : i1, !qecp.qubit<aux>
+    %mres0, %qd8 = qecp.measure %qd7 : i1, !qecp.qubit<data>
+    %mres1, %qa8 = qecp.measure %qa7 : i1, !qecp.qubit<aux>
+
+    // CHECK: [[tgraph:%.+]] = qecp.assemble_tanner [[row_idx]], [[col_ptr]] : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
+    %tgraph = qecp.assemble_tanner %row_idx, %col_ptr : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
+
+    // CHECK: [[esm:%.+]] = "test.op"() : () -> tensor<3xi1>
+    // CHECK: [[err_idx:%.+]] = qecp.decode_esm_css([[tgraph]] : !qecp.tanner_graph<8, 6, i32>) [[esm]] : tensor<3xi1> -> tensor<2xindex>
+    %esm = "test.op"() : () -> tensor<3xi1>
+    %err_idx = qecp.decode_esm_css(%tgraph : !qecp.tanner_graph<8, 6, i32>) %esm : tensor<3xi1> -> tensor<2xindex>
+
+    // CHECK: [[physical_meas:%.+]] = "test.op"() : () -> tensor<7xi1>
+    // CHECK: [[logical_meas:%.+]] = qecp.decode_physical_meas [[physical_meas]] : tensor<7xi1> -> tensor<1xi1>
+    %physical_meas = "test.op"() : () -> tensor<7xi1>
+    %logical_meas = qecp.decode_physical_meas %physical_meas : tensor<7xi1> -> tensor<1xi1>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
