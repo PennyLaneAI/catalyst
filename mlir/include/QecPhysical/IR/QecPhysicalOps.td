@@ -367,9 +367,10 @@ def DecodePhysicalMeasurementOp : QecPhysical_Op<"decode_physical_meas"> {
 
     let description = [{
         This operation decodes the results of a transversal measurement operation acting on a
-        physical codeblock and returns the corresponding logical measurement result(s). The logical
-        measurement results are returned as a one-dimensional tensor with shape=(k,), where k is the
-        number of QEC logical qubits encoded by the physical codeblock.
+        physical codeblock and returns the corresponding logical measurement result(s) in the
+        computational basis. The logical measurement results are returned as a one-dimensional
+        tensor with shape=(k,), where k is the number of QEC logical qubits encoded by the physical
+        codeblock.
     }];
 
     let arguments = (ins
