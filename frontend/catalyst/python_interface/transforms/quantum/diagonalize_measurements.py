@@ -132,8 +132,12 @@ class NonCommutingObservableValidator:
             # last gate operation would be reused for each observable on that qubit. Therefore,
             # we need to resolve the wire information if the qubit SSA used by an observable is
             # the result of an quantum.extract operation.
+            # FIXME: The following patch is a workaround and more work is required
             if isinstance(q.owner, ExtractOp):
-                q = dispatch_wires_extract(q.owner)
+                try:
+                    q = dispatch_wires_extract(q.owner)
+                except Exception:
+                    pass
 
             if q in self.visited_qubits:
                 self.overlapped_qubits.add(q)
