@@ -127,7 +127,7 @@ class TestPipeline:
 def test_apply_pass():
     """Test that 'apply_pass' correctly adds the transform to the transform sequence."""
 
-    @apply_pass("diagonalize-final-measurements", supported_obs=("PauliX"))
+    @apply_pass("diagonalize-final-measurements", supported_obs=("PauliX",))
     @apply_pass("cancel-inverses")
     @apply_pass("gridsynth", epsilon=42)
     @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -147,7 +147,8 @@ def test_apply_pass():
 
 
 def test_apply_pass_raise_error():
-    """Test if errors would be raised for an unsupported input for the diagonalize-final-measurements pass"""
+    """Test if errors would be raised for an unsupported input for the
+    diagonalize-final-measurements pass"""
 
     @apply_pass("diagonalize-final-measurements", to_eigvals=True)
     @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -159,10 +160,10 @@ def test_apply_pass_raise_error():
     with pytest.raises(ValueError, match="Only to_eigvals = False is supported."):
 
         @qml.qjit(target="mlir")
-        def module():
+        def module0():
             return qnode0()
 
-        module()
+        module0()
 
     @apply_pass("diagonalize-final-measurements")
     @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -173,14 +174,15 @@ def test_apply_pass_raise_error():
 
     with pytest.raises(
         qml.exceptions.CompileError,
-        match="Observables are not qubit-wise commuting. Please apply the `split-non-commuting` pass first.",
+        match="Observables are not qubit-wise commuting. Please apply the "
+        "`split-non-commuting` pass first.",
     ):
 
         @qml.qjit(target="mlir")
-        def module():
+        def module1():
             return qnode1()
 
-        module()
+        module1()
 
 
 def test_apply_pass_plugin(tmp_path):
