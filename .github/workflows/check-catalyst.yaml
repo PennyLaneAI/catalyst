@@ -96,6 +96,7 @@ jobs:
           path: |
             runtime-build/lib/*.so
             runtime-build/lib/backend/*.toml
+            runtime-build/lib/DecompGraphSolver/*.a
           retention-days: 1
 
       - name: Upload OQC-Runtime Artifact
