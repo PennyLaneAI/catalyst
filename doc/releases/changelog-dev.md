@@ -832,6 +832,7 @@
   Catalyst to have a single source of truth for documentation, which will provide a better overall
   experience when consulting our documentation.
   [(#2481)](https://github.com/PennyLaneAI/catalyst/pull/2481)
+  [(#2481)](https://github.com/PennyLaneAI/catalyst/pull/2629)
 
   Several entry-points were added to ``setup.py`` for the Pauli-based computation compilation passes
   and the :func:`~.draw_graph` function. This allows for the ability to use Catalyst features from
