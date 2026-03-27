@@ -169,8 +169,8 @@ struct PPMeasurementOpPattern : public OpConversionPattern<PPMeasurementOp> {
         // Load the measurement result (i1) from the result pointer
         Value mres = LLVM::LoadOp::create(rewriter, loc, IntegerType::get(ctx, 1), resultPtr);
 
-        // if the uint16_t rotation_sign is -1, we need to negate the measurement result
-        if (static_cast<int16_t>(op.getRotationSign()) == -1) {
+        // if the uint16_t sign is -1, we need to negate the measurement result
+        if (op.getNegated()) {
             Value one = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI1Type(),
                                                  rewriter.getBoolAttr(true));
             mres = LLVM::XOrOp::create(rewriter, loc, mres, one);

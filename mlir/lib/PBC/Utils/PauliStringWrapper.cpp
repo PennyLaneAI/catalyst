@@ -160,7 +160,7 @@ PauliWordPair normalizePPROps(PBCOpInterface lhs, PBCOpInterface rhs, ValueRange
         }
 
         if (auto ppmOp = dyn_cast<PPMeasurementOp>(operation)) {
-            wrapper.updateSign(static_cast<int16_t>(ppmOp.getRotationSign()) < 0);
+            wrapper.updateSign(ppmOp.getNegated());
         }
     };
 
@@ -233,9 +233,7 @@ void updatePauliWordSign(PBCOpInterface op, bool isNegated, PatternRewriter &rew
         pprOp.setRotationKind(rotationKind);
     }
     else if (auto ppmOp = dyn_cast<PPMeasurementOp>(op.getOperation())) {
-        int16_t rotationSign = static_cast<int16_t>(ppmOp.getRotationSign());
-        rotationSign = (rotationSign < 0 ? -rotationSign : rotationSign) * (isNegated ? -1 : 1);
-        ppmOp.setRotationSign(rotationSign);
+        ppmOp.setNegated(isNegated);
     }
 }
 

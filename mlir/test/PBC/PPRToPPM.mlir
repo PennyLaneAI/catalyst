@@ -26,7 +26,7 @@ func.func @test_ppr_to_ppm_clifford(%q1 : !quantum.bit) {
 
     // CHECK: [[QREG:%.+]]: !quantum.bit) {
     // CHECK: [[q_2:%.+]] = quantum.alloc_qb : !quantum.bit
-    // CHECK: [[M1:%.+]], [[out_0:%.+]]:2 = pbc.ppm ["Z", "Y"](-1) [[QREG]], [[q_2]] : i1, !quantum.bit, !quantum.bit
+    // CHECK: [[M1:%.+]], [[out_0:%.+]]:2 = pbc.ppm ["Z", "Y"](-) [[QREG]], [[q_2]] : i1, !quantum.bit, !quantum.bit
     // CHECK: [[M2:%.+]], [[out_1:%.+]] = pbc.ppm ["X"] [[out_0]]#1 : i1, !quantum.bit
     // CHECK: [[q_3:%.+]] = arith.xori [[M1]], [[M2]] : i1
     // CHECK: [[q_4:%.+]] = pbc.ppr ["Z"](2) [[out_0]]#0 cond([[q_3]]) : !quantum.bit
@@ -40,7 +40,7 @@ func.func @test_ppr_to_ppm_multi_clifford(%q1 : !quantum.bit, %q2 : !quantum.bit
 
     // CHECK: [[arg0:%.+]]: !quantum.bit, [[arg1:%.+]]: !quantum.bit, [[arg2:%.+]]: !quantum.bit)
     // CHECK: [[q_0:%.+]] = quantum.alloc_qb : !quantum.bit
-    // CHECK: [[m1:%.+]], [[o1:%.+]]:4 = pbc.ppm ["X", "Y", "Z", "Y"](-1) [[arg0]], [[arg1]], [[arg2]], [[q_0]] : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK: [[m1:%.+]], [[o1:%.+]]:4 = pbc.ppm ["X", "Y", "Z", "Y"](-) [[arg0]], [[arg1]], [[arg2]], [[q_0]] : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
     // CHECK: [[m2:%.+]], {{.*}} = pbc.ppm ["X"] [[o1]]#3 : i1, !quantum.bit
     // CHECK: [[q_1:%.+]] = arith.xori [[m1]], [[m2]] : i1
     // CHECK: {{.*}} = pbc.ppr ["X", "Y", "Z"](2) {{.*}} cond([[q_1]]) : !quantum.bit
@@ -79,7 +79,7 @@ func.func @test_ppr_to_ppm_mixed_clifford_non_clifford(%q1 : !quantum.bit) {
     // CHECK: [[q_0:%.+]]  = pbc.ppr ["Z"](2) [[out_0]]#0 cond([[m_1]]) : !quantum.bit
 
     // CHECK: [[q_1:%.+]] = quantum.alloc_qb : !quantum.bit
-    // CHECK: [[M1:%.+]], [[out_2:%.+]]:2 = pbc.ppm ["Z", "Y"](-1) [[q_0]], [[q_1]] : i1, !quantum.bit, !quantum.bit
+    // CHECK: [[M1:%.+]], [[out_2:%.+]]:2 = pbc.ppm ["Z", "Y"](-) [[q_0]], [[q_1]] : i1, !quantum.bit, !quantum.bit
     // CHECK: [[M2:%.+]], [[out_3:%.+]] = pbc.ppm ["X"] [[out_2]]#1 : i1, !quantum.bit
     // CHECK: [[q_2:%.+]] = arith.xori [[M1]], [[M2]] : i1
     // CHECK: [[q_3:%.+]] = pbc.ppr ["Z"](2) [[out_2]]#0 cond([[q_2]]) : !quantum.bit
@@ -95,7 +95,7 @@ func.func @test_ppr_to_ppm_with_condition(%q0 : !quantum.bit, %q1 : !quantum.bit
     // CHECK: [[m0:%.+]], {{.*}} = pbc.ppm ["Z"]
     // CHECK: [[if:%.+]]:3 = scf.if [[m0]]
     // CHECK:   [[q_0:%.+]] = quantum.alloc_qb : !quantum.bit
-    // CHECK:   [[m1:%.+]], [[o1:%.+]]:4 = pbc.ppm ["X", "Y", "Z", "Y"](-1)
+    // CHECK:   [[m1:%.+]], [[o1:%.+]]:4 = pbc.ppm ["X", "Y", "Z", "Y"](-)
     // CHECK:   [[m2:%.+]], {{.*}} = pbc.ppm ["X"] [[o1]]#3
     // CHECK:   [[q_1:%.+]] = arith.xori [[m1]], [[m2]] : i1
     // CHECK:   [[q:%.+]]:3 = pbc.ppr ["X", "Y", "Z"](2) {{.*}} cond([[q_1]])

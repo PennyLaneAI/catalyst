@@ -22,13 +22,12 @@ catalyst/mlir/include/PBC/IR/PBCDialect.td file in the catalyst repository.
 """
 
 from xdsl.dialects.builtin import (
-    I16,
     ArrayAttr,
     Float64Type,
     IntegerAttr,
     IntegerType,
     StringAttr,
-    i16,
+    UnitAttr,
 )
 from xdsl.dialects.utils import AbstractYieldOperation
 from xdsl.ir import Attribute, Dialect, EnumAttribute, SpacedOpaqueSyntaxAttribute
@@ -126,7 +125,7 @@ class PPMeasurementOp(IRDLOperation):
     name = "pbc.ppm"
 
     assembly_format = """
-        $pauli_product (`(` $rotation_sign^ `)`)?
+        $pauli_product (`(``-``)` $negated^)?
         $in_qubits
         attr-dict
         `:` type(results)
@@ -134,7 +133,7 @@ class PPMeasurementOp(IRDLOperation):
 
     pauli_product = prop_def(PauliWord)
 
-    rotation_sign = opt_prop_def(IntegerAttr[I16], default_value=IntegerAttr(1, i16))
+    negated = opt_prop_def(UnitAttr)
 
     in_qubits = var_operand_def(QubitType)
 

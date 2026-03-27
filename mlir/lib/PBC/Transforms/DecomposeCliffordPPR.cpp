@@ -57,8 +57,7 @@ SmallVector<Value> emitPiOverFourDecomposition(bool avoidPauliYMeasure, PPRotati
     // Initialize |0⟩ (zero) or Fabricate |Y⟩ (plus_i)
     auto axillaryQubit = initializeZeroOrPlusI(avoidPauliYMeasure, loc, rewriter);
 
-    auto [pauliForAxillaryQubit, rotationSign] =
-        determinePauliAndRotationSignOfMeasurement(avoidPauliYMeasure);
+    auto [pauliForAxillaryQubit, negated] = determinePauliAndSignOfMeasurement(avoidPauliYMeasure);
 
     // Extract qubits and insert axillary qubit
     SmallVector<Value> m1InQubits = op.getInQubits();
@@ -70,11 +69,11 @@ SmallVector<Value> emitPiOverFourDecomposition(bool avoidPauliYMeasure, PPRotati
 
     int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
     if (rotationKind < 0) {
-        // flip rotation sign
-        rotationSign = -rotationSign;
+        // flip the measurement sign
+        negated = !negated;
     }
 
-    auto ppmPZ = PPMeasurementOp::create(rewriter, loc, pauliP, rotationSign, m1InQubits);
+    auto ppmPZ = PPMeasurementOp::create(rewriter, loc, pauliP, m1InQubits, negated);
 
     SmallVector<StringRef> pauliX = {"X"};
     auto ppmX = PPMeasurementOp::create(rewriter, loc, pauliX, ppmPZ.getOutQubits().back());

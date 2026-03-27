@@ -417,7 +417,7 @@ def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface]> {
 
     let arguments = (ins
         PauliWord:$pauli_product,  // The Pauli product specifying the measurement basis
-        DefaultValuedAttr<I16Attr, "1">:$rotation_sign,
+        UnitAttr:$negated,  // Pauli words can carry a negative sign, which flips the result
         Variadic<QubitType>:$in_qubits  // The qubits to measure
     );
 
@@ -427,57 +427,39 @@ def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface]> {
     );
 
     let builders = [
-        OpBuilder<
+        OpBuilder<  // infer result types
         (ins
             "::mlir::ArrayAttr":$pauli_product,
-            "::mlir::ValueRange":$in_qubits
+            "::mlir::ValueRange":$in_qubits,
+            CArg<"bool", "0">:$negated
         ),[{
             PPMeasurementOp::build($_builder, $_state,
-            /*mres=*/ $_builder.getI1Type(),
-            /*out_qubits=*/ mlir::TypeRange(in_qubits),
-            /*pauli_product=*/ pauli_product,
-            /*rotation_sign=*/ 1,
-            /*in_qubits=*/ in_qubits);
+                /*mres=*/ $_builder.getI1Type(),
+                /*out_qubits=*/ mlir::TypeRange(in_qubits),
+                /*pauli_product=*/ pauli_product,
+                /*negated=*/ negated,
+                /*in_qubits=*/ in_qubits
+            );
         }]>,
-        OpBuilder<
+        OpBuilder<  // allow arrays of strings as input
         (ins
             "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
-            "::mlir::ValueRange":$in_qubits
+            "::mlir::ValueRange":$in_qubits,
+            CArg<"bool", "0">:$negated
         ),[{
             PPMeasurementOp::build($_builder, $_state,
-            /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product),
-            /*in_qubits=*/ in_qubits);
-        }]>,
-        OpBuilder<
-        (ins
-            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
-            "uint16_t":$rotation_sign,
-            "::mlir::ValueRange":$in_qubits
-        ),[{
-            PPMeasurementOp::build($_builder, $_state,
-            /*mres=*/ $_builder.getI1Type(),
-            /*out_qubits=*/ mlir::TypeRange(in_qubits),
-            /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product),
-            /*rotation_sign=*/ rotation_sign,
-            /*in_qubits=*/ in_qubits);
+                /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product),
+                /*in_qubits=*/ in_qubits,
+                /*negated=*/ negated
+            );
         }]>,
     ];
 
     let assemblyFormat = [{
-      $pauli_product (`(` $rotation_sign^ `)`)? $in_qubits attr-dict `:` type(results)
+        $pauli_product (`(``-``)` $negated^)? $in_qubits attr-dict `:` type(results)
     }];
 
     let hasVerifier = 1;
-
-    code extraBaseClassDeclaration = [{
-        uint16_t getRotationKind(){
-            return getRotationSign();
-        };
-        void setRotationKind(uint16_t attrValue){
-            setRotationSign(static_cast<int16_t>(attrValue) < 0 ? -1 : 1);
-        };
-    }];
-    let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
 def SelectPPMeasurementOp : PBC_Op<"select.ppm"> {

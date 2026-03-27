@@ -26,8 +26,7 @@ namespace pbc {
 /// based on whether to avoid Pauli Y measurements
 /// 1. avoidPauliYMeasure == true: Use |Y⟩ as axillary qubit and measure -P⊗Z
 /// 2. avoidPauliYMeasure == false: Use |0⟩ as axillary qubit and measure P⊗Y
-std::pair<mlir::StringRef, uint16_t>
-determinePauliAndRotationSignOfMeasurement(bool avoidPauliYMeasure);
+std::pair<mlir::StringRef, bool> determinePauliAndSignOfMeasurement(bool avoidPauliYMeasure);
 
 /// Initialize |0⟩ or Fabricate|Y⟩ based on avoidPauliYMeasure
 mlir::OpResult initializeZeroOrPlusI(bool avoidPauliYMeasure, mlir::Location loc,
