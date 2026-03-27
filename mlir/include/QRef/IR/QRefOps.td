@@ -370,17 +370,17 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [ParametrizedGate, AttrSizedOperand
     }];
 
     let arguments = (ins
-        F64:$params,
+        F64:$angle,
         UnitAttr:$adjoint,
         Variadic<QubitRefType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values
     );
 
     let assemblyFormat = [{
-        `(` $params `)` (`adj` $adjoint^)? attr-dict
+        `(` $angle `)` (`adj` $adjoint^)? attr-dict
         ( `ctrls` `(` $ctrl_qubits^ `)` )?
         ( `ctrlvals` `(` $ctrl_values^ `)` )?
-        `:` type($params) (`ctrls` type($ctrl_qubits)^ )?
+        ( `:` `ctrls` type($ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -525,17 +525,13 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOpera
 class Region_Op<string mnemonic, list<Trait> traits = []> :
         QRef_Op<mnemonic, traits # []>;
 
-def AdjointOp : Region_Op<"adjoint", [QuantumRegion, NoTerminator]> {
+def AdjointOp : Region_Op<"adjoint", [NoTerminator]> {
     let summary = "Calculate the adjoint of the enclosed operations";
 
     let regions = (region SizedRegion<1>:$region);
 
-    let arguments = (ins
-        QuregRefType:$qreg
-    );
-
     let assemblyFormat = [{
-        `(` $qreg `)` attr-dict `:` type(operands) $region
+        attr-dict-with-keyword $region
     }];
 
     let hasVerifier = 1;
