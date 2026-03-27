@@ -808,6 +808,7 @@
   [(#2519)](https://github.com/PennyLaneAI/catalyst/pull/2519)
   [(#2537)](https://github.com/PennyLaneAI/catalyst/pull/2537)
   [(#2563)](https://github.com/PennyLaneAI/catalyst/pull/2563)
+  [(#2571)](https://github.com/PennyLaneAI/catalyst/pull/2571)
   [(#2572)](https://github.com/PennyLaneAI/catalyst/pull/2572)
   [(#2574)](https://github.com/PennyLaneAI/catalyst/pull/2574)
 
