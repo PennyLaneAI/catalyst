@@ -62,6 +62,27 @@ TEST_CASE("Test DecompositionGraph construction", "[DecompGraph::Solver]")
     REQUIRE(graph.hasOperator(rz));
 }
 
+TEST_CASE("Do not solve for target gates", "[DecompGraph::Solver]")
+{
+    const auto h = OperatorNode{"H", 1, 0, false};
+    const auto rz = OperatorNode{"RZ", 1, 1, false};
+
+    const WeightedGateset gateset{{{h, 2.0}, {rz, 1.0}}};
+
+    const std::vector<RuleNode> rules{
+        {"h_to_rz", h, {{rz, 1}}},
+    };
+
+    const DecompositionGraph graph({h, rz}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto solutions = solver.getSolvedMap();
+    REQUIRE(solutions.size() == 2);
+    REQUIRE(solutions.at(h).isBasis);
+    REQUIRE(solutions.at(h).totalCost == 2.0);
+    REQUIRE(solutions.at(rz).isBasis);
+    REQUIRE(solutions.at(rz).totalCost == 1.0);
+}
+
 TEST_CASE("Test DecompositionGraph copy and move semantics", "[DecompGraph::Solver]")
 {
     const auto h = OperatorNode{"H", 1, 0, false};
@@ -334,7 +355,6 @@ TEST_CASE("Test PauliX -> GlobalPhase(1), RX(1) decomposition", "[DecompGraph::S
     REQUIRE(chosen_rule.totalCost == 1.0 * 1 + 1.0 * 1);
 }
 
-// Test cyclic decomposition
 TEST_CASE("Test cyclic decomposition with multiple rules for the same operator",
           "[DecompGraph::Solver]")
 {

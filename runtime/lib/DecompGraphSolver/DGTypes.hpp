@@ -83,6 +83,16 @@ struct RuleTerm {
 };
 
 /**
+ * @brief This represents the origin of a decomposition rule.
+ *
+ * This enum is used to categorize decomposition rules based on their source or type:
+ * - Default: The default rule for decomposing an operator as defined in the decomposition graph.
+ * - Fixed: A fixed rule that cannot be changed or overridden by the solver.
+ * - Alternative: An alternative rule that can be used in place of the default rule.
+ */
+enum class RuleOrigin : uint8_t { Default = 0, Fixed = 1, Alternative = 2 };
+
+/**
  * @brief This represents the decomposition rules in the graph decomposition problem.
  *
  * The RuleNode struct captures the essential information about a decomposition rule, including

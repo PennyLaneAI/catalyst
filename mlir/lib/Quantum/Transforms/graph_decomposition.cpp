@@ -119,7 +119,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         for (const std::string &opCostPair : targetGateSetOption) {
             llvm::StringRef pairRef(opCostPair);
 
-            auto [opName, cost] = pairRef.split(" = ");
+            auto [opNameRaw, costRaw] = pairRef.split("=");
+            llvm::StringRef opName = opNameRaw.trim();
+            llvm::StringRef cost = costRaw.trim();
 
             cost.consume_back(" : f64");
             bool success = to_float(cost, // remove the type info
