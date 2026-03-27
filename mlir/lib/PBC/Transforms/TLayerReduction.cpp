@@ -72,6 +72,7 @@ std::pair<bool, PBCOpInterface> checkCommutationAndFindMerge(PBCOpInterface rhsO
         }
 
         // Equal normalized Pauli strings => merge candidate
+        // TODO: include cancellation of opposite sign rotations
         auto canMerge = normalizedOps.first == normalizedOps.second;
         if (canMerge) {
             mergeOp = lhsOp;
@@ -134,10 +135,9 @@ void moveOpToLayer(PBCOpInterface rhsOp, PBCLayer &rhsLayer, PBCOpInterface merg
 // Merge `rhsOp` into `mergeOp` in lhsLayer when equal under normalization.
 // To merge this we keep and update the rotation kind of `mergeOp` in lhsLayer,
 // then just remove the `rhsOp` from the rhsLayer.
-void mergePPR(PBCOpInterface rhsOp, PBCLayer &rhsLayer, PBCOpInterface mergeOp, IRRewriter &writer)
+void mergePPR(PPRotationOp rhsOp, PBCLayer &rhsLayer, PPRotationOp mergeOp, IRRewriter &writer)
 {
-    auto mergeOpPprOp = dyn_cast<PPRotationOp>(mergeOp.getOperation());
-    assert(mergeOpPprOp != nullptr && "Op is not a PPRotationOp");
+    assert(rhsOp.getRotationKind() == mergeOp.getRotationKind() && "expected same rotation kind");
 
     mergeOp.setRotationKind(mergeOp.getRotationKind() / 2);
 
@@ -195,7 +195,8 @@ struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> 
                     auto [isCommute, mergeOp] = checkCommutationAndFindMerge(op, prevLayer);
 
                     if (isCommute && mergeOp) {
-                        mergePPR(op, currentLayer, mergeOp, writer);
+                        mergePPR(cast<PPRotationOp>(op), currentLayer, cast<PPRotationOp>(mergeOp),
+                                 writer);
                         changed = true;
                     }
                     else if (isCommute) {
