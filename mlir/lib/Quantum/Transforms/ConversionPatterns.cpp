@@ -545,7 +545,7 @@ struct GlobalPhaseOpPattern : public OpConversionPattern<GlobalPhaseOp> {
         LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, qirName, qirSignature);
         SmallVector<Value> args;
-        args.insert(args.end(), adaptor.getParams());
+        args.insert(args.end(), adaptor.getAngle());
         args.insert(args.end(), modifiersPtr);
 
         LLVM::CallOp::create(rewriter, loc, fnDecl, args);

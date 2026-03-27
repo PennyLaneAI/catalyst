@@ -33,6 +33,7 @@ from xdsl.dialects.builtin import (
     IntegerAttr,
     IntegerType,
     TensorType,
+    UnitAttr,
 )
 from xdsl.ir import (
     Attribute,
@@ -209,6 +210,7 @@ class TannerGraphType(ParametrizedAttribute, TypeAttribute, ContainerType[Attrib
         super().__init__(row_idx_size_attr, col_ptr_size_attr, element_type)
 
     def get_element_type(self) -> AttributeCovT:
+        """Return the element type of the Tanner graph's adjacency matrix."""
         return self.element_type
 
     def print_parameters(self, printer: Printer) -> None:
@@ -387,7 +389,7 @@ class ExtractCodeblockOp(IRDLOperation):
         idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (hyper_reg, None)
@@ -435,7 +437,7 @@ class InsertCodeblockOp(IRDLOperation):
         codeblock: PhysicalCodeBlockSSAValue | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (in_hyper_reg, None, codeblock)
@@ -453,7 +455,12 @@ class InsertCodeblockOp(IRDLOperation):
 
 @irdl_op_definition
 class ExtractQubitOp(IRDLOperation):
-    """Extract a physical qubit value from a codeblock."""
+    """Extract a physical qubit value from a codeblock.
+
+    This operation extracts a QEC physical qubit value from a physical codeblock. The qubit value is
+    restricted to have the 'data' role; in other words, an auxiliary qubit cannot be extracted from
+    a physical codeblock.
+    """
 
     name = "qecp.extract"
 
@@ -475,7 +482,7 @@ class ExtractQubitOp(IRDLOperation):
         idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (codeblock, None)
@@ -495,7 +502,12 @@ class ExtractQubitOp(IRDLOperation):
 
 @irdl_op_definition
 class InsertQubitOp(IRDLOperation):
-    """Update the physical qubit value of a codeblock."""
+    """Update the physical qubit value of a codeblock.
+
+    This operation updates the value of a QEC physical qubit in a physical codeblock. The qubit
+    value is restricted to have the 'data' role; in other words, an auxiliary qubit cannot be
+    inserted into a physical codeblock.
+    """
 
     T: ClassVar = VarConstraint("T", anyPhysicalCodeblock)
 
@@ -522,7 +534,7 @@ class InsertQubitOp(IRDLOperation):
         qubit: QecPhysicalQubitSSAValue | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (in_codeblock, None, qubit)
@@ -535,6 +547,142 @@ class InsertQubitOp(IRDLOperation):
 
         super().__init__(
             operands=operands, properties=properties, result_types=(in_codeblock_type,)
+        )
+
+
+class SingleQubitPhysicalGateOp(IRDLOperation):
+    """Base class for single-qubit physical gate operations.
+
+    An operation that inherits from this class represents a physical gate operation applied to a QEC
+    physical qubit. For example,
+
+    ```mlir
+    %1 = qecp.hadamard %0 : !qecp.qubit<data>
+    ```
+
+    represents a physical Hadamard operation applied to the physical data qubit `%0`. Single-qubit
+    physical gate operations can be applied to both data and auxiliary qubits.
+
+    Adjoint operations are supported by adding the `adj` unit attribute. For example, a physical S†
+    gate operation is represented as follows:
+
+    ```mlir
+    %1 = qecp.s %0 adj : !qecp.qubit<data>
+    """
+
+    T: ClassVar = VarConstraint("T", anyPhysicalQubit)
+
+    assembly_format = """
+            $in_qubit (`adj` $adjoint^)? attr-dict `:` type($out_qubit)
+        """
+
+    in_qubit = operand_def(T)
+
+    adjoint = opt_prop_def(UnitAttr)
+
+    out_qubit = result_def(T)
+
+    def __init__(
+        self, in_qubit: QecPhysicalQubitSSAValue | Operation, adjoint: UnitAttr | bool = False
+    ):
+        in_qubit_type = get_physical_qubit_type(in_qubit)
+
+        properties = {}
+        if adjoint:
+            properties["adjoint"] = UnitAttr()
+
+        super().__init__(operands=(in_qubit,), result_types=(in_qubit_type,), properties=properties)
+
+
+@irdl_op_definition
+class IdentityOp(SingleQubitPhysicalGateOp):
+    """A physical Identity gate operation."""
+
+    name = "qecp.identity"
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        super().__init__(in_qubit)
+
+
+@irdl_op_definition
+class PauliXOp(SingleQubitPhysicalGateOp):
+    """A physical Pauli X gate operation."""
+
+    name = "qecp.x"
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        super().__init__(in_qubit)
+
+
+@irdl_op_definition
+class PauliYOp(SingleQubitPhysicalGateOp):
+    """A physical Pauli Y gate operation."""
+
+    name = "qecp.y"
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        super().__init__(in_qubit)
+
+
+@irdl_op_definition
+class PauliZOp(SingleQubitPhysicalGateOp):
+    """A physical Pauli Z gate operation."""
+
+    name = "qecp.z"
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        super().__init__(in_qubit)
+
+
+@irdl_op_definition
+class HadamardOp(SingleQubitPhysicalGateOp):
+    """A physical Hadamard gate operation."""
+
+    name = "qecp.hadamard"
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        super().__init__(in_qubit)
+
+
+@irdl_op_definition
+class SOp(SingleQubitPhysicalGateOp):
+    """A physical S (π/2 phase) gate operation."""
+
+    name = "qecp.s"
+
+
+@irdl_op_definition
+class CnotOp(IRDLOperation):
+    """A physical CNOT gate operation."""
+
+    T_CTRL: ClassVar = VarConstraint("T_CTRL", anyPhysicalQubit)
+    T_TRGT: ClassVar = VarConstraint("T_TRGT", anyPhysicalQubit)
+
+    name = "qecp.cnot"
+
+    assembly_format = """
+            $in_ctrl_qubit `,` $in_trgt_qubit attr-dict `:` type($out_ctrl_qubit) `,` type($out_trgt_qubit)
+        """
+
+    in_ctrl_qubit = operand_def(T_CTRL)
+
+    in_trgt_qubit = operand_def(T_TRGT)
+
+    out_ctrl_qubit = result_def(T_CTRL)
+
+    out_trgt_qubit = result_def(T_TRGT)
+
+    def __init__(
+        self,
+        in_ctrl_qubit: QecPhysicalQubitSSAValue | Operation,
+        in_trgt_qubit: QecPhysicalQubitSSAValue | Operation,
+    ):
+        in_ctrl_qubit_type = get_physical_qubit_type(in_ctrl_qubit)
+        in_trgt_qubit_type = get_physical_qubit_type(in_trgt_qubit)
+
+        super().__init__(
+            operands=(in_ctrl_qubit, in_trgt_qubit),
+            result_types=(in_ctrl_qubit_type, in_trgt_qubit_type),
         )
 
 
@@ -642,6 +790,13 @@ QecPhysical = Dialect(
         InsertCodeblockOp,
         ExtractQubitOp,
         InsertQubitOp,
+        IdentityOp,
+        PauliXOp,
+        PauliYOp,
+        PauliZOp,
+        HadamardOp,
+        SOp,
+        CnotOp,
         AssembleTannerGraphOp,
         DecodeEsmCssOp,
         DecodePhysicalMeasurementOp,

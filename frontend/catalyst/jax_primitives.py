@@ -137,6 +137,7 @@ with Patcher(
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
 from pennylane.capture.primitives import quantum_subroutine_prim
+from pennylane.capture.primitives import value_and_grad_prim as pl_value_and_grad_prim
 from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
 
 from catalyst.compiler import get_lib_path
@@ -821,6 +822,34 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     ).results
 
 
+def _capture_value_and_grad_lowering(ctx, *args, jaxpr, fn, h, method, argnums):
+    """
+    Returns:
+        MLIR results
+    """
+    mlir_ctx = ctx.module_context.context
+    new_argnums = np.array(argnums)
+
+    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
+    flat_output_types = util.flatten(output_types)
+
+    val_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
+    gradient_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
+
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums), fn=fn)
+
+    symbol_ref = get_symbolref(ctx, func_op)
+    return ValueAndGradOp(
+        val_result_types,
+        gradient_result_types,
+        ir.StringAttr.get(method),
+        symbol_ref,
+        mlir.flatten_ir_values(args),
+        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
+        finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
+    ).results
+
+
 #
 # vjp/jvp
 #
@@ -1307,7 +1336,7 @@ def _gphase_lowering(
         ctrl_values_i1.append(p)
 
     GlobalPhaseOp(
-        params=param,
+        angle=param,
         out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
@@ -1835,7 +1864,12 @@ def _mcmobs_abstract_eval(*mcms):
 def _mcm_obs_lowering(jax_ctx: mlir.LoweringRuleContext, *mcms: list[ir.Value]):
     ctx = jax_ctx.module_context.context
     result_type = ir.OpaqueType.get("quantum", "obs", ctx)
-    extracted = [extract_scalar(mcm, "mcmobs") for mcm in mcms]
+    tensor_i1_type = ir.RankedTensorType.get([], ir.IntegerType.get_signless(1))
+
+    extracted = []
+    for mcm in mcms:
+        convert_op = StableHLOConvertOp(tensor_i1_type, mcm)
+        extracted.append(extract_scalar(convert_op.result, "mcmobs"))
     return MCMObsOp(result_type, extracted).results
 
 
@@ -2760,7 +2794,7 @@ def _adjoint_lowering(
     ), f"Expected a single result of quantum.register type, got: {output_types}"
 
     # Build an adjoint operation with a single-block region.
-    op = AdjointOp(output_types[0], qargs[0])
+    op = AdjointOp(output_types, qargs)
     adjoint_block = op.regions[0].blocks.append(*[mlir.aval_to_ir_types(a)[0] for a in aqargs])
     with ir.InsertionPoint(adjoint_block):
         source_info_util.extend_name_stack("adjoint")
@@ -2921,6 +2955,7 @@ CUSTOM_LOWERING_RULES = (
     (pl_jac_prim, _capture_grad_lowering),
     (pl_vjp_prim, _capture_vjp_lowering),
     (pl_jvp_prim, _capture_jvp_lowering),
+    (pl_value_and_grad_prim, _capture_value_and_grad_lowering),
     (func_p, _func_lowering),
     (jvp_p, _jvp_lowering),
     (vjp_p, _vjp_lowering),

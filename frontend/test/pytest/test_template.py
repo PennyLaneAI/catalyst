@@ -1126,7 +1126,6 @@ def test_qutrit_basis_state_preparation(backend):
     assert np.allclose(interpreted_fn(basis_state, obs), jitted_fn(basis_state, obs))
 
 
-@pytest.mark.xfail(reason="givens issue under investigation")
 def test_basis_rotation(backend):
     """Test BasisRotation"""
 
