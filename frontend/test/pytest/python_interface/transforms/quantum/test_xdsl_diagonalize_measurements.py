@@ -20,6 +20,7 @@ import pennylane as qml
 import pytest
 from pennylane.exceptions import CompileError
 
+from catalyst.passes.builtin_passes import diagonalize_measurements
 from catalyst.python_interface.transforms import (
     DiagonalizeFinalMeasurementsPass,
     diagonalize_final_measurements_pass,
@@ -711,17 +712,6 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
     def test_with_split_non_commuting_multiple_measurements(self, run_filecheck_qjit):
         """Test the executable file can be generated and run with lightning.qubit when applying
         both the diagonalize-final-measurements and the split-non-commuting passes"""
-
-        def diagonalize_measurements_setup_inputs(
-            to_eigvals: bool = False, supported_base_obs: tuple[str] | str = ("PauliZ",)
-        ):
-            "Return the options for the diagonalize-final-measurements pass."
-            return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
-
-        diagonalize_measurements = qml.transform(
-            pass_name="diagonalize-final-measurements",
-            setup_inputs=diagonalize_measurements_setup_inputs,
-        )
 
         dev = qml.device("lightning.qubit", wires=10)
 
