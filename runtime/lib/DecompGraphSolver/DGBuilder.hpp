@@ -15,11 +15,11 @@
 /**
  * @file DGBuilder.hpp
  *
- * @brief This file implements the DecompositionGraph class, which constructs a graph representation
- * of the decomposition problem based on the provided operators, gateset, and rules. The graph
- * is built using the Boost Graph Library, where vertices represent operators and rules, and edges
- * represent the relationships between them according to the decomposition rules.
-
+ * @brief This file implements the DecompositionGraph class, which constructs a graph
+ * representation of the decomposition problem based on the provided operators, gateset,
+ * and rules. The graph is built using the Boost Graph Library, where vertices represent
+ * operators and rules, and edges represent the relationships between them according to
+ * the decomposition rules.
  */
 
 #pragma once
@@ -48,10 +48,10 @@ class DecompositionGraph {
      * to find optimal decompositions of the target gates.
      *
      * @param operators The list of operators that are used in the decomposition rules and gateset.
-     * @param gateset The target gateset that we want to decompose into, along with their associated
-     * costs.
-     * @param rules The list of decomposition rules that define how operators can be decomposed into
-     * other operators.
+     * @param gateset The target gateset that we want to decompose into, along with their
+     * associated costs.
+     * @param rules The list of decomposition rules that define how operators can be decomposed
+     * into other operators.
      * @param fixedDecomps The mapping from operators to their fixed decomposition rules, which are
      * rules that cannot be changed or overridden by the solver. Default is an empty map.
      * @param altDecomps The mapping from operators to their alternative decomposition rules, which
@@ -144,10 +144,10 @@ class DecompositionGraph {
     /**
      * @brief Prints the graph structure for debugging purposes.
      *
-     * This method can be used to visualize the graph structure, including the operators, rules, and
-     * their relationships. It can help in understanding how the graph is constructed and how the
-     * decomposition rules are connected to the operators. The exact format of the output can be
-     * designed to be human-readable and informative for debugging.
+     * This method can be used to visualize the graph structure, including the operators, rules,
+     * and their relationships. It can help in understanding how the graph is constructed and how
+     * the decomposition rules are connected to the operators. The exact format of the output can
+     * be designed to be human-readable and informative for debugging.
      */
     void showGraph() const;
 };

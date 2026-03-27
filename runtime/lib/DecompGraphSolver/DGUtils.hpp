@@ -68,31 +68,41 @@ static inline auto graph_failed_message(const OperatorNode &op,
     return oss.str();
 }
 
-class GraphSolveError : public std::runtime_error {
+class GraphError : public std::runtime_error {
   public:
-    explicit GraphSolveError(std::string message) : std::runtime_error(std::move(message)) {}
+    explicit GraphError(std::string message) : std::runtime_error(std::move(message)) {}
 };
 
-class MissingRuleForOperatorError : public GraphSolveError {
+class MissingRuleForOperatorError : public GraphError {
   public:
     explicit MissingRuleForOperatorError(OperatorNode op)
-        : GraphSolveError("Missing rule for operator: " + print_op(op))
+        : GraphError("Missing rule for operator: " + print_op(op))
     {
     }
 };
 
-class CyclicDecompositionError : public GraphSolveError {
+class CyclicDecompositionError : public GraphError {
   public:
     explicit CyclicDecompositionError(std::vector<OperatorNode> cycle)
-        : GraphSolveError(cycle_message(cycle))
+        : GraphError(cycle_message(cycle))
     {
     }
 };
 
-class GraphSolverFailedError : public GraphSolveError {
+class GraphSolverFailedError : public GraphError {
   public:
     GraphSolverFailedError(OperatorNode op, std::vector<std::string> rule_errors)
-        : GraphSolveError(graph_failed_message(op, rule_errors))
+        : GraphError(graph_failed_message(op, rule_errors))
+    {
+    }
+};
+
+class RuleInvalidOverrideError : public GraphError {
+  public:
+    RuleInvalidOverrideError(const std::string &kind, const OperatorNode &op, const RuleNode &rule)
+        : GraphError("Invalid " + kind + " override for operator '" + print_op(op) +
+                     "' with rule '" + rule.name + "' for rule.output '" + print_op(rule.output) +
+                     "'")
     {
     }
 };

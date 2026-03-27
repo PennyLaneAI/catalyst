@@ -82,12 +82,79 @@ struct DecompositionGraph::Impl {
         return newId;
     }
 
+    static Core::RuleNode markRuleOrigin(Core::RuleNode rule, Core::RuleOrigin origin,
+                                         const Core::OperatorNode &op)
+    {
+        if (rule.output != op) {
+            throw Core::RuleInvalidOverrideError(
+                origin == Core::RuleOrigin::Fixed ? "fixed" : "alternative", op, rule);
+        }
+        rule.origin = origin;
+        return rule;
+    }
+
     Impl(std::vector<Core::OperatorNode> _operators, Core::WeightedGateset _gateset,
          std::vector<Core::RuleNode> _rules, Core::FixedDecomps _fixedDecomps = {},
          Core::AltDecomps _altDecomps = {})
         : operators(std::move(_operators)), gateset(std::move(_gateset)), rules(std::move(_rules)),
           fixedDecomps(std::move(_fixedDecomps)), altDecomps(std::move(_altDecomps))
     {
+        materializeRules();
+    }
+
+    void materializeRules()
+    {
+        std::unordered_map<Core::OperatorNode, std::vector<Core::RuleNode>, Core::OperatorNodeHash>
+            baseByOutput;
+        baseByOutput.reserve(rules.size());
+        for (auto &rule : rules) {
+            rule.origin = Core::RuleOrigin::Default;
+            baseByOutput[rule.output].push_back(rule);
+        }
+
+        std::vector<Core::RuleNode> effectiveRules;
+        effectiveRules.reserve(rules.size());
+        std::unordered_set<Core::OperatorNode, Core::OperatorNodeHash> seenOutputs;
+
+        auto appendRulesForOutput = [&](const Core::OperatorNode &op) {
+            if (!seenOutputs.insert(op).second) {
+                return;
+            }
+
+            const auto fixedIt = fixedDecomps.find(op);
+            if (fixedIt != fixedDecomps.end()) {
+                effectiveRules.push_back(
+                    markRuleOrigin(fixedIt->second, Core::RuleOrigin::Fixed, op));
+            }
+            else {
+                const auto baseIt = baseByOutput.find(op);
+                if (baseIt != baseByOutput.end()) {
+                    for (const auto &rule : baseIt->second) {
+                        effectiveRules.push_back(rule);
+                    }
+                }
+            }
+
+            const auto altIt = altDecomps.find(op);
+            if (altIt != altDecomps.end()) {
+                for (const auto &altRule : altIt->second) {
+                    effectiveRules.push_back(
+                        markRuleOrigin(altRule, Core::RuleOrigin::Alternative, op));
+                }
+            }
+        };
+
+        for (const auto &rule : rules) {
+            appendRulesForOutput(rule.output);
+        }
+        for (const auto &[op, _] : fixedDecomps) {
+            appendRulesForOutput(op);
+        }
+        for (const auto &[op, _] : altDecomps) {
+            appendRulesForOutput(op);
+        }
+
+        rules = std::move(effectiveRules);
     }
 
     void buildGraph()
@@ -219,9 +286,16 @@ void DecompositionGraph::showGraph() const
 
     // Show all rules by their names and their input/output operators
     std::cerr << "Rules:\n";
-    for (const auto &[ruleId, vertex] : impl->ruleIdToVertex) {
+    for (const auto &[ruleId, _] : impl->ruleIdToVertex) {
         const auto &rule = impl->rules[ruleId];
-        std::cerr << "  Rule ID " << ruleId << ": " << rule.name << "\n";
+        std::cerr << "  Rule ID " << ruleId << ": " << rule.name;
+        if (rule.origin == Core::RuleOrigin::Fixed) {
+            std::cerr << " [fixed]";
+        }
+        else if (rule.origin == Core::RuleOrigin::Alternative) {
+            std::cerr << " [alt]";
+        }
+        std::cerr << "\n";
         std::cerr << "    Output: " << Core::print_op(rule.output) << "\n";
         std::cerr << "    Inputs:\n";
         for (const auto &input : rule.inputs) {

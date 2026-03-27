@@ -29,7 +29,7 @@ Core::ChosenDecompRule DecompositionSolver::basisRule(const Core::OperatorNode &
 {
     if (!graph.isTargetGate(op)) {
         graph.showGraph(); // Debug: show the graph structure
-        throw Core::GraphSolveError("Operator is not a target gate in the gateset");
+        throw Core::GraphError("Operator is not a target gate in the gateset");
     }
 
     Core::ChosenDecompRule solution;
@@ -60,7 +60,7 @@ Core::ChosenDecompRule DecompositionSolver::evalRule(const Core::RuleNode &rule)
             // but should not prevent trying sibling decomposition rules.
             return invalidRule(solution.op);
         }
-        catch (const Core::GraphSolveError &) {
+        catch (const Core::GraphError &) {
             // Any error in solving the input operator invalidates this rule,
             // but should not prevent trying sibling decomposition rules.
             return invalidRule(solution.op);
