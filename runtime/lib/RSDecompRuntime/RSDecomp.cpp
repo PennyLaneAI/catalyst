@@ -298,7 +298,8 @@ size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis)
         oss << std::scientific << epsilon;
         RT_WARN("Gridsynth received epsilon=" + oss.str() +
                 ". For epsilon smaller than 1e-6, results may be inaccurate, or errors may"
-                " occur during decomposition. To guarantee correctness, please provide a larger epsilon value.");
+                " occur during decomposition. To guarantee correctness, please provide a larger "
+                "epsilon value.");
     }
     if (ppr_basis) {
         auto result = eval_ross_algorithm_ppr(theta, epsilon);
