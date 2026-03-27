@@ -442,6 +442,9 @@ void decomposeFrequencyPulses(ScheduleGroupsMap &pulseGroups)
 struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToARTIQPass> {
     using RTIOEventToARTIQPassBase::RTIOEventToARTIQPassBase;
 
+    // id -> callee name mapping
+    llvm::ArrayRef<std::pair<int32_t, std::string>> getRPCIdMap() const { return rpcIdMap; }
+
     void runOnOperation() override
     {
         ModuleOp module = getOperation();
@@ -488,6 +491,9 @@ struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToA
             return signalPassFailure();
         }
 
+        // Assign unique RPC service IDs to all rtio.rpc ops
+        rpcIdMap = assignRPCIds(module);
+
         // Lowering to LLVM
         if (failed(lowerToLLVM(module))) {
             return signalPassFailure();
@@ -495,6 +501,9 @@ struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToA
     }
 
   private:
+    /// Populated by assignRPCIds(); maps service_id -> callee name.
+    llvm::SmallVector<std::pair<int32_t, std::string>> rpcIdMap;
+
     static bool sameChannelSameFrequency(RTIOPulseOp ref, RTIOPulseOp candidate)
     {
         if (ref.getChannel() == candidate.getChannel()) {
@@ -522,9 +531,18 @@ struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToA
 
         OpBuilder::InsertionGuard guard(builder);
 
-        // Ensure helper functions are defined in the module
         ARTIQRuntimeBuilder artiq(builder, kernelFunc);
-        artiq.ensureHelperFunctions();
+
+        // DDS/SPI helper functions are only needed when the module has pulse ops.
+        // Skip them if there are no pulse ops to avoid requiring hardware device_db entries.
+        bool hasPulses = false;
+        module.walk([&](rtio::RTIOPulseOp) {
+            hasPulses = true;
+            return WalkResult::interrupt();
+        });
+        if (hasPulses) {
+            artiq.ensureHelperFunctions();
+        }
 
         builder.setInsertionPointToStart(&kernelFunc.getBody().front());
         artiq.rtioInit();
@@ -536,6 +554,31 @@ struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToA
         artiq.atMu(initialTime);
 
         return success();
+    }
+
+    // Walk every rtio.rpc in the module, assign a unique service ID to each distinct callee symbol,
+    // and attach it as an IntegerAttr named "rpc_id".
+    static llvm::SmallVector<std::pair<int32_t, std::string>> assignRPCIds(ModuleOp module)
+    {
+        llvm::DenseMap<mlir::StringAttr, int32_t> calleeToId;
+        llvm::SmallVector<std::pair<int32_t, std::string>> idMap;
+        int32_t nextId = 1;
+
+        module.walk([&](rtio::RTIORPCOp rpc) {
+            auto callee = mlir::StringAttr::get(module.getContext(),
+                                                rpc.getCallee().getRootReference().getValue());
+
+            auto [it, inserted] = calleeToId.try_emplace(callee, nextId);
+            if (inserted) {
+                idMap.push_back({nextId, callee.getValue().str()});
+                nextId++;
+            }
+            rpc->setAttr("rpc_id",
+                         mlir::IntegerAttr::get(mlir::IntegerType::get(module.getContext(), 32),
+                                                it->second));
+        });
+
+        return idMap;
     }
 
     LogicalResult lowerToLLVM(ModuleOp module)
@@ -550,6 +593,7 @@ struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToA
 
         RewritePatternSet patterns(ctx);
         populateRTIOToARTIQConversionPatterns(typeConverter, patterns);
+        populateRTIORPCConversionPatterns(typeConverter, patterns);
 
         ConversionTarget target(*ctx);
         target.addIllegalDialect<rtio::RTIODialect>();
