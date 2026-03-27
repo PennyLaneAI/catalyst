@@ -171,7 +171,6 @@ class LinkerDriver:
             "-lcustom_calls",
             "-lmlir_async_runtime",
             "-lrt_rsdecomp",
-            "-ldecompsolver",
         ]
 
         # If OQD runtime capi is built, link to it as well
