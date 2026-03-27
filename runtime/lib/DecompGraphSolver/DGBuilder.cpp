@@ -55,6 +55,8 @@ struct DecompositionGraph::Impl {
     std::vector<Core::OperatorNode> operators;
     Core::WeightedGateset gateset;
     std::vector<Core::RuleNode> rules;
+    Core::FixedDecomps fixedDecomps;
+    Core::AltDecomps altDecomps;
 
     std::unordered_map<Core::OperatorNode, OperatorId, Core::OperatorNodeHash> opToId;
     std::vector<Core::OperatorNode> idToOp;
@@ -69,13 +71,11 @@ struct DecompositionGraph::Impl {
         const auto it = opToId.find(op);
         if (it != opToId.end()) {
             return it->second;
-        } // else {
+        }
 
         OperatorId newId = opToId.size();
         opToId.emplace(op, newId);
         idToOp.push_back(op);
-        // return newId;
-        // opToId[op] = newId;
         const auto vertex =
             boost::add_vertex(GraphVertex{VertexType::Operator, OperatorVertex{newId}}, graph);
         opIdToVertex.emplace(newId, vertex);
@@ -83,8 +83,10 @@ struct DecompositionGraph::Impl {
     }
 
     Impl(std::vector<Core::OperatorNode> _operators, Core::WeightedGateset _gateset,
-         std::vector<Core::RuleNode> _rules)
-        : operators(std::move(_operators)), gateset(std::move(_gateset)), rules(std::move(_rules))
+         std::vector<Core::RuleNode> _rules, Core::FixedDecomps _fixedDecomps = {},
+         Core::AltDecomps _altDecomps = {})
+        : operators(std::move(_operators)), gateset(std::move(_gateset)), rules(std::move(_rules)),
+          fixedDecomps(std::move(_fixedDecomps)), altDecomps(std::move(_altDecomps))
     {
     }
 
@@ -127,8 +129,10 @@ struct DecompositionGraph::Impl {
 
 DecompositionGraph::DecompositionGraph(std::vector<Core::OperatorNode> operators,
                                        Core::WeightedGateset gateset,
-                                       std::vector<Core::RuleNode> rules)
-    : impl(std::make_unique<Impl>(std::move(operators), std::move(gateset), std::move(rules)))
+                                       std::vector<Core::RuleNode> rules,
+                                       Core::FixedDecomps fixedDecomps, Core::AltDecomps altDecomps)
+    : impl(std::make_unique<Impl>(std::move(operators), std::move(gateset), std::move(rules),
+                                  std::move(fixedDecomps), std::move(altDecomps)))
 {
     impl->buildGraph();
 }
@@ -165,6 +169,16 @@ DecompositionGraph &DecompositionGraph::operator=(DecompositionGraph &&other) no
 [[nodiscard]] const std::vector<Core::RuleNode> &DecompositionGraph::getRules() const noexcept
 {
     return impl->rules;
+}
+
+[[nodiscard]] const Core::FixedDecomps &DecompositionGraph::getFixedDecomps() const noexcept
+{
+    return impl->fixedDecomps;
+}
+
+[[nodiscard]] const Core::AltDecomps &DecompositionGraph::getAltDecomps() const noexcept
+{
+    return impl->altDecomps;
 }
 
 std::size_t DecompositionGraph::getNumRules() const { return impl->rules.size(); }

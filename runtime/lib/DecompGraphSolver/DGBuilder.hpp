@@ -52,9 +52,14 @@ class DecompositionGraph {
      * costs.
      * @param rules The list of decomposition rules that define how operators can be decomposed into
      * other operators.
+     * @param fixedDecomps The mapping from operators to their fixed decomposition rules, which are
+     * rules that cannot be changed or overridden by the solver. Default is an empty map.
+     * @param altDecomps The mapping from operators to their alternative decomposition rules, which
+     * are rules that can be used in place of the default rule. Default is an empty map.
      */
     DecompositionGraph(std::vector<Core::OperatorNode> operators, Core::WeightedGateset gateset,
-                       std::vector<Core::RuleNode> rules);
+                       std::vector<Core::RuleNode> rules, Core::FixedDecomps fixedDecomps = {},
+                       Core::AltDecomps altDecomps = {});
     ~DecompositionGraph();
 
     // copy and move constructors and assignment operators
@@ -89,6 +94,18 @@ class DecompositionGraph {
      * @return The list of decomposition rules for the graph decomposition problem.
      */
     [[nodiscard]] const std::vector<Core::RuleNode> &getRules() const noexcept;
+
+    /**
+     * @brief Returns the mapping from operators to their fixed decomposition rules,
+     * which are rules that cannot be changed or overridden by the solver.
+     */
+    [[nodiscard]] const Core::FixedDecomps &getFixedDecomps() const noexcept;
+
+    /**
+     * @brief Returns the mapping from operators to their alternative decomposition rules,
+     * which are rules that can be used in place of the default rule.
+     */
+    [[nodiscard]] const Core::AltDecomps &getAltDecomps() const noexcept;
 
     /**
      * @brief Returns the number of decomposition rules in the graph.

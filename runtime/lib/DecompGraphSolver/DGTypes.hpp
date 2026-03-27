@@ -30,6 +30,10 @@
 
 namespace DecompGraph::Core {
 
+////////////////////////
+// Operators and Gateset
+////////////////////////
+
 /**
  * @brief This represents the operator nodes in the graph decomposition problem.
  *
@@ -74,6 +78,28 @@ struct OperatorNodeHash {
 };
 
 /**
+ * @brief This represents the weighted target gateset for the graph decomposition problem.
+ */
+struct WeightedGateset {
+    std::unordered_map<OperatorNode, double, OperatorNodeHash> ops;
+
+    [[nodiscard]] bool contains(const OperatorNode &op) const { return ops.find(op) != ops.end(); }
+    [[nodiscard]] double getCost(const OperatorNode &op) const
+    {
+        auto it = ops.find(op);
+        if (it != ops.end()) {
+            return it->second;
+        }
+
+        return std::numeric_limits<double>::infinity();
+    }
+};
+
+///////////////////////////
+// Rules and Decompositions
+///////////////////////////
+
+/**
  * @brief This represents a term in decomposition rules,
  * which includes an operator and its multiplicity.
  */
@@ -112,30 +138,25 @@ struct RuleNode {
     std::string name;
     OperatorNode output;
     std::vector<RuleTerm> inputs;
+    RuleOrigin origin{RuleOrigin::Default};
 
     bool operator==(const RuleNode &other) const
     {
-        return name == other.name && output == other.output;
+        return name == other.name && output == other.output && origin == other.origin;
     }
 };
 
 /**
- * @brief This represents the weighted target gateset for the graph decomposition problem.
+ * @brief This represents the mapping from operators to their fixed decomposition rules,
+ * which are rules that cannot be changed or overridden by the solver.
  */
-struct WeightedGateset {
-    std::unordered_map<OperatorNode, double, OperatorNodeHash> ops;
+using FixedDecomps = std::unordered_map<OperatorNode, RuleNode, OperatorNodeHash>;
 
-    [[nodiscard]] bool contains(const OperatorNode &op) const { return ops.find(op) != ops.end(); }
-    [[nodiscard]] double getCost(const OperatorNode &op) const
-    {
-        auto it = ops.find(op);
-        if (it != ops.end()) {
-            return it->second;
-        }
-
-        return std::numeric_limits<double>::infinity();
-    }
-};
+/**
+ * @brief This represents the mapping from operators to their alternative decomposition rules,
+ * which are rules that can be used in place of the default rule.
+ */
+using AltDecomps = std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash>;
 
 /**
  * @brief This represents the chosen decomposition rule for an operator in
