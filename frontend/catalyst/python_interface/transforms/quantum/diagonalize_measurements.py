@@ -136,7 +136,7 @@ class NonCommutingObservableValidator:
             if isinstance(q.owner, ExtractOp):
                 try:
                     q = dispatch_wires_extract(q.owner)
-                except Exception:
+                except NotImplementedError:
                     pass
 
             if q in self.visited_qubits:
