@@ -1511,6 +1511,21 @@ struct ValueSemanticsConversionPass
         auto *qrefDialect = ctx->getLoadedDialect<qref::QRefDialect>();
         IRRewriter builder(ctx);
 
+        WalkResult getOpVerification = mod->walk([&](qref::GetOp getOp) {
+            if (!llvm::all_of(getOp->getUsers(),
+                              llvm::IsaPred<qref::QuantumOperation, qref::MeasureOp,
+                                            qref::ComputationalBasisOp, qref::NamedObsOp,
+                                            qref::HermitianOp>)) {
+                getOp.emitOpError(
+                    "qref.get operations can only be used by qref dialect gate operations");
+                return WalkResult::interrupt();
+            }
+            return WalkResult::advance();
+        });
+        if (getOpVerification.wasInterrupted()) {
+            return signalPassFailure();
+        }
+
         // Collect all functions that need to be converted
         // This includes qnode functions, and any subroutine functions
         SetVector<func::FuncOp> targetFuncs;

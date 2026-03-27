@@ -24,12 +24,15 @@
 // RUN: quantum-opt --convert-to-value-semantics --canonicalize --verify-diagnostics %s | FileCheck %s
 
 
-// CHECK: func.func @subroutine(%arg0: f64, %arg1: !quantum.bit) -> !quantum.bit {
-// CHECK:   [[RX:%.+]] = quantum.custom "RX"(%arg0) %arg1 : !quantum.bit
-// CHECK:   return [[RX]] : !quantum.bit
+// CHECK: func.func @subroutine(%arg0: f64, %arg1: i64, %arg2: !quantum.reg) -> !quantum.reg {
+// CHECK:     [[extract:%.+]] = quantum.extract %arg2[%arg1] : !quantum.reg -> !quantum.bit
+// CHECK:     [[RX:%.+]] = quantum.custom "RX"(%arg0) [[extract]] : !quantum.bit
+// CHECK:     [[insert:%.+]] = quantum.insert %arg2[%arg1], [[RX]] : !quantum.reg, !quantum.bit
+// CHECK:     return [[insert]] : !quantum.reg
 // CHECK: }
 
-func.func @subroutine(%arg0: f64, %q: !qref.bit) -> () {
+func.func @subroutine(%arg0: f64, %idx: i64, %reg: !qref.reg<6>) -> () {
+    %q = qref.get %reg[%idx] : !qref.reg<6>, i64 -> !qref.bit
     qref.custom "RX"(%arg0) %q : !qref.bit
     return
 }
@@ -68,12 +71,10 @@ func.func @main(%arg0: i1, %arg1: i64, %arg2: f64) -> tensor<64xf64> attributes 
 
         // CHECK: [[ifOut:%.+]]:2 = scf.if %arg0 -> (!quantum.reg, !quantum.bit)
         scf.if %arg0 {
-            // CHECK: [[this_q:%.+]] = quantum.extract [[H_insert]][[[i]]] : !quantum.reg -> !quantum.bit
-            // CHECK: [[callOut:%.+]] = func.call @subroutine(%arg2, [[this_q]]) : (f64, !quantum.bit) -> !quantum.bit
-            func.call @subroutine(%arg2, %this_q) : (f64, !qref.bit) -> ()
-            // CHECK: [[call_insert:%.+]] = quantum.insert [[H_insert]][[[i]]], [[callOut]] : !quantum.reg, !quantum.bit
+            // CHECK: [[callOut:%.+]] = func.call @subroutine(%arg2, [[i]], [[H_insert]]) : (f64, i64, !quantum.reg) -> !quantum.reg
+            func.call @subroutine(%arg2, %int, %reg) : (f64, i64, !qref.reg<6>) -> ()
 
-            // CHECK: scf.yield [[call_insert]], %arg5 : !quantum.reg, !quantum.bit
+            // CHECK: scf.yield [[callOut]], %arg5 : !quantum.reg, !quantum.bit
 
         // CHECK: else
         } else {
