@@ -275,6 +275,23 @@ def CnotOp : QecPhysical_Op<"cnot", [
     }];
 }
 
+def MeasureOp : QecPhysical_Op<"measure", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical single-qubit projective measurement in the computational basis.";
+
+    let arguments = (ins
+        QecPhysicalQubitType:$in_qubit
+    );
+
+    let results = (outs
+        I1:$mres,
+        QecPhysicalQubitType:$out_qubit
+    );
+
+    let assemblyFormat = [{
+        $in_qubit attr-dict `:` type($mres) `,` qualified(type($in_qubit))
+    }];
+}
+
 def AssembleTannerGraphOp : QecPhysical_Op<"assemble_tanner"> {
     let summary = "Assemble a Tanner graph in CSC form from the given input arrays.";
 
