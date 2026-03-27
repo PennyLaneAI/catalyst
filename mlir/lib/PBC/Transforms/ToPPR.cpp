@@ -271,7 +271,8 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
     if (angleOpt.has_value()) {
         constexpr double PI = llvm::numbers::pi;
         constexpr double SPECIFIC_ANGLES[6] = {PI / 2, PI / 4, PI / 8, -PI / 8, -PI / 4, -PI / 2};
-        // We are choosing a very small tolerance to accomodate floating point precision issues.
+        constexpr int8_t SPECIFIC_DENOMINATORS[6] = {2, 4, 8, -8, -4, -2};
+        // We are choosing a very small tolerance to accommodate floating point precision issues.
         // We choose this because it is a few bits away from the precision allowed by float 64
         // and we assume the angles have magnitudes on the order of pi.
         constexpr double TOLERANCE = 1e-12;
@@ -281,15 +282,15 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
 
         auto angle = std::fmod(ppr_angle, PI);
 
-        if (std::abs(angle) < TOLERANCE) {
-            // If the angle is 0, we can just erase the PauliRotOp.
+        if (std::abs(angle) < TOLERANCE || PI - std::abs(angle) < TOLERANCE) {
+            // If the angle is 0 or pi, we can just erase the PauliRotOp.
             rewriter.replaceOp(op, inQubits);
             return success();
         }
 
-        for (auto specific_angle : SPECIFIC_ANGLES) {
+        for (auto [i, specific_angle] : llvm::enumerate(SPECIFIC_ANGLES)) {
             if (std::abs(angle - specific_angle) < TOLERANCE) {
-                int64_t rotationKind = static_cast<int64_t>(PI / specific_angle);
+                int8_t rotationKind = SPECIFIC_DENOMINATORS[i];
                 if (op.getAdjoint()) {
                     rotationKind = -rotationKind;
                 }
