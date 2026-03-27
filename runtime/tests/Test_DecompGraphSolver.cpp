@@ -393,3 +393,100 @@ TEST_CASE("Test cyclic decomposition with multiple rules for the same operator",
     const auto &h_solution2 = solutions2.at(hadamard);
     REQUIRE(h_solution2.ruleName == "__builtin__hadamard_to_rz_ry");
 }
+
+TEST_CASE("Test GraphBuilder with fixed decomposition", "[DecompGraph::Solver]")
+{
+    const OperatorNode h{"H"};
+    const OperatorNode rz{"RZ"};
+    const OperatorNode rx{"RX"};
+
+    const WeightedGateset gateset{{{rz, 1.0}, {rx, 3.0}}};
+
+    const std::vector<RuleNode> rules{
+        {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}},
+        {"h_to_rx_rz_rx", h, {{rx, 1}, {rz, 2}}},
+    };
+
+    const FixedDecomps fixedDecomps{
+        {h, {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}}},
+    };
+
+    DecompositionGraph graph({h}, gateset, rules, fixedDecomps);
+    REQUIRE(graph.getAllRulesFor(h).size() == 1);
+    REQUIRE(graph.getAllRulesFor(h)[0].name == "h_to_rz_rx_rz");
+}
+
+TEST_CASE("Test GraphBuilder with alternative decomposition", "[DecompGraph::Solver]")
+{
+    const OperatorNode h{"H"};
+    const OperatorNode rz{"RZ"};
+    const OperatorNode rx{"RX"};
+
+    const WeightedGateset gateset{{{rz, 1.0}, {rx, 3.0}}};
+
+    const std::vector<RuleNode> rules{
+        {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}},
+    };
+
+    const AltDecomps altDecomps{
+        {h, {{"h_to_rx_rz_rx", h, {{rx, 1}, {rz, 2}}}, {"h_to_h", h, {{h, 1}}}}},
+    };
+
+    DecompositionGraph graph({h}, gateset, rules, {}, altDecomps);
+    REQUIRE(graph.getAllRulesFor(h).size() == 3);
+}
+
+TEST_CASE("Test GraphSolver with fixed decomposition", "[DecompGraph::Solver]")
+{
+    const OperatorNode h{"H"};
+    const OperatorNode rz{"RZ"};
+    const OperatorNode rx{"RX"};
+
+    const WeightedGateset gateset{{{rz, 3.0}, {rx, 1.0}}};
+
+    const std::vector<RuleNode> rules{
+        {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}},
+        {"h_to_rx_rz_rx", h, {{rx, 1}, {rz, 2}}},
+    };
+
+    const FixedDecomps fixedDecomps{
+        {h, {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}}},
+    };
+
+    DecompositionGraph graph({h}, gateset, rules, fixedDecomps);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+    REQUIRE(result.solvedRoots.size() == 1);
+    REQUIRE(result.solvedRoots[0] == h);
+    REQUIRE(result.optimizedMap.size() == 3);
+    const auto &chosen_rule = result.optimizedMap.at(h);
+    REQUIRE_FALSE(chosen_rule.isBasis);
+    REQUIRE(chosen_rule.ruleName == "h_to_rz_rx_rz");
+}
+
+TEST_CASE("Test GraphSolver with alternative decomposition", "[DecompGraph::Solver]")
+{
+    const OperatorNode h{"H"};
+    const OperatorNode rz{"RZ"};
+    const OperatorNode rx{"RX"};
+
+    const WeightedGateset gateset{{{rz, 1.0}, {rx, 3.0}}};
+
+    const std::vector<RuleNode> rules{
+        {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}},
+    };
+
+    const AltDecomps altDecomps{
+        {h, {{"h_to_rx_rz_rx", h, {{rx, 1}, {rz, 2}}}}},
+    };
+
+    DecompositionGraph graph({h}, gateset, rules, {}, altDecomps);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+    REQUIRE(result.solvedRoots.size() == 1);
+    REQUIRE(result.solvedRoots[0] == h);
+    REQUIRE(result.optimizedMap.size() == 3);
+    const auto &chosen_rule = result.optimizedMap.at(h);
+    REQUIRE_FALSE(chosen_rule.isBasis);
+    REQUIRE(chosen_rule.ruleName == "h_to_rz_rx_rz");
+}
