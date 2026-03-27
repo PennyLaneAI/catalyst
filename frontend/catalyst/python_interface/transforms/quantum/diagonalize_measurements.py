@@ -37,6 +37,7 @@ from xdsl.rewriter import InsertPoint
 from catalyst.python_interface.dialects.quantum import (
     ComputationalBasisOp,
     CustomOp,
+    ExtractOp,
     GlobalPhaseOp,
     HermitianOp,
     MultiRZOp,
@@ -45,6 +46,7 @@ from catalyst.python_interface.dialects.quantum import (
     NamedObsOp,
     QubitUnitaryOp,
 )
+from catalyst.python_interface.inspection.xdsl_conversion import dispatch_wires_extract
 from catalyst.python_interface.pass_api import compiler_transform
 
 _default_supported_obs = {"PauliZ", "Identity"}
@@ -125,6 +127,14 @@ class NonCommutingObservableValidator:
     def _register_qubits(self, qubits, obs_type):
         """Updates tracking for SSA qubit values and their associated observables."""
         for q in qubits:
+            # If there is no gate applied to a qubit, a qubit SSA value is extracted for every
+            # observable on that qubit in the current IR. Otherwise, the output qubit of the
+            # last gate operation would be reused for each observable on that qubit. Therefore,
+            # we need to resolve the wire information if the qubit SSA used by an observable is
+            # the result of an quantum.extract operation.
+            if isinstance(q.owner, ExtractOp):
+                q = dispatch_wires_extract(q.owner)
+
             if q in self.visited_qubits:
                 self.overlapped_qubits.add(q)
             self.visited_qubits.add(q)
