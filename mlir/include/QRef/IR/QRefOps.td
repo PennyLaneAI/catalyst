@@ -87,6 +87,8 @@ def AllocQubitOp : Memory_Op<"alloc_qb"> {
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
+
+    let hasCanonicalizeMethod = 1;
 }
 
 def DeallocQubitOp : Memory_Op<"dealloc_qb"> {
@@ -102,6 +104,8 @@ def DeallocQubitOp : Memory_Op<"dealloc_qb"> {
     let assemblyFormat = [{
         $qubit attr-dict `:` type(operands)
     }];
+
+    let hasCanonicalizeMethod = 1;
 }
 
 def DeallocOp : Memory_Op<"dealloc"> {
