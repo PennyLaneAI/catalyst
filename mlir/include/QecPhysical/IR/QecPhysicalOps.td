@@ -15,6 +15,7 @@
 #ifndef QEC_PHYSICAL_OPS
 #define QEC_PHYSICAL_OPS
 
+include "mlir/IR/CommonTypeConstraints.td"
 include "mlir/IR/OpBase.td"
 
 include "QecPhysical/IR/QecPhysicalDialect.td"
@@ -139,6 +140,12 @@ def InsertCodeblockOp : QecPhysical_Op<"insert_block", [AllTypesMatch<["in_hyper
 def ExtractQubitOp : QecPhysical_Op<"extract"> {
     let summary = "Extract a physical qubit value from a codeblock.";
 
+    let description = [{
+        This operation extracts a QEC physical qubit value from a physical codeblock. The qubit
+        value is restricted to have the 'data' role; in other words, an auxiliary qubit cannot be
+        extracted from a physical codeblock.
+    }];
+
     let arguments = (ins
         PhysicalCodeblockType:$codeblock,
         Optional<Index>:$idx,
@@ -161,6 +168,12 @@ def ExtractQubitOp : QecPhysical_Op<"extract"> {
 def InsertQubitOp : QecPhysical_Op<"insert", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
     let summary = "Update the physical qubit value of a codeblock.";
 
+    let description = [{
+        This operation updates the value of a QEC physical qubit in a physical codeblock. The qubit
+        value is restricted to have the 'data' role; in other words, an auxiliary qubit cannot be
+        inserted into a physical codeblock.
+    }];
+
     let arguments = (ins
         PhysicalCodeblockType:$in_codeblock,
         Optional<Index>:$idx,
@@ -181,25 +194,28 @@ def InsertQubitOp : QecPhysical_Op<"insert", [AllTypesMatch<["in_codeblock", "ou
     let hasFolder = 1;
 }
 
-def HadamardOp : QecPhysical_Op<"hadamard", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
-    let summary = "A physical Hadamard gate operation.";
-
-    let arguments = (ins
-        QecPhysicalQubitType:$in_qubit
-    );
-
-    let results = (outs
-        QecPhysicalQubitType:$out_qubit
-    );
-
-    let assemblyFormat = [{
-        $in_qubit attr-dict `:` qualified(type($in_qubit))
-    }];
-}
-
-def SOp : QecPhysical_Op<"s", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
-    let summary = "A physical S (π/2 phase) gate operation.";
-
+/**
+ * Base class for single-qubit physical gate operations.
+ *
+ * An operation that inherits from this class represents a physical gate operation applied to a QEC
+ * physical qubit. For example,
+ *
+ * ```mlir
+ * %1 = qecp.hadamard %0 : !qecp.qubit<data>
+ * ```
+ *
+ * represents a physical Hadamard operation applied to the physical data qubit `%0`. Single-qubit
+ * physical gate operations can be applied to both data and auxiliary qubits.
+ *
+ * Adjoint operations are supported by adding the `adj` unit attribute. For example, a physical S†
+ * gate operation is represented as follows:
+ *
+ * ```mlir
+ * %1 = qecp.s %0 adj : !qecp.qubit<data>
+ * ```
+ */
+class SingleQubitPhysicalGate_Op<string mnemonic, list<Trait> traits = []> :
+        QecPhysical_Op<mnemonic, traits> {
     let arguments = (ins
         QecPhysicalQubitType:$in_qubit,
         UnitAttr:$adjoint
@@ -212,6 +228,30 @@ def SOp : QecPhysical_Op<"s", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
     let assemblyFormat = [{
         $in_qubit (`adj` $adjoint^)? attr-dict `:` qualified(type($in_qubit))
     }];
+}
+
+def IdentityOp : SingleQubitPhysicalGate_Op<"identity", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical Identity gate operation.";
+}
+
+def PauliXOp : SingleQubitPhysicalGate_Op<"x", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical Pauli X gate operation.";
+}
+
+def PauliYOp : SingleQubitPhysicalGate_Op<"y", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical Pauli Y gate operation.";
+}
+
+def PauliZOp : SingleQubitPhysicalGate_Op<"z", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical Pauli Z gate operation.";
+}
+
+def HadamardOp : SingleQubitPhysicalGate_Op<"hadamard", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical Hadamard gate operation.";
+}
+
+def SOp : SingleQubitPhysicalGate_Op<"s", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical S (π/2 phase) gate operation.";
 }
 
 def CnotOp : QecPhysical_Op<"cnot", [
@@ -235,6 +275,25 @@ def CnotOp : QecPhysical_Op<"cnot", [
     }];
 }
 
+def AssembleTannerGraphOp : QecPhysical_Op<"assemble_tanner"> {
+    let summary = "Assemble a Tanner graph in CSC form from the given input arrays.";
+
+    let arguments = (ins
+        AnyTypeOf<[1DTensorOf<[AnyInteger]>, MemRefRankOf<[AnyInteger], [1]>]>:$row_idx,
+        AnyTypeOf<[1DTensorOf<[AnyInteger]>, MemRefRankOf<[AnyInteger], [1]>]>:$col_ptr
+    );
+
+    let results = (outs
+        TannerGraphType:$tanner_graph
+    );
+
+    let assemblyFormat = [{
+        $row_idx `,` $col_ptr attr-dict `:` type($row_idx) `,` type($col_ptr) `->` qualified(type($tanner_graph))
+    }];
+
+    let hasVerifier = 1;
+}
+
 def MeasureOp : QecPhysical_Op<"measure", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
     let summary = "A physical single-qubit projective measurement in the computational basis.";
 
@@ -251,5 +310,6 @@ def MeasureOp : QecPhysical_Op<"measure", [AllTypesMatch<["in_qubit", "out_qubit
         $in_qubit attr-dict `:` type($mres) `,` qualified(type($in_qubit))
     }];
 }
+
 
 #endif // QEC_PHYSICAL_OPS

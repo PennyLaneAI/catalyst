@@ -19,6 +19,7 @@ frontend/catalyst/_revision.py
 frontend/mlir_quantum
 frontend/cmake-build
 frontend/catalyst/include
+frontend/catalyst/resources
 
 # IDEs
 .vscode

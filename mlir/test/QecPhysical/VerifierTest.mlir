@@ -171,3 +171,59 @@ func.func @test_insert_block_with_aux_qubit(%b : !qecp.codeblock<1 x 7>, %q : !q
     %q1 = qecp.insert %b[0], %q : !qecp.codeblock<1 x 7>, !qecp.qubit<aux>
     return
 }
+
+// -----
+
+func.func @test_assemble_tanner_invalid_input_el_type_0(%arg0 : tensor<8xf32>, %arg1 : tensor<6xi32>) {
+    // expected-error@below {{operand #0 must be 1D tensor of integer values or 1D memref of integer values}}
+    %0 = qecp.assemble_tanner %arg0, %arg1 : tensor<8xf32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
+    func.return
+}
+
+// -----
+
+func.func @test_assemble_tanner_invalid_input_el_type_1(%arg0 : tensor<8xi32>, %arg1 : tensor<6xf32>) {
+    // expected-error@below {{operand #1 must be 1D tensor of integer values or 1D memref of integer values}}
+    %0 = qecp.assemble_tanner %arg0, %arg1 : tensor<8xi32>, tensor<6xf32> -> !qecp.tanner_graph<8, 6, i32>
+    func.return
+}
+
+// -----
+
+func.func @test_assemble_tanner_invalid_input_shape_0(%arg0 : tensor<8x2xi32>, %arg1 : tensor<6xi32>) {
+    // expected-error@below {{operand #0 must be 1D tensor of integer values or 1D memref of integer values}}
+    %0 = qecp.assemble_tanner %arg0, %arg1 : tensor<8x2xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
+    func.return
+}
+
+// -----
+
+func.func @test_assemble_tanner_invalid_input_shape_1(%arg0 : tensor<8xi32>, %arg1 : tensor<6x2xi32>) {
+    // expected-error@below {{operand #1 must be 1D tensor of integer values or 1D memref of integer values}}
+    %0 = qecp.assemble_tanner %arg0, %arg1 : tensor<8xi32>, tensor<6x2xi32> -> !qecp.tanner_graph<8, 6, i32>
+    func.return
+}
+
+// -----
+
+func.func @test_assemble_tanner_mismatch_in_element_type(%arg0 : tensor<8xi32>, %arg1 : tensor<6xi64>) {
+    // expected-error@below {{expected row_idx and col_ptr types to have same element type}}
+    %0 = qecp.assemble_tanner %arg0, %arg1 : tensor<8xi32>, tensor<6xi64> -> !qecp.tanner_graph<8, 6, i32>
+    func.return
+}
+
+// -----
+
+func.func @test_assemble_tanner_mismatch_in_out_element_type(%arg0 : tensor<8xi32>, %arg1 : tensor<6xi32>) {
+    // expected-error@below {{expected input operands and returned Tanner graph to have same element type}}
+    %0 = qecp.assemble_tanner %arg0, %arg1 : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i64>
+    func.return
+}
+
+// -----
+
+func.func @test_assemble_tanner_mismatch_shapes(%arg0 : tensor<8xi32>, %arg1 : tensor<6xi32>) {
+    // expected-error@below {{expected input row_idx and col_ptr sizes to match returned Tanner graph sizes}}
+    %0 = qecp.assemble_tanner %arg0, %arg1 : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<1, 2, i32>
+    func.return
+}

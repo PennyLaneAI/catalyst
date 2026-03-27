@@ -28,13 +28,16 @@ from typing import ClassVar, TypeAlias
 from xdsl.dialects.builtin import (
     I64,
     ContainerOf,
+    ContainerType,
     IndexType,
     IntegerAttr,
+    IntegerType,
     UnitAttr,
     i1,
 )
 from xdsl.ir import (
     Attribute,
+    AttributeCovT,
     Dialect,
     EnumAttribute,
     Operation,
@@ -46,6 +49,7 @@ from xdsl.ir import (
 )
 from xdsl.irdl import (
     AtLeast,
+    BaseAttr,
     IRDLOperation,
     TypeAttributeInvT,
     VarConstraint,
@@ -58,6 +62,8 @@ from xdsl.irdl import (
 )
 from xdsl.parser import AttrParser
 from xdsl.printer import Printer
+
+from catalyst.python_interface.xdsl_extras import MemRefConstraint, TensorConstraint
 
 
 class QecPhysicalQubitRole(StrEnum):
@@ -179,9 +185,60 @@ class PhysicalHyperRegisterType(ParametrizedAttribute, TypeAttribute):
         return [IntegerAttr(width, 64), IntegerAttr(k, 64), IntegerAttr(n, 64)]
 
 
+@irdl_attr_definition
+class TannerGraphType(ParametrizedAttribute, TypeAttribute, ContainerType[AttributeCovT]):
+    """A Tanner graph represented by its adjacency matrix in CSC form"""
+
+    name = "qecp.tanner_graph"
+
+    row_idx_size: IntegerAttr[I64]
+    col_ptr_size: IntegerAttr[I64]
+    element_type: AttributeCovT
+
+    def __init__(
+        self,
+        row_idx_size: int | IntegerAttr[I64],
+        col_ptr_size: int | IntegerAttr[I64],
+        element_type: AttributeCovT,
+    ):
+        row_idx_size_attr = (
+            IntegerAttr(row_idx_size, 64) if isinstance(row_idx_size, int) else row_idx_size
+        )
+        col_ptr_size_attr = (
+            IntegerAttr(col_ptr_size, 64) if isinstance(col_ptr_size, int) else col_ptr_size
+        )
+        super().__init__(row_idx_size_attr, col_ptr_size_attr, element_type)
+
+    def get_element_type(self) -> AttributeCovT:
+        """Return the element type of the Tanner graph's adjacency matrix."""
+        return self.element_type
+
+    def print_parameters(self, printer: Printer) -> None:
+        """Print the attribute parameters."""
+        with printer.in_angle_brackets():
+            printer.print_int(self.row_idx_size.value.data)
+            printer.print_string(", ")
+            printer.print_int(self.col_ptr_size.value.data)
+            printer.print_string(", ")
+            printer.print_attribute(self.element_type)
+
+    @classmethod
+    def parse_parameters(cls, parser: AttrParser) -> Sequence[Attribute]:
+        """Parse the attribute parameters."""
+        with parser.in_angle_brackets():
+            row_idx_size = parser.parse_integer()
+            parser.parse_characters(",")
+            col_idx_size = parser.parse_integer()
+            parser.parse_characters(",")
+            element_type = parser.parse_attribute()
+
+        return [IntegerAttr(row_idx_size, 64), IntegerAttr(col_idx_size, 64), element_type]
+
+
 QecPhysicalQubitSSAValue: TypeAlias = SSAValue[QecPhysicalQubitType]
 PhysicalCodeBlockSSAValue: TypeAlias = SSAValue[PhysicalCodeblockType]
 PhysicalHyperRegisterSSAValue: TypeAlias = SSAValue[PhysicalHyperRegisterType]
+TannerGraphSSAValue: TypeAlias = SSAValue[TannerGraphType]
 
 anyPhysicalQubit = ContainerOf(QecPhysicalQubitType)
 anyPhysicalCodeblock = ContainerOf(PhysicalCodeblockType)
@@ -332,7 +389,7 @@ class ExtractCodeblockOp(IRDLOperation):
         idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (hyper_reg, None)
@@ -380,7 +437,7 @@ class InsertCodeblockOp(IRDLOperation):
         codeblock: PhysicalCodeBlockSSAValue | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (in_hyper_reg, None, codeblock)
@@ -398,7 +455,12 @@ class InsertCodeblockOp(IRDLOperation):
 
 @irdl_op_definition
 class ExtractQubitOp(IRDLOperation):
-    """Extract a physical qubit value from a codeblock."""
+    """Extract a physical qubit value from a codeblock.
+
+    This operation extracts a QEC physical qubit value from a physical codeblock. The qubit value is
+    restricted to have the 'data' role; in other words, an auxiliary qubit cannot be extracted from
+    a physical codeblock.
+    """
 
     name = "qecp.extract"
 
@@ -420,7 +482,7 @@ class ExtractQubitOp(IRDLOperation):
         idx: int | IntegerAttr | SSAValue[IndexType] | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (codeblock, None)
@@ -440,7 +502,12 @@ class ExtractQubitOp(IRDLOperation):
 
 @irdl_op_definition
 class InsertQubitOp(IRDLOperation):
-    """Update the physical qubit value of a codeblock."""
+    """Update the physical qubit value of a codeblock.
+
+    This operation updates the value of a QEC physical qubit in a physical codeblock. The qubit
+    value is restricted to have the 'data' role; in other words, an auxiliary qubit cannot be
+    inserted into a physical codeblock.
+    """
 
     T: ClassVar = VarConstraint("T", anyPhysicalCodeblock)
 
@@ -467,7 +534,7 @@ class InsertQubitOp(IRDLOperation):
         qubit: QecPhysicalQubitSSAValue | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (in_codeblock, None, qubit)
@@ -483,34 +550,27 @@ class InsertQubitOp(IRDLOperation):
         )
 
 
-@irdl_op_definition
-class HadamardOp(IRDLOperation):
-    """A physical Hadamard gate operation."""
+class SingleQubitPhysicalGateOp(IRDLOperation):
+    """Base class for single-qubit physical gate operations.
+
+    An operation that inherits from this class represents a physical gate operation applied to a QEC
+    physical qubit. For example,
+
+    ```mlir
+    %1 = qecp.hadamard %0 : !qecp.qubit<data>
+    ```
+
+    represents a physical Hadamard operation applied to the physical data qubit `%0`. Single-qubit
+    physical gate operations can be applied to both data and auxiliary qubits.
+
+    Adjoint operations are supported by adding the `adj` unit attribute. For example, a physical S†
+    gate operation is represented as follows:
+
+    ```mlir
+    %1 = qecp.s %0 adj : !qecp.qubit<data>
+    """
 
     T: ClassVar = VarConstraint("T", anyPhysicalQubit)
-
-    name = "qecp.hadamard"
-
-    assembly_format = """
-            $in_qubit attr-dict `:` type($out_qubit)
-        """
-
-    in_qubit = operand_def(T)
-
-    out_qubit = result_def(T)
-
-    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
-        in_qubit_type = get_physical_qubit_type(in_qubit)
-        super().__init__(operands=(in_qubit,), result_types=(in_qubit_type,))
-
-
-@irdl_op_definition
-class SOp(IRDLOperation):
-    """A physical S (π/2 phase) gate operation."""
-
-    T: ClassVar = VarConstraint("T", anyPhysicalQubit)
-
-    name = "qecp.s"
 
     assembly_format = """
             $in_qubit (`adj` $adjoint^)? attr-dict `:` type($out_qubit)
@@ -518,7 +578,7 @@ class SOp(IRDLOperation):
 
     in_qubit = operand_def(T)
 
-    adjoint = adjoint = opt_prop_def(UnitAttr)
+    adjoint = opt_prop_def(UnitAttr)
 
     out_qubit = result_def(T)
 
@@ -532,6 +592,63 @@ class SOp(IRDLOperation):
             properties["adjoint"] = UnitAttr()
 
         super().__init__(operands=(in_qubit,), result_types=(in_qubit_type,), properties=properties)
+
+
+@irdl_op_definition
+class IdentityOp(SingleQubitPhysicalGateOp):
+    """A physical Identity gate operation."""
+
+    name = "qecp.identity"
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        super().__init__(in_qubit)
+
+
+@irdl_op_definition
+class PauliXOp(SingleQubitPhysicalGateOp):
+    """A physical Pauli X gate operation."""
+
+    name = "qecp.x"
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        super().__init__(in_qubit)
+
+
+@irdl_op_definition
+class PauliYOp(SingleQubitPhysicalGateOp):
+    """A physical Pauli Y gate operation."""
+
+    name = "qecp.y"
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        super().__init__(in_qubit)
+
+
+@irdl_op_definition
+class PauliZOp(SingleQubitPhysicalGateOp):
+    """A physical Pauli Z gate operation."""
+
+    name = "qecp.z"
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        super().__init__(in_qubit)
+
+
+@irdl_op_definition
+class HadamardOp(SingleQubitPhysicalGateOp):
+    """A physical Hadamard gate operation."""
+
+    name = "qecp.hadamard"
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        super().__init__(in_qubit)
+
+
+@irdl_op_definition
+class SOp(SingleQubitPhysicalGateOp):
+    """A physical S (π/2 phase) gate operation."""
+
+    name = "qecp.s"
 
 
 @irdl_op_definition
@@ -569,6 +686,37 @@ class CnotOp(IRDLOperation):
         )
 
 
+class AssembleTannerGraphOp(IRDLOperation):
+    """Assemble a Tanner graph in CSC form from the given input arrays."""
+
+    name = "qecp.assemble_tanner"
+
+    assembly_format = """
+            $row_idx `,` $col_ptr attr-dict `:` type($row_idx) `,` type($col_ptr) `->` type($tanner_graph)
+        """
+
+    row_idx = operand_def(
+        TensorConstraint(element_type=BaseAttr(IntegerType), rank=1)
+        | (MemRefConstraint(element_type=BaseAttr(IntegerType), rank=1))
+    )
+
+    col_ptr = operand_def(
+        TensorConstraint(element_type=BaseAttr(IntegerType), rank=1)
+        | (MemRefConstraint(element_type=BaseAttr(IntegerType), rank=1))
+    )
+
+    tanner_graph = result_def(TannerGraphType)
+
+    def __init__(
+        self,
+        row_idx: SSAValue | Operation,
+        col_ptr: SSAValue | Operation,
+        tanner_graph_type: TannerGraphType,
+    ):
+        operands = (row_idx, col_ptr)
+        super().__init__(operands=operands, result_types=(tanner_graph_type,))
+
+
 @irdl_op_definition
 class MeasureOp(IRDLOperation):
     """A physical single-qubit projective measurement in the computational basis."""
@@ -583,7 +731,7 @@ class MeasureOp(IRDLOperation):
 
     in_qubit = operand_def(T)
 
-    mres = mres = result_def(i1)
+    mres = result_def(i1)
 
     out_qubit = result_def(T)
 
@@ -603,9 +751,14 @@ QecPhysical = Dialect(
         InsertCodeblockOp,
         ExtractQubitOp,
         InsertQubitOp,
+        IdentityOp,
+        PauliXOp,
+        PauliYOp,
+        PauliZOp,
         HadamardOp,
         SOp,
         CnotOp,
+        AssembleTannerGraphOp,
         MeasureOp,
     ],
     [
@@ -613,5 +766,6 @@ QecPhysical = Dialect(
         QecPhysicalQubitType,
         PhysicalCodeblockType,
         PhysicalHyperRegisterType,
+        TannerGraphType,
     ],
 )

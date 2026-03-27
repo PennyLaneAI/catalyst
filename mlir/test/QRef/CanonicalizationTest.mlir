@@ -151,7 +151,7 @@ func.func @test_canonicalize_no_dce(%arg0: tensor<2xcomplex<f64>>, %arg1 : tenso
     qref.paulirot ["Z"](%arg2) %q0 : !qref.bit
 
     // CHECK: qref.gphase
-    qref.gphase(%arg2) : f64
+    qref.gphase(%arg2)
 
     // CHECK: qref.multirz
     qref.multirz (%arg2) %q0, %q1 : !qref.bit, !qref.bit
@@ -165,9 +165,9 @@ func.func @test_canonicalize_no_dce(%arg0: tensor<2xcomplex<f64>>, %arg1 : tenso
     // CHECK: qref.adjoint
     // CHECK:   qref.get
     // CHECK:   qref.custom "Hadamard"
-    qref.adjoint(%r) : !qref.reg<2> {
-    ^bb0(%r0: !qref.reg<2>):
-        %q = qref.get %r0[0] : !qref.reg<2> -> !qref.bit
+    qref.adjoint {
+    ^bb0():
+        %q = qref.get %r[0] : !qref.reg<2> -> !qref.bit
         qref.custom "Hadamard"() %q : !qref.bit
     }
 
