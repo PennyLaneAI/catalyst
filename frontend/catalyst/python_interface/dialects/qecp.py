@@ -686,6 +686,7 @@ class CnotOp(IRDLOperation):
         )
 
 
+@irdl_op_definition
 class AssembleTannerGraphOp(IRDLOperation):
     """Assemble a Tanner graph in CSC form from the given input arrays."""
 

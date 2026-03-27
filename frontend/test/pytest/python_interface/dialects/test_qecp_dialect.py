@@ -30,7 +30,6 @@ from xdsl.dialects.builtin import (
 from xdsl.ir import AttributeCovT, OpResult
 
 from catalyst.python_interface.dialects import qecp
-from catalyst.python_interface.dialects.qecp import QecPhysicalQubitRole
 
 pytestmark = pytest.mark.xdsl
 
@@ -330,7 +329,7 @@ class TestQecPhysicalOps:
         assert len(assemble_tanner_op.result_types) == 1
         assert isinstance(assemble_tanner_op.result_types[0], qecp.TannerGraphType)
 
-    pytest.mark.parametrize(
+    @pytest.mark.parametrize(
         "qubit",
         [
             create_ssa_value(qecp.QecPhysicalQubitType("data")),
@@ -456,10 +455,10 @@ def test_assembly_format(run_filecheck, pretty_print):
     // CHECK: [[tgraph:%.+]] = qecp.assemble_tanner [[row_idx]], [[col_ptr]] : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
     %tgraph = qecp.assemble_tanner %row_idx, %col_ptr : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
 
-    // CHECK: [[mres0:%.+]], [[q_data7:%.+]] = qecp.measure [[q_data6]] : i1, !qecp.qubit<data>
-    // CHECK: [[mres1:%.+]], [[q_aux3:%.+]] = qecp.measure [[q_aux2]] : i1, !qecp.qubit<aux>
-    %mres0, %q_data7 = qecp.measure %q_data6 : i1, !qecp.qubit<data>
-    %mres1, %q_aux3 = qecp.measure %q_aux2 : i1, !qecp.qubit<aux>
+    // CHECK: [[mres0:%.+]], [[qd8:%.+]] = qecp.measure [[qd7]] : i1, !qecp.qubit<data>
+    // CHECK: [[mres1:%.+]], [[qa8:%.+]] = qecp.measure [[qa7]] : i1, !qecp.qubit<aux>
+    %mres0, %qd8 = qecp.measure %qd7 : i1, !qecp.qubit<data>
+    %mres1, %qa8 = qecp.measure %qa7 : i1, !qecp.qubit<aux>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
