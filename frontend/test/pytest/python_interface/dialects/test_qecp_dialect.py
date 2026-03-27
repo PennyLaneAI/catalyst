@@ -60,8 +60,8 @@ expected_ops_names = {
     "HadamardOp": "qecp.hadamard",
     "SOp": "qecp.s",
     "CnotOp": "qecp.cnot",
-    "AssembleTannerGraphOp": "qecp.assemble_tanner",
     "MeasureOp": "qecp.measure",
+    "AssembleTannerGraphOp": "qecp.assemble_tanner",
 }
 
 expected_attrs_names = {
@@ -316,19 +316,6 @@ class TestQecPhysicalOps:
         assert cnot_op.result_types[0] == qubit_ctrl.type
         assert cnot_op.result_types[1] == qubit_trgt.type
 
-    def test_qecp_op_constructor_assemble_tanner(self):
-        """Test the constructor of the qecp.assemble_tanner op."""
-        row_idx_val = create_ssa_value(TensorType(i32, (8,)))
-        col_ptr_val = create_ssa_value(TensorType(i32, (6,)))
-        assemble_tanner_op = qecp.AssembleTannerGraphOp(
-            row_idx=row_idx_val,
-            col_ptr=col_ptr_val,
-            tanner_graph_type=qecp.TannerGraphType(8, 6, i32),
-        )
-        assert len(assemble_tanner_op.operands) == 2
-        assert len(assemble_tanner_op.result_types) == 1
-        assert isinstance(assemble_tanner_op.result_types[0], qecp.TannerGraphType)
-
     @pytest.mark.parametrize(
         "qubit",
         [
@@ -342,6 +329,19 @@ class TestQecPhysicalOps:
         assert len(measure_op.result_types) == 2
         assert measure_op.result_types[0] == IntegerType(1)
         assert measure_op.result_types[1] == qubit.type
+
+    def test_qecp_op_constructor_assemble_tanner(self):
+        """Test the constructor of the qecp.assemble_tanner op."""
+        row_idx_val = create_ssa_value(TensorType(i32, (8,)))
+        col_ptr_val = create_ssa_value(TensorType(i32, (6,)))
+        assemble_tanner_op = qecp.AssembleTannerGraphOp(
+            row_idx=row_idx_val,
+            col_ptr=col_ptr_val,
+            tanner_graph_type=qecp.TannerGraphType(8, 6, i32),
+        )
+        assert len(assemble_tanner_op.operands) == 2
+        assert len(assemble_tanner_op.result_types) == 1
+        assert isinstance(assemble_tanner_op.result_types[0], qecp.TannerGraphType)
 
 
 @pytest.mark.parametrize(
@@ -452,13 +452,13 @@ def test_assembly_format(run_filecheck, pretty_print):
     %row_idx = "test.op"() : () -> tensor<8xi32>
     %col_ptr = "test.op"() : () -> tensor<6xi32>
 
-    // CHECK: [[tgraph:%.+]] = qecp.assemble_tanner [[row_idx]], [[col_ptr]] : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
-    %tgraph = qecp.assemble_tanner %row_idx, %col_ptr : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
-
     // CHECK: [[mres0:%.+]], [[qd8:%.+]] = qecp.measure [[qd7]] : i1, !qecp.qubit<data>
     // CHECK: [[mres1:%.+]], [[qa8:%.+]] = qecp.measure [[qa7]] : i1, !qecp.qubit<aux>
     %mres0, %qd8 = qecp.measure %qd7 : i1, !qecp.qubit<data>
     %mres1, %qa8 = qecp.measure %qa7 : i1, !qecp.qubit<aux>
+
+    // CHECK: [[tgraph:%.+]] = qecp.assemble_tanner [[row_idx]], [[col_ptr]] : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
+    %tgraph = qecp.assemble_tanner %row_idx, %col_ptr : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
