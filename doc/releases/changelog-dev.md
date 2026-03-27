@@ -498,6 +498,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `rtio.rpc` operation is added to the RTIO dialect for OQD. It represents a host RPC call triggered by the kernel, optionally carrying runtime arguments and supporting both synchronous and async modes. The op is lowered to rpc_send / rpc_recv LLVM calls (the ARTIQ RPC wire protocol). It is required by both AWG control (program_awg, awg_close) and measurement result collection (set_dataset, transfer_data).
+  [(#2577)](https://github.com/PennyLaneAI/catalyst/pull/2577)
+
 * Updated Catalyst's xDSL dependencies to `xdsl` 0.59.0 and `xdsl-jax` 0.5.0.
   [(#2591)](https://github.com/PennyLaneAI/catalyst/pull/2591)
 
@@ -814,6 +817,7 @@
   [(#2571)](https://github.com/PennyLaneAI/catalyst/pull/2571)
   [(#2572)](https://github.com/PennyLaneAI/catalyst/pull/2572)
   [(#2574)](https://github.com/PennyLaneAI/catalyst/pull/2574)
+  [(#2576)](https://github.com/PennyLaneAI/catalyst/pull/2576)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
