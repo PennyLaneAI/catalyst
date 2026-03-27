@@ -39,11 +39,10 @@
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
 #include "QRef/IR/QRefTypes.h"
+#include "QRef/Transforms/value_semantics_conversion.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
-
-#include "value_semantics_conversion.h"
 
 using namespace mlir;
 using namespace catalyst;
