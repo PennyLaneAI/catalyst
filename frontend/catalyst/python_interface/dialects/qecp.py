@@ -774,6 +774,41 @@ class DecodeEsmCssOp(IRDLOperation):
         super().__init__(operands=operands, result_types=(err_idx_type,))
 
 
+@irdl_op_definition
+class DecodePhysicalMeasurementOp(IRDLOperation):
+    """
+    Decode physical measurement results and return the corresponding logical measurement.
+
+    This operation decodes the results of a transversal measurement operation acting on a
+    physical codeblock and returns the corresponding logical measurement result(s) in the
+    computational basis. The logical measurement results are returned as a one-dimensional
+    tensor with shape=(k,), where k is the number of QEC logical qubits encoded by the physical
+    codeblock.
+    """
+
+    name = "qecp.decode_physical_meas"
+
+    assembly_format = """
+            $physical_measurements attr-dict `:` type($physical_measurements) `->` type($logical_measurements)
+        """
+
+    physical_measurements = operand_def(
+        TensorConstraint(element_type=IntegerType(1), rank=1)
+        | (MemRefConstraint(element_type=IntegerType(1), rank=1))
+    )
+
+    logical_measurements = result_def(TensorConstraint(element_type=IntegerType(1), rank=1))
+
+    def __init__(
+        self,
+        physical_measurements: SSAValue[TensorType] | Operation,
+        logical_measurements_type: TensorType,
+    ):
+        super().__init__(
+            operands=(physical_measurements,), result_types=(logical_measurements_type,)
+        )
+
+
 QecPhysical = Dialect(
     "qecp",
     [
@@ -795,6 +830,7 @@ QecPhysical = Dialect(
         MeasureOp,
         AssembleTannerGraphOp,
         DecodeEsmCssOp,
+        DecodePhysicalMeasurementOp,
     ],
     [
         QecPhysicalQubitRoleAttr,
