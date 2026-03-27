@@ -278,6 +278,10 @@
   [(#2531)](https://github.com/PennyLaneAI/catalyst/pull/2531)
   [(#2619)](https://github.com/PennyLaneAI/catalyst/pull/2531)
 
+* A new optimization pass has been added to reduce the number of instructions in a quantum program,
+  `--merge-global-phase`, which safely combines global phase instructions for each region in the
+  program. The xDSL version written in Python has been removed.
+  [(#2604)](https://github.com/PennyLaneAI/catalyst/pull/2604)
 
 <h3>Improvements 🛠</h3>
 
@@ -345,6 +349,16 @@
 * The `measurements_from_samples` pass no longer results in `nan`s and cryptic error messages when
   `shots` aren't set. Instead, an informative error message is raised.
   [(#2456)](https://github.com/PennyLaneAI/catalyst/pull/2456)
+
+* The quantum kernel abstraction in Catalyst's IR (a nested module operation with its own transform
+  schedule and entry point and subroutine functions representing a PennyLane QNode) has been
+  documented and equipped with additional verification. Transformation passes scheduled from the
+  frontend must ensure, and can rely on, the presence of the `quantum.node` attribute to indicate
+  which functions in the module represent a separate quantum execution (with device initialization,
+  shots configuration, and set of measurement processes).
+  [(#2483)](https://github.com/PennyLaneAI/catalyst/pull/2483)
+  [(#2497)](https://github.com/PennyLaneAI/catalyst/pull/2497)
+  [(#2597)](https://github.com/PennyLaneAI/catalyst/pull/2597)
 
 * Graph decomposition with qjit now accepts `num_work_wires`, and lowers and decomposes correctly
   with the `decompose-lowering` pass and with `qp.transforms.decompose`.
@@ -795,6 +809,11 @@
 * An experimental *QEC Physical* MLIR dialect has been added. An equivalent xDSL dialect has also
   been added for compatibility with the Python interface to Catalyst.
   [(#2519)](https://github.com/PennyLaneAI/catalyst/pull/2519)
+  [(#2537)](https://github.com/PennyLaneAI/catalyst/pull/2537)
+  [(#2563)](https://github.com/PennyLaneAI/catalyst/pull/2563)
+  [(#2571)](https://github.com/PennyLaneAI/catalyst/pull/2571)
+  [(#2572)](https://github.com/PennyLaneAI/catalyst/pull/2572)
+  [(#2574)](https://github.com/PennyLaneAI/catalyst/pull/2574)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
