@@ -199,6 +199,14 @@ func.func @test_assemble_tanner_graph_tensor(%arg0 : tensor<8xi32>, %arg1 : tens
 
 // -----
 
+func.func @test_measure(%arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<aux>) {
+    %mres0, %0 = qecp.measure %arg0 : i1, !qecp.qubit<data>
+    %mres1, %1 = qecp.measure %arg1 : i1, !qecp.qubit<aux>
+    func.return
+}
+
+// -----
+
 func.func @test_assemble_tanner_graph_memref(%arg0 : memref<8xi32>, %arg1 : memref<6xi32>) {
     %0 = qecp.assemble_tanner %arg0, %arg1 : memref<8xi32>, memref<6xi32> -> !qecp.tanner_graph<8, 6, i32>
     func.return

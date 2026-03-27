@@ -60,6 +60,7 @@ expected_ops_names = {
     "HadamardOp": "qecp.hadamard",
     "SOp": "qecp.s",
     "CnotOp": "qecp.cnot",
+    "MeasureOp": "qecp.measure",
     "AssembleTannerGraphOp": "qecp.assemble_tanner",
     "DecodeEsmCssOp": "qecp.decode_esm_css",
 }
@@ -316,6 +317,20 @@ class TestQecPhysicalOps:
         assert cnot_op.result_types[0] == qubit_ctrl.type
         assert cnot_op.result_types[1] == qubit_trgt.type
 
+    @pytest.mark.parametrize(
+        "qubit",
+        [
+            create_ssa_value(qecp.QecPhysicalQubitType("data")),
+            create_ssa_value(qecp.QecPhysicalQubitType("aux")),
+        ],
+    )
+    def test_qecp_op_constructor_measure(self, qubit):
+        """Test the constructor of the qecp.measure op."""
+        measure_op = qecp.MeasureOp(qubit)
+        assert len(measure_op.result_types) == 2
+        assert measure_op.result_types[0] == IntegerType(1)
+        assert measure_op.result_types[1] == qubit.type
+
     def test_qecp_op_constructor_assemble_tanner(self):
         """Test the constructor of the qecp.assemble_tanner op."""
         row_idx_val = create_ssa_value(TensorType(i32, (8,)))
@@ -450,6 +465,11 @@ def test_assembly_format(run_filecheck, pretty_print):
     // CHECK: [[col_ptr:%.+]] = "test.op"() : () -> tensor<6xi32>
     %row_idx = "test.op"() : () -> tensor<8xi32>
     %col_ptr = "test.op"() : () -> tensor<6xi32>
+
+    // CHECK: [[mres0:%.+]], [[qd8:%.+]] = qecp.measure [[qd7]] : i1, !qecp.qubit<data>
+    // CHECK: [[mres1:%.+]], [[qa8:%.+]] = qecp.measure [[qa7]] : i1, !qecp.qubit<aux>
+    %mres0, %qd8 = qecp.measure %qd7 : i1, !qecp.qubit<data>
+    %mres1, %qa8 = qecp.measure %qa7 : i1, !qecp.qubit<aux>
 
     // CHECK: [[tgraph:%.+]] = qecp.assemble_tanner [[row_idx]], [[col_ptr]] : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
     %tgraph = qecp.assemble_tanner %row_idx, %col_ptr : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>

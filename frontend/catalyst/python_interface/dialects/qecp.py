@@ -34,6 +34,7 @@ from xdsl.dialects.builtin import (
     IntegerType,
     TensorType,
     UnitAttr,
+    i1,
 )
 from xdsl.ir import (
     Attribute,
@@ -687,6 +688,29 @@ class CnotOp(IRDLOperation):
 
 
 @irdl_op_definition
+class MeasureOp(IRDLOperation):
+    """A physical single-qubit projective measurement in the computational basis."""
+
+    T: ClassVar = VarConstraint("T", anyPhysicalQubit)
+
+    name = "qecp.measure"
+
+    assembly_format = """
+            $in_qubit attr-dict `:` type($mres) `,` type($in_qubit)
+        """
+
+    in_qubit = operand_def(T)
+
+    mres = result_def(i1)
+
+    out_qubit = result_def(T)
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        in_qubit_type = get_physical_qubit_type(in_qubit)
+        super().__init__(operands=(in_qubit,), result_types=(i1, in_qubit_type))
+
+
+@irdl_op_definition
 class AssembleTannerGraphOp(IRDLOperation):
     """Assemble a Tanner graph in CSC form from the given input arrays."""
 
@@ -768,6 +792,7 @@ QecPhysical = Dialect(
         HadamardOp,
         SOp,
         CnotOp,
+        MeasureOp,
         AssembleTannerGraphOp,
         DecodeEsmCssOp,
     ],
