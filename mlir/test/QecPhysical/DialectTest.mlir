@@ -183,3 +183,23 @@ func.func @test_gate_op_cnot(
     %6, %7 = qecp.cnot %3, %1 : !qecp.qubit<aux>, !qecp.qubit<data>
     func.return
 }
+
+// -----
+
+func.func @test_tanner_graph_type(%arg0 : !qecp.tanner_graph<8, 6, i32>) {
+    func.return
+}
+
+// -----
+
+func.func @test_assemble_tanner_graph_tensor(%arg0 : tensor<8xi32>, %arg1 : tensor<6xi32>) {
+    %0 = qecp.assemble_tanner %arg0, %arg1 : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
+    func.return
+}
+
+// -----
+
+func.func @test_assemble_tanner_graph_memref(%arg0 : memref<8xi32>, %arg1 : memref<6xi32>) {
+    %0 = qecp.assemble_tanner %arg0, %arg1 : memref<8xi32>, memref<6xi32> -> !qecp.tanner_graph<8, 6, i32>
+    func.return
+}

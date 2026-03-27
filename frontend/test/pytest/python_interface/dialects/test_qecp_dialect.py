@@ -18,7 +18,15 @@ from typing import cast
 
 import pytest
 from xdsl.dialects import test
-from xdsl.dialects.builtin import IndexType, IntegerAttr, UnitAttr
+from xdsl.dialects.builtin import (
+    IndexType,
+    IntegerAttr,
+    IntegerType,
+    TensorType,
+    UnitAttr,
+    i32,
+    i64,
+)
 from xdsl.ir import AttributeCovT, OpResult
 
 from catalyst.python_interface.dialects import qecp
@@ -52,6 +60,7 @@ expected_ops_names = {
     "HadamardOp": "qecp.hadamard",
     "SOp": "qecp.s",
     "CnotOp": "qecp.cnot",
+    "AssembleTannerGraphOp": "qecp.assemble_tanner",
 }
 
 expected_attrs_names = {
@@ -59,6 +68,7 @@ expected_attrs_names = {
     "QecPhysicalQubitType": "qecp.qubit",
     "PhysicalCodeblockType": "qecp.codeblock",
     "PhysicalHyperRegisterType": "qecp.hyperreg",
+    "TannerGraphType": "qecp.tanner_graph",
 }
 
 
@@ -123,6 +133,16 @@ class TestQecPhysicalTypes:
         assert hyper_reg.width == expected_width
         assert hyper_reg.k == expected_k
         assert hyper_reg.n == expected_n
+
+    @pytest.mark.parametrize("row_idx_size", [8, 10])
+    @pytest.mark.parametrize("col_ptr_size", [6, 8])
+    @pytest.mark.parametrize("element_type", [i32, i64])
+    def test_qecp_type_constructor_tanner_graph(self, row_idx_size, col_ptr_size, element_type):
+        """Test the constructor of qecp.TannerGraphType."""
+        tanner_graph = qecp.TannerGraphType(row_idx_size, col_ptr_size, element_type)
+        assert tanner_graph.row_idx_size == IntegerAttr(row_idx_size, IntegerType(64))
+        assert tanner_graph.col_ptr_size == IntegerAttr(col_ptr_size, IntegerType(64))
+        assert tanner_graph.element_type == element_type
 
 
 class TestQecPhysicalOps:
@@ -295,6 +315,19 @@ class TestQecPhysicalOps:
         assert cnot_op.result_types[0] == qubit_ctrl.type
         assert cnot_op.result_types[1] == qubit_trgt.type
 
+    def test_qecp_op_constructor_assemble_tanner(self):
+        """Test the constructor of the qecp.assemble_tanner op."""
+        row_idx_val = create_ssa_value(TensorType(i32, (8,)))
+        col_ptr_val = create_ssa_value(TensorType(i32, (6,)))
+        assemble_tanner_op = qecp.AssembleTannerGraphOp(
+            row_idx=row_idx_val,
+            col_ptr=col_ptr_val,
+            tanner_graph_type=qecp.TannerGraphType(8, 6, i32),
+        )
+        assert len(assemble_tanner_op.operands) == 2
+        assert len(assemble_tanner_op.result_types) == 1
+        assert isinstance(assemble_tanner_op.result_types[0], qecp.TannerGraphType)
+
 
 @pytest.mark.parametrize(
     "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
@@ -398,6 +431,14 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     // CHECK: [[qa12:%.+]], [[qa22:%.+]] = qecp.cnot [[qa11]], [[qa21]] : !qecp.qubit<aux>, !qecp.qubit<aux>
     %qa12, %qa22 = qecp.cnot %qa11, %qa21 : !qecp.qubit<aux>, !qecp.qubit<aux>
+
+    // CHECK: [[row_idx:%.+]] = "test.op"() : () -> tensor<8xi32>
+    // CHECK: [[col_ptr:%.+]] = "test.op"() : () -> tensor<6xi32>
+    %row_idx = "test.op"() : () -> tensor<8xi32>
+    %col_ptr = "test.op"() : () -> tensor<6xi32>
+
+    // CHECK: [[tgraph:%.+]] = qecp.assemble_tanner [[row_idx]], [[col_ptr]] : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
+    %tgraph = qecp.assemble_tanner %row_idx, %col_ptr : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)

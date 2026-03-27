@@ -15,6 +15,7 @@
 #ifndef QEC_PHYSICAL_OPS
 #define QEC_PHYSICAL_OPS
 
+include "mlir/IR/CommonTypeConstraints.td"
 include "mlir/IR/OpBase.td"
 
 include "QecPhysical/IR/QecPhysicalDialect.td"
@@ -272,6 +273,25 @@ def CnotOp : QecPhysical_Op<"cnot", [
     let assemblyFormat = [{
         $in_ctrl_qubit `,` $in_trgt_qubit attr-dict `:` qualified(type($in_ctrl_qubit)) `,` qualified(type($in_trgt_qubit))
     }];
+}
+
+def AssembleTannerGraphOp : QecPhysical_Op<"assemble_tanner"> {
+    let summary = "Assemble a Tanner graph in CSC form from the given input arrays.";
+
+    let arguments = (ins
+        AnyTypeOf<[1DTensorOf<[AnyInteger]>, MemRefRankOf<[AnyInteger], [1]>]>:$row_idx,
+        AnyTypeOf<[1DTensorOf<[AnyInteger]>, MemRefRankOf<[AnyInteger], [1]>]>:$col_ptr
+    );
+
+    let results = (outs
+        TannerGraphType:$tanner_graph
+    );
+
+    let assemblyFormat = [{
+        $row_idx `,` $col_ptr attr-dict `:` type($row_idx) `,` type($col_ptr) `->` qualified(type($tanner_graph))
+    }];
+
+    let hasVerifier = 1;
 }
 
 
