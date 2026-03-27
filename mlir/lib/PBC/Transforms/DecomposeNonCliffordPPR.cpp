@@ -36,8 +36,7 @@ namespace {
 // Return the magic state or complex conjugate of the magic state
 LogicalInitKind getMagicState(PPRotationOp op)
 {
-    int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
-    if (rotationKind > 0) {
+    if (op.getRotationKind() > 0) {
         return LogicalInitKind::magic;
     }
     return LogicalInitKind::magic_conj;
@@ -86,7 +85,7 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
     extendedPauliP.emplace_back("Z");                   // extend Z for the axillary qubit -> [P, Z]
     inQubits.emplace_back(magic.getOutQubits().back()); // [input qubits, |m⟩]
 
-    int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
+    int8_t rotationKind = op.getRotationKind();
     auto ppmPZ = PPMeasurementOp::create(rewriter, loc, extendedPauliP, inQubits, rotationKind < 0);
 
     auto ppmPZRes = ppmPZ.getMres();
@@ -286,7 +285,7 @@ void decomposeInjectMagicStatePiOverEight(PPRotationOp op, PatternRewriter &rewr
     // PPR P(π/4) on input qubits if PPM (P⊗Z) yields -1
     SmallVector<Value> outPZQubits = ppmPZ.getOutQubits(); // [input qubits, |m⟩]
     outPZQubits.pop_back();                                // [input qubits]
-    const uint16_t PI_DENOMINATOR = 4;                     // For rotation of P(PI/4)
+    const int8_t PI_DENOMINATOR = 4;                       // For rotation of P(PI/4)
     auto pprPI4 =
         PPRotationOp::create(rewriter, loc, pauliP, PI_DENOMINATOR, outPZQubits, ppmPZ.getMres());
 

@@ -105,7 +105,7 @@ func.func @arbitrary(%q1 : !quantum.bit, %q2 : !quantum.bit) {
 // -----
 
 func.func @baz_error(%q1 : !quantum.bit, %q2 : !quantum.bit) {
-    // expected-error@below {{'pbc.ppr' op attribute 'rotation_kind' failed to satisfy constraint: 16-bit signless integer attribute whose value is ±1, ±2, ±4, or ±8}}
-    %0, %1 = pbc.ppr ["X", "Z"] (16) %q1, %q2 : !quantum.bit, !quantum.bit
+    // expected-error@below {{'pbc.ppr' op attribute 'rotation_kind' failed to satisfy constraint: 8-bit signed integer attribute whose value is ±1, ±2, ±4, or ±8}}
+    %0, %1 = pbc.ppr ["X", "Z"](16) %q1, %q2 : !quantum.bit, !quantum.bit
     func.return
 }

@@ -139,8 +139,7 @@ void mergePPR(PBCOpInterface rhsOp, PBCLayer &rhsLayer, PBCOpInterface mergeOp, 
     auto mergeOpPprOp = dyn_cast<PPRotationOp>(mergeOp.getOperation());
     assert(mergeOpPprOp != nullptr && "Op is not a PPRotationOp");
 
-    int16_t signedRk = static_cast<int16_t>(mergeOpPprOp.getRotationKind());
-    mergeOpPprOp.setRotationKind(static_cast<uint16_t>(signedRk / 2));
+    mergeOp.setRotationKind(mergeOp.getRotationKind() / 2);
 
     rhsLayer.eraseOp(rhsOp);
     writer.replaceOp(rhsOp, rhsOp->getOperands());
