@@ -69,21 +69,24 @@ set(STABLEHLO_LIBS
 )
 
 # Decomposition Graph Solver:
-# This is a shared library that is built from src in the runtime but
-# we need to link to it from the MLIR code in the graph-decomposition pass
-add_library(decompsolver SHARED IMPORTED GLOBAL)
-if(APPLE)
-  set(_DECOMP_LIB_NAME "libdecompsolver.dylib")
+if(NOT RUNTIME_LIB_DIR)
+    message(WARNING
+        "RUNTIME_LIB_DIR not set — decompsolver will not be linked. "
+        "Build the runtime project first and pass -DRUNTIME_LIB_DIR=<path>."
+    )
 else()
-  set(_DECOMP_LIB_NAME "libdecompsolver.so")
+    message(STATUS "RUNTIME_LIB_DIR is set to ${RUNTIME_LIB_DIR}. Linking decompsolver.")
+    add_library(decompsolver STATIC IMPORTED GLOBAL)
+    set_target_properties(decompsolver PROPERTIES
+        IMPORTED_LOCATION "${RUNTIME_LIB_DIR}/DecompGraphSolver/libdecompsolver.a"
+    )
+    target_include_directories(decompsolver INTERFACE
+        ${PROJECT_SOURCE_DIR}/../runtime/lib/DecompGraphSolver
+        ${PROJECT_SOURCE_DIR}/../runtime/include
+    )
 endif()
-set_property(TARGET decompsolver PROPERTY
-  IMPORTED_LOCATION "${RUNTIME_LIB_DIR}/${_DECOMP_LIB_NAME}"
-)
-target_include_directories(decompsolver INTERFACE
-  ${PROJECT_SOURCE_DIR}/../runtime/lib/DecompGraphSolver
-  ${PROJECT_SOURCE_DIR}/../runtime/include
-)
+
+
 
 foreach(STABLEHLO_LIB IN LISTS STABLEHLO_LIBS)
     add_library(${STABLEHLO_LIB} STATIC IMPORTED GLOBAL)
