@@ -32,6 +32,7 @@ from xdsl.dialects.builtin import (
     IndexType,
     IntegerAttr,
     IntegerType,
+    TensorType,
     UnitAttr,
 )
 from xdsl.ir import (
@@ -717,6 +718,38 @@ class AssembleTannerGraphOp(IRDLOperation):
         super().__init__(operands=operands, result_types=(tanner_graph_type,))
 
 
+@irdl_op_definition
+class DecodeEsmCssOp(IRDLOperation):
+    """
+    Decode an ESM for a CSS code and return the index (indices) in the codeblock where the error(s)
+    occurred."
+    """
+
+    name = "qecp.decode_esm_css"
+
+    assembly_format = """
+            `(` $tanner_graph `:` type($tanner_graph) `)` $esm attr-dict `:` type($esm) `->` type($err_idx)
+        """
+
+    esm = operand_def(
+        TensorConstraint(element_type=IntegerType(1), rank=1)
+        | (MemRefConstraint(element_type=IntegerType(1), rank=1))
+    )
+
+    tanner_graph = operand_def(TannerGraphType)
+
+    err_idx = result_def(TensorConstraint(element_type=IndexType(), rank=1))
+
+    def __init__(
+        self,
+        tanner_graph: TannerGraphSSAValue | Operation,
+        esm: SSAValue[TensorType] | Operation,
+        err_idx_type: TensorType,
+    ):
+        operands = (tanner_graph, esm)
+        super().__init__(operands=operands, result_types=(err_idx_type,))
+
+
 QecPhysical = Dialect(
     "qecp",
     [
@@ -736,6 +769,7 @@ QecPhysical = Dialect(
         SOp,
         CnotOp,
         AssembleTannerGraphOp,
+        DecodeEsmCssOp,
     ],
     [
         QecPhysicalQubitRoleAttr,

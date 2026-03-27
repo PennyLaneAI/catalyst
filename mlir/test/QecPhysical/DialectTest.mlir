@@ -203,3 +203,10 @@ func.func @test_assemble_tanner_graph_memref(%arg0 : memref<8xi32>, %arg1 : memr
     %0 = qecp.assemble_tanner %arg0, %arg1 : memref<8xi32>, memref<6xi32> -> !qecp.tanner_graph<8, 6, i32>
     func.return
 }
+
+// -----
+
+func.func @test_decode_esm_css(%arg0 : !qecp.tanner_graph<8, 6, i32>, %arg1 : tensor<2xi1>) {
+    %0 = qecp.decode_esm_css(%arg0 : !qecp.tanner_graph<8, 6, i32>) %arg1 : tensor<2xi1> -> tensor<1xindex>
+    func.return
+}
