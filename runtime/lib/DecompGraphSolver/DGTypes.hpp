@@ -111,7 +111,6 @@ struct RuleNode {
 
 /**
  * @brief This represents the weighted target gateset for the graph decomposition problem.
- *
  */
 struct WeightedGateset {
     std::unordered_map<OperatorNode, double, OperatorNodeHash> ops;

@@ -25,11 +25,6 @@
 
 namespace DecompGraph::Solver {
 
-[[nodiscard]] Core::ChosenDecompRule invalidRule(const Core::OperatorNode &op)
-{
-    return {op, false, "", {}, 0.0, {}};
-}
-
 Core::ChosenDecompRule DecompositionSolver::basisRule(const Core::OperatorNode &op)
 {
     if (!graph.isTargetGate(op)) {
@@ -150,8 +145,11 @@ Core::ChosenDecompRule DecompositionSolver::solveOperator(const Core::OperatorNo
     } visitGuard(visited, solvingStack, op);
 
     auto chosen = graph.isTargetGate(op) ? basisRule(op) : bestRule(op);
+
+    // Debug: print the chosen rule for the operator
     std::cerr << "Chosen rule for operator " << op.name << ": " << chosen.ruleName << " with cost "
               << chosen.totalCost << "\n"; // FIXME: remove after debugging
+
     if (!chosen.ruleName.empty()) {
         solvedMap.emplace(op, chosen);
     }
@@ -168,7 +166,7 @@ Core::GraphResult DecompositionSolver::solve()
         const auto chosen_rule = solveOperator(root);
         if (chosen_rule.ruleName.empty()) {
             graph.showGraph();                            // Debug: show the graph structure
-            throw Core::GraphSolverFailedError(root, {}); // no valid rules
+            throw Core::GraphSolverFailedError(root, {}); // all rules failed for this root operator
         }
     }
 

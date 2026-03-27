@@ -300,7 +300,7 @@ TEST_CASE("Test GraphSolveError for cyclic decomposition", "[DecompGraph::Solver
     const DecompositionGraph graph({h}, gateset, rules);
     DecompositionSolver solver(graph);
 
-    REQUIRE_THROWS_AS(solver.solve(), CyclicDecompositionError);
+    REQUIRE_THROWS_AS(solver.solve(), GraphSolverFailedError);
 }
 
 TEST_CASE("Test PauliX -> GlobalPhase(1), RX(1) decomposition", "[DecompGraph::Solver]")
@@ -332,4 +332,44 @@ TEST_CASE("Test PauliX -> GlobalPhase(1), RX(1) decomposition", "[DecompGraph::S
     REQUIRE(chosen_rule.inputs[1].op == rx);
     REQUIRE(chosen_rule.inputs[1].multiplicity == 1);
     REQUIRE(chosen_rule.totalCost == 1.0 * 1 + 1.0 * 1);
+}
+
+// Test cyclic decomposition
+TEST_CASE("Test cyclic decomposition with multiple rules for the same operator",
+          "[DecompGraph::Solver]")
+{
+    const OperatorNode hadamard{"Hadamard"};
+    const OperatorNode globalPhase{"GlobalPhase"};
+    const OperatorNode rx{"RX"};
+    const OperatorNode rz{"RZ"};
+    const OperatorNode ry{"RY"};
+    const OperatorNode changeOpBasis{"ChangeOpBasis"};
+    const OperatorNode pauliRot{"PauliRot"};
+    const OperatorNode rot{"Rot"};
+
+    const std::vector<RuleNode> rules{
+        {"__builtin__ry_to_rz_cliff", ry, {{changeOpBasis, 1}}},
+        {"__builtin__ry_to_rx_cliff", ry, {{changeOpBasis, 1}}},
+        {"__builtin__ry_to_ppr", ry, {{pauliRot, 1}}},
+        {"__builtin__ry_to_rz_rx", ry, {{rx, 1}, {rz, 2}}},
+        {"__builtin__ry_to_rot", ry, {{rot, 1}}},
+        {"__builtin__hadamard_to_rz_rx", hadamard, {{globalPhase, 1}, {rx, 1}, {rz, 2}}},
+        {"__builtin__hadamard_to_rz_ry", hadamard, {{globalPhase, 1}, {ry, 1}, {rz, 1}}},
+    };
+
+    const WeightedGateset gateset{{{globalPhase, 1.0}, {rx, 1.0}, {rz, 1.0}}};
+    const DecompositionGraph graph({hadamard}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto solutions = solver.getSolvedMap();
+    const auto &h_solution = solutions.at(hadamard);
+    REQUIRE_FALSE(h_solution.isBasis);
+    REQUIRE(h_solution.ruleName == "__builtin__hadamard_to_rz_rx");
+    REQUIRE(h_solution.totalCost == 1.0 * 1 + 1.0 * 1 + 1.0 * 2);
+
+    const WeightedGateset gateset2{{{globalPhase, 1.0}, {rx, 1.0}, {rz, 2.0}, {ry, 1.0}}};
+    const DecompositionGraph graph2({hadamard}, gateset2, rules);
+    DecompositionSolver solver2(graph2);
+    const auto solutions2 = solver2.getSolvedMap();
+    const auto &h_solution2 = solutions2.at(hadamard);
+    REQUIRE(h_solution2.ruleName == "__builtin__hadamard_to_rz_ry");
 }

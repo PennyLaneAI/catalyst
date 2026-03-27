@@ -136,5 +136,19 @@ class DecompositionSolver {
      *
      */
     Core::ChosenDecompRule solveOperator(const Core::OperatorNode &op);
+
+    /**
+     * @brief Returns an invalid ChosenDecompRule for the given operator node, which indicates
+     * that no valid decomposition rule could be found for the operator. This is used as a
+     * sentinel value to indicate failure in finding a valid decomposition rule during the solving
+     * process.
+     *
+     * @param op The operator node for which to return an invalid ChosenDecompRule.
+     * @return Core::ChosenDecompRule An invalid ChosenDecompRule.
+     */
+    [[nodiscard]] inline Core::ChosenDecompRule invalidRule(const Core::OperatorNode &op)
+    {
+        return {op, false, "", {}, 0.0, {}};
+    }
 };
 } // namespace DecompGraph::Solver
