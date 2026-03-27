@@ -476,7 +476,7 @@ Essential Steps
 
 To activate the development environment, open a terminal and issue the following commands:
 
-.. code-block:: console
+.. code-block:: bash
 
   # Clone the Catalyst repository without submodules, as they are not needed for frontend
   # development
