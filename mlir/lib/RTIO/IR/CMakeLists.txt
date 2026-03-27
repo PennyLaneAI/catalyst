@@ -8,4 +8,7 @@ add_mlir_library(MLIRRTIO
     DEPENDS
     MLIRRTIOOpsIncGen
     MLIRRTIOAttributesIncGen
+
+    LINK_LIBS PRIVATE
+    MLIRLLVMDialect
 )
