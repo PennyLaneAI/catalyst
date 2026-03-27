@@ -25,6 +25,11 @@
 
 namespace DecompGraph::Solver {
 
+[[nodiscard]] Core::ChosenDecompRule invalidRule(const Core::OperatorNode &op)
+{
+    return {op, false, "", {}, 0.0, {}};
+}
+
 Core::ChosenDecompRule DecompositionSolver::basisRule(const Core::OperatorNode &op)
 {
     if (!graph.isTargetGate(op)) {
@@ -51,9 +56,23 @@ Core::ChosenDecompRule DecompositionSolver::evalRule(const Core::RuleNode &rule)
 
     double total_cost = 0.0;
     for (const auto &input : rule.inputs) {
-        const auto child = solveOperator(input.op);
+        Core::ChosenDecompRule child;
+        try {
+            child = solveOperator(input.op);
+        }
+        catch (const Core::CyclicDecompositionError &) {
+            // A cycle in the decomposition graph invalidates this rule,
+            // but should not prevent trying sibling decomposition rules.
+            return invalidRule(solution.op);
+        }
+        catch (const Core::GraphSolveError &) {
+            // Any error in solving the input operator invalidates this rule,
+            // but should not prevent trying sibling decomposition rules.
+            return invalidRule(solution.op);
+        }
+
         if (child.ruleName.empty()) {
-            return {solution.op, false, "", {}, 0.0, {}}; // invalid rule
+            return invalidRule(solution.op); // invalid rule
         }
         total_cost += child.totalCost * static_cast<double>(input.multiplicity);
         for (const auto &[basis_op, count] : child.basisCounts) {
@@ -62,7 +81,7 @@ Core::ChosenDecompRule DecompositionSolver::evalRule(const Core::RuleNode &rule)
     }
 
     if (total_cost == 0.0) {
-        return {solution.op, false, "", {}, 0.0, {}}; // invalid rule
+        return invalidRule(solution.op); // invalid rule
     }
     solution.totalCost = total_cost;
     return solution;
@@ -72,7 +91,7 @@ Core::ChosenDecompRule DecompositionSolver::bestRule(const Core::OperatorNode &o
 {
     const auto &all_rules = graph.getAllRulesFor(op);
     if (all_rules.empty()) {
-        return {op, false, "", {}, 0.0, {}}; // no valid rules
+        return invalidRule(op); // no valid rules
     }
 
     std::optional<Core::ChosenDecompRule> best_rule;
@@ -86,7 +105,7 @@ Core::ChosenDecompRule DecompositionSolver::bestRule(const Core::OperatorNode &o
     }
 
     if (!best_rule.has_value()) {
-        return {op, false, "", {}, 0.0, {}}; // no valid rules
+        return invalidRule(op); // no valid rules
     }
 
     return best_rule.value();
