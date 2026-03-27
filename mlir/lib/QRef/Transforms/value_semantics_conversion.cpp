@@ -114,12 +114,7 @@ struct QubitValueTracker {
     {
         assert(isa<qref::QuregType>(rQreg.getType()) && "Expected qref.reg type");
         assert(isa<quantum::QuregType>(vQreg.getType()) && "Expected quantum.reg type");
-        if (this->qreg_map.contains(rQreg)) {
-            this->qreg_map[rQreg] = vQreg;
-        }
-        else {
-            this->qreg_map.insert({rQreg, vQreg});
-        }
+        this->qreg_map[rQreg] = vQreg;
     }
 
     /**
@@ -161,20 +156,10 @@ struct QubitValueTracker {
         std::optional<rQubitGetOpInfo> getOpInfo = getGetOpInfo(rQubit);
 
         if (!getOpInfo.has_value()) {
-            if (this->qubit_map.contains(rQubit)) {
-                this->qubit_map[rQubit] = vQubit;
-            }
-            else {
-                this->qubit_map.insert({rQubit, vQubit});
-            }
+            this->qubit_map[rQubit] = vQubit;
         }
         else {
-            if (this->getOp_qubit_map.contains(getOpInfo.value())) {
-                this->getOp_qubit_map[getOpInfo.value()] = vQubit;
-            }
-            else {
-                this->getOp_qubit_map.insert({getOpInfo.value(), vQubit});
-            }
+            this->getOp_qubit_map[getOpInfo.value()] = vQubit;
         }
     }
 
@@ -562,43 +547,30 @@ void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValu
     });
 
     // If any rQregs are taken in, any rQubits belonging to them must not be taken in separately
-    SmallVector<Value> unnecessaryRQubits;
-    for (const Value &v : necessaryRegionRValues) {
+    necessaryRegionRValues.remove_if([&](const Value &v) {
         if (isa<BlockArgument>(v)) {
-            continue;
+            return false;
         }
-
         if (auto getOp = dyn_cast<qref::GetOp>(v.getDefiningOp())) {
             if (rQregsTakenIn.contains(getOp.getQreg())) {
-                unnecessaryRQubits.push_back(v);
+                return true;
             }
         }
-    }
-
-    for (const Value &v : unnecessaryRQubits) {
-        necessaryRegionRValues.remove(v);
-    }
+        return false;
+    });
 
     // Remove aliasing get ops
-    SetVector<Value> aliasingGetOpRemovalWorklist;
     DenseSet<rQubitGetOpInfo> seenGetInfos;
-    for (const Value &v : necessaryRegionRValues) {
+    necessaryRegionRValues.remove_if([&](const Value &v) {
         if (isa<BlockArgument>(v) || !isa<qref::GetOp>(v.getDefiningOp())) {
-            continue;
+            return false;
         }
 
         rQubitGetOpInfo info = getGetOpInfo(v).value();
-        if (seenGetInfos.contains(info)) {
-            aliasingGetOpRemovalWorklist.insert(v);
-        }
-        else {
-            seenGetInfos.insert(info);
-        }
-    }
-
-    for (const Value &v : aliasingGetOpRemovalWorklist) {
-        necessaryRegionRValues.remove(v);
-    }
+        // If already exists in set, insertion will fail, and we have seen an alias, so need to
+        // remove
+        return !seenGetInfos.insert(info).second;
+    });
 }
 
 /**
