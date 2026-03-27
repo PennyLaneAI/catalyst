@@ -242,10 +242,6 @@ def diagonalize_measurements(
     >>> print(error_msg)
     Observables are not qubit-wise commuting. Please apply the `split-non-commuting` pass first.
     """
-    if qnode is None:
-        return functools.partial(
-            diagonalize_measurements, supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
-        )
     return qml.transform(pass_name="diagonalize-final-measurements")(
         qnode, supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
     )
