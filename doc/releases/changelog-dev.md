@@ -501,6 +501,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Updated Catalyst's Catch2 dependency to v3.11.0.
+  [(#2634)](https://github.com/PennyLaneAI/catalyst/pull/2634)
+
 * `rtio.rpc` operation is added to the RTIO dialect for OQD. It represents a host RPC call triggered by the kernel, optionally carrying runtime arguments and supporting both synchronous and async modes. The op is lowered to rpc_send / rpc_recv LLVM calls (the ARTIQ RPC wire protocol). It is required by both AWG control (program_awg, awg_close) and measurement result collection (set_dataset, transfer_data).
   [(#2577)](https://github.com/PennyLaneAI/catalyst/pull/2577)
 
