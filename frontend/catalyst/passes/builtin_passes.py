@@ -145,7 +145,7 @@ def diagonalize_measurements(
 ):
     """
     Specify that the ``diagonalize-final-measurements`` compiler pass
-    for diagonalizing measurements (a peephole optimization) will be applied.
+    will be applied, which diagonalizes measurements into the standard basis. 
 
     Args:
         qnode (QNode): the QNode to apply the ``diagonalize_final_measurement`` compiler pass to.
