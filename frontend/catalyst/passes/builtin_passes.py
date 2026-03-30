@@ -149,7 +149,7 @@ def diagonalize_measurements(
 
     Args:
         qnode (QNode): the QNode to apply the ``diagonalize_final_measurement`` compiler pass to.
-        supported_base_obs (tuple[str]): A list of supported base observable names.
+        supported_base_obs (tuple[str, ...]): A list of supported base observable names.
             Allowed observables are ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard`` and ``Identity``.
             ``PauliZ`` and ``Identity`` are always treated as supported, regardless of input. Defaults to
             (``PauliZ``, ``Identity``).
