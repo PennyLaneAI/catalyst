@@ -288,9 +288,8 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the diagonalize final measurements pass."""
-        # This is a temporary workaround necessitated by the current value-based
-        # lowering path. Once the transition to reference semantics is complete
-        # (see more sc-113514), this CSE pass can be removed.
+        # This is a temporary workaround necessitated by the current non-program capture
+        # lowering path.
         CommonSubexpressionElimination().apply(_ctx, op)
 
         for op_ in op.walk():
