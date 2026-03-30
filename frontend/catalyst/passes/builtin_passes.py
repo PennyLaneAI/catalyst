@@ -223,7 +223,7 @@ def diagonalize_measurements(
     >>> print(error_msg)
     Only to_eigvals = False is supported.
 
-    An compile error would be raised, if non-commuting terms are encountered:
+    A compile error would be raised, if non-commuting terms are encountered:
 
     .. code-block:: python
 
