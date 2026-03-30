@@ -145,7 +145,7 @@ def diagonalize_measurements(
 ):
     """
     Specify that the ``-diagonalize-final-measurements`` MLIR (xDSL) compiler pass
-    for diagonalize_measurements (peephole) will be applied.
+    for diagonalizing measurements (a peephole optimization) will be applied.
 
     Args:
         qnode (QNode): the QNode to apply the ``diagonalize_final_measurement`` compiler pass to.
