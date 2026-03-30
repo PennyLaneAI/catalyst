@@ -33,6 +33,7 @@ from pennylane.ops import Hadamard, PauliX, PauliY
 from xdsl import context, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin, func
 from xdsl.rewriter import InsertPoint
+from xdsl.transforms.common_subexpression_elimination import CommonSubexpressionElimination
 
 from catalyst.python_interface.dialects.quantum import (
     ComputationalBasisOp,
@@ -127,18 +128,6 @@ class NonCommutingObservableValidator:
     def _register_qubits(self, qubits, obs_type):
         """Updates tracking for SSA qubit values and their associated observables."""
         for q in qubits:
-            # If there is no gate applied to a qubit, a qubit SSA value is extracted for every
-            # observable on that qubit in the current IR. Otherwise, the output qubit of the
-            # last gate operation would be reused for each observable on that qubit. Therefore,
-            # we need to resolve the wire information if the qubit SSA used by an observable is
-            # the result of an quantum.extract operation.
-            # FIXME: The following patch is a workaround and more work is required
-            if isinstance(q.owner, ExtractOp):
-                try:
-                    q = dispatch_wires_extract(q.owner)
-                except NotImplementedError:
-                    pass
-
             if q in self.visited_qubits:
                 self.overlapped_qubits.add(q)
             self.visited_qubits.add(q)
@@ -301,6 +290,9 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the diagonalize final measurements pass."""
+
+        CommonSubexpressionElimination().apply(_ctx, op)
+
         for op_ in op.walk():
             if isinstance(op_, func.FuncOp) and "quantum.node" in op_.attributes:
                 # Validate if each circuit in the module is commuting and an error
