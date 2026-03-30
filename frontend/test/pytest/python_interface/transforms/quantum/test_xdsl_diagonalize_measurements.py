@@ -911,9 +911,10 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
 
         circuit(0.7)
 
+
 class TestNonCommuteValidateNoCapture:
     def test_non_commuting_multiple_measurements_only(self, device):
-        """A CompileError is raised for non-commuting measurements without gates 
+        """A CompileError is raised for non-commuting measurements without gates
         applied and program capture is not enabled."""
 
         @diagonalize_final_measurements_pass
