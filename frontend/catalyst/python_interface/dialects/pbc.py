@@ -221,7 +221,7 @@ class SelectPPMeasurementOp(IRDLOperation):
     name = "pbc.select.ppm"
 
     assembly_format = """
-        `(` $select_switch `,` $pauli_product_0 `,` $pauli_product_1 `)`
+        ` ` `(` $select_switch `?` $pauli_product_0 (`(``-``)` $negated_0^)? `:` $pauli_product_1 (`(``-``)` $negated_1^)? `)`
         $in_qubits
         attr-dict
         `:` type(results)
@@ -231,7 +231,11 @@ class SelectPPMeasurementOp(IRDLOperation):
 
     pauli_product_0 = prop_def(PauliWord)
 
+    negated_0 = opt_prop_def(UnitAttr)
+
     pauli_product_1 = prop_def(PauliWord)
+
+    negated_1 = opt_prop_def(UnitAttr)
 
     in_qubits = var_operand_def(QubitType)
 

@@ -453,7 +453,9 @@ def SelectPPMeasurementOp : PBC_Op<"select.ppm"> {
     let arguments = (ins
         I1:$select_switch,
         PauliWord:$pauli_product_0,
+        UnitAttr:$negated_0,
         PauliWord:$pauli_product_1,
+        UnitAttr:$negated_1,
         Variadic<QubitType>:$in_qubits  // The qubits to measure
     );
 
@@ -463,41 +465,49 @@ def SelectPPMeasurementOp : PBC_Op<"select.ppm"> {
     );
 
     let builders = [
-        OpBuilder<
+        OpBuilder<  // infer result types
         (ins
             "::mlir::Value":$select_switch,
             "::mlir::ArrayAttr":$pauli_product_0,
             "::mlir::ArrayAttr":$pauli_product_1,
-            "::mlir::ValueRange":$in_qubits
+            "::mlir::ValueRange":$in_qubits,
+            CArg<"bool", "0">:$negated_0,
+            CArg<"bool", "0">:$negated_1
         ),[{
             SelectPPMeasurementOp::build($_builder, $_state,
-            /*mres_type=*/ $_builder.getI1Type(),
-            /*out_qubits=*/ mlir::TypeRange(in_qubits),
-            /*select_switch=*/ select_switch,
-            /*pauli_product_0=*/ pauli_product_0,
-            /*pauli_product_1=*/ pauli_product_1,
-            /*in_qubits=*/ in_qubits);
+                /*mres_type=*/ $_builder.getI1Type(),
+                /*out_qubits=*/ mlir::TypeRange(in_qubits),
+                /*select_switch=*/ select_switch,
+                /*pauli_product_0=*/ pauli_product_0,
+                /*negated_0=*/ negated_0,
+                /*pauli_product_1=*/ pauli_product_1,
+                /*negated_1=*/ negated_1,
+                /*in_qubits=*/ in_qubits
+            );
         }]>,
-        OpBuilder<
+        OpBuilder<  // C++ types for attributes
         (ins
             "::mlir::Value":$select_switch,
             "::mlir::ArrayRef<mlir::StringRef>":$pauli_product_0,
             "::mlir::ArrayRef<mlir::StringRef>":$pauli_product_1,
-            "::mlir::ValueRange":$in_qubits
+            "::mlir::ValueRange":$in_qubits,
+            CArg<"bool", "0">:$negated_0,
+            CArg<"bool", "0">:$negated_1
         ),[{
             SelectPPMeasurementOp::build($_builder, $_state,
-            /*mres_type=*/ $_builder.getI1Type(),
-            /*out_qubits=*/ mlir::TypeRange(in_qubits),
-            /*select_switch=*/ select_switch,
-            /*pauli_product_0=*/ $_builder.getStrArrayAttr(pauli_product_0),
-            /*pauli_product_1=*/ $_builder.getStrArrayAttr(pauli_product_1),
-            /*in_qubits=*/ in_qubits);
+                /*select_switch=*/ select_switch,
+                /*pauli_product_0=*/ $_builder.getStrArrayAttr(pauli_product_0),
+                /*pauli_product_1=*/ $_builder.getStrArrayAttr(pauli_product_1),
+                /*in_qubits=*/ in_qubits,
+                /*negated_0=*/ negated_0,
+                /*negated_1=*/ negated_1
+            );
         }]>
 
     ];
 
     let assemblyFormat = [{
-      `(` $select_switch `,` $pauli_product_0 `,` $pauli_product_1 `)` $in_qubits attr-dict `:` type(results)
+        ` ` `(` $select_switch `?` $pauli_product_0 (`(``-``)` $negated_0^)? `:` $pauli_product_1 (`(``-``)` $negated_1^)? `)` $in_qubits attr-dict `:` type(results)
     }];
 
     let hasVerifier = 1;

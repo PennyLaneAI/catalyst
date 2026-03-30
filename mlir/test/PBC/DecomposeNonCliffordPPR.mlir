@@ -73,7 +73,7 @@ func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
 // CHECK-AUTO: [[m_2:%.+]], [[out_2:%.+]] = pbc.ppm ["X"] [[out_1]]#0 : i1, !quantum.bit
 
 // // PPM X or Z on |0⟩ if cond(m0) is true
-// CHECK-AUTO: [[m_3:%.+]], [[out_3:%.+]] = pbc.select.ppm([[m_0]], ["X"], ["Z"]) [[out_1]]#1 : i1, !quantum.bit
+// CHECK-AUTO: [[m_3:%.+]], [[out_3:%.+]] = pbc.select.ppm ([[m_0]] ? ["X"] : ["Z"]) [[out_1]]#1 : i1, !quantum.bit
 
 // // Compute XOR to check if m2 and m1 are different and m3 is true
 // CHECK-AUTO: [[cond:%.+]] = arith.xori [[m_1]], [[m_2]] : i1
@@ -96,7 +96,7 @@ func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
 // CHECK-PAULI: [[m_0:%.+]], [[out_0:%.+]]:2 = pbc.ppm ["Z", "Z"] %arg0, [[magic]] : i1, !quantum.bit, !quantum.bit
 
 // // PPM X or Y on |m⟩ => m1
-// CHECK-PAULI: [[m_1:%.+]], [[out_1:%.+]] = pbc.select.ppm([[m_0]], ["Y"], ["X"]) [[out_0]]#1 : i1, !quantum.bit
+// CHECK-PAULI: [[m_1:%.+]], [[out_1:%.+]] = pbc.select.ppm ([[m_0]] ? ["Y"] : ["X"]) [[out_0]]#1 : i1, !quantum.bit
 
 // // PPR[Z](2) on Q if cond(m1) is true
 // CHECK-PAULI: [[q0_1:%.+]]  = pbc.ppr ["Z"](2) [[out_0]]#0 cond([[m_1]]) : !quantum.bit
@@ -153,7 +153,7 @@ func.func @test_ppr_to_ppm_2(%q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !quan
     // CHECK-AUTO: pbc.ppm ["X", "Y", "Z", "Y", "Z"]
     // CHECK-AUTO: pbc.ppm ["Z", "Y"]
     // CHECK-AUTO: pbc.ppm ["X"]
-    // CHECK-AUTO: pbc.select.ppm({{.*}}, ["X"], ["Z"])
+    // CHECK-AUTO: pbc.select.ppm ({{.*}} ? ["X"] : ["Z"])
     // CHECK-AUTO: arith.xori
 
     // // PPR P(π/2) on Q if cond(m3) is true
@@ -162,7 +162,7 @@ func.func @test_ppr_to_ppm_2(%q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !quan
     // // P = ["X", "Y", "Z", "Y"]
     // // PPM P⊗Z on Q and |m⟩   => m0
     // CHECK-PAULI: pbc.ppm ["X", "Y", "Z", "Y", "Z"]
-    // CHECK-PAULI: pbc.select.ppm([[m_0]], ["Y"], ["X"])
+    // CHECK-PAULI: pbc.select.ppm ([[m_0]] ? ["Y"] : ["X"])
     // CHECK-PAULI: pbc.ppr ["X", "Y", "Z", "Y"](2) {{.*}} cond({{.*}})
 
     // // P = ["X", "Y", "Z", "Y"]
@@ -300,7 +300,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-AUTO: [[M:%.+]], [[OUT:%.+]]:2 = pbc.ppm ["Z", "Z"] [[Q0]], [[Q_4]] : i1, !quantum.bit, !quantum.bit
     // CHECK-AUTO: [[M_0:%.+]], [[OUT_1:%.+]]:2 = pbc.ppm ["Z", "Y"](-) [[OUT]]#1, [[Q_3]] : i1, !quantum.bit, !quantum.bit
     // CHECK-AUTO: [[M_2:%.+]], [[OUT_3:%.+]] = pbc.ppm ["X"] [[OUT_1]]#0 : i1, !quantum.bit
-    // CHECK-AUTO: [[M_4:%.+]], [[OUT_5:%.+]] = pbc.select.ppm([[M]], ["X"], ["Z"]) [[OUT_1]]#1 : i1, !quantum.bit
+    // CHECK-AUTO: [[M_4:%.+]], [[OUT_5:%.+]] = pbc.select.ppm ([[M]] ? ["X"] : ["Z"]) [[OUT_1]]#1 : i1, !quantum.bit
     // CHECK-AUTO: [[Q_5:%.+]] = arith.xori [[M_0]], [[M_2]] : i1
     // CHECK-AUTO: [[Q_6:%.+]] = pbc.ppr ["Z"](2) [[OUT]]#0 cond([[Q_5]]) : !quantum.bit
 
@@ -313,7 +313,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-AUTO: [[M_6:%.+]], [[OUT_7:%.+]]:2 = pbc.ppm ["Y", "Z"] [[Q3]], [[Q_11]] : i1, !quantum.bit, !quantum.bit
     // CHECK-AUTO: [[M_8:%.+]], [[OUT_9:%.+]]:2 = pbc.ppm ["Z", "Y"](-) [[OUT_7]]#1, [[Q_10]] : i1, !quantum.bit, !quantum.bit
     // CHECK-AUTO: [[M_10:%.+]], [[OUT_11:%.+]] = pbc.ppm ["X"] [[OUT_9]]#0 : i1, !quantum.bit
-    // CHECK-AUTO: [[M_12:%.+]], [[OUT_13:%.+]] = pbc.select.ppm([[M_6]], ["X"], ["Z"]) [[OUT_9]]#1 : i1, !quantum.bit
+    // CHECK-AUTO: [[M_12:%.+]], [[OUT_13:%.+]] = pbc.select.ppm ([[M_6]] ? ["X"] : ["Z"]) [[OUT_9]]#1 : i1, !quantum.bit
     // CHECK-AUTO: [[Q_12:%.+]] = arith.xori [[M_8]], [[M_10]] : i1
     // CHECK-AUTO: [[Q_13:%.+]] = pbc.ppr ["Y"](2) [[OUT_7]]#0 cond([[Q_12]]) : !quantum.bit
 
@@ -327,7 +327,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-AUTO: [[M_14:%.+]], [[OUT_15:%.+]]:3 = pbc.ppm ["Y", "X", "Z"] [[Q2]], [[Q1]], [[Q_18]]
     // CHECK-AUTO: [[M_16:%.+]], [[OUT_17:%.+]]:2 = pbc.ppm ["Z", "Y"](-) [[OUT_15]]#2, [[Q_17]] : i1, !quantum.bit, !quantum.bit
     // CHECK-AUTO: [[M_18:%.+]], [[OUT_19:%.+]] = pbc.ppm ["X"] [[OUT_17]]#0 : i1, !quantum.bit
-    // CHECK-AUTO: [[M_20:%.+]], [[OUT_21:%.+]] = pbc.select.ppm([[M_14]], ["X"], ["Z"]) [[OUT_17]]#1 : i1, !quantum.bit
+    // CHECK-AUTO: [[M_20:%.+]], [[OUT_21:%.+]] = pbc.select.ppm ([[M_14]] ? ["X"] : ["Z"]) [[OUT_17]]#1 : i1, !quantum.bit
     // CHECK-AUTO: [[Q_19:%.+]] = arith.xori [[M_16]], [[M_18]] : i1
     // CHECK-AUTO: [[Q_20:%.+]]:2 = pbc.ppr ["Y", "X"](2) [[OUT_15]]#0, [[OUT_15]]#1 cond([[Q_19]]) : !quantum.bit, !quantum.bit
 
@@ -343,7 +343,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-AUTO: [[M_22:%.+]], [[OUT_23:%.+]]:5 = pbc.ppm ["Z", "Z", "Y", "Z", "Z"] [[Q_20]]#0, [[Q_20]]#1, [[Q_13]], [[Q_6]], [[Q_25]]
     // CHECK-AUTO: [[M_24:%.+]], [[OUT_25:%.+]]:2 = pbc.ppm ["Z", "Y"](-) [[OUT_23]]#4, [[Q_24]] : i1, !quantum.bit, !quantum.bit
     // CHECK-AUTO: [[M_26:%.+]], [[OUT_27:%.+]] = pbc.ppm ["X"] [[OUT_25]]#0 : i1, !quantum.bit
-    // CHECK-AUTO: [[M_28:%.+]], [[OUT_29:%.+]] = pbc.select.ppm([[M_22]], ["X"], ["Z"]) [[OUT_25]]#1 : i1, !quantum.bit
+    // CHECK-AUTO: [[M_28:%.+]], [[OUT_29:%.+]] = pbc.select.ppm ([[M_22]] ? ["X"] : ["Z"]) [[OUT_25]]#1 : i1, !quantum.bit
     // CHECK-AUTO: [[Q_26:%.+]] = arith.xori [[M_24]], [[M_26]] : i1
     // CHECK-AUTO: [[Q_27:%.+]]:4 = pbc.ppr ["Z", "Z", "Y", "Z"](2) [[OUT_23]]#0, [[OUT_23]]#1, [[OUT_23]]#2, [[OUT_23]]#3 cond([[Q_26]])
 
@@ -371,25 +371,25 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-PAULI: [[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit, [[Q2:%.+]]: !quantum.bit, [[Q3:%.+]]: !quantum.bit) {
     // CHECK-PAULI: [[Q4:%.+]]     = pbc.fabricate  magic
     // CHECK-PAULI: [[M:%.+]], [[out:%.+]]:2 = pbc.ppm ["Z", "Z"] [[Q0]], [[Q4]] : i1, !quantum.bit, !quantum.bit
-    // CHECK-PAULI: [[M1:%.+]], [[out_0:%.+]] = pbc.select.ppm([[M]], ["Y"], ["X"]) [[out]]#1 : i1, !quantum.bit
+    // CHECK-PAULI: [[M1:%.+]], [[out_0:%.+]] = pbc.select.ppm ([[M]] ? ["Y"] : ["X"]) [[out]]#1 : i1, !quantum.bit
     // CHECK-PAULI: [[Q5:%.+]]  = pbc.ppr ["Z"](2) [[out]]#0 cond([[M1]]) : !quantum.bit
 
     // // PPR ["Y"](-8) Q3
     // CHECK-PAULI: [[Q6:%.+]]     = pbc.fabricate  magic
     // CHECK-PAULI: [[M2:%.+]], [[out_2:%.+]]:2 = pbc.ppm ["Y", "Z"](-) [[Q3]], [[Q6]] : i1, !quantum.bit, !quantum.bit
-    // CHECK-PAULI: [[M3:%.+]], [[out_3:%.+]] = pbc.select.ppm([[M2]], ["Y"], ["X"]) [[out_2]]#1 : i1, !quantum.bit
+    // CHECK-PAULI: [[M3:%.+]], [[out_3:%.+]] = pbc.select.ppm ([[M2]] ? ["Y"] : ["X"]) [[out_2]]#1 : i1, !quantum.bit
     // CHECK-PAULI: [[Q7:%.+]]  = pbc.ppr ["Y"](2) [[out_2]]#0 cond([[M3]]) : !quantum.bit
 
     // // PPR ["Y", "X"](8) Q2, Q1
     // CHECK-PAULI: [[Q8:%.+]]     = pbc.fabricate  magic
     // CHECK-PAULI: [[M4:%.+]], [[out_4:%.+]]:3 = pbc.ppm ["Y", "X", "Z"] [[Q2]], [[Q1]], [[Q8]] : i1, !quantum.bit, !quantum.bit, !quantum.bit
-    // CHECK-PAULI: [[M5:%.+]], [[out_5:%.+]] = pbc.select.ppm([[M4]], ["Y"], ["X"]) [[out_4]]#2 : i1, !quantum.bit
+    // CHECK-PAULI: [[M5:%.+]], [[out_5:%.+]] = pbc.select.ppm ([[M4]] ? ["Y"] : ["X"]) [[out_4]]#2 : i1, !quantum.bit
     // CHECK-PAULI: [[Q9:%.+]]:2  = pbc.ppr ["Y", "X"](2) [[out_4]]#0, [[out_4]]#1 cond([[M5]]) : !quantum.bit, !quantum.bit
 
     // // PPR ["Z", "Z", "Y", "Z"](-8) Q2, Q1, Q3, Q0
     // CHECK-PAULI: [[Q10:%.+]] = pbc.fabricate  magic
     // CHECK-PAULI: [[M6:%.+]], [[out_6:%.+]]:5 = pbc.ppm ["Z", "Z", "Y", "Z", "Z"](-) [[Q9]]#0, [[Q9]]#1, [[Q7]], [[Q5]], [[Q10]] : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
-    // CHECK-PAULI: [[M7:%.+]], [[out_7:%.+]] = pbc.select.ppm([[M6]], ["Y"], ["X"]) [[out_6]]#4 : i1, !quantum.bit
+    // CHECK-PAULI: [[M7:%.+]], [[out_7:%.+]] = pbc.select.ppm ([[M6]] ? ["Y"] : ["X"]) [[out_6]]#4 : i1, !quantum.bit
     // CHECK-PAULI: [[Q11:%.+]]:4  = pbc.ppr ["Z", "Z", "Y", "Z"](2) [[out_6]]#0, [[out_6]]#1, [[out_6]]#2, [[out_6]]#3 cond([[M7]]) : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
 
     // // PPM Z, Z, Y, Y -> Q2, Q1, Q0, Q3

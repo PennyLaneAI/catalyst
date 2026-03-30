@@ -62,7 +62,7 @@ func.func @test_ppr_to_ppm_non_clifford(%q1 : !quantum.bit) {
 
     // CHECK: [[magic:%.+]] = pbc.fabricate  magic
     // CHECK: [[m_0:%.+]], [[out_0:%.+]]:2 = pbc.ppm ["Z", "Z"] %arg0, [[magic]] : i1, !quantum.bit, !quantum.bit
-    // CHECK: [[m_1:%.+]], [[out_1:%.+]] = pbc.select.ppm([[m_0]], ["Y"], ["X"]) [[out_0]]#1 : i1, !quantum.bit
+    // CHECK: [[m_1:%.+]], [[out_1:%.+]] = pbc.select.ppm ([[m_0]] ? ["Y"] : ["X"]) [[out_0]]#1 : i1, !quantum.bit
     // CHECK: [[q0_1:%.+]]  = pbc.ppr ["Z"](2) [[out_0]]#0 cond([[m_1]]) : !quantum.bit
 }
 
@@ -75,7 +75,7 @@ func.func @test_ppr_to_ppm_mixed_clifford_non_clifford(%q1 : !quantum.bit) {
 
     // CHECK: [[magic:%.+]] = pbc.fabricate  magic
     // CHECK: [[m_0:%.+]], [[out_0:%.+]]:2 = pbc.ppm ["Z", "Z"] %arg0, [[magic]] : i1, !quantum.bit, !quantum.bit
-    // CHECK: [[m_1:%.+]], [[out_1:%.+]] = pbc.select.ppm([[m_0]], ["Y"], ["X"]) [[out_0]]#1 : i1, !quantum.bit
+    // CHECK: [[m_1:%.+]], [[out_1:%.+]] = pbc.select.ppm ([[m_0]] ? ["Y"] : ["X"]) [[out_0]]#1 : i1, !quantum.bit
     // CHECK: [[q_0:%.+]]  = pbc.ppr ["Z"](2) [[out_0]]#0 cond([[m_1]]) : !quantum.bit
 
     // CHECK: [[q_1:%.+]] = quantum.alloc_qb : !quantum.bit

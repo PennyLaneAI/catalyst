@@ -39,13 +39,21 @@ func.func @magic() {
 
 func.func @bar(%q1 : !quantum.bit, %q2 : !quantum.bit) {
     %m_0, %0 = pbc.ppm ["Z"] %q1 : i1, !quantum.bit
-    %m_1, %1 = pbc.select.ppm (%m_0, ["X"], ["Z"]) %q2 : i1, !quantum.bit
+    %m_1, %1 = pbc.select.ppm (%m_0 ? ["X"] : ["Z"]) %q2 : i1, !quantum.bit
     func.return
 }
 
 func.func @baz(%q1 : !quantum.bit, %q2 : !quantum.bit) {
     %m_0, %0 = pbc.ppm ["Z"] %q1 : i1, !quantum.bit
     %1:2 = pbc.ppr ["Y", "Y"] (4) %0, %q2 cond(%m_0) : !quantum.bit, !quantum.bit
+    func.return
+}
+
+func.func @bas(%q1 : !quantum.bit, %q2 : !quantum.bit) {
+    %m_0, %0 = pbc.ppm ["Z"](-) %q1 : i1, !quantum.bit
+    pbc.select.ppm (%m_0 ? ["X"](-) : ["Z"](-)) %q2 : i1, !quantum.bit
+    pbc.select.ppm (%m_0 ? ["X"] : ["Z"](-)) %q2 : i1, !quantum.bit
+    pbc.select.ppm (%m_0 ? ["X"](-) : ["Z"]) %q2 : i1, !quantum.bit
     func.return
 }
 
