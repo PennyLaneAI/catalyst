@@ -92,7 +92,6 @@ struct ResourceTracker final {
                          const std::vector<QubitIdType> &controlled_wires)
     {
         UpdateDepth(wires, controlled_wires);
-
         std::size_t total_wires = wires.size() + controlled_wires.size();
 
         gate_types_[name]++;
