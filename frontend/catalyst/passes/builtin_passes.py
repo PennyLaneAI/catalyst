@@ -144,7 +144,7 @@ def diagonalize_measurements(
     qnode=None, supported_base_obs: tuple[str] = ("PauliZ", "Identity"), to_eigvals: bool = False
 ):
     """
-    Specify that the ``-diagonalize-final-measurements`` MLIR (xDSL) compiler pass
+    Specify that the ``diagonalize-final-measurements`` compiler pass
     for diagonalizing measurements (a peephole optimization) will be applied.
 
     Args:
