@@ -114,6 +114,13 @@ TEST_CASE("Test BraketRunner", "[openqasm]")
 
 TEST_CASE("Test BraketRunner Expval and Var", "[openqasm]")
 {
+    // Initializing the Python interpreter is required to run the circuit.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+
     OpenQasm::BraketBuilder builder{};
 
     builder.Register(OpenQasm::RegisterType::Qubit, "q", 2);
@@ -172,6 +179,13 @@ TEST_CASE("Test BraketRunner Expval and Var", "[openqasm]")
 
 TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
 {
+    // Initializing the Python interpreter is required to run the circuit.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+
     SECTION("Common")
     {
         auto device = OpenQasmDevice("{}");
@@ -195,6 +209,13 @@ TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
 
 TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]")
 {
+    // Initializing the Python interpreter is required to run the circuit.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+
     std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>("{}");
 
     constexpr size_t n = 3;
@@ -209,6 +230,13 @@ TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]")
 
 TEST_CASE("Test the OpenQasmDevice setBasisState", "[openqasm]")
 {
+    // Initializing the Python interpreter is required to run the circuit.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+
     std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>("{}");
 
     constexpr size_t n = 2;
@@ -223,6 +251,13 @@ TEST_CASE("Test the OpenQasmDevice setBasisState", "[openqasm]")
 
 TEST_CASE("Test the OpenQasmDevice setState", "[openqasm]")
 {
+    // Initializing the Python interpreter is required to run the circuit.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+
     std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>("{}");
 
     constexpr size_t n = 2;
@@ -236,6 +271,13 @@ TEST_CASE("Test the OpenQasmDevice setState", "[openqasm]")
 
 TEST_CASE("Test the bell pair circuit with BuilderType::Common", "[openqasm]")
 {
+    // Initializing the Python interpreter is required to run the circuit.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+
     std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>("{}");
 
     constexpr size_t n = 2;
@@ -260,6 +302,13 @@ TEST_CASE("Test the bell pair circuit with BuilderType::Common", "[openqasm]")
 TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::Braket",
           "[openqasm]")
 {
+    // Initializing the Python interpreter is required to run the circuit.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+
     constexpr size_t shots{1000};
     std::unique_ptr<OpenQasmDevice> device =
         std::make_unique<OpenQasmDevice>("{device_type : braket.local.qubit, backend : default}");
@@ -396,6 +445,13 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
 
 TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket", "[openqasm]")
 {
+    // Initializing the Python interpreter is required to run the circuit.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+
     constexpr size_t shots{1000};
     std::unique_ptr<OpenQasmDevice> device =
         std::make_unique<OpenQasmDevice>("{device_type : braket.local.qubit, backend : default}");
@@ -575,6 +631,13 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
 
 TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
 {
+    // Initializing the Python interpreter is required to run the circuit.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+
     std::unique_ptr<OpenQasmDevice> device =
         std::make_unique<OpenQasmDevice>("{device_type : braket.local.qubit, backend : default}");
     device->SetDeviceShots(1000);
@@ -622,6 +685,13 @@ TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
 
 TEST_CASE("Test PSWAP and ISWAP with BuilderType::Braket", "[openqasm]")
 {
+    // Initializing the Python interpreter is required to run the circuit.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+
     std::unique_ptr<OpenQasmDevice> device =
         std::make_unique<OpenQasmDevice>("{device_type : braket.local.qubit, backend : default}");
     device->SetDeviceShots(1000);
@@ -640,6 +710,13 @@ TEST_CASE("Test PSWAP and ISWAP with BuilderType::Braket", "[openqasm]")
 
 TEST_CASE("Test MatrixOperation with OpenQasmDevice and BuilderType::Common", "[openqasm]")
 {
+    // Initializing the Python interpreter is required to run the circuit.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+
     auto device = OpenQasmDevice("{}");
     auto wires = device.AllocateQubits(2);
     std::vector<std::complex<double>> matrix{
@@ -655,6 +732,13 @@ TEST_CASE("Test MatrixOperation with OpenQasmDevice and BuilderType::Common", "[
 
 TEST_CASE("Test __catalyst__rt__device_init registering the OpenQasm device", "[CoreQIS]")
 {
+    // Initializing the Python interpreter is required to run the circuit.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+
     __catalyst__rt__initialize(nullptr);
 
     char device_aws[30] = "braket.aws.qubit";
