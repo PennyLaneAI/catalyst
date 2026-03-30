@@ -882,7 +882,7 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
             circuit(0.7)
 
     def test_non_commuting_multiple_measurements_only(self, device):
-        """An CompileError is raised for non-commuting measurements without gates applied."""
+        """A CompileError is raised for non-commuting measurements without gates applied."""
 
         @diagonalize_final_measurements_pass
         @qml.set_shots(10)
