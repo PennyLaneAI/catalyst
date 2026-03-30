@@ -38,7 +38,6 @@ from xdsl.transforms.common_subexpression_elimination import CommonSubexpression
 from catalyst.python_interface.dialects.quantum import (
     ComputationalBasisOp,
     CustomOp,
-    ExtractOp,
     GlobalPhaseOp,
     HermitianOp,
     MultiRZOp,
@@ -47,7 +46,6 @@ from catalyst.python_interface.dialects.quantum import (
     NamedObsOp,
     QubitUnitaryOp,
 )
-from catalyst.python_interface.inspection.xdsl_conversion import dispatch_wires_extract
 from catalyst.python_interface.pass_api import compiler_transform
 
 _default_supported_obs = {"PauliZ", "Identity"}
