@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators_all.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_range_equals.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <catch2/matchers/catch_matchers_vector.hpp>
@@ -71,15 +71,15 @@ TEST_CASE("Test Matrix Multiplication", "[RSDecomp][Ross Selinger]")
     auto expected_HT = gate_type_to_matrix[GateType::HT];
 
     for (size_t i = 0; i < res_HT.size(); i++) {
-        CHECK(res_HT[i].real() == Catch::Approx(expected_HT[i].real()));
-        CHECK(res_HT[i].imag() == Catch::Approx(expected_HT[i].imag()));
+        CHECK_THAT(res_HT[i].real(), WithinRel(expected_HT[i].real()));
+        CHECK_THAT(res_HT[i].imag(), WithinRel(expected_HT[i].imag()));
     }
 
     auto res_SHT = multiply_matrices(res_HT, gate_type_to_matrix[GateType::S]);
     auto expected_SHT = gate_type_to_matrix[GateType::SHT];
     for (size_t i = 0; i < res_SHT.size(); i++) {
-        CHECK(res_SHT[i].real() == Catch::Approx(expected_SHT[i].real()));
-        CHECK(res_SHT[i].imag() == Catch::Approx(expected_SHT[i].imag()));
+        CHECK_THAT(res_SHT[i].real(), WithinRel(expected_SHT[i].real()));
+        CHECK_THAT(res_SHT[i].imag(), WithinRel(expected_SHT[i].imag()));
     }
 }
 
@@ -91,8 +91,8 @@ TEST_CASE("Test matrix_from_decomp_result", "[RSDecomp][Ross Selinger]")
     auto expected_matrix = gate_type_to_matrix[GateType::HT];
 
     for (size_t i = 0; i < result_matrix.size(); i++) {
-        CHECK(result_matrix[i].real() == Catch::Approx(expected_matrix[i].real()));
-        CHECK(result_matrix[i].imag() == Catch::Approx(expected_matrix[i].imag()));
+        CHECK_THAT(result_matrix[i].real(), WithinRel(expected_matrix[i].real()));
+        CHECK_THAT(result_matrix[i].imag(), WithinRel(expected_matrix[i].imag()));
     }
 
     decomp = {GateType::S, GateType::H, GateType::T};
@@ -101,8 +101,8 @@ TEST_CASE("Test matrix_from_decomp_result", "[RSDecomp][Ross Selinger]")
     expected_matrix = gate_type_to_matrix[GateType::SHT];
 
     for (size_t i = 0; i < result_matrix.size(); i++) {
-        CHECK(result_matrix[i].real() == Catch::Approx(expected_matrix[i].real()));
-        CHECK(result_matrix[i].imag() == Catch::Approx(expected_matrix[i].imag()));
+        CHECK_THAT(result_matrix[i].real(), WithinRel(expected_matrix[i].real()));
+        CHECK_THAT(result_matrix[i].imag(), WithinRel(expected_matrix[i].imag()));
     }
 }
 
@@ -254,4 +254,40 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[RSDecomp][Ross Selinger]")
 
     CHECK(buffer_ppr.size() == 1);
     CHECK(static_cast<PPRGateType>(buffer_ppr[0]) == PPRGateType::Z8);
+}
+
+TEST_CASE("rs_decomposition_get_size emits warning for epsilon < 1e-6", "[RSDecomp][Warning]")
+{
+    const double theta = 0.5;
+
+    SECTION("warning is emitted when epsilon < 1e-6")
+    {
+        std::ostringstream buf;
+        std::streambuf *old = std::cerr.rdbuf(buf.rdbuf());
+        (void)rs_decomposition_get_size(theta, 1e-8, false);
+        std::cerr.rdbuf(old);
+
+        CHECK_THAT(buf.str(), ContainsSubstring("Gridsynth received epsilon="));
+        CHECK_THAT(buf.str(), ContainsSubstring("For epsilon smaller than 1e-6"));
+    }
+
+    SECTION("no warning when epsilon >= 1e-6")
+    {
+        std::ostringstream buf;
+        std::streambuf *old = std::cerr.rdbuf(buf.rdbuf());
+        (void)rs_decomposition_get_size(theta, 1e-4, false);
+        std::cerr.rdbuf(old);
+
+        CHECK(buf.str().empty());
+    }
+
+    SECTION("no warning at boundary epsilon == 1e-6")
+    {
+        std::ostringstream buf;
+        std::streambuf *old = std::cerr.rdbuf(buf.rdbuf());
+        (void)rs_decomposition_get_size(theta, 1e-6, false);
+        std::cerr.rdbuf(old);
+
+        CHECK(buf.str().empty());
+    }
 }

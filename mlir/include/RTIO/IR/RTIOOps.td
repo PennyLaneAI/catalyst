@@ -167,6 +167,52 @@ def RTIOSyncOp : RTIO_Op<"sync"> {
     let hasVerifier = 1;
 }
 
+def RTIORPCOp : RTIO_Op<"rpc"> {
+    let summary = "Invoke a host RPC function from the kernel";
+    let description = [{
+        Represents an outgoing RPC call from the kernel to the host.
+
+        Attributes:
+        - callee:    The symbolic name of the host-side callable to invoke.
+        - is_async:  If present the call is async.
+        - rpc_id:    A unique integer identifier for each RPC function.
+                     Every distinct RPC function must map to a unique rpc_id.
+                     This is used to identify which RPC function is being invoked when
+                     communicating with the server.
+
+        Example (sync, no args):
+        ```mlir
+        rtio.rpc @program_awg rpc_id(1)
+        ```
+
+        Example (sync, with args):
+        ```mlir
+        rtio.rpc @set_dataset rpc_id(2) (%key, %val : i64, f64)
+        ```
+
+        Example (sync, with return value):
+        ```mlir
+        %x = rtio.rpc @get_value rpc_id(3) -> i64
+        ```
+    }];
+
+    let arguments = (ins
+        SymbolRefAttr:$callee,
+        UnitAttr:$is_async,
+        OptionalAttr<I32Attr>:$rpc_id,
+        Variadic<AnyType>:$args
+    );
+
+    let results = (outs Variadic<AnyType>:$results);
+
+    let assemblyFormat = [{
+        $callee (`rpc_id` `(` $rpc_id^ `)`)? (`async` $is_async^)? (`(` $args^ `:` type($args) `)`)?
+        (`->` type($results)^)? attr-dict
+    }];
+
+    let hasVerifier = 1;
+}
+
 def RTIOEmptyOp : RTIO_Op<"empty", [Pure]> {
     let summary = "Create an empty event for sequencing";
     let description = [{
