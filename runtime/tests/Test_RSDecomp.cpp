@@ -255,3 +255,39 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[RSDecomp][Ross Selinger]")
     CHECK(buffer_ppr.size() == 1);
     CHECK(static_cast<PPRGateType>(buffer_ppr[0]) == PPRGateType::Z8);
 }
+
+TEST_CASE("rs_decomposition_get_size emits warning for epsilon < 1e-6", "[RSDecomp][Warning]")
+{
+    const double theta = 0.5;
+
+    SECTION("warning is emitted when epsilon < 1e-6")
+    {
+        std::ostringstream buf;
+        std::streambuf *old = std::cerr.rdbuf(buf.rdbuf());
+        (void)rs_decomposition_get_size(theta, 1e-8, false);
+        std::cerr.rdbuf(old);
+
+        CHECK_THAT(buf.str(), ContainsSubstring("Gridsynth received epsilon="));
+        CHECK_THAT(buf.str(), ContainsSubstring("For epsilon smaller than 1e-6"));
+    }
+
+    SECTION("no warning when epsilon >= 1e-6")
+    {
+        std::ostringstream buf;
+        std::streambuf *old = std::cerr.rdbuf(buf.rdbuf());
+        (void)rs_decomposition_get_size(theta, 1e-4, false);
+        std::cerr.rdbuf(old);
+
+        CHECK(buf.str().empty());
+    }
+
+    SECTION("no warning at boundary epsilon == 1e-6")
+    {
+        std::ostringstream buf;
+        std::streambuf *old = std::cerr.rdbuf(buf.rdbuf());
+        (void)rs_decomposition_get_size(theta, 1e-6, false);
+        std::cerr.rdbuf(old);
+
+        CHECK(buf.str().empty());
+    }
+}
