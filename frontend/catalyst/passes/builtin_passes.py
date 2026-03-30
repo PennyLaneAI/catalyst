@@ -141,7 +141,7 @@ def cancel_inverses(qnode):
 
 
 def diagonalize_measurements(
-    qnode=None, supported_base_obs: tuple[str] = ("PauliZ", "Identity"), to_eigvals: bool = False
+    qnode, supported_base_obs: tuple[str, ...] = ("PauliZ", "Identity"), to_eigvals: bool = False
 ):
     """
     Specify that the ``diagonalize-final-measurements`` compiler pass
