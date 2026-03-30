@@ -87,21 +87,18 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
         // Get the rotation angle based on the op type
         // Since the qml.PauliRot(phi) == PPR(phi/2), this rotation_kind is multiplied by 2.
         Value thetaValue;
+        Value condition;
         if constexpr (std::is_same_v<T, PPRotationOp>) {
-            if (op.getCondition()) {
-                return op.emitOpError("PPRotationOp with condition is not supported.");
-            }
             // Compute the rotation angle: theta = π / rotation_kind
             // rotation_kind can be ±1, ±2, ±4, ±8
+            condition = adaptor.getCondition();
             int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
             double theta = 2 * (llvm::numbers::pi / static_cast<double>(rotationKind));
             thetaValue = LLVM::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(theta));
         }
         else if constexpr (std::is_same_v<T, PPRotationArbitraryOp>) {
-            if (op.getCondition()) {
-                return op.emitOpError("PPRotationArbitraryOp with condition is not supported.");
-            }
             // multiply by 2 to get the rotation angle
+            condition = adaptor.getCondition();
             thetaValue = LLVM::FMulOp::create(
                 rewriter, loc, adaptor.getArbitraryAngle(),
                 LLVM::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0)));
@@ -121,9 +118,33 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
             LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
         args.append(adaptor.getInQubits().begin(), adaptor.getInQubits().end());
 
-        LLVM::CallOp::create(rewriter, loc, fnDecl, args);
+        if (condition) {
+            // Wrap the PauliRot call in a conditional branch
+            // ^currentBlock :
+            //     ...(stuff before)
+            //     llvm.cond_br % cond, ^thenBlock, ^mergeBlock
+            // ^ thenBlock :
+            //     llvm.call @__catalyst__qis__PauliRot(...)
+            //     llvm.br ^ mergeBlock
+            // ^ mergeBlock :
+            //     ...(stuff after)
 
-        // Replace the op with the input qubits
+            Block *currentBlock = rewriter.getInsertionBlock();
+            Block *mergeBlock = rewriter.splitBlock(currentBlock, rewriter.getInsertionPoint());
+            Block *thenBlock = rewriter.createBlock(mergeBlock);
+
+            rewriter.setInsertionPointToEnd(currentBlock);
+            LLVM::CondBrOp::create(rewriter, loc, condition, thenBlock, mergeBlock);
+
+            rewriter.setInsertionPointToEnd(thenBlock);
+            LLVM::CallOp::create(rewriter, loc, fnDecl, args);
+            LLVM::BrOp::create(rewriter, loc, ValueRange{}, mergeBlock);
+            rewriter.setInsertionPointToStart(mergeBlock);
+        }
+        else {
+            LLVM::CallOp::create(rewriter, loc, fnDecl, args);
+        }
+
         rewriter.replaceOp(op, adaptor.getInQubits());
 
         return success();
@@ -186,6 +207,51 @@ struct PPMeasurementOpPattern : public OpConversionPattern<PPMeasurementOp> {
     }
 };
 
+struct SelectPPMeasurementOpPattern : public OpConversionPattern<SelectPPMeasurementOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(SelectPPMeasurementOp op, SelectPPMeasurementOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = getContext();
+        const TypeConverter *conv = getTypeConverter();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+
+        Value pauliWordPtr0 = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct_0());
+        Value pauliWordPtr1 = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct_1());
+
+        Value selectedPtr = LLVM::SelectOp::create(rewriter, loc, adaptor.getSelectSwitch(),
+                                                   pauliWordPtr0, pauliWordPtr1);
+
+        StringRef qirName = "__catalyst__qis__PauliMeasure";
+        Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+        Type qirSignature = LLVM::LLVMFunctionType::get(conv->convertType(ResultType::get(ctx)),
+                                                        {ptrType, IntegerType::get(ctx, 64)},
+                                                        /*isVarArg=*/true);
+
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
+
+        int64_t numQubits = adaptor.getInQubits().size();
+        SmallVector<Value> args;
+        args.push_back(selectedPtr);
+        args.push_back(
+            LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
+        args.append(adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+
+        Value resultPtr = LLVM::CallOp::create(rewriter, loc, fnDecl, args).getResult();
+        Value mres = LLVM::LoadOp::create(rewriter, loc, IntegerType::get(ctx, 1), resultPtr);
+
+        SmallVector<Value> values;
+        values.push_back(mres);
+        values.append(adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        rewriter.replaceOp(op, values);
+
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -200,6 +266,7 @@ void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePattern
     patterns.add<PPRotationBasedPattern<PPRotationArbitraryOp>>(typeConverter,
                                                                 patterns.getContext());
     patterns.add<PPMeasurementOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<SelectPPMeasurementOpPattern>(typeConverter, patterns.getContext());
 }
 
 } // namespace pbc

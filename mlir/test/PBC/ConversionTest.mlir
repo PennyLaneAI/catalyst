@@ -105,3 +105,61 @@ module @test_ppm_negative_basis {
 }
 
 // -----
+
+// CHECK-LABEL: @test_ppr_conditional
+module @test_ppr_conditional {
+    // CHECK: llvm.func @__catalyst__qis__PauliRot(!llvm.ptr, f64, !llvm.ptr, i64, ...)
+    // CHECK: llvm.mlir.global internal constant @pauli_word_XZ("XZ\00")
+    func.func @ppr_conditional(%q0 : !quantum.bit, %q1 : !quantum.bit, %cond : i1) -> (!quantum.bit, !quantum.bit) {
+        // CHECK: [[pauliPtr:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<3 x i8>
+        // CHECK: [[theta:%.+]] = llvm.mlir.constant
+        // CHECK: llvm.cond_br %arg2, ^[[THEN:.*]], ^[[MERGE:.*]]
+        // CHECK: ^[[THEN]]:
+        // CHECK: llvm.call @__catalyst__qis__PauliRot([[pauliPtr]], [[theta]], {{%.+}}, {{%.+}}, %arg0, %arg1)
+        // CHECK: llvm.br ^[[MERGE]]
+        // CHECK: ^[[MERGE]]:
+        %out:2 = pbc.ppr ["X", "Z"](4) %q0, %q1 cond(%cond) : !quantum.bit, !quantum.bit
+        return %out#0, %out#1 : !quantum.bit, !quantum.bit
+    }
+}
+
+// -----
+
+// CHECK-LABEL: @test_ppr_arbitrary_conditional
+module @test_ppr_arbitrary_conditional {
+    // CHECK: llvm.func @__catalyst__qis__PauliRot(!llvm.ptr, f64, !llvm.ptr, i64, ...)
+    // CHECK: llvm.mlir.global internal constant @pauli_word_XZ("XZ\00")
+    func.func @ppr_arbitrary_conditional(%q0 : !quantum.bit, %q1 : !quantum.bit, %theta : f64, %cond : i1) -> (!quantum.bit, !quantum.bit) {
+        // CHECK: [[pauliPtr:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<3 x i8>
+        // CHECK: llvm.cond_br %arg3, ^[[THEN:.*]], ^[[MERGE:.*]]
+        // CHECK: ^[[THEN]]:
+        // CHECK: llvm.call @__catalyst__qis__PauliRot([[pauliPtr]], {{%.+}}, {{%.+}}, {{%.+}}, %arg0, %arg1)
+        // CHECK: llvm.br ^[[MERGE]]
+        // CHECK: ^[[MERGE]]:
+        %out:2 = pbc.ppr.arbitrary ["X", "Z"](%theta) %q0, %q1 cond(%cond) : !quantum.bit, !quantum.bit
+        return %out#0, %out#1 : !quantum.bit, !quantum.bit
+    }
+}
+
+// -----
+
+// CHECK-LABEL: @test_select_ppm
+module @test_select_ppm {
+    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i64, ...) -> !llvm.ptr
+    // CHECK-DAG: llvm.mlir.global internal constant @pauli_word_X("X\00")
+    // CHECK-DAG: llvm.mlir.global internal constant @pauli_word_Z("Z\00")
+    func.func @select_ppm(%q0 : !quantum.bit, %cond : i1) -> (i1, !quantum.bit) {
+        // CHECK: llvm.mlir.addressof @pauli_word_X
+        // CHECK: [[pauliPtr0:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0]
+        // CHECK: llvm.mlir.addressof @pauli_word_Z
+        // CHECK: [[pauliPtr1:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0]
+        // CHECK: [[selectedPtr:%.+]] = llvm.select %arg1, [[pauliPtr0]], [[pauliPtr1]] : i1, !llvm.ptr
+        // CHECK: [[numQubits:%.+]] = llvm.mlir.constant(1 : i64) : i64
+        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[selectedPtr]], [[numQubits]], %arg0)
+        // CHECK: [[mres:%.+]] = llvm.load [[resultPtr]] : !llvm.ptr -> i1
+        %mres, %out = pbc.select.ppm (%cond, ["X"], ["Z"]) %q0 : i1, !quantum.bit
+        return %mres, %out : i1, !quantum.bit
+    }
+}
+
+// -----

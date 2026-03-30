@@ -319,10 +319,10 @@
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
   [(#2493)](https://github.com/PennyLaneAI/catalyst/pull/2493)
 
-* The PPR/PPM lowering passes (`lower-pbc-init-ops`, `unroll-conditional-ppr-ppm`) are now run
+* The PPR/PPM lowering pass `lower-pbc-init-ops` is now run
   as part of the main quantum compilation pipeline. When using `to-ppr` and `ppr-to-ppm` transforms,
-  these passes are applied automatically during compilation; we no longer need to stack them
-  explicitly.
+  this is applied automatically during compilation; we no longer need to stack them
+  explicitly. 
   [(#2460)](https://github.com/PennyLaneAI/catalyst/pull/2460)
 
 * `null.qubit` resource tracking is now able to track measurements and observables. This output
@@ -635,12 +635,13 @@
 * Added LLVM conversion patterns to lower PBC dialect operations to their corresponding runtime
   CAPI calls.
   This includes `pbc.ppr` and `pbc.ppr.arbitrary` (lowered to `__catalyst__qis__PauliRot`),
-  `pbc.ppm` (lowered to `__catalyst__qis__PauliMeasure`). This enables device execution of PBC
+  `pbc.ppm` and `pbc.select.ppm` (lowered to `__catalyst__qis__PauliMeasure`). This enables device execution of PBC
   operations through the Catalyst runtime.
   [(#2389)](https://github.com/PennyLaneAI/catalyst/pull/2389)
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/2390)
 
 * A new compiler pass `unroll-conditional-ppr-ppm` for lowering conditional PPR and PPMs
-  into normal PPR and PPMs with SCF dialect to support runtime execution.
+  into normal PPR and PPMs with SCF dialect.
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
 
 * Increased format size for the `--mlir-timing` flag, displaying more decimals for better timing precision.
