@@ -148,11 +148,11 @@ def diagonalize_measurements(
     for diagonalize_measurements (peephole) will be applied.
 
     Args:
-        qnode (QNode): the QNode to apply the diagonalize_final_measurement compiler pass to.
+        qnode (QNode): the QNode to apply the ``diagonalize_final_measurement`` compiler pass to.
         supported_base_obs (tuple[str]): A list of supported base observable names.
-        Allowed observables are ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard`` and ``Identity``.
-        ``PauliZ`` and ``Identity`` are always treated as supported, regardless of input. Defaults to
-        (``PauliZ``, ``Identity``).
+            Allowed observables are ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard`` and ``Identity``.
+            ``PauliZ`` and ``Identity`` are always treated as supported, regardless of input. Defaults to
+            (``PauliZ``, ``Identity``).
         to_eigvals (bool): Whether the diagonalization should create measurements using
             eigenvalues and wires rather than observables. Defaults to ``False``.
 
