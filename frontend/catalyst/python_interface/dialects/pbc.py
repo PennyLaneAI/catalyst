@@ -28,9 +28,9 @@ from xdsl.dialects.builtin import (
     Float64Type,
     IntegerAttr,
     IntegerType,
+    Signedness,
     StringAttr,
     UnitAttr,
-    Signedness,
 )
 from xdsl.dialects.utils import AbstractYieldOperation
 from xdsl.ir import Attribute, Dialect, EnumAttribute, SpacedOpaqueSyntaxAttribute
