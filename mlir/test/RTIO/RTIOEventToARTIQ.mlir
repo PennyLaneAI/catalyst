@@ -14,15 +14,15 @@
 
 // RUN: quantum-opt %s --convert-rtio-event-to-artiq --split-input-file | FileCheck %s
 
-// CHECK: llvm.func @now_mu() -> i64
-// CHECK: llvm.func @at_mu(i64)
-// CHECK: llvm.func @rtio_get_counter() -> i64
-// CHECK: llvm.func @rtio_init()
-// CHECK: llvm.func @delay_mu(i64)
-// CHECK: llvm.func internal @__rtio_set_frequency(%arg0: i32, %arg1: f64, %arg2: f64, %arg3: f64)
-// CHECK: llvm.func @rtio_output(i32, i32)
-// CHECK: llvm.func internal @__rtio_config_spi(%arg0: i32, %arg1: i32, %arg2: i32, %arg3: i32, %arg4: i32)
-// CHECK: llvm.func internal fastcc @__rtio_sec_to_mu(%arg0: f64) -> i64
+// CHECK-DAG: llvm.func @now_mu() -> i64
+// CHECK-DAG: llvm.func @rtio_init()
+// CHECK-DAG: llvm.func @at_mu(i64)
+// CHECK-DAG: llvm.func @rtio_get_counter() -> i64
+// CHECK-DAG: llvm.func @delay_mu(i64)
+// CHECK-DAG: llvm.func internal @__rtio_set_frequency(%arg0: i32, %arg1: f64, %arg2: f64, %arg3: f64)
+// CHECK-DAG: llvm.func @rtio_output(i32, i32)
+// CHECK-DAG: llvm.func internal @__rtio_config_spi(%arg0: i32, %arg1: i32, %arg2: i32, %arg3: i32, %arg4: i32)
+// CHECK-DAG: llvm.func internal fastcc @__rtio_sec_to_mu(%arg0: f64) -> i64
 
 // CHECK-LABEL: func.func @__kernel__()
 // CHECK-SAME: attributes {diff_method = "parameter-shift", qnode}
@@ -64,9 +64,9 @@ module @circuit attributes {rtio.config = #rtio.config<{core_addr = "172.31.9.64
     // CHECK: llvm.call @__rtio_set_frequency
     %4 = rtio.pulse %3 duration(%cst_1) frequency(%cst_6) phase(%cst_7) wait(%0) {offset = 0 : i64} : <"dds", [2 : i64], 0> -> !rtio.event
 
-    // Test sequential pulse on same channel
+    // Test sequential pulse on same channel (duration via max(duration_mu, minTTL), not __rtio_sec_to_mu)
     // CHECK: llvm.call tail @at_mu
-    // CHECK: llvm.call fastcc tail @__rtio_sec_to_mu
+    // CHECK: arith.maxsi
     // CHECK: llvm.call tail @rtio_output
     // CHECK: llvm.call fastcc tail @delay_mu
     // CHECK: llvm.call tail @rtio_output
@@ -119,7 +119,8 @@ module @simple_sequential attributes {rtio.config = #rtio.config<{core_addr = "1
 
     // First pulse, sets frequency and generates TTL
     // CHECK: llvm.call @__rtio_set_frequency
-    // CHECK: llvm.call fastcc tail @__rtio_sec_to_mu
+    // CHECK: llvm.call fastcc tail @delay_mu
+    // CHECK: arith.maxsi
     // CHECK: llvm.call tail @rtio_output
     // CHECK: llvm.call fastcc tail @delay_mu
     // CHECK: llvm.call tail @rtio_output
@@ -127,7 +128,7 @@ module @simple_sequential attributes {rtio.config = #rtio.config<{core_addr = "1
 
     // Second pulse, sequential, waits for first
     // CHECK: llvm.call tail @at_mu
-    // CHECK: llvm.call fastcc tail @__rtio_sec_to_mu
+    // CHECK: arith.maxsi
     // CHECK: llvm.call tail @rtio_output
     // CHECK: llvm.call fastcc tail @delay_mu
     // CHECK: llvm.call tail @rtio_output
@@ -218,3 +219,43 @@ module @rpc_with_return attributes {rtio.config = #rtio.config<{core_addr = "172
     return %x : i64
   }
 }
+
+// -----
+
+// RTIO measurement
+// CHECK-LABEL: func.func @__kernel__()
+// CHECK-SAME: attributes {qnode}
+module @measure_rtio_to_artiq attributes {rtio.config = #rtio.config<{device_db = {core = {arguments = {host = "172.31.9.64", ref_period = 1.000000e-09 : f64, target = "cortexa9"}, class = "Core", module = "artiq.coredevice.core", type = "local"}, ttl0 = {arguments = {channel = 5 : i64, gate_latency_mu = 104 : i64}, class = "TTLInOut", module = "artiq.coredevice.ttl", type = "local"}, ttl6 = {arguments = {channel = 11 : i64}, class = "TTLOut", module = "artiq.coredevice.ttl", type = "local"}, ttl7 = {arguments = {channel = 12 : i64}, class = "TTLOut", module = "artiq.coredevice.ttl", type = "local"}}}>} {
+  memref.global "private" constant @__qubit_map_0 : memref<1xindex> = dense<0>
+  func.func @__kernel__() attributes {qnode} {
+    %cst = arith.constant 0.000000e+00 : f64
+    %cst_0 = arith.constant 1.000000e-04 : f64
+    %0 = rtio.empty : !rtio.event
+    %1 = rtio.channel : !rtio.channel<"ttl", [1 : i64], 0>
+    %2 = rtio.pulse %1 duration(%cst_0) frequency(%cst) phase(%cst) wait(%0) {_measurement, offset = 0 : i64} : <"ttl", [1 : i64], 0> -> !rtio.event
+    %3 = rtio.readout %2 : !rtio.event -> i32
+    return
+  }
+  func.func private @__rtio_init_dataset() {
+    rtio.rpc @init_dataset rpc_id(1) async
+    return
+  }
+  func.func private @__rtio_transfer_measurement_results(%arg0: memref<1xi32>) {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c1_0 = arith.constant 1 : index
+    scf.for %arg1 = %c0 to %c1 step %c1_0 {
+      %0 = arith.index_cast %arg1 : index to i32
+      %1 = memref.load %arg0[%arg1] : memref<1xi32>
+      rtio.rpc @transfer_measurement_result rpc_id(2) async(%0, %1 : i32, i32)
+    }
+    return
+  }
+}
+
+// CHECK: memref.alloca{{.*}} : memref<1xi32>
+// CHECK: call @__rtio_init_dataset
+// CHECK: llvm.call @__rtio_count
+// CHECK: memref.store
+// CHECK: call @__rtio_transfer_measurement_results
+// CHECK: llvm.call{{.*}} @__rtio_wait_until_mu

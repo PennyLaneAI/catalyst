@@ -44,6 +44,9 @@ namespace ion {
 
 namespace {
 
+constexpr StringLiteral rtioTransferMeasurementResults = "__rtio_transfer_measurement_results";
+constexpr StringLiteral rtioInitDataset = "__rtio_init_dataset";
+
 /// Load a JSON file and convert it to an rtio.config attribute
 FailureOr<rtio::ConfigAttr> loadDeviceDbAsConfig(MLIRContext *ctx, StringRef filePath)
 {
@@ -105,13 +108,24 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
     {
         ConversionTarget target(baseTarget);
         target.addIllegalOp<ion::PulseOp>();
-
+        target.addIllegalOp<ion::MeasurePulseOp>();
         RewritePatternSet patterns(ctx);
         populateIonPulseToRTIOPatterns(typeConverter, patterns, ionInfo, qextractToMemrefMap);
+        populateIonMeasurePulseToRTIOPatterns(typeConverter, patterns, qextractToMemrefMap);
         if (failed(applyPartialConversion(funcOp, target, std::move(patterns)))) {
             return failure();
         }
         return success();
+    }
+
+    LogicalResult IonReadoutBitConversion(func::FuncOp funcOp, ConversionTarget &baseTarget,
+                                          TypeConverter &typeConverter, MLIRContext *ctx)
+    {
+        ConversionTarget target(baseTarget);
+        target.addIllegalOp<ion::ReadoutBitOp>();
+        RewritePatternSet patterns(ctx);
+        populateIonReadoutBitToRTIOPatterns(typeConverter, patterns);
+        return applyPartialConversion(funcOp, target, std::move(patterns));
     }
 
     LogicalResult ParallelProtocolConversion(func::FuncOp funcOp, ConversionTarget &baseTarget,
@@ -209,6 +223,75 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         return success();
     }
 
+    void createMeasurementHelperFunctions(func::FuncOp funcOp)
+    {
+        MLIRContext *ctx = funcOp.getContext();
+        SmallVector<rtio::RTIOReadoutOp> readouts;
+        funcOp.walk([&](rtio::RTIOReadoutOp readout) { readouts.push_back(readout); });
+
+        if (readouts.empty()) {
+            return;
+        }
+
+        auto module = funcOp->getParentOfType<ModuleOp>();
+        OpBuilder builder(ctx);
+        Location loc = funcOp.getLoc();
+
+        // Create __rtio_init_dataset: wraps the init_dataset RPC
+        {
+            auto funcType = FunctionType::get(ctx, {}, {});
+            builder.setInsertionPointToEnd(module.getBody());
+            auto initFunc = func::FuncOp::create(builder, loc, rtioInitDataset, funcType);
+            initFunc.setPrivate();
+
+            Block *entryBlock = initFunc.addEntryBlock();
+            builder.setInsertionPointToStart(entryBlock);
+            rtio::RTIORPCOp::create(builder, loc, TypeRange{},
+                                    SymbolRefAttr::get(ctx, "init_dataset"), UnitAttr::get(ctx),
+                                    builder.getI32IntegerAttr(static_cast<int32_t>(1)),
+                                    ValueRange{});
+            func::ReturnOp::create(builder, loc);
+        }
+
+        // Create __rtio_transfer_measurement_results:
+        // loops over a memref of readout counts and sends each via RPC
+        {
+            auto numReadouts = static_cast<int64_t>(readouts.size());
+            auto memrefType = MemRefType::get({numReadouts}, builder.getI32Type());
+            auto funcType = FunctionType::get(ctx, {memrefType}, {});
+
+            builder.setInsertionPointToEnd(module.getBody());
+            auto transferFunc =
+                func::FuncOp::create(builder, loc, rtioTransferMeasurementResults, funcType);
+            transferFunc.setPrivate();
+
+            Block *entryBlock = transferFunc.addEntryBlock();
+            builder.setInsertionPointToStart(entryBlock);
+
+            Value memrefArg = entryBlock->getArgument(0);
+            Value lb = arith::ConstantIndexOp::create(builder, loc, 0);
+            Value ub = arith::ConstantIndexOp::create(builder, loc, numReadouts);
+            Value step = arith::ConstantIndexOp::create(builder, loc, 1);
+
+            scf::ForOp forOp = scf::ForOp::create(builder, loc, lb, ub, step);
+            {
+                OpBuilder::InsertionGuard forGuard(builder);
+                builder.setInsertionPointToStart(forOp.getBody());
+                Value iv = forOp.getInductionVar();
+                Value indexI32 = arith::IndexCastOp::create(builder, loc, builder.getI32Type(), iv);
+                Value count = memref::LoadOp::create(builder, loc, memrefArg, ValueRange{iv});
+                // Host RPC: transfer_measurement_result(self, index, value)
+                rtio::RTIORPCOp::create(builder, loc, TypeRange{},
+                                        SymbolRefAttr::get(ctx, "transfer_measurement_result"),
+                                        UnitAttr::get(ctx),
+                                        builder.getI32IntegerAttr(static_cast<int32_t>(2)),
+                                        ValueRange{indexI32, count});
+            }
+
+            func::ReturnOp::create(builder, loc);
+        }
+    }
+
     LogicalResult FinalizeKernelFunction(func::FuncOp funcOp, MLIRContext *ctx)
     {
         RewritePatternSet patterns(ctx);
@@ -222,6 +305,9 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
             return failure();
         }
+
+        // Create helper function definitions (no kernel modifications)
+        createMeasurementHelperFunctions(funcOp);
 
         // Clean up unused quantum/ion/memref/linalg/builtin ops after patterns
         cleanupUnusedOps(funcOp);
@@ -426,15 +512,18 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         if (failed(IonPulseConversion(newQnodeFunc, target, typeConverter, ionInfo,
                                       qextractToMemrefMap, ctx)) ||
             failed(ParallelProtocolConversion(newQnodeFunc, target, typeConverter, ctx)) ||
+            failed(IonReadoutBitConversion(newQnodeFunc, target, typeConverter, ctx)) ||
             failed(SCFStructuralConversion(newQnodeFunc, target, typeConverter, ctx)) ||
             failed(FinalizeKernelFunction(newQnodeFunc, ctx))) {
             newQnodeFunc->emitError("Failed to convert to rtio dialect");
             return signalPassFailure();
         }
 
-        // remove other unused functions, only keep the kernel function
+        // remove other unused functions, only keep the kernel function and helpers
         for (auto funcOp : llvm::make_early_inc_range(module.getOps<func::FuncOp>())) {
-            if (funcOp.getName().str() != newQnodeFunc.getName().str()) {
+            StringRef name = funcOp.getName();
+            if (name != newQnodeFunc.getName() && name != "__rtio_init_dataset" &&
+                name != "__rtio_transfer_measurement_results") {
                 funcOp.erase();
             }
         }
