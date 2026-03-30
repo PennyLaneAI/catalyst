@@ -881,18 +881,6 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
         with pytest.raises(CompileError, match=_non_commuting_err_msg):
             circuit(0.7)
 
-    def test_non_commuting_multiple_measurements_only(self, device):
-        """A CompileError is raised for non-commuting measurements without gates applied."""
-
-        @diagonalize_final_measurements_pass
-        @qml.set_shots(10)
-        @qml.qnode(device)
-        def circuit():
-            return qml.expval(qml.X(0)), qml.expval(qml.Z(0))
-
-        with pytest.raises(CompileError, match=_non_commuting_err_msg):
-            qml.qjit(circuit)
-
     @pytest.mark.parametrize("obs", COMMUTE_SINGLE_OBS_LIST)
     @pytest.mark.parametrize("measurements", [qml.expval, qml.var])
     def test_commuting_single_measurement(self, device, obs, measurements):
@@ -922,3 +910,17 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
             return m[0](obs[0]), m[1](obs[1])
 
         circuit(0.7)
+
+class TestNonCommuteValidateNoCapture:
+    def test_non_commuting_multiple_measurements_only(self, device):
+        """A CompileError is raised for non-commuting measurements without gates 
+        applied and program capture is not enabled."""
+
+        @diagonalize_final_measurements_pass
+        @qml.set_shots(10)
+        @qml.qnode(device)
+        def circuit():
+            return qml.expval(qml.X(0)), qml.expval(qml.Z(0))
+
+        with pytest.raises(CompileError, match=_non_commuting_err_msg):
+            qml.qjit(circuit)
