@@ -172,7 +172,6 @@ TEST_CASE("Test BraketRunner Expval and Var", "[openqasm]")
 
 TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
 {
-
     SECTION("Common")
     {
         auto device = OpenQasmDevice("{}");
