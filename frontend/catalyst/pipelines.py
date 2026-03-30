@@ -244,9 +244,8 @@ def get_quantum_compilation_stage(_options: CompileOptions) -> List[str]:
         "inline-nested-module",
         "lower-mitigation",
         "adjoint-lowering",
-        # TODO: We can remove 2 passes below once PBC has its own pipeline.
+        # TODO: We can remove this pass below once PBC has its own pipeline.
         "lower-pbc-init-ops",
-        "unroll-conditional-ppr-ppm",
         "disable-assertion" if _options.disable_assertions else None,
     ]
     return list(filter(partial(is_not, None), user_transform_passes))
