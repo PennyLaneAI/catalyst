@@ -891,7 +891,7 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
             return qml.expval(qml.X(0)), qml.expval(qml.Z(0))
 
         with pytest.raises(CompileError, match=_non_commuting_err_msg):
-            qml.qjit(circuit)()
+            qml.qjit(circuit)
 
     @pytest.mark.parametrize("obs", COMMUTE_SINGLE_OBS_LIST)
     @pytest.mark.parametrize("measurements", [qml.expval, qml.var])
