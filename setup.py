@@ -129,9 +129,9 @@ requirements = [
     f"jaxlib=={jax_version}",
     "numpy>2.0.0",
     "scipy-openblas32>=0.3.26",  # symbol and library name
-    "diastatic-malt>=2.15.2",
-    "xdsl==0.56.1",
-    "xdsl-jax==0.2.0",
+    "diastatic-malt==2.15.3",
+    "xdsl==0.59.0",
+    "xdsl-jax==0.5.0",
 ]
 
 entry_points = {
@@ -151,6 +151,20 @@ entry_points = {
     ],
     "xdsl.universe": [
         "catalyst-xdsl-universe = catalyst.python_interface.xdsl_universe:CATALYST_XDSL_UNIVERSE"
+    ],
+    "pennylane.transforms": [
+        "to_ppr = catalyst.passes:to_ppr",
+        "merge_ppr_ppm = catalyst.passes:merge_ppr_ppm",
+        "commute_ppr = catalyst.passes:commute_ppr",
+        "ppm_compilation = catalyst.passes:ppm_compilation",
+        "ppr_to_ppm = catalyst.passes:ppr_to_ppm",
+        "reduce_t_depth = catalyst.passes:reduce_t_depth",
+        "decompose_arbitrary_ppr = catalyst.passes:decompose_arbitrary_ppr",
+        "disentangle_swap = catalyst.passes:disentangle_swap",
+        "disentangle_cnot = catalyst.passes:disentangle_cnot",
+    ],
+    "pennylane.drawer": [
+        "draw_graph = catalyst:draw_graph",
     ],
 }
 

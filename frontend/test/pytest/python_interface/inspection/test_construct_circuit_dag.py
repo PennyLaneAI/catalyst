@@ -15,19 +15,21 @@
 # pylint: disable=unused-argument, unused-variable, too-many-public-methods, too-many-lines
 
 import re
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import jax
 import pennylane as qml
 import pytest
-from xdsl.dialects import test
+from xdsl.dialects import builtin, func, test
 from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir import Operation
 from xdsl.ir.core import Block, Region
 
 from catalyst import measure
 from catalyst.python_interface.conversion import parse_generic_to_xdsl_module, xdsl_from_qjit
 from catalyst.python_interface.inspection.construct_circuit_dag import (
     ConstructCircuitDAG,
+    VisualizationError,
     get_label,
 )
 from catalyst.python_interface.inspection.dag_builder import DAGBuilder
@@ -184,6 +186,19 @@ def assert_dag_structure(nodes, edges, expected_edges):
 @pytest.mark.usefixtures("use_both_frontend")
 class TestFuncOpVisualization:
     """Tests the visualization of FuncOps with bounding boxes"""
+
+    def test_external_empty_function_visualization_error(self):
+        """Regression test for #2541 issue."""
+
+        external_func = func.FuncOp.external("test_func", [], [])
+        module = builtin.ModuleOp(ops=[external_func])
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        expected_error = (
+            r"Calls to functions without a definition are not yet compatible.*test_func"
+        )
+        with pytest.raises(VisualizationError, match=expected_error):
+            utility.construct(module)
 
     def test_standard_qnode(self):
         """Tests that a standard QJIT'd QNode is visualized correctly"""
@@ -785,6 +800,22 @@ class TestGetLabel:
 class TestCreateStaticOperatorNodes:
     """Tests that operators with static parameters can be created and visualized as nodes."""
 
+    @pytest.mark.parametrize("dialect", ["quantum", "pbc", "mbqc"])
+    def test_unsupported_non_skipped_op_raises_visualization_error(self, dialect):
+        """Tests that an unknown non-skipped operator raises an error."""
+
+        unknown_op = MagicMock(spec=Operation)
+        unknown_op.dialect_name.return_value = dialect
+        unknown_op.name = f"{dialect}.fake_unsupported_nonskipped_op"
+        unknown_op.__class__ = type("FakeQuantumOp", (Operation,), {})
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        with pytest.raises(
+            VisualizationError, match=rf"{dialect}.fake_unsupported_nonskipped_op.*not supported"
+        ):
+            # pylint: disable=protected-access
+            utility._visit_operation(unknown_op)
+
     def test_custom_op(self):
         """Tests that the CustomOp operation node can be created and visualized."""
 
@@ -1029,14 +1060,13 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node1"]["label"] == "<name> PauliRot|<wire> [0]"
         assert nodes["node2"]["label"] == "<name> PauliRot|<wire> [0, 1, 2]"
 
-    @pytest.mark.skipif(not qml.capture.enabled(), reason="Only works with capture enabled.")
     def test_complex_measurements(self):
         """Tests that complex measurements can be created."""
 
         dev = qml.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True)
+        @qml.qjit(autograph=True, capture=True)
         @qml.qnode(dev)
         def my_workflow():
             coeffs = [0.2, -0.543]
@@ -1046,6 +1076,7 @@ class TestCreateStaticOperatorNodes:
             return (
                 qml.expval(ham),
                 qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)),
+                qml.expval(2 * qml.X(0)),
             )
 
         module = my_workflow()
@@ -1055,10 +1086,11 @@ class TestCreateStaticOperatorNodes:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
-        assert len(nodes) == 3  # Device node + measurements
+        assert len(nodes) == 4  # Device node + measurements
 
-        assert nodes["node1"]["label"] == "<name> LinearCombination|<wire> [0, 1, 2]"
-        assert nodes["node2"]["label"] == "<name> Prod|<wire> [0, 1]"
+        assert nodes["node1"]["label"] == "<name> expval(LinearCombination)|<wire> [0, 1, 2]"
+        assert nodes["node2"]["label"] == "<name> expval(Prod)|<wire> [0, 1]"
+        assert nodes["node3"]["label"] == "<name> expval(SProd)|<wire> [0]"
 
     @pytest.mark.parametrize(
         "param, wires",

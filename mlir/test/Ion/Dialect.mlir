@@ -159,6 +159,47 @@ func.func @example_parallel_protocol_two_qubits(%arg0: f64) -> (!ion.qubit, !ion
     return %3#0, %3#1: !ion.qubit, !ion.qubit
 }
 
+func.func @example_measure_pulse(%arg0: f64) -> i1 {
+    %0 = quantum.alloc( 1) : !quantum.reg
+
+    // CHECK: [[q0:%.+]] = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[ion_qubit:%.+]] = builtin.unrealized_conversion_cast [[q0]] : !quantum.bit to !ion.qubit
+    %ion_qubit = builtin.unrealized_conversion_cast %1 : !quantum.bit to !ion.qubit
+
+    // CHECK: [[pp:%.+]] = ion.parallelprotocol([[ion_qubit]]) : !ion.qubit {
+    %pp = ion.parallelprotocol(%ion_qubit): !ion.qubit {
+        ^bb0(%arg1: !ion.qubit):
+        // CHECK: ion.measure_pulse(%arg0 : f64) %arg1 {beam = #ion.beam<
+        // CHECK-SAME: transition_index = 0 : i64,
+        // CHECK-SAME: rabi = 1.000000e+00 : f64,
+        // CHECK-SAME: detuning = 0.000000e+00 : f64,
+        // CHECK-SAME: polarization = [1, 0],
+        // CHECK-SAME: wavevector = [0, 1]>,
+        // CHECK-SAME: phase = 0.000000e+00 : f64}
+        %mp = ion.measure_pulse(%arg0: f64) %arg1 {
+            beam=#ion.beam<
+                transition_index=0,
+                rabi=1.0,
+                detuning=0.0,
+                polarization=[1, 0],
+                wavevector=[0, 1]
+            >,
+            phase=0.0
+        } : !ion.pulse
+        // CHECK: ion.yield %arg1 : !ion.qubit
+        ion.yield %arg1: !ion.qubit
+    }
+
+    // CHECK: [[mres:%.+]], [[out_qubit:%.+]] = ion.readout_bit [[pp]] : i1, !ion.qubit
+    %mres, %out_qubit = ion.readout_bit %pp : i1, !ion.qubit
+
+    // CHECK: return [[mres]] : i1
+    return %mres: i1
+}
+
+
 // No FileCheck here, return success if the MLIR can be parsed
 func.func @example_ion() -> !ion.ion {
     %0 = ion.ion {

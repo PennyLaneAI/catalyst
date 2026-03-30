@@ -306,8 +306,8 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
                 // so that we can safely delete it (all quantum ops must be eliminated).
                 rewriter.replaceOp(gate, gate.getQubitOperands());
             }
-            else if (auto region = dyn_cast<quantum::QuantumRegion>(op)) {
-                rewriter.replaceOp(op, region.getRegisterOperand());
+            else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(op)) {
+                rewriter.replaceOp(op, adjointOp.getArgs());
             }
             else if (isa<quantum::DeallocOp>(op)) {
                 rewriter.eraseOp(op);
