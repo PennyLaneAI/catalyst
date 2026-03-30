@@ -586,9 +586,9 @@ def to_ppr(qnode):
         :class:`QNode <pennylane.QNode>`
 
     .. seealso::
-        :func:`~.transforms.commute_ppr`, :func:`~.transforms.merge_ppr_ppm`,
-        :func:`~.transforms.ppr_to_ppm`, :func:`~.transforms.ppm_compilation`,
-        :func:`~.transforms.reduce_t_depth`, :func:`~.transforms.decompose_arbitrary_ppr`
+        :func:`pennylane.transforms.commute_ppr`, :func:`pennylane.transforms.merge_ppr_ppm`,
+        :func:`pennylane.transforms.ppr_to_ppm`, :func:`pennylane.transforms.ppm_compilation`,
+        :func:`pennylane.transforms.reduce_t_depth`, :func:`pennylane.transforms.decompose_arbitrary_ppr`
 
     .. note::
 
@@ -671,9 +671,9 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
         :class:`QNode <pennylane.QNode>`
 
     .. seealso::
-        :func:`~.transforms.to_ppr`, :func:`~.transforms.merge_ppr_ppm`,
-        :func:`~.transforms.ppr_to_ppm`, :func:`~.transforms.ppm_compilation`,
-        :func:`~.transforms.reduce_t_depth`, :func:`~.transforms.decompose_arbitrary_ppr`
+        :func:`pennylane.transforms.to_ppr`, :func:`pennylane.transforms.merge_ppr_ppm`,
+        :func:`pennylane.transforms.ppr_to_ppm`, :func:`pennylane.transforms.ppm_compilation`,
+        :func:`pennylane.transforms.reduce_t_depth`, :func:`pennylane.transforms.decompose_arbitrary_ppr`
 
     .. note::
 
@@ -776,9 +776,9 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
         :class:`QNode <pennylane.QNode>`
 
     .. seealso::
-        :func:`~.transforms.to_ppr`, :func:`~.transforms.commute_ppr`,
-        :func:`~.transforms.ppr_to_ppm`, :func:`~.transforms.ppm_compilation`,
-        :func:`~.transforms.reduce_t_depth`, :func:`~.transforms.decompose_arbitrary_ppr`
+        :func:`pennylane.transforms.to_ppr`, :func:`pennylane.transforms.commute_ppr`,
+        :func:`pennylane.transforms.ppr_to_ppm`, :func:`pennylane.transforms.ppm_compilation`,
+        :func:`pennylane.transforms.reduce_t_depth`, :func:`pennylane.transforms.decompose_arbitrary_ppr`
 
     .. note::
 
@@ -875,9 +875,9 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
         :class:`QNode <pennylane.QNode>`
 
     .. seealso::
-        :func:`~.transforms.to_ppr`, :func:`~.transforms.commute_ppr`,
-        :func:`~.transforms.merge_ppr_ppm`, :func:`~.transforms.ppm_compilation`,
-        :func:`~.transforms.reduce_t_depth`, :func:`~.transforms.decompose_arbitrary_ppr`
+        :func:`pennylane.transforms.to_ppr`, :func:`pennylane.transforms.commute_ppr`,
+        :func:`pennylane.transforms.merge_ppr_ppm`, :func:`pennylane.transforms.ppm_compilation`,
+        :func:`pennylane.transforms.reduce_t_depth`, :func:`pennylane.transforms.decompose_arbitrary_ppr`
 
     .. note::
 
@@ -965,14 +965,14 @@ def ppm_compilation(
 
     This pass combines multiple sub-passes:
 
-    - :func:`~.transforms.to_ppr` : Converts gates into Pauli Product Rotations (PPRs)
-    - :func:`~.transforms.commute_ppr` : Commutes PPRs past non-Clifford PPRs
-    - :func:`~.transforms.merge_ppr_ppm` : Merges PPRs into Pauli Product Measurements (PPMs)
-    - :func:`~.transforms.ppr_to_ppm` : Decomposes PPRs into PPMs
+    - :func:`pennylane.transforms.to_ppr` : Converts gates into Pauli Product Rotations (PPRs)
+    - :func:`pennylane.transforms.commute_ppr` : Commutes PPRs past non-Clifford PPRs
+    - :func:`pennylane.transforms.merge_ppr_ppm` : Merges PPRs into Pauli Product Measurements (PPMs)
+    - :func:`pennylane.transforms.ppr_to_ppm` : Decomposes PPRs into PPMs
 
     The ``avoid_y_measure`` and ``decompose_method`` arguments are passed to the
-    :func:`~.transforms.ppr_to_ppm` pass. The ``max_pauli_size`` argument is passed to the
-    :func:`~.transforms.commute_ppr` and :func:`~.transforms.merge_ppr_ppm` passes.
+    :func:`pennylane.transforms.ppr_to_ppm` pass. The ``max_pauli_size`` argument is passed to the
+    :func:`pennylane.transforms.commute_ppr` and :func:`pennylane.transforms.merge_ppr_ppm` passes.
 
     For more information on PPRs and PPMs, check out
     the `Compilation Hub <https://pennylane.ai/compilation/pauli-based-computation>`_.
@@ -1197,9 +1197,9 @@ def reduce_t_depth(qnode):
         :class:`QNode <pennylane.QNode>`
 
     .. seealso::
-        :func:`~.transforms.to_ppr`, :func:`~.transforms.commute_ppr`,
-        :func:`~.transforms.merge_ppr_ppm`, :func:`~.transforms.ppr_to_ppm`,
-        :func:`~.transforms.ppm_compilation`, :func:`~.transforms.decompose_arbitrary_ppr`
+        :func:`pennylane.transforms.to_ppr`, :func:`pennylane.transforms.commute_ppr`,
+        :func:`pennylane.transforms.merge_ppr_ppm`, :func:`pennylane.transforms.ppr_to_ppm`,
+        :func:`pennylane.transforms.ppm_compilation`, :func:`pennylane.transforms.decompose_arbitrary_ppr`
 
     .. note::
 
@@ -1208,8 +1208,8 @@ def reduce_t_depth(qnode):
 
     **Example**
 
-    In the example below, after performing the :func:`~.transforms.to_ppr` and
-    :func:`~.transforms.merge_ppr_ppm` passes, the circuit contains a depth of four of
+    In the example below, after performing the :func:`pennylane.transforms.to_ppr` and
+    :func:`pennylane.transforms.merge_ppr_ppm` passes, the circuit contains a depth of four of
     non-Clifford PPRs. Subsequently applying the ``reduce_t_depth`` pass will move PPRs around via
     commutation, resulting in a circuit with a smaller PPR depth.
 
@@ -1377,9 +1377,9 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
         :class:`QNode <pennylane.QNode>`
 
     .. seealso::
-        :func:`~.transforms.to_ppr`, :func:`~.transforms.commute_ppr`,
-        :func:`~.transforms.merge_ppr_ppm`, :func:`~.transforms.ppr_to_ppm`,
-        :func:`~.transforms.ppm_compilation`, :func:`~.transforms.reduce_t_depth`
+        :func:`pennylane.transforms.to_ppr`, :func:`pennylane.transforms.commute_ppr`,
+        :func:`pennylane.transforms.merge_ppr_ppm`, :func:`pennylane.transforms.ppr_to_ppm`,
+        :func:`pennylane.transforms.ppm_compilation`, :func:`pennylane.transforms.reduce_t_depth`
 
     .. note::
 
