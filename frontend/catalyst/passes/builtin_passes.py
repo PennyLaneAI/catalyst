@@ -160,22 +160,24 @@ def diagonalize_measurements(
         :class:`QNode <pennylane.QNode>`
 
     .. note::
-        - Unlike the PennyLane tape transform, :func:`pennylane.transforms.diagonalize_measurements`,
+        Unlike the PennyLane tape transform, :func:`pennylane.transforms.diagonalize_measurements`,
         the QNode itself will not be changed or transformed by applying this decorator.
 
-        - Unlike the PennyLane tape transform, ``supported_base_obs`` here only accepts a tuple of supported
+        Unlike the PennyLane tape transform, ``supported_base_obs`` here only accepts a tuple of supported
         base observable names, instead of the corresponding classes. The reason is that xDSL does not accept
-        class types are values of option-elements. For more details, please refer the [xDSL repo](https://github.com/xdslproject/xdsl/blob/ba190d9ba1612807e7604374afa7eb2c1c3d2047/xdsl/utils/arg_spec.py#L315-L327)_.
+        class types are values of option-elements. For more details, please refer the `xDSL repo <https://github.com/xdslproject/xdsl/blob/ba190d9ba1612807e7604374afa7eb2c1c3d2047/xdsl/utils/arg_spec.py#L315-L327>`__.
 
-        - Unlike the PennyLane tape transform, only ``to_eigvals = False`` is supported. An error would be raised,
+        Unlike the PennyLane tape transform, only ``to_eigvals = False`` is supported. An error would be raised,
         if ``to_eigvals`` is set as ``False``.
 
-        - An error will be raised if non-commuting terms are encountered.
+        An error will be raised if non-commuting terms are encountered.
 
     **Example**
 
     The `diagonalize-final-measurements` compilation pass can be applied as a decorator on a QNode:
+
     .. code-block:: python
+
         import pennylane as qml
         from catalyst import qjit
         from catalyst.passes import diagonalize_measurements
@@ -197,7 +199,9 @@ def diagonalize_measurements(
     0.9687151001182651
 
     An error would be raised, if ``to_eigvals=True`` is passed as an option:
+
     .. code-block:: python
+
         import pennylane as qml
         from catalyst import qjit
         from catalyst.passes import diagonalize_measurements
@@ -220,7 +224,9 @@ def diagonalize_measurements(
     Only to_eigvals = False is supported.
 
     An compile error would be raised, if non-commuting terms are encountered:
+
     .. code-block:: python
+
         import pennylane as qml
         from pennylane.exceptions import CompileError
         from catalyst import qjit
