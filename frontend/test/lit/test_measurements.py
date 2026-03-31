@@ -556,6 +556,7 @@ def expval13():
         # CHECK: [[extract:%.+]] = quantum.extract {{%.+}}[ 0] : !quantum.reg -> !quantum.bit
         # CHECK: {{%.+}} = quantum.namedobs [[extract]][ PauliX] : !quantum.obs
         # CHECK: {{%.+}} = quantum.namedobs [[extract]][ PauliZ] : !quantum.obs
+        # CHECK: {{%.+}} = quantum.insert {{%.+}}[ 0], [[extract]] : !quantum.reg, !quantum.bit
         return qml.expval(qml.X(0)), qml.expval(qml.Z(0))
 
     return circ()
