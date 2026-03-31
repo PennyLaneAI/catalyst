@@ -259,8 +259,11 @@ class LinkerDriver:
             fallback_compilers = LinkerDriver._default_fallback_compilers
         for compiler in LinkerDriver._available_compilers(fallback_compilers):
             success = LinkerDriver._attempt_link(compiler, flags, infile, outfile, options)
+            if options.verbose:
+                print("Shared object linking successful", file=options.logfile)
             if success:
                 return outfile
+
         msg = f"Unable to link {infile}. Please check the output for any error messages. If no "
         msg += "compiler was found by Catalyst, please specify a compatible one via $CATALYST_CC."
         raise CompileError(msg)
@@ -450,9 +453,6 @@ class Compiler:
             workspace, Directory
         ), f"Compiler expects a Directory type, got {type(workspace)}."
         assert workspace.is_dir(), f"Compiler expects an existing directory, got {workspace}."
-        assert (
-            self.options.lower_to_llvm
-        ), "lower_to_llvm must be set to True in order to compile to a shared object"
 
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
