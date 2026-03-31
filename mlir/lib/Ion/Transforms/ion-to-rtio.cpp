@@ -441,6 +441,50 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         }
     }
 
+    // Remove other unused functions, keep the kernel and RTIO helpers only.
+    void eraseNonKernelFunctions(ModuleOp module, func::FuncOp kernelFunc)
+    {
+        for (auto funcOp : llvm::make_early_inc_range(module.getOps<func::FuncOp>())) {
+            StringRef name = funcOp.getName();
+            if (name != kernelFunc.getName() && name != rtioInitDataset &&
+                name != rtioTransferMeasurementResults) {
+                funcOp.erase();
+            }
+        }
+    }
+
+    LogicalResult lowerKernelToRtio(ModuleOp module, func::FuncOp kernelFunc, IonInfo ionInfo,
+                                    MLIRContext *ctx)
+    {
+        // Drop one pulse from the protocol
+        dropOnePulseFromProtocol(kernelFunc);
+
+        // Map qreg alloc / extract to memref for rtio.pulse channel construction
+        DenseMap<Value, Value> qregToMemrefMap;
+        DenseMap<Value, Value> qextractToMemrefMap;
+        initializeMemrefMap(kernelFunc, module, qregToMemrefMap, qextractToMemrefMap, ctx);
+
+        TypeConverter typeConverter;
+        typeConverter.addConversion([](Type type) { return type; });
+        typeConverter.addConversion(
+            [&](ion::PulseType type) -> Type { return rtio::EventType::get(ctx); });
+
+        ConversionTarget target(*ctx);
+        target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
+
+        if (failed(IonPulseConversion(kernelFunc, target, typeConverter, ionInfo,
+                                      qextractToMemrefMap, ctx)) ||
+            failed(ParallelProtocolConversion(kernelFunc, target, typeConverter, ctx)) ||
+            failed(IonReadoutBitConversion(kernelFunc, target, typeConverter, ctx)) ||
+            failed(SCFStructuralConversion(kernelFunc, target, typeConverter, ctx)) ||
+            failed(FinalizeKernelFunction(kernelFunc, ctx))) {
+            return failure();
+        }
+
+        eraseNonKernelFunctions(module, kernelFunc);
+        return success();
+    }
+
     void runOnOperation() override
     {
         MLIRContext *ctx = &getContext();
@@ -490,42 +534,9 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         func::FuncOp newQnodeFunc = createKernelFunction(qnodeFunc, kernelName, builder);
         module.insert(qnodeFunc, newQnodeFunc);
 
-        // drop one of the pulse from the certain protocol
-        // the way we handle the dropped pulse will be updated in the future
-        dropOnePulseFromProtocol(newQnodeFunc);
-
-        // Construct mapping from qreg alloc and qreg extract to memref
-        // In the later conversion, we use the mapping to construct the channel for rtio.pulse
-        DenseMap<Value, Value> qregToMemrefMap;
-        DenseMap<Value, Value> qextractToMemrefMap;
-        initializeMemrefMap(newQnodeFunc, module, qregToMemrefMap, qextractToMemrefMap, ctx);
-
-        TypeConverter typeConverter;
-        typeConverter.addConversion([](Type type) { return type; });
-        typeConverter.addConversion(
-            [&](ion::PulseType type) -> Type { return rtio::EventType::get(ctx); });
-
-        ConversionTarget target(*ctx);
-        target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-
-        // prepare kernel function
-        if (failed(IonPulseConversion(newQnodeFunc, target, typeConverter, ionInfo,
-                                      qextractToMemrefMap, ctx)) ||
-            failed(ParallelProtocolConversion(newQnodeFunc, target, typeConverter, ctx)) ||
-            failed(IonReadoutBitConversion(newQnodeFunc, target, typeConverter, ctx)) ||
-            failed(SCFStructuralConversion(newQnodeFunc, target, typeConverter, ctx)) ||
-            failed(FinalizeKernelFunction(newQnodeFunc, ctx))) {
+        if (failed(lowerKernelToRtio(module, newQnodeFunc, ionInfo, ctx))) {
             newQnodeFunc->emitError("Failed to convert to rtio dialect");
             return signalPassFailure();
-        }
-
-        // remove other unused functions, only keep the kernel function and helpers
-        for (auto funcOp : llvm::make_early_inc_range(module.getOps<func::FuncOp>())) {
-            StringRef name = funcOp.getName();
-            if (name != newQnodeFunc.getName() && name != "__rtio_init_dataset" &&
-                name != "__rtio_transfer_measurement_results") {
-                funcOp.erase();
-            }
         }
     }
 };
