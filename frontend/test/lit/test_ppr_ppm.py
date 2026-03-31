@@ -68,11 +68,21 @@ def test_commute_ppr():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
+    # CHECK-LABEL: public @cir_commute_ppr
     @qjit(pipelines=pipe, target="mlir")
     @commute_ppr
     @to_ppr
     @qml.qnode(qml.device("null.qubit", wires=2))
     def cir_commute_ppr():
+        # CHECK: %0 = quantum.alloc( 2)
+        # CHECK: %1 = quantum.extract %0[ 0]
+        # CHECK: %2 = pbc.ppr ["X"](8) %1
+        # CHECK: %3 = pbc.ppr ["Z"](4) %2
+        # CHECK: %4 = pbc.ppr ["X"](4) %3
+        # CHECK: %5 = pbc.ppr ["Z"](4) %4
+        # CHECK: %6 = quantum.extract %0[ 1]
+        # CHECK: %7 = pbc.ppr ["Z"](8) %6
+        # CHECK: %8 = pbc.ppr ["Z"](4) %7
         qml.H(0)
         qml.S(1)
         qml.T(0)
@@ -83,16 +93,6 @@ def test_commute_ppr():
     print(cir_commute_ppr.mlir_opt)
 
 
-# CHECK-LABEL: public @cir_commute_ppr
-# CHECK: %0 = quantum.alloc( 2)
-# CHECK: %1 = quantum.extract %0[ 0]
-# CHECK: %2 = pbc.ppr ["X"](8) %1
-# CHECK: %3 = pbc.ppr ["Z"](4) %2
-# CHECK: %4 = pbc.ppr ["X"](4) %3
-# CHECK: %5 = pbc.ppr ["Z"](4) %4
-# CHECK: %6 = quantum.extract %0[ 1]
-# CHECK: %7 = pbc.ppr ["Z"](8) %6
-# CHECK: %8 = pbc.ppr ["Z"](4) %7
 test_commute_ppr()
 
 
@@ -196,31 +196,95 @@ def test_ppr_to_ppm():
     @qjit(pipelines=pipe, target="mlir")
     def circuit_ppr_to_ppm():
 
+        # CHECK-LABEL: public @cir_default_0
         @ppr_to_ppm
         @to_ppr
         @qml.qnode(device)
         def cir_default():
+            # PPR Z(pi/4) should be decomposed.
+            # CHECK-NOT: pbc.ppr ["Z"](4)
+            # CHECK: quantum.alloc( 2)
+            # CHECK: quantum.alloc_qb
+            # CHECK: pbc.ppm ["Z", "Y"](-1)
+            # CHECK: pbc.ppm ["X"] {{.+}} : i1, !quantum.bit
+            # CHECK: [[pred:%.+]] = arith.xori
+            # CHECK: pbc.ppr ["Z"](2) {{.+}} cond([[pred]])
             qml.S(0)
 
+        # CHECK-LABEL: public @cir_inject_magic_state_0
         @ppr_to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True)
         @to_ppr
         @qml.qnode(device)
         def cir_inject_magic_state():
+            # CHECK: quantum.custom "Hadamard"
+            # CHECK: quantum.custom "T"
+            # CHECK: [[m:%.+]], {{.+}} = pbc.ppm ["Z", "Z"]
+            # CHECK: scf.if [[m]]
+            # CHECK:   quantum.custom "Hadamard"
+            # CHECK:   quantum.custom "S"
+            # CHECK:   pbc.ppm ["Z", "Z"]
+            # CHECK:   pbc.ppm ["X"] {{.+}}
+            # CHECK:   scf.yield
             qml.T(0)
+
+            # CHECK: quantum.custom "Hadamard"
+            # CHECK: quantum.custom "S"
+            # Avoid Y-measurement, so Z-measurement should be used
+            # CHECK: pbc.ppm ["Z", "X", "Z"]
+            # CHECK: pbc.ppm ["X"]
+            # CHECK: [[pred:%.+]] = arith.xori
+            # CHECK: pbc.ppr ["Z", "X"](2) {{.+}}, {{.+}} cond([[pred]])
             qml.CNOT([0, 1])
 
+        # CHECK-LABEL: public @cir_pauli_corrected_0
         @ppr_to_ppm(decompose_method="pauli-corrected")
         @to_ppr
         @qml.qnode(device)
         def cir_pauli_corrected():
+            # CHECK: quantum.custom "Hadamard"
+            # CHECK: quantum.custom "T"
+            # CHECK: [[m:%.+]], {{.+}} = pbc.ppm ["Z", "Z"]
+            # CHECK: pbc.select.ppm([[m]], ["Y"], ["X"])
+            # CHECK: pbc.ppr ["Z"](2) {{.+}} cond(
             qml.T(0)
+
+            # CHECK: pbc.ppm ["Z", "X", "Y"](-1)
+            # CHECK: pbc.ppm ["X"]
+            # CHECK: [[pred:%.+]] = arith.xori
+            # CHECK: pbc.ppr ["Z", "X"](2) {{.+}},{{.+}} cond([[pred]])
             qml.CNOT([0, 1])
 
+        # CHECK-LABEL: public @cir_pauli_corrected_avoid_y_0
         @ppr_to_ppm(decompose_method="pauli-corrected", avoid_y_measure=True)
         @to_ppr
         @qml.qnode(device)
         def cir_pauli_corrected_avoid_y():
+            # CHECK: quantum.custom "Hadamard"
+            # CHECK: quantum.custom "T"
+            # CHECK: [[m:%.+]], {{.+}} = pbc.ppm ["Z", "Z"]
+            # CHECK: scf.if [[m]]
+            # CHECK:   quantum.custom "Hadamard"
+            # CHECK:   quantum.custom "S"
+            # CHECK:   pbc.ppm ["Z", "Z"]
+            # CHECK:   pbc.ppm ["X", "X"]
+            # CHECK:   pbc.ppr ["Z"](2) {{.+}} cond(
+            # CHECK:   quantum.dealloc_qb
+            # CHECK:   quantum.dealloc_qb
+            # CHECK:   scf.yield
+            # CHECK: else
+            # CHECK:   pbc.ppm ["X"]
+            # CHECK:   pbc.ppr ["Z"](2)
+            # CHECK:   quantum.dealloc_qb
+            # CHECK:   scf.yield
             qml.T(0)
+
+            # CHECK: quantum.custom "Hadamard"
+            # CHECK: quantum.custom "S"
+            # # Avoid Y-measurement, so Z-measurement should be used
+            # CHECK: pbc.ppm ["Z", "X", "Z"]
+            # CHECK: pbc.ppm ["X"]
+            # CHECK: [[pred:%.+]] = arith.xori
+            # CHECK: pbc.ppr ["Z", "X"](2) {{.+}},{{.+}} cond([[pred]])
             qml.CNOT([0, 1])
 
         return (
@@ -233,101 +297,6 @@ def test_ppr_to_ppm():
     print(circuit_ppr_to_ppm.mlir_opt)
 
 
-# CHECK-LABEL: public @cir_default_0
-
-# PPR Z(pi/4) should be decomposed.
-# CHECK-NOT: pbc.ppr ["Z"](4)
-# CHECK: quantum.alloc( 2)
-# CHECK: quantum.alloc_qb
-# CHECK: pbc.ppm ["Z", "Y"](-1) {{.+}}, {{.+}} : i1, !quantum.bit, !quantum.bit
-# CHECK: pbc.ppm ["X"] {{.+}} : i1, !quantum.bit
-# CHECK: arith.xori
-# CHECK: scf.if
-# CHECK: pbc.ppr ["Z"](2) {{.+}}
-# CHECK: }
-
-
-# CHECK-LABEL: public @cir_inject_magic_state_0
-
-# FOR T gate
-# CHECK: quantum.custom "Hadamard"
-# CHECK: quantum.custom "T"
-# CHECK: pbc.ppm ["Z", "Z"] {{.+}}, {{.+}}
-# CHECK: scf.if
-# CHECK: pbc.ppm ["Z", "Z"] {{.+}}, {{.+}}
-# CHECK: scf.if
-# CHECK: pbc.ppm ["X"] {{.+}}
-# CHECK: }
-
-# FOR CNOT gate
-# CHECK: quantum.custom "Hadamard"
-# CHECK: quantum.custom "S"
-# Avoid Y-measurement, so Z-measurement should be used
-# CHECK: ["Z", "X", "Z"] {{.+}}, {{.+}}, {{.+}}
-# CHECK: pbc.ppm ["X"] {{.+}} : i1, !quantum.bit
-# CHECK: arith.xori
-# CHECK: scf.if
-# CHECK: pbc.ppr ["Z", "X"](2) {{.+}},{{.+}}
-# CHECK: }
-
-# CHECK-LABEL: public @cir_pauli_corrected_0
-
-# FOR T gate
-# CHECK: quantum.custom "Hadamard"
-# CHECK: quantum.custom "T"
-# CHECK: pbc.ppm ["Z", "Z"] {{.+}}, {{.+}}
-# CHECK: scf.if
-# CHECK: pbc.ppm ["Y"]
-# CHECK: }
-# CHECK: else
-# CHECK: pbc.ppm ["X"]
-# CHECK: }
-
-# CHECK: scf.if
-# CHECK: pbc.ppr ["Z"](2) {{.+}}
-# CHECK: }
-
-# FOR CNOT gate
-# CHECK: ["Z", "X", "Y"](-1) {{.+}}, {{.+}}, {{.+}}
-# CHECK: pbc.ppm ["X"] {{.+}}
-# CHECK: arith.xori
-# CHECK: scf.if
-# CHECK: pbc.ppr ["Z", "X"](2) {{.+}},{{.+}}
-# CHECK: }
-
-# CHECK-LABEL: public @cir_pauli_corrected_avoid_y_0
-
-# FOR T gate
-# CHECK: quantum.custom "Hadamard"
-# CHECK: quantum.custom "T"
-# CHECK: pbc.ppm ["Z", "Z"] {{.+}}, {{.+}}
-# CHECK: scf.if {{.+}}
-# CHECK: quantum.custom "Hadamard"
-# CHECK: quantum.custom "S"
-# # CHECK: pbc.ppm ["Z", "Z"]
-# CHECK: pbc.ppm ["X", "X"]
-# CHECK: scf.if
-# CHECK: pbc.ppr ["Z"](2) {{.+}}
-# CHECK: }
-# CHECK: quantum.dealloc_qb {{.+}}
-# CHECK: quantum.dealloc_qb {{.+}}
-# CHECK: scf.yield {{.+}}
-# CHECK: else
-# CHECK: pbc.ppm ["X"]
-# CHECK: pbc.ppr ["Z"](2)
-# CHECK: quantum.dealloc_qb {{.+}}
-# CHECK: scf.yield {{.+}}
-
-# FOR CNOT gate
-# CHECK: quantum.custom "Hadamard"
-# CHECK: quantum.custom "S"
-# # Avoid Y-measurement, so Z-measurement should be used
-# CHECK: ["Z", "X", "Z"] {{.+}}, {{.+}}, {{.+}}
-# CHECK: pbc.ppm ["X"] {{.+}} : i1, !quantum.bit
-# CHECK: arith.xori
-# CHECK: scf.if
-# CHECK: pbc.ppr ["Z", "X"](2) {{.+}},{{.+}}
-# CHECK: }
 test_ppr_to_ppm()
 
 
@@ -344,20 +313,33 @@ def test_clifford_to_ppm():
     @qjit(pipelines=pipe, target="mlir")
     def test_clifford_to_ppm_workflow():
 
+        # CHECK-LABEL: public @cir_clifford_to_ppm
         @ppm_compilation(decompose_method="auto-corrected")
         @qml.qnode(qml.device("null.qubit", wires=2))
         def cir_clifford_to_ppm():
+            # decompose Clifford to PPM
+            # CHECK: pbc.select.ppm({{%.+}}, ["X"], ["Z"])
+            # CHECK: pbc.ppm ["X", "Z", "Z"]
+            # CHECK: pbc.ppm ["Z", "Y"](-1)
+            # CHECK: pbc.ppm ["X"]
+            # CHECK: pbc.select.ppm({{%.+}}, ["X"], ["Z"])
             qml.H(0)
             qml.CNOT(wires=[0, 1])
             qml.T(0)
             qml.T(1)
             return [measure(0), measure(1)]
 
+        # CHECK-LABEL: public @cir_clifford_to_ppm_with_params
         @ppm_compilation(
             decompose_method="clifford-corrected", avoid_y_measure=True, max_pauli_size=2
         )
         @qml.qnode(qml.device("null.qubit", wires=5))
         def cir_clifford_to_ppm_with_params():
+            # decompose Clifford to PPM with params
+            # CHECK-NOT: pbc.ppm [{{.+}}, {{.+}}, {{.+}}, {{.+}}, {{.+}}, {{.+}}]
+            # CHECK-NOT: pbc.ppm [{{.+}}, {{.+}}, {{.+}}, {{.+}}]
+            # It can be decomposed to three pauli strings in decomposing ppr to ppm
+            # CHECK: pbc.ppm [{{.+}}, {{.+}}, {{.+}}]
             for idx in range(5):
                 qml.H(idx)
                 qml.CNOT(wires=[idx, idx + 1])
@@ -371,30 +353,6 @@ def test_clifford_to_ppm():
     print(test_clifford_to_ppm_workflow.mlir_opt)
 
 
-# CHECK-LABEL: public @cir_clifford_to_ppm
-# decompose Clifford to PPM
-# CHECK: scf.if
-# CHECK: pbc.ppm ["X"]
-# CHECK: }
-# CHECK: else
-# CHECK: pbc.ppm ["Z"]
-# CHECK: }
-# CHECK: pbc.ppm ["X", "Z", "Z"]
-# CHECK: pbc.ppm ["Z", "Y"](-1)
-# CHECK: pbc.ppm ["X"]
-# CHECK: scf.if
-# CHECK: pbc.ppm ["X"]
-# CHECK: }
-# CHECK: else
-# CHECK: pbc.ppm ["Z"]
-# CHECK: }
-
-# CHECK-LABEL: public @cir_clifford_to_ppm_with_params
-# decompose Clifford to PPM with params
-# CHECK-NOT: pbc.ppm [{{.+}}, {{.+}}, {{.+}}, {{.+}}, {{.+}}, {{.+}}]
-# CHECK-NOT: pbc.ppm [{{.+}}, {{.+}}, {{.+}}, {{.+}}]
-# It can be decomposed to three pauli strings in decomposing ppr to ppm
-# CHECK: pbc.ppm [{{.+}}, {{.+}}, {{.+}}]
 test_clifford_to_ppm()
 
 
@@ -405,6 +363,7 @@ def test_reduce_t_depth():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
+    # CHECK-LABEL: public @test_reduce_t_depth_workflow
     @qjit(pipelines=pipe, target="mlir")
     @reduce_t_depth
     @merge_ppr_ppm
@@ -412,6 +371,12 @@ def test_reduce_t_depth():
     @to_ppr
     @qml.qnode(qml.device("null.qubit", wires=3))
     def test_reduce_t_depth_workflow():
+        # CHECK: pbc.ppr ["X"](8)
+        # CHECK: pbc.ppr ["X"](8)
+        # CHECK: pbc.ppr ["Y", "X"](8)
+        # CHECK: pbc.ppr ["X", "Y", "X"](8)
+        # CHECK: pbc.ppr ["X"](8)
+        # CHECK: pbc.ppr ["X", "X", "Y"](8)
         n = 3
         for i in range(n):
             qml.H(wires=i)
@@ -426,12 +391,6 @@ def test_reduce_t_depth():
     print(test_reduce_t_depth_workflow.mlir_opt)
 
 
-# CHECK: pbc.ppr ["X"](8)
-# CHECK: pbc.ppr ["X"](8)
-# CHECK: pbc.ppr ["Y", "X"](8)
-# CHECK: pbc.ppr ["X", "Y", "X"](8)
-# CHECK: pbc.ppr ["X"](8)
-# CHECK: pbc.ppr ["X", "X", "Y"](8)
 test_reduce_t_depth()
 
 
@@ -442,11 +401,25 @@ def test_ppr_to_mbqc():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
+    # CHECK-LABEL: public @test_ppr_to_mbqc_workflow
     @qjit(pipelines=pipe, target="mlir")
     @ppr_to_mbqc
     @to_ppr
     @qml.qnode(qml.device("null.qubit", wires=2))
     def test_ppr_to_mbqc_workflow():
+        # CHECK: quantum.custom "Hadamard"
+        # CHECK: quantum.custom "RZ"
+        # CHECK: quantum.custom "Hadamard"
+        # CHECK: quantum.custom "RZ"
+
+        # CHECK: quantum.custom "Hadamard"
+        # CHECK: quantum.custom "CNOT"
+        # CHECK: quantum.custom "RZ"
+        # CHECK: quantum.custom "CNOT"
+        # CHECK: quantum.custom "Hadamard"
+        # CHECK-NOT: pbc.ppr
+        # CHECK-NOT: pbc.ppm
+        # CHECK: quantum.measure
         qml.H(0)
         qml.CNOT([0, 1])
         return measure(1)
@@ -454,19 +427,6 @@ def test_ppr_to_mbqc():
     print(test_ppr_to_mbqc_workflow.mlir_opt)
 
 
-# CHECK: quantum.custom "Hadamard"
-# CHECK: quantum.custom "RZ"
-# CHECK: quantum.custom "Hadamard"
-# CHECK: quantum.custom "RZ"
-
-# CHECK: quantum.custom "Hadamard"
-# CHECK: quantum.custom "CNOT"
-# CHECK: quantum.custom "RZ"
-# CHECK: quantum.custom "CNOT"
-# CHECK: quantum.custom "Hadamard"
-# CHECK-NOT: pbc.ppr
-# CHECK-NOT: pbc.ppm
-# CHECK: quantum.measure
 test_ppr_to_mbqc()
 
 
@@ -479,11 +439,21 @@ def test_decompose_arbitrary_ppr():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
+    # CHECK-LABEL: public @test_decompose_arbitrary_ppr_workflow
     @qjit(pipelines=pipe, target="mlir")
     @qml.transform(pass_name="decompose-arbitrary-ppr")
     @qml.transform(pass_name="to-ppr")
     @qml.qnode(qml.device("null.qubit", wires=3))
     def test_decompose_arbitrary_ppr_workflow():
+        # CHECK: pbc.ppr ["Y"](8)
+        # CHECK-NOT: pbc.ppr ["Z"](2)
+        # CHECK: quantum.custom "Hadamard"
+        # CHECK: pbc.ppm ["X", "Y", "Z", "Z"]
+        # CHECK: pbc.ppr ["X"](2)
+        # CHECK: pbc.ppr.arbitrary ["Z"]
+        # CHECK: pbc.ppm ["X"]
+        # CHECK: pbc.ppr ["X", "Y", "Z"](2)
+        # CHECK: quantum.dealloc_qb
         qml.PauliRot(np.pi / 4, pauli_word="Y", wires=0)
         qml.PauliRot(0.123, pauli_word="XYZ", wires=[0, 1, 2])
 
@@ -491,13 +461,4 @@ def test_decompose_arbitrary_ppr():
     qml.capture.disable()
 
 
-# CHECK: pbc.ppr ["Y"](8)
-# CHECK-NOT: pbc.ppr ["Z"](2)
-# CHECK: quantum.custom "Hadamard"
-# CHECK: pbc.ppm ["X", "Y", "Z", "Z"]
-# CHECK: pbc.ppr ["X"](2)
-# CHECK: pbc.ppr.arbitrary ["Z"]
-# CHECK: pbc.ppm ["X"]
-# CHECK: pbc.ppr ["X", "Y", "Z"](2)
-# CHECK: quantum.dealloc_qb
 test_decompose_arbitrary_ppr()

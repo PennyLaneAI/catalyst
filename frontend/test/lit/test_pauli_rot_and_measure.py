@@ -404,15 +404,11 @@ def test_ppr_to_ppm():
         qml.PauliRot(np.pi / 4, "Y", wires=0)
         qml.pauli_measure("X", wires=0)
 
-    # CHECK: pbc.ppm ["X", "Y"]
-    # CHECK: pbc.ppm ["Y", "Z"]
-    # CHECK: scf.if
-    # CHECK: pbc.ppm ["Y"]
-    # CHECK: else
-    # CHECK: pbc.ppm ["X"]
-    # CHECK: }
+    # CHECK:     pbc.ppm ["X", "Y"]
+    # CHECK:     [[m:%.+]], {{.+}} = pbc.ppm ["Y", "Z"]
+    # CHECK:     pbc.select.ppm([[m]], ["Y"], ["X"])
     # CHECK-NOT: pbc.ppr ["Y"](8)
-    # CHECK: pbc.ppm ["X"]
+    # CHECK:     pbc.ppm ["X"]
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -437,12 +433,8 @@ def test_ppm_compilation():
         qml.T(wires=0)
         qml.pauli_measure("X", wires=0)
 
-    # CHECK: pbc.ppm ["X", "Z"]
-    # CHECK: scf.if
-    # CHECK: pbc.ppm ["Y"]
-    # CHECK: else
-    # CHECK: pbc.ppm ["X"]
-    # CHECK: }
+    # CHECK: [[m:%.+]], {{.+}} = pbc.ppm ["X", "Z"]
+    # CHECK: pbc.select.ppm([[m]], ["Y"], ["X"])
     # CHECK: pbc.ppr ["X"](2)
     # CHECK: pbc.ppm ["Y", "Z"]
     # CHECK-NOT: pbc.ppr ["Z"](8)
