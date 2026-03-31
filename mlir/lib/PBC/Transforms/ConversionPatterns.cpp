@@ -156,27 +156,34 @@ template <typename T> struct PPMeasurementOpPattern : public OpConversionPattern
         // Create a global string for the Pauli word
         Value selectSwitch;
         Value pauliWordPtr, pauliWordAltPtr;
+        Value negated, negatedAlt;
         if constexpr (std::is_same_v<T, PPMeasurementOp>) {
             pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct());
+            negated =
+                LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(op.getNegated()));
             pauliWordAltPtr = pauliWordPtr;
+            negatedAlt = negated;
             selectSwitch = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(true));
         }
         else if constexpr (std::is_same_v<T, SelectPPMeasurementOp>) {
             pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct_0());
+            negated =
+                LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(op.getNegated_0()));
             pauliWordAltPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct_1());
+            negatedAlt =
+                LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(op.getNegated_1()));
             selectSwitch = op.getSelectSwitch();
         }
         else {
             static_assert(!std::is_same_v<T, T>(), "unexpected type in templated rewrite");
         }
 
-        // RESULT* __catalyst__qis__PauliMeasure(const char* pauliWord, int64_t numQubits,
-        // ...qubits)
         StringRef qirName = "__catalyst__qis__PauliMeasure";
         Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
         Type qirSignature = LLVM::LLVMFunctionType::get(
             conv->convertType(ResultType::get(ctx)),
-            {ptrType, ptrType, IntegerType::get(ctx, 1), IntegerType::get(ctx, 64)},
+            {ptrType, IntegerType::get(ctx, 1), ptrType, IntegerType::get(ctx, 1),
+             IntegerType::get(ctx, 1), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);
 
         LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
@@ -186,7 +193,9 @@ template <typename T> struct PPMeasurementOpPattern : public OpConversionPattern
         int64_t numQubits = adaptor.getInQubits().size();
         SmallVector<Value> args;
         args.push_back(pauliWordPtr);
+        args.push_back(negated);
         args.push_back(pauliWordAltPtr);
+        args.push_back(negatedAlt);
         args.push_back(selectSwitch);
         args.push_back(
             LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
@@ -197,15 +206,6 @@ template <typename T> struct PPMeasurementOpPattern : public OpConversionPattern
 
         // Load the measurement result (i1) from the result pointer
         Value mres = LLVM::LoadOp::create(rewriter, loc, IntegerType::get(ctx, 1), resultPtr);
-
-        // if the pauli product is negative, we need to flip the measurement result
-        if constexpr (std::is_same_v<T, PPMeasurementOp>) {
-            if (op.getNegated()) {
-                Value one = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI1Type(),
-                                                     rewriter.getBoolAttr(true));
-                mres = LLVM::XOrOp::create(rewriter, loc, mres, one);
-            }
-        }
 
         // Replace the op with the measurement result and the input qubits
         SmallVector<Value> values;

@@ -81,13 +81,14 @@ module @test_ppr_arbitrary {
 
 // CHECK-LABEL: @test_ppm
 module @test_ppm {
-    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, !llvm.ptr, i1, i64, ...) -> !llvm.ptr
+    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1, !llvm.ptr, i1, i1, i64, ...) -> !llvm.ptr
     // CHECK: llvm.mlir.global internal constant @pauli_word_XY("XY\00")
     func.func @ppm(%q0 : !quantum.bit, %q1 : !quantum.bit) -> (i1, !quantum.bit, !quantum.bit) {
         // CHECK: [[pauliPtr:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<3 x i8>
         // CHECK-DAG: [[numQubits:%.+]] = llvm.mlir.constant(2 : i64) : i64
         // CHECK-DAG: [[true:%.+]] = llvm.mlir.constant(true) : i1
-        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[pauliPtr]], [[pauliPtr]], [[true]], [[numQubits]], %arg0, %arg1)
+        // CHECK-DAG: [[false:%.+]] = llvm.mlir.constant(false) : i1
+        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[pauliPtr]], [[false]], [[pauliPtr]], [[false]], [[true]], [[numQubits]], %arg0, %arg1)
         // CHECK: [[mres:%.+]] = llvm.load [[resultPtr]] : !llvm.ptr -> i1
         %mres, %out:2 = pbc.ppm ["X", "Y"] %q0, %q1 : i1, !quantum.bit, !quantum.bit
         return %mres, %out#0, %out#1 : i1, !quantum.bit, !quantum.bit
@@ -98,16 +99,15 @@ module @test_ppm {
 
 // CHECK-LABEL: @test_ppm_negative_basis
 module @test_ppm_negative_basis {
-    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, !llvm.ptr, i1, i64, ...) -> !llvm.ptr
+    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1, !llvm.ptr, i1, i1, i64, ...) -> !llvm.ptr
     // CHECK: llvm.mlir.global internal constant @pauli_word_XY("XY\00")
     func.func @ppm_negative_basis(%q0 : !quantum.bit, %q1 : !quantum.bit) -> (i1, !quantum.bit, !quantum.bit) {
         // CHECK: [[pauliPtr:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<3 x i8>
-        // CHECK-DAG: [[numQubits:%.+]] = llvm.mlir.constant(2 : i64) : i64
-        // CHECK-DAG: [[true:%.+]] = llvm.mlir.constant(true) : i1
-        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[pauliPtr]], [[pauliPtr]], [[true]], [[numQubits]], %arg0, %arg1)
+        // CHECK: [[neg:%.+]] = llvm.mlir.constant(true) : i1
+        // CHECK: [[switch:%.+]] = llvm.mlir.constant(true) : i1
+        // CHECK: [[numQubits:%.+]] = llvm.mlir.constant(2 : i64) : i64
+        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[pauliPtr]], [[neg]], [[pauliPtr]], [[neg]], [[switch]], [[numQubits]], %arg0, %arg1)
         // CHECK: [[mres:%.+]] = llvm.load [[resultPtr]] : !llvm.ptr -> i1
-        // CHECK: [[true:%.+]] = llvm.mlir.constant(true) : i1
-        // CHECK: [[mres_negated:%.+]] = llvm.xor [[mres]], [[true]] : i1
         %mres, %out:2 = pbc.ppm ["X", "Y"](-) %q0, %q1 : i1, !quantum.bit, !quantum.bit
         return %mres, %out#0, %out#1 : i1, !quantum.bit, !quantum.bit
     }
@@ -117,15 +117,17 @@ module @test_ppm_negative_basis {
 
 // CHECK-LABEL: @test_select_ppm
 module @test_select_ppm {
-    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, !llvm.ptr, i1, i64, ...) -> !llvm.ptr
+    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1, !llvm.ptr, i1, i1, i64, ...) -> !llvm.ptr
     // CHECK: llvm.mlir.global internal constant @pauli_word_XY("XY\00")
     func.func @select_ppm(%q0 : !quantum.bit, %q1 : !quantum.bit, %sel : i1) -> (i1, !quantum.bit, !quantum.bit) {
         // CHECK: [[pauliPtr0:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<3 x i8>
+        // CHECK: [[false:%.+]] = llvm.mlir.constant(false) : i1
         // CHECK: [[pauliPtr1:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<3 x i8>
+        // CHECK: [[true:%.+]] = llvm.mlir.constant(true) : i1
         // CHECK: [[numQubits:%.+]] = llvm.mlir.constant(2 : i64) : i64
-        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[pauliPtr0]], [[pauliPtr1]], %arg2, [[numQubits]], %arg0, %arg1)
+        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[pauliPtr0]], [[false]], [[pauliPtr1]], [[true]], %arg2, [[numQubits]], %arg0, %arg1)
         // CHECK: [[mres:%.+]] = llvm.load [[resultPtr]] : !llvm.ptr -> i1
-        %mres, %out:2 = pbc.select.ppm (%sel ? ["X", "Y"] : ["X", "Z"]) %q0, %q1 : i1, !quantum.bit, !quantum.bit
+        %mres, %out:2 = pbc.select.ppm (%sel ? ["X", "Y"] : ["X", "Z"](-)) %q0, %q1 : i1, !quantum.bit, !quantum.bit
         return %mres, %out#0, %out#1 : i1, !quantum.bit, !quantum.bit
     }
 }

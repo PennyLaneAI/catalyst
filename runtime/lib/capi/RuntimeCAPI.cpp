@@ -1038,8 +1038,8 @@ RESULT *__catalyst__qis__Measure(QUBIT *wire, int32_t postselect)
     return getQuantumDevicePtr()->Measure(reinterpret_cast<QubitIdType>(wire), postselectOpt);
 }
 
-RESULT *__catalyst__qis__PauliMeasure(const char *pauliStr, const char *pauliStrAlt,
-                                      bool selectSwitch, int64_t numQubits, ...)
+RESULT *__catalyst__qis__PauliMeasure(const char *pauliStr, bool negated, const char *pauliStrAlt,
+                                      bool negatedAlt, bool selectSwitch, int64_t numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
 
@@ -1064,7 +1064,13 @@ RESULT *__catalyst__qis__PauliMeasure(const char *pauliStr, const char *pauliStr
     }
     va_end(args);
 
-    return getQuantumDevicePtr()->PauliMeasure(pauliStr_, wires);
+    RESULT *res = getQuantumDevicePtr()->PauliMeasure(pauliStr_, wires);
+    if ((negated && selectSwitch) || (negatedAlt && !selectSwitch)) {
+        // Can't assume the result is writable, so flip using our constants.
+        res = *res ? __catalyst__rt__result_get_zero() : __catalyst__rt__result_get_one();
+    }
+
+    return res;
 }
 
 double __catalyst__qis__Expval(ObsIdType obsKey) { return getQuantumDevicePtr()->Expval(obsKey); }
