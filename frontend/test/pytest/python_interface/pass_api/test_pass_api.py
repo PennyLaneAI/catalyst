@@ -55,11 +55,19 @@ class TestDictToCompilePipeline:
         pass_pipeline_dict = {
             "cancel_inverses": {},
             "gridsynth": {"epsilon": 42},
+            "diagonalize_final_measurements": {
+                "supported_obs": ("PauliX", "Hadamard"),
+                "to_eigvals": False,
+            },
         }
         cp = dict_to_compile_pipeline(pass_pipeline_dict, *flags, **valued_options)
         t1 = BoundTransform(qml.transform(pass_name="cancel-inverses"))
         t2 = BoundTransform(qml.transform(pass_name="gridsynth"), kwargs={"epsilon": 42})
-        exp_pipeline = CompilePipeline(t1, t2)
+        t3 = BoundTransform(
+            qml.transform(pass_name="diagonalize-final-measurements"),
+            kwargs={"supported_obs": ("PauliX", "Hadamard"), "to_eigvals": False},
+        )
+        exp_pipeline = CompilePipeline(t1, t2, t3)
 
         assert cp == exp_pipeline
 
@@ -119,6 +127,7 @@ class TestPipeline:
 def test_apply_pass():
     """Test that 'apply_pass' correctly adds the transform to the transform sequence."""
 
+    @apply_pass("diagonalize-final-measurements", supported_obs=("PauliX",))
     @apply_pass("cancel-inverses")
     @apply_pass("gridsynth", epsilon=42)
     @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -131,9 +140,49 @@ def test_apply_pass():
     def module():
         return qnode()
 
+    assert "diagonalize-final-measurements" in module.mlir
     assert "cancel-inverses" in module.mlir
     assert "gridsynth" in module.mlir
     assert '"epsilon" = 42' in module.mlir
+
+
+@pytest.mark.xfail(reason="to_eigvals = True is not supported yet")
+def test_apply_pass_unsupported_inputs():
+    """Test if the pipeline would break for an unsupported input for the
+    diagonalize-final-measurements pass"""
+
+    @qml.qjit(target="mlir")
+    @apply_pass("diagonalize-final-measurements", to_eigvals=True)
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def qnode():
+        qml.X(0)
+        qml.X(0)
+        return qml.state()
+
+    qnode()
+
+
+def test_apply_pass_raise_error():
+    """Test if an error would be raised for a non-commuting circuit."""
+
+    @apply_pass("diagonalize-final-measurements")
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def qnode():
+        qml.X(0)
+        qml.X(0)
+        return qml.expval(qml.X(0) + qml.Z(0))
+
+    with pytest.raises(
+        qml.exceptions.CompileError,
+        match="Observables are not qubit-wise commuting. Please apply the "
+        "`split-non-commuting` pass first.",
+    ):
+
+        @qml.qjit(target="mlir")
+        def module():
+            return qnode()
+
+        module()
 
 
 def test_apply_pass_plugin(tmp_path):
