@@ -547,6 +547,23 @@ _ = expval12(10)
 print(expval12.mlir)
 
 
+# CHECK-LABEL: @expval13
+@qjit(target="mlir")
+def expval13():
+    # CHECK: func.func public @circ() -> (tensor<f64>, tensor<f64>)
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circ():
+        # CHECK: [[extract:%.+]] = quantum.extract {{%.+}}[ 0] : !quantum.reg -> !quantum.bit
+        # CHECK: {{%.+}} = quantum.namedobs [[extract]][ PauliX] : !quantum.obs
+        # CHECK: {{%.+}} = quantum.namedobs [[extract]][ PauliZ] : !quantum.obs
+        return qml.expval(qml.X(0)), qml.expval(qml.Z(0))
+
+    return circ()
+
+
+print(expval13.mlir)
+
+
 # CHECK-LABEL: public @var1(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
