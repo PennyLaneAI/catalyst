@@ -89,9 +89,6 @@ class TestCond:
     def test_simple_cond(self, backend):
         """Test basic function with conditional."""
 
-        if qml.capture.enabled():
-            pytest.xfail("Capture does not support returning classical values from qnodes")
-
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
@@ -103,7 +100,8 @@ class TestCond:
             def else_fn():
                 return n
 
-            return cond_fn()
+            out = cond_fn()
+            return qml.measurements.ClassicalConstant(out) if qml.capture.enabled() else out
 
         assert circuit(0) == 0
         assert circuit(1) == 1
@@ -143,8 +141,6 @@ class TestCond:
     def test_cond_many_else_if(self, backend):
         """Test a cond with multiple else_if branches"""
 
-        if qml.capture.enabled():
-            pytest.xfail("Capture does not support returning classical values from qnodes")
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
@@ -165,7 +161,8 @@ class TestCond:
             def cond_else():
                 return x
 
-            return cond_fn()
+            out = cond_fn()
+            return qml.measurements.ClassicalConstant(out) if qml.capture.enabled() else out
 
         assert circuit(5) == 40
         assert circuit(3) == 12

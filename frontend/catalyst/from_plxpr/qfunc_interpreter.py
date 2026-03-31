@@ -33,7 +33,7 @@ from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
 from pennylane.capture.primitives import quantum_subroutine_prim, transform_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
-from pennylane.measurements import CountsMP
+from pennylane.measurements import CountsMP, ClassicalConstant
 
 from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import (
@@ -440,6 +440,9 @@ def interpret_counts(self, *wires, all_outcomes):
     keys = jax.lax.convert_element_type(keys, int)
     return keys, vals
 
+@PLxPRToQuantumJaxprInterpreter.register_primitive(ClassicalConstant._primitive)
+def interpret_classical_constant(self, constant):
+    return constant
 
 # pylint: disable=unused-argument
 @PLxPRToQuantumJaxprInterpreter.register_primitive(CountsMP._mcm_primitive)

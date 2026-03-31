@@ -1832,3 +1832,19 @@ def test_different_static_argnums():
     assert qml.math.allclose(resx, jnp.array([a, -b * 1j]))
     assert qml.math.allclose(resy, jnp.array([a, b]))
     assert qml.math.allclose(resz, jnp.array([a - b * 1j, 0]))
+
+
+@pytest.mark.parametrize("shots", (None, 10))
+def test_classical_constant_return(shots):
+    """Test that classical constants can be returned from a qnode that is qjitted."""
+
+    @qml.qjit(capture=True)
+    @qml.qnode(qml.device('lightning.qubit', wires=1), shots=shots)
+    def c(x):
+        return qml.measurements.ClassicalConstant(x), qml.measurements.ClassicalConstant(x**2), qml.measurements.ClassicalConstant(5.0)
+    
+    x = jnp.array([0, 1, 2])
+    r1, r2, r3 = c(x)
+    assert qml.math.allclose(r1, x)
+    assert qml.math.allclose(r2, jnp.array([0,1,4]))
+    assert qml.math.allclose(r3, 5.0)

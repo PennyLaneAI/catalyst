@@ -498,6 +498,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Integrates `qml.measurements.ClassicalConstant` measurement process with `qjit(capture=True)` for returning values with no
+  quantum component from a QNode.
+
 * Updated Catalyst's Catch2 dependency to v3.11.0.
   [(#2634)](https://github.com/PennyLaneAI/catalyst/pull/2634)
 
