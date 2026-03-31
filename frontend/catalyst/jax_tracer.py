@@ -938,6 +938,7 @@ def trace_quantum_operations(
     return qrp
 
 
+# pylint: disable=too-many-branches
 @debug_logger
 def trace_observables(
     obs: Optional[Operator],
@@ -971,13 +972,17 @@ def trace_observables(
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = namedobs_p.bind(qubits[0], kind=type(obs).__name__)
         # When there are multiple named obs, they could be on the same wire
-        # Must delay the insert to after all named obs are traced, to avoid double extracts
-        if all(w not in qrp.cache for w in wires):
+        # qrp.insert ensures the extracted wires are added to cache, however this call is only
+        # allowed on wires that aren't already in the cache.
+        if wires[0] not in qrp.cache:
             qrp.insert(wires, qubits)
     elif isinstance(obs, qml.Hermitian):
         # TODO: remove once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = hermitian_p.bind(jax.numpy.asarray(*obs.parameters), *qubits)
+        for w, q in zip(wires, qubits):
+            if w not in qrp.cache:
+                qrp.insert([w], [q])
     elif isinstance(obs, qml.ops.op_math.Prod):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = tensorobs_p.bind(*nested_obs)

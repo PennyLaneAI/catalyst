@@ -20,6 +20,7 @@ import pennylane as qml
 import pytest
 from pennylane.exceptions import CompileError
 
+from catalyst.passes.builtin_passes import diagonalize_measurements
 from catalyst.python_interface.transforms import (
     DiagonalizeFinalMeasurementsPass,
     diagonalize_final_measurements_pass,
@@ -705,20 +706,36 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
+    def test_diagonalize_measurements_bultin_pass(self, run_filecheck_qjit):
+        """Unit test for the diagonalize_measurements builtin pass."""
+
+        dev = qml.device("lightning.qubit", wires=10)
+        obs = qml.X(0)
+
+        @qml.qjit
+        @diagonalize_measurements(supported_base_obs=("PauliX",))
+        @qml.qnode(dev)
+        def circuit():
+            qml.CNOT(wires=[0, 1])
+            # CHECK: quantum.namedobs [[q:%.+]][PauliX]
+            return qml.expval(qml.X(0))
+
+        run_filecheck_qjit(circuit)
+
+        res = circuit()
+
+        @qml.qjit
+        @qml.qnode(dev)
+        def circuit_ref():
+            qml.CNOT(wires=[0, 1])
+            return qml.expval(obs)
+
+        res_ref = circuit_ref()
+        assert np.allclose(res, res_ref)
+
     def test_with_split_non_commuting_multiple_measurements(self, run_filecheck_qjit):
         """Test the executable file can be generated and run with lightning.qubit when applying
         both the diagonalize-final-measurements and the split-non-commuting passes"""
-
-        def diagonalize_measurements_setup_inputs(
-            to_eigvals: bool = False, supported_base_obs: tuple[str] | str = ("PauliZ",)
-        ):
-            "Return the options for the diagonalize-final-measurements pass."
-            return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
-
-        diagonalize_measurements = qml.transform(
-            pass_name="diagonalize-final-measurements",
-            setup_inputs=diagonalize_measurements_setup_inputs,
-        )
 
         dev = qml.device("lightning.qubit", wires=10)
 

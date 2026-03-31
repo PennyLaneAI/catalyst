@@ -230,6 +230,9 @@
   [(#2538)](https://github.com/PennyLaneAI/catalyst/pull/2538)
   [(#2633)](https://github.com/PennyLaneAI/catalyst/pull/2633)
 
+* The `diagonalize-final-measurements` xDSL pass is now available as a builtin pass accessible from the Catalyst frontend as `catalyst.passes.diagonalize_measurements`.
+  [(#2630)](https://github.com/PennyLaneAI/catalyst/pull/2630)
+
 * Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
   effectively filtering for decomposition rules in the MLIR-native decomposition framework.
   [(#2539)](https://github.com/PennyLaneAI/catalyst/pull/2539)
@@ -430,7 +433,8 @@
 <h3>Bug fixes 🐛</h3>
 
 * Fixed a bug where multiple `quantum.extract` operations from the same index were being created
-  when there are multiple named observables on that same wire index, when capture is not enabled.
+  when there are multiple named observables or Hermitian observables on that same wire index,
+  when capture is not enabled.
   [(#2641)](https://github.com/PennyLaneAI/catalyst/pull/2641)
 
 * :func:`~pennylane.adjoint` can now be used on subroutines with classical arguments.
