@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <cstdint>
 #include <cstdio>
@@ -324,7 +324,7 @@ TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample call
 
     auto obs = __catalyst__qis__NamedObs(ObsId::PauliZ, *ctrls);
 
-    CHECK(__catalyst__qis__Variance(obs) == Catch::Approx(0.0).margin(1e-5));
+    CHECK_THAT(__catalyst__qis__Variance(obs), WithinAbs(0.0, 1e-5));
 
     __catalyst__rt__qubit_release_array(qs);
     __catalyst__rt__device_release();
@@ -342,8 +342,8 @@ TEST_CASE("Test NullQubit state vector - 0 qubits", "[NullQubit]")
     sim->State(view);
 
     CHECK(view.size() == 1);
-    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
-    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK_THAT(view(0).real(), WithinRel(1.0, 1e-5));
+    CHECK_THAT(view(0).imag(), WithinRel(0.0, 1e-5));
 }
 
 TEST_CASE("Test NullQubit state vector - 1 qubit", "[NullQubit]")
@@ -359,10 +359,10 @@ TEST_CASE("Test NullQubit state vector - 1 qubit", "[NullQubit]")
     sim->State(view);
 
     CHECK(view.size() == 2);
-    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
-    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(1).real() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(1).imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK_THAT(view(0).real(), WithinRel(1.0, 1e-5));
+    CHECK_THAT(view(0).imag(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(1).real(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(1).imag(), WithinRel(0.0, 1e-5));
 }
 
 TEST_CASE("Test NullQubit state vector - 2 qubits", "[NullQubit]")
@@ -379,14 +379,14 @@ TEST_CASE("Test NullQubit state vector - 2 qubits", "[NullQubit]")
     sim->State(view);
 
     CHECK(view.size() == 4);
-    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
-    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(1).real() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(1).imag() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(2).real() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(2).imag() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(3).real() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(3).imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK_THAT(view(0).real(), WithinRel(1.0, 1e-5));
+    CHECK_THAT(view(0).imag(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(1).real(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(1).imag(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(2).real(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(2).imag(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(3).real(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(3).imag(), WithinRel(0.0, 1e-5));
 }
 
 TEST_CASE("Test NullQubit state vector after ReleaseQubit", "[NullQubit]")
@@ -407,10 +407,10 @@ TEST_CASE("Test NullQubit state vector after ReleaseQubit", "[NullQubit]")
     sim->State(view);
 
     CHECK(view.size() == 2);
-    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
-    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(1).real() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(1).imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK_THAT(view(0).real(), WithinRel(1.0, 1e-5));
+    CHECK_THAT(view(0).imag(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(1).real(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(1).imag(), WithinRel(0.0, 1e-5));
 }
 
 TEST_CASE("Test NullQubit state vector after AllocateQubits", "[NullQubit]")
@@ -428,14 +428,14 @@ TEST_CASE("Test NullQubit state vector after AllocateQubits", "[NullQubit]")
     sim->State(view);
 
     CHECK(view.size() == 4);
-    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
-    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(1).real() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(1).imag() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(2).real() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(2).imag() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(3).real() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(3).imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK_THAT(view(0).real(), WithinRel(1.0, 1e-5));
+    CHECK_THAT(view(0).imag(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(1).real(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(1).imag(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(2).real(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(2).imag(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(3).real(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(3).imag(), WithinRel(0.0, 1e-5));
 }
 
 TEST_CASE("Test NullQubit state vector after AllocateQubits and ReleaseQubit", "[NullQubit]")
@@ -457,10 +457,10 @@ TEST_CASE("Test NullQubit state vector after AllocateQubits and ReleaseQubit", "
     sim->State(view);
 
     CHECK(view.size() == 2);
-    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
-    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(1).real() == Catch::Approx(0.0).epsilon(1e-5));
-    CHECK(view(1).imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK_THAT(view(0).real(), WithinRel(1.0, 1e-5));
+    CHECK_THAT(view(0).imag(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(1).real(), WithinRel(0.0, 1e-5));
+    CHECK_THAT(view(1).imag(), WithinRel(0.0, 1e-5));
 }
 
 TEST_CASE("test AllocateQubits generates a proper std::vector<QubitIdType>", "[NullQubit]")
@@ -592,8 +592,8 @@ TEST_CASE("Mix Gate test R(X,Y,Z) num_qubits=4", "[NullQubit]")
     sim->State(view);
 
     CHECK(view.size() == 16);
-    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
-    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK_THAT(view(0).real(), WithinRel(1.0, 1e-5));
+    CHECK_THAT(view(0).imag(), WithinRel(0.0, 1e-5));
 }
 
 TEST_CASE("Gate PCPhase num_qubits=3", "[NullQubit]")
@@ -610,8 +610,8 @@ TEST_CASE("Gate PCPhase num_qubits=3", "[NullQubit]")
     sim->State(view);
 
     CHECK(view.size() == 8);
-    CHECK(view(0).real() == Catch::Approx(1.0).epsilon(1e-5));
-    CHECK(view(0).imag() == Catch::Approx(0.0).epsilon(1e-5));
+    CHECK_THAT(view(0).real(), WithinRel(1.0, 1e-5));
+    CHECK_THAT(view(0).imag(), WithinRel(0.0, 1e-5));
 }
 
 TEST_CASE("Test __catalyst__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamShift], "
@@ -659,9 +659,9 @@ TEST_CASE("Test __catalyst__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,Param
 
     __catalyst__rt__toggle_recorder(/* activate_cm */ false);
 
-    CHECK(result_tp.data_aligned[0] == Catch::Approx(0.0).margin(1e-5));
-    CHECK(result_tp.data_aligned[1] == Catch::Approx(0.0).margin(1e-5));
-    CHECK(result_tp.data_aligned[2] == Catch::Approx(0.0).margin(1e-5));
+    CHECK_THAT(result_tp.data_aligned[0], WithinAbs(0.0, 1e-5));
+    CHECK_THAT(result_tp.data_aligned[1], WithinAbs(0.0, 1e-5));
+    CHECK_THAT(result_tp.data_aligned[2], WithinAbs(0.0, 1e-5));
 
     __catalyst__rt__qubit_release(q1);
     __catalyst__rt__qubit_release(q0);
@@ -735,8 +735,8 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
         DataView<std::complex<double>, 1> state_view(state);
         sim->State(state_view);
 
-        CHECK(state_view(0).real() == Catch::Approx(1.0).margin(1e-5));
-        CHECK(state_view(0).imag() == Catch::Approx(0.0).margin(1e-5));
+        CHECK_THAT(state_view(0).real(), WithinAbs(1.0, 1e-5));
+        CHECK_THAT(state_view(0).imag(), WithinAbs(0.0, 1e-5));
     }
 
     SECTION("Probs")
@@ -745,7 +745,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
         DataView<double, 1> probs_view(probs);
         sim->Probs(probs_view);
 
-        CHECK(probs_view(0) == Catch::Approx(1.0).margin(1e-5));
+        CHECK_THAT(probs_view(0), WithinAbs(1.0, 1e-5));
     }
 
     SECTION("PartialProbs")
@@ -755,7 +755,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
         std::vector<QubitIdType> wires;
         sim->PartialProbs(probs_view, wires);
 
-        CHECK(probs_view(0) == Catch::Approx(1.0).margin(1e-5));
+        CHECK_THAT(probs_view(0), WithinAbs(1.0, 1e-5));
     }
 
     SECTION("Sample")
@@ -793,7 +793,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
         DataView<double, 1> eigvals_view(eigvals);
         sim->Counts(eigvals_view, counts_view);
 
-        CHECK(eigvals_view(0) == Catch::Approx(0.0).margin(1e-5));
+        CHECK_THAT(eigvals_view(0), WithinAbs(0.0, 1e-5));
         CHECK(counts_view(0) == shots);
     }
 
@@ -806,7 +806,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
         std::vector<QubitIdType> wires;
         sim->PartialCounts(eigvals_view, counts_view, wires);
 
-        CHECK(eigvals_view(0) == Catch::Approx(0.0).margin(1e-5));
+        CHECK_THAT(eigvals_view(0), WithinAbs(0.0, 1e-5));
         CHECK(counts_view(0) == shots);
     }
 }
@@ -830,10 +830,10 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
         DataView<std::complex<double>, 1> state_view(state);
         sim->State(state_view);
 
-        CHECK(state_view(0).real() == Catch::Approx(1.0).margin(1e-5));
-        CHECK(state_view(0).imag() == Catch::Approx(0.0).margin(1e-5));
-        CHECK(state_view(1).real() == Catch::Approx(0.0).margin(1e-5));
-        CHECK(state_view(1).imag() == Catch::Approx(0.0).margin(1e-5));
+        CHECK_THAT(state_view(0).real(), WithinAbs(1.0, 1e-5));
+        CHECK_THAT(state_view(0).imag(), WithinAbs(0.0, 1e-5));
+        CHECK_THAT(state_view(1).real(), WithinAbs(0.0, 1e-5));
+        CHECK_THAT(state_view(1).imag(), WithinAbs(0.0, 1e-5));
     }
 
     SECTION("Probs")
@@ -842,8 +842,8 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
         DataView<double, 1> probs_view(probs);
         sim->Probs(probs_view);
 
-        CHECK(probs_view(0) == Catch::Approx(1.0).margin(1e-5));
-        CHECK(probs_view(1) == Catch::Approx(0.0).margin(1e-5));
+        CHECK_THAT(probs_view(0), WithinAbs(1.0, 1e-5));
+        CHECK_THAT(probs_view(1), WithinAbs(0.0, 1e-5));
     }
 
     SECTION("PartialProbs")
@@ -853,8 +853,8 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
         std::vector<QubitIdType> wires;
         sim->PartialProbs(probs_view, wires);
 
-        CHECK(probs_view(0) == Catch::Approx(1.0).margin(1e-5));
-        CHECK(probs_view(1) == Catch::Approx(0.0).margin(1e-5));
+        CHECK_THAT(probs_view(0), WithinAbs(1.0, 1e-5));
+        CHECK_THAT(probs_view(1), WithinAbs(0.0, 1e-5));
     }
 
     SECTION("Sample")
@@ -894,8 +894,8 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
         DataView<double, 1> eigvals_view(eigvals);
         sim->Counts(eigvals_view, counts_view);
 
-        CHECK(eigvals_view(0) == Catch::Approx(0.0).margin(1e-5));
-        CHECK(eigvals_view(1) == Catch::Approx(1.0).margin(1e-5));
+        CHECK_THAT(eigvals_view(0), WithinAbs(0.0, 1e-5));
+        CHECK_THAT(eigvals_view(1), WithinAbs(1.0, 1e-5));
         CHECK(counts_view(0) == shots);
         CHECK(counts_view(1) == 0);
     }
@@ -909,8 +909,8 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
         std::vector<QubitIdType> wires;
         sim->PartialCounts(eigvals_view, counts_view, wires);
 
-        CHECK(eigvals_view(0) == Catch::Approx(0.0).margin(1e-5));
-        CHECK(eigvals_view(1) == Catch::Approx(1.0).margin(1e-5));
+        CHECK_THAT(eigvals_view(0), WithinAbs(0.0, 1e-5));
+        CHECK_THAT(eigvals_view(1), WithinAbs(1.0, 1e-5));
         CHECK(counts_view(0) == shots);
         CHECK(counts_view(1) == 0);
     }

@@ -379,7 +379,7 @@ def test_merge_ppr_ppm():
         qml.PauliRot(np.pi / 2, "Z", wires=0)
         qml.pauli_measure("X", wires=0)
 
-    # CHECK: pbc.ppm ["Y"](-1)
+    # CHECK: pbc.ppm ["Y"](-)
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -406,7 +406,7 @@ def test_ppr_to_ppm():
 
     # CHECK:     pbc.ppm ["X", "Y"]
     # CHECK:     [[m:%.+]], {{.+}} = pbc.ppm ["Y", "Z"]
-    # CHECK:     pbc.select.ppm([[m]], ["Y"], ["X"])
+    # CHECK:     pbc.select.ppm ([[m]] ? ["Y"] : ["X"])
     # CHECK-NOT: pbc.ppr ["Y"](8)
     # CHECK:     pbc.ppm ["X"]
     print(circuit.mlir_opt)
@@ -434,7 +434,7 @@ def test_ppm_compilation():
         qml.pauli_measure("X", wires=0)
 
     # CHECK: [[m:%.+]], {{.+}} = pbc.ppm ["X", "Z"]
-    # CHECK: pbc.select.ppm([[m]], ["Y"], ["X"])
+    # CHECK: pbc.select.ppm ([[m]] ? ["Y"] : ["X"])
     # CHECK: pbc.ppr ["X"](2)
     # CHECK: pbc.ppm ["Y", "Z"]
     # CHECK-NOT: pbc.ppr ["Z"](8)

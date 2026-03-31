@@ -98,8 +98,7 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
             }
             // Compute the rotation angle: theta = π / rotation_kind
             // rotation_kind can be ±1, ±2, ±4, ±8
-            int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
-            double theta = 2 * (llvm::numbers::pi / static_cast<double>(rotationKind));
+            double theta = 2 * (llvm::numbers::pi / static_cast<double>(op.getRotationKind()));
             thetaValue = LLVM::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(theta));
         }
         else if constexpr (std::is_same_v<T, PPRotationArbitraryOp>) {
@@ -199,10 +198,9 @@ template <typename T> struct PPMeasurementOpPattern : public OpConversionPattern
         // Load the measurement result (i1) from the result pointer
         Value mres = LLVM::LoadOp::create(rewriter, loc, IntegerType::get(ctx, 1), resultPtr);
 
-        // if the uint16_t rotation_sign is -1, we need to negate the measurement result
-        // TODO: fix PauliWord sign for PPM
+        // if the pauli product is negative, we need to flip the measurement result
         if constexpr (std::is_same_v<T, PPMeasurementOp>) {
-            if (static_cast<int16_t>(op.getRotationSign()) == -1) {
+            if (op.getNegated()) {
                 Value one = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI1Type(),
                                                      rewriter.getBoolAttr(true));
                 mres = LLVM::XOrOp::create(rewriter, loc, mres, one);

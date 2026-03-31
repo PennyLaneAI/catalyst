@@ -26,7 +26,6 @@ from pennylane.workflow.qnode import QNode
 from xdsl.dialects.builtin import ModuleOp
 
 from catalyst.jit import QJIT
-from catalyst.passes.pass_api import PassPipelineWrapper
 from catalyst.python_interface.compiler import Compiler
 
 from .collector import QMLCollector
@@ -138,8 +137,7 @@ def check_draw_imports():
 
 # pylint: disable=line-too-long
 def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
-    """
-    Visualize a single QJIT compiled QNode, showing wire flow through quantum operations,
+    r"""Visualize a single QJIT compiled QNode, showing wire flow through quantum operations,
     program structure, and pass-by-pass impacts on compiled programs.
 
     .. note::
@@ -230,7 +228,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     >>> fig, ax = catalyst.draw_graph(circuit, level=0)()
     >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
-    .. figure:: ../../../doc/_static/catalyst-draw-graph-level0-example.png
+    .. figure:: /_static/catalyst-draw-graph-level0-example.png
         :width: 35%
         :alt: Graphical representation of circuit with level=0
         :align: left
@@ -247,7 +245,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     >>> fig, ax = catalyst.draw_graph(circuit, level=2)()
     >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
-    .. figure:: ../../../doc/_static/catalyst-draw-graph-level2-example.png
+    .. figure:: /_static/catalyst-draw-graph-level2-example.png
         :width: 35%
         :alt: Graphical representation of circuit with level=2
         :align: left
@@ -278,7 +276,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         >>> fig, ax = catalyst.draw_graph(circuit)()
         >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
-        .. figure:: ../../../doc/_static/catalyst-draw-graph-control-flow-example.png
+        .. figure:: /_static/catalyst-draw-graph-control-flow-example.png
             :width: 35%
             :alt: Graphical representation of circuit with control flow
             :align: left
@@ -313,7 +311,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         >>> fig, ax = catalyst.draw_graph(circuit)(x, y)
         >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
-        .. figure:: ../../../doc/_static/catalyst-draw-graph-dynamic-wire-example.png
+        .. figure:: /_static/catalyst-draw-graph-dynamic-wire-example.png
             :width: 35%
             :alt: Graphical representation of circuit with control flow
             :align: left
@@ -330,13 +328,8 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     if isinstance(level, int):
         max_level = level
 
-    if not isinstance(qnode, QJIT) or (
-        not isinstance(qnode.original_function, QNode)
-        and not (
-            isinstance(qnode.original_function, PassPipelineWrapper)
-            and isinstance(qnode.original_qnode, QNode)
-        )
-    ):
+    is_valid_qjit_qnode = isinstance(qnode, QJIT) and isinstance(qnode.original_function, QNode)
+    if not is_valid_qjit_qnode:
         raise TypeError(
             "The circuit must be a qjit-compiled qnode. "
             "Please apply the 'qml.qjit' function to your qnode."

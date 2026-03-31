@@ -179,7 +179,7 @@ def test_merge_ppr_ppm_max_pauli_size():
 
 # CHECK-LABEL: public @cir_merge_ppr_ppm_max_pauli_size
 # CHECK-NOT: pbc.ppm ["Z", "Z"]
-# CHECK:  pbc.ppm ["Y"](-1)
+# CHECK:  pbc.ppm ["Y"](-)
 test_merge_ppr_ppm_max_pauli_size()
 
 
@@ -205,7 +205,7 @@ def test_ppr_to_ppm():
             # CHECK-NOT: pbc.ppr ["Z"](4)
             # CHECK: quantum.alloc( 2)
             # CHECK: quantum.alloc_qb
-            # CHECK: pbc.ppm ["Z", "Y"](-1)
+            # CHECK: pbc.ppm ["Z", "Y"](-)
             # CHECK: pbc.ppm ["X"] {{.+}} : i1, !quantum.bit
             # CHECK: [[pred:%.+]] = arith.xori
             # CHECK: pbc.ppr ["Z"](2) {{.+}} cond([[pred]])
@@ -244,11 +244,11 @@ def test_ppr_to_ppm():
             # CHECK: quantum.custom "Hadamard"
             # CHECK: quantum.custom "T"
             # CHECK: [[m:%.+]], {{.+}} = pbc.ppm ["Z", "Z"]
-            # CHECK: pbc.select.ppm([[m]], ["Y"], ["X"])
+            # CHECK: pbc.select.ppm ([[m]] ? ["Y"] : ["X"])
             # CHECK: pbc.ppr ["Z"](2) {{.+}} cond(
             qml.T(0)
 
-            # CHECK: pbc.ppm ["Z", "X", "Y"](-1)
+            # CHECK: pbc.ppm ["Z", "X", "Y"](-)
             # CHECK: pbc.ppm ["X"]
             # CHECK: [[pred:%.+]] = arith.xori
             # CHECK: pbc.ppr ["Z", "X"](2) {{.+}},{{.+}} cond([[pred]])
@@ -318,11 +318,11 @@ def test_clifford_to_ppm():
         @qml.qnode(qml.device("null.qubit", wires=2))
         def cir_clifford_to_ppm():
             # decompose Clifford to PPM
-            # CHECK: pbc.select.ppm({{%.+}}, ["X"], ["Z"])
+            # CHECK: pbc.select.ppm ({{%.+}} ? ["X"] : ["Z"])
             # CHECK: pbc.ppm ["X", "Z", "Z"]
-            # CHECK: pbc.ppm ["Z", "Y"](-1)
+            # CHECK: pbc.ppm ["Z", "Y"](-)
             # CHECK: pbc.ppm ["X"]
-            # CHECK: pbc.select.ppm({{%.+}}, ["X"], ["Z"])
+            # CHECK: pbc.select.ppm ({{%.+}} ? ["X"] : ["Z"])
             qml.H(0)
             qml.CNOT(wires=[0, 1])
             qml.T(0)

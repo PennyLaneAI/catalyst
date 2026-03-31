@@ -18,7 +18,7 @@ _Perform a dialect conversion from Quantum to LLVM (QIR)._
 
 _Copy global memrefs before returning from C interface._
 
-### `-disentangle-CNOT`
+### `-disentangle-cnot`
 
 _Replace a CNOT gate with two single qubit gates whenever possible._
 
@@ -28,7 +28,7 @@ _Replace a CNOT gate with two single qubit gates whenever possible._
 -emit-FSM-state-remark : Whether to emit the state analysis result from the simple states propagation FSM onto the gate operations.
 ```
 
-### `-disentangle-SWAP`
+### `-disentangle-swap`
 
 _Replace a SWAP gate with single qubit gates and a shorter SWAPZ gates whenever possible._
 

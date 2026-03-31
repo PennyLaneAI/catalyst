@@ -116,12 +116,36 @@ LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewrit
     return failure();
 }
 
+LogicalResult AllocQubitOp::canonicalize(AllocQubitOp allocQb, mlir::PatternRewriter &rewriter)
+{
+    if (allocQb->use_empty()) {
+        rewriter.eraseOp(allocQb);
+        return success();
+    }
+
+    return failure();
+}
+
 LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter)
 {
     if (auto alloc = dyn_cast_if_present<AllocOp>(dealloc.getQreg().getDefiningOp())) {
         if (dealloc.getQreg().hasOneUse()) {
             rewriter.eraseOp(dealloc);
             rewriter.eraseOp(alloc);
+            return success();
+        }
+    }
+
+    return failure();
+}
+
+LogicalResult DeallocQubitOp::canonicalize(DeallocQubitOp deallocQb,
+                                           mlir::PatternRewriter &rewriter)
+{
+    if (auto allocQb = dyn_cast_if_present<AllocQubitOp>(deallocQb.getQubit().getDefiningOp())) {
+        if (allocQb.getQubit().hasOneUse()) {
+            rewriter.eraseOp(deallocQb);
+            rewriter.eraseOp(allocQb);
             return success();
         }
     }
@@ -208,6 +232,11 @@ LogicalResult AdjointOp::verify()
 
     if (res.wasInterrupted()) {
         return emitOpError("quantum measurements are not allowed in the adjoint regions");
+    }
+
+    Block &b = this->getRegion().front();
+    if (b.getNumArguments() != 0) {
+        return emitOpError("qref.adjoint op must have no arguments on its block");
     }
 
     return success();
