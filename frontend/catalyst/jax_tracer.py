@@ -972,7 +972,8 @@ def trace_observables(
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = namedobs_p.bind(qubits[0], kind=type(obs).__name__)
         # When there are multiple named obs, they could be on the same wire
-        # Must delay the insert to after all named obs are traced, to avoid double extracts
+        # qrp.insert ensures the extracted wires are added to cache, however this call is only
+        # allowed on wires that aren't already in the cache.
         if wires[0] not in qrp.cache:
             qrp.insert(wires, qubits)
     elif isinstance(obs, qml.Hermitian):
