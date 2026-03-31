@@ -141,11 +141,13 @@ def cancel_inverses(qnode):
 
 
 def diagonalize_measurements(
-    qnode, supported_base_obs: tuple[str, ...] = ("PauliZ", "Identity"), to_eigvals: bool = False
+    qnode=None,
+    supported_base_obs: tuple[str, ...] = ("PauliZ", "Identity"),
+    to_eigvals: bool = False,
 ):
     """
     Specify that the ``diagonalize-final-measurements`` compiler pass
-    will be applied, which diagonalizes measurements into the standard basis. 
+    will be applied, which diagonalizes measurements into the standard basis.
 
     Args:
         qnode (QNode): the QNode to apply the ``diagonalize_final_measurement`` compiler pass to.
@@ -248,6 +250,10 @@ def diagonalize_measurements(
     >>> print(error_msg)
     Observables are not qubit-wise commuting. Please apply the `split-non-commuting` pass first.
     """
+    if qnode is None:
+        return functools.partial(
+            diagonalize_measurements, supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
+        )
     return qml.transform(pass_name="diagonalize-final-measurements")(
         qnode, supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
     )
