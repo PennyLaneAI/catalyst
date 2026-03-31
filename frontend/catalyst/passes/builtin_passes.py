@@ -458,7 +458,7 @@ def ions_decomposition(qnode):  # pragma: nocover
 
 
 def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
-    r"""A quantnum compilation pass to discretize
+    r"""A quantum compilation pass to discretize
     single-qubit RZ and PhaseShift gates into the Clifford+T basis or the PPR basis using the Ross-Selinger Gridsynth algorithm.
     Reference: https://arxiv.org/abs/1403.2975
 

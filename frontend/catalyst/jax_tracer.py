@@ -970,6 +970,10 @@ def trace_observables(
     elif isinstance(obs, KNOWN_NAMED_OBS):
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = namedobs_p.bind(qubits[0], kind=type(obs).__name__)
+        # When there are multiple named obs, they could be on the same wire
+        # Must delay the insert to after all named obs are traced, to avoid double extracts
+        if all(w not in qrp.cache for w in wires):
+            qrp.insert(wires, qubits)
     elif isinstance(obs, qml.Hermitian):
         # TODO: remove once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
         qubits = qrp.extract(wires, allow_reuse=True)
