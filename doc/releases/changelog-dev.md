@@ -430,7 +430,7 @@
 
 * Fixed a bug where multiple `quantum.extract` operations from the same index were being created
   when there are multiple named observables on that same wire index, when capture is not enabled.
-  [(#????)](https://github.com/PennyLaneAI/catalyst/pull/????)
+  [(#2641)](https://github.com/PennyLaneAI/catalyst/pull/2641)
 
 * :func:`~pennylane.adjoint` can now be used on subroutines with classical arguments.
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
