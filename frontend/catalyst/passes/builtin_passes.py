@@ -167,8 +167,8 @@ def diagonalize_measurements(
         base observable names, instead of the corresponding classes. The reason is that xDSL does not accept
         class types as values of option-elements. For more details, please refer to the `xDSL repo <https://github.com/xdslproject/xdsl/blob/ba190d9ba1612807e7604374afa7eb2c1c3d2047/xdsl/utils/arg_spec.py#L315-L327>`__.
 
-        Unlike the PennyLane tape transform, only ``to_eigvals = False`` is supported. An error would be raised,
-        if ``to_eigvals`` is set as ``True``.
+        Unlike the PennyLane tape transform, only ``to_eigvals = False`` is supported. Setting ``to_eigvals`` as ``True``
+        will raise an error.
 
         An error will be raised if non-commuting terms are encountered.
 
@@ -183,7 +183,7 @@ def diagonalize_measurements(
         from catalyst.passes import diagonalize_measurements
 
         @qjit
-        @diagonalize_measurements(supported_base_obs=[qml.PauliX])
+        @diagonalize_measurements(supported_base_obs=("PauliX",))
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
             qml.Hadamard(0)
@@ -198,7 +198,7 @@ def diagonalize_measurements(
     >>> circuit()
     0.9687151001182651
 
-    An error would be raised, if ``to_eigvals=True`` is passed as an option:
+    An error is raised if ``to_eigvals=True`` is passed as an option:
 
     .. code-block:: python
 
@@ -223,7 +223,7 @@ def diagonalize_measurements(
     >>> print(error_msg)
     Only to_eigvals = False is supported.
 
-    A compile error would be raised, if non-commuting terms are encountered:
+    A compile error is raised if non-commuting terms are encountered:
 
     .. code-block:: python
 
