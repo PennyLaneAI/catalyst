@@ -99,7 +99,7 @@ module @test_ppm_negative_basis {
         // CHECK: [[mres:%.+]] = llvm.load [[resultPtr]] : !llvm.ptr -> i1
         // CHECK: [[true:%.+]] = llvm.mlir.constant(true) : i1
         // CHECK: [[mres_negated:%.+]] = llvm.xor [[mres]], [[true]] : i1
-        %mres, %out:2 = pbc.ppm ["X", "Y"](-1) %q0, %q1 : i1, !quantum.bit, !quantum.bit
+        %mres, %out:2 = pbc.ppm ["X", "Y"](-) %q0, %q1 : i1, !quantum.bit, !quantum.bit
         return %mres, %out#0, %out#1 : i1, !quantum.bit, !quantum.bit
     }
 }

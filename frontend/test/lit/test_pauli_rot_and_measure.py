@@ -379,7 +379,7 @@ def test_merge_ppr_ppm():
         qml.PauliRot(np.pi / 2, "Z", wires=0)
         qml.pauli_measure("X", wires=0)
 
-    # CHECK: pbc.ppm ["Y"](-1)
+    # CHECK: pbc.ppm ["Y"](-)
     print(circuit.mlir_opt)
     qml.capture.disable()
 
