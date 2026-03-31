@@ -33,7 +33,6 @@ from pennylane.ops import Hadamard, PauliX, PauliY
 from xdsl import context, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin, func
 from xdsl.rewriter import InsertPoint
-from xdsl.transforms.common_subexpression_elimination import CommonSubexpressionElimination
 
 from catalyst.python_interface.dialects.quantum import (
     ComputationalBasisOp,
@@ -288,10 +287,6 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the diagonalize final measurements pass."""
-        # This is a temporary workaround necessitated by the current non-program capture
-        # lowering path.
-        CommonSubexpressionElimination().apply(_ctx, op)
-
         for op_ in op.walk():
             if isinstance(op_, func.FuncOp) and "quantum.node" in op_.attributes:
                 # Validate if each circuit in the module is commuting and an error
