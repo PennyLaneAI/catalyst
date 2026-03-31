@@ -634,7 +634,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
             _ = circuit(0.7)
 
 
-@pytest.mark.usefixtures("use_capture")
+@pytest.mark.usefixtures("use_both_frontend")
 class TestDiagonalizeFinalMeasurementsCatalystFrontend:
     """Integration tests going through the catalyst frontend (program capture disabled)"""
 
