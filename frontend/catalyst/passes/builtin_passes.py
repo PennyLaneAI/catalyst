@@ -140,6 +140,125 @@ def cancel_inverses(qnode):
     return qml.transform(pass_name="cancel-inverses")(qnode)
 
 
+def diagonalize_measurements(
+    qnode=None,
+    supported_base_obs: tuple[str, ...] = ("PauliZ", "Identity"),
+    to_eigvals: bool = False,
+):
+    """
+    Specify that the ``diagonalize-final-measurements`` compiler pass
+    will be applied, which diagonalizes measurements into the standard basis.
+
+    Args:
+        qnode (QNode): The QNode to apply the ``diagonalize_final_measurement`` compiler pass to.
+        supported_base_obs (tuple[str, ...]): A list of supported base observable names.
+            Allowed observables are ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard`` and ``Identity``.
+            ``PauliZ`` and ``Identity`` are always treated as supported, regardless of input. Defaults to
+            (``PauliZ``, ``Identity``).
+        to_eigvals (bool): Whether the diagonalization should create measurements using
+            eigenvalues and wires rather than observables. Defaults to ``False``.
+
+    Returns:
+        :class:`QNode <pennylane.QNode>`
+
+    .. note::
+        Unlike the PennyLane tape transform, :func:`pennylane.transforms.diagonalize_measurements`,
+        the QNode itself will not be changed or transformed by applying this decorator.
+
+        Unlike the PennyLane tape transform, ``supported_base_obs`` here only accepts a tuple of supported
+        base observable names, instead of the corresponding classes. The reason is that xDSL does not accept
+        class types as values of option-elements. For more details, please refer to the `xDSL repo <https://github.com/xdslproject/xdsl/blob/ba190d9ba1612807e7604374afa7eb2c1c3d2047/xdsl/utils/arg_spec.py#L315-L327>`__.
+
+        Unlike the PennyLane tape transform, only ``to_eigvals = False`` is supported. Setting ``to_eigvals`` as ``True``
+        will raise an error.
+
+        An error will be raised if non-commuting terms are encountered.
+
+    **Example**
+
+    The ``diagonalize-final-measurements`` compilation pass can be applied as a decorator on a QNode:
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from catalyst import qjit
+        from catalyst.passes import diagonalize_measurements
+
+        @qjit
+        @diagonalize_measurements(supported_base_obs=("PauliX",))
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit():
+            qml.Hadamard(0)
+            qml.RZ(1.1, 0)
+            qml.PhaseShift(0.22, 0)
+            return qml.expval(qml.Y(0))
+
+        expected_substr = 'transform.apply_registered_pass "diagonalize-final-measurements" with options = {"supported-base-obs" = ["PauliX"], "to-eigvals" = false}'
+
+    >>> expected_substr in circuit.mlir
+    True
+    >>> circuit()
+    0.9687151001182651
+
+    An error is raised if ``to_eigvals=True`` is passed as an option:
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from catalyst import qjit
+        from catalyst.passes import diagonalize_measurements
+
+        @diagonalize_measurements(to_eigvals=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit():
+            qml.Hadamard(0)
+            qml.PhaseShift(0.22, 0)
+            return qml.expval(qml.Y(0))
+
+        error_msg = None
+
+        try:
+            qjit(circuit)
+        except ValueError as e:
+            error_msg = str(e)
+
+    >>> print(error_msg)
+    Only to_eigvals = False is supported.
+
+    A compile error is raised if non-commuting terms are encountered:
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from pennylane.exceptions import CompileError
+        from catalyst import qjit
+        from catalyst.passes import diagonalize_measurements
+
+        @diagonalize_measurements
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit():
+            qml.Hadamard(0)
+            return qml.expval(qml.Y(0) + qml.X(0))
+
+        error_msg = None
+
+        try:
+            qjit(circuit)
+        except CompileError as e:
+            error_msg = str(e)
+
+    >>> print(error_msg)
+    Observables are not qubit-wise commuting. Please apply the `split-non-commuting` pass first.
+    """
+    if qnode is None:
+        return functools.partial(
+            diagonalize_measurements, supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
+        )
+    return qml.transform(pass_name="diagonalize-final-measurements")(
+        qnode, supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
+    )
+
+
 def disentangle_cnot(qnode):
     """A peephole optimization for replacing ``CNOT`` gates with single-qubit gates.
 
