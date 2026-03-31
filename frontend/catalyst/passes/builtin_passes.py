@@ -18,6 +18,7 @@ import copy
 import functools
 import json
 
+from pennylane.transforms.core import Transform
 import pennylane as qml
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
@@ -314,6 +315,217 @@ def merge_rotations(qnode):
     Array(0.5965506257017892, dtype=float64)
     """
     return qml.transform(pass_name="merge-rotations")(qnode)
+
+
+def combine_global_phases(qnode):
+    """Combine all ``GlobalPhase`` operations into a single ``GlobalPhase`` operation.
+
+    Args:
+        fn (QNode): QNode to apply the pass to
+
+    Returns:
+        :class:`QNode <pennylane.QNode>`
+
+    **Example**
+
+    The ``combine_global_phases`` compilation pass merges :class:`pennylane.GlobalPhase` operators
+    together into one :class:`pennylane.GlobalPhase` operator.
+
+    .. code-block:: python
+
+        import pennylane as qml
+        import catalyst
+
+        @qml.qjit(capture=True)
+        @catalyst.passes.combine_global_phases
+        @qml.qnode(qml.device("lightning.qubit", wires=5))
+        def circuit():
+            qml.GlobalPhase(0)
+            qml.GlobalPhase(1)
+            qml.GlobalPhase(2)
+            qml.GlobalPhase(3)
+            qml.GlobalPhase(4)
+            return qml.state()
+
+    >>> print(qml.specs(circuit, level=2)())
+    Device: lightning.qubit
+    Device wires: 5
+    Shots: Shots(total=None)
+    Level: combine-global-phases (MLIR-1)
+    <BLANKLINE>
+    Wire allocations: 5
+    Total gates: 1
+    Gate counts:
+    - GlobalPhase: 1
+    Measurements:
+    - state(all wires): 1
+    Depth: Not computed
+
+    .. details::
+        :title: Usage details
+
+        The ``combine_global_phases`` pass does not support optimization around structured
+        control flow. Consider the following circuit.
+
+        .. code-block:: python
+
+            import pennylane as qml
+            import catalyst
+
+            @qml.qjit(capture=True, autograph=True)
+            @catalyst.passes.combine_global_phases
+            @qml.qnode(qml.device("lightning.qubit", wires=5))
+            def circuit():
+                qml.GlobalPhase(0)
+                qml.GlobalPhase(1)
+                qml.GlobalPhase(2)
+                qml.GlobalPhase(3)
+                qml.GlobalPhase(4)
+
+                for i in range(3):
+                    qml.GlobalPhase(i)
+                    qml.GlobalPhase(i + 1)
+
+                return qml.state()
+
+        >>> print(qml.specs(circuit, level=2)())
+        Device: lightning.qubit
+        Device wires: 5
+        Shots: Shots(total=None)
+        Level: combine-global-phases (MLIR-1)
+        <BLANKLINE>
+        Wire allocations: 5
+        Total gates: 4
+        Gate counts:
+        - GlobalPhase: 4
+        Measurements:
+        - state(all wires): 1
+        Depth: Not computed
+
+        The resulting circuit contains four ``GlobalPhase`` operations, one from the five merged
+        outside of the ``for`` loop, and three total from the entire ``for`` loop (the two within
+        the body of the ``for`` loop are merged).
+
+        Lastly, ``GlobalPhase`` operations can be merged together when nested in symbolic operations
+        like ``ctrl`` or ``adjoint``.
+
+        .. code-block:: python
+
+            import pennylane as qml
+            import catalyst
+
+            @qml.qjit(capture=True, autograph=True)
+            @catalyst.passes.combine_global_phases
+            @qml.qnode(qml.device("lightning.qubit", wires=5))
+            def circuit():
+                qml.ctrl(qml.GlobalPhase, control=(0, 1, 2))(3)
+                qml.ctrl(qml.GlobalPhase, control=(0, 1, 2))(4)
+                return qml.state()
+
+        >>> print(qml.specs(circuit, level=2)())
+        Device: lightning.qubit
+        Device wires: 5
+        Shots: Shots(total=None)
+        Level: combine-global-phases (MLIR-1)
+        <BLANKLINE>
+        Wire allocations: 5
+        Total gates: 1
+        Gate counts:
+        - 3C(GlobalPhase): 1
+        Measurements:
+        - state(all wires): 1
+        Depth: Not computed
+    """
+    return Transform(pass_name="combine-global-phases")(qnode)
+
+
+def parity_synth(qnode):
+    r"""
+    Pass for applying ParitySynth to phase polynomials in a circuit.
+
+    ParitySynth has been proposed by Vandaele et al. in `arXiv:2104.00934
+    <https://arxiv.org/abs/2104.00934>`__ as a technique to synthesize
+    `phase polynomials
+    <https://pennylane.ai/compilation/phase-polynomial-intermediate-representation>`__
+    into elementary quantum gates, namely ``CNOT`` and ``RZ``. For this, it synthesizes the
+    `parity table <https://pennylane.ai/compilation/parity-table>`__ of the phase polynomial,
+    and defers the remaining `parity matrix <https://pennylane.ai/compilation/parity-matrix>`__
+    synthesis to `RowCol <https://pennylane.ai/compilation/rowcol-algorithm>`__.
+
+    .. note::
+
+        This pass requires the ``networkx`` package, which can be installed via
+        ``pip install networkx``.
+
+    Args:
+        fn (QNode): QNode to apply the pass to
+
+    Returns:
+        :class:`QNode <pennylane.QNode>`
+
+    This pass walks over the input circuit and aggregates all ``CNOT`` and ``RZ`` operators
+    into a subcircuit that describes a phase polyonomial. Other gates form the boundaries of
+    these subcircuits, and whenever one is encountered the phase polynomial of the aggregated
+    subcircuit is resynthesized with the ParitySynth algorithm. This implies that while this
+    pass works on circuits containing any operations, it is recommended to maximize the
+    subcircuits that represent phase polynomials (i.e. consist of ``CNOT`` and ``RZ`` gates) to
+    enhance the effectiveness of the pass. This might be possible through decomposition or
+    re-ordering of commuting gates.
+
+    Note that nested regions, such as nested functions and control flow function bodies, are
+    synthesized independently, i.e., region boundaries are always treated as boundaries of phase
+    polynomial subcircuits. Similarly, dynamic wires create boundaries around the operations using
+    them, causing separation of phase polynomial operations into multiple subcircuits.
+
+    **Example**
+
+    In the following, we apply the pass to a simple quantum circuit that has optimization
+    potential in terms of commuting gates that can be interchanged to unlock a cancellation of
+    a self-inverse gate (``CNOT``) with itself. Concretely, the circuit is:
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from catalyst.python_interface import Compiler
+        import catalyst
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit(capture=True)
+        @catalyst.passes.parity_synth
+        @qml.qnode(dev)
+        def circuit(x: float, y: float, z: float):
+            qml.CNOT((0, 1))
+            qml.RZ(x, 1)
+            qml.CNOT((0, 1))
+            qml.RX(y, 1)
+            qml.CNOT((1, 0))
+            qml.RZ(z, 1)
+            qml.CNOT((1, 0))
+            return qml.state()
+
+    We can draw the circuit and observe the last ``RZ`` gate to be wrapped in a pair of ``CNOT``
+    gates that commute with it. Before the pass is applied:
+
+    >>> print(catalyst.draw_graph(circuit, level=0)(0.52, 0.12, 0.2))
+
+    .. figure:: /_static/parity-synth-example-before.png
+        :width: 35%
+        :alt: Example using ``parity_synth``
+        :align: left
+
+    After the pass is applied:
+
+    >>> print(catalyst.draw_graph(circuit, level=1)(0.52, 0.12, 0.2))
+
+
+    .. figure:: /_static/parity-synth-example-pass-applied.png
+        :width: 35%
+        :alt: Example using ``parity_synth``
+        :align: left
+    """
+
+    return Transform(pass_name="parity-synth")(qnode)
 
 
 def decompose_lowering(qnode):
