@@ -288,7 +288,7 @@ def _get_catalyst_cli_cmd(*args, stdin=None):
     return cmd
 
 
-def _catalyst(*args, stdin=None):
+def _catalyst(*args, stdin=None, text=True):
     """Raw interface to catalyst
 
     echo ${stdin} | catalyst *args -
@@ -296,19 +296,19 @@ def _catalyst(*args, stdin=None):
     """
     cmd = _get_catalyst_cli_cmd(*args, stdin=stdin)
     try:
-        result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=True)
+        result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=text)
         return result.stdout
     except subprocess.CalledProcessError as e:
         raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
 
-def _quantum_opt(*args, stdin=None):
+def _quantum_opt(*args, stdin=None, text=True):
     """Raw interface to quantum-opt
 
     echo ${stdin} | catalyst --tool=opt *args -
     catalyst --tool=opt *args
     """
-    return _catalyst(("--tool", "opt"), *args, stdin=stdin)
+    return _catalyst(("--tool", "opt"), *args, stdin=stdin, text=text)
 
 
 def canonicalize(*args, stdin=None, options: Optional[CompileOptions] = None):

@@ -260,7 +260,7 @@ TEST(InterfaceTests, globalPhase)
 {
     std::string moduleStr = R"mlir(
 func.func @f(%q0: !qref.bit, %cv: i1, %param: f64) {
-    qref.gphase(%param) adj ctrls (%q0) ctrlvals (%cv) : f64 ctrls !qref.bit
+    qref.gphase(%param) adj ctrls (%q0) ctrlvals (%cv) : ctrls !qref.bit
     return
 }
   )mlir";

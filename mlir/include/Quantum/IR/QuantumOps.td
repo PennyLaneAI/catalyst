@@ -579,7 +579,7 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
     }];
 
     let arguments = (ins
-        F64:$params,
+        F64:$angle,
         UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values
@@ -590,7 +590,7 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
     );
 
     let assemblyFormat = [{
-        `(` $params `)` attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` (`ctrls` type($out_ctrl_qubits)^ )?
+        `(` $angle `)` (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? ( `:` `ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -742,21 +742,21 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect
 class Region_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [NoMemoryEffect]>;
 
-def AdjointOp : Region_Op<"adjoint", [QuantumRegion, SingleBlockImplicitTerminator<"YieldOp">]> {
+def AdjointOp : Region_Op<"adjoint", [SingleBlockImplicitTerminator<"YieldOp">, AllTypesMatch<["args", "results"]>]> {
     let summary = "Calculate the adjoint of the enclosed operations";
 
     let regions = (region SizedRegion<1>:$region);
 
     let arguments = (ins
-        QuregType:$qreg
+        Variadic<AnyTypeOf<[QuregType, QubitType]>>:$args
     );
 
     let results = (outs
-        QuregType:$out_qreg
+        Variadic<AnyTypeOf<[QuregType, QubitType]>>:$results
     );
 
     let assemblyFormat = [{
-        `(` $qreg `)` attr-dict `:` type(operands) $region
+        `(` $args `)` attr-dict `:` type($results) $region
     }];
 
     let hasVerifier = 1;
@@ -766,7 +766,7 @@ def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["A
     let summary = "Return results from quantum program regions";
 
     let arguments = (ins
-        Variadic<QuregType>:$retvals
+        Variadic<AnyTypeOf<[QuregType, QubitType]>>:$retvals
     );
 
     let assemblyFormat = [{

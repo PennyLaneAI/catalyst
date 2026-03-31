@@ -71,7 +71,7 @@ LogicalResult convertArbitraryPPRToArbitraryZ(PPRotationArbitraryOp &op, Pattern
     // | X(π/2)|──
     // └───────┘
     SmallVector<StringRef> X = {"X"};
-    const uint16_t PI2 = 2; // For rotation of P(PI/2)
+    const int8_t PI2 = 2; // For rotation of P(PI/2)
     auto inQubit = ppmPZ.getOutQubits().back();
     auto pprX = PPRotationOp::create(rewriter, loc, X, PI2, inQubit, ppmPZ.getMres());
 

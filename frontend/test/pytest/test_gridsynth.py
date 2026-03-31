@@ -68,3 +68,38 @@ def test_gridsynth_ppr_basis(param, eps):
     result = qjitted_circuit(param)
     result_with_ppr = qjitted_circuit_with_ppr(param)
     assert np.allclose(result, result_with_ppr, atol=eps)
+
+
+_EPSILON_WARN_FRAGMENT = "For epsilon smaller than 1e-6"
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_epsilon_warning_emitted_for_small_epsilon(capfd):
+    """Test that a runtime warning is written to stderr when epsilon < 1e-6."""
+    dev = qml.device("lightning.qubit", wires=1)
+
+    @qml.qnode(dev)
+    def circuit(x: float):
+        qml.RZ(x, wires=0)
+        return qml.state()
+
+    qml.qjit(qml.transforms.gridsynth(circuit, epsilon=1e-8))(0.5)
+
+    captured = capfd.readouterr()
+    assert _EPSILON_WARN_FRAGMENT in captured.err
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_epsilon_warning_not_emitted_for_safe_epsilon(capfd):
+    """Test that no runtime warning is written to stderr when epsilon >= 1e-6."""
+    dev = qml.device("lightning.qubit", wires=1)
+
+    @qml.qnode(dev)
+    def circuit(x: float):
+        qml.RZ(x, wires=0)
+        return qml.state()
+
+    qml.qjit(qml.transforms.gridsynth(circuit, epsilon=1e-4))(0.5)
+
+    captured = capfd.readouterr()
+    assert _EPSILON_WARN_FRAGMENT not in captured.err

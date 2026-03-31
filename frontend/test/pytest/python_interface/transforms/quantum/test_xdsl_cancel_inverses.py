@@ -37,6 +37,7 @@ class TestIterativeCancelInversesPass:
                 // CHECK: quantum.custom "PauliY"() [[q1]] : !quantum.bit
                 %1 = quantum.custom "PauliX"() %0 : !quantum.bit
                 %2 = quantum.custom "PauliY"() %1 : !quantum.bit
+                quantum.dealloc_qb %2 : !quantum.bit
                 return
             }
         """
@@ -56,6 +57,8 @@ class TestIterativeCancelInversesPass:
                 // CHECK: quantum.custom "PauliX"() [[q1]] : !quantum.bit
                 %2 = quantum.custom "PauliX"() %0 : !quantum.bit
                 %3 = quantum.custom "PauliX"() %1 : !quantum.bit
+                quantum.dealloc_qb %2 : !quantum.bit
+                quantum.dealloc_qb %3 : !quantum.bit
                 return
             }
         """
@@ -71,6 +74,7 @@ class TestIterativeCancelInversesPass:
                 // CHECK-NOT: quantum.custom
                 %1 = quantum.custom "PauliX"() %0 : !quantum.bit
                 %2 = quantum.custom "PauliX"() %1 : !quantum.bit
+                quantum.dealloc_qb %2 : !quantum.bit
                 return
             }
         """
@@ -90,6 +94,7 @@ class TestIterativeCancelInversesPass:
                 %4 = quantum.custom "PauliZ"() %3 : !quantum.bit
                 %5 = quantum.custom "PauliY"() %4 : !quantum.bit
                 %6 = quantum.custom "PauliX"() %5 : !quantum.bit
+                quantum.dealloc_qb %6 : !quantum.bit
                 return
             }
         """
@@ -108,6 +113,9 @@ class TestIterativeCancelInversesPass:
                 // CHECK-NOT: quantum.custom
                 %4, %5, %6 = quantum.custom "PauliY"() %1 ctrls(%2, %3) ctrlvals(%0, %0) : !quantum.bit ctrls !quantum.bit, !quantum.bit
                 %7, %8, %9 = quantum.custom "PauliY"() %4 ctrls(%5, %6) ctrlvals(%0, %0) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+                quantum.dealloc_qb %7 : !quantum.bit
+                quantum.dealloc_qb %8 : !quantum.bit
+                quantum.dealloc_qb %9 : !quantum.bit
                 return
             }
         """
@@ -128,6 +136,9 @@ class TestIterativeCancelInversesPass:
                 // CHECK-NOT: "quantum.custom"
                 %5, %6, %7 = quantum.custom "PauliY"() %2 ctrls(%3, %4) ctrlvals(%1, %0) : !quantum.bit ctrls !quantum.bit, !quantum.bit
                 %8, %9, %10 = quantum.custom "PauliY"() %5 ctrls(%6, %7) ctrlvals(%1, %0) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+                quantum.dealloc_qb %8 : !quantum.bit
+                quantum.dealloc_qb %9 : !quantum.bit
+                quantum.dealloc_qb %10 : !quantum.bit
                 return
             }
         """
@@ -154,6 +165,9 @@ class TestIterativeCancelInversesPass:
                 // CHECK: quantum.custom "PauliY"() [[q3]] ctrls([[q4]], [[q5]]) ctrlvals([[cval0]], [[cval1]]) : !quantum.bit ctrls !quantum.bit, !quantum.bit
                 %5, %6, %7 = quantum.custom "PauliY"() %2 ctrls(%3, %4) ctrlvals(%1, %0) : !quantum.bit ctrls !quantum.bit, !quantum.bit
                 %8, %9, %10 = quantum.custom "PauliY"() %5 ctrls(%6, %7) ctrlvals(%0, %1) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+                quantum.dealloc_qb %8 : !quantum.bit
+                quantum.dealloc_qb %9 : !quantum.bit
+                quantum.dealloc_qb %10 : !quantum.bit
                 return
             }
         """
@@ -174,6 +188,7 @@ class TestIterativeCancelInversesPass:
                 %1 = quantum.custom "PauliX"() %0 : !quantum.bit
                 %2 = quantum.custom "PauliY"() %1 : !quantum.bit
                 %3 = quantum.custom "PauliX"() %2 : !quantum.bit
+                quantum.dealloc_qb %3 : !quantum.bit
                 return
             }
         """
