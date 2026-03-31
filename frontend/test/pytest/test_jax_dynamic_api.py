@@ -24,7 +24,7 @@ from jax._src.source_info_util import current as current_source_info
 from numpy import array_equal
 from numpy.testing import assert_allclose
 
-from catalyst import cond, for_loop, qjit, while_loop
+from catalyst import cond, qjit, while_loop
 from catalyst.jax_extras import DShapedArray, ShapedArray
 from catalyst.jax_extras.tracing import trace_to_jaxpr
 from catalyst.tracing.contexts import EvaluationContext
@@ -400,6 +400,7 @@ def test_array_assignment(capture_mode):
 
 
 class TestForLoop:
+    """Tests for dynamic shapes with for loops."""
 
     def test_qjit_forloop_identity(self, capture_mode):
         """Test simple for-loop primitive vs dynamic dimensions"""
@@ -419,8 +420,7 @@ class TestForLoop:
         expected = jnp.ones(3)
         assert_array_and_dtype_equal(result, expected)
 
-
-    @pytest.mark.capture_todo # sc-115288
+    @pytest.mark.capture_todo  # sc-115288
     def test_qjit_forloop_capture(self, capture_mode):
         """Test simple for-loop primitive vs dynamic dimensions"""
 
@@ -438,7 +438,6 @@ class TestForLoop:
         result = f(3)
         expected = 4 * jnp.ones(3)
         assert_array_and_dtype_equal(result, expected)
-
 
     def test_qjit_forloop_shared_indbidx(self, capture_mode):
         """Test for-loops with shared dynamic input dimensions in classical tracing mode"""
@@ -458,7 +457,6 @@ class TestForLoop:
         result = f(3)
         expected = 2 * jnp.ones(3)
         assert_array_and_dtype_equal(result, expected)
-
 
     def test_qjit_forloop_indbidx_outdbidx(self, capture_mode):
         """Test for-loops with shared dynamic output dimensions in classical tracing mode"""
@@ -481,7 +479,6 @@ class TestForLoop:
         assert_array_and_dtype_equal(res_a, jnp.ones([3, 3]))
         assert_array_and_dtype_equal(res_b, jnp.ones([4, 3]))
 
-
     def test_qjit_forloop_index_indbidx(self, capture_mode):
         """Test for-loops referring loop return new dimension variable."""
 
@@ -499,7 +496,6 @@ class TestForLoop:
 
         res_a = f(3)
         assert_array_and_dtype_equal(res_a, jnp.ones(9))
-
 
     def test_qjit_forloop_indbidx_const(self, capture_mode):
         """Test for-loops preserve type information in the presence of a constant."""
@@ -519,7 +515,6 @@ class TestForLoop:
 
         res_a = f(3)
         assert_array_and_dtype_equal(res_a, jnp.ones(3) * (3**3))
-
 
     def test_qjit_forloop_shared_dimensions(self, capture_mode):
         """Test catalyst for-loop primitive's experimental_preserve_dimensions option"""
@@ -542,8 +537,7 @@ class TestForLoop:
         assert_array_and_dtype_equal(result[0], expected[0])
         assert_array_and_dtype_equal(result[1], expected[1])
 
-
-    @pytest.mark.capture_todo # how do we test this without returning classical data?
+    @pytest.mark.capture_todo  # how do we test this without returning classical data?
     def test_qnode_forloop_identity(self, capture_mode):
         """Test simple for-loops with dynamic dimensions while doing quantum tracing."""
 
@@ -562,7 +556,6 @@ class TestForLoop:
         result = f(3)
         expected = jnp.ones(3)
         assert_array_and_dtype_equal(result, expected)
-
 
     @pytest.mark.capture_todo
     def test_qnode_forloop_capture(self, capture_mode):
@@ -584,8 +577,7 @@ class TestForLoop:
         expected = 4 * jnp.ones(3)
         assert_array_and_dtype_equal(result, expected)
 
-
-    @pytest.mark.capture_todo # sc-115287
+    @pytest.mark.capture_todo  # sc-115287
     def test_qnode_forloop_shared_indbidx(self, capture_mode):
         """Tests that for-loops preserve equality of output dynamic dimensions."""
 
@@ -605,7 +597,6 @@ class TestForLoop:
         result = f(3)
         expected = 2 * jnp.ones(3)
         assert_array_and_dtype_equal(result, expected)
-
 
     @pytest.mark.capture_todo
     def test_qnode_forloop_indbidx_outdbidx(self, capture_mode):
@@ -628,7 +619,6 @@ class TestForLoop:
         res_a, res_b = f(3)
         assert_array_and_dtype_equal(res_a, jnp.ones(3))
         assert_array_and_dtype_equal(res_b, jnp.ones(4))
-
 
     @pytest.mark.capture_todo
     def test_qnode_forloop_abstracted_axes(self, capture_mode):

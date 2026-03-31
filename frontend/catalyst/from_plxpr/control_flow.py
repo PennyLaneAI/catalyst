@@ -24,8 +24,8 @@ from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
-
 from pennylane.math import is_abstract
+
 from catalyst.from_plxpr.from_plxpr import (
     PLxPRToQuantumJaxprInterpreter,
     WorkflowInterpreter,
@@ -206,13 +206,16 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     # Return only the output values that match the plxpr output values
     return outvals
 
+
 def _reverse_iterator(f, start, step, num_abstract_shapes):
     def new_f(*args):
         abstract_shapes = args[:num_abstract_shapes]
-        new_i = start + step*args[num_abstract_shapes]
-        inputs = args[num_abstract_shapes+1:]
+        new_i = start + step * args[num_abstract_shapes]
+        inputs = args[num_abstract_shapes + 1 :]
         return f(*abstract_shapes, new_i, *inputs)
+
     return new_f
+
 
 # pylint: disable=unused-argument, too-many-arguments
 @WorkflowInterpreter.register_primitive(plxpr_for_loop_prim)
@@ -242,15 +245,17 @@ def workflow_for_loop(
     converter = copy(self)
     evaluator = partial(converter.eval, jaxpr_body_fn, consts)
 
-    if (not is_abstract(step) and step < 0) or (not is_abstract(start) and not is_abstract(stop) and stop < start):
+    if (not is_abstract(step) and step < 0) or (
+        not is_abstract(start) and not is_abstract(stop) and stop < start
+    ):
         evaluator = _reverse_iterator(evaluator, start, step, len(abstract_shapes))
-        num_iterations = (stop - start)//step
+        num_iterations = (stop - start) // step
         start, stop, step = 0, num_iterations, 1
 
     converted_jaxpr_branch = jax.make_jaxpr(evaluator)(*abstract_shapes, start, *args)
 
     new_consts = converted_jaxpr_branch.consts
-    abstract_shapes_end = len(new_consts)+len(abstract_shapes)
+    abstract_shapes_end = len(new_consts) + len(abstract_shapes)
     args_end = abstract_shapes_end + len(args)
     consts_slice = (0, len(new_consts), 1)
     abstract_shapes_slice = (len(new_consts), abstract_shapes_end, 1)
@@ -263,7 +268,7 @@ def workflow_for_loop(
         *new_consts,
         *abstract_shapes,
         *args,
-        jaxpr_body_fn = converted_jaxpr_branch.jaxpr,
+        jaxpr_body_fn=converted_jaxpr_branch.jaxpr,
         consts_slice=consts_slice,
         abstract_shapes_slice=abstract_shapes_slice,
         args_slice=args_slice,
@@ -320,9 +325,11 @@ def handle_for_loop(
         outer_dynqreg_handlers=dynalloced_qregs,
     )
 
-    if (not is_abstract(step) and step < 0) or (not is_abstract(start) and not is_abstract(stop) and stop < start):
+    if (not is_abstract(step) and step < 0) or (
+        not is_abstract(start) and not is_abstract(stop) and stop < start
+    ):
         f = _reverse_iterator(f, start, step, len(abstract_shapes))
-        num_iterations = (stop - start)//step
+        num_iterations = (stop - start) // step
         start, stop, step = 0, num_iterations, 1
     converted_jaxpr_branch = jax.make_jaxpr(f)(*start_plus_args_plus_qreg)
 
@@ -330,8 +337,8 @@ def handle_for_loop(
     # strip global wire indices of dynamic wires
     new_consts = converted_jaxpr_branch.consts
     new_consts = tuple(const for const in new_consts if const not in dynalloced_wire_global_indices)
-    
-    abstract_shapes_end = len(new_consts)+len(abstract_shapes)
+
+    abstract_shapes_end = len(new_consts) + len(abstract_shapes)
     args_end = abstract_shapes_end + len(args) + len(qregs)
     consts_slice = (0, len(new_consts), 1)
     abstract_shapes_slice = (len(new_consts), abstract_shapes_end, 1)

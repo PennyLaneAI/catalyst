@@ -134,12 +134,12 @@ with Patcher(
         lower_jaxpr,
     )
 
+from pennylane.capture.primitives import for_loop_prim as pl_for_loop_prim
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
 from pennylane.capture.primitives import quantum_subroutine_prim
 from pennylane.capture.primitives import value_and_grad_prim as pl_value_and_grad_prim
 from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
-from pennylane.capture.primitives import for_loop_prim as pl_for_loop_prim
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
@@ -2719,10 +2719,12 @@ def _pl_for_loop_lowering(
         new_dtype = ir.RankedTensorType.get((), start_type)
         tensor_index = FromElementsOp(new_dtype, scalar_index).result
 
-        inner_shapes = body_block.arguments[1:len(abstract_shapes)+1]
-        inner_args = body_block.arguments[len(abstract_shapes)+1:]
+        inner_shapes = body_block.arguments[1 : len(abstract_shapes) + 1]
+        inner_args = body_block.arguments[len(abstract_shapes) + 1 :]
         loop_params = (*body_consts, *inner_shapes, tensor_index, *inner_args)
-        new_jaxpr = jaxpr_body_fn.replace(constvars=(), invars=jaxpr_body_fn.constvars + jaxpr_body_fn.invars)
+        new_jaxpr = jaxpr_body_fn.replace(
+            constvars=(), invars=jaxpr_body_fn.constvars + jaxpr_body_fn.invars
+        )
 
         # Recursively generate the mlir for the loop body
         out, _ = mlir.jaxpr_subcomp(
