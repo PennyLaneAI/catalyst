@@ -17,6 +17,9 @@
  */
 
 #include <algorithm>
+#include <optional>
+#include <unordered_set>
+#include <vector>
 
 #include <iostream>
 
@@ -28,8 +31,7 @@ namespace DecompGraph::Solver {
 Core::ChosenDecompRule DecompositionSolver::basisRule(const Core::OperatorNode &op)
 {
     if (!graph.isTargetGate(op)) {
-        graph.showGraph(); // Debug: show the graph structure
-        throw Core::GraphError("Operator is not a target gate in the gateset");
+        return invalidRule(op); // not a target gate, so no valid basis rule
     }
 
     Core::ChosenDecompRule solution;
@@ -52,23 +54,12 @@ Core::ChosenDecompRule DecompositionSolver::evalRule(const Core::RuleNode &rule)
     double total_cost = 0.0;
     for (const auto &input : rule.inputs) {
         Core::ChosenDecompRule child;
-        try {
-            child = solveOperator(input.op);
-        }
-        catch (const Core::CyclicDecompositionError &) {
-            // A cycle in the decomposition graph invalidates this rule,
-            // but should not prevent trying sibling decomposition rules.
-            return invalidRule(solution.op);
-        }
-        catch (const Core::GraphError &) {
-            // Any error in solving the input operator invalidates this rule,
-            // but should not prevent trying sibling decomposition rules.
+        child = solveOperator(input.op);
+        if (isInvalidRule(child)) {
+            // if any input cannot be solved, this rule is invalid
             return invalidRule(solution.op);
         }
 
-        if (child.ruleName.empty()) {
-            return invalidRule(solution.op); // invalid rule
-        }
         total_cost += child.totalCost * static_cast<double>(input.multiplicity);
         for (const auto &[basis_op, count] : child.basisCounts) {
             solution.basisCounts[basis_op] += count * input.multiplicity;
@@ -93,7 +84,7 @@ Core::ChosenDecompRule DecompositionSolver::bestRule(const Core::OperatorNode &o
 
     for (const auto &rule : all_rules) {
         auto candidate = evalRule(rule);
-        if (!candidate.ruleName.empty() &&
+        if (!isInvalidRule(candidate) &&
             (!best_rule.has_value() || candidate.totalCost < best_rule->totalCost)) {
             best_rule = std::move(candidate);
         }
@@ -114,8 +105,7 @@ Core::ChosenDecompRule DecompositionSolver::solveOperator(const Core::OperatorNo
     }
 
     if (visited.find(op) != visited.end()) {
-        graph.showGraph(); // Debug: show the graph structure
-        throw Core::CyclicDecompositionError(solvingStack);
+        return invalidRule(op); // cycle detected, return invalid rule to prevent infinite recursion
     }
 
     // RAII guard for the visited set to check/solve the graph recursively
@@ -146,11 +136,11 @@ Core::ChosenDecompRule DecompositionSolver::solveOperator(const Core::OperatorNo
 
     auto chosen = graph.isTargetGate(op) ? basisRule(op) : bestRule(op);
 
-    // Debug: print the chosen rule for the operator
-    std::cerr << "Chosen rule for operator " << op.name << ": " << chosen.ruleName << " with cost "
-              << chosen.totalCost << "\n"; // FIXME: remove after debugging
+    if (!isInvalidRule(chosen)) {
+        // Debug: print the chosen rule for the operator
+        std::cerr << "Chosen rule for operator " << op.name << ": " << chosen.ruleName
+                  << " with cost " << chosen.totalCost << "\n"; // FIXME: remove after debugging
 
-    if (!chosen.ruleName.empty()) {
         solvedMap.emplace(op, chosen);
     }
     return chosen;
@@ -164,7 +154,7 @@ Core::GraphResult DecompositionSolver::solve()
 
     for (const auto &root : result.solvedRoots) {
         const auto chosen_rule = solveOperator(root);
-        if (chosen_rule.ruleName.empty()) {
+        if (isInvalidRule(chosen_rule)) {
             graph.showGraph();                            // Debug: show the graph structure
             throw Core::GraphSolverFailedError(root, {}); // all rules failed for this root operator
         }

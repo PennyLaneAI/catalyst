@@ -150,5 +150,15 @@ class DecompositionSolver {
     {
         return {op, false, "", {}, 0.0, {}};
     }
+
+    /**
+     * @brief Checks if the given ChosenDecompRule is invalid, which is determined by whether the
+     * rule name is empty. An invalid ChosenDecompRule indicates that no valid decomposition rule
+     * could be found for the operator during the solving process.
+     */
+    [[nodiscard]] inline bool isInvalidRule(const Core::ChosenDecompRule &rule) const
+    {
+        return rule.ruleName.empty();
+    }
 };
 } // namespace DecompGraph::Solver
