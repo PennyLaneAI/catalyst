@@ -572,6 +572,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
     }
 
+<<<<<<< HEAD
     /**
      * @brief Performs a dummy Pauli-basis measurement that always returns false
      *
@@ -588,6 +589,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
     }
 
+=======
+>>>>>>> 2b8ec8832 (Adding null qubit tracking for PauliRot and PauliMeasure runtime calls)
     /**
      * @brief No-op implementation for gradient computation
      *
