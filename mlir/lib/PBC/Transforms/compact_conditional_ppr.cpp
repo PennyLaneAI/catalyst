@@ -1,46 +1,44 @@
 // Copyright 2026 Xanadu Quantum Technologies Inc.
-
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "lower-pbc-init-ops"
+#define DEBUG_TYPE "compact-conditional-ppr"
 
+#include "mlir/Dialect/arith/IR/Arith.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "PBC/Transforms/Patterns.h"
-#include "Quantum/IR/QuantumDialect.h"
 
-using namespace llvm;
 using namespace mlir;
-using namespace catalyst;
 using namespace catalyst::pbc;
 
 namespace catalyst {
 namespace pbc {
 
-#define GEN_PASS_DECL_LOWERPBCINITOPSPASS
-#define GEN_PASS_DEF_LOWERPBCINITOPSPASS
+#define GEN_PASS_DECL_COMPACTCONDITIONALPPRPASS
+#define GEN_PASS_DEF_COMPACTCONDITIONALPPRPASS
 #include "PBC/Transforms/Passes.h.inc"
 
-struct LowerPBCInitOpsPass : public impl::LowerPBCInitOpsPassBase<LowerPBCInitOpsPass> {
-    using LowerPBCInitOpsPassBase::LowerPBCInitOpsPassBase;
+struct CompactConditionalPPRPass
+    : public impl::CompactConditionalPPRPassBase<CompactConditionalPPRPass> {
+    using CompactConditionalPPRPassBase::CompactConditionalPPRPassBase;
 
     void runOnOperation() final
     {
         RewritePatternSet patterns(&getContext());
-
-        populateLowerPBCInitOpsPatterns(patterns);
+        populateCompactConditionalPPRPatterns(patterns);
 
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
