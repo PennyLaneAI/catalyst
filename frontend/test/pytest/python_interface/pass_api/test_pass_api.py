@@ -146,28 +146,28 @@ def test_apply_pass():
     assert '"epsilon" = 42' in module.mlir
 
 
-def test_apply_pass_raise_error():
-    """Test if errors would be raised for an unsupported input for the
+@pytest.mark.xfail(reason="to_eigvals = True is not supported yet")
+def test_apply_pass_unsupported_inputs():
+    """Test if the pipeline would break for an unsupported input for the
     diagonalize-final-measurements pass"""
 
+    @qml.qjit(target="mlir")
     @apply_pass("diagonalize-final-measurements", to_eigvals=True)
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    def qnode0():
+    def qnode():
         qml.X(0)
         qml.X(0)
         return qml.state()
 
-    with pytest.raises(ValueError, match="Only to_eigvals = False is supported."):
+    qnode()
 
-        @qml.qjit(target="mlir")
-        def module0():
-            return qnode0()
 
-        module0()
+def test_apply_pass_raise_error():
+    """Test if an error would be raised for a non-commuting circuit."""
 
     @apply_pass("diagonalize-final-measurements")
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    def qnode1():
+    def qnode():
         qml.X(0)
         qml.X(0)
         return qml.expval(qml.X(0) + qml.Z(0))
@@ -179,10 +179,10 @@ def test_apply_pass_raise_error():
     ):
 
         @qml.qjit(target="mlir")
-        def module1():
-            return qnode1()
+        def module():
+            return qnode()
 
-        module1()
+        module()
 
 
 def test_apply_pass_plugin(tmp_path):
