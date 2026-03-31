@@ -471,14 +471,6 @@ struct ResourceTracker final {
      */
     void MidMeasurement() { measurements_["MidMeasure"]++; }
 
-    void PauliMeasurement(const std::string &pauli_word, const std::vector<QubitIdType> &wires)
-    {
-        std::string full_meas_name =
-            "PauliMeasure(" + pauli_word + ", " + std::to_string(wires.size()) + " wires)";
-        measurements_[full_meas_name]++;
-        UpdateDepth(wires);
-    }
-
     /**
      * @brief Prints resource usage statistics in JSON format to the specified file
      *

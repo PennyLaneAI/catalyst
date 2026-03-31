@@ -286,8 +286,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         if (this->track_resources_) {
             std::string tracked_name = name;
             if (name == "PauliRot" && !params.empty()) {
-                tracked_name = classifyPauliRotAngle(params[0]) + "-w" +
-                               std::to_string(wires.size());
+                tracked_name =
+                    classifyPauliRotAngle(params[0]) + "-w" + std::to_string(wires.size());
             }
             this->resource_tracker_.NamedOperation(tracked_name, inverse, wires, controlled_wires);
         }
@@ -566,31 +566,12 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     auto PauliMeasure(const std::string &, const std::vector<QubitIdType> &wires) -> Result
     {
         if (this->track_resources_) {
-            this->resource_tracker_.PauliMeasure(
-                "PauliMeasure-w" + std::to_string(wires.size()), wires);
+            this->resource_tracker_.PauliMeasure("PauliMeasure-w" + std::to_string(wires.size()),
+                                                 wires);
         }
         return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
     }
 
-<<<<<<< HEAD
-    /**
-     * @brief Performs a dummy Pauli-basis measurement that always returns false
-     *
-     * @param pauli_word The Pauli basis to measure in (e.g. "XZ", "XYZ") (ignored)
-     * @param wires The qubits to measure (ignored)
-     * @return Result Always returns a reference to the global false constant
-     */
-    auto PauliMeasure(const std::string &pauli_word, const std::vector<QubitIdType> &wires)
-        -> Result
-    {
-        if (this->track_resources_) {
-            this->resource_tracker_.PauliMeasurement(pauli_word, wires);
-        }
-        return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
-    }
-
-=======
->>>>>>> 2b8ec8832 (Adding null qubit tracking for PauliRot and PauliMeasure runtime calls)
     /**
      * @brief No-op implementation for gradient computation
      *
