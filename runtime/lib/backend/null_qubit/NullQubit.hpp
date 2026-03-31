@@ -26,6 +26,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <cmath>
+
 #include "DataView.hpp"
 #include "QuantumDevice.hpp"
 #include "QubitManager.hpp"
@@ -34,6 +36,21 @@
 #include "Utils.hpp"
 
 namespace Catalyst::Runtime::Devices {
+
+static std::string classifyPauliRotAngle(double angle)
+{
+    double absAngle = std::abs(angle);
+    if (absAngle < 1e-12) {
+        return "PauliRot-identity";
+    }
+    constexpr int fractions[] = {1, 2, 4, 8};
+    for (int k : fractions) {
+        if (std::abs(absAngle - M_PI / k) / (M_PI / k) < 1e-6) {
+            return "PauliRot-pi/" + std::to_string(k);
+        }
+    }
+    return "PauliRot-Phi";
+}
 
 /**
  * @brief A null backend quantum device.
@@ -260,14 +277,19 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param controlled_wires Control qubits for controlled operations
      * @param controlled_values Control values for multi-controlled operations
      */
-    void NamedOperation(const std::string &name, [[maybe_unused]] const std::vector<double> &params,
+    void NamedOperation(const std::string &name, const std::vector<double> &params,
                         const std::vector<QubitIdType> &wires, bool inverse,
                         const std::vector<QubitIdType> &controlled_wires = {},
                         [[maybe_unused]] const std::vector<bool> &controlled_values = {},
                         [[maybe_unused]] const std::vector<std::string> &optional_params = {})
     {
         if (this->track_resources_) {
-            this->resource_tracker_.NamedOperation(name, inverse, wires, controlled_wires);
+            std::string tracked_name = name;
+            if (name == "PauliRot" && !params.empty()) {
+                tracked_name = classifyPauliRotAngle(params[0]) + "-w" +
+                               std::to_string(wires.size());
+            }
+            this->resource_tracker_.NamedOperation(tracked_name, inverse, wires, controlled_wires);
         }
     }
 
@@ -537,6 +559,15 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     {
         if (this->track_resources_) {
             this->resource_tracker_.MidMeasurement();
+        }
+        return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
+    }
+
+    auto PauliMeasure(const std::string &, const std::vector<QubitIdType> &wires) -> Result
+    {
+        if (this->track_resources_) {
+            this->resource_tracker_.PauliMeasure(
+                "PauliMeasure-w" + std::to_string(wires.size()), wires);
         }
         return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
     }

@@ -451,6 +451,20 @@ struct ResourceTracker final {
     }
 
     /**
+     * @brief Records a Pauli product measurement as a gate operation for resource tracking
+     *
+     * PauliMeasure is a computational instruction (not a terminal measurement),
+     * so it is recorded in gate_types and gate_sizes alongside other operations.
+     *
+     * @param name The name including weight (e.g. "PauliMeasure-w2")
+     * @param wires The qubits being measured
+     */
+    void PauliMeasure(const std::string &name, const std::vector<QubitIdType> &wires)
+    {
+        RecordOperation(name, wires, {});
+    }
+
+    /**
      * @brief Records a mid-circuit measurement for resource tracking
      *
      * Increments the count of mid-circuit measurements performed.

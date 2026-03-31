@@ -270,6 +270,7 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=1 that performs a measuremen
     CHECK(*m == false); // Measurement of NullQubit should always return 0 (false)
 }
 
+<<<<<<< HEAD
 TEST_CASE_METHOD(NullQubitRuntimeFixture,
                  "Test null qubit circuit with pauli measurement returns false", "[NullQubit]")
 {
@@ -277,6 +278,22 @@ TEST_CASE_METHOD(NullQubitRuntimeFixture,
     auto Qs = sim->AllocateQubits(2);
     RESULT *result2 = sim->PauliMeasure("XZ", Qs);
     CHECK(*result2 == false);
+=======
+TEST_CASE_METHOD(NullQubitRuntimeFixture, "Test null qubit circuit with pauli measurement succeeds",
+                 "[NullQubit]")
+{
+    QirArray *reg = __catalyst__rt__qubit_allocate_array(3);
+
+    auto reg_vec = *reinterpret_cast<std::vector<QubitIdType> *>(reg);
+
+    RESULT *m = __catalyst__qis__PauliMeasure("XYZ", 3, reg_vec[0], reg_vec[1], reg_vec[2]);
+    CHECK(*m == false);
+
+    NullQubit device("{}");
+    auto qubits = device.AllocateQubits(1);
+    auto result = device.PauliMeasure("X", qubits);
+    CHECK(*result == false);
+>>>>>>> 2b8ec8832 (Adding null qubit tracking for PauliRot and PauliMeasure runtime calls)
 }
 
 TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample calling Hadamard, "
