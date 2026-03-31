@@ -599,6 +599,9 @@
   to inner PPM ops.
   [(#2511)](https://github.com/PennyLaneAI/catalyst/pull/2511)
 
+* The operands and assembly format of several PBC operations have been updated for clarity and
+  improved functionality.
+  [(#2637)](https://github.com/PennyLaneAI/catalyst/pull/2637)
 
 * Update `mlir_specs` to account for new `marker` functionality in PennyLane.
   [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
