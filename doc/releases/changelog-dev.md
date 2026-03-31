@@ -229,7 +229,7 @@
   Otherwise, the more strict *non-overlapping observable* check is applied.
   [(#2538)](https://github.com/PennyLaneAI/catalyst/pull/2538)
 
-* Register `diagonalize-final-measurements` xDSL pass as a builtin pass and a public-facing docstring is added.
+* The `diagonalize-final-measurements` xDSL pass is now available as a builtin pass accessible from the Catalyst frontend as `catalyst.passes.diagonalize_measurements`.
   [(#2630)](https://github.com/PennyLaneAI/catalyst/pull/2630)
 
 * Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
