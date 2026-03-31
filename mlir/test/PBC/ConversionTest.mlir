@@ -86,8 +86,8 @@ module @test_ppm {
     func.func @ppm(%q0 : !quantum.bit, %q1 : !quantum.bit) -> (i1, !quantum.bit, !quantum.bit) {
         // CHECK: [[pauliPtr:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<3 x i8>
         // CHECK-DAG: [[numQubits:%.+]] = llvm.mlir.constant(2 : i64) : i64
-        // CHECK-DAG: [[false:%.+]] = llvm.mlir.constant(false) : i1
-        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[pauliPtr]], [[pauliPtr]], [[false]], [[numQubits]], %arg0, %arg1)
+        // CHECK-DAG: [[true:%.+]] = llvm.mlir.constant(true) : i1
+        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[pauliPtr]], [[pauliPtr]], [[true]], [[numQubits]], %arg0, %arg1)
         // CHECK: [[mres:%.+]] = llvm.load [[resultPtr]] : !llvm.ptr -> i1
         %mres, %out:2 = pbc.ppm ["X", "Y"] %q0, %q1 : i1, !quantum.bit, !quantum.bit
         return %mres, %out#0, %out#1 : i1, !quantum.bit, !quantum.bit
@@ -103,8 +103,8 @@ module @test_ppm_negative_basis {
     func.func @ppm_negative_basis(%q0 : !quantum.bit, %q1 : !quantum.bit) -> (i1, !quantum.bit, !quantum.bit) {
         // CHECK: [[pauliPtr:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<3 x i8>
         // CHECK-DAG: [[numQubits:%.+]] = llvm.mlir.constant(2 : i64) : i64
-        // CHECK-DAG: [[false:%.+]] = llvm.mlir.constant(false) : i1
-        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[pauliPtr]], [[pauliPtr]], [[false]], [[numQubits]], %arg0, %arg1)
+        // CHECK-DAG: [[true:%.+]] = llvm.mlir.constant(true) : i1
+        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[pauliPtr]], [[pauliPtr]], [[true]], [[numQubits]], %arg0, %arg1)
         // CHECK: [[mres:%.+]] = llvm.load [[resultPtr]] : !llvm.ptr -> i1
         // CHECK: [[true:%.+]] = llvm.mlir.constant(true) : i1
         // CHECK: [[mres_negated:%.+]] = llvm.xor [[mres]], [[true]] : i1

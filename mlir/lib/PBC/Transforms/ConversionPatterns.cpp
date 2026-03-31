@@ -155,17 +155,17 @@ template <typename T> struct PPMeasurementOpPattern : public OpConversionPattern
         ModuleOp mod = op->template getParentOfType<ModuleOp>();
 
         // Create a global string for the Pauli word
-        Value selectAlt;
+        Value selectSwitch;
         Value pauliWordPtr, pauliWordAltPtr;
         if constexpr (std::is_same_v<T, PPMeasurementOp>) {
             pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct());
             pauliWordAltPtr = pauliWordPtr;
-            selectAlt = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(false));
+            selectSwitch = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(true));
         }
         else if constexpr (std::is_same_v<T, SelectPPMeasurementOp>) {
             pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct_0());
             pauliWordAltPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct_1());
-            selectAlt = op.getSelectSwitch();
+            selectSwitch = op.getSelectSwitch();
         }
         else {
             static_assert(false, "unexpected type in templated rewrite");
@@ -188,7 +188,7 @@ template <typename T> struct PPMeasurementOpPattern : public OpConversionPattern
         SmallVector<Value> args;
         args.push_back(pauliWordPtr);
         args.push_back(pauliWordAltPtr);
-        args.push_back(selectAlt);
+        args.push_back(selectSwitch);
         args.push_back(
             LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
         args.append(adaptor.getInQubits().begin(), adaptor.getInQubits().end());
