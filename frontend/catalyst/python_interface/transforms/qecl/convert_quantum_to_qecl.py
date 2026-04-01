@@ -58,8 +58,10 @@ class AllocOpConversion(RewritePattern):
                 f"a dynamic number of qubits"
             )
 
-        _assert_attribute_type(nqubits_attr, IntegerAttr, "nqubits_attr", op)
-        nqubits_attr = cast(IntegerAttr, nqubits_attr)
+        assert isinstance(nqubits_attr, IntegerAttr), (
+            f"Expected attribute 'nqubits_attr' of {op.name} op to have type '{IntegerAttr.name}', "
+            f"but got {nqubits_attr.name}"
+        )
         nqubits = nqubits_attr.value.data
 
         hyper_reg_width = math.ceil(nqubits / self.k)
@@ -385,26 +387,6 @@ class MeasureOpConversion(RewritePattern):
 
 
 # MARK: Helpers
-
-
-def _assert_operand_type(
-    operand: SSAValue, expected_type: type[TypeAttribute], operand_name: str, op: Operation
-):
-    """Helper function to assert that an operand of an op has the expected type."""
-    assert isinstance(operand.type, expected_type), (
-        f"Expected operand '{operand_name}' of {op.name} op to have type "
-        f"'{expected_type.name}', but got '{operand.type.name}'"
-    )
-
-
-def _assert_attribute_type(
-    attr: Attribute, expected_type: type[Attribute], attr_name: str, op: Operation
-):
-    """Helper function to assert that an attribute of an op has the expected type."""
-    assert isinstance(attr, expected_type), (
-        f"Expected attribute '{attr_name}' of {op.name} op to have type "
-        f"'{expected_type.name}', but got {attr.name}"
-    )
 
 
 def _get_idx_value_or_attr_from_extract_or_insert_op(
