@@ -251,6 +251,23 @@ class TestExpval:
         observed = expval1(np.pi)
         assert np.isclose(observed, expected)
 
+    def test_named_identity(self, backend):
+        """
+        Test expval for identity named observable on multiple wires.
+
+        Note that the identity observable on multiple wires doesn't yet work in capture:
+        https://github.com/PennyLaneAI/catalyst/issues/2645
+        """
+
+        @qjit(capture=False)
+        @qml.qnode(qml.device(backend, wires=3))
+        def expval():
+            return qml.expval(qml.Identity(wires=[1, 2])), qml.expval(qml.Identity(wires=[0, 1, 2]))
+
+        expected = np.array([1.0, 1.0])
+        observed = expval()
+        assert np.allclose(observed, expected)
+
     def test_hermitian_1(self, backend):
         """Test expval for Hermitian observable."""
 
