@@ -277,7 +277,8 @@ TEST_CASE_METHOD(NullQubitRuntimeFixture, "Test null qubit circuit with pauli me
 
     auto reg_vec = *reinterpret_cast<std::vector<QubitIdType> *>(reg);
 
-    RESULT *m = __catalyst__qis__PauliMeasure("XYZ", 3, reg_vec[0], reg_vec[1], reg_vec[2]);
+    RESULT *m = __catalyst__qis__PauliMeasure("XYZ", false, nullptr, false, true, 3,
+                                              reg_vec[0], reg_vec[1], reg_vec[2]);
     CHECK(*m == false);
 
     NullQubit device("{}");

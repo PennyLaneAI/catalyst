@@ -21,7 +21,7 @@ func.func @test_select_ppm(%q : !quantum.bit, %cond : i1) -> (i1, !quantum.bit) 
     // CHECK: else
     // CHECK: [[m2:%.+]], [[q2:%.+]] = pbc.ppm ["Z"]
     // CHECK: scf.yield [[m2]], [[q2]]
-    // CHECK-NOT: pbc.select.ppm({{.*}} ? ["X"] : ["Z"])
+    // CHECK-NOT: pbc.select.ppm ({{.*}} ? ["X"] : ["Z"])
     %m, %out = pbc.select.ppm (%cond ? ["X"] : ["Z"]) %q : i1, !quantum.bit
     func.return %m, %out : i1, !quantum.bit
 }
