@@ -52,7 +52,7 @@ struct ResourceTracker final {
      * @brief Internal method to record an operation being applied to the device
      *
      * Updates the gate type and size counts, and if depth tracking is enabled,
-     * updates the circuit depth of the wires involved in an operation.
+     * updates the depth of the wires involved in the operation.
      *
      * @param wires The wires the operation is being applied to
      * @param controlled_wires The control wires the operation is being applied to
