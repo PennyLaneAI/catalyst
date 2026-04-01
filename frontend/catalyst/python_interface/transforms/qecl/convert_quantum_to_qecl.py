@@ -267,7 +267,7 @@ class CustomOpConversion(RewritePattern):
                     _raise_failed_to_convert_op_compile_error(op)
 
             case "S":
-                adjoint = True if op.properties.get("adjoint") else False
+                adjoint = bool(op.properties.get("adjoint"))
                 assert len(op.in_qubits) == 1
                 qubit_owner_op = op.in_qubits[0].owner
                 if isinstance(qubit_owner_op, builtin.UnrealizedConversionCastOp) and isinstance(
@@ -379,10 +379,8 @@ class ScfForOpConversion(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: scf.ForOp, rewriter: PatternRewriter):
         if any(
-            [
-                isinstance(result_type, qecl.LogicalHyperRegisterType)
-                for result_type in op.result_types
-            ]
+            isinstance(result_type, qecl.LogicalHyperRegisterType)
+            for result_type in op.result_types
         ):
             # This op has already been converted
             return
