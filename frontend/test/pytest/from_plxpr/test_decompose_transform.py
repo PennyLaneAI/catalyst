@@ -33,7 +33,7 @@ def _normalize_gate_types(gate_types):
     """
     TODO: Remove this function once PennyLane tape-based resource counting specs format
     is unified with the updated resource tracking specs format.
-    
+
     Normalize gate type names by stripping NullQubit suffixes (e.g. 'PauliRot-Phi-w4')
     back to the base name ('PauliRot') and summing counts for matching base names.
     """
