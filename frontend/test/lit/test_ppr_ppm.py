@@ -179,7 +179,7 @@ def test_merge_ppr_ppm_max_pauli_size():
 
 # CHECK-LABEL: public @cir_merge_ppr_ppm_max_pauli_size
 # CHECK-NOT: pbc.ppm ["Z", "Z"]
-# CHECK:  pbc.ppm ["Y"](-1)
+# CHECK:  pbc.ppm ["Y"](-)
 test_merge_ppr_ppm_max_pauli_size()
 
 
@@ -239,7 +239,7 @@ def test_ppr_to_ppm():
 # CHECK-NOT: pbc.ppr ["Z"](4)
 # CHECK: quantum.alloc( 2)
 # CHECK: quantum.alloc_qb
-# CHECK: pbc.ppm ["Z", "Y"](-1) {{.+}}, {{.+}} : i1, !quantum.bit, !quantum.bit
+# CHECK: pbc.ppm ["Z", "Y"](-) {{.+}}, {{.+}} : i1, !quantum.bit, !quantum.bit
 # CHECK: pbc.ppm ["X"] {{.+}} : i1, !quantum.bit
 # CHECK: arith.xori
 # CHECK: scf.if
@@ -288,7 +288,7 @@ def test_ppr_to_ppm():
 # CHECK: }
 
 # FOR CNOT gate
-# CHECK: ["Z", "X", "Y"](-1) {{.+}}, {{.+}}, {{.+}}
+# CHECK: ["Z", "X", "Y"](-) {{.+}}, {{.+}}, {{.+}}
 # CHECK: pbc.ppm ["X"] {{.+}}
 # CHECK: arith.xori
 # CHECK: scf.if
@@ -380,7 +380,7 @@ def test_clifford_to_ppm():
 # CHECK: pbc.ppm ["Z"]
 # CHECK: }
 # CHECK: pbc.ppm ["X", "Z", "Z"]
-# CHECK: pbc.ppm ["Z", "Y"](-1)
+# CHECK: pbc.ppm ["Z", "Y"](-)
 # CHECK: pbc.ppm ["X"]
 # CHECK: scf.if
 # CHECK: pbc.ppm ["X"]

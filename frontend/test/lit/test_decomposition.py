@@ -244,7 +244,7 @@ def test_decompose_singleexcitationplus():
     """
     Test decomposition of single excitation plus.
     See
-    https://github.com/PennyLaneAI/pennylane/blob/master/pennylane/ops/qubit/qchem_ops.py
+    https://github.com/PennyLaneAI/pennylane/blob/main/pennylane/ops/qubit/qchem_ops.py
     for the decomposition of qml.SingleExcitationPlus
     """
     dev = get_custom_device_without(2, discards={"SingleExcitationPlus", "C(SingleExcitationPlus)"})

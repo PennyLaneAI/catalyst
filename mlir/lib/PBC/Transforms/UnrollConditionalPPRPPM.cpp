@@ -117,8 +117,7 @@ struct LowerCondPPR : public OpRewritePattern<PPRotationOp> {
         {
             OpBuilder::InsertionGuard guard(rewriter);
             rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
-            auto ppr = PPRotationOp::create(rewriter, loc, resultTypes, pauliProduct, rotationKind,
-                                            inQubits);
+            auto ppr = PPRotationOp::create(rewriter, loc, pauliProduct, rotationKind, inQubits);
             scf::YieldOp::create(rewriter, loc, ppr.getOutQubits());
         }
 
