@@ -195,7 +195,6 @@ dialects:
 		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD) \
 		-DCATALYST_ENABLE_WARNINGS=$(STRICT_WARNINGS)
 
-	quantum-opt $(MK_DIR)/test/Quantum/GraphDecomposition/test_rules.mlir --register-decomp-rule-resource --emit-bytecode -o $(MK_DIR)/test/Quantum/GraphDecomposition/test_rules.mlirbc
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli check-unit-tests
 
 .PHONY: dialect-docs
@@ -219,7 +218,6 @@ dialect-docs:
 .PHONY: test
 test:
 	@echo "test the Catalyst MLIR dialects test suite"
-	quantum-opt $(MK_DIR)/test/Quantum/GraphDecomposition/test_rules.mlir --register-decomp-rule-resource --emit-bytecode -o $(MK_DIR)/test/Quantum/GraphDecomposition/test_rules.mlirbc
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects
 
 .PHONY: clean clean-dialects clean-enzyme clean-stablehlo clean-plugin clean-dialect-docs

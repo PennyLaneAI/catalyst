@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// NOTE: be sure to run `quantum-opt --emit-bytecode test_rules.mlir -o test_rules.mlirbc` after making changes to this file.
+
 func.func @__builtin_h_to_rz_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="Hadamard"} {
     %piby2 = arith.constant 1.57 : f64
     %pi = arith.constant 3.14 : f64
