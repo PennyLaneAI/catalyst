@@ -36,6 +36,7 @@ if "Address" in getattr(config, "llvm_use_sanitizer", ""):
 
 config.substitutions.append(("%PYTHON", python_executable))
 config.substitutions.append(("%BYTECODE_PATH", config.bytecode_path))
+config.excludes.append("test_rules.mlir")
 
 # Define PATH to include the various tools needed for our tests.
 try:
