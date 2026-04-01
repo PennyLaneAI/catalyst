@@ -18,7 +18,7 @@ This module contains the implementation of the xDSL quantum-to-qecl dialect-conv
 """
 import math
 from dataclasses import dataclass
-from typing import cast
+from typing import NoReturn, cast
 
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, scf
@@ -39,7 +39,7 @@ from catalyst.python_interface.dialects import qecl, quantum
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 from catalyst.utils.exceptions import CompileError
 
-# MARK: Conversion Patterns
+# MARK: Alloc Op Pattern
 
 
 @dataclass(frozen=True)
@@ -74,6 +74,9 @@ class AllocOpConversion(RewritePattern):
                 _cast_to_qureg(alloc_op.hyper_reg),
             ],
         )
+
+
+# MARK: Extract Op Pattern
 
 
 @dataclass(frozen=True)
@@ -154,6 +157,9 @@ class ExtractOpConversion(RewritePattern):
         )
 
 
+# MARK: Insert Op Pattern
+
+
 class InsertOpConversion(RewritePattern):
     """Converts `quantum.extract` ops to equivalent `qecl.insert_block` ops."""
 
@@ -193,6 +199,9 @@ class InsertOpConversion(RewritePattern):
         rewriter.replace_op(op, ops_to_insert)
 
 
+# MARK: Dealloc Op Pattern
+
+
 class DeallocOpConversion(RewritePattern):
     """Converts `quantum.dealloc` ops to equivalent `qecl.dealloc` ops."""
 
@@ -214,6 +223,9 @@ class DeallocOpConversion(RewritePattern):
             _raise_failed_to_convert_op_compile_error(op)
 
         rewriter.replace_op(op, ops_to_insert)
+
+
+# MARK: Custom Op Pattern
 
 
 class CustomOpConversion(RewritePattern):
@@ -321,6 +333,9 @@ class CustomOpConversion(RewritePattern):
         rewriter.replace_op(op, ops_to_insert, new_results=new_results)
 
 
+# MARK: Measure Op Pattern
+
+
 class MeasureOpConversion(RewritePattern):
     """Converts `quantum.measure` ops to equivalent `qecl.measure` ops.
 
@@ -353,6 +368,9 @@ class MeasureOpConversion(RewritePattern):
             _raise_failed_to_convert_op_compile_error(op)
 
         rewriter.replace_op(op, ops_to_insert, new_results=new_results)
+
+
+# MARK: Scf.For Op Pattern
 
 
 class ScfForOpConversion(RewritePattern):
@@ -466,7 +484,7 @@ def _get_idx_value_or_attr_from_extract_or_insert_op(
     return idx
 
 
-def _cast_to_qureg(value: SSAValue):
+def _cast_to_qureg(value: SSAValue) -> builtin.UnrealizedConversionCastOp:
     """Return a `builtin.unrealized_conversion_cast` op that casts `value` to type `quantum.reg`."""
     # For now, we restrict usage of this function to cast from `qecl.hyperreg` to `quantum.reg`
     assert isinstance(value.type, qecl.LogicalHyperRegisterType), (
@@ -476,7 +494,7 @@ def _cast_to_qureg(value: SSAValue):
     return builtin.UnrealizedConversionCastOp.get((value,), (quantum.QuregType(),))
 
 
-def _cast_to_qubit(value: SSAValue):
+def _cast_to_qubit(value: SSAValue) -> builtin.UnrealizedConversionCastOp:
     """Return a `builtin.unrealized_conversion_cast` op that casts `value` to type `quantum.bit`."""
     # For now, we restrict usage of this function to cast from `qecl.codeblock` to `quantum.bit`
     assert isinstance(value.type, qecl.LogicalCodeblockType), (
@@ -486,7 +504,7 @@ def _cast_to_qubit(value: SSAValue):
     return builtin.UnrealizedConversionCastOp.get((value,), (quantum.QubitType(),))
 
 
-def _raise_failed_to_convert_op_compile_error(op: Operation):
+def _raise_failed_to_convert_op_compile_error(op: Operation) -> NoReturn:
     """Raise a `CompileError` for cases where the conversion pattern for `op` failed."""
     raise CompileError(
         f"Failed to convert op '{op}': conversion pattern for '{op.name}' could not identity "
