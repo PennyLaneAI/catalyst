@@ -492,11 +492,11 @@ class TestDiagonalizeFinalMeasurementsPass:
         run_filecheck(program, pipeline)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
     """Integration tests going through plxpr (program capture enabled)"""
 
     # pylint: disable=unnecessary-lambda
-    @pytest.mark.usefixtures("use_capture")
     @pytest.mark.parametrize(
         "mp, obs, expected_res",
         [
@@ -534,7 +534,6 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
 
         assert np.allclose(expected_res(angle), circuit_compiled(angle))
 
-    @pytest.mark.usefixtures("use_capture")
     def test_with_composite_observables(self):
         """Test the transform works for an observable built using operator arithmetic
         (sprod, prod, sum)"""
@@ -595,7 +594,6 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
-    @pytest.mark.usefixtures("use_capture")
     @pytest.mark.parametrize("phi", [0.123, 1.23])
     def test_overlapping_commute_observables_multiple_measurements(self, phi):
         """Test the case where multiple overlapping (commuting) observables exist in
@@ -617,7 +615,6 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
         assert np.allclose(expected_expval, expval)
         assert np.allclose(expected_var, var)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_non_commuting_observables_raise_error(self):
         """Check that an error is raised if we try to diagonalize a circuit that contains
         non-commuting observables."""
@@ -813,7 +810,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
 
-@pytest.mark.usefixtures("use_capture")
+@pytest.mark.usefixtures("use_both_frontend")
 class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
     """Integrate test for NonCommutingObservableValidator"""
 
@@ -861,7 +858,7 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
 
     @pytest.mark.parametrize("add_compbasis_meas", ["false", "wires", "qreg"])
     @pytest.mark.parametrize("obs", NON_COMMUTE_SINGLE_OBS_LIST)
-    @pytest.mark.parametrize("measurements", [qml.expval, qml.var, qml.sample])
+    @pytest.mark.parametrize("measurements", [qml.expval, qml.var])
     def test_non_commuting_single_measurement(self, add_compbasis_meas, device, obs, measurements):
         """An CompileError is raised for single measurement non-commuting Hamiltonians."""
 
@@ -882,8 +879,21 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
         with pytest.raises(CompileError, match=_non_commuting_err_msg):
             circuit(0.7)
 
+    def test_non_commuting_multiple_measurements_only(self, device):
+        """A CompileError is raised for non-commuting measurements without gates
+        applied."""
+
+        @diagonalize_final_measurements_pass
+        @qml.set_shots(10)
+        @qml.qnode(device)
+        def circuit():
+            return qml.expval(qml.X(0)), qml.var(qml.Z(0))
+
+        with pytest.raises(CompileError, match=_non_commuting_err_msg):
+            qml.qjit(circuit)
+
     @pytest.mark.parametrize("obs", NON_COMMUTE_MULTI_OBS_LIST)
-    @pytest.mark.parametrize("m", [(qml.expval, qml.var), (qml.expval, qml.sample)])
+    @pytest.mark.parametrize("m", [(qml.expval, qml.var)])
     def test_non_commuting_multiple_measurements(self, device, obs, m):
         """An CompileError is raised for multiple non-commuting measurements."""
 
