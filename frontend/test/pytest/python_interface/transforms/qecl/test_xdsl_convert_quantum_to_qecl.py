@@ -431,7 +431,8 @@ class TestGatePattern:
             %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
 
             // CHECK: [[cb1:%.+]] = qecl.hadamard [[cb0]][0] : !qecl.codeblock<1>
-            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb1]] : !qecl.codeblock<1> to !quantum.bit
+            // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
             %2 = quantum.custom "Hadamard"() %1 : !quantum.bit
 
             // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
@@ -455,10 +456,12 @@ class TestGatePattern:
             %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
 
             // CHECK: [[cb1:%.+]] = qecl.s [[cb0]][0] : !qecl.codeblock<1>
+            // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
             %2 = quantum.custom "S"() %1 : !quantum.bit
 
-            // CHECK: [[cb2:%.+]] = qecl.s [[cb1]][0] adj : !qecl.codeblock<1>
-            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
+            // CHECK: [[cb3:%.+]] = qecl.s [[cb2]][0] adj : !qecl.codeblock<1>
+            // CHECK: [[cb4:%.+]] = qecl.qec [[cb3]] : !qecl.codeblock<1>
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb4]] : !qecl.codeblock<1> to !quantum.bit
             %3 = quantum.custom "S"() %2 adj : !quantum.bit
 
             // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
@@ -486,8 +489,10 @@ class TestGatePattern:
             %2 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
 
             // CHECK: [[cb2:%.+]], [[cb3:%.+]] = qecl.cnot [[cb0]][0], [[cb1]][0] : !qecl.codeblock<1>, !qecl.codeblock<1>
-            // CHECK: [[conv_cast1:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
-            // CHECK: [[conv_cast2:%.+]] = builtin.unrealized_conversion_cast [[cb3]] : !qecl.codeblock<1> to !quantum.bit
+            // CHECK: [[cb4:%.+]] = qecl.qec [[cb2]] : !qecl.codeblock<1>
+            // CHECK: [[cb5:%.+]] = qecl.qec [[cb3]] : !qecl.codeblock<1>
+            // CHECK: [[conv_cast1:%.+]] = builtin.unrealized_conversion_cast [[cb4]] : !qecl.codeblock<1> to !quantum.bit
+            // CHECK: [[conv_cast2:%.+]] = builtin.unrealized_conversion_cast [[cb5]] : !qecl.codeblock<1> to !quantum.bit
             %3, %4 = quantum.custom "CNOT"() %1, %2 : !quantum.bit, !quantum.bit
 
             // CHECK: "test.op"([[conv_cast1]], [[conv_cast2]]) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)

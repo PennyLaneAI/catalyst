@@ -24,7 +24,7 @@ from typing import cast
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin
 from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType
-from xdsl.ir import Attribute, Block, Operation, SSAValue, TypeAttribute
+from xdsl.ir import Block, Operation, SSAValue
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
@@ -71,9 +71,7 @@ class AllocOpConversion(RewritePattern):
                 alloc_op := qecl.AllocOp(
                     qecl.LogicalHyperRegisterType(width=hyper_reg_width, k=self.k)
                 ),
-                builtin.UnrealizedConversionCastOp.get(
-                    (alloc_op.hyper_reg,), (quantum.QuregType(),)
-                ),
+                _cast_to_qureg(alloc_op.hyper_reg),
             ],
         )
 
@@ -113,24 +111,18 @@ class ExtractOpConversion(RewritePattern):
                     conv_cast_op,
                     extract_codeblock_op,
                     encode_op := qecl.EncodeOp(
-                        in_codeblock=extract_codeblock_op,
+                        in_codeblock=extract_codeblock_op.codeblock,
                         init_state=qecl.LogicalCodeblockInitState.Zero,
                     ),
-                    qec_cycle_op := qecl.QecCycleOp(
-                        in_codeblock=cast(qecl.LogicalCodeBlockSSAValue, encode_op.results[0])
-                    ),
-                    builtin.UnrealizedConversionCastOp.get(
-                        (qec_cycle_op.results[0],), (quantum.QubitType(),)
-                    ),
+                    qec_cycle_op := qecl.QecCycleOp(in_codeblock=encode_op.out_codeblock),
+                    _cast_to_qubit(qec_cycle_op.out_codeblock),
                 ]
 
             else:
                 ops_to_insert = [
                     conv_cast_op,
                     extract_codeblock_op,
-                    builtin.UnrealizedConversionCastOp.get(
-                        (extract_codeblock_op.results[0],), (quantum.QubitType(),)
-                    ),
+                    _cast_to_qubit(extract_codeblock_op.codeblock),
                 ]
 
         else:
@@ -196,9 +188,7 @@ class InsertOpConversion(RewritePattern):
                     idx=idx,
                     codeblock=qubit_conv_cast_op.results[0],
                 ),
-                builtin.UnrealizedConversionCastOp.get(
-                    (insert_codeblock_op.results[0],), (quantum.QuregType(),)
-                ),
+                _cast_to_qureg(insert_codeblock_op.out_hyper_reg),
             ]
         else:
             raise CompileError(
@@ -238,6 +228,8 @@ class DeallocOpConversion(RewritePattern):
 class CustomOpConversion(RewritePattern):
     """Converts `quantum.custom` ops to equivalent `qecl.hadamard`, `qecl.s` and `qecl.cnot` ops.
 
+    For now, we insert cycles of QEC after every gate operation.
+
     NOTES
     -----
 
@@ -265,9 +257,8 @@ class CustomOpConversion(RewritePattern):
                             (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
                         ),
                         gate_op := qecl.HadamardOp(in_codeblock=conv_cast_op.results[0], idx=0),
-                        builtin.UnrealizedConversionCastOp.get(
-                            (gate_op.results[0],), (quantum.QubitType(),)
-                        ),
+                        qec_cycle_op := qecl.QecCycleOp(in_codeblock=gate_op.out_codeblock),
+                        _cast_to_qubit(qec_cycle_op.out_codeblock),
                     ]
                 else:
                     raise CompileError(
@@ -289,9 +280,8 @@ class CustomOpConversion(RewritePattern):
                         gate_op := qecl.SOp(
                             in_codeblock=conv_cast_op.results[0], idx=0, adjoint=adjoint
                         ),
-                        builtin.UnrealizedConversionCastOp.get(
-                            (gate_op.results[0],), (quantum.QubitType(),)
-                        ),
+                        qec_cycle_op := qecl.QecCycleOp(in_codeblock=gate_op.out_codeblock),
+                        _cast_to_qubit(qec_cycle_op.out_codeblock),
                     ]
                 else:
                     raise CompileError(
@@ -324,12 +314,14 @@ class CustomOpConversion(RewritePattern):
                             in_trgt_codeblock=trgt_conv_cast_op.results[0],
                             idx_trgt=0,
                         ),
-                        ctrl_conv_cast_op := builtin.UnrealizedConversionCastOp.get(
-                            (gate_op.results[0],), (quantum.QubitType(),)
+                        ctrl_qecl_cycle_op := qecl.QecCycleOp(
+                            in_codeblock=gate_op.out_ctrl_codeblock
                         ),
-                        trgt_conv_cast_op := builtin.UnrealizedConversionCastOp.get(
-                            (gate_op.results[1],), (quantum.QubitType(),)
+                        trgt_qecl_cycle_op := qecl.QecCycleOp(
+                            in_codeblock=gate_op.out_trgt_codeblock
                         ),
+                        ctrl_conv_cast_op := _cast_to_qubit(ctrl_qecl_cycle_op.out_codeblock),
+                        trgt_conv_cast_op := _cast_to_qubit(trgt_qecl_cycle_op.out_codeblock),
                     ]
                     new_results = (ctrl_conv_cast_op.results[0], trgt_conv_cast_op.results[0])
                 else:
@@ -372,9 +364,7 @@ class MeasureOpConversion(RewritePattern):
                     (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
                 ),
                 measure_op := qecl.MeasureOp(in_codeblock=conv_cast_op.results[0], idx=0),
-                conv_cast_op := builtin.UnrealizedConversionCastOp.get(
-                    (measure_op.results[1],), (quantum.QubitType(),)
-                ),
+                conv_cast_op := _cast_to_qubit(measure_op.out_codeblock),
             ]
             new_results = (measure_op.mres, conv_cast_op.results[0])
         else:
@@ -420,6 +410,26 @@ def _get_idx_value_or_attr_from_extract_or_insert_op(
         assert False, f"Both idx and idx_attr of op '{op}' are None"
 
     return idx
+
+
+def _cast_to_qureg(value: SSAValue):
+    """Return a `builtin.unrealized_conversion_cast` op that casts `value` to type `quantum.reg`."""
+    # For now, we restrict usage of this function to cast from `qecl.hyperreg` to `quantum.reg`
+    assert isinstance(value.type, qecl.LogicalHyperRegisterType), (
+        f"Value '{value}' must have type '{qecl.LogicalHyperRegisterType.name}' to cast to "
+        f"'{quantum.QuregType.name}', but got {value.type}"
+    )
+    return builtin.UnrealizedConversionCastOp.get((value,), (quantum.QuregType(),))
+
+
+def _cast_to_qubit(value: SSAValue):
+    """Return a `builtin.unrealized_conversion_cast` op that casts `value` to type `quantum.bit`."""
+    # For now, we restrict usage of this function to cast from `qecl.codeblock` to `quantum.bit`
+    assert isinstance(value.type, qecl.LogicalCodeblockType), (
+        f"Value '{value}' must have type '{qecl.LogicalCodeblockType.name}' to cast to "
+        f"'{quantum.QubitType.name}', but got {value.type}"
+    )
+    return builtin.UnrealizedConversionCastOp.get((value,), (quantum.QubitType(),))
 
 
 # MARK: Conversion Pass

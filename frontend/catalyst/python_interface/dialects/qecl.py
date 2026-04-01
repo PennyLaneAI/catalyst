@@ -26,7 +26,6 @@ from typing import ClassVar, TypeAlias
 
 from xdsl.dialects.builtin import (
     I64,
-    ContainerOf,
     IndexType,
     IntegerAttr,
     IntegerType,
@@ -50,6 +49,7 @@ from xdsl.irdl import (
     IRDLOperation,
     TypeAttributeInvT,
     VarConstraint,
+    base,
     irdl_attr_definition,
     irdl_op_definition,
     operand_def,
@@ -147,9 +147,6 @@ class LogicalHyperRegisterType(ParametrizedAttribute, TypeAttribute):
 
 LogicalCodeBlockSSAValue: TypeAlias = SSAValue[LogicalCodeblockType]
 LogicalHyperRegisterSSAValue: TypeAlias = SSAValue[LogicalHyperRegisterType]
-
-anyLogicalCodeblock = ContainerOf(LogicalCodeblockType)
-anyLogicalHyperRegister = ContainerOf(LogicalHyperRegisterType)
 
 
 def _get_type_from_ssa_value_or_operation(
@@ -273,7 +270,7 @@ class ExtractCodeblockOp(IRDLOperation):
 class InsertCodeblockOp(IRDLOperation):
     """Update the logical codeblock value of a hyper-register."""
 
-    T: ClassVar = VarConstraint("T", anyLogicalHyperRegister)
+    T: ClassVar = VarConstraint("T", base(LogicalHyperRegisterType))
 
     name = "qecl.insert_block"
 
@@ -318,7 +315,7 @@ class InsertCodeblockOp(IRDLOperation):
 class EncodeOp(IRDLOperation):
     """Encode a logical codeblock to the specified logical state."""
 
-    T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
+    T: ClassVar = VarConstraint("T", base(LogicalCodeblockType))
 
     name = "qecl.encode"
 
@@ -384,7 +381,7 @@ class NoiseOp(IRDLOperation):
 class QecCycleOp(IRDLOperation):
     """Perform a single cycle of a quantum error-correction protocol."""
 
-    T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
+    T: ClassVar = VarConstraint("T", base(LogicalCodeblockType))
 
     name = "qecl.qec"
 
@@ -428,7 +425,7 @@ class SingleQubitLogicalGateOp(IRDLOperation):
     ```
     """
 
-    T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
+    T: ClassVar = VarConstraint("T", base(LogicalCodeblockType))
 
     in_codeblock = operand_def(T)
 
@@ -615,8 +612,8 @@ class CnotOp(IRDLOperation):
     k >= 2).
     """
 
-    T_CTRL: ClassVar = VarConstraint("T_CTRL", anyLogicalCodeblock)
-    T_TRGT: ClassVar = VarConstraint("T_TRGT", anyLogicalCodeblock)
+    T_CTRL: ClassVar = VarConstraint("T_CTRL", base(LogicalCodeblockType))
+    T_TRGT: ClassVar = VarConstraint("T_TRGT", base(LogicalCodeblockType))
 
     name = "qecl.cnot"
 
@@ -698,7 +695,7 @@ class MeasureOp(IRDLOperation):
     the `postselect` attribute to select the basis state of the qubit post-measurement.
     """
 
-    T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
+    T: ClassVar = VarConstraint("T", base(LogicalCodeblockType))
 
     name = "qecl.measure"
 
