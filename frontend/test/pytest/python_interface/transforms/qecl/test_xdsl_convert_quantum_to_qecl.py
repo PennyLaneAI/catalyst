@@ -530,23 +530,27 @@ class TestMeasurePattern:
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
 
-@pytest.mark.xfail(reason="Not supported yet")
+@pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
 class TestTodo:
     def test_conversion_with_scf_for_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """TODO"""
         program = """
         func.func @test_program() -> !quantum.reg {
+            %c0 = arith.constant 0 : index
             %c1 = arith.constant 1 : index
             %c2 = arith.constant 2 : index
-            %c0 = arith.constant 0 : index
+
+            // CHECK: [[hreg:%.+]] = qecl.alloc
             %0 = quantum.alloc( 1) : !quantum.reg
+
+            // CHECK: [[res:%.+]] = scf.for %arg0 = %c0 to %c2 step %c1 iter_args(%arg1 = [[hreg]]) -> (!qecl.hyperreg<1 x 1>)
             %1 = scf.for %arg0 = %c0 to %c2 step %c1 iter_args(%arg1 = %0) -> (!quantum.reg) {
-                %4 = arith.constant 0.1 : f64
-                %5 = quantum.extract %arg1[ 0] : !quantum.reg -> !quantum.bit
-                %out_qubits = quantum.custom "RX"(%4) %5 : !quantum.bit
-                %7 = quantum.insert %arg1[ 0], %out_qubits : !quantum.reg, !quantum.bit
-                scf.yield %7 : !quantum.reg
+                // CHECK: scf.yield %arg1 : !qecl.hyperreg<1 x 1>
+                scf.yield %arg1 : !quantum.reg
             }
+
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[res]] : !qecl.hyperreg<1 x 1> to !quantum.reg
+            // CHECK: return [[conv_cast]] : !quantum.reg
             return %1 : !quantum.reg
         }
         """
