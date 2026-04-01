@@ -45,15 +45,15 @@ static std::string classifyPauliRotAngle(double pauliRotAngle)
 
     double pprAngle = pauliRotAngle / 2.0;
     double angle = std::fmod(pprAngle, PI);
-
-    if (std::abs(angle) < TOLERANCE || PI - std::abs(angle) < TOLERANCE) {
+    double absAngle = std::abs(angle);
+    if (absAngle < TOLERANCE || PI - absAngle < TOLERANCE) {
         return "PauliRot-identity";
     }
 
-    constexpr double SPECIFIC_ANGLES[] = {PI / 2, PI / 4, PI / 8, -PI / 8, -PI / 4, -PI / 2};
-    constexpr int SPECIFIC_DENOMINATORS[] = {2, 4, 8, 8, 4, 2};
-    for (int i = 0; i < 6; i++) {
-        if (std::abs(angle - SPECIFIC_ANGLES[i]) < TOLERANCE) {
+    constexpr double SPECIFIC_ANGLES[] = {PI / 2, PI / 4, PI / 8};
+    constexpr int SPECIFIC_DENOMINATORS[] = {2, 4, 8};
+    for (int i = 0; i < 3; i++) {
+        if (absAngle - SPECIFIC_ANGLES[i] < TOLERANCE) {
             return "PauliRot-pi/" + std::to_string(SPECIFIC_DENOMINATORS[i]);
         }
     }
