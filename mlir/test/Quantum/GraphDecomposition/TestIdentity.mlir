@@ -14,7 +14,7 @@
 
 // Test that decomposition handles circuits that are already decomposed to the given gateset.
 
-// RUN: quantum-opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=Hadamard=1.0,CNOT=1.0 alt-decomps=Hadamard=false_decomp bytecode-rules="../../../../../frontend/catalyst/resources/decomposition_rules.mlirbc"})' %s | FileCheck %s
+// RUN: quantum-opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=Hadamard=1.0,CNOT=1.0 alt-decomps=Hadamard=false_decomp bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
 
 func.func @circuit() -> !quantum.bit {
     %0 = quantum.alloc(2) : !quantum.reg

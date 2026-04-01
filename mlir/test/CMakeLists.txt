@@ -1,3 +1,5 @@
+set(BYTECODE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/Quantum/GraphDecomposition/decomposition_rules.mlirbc")
+
 configure_lit_site_cfg(
     ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
     ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py
@@ -32,7 +34,7 @@ set(TEST_SUITES
     RTIO
     QecLogical
     QecPhysical
-    )
+)
 
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)

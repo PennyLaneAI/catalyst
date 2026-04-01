@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-// RUN: quantum-opt --split-input-file --pass-pipeline='builtin.module( graph-decomposition{gate-set=Hadamard=1.0 fixed-decomps=PauliX=x_to_h bytecode-rules="../../../../../frontend/catalyst/resources/decomposition_rules.mlirbc"}, graph-decomposition{gate-set=PauliX=1.0 fixed-decomps=Hadamard=h_to_x bytecode-rules="../../../../../frontend/catalyst/resources/decomposition_rules.mlirbc"}, graph-decomposition{gate-set=Hadamard=1.0 fixed-decomps=PauliX=x_to_h bytecode-rules="../../../../../frontend/catalyst/resources/decomposition_rules.mlirbc"})' %s | FileCheck %s --check-prefixes TRIPLE
+// RUN: quantum-opt --split-input-file --pass-pipeline='builtin.module( graph-decomposition{gate-set=Hadamard=1.0 fixed-decomps=PauliX=x_to_h bytecode-rules="%BYTECODE_PATH"}, graph-decomposition{gate-set=PauliX=1.0 fixed-decomps=Hadamard=h_to_x bytecode-rules="%BYTECODE_PATH"}, graph-decomposition{gate-set=Hadamard=1.0 fixed-decomps=PauliX=x_to_h bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes TRIPLE
 
 func.func @circuit() -> !quantum.bit {
     %0 = quantum.alloc(2) : !quantum.reg
@@ -33,5 +32,3 @@ func.func @x_to_h(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="Pa
     %q1 = quantum.custom "Hadamard"() %q : !quantum.bit
     return %q1 : !quantum.bit
 }
-
-
