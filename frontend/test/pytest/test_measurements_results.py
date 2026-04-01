@@ -251,7 +251,8 @@ class TestExpval:
         observed = expval1(np.pi)
         assert np.isclose(observed, expected)
 
-    def test_named_identity(self, backend):
+    @pytest.mark.capture_todo
+    def test_named_identity(self, backend, capture_mode):
         """
         Test expval for identity named observable on multiple wires.
 
@@ -259,7 +260,7 @@ class TestExpval:
         https://github.com/PennyLaneAI/catalyst/issues/2645
         """
 
-        @qjit(capture=False)
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=3))
         def expval():
             return qml.expval(qml.Identity(wires=[1, 2])), qml.expval(qml.Identity(wires=[0, 1, 2]))
