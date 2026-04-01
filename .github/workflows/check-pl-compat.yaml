@@ -36,7 +36,7 @@ jobs:
         fetch-depth: 0
     - if: ${{ inputs.catalyst == 'stable' }}
       run: |
-        git checkout $(git tag | sort -V | tail -1)
+        git checkout $(git tag -l 'v*' | sort -V | tail -1)
     - if: ${{ inputs.catalyst == 'release-candidate' }}
       run: |
         # For rc, we install all packages from TestPyPI.
