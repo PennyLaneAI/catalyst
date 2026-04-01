@@ -143,10 +143,7 @@ class ExtractOpConversion(RewritePattern):
             # ops_to_insert = []
 
             # Maybe we don't need this? And we just error out?
-            raise CompileError(
-                f"Failed to convert op '{op}': conversion pattern for '{op.name}' could not "
-                f"identity appropriate type-conversion operation(s)"
-            )
+            _raise_failed_to_convert_op_compile_error(op)
 
         rewriter.replace_op(op, ops_to_insert)
 
@@ -191,10 +188,7 @@ class InsertOpConversion(RewritePattern):
                 _cast_to_qureg(insert_codeblock_op.out_hyper_reg),
             ]
         else:
-            raise CompileError(
-                f"Failed to convert op '{op}': conversion pattern for '{op.name}' could not "
-                f"identity appropriate type-conversion operation(s)"
-            )
+            _raise_failed_to_convert_op_compile_error(op)
 
         rewriter.replace_op(op, ops_to_insert)
 
@@ -217,10 +211,7 @@ class DeallocOpConversion(RewritePattern):
                 qecl.DeallocOp(hyper_reg=conv_cast_op.results[0]),
             ]
         else:
-            raise CompileError(
-                f"Failed to convert op '{op}': conversion pattern for '{op.name}' could not "
-                f"identity appropriate type-conversion operation(s)"
-            )
+            _raise_failed_to_convert_op_compile_error(op)
 
         rewriter.replace_op(op, ops_to_insert)
 
@@ -261,10 +252,7 @@ class CustomOpConversion(RewritePattern):
                         _cast_to_qubit(qec_cycle_op.out_codeblock),
                     ]
                 else:
-                    raise CompileError(
-                        f"Failed to convert op '{op}': conversion pattern for '{op.name}' could not "
-                        f"identity appropriate type-conversion operation(s)"
-                    )
+                    _raise_failed_to_convert_op_compile_error(op)
 
             case "S":
                 adjoint = True if op.properties.get("adjoint") else False
@@ -284,10 +272,7 @@ class CustomOpConversion(RewritePattern):
                         _cast_to_qubit(qec_cycle_op.out_codeblock),
                     ]
                 else:
-                    raise CompileError(
-                        f"Failed to convert op '{op}': conversion pattern for '{op.name}' could not "
-                        f"identity appropriate type-conversion operation(s)"
-                    )
+                    _raise_failed_to_convert_op_compile_error(op)
 
             case "CNOT":
                 assert len(op.in_qubits) == 2
@@ -325,10 +310,7 @@ class CustomOpConversion(RewritePattern):
                     ]
                     new_results = (ctrl_conv_cast_op.results[0], trgt_conv_cast_op.results[0])
                 else:
-                    raise CompileError(
-                        f"Failed to convert op '{op}': conversion pattern for '{op.name}' could not "
-                        f"identity appropriate type-conversion operation(s)"
-                    )
+                    _raise_failed_to_convert_op_compile_error(op)
 
             case _:
                 raise NotImplementedError(
@@ -368,10 +350,7 @@ class MeasureOpConversion(RewritePattern):
             ]
             new_results = (measure_op.mres, conv_cast_op.results[0])
         else:
-            raise CompileError(
-                f"Failed to convert op '{op}': conversion pattern for '{op.name}' could not "
-                f"identity appropriate type-conversion operation(s)"
-            )
+            _raise_failed_to_convert_op_compile_error(op)
 
         rewriter.replace_op(op, ops_to_insert, new_results=new_results)
 
@@ -430,6 +409,14 @@ def _cast_to_qubit(value: SSAValue):
         f"'{quantum.QubitType.name}', but got {value.type}"
     )
     return builtin.UnrealizedConversionCastOp.get((value,), (quantum.QubitType(),))
+
+
+def _raise_failed_to_convert_op_compile_error(op: Operation):
+    """Raise a `CompileError` for cases where the conversion pattern for `op` failed."""
+    raise CompileError(
+        f"Failed to convert op '{op}': conversion pattern for '{op.name}' could not identity "
+        f"appropriate type-conversion operation(s)"
+    )
 
 
 # MARK: Conversion Pass
