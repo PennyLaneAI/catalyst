@@ -119,6 +119,8 @@ def MergeRotationsPass : Pass<"merge-rotations"> {
 def GraphDecompositionPass : Pass<"graph-decomposition"> {
     let summary = "Decompose gates using an MLIR-native graph-based framework.";
 
+    let description = "Example Usage: `catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RX=1.0,RY=2.0,GlobalPhase=0.0 fixed-decomps=PauliX=x_to_rx,Hadamard=hadamard_to_rz_rx alt-decomps=PauliY=y_to_ry|y_to_rot,PauliZ=z_to_rz|z_to_rot bytecode-rules=\"./rule_library.mlirbc\"})'";
+
     let options = [
     ListOption<
     /*C++ name*/"targetGateSetOption", 
@@ -129,18 +131,18 @@ def GraphDecompositionPass : Pass<"graph-decomposition"> {
     /*C++ name*/"fixedDecompsOption", 
     /*CLI name*/"fixed-decomps", 
     /*Type*/"std::string", 
-    /*Description*/"A map of operators to decomposition rules that will be used over any built-in rules.">,
+    /*Description*/"Maps an operator to a decomposition rule that will be applied.">,
     ListOption<
     /*C++ name*/"altDecompsOption", 
     /*CLI name*/"alt-decomps", 
     /*Type*/"std::string", 
-    /*Description*/"A map of operators to alternative decomposition rules that will be considered alongside any built-in rules.">,
+    /*Description*/"Maps an operator to a `|` separated list of alternative decomposition rules that will be considered alongside any built-in rules for the operator.">,
     Option<
     /*C++ name*/"bytecodeRulesFile", 
     /*CLI name*/"bytecode-rules", 
     /*Type*/"std::string", 
     /*Default*/[{ "./frontend/catalyst/resources/decomposition_rules.mlirbc" }],
-    /*Description*/"A map of operators to alternative decomposition rules that will be considered alongside any built-in rules.">
+    /*Description*/"A path to a bytecode file of compiled decomposition rules.">
     ];
 
     let dependentDialects = [
