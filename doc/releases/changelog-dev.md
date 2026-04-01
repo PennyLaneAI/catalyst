@@ -228,6 +228,7 @@
   only Pauli or Hadamard observables, the *qubit-wise commutativity* (QWC) check is applied.
   Otherwise, the more strict *non-overlapping observable* check is applied.
   [(#2538)](https://github.com/PennyLaneAI/catalyst/pull/2538)
+  [(#2633)](https://github.com/PennyLaneAI/catalyst/pull/2633)
 
 * The `diagonalize-final-measurements` xDSL pass is now available as a builtin pass accessible from the Catalyst frontend as `catalyst.passes.diagonalize_measurements`.
   [(#2630)](https://github.com/PennyLaneAI/catalyst/pull/2630)
@@ -601,6 +602,10 @@
 * The operands and assembly format of several PBC operations have been updated for clarity and
   improved functionality.
   [(#2637)](https://github.com/PennyLaneAI/catalyst/pull/2637)
+
+* A :class:`~.QJIT`'s ``compile`` method can now be used to run MLIR compilation without having
+  to generate LLVM IR and object code. Use with ``CompileOptions(lower_to_llvm=False, link=False)``.
+  [(#2599)](https://github.com/PennyLaneAI/catalyst/pull/2599)
 
 * Update `mlir_specs` to account for new `marker` functionality in PennyLane.
   [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
