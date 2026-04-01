@@ -138,7 +138,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             opName = opName.trim();
             llvm::SmallVector<llvm::StringRef> splitRulesRef;
 
-            rulesRef.split(splitRulesRef, ",");
+            rulesRef.split(splitRulesRef, "|");
             auto &opRulesList = opToAltDecompNames[opName.str()];
 
             for (llvm::StringRef ruleNameRef : splitRulesRef) {
@@ -146,7 +146,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 if (!ruleNameRef.empty()) {
                     opRulesList.push_back(ruleNameRef.str());
                     userRuleNames.push_back(ruleNameRef.str());
-                    llvm::errs() << "adding fixed decomp " << ruleNameRef << " for " << opName
+                    llvm::errs() << "adding alt decomp " << ruleNameRef << " for " << opName
                                  << "\n";
                 }
             }
