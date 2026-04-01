@@ -323,11 +323,14 @@
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
   [(#2493)](https://github.com/PennyLaneAI/catalyst/pull/2493)
 
-* The PPR/PPM lowering passes (`lower-pbc-init-ops`, `unroll-conditional-ppr-ppm`) are now run
-  as part of the main quantum compilation pipeline. When using `to-ppr` and `ppr-to-ppm` transforms,
-  these passes are applied automatically during compilation; we no longer need to stack them
-  explicitly.
+* Programs expressed in the Pauli-based computation (PBC) representation can now be executed via the
+  runtime on supporting devices.
+  [(#2389)](https://github.com/PennyLaneAI/catalyst/pull/2389)
   [(#2460)](https://github.com/PennyLaneAI/catalyst/pull/2460)
+  [(#2460)](https://github.com/PennyLaneAI/catalyst/pull/2639)
+
+  The support includes new C-API targets for Pauli-product rotations and Pauli-product measurements,
+  including the conditional and multiplexed variants.
 
 * `null.qubit` resource tracking is now able to track measurements and observables. This output
   is also reflected in `qml.specs`.
@@ -651,15 +654,10 @@
   [(#2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
   [(#2413)](https://github.com/PennyLaneAI/catalyst/pull/2413)
 
-* Added LLVM conversion patterns to lower PBC dialect operations to their corresponding runtime
-  CAPI calls.
-  This includes `pbc.ppr` and `pbc.ppr.arbitrary` (lowered to `__catalyst__qis__PauliRot`),
-  `pbc.ppm` (lowered to `__catalyst__qis__PauliMeasure`). This enables device execution of PBC
-  operations through the Catalyst runtime.
-  [(#2389)](https://github.com/PennyLaneAI/catalyst/pull/2389)
-
-* A new compiler pass `unroll-conditional-ppr-ppm` for lowering conditional PPR and PPMs
-  into normal PPR and PPMs with SCF dialect to support runtime execution.
+* A new compiler pass, `unroll-conditional-ppr-ppm`, has been added to convert conditional or
+  multiplexed Pauli-product rotations and measurements into their basic versions nested inside
+  conditionals (from the SCF dialect). Note that this is not needed for the standard execution
+  pipeline.
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
 
 * Increased format size for the `--mlir-timing` flag, displaying more decimals for better timing precision.
