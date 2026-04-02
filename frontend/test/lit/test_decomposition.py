@@ -1596,7 +1596,7 @@ test_default_decomps()
 def test_graph_decomp_registered():
     """Test that the `graph_decomposition` pass is registered correctly."""
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=True)
     # CHECK: transform.apply_registered_pass "graph-decomposition"
     @graph_decomposition(gate_set={qml.RX})
     @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -1651,7 +1651,7 @@ def test_cpp_decomp_empty_args():
     supplied.
     """
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=True)
     # CHECK: transform.apply_registered_pass "graph-decomposition"
     # CHECK-NOT: fixed-decomps
     # CHECK-NOT: alt-decomps
@@ -1663,7 +1663,7 @@ def test_cpp_decomp_empty_args():
 
     print(circuit.mlir)
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=True)
     # CHECK: transform.apply_registered_pass "graph-decomposition"
     # CHECK-NOT: fixed-decomps
     # CHECK-NOT: alt-decomps
@@ -1686,7 +1686,7 @@ def test_cpp_decomp_string_op_names():
         qml.RX(np.pi, wires)
         qml.RZ(np.pi, wires)
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=True)
     # CHECK: transform.apply_registered_pass "graph-decomposition" with options = {
     # CHECK-DAG: "fixed-decomps" = {PauliX = "{{.*}}", PauliZ = "{{.*}}"}
     # CHECK-DAG: "alt-decomps" = {PauliY = ["{{.*}}", "y_to_xz"]}
@@ -1706,12 +1706,35 @@ def test_cpp_decomp_string_op_names():
     )
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def circuit():
-        qml.X(0)
-        qml.Y(1)
-        qml.Z(0)
-        return qml.probs()
+        return
 
     print(circuit.mlir)
 
 
 test_cpp_decomp_string_op_names()
+
+
+def test_cpp_decomp_builtin_rules():
+    """Test that cpp decomp applies builtin rules."""
+
+    @qjit(target="mlir", capture=True)
+    @graph_decomposition(
+        gate_set={qml.RX, qml.RY, qml.RZ, qml.GlobalPhase},
+    )
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def circuit():
+        # CHECK-NOT: PauliX
+        # CHECK-NOT: PauliY
+        # CHECK-NOT: PauliZ
+        # CHECK-DAG: RX
+        # CHECK-DAG: RY
+        # CHECK-DAG: RZ
+        qml.X(0)
+        qml.Y(1)
+        qml.Z(0)
+        return qml.probs()
+
+    print(circuit.mlir_opt)
+
+
+test_cpp_decomp_builtin_rules()
