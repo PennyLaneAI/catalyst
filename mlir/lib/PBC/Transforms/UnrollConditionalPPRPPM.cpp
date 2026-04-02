@@ -26,7 +26,7 @@ namespace {
 // Lower pbc.select.ppm to scf.if with two ppm operations.
 //
 // For example:
-// %mres, %out = pbc.select.ppm(%cond, ["X"], ["Z"]) %qubits : i1, !quantum.bit
+// %mres, %out = pbc.select.ppm (%cond ? ["X"] : ["Z"]) %qubits : i1, !quantum.bit
 //
 // becomes:
 // %mres, %out = scf.if %cond -> (i1, !quantum.bit) {

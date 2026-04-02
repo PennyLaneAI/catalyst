@@ -74,8 +74,6 @@ add_subdirectory(lib)
 add_subdirectory(tests)
 
 if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))
-# Don't rerun external project everytime we configure the runtime build.
-if(NOT EXISTS ${CMAKE_BINARY_DIR}/lib/liblapacke.3.dylib)
     if(CMAKE_OSX_SYSROOT)
         get_filename_component(OSX_SDK_PATH ${CMAKE_OSX_SYSROOT} REALPATH)
     else()
@@ -98,19 +96,21 @@ if(NOT EXISTS ${CMAKE_BINARY_DIR}/lib/liblapacke.3.dylib)
         endif()
     endif()
 
+    # Let CMake figure out, if rebuilding the external project is necessary
     ExternalProject_Add(lapacke-accelerate
         GIT_REPOSITORY https://github.com/lepus2589/accelerate-lapacke.git
-        GIT_TAG master
+        GIT_TAG v2.0.0
         PREFIX _lapacke-accelerate
-        CMAKE_ARGS "--preset accelerate-lapacke32"
-                   "-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_lapacke-accelerate/install"
+        INSTALL_DIR _lapacke-accelerate/install
+        CMAKE_ARGS "--preset" "accelerate-lapacke32"
+                   "-DCMAKE_STAGING_PREFIX=<INSTALL_DIR>"
+                   "-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/lib"
                    "-DCMAKE_OSX_SYSROOT=${OSX_SDK_PATH}"
-        INSTALL_COMMAND ${CMAKE_COMMAND} --build . --target install
-        COMMAND cp ${CMAKE_BINARY_DIR}/_lapacke-accelerate/install/lib/liblapacke.3.dylib ${CMAKE_BINARY_DIR}/lib
+        INSTALL_COMMAND "${CMAKE_COMMAND}" --build <BINARY_DIR> --target install
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different "<INSTALL_DIR>/lib/liblapacke.3.dylib" "${CMAKE_BINARY_DIR}/lib"
         LOG_CONFIGURE ON
         LOG_INSTALL ON
         LOG_BUILD ON
     )
     add_dependencies(rt_capi lapacke-accelerate)  # automatically build with the runtime
-endif()
-endif()
+endif()  # if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))
