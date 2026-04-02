@@ -976,7 +976,6 @@ def trace_observables(
         # won't actually lead to wrong execution results, since the only exception is the identity
         # But of course we should fix this at some time.
         # TODO: make the NamedObs op take in multiple qubit values
-        # https://github.com/PennyLaneAI/catalyst/issues/2645
 
         qubits = qrp.extract([wires[0]], allow_reuse=True)
         obs_tracers = namedobs_p.bind(qubits[0], kind=type(obs).__name__)

@@ -251,7 +251,7 @@ class TestExpval:
         observed = expval1(np.pi)
         assert np.isclose(observed, expected)
 
-    def test_named_identity(self, backend, capture_mode):
+    def test_named_identity(self, backend):
         """
         Test expval for identity named observable on multiple wires.
         """
