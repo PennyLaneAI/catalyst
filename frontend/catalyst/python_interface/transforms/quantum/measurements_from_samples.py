@@ -122,7 +122,7 @@ class AddPostProcessingPattern(RewritePattern):
         rewriter.insert_op(outer_fn, InsertPoint.before(func_op))
 
         # call the renamed quantum_node inside the new outer FuncOp
-        call_args = outer_fn.body.block.args
+        call_args = outer_fn.function_type.inputs.data
         result_types = func_type.outputs.data
         call_op = func.CallOp(qnode_name, call_args, result_types)
         outer_fn.body.block.add_op(call_op)
@@ -445,7 +445,13 @@ class MeasurementsFromSamplesPattern(RewritePattern):
 
         return n_qubits
 
-    def update_returns(self, mp_index, sample_op, postprocessing_func_call_op, rewriter):
+    def update_returns(
+        self,
+        mp_index: int,
+        sample_op: quantum.SampleOp,
+        postprocessing_func_call_op: func.CallOp,
+        rewriter: PatternRewriter,
+    ):
         """Update the return structure so that the qnode returns the output of sample
         instead of the original output, and the outer function returns the output of
         post-processing instead of directly returning the output of calling the qnode.
