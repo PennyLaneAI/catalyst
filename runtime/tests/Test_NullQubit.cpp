@@ -15,6 +15,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 
@@ -969,6 +970,15 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
     sim->NamedOperation("T", {}, {Qs[0]}, true, {Qs[2]});
     sim->NamedOperation("CNOT", {}, {Qs[0], Qs[1]}, false);
 
+    sim->NamedOperation("PauliRot", {0.5}, {Qs[0], Qs[1]}, false);
+    sim->NamedOperation("PauliRot", {M_PI}, {Qs[0], Qs[1], Qs[2]}, false);
+    sim->NamedOperation("PauliRot", {M_PI / 2}, {Qs[0]}, false);
+    sim->NamedOperation("PauliRot", {M_PI / 4}, {Qs[0], Qs[1]}, false);
+    sim->NamedOperation("PauliRot", {0.0}, {Qs[0]}, false);
+
+    sim->PauliMeasure("XY", {Qs[0], Qs[1]});
+    sim->PauliMeasure("XYZ", {Qs[0], Qs[1], Qs[2]});
+
     // Applying an empty matrix is fine for NullQubit
     sim->MatrixOperation({}, {Qs[0]}, false);
     sim->MatrixOperation({}, {Qs[0]}, false, {Qs[1]});
@@ -1050,6 +1060,13 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
         "C(S)",
         "2C(S)",
         "CNOT",
+        "PauliRot-Phi-w2",
+        "PauliRot-pi-w3",
+        "PauliRot-pi/2-w1",
+        "PauliRot-pi/4-w2",
+        "PauliRot-identity-w1",
+        "PauliMeasure-w2",
+        "PauliMeasure-w3",
         "Adjoint(ControlledQubitUnitary)",
         "ControlledQubitUnitary",
         "Adjoint(QubitUnitary)",
@@ -1080,10 +1097,10 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
             CHECK(line.find("4") != std::string::npos);
         }
         if (line.find("num_gates") != std::string::npos) {
-            CHECK(line.find("12") != std::string::npos);
+            CHECK(line.find("19") != std::string::npos);
         }
         if (line.find("depth") != std::string::npos) {
-            CHECK(line.find("11") != std::string::npos);
+            CHECK(line.find("18") != std::string::npos);
         }
         full_json += line + "\n";
     }
