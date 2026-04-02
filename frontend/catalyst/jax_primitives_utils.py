@@ -398,7 +398,7 @@ def transform_named_sequence_lowering(pipeline, sym_name):
     with ir.InsertionPoint(bb_named_sequence):
         target = bb_named_sequence.arguments[0]
         for _pass in pipeline:
-            assert isinstance(_pass, BoundTransform) or isinstance(_pass, PassPlugin)
+            assert isinstance(_pass, (BoundTransform, PassPlugin))
             name = _pass.pass_name if isinstance(_pass, BoundTransform) else _pass.name
             options = _lowered_options(_pass)
             apply_registered_pass_op = ApplyRegisteredPassOp(
