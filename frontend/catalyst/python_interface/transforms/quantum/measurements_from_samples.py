@@ -146,8 +146,8 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         super().__init__()
 
         self._shots = None
-        self.qnode: func.FuncOp = None
-        self.call_op: func.CallOp = None
+        self.qnode: func.FuncOp | None = None
+        self.call_op: func.CallOp | None = None
 
     @abstractmethod
     def match_and_rewrite(self, op: ir.Operation, rewriter: PatternRewriter, /):
@@ -155,15 +155,15 @@ class MeasurementsFromSamplesPattern(RewritePattern):
 
     def _get_parent_module(self, op: func.FuncOp) -> builtin.ModuleOp:
         """Get the first ancestral builtin.ModuleOp op of a given func.func op."""
-        while (op := op.parent_op()) and not isinstance(op, builtin.ModuleOp):
-            pass  # pragma: no cover
-        if op is None:
-            raise RuntimeError(  # pragma: no cover
-                "The given qnode func is not nested within a builtin.module. Please ensure the "
-                "qnode func is defined in a builtin.module."
-            )
+        _op: Operation | None = op
+        while _op := _op.parent_op():
+            if isinstance(_op, builtin.ModuleOp):
+                break
+            if _op is None:
+                raise CompileError("...")
 
-        return op
+        assert isinstance(_op, builtin.ModuleOp)
+        return _op
 
     def _get_call_op(self, qnode: func.FuncOp):
         """Get the CallOp in another module function that calls this quantum_node. Postprocessing
@@ -465,6 +465,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         """
         # update the qnode to return the result of the SampleOp directly
         return_op = self.qnode.get_return_op()
+        assert return_op is not None, "QNode has no return op"
         return_op.operands[mp_index] = sample_op.results[0]
         rewriter.notify_op_modified(return_op)
 
@@ -600,12 +601,13 @@ class ProbsPattern(MeasurementsFromSamplesPattern):
         for probs_op in probs_ops:
 
             compbasis_op = probs_op.operands[0].owner
+            assert isinstance(compbasis_op, quantum.ComputationalBasisOp)
 
             n_qubits = None
             if compbasis_op.qreg is not None:
                 n_qubits = self.get_n_qubits_from_qreg(compbasis_op.qreg)
 
-            elif not compbasis_op.qubits == ():
+            elif compbasis_op.qubits != ():
                 n_qubits = len(compbasis_op.qubits)
 
             assert (
