@@ -1371,28 +1371,8 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
                       const SetVector<Value> &rValuesUsedBySubroutine)
 {
     MLIRContext *ctx = f.getContext();
-    auto *qrefDialect = ctx->getLoadedDialect<qref::QRefDialect>();
-    bool hasQrefArgs =
-        llvm::any_of(f.getArgumentTypes(), llvm::IsaPred<qref::QubitType, qref::QuregType>);
-
-    bool hasQrefOps = f.walk([&](Operation *op) {
-                           if (op->getDialect() == qrefDialect) {
-                               return WalkResult::interrupt();
-                           }
-                           return WalkResult::advance();
-                       }).wasInterrupted();
-
-    if (!(hasQrefArgs || hasQrefOps)) {
-        // Not a qref func, nothing to convert
-        return;
-    }
-
     OpBuilder::InsertionGuard guard(builder);
-    builder.setInsertionPoint(f);
     Location loc = f->getLoc();
-
-    // SetVector<Value> rValuesUsedBySubroutine;
-    // getNecessarySubroutineRValues(f, rValuesUsedBySubroutine);
 
     // Add new quantum arguments
     QubitValueTracker regionTracker;
@@ -1545,8 +1525,6 @@ struct ValueSemanticsConversionPass
         });
 
         for (auto subroutine : targetSubroutines) {
-
-            // ReferenceToValueSemanticsConversion::SubroutineInfo subroutineInfo(subroutine);
             //  The subroutine conversion happens in-place, i.e. we are editing the existing func op
             //  So the string ref to the name will not die
             SubroutineInfo info(subroutine);

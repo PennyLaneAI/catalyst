@@ -20,8 +20,13 @@
 
 // CHECK: func.func @test_extract_before_call(%arg0: f64, %arg1: !quantum.bit, %arg2: !quantum.bit, %arg3: !quantum.bit) ->
 // CHECK-SAME:    (!quantum.bit, !quantum.bit, !quantum.bit)
-func.func @test_extract_before_call(%r0: !qref.reg<2>, %r1: !qref.reg<?>, %arg2: f64) {
+// CHECK:     [[CNOT:%.+]]:2 = quantum.custom "CNOT"() %arg1, %arg2 : !quantum.bit, !quantum.bit
+// CHECK:     [[RX:%.+]] = quantum.custom "RX"(%arg0) %arg3 : !quantum.bit
+// CHECK:     [[TOFFOLI:%.+]]:3 = quantum.custom "Toffoli"() [[CNOT]]#0, [[CNOT]]#1, [[RX]] : !quantum.bit, !quantum.bit, !quantum.bit
+// CHECK:     return [[TOFFOLI]]#0, [[TOFFOLI]]#1, [[TOFFOLI]]#2 : !quantum.bit, !quantum.bit, !quantum.bit
+// CHECK: }
 
+func.func @test_extract_before_call(%r0: !qref.reg<2>, %r1: !qref.reg<?>, %arg2: f64) {
     %q00 = qref.get %r0[0] : !qref.reg<2> -> !qref.bit
     %q01 = qref.get %r0[1] : !qref.reg<2> -> !qref.bit
     %q11 = qref.get %r1[1] : !qref.reg<?> -> !qref.bit
@@ -30,11 +35,6 @@ func.func @test_extract_before_call(%r0: !qref.reg<2>, %r1: !qref.reg<?>, %arg2:
     qref.custom "RX"(%arg2) %q11 : !qref.bit
     qref.custom "Toffoli"() %q00, %q01, %q11 : !qref.bit, !qref.bit, !qref.bit
     return
-
-    // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() %arg1, %arg2 : !quantum.bit, !quantum.bit
-    // CHECK: [[RX:%.+]] = quantum.custom "RX"(%arg0) %arg3 : !quantum.bit
-    // CHECK: [[TOFFOLI:%.+]]:3 = quantum.custom "Toffoli"() [[CNOT]]#0, [[CNOT]]#1, [[RX]] : !quantum.bit, !quantum.bit, !quantum.bit
-    // CHECK: return [[TOFFOLI]]#0, [[TOFFOLI]]#1, [[TOFFOLI]]#2 : !quantum.bit, !quantum.bit, !quantum.bit
 }
 
 // CHECK: func.func @main(%arg0: i64, %arg1: f64) -> (!quantum.obs, !quantum.obs) attributes {quantum.node}
@@ -115,4 +115,32 @@ func.func @main(%arg0: f64, %arg1: i64) -> () attributes {quantum.node} {
 }
 
 
+// -----
 
+
+// CHECK: func.func @test_single_qubit_alloc(%arg0: f64, %arg1: !quantum.bit) -> !quantum.bit {
+// CHECK:   %out_qubits = quantum.custom "RX"(%arg0) %arg1 : !quantum.bit
+// CHECK:   return %out_qubits : !quantum.bit
+// CHECK: }
+
+
+func.func @test_single_qubit_alloc(%q: !qref.bit, %param: f64) -> () {
+    qref.custom "RX"(%param) %q : !qref.bit
+    return
+}
+
+// CHECK: func.func @main(%arg0: f64) attributes {quantum.node}
+func.func @main(%arg0: f64) -> () attributes {quantum.node} {
+    // CHECK: [[q:%.+]] = quantum.alloc_qb : !quantum.bit
+    %q = qref.alloc_qb : !qref.bit
+
+    // CHECK: [[first_call:%.+]] = call @test_single_qubit_alloc(%arg0, [[q]]) : (f64, !quantum.bit) -> !quantum.bit
+    // CHECK: [[second_call:%.+]] = call @test_single_qubit_alloc(%arg0, [[first_call]]) : (f64, !quantum.bit) -> !quantum.bit
+    func.call @test_single_qubit_alloc(%q, %arg0) : (!qref.bit, f64) -> ()
+    func.call @test_single_qubit_alloc(%q, %arg0) : (!qref.bit, f64) -> ()
+
+    // CHECK: quantum.dealloc_qb [[second_call]] : !quantum.bit
+    qref.dealloc_qb %q : !qref.bit
+
+    return
+}

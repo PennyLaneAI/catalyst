@@ -195,7 +195,6 @@ struct SubroutineInfo {
     func::FuncOp subroutine;
     SetVector<Value> necessarySubroutineRValues;
     SmallVector<std::variant<unsigned, std::pair<unsigned, uint64_t>>> newArgsInfo;
-
 }; // struct SubroutineInfo
 
 } // namespace ReferenceToValueSemanticsConversion
