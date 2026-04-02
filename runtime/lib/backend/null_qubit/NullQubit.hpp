@@ -37,23 +37,25 @@
 
 namespace Catalyst::Runtime::Devices {
 
-/// Classify a PauliRot angle into its rotation kind.
-static std::string classifyPauliRotAngle(double pauliRotAngle)
+// Classify a PauliRot angle into its rotation kind.
+static std::string classifyPauliRotAngle(double angle, const double tolerance = 1e-12)
 {
     constexpr double PI = M_PI;
-    constexpr double TOLERANCE = 1e-12;
 
-    double pprAngle = pauliRotAngle / 2.0;
-    double angle = std::fmod(pprAngle, PI);
-    double absAngle = std::abs(angle);
-    if (absAngle < TOLERANCE || PI - absAngle < TOLERANCE) {
+    double modAngle = std::fmod(angle, 2 * PI);
+    double absAngle = std::abs(modAngle);
+    if (absAngle < tolerance || PI - absAngle < tolerance) {
         return "PauliRot-identity";
     }
 
-    constexpr double SPECIFIC_ANGLES[] = {PI / 2, PI / 4, PI / 8};
-    constexpr int SPECIFIC_DENOMINATORS[] = {2, 4, 8};
+    constexpr double SPECIFIC_ANGLES[] = {PI, PI / 2, PI / 4};
+    constexpr int SPECIFIC_DENOMINATORS[] = {1, 2, 4};
     for (int i = 0; i < 3; i++) {
-        if (absAngle - SPECIFIC_ANGLES[i] < TOLERANCE) {
+        if (std::abs(absAngle - SPECIFIC_ANGLES[i]) < tolerance) {
+            int denominator = SPECIFIC_DENOMINATORS[i];
+            if (denominator == 1) {
+                return "PauliRot-pi";
+            }
             return "PauliRot-pi/" + std::to_string(SPECIFIC_DENOMINATORS[i]);
         }
     }
