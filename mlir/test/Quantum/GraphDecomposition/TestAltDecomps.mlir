@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RY=1.0,PauliX=3.0,PauliZ=3.0,GlobalPhase=1.0 alt-decomps=PauliY=y_to_ry|y_to_x_z bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes RY
+// RUN: quantum-opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RY=1.0,PauliX=3.0,PauliZ=3.0,GlobalPhase=1.0 alt-decomps=PauliY=[y_to_ry,y_to_x_z] bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes RY
 
-// RUN: quantum-opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RY=3.0,PauliX=1.0,PauliZ=1.0,GlobalPhase=1.0 alt-decomps=PauliY=y_to_ry|y_to_x_z bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes XZ
+// RUN: quantum-opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RY=3.0,PauliX=1.0,PauliZ=1.0,GlobalPhase=1.0 alt-decomps=PauliY=[y_to_ry,y_to_x_z] bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes XZ
 
 func.func @circuit() -> !quantum.bit {
     %0 = quantum.alloc(2) : !quantum.reg

@@ -51,6 +51,24 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
     void runOnOperation() final
     {
+        llvm::errs() << "targetGateSetOption\n";
+        for (auto item : targetGateSetOption) {
+            llvm::errs() << "\t" << item << ",\n";
+        }
+        llvm::errs() << "\n";
+
+        llvm::errs() << "fixedDecompsOption\n";
+        for (auto item : fixedDecompsOption) {
+            llvm::errs() << "\t" << item << ",\n";
+        }
+        llvm::errs() << "\n";
+
+        llvm::errs() << "altDecompsOption\n";
+        for (auto item : altDecompsOption) {
+            llvm::errs() << "\t" << item << ",\n";
+        }
+        llvm::errs() << "\n";
+
         ///////////////////////////
         // Step 1: Gather inputs for graph
         std::vector<OperatorNode> setOfOps;
@@ -103,6 +121,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             llvm::errs() << "re-adding user rules " << rule.get().getName() << "\n";
             module.getBody()->push_back(rule.release());
         }
+
+        // TODO: insert a "clean-up" pass after the last graph-decomposition pass to remove user
+        // functions
     }
 
   private:
@@ -115,6 +136,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             auto [opName, ruleName] = pairRef.split("=");
             opName = opName.trim();
             ruleName = ruleName.trim();
+            ruleName.consume_front("\"");
+            ruleName.consume_back("\"");
 
             if (ruleName.empty()) {
                 llvm::errs() << opName
@@ -138,11 +161,16 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             opName = opName.trim();
             llvm::SmallVector<llvm::StringRef> splitRulesRef;
 
-            rulesRef.split(splitRulesRef, "|");
+            rulesRef = rulesRef.trim();
+            rulesRef.consume_front("[");
+            rulesRef.consume_back("]");
+            rulesRef.split(splitRulesRef, ",");
             auto &opRulesList = opToAltDecompNames[opName.str()];
 
             for (llvm::StringRef ruleNameRef : splitRulesRef) {
                 ruleNameRef = ruleNameRef.trim();
+                ruleNameRef.consume_front("\"");
+                ruleNameRef.consume_back("\"");
                 if (!ruleNameRef.empty()) {
                     opRulesList.push_back(ruleNameRef.str());
                     userRuleNames.push_back(ruleNameRef.str());
