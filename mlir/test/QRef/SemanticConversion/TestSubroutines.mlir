@@ -144,3 +144,60 @@ func.func @main(%arg0: f64) -> () attributes {quantum.node} {
 
     return
 }
+
+
+// -----
+
+
+// CHECK: func.func @test_mixed_args(%arg0: i64, [[q20:%.+]]: !quantum.bit, %arg2: !quantum.reg, [[q:%.+]]: !quantum.bit) ->
+// CHECK-SAME:   (i1, i1, i1, !quantum.bit, !quantum.reg, !quantum.bit) {
+// CHECK:   [[extract:%.+]] = quantum.extract %arg2[%arg0] : !quantum.reg -> !quantum.bit
+// CHECK:   [[GATE:%.+]]:3 = quantum.custom "gate"() [[q20]], [[extract]], [[q]] : !quantum.bit, !quantum.bit, !quantum.bit
+// CHECK:   [[q20_mres:%.+]], [[q20_MEASURE:%.+]] = quantum.measure [[GATE]]#0 : i1, !quantum.bit
+// CHECK:   [[extract_mres:%.+]], [[extract_MEASURE:%.+]] = quantum.measure [[GATE]]#1 : i1, !quantum.bit
+// CHECK:   [[insert:%.+]] = quantum.insert %arg2[%arg0], [[extract_MEASURE]] : !quantum.reg, !quantum.bit
+// CHECK:   [[q_mres:%.+]], [[q_MEASURE:%.+]] = quantum.measure [[GATE]]#2 : i1, !quantum.bit
+// CHECK:   return [[q20_mres]], [[extract_mres]], [[q_mres]], [[q20_MEASURE]], [[insert]], [[q_MEASURE]]
+// CHECK-SAME:     i1, i1, i1, !quantum.bit, !quantum.reg, !quantum.bit
+// CHECK: }
+
+func.func @test_mixed_args(%q: !qref.bit, %r2: !qref.reg<2>, %r3: !qref.reg<3>, %idx: i64) -> (i1, i1, i1) {
+    %q20 = qref.get %r2[0] : !qref.reg<2> -> !qref.bit
+    %q3 = qref.get %r3[%idx] : !qref.reg<3>, i64 -> !qref.bit
+    qref.custom "gate"() %q20, %q3, %q : !qref.bit, !qref.bit, !qref.bit
+
+    %mres_q20 = qref.measure %q20 : i1
+    %mres_q3 = qref.measure %q3 : i1
+    %mres_q = qref.measure %q : i1
+    return %mres_q20, %mres_q3, %mres_q : i1, i1, i1
+}
+
+// CHECK: func.func @main(%arg0: i64) -> (i1, i1, i1, i1, i1, i1) attributes {quantum.node}
+func.func @main(%arg0: i64) -> (i1, i1, i1, i1, i1, i1) attributes {quantum.node} {
+    // CHECK: [[q:%.+]] = quantum.alloc_qb : !quantum.bit
+    // CHECK: [[r2:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[r3:%.+]] = quantum.alloc( 3) : !quantum.reg
+    %q = qref.alloc_qb : !qref.bit
+    %r2 = qref.alloc(2) : !qref.reg<2>
+    %r3 = qref.alloc(3) : !qref.reg<3>
+
+    // CHECK: [[q20:%.+]] = quantum.extract [[r2]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[first_call:%.+]]:6 = call @test_mixed_args(%arg0, [[q20]], [[r3]], [[q]])
+    // CHECK-SAME:  (i64, !quantum.bit, !quantum.reg, !quantum.bit) -> (i1, i1, i1, !quantum.bit, !quantum.reg, !quantum.bit)
+    // CHECK: [[second_call:%.+]]:6 = call @test_mixed_args(%arg0, [[first_call]]#3, [[first_call]]#4, [[first_call]]#5) :
+    // CHECK-SAME:  (i64, !quantum.bit, !quantum.reg, !quantum.bit) -> (i1, i1, i1, !quantum.bit, !quantum.reg, !quantum.bit)
+    %call0:3 = func.call @test_mixed_args(%q, %r2, %r3, %arg0) : (!qref.bit, !qref.reg<2>, !qref.reg<3>, i64) -> (i1, i1, i1)
+    %call1:3 = func.call @test_mixed_args(%q, %r2, %r3, %arg0) : (!qref.bit, !qref.reg<2>, !qref.reg<3>, i64) -> (i1, i1, i1)
+    // CHECK: [[insert_r2:%.+]] = quantum.insert [[r2]][ 0], [[second_call]]#3 : !quantum.reg, !quantum.bit
+
+    // CHECK: quantum.dealloc_qb [[second_call]]#5 : !quantum.bit
+    // CHECK: quantum.dealloc [[insert_r2]] : !quantum.reg
+    // CHECK: quantum.dealloc [[second_call]]#4 : !quantum.reg
+    qref.dealloc_qb %q : !qref.bit
+    qref.dealloc %r2 : !qref.reg<2>
+    qref.dealloc %r3 : !qref.reg<3>
+
+    // CHECK: return [[first_call]]#0, [[first_call]]#1, [[first_call]]#2,
+    // CHECK-SAME:  [[second_call]]#0, [[second_call]]#1, [[second_call]]#2 : i1, i1, i1, i1, i1, i1
+    return %call0#0, %call0#1, %call0#2, %call1#0, %call1#1, %call1#2 : i1, i1, i1, i1, i1, i1
+}
