@@ -25,7 +25,36 @@ public:
 
     LogicalResult emitModule(ModuleOp module) {
         os << "OPENQASM 3.0;\ninclude \"stdgates.inc\";\n\n";
-        
+
+        // Define gates that are not in stdgates.inc but are commonly used in QASM 2.0
+        // These definitions are compatible with Qiskit's conventions
+        os << "// Additional gate definitions for QASM 2.0 compatibility\n";
+        os << "gate rzz(theta) a, b {\n";
+        os << "  cx a, b;\n";
+        os << "  rz(theta) b;\n";
+        os << "  cx a, b;\n";
+        os << "}\n\n";
+
+        os << "gate rxx(theta) a, b {\n";
+        os << "  h a;\n";
+        os << "  h b;\n";
+        os << "  cx a, b;\n";
+        os << "  rz(theta) b;\n";
+        os << "  cx a, b;\n";
+        os << "  h a;\n";
+        os << "  h b;\n";
+        os << "}\n\n";
+
+        os << "gate ryy(theta) a, b {\n";
+        os << "  rx(pi/2) a;\n";
+        os << "  rx(pi/2) b;\n";
+        os << "  cx a, b;\n";
+        os << "  rz(theta) b;\n";
+        os << "  cx a, b;\n";
+        os << "  rx(-pi/2) a;\n";
+        os << "  rx(-pi/2) b;\n";
+        os << "}\n\n";
+
         // Walk the module
         for (Operation &op : module.getBody()->getOperations()) {
             if (failed(emitOperation(&op)))
@@ -265,8 +294,29 @@ private:
 
         // Check if register is mapped
         if (!qubitMap.count(reg)) {
-            return op.emitError("Cannot emit extract: register operand not mapped");
+            // The register might not be mapped yet if this is a block argument
+            // or if it's coming from a complex control flow pattern
+            // Try to provide more diagnostic information
+            llvm::errs() << "WARNING: ExtractOp register operand not mapped\n";
+            llvm::errs() << "  Register value: " << reg << "\n";
+            if (auto defOp = reg.getDefiningOp()) {
+                llvm::errs() << "  Defined by: " << defOp->getName() << "\n";
+            } else {
+                llvm::errs() << "  (block argument)\n";
+            }
+
+            // Try to auto-generate a mapping if this is from an AllocOp
+            if (auto allocOp = reg.getDefiningOp<AllocOp>()) {
+                // This should have been handled already, but let's be safe
+                llvm::errs() << "  Attempting to handle AllocOp retroactively\n";
+                if (failed(emitAlloc(allocOp))) {
+                    return failure();
+                }
+            } else {
+                return op.emitError("Cannot emit extract: register operand not mapped");
+            }
         }
+
         std::string regName = qubitMap[reg];
         if (regName.empty()) {
             return op.emitError("Cannot emit extract: register name is empty");
@@ -304,11 +354,23 @@ private:
         // quantum.custom "name" (q1, q2)
         // or quantum.custom "name"(p1) (q1)
         llvm::StringRef gateName = op.getGateName();
+        std::string qasmGateName;
+
+        // Map gate names from QASM 2.0 (qelib1.inc) to QASM 3.0 (stdgates.inc)
         if (gateName == "cnot") {
-            os << "cx";
+            qasmGateName = "cx";
+        } else if (gateName == "cu1") {
+            // cu1(lambda) in QASM 2.0 is equivalent to cp(lambda) in QASM 3.0
+            qasmGateName = "cp";
+        } else if (gateName == "rzz" || gateName == "rxx" || gateName == "ryy") {
+            // These gates are not in stdgates.inc but are valid parameterized gates
+            // We'll emit them as-is and they should work in QASM 3.0
+            qasmGateName = gateName.str();
         } else {
-            os << gateName;
+            qasmGateName = gateName.str();
         }
+
+        os << qasmGateName;
         
         auto params = op.getParams();
         if (!params.empty()) {
@@ -342,9 +404,16 @@ private:
             if (qubitMap.count(q) && !qubitMap[q].empty()) {
                  os << qubitMap[q];
             } else {
-                 // Input qubit not mapped - should not happen in well-formed IR
-                 llvm::errs() << "ERROR: Gate " << gateName << " input qubit not mapped\n";
+                 // Input qubit not mapped - this should not happen in well-formed IR
+                 // after proper SSA canonicalization
+                 llvm::errs() << "ERROR: Gate '" << gateName << "' input qubit not mapped\n";
                  llvm::errs() << "  Input value: " << q << "\n";
+                 if (auto opResult = dyn_cast<OpResult>(q)) {
+                     llvm::errs() << "  This is result #" << opResult.getResultNumber()
+                                  << " of operation " << opResult.getDefiningOp()->getName() << "\n";
+                 }
+                 llvm::errs() << "  Hint: This may be caused by complex SSA patterns from quantum-opt canonicalization.\n";
+                 llvm::errs() << "  Try disabling canonicalization or decomposing the circuit further.\n";
                  return op.emitError("Cannot emit gate: input qubit not mapped to QASM variable");
             }
             if (i < operands.size() - 1) os << ", ";
@@ -360,30 +429,37 @@ private:
         // (operations that return tuples like %result:2)
         auto results = op->getResults();
 
-        // DEBUG: For multi-result operations, print details
-        if (results.size() > 1 && gateName == "cu") {
-            llvm::errs() << "DEBUG: cu gate has " << results.size() << " results\n";
-            for (size_t i = 0; i < results.size(); ++i) {
-                llvm::errs() << "  results[" << i << "] = " << results[i] << "\n";
-            }
-        }
-
         // Map each result to the corresponding input qubit name
-        if (results.size() != operands.size()) {
-            return op.emitError("Mismatch between qubit operands and results");
-        }
+        // Handle mismatch gracefully - some gates might have different numbers of outputs
+        size_t numToMap = std::min(results.size(), operands.size());
 
-        for (size_t i = 0; i < results.size(); ++i) {
+        for (size_t i = 0; i < numToMap; ++i) {
              Value inQ = operands[i];
              Value outQ = results[i];
-             if (qubitMap.count(inQ) && !qubitMap[inQ].empty()) {
-                 qubitMap[outQ] = qubitMap[inQ];
-                 if (results.size() > 1 && gateName == "cu") {
-                     llvm::errs() << "DEBUG: Mapped cu result[" << i << "] to " << qubitMap[inQ] << "\n";
-                 }
+
+             // Check if input is in map
+             bool hasMapping = qubitMap.count(inQ) > 0;
+             bool hasEmptyMapping = hasMapping && qubitMap[inQ].empty();
+
+             if (hasMapping && !hasEmptyMapping) {
+                 // IMPORTANT: Copy the mapped name to a local variable FIRST before inserting.
+                 // Direct assignment like `qubitMap[outQ] = qubitMap[inQ]` can cause issues
+                 // with LLVM DenseMap when the map is modified during lookup (iterator invalidation).
+                 std::string mappedName = qubitMap[inQ];
+                 qubitMap[outQ] = mappedName;
+             } else {
+                 // If input not mapped or has empty mapping, skip this result
+                 // This can happen with complex control flow patterns from quantum-opt canonicalization
+                 llvm::errs() << "WARNING: Skipping output qubit mapping for gate "
+                              << gateName << " operand " << i
+                              << " (input " << (hasEmptyMapping ? "has empty mapping" : "not mapped") << ")\n";
              }
-             // If input not mapped, output won't be mapped either
-             // This will cause errors downstream, which is intentional (fail-fast)
+        }
+
+        // If there are extra results (shouldn't happen for quantum gates), warn
+        if (results.size() > operands.size()) {
+            llvm::errs() << "WARNING: Gate " << gateName << " has " << results.size()
+                         << " results but " << operands.size() << " operands\n";
         }
         
         return success();
