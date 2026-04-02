@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <mlir/IR/BuiltinOps.h>
 #define DEBUG_TYPE "value-semantics-conversion"
 
 #include <cstdint>
@@ -575,8 +574,6 @@ void getNecessaryRegionRValues(Region &r, SetVector<Value> &necessaryRegionRValu
     });
 }
 
-
-
 /**
  * @brief Given a qref gate operation, compute the result segment sizes for the corresponding value
  * semantics gate operation.
@@ -835,141 +832,29 @@ void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tra
 {
     OpBuilder::InsertionGuard guard(builder);
     MLIRContext *ctx = callOp.getContext();
-    Location loc = callOp->getLoc();
-    unsigned numExistingCallResults = callOp->getNumResults();
 
-    auto f =
-        mlir::SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callOp, callOp.getCalleeAttr());
-    SetVector<Value> rValuesUsedBySubroutine;
-    getNecessarySubroutineRValues(f, rValuesUsedBySubroutine);
+    SmallVector<Type> newResultTypes;
+    for (auto callArg : callOp.getOperands()) {
+        if (isa<qref::QuregType>(callArg.getType())) {
+            newResultTypes.push_back(quantum::QuregType::get(ctx));
+        }
+        else if (isa<qref::QubitType>(callArg.getType())) {
+            newResultTypes.push_back(quantum::QubitType::get(ctx));
+        }
+    }
 
-    if (rValuesUsedBySubroutine.size() == 0) {
+    if (newResultTypes.size() == 0) {
         return;
     }
 
-    // handleSubroutine(builder, f, rValuesUsedBySubroutine);
-    llvm::errs() << "encountered call op " << callOp << "\n";
-    llvm::errs() << "calling subroutine " << f << "\n";
-
-    SmallVector<Value> newCallArgs(callOp.getOperands());
-    // for (auto oldCallArg : callOp.getOperands()){
-    //     if (isa<qref::QubitType>(oldCallArg.getType())) {
-    //         assert(tracker.isRootRQubit(oldCallArg) && "only root qubits can be passed into a
-    //         subroutine in reference semantics");
-    //         newCallArgs.push_back(tracker.getCurrentVQubit(oldCallArg));
-    //     }
-    //     else if (isa<qref::QuregType>(oldCallArg.getType())) {
-    //         newCallArgs.push_back(tracker.getCurrentVQreg(oldCallArg));
-    //     }
-    //     else {
-    //         newCallArgs.push_back(oldCallArg);
-    //     }
-    // }
-    SmallVector<std::tuple<quantum::ExtractOp, Value, unsigned>>
-        insertQubitResultIndicesFromNewCall;
-    SmallVector<std::pair<Value, unsigned>> trackerUpdateValues;
-    for (auto [i, rValue] : llvm::enumerate(rValuesUsedBySubroutine)) {
-        llvm::errs() << "subroutine needs " << rValue << "\n";
-
-        if (isa<qref::QuregType>(rValue.getType())) {
-            unsigned subroutineQregArgIndex = dyn_cast<BlockArgument>(rValue).getArgNumber();
-            newCallArgs.push_back(
-                tracker.getCurrentVQreg(callOp.getOperand(subroutineQregArgIndex)));
-            trackerUpdateValues.push_back(
-                {callOp.getOperand(subroutineQregArgIndex), i + numExistingCallResults});
-        }
-        else if (isa<qref::QubitType>(rValue.getType())) {
-            if (auto getOp = dyn_cast<qref::GetOp>(rValue.getDefiningOp())) {
-                assert(!getOp.getIdx() && "qref.bit values from a get op inside a subroutine "
-                                          "scheduled to be passed in as "
-                                          "an quantum.extract-ed qubit from the call site must "
-                                          "have static extract index");
-                assert(isa<BlockArgument>(getOp.getQreg()) &&
-                       "qref.bit values from a get op inside a subroutine scheduled to be passed "
-                       "in as "
-                       "an quantum.extract-ed qubit from the call site must be extracted from a "
-                       "register not allocated inside the subroutine");
-                uint64_t index = getOp.getIdxAttr().value();
-                unsigned subroutineQregArgIndex =
-                    dyn_cast<BlockArgument>(getOp.getQreg()).getArgNumber();
-                builder.setInsertionPoint(callOp);
-                auto extractOp = quantum::ExtractOp::create(
-                    builder, loc, quantum::QubitType::get(ctx),
-                    tracker.getCurrentVQreg(callOp.getOperand(subroutineQregArgIndex)), {},
-                    IntegerAttr::get(builder.getI64Type(), index));
-                newCallArgs.push_back(extractOp.getQubit());
-                insertQubitResultIndicesFromNewCall.push_back(
-                    {extractOp, callOp.getOperand(subroutineQregArgIndex),
-                     i + numExistingCallResults});
-            }
-            else {
-                unsigned subroutineQubitArgIndex = dyn_cast<BlockArgument>(rValue).getArgNumber();
-                newCallArgs.push_back(
-                    tracker.getCurrentVQubit(callOp.getOperand(subroutineQubitArgIndex)));
-                trackerUpdateValues.push_back(
-                    {callOp.getOperand(subroutineQubitArgIndex), i + numExistingCallResults});
-            }
-        }
-    }
-
-    handleSubroutine(builder, f, rValuesUsedBySubroutine);
-
-    llvm::erase_if(newCallArgs,
-                   [](Value v) { return isa<qref::QubitType, qref::QuregType>(v.getType()); });
-
-    // SmallVector<Type> newResultTypes;
-    // for (auto callArg : callOp.getOperands()) {
-    //     if (isa<qref::QuregType>(callArg.getType())) {
-    //         newResultTypes.push_back(quantum::QuregType::get(ctx));
-    //     }
-    //     else if (isa<qref::QubitType>(callArg.getType())) {
-    //         newResultTypes.push_back(quantum::QubitType::get(ctx));
-    //     }
-    // }
-
-    // if (newResultTypes.size() == 0) {
-    //     return;
-    // }
-
-    // auto newCallOp =
-    //     migrateOpToValueSemantics<func::CallOp>(builder, callOp, tracker, newResultTypes);
-
-    auto newCallOp = func::CallOp::create(builder, loc, f, newCallArgs);
+    auto newCallOp =
+        migrateOpToValueSemantics<func::CallOp>(builder, callOp, tracker, newResultTypes);
 
     for (auto [i, v] : llvm::enumerate(callOp->getResults())) {
         builder.replaceAllUsesWith(v, newCallOp->getResult(i));
     }
 
-    for (auto pair : trackerUpdateValues) {
-        Value rValue = pair.first;
-        if (isa<qref::QuregType>(rValue.getType())) {
-            tracker.setCurrentVQreg(rValue, newCallOp->getResult(pair.second));
-        }
-        else if (isa<qref::QubitType>(rValue.getType())) {
-            tracker.setCurrentVQubit(rValue, newCallOp->getResult(pair.second));
-        }
-    }
-
     builder.eraseOp(callOp);
-    if (insertQubitResultIndicesFromNewCall.size() == 0) {
-        return;
-    }
-
-    builder.setInsertionPointAfter(newCallOp);
-    // Value insertQreg = insertQubitResultIndicesFromNewCall[0].first.getQreg();
-    for (auto triplet : insertQubitResultIndicesFromNewCall) {
-        quantum::ExtractOp extractOp = std::get<0>(triplet);
-        Value rSourceQreg = std::get<1>(triplet);
-        Value qubitToInsert = newCallOp->getResult(std::get<2>(triplet));
-        auto insertOp = quantum::InsertOp::create(
-            builder, loc, quantum::QuregType::get(ctx), tracker.getCurrentVQreg(rSourceQreg),
-            extractOp.getIdx(), extractOp.getIdxAttrAttr(), qubitToInsert);
-        tracker.setCurrentVQreg(rSourceQreg, insertOp.getOutQreg());
-        builder.setInsertionPointAfter(insertOp);
-    }
-
-    llvm::errs() << "after handling call, dumping " << newCallOp->getParentOfType<ModuleOp>()
-                 << "\n";
 }
 
 void handleCompbasis(IRRewriter &builder, qref::ComputationalBasisOp rCompbasisOp,
@@ -1483,7 +1368,7 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
 }
 
 void handleSubroutine(IRRewriter &builder, func::FuncOp f,
-                      SetVector<Value> &rValuesUsedBySubroutine)
+                      const SetVector<Value> &rValuesUsedBySubroutine)
 {
     MLIRContext *ctx = f.getContext();
     auto *qrefDialect = ctx->getLoadedDialect<qref::QRefDialect>();
@@ -1604,13 +1489,16 @@ namespace qref {
 struct ValueSemanticsConversionPass
     : impl::ValueSemanticsConversionPassBase<ValueSemanticsConversionPass> {
     using ValueSemanticsConversionPassBase::ValueSemanticsConversionPassBase;
+    using SubroutineInfo = ReferenceToValueSemanticsConversion::SubroutineInfo;
 
     void runOnOperation() final
     {
         Operation *mod = getOperation();
         MLIRContext *ctx = mod->getContext();
+        Location loc = mod->getLoc();
         auto *qrefDialect = ctx->getLoadedDialect<qref::QRefDialect>();
         IRRewriter builder(ctx);
+        DenseMap<StringRef, SubroutineInfo> subroutineInfos;
 
         WalkResult getOpVerification = mod->walk([&](qref::GetOp getOp) {
             if (!llvm::all_of(getOp->getUsers(),
@@ -1656,9 +1544,51 @@ struct ValueSemanticsConversionPass
             return WalkResult::advance();
         });
 
-        // for (auto subroutine : targetSubroutines) {
-        //     ReferenceToValueSemanticsConversion::handleSubroutine(builder, subroutine);
-        // }
+        for (auto subroutine : targetSubroutines) {
+
+            // ReferenceToValueSemanticsConversion::SubroutineInfo subroutineInfo(subroutine);
+            //  The subroutine conversion happens in-place, i.e. we are editing the existing func op
+            //  So the string ref to the name will not die
+            SubroutineInfo info(subroutine);
+            subroutineInfos.insert({subroutine.getName(), info});
+            ReferenceToValueSemanticsConversion::handleSubroutine(
+                builder, subroutine, info.getNecessarySubroutineRValues());
+        }
+
+        SmallVector<func::CallOp> callMutateWorklist;
+        mod->walk([&](func::CallOp callOp) { callMutateWorklist.push_back(callOp); });
+
+        IRRewriter::InsertPoint ip = builder.saveInsertionPoint();
+        for (func::CallOp callOp : callMutateWorklist) {
+            builder.setInsertionPoint(callOp);
+            SmallVector<Value> newCallArgs;
+            ValueRange oldCallArgs(callOp->getOperands());
+            for (Value oldCallArg : oldCallArgs) {
+                if (!isa<qref::QubitType, qref::QuregType>(oldCallArg.getType())) {
+                    newCallArgs.push_back(oldCallArg);
+                }
+            }
+            for (auto newArgsInfo : subroutineInfos.at(callOp.getCallee()).getNewArgsInfo()) {
+                if (std::holds_alternative<unsigned>(newArgsInfo)) {
+                    newCallArgs.push_back(oldCallArgs[std::get<unsigned>(newArgsInfo)]);
+                }
+                else {
+                    std::pair _pair = std::get<std::pair<unsigned, uint64_t>>(newArgsInfo);
+                    unsigned oldCallArgIdx = _pair.first;
+                    unsigned extractIdx = _pair.second;
+                    assert(isa<qref::QuregType>(oldCallArgs[oldCallArgIdx].getType()) &&
+                           "Expected rQreg");
+                    auto getOp = qref::GetOp::create(
+                        builder, loc, qref::QubitType::get(ctx), oldCallArgs[oldCallArgIdx],
+                        nullptr, IntegerAttr::get(builder.getI64Type(), extractIdx));
+                    newCallArgs.push_back(getOp.getQubit());
+                }
+            }
+            auto newCallOp = func::CallOp::create(builder, loc, callOp->getResultTypes(),
+                                                  callOp.getCallee(), newCallArgs);
+            builder.replaceOp(callOp, newCallOp);
+        }
+        builder.restoreInsertionPoint(ip);
 
         for (auto targetFunc : targetFuncs) {
             ReferenceToValueSemanticsConversion::QubitValueTracker tracker;

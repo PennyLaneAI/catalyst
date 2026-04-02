@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <variant>
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Operation.h"
@@ -27,17 +28,13 @@ using namespace catalyst;
 
 namespace ReferenceToValueSemanticsConversion {
 
-struct SubroutineInfo {
-
-}; // struct SubroutineInfo
-
-
-void getNecessarySubroutineRValues(func::FuncOp f, SetVector<Value> &necessarySubroutineRValues)
+void _getNecessarySubroutineRValues(func::FuncOp f, SetVector<Value> &necessarySubroutineRValues)
 {
     auto *qrefDialect = f.getContext()->getLoadedDialect<qref::QRefDialect>();
     llvm::SmallDenseSet<Value, 8> rQregsTakenIn;
 
     f.walk([&](Operation *op) {
+        // TODO: what if calling a subroutine from another subroutine??
         if (op->getDialect() != qrefDialect && !isa<func::CallOp>(op)) {
             return;
         }
@@ -103,4 +100,102 @@ void getNecessarySubroutineRValues(func::FuncOp f, SetVector<Value> &necessarySu
         return !seenGetInfos.insert(info).second;
     });
 }
+
+/**
+ * @brief An info object to store what new arguments the converted subroutine needs.
+ *
+ * The strategy to convert subroutines and calls are as follows:
+ *
+ * The subroutine body is walked over, and the necessary rValues are collected.
+ * An rValue is deemed necessary if it is an operand to a gate-like operation inside the subroutine,
+ * and does not belong to an allocation from inside the subroutine.
+ * These are the values that need to be passed in from outside the subroutine.
+ *
+ * Of the necessary rValues, there will be 2 kinds:
+ * - Either it is already a subroutine argument (A);
+ * - or, it is a rQubit from a getOp inside the subroutine, whose rQreg is a subroutine argument,
+ * and whose extract index is static (B)
+ *
+ * For each of these collected necessary rValues, an entry is added to this info object.
+ * - For type A, the entry is a single number, indicating the argument index
+ * - For type B, the entry is a pair of numbers, indicating the argument index of the rQreg, and the
+ * static extract index
+ *
+ * For example, consider the subroutine and the call (pseudocode)
+ *
+ *    func.func @subroutine(%r: !qref.reg<3>, %q: !qref.bit, %param: f64) -> () {
+ *        %q0 = qref.get %r[0]
+ *        %q1 = qref.get %r[1]
+ *
+ *        %r_inside = qref.alloc(2)
+ *        %q_inside = qref.get %r_inside[1]
+ *
+ *        qref.custom "gate"(%param) %q0, %q1, %q, %q_inside
+ *        return
+ *    }
+ *
+ *    func.call @subroutine(%r_call, %q_call, %param_call) : (!qref.reg<3>, !qref.bit, f64) -> ()
+ *
+ * The necessary rValues of the subroutine are %q0 (type B), %q1 (type B) and %q (type A)
+ * The content of the info object would be
+ *   [[0, 0], [0, 1], 1]
+ *
+ * The purpose is so that when building the new call op, extract ops can be properly built before
+ * the new call. The new call would be
+ *    %q0_call = qref.get %r_call[0]    // from reg = call_old_args[0], extract idx = 0
+ *    %q1_call = qref.get %r_call[1]    // from reg = call_old_args[0], extract idx = 1
+ *    func.call @subroutine(%param_call, %q0_call, %q1_call, %q_call)  // old_call_args[1] = %q_call
+ *
+ * All new args, one for each rValue needed by the subroutine, must be appended to the end of
+ * the list of new arguments
+ * All old qref args must be purged from the call, since the newly collected necessary rValues are a
+ * complete source of truth.
+ *
+ * Note that this object performs no IR mutation whatsoever. It is only an analysis.
+ * It is to be used by the handlers of call ops, to build the new call op signature.
+ */
+struct SubroutineInfo {
+  public:
+    SubroutineInfo(func::FuncOp f) : subroutine(f)
+    {
+        _getNecessarySubroutineRValues(this->subroutine, this->necessarySubroutineRValues);
+        for (auto rValue : this->necessarySubroutineRValues) {
+            if (auto rValueAsArg = dyn_cast<BlockArgument>(rValue)) {
+                newArgsInfo.push_back(rValueAsArg.getArgNumber());
+                continue;
+            }
+            auto getOp = dyn_cast<qref::GetOp>(rValue.getDefiningOp());
+            assert(getOp && "Gates inside a subroutine in reference semantics must act on either "
+                            "qref arguments of the subroutine, allocations from within the "
+                            "subroutine, or qref.bit values produced by qref.get ops");
+            Value rQreg = getOp.getQreg();
+            assert(llvm::is_contained(f.getArguments(), rQreg) &&
+                   "Subroutines in reference semantics cannot take in qref.bit values that are not "
+                   "from a single qubit allocation");
+            assert(!getOp.getIdx() && "qref.bit values from a get op inside a subroutine "
+                                      "scheduled to be passed in as "
+                                      "an quantum.extract-ed qubit from the call site must "
+                                      "have static extract index");
+            unsigned argnum = cast<BlockArgument>(rQreg).getArgNumber();
+            this->newArgsInfo.push_back(std::make_pair(argnum, getOp.getIdxAttr().value()));
+        }
+    }
+
+    const SetVector<Value> &getNecessarySubroutineRValues()
+    {
+        return this->necessarySubroutineRValues;
+    }
+
+    const SmallVector<std::variant<unsigned, std::pair<unsigned, uint64_t>>> &getNewArgsInfo()
+    {
+        return this->newArgsInfo;
+    }
+
+  private:
+    func::FuncOp subroutine;
+    SetVector<Value> necessarySubroutineRValues;
+    SmallVector<std::variant<unsigned, std::pair<unsigned, uint64_t>>> newArgsInfo;
+
+}; // struct SubroutineInfo
+
 } // namespace ReferenceToValueSemanticsConversion
