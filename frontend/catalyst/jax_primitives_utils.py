@@ -399,10 +399,7 @@ def transform_named_sequence_lowering(pipeline, sym_name):
         target = bb_named_sequence.arguments[0]
         for _pass in pipeline:
             assert isinstance(_pass, BoundTransform) or isinstance(_pass, PassPlugin)
-            if isinstance(_pass, BoundTransform):
-                name = _pass.pass_name
-            else:
-                name = _pass.name
+            name = _pass.pass_name if isinstance(_pass, BoundTransform) else _pass.name
             options = _lowered_options(_pass)
             apply_registered_pass_op = ApplyRegisteredPassOp(
                 result=transform_mod_type,
