@@ -549,13 +549,13 @@ class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
                     postprocessing_module, matched_op, postprocessing_func_name
                 )
 
-            # get the tensor_op the original MP result is passed to
+            # get the from_elements_op the original MP result is passed to
             # from its uses get the index this result is returned at
-            tensor_op = list(matched_op.results[0].uses)[0].operation
+            from_elements_op = list(matched_op.results[0].uses)[0].operation
             assert isinstance(
-                tensor_op, tensor.FromElementsOp
-            ), f"Expected to find a tensor.from_elements op, but got {type(tensor_op).__name__}"
-            mp_index = list(tensor_op.results[0].uses)[0].index
+                from_elements_op, tensor.FromElementsOp
+            ), f"Expected to find a tensor.from_elements op, but got {type(from_elements_op).__name__}"
+            mp_index = list(from_elements_op.results[0].uses)[0].index
 
             # Insert the call to the post-processing function
             postprocessing_func_call_op = func.CallOp(
@@ -572,7 +572,7 @@ class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
             self.update_returns(mp_index, sample_op, postprocessing_func_call_op, rewriter)
 
             # delete now unused obs --> mp --> tensor chain
-            rewriter.erase_op(tensor_op)
+            rewriter.erase_op(from_elements_op)
             rewriter.erase_op(matched_op)
             rewriter.erase_op(observable_op)
 
