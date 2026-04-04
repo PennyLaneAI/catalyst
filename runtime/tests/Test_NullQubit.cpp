@@ -15,6 +15,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 
@@ -270,23 +271,21 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=1 that performs a measuremen
     CHECK(*m == false); // Measurement of NullQubit should always return 0 (false)
 }
 
-TEST_CASE_METHOD(NullQubitRuntimeFixture,
-                 "Test null qubit circuit with pauli measurement throws an exception",
+TEST_CASE_METHOD(NullQubitRuntimeFixture, "Test null qubit circuit with pauli measurement succeeds",
                  "[NullQubit]")
 {
-    // Allocate register with three qubits, [0, 1, 2]
     QirArray *reg = __catalyst__rt__qubit_allocate_array(3);
 
     auto reg_vec = *reinterpret_cast<std::vector<QubitIdType> *>(reg);
 
-    // PauliMeasure is unsupported by device
-    CHECK_THROWS_WITH(__catalyst__qis__PauliMeasure("XYZ", false, nullptr, false, true, 3,
-                                                    reg_vec[0], reg_vec[1], reg_vec[2]),
-                      ContainsSubstring("PauliMeasure is unsupported by device"));
+    RESULT *m = __catalyst__qis__PauliMeasure("XYZ", false, nullptr, false, true, 3, reg_vec[0],
+                                              reg_vec[1], reg_vec[2]);
+    CHECK(*m == false);
 
-    NullQubit device;
-    CHECK_THROWS_WITH(device.PauliMeasure("X", {0}),
-                      ContainsSubstring(" PauliMeasure is unsupported by devic"));
+    NullQubit device("{}");
+    auto qubits = device.AllocateQubits(1);
+    auto result = device.PauliMeasure("X", qubits);
+    CHECK(*result == false);
 }
 
 TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample calling Hadamard, "
@@ -971,6 +970,15 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
     sim->NamedOperation("T", {}, {Qs[0]}, true, {Qs[2]});
     sim->NamedOperation("CNOT", {}, {Qs[0], Qs[1]}, false);
 
+    sim->NamedOperation("PauliRot", {0.5}, {Qs[0], Qs[1]}, false);
+    sim->NamedOperation("PauliRot", {M_PI}, {Qs[0], Qs[1], Qs[2]}, false);
+    sim->NamedOperation("PauliRot", {M_PI / 2}, {Qs[0]}, false);
+    sim->NamedOperation("PauliRot", {M_PI / 4}, {Qs[0], Qs[1]}, false);
+    sim->NamedOperation("PauliRot", {0.0}, {Qs[0]}, false);
+
+    sim->PauliMeasure("XY", {Qs[0], Qs[1]});
+    sim->PauliMeasure("XYZ", {Qs[0], Qs[1], Qs[2]});
+
     // Applying an empty matrix is fine for NullQubit
     sim->MatrixOperation({}, {Qs[0]}, false);
     sim->MatrixOperation({}, {Qs[0]}, false, {Qs[1]});
@@ -1052,6 +1060,13 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
         "C(S)",
         "2C(S)",
         "CNOT",
+        "PauliRot-Phi-w2",
+        "PauliRot-pi-w3",
+        "PauliRot-pi/2-w1",
+        "PauliRot-pi/4-w2",
+        "PauliRot-identity-w1",
+        "PauliMeasure-w2",
+        "PauliMeasure-w3",
         "Adjoint(ControlledQubitUnitary)",
         "ControlledQubitUnitary",
         "Adjoint(QubitUnitary)",
@@ -1082,10 +1097,10 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
             CHECK(line.find("4") != std::string::npos);
         }
         if (line.find("num_gates") != std::string::npos) {
-            CHECK(line.find("12") != std::string::npos);
+            CHECK(line.find("19") != std::string::npos);
         }
         if (line.find("depth") != std::string::npos) {
-            CHECK(line.find("11") != std::string::npos);
+            CHECK(line.find("18") != std::string::npos);
         }
         full_json += line + "\n";
     }

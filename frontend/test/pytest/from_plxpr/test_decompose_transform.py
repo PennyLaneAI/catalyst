@@ -29,6 +29,21 @@ from pennylane_lightning.lightning_qubit.lightning_qubit import (
 )
 
 
+def _normalize_gate_types(gate_types):
+    """
+    TODO: Remove this function once PennyLane tape-based resource counting specs format
+    is unified with the updated resource tracking specs format.
+
+    Normalize gate type names by stripping NullQubit suffixes (e.g. 'PauliRot-Phi-w4')
+    back to the base name ('PauliRot') and summing counts for matching base names.
+    """
+    result = {}
+    for k, v in gate_types.items():
+        base = k.split("-")[0]
+        result[base] = result.get(base, 0) + v
+    return result
+
+
 class TestGraphDecomposition:
     """Test the new graph-based decomposition integration with from_plxpr."""
 
@@ -94,7 +109,7 @@ class TestGraphDecomposition:
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
-        assert resources == expected_resources
+        assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_alt_decomps(self):
@@ -124,7 +139,7 @@ class TestGraphDecomposition:
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
         resources = qml.specs(qjited_circuit, level="device")()["resources"].gate_types
-        assert resources == expected_resources
+        assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_fixed_rules(self):
@@ -178,7 +193,7 @@ class TestGraphDecomposition:
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
-        assert resources == expected_resources
+        assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_tensorlike(self):
@@ -211,7 +226,7 @@ class TestGraphDecomposition:
         assert qml.math.allclose(without_qjit, with_qjit(x, y))
         expected_resources = qml.specs(circuit, level="device")(x, y)["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")(x, y)["resources"].gate_types
-        assert resources == expected_resources
+        assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_inordered_params(self):
@@ -234,7 +249,7 @@ class TestGraphDecomposition:
 
         expected_resources = qml.specs(circuit, level="device")(x, y, z)["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")(x, y, z)["resources"].gate_types
-        assert resources == expected_resources
+        assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_decompose_with_stopping_condition(self):
@@ -268,7 +283,7 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")(x, y, z)["resources"].gate_types
         assert "MultiRZ" in resources
         assert "MultiRZ" in expected_resources
-        assert resources == expected_resources
+        assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_decompose_with_lightning_stopping_condition(self):
@@ -294,11 +309,11 @@ class TestGraphDecomposition:
 
         expected_resources = qml.specs(circuit, level="device")(x)["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")(x)["resources"].gate_types
-        assert "PauliRot" in expected_resources
-        assert "PauliRot" in resources
-        assert "StatePrep" not in expected_resources
-        assert "StatePrep" not in resources
-        assert resources == expected_resources
+        assert any(k.startswith("PauliRot") for k in expected_resources)
+        assert any(k.startswith("PauliRot") for k in resources)
+        assert not any(k.startswith("StatePrep") for k in expected_resources)
+        assert not any(k.startswith("StatePrep") for k in resources)
+        assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
 
     @pytest.mark.skip(
         reason="inconsistent type and error msg across gcc/clang on arm/x86 for undefined symbols"
@@ -343,7 +358,7 @@ class TestGraphDecomposition:
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
-        assert resources == expected_resources
+        assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
 
     @pytest.mark.xfail(reason="unstable global phase numbers", strict=False)
     @pytest.mark.usefixtures("use_capture_dgraph")
@@ -372,7 +387,7 @@ class TestGraphDecomposition:
             result_without_qjit = circuit()
             expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
 
-        assert resources == expected_resources
+        assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         assert qml.math.allclose(result_without_qjit, result_with_qjit)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
@@ -397,7 +412,7 @@ class TestGraphDecomposition:
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
-        assert resources == expected_resources
+        assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_multi_qubits(self):
@@ -421,7 +436,7 @@ class TestGraphDecomposition:
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
-        assert resources == expected_resources
+        assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_adjoint(self):
@@ -446,7 +461,7 @@ class TestGraphDecomposition:
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
-        assert resources == expected_resources
+        assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_ctrl(self):
@@ -470,7 +485,7 @@ class TestGraphDecomposition:
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
-        assert resources == expected_resources
+        assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_template_qft(self):
@@ -492,7 +507,7 @@ class TestGraphDecomposition:
         result_without_qjit = circuit()
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
 
-        assert resources == expected_resources
+        assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         assert qml.math.allclose(result_without_qjit, result_with_qjit)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
@@ -519,7 +534,7 @@ class TestGraphDecomposition:
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
-        assert resources == expected_resources
+        assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     @pytest.mark.parametrize(
