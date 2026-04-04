@@ -30,11 +30,11 @@ def circuit_np():
     return qml.expval(qml.PauliZ(0))
 
 
-def test_variable_wires(backend):
+def test_variable_wires(backend, capture_mode):
     """Test variable wires."""
 
-    jitted_fn_jnp = qjit(qml.qnode(qml.device(backend, wires=1))(circuit_jnp))
-    jitted_fn_np = qjit(qml.qnode(qml.device(backend, wires=1))(circuit_np))
+    jitted_fn_jnp = qjit(qml.qnode(qml.device(backend, wires=1))(circuit_jnp), capture=capture_mode)
+    jitted_fn_np = qjit(qml.qnode(qml.device(backend, wires=1))(circuit_np), capture=capture_mode)
     assert np.isclose(jitted_fn_jnp(), jitted_fn_np())
 
 
