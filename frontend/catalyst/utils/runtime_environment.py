@@ -22,45 +22,39 @@ import sysconfig
 
 from catalyst._configuration import INSTALLED
 
-package_root = os.path.dirname(__file__)
+package_root = os.path.join(os.path.dirname(__file__), "..")
 
 # Default paths to dep libraries
 DEFAULT_LIB_PATHS = {
-    "llvm": os.path.join(package_root, "../../../mlir/llvm-project/build/lib"),
-    "runtime": os.path.join(package_root, "../../../runtime/build/lib"),
-    "enzyme": os.path.join(package_root, "../../../mlir/Enzyme/build/Enzyme"),
-    "oqc_runtime": os.path.join(package_root, "../../catalyst/third_party/oqc/src/build"),
-    "oqd_runtime": os.path.join(package_root, "../../../runtime/build/lib"),
+    "llvm": os.path.join(package_root, "..", "..", "mlir", "llvm-project", "build", "lib"),
+    "dialects": os.path.join(package_root, "..", "..", "mlir", "build", "lib"),
+    "runtime": os.path.join(package_root, "..", "..", "runtime", "build", "lib"),
+    "enzyme": os.path.join(package_root, "..", "..", "mlir", "Enzyme", "build", "Enzyme"),
+    "oqc_runtime": os.path.join(package_root, "third_party", "oqc", "src", "build"),
+    "oqd_runtime": os.path.join(package_root, "..", "..", "runtime", "build", "lib"),
 }
 
 DEFAULT_INCLUDE_PATHS = {
-    "mlir": os.path.join(package_root, "../../../mlir/include"),
+    "mlir": os.path.join(package_root, "..", "..", "mlir", "include"),
 }
 
 DEFAULT_BIN_PATHS = {
-    "cli": os.path.join(package_root, "../../../mlir/build/bin"),
+    "cli": os.path.join(package_root, "..", "..", "mlir", "build", "bin"),
 }
 
 
 def get_lib_path(project, env_var):
-    """Get the library path."""
+    """Get the path to Catalyst's shared libraries."""
     if INSTALLED:
-        return os.path.join(package_root, "..", "lib")  # pragma: no cover
+        return os.path.join(package_root, "lib")  # pragma: no cover
     return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
 
 
 def get_include_path():
     """Return the path to Catalyst's include directory."""
     if INSTALLED:
-        return os.path.join(package_root, "..", "include")  # pragma: no cover
+        return os.path.join(package_root, "include")  # pragma: no cover
     return os.getenv("CATALYST_INCLUDE_DIRS", DEFAULT_INCLUDE_PATHS.get("mlir", ""))
-
-
-def get_bin_path(project, env_var):
-    """Get the library path."""
-    if INSTALLED:
-        return os.path.join(package_root, "..", "bin")  # pragma: no cover
-    return os.getenv(env_var, DEFAULT_BIN_PATHS.get(project, ""))
 
 
 def get_cli_path() -> str:  # pragma: nocover
@@ -85,6 +79,12 @@ def get_cli_path() -> str:  # pragma: nocover
 
     # Fallback to python location
     path = os.path.join(os.path.dirname(sys.executable), catalyst_cli)
+    if os.path.isfile(path):
+        return path
+
+    # Check the old bin directory location, which in rare scenarios may still be used
+    # (e.g. the configuration after `make wheel` has been run).
+    path = os.path.join(package_root, "..", "bin", catalyst_cli)
     if os.path.isfile(path):
         return path
 
