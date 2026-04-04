@@ -1119,13 +1119,15 @@ class CustomDevice(qml.devices.Device):
 class TestDensityMatrixMP:
     """Tests for density_matrix"""
 
-    def test_error(self):
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    def test_error(self, capture_mode):
         """Test that tracing density matrix produces an error"""
 
         err_msg = "DensityMatrixMP is not a supported measurement process"
         with pytest.raises(CompileError, match=err_msg):
 
-            @qjit
+            @qjit(capture=capture_mode)
             @qml.qnode(CustomDevice(wires=1))
             def circuit():
                 return qml.density_matrix([0])
@@ -1245,10 +1247,10 @@ class TestNullQubitMeasurements:
     n_shots = 100
 
     @pytest.mark.parametrize("n_qubits", [0, 1, 2])
-    def test_nullq_sample(self, n_qubits):
+    def test_nullq_sample(self, n_qubits, capture_mode):
         """Test qml.sample() on null.qubit device."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.set_shots(self.n_shots)
         @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_sample():
@@ -1262,10 +1264,10 @@ class TestNullQubitMeasurements:
         observed = circuit_sample()
         assert np.array_equal(observed, expected)
 
-    def test_nullq_sample_per_wire(self):
+    def test_nullq_sample_per_wire(self, capture_mode):
         """Test qml.sample() on null.qubit device, returning results per wire."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.set_shots(self.n_shots)
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit_sample():
@@ -1281,10 +1283,10 @@ class TestNullQubitMeasurements:
         assert np.array_equal(observed_1, expected)
 
     @pytest.mark.parametrize("n_qubits", [0, 1, 2])
-    def test_nullq_counts(self, n_qubits):
+    def test_nullq_counts(self, n_qubits, capture_mode):
         """Test qml.counts() on null.qubit device."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.set_shots(self.n_shots)
         @qml.qnode(qml.device("null.qubit", wires=n_qubits))
         def circuit_counts():
@@ -1302,10 +1304,10 @@ class TestNullQubitMeasurements:
         observed = circuit_counts()
         assert np.array_equal(observed, expected)
 
-    def test_nullq_counts_per_wire(self):
+    def test_nullq_counts_per_wire(self, capture_mode):
         """Test qml.counts() on null.qubit device, returning results per wire."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.set_shots(self.n_shots)
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit_counts():
@@ -1325,7 +1327,7 @@ class TestNullQubitMeasurements:
         assert np.array_equal(observed_1, expected)
 
     @pytest.mark.parametrize("n_qubits", [0, 1, 2])
-    def test_nullq_probs(self, n_qubits):
+    def test_nullq_probs(self, n_qubits, capture_mode):
         """Test qml.probs() on null.qubit device."""
 
         @qml.set_shots(self.n_shots)
@@ -1336,10 +1338,10 @@ class TestNullQubitMeasurements:
             return qml.probs()
 
         expected = circuit_probs()
-        observed = qjit(circuit_probs)()
+        observed = qjit(circuit_probs, capture=capture_mode)()
         assert np.array_equal(observed, expected)
 
-    def test_nullq_probs_per_wire(self):
+    def test_nullq_probs_per_wire(self, capture_mode):
         """Test qml.probs() on null.qubit device, returning results per wire."""
 
         @qml.set_shots(self.n_shots)
@@ -1350,11 +1352,11 @@ class TestNullQubitMeasurements:
             return qml.probs(wires=0), qml.probs(wires=1)
 
         expected = circuit_probs()
-        observed = qjit(circuit_probs)()
+        observed = qjit(circuit_probs, capture=capture_mode)()
         assert np.array_equal(observed, expected)
 
     @pytest.mark.parametrize("n_qubits", [0, 1, 2])
-    def test_nullq_state(self, n_qubits):
+    def test_nullq_state(self, n_qubits, capture_mode):
         """Test qml.state() on null.qubit device."""
 
         @qml.set_shots(None)
@@ -1365,11 +1367,11 @@ class TestNullQubitMeasurements:
             return qml.state()
 
         expected = circuit_state()
-        observed = qjit(circuit_state)()
+        observed = qjit(circuit_state, capture=capture_mode)()
         assert np.array_equal(observed, expected)
 
     @pytest.mark.parametrize("n_qubits", [1, 2])
-    def test_nullq_expval(self, n_qubits):
+    def test_nullq_expval(self, n_qubits, capture_mode):
         """Test qml.expval() on null.qubit device."""
 
         @qml.set_shots(self.n_shots)
@@ -1381,11 +1383,11 @@ class TestNullQubitMeasurements:
             return qml.expval(qml.X(0)), qml.expval(qml.Y(0)), qml.expval(qml.Z(0))
 
         expected = circuit_expval()
-        observed = qjit(circuit_expval)()
+        observed = qjit(circuit_expval, capture=capture_mode)()
         assert np.array_equal(observed, expected)
 
     @pytest.mark.parametrize("n_qubits", [1, 2])
-    def test_nullq_var(self, n_qubits):
+    def test_nullq_var(self, n_qubits, capture_mode):
         """Test qml.var() on null.qubit device."""
 
         @qml.set_shots(self.n_shots)
@@ -1397,7 +1399,7 @@ class TestNullQubitMeasurements:
             return qml.var(qml.X(0)), qml.var(qml.Y(0)), qml.var(qml.Z(0))
 
         expected = circuit_var()
-        observed = qjit(circuit_var)()
+        observed = qjit(circuit_var, capture=capture_mode)()
         assert np.array_equal(observed, expected)
 
 
