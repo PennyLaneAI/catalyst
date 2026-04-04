@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <list>
 #include <memory>
@@ -23,6 +24,12 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+
+#if defined(__APPLE__)
+#include <mach/mach.h>
+#elif defined(__linux__)
+#include <cstdio>
+#endif
 
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
@@ -205,6 +212,74 @@ class LinesCount {
     }
 };
 
+/**
+ * Returns the current resident set size (RSS) of the process in MB.
+ * Works on macOS and Linux.
+ */
+inline double getResidentSetSizeMB()
+{
+#if defined(__APPLE__)
+    mach_task_basic_info_data_t info;
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &count) ==
+        KERN_SUCCESS) {
+        return static_cast<double>(info.resident_size) / (1024.0 * 1024.0);
+    }
+#elif defined(__linux__)
+    FILE *fp = fopen("/proc/self/status", "r");
+    if (fp) {
+        char line[128];
+        while (fgets(line, sizeof(line), fp)) {
+            if (strncmp(line, "VmRSS:", 6) == 0) {
+                fclose(fp);
+                long kb = 0;
+                sscanf(line + 6, " %ld", &kb);
+                return static_cast<double>(kb) / 1024.0;
+            }
+        }
+        fclose(fp);
+    }
+#endif
+    return 0.0;
+}
+
+/**
+ * MemoryTracker: records per-pass RSS snapshots and writes them as ndjson
+ * Usage:
+ *   MEMORY_PROFILE_PATH=/path/to/memory_profile.ndjson python3 ...
+ */
+class MemoryTracker {
+  public:
+    static const char *profilePath() { return getenv("MEMORY_PROFILE_PATH"); }
+
+    static bool isEnabled() { return profilePath() != nullptr; }
+
+    static void record(const std::string &passName, double rssBefore, double rssAfter)
+    {
+        const char *path = profilePath();
+        if (!path) {
+            return;
+        }
+        double delta = rssAfter - rssBefore;
+        std::ofstream out(path, std::ios::app);
+        if (!out.is_open()) {
+            return;
+        }
+
+        std::string escaped;
+        for (char c : passName) {
+            if (c == '"' || c == '\\') {
+                escaped += '\\';
+            }
+            escaped += c;
+        }
+        out << "{\"pass\":\"" << escaped << "\","
+            << "\"rss_before_mb\":" << std::fixed << std::setprecision(2) << rssBefore << ","
+            << "\"rss_after_mb\":" << std::fixed << std::setprecision(2) << rssAfter << ","
+            << "\"delta_mb\":" << std::fixed << std::setprecision(2) << delta << "}\n";
+    }
+};
+
 } // namespace catalyst::utils
 
 namespace {
@@ -242,6 +317,9 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
     // Store fingerprints before each pass to detect changes
     DenseMap<Pass *, std::optional<OperationFingerPrint>> beforePassFingerprints;
 
+    // Store RSS samples
+    DenseMap<Pass *, double> beforePassRSS;
+
     CatalystPassInstrumentation(const CompilerOptions &options, CompilerOutput &output,
                                 catalyst::utils::Timer &timer)
         : options(options), output(output), timer(timer)
@@ -256,6 +334,10 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
         if (this->options.keepIntermediate == SaveTemps::AfterPassChanged) {
             this->beforePassFingerprints[pass] = OperationFingerPrint(operation);
         }
+        // get RSS before pass
+        if (catalyst::utils::MemoryTracker::isEnabled()) {
+            this->beforePassRSS[pass] = catalyst::utils::getResidentSetSizeMB();
+        }
     }
 
     void runAfterPass(Pass *pass, Operation *operation) override
@@ -265,6 +347,18 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
             auto pipelineName = pass->getName();
             this->timer.dump(pipelineName.str(), /*add_endl */ false);
             catalyst::utils::LinesCount::Operation(operation);
+        }
+
+        // get RSS after pass
+        if (catalyst::utils::MemoryTracker::isEnabled()) {
+            double rssBefore = 0.0;
+            auto it = this->beforePassRSS.find(pass);
+            if (it != this->beforePassRSS.end()) {
+                rssBefore = it->second;
+                this->beforePassRSS.erase(it);
+            }
+            double rssAfter = catalyst::utils::getResidentSetSizeMB();
+            catalyst::utils::MemoryTracker::record(pass->getName().str(), rssBefore, rssAfter);
         }
 
         bool shouldDump = false;
@@ -309,6 +403,9 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
         if (this->options.keepIntermediate == SaveTemps::AfterPassChanged) {
             this->beforePassFingerprints.erase(pass);
         }
+
+        // Clean up RSS entry on failure too
+        this->beforePassRSS.erase(pass);
     }
 
   private:
