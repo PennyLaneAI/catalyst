@@ -41,6 +41,47 @@ def generate_random_state(n=1, seed=None):
     return input_state / np.linalg.norm(input_state)
 
 
+@pytest.mark.parametrize(
+    "state",
+    [np.array([1, 1]), np.array([np.sqrt(1 / 2), np.sqrt(1 / 2)])],
+    ids=["unnormalized_input", "normalized_input"],
+)
+def test_state_prep_pad_with_kwarg(state, capture_mode):
+    """Tests the 'pad_with' kwarg."""
+
+    num_qubits = 2
+
+    @qml.qjit(capture=capture_mode)
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def circuit(state=None):
+        qml.StatePrep(state, wires=range(num_qubits), pad_with=0.0)
+        return qml.expval(qml.Z(0)), qml.state()
+
+    res, state = circuit(state)
+
+    assert np.allclose(res, 1.0)
+    assert len(state) == 2**num_qubits
+    assert np.allclose(state, np.sqrt(1 / 2) * np.array([1, 1, 0, 0]))
+
+
+def test_state_prep_normalize_kwarg(capture_mode):
+    """Tests the 'normalize' kwarg."""
+
+    num_qubits = 2
+
+    @qml.qjit(capture=capture_mode)
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def circuit(state=None):
+        qml.StatePrep(state, wires=range(num_qubits), normalize=True)
+        return qml.expval(qml.Z(0)), qml.state()
+
+    res, state = circuit(np.array([15, 15, 15, 15]))
+
+    assert np.allclose(res, 0.0)
+    assert len(state) == 2**num_qubits
+    assert np.allclose(state, 1 / 2 * np.array([1, 1, 1, 1]))
+
+
 class Test2QubitStatePrep:
     """
     Tests two variations of a simple two-qubit circuit beginning with state preparation on one of
