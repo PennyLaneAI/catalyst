@@ -280,7 +280,10 @@
 * Added a cache of pre-compiled PennyLane built-in decomposition rules for use with the C++ graph
   decomposition system.
   [(#2531)](https://github.com/PennyLaneAI/catalyst/pull/2531)
-  [(#2619)](https://github.com/PennyLaneAI/catalyst/pull/2531)
+  [(#2619)](https://github.com/PennyLaneAI/catalyst/pull/2619)
+
+* Added the `graph-decomposition` pass to orchestrate the new MLIR-native graph-based decomposition system.
+  [(#2552)](https://github.com/PennyLaneAI/catalyst/pull/2552)
 
 * A new optimization pass has been added to reduce the number of instructions in a quantum program,
   `--merge-global-phase`, which safely combines global phase instructions for each region in the
