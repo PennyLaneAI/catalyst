@@ -215,7 +215,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         wires = [self.init_qreg[w] for w in obs.wires]
         if obs.name == "Hermitian":
             return hermitian_p.bind(obs.data[0], *wires)
-        return namedobs_p.bind(*wires, *obs.data, kind=obs.name)
+        return namedobs_p.bind(wires[0], *obs.data, kind=obs.name)
 
     def _compbasis_obs(self, *wires):
         """Add a computational basis sampling observable."""
