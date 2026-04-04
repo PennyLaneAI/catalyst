@@ -20,9 +20,10 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -128,10 +129,9 @@ class PulseScheduler {
     // return the next events to process
     SmallVector<Value> processEvent(Value event)
     {
-        SmallVector<Value> nextEvents;
         auto consumers = getEventConsumers(event);
         if (consumers.empty()) {
-            return nextEvents;
+            return {};
         }
 
         // Group pulses by channel, respecting grouping predicate
@@ -160,7 +160,7 @@ class PulseScheduler {
         }
 
         if (channelPulses.empty()) {
-            return nextEvents;
+            return {};
         }
 
         // Extend chains on each channel
@@ -350,6 +350,7 @@ void decomposeFrequencyPulses(ScheduleGroupsMap &pulseGroups)
         }
 
         // Find root pulses (pulses whose wait isn't produced by another pulse in this group)
+        // And skip `_measurement` pulses.
         DenseMap<Value, rtio::RTIOPulseOp> channelRoots;
         for (auto *op : groupOps) {
             auto pulse = cast<rtio::RTIOPulseOp>(op);
@@ -359,7 +360,7 @@ void decomposeFrequencyPulses(ScheduleGroupsMap &pulseGroups)
                 return cast<rtio::RTIOPulseOp>(other).getEvent() == wait;
             });
 
-            if (isRoot) {
+            if (isRoot && !pulse->hasAttr("_measurement")) {
                 Value channel = pulse.getChannel();
                 if (!channelRoots.count(channel)) {
                     channelRoots[channel] = pulse;
@@ -442,9 +443,6 @@ void decomposeFrequencyPulses(ScheduleGroupsMap &pulseGroups)
 struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToARTIQPass> {
     using RTIOEventToARTIQPassBase::RTIOEventToARTIQPassBase;
 
-    // id -> callee name mapping
-    llvm::ArrayRef<std::pair<int32_t, std::string>> getRPCIdMap() const { return rpcIdMap; }
-
     void runOnOperation() override
     {
         ModuleOp module = getOperation();
@@ -454,7 +452,7 @@ struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToA
         // Schedule pulses into groups
         DenseMap<func::FuncOp, ScheduleGroupsMap> pulseGroups;
         module.walk([&](func::FuncOp funcOp) {
-            PulseScheduler scheduler(funcOp, builder, sameChannelSameFrequency);
+            PulseScheduler scheduler(funcOp, builder, canGroup);
             pulseGroups[funcOp] = scheduler.schedule();
         });
 
@@ -491,8 +489,13 @@ struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToA
             return signalPassFailure();
         }
 
-        // Assign unique RPC service IDs to all rtio.rpc ops
-        rpcIdMap = assignRPCIds(module);
+        // Assign unique RPC service IDs to all rtio.rpc ops if no predefined RPC IDs.
+        (void)assignRPCIds(module);
+
+        // Wire up measurement helpers before lowering
+        if (failed(finalizeMeasurementResultHandling(module, builder))) {
+            return signalPassFailure();
+        }
 
         // Lowering to LLVM
         if (failed(lowerToLLVM(module))) {
@@ -501,11 +504,14 @@ struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToA
     }
 
   private:
-    /// Populated by assignRPCIds(); maps service_id -> callee name.
-    llvm::SmallVector<std::pair<int32_t, std::string>> rpcIdMap;
-
-    static bool sameChannelSameFrequency(RTIOPulseOp ref, RTIOPulseOp candidate)
+    static bool canGroup(RTIOPulseOp ref, RTIOPulseOp candidate)
     {
+        // If either pulse is a measurement, they cannot be grouped
+        if (ref->hasAttr("_measurement") || candidate->hasAttr("_measurement")) {
+            return false;
+        }
+
+        // And only group pulses on the same channel and frequency
         if (ref.getChannel() == candidate.getChannel()) {
             return ref.getFrequency() == candidate.getFrequency();
         }
@@ -552,6 +558,91 @@ struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToA
         Value slack = artiq.constI64(ARTIQHardwareConfig::initSlackDelay);
         Value initialTime = arith::AddIOp::create(builder, kernelFunc.getLoc(), counter, slack);
         artiq.atMu(initialTime);
+
+        // TTL6 scope trigger
+        MeasurementChannelAddrs ch = ARTIQRuntimeBuilder::getMeasurementChannelAddresses(module);
+        if (ch.acquisitionOutputAddr != 0) {
+            Location loc = kernelFunc.getLoc();
+            Value trigStart = arith::SubIOp::create(
+                builder, loc, initialTime, artiq.constI64(ARTIQHardwareConfig::scopeTriggerLeadMu));
+            artiq.atMu(trigStart);
+            artiq.rtioOutput(artiq.constI32(ch.acquisitionOutputAddr), artiq.constI32(1));
+            artiq.atMu(initialTime);
+            artiq.rtioOutput(artiq.constI32(ch.acquisitionOutputAddr), artiq.constI32(0));
+        }
+
+        return success();
+    }
+
+    /// Wire up measurement-result helper functions created by IonToRTIO.
+    /// Inserts into the kernel:
+    ///   1. call @__rtio_init_dataset at the start
+    ///   2. memref.store after each rtio.readout result
+    ///   3. call @__rtio_transfer_measurement_results before return
+    ///   4. wait_until_mu(now_mu()) after the transfer call
+    static LogicalResult finalizeMeasurementResultHandling(ModuleOp module, OpBuilder &builder)
+    {
+        auto kernelFunc = module.lookupSymbol<func::FuncOp>(ARTIQFuncNames::kernel);
+        if (!kernelFunc) {
+            return success();
+        }
+
+        auto transferFunc =
+            module.lookupSymbol<func::FuncOp>(ARTIQFuncNames::rtioTransferMeasurementResults);
+        auto initFunc = module.lookupSymbol<func::FuncOp>(ARTIQFuncNames::rtioInitDataset);
+
+        if (!transferFunc) {
+            return success();
+        }
+
+        for (Block &block : kernelFunc.getBody()) {
+            Operation *terminator = block.getTerminator();
+            if (!terminator || !isa<func::ReturnOp>(terminator)) {
+                continue;
+            }
+
+            Location loc = kernelFunc.getLoc();
+            OpBuilder::InsertionGuard guard(builder);
+
+            // 1. call @__rtio_init_dataset at the start
+            if (initFunc) {
+                builder.setInsertionPointToStart(&block);
+                func::CallOp::create(builder, loc, initFunc, ValueRange{});
+            }
+
+            // Collect rtio.readout ops in block order (before they become __rtio_count).
+            SmallVector<RTIOReadoutOp> readouts;
+            for (Operation &op : block) {
+                if (auto readout = dyn_cast<RTIOReadoutOp>(&op)) {
+                    readouts.push_back(readout);
+                }
+            }
+
+            if (readouts.empty()) {
+                continue;
+            }
+
+            auto memrefType = cast<MemRefType>(transferFunc.getArgumentTypes()[0]);
+
+            // Allocate the results buffer at the top of the block
+            builder.setInsertionPointToStart(&block);
+            Value alloc = memref::AllocaOp::create(builder, loc, memrefType);
+
+            // 2. Store each readout count right after its defining op
+            for (auto [i, readout] : llvm::enumerate(readouts)) {
+                builder.setInsertionPointAfter(readout);
+                Value idx = arith::ConstantIndexOp::create(builder, loc, static_cast<int64_t>(i));
+                memref::StoreOp::create(builder, loc, readout.getCount(), alloc, ValueRange{idx});
+            }
+
+            // 3. call @__rtio_transfer_measurement_results + wait before return
+            builder.setInsertionPoint(terminator);
+            func::CallOp::create(builder, loc, transferFunc, ValueRange{alloc});
+
+            // 4. wait_until_mu(now_mu()) so async RPCs flush before return
+            ARTIQRuntimeBuilder artiq(builder, kernelFunc);
+            artiq.waitUntilMu(artiq.nowMu());
+        }
 
         return success();
     }
