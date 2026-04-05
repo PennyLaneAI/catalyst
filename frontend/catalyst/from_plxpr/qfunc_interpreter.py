@@ -35,6 +35,7 @@ from pennylane.capture.primitives import quantum_subroutine_prim, transform_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
 
+from catalyst.device.op_support import is_quantum_gate
 from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import (
     AbstractQbit,
@@ -181,7 +182,11 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         if (fn := _special_op_bind_call.get(type(op))) is not None:
             bind_fn = partial(fn, hyperparameters=op.hyperparameters)
         else:
-            bind_fn = qinst_p.bind
+            if not is_quantum_gate(op):
+                raise CompileError(
+                    f"Operation {op.name} with hyperparameters {list(op.hyperparameters.keys())} "
+                    "is not compatible with quantum instructions."
+                )
 
         out_qubits = bind_fn(
             *[*in_qubits, *op.data, *in_ctrl_qubits, *control_values],
