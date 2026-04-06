@@ -87,12 +87,12 @@
 #include "RTIO/IR/RTIODialect.h"
 #include "RegisterAllPasses.h"
 
-#include "Enzyme.h"
-
 using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::driver;
 namespace cl = llvm::cl;
+
+namespace {
 
 std::string joinPasses(const llvm::SmallVector<std::string> &passes)
 {
