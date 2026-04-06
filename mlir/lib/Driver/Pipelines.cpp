@@ -60,9 +60,8 @@ void createQuantumCompilationStage(OpPassManager &pm)
     pm.addPass(catalyst::createInlineNestedModulePass());
     pm.addPass(catalyst::mitigation::createMitigationLoweringPass());
     pm.addPass(catalyst::quantum::createAdjointLoweringPass());
-    // TODO: We can remove 2 passes below once PBC has its own pipeline.
+    // TODO: We can remove this pass below once PBC has its own pipeline.
     pm.addPass(catalyst::pbc::createLowerPBCInitOpsPass());
-    pm.addPass(catalyst::pbc::createUnrollConditionalPPRPPMPass());
     pm.addPass(catalyst::createDisableAssertionPass());
 }
 void createHloLoweringStage(OpPassManager &pm)
@@ -103,6 +102,7 @@ void createBufferizationStage(OpPassManager &pm)
     pm.addPass(mlir::createConvertElementwiseToLinalgPass());
     pm.addPass(catalyst::gradient::createGradientPreprocessingPass());
     pm.addPass(mlir::bufferization::createEmptyTensorEliminationPass());
+    pm.addPass(catalyst::createMarkEntryPointArgsNonWritablePass());
     ///////////
     mlir::bufferization::OneShotBufferizePassOptions options;
     options.bufferizeFunctionBoundaries = true;

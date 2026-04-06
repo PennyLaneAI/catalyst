@@ -860,7 +860,7 @@ void __catalyst__qis__PSWAP(double phi, QUBIT *wire0, QUBIT *wire1, const Modifi
 }
 
 void __catalyst__qis__PauliRot(const char *pauliStr, double theta, const Modifiers *modifiers,
-                               int64_t numQubits, ...)
+                               bool cond, int64_t numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
 
@@ -876,6 +876,10 @@ void __catalyst__qis__PauliRot(const char *pauliStr, double theta, const Modifie
         wires[i] = va_arg(args, QubitIdType);
     }
     va_end(args);
+
+    if (!cond) {
+        return;
+    }
 
     getQuantumDevicePtr()->NamedOperation("PauliRot", {theta}, wires,
                                           /* modifiers */ MODIFIERS_ARGS(modifiers), {pauliStr_});
@@ -1034,12 +1038,21 @@ RESULT *__catalyst__qis__Measure(QUBIT *wire, int32_t postselect)
     return getQuantumDevicePtr()->Measure(reinterpret_cast<QubitIdType>(wire), postselectOpt);
 }
 
-RESULT *__catalyst__qis__PauliMeasure(const char *pauliStr, int64_t numQubits, ...)
+RESULT *__catalyst__qis__PauliMeasure(const char *pauliStr, bool negated, const char *pauliStrAlt,
+                                      bool negatedAlt, bool selectSwitch, int64_t numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
 
     // convert chat* to string
-    std::string pauliStr_(pauliStr);
+    std::string pauliStr_;
+    if (selectSwitch) {
+        RT_FAIL_IF(pauliStr == nullptr, "Invalid (null) pauli string provided.");
+        pauliStr_ = pauliStr;
+    }
+    else {
+        RT_FAIL_IF(pauliStrAlt == nullptr, "Invalid (null) alternative pauli string provided.");
+        pauliStr_ = pauliStrAlt;
+    }
     RT_FAIL_IF(static_cast<size_t>(numQubits) != pauliStr_.size(),
                "The length of the pauli string must be equal to the number of wires.");
 
@@ -1051,7 +1064,13 @@ RESULT *__catalyst__qis__PauliMeasure(const char *pauliStr, int64_t numQubits, .
     }
     va_end(args);
 
-    return getQuantumDevicePtr()->PauliMeasure(pauliStr_, wires);
+    RESULT *res = getQuantumDevicePtr()->PauliMeasure(pauliStr_, wires);
+    if ((negated && selectSwitch) || (negatedAlt && !selectSwitch)) {
+        // Can't assume the result is writable, so flip using our constants.
+        res = *res ? __catalyst__rt__result_get_zero() : __catalyst__rt__result_get_one();
+    }
+
+    return res;
 }
 
 double __catalyst__qis__Expval(ObsIdType obsKey) { return getQuantumDevicePtr()->Expval(obsKey); }

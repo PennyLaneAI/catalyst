@@ -32,6 +32,7 @@ set(LIBS
     MLIRQuantum
     quantum-transforms
     MLIRQRef
+    qref-transforms
     MLIRPBC
     pbc-transforms
     MLIRGradient
@@ -47,6 +48,7 @@ set(LIBS
     MLIRRTIO
     rtio-transforms
     MLIRQecLogical
+    MLIRQecPhysical
     MLIRCatalystTest
     ${ENZYME_LIB}
     CatalystCompilerDriver

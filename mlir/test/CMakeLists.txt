@@ -31,6 +31,7 @@ set(TEST_SUITES
     PBC
     RTIO
     QecLogical
+    QecPhysical
     )
 
 

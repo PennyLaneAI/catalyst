@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <pybind11/embed.h>
 
@@ -29,6 +29,16 @@ using namespace Catch::Matchers;
 using namespace Catalyst::Runtime::Device;
 
 using BType = OpenQasm::BuilderType;
+
+static void ensurePythonInterpreter()
+{
+    // Initializing the Python interpreter is required to run Braket-backed tests.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+}
 
 TEST_CASE("Test OpenQasmRunner base class", "[openqasm]")
 {
@@ -65,6 +75,8 @@ TEST_CASE("Test OpenQasmRunner base class", "[openqasm]")
 
 TEST_CASE("Test BraketRunner", "[openqasm]")
 {
+    ensurePythonInterpreter();
+
     OpenQasm::BraketBuilder builder{};
 
     builder.Register(OpenQasm::RegisterType::Qubit, "q", 2);
@@ -75,13 +87,6 @@ TEST_CASE("Test BraketRunner", "[openqasm]")
     builder.Gate("PauliY", {}, {}, {0}, false);
 
     auto &&circuit = builder.toOpenQasm();
-
-    // Initializing the Python interpreter is required to run the circuit.
-    // We use pybind11 for this since nanobind has no intention to support embedding a Python
-    // interpreter in C++.
-    if (!Py_IsInitialized()) {
-        pybind11::initialize_interpreter();
-    }
 
     OpenQasm::BraketRunner runner{};
 
@@ -114,6 +119,8 @@ TEST_CASE("Test BraketRunner", "[openqasm]")
 
 TEST_CASE("Test BraketRunner Expval and Var", "[openqasm]")
 {
+    ensurePythonInterpreter();
+
     OpenQasm::BraketBuilder builder{};
 
     builder.Register(OpenQasm::RegisterType::Qubit, "q", 2);
@@ -121,13 +128,6 @@ TEST_CASE("Test BraketRunner Expval and Var", "[openqasm]")
     builder.Gate("RX", {0.5}, {}, {0}, false);
     builder.Gate("Hadamard", {}, {}, {1}, false);
     builder.Gate("CNOT", {}, {}, {0, 1}, false);
-
-    // Initializing the Python interpreter is required to run the circuit.
-    // We use pybind11 for this since nanobind has no intention to support embedding a Python
-    // interpreter in C++.
-    if (!Py_IsInitialized()) {
-        pybind11::initialize_interpreter();
-    }
 
     OpenQasm::BraketRunner runner{};
 
@@ -260,6 +260,8 @@ TEST_CASE("Test the bell pair circuit with BuilderType::Common", "[openqasm]")
 TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::Braket",
           "[openqasm]")
 {
+    ensurePythonInterpreter();
+
     constexpr size_t shots{1000};
     std::unique_ptr<OpenQasmDevice> device =
         std::make_unique<OpenQasmDevice>("{device_type : braket.local.qubit, backend : default}");
@@ -288,7 +290,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         device->Probs(view);
 
         CHECK(probs[1] == probs[2]);
-        CHECK(probs[0] + probs[3] == Catch::Approx(1.f).margin(1e-5));
+        CHECK_THAT(probs[0] + probs[3], WithinAbs(1.0, 1e-5));
     }
 
     SECTION("PartialProbs")
@@ -297,7 +299,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         DataView<double, 1> view(probs);
         device->PartialProbs(view, std::vector<QubitIdType>{0, 1});
 
-        CHECK(probs[0] + probs[3] == Catch::Approx(1.f).margin(1e-5));
+        CHECK_THAT(probs[0] + probs[3], WithinAbs(1.0, 1e-5));
     }
 
     SECTION("Samples")
@@ -362,7 +364,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         device->SetDeviceShots(0); // to get deterministic results
         auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto expval = device->Expval(obs);
-        CHECK(expval == Catch::Approx(0.0).margin(1e-5));
+        CHECK_THAT(expval, WithinAbs(0.0, 1e-5));
     }
 
     SECTION("Expval(x(0) @ h(1))")
@@ -372,7 +374,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto obs = device->TensorObservable({obs_x, obs_h});
         auto expval = device->Expval(obs);
-        CHECK(expval == Catch::Approx(0.7071067812).margin(1e-5));
+        CHECK_THAT(expval, WithinAbs(0.7071067812, 1e-5));
     }
 
     SECTION("Var(h(1))")
@@ -380,7 +382,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         device->SetDeviceShots(0); // to get deterministic results
         auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto expval = device->Var(obs);
-        CHECK(expval == Catch::Approx(1.0).margin(1e-5));
+        CHECK_THAT(expval, WithinAbs(1.0, 1e-5));
     }
 
     SECTION("Var(x(0) @ h(1))")
@@ -390,12 +392,14 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto obs = device->TensorObservable({obs_x, obs_h});
         auto expval = device->Var(obs);
-        CHECK(expval == Catch::Approx(0.5).margin(1e-5));
+        CHECK_THAT(expval, WithinAbs(0.5, 1e-5));
     }
 }
 
 TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket", "[openqasm]")
 {
+    ensurePythonInterpreter();
+
     constexpr size_t shots{1000};
     std::unique_ptr<OpenQasmDevice> device =
         std::make_unique<OpenQasmDevice>("{device_type : braket.local.qubit, backend : default}");
@@ -431,7 +435,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         DataView<double, 1> view(probs);
         device->Probs(view);
 
-        CHECK(probs[27] + probs[26] == Catch::Approx(1.f).margin(1e-5));
+        CHECK_THAT(probs[27] + probs[26], WithinAbs(1.0, 1e-5));
     }
 
     SECTION("PartialProbs")
@@ -440,7 +444,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         DataView<double, 1> view(probs);
         device->PartialProbs(view, std::vector<QubitIdType>{0, 1, 2, 3, 4});
 
-        CHECK(probs[27] + probs[26] == Catch::Approx(1.f).margin(1e-5));
+        CHECK_THAT(probs[27] + probs[26], WithinAbs(1.0, 1e-5));
     }
 
     SECTION("Samples")
@@ -505,7 +509,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         device->SetDeviceShots(0); // to get deterministic results
         auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto expval = device->Expval(obs);
-        CHECK(expval == Catch::Approx(-0.7071067812).margin(1e-5));
+        CHECK_THAT(expval, WithinAbs(-0.7071067812, 1e-5));
     }
 
     SECTION("Expval(hermitian(1))")
@@ -519,7 +523,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         };
         auto obs = device->Observable(ObsId::Hermitian, matrix, std::vector<QubitIdType>{1});
         auto expval = device->Expval(obs);
-        CHECK(expval == Catch::Approx(0).margin(1e-5));
+        CHECK_THAT(expval, WithinAbs(0.0, 1e-5));
     }
 
     SECTION("Expval(x(0) @ h(1))")
@@ -529,7 +533,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto tp = device->TensorObservable({obs_z, obs_h});
         auto expval = device->Expval(tp);
-        CHECK(expval == Catch::Approx(0.7071067812).margin(1e-5));
+        CHECK_THAT(expval, WithinAbs(0.7071067812, 1e-5));
 
         auto obs = device->HamiltonianObservable({0.2}, {tp});
         REQUIRE_THROWS_WITH(device->Expval(obs),
@@ -541,7 +545,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         device->SetDeviceShots(0); // to get deterministic results
         auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto var = device->Var(obs);
-        CHECK(var == Catch::Approx(0.5).margin(1e-5));
+        CHECK_THAT(var, WithinAbs(0.5, 1e-5));
     }
 
     SECTION("Var(hermitian(1))")
@@ -555,7 +559,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         };
         auto obs = device->Observable(ObsId::Hermitian, matrix, std::vector<QubitIdType>{1});
         auto var = device->Var(obs);
-        CHECK(var == Catch::Approx(1).margin(1e-5));
+        CHECK_THAT(var, WithinAbs(1.0, 1e-5));
     }
 
     SECTION("Var(x(0) @ h(1))")
@@ -565,7 +569,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto tp = device->TensorObservable({obs_z, obs_h});
         auto var = device->Var(tp);
-        CHECK(var == Catch::Approx(0.5).margin(1e-5));
+        CHECK_THAT(var, WithinAbs(0.5, 1e-5));
 
         auto obs = device->HamiltonianObservable({0.2}, {tp});
         REQUIRE_THROWS_WITH(device->Var(obs),
@@ -575,6 +579,8 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
 
 TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
 {
+    ensurePythonInterpreter();
+
     std::unique_ptr<OpenQasmDevice> device =
         std::make_unique<OpenQasmDevice>("{device_type : braket.local.qubit, backend : default}");
     device->SetDeviceShots(1000);
@@ -608,7 +614,7 @@ TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
         std::vector<double> probs(size);
         DataView<double, 1> view(probs);
         device->Probs(view);
-        CHECK(probs[1] == Catch::Approx(1.f).margin(1e-5));
+        CHECK_THAT(probs[1], WithinAbs(1.0, 1e-5));
     }
 
     SECTION("Expval(h(1))")
@@ -616,12 +622,14 @@ TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
         device->SetDeviceShots(0); // to get deterministic results
         auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto expval = device->Expval(obs);
-        CHECK(expval == Catch::Approx(-0.7071067812).margin(1e-5));
+        CHECK_THAT(expval, WithinAbs(-0.7071067812, 1e-5));
     }
 }
 
 TEST_CASE("Test PSWAP and ISWAP with BuilderType::Braket", "[openqasm]")
 {
+    ensurePythonInterpreter();
+
     std::unique_ptr<OpenQasmDevice> device =
         std::make_unique<OpenQasmDevice>("{device_type : braket.local.qubit, backend : default}");
     device->SetDeviceShots(1000);
@@ -635,7 +643,7 @@ TEST_CASE("Test PSWAP and ISWAP with BuilderType::Braket", "[openqasm]")
 
     auto obs = device->Observable(ObsId::PauliZ, {}, std::vector<QubitIdType>{1});
     auto expval = device->Expval(obs);
-    CHECK(expval == Catch::Approx(1).margin(1e-5));
+    CHECK_THAT(expval, WithinAbs(1.0, 1e-5));
 }
 
 TEST_CASE("Test MatrixOperation with OpenQasmDevice and BuilderType::Common", "[openqasm]")

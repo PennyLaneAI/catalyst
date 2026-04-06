@@ -1,4 +1,4 @@
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023-2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,10 +14,15 @@
 
 #include <cassert>
 
+#include <algorithm>
+#include <filesystem>
 #include <iostream>
+#include <list>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
@@ -62,6 +67,7 @@
 #include "Driver/CompilerDriver.hpp"
 #include "Driver/LineUtils.hpp"
 #include "Driver/PassInstrumentation.hpp"
+#include "Driver/HighResolutionOutputStrategy.h"
 #include "Driver/Pipelines.h"
 #include "Driver/Support.h"
 #include "Driver/Timer.hpp"
@@ -75,14 +81,13 @@
 #include "PBC/IR/PBCDialect.h"
 #include "PauliFrame/IR/PauliFrameDialect.h"
 #include "QecLogical/IR/QecLogicalDialect.h"
+#include "QecPhysical/IR/QecPhysicalDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "RTIO/IR/RTIODialect.h"
 #include "RegisterAllPasses.h"
 
 #include "Enzyme.h"
-
-namespace {
 
 using namespace mlir;
 using namespace catalyst;
@@ -177,6 +182,7 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     registry.insert<mitigation::MitigationDialect>();
     registry.insert<pauli_frame::PauliFrameDialect>();
     registry.insert<qecl::QecLogicalDialect>();
+    registry.insert<qecp::QecPhysicalDialect>();
 }
 } // namespace catalyst::driver
 
@@ -549,8 +555,6 @@ catalyst::driver::parsePipelines(const cl::list<std::string> &catalystPipeline)
     }
     return allPipelines;
 }
-
-///////////////////////////////////////////////////////////////////////////////////////////
 
 std::string CompilerOptions::getObjectFile() const
 {

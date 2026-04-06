@@ -34,5 +34,25 @@ LogicalResult RTIOSyncOp::verify()
     return success();
 }
 
+LogicalResult RTIORPCOp::verify()
+{
+    if (getIsAsync() && !getResults().empty()) {
+        return emitOpError("async RPC cannot have return values (remove 'async' or results)");
+    }
+
+    if (getResults().size() > 1) {
+        return emitOpError("RPC can return at most one value");
+    }
+
+    if (auto kwNames = (*this)->getAttrOfType<ArrayAttr>("keyword_names")) {
+        if (kwNames.size() > getArgs().size()) {
+            return emitOpError("keyword_names has more entries (")
+                   << kwNames.size() << ") than arguments (" << getArgs().size() << ")";
+        }
+    }
+
+    return success();
+}
+
 #define GET_OP_CLASSES
 #include "RTIO/IR/RTIOOps.cpp.inc"

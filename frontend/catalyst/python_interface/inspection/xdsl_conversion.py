@@ -18,7 +18,6 @@ from __future__ import annotations
 import contextlib
 import inspect
 from collections.abc import Callable
-from copy import deepcopy
 from itertools import compress
 from typing import TYPE_CHECKING
 
@@ -52,6 +51,7 @@ from catalyst.python_interface.dialects.quantum import (
     SetBasisStateOp,
     SetStateOp,
 )
+from catalyst.utils.patching import Patcher
 
 if TYPE_CHECKING:
     from jaxlib.mlir._mlir_libs._mlir.ir import Module
@@ -85,14 +85,13 @@ def get_mlir_module(workflow: QJIT, args, kwargs) -> Module:
     if (mlir_module := getattr(workflow, "mlir_module", None)) is not None:
         return mlir_module
 
-    # Deep copy as to not mutate compile_options
-    compile_options = deepcopy(workflow.compile_options)
-    compile_options.autograph = False  # Autograph has already been applied for `user_function`
+    if (jaxpr := getattr(workflow, "jaxpr", None)) is None:
+        jaxpr, *_ = workflow.capture(args, **kwargs)
 
-    jitted_qnode = QJIT(workflow.user_function, compile_options)
+    with Patcher((workflow, "jaxpr", jaxpr)):
+        mlir_module = workflow.generate_ir()
 
-    jitted_qnode.jit_compile(args, **kwargs)
-    return jitted_qnode.mlir_module
+    return mlir_module
 
 
 from_str_to_PL_gate = {
@@ -203,7 +202,6 @@ def resolve_constant_params(ssa: SSAValue) -> float | int | str:
                 x = resolve_constant_params(op.operands[0])
                 y = resolve_constant_params(op.operands[1])
                 return f"({x} % {y})"
-            raise NotImplementedError(f"Function call to {op.callee} not supported")
 
         case "tensor.from_elements":
             return resolve_constant_params(op.operands[0])
@@ -517,6 +515,8 @@ def xdsl_to_qml_measurement(op, *args, **kwargs) -> MeasurementProcess | Operato
             case "quantum.hamiltonian":
                 coeffs = _extract(op, "coeffs", resolve_constant_params, single=True)
                 ops_list = [xdsl_to_qml_measurement(term.owner) for term in op.terms]
+                if len(ops_list) == 1:
+                    return ops_list[0] * coeffs
                 return ops.LinearCombination(coeffs, ops_list)
             case "quantum.compbasis":
                 return _extract(op, "qubits", resolve_constant_wire)
