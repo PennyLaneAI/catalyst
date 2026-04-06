@@ -1475,7 +1475,7 @@ struct ValueSemanticsConversionPass
     {
         Operation *mod = getOperation();
         MLIRContext *ctx = mod->getContext();
-        Location loc = mod->getLoc();
+        // Location loc = mod->getLoc();
         auto *qrefDialect = ctx->getLoadedDialect<qref::QRefDialect>();
         IRRewriter builder(ctx);
         DenseMap<StringRef, SubroutineInfo> subroutineInfos;
@@ -1535,38 +1535,10 @@ struct ValueSemanticsConversionPass
 
         SmallVector<func::CallOp> callMutateWorklist;
         mod->walk([&](func::CallOp callOp) { callMutateWorklist.push_back(callOp); });
-
-        IRRewriter::InsertPoint ip = builder.saveInsertionPoint();
         for (func::CallOp callOp : callMutateWorklist) {
-            builder.setInsertionPoint(callOp);
-            SmallVector<Value> newCallArgs;
-            ValueRange oldCallArgs(callOp->getOperands());
-            for (Value oldCallArg : oldCallArgs) {
-                if (!isa<qref::QubitType, qref::QuregType>(oldCallArg.getType())) {
-                    newCallArgs.push_back(oldCallArg);
-                }
-            }
-            for (auto newArgsInfo : subroutineInfos.at(callOp.getCallee()).getNewArgsInfo()) {
-                if (std::holds_alternative<unsigned>(newArgsInfo)) {
-                    newCallArgs.push_back(oldCallArgs[std::get<unsigned>(newArgsInfo)]);
-                }
-                else {
-                    std::pair _pair = std::get<std::pair<unsigned, uint64_t>>(newArgsInfo);
-                    unsigned oldCallArgIdx = _pair.first;
-                    unsigned extractIdx = _pair.second;
-                    assert(isa<qref::QuregType>(oldCallArgs[oldCallArgIdx].getType()) &&
-                           "Expected rQreg");
-                    auto getOp = qref::GetOp::create(
-                        builder, loc, qref::QubitType::get(ctx), oldCallArgs[oldCallArgIdx],
-                        nullptr, IntegerAttr::get(builder.getI64Type(), extractIdx));
-                    newCallArgs.push_back(getOp.getQubit());
-                }
-            }
-            auto newCallOp = func::CallOp::create(builder, loc, callOp->getResultTypes(),
-                                                  callOp.getCallee(), newCallArgs);
-            builder.replaceOp(callOp, newCallOp);
+            ReferenceToValueSemanticsConversion::stageCallOpForConversion(
+                builder, callOp, subroutineInfos.at(callOp.getCallee()));
         }
-        builder.restoreInsertionPoint(ip);
 
         for (auto targetFunc : targetFuncs) {
             ReferenceToValueSemanticsConversion::QubitValueTracker tracker;
