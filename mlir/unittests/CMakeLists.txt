@@ -11,4 +11,5 @@ endfunction()
 
 add_subdirectory(Example)
 add_subdirectory(QRef)
+add_subdirectory(TraceQubit)
 add_subdirectory(Utils)
