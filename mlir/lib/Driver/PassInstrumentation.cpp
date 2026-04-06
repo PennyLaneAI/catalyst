@@ -95,9 +95,11 @@ void CatalystPassInstrumentation::dumpIRAfterPass(mlir::Pass *pass, mlir::Operat
     else {
         s << *op;
     }
-    std::string fileName = pipelineName.str();
+    std::string fileName;
+    llvm::raw_string_ostream os(fileName);
+    os << pipelineName;
     if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
-        fileName += std::string("_") + funcOp.getName().str();
+        os << '_' << funcOp.getName();
     }
     dumpToFile(this->options, this->output.nextPassDumpFilename(fileName), tmp);
 }
