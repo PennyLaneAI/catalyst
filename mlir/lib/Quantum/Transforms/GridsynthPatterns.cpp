@@ -130,27 +130,21 @@ void populatePPRBasisSwitchCases(PatternRewriter &rewriter, Location loc,
                                  scf::IndexSwitchOp switchOp, Value qbitIn)
 {
     // Helper to create a single PPRotationOp directly on the qubit.
-    auto createPPROp = [&](OpBuilder &builder, ArrayRef<StringRef> pauliWord, uint16_t rotationKind,
+    auto createPPROp = [&](OpBuilder &builder, ArrayRef<StringRef> pauliWord, int8_t rotationKind,
                            bool isAdjoint, Value currentQbit) -> Value {
-        // Convert rotation kind to signed integer and negate if adjoint
-        int16_t signedRotation = static_cast<int16_t>(rotationKind);
+        // negate if adjoint
         if (isAdjoint) {
-            signedRotation = -signedRotation;
+            rotationKind = -rotationKind;
         }
-
-        // We need to cast back to uint16_t for the C++ builder signature
-        uint16_t finalRotationArg = static_cast<uint16_t>(signedRotation);
-
-        auto pprOp = catalyst::pbc::PPRotationOp::create(builder, loc, pauliWord, finalRotationArg,
-                                                         ValueRange{currentQbit}, nullptr);
-
+        auto pprOp = catalyst::pbc::PPRotationOp::create(builder, loc, pauliWord, rotationKind,
+                                                         ValueRange{currentQbit});
         return pprOp->getResult(0);
     };
 
     struct PPRConfig {
         bool isIdentity;
         ArrayRef<StringRef> pauli;
-        uint16_t n;     // The denominator (2, 4, 8)
+        int8_t n;       // The denominator (2, 4, 8)
         bool isAdjoint; // True if adjX, adjY, etc.
     };
 
