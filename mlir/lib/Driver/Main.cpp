@@ -32,10 +32,10 @@
 #include "RegisterAllPasses.h"
 
 #include "Driver/CatalystLLVMTarget.h"
-#include "Driver/CompilerDriver.hpp"
+#include "Driver/CompilerDriver.h"
 #include "Driver/HighResolutionOutputStrategy.h"
-#include "Driver/LineUtils.hpp"
-#include "Driver/Timer.hpp"
+#include "Driver/LineUtils.h"
+#include "Driver/Timer.h"
 #include "stablehlo/transforms/optimization/Passes.h"
 
 namespace {

@@ -2,12 +2,12 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
-#include "Driver/CompilerDriver.hpp"
-#include "Driver/LineUtils.hpp"
-#include "Driver/PassInstrumentation.hpp"
+#include "Driver/CompilerDriver.h"
+#include "Driver/LineUtils.h"
+#include "Driver/PassInstrumentation.h"
 #include "Driver/Support.h"
 
-#include "Driver/Timer.hpp"
+#include "Driver/Timer.h"
 
 namespace catalyst {
 

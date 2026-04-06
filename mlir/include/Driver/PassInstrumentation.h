@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Driver/CompilerDriver.hpp"
-#include "Timer.hpp"
+#include "Driver/CompilerDriver.h"
+#include "Timer.h"
 #include "mlir/Pass/PassInstrumentation.h"
 
 namespace catalyst {
