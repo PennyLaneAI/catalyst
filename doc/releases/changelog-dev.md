@@ -852,7 +852,7 @@
   [(#2546)](https://github.com/PennyLaneAI/catalyst/pull/2546)
 
 * Typos and rendering issues in various docstrings in the :mod:`catalyst.passes` module were fixed.
-  [(#???)](https://github.com/PennyLaneAI/catalyst/pull/???)
+  [(#2649)](https://github.com/PennyLaneAI/catalyst/pull/2649)
 
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
   [(#2406)](https://github.com/PennyLaneAI/catalyst/pull/2406)
