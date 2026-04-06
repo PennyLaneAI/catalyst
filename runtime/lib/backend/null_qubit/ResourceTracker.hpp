@@ -48,15 +48,6 @@ struct ResourceTracker final {
     bool compute_depth_;
     std::string resources_filename_;
 
-    /**
-     * @brief Internal method to record an operation being applied to the device
-     *
-     * Updates the gate type and size counts, and if depth tracking is enabled,
-     * updates the depth of the wires involved in the operation.
-     *
-     * @param wires The wires the operation is being applied to
-     * @param controlled_wires The control wires the operation is being applied to
-     */
     void UpdateDepth(const std::vector<QubitIdType> &wires,
                      const std::vector<QubitIdType> &controlled_wires = {})
     {
@@ -88,6 +79,16 @@ struct ResourceTracker final {
         }
     }
 
+    /**
+     * @brief Internal method to record an operation being applied to the device
+     *
+     * Updates the gate type and size counts, and if depth tracking is enabled,
+     * updates the depth of the wires involved in the operation.
+     *
+     * @param name The name of the operation
+     * @param wires The wires the operation is being applied to
+     * @param controlled_wires The control wires the operation is being applied to
+     */
     void RecordOperation(const std::string &name, const std::vector<QubitIdType> &wires,
                          const std::vector<QubitIdType> &controlled_wires)
     {
