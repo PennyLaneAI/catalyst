@@ -87,6 +87,8 @@
 #include "RTIO/IR/RTIODialect.h"
 #include "RegisterAllPasses.h"
 
+#include "Enzyme.h"
+
 using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::driver;

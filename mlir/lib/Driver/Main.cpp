@@ -244,8 +244,13 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         // already handled
     }
     else if (output.outputFilename == "-" && mlirModule) {
-        mlirModule->print(outfile->os(), opPrintingFlags);
-        outfile->keep();
+        if (options.shouldEmitBytecode) {
+            return mlir::writeBytecodeToFile(mlirModule.get(), outfile->os());
+        }
+        else {
+            mlirModule->print(outfile->os(), opPrintingFlags);
+            outfile->keep();
+        }
     }
 
     if (options.keepIntermediate and output.outputFilename != "-") {
@@ -374,7 +379,8 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .pipelinesCfg = parsePipelines(CatalystPipeline),
                             .checkpointStage = CheckpointStage,
                             .loweringAction = LoweringAction,
-                            .dumpPassPipeline = DumpPassPipeline};
+                            .dumpPassPipeline = DumpPassPipeline.shouldEmitByteCode =
+                                config.shouldEmitBytecode()};
 
     mlir::LogicalResult result = QuantumDriverMain(options, *output, registry);
 
