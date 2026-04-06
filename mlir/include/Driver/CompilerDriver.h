@@ -262,7 +262,7 @@ llvm::LogicalResult runLowering(const CompilerOptions &options, mlir::MLIRContex
                                 mlir::TimingScope &timing);
 
 /**
- * @brief Run the given compiler pipeline...
+ * @brief Run the given compiler pipeline.
  *
  * @param pm
  * @param options Compiler configuration options.
@@ -277,7 +277,7 @@ llvm::LogicalResult runPipeline(mlir::PassManager &pm, const CompilerOptions &op
                                 bool clHasManualPipeline, mlir::ModuleOp moduleOp);
 
 /**
- * @brief
+ * @brief Configure the compiler pass pipeline.
  *
  * @param pm
  * @param options Compiler configuration options.
@@ -289,7 +289,7 @@ llvm::LogicalResult configurePipeline(mlir::PassManager &pm, const CompilerOptio
                                       Pipeline &pipeline, bool clHasManualPipeline);
 
 /**
- * @brief
+ * @brief Configure the pass-manager with the given inputs.
  *
  * @param pm
  * @param options Compiler configuration options.
@@ -303,7 +303,7 @@ llvm::LogicalResult preparePassManager(mlir::PassManager &pm, const CompilerOpti
                                        mlir::TimingScope &timing);
 
 /**
- * @brief
+ * @brief Buffer and read the given filename contents into a string.
  *
  * @param filename
  * @return std::string
@@ -311,7 +311,7 @@ llvm::LogicalResult preparePassManager(mlir::PassManager &pm, const CompilerOpti
 std::string readInputFile(const std::string &filename);
 
 /**
- * @brief
+ * @brief Run Enzyme-specific compiler passes.
  *
  * @param options Compiler configuration options.
  * @param llvmModule
