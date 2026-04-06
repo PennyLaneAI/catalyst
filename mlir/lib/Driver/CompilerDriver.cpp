@@ -87,12 +87,12 @@
 #include "RTIO/IR/RTIODialect.h"
 #include "RegisterAllPasses.h"
 
-#include "Enzyme.h"
-
 using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::driver;
 namespace cl = llvm::cl;
+
+namespace {
 
 std::string joinPasses(const llvm::SmallVector<std::string> &passes)
 {
@@ -369,7 +369,7 @@ std::string catalyst::driver::readInputFile(const std::string &filename)
     return buffer.str();
 }
 
-llvm::LogicalResult catalyst::driver::preparePassManager(PassManager &pm,
+[[nodiscard]] llvm::LogicalResult catalyst::driver::preparePassManager(PassManager &pm,
                                                          const CompilerOptions &options,
                                                          CompilerOutput &output,
                                                          catalyst::utils::Timer<> &timer,
@@ -388,7 +388,7 @@ llvm::LogicalResult catalyst::driver::preparePassManager(PassManager &pm,
     return success();
 }
 
-llvm::LogicalResult catalyst::driver::configurePipeline(PassManager &pm,
+[[nodiscard]] llvm::LogicalResult catalyst::driver::configurePipeline(PassManager &pm,
                                                         const CompilerOptions &options,
                                                         Pipeline &pipeline,
                                                         bool clHasManualPipeline)
@@ -437,7 +437,7 @@ llvm::LogicalResult catalyst::driver::runPipeline(PassManager &pm, const Compile
     return success();
 }
 
-llvm::LogicalResult catalyst::driver::runLowering(const CompilerOptions &options, MLIRContext *ctx,
+[[nodiscard]] llvm::LogicalResult catalyst::driver::runLowering(const CompilerOptions &options, MLIRContext *ctx,
                                                   ModuleOp moduleOp, CompilerOutput &output,
                                                   TimingScope &timing)
 
