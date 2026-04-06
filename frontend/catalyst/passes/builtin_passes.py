@@ -371,7 +371,7 @@ def disentangle_swap(qnode):
 
 
 def merge_rotations(qnode):
-    """Specify that the ``-merge-rotations`` MLIR compiler pass
+    r"""Specify that the ``-merge-rotations`` MLIR compiler pass
     for merging roations (peephole) will be applied.
 
     The full list of supported gates are as follows:
