@@ -119,8 +119,8 @@ func.func @main(%arg0: f64, %arg1: i64) -> () attributes {quantum.node} {
 
 
 // CHECK: func.func @test_single_qubit_alloc(%arg0: f64, %arg1: !quantum.bit) -> !quantum.bit {
-// CHECK:   %out_qubits = quantum.custom "RX"(%arg0) %arg1 : !quantum.bit
-// CHECK:   return %out_qubits : !quantum.bit
+// CHECK:   [[RX:%.+]] = quantum.custom "RX"(%arg0) %arg1 : !quantum.bit
+// CHECK:   return [[RX]] : !quantum.bit
 // CHECK: }
 
 
@@ -200,4 +200,169 @@ func.func @main(%arg0: i64) -> (i1, i1, i1, i1, i1, i1) attributes {quantum.node
     // CHECK: return [[first_call]]#0, [[first_call]]#1, [[first_call]]#2,
     // CHECK-SAME:  [[second_call]]#0, [[second_call]]#1, [[second_call]]#2 : i1, i1, i1, i1, i1, i1
     return %call0#0, %call0#1, %call0#2, %call1#0, %call1#1, %call1#2 : i1, i1, i1, i1, i1, i1
+}
+
+
+// -----
+
+
+// CHECK:   func.func @test_loop_callsite(%arg0: !quantum.bit, %arg1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+// CHECK:     [[CNOT:%.+]]:2 = quantum.custom "CNOT"() %arg0, %arg1 : !quantum.bit, !quantum.bit
+// CHECK:     return [[CNOT]]#0, [[CNOT]]#1 : !quantum.bit, !quantum.bit
+// CHECK:   }
+
+func.func @test_loop_callsite(%reg: !qref.reg<2>, %q: !qref.bit) -> () {
+    %q0 = qref.get %reg[0] : !qref.reg<2> -> !qref.bit
+    qref.custom "CNOT"() %q, %q0 : !qref.bit, !qref.bit
+    return
+}
+
+// CHECK: func.func @main() attributes {quantum.node}
+func.func @main() -> () attributes {quantum.node} {
+    // CHECK: [[q:%.+]] = quantum.alloc_qb : !quantum.bit
+    // CHECK: [[r0:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[r1:%.+]] = quantum.alloc( 2) : !quantum.reg
+    %q = qref.alloc_qb : !qref.bit
+    %r0 = qref.alloc(2) : !qref.reg<2>
+    %r1 = qref.alloc(2) : !qref.reg<2>
+
+    %start = arith.constant 0 : index
+    %step = arith.constant 1 : index
+    %stop = arith.constant 37 : index
+
+    // CHECK: [[q0:%.+]] = quantum.extract [[r0]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[q1:%.+]] = quantum.extract [[r1]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[loopOut:%.+]]:3 = scf.for %arg0 = {{%.+}} to {{%.+}} step {{%.+}} iter_args(%arg1 = [[q]], %arg2 = [[q0]], %arg3 = [[q1]])
+    // CHECK-SAME:   -> (!quantum.bit, !quantum.bit, !quantum.bit)
+    scf.for %i = %start to %stop step %step {
+        // CHECK: [[first_call:%.+]]:2 = func.call @test_loop_callsite(%arg1, %arg2) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+        // CHECK: [[second_call:%.+]]:2 = func.call @test_loop_callsite([[first_call]]#0, %arg3) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+        func.call @test_loop_callsite(%r0, %q) : (!qref.reg<2>, !qref.bit) -> ()
+        func.call @test_loop_callsite(%r1, %q) : (!qref.reg<2>, !qref.bit) -> ()
+
+        // CHECK: scf.yield [[second_call]]#0, [[first_call]]#1, [[second_call]]#1 : !quantum.bit, !quantum.bit, !quantum.bit
+    }
+    // CHECK: [[insert0:%.+]] = quantum.insert [[r0]][ 0], [[loopOut]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[r1]][ 0], [[loopOut]]#2 : !quantum.reg, !quantum.bit
+
+    // CHECK: quantum.dealloc_qb [[loopOut]]#0 : !quantum.bit
+    // CHECK: quantum.dealloc [[insert0]] : !quantum.reg
+    // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
+    qref.dealloc_qb %q : !qref.bit
+    qref.dealloc %r0 : !qref.reg<2>
+    qref.dealloc %r1 : !qref.reg<2>
+
+    return
+}
+
+
+// -----
+
+
+// CHECK:   func.func @test_cond_callsite(%arg0: !quantum.bit, %arg1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+// CHECK:     [[CNOT:%.+]]:2 = quantum.custom "CNOT"() %arg0, %arg1 : !quantum.bit, !quantum.bit
+// CHECK:     return [[CNOT]]#0, [[CNOT]]#1 : !quantum.bit, !quantum.bit
+// CHECK:   }
+
+func.func @test_cond_callsite(%reg: !qref.reg<2>, %q: !qref.bit) -> () {
+    %q0 = qref.get %reg[0] : !qref.reg<2> -> !qref.bit
+    qref.custom "CNOT"() %q, %q0 : !qref.bit, !qref.bit
+    return
+}
+
+// CHECK: func.func @main(%arg0: i1) attributes {quantum.node}
+func.func @main(%arg0: i1) -> () attributes {quantum.node} {
+    // CHECK: [[q:%.+]] = quantum.alloc_qb : !quantum.bit
+    // CHECK: [[r0:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[r1:%.+]] = quantum.alloc( 2) : !quantum.reg
+    %q = qref.alloc_qb : !qref.bit
+    %r0 = qref.alloc(2) : !qref.reg<2>
+    %r1 = qref.alloc(2) : !qref.reg<2>
+
+    // CHECK: [[q0:%.+]] = quantum.extract [[r0]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[q1:%.+]] = quantum.extract [[r1]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[ifOut:%.+]]:3 = scf.if %arg0 -> (!quantum.bit, !quantum.bit, !quantum.bit)
+    scf.if %arg0 {
+        // CHECK: [[first_call:%.+]]:2 = func.call @test_cond_callsite([[q]], [[q0]]) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+        // CHECK: [[second_call:%.+]]:2 = func.call @test_cond_callsite([[first_call]]#0, [[q1]]) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+        func.call @test_cond_callsite(%r0, %q) : (!qref.reg<2>, !qref.bit) -> ()
+        func.call @test_cond_callsite(%r1, %q) : (!qref.reg<2>, !qref.bit) -> ()
+
+        // CHECK: scf.yield [[second_call]]#0, [[first_call]]#1, [[second_call]]#1 : !quantum.bit, !quantum.bit, !quantum.bit
+    }
+    // CHECK: } else {
+    // CHECK:   scf.yield [[q]], [[q0]], [[q1]] : !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK: }
+    // CHECK: [[insert0:%.+]] = quantum.insert [[r0]][ 0], [[ifOut]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[r1]][ 0], [[ifOut]]#2 : !quantum.reg, !quantum.bit
+
+    // CHECK: quantum.dealloc_qb [[ifOut]]#0 : !quantum.bit
+    // CHECK: quantum.dealloc [[insert0]] : !quantum.reg
+    // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
+    qref.dealloc_qb %q : !qref.bit
+    qref.dealloc %r0 : !qref.reg<2>
+    qref.dealloc %r1 : !qref.reg<2>
+
+    return
+}
+
+
+// -----
+
+
+// CHECK:   func.func @test_nested_callsite(%arg0: !quantum.bit, %arg1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+// CHECK:     [[CNOT:%.+]]:2 = quantum.custom "CNOT"() %arg0, %arg1 : !quantum.bit, !quantum.bit
+// CHECK:     return [[CNOT]]#0, [[CNOT]]#1 : !quantum.bit, !quantum.bit
+// CHECK:   }
+
+func.func @test_nested_callsite(%reg: !qref.reg<2>, %q: !qref.bit) -> () {
+    %q0 = qref.get %reg[0] : !qref.reg<2> -> !qref.bit
+    qref.custom "CNOT"() %q, %q0 : !qref.bit, !qref.bit
+    return
+}
+
+// CHECK: func.func @main(%arg0: i1) attributes {quantum.node}
+func.func @main(%arg0: i1) -> () attributes {quantum.node} {
+    // CHECK: [[q:%.+]] = quantum.alloc_qb : !quantum.bit
+    // CHECK: [[r0:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[r1:%.+]] = quantum.alloc( 2) : !quantum.reg
+    %q = qref.alloc_qb : !qref.bit
+    %r0 = qref.alloc(2) : !qref.reg<2>
+    %r1 = qref.alloc(2) : !qref.reg<2>
+
+    %start = arith.constant 0 : index
+    %step = arith.constant 1 : index
+    %stop = arith.constant 37 : index
+
+    // CHECK: [[q0:%.+]] = quantum.extract [[r0]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[q1:%.+]] = quantum.extract [[r1]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[ifOut:%.+]]:3 = scf.if %arg0 -> (!quantum.bit, !quantum.bit, !quantum.bit)
+    scf.if %arg0 {
+        // CHECK: [[loopOut:%.+]]:3 = scf.for %arg1 = {{%.+}} to {{%.+}} step {{%.+}} iter_args(%arg2 = [[q]], %arg3 = [[q0]], %arg4 = [[q1]])
+        // CHECK-SAME:   -> (!quantum.bit, !quantum.bit, !quantum.bit)
+        scf.for %i = %start to %stop step %step {
+            // CHECK: [[first_call:%.+]]:2 = func.call @test_nested_callsite(%arg2, %arg3) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+            // CHECK: [[second_call:%.+]]:2 = func.call @test_nested_callsite([[first_call]]#0, %arg4) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+            func.call @test_nested_callsite(%r0, %q) : (!qref.reg<2>, !qref.bit) -> ()
+            func.call @test_nested_callsite(%r1, %q) : (!qref.reg<2>, !qref.bit) -> ()
+
+            // CHECK: scf.yield [[second_call]]#0, [[first_call]]#1, [[second_call]]#1 : !quantum.bit, !quantum.bit, !quantum.bit
+        }
+
+        // CHECK: scf.yield [[loopOut]]#0, [[loopOut]]#1, [[loopOut]]#2 : !quantum.bit, !quantum.bit, !quantum.bit
+    }
+    // CHECK: } else {
+    // CHECK:   scf.yield [[q]], [[q0]], [[q1]] : !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK: }
+    // CHECK: [[insert0:%.+]] = quantum.insert [[r0]][ 0], [[ifOut]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[r1]][ 0], [[ifOut]]#2 : !quantum.reg, !quantum.bit
+
+    // CHECK: quantum.dealloc_qb [[ifOut]]#0 : !quantum.bit
+    // CHECK: quantum.dealloc [[insert0]] : !quantum.reg
+    // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
+    qref.dealloc_qb %q : !qref.bit
+    qref.dealloc %r0 : !qref.reg<2>
+    qref.dealloc %r1 : !qref.reg<2>
+
+    return
 }
