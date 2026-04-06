@@ -23,7 +23,7 @@
 #include "mlir/Pass/PassInstrumentation.h"
 #include "llvm/IR/Module.h"
 
-#include "Driver/LineUtils.hpp"
+#include "Driver/LineUtils.h"
 
 namespace {
 

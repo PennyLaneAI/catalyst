@@ -34,6 +34,7 @@
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 
 #include "Driver/Pipelines.h"
+#include "Driver/Timer.h"
 
 namespace catalyst::driver {
 
