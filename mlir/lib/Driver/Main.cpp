@@ -2,12 +2,13 @@
 #include "Driver/Support.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
-#include "mlir/IR/BuiltinOps.h"  // mlir::ModuleOp
-#include "mlir/IR/Diagnostics.h" // mlir::Diagnostic
-#include "mlir/IR/MLIRContext.h" // mlir::MLIRContext
-#include "mlir/IR/OwningOpRef.h" // mlir::OwningOpRef
-#include "mlir/Support/Timing.h" // mlir::DefaultTimingManager, mlir::TimingScope
-#include "llvm/IR/LLVMContext.h" // llvm::LLVMContext
+#include "mlir/Bytecode/BytecodeWriter.h" // mlir::writeBytecodeToFile
+#include "mlir/IR/BuiltinOps.h"           // mlir::ModuleOp
+#include "mlir/IR/Diagnostics.h"          // mlir::Diagnostic
+#include "mlir/IR/MLIRContext.h"          // mlir::MLIRContext
+#include "mlir/IR/OwningOpRef.h"          // mlir::OwningOpRef
+#include "mlir/Support/Timing.h"          // mlir::DefaultTimingManager, mlir::TimingScope
+#include "llvm/IR/LLVMContext.h"          // llvm::LLVMContext
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/LogicalResult.h" // llvm::LogicalResult
@@ -379,8 +380,8 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .pipelinesCfg = parsePipelines(CatalystPipeline),
                             .checkpointStage = CheckpointStage,
                             .loweringAction = LoweringAction,
-                            .dumpPassPipeline = DumpPassPipeline.shouldEmitByteCode =
-                                config.shouldEmitBytecode()};
+                            .dumpPassPipeline = DumpPassPipeline,
+                            .shouldEmitBytecode = config.shouldEmitBytecode()};
 
     mlir::LogicalResult result = QuantumDriverMain(options, *output, registry);
 
