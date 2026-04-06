@@ -25,7 +25,7 @@ import pennylane as qml
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.passes.utils import prepare_decomposition_options
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.precompile_decomposition_rules import BYTECODE_FILE_PATH
+from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 # pylint: disable=line-too-long, too-many-lines
 

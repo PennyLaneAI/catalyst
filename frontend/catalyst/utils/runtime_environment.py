@@ -19,6 +19,7 @@ import os
 import os.path
 import sys
 import sysconfig
+from pathlib import Path
 
 from catalyst._configuration import INSTALLED
 
@@ -40,6 +41,8 @@ DEFAULT_INCLUDE_PATHS = {
 DEFAULT_BIN_PATHS = {
     "cli": os.path.join(package_root, "../../../mlir/build/bin"),
 }
+
+BYTECODE_FILE_PATH = Path(__file__).parent.parent / Path("resources/decomposition_rules.mlirbc")
 
 
 def get_lib_path(project, env_var):

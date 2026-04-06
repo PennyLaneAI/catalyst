@@ -20,7 +20,7 @@ from pathlib import Path
 
 from pennylane.decomposition.utils import to_name
 
-from catalyst.utils.precompile_decomposition_rules import BYTECODE_FILE_PATH
+from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 
 def prepare_decomposition_options(
