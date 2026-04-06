@@ -12,17 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Driver/Support.h"
-#include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
-#include "mlir/Bytecode/BytecodeWriter.h" // mlir::writeBytecodeToFile
-#include "mlir/IR/BuiltinOps.h"           // mlir::ModuleOp
-#include "mlir/IR/Diagnostics.h"          // mlir::Diagnostic
-#include "mlir/IR/MLIRContext.h"          // mlir::MLIRContext
-#include "mlir/IR/OwningOpRef.h"          // mlir::OwningOpRef
-#include "mlir/Support/Timing.h"          // mlir::DefaultTimingManager, mlir::TimingScope
-#include "llvm/IR/LLVMContext.h"          // llvm::LLVMContext
+#include "llvm/ADT/STLForwardCompat.h"
+#include "llvm/IR/LLVMContext.h" // llvm::LLVMContext
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/LogicalResult.h" // llvm::LogicalResult
@@ -30,28 +21,35 @@
 #include "llvm/Support/SMLoc.h"         // llvm::SMLoc
 #include "llvm/Support/SourceMgr.h"     // llvm::SourceMgr
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
-#include <llvm/ADT/STLForwardCompat.h>
-#include <llvm/Support/ToolOutputFile.h>
 
-#include <mlir/InitAllPasses.h>
-
+#include "mlir/Bytecode/BytecodeWriter.h" // mlir::writeBytecodeToFile
+#include "mlir/InitAllPasses.h"
+#include "mlir/IR/BuiltinOps.h"           // mlir::ModuleOp
+#include "mlir/IR/Diagnostics.h"          // mlir::Diagnostic
+#include "mlir/IR/MLIRContext.h"          // mlir::MLIRContext
+#include "mlir/IR/OwningOpRef.h"          // mlir::OwningOpRef
+#include "mlir/Support/FileUtilities.h"
+#include "mlir/Support/Timing.h" // mlir::DefaultTimingManager, mlir::TimingScope
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
 
-#include "mlir/Support/FileUtilities.h"
-
 #include "stablehlo/integrations/c/StablehloPasses.h"
+#include "stablehlo/transforms/optimization/Passes.h"
 
-#include "RegisterAllPasses.h"
-
+#include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Driver/CatalystLLVMTarget.h"
 #include "Driver/CompilerDriver.h"
 #include "Driver/HighResolutionOutputStrategy.h"
 #include "Driver/LineUtils.h"
+#include "Driver/Support.h"
 #include "Driver/Timer.h"
-#include "stablehlo/transforms/optimization/Passes.h"
+#include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
+#include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
+
+#include "RegisterAllPasses.h"
 
 using namespace catalyst;
 using namespace catalyst::driver;
