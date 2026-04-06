@@ -15,6 +15,7 @@
 This file contains the definition of operations representing gates in the
 Quantum dialect.
 """
+
 from collections.abc import Sequence
 from typing import ClassVar
 

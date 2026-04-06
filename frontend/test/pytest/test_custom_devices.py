@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test for custom device integration with Catalyst."""
+
 import platform
 
 import pennylane as qml

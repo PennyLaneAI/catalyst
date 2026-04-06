@@ -158,21 +158,17 @@ class CompileOptions:
 
         # Check that async runs must not be seeded
         if self.async_qnodes and self.seed is not None:
-            raise CompileError(
-                """
+            raise CompileError("""
                 Seeding has no effect on asynchronous QNodes,
                 as the execution order of parallel runs is not guaranteed.
                 As such, seeding an asynchronous run is not supported.
-                """
-            )
+                """)
 
         # Check that seed is 32-bit unsigned int
         if (self.seed is not None) and (self.seed < 0 or self.seed > 2**32 - 1):
-            raise ValueError(
-                """
+            raise ValueError("""
                 Seed must be an unsigned 32-bit integer!
-                """
-            )
+                """)
 
         # Make the format of static_argnums easier to handle.
         static_argnums = self.static_argnums
@@ -298,9 +294,7 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
     bufferization_options = """bufferize-function-boundaries
         allow-return-allocs-from-loops
         function-boundary-type-conversion=identity-layout-map
-        unknown-type-conversion=identity-layout-map""".replace(
-        "\n", " "
-    )
+        unknown-type-conversion=identity-layout-map""".replace("\n", " ")
     if options.async_qnodes:
         bufferization_options += " copy-before-write"
 

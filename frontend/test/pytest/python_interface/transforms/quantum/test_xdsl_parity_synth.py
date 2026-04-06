@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the ParitySynth transform"""
+
 from collections import namedtuple
 from itertools import product
 

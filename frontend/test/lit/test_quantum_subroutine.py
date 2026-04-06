@@ -15,6 +15,7 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 """Lit tests for quantum subroutines"""
+
 from functools import partial
 
 import jax
