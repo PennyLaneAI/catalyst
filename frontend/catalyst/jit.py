@@ -707,10 +707,13 @@ class QJIT(CatalystCallable):
             bool: whether the provided arguments will require promotion to be used with the compiled
                   function
         """
+        opts = self.compile_options
+        assert opts.lower_to_llvm and opts.link, "invalid options for jit_compile"
+
         cached_fn, requires_promotion = self.fn_cache.lookup(args)
 
         if cached_fn is None:
-            if self.user_sig and not self.compile_options.static_argnums:
+            if self.user_sig and not opts.static_argnums:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
 

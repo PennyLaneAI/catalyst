@@ -547,6 +547,54 @@ _ = expval12(10)
 print(expval12.mlir)
 
 
+# CHECK-LABEL: @expval13
+@qjit(target="mlir")
+def expval13():
+    # CHECK: func.func public @circ() -> (tensor<f64>, tensor<f64>)
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circ():
+        # CHECK: [[extract:%.+]] = quantum.extract {{%.+}}[ 0] : !quantum.reg -> !quantum.bit
+        # CHECK: {{%.+}} = quantum.namedobs [[extract]][ PauliX] : !quantum.obs
+        # CHECK: {{%.+}} = quantum.namedobs [[extract]][ PauliZ] : !quantum.obs
+        # CHECK: {{%.+}} = quantum.insert {{%.+}}[ 0], [[extract]] : !quantum.reg, !quantum.bit
+        return qml.expval(qml.X(0)), qml.expval(qml.Z(0))
+
+    return circ()
+
+
+print(expval13.mlir)
+
+
+# CHECK-LABEL: @expval14
+@qjit(target="mlir")
+def expval14():
+    A = np.zeros((4, 4), dtype=complex)
+    B = np.zeros((2, 2), dtype=complex)
+
+    # CHECK: func.func public @circ(%arg0: tensor<4x4xcomplex<f64>>, %arg1: tensor<2x2xcomplex<f64>>) -> (tensor<f64>, tensor<f64>, tensor<f64>)
+    @qml.qnode(qml.device("null.qubit", wires=3))
+    def circ():
+        # CHECK: [[extract0:%.+]] = quantum.extract {{%.+}}[ 0] : !quantum.reg -> !quantum.bit
+        # CHECK: [[extract1:%.+]] = quantum.extract {{%.+}}[ 1] : !quantum.reg -> !quantum.bit
+        # CHECK: {{%.+}} = quantum.hermitian(%arg0 : tensor<4x4xcomplex<f64>>) [[extract0]], [[extract1]] : !quantum.obs
+        # CHECK: [[extract2:%.+]] = quantum.extract {{%.+}}[ 2] : !quantum.reg -> !quantum.bit
+        # CHECK: {{%.+}} = quantum.hermitian(%arg0 : tensor<4x4xcomplex<f64>>) [[extract1]], [[extract2]] : !quantum.obs
+        # CHECK: {{%.+}} = quantum.hermitian(%arg1 : tensor<2x2xcomplex<f64>>) [[extract2]] : !quantum.obs
+        # CHECK: {{%.+}} = quantum.insert {{%.+}}[ 0], [[extract0]] : !quantum.reg, !quantum.bit
+        # CHECK: {{%.+}} = quantum.insert {{%.+}}[ 1], [[extract1]] : !quantum.reg, !quantum.bit
+        # CHECK: {{%.+}} = quantum.insert {{%.+}}[ 2], [[extract2]] : !quantum.reg, !quantum.bit
+        return (
+            qml.expval(qml.Hermitian(A, wires=[0, 1])),
+            qml.expval(qml.Hermitian(A, wires=[1, 2])),
+            qml.expval(qml.Hermitian(B, wires=[2])),
+        )
+
+    return circ()
+
+
+print(expval14.mlir)
+
+
 # CHECK-LABEL: public @var1(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))

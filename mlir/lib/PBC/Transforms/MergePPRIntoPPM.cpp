@@ -126,16 +126,8 @@ void moveCliffordPastPPM(const PauliStringWrapper &lhsPauli, const PauliStringWr
     SmallVector<StringRef> pauliProductArrayRef = removeIdentityPauli(rhs, newRHSOperands);
     mlir::ArrayAttr pauliProduct = rewriter.getStrArrayAttr(pauliProductArrayRef);
 
-    // Get the type list from new RHS
-    SmallVector<Type> newOutQubitTypes;
-    for (auto qubit : newRHSOperands) {
-        newOutQubitTypes.push_back(qubit.getType());
-    }
-
-    Type mresType = rhs.getMres().getType();
-
-    auto newPPM = PPMeasurementOp::create(rewriter, rhs->getLoc(), mresType, newOutQubitTypes,
-                                          pauliProduct, rhs.getRotationSign(), newRHSOperands);
+    auto newPPM = PPMeasurementOp::create(rewriter, rhs->getLoc(), pauliProduct, newRHSOperands,
+                                          rhs.getNegated());
     rewriter.moveOpBefore(newPPM, rhs);
 
     // Update the use of value in newRHSOperands

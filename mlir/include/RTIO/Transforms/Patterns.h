@@ -26,6 +26,8 @@ namespace catalyst {
 namespace rtio {
 void populateRTIOToARTIQConversionPatterns(mlir::LLVMTypeConverter &typeConverter,
                                            mlir::RewritePatternSet &patterns);
+void populateRTIORPCConversionPatterns(mlir::LLVMTypeConverter &typeConverter,
+                                       mlir::RewritePatternSet &patterns);
 void populateRTIORewritePatterns(mlir::RewritePatternSet &patterns);
 void populateRTIOSyncSimplifyPatterns(mlir::RewritePatternSet &patterns);
 void populateRTIOPulseDecomposePatterns(mlir::RewritePatternSet &patterns);

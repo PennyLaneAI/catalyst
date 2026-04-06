@@ -55,6 +55,47 @@ func.func @test_alloc_dealloc_no_fold() -> !qref.bit {
     return %q : !qref.bit<3>
 }
 
+// CHECK-LABEL: test_alloc_qb_dce
+func.func @test_alloc_qb_dce() {
+    // CHECK-NOT: qref.alloc_qb
+    %q = qref.alloc_qb : !qref.bit
+    return
+}
+
+// -----
+
+// CHECK-LABEL: test_alloc_qb_no_cse
+func.func @test_alloc_qb_no_cse() -> (!qref.bit, !qref.bit) {
+    // CHECK: qref.alloc_qb
+    // CHECK-NEXT: qref.alloc_qb
+    %q1 = qref.alloc_qb : !qref.bit
+    %q2 = qref.alloc_qb : !qref.bit
+    return %q1, %q2 : !qref.bit, !qref.bit
+}
+
+// -----
+
+// CHECK-LABEL: test_alloc_qb_dealloc_qb_fold
+func.func @test_alloc_qb_dealloc_qb_fold() {
+    // CHECK-NOT: qref.alloc_qb
+    // CHECK-NOT: qref.dealloc_qb
+    %q = qref.alloc_qb : !qref.bit
+    qref.dealloc_qb %q : !qref.bit
+    return
+}
+
+// -----
+
+// CHECK-LABEL: test_alloc_qb_dealloc_qb_no_fold
+func.func @test_alloc_qb_dealloc_qb_no_fold() {
+    // CHECK: qref.alloc_qb
+    // CHECK: qref.dealloc_qb
+    %q = qref.alloc_qb : !qref.bit
+    qref.custom "X"() %q : !qref.bit
+    qref.dealloc_qb %q : !qref.bit
+    return
+}
+
 // -----
 
 // CHECK-LABEL: test_get_no_user_fold
@@ -151,7 +192,7 @@ func.func @test_canonicalize_no_dce(%arg0: tensor<2xcomplex<f64>>, %arg1 : tenso
     qref.paulirot ["Z"](%arg2) %q0 : !qref.bit
 
     // CHECK: qref.gphase
-    qref.gphase(%arg2) : f64
+    qref.gphase(%arg2)
 
     // CHECK: qref.multirz
     qref.multirz (%arg2) %q0, %q1 : !qref.bit, !qref.bit
