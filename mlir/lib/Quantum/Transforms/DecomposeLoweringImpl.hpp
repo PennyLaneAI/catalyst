@@ -24,6 +24,7 @@
 #include "mlir/IR/ValueRange.h"
 
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Utils/QubitTracing.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -382,38 +383,20 @@ class BaseSignatureAnalyzer {
 
     QubitIndex getExtractIndex(Value qubit)
     {
-        while (qubit) {
-            if (auto extractOp = qubit.getDefiningOp<quantum::ExtractOp>()) {
-                if (Value idx = extractOp.getIdx()) {
-                    return QubitIndex(idx, extractOp.getQreg());
-                }
-                if (IntegerAttr idxAttr = extractOp.getIdxAttrAttr()) {
-                    return QubitIndex(idxAttr, extractOp.getQreg());
-                }
-            }
-
-            if (auto gate = dyn_cast_or_null<quantum::QuantumGate>(qubit.getDefiningOp())) {
-                auto qubitOperands = gate.getQubitOperands();
-                auto qubitResults = gate.getQubitResults();
-                auto it =
-                    llvm::find_if(qubitResults, [&](Value result) { return result == qubit; });
-
-                if (it != qubitResults.end()) {
-                    size_t resultIndex = std::distance(qubitResults.begin(), it);
-                    if (resultIndex < qubitOperands.size()) {
-                        qubit = qubitOperands[resultIndex];
-                        continue;
-                    }
-                }
-            }
-            else if (auto measureOp = dyn_cast_or_null<quantum::MeasureOp>(qubit.getDefiningOp())) {
-                qubit = measureOp.getInQubit();
-                continue;
-            }
-
-            break;
+        Value extractQubit = traceQubit(qubit);
+        if (!extractQubit) {
+            return QubitIndex();
         }
-
+        auto extractOp = extractQubit.getDefiningOp<ExtractOp>();
+        if (!extractOp) {
+            return QubitIndex();
+        }
+        if (Value idx = extractOp.getIdx()) {
+            return QubitIndex(idx, extractOp.getQreg());
+        }
+        if (IntegerAttr idxAttr = extractOp.getIdxAttrAttr()) {
+            return QubitIndex(idxAttr, extractOp.getQreg());
+        }
         return QubitIndex();
     }
 };
