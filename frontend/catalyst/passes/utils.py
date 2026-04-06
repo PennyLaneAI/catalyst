@@ -35,7 +35,8 @@ def prepare_decomposition_options(
     Args:
         gate_set: An iterable of gate types or a dictionary mapping gate types to their costs.
         fixed_decomps: An optional dictionary mapping gate types to specific decomposition rules.
-        alt_decomps: An optional dictionary mapping gate types to lists of alternative decomposition rules.
+        alt_decomps: An optional dictionary mapping gate types to lists of alternative decomposition
+                     rules.
         _builtin_rule_path: The path to the precompiled decomposition rules bytecode file.
 
     Returns:

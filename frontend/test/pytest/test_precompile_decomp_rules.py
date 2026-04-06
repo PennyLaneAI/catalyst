@@ -19,7 +19,6 @@ import pytest
 
 from catalyst.compiler import _quantum_opt
 from catalyst.utils.precompile_decomposition_rules import (
-    COMPILER_OPS_FOR_DECOMPOSITION,
     compile_op_decomp_rules,
     get_abstract_args,
     precompile_decomp_rules,
