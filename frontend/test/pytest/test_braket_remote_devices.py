@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Unit tests for `OpenQasmDevice` on "remote" Amazon Braket devices"""
+
 import numpy as np
 import pennylane as qml
 import pytest
