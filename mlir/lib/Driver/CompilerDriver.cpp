@@ -65,9 +65,9 @@
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Driver/CatalystLLVMTarget.h"
 #include "Driver/CompilerDriver.h"
+#include "Driver/HighResolutionOutputStrategy.h"
 #include "Driver/LineUtils.h"
 #include "Driver/PassInstrumentation.h"
-#include "Driver/HighResolutionOutputStrategy.h"
 #include "Driver/Pipelines.h"
 #include "Driver/Support.h"
 #include "Driver/Timer.h"
@@ -369,11 +369,10 @@ std::string catalyst::driver::readInputFile(const std::string &filename)
     return buffer.str();
 }
 
-[[nodiscard]] llvm::LogicalResult catalyst::driver::preparePassManager(PassManager &pm,
-                                                         const CompilerOptions &options,
-                                                         CompilerOutput &output,
-                                                         catalyst::utils::Timer<> &timer,
-                                                         TimingScope &timing)
+[[nodiscard]] llvm::LogicalResult
+catalyst::driver::preparePassManager(PassManager &pm, const CompilerOptions &options,
+                                     CompilerOutput &output, catalyst::utils::Timer<> &timer,
+                                     TimingScope &timing)
 {
     MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
     pm.enableVerifier(config.shouldVerifyPasses());
@@ -388,10 +387,9 @@ std::string catalyst::driver::readInputFile(const std::string &filename)
     return success();
 }
 
-[[nodiscard]] llvm::LogicalResult catalyst::driver::configurePipeline(PassManager &pm,
-                                                        const CompilerOptions &options,
-                                                        Pipeline &pipeline,
-                                                        bool clHasManualPipeline)
+[[nodiscard]] llvm::LogicalResult
+catalyst::driver::configurePipeline(PassManager &pm, const CompilerOptions &options,
+                                    Pipeline &pipeline, bool clHasManualPipeline)
 {
     pm.clear();
     if (!clHasManualPipeline && failed(pipeline.addPipeline(pm))) {
@@ -437,9 +435,10 @@ llvm::LogicalResult catalyst::driver::runPipeline(PassManager &pm, const Compile
     return success();
 }
 
-[[nodiscard]] llvm::LogicalResult catalyst::driver::runLowering(const CompilerOptions &options, MLIRContext *ctx,
-                                                  ModuleOp moduleOp, CompilerOutput &output,
-                                                  TimingScope &timing)
+[[nodiscard]] llvm::LogicalResult catalyst::driver::runLowering(const CompilerOptions &options,
+                                                                MLIRContext *ctx, ModuleOp moduleOp,
+                                                                CompilerOutput &output,
+                                                                TimingScope &timing)
 
 {
     catalyst::utils::Timer<> timer{};

@@ -13,7 +13,6 @@
 // limitations under the License.
 #pragma once
 
-#include <sys/time.h>
 #include <cassert>
 #include <chrono>
 #include <concepts>
@@ -27,6 +26,7 @@
 #include <ratio>
 #include <string>
 #include <string_view>
+#include <sys/time.h>
 #include <utility> // std::forward
 
 namespace catalyst::utils {
