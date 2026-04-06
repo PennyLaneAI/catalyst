@@ -13,7 +13,7 @@
 // limitations under the License.
 #pragma once
 
-#include <bits/types/struct_timeval.h>
+#include <sys/time.h>
 #include <cassert>
 #include <chrono>
 #include <concepts>
