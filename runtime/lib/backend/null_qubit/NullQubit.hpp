@@ -44,7 +44,7 @@ static std::string classifyPauliRotAngle(double angle, const double tolerance = 
 
     double modAngle = std::fmod(angle, 2 * PI);
     double absAngle = std::abs(modAngle);
-    if (absAngle < tolerance || PI - absAngle < tolerance) {
+    if (absAngle < tolerance || 2 * PI - absAngle < tolerance) {
         return "PauliRot-identity";
     }
 

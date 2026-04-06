@@ -974,7 +974,7 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
     sim->NamedOperation("PauliRot", {M_PI}, {Qs[0], Qs[1], Qs[2]}, false);
     sim->NamedOperation("PauliRot", {M_PI / 2}, {Qs[0]}, false);
     sim->NamedOperation("PauliRot", {M_PI / 4}, {Qs[0], Qs[1]}, false);
-    sim->NamedOperation("PauliRot", {0.0}, {Qs[0]}, false);
+    sim->NamedOperation("PauliRot", {2 * M_PI}, {Qs[0]}, false);
 
     sim->PauliMeasure("XY", {Qs[0], Qs[1]});
     sim->PauliMeasure("XYZ", {Qs[0], Qs[1], Qs[2]});
