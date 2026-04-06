@@ -155,7 +155,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
 
     def _get_parent_module(self, op: func.FuncOp) -> builtin.ModuleOp:
         """Get the first ancestral builtin.ModuleOp op of a given func.func op."""
-        _op: Operation | None = op
+        _op: ir.Operation | None = op
         while _op := _op.parent_op():
             if isinstance(_op, builtin.ModuleOp):
                 break
@@ -499,6 +499,8 @@ class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
     """A rewrite pattern for the ``measurements_from_samples`` transform that matches and rewrites
     ``qml.expval()`` and ``qml.var()`` operations.
 
+    Note: only single-wire observables are currently supported
+
     Args:
         shots (int): The number of shots (e.g. as retrieved from the DeviceInitOp).
     """
@@ -563,7 +565,7 @@ class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
             from_elements_op = list(matched_op.results[0].uses)[0].operation
             assert isinstance(
                 from_elements_op, tensor.FromElementsOp
-            ), f"Expected to find a tensor.from_elements op, but got {type(from_elements_op).__name__}"
+            ), f"Expected a tensor.from_elements op, but got {type(from_elements_op).__name__}"
             mp_index = list(from_elements_op.results[0].uses)[0].index
 
             # Insert the call to the post-processing function
