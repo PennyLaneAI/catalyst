@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include <pybind11/embed.h>
 
 #include "OQCDevice.cpp"
@@ -26,7 +27,8 @@ TEST_CASE("Test the OQCDevice constructor", "[openqasm]")
     auto device = OQCDevice("{shots : 100}");
     CHECK(device.GetNumQubits() == 0);
 
-    REQUIRE_THROWS_WITH(device.Measure(0), Catch::Contains("unsupported by device"));
+    REQUIRE_THROWS_WITH(device.Measure(0),
+                        Catch::Matchers::ContainsSubstring("unsupported by device"));
 }
 
 TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]")
@@ -89,6 +91,7 @@ TEST_CASE("Test counts", "[openqasm][counts]")
     DataView<double, 1> eigvals_view(eigvals);
     DataView<int64_t, 1> counts_view(counts);
 
-    REQUIRE_THROWS_WITH(device->PartialCounts(eigvals_view, counts_view, {wires[0], wires[1]}),
-                        Catch::Contains("OQC credentials not found in environment variables"));
+    REQUIRE_THROWS_WITH(
+        device->PartialCounts(eigvals_view, counts_view, {wires[0], wires[1]}),
+        Catch::Matchers::ContainsSubstring("OQC credentials not found in environment variables"));
 }
