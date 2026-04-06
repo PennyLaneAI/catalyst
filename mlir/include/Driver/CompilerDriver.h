@@ -38,9 +38,12 @@
 
 namespace catalyst::driver {
 
-/// Verbosity level
 // TODO: Adjust the number of levels according to our needs. MLIR seems to print few really
 // low-level messages, we might want to hide these.
+/**
+ * @brief Controls the verbosity level of the compiler during processing.
+ *
+ */
 enum class Verbosity { Silent = 0, Urgent = 1, Debug = 2, All = 3 };
 
 /**
