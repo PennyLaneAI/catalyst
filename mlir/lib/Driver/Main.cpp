@@ -27,11 +27,11 @@
 #include "llvm/TargetParser/Host.h"
 
 #include "mlir/Bytecode/BytecodeWriter.h" // mlir::writeBytecodeToFile
-#include "mlir/InitAllPasses.h"
 #include "mlir/IR/BuiltinOps.h"           // mlir::ModuleOp
 #include "mlir/IR/Diagnostics.h"          // mlir::Diagnostic
 #include "mlir/IR/MLIRContext.h"          // mlir::MLIRContext
 #include "mlir/IR/OwningOpRef.h"          // mlir::OwningOpRef
+#include "mlir/InitAllPasses.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/Timing.h" // mlir::DefaultTimingManager, mlir::TimingScope
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
