@@ -38,10 +38,8 @@
 #include "Driver/Timer.h"
 #include "stablehlo/transforms/optimization/Passes.h"
 
-namespace {
 using namespace catalyst;
 using namespace catalyst::driver;
-} // namespace
 
 llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &output,
                                       mlir::DialectRegistry &registry)
