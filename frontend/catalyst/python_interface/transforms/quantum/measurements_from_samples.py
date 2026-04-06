@@ -469,6 +469,9 @@ class MeasurementsFromSamplesPattern(RewritePattern):
                 the outer function should return.
             rewriter (PatternRewriter): The xDSL pattern rewriter.
         """
+        assert self.qnode is not None
+        assert self.call_op is not None
+
         # update the qnode to return the result of the SampleOp directly
         return_op = self.qnode.get_return_op()
         assert return_op is not None, "QNode has no return op"
@@ -726,8 +729,7 @@ def get_shots(quantum_node: func.FuncOp) -> int:
     """
 
     shots = _get_static_shots_value_from_device_op(quantum_node)
-    if not isinstance(shots, int):
-        raise TypeError(f"Expected `shots` to be an integer value but got {type(shots).__name__}")
+    assert isinstance(shots, int), "Expected `shots` to be an integer"
     if shots == 0:
         raise ValueError("The measurements_from_samples pass requires non-zero shots")
     return shots
