@@ -16,9 +16,13 @@
 
 #include <variant>
 
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Casting.h"
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Value.h"
 
 #include "QRef/IR/QRefOps.h"
@@ -29,13 +33,43 @@ using namespace catalyst;
 
 namespace ReferenceToValueSemanticsConversion {
 
+bool isQrefSubroutine(func::FuncOp f)
+{
+    // If has a qref argument, definitely is a qref subroutine
+    if (llvm::any_of(f.getArgumentTypes(), llvm::IsaPred<qref::QubitType, qref::QuregType>)) {
+        return true;
+    }
+
+    // If we don't know from the args, must look at the body
+    if (f.isDeclaration()) {
+        return false;
+    }
+
+    MLIRContext *ctx = f->getContext();
+    auto *qrefDialect = ctx->getLoadedDialect<qref::QRefDialect>();
+
+    WalkResult walkResult = f.walk([qrefDialect](Operation *op) {
+        if (op->getDialect() == qrefDialect) {
+            return WalkResult::interrupt();
+        }
+        if (func::CallOp callOp = dyn_cast<func::CallOp>(op)) {
+            auto funcOp = mlir::SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+                callOp, callOp.getCalleeAttr());
+            if (isQrefSubroutine(funcOp)) {
+                return WalkResult::interrupt();
+            }
+        }
+        return WalkResult::advance();
+    });
+    return walkResult.wasInterrupted();
+}
+
 void _getNecessarySubroutineRValues(func::FuncOp f, SetVector<Value> &necessarySubroutineRValues)
 {
     auto *qrefDialect = f.getContext()->getLoadedDialect<qref::QRefDialect>();
     llvm::SmallDenseSet<Value, 8> rQregsTakenIn;
 
     f.walk([&](Operation *op) {
-        // TODO: what if calling a subroutine from another subroutine??
         if (op->getDialect() != qrefDialect && !isa<func::CallOp>(op)) {
             return;
         }

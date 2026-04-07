@@ -20,16 +20,19 @@
 #include <vector>
 
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
 
+#include "mlir/Analysis/CallGraph.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeRange.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
@@ -1475,10 +1478,7 @@ struct ValueSemanticsConversionPass
     {
         Operation *mod = getOperation();
         MLIRContext *ctx = mod->getContext();
-        // Location loc = mod->getLoc();
-        auto *qrefDialect = ctx->getLoadedDialect<qref::QRefDialect>();
         IRRewriter builder(ctx);
-        DenseMap<StringRef, SubroutineInfo> subroutineInfos;
 
         WalkResult getOpVerification = mod->walk([&](qref::GetOp getOp) {
             if (!llvm::all_of(getOp->getUsers(),
@@ -1496,50 +1496,51 @@ struct ValueSemanticsConversionPass
         }
 
         // Collect all functions that need to be converted
-        // This includes qnode functions, and any subroutine functions
         SetVector<func::FuncOp> targetFuncs;
-        SetVector<func::FuncOp> targetSubroutines;
         mod->walk([&](func::FuncOp f) {
             if (f->hasAttrOfType<UnitAttr>("quantum.node")) {
                 targetFuncs.insert(f);
-                return WalkResult::advance();
             }
-
-            if (llvm::any_of(f.getArgumentTypes(),
-                             llvm::IsaPred<qref::QubitType, qref::QuregType>)) {
-                targetSubroutines.insert(f);
-                return WalkResult::advance();
-            }
-
-            WalkResult wr_subroutine = f.walk([qrefDialect](Operation *op) {
-                if (op->getDialect() == qrefDialect) {
-                    return WalkResult::interrupt();
-                }
-                return WalkResult::advance();
-            });
-            if (wr_subroutine.wasInterrupted()) {
-                targetSubroutines.insert(f);
-            }
-
-            return WalkResult::advance();
         });
 
-        for (auto subroutine : targetSubroutines) {
-            //  The subroutine conversion happens in-place, i.e. we are editing the existing func op
-            //  So the string ref to the name will not die
+        // Convert subroutines and their corresponding calls
+        // We traverse the call graph depth-first (which is guaranteed by the SCC iterator),
+        // so that a caller subroutine can correctly collect the qref operands on its call op
+        // to a callee subroutine.
+        const CallGraph callGraph(mod);
+        for (auto scc = llvm::scc_begin(&callGraph); !scc.isAtEnd(); ++scc) {
+            if ((*scc->begin())->isExternal()) {
+                continue;
+            }
+
+            func::FuncOp subroutine =
+                cast<func::FuncOp>((*scc->begin())->getCallableRegion()->getParentOp());
+            if (scc.hasCycle()) {
+                subroutine.emitOpError("Quantum subroutine call graphs must not have cycles");
+                return signalPassFailure();
+            }
+
+            if (!ReferenceToValueSemanticsConversion::isQrefSubroutine(subroutine)) {
+                continue;
+            }
+
             SubroutineInfo info(subroutine);
-            subroutineInfos.insert({subroutine.getName(), info});
             ReferenceToValueSemanticsConversion::handleSubroutine(
                 builder, subroutine, info.getNecessarySubroutineRValues());
+
+            auto uses = SymbolTable::getSymbolUses(subroutine, mod);
+            if (uses) {
+                for (auto use : *uses) {
+                    Operation *user = use.getUser();
+                    if (auto callOp = dyn_cast<func::CallOp>(user)) {
+                        ReferenceToValueSemanticsConversion::stageCallOpForConversion(builder,
+                                                                                      callOp, info);
+                    }
+                }
+            }
         }
 
-        SmallVector<func::CallOp> callMutateWorklist;
-        mod->walk([&](func::CallOp callOp) { callMutateWorklist.push_back(callOp); });
-        for (func::CallOp callOp : callMutateWorklist) {
-            ReferenceToValueSemanticsConversion::stageCallOpForConversion(
-                builder, callOp, subroutineInfos.at(callOp.getCallee()));
-        }
-
+        // Convert the main quantum.mode functions
         for (auto targetFunc : targetFuncs) {
             ReferenceToValueSemanticsConversion::QubitValueTracker tracker;
             ReferenceToValueSemanticsConversion::handleRegion(builder, targetFunc.getBody(),

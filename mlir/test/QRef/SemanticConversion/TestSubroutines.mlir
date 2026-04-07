@@ -366,3 +366,43 @@ func.func @main(%arg0: i1) -> () attributes {quantum.node} {
 
     return
 }
+
+
+// -----
+
+
+// test subroutines calling other subroutines
+
+// CHECK:   func.func @callee(%arg0: !quantum.bit) -> !quantum.bit {
+// CHECK:     [[X:%.+]] = quantum.custom "PauliX"() %arg0 : !quantum.bit
+// CHECK:     return [[X]] : !quantum.bit
+// CHECK:   }
+func.func @callee(%r: !qref.reg<1>) {
+    %q = qref.get %r[0] : !qref.reg<1> -> !qref.bit
+    qref.custom "PauliX"() %q : !qref.bit
+    return
+}
+
+// CHECK:   func.func @caller(%arg0: !quantum.bit) -> !quantum.bit {
+// CHECK:     [[call:%.+]] = call @callee(%arg0) : (!quantum.bit) -> !quantum.bit
+// CHECK:     return [[call]] : !quantum.bit
+// CHECK:   }
+func.func @caller(%r: !qref.reg<1>) {
+    func.call @callee(%r) : (!qref.reg<1>) -> ()
+    return
+}
+
+// CHECK: func.func @main() attributes {quantum.node}
+func.func @main() attributes {quantum.node} {
+    // CHECK: [[r:%.+]] = quantum.alloc( 1) : !quantum.reg
+    %r = qref.alloc(1) : !qref.reg<1>
+
+    // CHECK: [[extract:%.+]] = quantum.extract [[r]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[call:%.+]] = call @caller([[extract]]) : (!quantum.bit) -> !quantum.bit
+    func.call @caller(%r) : (!qref.reg<1>) -> ()
+    // CHECK: [[insert:%.+]] = quantum.insert [[r]][ 0], [[call]] : !quantum.reg, !quantum.bit
+
+    // CHECK: quantum.dealloc [[insert]] : !quantum.reg
+    qref.dealloc %r : !qref.reg<1>
+    return
+}
