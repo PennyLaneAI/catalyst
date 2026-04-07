@@ -19,6 +19,7 @@ include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
 
 include "Quantum/IR/QuantumDialect.td"
+include "Quantum/IR/QuantumTypes.td"
 
 include "MBQC/IR/MBQCDialect.td"
 

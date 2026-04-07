@@ -396,22 +396,31 @@ class TestIntegration:
         assert check_cache(inner)
         assert fn(3) == tuple([jax.numpy.array(2.0), jax.numpy.array(6.0)])
 
-    def test_vjp_wrapper(self):
+    @pytest.mark.usefixtures("use_both_frontend")
+    @pytest.mark.parametrize("vjp_func", [vjp, qml.vjp])
+    def test_vjp_wrapper(self, vjp_func):
         """Test conversion is happening succesfully on functions wrapped with 'vjp'."""
 
+        if qml.capture.enabled() and vjp_func == vjp:  # pylint: disable=comparison-with-callable
+            pytest.xfail("program capture autograph doesn't work with catalyst.vjp")
+
         def inner(x):
-            return 2 * x, x**2
+            if x > 0:
+                return 2 * x, x**2
+            return 4 * x, x**8
 
         @qjit(autograph=True)
         def fn(x: float):
-            return vjp(inner, (x,), (1.0, 1.0))
+            return vjp_func(inner, (x,), (1.0, 1.0))
 
         assert hasattr(fn.user_function, "ag_unconverted")
-        assert check_cache(inner)
+        if not qml.capture.enabled():
+            assert check_cache(inner)
         assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
         assert np.allclose(fn(3)[1], jnp.array(8.0))
 
-    def test_jvp_wrapper(self):
+    @pytest.mark.parametrize("jvp_func", [jvp, qml.jvp])
+    def test_jvp_wrapper(self, jvp_func):
         """Test conversion is happening succesfully on functions wrapped with 'jvp'."""
 
         def inner(x):
@@ -419,7 +428,7 @@ class TestIntegration:
 
         @qjit(autograph=True)
         def fn(x: float):
-            return jvp(inner, (x,), (1.0,))
+            return jvp_func(inner, (x,), (1.0,))
 
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(inner)
@@ -714,11 +723,11 @@ class TestConditionals:
 
         m = qml.measure if qml.capture.enabled() else measure
 
-        def circuit():
-            if True:
+        def circuit(pred: bool):
+            if pred:
                 res = m(wires=0)
 
-            return res
+            return res  # pylint: disable=possibly-used-before-assignment
 
         err_type = qml.exceptions.AutoGraphError if qml.capture.enabled() else AutoGraphError
 
@@ -992,6 +1001,7 @@ class TestForLoops:
     def test_for_in_dynamic_range_indexing_array(self):
         """Test for loop over a Python range with dynamic bounds that is used to index an array."""
 
+        @qjit(autograph=True)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(n: int):
             params = jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi])
@@ -2173,14 +2183,15 @@ class TestDecorators:
         functional wrappers."""
 
         @qml.prod
-        def template():
-            qml.H(0)
-            qml.X(0)
+        def template(b: bool):
+            if b:
+                qml.H(0)
+                qml.X(0)
 
         @qjit(autograph=True, target="jaxpr")
         @qml.qnode(qml.device("null.qubit", wires=0))
         def circuit():
-            qml.adjoint(template())
+            qml.adjoint(template)(True)
             return qml.state()
 
         assert circuit.jaxpr is not None
@@ -2576,10 +2587,10 @@ class TestJaxIndexOperatorUpdate:
                 test_array_index(x)
 
 
-class TestWithPassPipelineWrapper:
+class TestWithPass:
     """Test with passes"""
 
-    def test_with_pass_pipeline_wrapper(self):
+    def test_with_pass(self):
         """this test should work. So there are no asserts"""
 
         @qjit(autograph=True)

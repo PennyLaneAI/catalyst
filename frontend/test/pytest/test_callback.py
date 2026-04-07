@@ -13,7 +13,6 @@
 # limitations under the License.
 """Test callbacks"""
 
-
 from collections.abc import Sequence
 from functools import partial
 
@@ -193,20 +192,37 @@ def test_identity_types(arg):
 @pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
-    [jnp.array(0), jnp.array(1)],
+    [0, 1, 2.0],
 )
-def test_identity_types_shaped_array(arg):
-    """Test callback with return values. Use ShapedArray to denote the type"""
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        jnp.float32,
+        jnp.float64,
+        jnp.int8,
+        jnp.int16,
+        jnp.int32,
+        jnp.int64,
+        jnp.uint8,
+        jnp.uint16,
+        jnp.uint32,
+        jnp.uint64,
+    ],
+)
+def test_identity_types_cast_shaped_array(arg, dtype):
+    """Test callback with arguments and return values of given types."""
+
+    arg_cast = jnp.array(arg, dtype=dtype)
 
     @base_callback
-    def identity(arg) -> jax.core.ShapedArray([], int):
+    def identity(arg: dtype) -> jax.core.ShapedArray([], dtype):
         return arg
 
     @qjit
     def cir(x):
         return identity(x)
 
-    assert np.allclose(cir(arg), arg)
+    assert np.allclose(cir(arg_cast), arg_cast)
 
 
 @pytest.mark.usefixtures("use_both_frontend")
@@ -860,8 +876,7 @@ def test_active_grad_inside_qjit(backend, scale):
         qml.RX(param, wires=0)
         return qml.expval(qml.PauliZ(0))
 
-    @jax.jit
-    @qml.grad
+    @partial(qml.grad, argnums=0)
     @qml.qnode(qml.device(backend, wires=1))
     def wrapper_jit(x):
         param = scale * identity(x)
@@ -1260,7 +1275,7 @@ def test_different_shapes():
     @pure_callback
     def fun_bwd_callback(cot) -> jnp.array([1.0, 1.0]):
         nonlocal f_vjp
-        return f_vjp(cot)
+        return f_vjp(cot)  # pylint: disable=not-callable
 
     @fun_callback.bwd
     def fun_bwd(_res, cot):
@@ -1303,7 +1318,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions():
     @pure_callback
     def matrix_multiply_vjp(cotangents) -> A:
         nonlocal f_vjp
-        retval = f_vjp(cotangents)
+        retval = f_vjp(cotangents)  # pylint: disable=not-callable
         return retval
 
     @pure_callback
@@ -1355,7 +1370,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions2():
     def matrix_multiply_vjp(cotangents) -> A:
         nonlocal f_vjp
         nonlocal A, B
-        retval = f_vjp(cotangents)
+        retval = f_vjp(cotangents)  # pylint: disable=not-callable
         return retval[0]
 
     @pure_callback
@@ -1409,7 +1424,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions3():
     def matrix_multiply_vjp(cotangents) -> (A, B):
         nonlocal f_vjp
         nonlocal A, B
-        retval = f_vjp(cotangents)
+        retval = f_vjp(cotangents)  # pylint: disable=not-callable
         return retval
 
     @pure_callback

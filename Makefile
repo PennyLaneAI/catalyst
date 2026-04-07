@@ -22,6 +22,7 @@ TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pyproject.toml')
 ENABLE_FLAKY ?= OFF
+XDSL_TESTS ?= ON
 
 # Test
 
@@ -61,7 +62,11 @@ FLAKY :=
 ifeq ($(ENABLE_FLAKY),ON)
 FLAKY := --force-flaky --max-runs=5 --min-passes=5
 endif
-PYTEST_FLAGS := $(PARALLELIZE) $(TEST_EXCLUDES) $(FLAKY)
+XDSL_MARKER :=
+ifeq ($(XDSL_TESTS),OFF)
+XDSL_MARKER := -m "not xdsl"
+endif
+PYTEST_FLAGS := $(PARALLELIZE) $(TEST_EXCLUDES) $(FLAKY) $(XDSL_MARKER)
 
 # TODO: Find out why we have container overflow on macOS.
 ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0,detect_container_overflow=0"
@@ -121,7 +126,7 @@ frontend:
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
 	rm -r frontend/pennylane_catalyst.egg-info
 
-.PHONY: mlir llvm stablehlo enzyme dialects runtime oqc
+.PHONY: mlir llvm stablehlo enzyme dialects runtime oqc builtin-decomp-rules
 mlir:
 	$(MAKE) -C mlir all
 
@@ -136,7 +141,11 @@ enzyme:
 
 dialects:
 	$(MAKE) -C mlir dialects
-	
+
+builtin-decomp-rules: dialects runtime frontend
+	$(PYTHON) -m frontend.catalyst.utils.precompile_decomposition_rules
+
+
 .PHONY: dialect-docs
 dialect-docs:
 	$(MAKE) -C mlir dialect-docs
@@ -192,13 +201,15 @@ endif
 endif
 
 test-demos:
+    # Some demos fail with optax dependency pulling in latest jax
+    # We skip them for now. These demos should be properly moved to the qml repo.
 ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
 	@echo "Cannot run Jupyter Notebooks with ASAN on macOS, likely due to subprocess invocation."
 	@exit 1
 endif
 	@echo "check the Catalyst demos"
 	MDD_BENCHMARK_PRECISION=1 \
-	$(ASAN_COMMAND) $(PYTHON) -m pytest demos --nbmake $(PYTEST_FLAGS)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest demos -k "tutorial_qft_arithmetics.ipynb" --nbmake $(PYTEST_FLAGS)
 
 wheel:
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
@@ -210,18 +221,20 @@ wheel:
 	cp $(RT_BUILD_DIR)/lib/openqasm_python_module.so $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/liblapacke.* $(MK_DIR)/frontend/catalyst/lib || true  # optional
 	cp $(RT_BUILD_DIR)/lib/librt_capi.* $(MK_DIR)/frontend/catalyst/lib
+	cp $(RT_BUILD_DIR)/lib/librt_rsdecomp.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/backend/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(OQC_BUILD_DIR)/librtd_oqc* $(MK_DIR)/frontend/catalyst/lib
 	cp $(OQC_BUILD_DIR)/oqc_python_module.so $(MK_DIR)/frontend/catalyst/lib
 	cp $(OQC_BUILD_DIR)/backend/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.* $(MK_DIR)/frontend/catalyst/lib
+	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_apfloat_wrappers.* $(MK_DIR)/frontend/catalyst/lib || true # optional
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_async_runtime.* $(MK_DIR)/frontend/catalyst/lib
 
 	# Copy mlir bindings & compiler driver to frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
 	cp -R $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
-	for file in gradient quantum _ods_common catalyst mbqc mitigation _transform; do \
+	for file in gradient quantum _ods_common catalyst mbqc mitigation pbc _transform; do \
 		cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
 	done
 	mkdir -p $(MK_DIR)/frontend/bin
@@ -310,7 +323,7 @@ coverage: coverage-frontend coverage-runtime
 
 lit-coverage:
 	@echo "Running lit tests with coverage"
-	ENABLE_LIT_COVERAGE=1 COVERAGE_FILE=$(MK_DIR)/.coverage.lit $(LLVM_BUILD_DIR)/bin/llvm-lit -sv frontend/test/lit -j$(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
+	ENABLE_LIT_COVERAGE=1 COVERAGE_FILE=$(MK_DIR)/.coverage.lit $(PYTHON) $(LLVM_BUILD_DIR)/bin/llvm-lit -sv frontend/test/lit -j$(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
 
 coverage-frontend:
 ifeq ($(ENABLE_ASAN),ON)

@@ -17,6 +17,7 @@
 # pylint: disable=line-too-long
 
 """Test for qml.set_shots functionality."""
+
 from functools import partial
 
 import pennylane as qml
@@ -30,7 +31,7 @@ def test_simple_circuit_set_shots():
 
     @qjit(target="mlir")
     @partial(qml.set_shots, shots=2048)
-    @qml.qnode(device=dev)
+    @qml.qnode(device=dev, mcm_method="single-branch-statistics")
     def circuit():
         return qml.expval(qml.PauliZ(wires=0))
 

@@ -26,7 +26,6 @@ using namespace mlir;
 namespace catalyst {
 namespace mbqc {
 
-#define GEN_PASS_DECL_MBQCCONVERSIONPASS
 #define GEN_PASS_DEF_MBQCCONVERSIONPASS
 #include "MBQC/Transforms/Passes.h.inc"
 
@@ -64,10 +63,4 @@ struct MBQCConversionPass : impl::MBQCConversionPassBase<MBQCConversionPass> {
 };
 
 } // namespace mbqc
-
-std::unique_ptr<Pass> createMBQCConversionPass()
-{
-    return std::make_unique<mbqc::MBQCConversionPass>();
-}
-
 } // namespace catalyst

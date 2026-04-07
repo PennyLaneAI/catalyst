@@ -27,7 +27,7 @@ Supported backend devices include:
     - A fast state-vector qubit simulator written with a C++ backend. See the
       `Lightning-Qubit documentation <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_qubit/device.html>`__
       for more details, as well as its
-      `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_qubit/lightning_qubit.toml>`__
+      `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/main/pennylane_lightning/lightning_qubit/lightning_qubit.toml>`__
       for natively supported instructions.
 
   * - ``lightning.kokkos``
@@ -36,8 +36,16 @@ Supported backend devices include:
       circuit simulation. See the
       `Lightning-Kokkos documentation <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_kokkos/device.html>`__
       for more details, as well as its
-      `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_kokkos/lightning_kokkos.toml>`__
+      `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/main/pennylane_lightning/lightning_kokkos/lightning_kokkos.toml>`__
       for natively supported instructions.
+
+  * - ``lightning.amdgpu``
+
+    - A fast state-vector qubit simulator based on the ``lightning.kokkos`` device to give maximum performance on AMD GPUs. See the
+      `Lightning-AMDGPU documentation <https://docs.pennylane.ai/projects/lightning/en/latest/lightning_amdgpu/device.html>`__
+      for more details, as well as its
+      `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/main/pennylane_lightning/lightning_kokkos/lightning_kokkos.toml>`__ 
+      (shared with ``lightning.kokkos``) for natively supported instructions.
 
   * - ``lightning.gpu``
 
@@ -45,7 +53,7 @@ Supported backend devices include:
       for the GPU-accelerated quantum simulation. See the
       `Lightning-GPU documentation <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_gpu/device.html>`__
       for more details, as well as its
-      `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_gpu/lightning_gpu.toml>`__
+      `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/main/pennylane_lightning/lightning_gpu/lightning_gpu.toml>`__
       for natively supported instructions.
 
   * - ``braket.aws.qubit``

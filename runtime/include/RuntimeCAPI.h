@@ -35,6 +35,7 @@ void __catalyst__rt__print_string(char *);
 void __catalyst__rt__assert_bool(bool, char *);
 int64_t __catalyst__rt__array_get_size_1d(QirArray *);
 int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *, int64_t);
+void __catalyst__rt__array_update_element_1d(QirArray *, int64_t, QUBIT *);
 
 QUBIT *__catalyst__rt__qubit_allocate();
 QirArray *__catalyst__rt__qubit_allocate_array(int64_t);
@@ -86,6 +87,8 @@ void __catalyst__qis__GlobalPhase(double, const Modifiers *);
 void __catalyst__qis__PCPhase(double, double, const Modifiers *, int64_t, /*qubits*/...);
 void __catalyst__qis__ISWAP(QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__PSWAP(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__PauliRot(const char *, double, const Modifiers *, bool, int64_t,
+                               /*qubits*/...);
 
 // Struct pointer arguments for these instructions represent real arguments,
 // as passing structs by value is too unreliable / compiler dependant.
@@ -99,6 +102,8 @@ ObsIdType __catalyst__qis__HamiltonianObs(MemRefT_double_1d *, int64_t, /*obsKey
 
 // Struct pointers arguments here represent return values.
 RESULT *__catalyst__qis__Measure(QUBIT *, int32_t);
+RESULT *__catalyst__qis__PauliMeasure(const char *, bool, const char *, bool, bool, int64_t,
+                                      /*qubits*/...);
 double __catalyst__qis__Expval(ObsIdType);
 double __catalyst__qis__Variance(ObsIdType);
 void __catalyst__qis__Probs(MemRefT_double_1d *, int64_t, /*qubits*/...);

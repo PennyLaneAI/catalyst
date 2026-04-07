@@ -5,13 +5,19 @@ set(LIBS
     ${conversion_libs}
     ExternalStablehloLib
     MLIRLspServerLib
+    MLIRRegisterAllDialects
     MLIRCatalyst
     MLIRQuantum
-    MLIRQEC
+    MLIRQRef
+    MLIRPBC
     MLIRGradient
     MLIRMBQC
     MLIRMitigation
+    MLIRPauliFrame
     MLIRIon
+    MLIRRTIO
+    MLIRQecLogical
+    MLIRQecPhysical
 )
 
 add_llvm_executable(quantum-lsp-server quantum-lsp-server.cpp)

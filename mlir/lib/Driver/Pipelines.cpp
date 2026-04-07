@@ -14,9 +14,23 @@
 
 #include <memory>
 
+#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
+#include "mlir/Conversion/BufferizationToMemRef/BufferizationToMemRef.h"
+#include "mlir/Conversion/ComplexToLLVM/ComplexToLLVM.h"
+#include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
+#include "mlir/Conversion/IndexToLLVM/IndexToLLVM.h"
+#include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
+#include "mlir/Conversion/MathToLibm/MathToLibm.h"
+#include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
+#include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
+#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
+#include "mlir/Conversion/TensorToLinalg/TensorToLinalgPass.h"
+#include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/InitAllDialects.h"
-#include "mlir/InitAllPasses.h"
+#include "mlir/Dialect/Bufferization/Transforms/Passes.h"
+#include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 #include "stablehlo/conversions/linalg/transforms/Passes.h"
@@ -29,58 +43,66 @@
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Mitigation/Transforms/Passes.h"
+#include "PBC/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
-#include "hlo-extensions/Passes.h"
+#include "hlo-extensions/Transforms/Passes.h"
 
 using namespace mlir;
+
 namespace catalyst {
 namespace driver {
 
-void createEnforceRuntimeInvariantsPipeline(OpPassManager &pm)
+void createQuantumCompilationStage(OpPassManager &pm)
 {
-    pm.addPass(catalyst::createSplitMultipleTapesPass());
+    pm.addPass(catalyst::quantum::createSplitMultipleTapesPass());
     pm.addNestedPass<ModuleOp>(catalyst::createApplyTransformSequencePass());
     pm.addPass(catalyst::createInlineNestedModulePass());
+    pm.addPass(catalyst::mitigation::createMitigationLoweringPass());
+    pm.addPass(catalyst::quantum::createAdjointLoweringPass());
+    // TODO: We can remove this pass below once PBC has its own pipeline.
+    pm.addPass(catalyst::pbc::createLowerPBCInitOpsPass());
+    pm.addPass(catalyst::createDisableAssertionPass());
 }
-void createHloLoweringPipeline(OpPassManager &pm)
+void createHloLoweringStage(OpPassManager &pm)
 {
     pm.addPass(mlir::createCanonicalizerPass());
-
     pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createChloLegalizeToStablehloPass());
-    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeControlFlowPass());
+    pm.addNestedPass<mlir::func::FuncOp>(
+        catalyst::hlo_extensions::createStablehloLegalizeControlFlowPass());
     stablehlo::StablehloAggressiveSimplificationPassOptions ASoptions;
     pm.addNestedPass<mlir::func::FuncOp>(
         stablehlo::createStablehloAggressiveSimplificationPass(ASoptions));
     pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createStablehloLegalizeToLinalgPass());
-    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeToStdPass());
-    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createStablehloLegalizeSortPass());
+    pm.addNestedPass<mlir::func::FuncOp>(
+        catalyst::hlo_extensions::createStablehloLegalizeToStandardPass());
+    pm.addNestedPass<mlir::func::FuncOp>(
+        catalyst::hlo_extensions::createStablehloLegalizeSortPass());
     pm.addPass(stablehlo::createStablehloConvertToSignlessPass());
     pm.addPass(mlir::createCanonicalizerPass());
-    pm.addPass(catalyst::createScatterLoweringPass());
-    pm.addPass(catalyst::createHloCustomCallLoweringPass());
+    pm.addPass(catalyst::hlo_extensions::createScatterLoweringPass());
+    pm.addPass(catalyst::hlo_extensions::createHloCustomCallLoweringPass());
     pm.addPass(mlir::createCSEPass());
     mlir::LinalgDetensorizePassOptions LDoptions;
     LDoptions.aggressiveMode = true;
     pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgDetensorizePass(LDoptions));
     pm.addPass(catalyst::createDetensorizeSCFPass());
+    pm.addPass(catalyst::createDetensorizeFunctionBoundaryPass());
     pm.addPass(mlir::createCanonicalizerPass());
+    pm.addPass(mlir::createSymbolDCEPass());
 }
-void createQuantumCompilationPipeline(OpPassManager &pm)
+void createGradientLoweringStage(OpPassManager &pm)
 {
-    pm.addPass(catalyst::createAnnotateFunctionPass());
-    pm.addPass(catalyst::createMitigationLoweringPass());
-    pm.addPass(catalyst::createGradientLoweringPass());
-    pm.addPass(catalyst::createAdjointLoweringPass());
-    pm.addPass(catalyst::createDisableAssertionPass());
+    pm.addPass(catalyst::gradient::createAnnotateInvalidGradientFunctionsPass());
+    pm.addPass(catalyst::gradient::createGradientLoweringPass());
 }
-void createBufferizationPipeline(OpPassManager &pm)
+void createBufferizationStage(OpPassManager &pm)
 {
-    pm.addPass(mlir::createInlinerPass());
     pm.addPass(mlir::createConvertTensorToLinalgPass());
     pm.addPass(mlir::createConvertElementwiseToLinalgPass());
-    pm.addPass(catalyst::createGradientPreprocessingPass());
+    pm.addPass(catalyst::gradient::createGradientPreprocessingPass());
     pm.addPass(mlir::bufferization::createEmptyTensorEliminationPass());
+    pm.addPass(catalyst::createMarkEntryPointArgsNonWritablePass());
     ///////////
     mlir::bufferization::OneShotBufferizePassOptions options;
     options.bufferizeFunctionBoundaries = true;
@@ -91,7 +113,7 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addPass(mlir::bufferization::createOneShotBufferizePass(options));
     //////////////
     pm.addPass(mlir::createCanonicalizerPass());
-    pm.addPass(catalyst::createGradientPostprocessingPass());
+    pm.addPass(catalyst::gradient::createGradientPostprocessingPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferHoistingPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferLoopHoistingPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createPromoteBuffersToStackPass());
@@ -100,12 +122,12 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addPass(catalyst::createArrayListToMemRefPass());
     pm.addPass(mlir::createConvertBufferizationToMemRefPass());
     pm.addPass(mlir::createCanonicalizerPass());
-    pm.addPass(catalyst::createCopyGlobalMemRefPass());
+    pm.addPass(catalyst::quantum::createCopyGlobalMemRefPass());
 }
-void createLLVMDialectLoweringPipeline(OpPassManager &pm)
+void createLLVMDialectLoweringStage(OpPassManager &pm)
 {
     pm.addPass(mlir::memref::createExpandReallocPass());
-    pm.addPass(catalyst::createGradientConversionPass());
+    pm.addPass(catalyst::gradient::createGradientConversionPass());
     pm.addPass(catalyst::createMemrefCopyToLinalgCopyPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::createConvertLinalgToLoopsPass());
     pm.addPass(mlir::createSCFToControlFlowPass());
@@ -122,10 +144,11 @@ void createLLVMDialectLoweringPipeline(OpPassManager &pm)
     options.useGenericFunctions = true;
     pm.addPass(mlir::createFinalizeMemRefToLLVMConversionPass(options));
     pm.addPass(mlir::createConvertIndexToLLVMPass());
+    pm.addPass(catalyst::pbc::createPBCConversionPass());
     pm.addPass(catalyst::createCatalystConversionPass());
-    pm.addPass(catalyst::createQuantumConversionPass());
+    pm.addPass(catalyst::quantum::createQuantumConversionPass());
     pm.addPass(catalyst::createAddExceptionHandlingPass());
-    pm.addPass(catalyst::createEmitCatalystPyInterfacePass());
+    pm.addPass(catalyst::quantum::createEmitCatalystPyInterfacePass());
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(mlir::createReconcileUnrealizedCastsPass());
     pm.addPass(catalyst::createGEPInboundsPass());
@@ -134,41 +157,40 @@ void createLLVMDialectLoweringPipeline(OpPassManager &pm)
 
 void createDefaultCatalystPipeline(OpPassManager &pm)
 {
-    createEnforceRuntimeInvariantsPipeline(pm);
-    createHloLoweringPipeline(pm);
-    createQuantumCompilationPipeline(pm);
-    createBufferizationPipeline(pm);
-    createLLVMDialectLoweringPipeline(pm);
+    createQuantumCompilationStage(pm);
+    createHloLoweringStage(pm);
+    createGradientLoweringStage(pm);
+    createBufferizationStage(pm);
+    createLLVMDialectLoweringStage(pm);
 }
 
-void registerEnforceRuntimeInvariantsPipeline()
+void registerQuantumCompilationStage()
 {
-    PassPipelineRegistration<>("enforce-runtime-invariants-pipeline",
-                               "Register enforce runtime invariants pipeline as a pass.",
-                               createEnforceRuntimeInvariantsPipeline);
+    PassPipelineRegistration<>("quantum-compilation-stage",
+                               "Register quantum compilation stage as a pass.",
+                               createQuantumCompilationStage);
 }
-void registerHloLoweringPipeline()
+void registerHloLoweringStage()
 {
-    PassPipelineRegistration<>("hlo-lowering-pipeline", "Register HLO lowering pipeline as a pass.",
-                               createHloLoweringPipeline);
+    PassPipelineRegistration<>("hlo-lowering-stage", "Register HLO lowering stage as a pass.",
+                               createHloLoweringStage);
 }
-void registerQuantumCompilationPipeline()
+void registerGradientLoweringStage()
 {
-    PassPipelineRegistration<>("quantum-compilation-pipeline",
-                               "Register quantum compilation pipeline as a pass.",
-                               createQuantumCompilationPipeline);
+    PassPipelineRegistration<>("gradient-lowering-stage",
+                               "Register gradient lowering stage as a pass.",
+                               createGradientLoweringStage);
 }
-void registerBufferizationPipeline()
+void registerBufferizationStage()
 {
-    PassPipelineRegistration<>("bufferization-pipeline",
-                               "Register bufferization pipeline as a pass.",
-                               createBufferizationPipeline);
+    PassPipelineRegistration<>("bufferization-stage", "Register bufferization stage as a pass.",
+                               createBufferizationStage);
 }
-void registerLLVMDialectLoweringPipeline()
+void registerLLVMDialectLoweringStage()
 {
-    PassPipelineRegistration<>("llvm-dialect-lowering-pipeline",
-                               "Register LLVM dialect lowering pipeline as a pass.",
-                               createLLVMDialectLoweringPipeline);
+    PassPipelineRegistration<>("llvm-dialect-lowering-stage",
+                               "Register LLVM dialect lowering stage as a pass.",
+                               createLLVMDialectLoweringStage);
 }
 
 void registerDefaultCatalystPipeline()
@@ -180,11 +202,11 @@ void registerDefaultCatalystPipeline()
 
 void registerAllCatalystPipelines()
 {
-    registerEnforceRuntimeInvariantsPipeline();
-    registerHloLoweringPipeline();
-    registerQuantumCompilationPipeline();
-    registerBufferizationPipeline();
-    registerLLVMDialectLoweringPipeline();
+    registerQuantumCompilationStage();
+    registerHloLoweringStage();
+    registerGradientLoweringStage();
+    registerBufferizationStage();
+    registerLLVMDialectLoweringStage();
     registerDefaultCatalystPipeline();
 }
 
@@ -192,13 +214,12 @@ std::vector<Pipeline> getDefaultPipeline()
 {
     using PipelineFunc = void (*)(mlir::OpPassManager &);
     std::vector<PipelineFunc> pipelineFuncs = {
-        &createEnforceRuntimeInvariantsPipeline, &createHloLoweringPipeline,
-        &createQuantumCompilationPipeline, &createBufferizationPipeline,
-        &createLLVMDialectLoweringPipeline};
+        &createQuantumCompilationStage, &createHloLoweringStage, &createGradientLoweringStage,
+        &createBufferizationStage, &createLLVMDialectLoweringStage};
 
     llvm::SmallVector<std::string> defaultPipelineNames = {
-        "enforce-runtime-invariants-pipeline", "hlo-lowering-pipeline",
-        "quantum-compilation-pipeline", "bufferization-pipeline", "llvm-dialect-lowering-pipeline"};
+        "QuantumCompilationStage", "HLOLoweringStage", "GradientLoweringStage",
+        "BufferizationStage", "MLIRToLLVMDialectConversion"};
 
     std::vector<Pipeline> defaultPipelines(defaultPipelineNames.size());
     for (size_t i = 0; i < defaultPipelineNames.size(); ++i) {

@@ -179,4 +179,3 @@ module @bar {
     return %3 : tensor<2xcomplex<f64>>
   }
 }
-

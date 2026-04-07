@@ -25,7 +25,6 @@ include "mlir/IR/BuiltinAttributes.td"
 
 include "Ion/IR/IonDialect.td"
 include "Ion/IR/IonInterfaces.td"
-include "Quantum/IR/QuantumDialect.td"
 
 //===----------------------------------------------------------------------===//
 // Ion dialect enums.
@@ -63,7 +62,7 @@ def LevelAttr : Ion_Attr<"Level", "level"> {
 
 
   let builders = [
-    AttrBuilderWithInferredContext<(ins     
+    AttrBuilderWithInferredContext<(ins
     "mlir::StringAttr":$label,
     "mlir::IntegerAttr":$principal,
     "mlir::FloatAttr":$spin,
@@ -181,10 +180,8 @@ def ModesOp : Ion_Op<"mode"> {
   }];
 }
 
-
-def PulseOp : Ion_Op<"pulse"> {
-    let summary = "Represent a pulse (a laser beam and some time).";
-
+// Base pulse operation shared by PulseOp and MeasurePulseOp.
+class BasePulseOp<string mnemonic> : Ion_Op<mnemonic> {
     let arguments = (ins
         AnyFloat: $time,
         QubitType: $in_qubit,
@@ -192,15 +189,48 @@ def PulseOp : Ion_Op<"pulse"> {
         Builtin_FloatAttr: $phase
     );
 
-    let results = (outs
-    PulseType:$out_pulse
-    );
+    let results = (outs PulseType:$out_pulse);
 
     let assemblyFormat = [{
         `(` $time `:` type($time) `)` $in_qubit attr-dict `:` type($out_pulse)
     }];
 }
 
+def PulseOp : BasePulseOp<"pulse"> {
+    let summary = "Represent a pulse (a laser beam and some time).";
+}
+
+def MeasurePulseOp : BasePulseOp<"measure_pulse"> {
+    let summary = "Represent a fluorescent measurement pulse for mid-circuit measurement.";
+
+    let description = [{
+        The MeasurePulseOp represents a measurement pulse in the OpenAPL protocol.
+        It is used for mid-circuit measurement in trapped-ion systems,
+        typically using fluorescence detection.
+    }];
+}
+
+def ReadoutBitOp : Ion_Op<"readout_bit", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "Read out the classical measurement result from a qubit after a measure pulse.";
+
+    let description = [{
+        This op reads out the classical measurement result from a ParallelProtocolOp containing a
+        MeasurePulseOp, and threads the qubit wire through.
+    }];
+
+    let arguments = (ins
+        QubitType: $in_qubit
+    );
+
+    let results = (outs
+        I1: $mres,
+        QubitType: $out_qubit
+    );
+
+    let assemblyFormat = [{
+        $in_qubit attr-dict `:` type(results)
+    }];
+}
 
 def ParallelProtocolOp : Ion_Op<"parallelprotocol", [SingleBlockImplicitTerminator<"YieldOp">]> {
     let summary = "Represent a parallel protocol of pulses.";
@@ -214,7 +244,7 @@ def ParallelProtocolOp : Ion_Op<"parallelprotocol", [SingleBlockImplicitTerminat
 
     let builders = [
       OpBuilder<(ins
-        CArg<"mlir::ValueRange", "std::nullopt">:$in_qubits,
+        CArg<"mlir::ValueRange", "{}">:$in_qubits,
         CArg<"llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange)>",
             "nullptr">)>
     ];

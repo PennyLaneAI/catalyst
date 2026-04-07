@@ -17,7 +17,11 @@
 #include "mlir/Pass/Pass.h"
 
 namespace catalyst {
+namespace mbqc {
 
-std::unique_ptr<mlir::Pass> createMBQCConversionPass();
+#define GEN_PASS_DECL
+#define GEN_PASS_REGISTRATION
+#include "MBQC/Transforms/Passes.h.inc"
 
+} // namespace mbqc
 } // namespace catalyst

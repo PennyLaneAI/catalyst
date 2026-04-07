@@ -38,7 +38,7 @@ void oneQubitDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewri
     ValueRange inQubits = op.getInQubits();
 
     TypedAttr phiAttr = rewriter.getF64FloatAttr(phi);
-    mlir::Value phiValue = rewriter.create<arith::ConstantOp>(op.getLoc(), phiAttr);
+    mlir::Value phiValue = arith::ConstantOp::create(rewriter, op.getLoc(), phiAttr);
 
     mlir::Value thetaValue;
     if (std::holds_alternative<mlir::Value>(theta)) {
@@ -46,19 +46,19 @@ void oneQubitDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewri
     }
     else if (std::holds_alternative<double>(theta)) {
         TypedAttr thetaAttr = rewriter.getF64FloatAttr(std::get<double>(theta));
-        thetaValue = rewriter.create<arith::ConstantOp>(op.getLoc(), thetaAttr);
+        thetaValue = arith::ConstantOp::create(rewriter, op.getLoc(), thetaAttr);
     }
     TypedAttr lambdaAttr = rewriter.getF64FloatAttr(lambda);
-    mlir::Value lambdaValue = rewriter.create<arith::ConstantOp>(op.getLoc(), lambdaAttr);
+    mlir::Value lambdaValue = arith::ConstantOp::create(rewriter, op.getLoc(), lambdaAttr);
 
-    auto rxPhi = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, TypeRange{}, phiValue,
-                                           inQubits, "RX", false, ValueRange{}, ValueRange{});
-    auto ryTheta = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, TypeRange{}, thetaValue,
-                                             rxPhi.getOutQubits(), "RY", false,
-                                             rxPhi.getInCtrlQubits(), rxPhi.getInCtrlValues());
+    auto rxPhi = CustomOp::create(rewriter, op.getLoc(), outQubitsTypes, TypeRange{}, phiValue,
+                                  inQubits, "RX", false, ValueRange{}, ValueRange{});
+    auto ryTheta = CustomOp::create(rewriter, op.getLoc(), outQubitsTypes, TypeRange{}, thetaValue,
+                                    rxPhi.getOutQubits(), "RY", false, rxPhi.getInCtrlQubits(),
+                                    rxPhi.getInCtrlValues());
     auto rxLambda =
-        rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, TypeRange{}, lambdaValue,
-                                  ryTheta.getOutQubits(), "RX", false, ValueRange{}, ValueRange{});
+        CustomOp::create(rewriter, op.getLoc(), outQubitsTypes, TypeRange{}, lambdaValue,
+                         ryTheta.getOutQubits(), "RX", false, ValueRange{}, ValueRange{});
     op.replaceAllUsesWith(rxLambda);
 }
 
@@ -110,31 +110,30 @@ void cnotDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
     mlir::Value inQubit1 = op.getInQubits().back();
 
     TypedAttr piOver2Attr = rewriter.getF64FloatAttr(PI / 2);
-    mlir::Value piOver2 = rewriter.create<arith::ConstantOp>(op.getLoc(), piOver2Attr);
-    auto ryPiOver2 =
-        rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes.front(), TypeRange{}, piOver2,
-                                  inQubit0, "RY", false, ValueRange{}, ValueRange{});
+    mlir::Value piOver2 = arith::ConstantOp::create(rewriter, op.getLoc(), piOver2Attr);
+    auto ryPiOver2 = CustomOp::create(rewriter, op.getLoc(), outQubitsTypes.front(), TypeRange{},
+                                      piOver2, inQubit0, "RY", false, ValueRange{}, ValueRange{});
     SmallVector<mlir::Value> qubitsAfterRy;
     qubitsAfterRy.push_back(ryPiOver2.getOutQubits().front());
     qubitsAfterRy.push_back(inQubit1);
-    auto ms = rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes, TypeRange{}, piOver2,
-                                        qubitsAfterRy, "MS", false, ValueRange{}, ValueRange{});
+    auto ms = CustomOp::create(rewriter, op.getLoc(), outQubitsTypes, TypeRange{}, piOver2,
+                               qubitsAfterRy, "MS", false, ValueRange{}, ValueRange{});
     mlir::Value qubit0AfterMs = ms.getOutQubits().front();
     mlir::Value qubit1AfterMs = ms.getOutQubits().back();
 
     TypedAttr minusPiOver2Attr = rewriter.getF64FloatAttr(-PI / 2);
-    mlir::Value minusPiOver2 = rewriter.create<arith::ConstantOp>(op.getLoc(), minusPiOver2Attr);
+    mlir::Value minusPiOver2 = arith::ConstantOp::create(rewriter, op.getLoc(), minusPiOver2Attr);
     auto rxMinusPiOver2 =
-        rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes.front(), TypeRange{}, minusPiOver2,
-                                  qubit0AfterMs, "RX", false, ValueRange{}, ValueRange{});
+        CustomOp::create(rewriter, op.getLoc(), outQubitsTypes.front(), TypeRange{}, minusPiOver2,
+                         qubit0AfterMs, "RX", false, ValueRange{}, ValueRange{});
     auto firstRyMinusPiOver2 =
-        rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes.front(), TypeRange{}, minusPiOver2,
-                                  qubit1AfterMs, "RY", false, ValueRange{}, ValueRange{});
+        CustomOp::create(rewriter, op.getLoc(), outQubitsTypes.front(), TypeRange{}, minusPiOver2,
+                         qubit1AfterMs, "RY", false, ValueRange{}, ValueRange{});
 
     mlir::Value qubit0AfterRY = rxMinusPiOver2.getOutQubits().front();
     auto secondRyMinusPiOver2 =
-        rewriter.create<CustomOp>(op.getLoc(), outQubitsTypes.front(), TypeRange{}, minusPiOver2,
-                                  qubit0AfterRY, "RY", false, ValueRange{}, ValueRange{});
+        CustomOp::create(rewriter, op.getLoc(), outQubitsTypes.front(), TypeRange{}, minusPiOver2,
+                         qubit0AfterRY, "RY", false, ValueRange{}, ValueRange{});
 
     SmallVector<mlir::Value> qubitsEnd;
     qubitsEnd.push_back(firstRyMinusPiOver2.getOutQubits().front());

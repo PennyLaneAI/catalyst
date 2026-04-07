@@ -14,8 +14,10 @@
 """This module contains functions for lowering, compiling, and linking
 MLIR/LLVM representations.
 """
+
 import glob
 import importlib
+import io
 import logging
 import os
 import pathlib
@@ -169,6 +171,7 @@ class LinkerDriver:
             f"-l{lapack_lib_name}",  # required for custom_calls lib
             "-lcustom_calls",
             "-lmlir_async_runtime",
+            "-lrt_rsdecomp",
         ]
 
         # If OQD runtime capi is built, link to it as well
@@ -257,8 +260,11 @@ class LinkerDriver:
             fallback_compilers = LinkerDriver._default_fallback_compilers
         for compiler in LinkerDriver._available_compilers(fallback_compilers):
             success = LinkerDriver._attempt_link(compiler, flags, infile, outfile, options)
+            if options.verbose:
+                print("Shared object linking successful", file=options.logfile)
             if success:
                 return outfile
+
         msg = f"Unable to link {infile}. Please check the output for any error messages. If no "
         msg += "compiler was found by Catalyst, please specify a compatible one via $CATALYST_CC."
         raise CompileError(msg)
@@ -283,7 +289,7 @@ def _get_catalyst_cli_cmd(*args, stdin=None):
     return cmd
 
 
-def _catalyst(*args, stdin=None):
+def _catalyst(*args, stdin=None, text=True):
     """Raw interface to catalyst
 
     echo ${stdin} | catalyst *args -
@@ -291,22 +297,22 @@ def _catalyst(*args, stdin=None):
     """
     cmd = _get_catalyst_cli_cmd(*args, stdin=stdin)
     try:
-        result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=True)
+        result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=text)
         return result.stdout
     except subprocess.CalledProcessError as e:
         raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
 
-def _quantum_opt(*args, stdin=None):
+def _quantum_opt(*args, stdin=None, text=True):
     """Raw interface to quantum-opt
 
     echo ${stdin} | catalyst --tool=opt *args -
     catalyst --tool=opt *args
     """
-    return _catalyst(("--tool", "opt"), *args, stdin=stdin)
+    return _catalyst(("--tool", "opt"), *args, stdin=stdin, text=text)
 
 
-def canonicalize(*args, stdin=None):
+def canonicalize(*args, stdin=None, options: Optional[CompileOptions] = None):
     """Run opt with canonicalization
 
     echo ${stdin} | catalyst --tool=opt \
@@ -316,7 +322,11 @@ def canonicalize(*args, stdin=None):
 
     Returns stdout string
     """
-    return _quantum_opt(("--pass-pipeline", "builtin.module(canonicalize)"), *args, stdin=stdin)
+    opts = ["--pass-pipeline", "builtin.module(canonicalize)"]
+    if options and options.use_nameloc:
+        opts.append("--use-nameloc-as-prefix")
+
+    return _quantum_opt(*opts, *args, stdin=stdin)
 
 
 def _options_to_cli_flags(options):
@@ -345,8 +355,16 @@ def _options_to_cli_flags(options):
     if options.keep_intermediate:
         extra_args += ["--keep-intermediate"]
 
-    if options.keep_intermediate >= KeepIntermediateLevel.PASS:
-        extra_args += ["--save-ir-after-each=pass"]
+    match options.keep_intermediate:
+        case KeepIntermediateLevel.CHANGED:
+            extra_args += ["--save-ir-after-each=changed", "--dump-module-scope"]
+        case KeepIntermediateLevel.PASS:
+            extra_args += ["--save-ir-after-each=pass", "--dump-module-scope"]
+        case _:
+            pass
+
+    if options.use_nameloc:
+        extra_args += ["--use-nameloc-as-prefix"]
 
     if options.verbose:
         extra_args += ["--verbose"]
@@ -367,8 +385,19 @@ def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
     return _catalyst(*opts, *args, stdin=stdin)
 
 
-def to_mlir_opt(*args, stdin=None, options: Optional[CompileOptions] = None):
+def to_mlir_opt(
+    *args, stdin=None, options: Optional[CompileOptions] = None, using_python_compiler=False
+):
     """echo ${input} | catalyst --tool=opt *args *opts -"""
+    # Check if we need to use the Python interface for xDSL passes
+    if using_python_compiler:
+        # Use the Python interface path for xDSL passes
+        # pylint: disable-next=import-outside-toplevel
+        from catalyst.python_interface import Compiler as UnifiedCompiler
+
+        compiler = UnifiedCompiler()
+        stdin = compiler.run(stdin, callback=None)
+
     # These are the options that may affect compilation
     if not options:
         return _quantum_opt(*args, stdin=stdin)
@@ -405,6 +434,7 @@ class Compiler:
         )
         return cmd
 
+    # pylint: disable=too-many-branches
     @debug_logger
     def run_from_ir(self, ir: str, module_name: str, workspace: Directory):
         """Compile a shared object from a textual IR (MLIR or LLVM).
@@ -424,9 +454,6 @@ class Compiler:
             workspace, Directory
         ), f"Compiler expects a Directory type, got {type(workspace)}."
         assert workspace.is_dir(), f"Compiler expects an existing directory, got {workspace}."
-        assert (
-            self.options.lower_to_llvm
-        ), "lower_to_llvm must be set to True in order to compile to a shared object"
 
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
@@ -459,8 +486,11 @@ class Compiler:
         else:
             out_IR = None
 
-        output = LinkerDriver.run(output_object_name, options=self.options)
-        output_object_name = str(pathlib.Path(output).absolute())
+        if self.options.link:
+            output = LinkerDriver.run(output_object_name, options=self.options)
+            output = str(pathlib.Path(output).absolute())
+        else:
+            output = None
 
         # Clean up temporary files
         if os.path.exists(tmp_infile_name):
@@ -468,21 +498,91 @@ class Compiler:
         if os.path.exists(output_ir_name):
             os.remove(output_ir_name)
 
-        return output_object_name, out_IR
+        return output, out_IR
+
+    def has_xdsl_passes_in_transform_modules(self, mlir_module):
+        """Check if the MLIR module contains xDSL passes in transform dialect.
+
+        This checks for the 'catalyst.uses_xdsl_passes' attribute that is set during
+        lowering on transform modules when xDSL passes are added to the transform pipeline.
+
+        Args:
+            mlir_module: MLIR module to check for xDSL passes
+
+        Returns:
+            bool: True if xDSL passes detected in any transform module
+        """
+
+        def has_both_attributes(attrs):
+            """Check if attributes dict has both required keys."""
+            try:
+                has_transform = (
+                    "transform.with_named_sequence" in attrs
+                    or "transform.with_named_sequence" in getattr(attrs, "keys", lambda: [])()
+                )
+                has_xdsl = (
+                    "catalyst.uses_xdsl_passes" in attrs
+                    or "catalyst.uses_xdsl_passes" in getattr(attrs, "keys", lambda: [])()
+                )
+                return has_transform and has_xdsl
+            except (AttributeError, KeyError, TypeError):
+                return False
+
+        def check_nested_operations(op):
+            """Check if any nested operation has the required attributes."""
+            regions = getattr(op, "regions", [])
+            if not regions:
+                return False
+
+            try:
+                for nested_op in regions[0].blocks[0].operations:
+                    attrs = getattr(nested_op, "attributes", None)
+                    if attrs and has_both_attributes(attrs):
+                        return True
+            except (AttributeError, IndexError):
+                pass
+            return False
+
+        try:
+            return any(
+                check_nested_operations(op)
+                for op in mlir_module.operation.regions[0].blocks[0].operations
+            )
+        except Exception:  # pylint: disable=broad-except
+            # If we can't check the attribute, assume no xDSL passes
+            return False
 
     @debug_logger
-    def is_using_python_compiler(self):
-        """Returns true if we detect that there is an xdsl plugin in use.
+    def is_using_python_compiler(self, mlir_module=None):
+        """Returns true if we need the Python interface path.
+
+        This happens when:
+        1. xDSL plugin is explicitly loaded (legacy), OR
+        2. Module has xDSL passes in transform modules (detected via attribute)
 
         Will also modify self.options.pass_plugins and self.options.dialect_plugins to remove
         the xdsl plugin.
+
+        Args:
+            mlir_module: Optional MLIR module to check for xDSL passes attribute
         """
         xdsl_path = pathlib.Path("xdsl-does-not-use-a-real-path")
-        if not (
+
+        has_plugin = (
             xdsl_path in self.options.pass_plugins or xdsl_path in self.options.dialect_plugins
-        ):
+        )
+
+        if not has_plugin and mlir_module is None:
             return False
 
+        has_xdsl_passes = mlir_module is not None and self.has_xdsl_passes_in_transform_modules(
+            mlir_module
+        )
+
+        if not has_plugin and not has_xdsl_passes:
+            return False
+
+        # Remove the fake plugin path from options before returning
         if xdsl_path in self.options.pass_plugins:
             plugins = self.options.pass_plugins
             self.options.pass_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
@@ -492,6 +592,53 @@ class Compiler:
             self.options.dialect_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
 
         return True
+
+    def _create_xdsl_pass_save_callback(self, workspace):
+        """Create a callback function to save IR after each xdsl pass.
+
+        Args:
+            workspace: The workspace directory path
+
+        Returns:
+            Callable or None: The callback function if intermediate saving is enabled, None
+            otherwise
+        """
+        if not (workspace and self.options.keep_intermediate >= KeepIntermediateLevel.CHANGED):
+            return None
+
+        # pylint: disable-next=import-outside-toplevel
+        from xdsl.printer import Printer
+
+        user_transform_dir = os.path.join(str(workspace), "0_QuantumCompilationStage")
+        os.makedirs(user_transform_dir, exist_ok=True)
+
+        class SavePassIRCallback:
+            """Callback to save IR after each pass in python_interface."""
+
+            def __init__(self, transform_dir):
+                self.transform_dir = transform_dir
+                self.counter = 1
+
+            def __call__(self, previous_pass, module, _next_pass=None, **_kwargs):
+                """Save IR after each pass."""
+                # Only save after a pass has run (when previous_pass is not None)
+                if previous_pass is None:
+                    return
+
+                pass_name = (
+                    previous_pass.name if hasattr(previous_pass, "name") else str(previous_pass)
+                )
+                buffer = io.StringIO()
+                Printer(stream=buffer, print_generic_format=False).print_op(module)
+                ir_file = os.path.join(
+                    self.transform_dir,
+                    f"{self.counter}_{pass_name}.mlir",
+                )
+                with open(ir_file, "w", encoding="utf-8") as f:
+                    f.write(buffer.getvalue())
+                self.counter += 1
+
+        return SavePassIRCallback(user_transform_dir)
 
     @debug_logger
     def run(self, mlir_module, *args, **kwargs):
@@ -508,21 +655,33 @@ class Compiler:
         Returns:
             (str): filename of shared object
         """
+        using_python_compiler = self.is_using_python_compiler(mlir_module)
+        workspace = args[0] if args else kwargs.get("workspace")
+        module_name = str(mlir_module.operation.attributes["sym_name"]).replace('"', "")
+        ir = mlir_module.operation.get_asm(
+            binary=False, print_generic_op_form=using_python_compiler, assume_verified=True
+        )
 
-        if self.is_using_python_compiler():
+        # Save intermediate IR before any compiler transformation is applied
+        if workspace and self.options.keep_intermediate:
+            initial_ir_file = os.path.join(str(workspace), f"0_{module_name}.mlir")
+            with open(initial_ir_file, "w", encoding="utf-8") as f:
+                # We need to canonicalize the IR to get the pretty format
+                f.write(canonicalize(stdin=ir, options=self.options))
+
+        if using_python_compiler:
             # We keep this module here to keep xDSL requirement optional
             # Only move this is it has been decided that xDSL is no longer optional.
             # pylint: disable-next=import-outside-toplevel
-            from pennylane.compiler.python_compiler import Compiler as PythonCompiler
+            from catalyst.python_interface import Compiler as UnifiedCompiler
 
-            compiler = PythonCompiler()
-            mlir_module = compiler.run(mlir_module)
+            callback = self._create_xdsl_pass_save_callback(workspace)
+            compiler = UnifiedCompiler()
+            ir = compiler.run(ir, callback=callback)
 
         return self.run_from_ir(
-            mlir_module.operation.get_asm(
-                binary=False, print_generic_op_form=False, assume_verified=True
-            ),
-            str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
+            ir,
+            module_name,
             *args,
             **kwargs,
         )

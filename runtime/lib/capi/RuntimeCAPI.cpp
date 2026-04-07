@@ -29,6 +29,7 @@
 #include "MemRefUtils.hpp"
 #include "QuantumDevice.hpp"
 #include "Timer.hpp"
+#include "Types.h"
 
 #include "RuntimeCAPI.h"
 
@@ -389,9 +390,9 @@ void __catalyst__rt__qubit_release(QUBIT *qubit)
 
 static int __catalyst__rt__qubit_release_array__impl(QirArray *qubit_array)
 {
-    getQuantumDevicePtr()->ReleaseAllQubits();
     std::vector<QubitIdType> *qubit_array_ptr =
         reinterpret_cast<std::vector<QubitIdType> *>(qubit_array);
+    getQuantumDevicePtr()->ReleaseQubits(*qubit_array_ptr);
     delete qubit_array_ptr;
     return 0;
 }
@@ -858,6 +859,32 @@ void __catalyst__qis__PSWAP(double phi, QUBIT *wire0, QUBIT *wire1, const Modifi
         MODIFIERS_ARGS(modifiers));
 }
 
+void __catalyst__qis__PauliRot(const char *pauliStr, double theta, const Modifiers *modifiers,
+                               bool cond, int64_t numQubits, ...)
+{
+    RT_ASSERT(numQubits >= 0);
+
+    // convert chat* to string
+    std::string pauliStr_(pauliStr);
+    RT_FAIL_IF(static_cast<size_t>(numQubits) != pauliStr_.size(),
+               "The length of the pauli string must be equal to the number of wires.");
+
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+
+    if (!cond) {
+        return;
+    }
+
+    getQuantumDevicePtr()->NamedOperation("PauliRot", {theta}, wires,
+                                          /* modifiers */ MODIFIERS_ARGS(modifiers), {pauliStr_});
+}
+
 static void _qubitUnitary_impl(MemRefT_CplxT_double_2d *matrix, int64_t numQubits,
                                std::vector<std::complex<double>> &coeffs,
                                std::vector<QubitIdType> &wires, va_list *args)
@@ -1011,6 +1038,41 @@ RESULT *__catalyst__qis__Measure(QUBIT *wire, int32_t postselect)
     return getQuantumDevicePtr()->Measure(reinterpret_cast<QubitIdType>(wire), postselectOpt);
 }
 
+RESULT *__catalyst__qis__PauliMeasure(const char *pauliStr, bool negated, const char *pauliStrAlt,
+                                      bool negatedAlt, bool selectSwitch, int64_t numQubits, ...)
+{
+    RT_ASSERT(numQubits >= 0);
+
+    // convert chat* to string
+    std::string pauliStr_;
+    if (selectSwitch) {
+        RT_FAIL_IF(pauliStr == nullptr, "Invalid (null) pauli string provided.");
+        pauliStr_ = pauliStr;
+    }
+    else {
+        RT_FAIL_IF(pauliStrAlt == nullptr, "Invalid (null) alternative pauli string provided.");
+        pauliStr_ = pauliStrAlt;
+    }
+    RT_FAIL_IF(static_cast<size_t>(numQubits) != pauliStr_.size(),
+               "The length of the pauli string must be equal to the number of wires.");
+
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+
+    RESULT *res = getQuantumDevicePtr()->PauliMeasure(pauliStr_, wires);
+    if ((negated && selectSwitch) || (negatedAlt && !selectSwitch)) {
+        // Can't assume the result is writable, so flip using our constants.
+        res = *res ? __catalyst__rt__result_get_zero() : __catalyst__rt__result_get_one();
+    }
+
+    return res;
+}
+
 double __catalyst__qis__Expval(ObsIdType obsKey) { return getQuantumDevicePtr()->Expval(obsKey); }
 
 double __catalyst__qis__Variance(ObsIdType obsKey) { return getQuantumDevicePtr()->Var(obsKey); }
@@ -1157,6 +1219,40 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
 
     QubitIdType *data = qubit_vector_ptr->data();
     return (int8_t *)&data[idx];
+}
+
+void __catalyst__rt__array_update_element_1d(QirArray *ptr, int64_t idx, QUBIT *qubit)
+{
+    RT_ASSERT(getQuantumDevicePtr() != nullptr);
+    RT_ASSERT(CTX->getMemoryManager() != nullptr);
+    std::vector<QubitIdType> *qubit_vector_ptr = reinterpret_cast<std::vector<QubitIdType> *>(ptr);
+
+    RT_ASSERT(idx >= 0);
+
+    if (static_cast<size_t>(idx) >= qubit_vector_ptr->size()) {
+        std::string error_msg = "The qubit register does not contain the requested wire: ";
+        error_msg += std::to_string(idx);
+        RT_FAIL(error_msg.c_str());
+    }
+
+    QubitIdType *data = qubit_vector_ptr->data();
+    const QubitIdType qubit_id = reinterpret_cast<QubitIdType>(qubit);
+    const QubitIdType current_qubit_id = data[idx];
+
+    // If the ID of the qubit to insert is equal to the ID currently at the requested position in
+    // the register, there is nothing to do, and we return the unmodified array.
+    if (current_qubit_id == qubit_id) {
+        return;
+    }
+
+    // TODO
+    // CAUTION: There is a risk here that we overwrite the ID of an active qubit contained in the
+    // register (one that has not been deallocated). Ideally we should be able to query whether a
+    // qubit is active given its ID, but we do not have a general, device-agnostic way to do this
+    // yet. For NullQubit, for example, we can query its `qubit_manager` object to determine if a
+    // given qubit is active, but not all devices implement a qubit manager.
+    data[idx] = qubit_id;
+    return;
 }
 
 // -------------------------------------------------------------------------- //

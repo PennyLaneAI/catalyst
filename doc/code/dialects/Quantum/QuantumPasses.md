@@ -6,9 +6,9 @@
 
 _Lower adjoint regions containing a single quantum operations._
 
-### `-annotate-function`
+### `-annotate-invalid-gradient-functions`
 
-_Annotate functions that contain a measurement operation._
+_Annotate functions that contain operations invalid for automatic gradient computation._
 
 ### `-convert-quantum-to-llvm`
 
@@ -18,7 +18,7 @@ _Perform a dialect conversion from Quantum to LLVM (QIR)._
 
 _Copy global memrefs before returning from C interface._
 
-### `-disentangle-CNOT`
+### `-disentangle-cnot`
 
 _Replace a CNOT gate with two single qubit gates whenever possible._
 
@@ -28,7 +28,7 @@ _Replace a CNOT gate with two single qubit gates whenever possible._
 -emit-FSM-state-remark : Whether to emit the state analysis result from the simple states propagation FSM onto the gate operations.
 ```
 
-### `-disentangle-SWAP`
+### `-disentangle-swap`
 
 _Replace a SWAP gate with single qubit gates and a shorter SWAPZ gates whenever possible._
 
@@ -54,9 +54,9 @@ _Perform loop boundary optimization to eliminate the redundancy of operations on
 
 _Perform merging of chained rotation gates about the same axis._
 
-### `-remove-chained-self-inverse`
+### `-cancel-inverses`
 
-_Perform removal of chained operations that are self inverses._
+_Perform removal of chained operations that are inverses._
 
 ### `-split-multiple-tapes`
 

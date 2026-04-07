@@ -35,7 +35,10 @@ TEST_CASE("Test the OQDDevice constructor", "[oqd]")
     auto device = OQDDevice("{shots : 100}");
 
     REQUIRE_THROWS_WITH(device.GetNumQubits(), ContainsSubstring("unsupported by device"));
-    REQUIRE_THROWS_WITH(device.Measure(0), ContainsSubstring("unsupported by device"));
+    // Measure returns a false placeholder
+    Result res = device.Measure(0);
+    REQUIRE(res != nullptr);
+    REQUIRE(*res == false);
 }
 
 TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")
@@ -51,7 +54,7 @@ TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")
     CHECK(allocaedQubits[1] == 1);
     CHECK(allocaedQubits[2] == 2);
 
-    device.ReleaseAllQubits();
+    device.ReleaseQubits(allocaedQubits);
     CHECK(device.getIonSpecs() == "");
     CHECK(device.getPhononSpecs().empty());
 

@@ -1,4 +1,4 @@
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023-2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,8 +23,6 @@ def DetensorizeFunctionBoundaryPass : Pass<"detensorize-function-boundary"> {
     let dependentDialects = [
         "tensor::TensorDialect",
     ];
-
-    let constructor = "catalyst::createDetensorizeFunctionBoundaryPass()";
 }
 
 def DetensorizeSCFPass : Pass<"detensorize-scf"> {
@@ -33,8 +31,6 @@ def DetensorizeSCFPass : Pass<"detensorize-scf"> {
     let dependentDialects = [
         "tensor::TensorDialect"
     ];
-
-    let constructor = "catalyst::createDetensorizeSCFPass()";
 }
 
 def ArrayListToMemRefPass : Pass<"convert-arraylist-to-memref"> {
@@ -50,8 +46,6 @@ def ArrayListToMemRefPass : Pass<"convert-arraylist-to-memref"> {
         "mlir::memref::MemRefDialect",
         "mlir::scf::SCFDialect"
     ];
-
-    let constructor = "catalyst::createArrayListToMemRefPass()";
 }
 
 def CatalystConversionPass : Pass<"convert-catalyst-to-llvm"> {
@@ -61,8 +55,6 @@ def CatalystConversionPass : Pass<"convert-catalyst-to-llvm"> {
         "mlir::func::FuncDialect",
         "mlir::LLVM::LLVMDialect",
     ];
-
-    let constructor = "catalyst::createCatalystConversionPass()";
 }
 
 def QnodeToAsyncLoweringPass : Pass<"qnode-to-async-lowering"> {
@@ -73,14 +65,10 @@ def QnodeToAsyncLoweringPass : Pass<"qnode-to-async-lowering"> {
         "mlir::memref::MemRefDialect",
         "bufferization::BufferizationDialect"
     ];
-
-    let constructor = "catalyst::QnodeToAsyncLoweringPass()";
 }
 
 def DisableAssertionPass : Pass<"disable-assertion"> {
     let summary = "Disable all catalyst_assertions.";
-
-    let constructor = "catalyst::createDisableAssertionPass()";
 }
 
 def AddExceptionHandlingPass : Pass<"add-exception-handling"> {
@@ -99,8 +87,6 @@ def AddExceptionHandlingPass : Pass<"add-exception-handling"> {
         "mlir::LLVM::LLVMDialect",
     ];
 
-    let constructor = "catalyst::createAddExceptionHandlingPass()";
-
     let options = [
         Option<
             /*C++ var name=*/"stopAfterStep",
@@ -117,8 +103,6 @@ def AddExceptionHandlingPass : Pass<"add-exception-handling"> {
 
 def GEPInboundsPass : Pass<"gep-inbounds"> {
     let summary = "Mark GEPOp inbounds.";
-
-    let constructor = "catalyst::GEPInboundsPass()";
 }
 
 def MemrefCopyToLinalgCopyPass : Pass<"memrefcpy-to-linalgcpy"> {
@@ -128,8 +112,6 @@ def MemrefCopyToLinalgCopyPass : Pass<"memrefcpy-to-linalgcpy"> {
         "memref::MemRefDialect",
         "linalg::LinalgDialect"
     ];
-
-    let constructor = "catalyst::MemrefCopyToLinalgCopyPass()";
 }
 
 def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"> {
@@ -138,9 +120,6 @@ def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"
     let dependentDialects = [
         "mlir::LLVM::LLVMDialect"
     ];
-
-    let constructor = "catalyst::createRegisterInactiveCallbackPass()";
-
 }
 
 def MemrefToLLVMWithTBAAPass : Pass<"memref-to-llvm-tbaa", "mlir::ModuleOp"> {
@@ -149,14 +128,19 @@ def MemrefToLLVMWithTBAAPass : Pass<"memref-to-llvm-tbaa", "mlir::ModuleOp"> {
   let dependentDialects = [
         "mlir::LLVM::LLVMDialect"
   ];
+}
 
-  let constructor = "::catalyst::createMemrefToLLVMWithTBAAPass()";
+def MarkEntryPointArgsNonWritablePass : Pass<"mark-entry-point-args-non-writable", "mlir::ModuleOp"> {
+    let summary = "Mark entry-point arguments as non-writable for bufferization.";
+
+    let dependentDialects = [
+        "bufferization::BufferizationDialect",
+        "func::FuncDialect"
+    ];
 }
 
 def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
     let summary = "Apply the passes scheduled with the transform dialect.";
-
-    let constructor = "catalyst::createApplyTransformSequencePass()";
 }
 
 def InlineNestedModulePass : Pass<"inline-nested-module"> {
@@ -165,8 +149,6 @@ def InlineNestedModulePass : Pass<"inline-nested-module"> {
     let dependentDialects = [
         "mlir::func::FuncDialect"
     ];
-
-    let constructor = "catalyst::createInlineNestedModulePass()";
 
     let options = [
         Option<
@@ -193,7 +175,7 @@ def InlineNestedModulePass : Pass<"inline-nested-module"> {
 //   * See https://llvm.org/LICENSE.txt for license information.
 //   * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-def BufferDeallocation : Pass<"buffer-deallocation", "func::FuncOp"> {
+def BufferDeallocationPass : Pass<"buffer-deallocation", "func::FuncOp"> {
   let summary = "Adds all required dealloc operations for all allocations in "
                 "the input program";
   let description = [{
@@ -263,7 +245,100 @@ def BufferDeallocation : Pass<"buffer-deallocation", "func::FuncOp"> {
     ```
 
   }];
-  let constructor = "mlir::bufferization::createBufferDeallocationPass()";
+}
+
+def ResourceTrackerPass : Pass<"resource-tracker"> {
+    let summary = "Track and report resource usage.";
+    let description = [{
+        This pass computes comprehensive resource metrics, including gate counts,
+        measurements, qubit allocations, device name, as well as structured classical ops.
+        For operations within the `Quantum`, `PBC`, and `MBQC` dialects,
+        It leverages `ResourceAnalysis` to retrieve cached results and integrates directly
+        with the MLIR Pass Statistics mechanism for reporting.
+
+        Optionally, it can output the results as JSON to stdout for
+        consumption by the PennyLane frontend.
+
+        Usage:
+            quantum-opt input.mlir -resource-tracker -mlir-pass-statistics
+            quantum-opt input.mlir -resource-tracker -resource-tracker-output-json=true
+    }];
+
+    let options = [
+        Option<
+            /*C++ var name=*/"outputJson",
+            /*CLI arg name=*/"output-json",
+            /*type=*/"bool",
+            /*default=*/"false",
+            /*description=*/"Print resource counts as JSON to stdout"
+        >
+    ];
+}
+
+
+def RegisterDecompRuleResourcePass : Pass<"register-decomp-rule-resource"> {
+    let summary = "Compute and register the resources of decomposition rules.";
+    let description = [{
+        This pass uses `ResourceTrackerPass` to compute resource metrics of
+        functions marked with the `target_gate` attribute, effectively
+        filtering for decomposition rules.
+
+        Note: This pass only applies to top level functions in the main module.
+
+        Usage:
+            quantum-opt input.mlir -register-decomp-rule-resource
+
+        Input:
+
+        ```mlir
+        func.func @decomp_rule() attributes {target_gate="CustomGate"}  {
+            %0 = quantum.alloc( 2) : !quantum.reg
+            %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+            %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+            %3 = quantum.custom "Hadamard"() %1 : !quantum.bit
+            %4 = quantum.custom "T"() %3 : !quantum.bit
+            %5 = quantum.custom "S"() %2 : !quantum.bit
+            %6:2 = quantum.custom "CNOT"() %4, %5 : !quantum.bit, !quantum.bit
+            %7 = quantum.insert %0[ 0], %6#0 : !quantum.reg, !quantum.bit
+            %8 = quantum.insert %7[ 1], %6#1 : !quantum.reg, !quantum.bit
+            quantum.dealloc %8 : !quantum.reg
+            return
+        }
+        ```
+
+        Output:
+
+        ```mlir
+        func.func @decomp_rule() attributes {resources = {measurements = {}, num_alloc_qubits = 2 : i64, num_arg_qubits = 0 : i64, num_qubits = 2 : i64, operations = {"CNOT(2)" = 1 : i64, "Hadamard(1)" = 1 : i64, "S(1)" = 1 : i64, "T(1)" = 1 : i64}}, target_gate = "CustomGate"}  {
+            %0 = quantum.alloc( 2) : !quantum.reg
+            %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+            %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+            %3 = quantum.custom "Hadamard"() %1 : !quantum.bit
+            %4 = quantum.custom "T"() %3 : !quantum.bit
+            %5 = quantum.custom "S"() %2 : !quantum.bit
+            %6:2 = quantum.custom "CNOT"() %4, %5 : !quantum.bit, !quantum.bit
+            %7 = quantum.insert %0[ 0], %6#0 : !quantum.reg, !quantum.bit
+            %8 = quantum.insert %7[ 1], %6#1 : !quantum.reg, !quantum.bit
+            quantum.dealloc %8 : !quantum.reg
+            return
+        }
+        ```
+    }];
+}
+
+def EmptyPass : Pass<"empty"> {
+    let summary = "Empty pass that does nothing.";
+
+    let options = [
+        Option<
+            /*C++ var name=*/"key",
+            /*CLI arg name=*/"key",
+            /*type=*/"std::string",
+            /*default=*/"\"\"",
+            /*description=*/
+            "Useful for storing metadata about the pass for inspectability."
+        >
+    ];
 }
 
 #endif // CATALYST_PASSES

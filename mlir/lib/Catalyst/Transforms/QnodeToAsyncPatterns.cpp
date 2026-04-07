@@ -56,11 +56,11 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
         // TODO: We could just remove the call altogether.
         // But we should make sure that there are no side effects in the call.
         // One possible side effect is printing to stdout.
-        rewriter.create<async::AwaitOp>(op.getLoc(), executeOp.getResults().front());
+        async::AwaitOp::create(rewriter, op.getLoc(), executeOp.getResults().front());
 
         for (auto refCountedValue : executeOp.getResults()) {
-            rewriter.create<async::RuntimeDropRefOp>(op.getLoc(), refCountedValue,
-                                                     rewriter.getI64IntegerAttr(1));
+            async::RuntimeDropRefOp::create(rewriter, op.getLoc(), refCountedValue,
+                                            rewriter.getI64IntegerAttr(1));
         }
     }
 
@@ -149,7 +149,7 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
                 // Now we can safely modify users
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
                 rewriter.setInsertionPoint(user);
-                auto awaitOp = rewriter.create<async::AwaitOp>(op.getLoc(), newVal);
+                auto awaitOp = async::AwaitOp::create(rewriter, op.getLoc(), newVal);
                 auto awaitVal = awaitOp.getResults();
                 rewriter.replaceUsesWithIf(oldVal, awaitVal, [&](OpOperand &use) {
                     // TODO:
@@ -192,14 +192,14 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
 
         rewriter.modifyOpInPlace(op, [&] { op->setAttr("transformed", rewriter.getUnitAttr()); });
         IRMapping map;
-        auto executeOp =
-            rewriter.create<async::ExecuteOp>(op.getLoc(), retTy, dependencies, operands, noopExec);
+        auto executeOp = async::ExecuteOp::create(rewriter, op.getLoc(), retTy, dependencies,
+                                                  operands, noopExec);
         {
             PatternRewriter::InsertionGuard insertGuard(rewriter);
             rewriter.setInsertionPoint(executeOp.getBody(), executeOp.getBody()->end());
             Operation *cloneOp = op->clone(map);
             rewriter.insert(cloneOp);
-            rewriter.create<async::YieldOp>(op.getLoc(), cloneOp->getResults());
+            async::YieldOp::create(rewriter, op.getLoc(), cloneOp->getResults());
         }
 
         insertDropRefOps(op, executeOp, rewriter);

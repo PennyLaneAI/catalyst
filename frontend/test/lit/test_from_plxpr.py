@@ -18,6 +18,8 @@
 
 """Lit tests for the PLxPR to JAXPR with quantum primitives pipeline"""
 
+from functools import partial
+
 import pennylane as qml
 
 
@@ -45,7 +47,7 @@ def test_conditional_capture():
 
     print(main.mlir)
 
-    qml.capture.enable()
+    qml.capture.disable()
 
 
 test_conditional_capture()
@@ -69,7 +71,7 @@ def test_loop_capture():
         def loop_fn(_):
             qml.Hadamard(0)
 
-        loop_fn()
+        loop_fn()  # pylint: disable=no-value-for-parameter
 
         return qml.state()
 
@@ -136,10 +138,13 @@ def test_dynamic_wire():
         # CHECK-NEXT: [[QBIT:%.+]] = quantum.extract [[QREG]][[[SCALAR]]]
         # CHECK-NEXT: [[QBIT_1:%.+]] = quantum.custom "PauliY"() [[QBIT]]
         # CHECK-NEXT: [[QBIT_2:%.+]] = quantum.custom "PauliZ"() [[QBIT_1]]
+        # CHECK-NEXT: [[QBIT_3:%.+]] = quantum.custom "PauliX"() [[QBIT_2]]
+        # CHECK: {{%.+}} = quantum.pcphase({{%.+}}, {{%.+}}) [[QBIT_3]]
         qml.X(0)
         qml.Y(w1)
         qml.Z(w1)
-        qml.X(0)
+        qml.X(w1)
+        qml.PCPhase(0.5, wires=w1, dim=1)
         return qml.state()
 
     print(circuit.mlir)
@@ -338,3 +343,117 @@ def test_multi_qubit_gates_on_different_dynamic_wires():
 
 
 test_multi_qubit_gates_on_different_dynamic_wires()
+
+
+def test_pass_application():
+    """Application of pass decorators."""
+
+    dev = qml.device("null.qubit", wires=1)
+
+    qml.capture.enable()
+
+    @qml.qjit(target="mlir")
+    @qml.transforms.cancel_inverses
+    @qml.transforms.merge_rotations
+    @qml.qnode(dev)
+    def circuit():
+        return qml.probs()
+
+    # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
+    # CHECK-NEXT: transform.apply_registered_pass "cancel-inverses" to [[first_pass]]
+
+    print(circuit.mlir)
+    qml.capture.disable()
+
+
+test_pass_application()
+
+
+def test_pass_decomposition():
+    """Application of pass decorator with decomposition."""
+
+    dev = qml.device("null.qubit", wires=1)
+
+    qml.capture.enable()
+    qml.decomposition.enable_graph()
+
+    @qml.qjit(target="mlir")
+    @qml.transforms.cancel_inverses
+    @qml.transforms.merge_rotations
+    @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
+    @qml.qnode(dev)
+    def circuit1():
+        return qml.probs()
+
+    # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "decompose-lowering"
+    # CHECK-NEXT: [[second_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
+    # CHECK-NEXT: transform.apply_registered_pass "cancel-inverses" to [[second_pass]]
+
+    print(circuit1.mlir)
+
+    @qml.qjit(target="mlir")
+    @qml.transforms.cancel_inverses
+    @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
+    @qml.transforms.merge_rotations
+    @qml.qnode(dev)
+    def circuit2():
+        return qml.probs()
+
+    # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
+    # CHECK-NEXT: [[second_pass:%.+]] = transform.apply_registered_pass "decompose-lowering"
+    # CHECK-NEXT: transform.apply_registered_pass "cancel-inverses" to [[second_pass]]
+
+    print(circuit2.mlir)
+
+    @qml.qjit(target="mlir")
+    @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
+    @qml.transforms.cancel_inverses
+    @qml.transforms.merge_rotations
+    @qml.qnode(dev)
+    def circuit3():
+        return qml.probs()
+
+    # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
+    # CHECK-NEXT: [[second_pass:%.+]] = transform.apply_registered_pass "cancel-inverses"
+    # CHECK-NEXT: transform.apply_registered_pass "decompose-lowering" to [[second_pass]]
+
+    print(circuit3.mlir)
+
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
+
+
+test_pass_decomposition()
+
+
+def test_two_qnodes_with_different_passes_in_one_workflow():
+    """Two qnodes with different passes in one workflow."""
+
+    dev = qml.device("null.qubit", wires=1)
+
+    qml.capture.enable()
+
+    @qml.qjit(target="mlir")
+    def workflow():
+        @qml.transforms.merge_rotations
+        @qml.qnode(dev)
+        def circuit1():
+            return qml.probs()
+
+        @qml.transforms.cancel_inverses
+        @qml.qnode(dev)
+        def circuit2():
+            return qml.probs()
+
+        return circuit1() + circuit2()
+
+    # CHECK: module @module_circuit1 {
+    # CHECK: transform.apply_registered_pass "merge-rotations"
+    # CHECK: module @module_circuit2 {
+    # CHECK: transform.apply_registered_pass "cancel-inverses"
+
+    print(workflow.mlir)
+    qml.capture.disable()
+
+
+test_two_qnodes_with_different_passes_in_one_workflow()

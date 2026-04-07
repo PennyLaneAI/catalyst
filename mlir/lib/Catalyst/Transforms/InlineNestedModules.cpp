@@ -65,12 +65,14 @@
 
 #include <deque>
 
+#include "llvm/ADT/SmallSet.h"
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystOps.h"
-#include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
 #include "Gradient/IR/GradientInterfaces.h"
 #include "Mitigation/IR/MitigationOps.h"
@@ -153,6 +155,8 @@ SymbolRefAttr getFullyQualifiedNameUntil(SymbolOpInterface symbol, const Operati
 }
 
 static constexpr llvm::StringRef fullyQualifiedNameAttr = "catalyst.fully_qualified_name";
+static constexpr llvm::StringRef quantumNodeAttr = "quantum.node";
+static constexpr llvm::StringRef legacyQNodeAttr = "qnode";
 
 struct AnnotateWithFullyQualifiedName : public OpInterfaceRewritePattern<SymbolOpInterface> {
     using OpInterfaceRewritePattern<SymbolOpInterface>::OpInterfaceRewritePattern;
@@ -183,14 +187,17 @@ struct AnnotateWithFullyQualifiedName : public OpInterfaceRewritePattern<SymbolO
 
 struct RenameFunctionsPattern : public RewritePattern {
     /// This overload constructs a pattern that matches any operation type.
-    RenameFunctionsPattern(MLIRContext *context, SmallVector<Operation *> *symbolTables)
-        : RewritePattern(MatchAnyOpTypeTag(), 1, context), _symbolTables(symbolTables)
+    RenameFunctionsPattern(MLIRContext *context, SmallVector<Operation *> *symbolTables,
+                           llvm::SmallSet<StringRef, 8> *externalFuncDeclNames)
+        : RewritePattern(MatchAnyOpTypeTag(), 1, context), _symbolTables(symbolTables),
+          _externalFuncDeclNames(externalFuncDeclNames)
     {
     }
 
     LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) const override;
 
     SmallVector<Operation *> *_symbolTables;
+    llvm::SmallSet<StringRef, 8> *_externalFuncDeclNames;
 };
 
 static constexpr llvm::StringRef hasBeenRenamedAttrName = "catalyst.unique_names";
@@ -228,8 +235,21 @@ LogicalResult RenameFunctionsPattern::matchAndRewrite(Operation *child,
     for (auto &region : child->getRegions()) {
         for (auto &block : region.getBlocks()) {
             for (auto &op : block) {
-                if (!isa<SymbolOpInterface>(op))
+                if (!isa<SymbolOpInterface>(op)) {
                     continue;
+                }
+
+                // We should not rename external function declarations, as they can be
+                // names required by other APIs.
+                // We record these external func decls during the rename pattern.
+                // Then during the actual inlining stage, only the first occurrence of the
+                // per-module func decls of these external decls should be inlined.
+                if (auto f = dyn_cast<func::FuncOp>(op)) {
+                    if (f.isExternal()) {
+                        _externalFuncDeclNames->insert(f.getName());
+                        continue;
+                    }
+                }
 
                 if (failed(childSymTab.renameToUnique(&op, raw_tables))) {
                     // TODO: Check for error in one of the tests.
@@ -249,7 +269,23 @@ LogicalResult RenameFunctionsPattern::matchAndRewrite(Operation *child,
 
 struct InlineNestedModule : public RewritePattern {
     /// This overload constructs a pattern that matches any operation type.
-    InlineNestedModule(MLIRContext *context) : RewritePattern(MatchAnyOpTypeTag(), 1, context) {}
+    InlineNestedModule(MLIRContext *context,
+                       const llvm::SmallSet<StringRef, 8> &externalFuncDeclNames)
+        : RewritePattern(MatchAnyOpTypeTag(), 1, context),
+          _externalFuncDeclNames(externalFuncDeclNames)
+    {
+    }
+
+    const llvm::SmallSet<StringRef, 8> &_externalFuncDeclNames;
+
+    // Note: mlir expects pattern objects to be const.
+    // In other words, repeated applications of a rewrite pattern should not have dependency on each
+    // other.
+    // This --inline-nested-module pass is breaking this assumption.
+    //
+    // TODO: refactor this pass to not use the pattern rewriter, but just raw logic in a
+    // `runOnOperation()`
+    mutable llvm::SmallSet<StringRef, 8> alreadyInlinedFuncDeclNames;
 
     LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) const override
     {
@@ -261,6 +297,31 @@ struct InlineNestedModule : public RewritePattern {
         }
 
         auto parent = op->getParentOp();
+        assert(parent->hasTrait<OpTrait::SymbolTable>() &&
+               "the direct parent of a qnode module must be a module op");
+
+        // Look for the func decls in the current qnode module
+        // If it is a recorded external func decl, erase it if it already has been inlined.
+        SmallVector<Operation *> _erasureWorklist;
+        for (auto &region : op->getRegions()) {
+            auto funcOps = region.getOps<func::FuncOp>();
+            for (auto f : funcOps) {
+                StringRef funcName = f.getName();
+                if (f.isExternal() && _externalFuncDeclNames.contains(funcName)) {
+                    if (alreadyInlinedFuncDeclNames.contains(funcName)) {
+                        _erasureWorklist.push_back(f);
+                    }
+                    else {
+                        alreadyInlinedFuncDeclNames.insert(funcName);
+                    }
+                }
+            }
+        }
+
+        for (auto _op : _erasureWorklist) {
+            rewriter.eraseOp(_op);
+        }
+
         // Can't generalize getting a region other than the zero-th one.
         rewriter.inlineRegionBefore(op->getRegion(0), &parent->getRegion(0).back());
         Block *inlinedBlock = &parent->getRegion(0).front();
@@ -355,11 +416,22 @@ struct CleanupPattern : public RewritePattern {
 
     LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) const override
     {
-        auto hasQualifiedName = op->hasAttr(fullyQualifiedNameAttr);
-        if (!hasQualifiedName) {
+        bool hasQualifiedName = op->hasAttr(fullyQualifiedNameAttr);
+        bool hasQNodeAttr = op->hasAttr(quantumNodeAttr);
+        if (!hasQualifiedName && !hasQNodeAttr) {
             return failure();
         }
-        rewriter.modifyOpInPlace(op, [&] { op->removeAttr(fullyQualifiedNameAttr); });
+
+        rewriter.modifyOpInPlace(op, [&] {
+            if (hasQNodeAttr) {
+                op->removeAttr(quantumNodeAttr);
+                op->setAttr(legacyQNodeAttr, UnitAttr::get(op->getContext()));
+            }
+            if (hasQualifiedName) {
+                op->removeAttr(fullyQualifiedNameAttr);
+            }
+        });
+
         return success();
     }
 };
@@ -426,7 +498,8 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
             return WalkResult::skip();
         });
 
-        renameFunctions.add<RenameFunctionsPattern>(context, &symbolTables);
+        llvm::SmallSet<StringRef, 8> externalFuncDeclNames;
+        renameFunctions.add<RenameFunctionsPattern>(context, &symbolTables, &externalFuncDeclNames);
 
         bool run = _stopAfterStep >= 2 || _stopAfterStep == 0;
         if (run && failed(applyPatternsGreedily(symbolTable, std::move(renameFunctions), config))) {
@@ -434,7 +507,7 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         }
 
         RewritePatternSet inlineNested(context);
-        inlineNested.add<InlineNestedModule>(context);
+        inlineNested.add<InlineNestedModule>(context, externalFuncDeclNames);
         run = _stopAfterStep >= 3 || _stopAfterStep == 0;
         if (run && failed(applyPatternsGreedily(symbolTable, std::move(inlineNested), config))) {
             signalPassFailure();
@@ -475,8 +548,8 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
     }
 };
 
-#define GEN_PASS_DEF_INLINENESTEDMODULEPASS
 #define GEN_PASS_DECL_INLINENESTEDMODULEPASS
+#define GEN_PASS_DEF_INLINENESTEDMODULEPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 struct InlineNestedModulePass : impl::InlineNestedModulePassBase<InlineNestedModulePass> {
@@ -501,10 +574,5 @@ struct InlineNestedModulePass : impl::InlineNestedModulePassBase<InlineNestedMod
         }
     }
 };
-
-std::unique_ptr<Pass> createInlineNestedModulePass()
-{
-    return std::make_unique<InlineNestedModulePass>();
-}
 
 } // namespace catalyst

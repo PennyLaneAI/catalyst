@@ -47,10 +47,10 @@ def flush_peephole_opted_mlir_to_iostream(func):
     The QJIT compiler does not offer a direct interface to access an intermediate mlir in the pipeline.
     The `QJIT.mlir` is the mlir before any passes are run, i.e. the "0_<qnode_name>.mlir".
     Since the QUANTUM_COMPILATION_PASS is located in the middle of the pipeline, we need
-    to retrieve it with keep_intermediate=True and manually access the "2_QuantumCompilationPass.mlir".
+    to retrieve it with keep_intermediate=True and manually access the "2_QuantumCompilationStage.mlir".
     Then we delete the kept intermediates to avoid pollution of the workspace
     """
-    print(get_compilation_stage(func, "QuantumCompilationPass"))
+    print(get_compilation_stage(func, "QuantumCompilationStage"))
     shutil.rmtree(func.__name__)
 
 

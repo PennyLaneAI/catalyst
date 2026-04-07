@@ -33,7 +33,7 @@ from functools import partial
 from io import TextIOWrapper
 from operator import is_not
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, Iterable, List, Literal, Optional, Set, Tuple, Union
 
 from catalyst.utils.exceptions import CompileError
 
@@ -46,7 +46,8 @@ class KeepIntermediateLevel(enum.IntEnum):
 
     NONE = 0  # No intermediate files are kept.
     PIPELINE = 1  # Intermediate files are saved after each pipeline.
-    PASS = 2  # Intermediate files are saved after each pass.
+    CHANGED = 2  # Intermediate files are saved after each pass (only if changed).
+    PASS = 3  # Intermediate files are saved after each pass, even if unchanged.
 
 
 def _parse_keep_intermediate(
@@ -54,18 +55,20 @@ def _parse_keep_intermediate(
 ) -> KeepIntermediateLevel:
     """Parse the keep_intermediate value into a KeepIntermediateLevel enum."""
     match level:
-        case 0 | 1 | 2:
+        case 0 | 1 | 2 | 3:
             return KeepIntermediateLevel(level)
         case "none" | None:
             return KeepIntermediateLevel.NONE
         case "pipeline":
             return KeepIntermediateLevel.PIPELINE
+        case "changed":
+            return KeepIntermediateLevel.CHANGED
         case "pass":
             return KeepIntermediateLevel.PASS
         case _:
             raise ValueError(
                 f"Invalid value for keep_intermediate: {level}. "
-                "Valid values are True, False, 0, 1, 2, 'none', 'pipeline', 'pass'."
+                "Valid values are True, False, 0, 1, 2, 3, 'none', 'pipeline', 'changed', 'pass'."
             )
 
 
@@ -75,46 +78,63 @@ class CompileOptions:
     """Generic compilation options, for which reasonable default values exist.
 
     Args:
-        verbose (Optional[bool]): flag indicating whether to enable verbose output.
-            Default is ``False``
-        logfile (Optional[TextIOWrapper]): the logfile to write output to.
-            Default is ``sys.stderr``
+        verbose (Optional[bool]): Flag indicating whether to enable verbose output.
+            Default is ``False``.
+        logfile (Optional[TextIOWrapper]): The logfile to write output to.
+            Default is ``sys.stderr``.
         keep_intermediate (Optional[Union[str, int, bool]]): Level controlling intermediate file
-        generation.
+            generation.
+
             - ``False`` or ``0`` or ``"none"`` (default): No intermediate files are kept.
             - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
-            - ``2`` or ``"pass"``: Intermediate files are saved after each pass.
+            - ``2`` or ``"changed"``: Intermediate files are saved after each pass only if changed.
+            - ``3`` or ``"pass"``: Intermediate files are saved after each pass, even if unchanged.
+        use_nameloc (Optional[bool]): If ``True``, add function parameter names to the IR as name
+            locations.
         pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
             tuple corresponds to the name of a pipeline. The second entry of the tuple corresponds
             to a list of MLIR passes.
-        autograph (Optional[bool]): flag indicating whether experimental autograph support is to
+        autograph (Optional[bool]): Flag indicating whether experimental autograph support is to
             be enabled.
         autograph_include (Optional[Iterable[str]]): A list of (sub)modules to be allow-listed
-        for autograph conversion.
-        async_qnodes (Optional[bool]): flag indicating whether experimental asynchronous execution
+            for autograph conversion.
+        async_qnodes (Optional[bool]): Flag indicating whether experimental asynchronous execution
             of QNodes support is to be enabled.
-        lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
+        lower_to_llvm (Optional[bool]): Flag indicating whether to attempt the LLVM lowering after
             the main compilation pipeline is complete. Default is ``True``.
-        static_argnums (Optional[Union[int, Iterable[int]]]): indices of static arguments.
+        static_argnums (Optional[Union[int, Iterable[int]]]): Indices of static arguments.
             Default is ``None``.
-        static_argnames (Optional[Union[str, Iterable[str]]]): names of static arguments.
+        static_argnames (Optional[Union[str, Iterable[str]]]): Names of static arguments.
             Default is ``None``.
-        abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
-        disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
+        abstracted_axes (Optional[Any]): Store the abstracted_axes value. Default is ``None``.
+        disable_assertions (Optional[bool]): Disable all assertions. Default is ``False``.
         seed (Optional[int]) : the seed for random operations in a qjit call.
-            Default is None.
+            Default is ``None``.
         circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
             A dictionary that specifies the quantum circuit transformation pass pipeline order,
             and optionally arguments for each pass in the pipeline.
-            Default is None.
+            Default is ``None``.
         pass_plugins (Optional[Iterable[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[Iterable[Path]]): List of paths to dialect plugins.
+        capture (Optional[Union[str, bool]]): Controls whether to use PennyLane program capture.
+
+            - ``"global"`` (default): Defer to ``qml.capture.enabled()``
+            - ``True``: Force program capture on, regardless of global setting
+            - ``False``: Force program capture off (use old frontend)
+        skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
+            If ``True``, transforms used to preprocess and validate the user program before
+            executing on a quantum backend will not be used, and the user is expected to ensure
+            the validity of the program themselves. If ``capture=False``, or ``capture="global"``
+            and ``qml.capture.enabled() == False``, this argument will be ignored. ``False``
+            by default.
     """
 
     verbose: Optional[bool] = False
     logfile: Optional[TextIOWrapper] = sys.stderr
     target: Optional[str] = "binary"
+    link: Optional[bool] = True
     keep_intermediate: Optional[Union[str, int, bool, KeepIntermediateLevel]] = False
+    use_nameloc: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
     autograph_include: Optional[Iterable[str]] = ()
@@ -129,6 +149,8 @@ class CompileOptions:
     circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
     pass_plugins: Optional[Set[Path]] = None
     dialect_plugins: Optional[Set[Path]] = None
+    capture: bool | Literal["global"] = "global"
+    skip_preprocess: bool = False
 
     def __post_init__(self):
         # Convert keep_intermediate to Enum
@@ -136,21 +158,17 @@ class CompileOptions:
 
         # Check that async runs must not be seeded
         if self.async_qnodes and self.seed is not None:
-            raise CompileError(
-                """
+            raise CompileError("""
                 Seeding has no effect on asynchronous QNodes,
                 as the execution order of parallel runs is not guaranteed.
                 As such, seeding an asynchronous run is not supported.
-                """
-            )
+                """)
 
         # Check that seed is 32-bit unsigned int
         if (self.seed is not None) and (self.seed < 0 or self.seed > 2**32 - 1):
-            raise ValueError(
-                """
+            raise ValueError("""
                 Seed must be an unsigned 32-bit integer!
-                """
-            )
+                """)
 
         # Make the format of static_argnums easier to handle.
         static_argnums = self.static_argnums
@@ -170,6 +188,14 @@ class CompileOptions:
             self.dialect_plugins = set()
         else:
             self.dialect_plugins = set(self.dialect_plugins)
+
+        # Validate capture parameter
+        valid_capture_values = ("global", True, False)
+        if self.capture not in valid_capture_values:
+            raise ValueError(
+                f"Invalid value for capture: {self.capture!r}. "
+                f"Valid values are: 'global', True, False."
+            )
 
     def __deepcopy__(self, memo):
         """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
@@ -192,17 +218,18 @@ class CompileOptions:
         """Returns all stages in order for compilation"""
         # Dictionaries in python are ordered
         stages = {}
-        stages["EnforceRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(self)
-        stages["HLOLoweringPass"] = get_hlo_lowering_stage(self)
-        stages["QuantumCompilationPass"] = get_quantum_compilation_stage(self)
-        stages["BufferizationPass"] = get_bufferization_stage(self)
-        stages["MLIRToLLVMDialect"] = get_convert_to_llvm_stage(self)
+        stages["QuantumCompilationStage"] = get_quantum_compilation_stage(self)
+        stages["HLOLoweringStage"] = get_hlo_lowering_stage(self)
+        stages["GradientLoweringStage"] = get_gradient_lowering_stage(self)
+        stages["BufferizationStage"] = get_bufferization_stage(self)
+        stages["MLIRToLLVMDialectConversion"] = get_convert_to_llvm_stage(self)
         return list(stages.items())
 
 
-def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
-    """Returns the list of passes in the enforce runtime invariant stage."""
-    enforce_runtime_invariants = [
+def get_quantum_compilation_stage(_options: CompileOptions) -> List[str]:
+    """Returns the list of passes that performs quantum compilation"""
+
+    user_transform_passes = [
         # We want the invariant that transforms that generate multiple
         # tapes will generate multiple qnodes. One for each tape.
         # Split multiple tapes enforces that invariant.
@@ -218,8 +245,13 @@ def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
         # But qnodes targeting other backends may choose to lower
         # this into something else.
         "inline-nested-module",
+        "lower-mitigation",
+        "adjoint-lowering",
+        # TODO: We can remove this pass below once PBC has its own pipeline.
+        "lower-pbc-init-ops",
+        "disable-assertion" if _options.disable_assertions else None,
     ]
-    return enforce_runtime_invariants
+    return list(filter(partial(is_not, None), user_transform_passes))
 
 
 def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
@@ -246,17 +278,14 @@ def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
     return hlo_lowering
 
 
-def get_quantum_compilation_stage(options: CompileOptions) -> List[str]:
-    """Returns the list of passes that performs quantum transformations"""
+def get_gradient_lowering_stage(_options: CompileOptions) -> List[str]:
+    """Returns the list of passes that performs gradient lowering"""
 
-    quantum_compilation = [
-        "annotate-function",
-        "lower-mitigation",
+    gradient_lowering = [
+        "annotate-invalid-gradient-functions",
         "lower-gradients",
-        "adjoint-lowering",
-        "disable-assertion" if options.disable_assertions else None,
     ]
-    return list(filter(partial(is_not, None), quantum_compilation))
+    return gradient_lowering
 
 
 def get_bufferization_stage(options: CompileOptions) -> List[str]:
@@ -265,21 +294,20 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
     bufferization_options = """bufferize-function-boundaries
         allow-return-allocs-from-loops
         function-boundary-type-conversion=identity-layout-map
-        unknown-type-conversion=identity-layout-map""".replace(
-        "\n", " "
-    )
+        unknown-type-conversion=identity-layout-map""".replace("\n", " ")
     if options.async_qnodes:
         bufferization_options += " copy-before-write"
 
     bufferization = [
-        "inline",
         "convert-tensor-to-linalg",  # tensor.pad
         "convert-elementwise-to-linalg",  # Must be run before --one-shot-bufferize
         "gradient-preprocess",
-        "eliminate-empty-tensors",
         # Keep eliminate-empty-tensors commented out until benchmarks use more structure
         # and produce functions of reasonable size. Otherwise, eliminate-empty-tensors
         # will consume a significant amount of compile time along with one-shot-bufferize.
+        # "eliminate-empty-tensors",
+        # This pass is needed to avoid aliasing of the input buffer with the output buffer.
+        "mark-entry-point-args-non-writable",
         ####################
         "one-shot-bufferize{" + bufferization_options + "}",
         ####################
@@ -288,7 +316,9 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
-        "func.func(promote-buffers-to-stack)",
+        # TODO: investigate re-adding this after new buffer dealloc pipeline
+        #       removed due to high stack memory use in nested structures
+        # "func.func(promote-buffers-to-stack)",
         # TODO: migrate to new buffer deallocation "buffer-deallocation-pipeline"
         "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",
@@ -334,6 +364,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
         "finalize-memref-to-llvm{use-generic-functions}",
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",
+        "convert-pbc-to-llvm",  # TODO: Remove this once PBC has its own pipeline
         "convert-quantum-to-llvm",
         # There should be no identical code folding
         # (`mergeIdenticalBlocks` in the MLIR source code)

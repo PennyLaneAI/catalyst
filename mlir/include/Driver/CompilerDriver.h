@@ -19,11 +19,12 @@
 #include <unordered_map>
 #include <vector>
 
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/raw_ostream.h"
+
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/raw_ostream.h"
 
 #include "Driver/Pipelines.h"
 
@@ -35,7 +36,7 @@ namespace driver {
 // low-level messages, we might want to hide these.
 enum class Verbosity { Silent = 0, Urgent = 1, Debug = 2, All = 3 };
 
-enum SaveTemps { None, AfterPipeline, AfterPass };
+enum SaveTemps { None, AfterPipeline, AfterPassChanged, AfterPass };
 
 enum Action { OPT, Translate, LLC, All };
 
@@ -59,8 +60,12 @@ struct CompilerOptions {
     mlir::StringRef moduleName;
     /// The stream to output any error messages from MLIR/LLVM passes and translation.
     llvm::raw_ostream &diagnosticStream;
-    /// If specified, the driver will output the module after each pipeline or each pass.
+    /// If specified, the driver will output the IR after each pipeline or each pass.
     SaveTemps keepIntermediate;
+    /// If true, the compiler will dump the module scope when saving intermediate files.
+    bool dumpModuleScope;
+    /// Print SSA IDs using their name location, if provided, as prefix.
+    bool useNameLocAsPrefix;
     /// If true, the llvm.coroutine will be lowered.
     bool asyncQnodes;
     /// Sets the verbosity level to use when printing messages.
@@ -74,6 +79,8 @@ struct CompilerOptions {
     Action loweringAction;
     /// If true, the compiler will dump the pass pipeline that will be run.
     bool dumpPassPipeline;
+    /// If true, the compiler will write bytecode rather than text.
+    bool shouldEmitBytecode;
 
     /// Get the destination of the object file at the end of compilation.
     std::string getObjectFile() const
@@ -89,16 +96,35 @@ struct CompilerOutput {
     std::string outIR;
     std::string diagnosticMessages;
     PipelineOutputs pipelineOutputs;
-    size_t pipelineCounter = 0;
+    size_t globalPipelineCounter = 0; // Counter for root-level pipeline summary files
+    size_t passCounter = 0;           // Counter for passes within a pipeline folder
+    std::string currentStage = ".";   // Current compilation stage subdirectory
     /// if the compiler reach the pass specified by startAfterPass.
     bool isCheckpointFound;
 
-    // Gets the next pipeline dump file name, prefixed with number.
-    std::string nextPipelineDumpFilename(std::string pipelineName, std::string ext = ".mlir")
+    // Gets the next pass dump file name within a pipeline folder
+    std::string nextPassDumpFilename(std::string pipelineName, std::string ext = ".mlir")
     {
-        return std::filesystem::path(std::to_string(this->pipelineCounter++) + "_" + pipelineName)
+        return std::filesystem::path(currentStage) /
+               std::filesystem::path(std::to_string(this->passCounter++) + "_" + pipelineName)
+                   .replace_extension(ext);
+    };
+
+    // Gets the root-level pipeline summary file name
+    std::string nextPipelineSummaryFilename(std::string pipelineName, std::string ext = ".mlir")
+    {
+        return std::filesystem::path(std::to_string(this->globalPipelineCounter) + "_After" +
+                                     pipelineName)
             .replace_extension(ext);
     };
+
+    // Set the current compilation stage for organizing output files
+    void setStage(const std::string &stageName)
+    {
+        ++globalPipelineCounter;
+        currentStage = std::to_string(globalPipelineCounter) + "_" + stageName;
+        passCounter = 1;
+    }
 };
 
 }; // namespace driver
@@ -112,7 +138,8 @@ mlir::LogicalResult QuantumDriverMain(const catalyst::driver::CompilerOptions &o
 int QuantumDriverMainFromCL(int argc, char **argv);
 int QuantumDriverMainFromArgs(const std::string &source, const std::string &workspace,
                               const std::string &moduleName, bool keepIntermediate,
-                              bool asyncQNodes, bool verbose, bool lowerToLLVM,
+                              bool useNamelocAsPrefix, bool asyncQNodes, bool verbose,
+                              bool lowerToLLVM,
                               const std::vector<catalyst::driver::Pipeline> &passPipelines,
                               const std::string &checkpointStage,
                               catalyst::driver::CompilerOutput &output);

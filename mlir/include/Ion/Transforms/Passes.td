@@ -40,8 +40,6 @@ def GatesToPulsesPass : Pass<"gates-to-pulses"> {
         "ion::IonDialect",
         "scf::SCFDialect"
     ];
-
-    let constructor = "catalyst::createGatesToPulsesPass()";
 }
 
 def IonConversionPass : Pass<"convert-ion-to-llvm"> {
@@ -52,8 +50,30 @@ def IonConversionPass : Pass<"convert-ion-to-llvm"> {
        "mlir::LLVM::LLVMDialect",
        "catalyst::quantum::QuantumDialect",
     ];
+}
 
-    let constructor = "catalyst::createIonConversionPass()";
+def IonToRTIOPass : Pass<"convert-ion-to-rtio", "mlir::ModuleOp"> {
+    let summary = "Convert Ion dialect operations to RTIO dialect";
+
+    let dependentDialects = [
+        "rtio::RTIODialect",
+        "arith::ArithDialect",
+        "func::FuncDialect",
+        "memref::MemRefDialect",
+        "scf::SCFDialect",
+        "quantum::QuantumDialect",
+        "ion::IonDialect",
+        "linalg::LinalgDialect",
+    ];
+
+    let options = [
+        Option<"kernelName", "kernel-name",
+               "std::string", /*default=*/"\"__kernel__\"",
+               "Name of the generated kernel function">,
+        Option<"deviceDb", "device_db",
+               "std::string", /*default=*/"\"\"",
+               "Path to the device database JSON file">,
+    ];
 }
 
 #endif // ION_PASSES

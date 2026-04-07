@@ -14,21 +14,17 @@
 
 """Unit test module for catalyst/device/decomposition.py"""
 
-import os
-import pathlib
 import platform
 
 import numpy as np
 import pennylane as qml
 import pytest
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
+from utils import CONFIG_CUSTOM_DEVICE
 
 from catalyst import CompileError, ctrl, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device.decomposition import catalyst_decomposer
-
-TEST_PATH = os.path.dirname(__file__)
-CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../../custom_device/custom_device.toml")
 
 
 class TestGateAliases:
@@ -124,18 +120,14 @@ class TestControlledDecomposition:
         dev = qml.device(backend, wires=4)
 
         class OpWithNoMatrix(qml.operation.Operation):
-            """Op without a matrix"""
-
-            def matrix(self):
-                """matrix undefined"""
-                raise NotImplementedError()
+            """Op without a matrix or decomp"""
 
         @qml.qnode(dev)
         def f():
             ctrl(OpWithNoMatrix(wires=[0, 1]), control=[2, 3])
             return qml.probs()
 
-        with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported."):
+        with pytest.raises(CompileError, match="not supported with catalyst on this device"):
             qjit(f, target="jaxpr")
 
     def test_no_unitary_support(self):

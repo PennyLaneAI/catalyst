@@ -12,15 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test for custom device integration with Catalyst."""
+
 import platform
 
 import pennylane as qml
 import pytest
-from conftest import CONFIG_CUSTOM_DEVICE
+from utils import CONFIG_CUSTOM_DEVICE
 
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import QJITDevice, extract_backend_info
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
 
 RUNTIME_LIB_PATH = get_lib_path("runtime", "RUNTIME_LIB_DIR")
@@ -182,4 +184,6 @@ def test_error_raised_no_unitary_support_for_matrix_ops():
         CompileError,
         match="The device that specifies to_matrix_ops must support QubitUnitary.",
     ):
-        QJITDevice(CustomDevice(wires=2))
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
+            config = qml.devices.ExecutionConfig()
+            QJITDevice(CustomDevice(wires=2)).preprocess(config)

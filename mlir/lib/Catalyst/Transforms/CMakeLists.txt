@@ -12,15 +12,18 @@ file(GLOB SRC
     DetensorizeSCFPass.cpp
     disable_assertion.cpp
     DisableAssertionPatterns.cpp
+    EmptyPass.cpp
     GEPInboundsPass.cpp
     GEPInboundsPatterns.cpp
     InlineNestedModules.cpp
+    mark_entry_point_args_non_writable.cpp
     MemrefCopyToLinalgCopyPass.cpp
     MemrefCopyToLinalgCopyPatterns.cpp
     qnode_to_async_lowering.cpp
     QnodeToAsyncPatterns.cpp
-    RegisterAllPasses.cpp
     RegisterInactiveCallbackPass.cpp
+    ResourceTrackerPass.cpp
+    RegisterDecompRuleResourcePass.cpp
     SplitMultipleTapes.cpp
     TBAAPatterns.cpp
     TBAATagsPass.cpp
@@ -31,6 +34,7 @@ get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 set(LIBS
     ${dialect_libs}
     ${conversion_libs}
+    catalyst-analysis
 )
 
 set(DEPENDS

@@ -19,12 +19,11 @@ import logging
 import textwrap
 
 import jax
-from jax._src.dispatch import jaxpr_replicas
+from jax._src import core
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
+from jax._src.interpreters.pxla import _jaxpr_replicas as jaxpr_replicas
 from jax._src.sharding_impls import AxisEnv, ReplicaAxisContext
-from jax._src.source_info_util import new_name_stack
-from jax._src.util import wrap_name
 from jax.extend.core import ClosedJaxpr
 from jax.interpreters.mlir import (
     AxisContext,
@@ -46,19 +45,24 @@ from catalyst.utils.patching import Patcher
 
 __all__ = ("jaxpr_to_mlir", "custom_lower_jaxpr_to_module")
 
-from catalyst.jax_extras.patches import _no_clean_up_dead_vars, get_aval2
+from catalyst.jax_extras.patches import (
+    _no_clean_up_dead_vars,
+    get_aval2,
+    patched_multi_broadcast_in_dim,
+)
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
 @debug_logger
-def jaxpr_to_mlir(func_name, jaxpr):
+def jaxpr_to_mlir(jaxpr, func_name, arg_names):
     """Lower a Jaxpr into an MLIR module.
 
     Args:
-        func_name(str): function name
         jaxpr(Jaxpr): Jaxpr code to lower
+        func_name(str): function name
+        arg_names(list[str]): list of argument names
 
     Returns:
         module: the MLIR module corresponding to ``func``
@@ -68,11 +72,11 @@ def jaxpr_to_mlir(func_name, jaxpr):
     with Patcher(
         (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
         (jax._src.core, "clean_up_dead_vars", _no_clean_up_dead_vars),
+        (jax._src.interpreters.mlir, "multi_broadcast_in_dim", patched_multi_broadcast_in_dim),
     ):
         nrep = jaxpr_replicas(jaxpr)
         effects = jax_ordered_effects.filter_in(jaxpr.effects)
         axis_context = ReplicaAxisContext(AxisEnv(nrep, (), ()))
-        name_stack = new_name_stack(wrap_name("ok", "jit"))
         module, context = custom_lower_jaxpr_to_module(
             func_name="jit_" + func_name,
             module_name=func_name,
@@ -80,7 +84,7 @@ def jaxpr_to_mlir(func_name, jaxpr):
             effects=effects,
             platform="cpu",
             axis_context=axis_context,
-            name_stack=name_stack,
+            arg_names=arg_names,
         )
 
     return module, context
@@ -95,12 +99,12 @@ def custom_lower_jaxpr_to_module(
     effects,
     platform: str,
     axis_context: AxisContext,
-    name_stack,
     replicated_args=None,
+    arg_names=None,
     arg_shardings=None,
     result_shardings=None,
 ):
-    """Lowers a top-level jaxpr to an MHLO module.
+    """Lowers a top-level jaxpr to an MLIR module.
 
     Handles the quirks of the argument/return value passing conventions of the
     runtime.
@@ -142,26 +146,41 @@ def custom_lower_jaxpr_to_module(
         # XLA computation preserves the module name.
         module_name = _module_name_regex.sub("_", module_name)
         ctx.module.operation.attributes["sym_name"] = ir.StringAttr.get(module_name)
+
+        const_args = core.jaxpr_const_args(jaxpr.jaxpr)
+        const_arg_avals = [core.shaped_abstractify(c) for c in const_args]
+        num_const_args = len(const_arg_avals)
+        in_avals = const_arg_avals + jaxpr.in_avals
+
+        # Use main_function=False to preserve the function name (e.g., "jit_func")
+        # instead of renaming it to "main"
         lower_jaxpr_to_fun(
             ctx,
             func_name,
             jaxpr,
             effects,
-            public=True,
+            num_const_args=num_const_args,
+            in_avals=in_avals,
+            main_function=False,
             replicated_args=replicated_args,
+            arg_names=arg_names,
             arg_shardings=arg_shardings,
             result_shardings=result_shardings,
-            name_stack=name_stack,
         )
 
+        # Set the entry point function visibility to public and other functions to internal
         worklist = [*ctx.module.body.operations]
         while worklist:
             op = worklist.pop()
             func_name = str(op.name)
             is_entry_point = func_name.startswith('"jit_')
+
             if is_entry_point:
+                # Keep entry point functions public
+                op.attributes["sym_visibility"] = ir.StringAttr.get("public")
                 continue
             if isinstance(op, FuncOp):
+                # Set non-entry functions to internal linkage
                 op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
             if isinstance(op, ModuleOp):
                 worklist += [*op.body.operations]
@@ -188,14 +207,10 @@ def get_mlir_attribute_from_pyval(value):
             elif 0 <= value < 18446744073709551616:  # = 2**64
                 attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64), value)
             else:
-                raise CompileError(
-                    textwrap.dedent(
-                        """
+                raise CompileError(textwrap.dedent("""
                     Large interger attributes currently not supported in MLIR,
                     see https://github.com/llvm/llvm-project/issues/128072
-                    """
-                    )
-                )
+                    """))
 
         case float():
             attr = ir.FloatAttr.get(ir.F64Type.get(), value)

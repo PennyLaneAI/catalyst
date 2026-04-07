@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test for the device API."""
+
 import pennylane as qml
 import pytest
 from pennylane.devices import NullQubit
+from pennylane.devices.capabilities import DeviceCapabilities, ExecutionCondition
 
 from catalyst import qjit
 from catalyst.device import QJITDevice, get_device_capabilities, qjit_device
@@ -25,13 +27,10 @@ from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 
 def test_qjit_device():
     """Test the qjit device from a device using the new api."""
-    with pytest.warns(
-        qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
-    ):
-        device = NullQubit(wires=10, shots=2032)
 
-        # Create qjit device
-        device_qjit = QJITDevice(device)
+    # Create qjit device
+    device = NullQubit(wires=10)
+    device_qjit = QJITDevice(device)
 
     # Check attributes of the new device
     # Since shots are not used in the new API, we expect None
@@ -39,18 +38,19 @@ def test_qjit_device():
     assert device_qjit.wires == qml.wires.Wires(range(0, 10))
 
     # Check the preprocess of the new device
-    with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-        transform_program, _ = device_qjit.preprocess(ctx)
-    assert transform_program
-    assert len(transform_program) == 3
-    assert transform_program[-2]._transform.__name__ == "verify_operations"
-    assert transform_program[-1]._transform.__name__ == "validate_measurements"
+    with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
+        config = qml.devices.ExecutionConfig()
+        compile_pipeline, _ = device_qjit.preprocess(config)
+    assert compile_pipeline
+    assert len(compile_pipeline) == 3
+    assert compile_pipeline[-2].tape_transform.__name__ == "verify_operations"
+    assert compile_pipeline[-1].tape_transform.__name__ == "validate_measurements"
 
     # TODO: readd when we do not discard device preprocessing
-    # t = transform_program[0].transform.__name__
+    # t = compile_pipeline[0].tape_transform.__name__
     # assert t == "split_non_commuting"
 
-    t = transform_program[0].transform.__name__
+    t = compile_pipeline[0].tape_transform.__name__
     assert t == "catalyst_decompose"
 
     # Check that the device cannot execute tapes
@@ -101,7 +101,7 @@ def test_qjit_device_measurements(shots, mocker):
         assert finite_shot_measurements.issubset(expected_measurements)
         assert state_measurements.intersection(expected_measurements) == set()
 
-    spy = mocker.spy(qjit_device, "get_qjit_device_capabilities")
+    spy = mocker.spy(qjit_device, "filter_device_capabilities_with_shots")
 
     @qjit
     @qml.set_shots(shots)
@@ -113,6 +113,36 @@ def test_qjit_device_measurements(shots, mocker):
     circuit()
 
     assert spy.spy_return.measurement_processes == expected_measurements
+
+
+@pytest.mark.parametrize(
+    "MPs, requires_shots",
+    [
+        (
+            {
+                "StateMP": [ExecutionCondition.ANALYTIC_MODE_ONLY],
+                "CountsMP": [ExecutionCondition.FINITE_SHOTS_ONLY],
+            },
+            False,
+        ),
+        (
+            {
+                "SampleMP": [
+                    ExecutionCondition.FINITE_SHOTS_ONLY,
+                    ExecutionCondition.TERMS_MUST_COMMUTE,
+                ],
+                "CountsMP": [ExecutionCondition.FINITE_SHOTS_ONLY],
+            },
+            True,
+        ),
+    ],
+)
+def test_device_requires_shots(MPs, requires_shots):
+    """Test that shots requirement is properly inferred from capabilities"""
+    # Construct a mock DeviceCapabilities object.
+    # Don't care about non MP capabilities, so just use default values.
+    caps = DeviceCapabilities(measurement_processes=MPs)
+    assert qjit_device._requires_shots(caps) == requires_shots
 
 
 def test_simple_circuit():
@@ -139,6 +169,18 @@ def test_track_resources():
     dev = NullQubit(wires=2, track_resources=True)
     assert "track_resources" in QJITDevice.extract_backend_info(dev).kwargs
     assert QJITDevice.extract_backend_info(dev).kwargs["track_resources"] is True
+    assert "resources_filename" not in QJITDevice.extract_backend_info(dev).kwargs
+    assert "compute_depth" not in QJITDevice.extract_backend_info(dev).kwargs
+
+    dev = NullQubit(
+        wires=2, track_resources=True, resources_filename="my_resources.txt", compute_depth=True
+    )
+    assert "track_resources" in QJITDevice.extract_backend_info(dev).kwargs
+    assert QJITDevice.extract_backend_info(dev).kwargs["track_resources"] is True
+    assert "resources_filename" in QJITDevice.extract_backend_info(dev).kwargs
+    assert QJITDevice.extract_backend_info(dev).kwargs["resources_filename"] == "my_resources.txt"
+    assert "compute_depth" in QJITDevice.extract_backend_info(dev).kwargs
+    assert QJITDevice.extract_backend_info(dev).kwargs["compute_depth"] is True
 
 
 if __name__ == "__main__":

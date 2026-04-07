@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test skipping iniitial state prep"""
+"""Test skipping initial state prep"""
 
 import jax.numpy as jnp
 import pennylane as qml

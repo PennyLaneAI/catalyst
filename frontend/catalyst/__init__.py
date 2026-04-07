@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2022 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,12 +18,11 @@ This package contains the Catalyst Python interface.
 # pylint: disable=wrong-import-position
 
 import sys
-import types
 from os.path import dirname
 
 import jaxlib as _jaxlib
 
-_jaxlib_version = "0.6.2"
+_jaxlib_version = "0.7.1"
 if _jaxlib.__version__ != _jaxlib_version:
     import warnings
 
@@ -77,12 +76,30 @@ from catalyst.compiler import CompileOptions
 from catalyst.debug.assertion import debug_assert
 from catalyst.jit import QJIT, qjit
 from catalyst.passes.pass_api import pipeline
+from catalyst.python_interface.inspection.draw import draw_graph
 from catalyst.utils.exceptions import (
     AutoGraphError,
     CompileError,
     DifferentiableCompileError,
     PlxprCaptureCFCompatibilityError,
 )
+from catalyst.utils.precompile_decomposition_rules import (
+    BYTECODE_FILE_PATH,
+    precompile_decomp_rules,
+)
+
+# we ONLY want to compile on init for dev installs, where the caching should work correctly
+if (
+    not (
+        INSTALLED  # do not recompile on user installations
+        or os.getenv("DOCUTILSCONFIG")  # do not run for docs
+        or os.getenv("READTHEDOCS_CANONICAL_URL")  # do not run for RTD
+        or os.getenv("CI")  # do not run in CI
+    )
+    and not BYTECODE_FILE_PATH.exists()
+):  # pragma: no cover
+    precompile_decomp_rules()  # pragma: no cover
+
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising
@@ -163,7 +180,6 @@ while processing the following with AutoGraph:
     for x in params:
 """
 
-
 __all__ = (
     "qjit",
     "QJIT",
@@ -176,6 +192,7 @@ __all__ = (
     "debug_assert",
     "CompileOptions",
     "debug",
+    "draw_graph",
     "passes",
     "pipeline",
     *_api_extension_list,

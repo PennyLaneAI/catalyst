@@ -14,16 +14,19 @@
 
 // RUN: quantum-opt %s --convert-ion-to-llvm --split-input-file -verify-diagnostics | FileCheck %s
 
+// CHECK: llvm.func @__catalyst__oqd__readout_bit(!llvm.ptr) -> i1
+// CHECK: llvm.func @__catalyst__oqd__measure_pulse(!llvm.ptr, f64, f64, !llvm.ptr) -> !llvm.ptr
 // CHECK: llvm.func @__catalyst__oqd__pulse(!llvm.ptr, f64, f64, !llvm.ptr) -> !llvm.ptr
 // CHECK: llvm.func @__catalyst__oqd__ParallelProtocol(!llvm.ptr, i64)
 
 // CHECK-LABEL: parallel_protocol_op
-func.func public @parallel_protocol_op(%arg0: f64) -> !quantum.bit {
+func.func public @parallel_protocol_op(%arg0: f64) -> i1 {
 
     // Get wire number
     // CHECK: {{.+}} = quantum.alloc( 1) : !quantum.reg
     // CHECK: {{.+}} = quantum.extract {{.+}}[ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[wire:%.+]] = builtin.unrealized_conversion_cast {{.+}} : !quantum.bit to !llvm.ptr
+    // CHECK: [[ion_qubit:%.+]] = builtin.unrealized_conversion_cast {{.+}} : !quantum.bit to !ion.qubit
+    // CHECK: [[wire:%.+]] = builtin.unrealized_conversion_cast [[ion_qubit:%.+]] : !ion.qubit to !llvm.ptr
 
     // Pulse 1
     // CHECK: %[[pulse_1:.*]] = llvm.call @__catalyst__oqd__pulse([[wire]]
@@ -67,11 +70,31 @@ func.func public @parallel_protocol_op(%arg0: f64) -> !quantum.bit {
     // CHECK: %[[pulse_array_size_2:.*]] = llvm.mlir.constant(2 : i64) : i64
     // CHECK: llvm.call @__catalyst__oqd__ParallelProtocol(%[[pulse_array_ptr_2:.*]], %[[pulse_array_size_2:.*]]) : (!llvm.ptr, i64)
 
+    // MeasurePulse call
+    // CHECK: %[[mp:.*]] = llvm.call @__catalyst__oqd__measure_pulse([[wire]]
+
+    // Pulse array (1 entry)
+    // CHECK: %[[pulse_array_3:.*]] = llvm.mlir.undef : !llvm.array<1 x ptr>
+    // CHECK: %[[pulse_array_insert_3:.*]] = llvm.insertvalue %[[mp_ptr:.*]], %[[pulse_array_3:.*]][0] : !llvm.array<1 x ptr>
+
+    // Store pulse array on stack
+    // CHECK: %[[c1_3:.*]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: %[[pulse_array_ptr_3:.*]] = llvm.alloca %[[c1_3:.*]] x !llvm.array<1 x ptr> : (i64) -> !llvm.ptr
+    // CHECK: llvm.store %[[pulse_array_insert_3:.*]], %[[pulse_array_ptr_3:.*]] : !llvm.array<1 x ptr>, !llvm.ptr
+
+    // Parallel Protocol Stub
+    // CHECK: %[[pulse_array_size_3:.*]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: llvm.call @__catalyst__oqd__ParallelProtocol(%[[pulse_array_ptr_3:.*]], %[[pulse_array_size_3:.*]]) : (!llvm.ptr, i64)
+
+    // Readout; qubit wire is threaded through unchanged
+    // CHECK: %[[mres:.*]] = llvm.call @__catalyst__oqd__readout_bit([[wire]]) : (!llvm.ptr) -> i1
+
     %qreg = quantum.alloc( 1) : !quantum.reg
     %q0 = quantum.extract %qreg[ 0] : !quantum.reg -> !quantum.bit
+    %ion_qubit_0 = builtin.unrealized_conversion_cast %q0 : !quantum.bit to !ion.qubit
 
-    %pp= ion.parallelprotocol(%q0) : !quantum.bit{
-        ^bb0(%arg1: !quantum.bit):
+    %pp = ion.parallelprotocol(%ion_qubit_0) : !ion.qubit{
+        ^bb0(%arg1: !ion.qubit):
           %p1 = ion.pulse(%arg0: f64) %arg1 {
               beam=#ion.beam<
                   transition_index=1,
@@ -93,11 +116,11 @@ func.func public @parallel_protocol_op(%arg0: f64) -> !quantum.bit {
               >,
               phase=0.0
           } : !ion.pulse
-          ion.yield %arg1: !quantum.bit
+          ion.yield %arg1: !ion.qubit
     }
 
-    %pp1= ion.parallelprotocol(%pp) : !quantum.bit{
-        ^bb0(%arg1: !quantum.bit):
+    %pp1 = ion.parallelprotocol(%pp) : !ion.qubit{
+        ^bb0(%arg1: !ion.qubit):
           %p1 = ion.pulse(%arg0: f64) %arg1 {
               beam=#ion.beam<
                   transition_index=1,
@@ -119,8 +142,24 @@ func.func public @parallel_protocol_op(%arg0: f64) -> !quantum.bit {
               >,
               phase=0.0
           } : !ion.pulse
-          ion.yield %arg1: !quantum.bit
+          ion.yield %arg1: !ion.qubit
     }
 
-    return %pp1: !quantum.bit
+    %pp2 = ion.parallelprotocol(%pp1) : !ion.qubit {
+        ^bb0(%arg1: !ion.qubit):
+            %mp = ion.measure_pulse(%arg0: f64) %arg1 {
+                beam=#ion.beam<
+                    transition_index=0,
+                    rabi=1.0,
+                    detuning=0.0,
+                    polarization=[1, 0],
+                    wavevector=[0, 1]
+                >,
+                phase=0.0
+            } : !ion.pulse
+            ion.yield %arg1 : !ion.qubit
+    }
+
+    %mres, %out_qubit = ion.readout_bit %pp2 : i1, !ion.qubit
+    return %mres : i1
 }

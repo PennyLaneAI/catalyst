@@ -26,23 +26,33 @@ set(LIBS
     ExternalStablehloLib
     MLIROptLib
     MLIRCatalyst
+    catalyst-analysis
     catalyst-transforms
     catalyst-stablehlo-transforms
     MLIRQuantum
     quantum-transforms
-    MLIRQEC
-    qec-transforms
+    MLIRQRef
+    qref-transforms
+    MLIRPBC
+    pbc-transforms
     MLIRGradient
     gradient-transforms
     MLIRMBQC
     mbqc-transforms
     MLIRMitigation
     mitigation-transforms
+    MLIRPauliFrame
+    pauli-frame-transforms
     MLIRIon
     ion-transforms
+    MLIRRTIO
+    rtio-transforms
+    MLIRQecLogical
+    MLIRQecPhysical
     MLIRCatalystTest
     ${ENZYME_LIB}
     CatalystCompilerDriver
+    MLIRTestDialect
 )
 
 add_mlir_tool(catalyst-cli catalyst-cli.cpp SUPPORT_PLUGINS)

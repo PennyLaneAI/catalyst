@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # pylint: disable=too-many-lines
+
+import re
 from textwrap import dedent
 
 import jax
@@ -45,18 +47,16 @@ class TestCondToJaxpr:
         """Check the JAXPR of simple conditional function."""
         # pylint: disable=line-too-long
 
-        expected = dedent(
-            """
+        expected = dedent("""
             { lambda ; a:i64[]. let
                 b:bool[] = eq a 5:i64[]
                 c:i64[] = cond[
                   branch_jaxprs=[{ lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
                                  { lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
-                  nimplicit_outputs=0
+                  num_implicit_outputs=0
                 ] b a a
               in (c,) }
-            """
-        )
+            """)
 
         @qjit
         def circuit(n: int):
@@ -72,9 +72,12 @@ class TestCondToJaxpr:
             return out
 
         def asline(text):
-            return " ".join(map(lambda x: x.strip(), str(text).split("\n"))).strip()
+            return " ".join(
+                map(lambda x: re.sub(r"\033\[[0-9;]*m", "", x).strip(), str(text).split("\n"))
+            ).strip()
 
-        assert asline(expected) == asline(circuit.jaxpr)
+        result = circuit.jaxpr
+        assert asline(expected) == asline(result)
 
 
 # pylint: disable=too-many-public-methods,too-many-lines
@@ -211,8 +214,8 @@ class TestCond:
             cond_fn()
             return measure(wires=0)
 
-        assert circuit(3) == False
-        assert circuit(6) == True
+        assert not circuit(3)
+        assert circuit(6)
 
     def test_branch_return_pytree_mismatch(self):
         """Test that an exception is raised when the true branch returns a value without an else
@@ -235,7 +238,7 @@ class TestCond:
 
         with pytest.raises(
             TypeError,
-            match="Conditional requires a consistent return structure across all branches",
+            match="Control flow requires a consistent return structure across all branches",
         ):
             qjit(circuit)
 
@@ -244,8 +247,8 @@ class TestCond:
         branch.
         """
 
-        def circuit():
-            @cond(True)
+        def circuit(pred: bool):
+            @cond(pred)
             def cond_fn():
                 return measure(wires=0)
 
@@ -255,12 +258,11 @@ class TestCond:
             with pytest.raises(
                 ValueError, match="false branch must be provided if the true branch"
             ):
-                qjit(qml.qnode(qml.device(backend, wires=1), autograph=False)(circuit))
+                qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
         else:
-
             with pytest.raises(
                 TypeError,
-                match="Conditional requires a consistent return structure across all branches",
+                match="Control flow requires a consistent return structure across all branches",
             ):
                 qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
@@ -286,8 +288,7 @@ class TestCond:
             ):
                 qjit(circuit)
         else:
-
-            m = "Conditional requires a consistent array shape per result across all branches"
+            m = "Control flow requires a consistent array shape per result across all branches"
             with pytest.raises(
                 TypeError,
                 match=m,
@@ -297,8 +298,8 @@ class TestCond:
     def test_branch_return_shape_mismatch_quantum(self, backend):
         """Test that an exception is raised when the array shapes across branches don't match."""
 
-        def circuit():
-            @cond(True)
+        def circuit(pred: bool):
+            @cond(pred)
             def cond_fn():
                 return measure(wires=0)
 
@@ -314,9 +315,9 @@ class TestCond:
                 ValueError,
                 match="Mismatch in output abstract values in false branch",
             ):
-                qjit(qml.qnode(qml.device(backend, wires=1), autograph=False)(circuit))
+                qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
         else:
-            m = "Conditional requires a consistent array shape per result across all branches"
+            m = "Control flow requires a consistent array shape per result across all branches"
             with pytest.raises(
                 TypeError,
                 match=m,
@@ -331,7 +332,7 @@ class TestCond:
             pytest.xfail("capture does not allow returning mcm's or classical values")
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1), autograph=False)
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit():
             @cond(True)
             def cond_fn():
@@ -366,7 +367,7 @@ class TestCond:
                 return True
 
             r = cond_fn()
-            assert r.dtype is jnp.dtype("int")
+            assert r.dtype is jnp.dtype("int")  # pylint: disable=no-member
             return r
 
         assert 0 == circuit()
@@ -392,7 +393,7 @@ class TestCond:
                 return False
 
             r = cond_fn()
-            assert r.dtype is jnp.dtype(
+            assert r.dtype is jnp.dtype(  # pylint: disable=no-member
                 "float64" if jax.config.values["jax_enable_x64"] else "float32"
             )
             return r
@@ -420,7 +421,7 @@ class TestCond:
                 return 0.5
 
             r = cond_fn()
-            assert r.dtype is jnp.dtype(
+            assert r.dtype is jnp.dtype(  # pylint: disable=no-member
                 "float64" if jax.config.values["jax_enable_x64"] else "float32"
             )
             return r
@@ -451,7 +452,7 @@ class TestCond:
             expected_dtype = jnp.dtype(
                 "float64" if jax.config.values["jax_enable_x64"] else "float32"
             )
-            assert all(v.dtype is expected_dtype for _, v in r.items())
+            assert all(v.dtype is expected_dtype for _, v in r.items())  # pylint: disable=no-member
             return r
 
         assert {0: 0.7, 1: 1.0} == circuit(False, True)
@@ -482,17 +483,16 @@ class TestCond:
         else:
             with pytest.raises(
                 TypeError,
-                match="Conditional requires a consistent number of results across all branches",
+                match="Control flow requires a consistent number of results across all branches",
             ):
                 f(True, 3)
 
-    @pytest.mark.xfail(
-        reason="Inability to apply Jax transformations before the quantum traing is complete"
-    )
     def test_branch_multi_return_type_unification_qnode_2(self, backend):
-        """Test that unification happens before the results of the cond primitve is available.
+        """Test that unification happens before the results of the cond primitive is available.
         See the FIXME in the ``CondCallable._call_with_quantum_ctx`` function.
         """
+        if qml.capture.enabled():
+            pytest.xfail(reason="unification not working with capture")
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
@@ -506,7 +506,7 @@ class TestCond:
                 return True
 
             r = cond_fn()
-            assert r.dtype is jnp.dtype("int")
+            assert r.dtype is jnp.dtype("int")  # pylint: disable=no-member
             return r
 
         assert 0 == circuit()
@@ -516,8 +516,8 @@ class TestCond:
         than the else branch, given a classical tracing context (no QNode).
         """
 
-        def circuit():
-            @cond(True)
+        def circuit(pred: bool):
+            @cond(pred)
             def cond_fn():
                 return (1, 1)
 
@@ -533,7 +533,7 @@ class TestCond:
         else:
             with pytest.raises(
                 TypeError,
-                match="Conditional requires a consistent return structure across all branches",
+                match="Control flow requires a consistent return structure across all branches",
             ):
                 qjit(circuit)
 
@@ -557,57 +557,31 @@ class TestCond:
 
         assert 1.0 == qjit(circuit)()
 
-    def test_branch_with_arg(self):
-        """Test that an exception is raised when an 'else if' branch function contains an arg"""
-
-        if qml.capture.enabled():
-            pytest.xfail("capture does not allow returning mcms")
-
-        def circuit(pred: bool):
-            @cond(pred)
-            def cond_fn():
-                qml.PauliX(0)
-
-            @cond_fn.else_if(pred)
-            def cond_elif(x):
-                qml.PauliX(x)
-
-            return measure(wires=0)
-
-        with pytest.raises(
-            TypeError, match="Conditional 'else if' function is not allowed to have any arguments"
-        ):
-            qjit(qml.qnode(qml.device("lightning.qubit", wires=1), autograph=False)(circuit))
-
-    def test_identical_branch_names(self, backend):
-        """Test that branches of the conditional can carry the same function name."""
-
-        if qml.capture.enabled():
-            pytest.xfail("capture does not allow returning mcms")
+    def test_branch_with_arg(self, backend):
+        """Test that we support conditional functions with arguments."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1), autograph=False)
-        def circuit(pred: bool):
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(pred: bool, phi: float):
             @cond(pred)
-            def conditional_flip():
-                qml.PauliX(0)
+            def conditional(x):
+                qml.RY(x, 0)
 
-            @conditional_flip.otherwise
-            def conditional_flip():
-                qml.Identity(0)
+            @conditional.otherwise
+            def conditional(x):
+                qml.RY(x, 1)
 
-            conditional_flip()
+            conditional(phi)
 
-            return measure(wires=0)
+            return qml.expval(qml.Z(0)), qml.expval(qml.Z(1))
 
-        assert circuit(False) == 0
-        assert circuit(True) == 1
+        assert circuit(True, np.pi) == (-1.0, 1.0)
+        assert circuit(False, np.pi) == (1.0, -1.0)
 
-    def test_argument_error_with_callables(self):
-        """Test for the error when arguments are supplied and the target is not a function."""
+    def test_return_type_errors_with_callables(self):
+        """Test for errors when branches have mismatched return behaviour."""
 
         def f(x: int):
-
             res = qml.cond(x < 5, lambda z: z + 1)(0)
 
             return res
@@ -616,11 +590,10 @@ class TestCond:
             with pytest.raises(ValueError, match="false branch must be provided"):
                 qjit(f)
         else:
-            with pytest.raises(TypeError, match="not allowed to have any arguments"):
+            with pytest.raises(TypeError, match="requires a consistent return structure"):
                 qjit(f)
 
         def g(x: int):
-
             res = qml.cond(x < 5, qml.Hadamard, lambda z: z + 1)(0)
 
             return res
@@ -629,15 +602,12 @@ class TestCond:
             with pytest.raises(ValueError, match="Mismatch in output abstract values"):
                 qjit(g)
         else:
-            m = "Conditional 'False' function can have arguments only if it is a PennyLane gate."
             with pytest.raises(
-                TypeError,
-                match=m,
+                TypeError, match="requires a consistent return structure across all branches"
             ):
                 qjit(g)
 
         def h(x: int):
-
             res = qml.cond(x < 5, qml.Hadamard, qml.Hadamard, ((x < 6, lambda z: z + 1),))(0)
 
             return res
@@ -647,8 +617,7 @@ class TestCond:
                 qjit(h)
         else:
             with pytest.raises(
-                TypeError,
-                match="Conditional 'else if' function can have arguments only if it is a PennyLane gate.",  # pylint:disable=line-too-long
+                TypeError, match="requires a consistent return structure across all branches"
             ):
                 qjit(h)
 
@@ -685,7 +654,7 @@ class TestCond:
                 def loop(n):
                     qml.X(n)
 
-                loop()
+                loop()  # pylint: disable=no-value-for-parameter
 
             test(4)
 
@@ -818,8 +787,8 @@ class TestClassicalCompilation:
     def test_no_true_false_parameters(self):
         """Test non-empty parameter detection in conditionals"""
 
-        def arithc2():
-            @cond(True)
+        def arithc2(pred: bool):
+            @cond(pred)
             def branch(_):
                 return 1
 
@@ -829,16 +798,11 @@ class TestClassicalCompilation:
 
             return branch()
 
-        match = (
-            "missing 1 required positional argument"
-            if qml.capture.enabled()
-            else "Conditional 'True'"
-        )
-        with pytest.raises(TypeError, match=match):
+        with pytest.raises(TypeError, match="missing 1 required positional argument"):
             qjit(arithc2)
 
-        def arithc1():
-            @cond(True)
+        def arithc1(pred: bool):
+            @cond(pred)
             def branch():
                 return 1
 
@@ -848,12 +812,7 @@ class TestClassicalCompilation:
 
             return branch()  # pylint: disable=no-value-for-parameter
 
-        match = (
-            "missing 1 required positional argument"
-            if qml.capture.enabled()
-            else "Conditional 'False'"
-        )
-        with pytest.raises(TypeError, match=match):
+        with pytest.raises(TypeError, match="missing 1 required positional argument"):
             qjit(arithc1)
 
 
@@ -864,7 +823,7 @@ class TestCondOperatorAccess:
         """Test Cond operation access in quantum context."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1), autograph=False)
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             @cond(n > 4)
             def cond_fn():
@@ -1119,6 +1078,9 @@ class TestCondPredicateConversion:
     def test_string_conversion_failed(self):
         """Test failure at converting string to bool using Autograph."""
 
+        if qml.capture.enabled():
+            pytest.skip("works with program capture.")
+
         @qjit(autograph=True)
         def workflow(x):
             n = "fail"
@@ -1130,15 +1092,31 @@ class TestCondPredicateConversion:
 
             return y
 
-        if qml.capture.enabled():
-            with pytest.raises(TypeError, match="is not a valid JAX type"):
-                workflow(3)
-        else:
-            with pytest.raises(
-                TypeError,
-                match="Conditional predicates are required to be of bool, integer or float type",
-            ):
-                workflow(3)
+        with pytest.raises(
+            TypeError,
+            match="Conditional predicates are required to be of bool, integer or float type",
+        ):
+            workflow(3)
+
+    def test_string_conversion_capture_works(self):
+        """Test that truthy values in conditionals work when capture is enabled."""
+
+        if not qml.capture.enabled():
+            pytest.skip("only works with program capture.")
+
+        @qjit(autograph=True)
+        def workflow(x):
+            n = "fail"
+
+            if n:
+                y = x**2
+            else:
+                y = 0
+
+            return y
+
+        out = workflow(0.5)
+        assert qml.math.allclose(out, 0.25)
 
     def test_array_conversion_failed(self):
         """Test failure at converting array to bool using Autograph."""

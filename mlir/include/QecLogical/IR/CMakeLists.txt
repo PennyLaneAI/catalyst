@@ -1,0 +1,10 @@
+add_mlir_dialect(QecLogicalOps qecl)
+add_mlir_doc(QecLogicalDialect QecLogicalDialect QecLogical/ -gen-dialect-doc -gen-op-doc)
+add_mlir_doc(QecLogicalOps QecLogicalOps QecLogical/ -gen-op-doc)
+
+set(LLVM_TARGET_DEFINITIONS QecLogicalAttrDefs.td)
+mlir_tablegen(QecLogicalEnums.h.inc -gen-enum-decls)
+mlir_tablegen(QecLogicalEnums.cpp.inc -gen-enum-defs)
+mlir_tablegen(QecLogicalAttributes.h.inc -gen-attrdef-decls -attrdefs-dialect=qecl)
+mlir_tablegen(QecLogicalAttributes.cpp.inc -gen-attrdef-defs -attrdefs-dialect=qecl)
+add_public_tablegen_target(MLIRQecLogicalAttrDefsIncGen)

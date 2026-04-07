@@ -7,13 +7,20 @@ file(GLOB SRC
     emit_catalyst_pyface.cpp
     cp_global_buffers.cpp
     adjoint_lowering.cpp
-    annotate_function.cpp
     AdjointPatterns.cpp
-    ChainedSelfInversePatterns.cpp
-    remove_chained_self_inverse.cpp
+    CancelInversesPatterns.cpp
+    cancel_inverses.cpp
     SplitMultipleTapes.cpp
+    split_non_commuting.cpp
+    split_to_single_terms.cpp
     merge_rotation.cpp
     MergeRotationsPatterns.cpp
+    decompose_lowering.cpp
+    DecomposeLoweringPatterns.cpp
+    dynamic_one_shot.cpp
+    merge_global_phase.cpp
+    gridsynth.cpp
+    GridsynthPatterns.cpp
     DisentangleSWAP.cpp
     DisentangleCNOT.cpp
     ions_decompositions.cpp
@@ -28,6 +35,7 @@ set(LIBS
     ${dialect_libs}
     ${conversion_libs}
     MLIRQuantum
+    ExternalStablehloLib
 )
 
 set(DEPENDS

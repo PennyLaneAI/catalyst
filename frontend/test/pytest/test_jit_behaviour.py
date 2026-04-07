@@ -492,7 +492,7 @@ class TestShots:
             wires = random.randint(1, max_wires)
             expected_shape = (shots, wires)
             f_aot = fsample_aot_builder(backend, wires=wires)
-            observed_val = f_aot(0.0, shots=shots)
+            observed_val = f_aot(0.0, shots=shots)  # pylint: disable=unexpected-keyword-arg
             observed_shape = jnp.shape(observed_val)
             # We are failing this test because of the type system.
             # If shots is specified AOT, we would need to recompile
@@ -852,7 +852,7 @@ class TestTracingQJITAnnotatedFunctions:
         mlir_v1 = workflow.mlir
 
         @qjit
-        def workflow(phi: float):
+        def workflow(phi: float):  # pylint: disable=function-redefined
             g = grad(qjit(circuit))
             return g(phi)
 
@@ -871,8 +871,8 @@ class TestDefaultAvailableIR:
 
         assert f.mlir
 
-    def test_qir(self, backend):
-        """Test qir."""
+    def test_llvmir(self, backend):
+        """Test llvmir."""
 
         @qml.qnode(qml.device(backend, wires=1))
         def f(x: float):
@@ -883,8 +883,8 @@ class TestDefaultAvailableIR:
         def g(x: float):
             return f(x)
 
-        assert g.qir
-        assert "__catalyst__qis" in g.qir
+        assert g.llvmir
+        assert "__catalyst__qis" in g.llvmir
 
     def test_mlir_opt(self, backend):
         """Test mlir opt."""
@@ -900,6 +900,25 @@ class TestDefaultAvailableIR:
 
         assert g.mlir_opt
         assert "__catalyst__qis" in g.mlir_opt
+
+    @pytest.mark.xdsl
+    @pytest.mark.usefixtures("use_capture")
+    def test_mlir_opt_using_xdsl_passes(self, backend):
+        """Test mlir opt using xDSL passes."""
+        # pylint: disable-next=import-outside-toplevel
+        from catalyst.python_interface.transforms import iterative_cancel_inverses_pass
+
+        @qjit
+        @iterative_cancel_inverses_pass
+        @qml.qnode(qml.device(backend, wires=1))
+        def f():
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=0)
+            return qml.state()
+
+        mlir_opt = f.mlir_opt
+        assert mlir_opt
+        assert not "__catalyst__qis__Hadamard" in mlir_opt
 
     def test_jaxpr_target(self, backend):
         """Test no mlir is generated for jaxpr target."""

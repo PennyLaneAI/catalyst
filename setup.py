@@ -107,7 +107,7 @@ jax_version = dep_versions.get("jax")
 pl_version = dep_versions.get("pennylane")
 lq_version = dep_versions.get("lightning")
 
-pl_min_release = "0.42.0"
+pl_min_release = "0.43.0"
 lq_min_release = pl_min_release
 
 if pl_version is not None:
@@ -127,9 +127,11 @@ requirements = [
     kokkos_dep,
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
-    "numpy!=2.0.0",
+    "numpy>2.0.0",
     "scipy-openblas32>=0.3.26",  # symbol and library name
-    "diastatic-malt>=2.15.2",
+    "diastatic-malt==2.15.3",
+    "xdsl==0.59.0",
+    "xdsl-jax==0.5.0",
 ]
 
 entry_points = {
@@ -147,7 +149,23 @@ entry_points = {
         "cuda_quantum.ops = catalyst.api_extensions",
         "cuda_quantum.qjit = catalyst.third_party.cuda:cudaqjit",
     ],
-    "catalyst.passes_resolution": ["catalyst_xdsl_plugin.passes = catalyst.passes.xdsl_plugin"],
+    "xdsl.universe": [
+        "catalyst-xdsl-universe = catalyst.python_interface.xdsl_universe:CATALYST_XDSL_UNIVERSE"
+    ],
+    "pennylane.transforms": [
+        "to_ppr = catalyst.passes:to_ppr",
+        "merge_ppr_ppm = catalyst.passes:merge_ppr_ppm",
+        "commute_ppr = catalyst.passes:commute_ppr",
+        "ppm_compilation = catalyst.passes:ppm_compilation",
+        "ppr_to_ppm = catalyst.passes:ppr_to_ppm",
+        "reduce_t_depth = catalyst.passes:reduce_t_depth",
+        "decompose_arbitrary_ppr = catalyst.passes:decompose_arbitrary_ppr",
+        "disentangle_swap = catalyst.passes:disentangle_swap",
+        "disentangle_cnot = catalyst.passes:disentangle_cnot",
+    ],
+    "pennylane.drawer": [
+        "draw_graph = catalyst:draw_graph",
+    ],
 }
 
 classifiers = [
@@ -161,6 +179,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3 :: Only",
 ]
 

@@ -152,6 +152,7 @@ class MatrixGenerator:
 
         return A + 1j * B
 
+    @staticmethod
     def random_real_symmetric_matrix(n, positive=False, seed=42, dtype=None):
         """
         Generate a random n x n real symmetric matrix.
@@ -192,6 +193,7 @@ class MatrixGenerator:
 
         return S
 
+    @staticmethod
     def random_real_symmetric_positive_definite_matrix(n, seed=42, dtype=None):
         """
         Generate a random n x n real symmetric positive-definite matrix.
@@ -226,6 +228,7 @@ class MatrixGenerator:
 
         return S
 
+    @staticmethod
     def random_complex_hermitian_matrix(n, seed=42, dtype=None):
         """
         Generate a random n x n complex Hermitian matrix.
@@ -266,6 +269,7 @@ class MatrixGenerator:
 
         return H
 
+    @staticmethod
     def random_complex_hermitian_positive_definite_matrix(n, seed=42, dtype=None):
         """
         Generate a random n x n complex Hermitian positive-definite matrix.

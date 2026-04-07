@@ -3,7 +3,7 @@ Include(FetchContent)
 FetchContent_Declare(
     Catch2
     GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_TAG        v3.8.0
+    GIT_TAG        v3.11.0
 )
 
 # Raised by Catch2 with GCC-13, so we disable it here before including their project.
@@ -21,7 +21,7 @@ execute_process(
 find_package(pybind11 CONFIG REQUIRED)
 
 # Required for catch_discover_tests().
-list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/contrib)
+list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 
 # Modify `ctest` to only run the supported subset of tests.
 include(CTest)
@@ -54,7 +54,9 @@ endif()
 
 add_executable(runner_tests_qir_runtime)
 target_sources(runner_tests_qir_runtime PRIVATE
+    Test_DataView.cpp
     Test_NullQubit.cpp
+    Test_ResourceTracker.cpp
 )
 
 # For tests we do require libpython in order to embed a Python interpreter.
@@ -131,3 +133,22 @@ target_link_libraries(runner_tests_mbqc_runtime PRIVATE
 )
 
 catch_discover_tests(runner_tests_mbqc_runtime)
+
+# RS Decomposition test suite
+add_executable(runner_tests_rsdecomp_runtime)
+target_sources(runner_tests_rsdecomp_runtime PRIVATE
+    Test_RSDecompUtils.cpp
+    Test_RSDecompRings.cpp
+    Test_RSDecompEllipse.cpp
+    Test_RSDecompGridProblems.cpp
+    Test_RSDecompNormalForms.cpp
+    Test_RSDecompNormSolver.cpp
+    Test_RSDecomp.cpp
+)
+target_link_libraries(runner_tests_rsdecomp_runtime PRIVATE
+    Catch2WithMain
+    catalyst_runtime_testing
+    rt_rsdecomp
+)
+
+catch_discover_tests(runner_tests_rsdecomp_runtime)

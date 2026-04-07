@@ -20,13 +20,18 @@ set(DIALECT_TESTS_DEPEND
 
 set(TEST_SUITES
     Quantum
+    QRef
     Gradient
     Mitigation
     Catalyst
     Ion
     MBQC
+    PauliFrame
     cli
-    QEC
+    PBC
+    RTIO
+    QecLogical
+    QecPhysical
     )
 
 

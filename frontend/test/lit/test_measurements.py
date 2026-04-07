@@ -35,7 +35,8 @@ from catalyst.jax_primitives import compbasis_p, counts_p, sample_p
 try:
     # COM: CHECK-LABEL: public @sample1(
     @qjit(target="mlir")
-    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    @qml.set_shots(1000)
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
     def sample1(x: float, y: float):
         qml.RX(x, wires=0)
         qml.RY(y, wires=1)
@@ -50,7 +51,8 @@ try:
 
     # COM: CHECK-LABEL: public @sample2(
     @qjit(target="mlir")
-    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    @qml.set_shots(1000)
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
     def sample2(x: float, y: float):
         qml.RX(x, wires=0)
         # COM: CHECK: [[q1:%.+]] = quantum.custom "RY"
@@ -71,7 +73,8 @@ except CompileError:
 
 # CHECK-LABEL: public @sample3(
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+@qml.set_shots(1000)
+@qml.qnode(qml.device("lightning.qubit", wires=2))
 # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
 # CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def sample3(x: float, y: float):
@@ -111,18 +114,19 @@ def test_sample_static():
 print(test_sample_static.mlir)
 
 
-# TODO: convert the device to have a dynamic shots value when core PennyLane device supports it
-# CHECK-LABEL: public @test_sample_dynamic(
 @qjit
-@qml.qnode(
-    qml.device("null.qubit", wires=1)
-)  # SampleOp is only legal if there is a device in the same scope
 def test_sample_dynamic(shots: int):
     """Test that the sample primitive with dynamic shape can be correctly compiled to mlir."""
-    obs = compbasis_p.bind()
-    x = shots + 1
-    sample = sample_p.bind(obs, x, static_shape=(None, 0))
-    return sample + jax.numpy.zeros((x, 0))
+
+    @qml.set_shots(shots)
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circ():
+        obs = compbasis_p.bind()
+        x = shots + 1
+        sample = sample_p.bind(obs, x, static_shape=(None, 0))
+        return sample + jax.numpy.zeros((x, 0))
+
+    circ()
 
 
 # CHECK: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
@@ -139,7 +143,8 @@ print(test_sample_dynamic.mlir)
 # CHECK-LABEL: @sample_dynamic_qubits
 @qjit(target="mlir")
 def sample_dynamic_qubits(num_qubits):
-    @qml.qnode(qml.device("lightning.qubit", wires=num_qubits, shots=37))
+    @qml.set_shots(37)
+    @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
     def circ():
         # CHECK: [[nqubits:%.+]] = quantum.num_qubits : i64
         # CHECK: quantum.compbasis
@@ -165,7 +170,8 @@ try:
 
     # COM: CHECK-LABEL: public @counts1(
     @qjit(target="mlir")
-    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    @qml.set_shots(1000)
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
     def counts1(x: float, y: float):
         qml.RX(x, wires=0)
         qml.RY(y, wires=1)
@@ -179,7 +185,8 @@ try:
     print(counts1.mlir)
 
     @qjit(target="mlir")
-    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    @qml.set_shots(1000)
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
     def counts2(x: float, y: float):
         qml.RX(x, wires=0)
         # COM: CHECK: [[q1:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RY"
@@ -200,7 +207,8 @@ except:
 
 # CHECK-LABEL: public @counts3(
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+@qml.set_shots(1000)
+@qml.qnode(qml.device("lightning.qubit", wires=2))
 # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
 # CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def counts3(x: float, y: float):
@@ -224,7 +232,8 @@ print(counts3.mlir)
 
 
 # CHECK-LABEL: public @jit_test_counts_static(
-@qjit
+@qjit(target="mlir")
+@qml.qnode(qml.device("null.qubit", wires=0))
 def test_counts_static():
     """Test that the counts primitive can be correctly compiled to mlir."""
     obs = compbasis_p.bind()
@@ -240,7 +249,8 @@ print(test_counts_static.mlir)
 # CHECK-LABEL: @counts_dynamic_qubits
 @qjit(target="mlir")
 def counts_dynamic_qubits(num_qubits):
-    @qml.qnode(qml.device("lightning.qubit", wires=num_qubits, shots=37))
+    @qml.set_shots(37)
+    @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
     def circ():
         # CHECK: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
         # CHECK: [[nqubits:%.+]] = quantum.num_qubits : i64
@@ -361,10 +371,10 @@ def expval5(x: float, y: float):
 print(expval5.mlir)
 
 
-# CHECK-LABEL: public @expval5(
+# CHECK-LABEL: public @expval6(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
-def expval5(x: float, y: float):
+def expval6(x: float, y: float):
     # CHECK: [[q0:%.+]] = quantum.custom "RX"
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
@@ -386,13 +396,13 @@ def expval5(x: float, y: float):
     return qml.expval(qml.Hamiltonian(coeffs, obs))
 
 
-print(expval5.mlir)
+print(expval6.mlir)
 
 
-# CHECK-LABEL: public @expval6(
+# CHECK-LABEL: public @expval7(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
-def expval6(x: float):
+def expval7(x: float):
     # CHECK: [[q0:%.+]] = quantum.custom "RX"
     qml.RX(x, wires=0)
 
@@ -415,20 +425,6 @@ def expval6(x: float):
     return qml.expval(qml.Hamiltonian(coeff, [obs, qml.PauliX(0)]))
 
 
-print(expval6.mlir)
-
-
-# CHECK-LABEL: public @expval7(
-@qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2))
-def expval7():
-    A = np.array([[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]])
-
-    # CHECK: [[obs:%.+]] = quantum.hermitian
-    # CHECK: quantum.expval [[obs]] : f64
-    return qml.expval(qml.Hermitian(A, wires=0))
-
-
 print(expval7.mlir)
 
 
@@ -436,6 +432,20 @@ print(expval7.mlir)
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def expval8():
+    A = np.array([[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]])
+
+    # CHECK: [[obs:%.+]] = quantum.hermitian
+    # CHECK: quantum.expval [[obs]] : f64
+    return qml.expval(qml.Hermitian(A, wires=0))
+
+
+print(expval8.mlir)
+
+
+# CHECK-LABEL: public @expval9(
+@qjit(target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=2))
+def expval9():
     B = np.array(
         [
             [complex(1.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
@@ -450,13 +460,13 @@ def expval8():
     return qml.expval(qml.Hermitian(B, wires=[0, 1]))
 
 
-print(expval8.mlir)
+print(expval9.mlir)
 
 
-# CHECK-LABEL: public @expval9(
+# CHECK-LABEL: public @expval10(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
-def expval9(x: float, y: float):
+def expval10(x: float, y: float):
     # CHECK: [[q0:%.+]] = quantum.custom "RX"
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
@@ -472,13 +482,13 @@ def expval9(x: float, y: float):
     return qml.expval(qml.PauliX(0) @ qml.PauliZ(1) @ qml.Hadamard(2))
 
 
-print(expval9.mlir)
+print(expval10.mlir)
 
 
-# CHECK-LABEL: public @expval10(
+# CHECK-LABEL: public @expval11(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
-def expval10(x: float, y: float):
+def expval11(x: float, y: float):
     # CHECK: [[q0:%.+]] = quantum.custom "RX"
     qml.RX(x, wires=0)
     # CHECK: [[q1:%.+]] = quantum.custom "RY"
@@ -502,12 +512,12 @@ def expval10(x: float, y: float):
     return qml.expval(qml.PauliX(1) @ qml.Hermitian(B, wires=[0, 2]))
 
 
-print(expval10.mlir)
+print(expval11.mlir)
 
 
-# CHECK-LABEL: @expval11
+# CHECK-LABEL: @expval12
 @qjit(target="mlir")
-def expval11(num_qubits):
+def expval12(num_qubits):
     # CHECK: func.func public @circ(%arg0: tensor<i64>) -> tensor<f64>
     @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
     def circ():
@@ -533,8 +543,56 @@ def expval11(num_qubits):
     return circ()
 
 
-_ = expval11(10)
-print(expval11.mlir)
+_ = expval12(10)
+print(expval12.mlir)
+
+
+# CHECK-LABEL: @expval13
+@qjit(target="mlir")
+def expval13():
+    # CHECK: func.func public @circ() -> (tensor<f64>, tensor<f64>)
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circ():
+        # CHECK: [[extract:%.+]] = quantum.extract {{%.+}}[ 0] : !quantum.reg -> !quantum.bit
+        # CHECK: {{%.+}} = quantum.namedobs [[extract]][ PauliX] : !quantum.obs
+        # CHECK: {{%.+}} = quantum.namedobs [[extract]][ PauliZ] : !quantum.obs
+        # CHECK: {{%.+}} = quantum.insert {{%.+}}[ 0], [[extract]] : !quantum.reg, !quantum.bit
+        return qml.expval(qml.X(0)), qml.expval(qml.Z(0))
+
+    return circ()
+
+
+print(expval13.mlir)
+
+
+# CHECK-LABEL: @expval14
+@qjit(target="mlir")
+def expval14():
+    A = np.zeros((4, 4), dtype=complex)
+    B = np.zeros((2, 2), dtype=complex)
+
+    # CHECK: func.func public @circ(%arg0: tensor<4x4xcomplex<f64>>, %arg1: tensor<2x2xcomplex<f64>>) -> (tensor<f64>, tensor<f64>, tensor<f64>)
+    @qml.qnode(qml.device("null.qubit", wires=3))
+    def circ():
+        # CHECK: [[extract0:%.+]] = quantum.extract {{%.+}}[ 0] : !quantum.reg -> !quantum.bit
+        # CHECK: [[extract1:%.+]] = quantum.extract {{%.+}}[ 1] : !quantum.reg -> !quantum.bit
+        # CHECK: {{%.+}} = quantum.hermitian(%arg0 : tensor<4x4xcomplex<f64>>) [[extract0]], [[extract1]] : !quantum.obs
+        # CHECK: [[extract2:%.+]] = quantum.extract {{%.+}}[ 2] : !quantum.reg -> !quantum.bit
+        # CHECK: {{%.+}} = quantum.hermitian(%arg0 : tensor<4x4xcomplex<f64>>) [[extract1]], [[extract2]] : !quantum.obs
+        # CHECK: {{%.+}} = quantum.hermitian(%arg1 : tensor<2x2xcomplex<f64>>) [[extract2]] : !quantum.obs
+        # CHECK: {{%.+}} = quantum.insert {{%.+}}[ 0], [[extract0]] : !quantum.reg, !quantum.bit
+        # CHECK: {{%.+}} = quantum.insert {{%.+}}[ 1], [[extract1]] : !quantum.reg, !quantum.bit
+        # CHECK: {{%.+}} = quantum.insert {{%.+}}[ 2], [[extract2]] : !quantum.reg, !quantum.bit
+        return (
+            qml.expval(qml.Hermitian(A, wires=[0, 1])),
+            qml.expval(qml.Hermitian(A, wires=[1, 2])),
+            qml.expval(qml.Hermitian(B, wires=[2])),
+        )
+
+    return circ()
+
+
+print(expval14.mlir)
 
 
 # CHECK-LABEL: public @var1(

@@ -13,9 +13,9 @@
 // limitations under the License.
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
 #include "Gradient/Transforms/EnzymeConstants.h"
 
@@ -24,7 +24,6 @@ using namespace mlir;
 namespace catalyst {
 
 #define GEN_PASS_DEF_REGISTERINACTIVECALLBACKPASS
-#define GEN_PASS_DECL_REGISTERINACTIVECALLBACKPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 struct RegisterInactiveCallbackPass
@@ -47,21 +46,18 @@ struct RegisterInactiveCallbackPass
         auto isConstant = false;
         auto linkage = LLVM::Linkage::External;
         auto key = catalyst::gradient::enzyme_inactivefn_key;
-        auto glb = builder.create<LLVM::GlobalOp>(loc, arrTy, isConstant, linkage, key, nullptr);
+        auto glb = LLVM::GlobalOp::create(builder, loc, arrTy, isConstant, linkage, key, nullptr);
         // Create a block and push it to the global
         Block *block = new Block();
         glb.getInitializerRegion().push_back(block);
         builder.setInsertionPointToStart(block);
-        auto undef = builder.create<LLVM::UndefOp>(glb.getLoc(), arrTy);
+        auto undef = LLVM::UndefOp::create(builder, glb.getLoc(), arrTy);
         auto fnSym = SymbolRefAttr::get(context, inactive_callbackFnName);
-        auto fnPtr = builder.create<LLVM::AddressOfOp>(glb.getLoc(), ptrTy, fnSym);
-        auto filledInArray = builder.create<LLVM::InsertValueOp>(glb.getLoc(), undef, fnPtr, 0);
-        builder.create<LLVM::ReturnOp>(glb.getLoc(), filledInArray);
+        auto fnPtr = LLVM::AddressOfOp::create(builder, glb.getLoc(), ptrTy, fnSym);
+        auto filledInArray = LLVM::InsertValueOp::create(builder, glb.getLoc(), undef, fnPtr,
+                                                         SmallVector<int64_t>{0});
+        LLVM::ReturnOp::create(builder, glb.getLoc(), filledInArray);
     }
 };
 
-std::unique_ptr<Pass> createRegisterInactiveCallbackPass()
-{
-    return std::make_unique<RegisterInactiveCallbackPass>();
-}
 } // namespace catalyst

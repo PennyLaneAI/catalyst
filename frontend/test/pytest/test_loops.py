@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,8 +31,7 @@ class TestLoopToJaxpr:
     def test_while_loop(self):
         """Check the while loop JAXPR."""
 
-        expected = dedent(
-            """
+        expected = dedent("""
             { lambda ; a:f64[]. let
                 b:i64[] c:f64[] = while_loop[
                   body_jaxpr={ lambda ; d:i64[] e:f64[]. let
@@ -43,12 +42,11 @@ class TestLoopToJaxpr:
                       i:bool[] = lt g 10:i64[]
                     in (i,) }
                   cond_nconsts=0
-                  nimplicit=0
+                  num_implicit_inputs=0
                   preserve_dimensions=True
                 ] 0:i64[] a
               in (b, c) }
-            """
-        )
+            """)
 
         @qjit
         def circuit(x: float):
@@ -58,13 +56,13 @@ class TestLoopToJaxpr:
 
             return loop((0, x))
 
-        assert expected.strip() == str(circuit.jaxpr).strip()
+        result = circuit.jaxpr.pretty_print(use_color=False).strip()
+        assert expected.strip() == result
 
     def test_for_loop(self):
         """Check the for loop JAXPR."""
 
-        expected = dedent(
-            """
+        expected = dedent("""
             { lambda ; a:f64[] b:i64[]. let
                 c:i64[] d:f64[] = for_loop[
                   apply_reverse_transform=False
@@ -72,12 +70,11 @@ class TestLoopToJaxpr:
                       h:i64[] = add f 1:i64[]
                     in (h, g) }
                   body_nconsts=0
-                  nimplicit=0
+                  num_implicit_inputs=0
                   preserve_dimensions=True
                 ] 0:i64[] b 1:i64[] 0:i64[] 0:i64[] a
               in (c, d) }
-        """
-        )
+        """)
 
         @qjit
         def circuit(x: float, n: int):
@@ -87,7 +84,8 @@ class TestLoopToJaxpr:
 
             return loop((0, x))
 
-        assert expected.strip() == str(circuit.jaxpr).strip()
+        result = circuit.jaxpr.pretty_print(use_color=False).strip()
+        assert expected.strip() == result
 
 
 class TestWhileLoops:
@@ -809,8 +807,7 @@ class TestForLoopOperatorAccess:
 
             return qml.probs()
 
-        assert circuit()[0] == 1
-        assert circuit()[1] == 0
+        assert np.allclose(circuit(), [1, 0])
 
     def test_for_loop_access_classical(self):
         """Test ForLoop operation access in classical context."""
@@ -880,8 +877,7 @@ class TestWhileLoopOperatorAccess:
 
             return qml.probs()
 
-        assert circuit()[0] == 0
-        assert circuit()[1] == 1
+        assert np.allclose(circuit(), [0, 1])
 
     def test_while_loop_access_classical(self):
         """Test WhileLoop operation access in classical context."""

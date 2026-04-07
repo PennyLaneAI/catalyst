@@ -12,28 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# RUN: %PYTHON %s | FileCheck %s
+"""Tests for multi-qubit gate compilation in Catalyst."""
 
-import os
-import pathlib
-import platform
+# RUN: %PYTHON %s | FileCheck %s
 
 import numpy as np
 import pennylane as qml
 from pennylane.devices.capabilities import OperatorProperties
+from utils import get_custom_qjit_device
 
 from catalyst import measure, qjit
-from catalyst.compiler import get_lib_path
-from catalyst.device import get_device_capabilities
-
-TEST_PATH = os.path.dirname(__file__)
-CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")
 
 
 # CHECK-LABEL: public @jit_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=5))
 def circuit(x: float):
+    """Test circuit with various multi-qubit gates."""
     # CHECK: {{%.+}} = quantum.custom "Identity"() {{.+}} : !quantum.bit
     qml.Identity(0)
     # CHECK: {{%.+}} = quantum.custom "CNOT"() {{.+}} : !quantum.bit, !quantum.bit
@@ -53,10 +48,11 @@ def circuit(x: float):
 print(circuit.mlir)
 
 
-# CHECK-LABEL: public @jit_circuit
+# CHECK-LABEL: public @jit_circuit_unitary
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
-def circuit():
+def circuit_unitary():
+    """Test circuit with unitary gates."""
     U1 = 1 / np.sqrt(2) * np.array([[1.0, 1.0], [1.0, -1.0]], dtype=complex)
     # CHECK: {{%.+}} = quantum.unitary({{%.+}} : tensor<2x2xcomplex<f64>>) {{%.+}} : !quantum.bit
     qml.QubitUnitary(U1, wires=0)
@@ -69,57 +65,23 @@ def circuit():
             [0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 0.99500417 - 0.09983342j],
         ]
     )
+    # pylint: disable=line-too-long
     # CHECK: {{%.+}} = quantum.unitary({{%.+}} : tensor<4x4xcomplex<f64>>) {{%.+}}, {{%.+}} : !quantum.bit, !quantum.bit
     qml.QubitUnitary(U2, wires=[0, 2])
 
     return measure(wires=0), measure(wires=1)
 
 
-print(circuit.mlir)
+print(circuit_unitary.mlir)
 
 
-def get_custom_qjit_device(num_wires, discards, additions):
-    """Generate a custom device without gates in discards."""
-
-    class CustomDevice(qml.devices.Device):
-        """Custom Gate Set Device"""
-
-        name = "lightning.qubit"
-        config_filepath = CONFIG_CUSTOM_DEVICE
-
-        def __init__(self, shots=None, wires=None):
-            super().__init__(wires=wires, shots=shots)
-            self.qjit_capabilities = get_device_capabilities(self)
-            for gate in discards:
-                self.qjit_capabilities.operations.pop(gate, None)
-            self.qjit_capabilities.operations.update(additions)
-
-        @staticmethod
-        def get_c_interface():
-            """Returns a tuple consisting of the device name, and
-            the location to the shared object with the C/C device implementation.
-            """
-
-            system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-            # Borrowing the NullQubit library:
-            lib_path = (
-                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
-            )
-            return "NullQubit", lib_path
-
-        def execute(self, circuits, execution_config):
-            """Exececute the device (no)."""
-            raise RuntimeError("No execution for the custom device")
-
-    return CustomDevice(wires=num_wires)
-
-
-# CHECK-LABEL: public @jit_circuit
+# CHECK-LABEL: public @jit_circuit_iswap_pswap
 @qjit(target="mlir")
 @qml.qnode(
     get_custom_qjit_device(2, (), {"ISWAP": OperatorProperties(), "PSWAP": OperatorProperties()})
 )
-def circuit(x: float):
+def circuit_iswap_pswap(x: float):
+    """Test circuit with ISWAP and PSWAP gates."""
     # CHECK: {{%.+}} = quantum.custom "ISWAP"() {{.+}} : !quantum.bit, !quantum.bit
     qml.ISWAP(wires=[0, 1])
     # CHECK: {{%.+}} = quantum.custom "PSWAP"({{%.+}}) {{.+}} : !quantum.bit, !quantum.bit
@@ -127,7 +89,7 @@ def circuit(x: float):
     return qml.probs()
 
 
-print(circuit.mlir)
+print(circuit_iswap_pswap.mlir)
 
 
 # CHECK-LABEL: public @jit_isingZZ_circuit

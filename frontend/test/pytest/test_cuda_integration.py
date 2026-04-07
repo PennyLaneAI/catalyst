@@ -69,7 +69,7 @@ class TestCudaQ:
         from catalyst.third_party.cuda import cudaqjit as cjit
 
         @cjit
-        @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=None))
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit():
             qml.RX(jnp.pi / 4, wires=[0])
             measure(0)
@@ -459,7 +459,7 @@ class TestCudaQ:
         with pytest.raises(CompileError, match="Cannot translate tapes with context"):
             catalyst.third_party.cuda.cudaqjit(wrapper)(1.0)
 
-    def test_samples(self):
+    def test_samples_multiple_wires(self):
         """Samples with more than one wire."""
 
         from catalyst.third_party.cuda import cudaqjit as cjit

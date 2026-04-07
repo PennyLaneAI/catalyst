@@ -49,7 +49,7 @@ module @static_alloca_custom_call {
     // CHECK: ^bb1:
     cf.br ^bb1
   ^bb1:
-    %0 = catalyst.custom_call fn("lapack_dgesdd") (%arg0, %arg1) {number_original_arg = array<i32: 1>} : (memref<3x3xf64>, memref<3x3xf64>) -> memref<3x3xf64>
+    %0 = catalyst.custom_call fn("lapack_dgesdd") (%arg0, %arg1) {number_original_arg = 1: i32} : (memref<3x3xf64>, memref<3x3xf64>) -> memref<3x3xf64>
     return
   }
 }

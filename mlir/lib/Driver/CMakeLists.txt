@@ -27,20 +27,29 @@ set(LIBS
     ${translation_libs}
     ExternalStablehloLib
     MLIROptLib
+    MLIRRegisterAllDialects
+    MLIRRegisterAllPasses
+    MLIRRegisterAllExtensions
     MLIRCatalyst
     catalyst-transforms
+    MLIRQRef
+    qref-transforms
     MLIRQuantum
     quantum-transforms
-    MLIRQEC
-    qec-transforms
+    MLIRPBC
+    pbc-transforms
     MLIRGradient
     gradient-transforms
     MLIRMBQC
     mbqc-transforms
     MLIRMitigation
     mitigation-transforms
+    MLIRPauliFrame
+    pauli-frame-transforms
     MLIRIon
     ion-transforms
+    MLIRRTIO
+    rtio-transforms
     MLIRCatalystTest
     ${ENZYME_LIB}
 )
@@ -49,7 +58,9 @@ add_mlir_library(CatalystCompilerDriver
     CompilerDriver.cpp
     CatalystLLVMTarget.cpp
     Pipelines.cpp
+    HighResolutionOutputStrategy.cpp
 
     LINK_LIBS PRIVATE
     ${LIBS}
+    MLIRSupport
 )

@@ -132,7 +132,7 @@ class TestDebugPrint:
             def loop(i):
                 debug.print(i)
 
-            loop()
+            loop()  # pylint: disable=no-value-for-parameter
 
         out, err = capfd.readouterr()
         assert err == ""
@@ -246,13 +246,17 @@ class TestPrintStage:
         """Test that the IR can be printed after the HLO lowering pipeline."""
 
         @qjit(keep_intermediate=True)
-        def func():
-            return 0
+        def func(x):
+            return x
 
-        print(get_compilation_stage(func, "HLOLoweringPass"))
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        func.use_cwd_for_workspace = False
+        func.jit_compile((0,))
+
+        print(get_compilation_stage(func, "HLOLoweringStage"))
 
         out, _ = capsys.readouterr()
-        assert "@jit_func() -> tensor<i64>" in out
+        assert "@jit_func(%arg0: tensor<i64>) -> tensor<i64>" in out
         assert "stablehlo.constant" not in out
 
         func.workspace.cleanup()
@@ -264,7 +268,7 @@ class TestPrintStage:
             return 0
 
         with pytest.raises(TypeError, match="needs to be a 'QJIT' object"):
-            print(get_compilation_stage(func, "HLOLoweringPass"))
+            print(get_compilation_stage(func, "HLOLoweringStage"))
 
 
 class TestCProgramGeneration:
@@ -339,7 +343,6 @@ class TestCProgramGeneration:
         with pytest.raises(TypeError, match="First argument needs to be a 'QJIT' object"):
             get_cmain(f, 0.5)
 
-    @pytest.mark.skip
     @pytest.mark.parametrize(
         ("pass_name", "target", "replacement"),
         [
@@ -350,29 +353,29 @@ class TestCProgramGeneration:
                 + "    %0 = stablehlo.multiply %x, %arg0 : tensor<f64>\n",
             ),
             (
-                "HLOLoweringPass",
+                "QuantumCompilationStage",
+                "%0 = stablehlo.multiply %arg0, %arg0 : tensor<f64>\n",
+                "%x = stablehlo.multiply %arg0, %arg0 : tensor<f64>\n"
+                + "    %0 = stablehlo.multiply %x, %arg0 : tensor<f64>\n",
+            ),
+            (
+                "HLOLoweringStage",
                 "%0 = arith.mulf %extracted, %extracted : f64\n",
                 "%t = arith.mulf %extracted, %extracted : f64\n"
                 + "    %0 = arith.mulf %t, %extracted : f64\n",
             ),
             (
-                "QuantumCompilationPass",
-                "%0 = arith.mulf %extracted, %extracted : f64\n",
-                "%t = arith.mulf %extracted, %extracted : f64\n"
-                + "    %0 = arith.mulf %t, %extracted : f64\n",
-            ),
-            (
-                "BufferizationPass",
-                "%2 = arith.mulf %1, %1 : f64",
+                "BufferizationStage",
+                "%2 = arith.mulf %1, %1 : f64\n",
                 "%t = arith.mulf %1, %1 : f64\n" + "    %2 = arith.mulf %t, %1 : f64\n",
             ),
             (
-                "MLIRToLLVMDialect",
-                "%5 = llvm.fmul %4, %4  : f64\n",
-                "%t = llvm.fmul %4, %4  : f64\n" + "    %5 = llvm.fmul %t, %4  : f64\n",
+                "MLIRToLLVMDialectConversion",
+                "%7 = llvm.fmul %6, %6 : f64\n",
+                "%t = llvm.fmul %6, %6  : f64\n" + "    %7 = llvm.fmul %t, %6  : f64\n",
             ),
             (
-                "llvm_ir",
+                "LLVMIRTranslation",
                 "%5 = fmul double %4, %4\n",
                 "%t = fmul double %4, %4\n" + "%5 = fmul double %t, %4\n",
             ),
@@ -391,6 +394,9 @@ class TestCProgramGeneration:
             return x**2
 
         jit_f = qjit(f, keep_intermediate=True)
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        jit_f.use_cwd_for_workspace = False
+
         data = 2.0
         old_result = jit_f(data)
         old_ir = get_compilation_stage(jit_f, pass_name)
@@ -404,16 +410,30 @@ class TestCProgramGeneration:
         shutil.rmtree(str(jit_f.workspace), ignore_errors=True)
         assert old_result * data == new_result
 
-    @pytest.mark.parametrize("pass_name", ["HLOLoweringPass", "O2Opt", "Enzyme"])
+    @pytest.mark.parametrize(
+        "pass_name",
+        [
+            "QuantumCompilationStage",
+            "HLOLoweringStage",
+            "GradientLoweringStage",
+            "BufferizationStage",
+            "MLIRToLLVMDialectConversion",
+            "LLVMIRTranslation",
+            "O2Opt",
+            "Enzyme",
+        ],
+    )
     def test_modify_ir_file_generation(self, pass_name):
         """Test if recompilation rerun the same pass."""
 
-        def f(x: float):
+        def f(x):
             """Square function."""
             return x**2
 
-        jit_f = qjit(f)
-        jit_grad_f = qjit(value_and_grad(jit_f), keep_intermediate=True)
+        jit_grad_f = qjit(value_and_grad(f), keep_intermediate=True)
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        jit_grad_f.use_cwd_for_workspace = False
+
         jit_grad_f(3.0)
         ir = get_compilation_stage(jit_grad_f, pass_name)
         old_workspace = str(jit_grad_f.workspace)
@@ -421,7 +441,7 @@ class TestCProgramGeneration:
         replace_ir(jit_grad_f, pass_name, ir)
         jit_grad_f(3.0)
         file_list = os.listdir(str(jit_grad_f.workspace))
-        res = [i for i in file_list if pass_name in i]
+        res = [file_name for file_name in file_list if pass_name in file_name]
 
         shutil.rmtree(old_workspace, ignore_errors=True)
         shutil.rmtree(str(jit_grad_f.workspace), ignore_errors=True)
@@ -554,6 +574,13 @@ class TestOptionsToCliFlags:
         assert ("--load-dialect-plugin", path) in flags
         assert isinstance(options.dialect_plugins, set)
 
+    def test_option_use_nameloc(self):
+        """Test use name location option"""
+
+        options = CompileOptions(use_nameloc=True)
+        flags = _options_to_cli_flags(options)
+        assert "--use-nameloc-as-prefix" in flags
+
     def test_option_not_lower_to_llvm(self):
         """Test not lower to llvm"""
         options = CompileOptions(lower_to_llvm=False)
@@ -571,13 +598,11 @@ class TestOptionsToCliFlags:
         """
         observed = to_llvmir(stdin=mlir)
         # pylint: disable=line-too-long
-        expected = textwrap.dedent(
-            """
+        expected = textwrap.dedent("""
         define void @foo() {
           ret void
         }
-        """
-        ).strip()
+        """).strip()
         # pylint: enable=line-too-long
         assert expected in observed
 
@@ -587,21 +612,19 @@ class TestOptionsToCliFlags:
         module {
             func.func @foo() {
                 %c = stablehlo.constant dense<0> : tensor<i64>
-                return 
+                return
             }
         }
         """
 
         observed = to_mlir_opt(stdin=mlir)
-        expected = textwrap.dedent(
-            """
+        expected = textwrap.dedent("""
         module {
           llvm.func @foo() {
             llvm.return
           }
         }
-        """
-        ).strip()
+        """).strip()
         assert expected in observed
 
     def test_catalyst_error(self):

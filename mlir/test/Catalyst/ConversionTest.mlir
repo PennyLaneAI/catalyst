@@ -112,7 +112,7 @@ func.func @custom_call(%arg0: memref<3x3xf64>, %arg1: memref<3x3xf64>) -> () {
     // CHECK: [[alloca3:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(i64, ptr, i8)>
 
     // CHECK: llvm.call @lapack_dgesdd([[alloca2]], [[alloca0]])
-    catalyst.custom_call fn("lapack_dgesdd") (%arg0, %arg1) {number_original_arg = array<i32: 1>} : (memref<3x3xf64>, memref<3x3xf64>) -> ()
+    catalyst.custom_call fn("lapack_dgesdd") (%arg0, %arg1) {number_original_arg = 1 : i32} : (memref<3x3xf64>, memref<3x3xf64>) -> ()
     return 
 }
 

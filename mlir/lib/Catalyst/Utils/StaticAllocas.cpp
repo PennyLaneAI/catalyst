@@ -29,9 +29,9 @@ LLVM::AllocaOp getStaticAlloca(Location &loc, RewriterBase &rewriter, Type ty, i
     PatternRewriter::InsertionGuard insertGuard(rewriter);
     // Move the value at the beginning
     rewriter.setInsertionPointAfter(&entryBlock->front());
-    auto valueOp = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(value));
-    return rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
-                                           ty, valueOp);
+    auto valueOp = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(value));
+    return LLVM::AllocaOp::create(rewriter, loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
+                                  ty, valueOp);
 }
 
 mlir::memref::AllocaOp getStaticMemrefAlloca(Location &loc, RewriterBase &rewriter,
@@ -45,7 +45,7 @@ mlir::memref::AllocaOp getStaticMemrefAlloca(Location &loc, RewriterBase &rewrit
     if (insertionBlock != entryBlock) {
         rewriter.setInsertionPoint(&entryBlock->front());
     }
-    return rewriter.create<memref::AllocaOp>(loc, paramCountType);
+    return memref::AllocaOp::create(rewriter, loc, paramCountType);
 }
 
 } // namespace catalyst

@@ -129,7 +129,7 @@ def test_sum(as_linear_combination):
     """Test the conversion of a Sum class."""
     qml.capture.enable()
 
-    @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
     def c():
         if as_linear_combination:
             # Note that we should investigate improving the capture of hamiltonian

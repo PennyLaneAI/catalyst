@@ -19,9 +19,9 @@
 
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientOps.h"
+#include "Gradient/Transforms/annotate_invalid_gradient_functions.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/annotate_function.h"
 
 #define GET_OP_CLASSES
 #include "Gradient/IR/GradientOps.cpp.inc"
@@ -56,7 +56,7 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
         return op_state->emitOpError("incorrect number of operands for callee, ")
                << "expected " << fnType.getNumInputs() << " but got " << fnArgs.size();
 
-    if (callee->getAttrOfType<UnitAttr>(catalyst::quantum::hasInvalidGradientOp)) {
+    if (callee->getAttrOfType<UnitAttr>(catalyst::gradient::hasInvalidGradientOp)) {
         // Check that the method is not finite difference, as finite difference should always be
         // available
         auto gradOpInterface = cast<GradientOpInterface>(op_state->getOperation());
@@ -220,18 +220,15 @@ LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTabl
         }
     }
 
-    for (size_t i = 0; i < callee.getFunctionType().getNumResults(); i++) {
-        // callee (function to be differentiated) always returns a single float
-        // grad type and shape should match the callee's argument's type and shape
-        // match from the tail because constant inputs will have types in the front
-        auto calleeInputType =
-            callee.getFunctionType().getInput(callee.getFunctionType().getNumInputs() - 1 - i);
-        auto gradRtype = grad_types[grad_types.size() - 1 - i];
+    // Each gradient result type must match the type of its corresponding
+    // differentiated operand (indexed by diffArgIndices).
+    for (size_t i = 0; i < diffArgIndices.size(); i++) {
+        auto calleeInputType = callee.getFunctionType().getInput(diffArgIndices[i]);
+        auto gradRtype = grad_types[i];
         if (calleeInputType != gradRtype) {
             return this->emitOpError("result types do not match")
-                   << " result " << i << " should match "
-                   << " was expected to match the type " << gradRtype << " but got "
-                   << calleeInputType;
+                   << " gradient " << i << " (for arg " << diffArgIndices[i] << ")"
+                   << " expected type " << calleeInputType << " but got " << gradRtype;
         }
     }
 

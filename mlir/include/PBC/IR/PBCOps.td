@@ -1,0 +1,578 @@
+// Copyright 2025 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#ifndef PBC_OPS
+#define PBC_OPS
+
+include "mlir/IR/OpBase.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"  // for ReturnLike
+include "mlir/Interfaces/SideEffectInterfaces.td" // for Pure
+
+include "Quantum/IR/QuantumDialect.td"
+include "Quantum/IR/QuantumTypes.td"
+include "PBC/IR/PBCDialect.td"
+include "PBC/IR/PBCOpInterfaces.td"
+
+//===----------------------------------------------------------------------===//
+// PBC dialect operations.
+//===----------------------------------------------------------------------===//
+
+class PBC_Op<string mnemonic, list<Trait> traits = []> : Op<PBCDialect, mnemonic, traits>;
+
+//===----------------------------------------------------------------------===//
+// Attribute constraints
+//===----------------------------------------------------------------------===//
+
+// Constraint for rotation_kind: must be one of ±1, ±2, ±4, ±8
+// The power-of-2 check works because powers of 2 have exactly one bit set.
+def RotationKindConstraint : AttrConstraint<
+    CPred<"[&]() {"
+          "  auto val = ::llvm::cast<::mlir::IntegerAttr>($_self).getSInt();"
+          "  auto absVal = val < 0 ? -val : val;"
+          "  return absVal >= 1 && absVal <= 8 && (absVal & (absVal - 1)) == 0;"
+          "}()">,
+    "whose value is ±1, ±2, ±4, or ±8">;
+
+def PrepareStateOp : PBC_Op<"prepare"> {
+    let summary = "Prepare auxiliary qubits in a given state.";
+    let description = [{
+        Prepares simple (non-magic) states in new qubits, such as |0⟩, |1⟩, |+⟩, |-⟩, |Y⟩, |-Y⟩.
+
+        This operation is typically used for auxiliary qubits introduced by compilation passes
+        lower in the stack, "algorithmic"-level allocations would typically use `quantum.alloc`
+        or `quantum.alloc_qb` instead. However, those are limited to the |0⟩ state only.
+
+        Based on PBC scheme, |Y⟩ (plus_i) and |-Y⟩ (minus_i) can be prepared as transversal
+        operations. Otherwise, if those states require expesive preparations in factories,
+        `pbc.fabricate` should be used.
+
+        Magic state such as |m⟩ (magic) and |m̅⟩ (magic_conj) cannot be prepared
+        by this operation, use `pbc.fabricate` instead.
+
+        Example:
+        ```mlir
+        %0 = pbc.prepare zero : !quantum.bit
+        %1 = pbc.prepare minus : !quantum.bit
+        %2 = pbc.prepare plus_i : !quantum.bit
+        ```
+    }];
+
+    let arguments = (ins
+        LogicalInit:$init_state
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let assemblyFormat = [{
+        $init_state attr-dict `:` type($out_qubits)
+    }];
+
+    let hasVerifier = 1;
+}
+
+def FabricateOp : PBC_Op<"fabricate"> {
+    let summary = "Fabricate axillary qubits from qubit factories.";
+    let description = [{
+        The FabricateOp represents a operation that produces/fetches auxiliary qubits from a qubit factory.
+
+        FabricateOp is used to prepare states not normally available in an error correction scheme,
+        such as magic states |m⟩ (magic) and |m̅⟩ (magic_conj), or |Y⟩ (plus_i), and |-Y⟩ (minus_i)
+        in some instances. For states constructible within the scheme, use `PrepareStateOp` instead.
+
+        Example:
+        ```mlir
+        %0 = pbc.fabricate magic: !quantum.bit
+        %1 = pbc.fabricate magic_conj: !quantum.bit
+        %2 = pbc.fabricate plus_i: !quantum.bit
+        %3 = pbc.fabricate minus_i: !quantum.bit
+        ```
+    }];
+
+    let arguments = (ins
+        LogicalInit:$init_state
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let builders = [
+        // Convenience builder with single qubit
+        OpBuilder<
+        (ins
+            "::catalyst::pbc::LogicalInitKind":$init_state
+        ),[{
+            FabricateOp::build($_builder, $_state,
+            /*out_qubits=*/ mlir::TypeRange({catalyst::quantum::QubitType::get($_builder.getContext())}),
+            /*init_state=*/ init_state);
+        }]>,
+        // Convenience builder with size of qubits
+        OpBuilder<
+        (ins
+            "::catalyst::pbc::LogicalInitKind":$init_state,
+            "int":$size_of_qubits
+        ),[{
+            std::vector<mlir::Type> types;
+            for (int i = 0; i < size_of_qubits; i++) {
+                types.push_back(catalyst::quantum::QubitType::get($_builder.getContext()));
+            }
+            mlir::TypeRange out_qubits(types);
+            FabricateOp::build($_builder, $_state,
+            /*out_qubits=*/ out_qubits,
+            /*init_state=*/ init_state);
+        }]>
+    ];
+
+    let assemblyFormat = [{
+        $init_state attr-dict `:` type($out_qubits)
+    }];
+
+    let hasVerifier = 1;
+}
+
+def PPRotationOp : PBC_Op<"ppr", [PBCOpInterface, AttrSizedOperandSegments]> {
+    let summary = "Pauli Product Rotation on qubits.";
+
+    let description = [{
+        The PPRotationOp represents a Pauli product rotation operation on a set of qubits.
+        It applies a rotation of the form exp(-iθP) where:
+        - P is a Pauli product (specified by pauli_product)
+        - θ is the rotation angle (specified by rotation_kind in fractions of π)
+
+        The operation is characterized by:
+        1. A Pauli product (e.g., ["X", "I", "Z"]) specifying which Pauli operators to apply
+        2. A rotation kind (in fractions of π) specifying the angle
+        3. A list of input qubits to apply the rotation to
+        4. A condition (optional) for the operation to be applied only if the condition is true.
+
+        The operation returns the same number of qubits as input.
+
+        Example:
+        ```mlir
+        %c0 = arith.constant true : i1
+        %Q_0:3 = pbc.ppr ["X", "I", "Z"](4) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+        %Q_1:3 = pbc.ppr ["X", "I", "Z"](4) %Q_0[0], %Q_0[1], %Q_0[2] cond(%c0) : !quantum.bit, !quantum.bit, !quantum.bit
+        ```
+        This applies exp(-iπ/4 * X⊗I⊗Z) to the three qubits.
+    }];
+
+    let arguments = (ins
+        PauliWord:$pauli_product,  // The Pauli product to apply (e.g., ["X", "I", "Z"])
+        ConfinedAttr<SI8Attr, [RotationKindConstraint]>:$rotation_kind,  // angle in fractions of π (e.g., 4 for π/4)
+        Variadic<QubitType>:$in_qubits,  // The qubits to apply the rotation to
+        Optional<I1>:$condition
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let builders = [
+        OpBuilder<  // infer result types
+        (ins
+            "::mlir::ArrayAttr":$pauli_product,
+            "::mlir::IntegerAttr":$rotation_kind,
+            "::mlir::ValueRange":$in_qubits,
+            CArg<"::mlir::Value", "nullptr">:$condition
+        ),[{
+            PPRotationOp::build($_builder, $_state,
+                /*out_qubits=*/ mlir::TypeRange(in_qubits),
+                /*pauli_product=*/ pauli_product,
+                /*rotation_kind=*/ rotation_kind,
+                /*in_qubits=*/ in_qubits,
+                /*condition=*/ condition
+            );
+        }]>,
+        OpBuilder<  // C++ values for attributes
+        (ins
+            "::mlir::ArrayRef<::mlir::StringRef>":$pauli_product,
+            "int8_t":$rotation_kind,
+            "::mlir::ValueRange":$in_qubits,
+            CArg<"::mlir::Value", "nullptr">:$condition
+        ),[{
+            auto SI8 = ::mlir::IntegerType::get($_builder.getContext(), 8, ::mlir::IntegerType::Signed);
+            PPRotationOp::build($_builder, $_state,
+                /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product),
+                /*rotation_kind=*/ $_builder.getIntegerAttr(SI8, rotation_kind),
+                /*in_qubits=*/ in_qubits,
+                /*condition=*/ condition
+            );
+        }]>,
+        OpBuilder<  // C++ value for rotation_kind
+        (ins
+            "::mlir::ArrayAttr":$pauli_product,
+            "int8_t":$rotation_kind,
+            "::mlir::ValueRange":$in_qubits,
+            CArg<"::mlir::Value", "nullptr">:$condition
+        ),[{
+            auto SI8 = mlir::IntegerType::get($_builder.getContext(), 8, ::mlir::IntegerType::Signed);
+            PPRotationOp::build($_builder, $_state,
+                /*pauli_product=*/ pauli_product,
+                /*rotation_kind=*/ $_builder.getIntegerAttr(SI8, rotation_kind),
+                /*in_qubits=*/ in_qubits,
+                /*condition=*/ condition
+            );
+        }]>,
+    ];
+
+    let assemblyFormat = [{
+        $pauli_product `(` $rotation_kind `)` $in_qubits attr-dict (`cond` `(` $condition^ `)`)? `:` type($out_qubits)
+    }];
+
+    let hasVerifier = 1;
+
+    let hasCanonicalizeMethod = 1;
+
+    code extraBaseClassDeclaration = [{
+        bool hasPiOverTwoRotation(){
+            auto rotationKind = getRotationKind();
+            return rotationKind == 2 || rotationKind == -2;
+        };
+        bool hasPiOverFourRotation(){
+            auto rotationKind = getRotationKind();
+            return rotationKind == 4 || rotationKind == -4;
+        };
+        bool hasPiOverEightRotation(){
+            auto rotationKind = getRotationKind();
+            return rotationKind == 8 || rotationKind == -8;
+        };
+
+        bool isNonClifford(){
+            return hasPiOverEightRotation();  // π/8 rotations are non-Clifford
+        };
+        bool isClifford(){
+            return hasPiOverTwoRotation() || hasPiOverFourRotation();  // π/2 and π/4 rotations are Clifford
+        };
+    }];
+    let extraClassDeclaration = extraBaseClassDeclaration;
+}
+
+def PPRotationArbitraryOp : PBC_Op<"ppr.arbitrary", [PBCOpInterface, AttrSizedOperandSegments]> {
+    let summary = "Pauli Product Rotation with arbitrary angle.";
+    let description = [{
+        The PPRotationArbitraryOp represents a Pauli product rotation operation with an arbitrary angle.
+        It applies a rotation of the form exp(-iθP) to a set of qubits, where:
+        - P is a Pauli product (specified by pauli_product)
+        - θ is the rotation angle (specified by arbitrary_angle in radians)
+
+        The operation is characterized by:
+        1. A Pauli product (e.g., ["X", "I", "Z"]) specifying which Pauli operators to apply
+        2. A rotation angle (specified by arbitrary_angle in radians)
+        3. A list of input qubits to apply the rotation to
+        4. A condition (optional) for the operation to be applied only if the condition is true.
+
+        Example:
+        ```mlir
+        %const = arith.constant 0.14 : f64
+        %result = pbc.ppr.arbitrary ["X", "Z"](%const) %q0, %q1 : !quantum.bit, !quantum.bit
+        ```
+        This applies exp(-i0.14 * X⊗Z) to the two qubits.
+    }];
+
+    let arguments = (ins
+        PauliWord:$pauli_product,
+        F64:$arbitrary_angle,
+        Variadic<QubitType>:$in_qubits,
+        Optional<I1>:$condition
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let builders = [
+        OpBuilder<
+        (ins
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
+            "::mlir::Value":$arbitrary_angle,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            PPRotationArbitraryOp::build($_builder, $_state,
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product),
+            /*arbitrary_angle=*/ arbitrary_angle,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ nullptr);
+        }]>,
+        // Convenience builder with no condition
+        OpBuilder<
+        (ins
+            "::mlir::TypeRange":$out_qubits,
+            "::mlir::ArrayAttr":$pauli_product,
+            "::mlir::Value":$arbitrary_angle,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            PPRotationArbitraryOp::build($_builder, $_state,
+            /*out_qubits=*/ out_qubits,
+            /*pauli_product=*/ pauli_product,
+            /*arbitrary_angle=*/ arbitrary_angle,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ nullptr);
+        }]>,
+        // Convenience builder with ArrayRef<StringRef> with condition
+        OpBuilder<
+        (ins
+            "::mlir::TypeRange":$out_qubits,
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
+            "::mlir::Value":$arbitrary_angle,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            PPRotationArbitraryOp::build($_builder, $_state,
+            /*out_qubits=*/ out_qubits,
+            /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product),
+            /*arbitrary_angle=*/ arbitrary_angle,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ nullptr);
+        }]>,
+        // Convenience builder with no type range
+        OpBuilder<
+        (ins
+            "::mlir::ArrayAttr":$pauli_product,
+            "::mlir::Value":$arbitrary_angle,
+            "::mlir::ValueRange":$in_qubits,
+            "::mlir::Value":$condition
+        ),[{
+            PPRotationArbitraryOp::build($_builder, $_state,
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*pauli_product=*/ pauli_product,
+            /*arbitrary_angle=*/ arbitrary_angle,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ condition);
+        }]>,
+    ];
+
+    let assemblyFormat = [{
+        $pauli_product `(` $arbitrary_angle `)` $in_qubits attr-dict (`cond` `(` $condition^ `)`)? `:` type($out_qubits)
+    }];
+
+    let hasVerifier = 1;
+    let hasCanonicalizeMethod = 1;
+}
+
+def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface]> {
+    let summary = "Pauli Product Measurement on qubits.";
+
+    let description = [{
+        The PPMeasurementOp represents a Pauli product measurement operation.
+        It measures a set of qubits in the basis specified by a Pauli product.
+
+        The operation is characterized by:
+        1. A Pauli product (e.g., ["X", "I", "Z"]) specifying the measurement basis
+        2. A list of input qubits to measure
+
+        The operation returns:
+        1. A measurement result (1-bit classical value)
+        2. The post-measurement state of the qubits
+
+        Example:
+        ```mlir
+        %result, %q0:3 = pbc.ppm ["X", "I", "Z"] %q0, %q1, %q2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+        ```
+        This measures the three qubits in the X⊗I⊗Z basis.
+    }];
+
+    let arguments = (ins
+        PauliWord:$pauli_product,  // The Pauli product specifying the measurement basis
+        UnitAttr:$negated,  // Pauli words can carry a negative sign, which flips the result
+        Variadic<QubitType>:$in_qubits  // The qubits to measure
+    );
+
+    let results = (outs
+        I1:$mres,  // The measurement result (0 or 1)
+        Variadic<QubitType>:$out_qubits  // The post-measurement state of the qubits
+    );
+
+    let builders = [
+        OpBuilder<  // infer result types
+        (ins
+            "::mlir::ArrayAttr":$pauli_product,
+            "::mlir::ValueRange":$in_qubits,
+            CArg<"bool", "0">:$negated
+        ),[{
+            PPMeasurementOp::build($_builder, $_state,
+                /*mres=*/ $_builder.getI1Type(),
+                /*out_qubits=*/ mlir::TypeRange(in_qubits),
+                /*pauli_product=*/ pauli_product,
+                /*negated=*/ negated,
+                /*in_qubits=*/ in_qubits
+            );
+        }]>,
+        OpBuilder<  // allow arrays of strings as input
+        (ins
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
+            "::mlir::ValueRange":$in_qubits,
+            CArg<"bool", "0">:$negated
+        ),[{
+            PPMeasurementOp::build($_builder, $_state,
+                /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product),
+                /*in_qubits=*/ in_qubits,
+                /*negated=*/ negated
+            );
+        }]>,
+    ];
+
+    let assemblyFormat = [{
+        $pauli_product (`(``-``)` $negated^)? $in_qubits attr-dict `:` type(results)
+    }];
+
+    let hasVerifier = 1;
+}
+
+def SelectPPMeasurementOp : PBC_Op<"select.ppm"> {
+    let summary = "Multiplexed Pauli product measurement.";
+
+    let description = [{
+    Based on the boolean `select_switch` (type `i1`), this op selects between two Pauli product strings:
+    - If `select_switch` is 1, applies and measures using `pauli_product_0`.
+    - If `select_switch` is 0, uses `pauli_product_1`.
+
+    The operation returns:
+    - `mres`: the result of the Pauli product measurement (`i1`)
+    - `out_qubits`: post-measurement qubits
+
+    Example:
+    ```mlir
+    %m3, %3 = pbc.select.ppm (%m1, ["X"], ["Z"]) %1#1 : i1, !quantum.bit
+    ```
+    If %m1 == 1, applies "X" to %1#1; else applies "Z". Then measures.
+    }];
+
+    let arguments = (ins
+        I1:$select_switch,
+        PauliWord:$pauli_product_0,
+        UnitAttr:$negated_0,
+        PauliWord:$pauli_product_1,
+        UnitAttr:$negated_1,
+        Variadic<QubitType>:$in_qubits  // The qubits to measure
+    );
+
+    let results = (outs
+        I1:$mres,  // The measurement result (0 or 1)
+        Variadic<QubitType>:$out_qubits  // The post-measurement state of the qubits
+    );
+
+    let builders = [
+        OpBuilder<  // infer result types
+        (ins
+            "::mlir::Value":$select_switch,
+            "::mlir::ArrayAttr":$pauli_product_0,
+            "::mlir::ArrayAttr":$pauli_product_1,
+            "::mlir::ValueRange":$in_qubits,
+            CArg<"bool", "0">:$negated_0,
+            CArg<"bool", "0">:$negated_1
+        ),[{
+            SelectPPMeasurementOp::build($_builder, $_state,
+                /*mres_type=*/ $_builder.getI1Type(),
+                /*out_qubits=*/ mlir::TypeRange(in_qubits),
+                /*select_switch=*/ select_switch,
+                /*pauli_product_0=*/ pauli_product_0,
+                /*negated_0=*/ negated_0,
+                /*pauli_product_1=*/ pauli_product_1,
+                /*negated_1=*/ negated_1,
+                /*in_qubits=*/ in_qubits
+            );
+        }]>,
+        OpBuilder<  // C++ types for attributes
+        (ins
+            "::mlir::Value":$select_switch,
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product_0,
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product_1,
+            "::mlir::ValueRange":$in_qubits,
+            CArg<"bool", "0">:$negated_0,
+            CArg<"bool", "0">:$negated_1
+        ),[{
+            SelectPPMeasurementOp::build($_builder, $_state,
+                /*select_switch=*/ select_switch,
+                /*pauli_product_0=*/ $_builder.getStrArrayAttr(pauli_product_0),
+                /*pauli_product_1=*/ $_builder.getStrArrayAttr(pauli_product_1),
+                /*in_qubits=*/ in_qubits,
+                /*negated_0=*/ negated_0,
+                /*negated_1=*/ negated_1
+            );
+        }]>
+
+    ];
+
+    let assemblyFormat = [{
+        ` ` `(` $select_switch `?` $pauli_product_0 (`(``-``)` $negated_0^)? `:` $pauli_product_1 (`(``-``)` $negated_1^)? `)` $in_qubits attr-dict `:` type(results)
+    }];
+
+    let hasVerifier = 1;
+}
+
+def LayerOp : PBC_Op<"layer", [SingleBlockImplicitTerminator<"YieldOp">]> {
+    let summary = "A layer operation";
+
+    let description = [{
+    The `pbc.layer` operation represents a group of PPR/PPM operations that are
+    either mutually commutative within the group or act on different qubits.
+
+    `pbc.layer` operates on carried variables and returns the final values after termination.
+
+    The body region must contain exactly one block that terminates with `pbc.yield`.
+
+    Example:
+    ```mlir
+    func.func @layer(%arg0 : !quantum.bit) -> i1 {
+        %m, %0 = pbc.layer(%q0 = %arg0) : !quantum.bit {
+            %res, %q_1 = pbc.ppm ["Z"](4) %q0 : i1, !quantum.bit
+            pbc.yield %res, %q_1 : i1, !quantum.bit
+        }
+        func.return %m : i1
+    }
+    ```
+    }];
+
+    let arguments = (ins Variadic<AnyType>: $initArgs);
+
+    let results = (outs Variadic<AnyType>:$results);
+    let regions = (region SizedRegion<1>:$region);
+
+    let skipDefaultBuilders = 1;
+    let builders = [
+      OpBuilder<(ins
+        CArg<"mlir::ValueRange", "{}">:$initArgs,
+        CArg<"mlir::ValueRange", "{}">:$outArgs,
+        CArg<"llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange, mlir::ValueRange)>",
+            "nullptr">)>
+    ];
+
+    let extraClassDeclaration = [{
+      using BodyBuilderFn =
+          llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange, mlir::ValueRange)>;
+
+    }];
+
+    let hasCustomAssemblyFormat = 1;
+}
+
+def YieldOp : PBC_Op<"yield", [ Pure, ReturnLike, Terminator, ParentOneOf<["LayerOp"]> ]> {
+    let summary = "Return results from a layer region";
+
+    let arguments = (ins
+        Variadic<AnyType>:$results
+    );
+
+    let assemblyFormat = [{
+        attr-dict ($results^ `:` type($results))?
+    }];
+
+    let builders = [
+        OpBuilder<(ins), [{ /* nothing to do */ }]>
+    ];
+}
+
+#endif // PBC_OPS

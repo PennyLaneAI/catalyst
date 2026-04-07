@@ -15,44 +15,14 @@
 #ifndef QUANTUM_OPS
 #define QUANTUM_OPS
 
-include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
+include "Quantum/IR/QuantumAttrDefs.td"
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumInterfaces.td"
-
-//===----------------------------------------------------------------------===//
-// Quantum dialect enums.
-//===----------------------------------------------------------------------===//
-
-def NamedObservable : I32EnumAttr<"NamedObservable",
-    "Known named observables",
-    [
-        I32EnumAttrCase<"Identity", 0>,
-        I32EnumAttrCase<"PauliX",   1>,
-        I32EnumAttrCase<"PauliY",   2>,
-        I32EnumAttrCase<"PauliZ",   3>,
-        I32EnumAttrCase<"Hadamard", 4>,
-    ]> {
-    let cppNamespace = "catalyst::quantum";
-    let genSpecializedAttr = 0;
-}
-
-
-//===----------------------------------------------------------------------===//
-// Quantum dialect traits.
-//===----------------------------------------------------------------------===//
-
-def Unitary : NativeOpTrait<"UnitaryTrait">;
-def Hermitian : NativeOpTrait<"HermitianTrait">;
-
-//===----------------------------------------------------------------------===//
-// Quantum dialect attributes.
-//===----------------------------------------------------------------------===//
-
-def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_observable">;
+include "Quantum/IR/QuantumTypes.td"
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect operations.
@@ -125,7 +95,7 @@ def DeviceReleaseOp : Quantum_Op<"device_release"> {
     }];
 }
 
-def NumQubitsOp : Quantum_Op<"num_qubits"> {
+def NumQubitsOp : Quantum_Op<"num_qubits", [MemoryEffects<[MemRead]>]> {
     let summary = "Get the number of currently allocated qubits.";
 
     let results = (outs
@@ -141,9 +111,7 @@ def NumQubitsOp : Quantum_Op<"num_qubits"> {
 
 class Memory_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;
 
-// The operation has no memory effect and is pure, therefore two similar alloc would be removed
-// by a CSE pass. This needs to be changed in the future.
-def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
+def AllocOp : Memory_Op<"alloc"> {
     let summary = "Allocate n qubits into a quantum register.";
     let description = [{
     }];
@@ -160,6 +128,8 @@ def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     let assemblyFormat = [{
         `(` ($nqubits^):($nqubits_attr)? `)` attr-dict `:` type(results)
     }];
+
+    let hasCanonicalizeMethod = 1;
 }
 
 def AllocQubitOp : Memory_Op<"alloc_qb"> {
@@ -241,6 +211,7 @@ def ExtractOp : Memory_Op<"extract", [NoMemoryEffect]> {
         $qreg `[` ($idx^):($idx_attr)? `]` attr-dict `:` type($qreg) `->` type(results)
     }];
 
+    let hasCanonicalizeMethod = 1;
     let hasVerifier = 1;
     let hasFolder = 1;
 }
@@ -560,6 +531,44 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
         }
     }];
     let hasCanonicalizeMethod = 1;
+    let hasVerifier = 1;
+}
+
+def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
+                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+    let summary = "Apply a Pauli Product Rotation";
+    let description = [{
+        The `quantum.paulirot` operation applies a rotation around a Pauli product
+        operator to the state-vector.
+        The arguments are the rotation angle `angle`, a string representing the
+        Pauli product operator, and a set of qubits the operation acts on.
+    }];
+
+    let arguments = (ins
+        F64:$angle,
+        PauliWord:$pauli_product,
+        Variadic<QubitType>:$in_qubits,
+        UnitAttr:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        $pauli_product `(` $angle `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getAllParams() {
+            return getODSOperands(getParamOperandIdx());
+        }
+    }];
+
+    let hasVerifier = 1;
 }
 
 def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
@@ -570,7 +579,7 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
     }];
 
     let arguments = (ins
-        F64:$params,
+        F64:$angle,
         UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values
@@ -581,7 +590,7 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
     );
 
     let assemblyFormat = [{
-        `(` $params `)` attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` (`ctrls` type($out_ctrl_qubits)^ )?
+        `(` $angle `)` (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? ( `:` `ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -733,21 +742,21 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect
 class Region_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [NoMemoryEffect]>;
 
-def AdjointOp : Region_Op<"adjoint", [QuantumRegion, SingleBlockImplicitTerminator<"YieldOp">]> {
+def AdjointOp : Region_Op<"adjoint", [SingleBlockImplicitTerminator<"YieldOp">, AllTypesMatch<["args", "results"]>]> {
     let summary = "Calculate the adjoint of the enclosed operations";
 
     let regions = (region SizedRegion<1>:$region);
 
     let arguments = (ins
-        QuregType:$qreg
+        Variadic<AnyTypeOf<[QuregType, QubitType]>>:$args
     );
 
     let results = (outs
-        QuregType:$out_qreg
+        Variadic<AnyTypeOf<[QuregType, QubitType]>>:$results
     );
 
     let assemblyFormat = [{
-        `(` $qreg `)` attr-dict `:` type(operands) $region
+        `(` $args `)` attr-dict `:` type($results) $region
     }];
 
     let hasVerifier = 1;
@@ -757,7 +766,7 @@ def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["A
     let summary = "Return results from quantum program regions";
 
     let arguments = (ins
-        Variadic<QuregType>:$retvals
+        Variadic<AnyTypeOf<[QuregType, QubitType]>>:$retvals
     );
 
     let assemblyFormat = [{
@@ -842,6 +851,38 @@ def NamedObsOp : Observable_Op<"namedobs"> {
 
     let assemblyFormat = [{
         $qubit `[` $type `]` attr-dict  `:` type(results)
+    }];
+}
+
+def MCMObsOp : Observable_Op<"mcmobs"> {
+    let summary = "Define a pseudo-observable of mid-circuit measurements for use in measurement processes";
+    let description = [{
+        The `quantum.mcmobs` operation defines a quantum observable from mid-circuit measurements,
+        to be used by other operations such as measurement processes.
+
+        The only argument is a sequence of boolean result values of mid-circuit measurements.
+
+        Example:
+
+        ```mlir
+        func.func @foo(%mcm: i1)
+        {
+            %obs = quantum.mcmobs %mcm : !quantum.obs
+            func.return
+        }
+        ```
+    }];
+
+    let arguments = (ins
+        Variadic<I1>:$mcms
+    );
+
+    let results = (outs
+        ObservableType:$obs
+    );
+
+    let assemblyFormat = [{
+        $mcms attr-dict `:` type(results)
     }];
 }
 
@@ -1138,6 +1179,8 @@ def ExpvalOp : Measurement_Op<"expval"> {
     let assemblyFormat = [{
         $obs attr-dict `:` type(results)
     }];
+
+    let hasVerifier = 1;
 }
 
 def VarianceOp : Measurement_Op<"var"> {
@@ -1174,6 +1217,8 @@ def VarianceOp : Measurement_Op<"var"> {
     let assemblyFormat = [{
         $obs attr-dict `:` type(results)
     }];
+
+    let hasVerifier = 1;
 }
 
 def ProbsOp : Measurement_Op<"probs", [AttrSizedOperandSegments]> {

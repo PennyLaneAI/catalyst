@@ -26,8 +26,6 @@ def MitigationLoweringPass : Pass<"lower-mitigation"> {
         "scf::SCFDialect",
         "catalyst::quantum::QuantumDialect"
     ];
-
-    let constructor = "catalyst::createMitigationLoweringPass()";
 }
 
 #endif // MITIGATION_PASSES

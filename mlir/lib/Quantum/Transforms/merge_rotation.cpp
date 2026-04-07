@@ -1,4 +1,4 @@
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023-2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
+#include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 
@@ -34,7 +35,6 @@ namespace catalyst {
 namespace quantum {
 
 #define GEN_PASS_DEF_MERGEROTATIONSPASS
-#define GEN_PASS_DECL_MERGEROTATIONSPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
@@ -53,6 +53,10 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
                                                                  &getContext());
         catalyst::quantum::MultiRZOp::getCanonicalizationPatterns(patternsCanonicalization,
                                                                   &getContext());
+        catalyst::pbc::PPRotationOp::getCanonicalizationPatterns(patternsCanonicalization,
+                                                                 &getContext());
+        catalyst::pbc::PPRotationArbitraryOp::getCanonicalizationPatterns(patternsCanonicalization,
+                                                                          &getContext());
         if (failed(applyPatternsGreedily(module, std::move(patternsCanonicalization)))) {
             return signalPassFailure();
         }
@@ -60,7 +64,6 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
         RewritePatternSet patterns(&getContext());
         populateLoopBoundaryPatterns(patterns, 1);
         populateMergeRotationsPatterns(patterns);
-
         if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
             return signalPassFailure();
         }
@@ -68,10 +71,4 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
 };
 
 } // namespace quantum
-
-std::unique_ptr<Pass> createMergeRotationsPass()
-{
-    return std::make_unique<quantum::MergeRotationsPass>();
-}
-
 } // namespace catalyst

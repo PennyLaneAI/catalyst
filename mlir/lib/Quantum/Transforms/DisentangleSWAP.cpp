@@ -17,23 +17,26 @@
 
 #define DEBUG_TYPE "disentangleswap"
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/Pass/Pass.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 
-#include "Catalyst/IR/CatalystDialect.h"
-#include "Quantum/IR/QuantumOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/Pass/Pass.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "PropagateSimpleStatesAnalysis.hpp"
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 using namespace catalyst;
+using namespace catalyst::quantum;
 
 namespace catalyst {
-#define GEN_PASS_DEF_DISENTANGLESWAPPASS
+namespace quantum {
+
 #define GEN_PASS_DECL_DISENTANGLESWAPPASS
+#define GEN_PASS_DEF_DISENTANGLESWAPPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWAPPass> {
@@ -49,15 +52,15 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(insert_after_gate);
         quantum::CustomOp newGate =
-            builder.create<quantum::CustomOp>(loc,
-                                              /*out_qubits=*/mlir::TypeRange({outQubit.getType()}),
-                                              /*out_ctrl_qubits=*/mlir::TypeRange(),
-                                              /*params=*/mlir::ValueRange(),
-                                              /*in_qubits=*/mlir::ValueRange({inQubit}),
-                                              /*gate_name=*/gateName,
-                                              /*adjoint=*/false,
-                                              /*in_ctrl_qubits=*/mlir::ValueRange(),
-                                              /*in_ctrl_values=*/mlir::ValueRange());
+            quantum::CustomOp::create(builder, loc,
+                                      /*out_qubits=*/mlir::TypeRange({outQubit.getType()}),
+                                      /*out_ctrl_qubits=*/mlir::TypeRange(),
+                                      /*params=*/mlir::ValueRange(),
+                                      /*in_qubits=*/mlir::ValueRange({inQubit}),
+                                      /*gate_name=*/gateName,
+                                      /*adjoint=*/false,
+                                      /*in_ctrl_qubits=*/mlir::ValueRange(),
+                                      /*in_ctrl_values=*/mlir::ValueRange());
 
         return newGate;
     }
@@ -71,15 +74,15 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(insert_after_gate);
         quantum::CustomOp newGate =
-            builder.create<quantum::CustomOp>(loc,
-                                              /*out_qubits=*/mlir::TypeRange({inQubit.getType()}),
-                                              /*out_ctrl_qubits=*/mlir::TypeRange(),
-                                              /*params=*/mlir::ValueRange(),
-                                              /*in_qubits=*/mlir::ValueRange({inQubit}),
-                                              /*gate_name=*/gateName,
-                                              /*adjoint=*/false,
-                                              /*in_ctrl_qubits=*/mlir::ValueRange(),
-                                              /*in_ctrl_values=*/mlir::ValueRange());
+            quantum::CustomOp::create(builder, loc,
+                                      /*out_qubits=*/mlir::TypeRange({inQubit.getType()}),
+                                      /*out_ctrl_qubits=*/mlir::TypeRange(),
+                                      /*params=*/mlir::ValueRange(),
+                                      /*in_qubits=*/mlir::ValueRange({inQubit}),
+                                      /*gate_name=*/gateName,
+                                      /*adjoint=*/false,
+                                      /*in_ctrl_qubits=*/mlir::ValueRange(),
+                                      /*in_ctrl_values=*/mlir::ValueRange());
 
         return newGate;
     }
@@ -94,8 +97,8 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
     {
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(insert_after_gate);
-        quantum::CustomOp newGate = builder.create<quantum::CustomOp>(
-            loc,
+        quantum::CustomOp newGate = quantum::CustomOp::create(
+            builder, loc,
             /*out_qubits=*/mlir::TypeRange({controlOut.getType(), targetOut.getType()}),
             /*out_ctrl_qubits=*/mlir::TypeRange({}),
             /*params=*/mlir::ValueRange(),
@@ -117,8 +120,8 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
     {
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(insert_after_gate);
-        quantum::CustomOp newGate = builder.create<quantum::CustomOp>(
-            loc,
+        quantum::CustomOp newGate = quantum::CustomOp::create(
+            builder, loc,
             /*out_qubits=*/mlir::TypeRange({controlIn.getType(), targetIn.getType()}),
             /*out_ctrl_qubits=*/mlir::TypeRange({}),
             /*params=*/mlir::ValueRange(),
@@ -503,9 +506,5 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
     }
 };
 
-std::unique_ptr<Pass> createDisentangleSWAPPass()
-{
-    return std::make_unique<DisentangleSWAPPass>();
-}
-
+} // namespace quantum
 } // namespace catalyst

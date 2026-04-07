@@ -34,11 +34,23 @@ auto OpenQasmDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdTyp
 
     builder->Register(OpenQasm::RegisterType::Qubit, "qubits", new_num_qubits);
 
-    return qubit_manager.AllocateRange(cur_num_qubits, num_qubits);
+    std::vector<QubitIdType> result = qubit_manager.AllocateRange(cur_num_qubits, num_qubits);
+
+    RT_FAIL_IF(!this->initial_allocated_QubitIds.empty(),
+               "OpenQASM device does not support dynamic qubit allocation")
+    this->initial_allocated_QubitIds.insert(result.begin(), result.end());
+    return result;
 }
 
-void OpenQasmDevice::ReleaseAllQubits()
+void OpenQasmDevice::ReleaseQubits(const std::vector<QubitIdType> &qubits)
 {
+    std::set<QubitIdType> dealloc_Ids(qubits.begin(), qubits.end());
+    RT_FAIL_IF(this->initial_allocated_QubitIds != dealloc_Ids,
+               "OpenQASM device does not support dynamic qubit allocation. Please ensure the "
+               "deallocation qubit ID array contains the same values as those produced by the "
+               "initial `AllocateQubits` call")
+    this->initial_allocated_QubitIds.clear();
+
     // refresh the builder for device re-use.
     if (builder_type != OpenQasm::BuilderType::Common) {
         builder = std::make_unique<OpenQasm::BraketBuilder>();
@@ -54,10 +66,11 @@ void OpenQasmDevice::SetDeviceShots(size_t shots) { device_shots = shots; }
 
 auto OpenQasmDevice::GetDeviceShots() const -> size_t { return device_shots; }
 
-void OpenQasmDevice::NamedOperation(const std::string &name, const std::vector<double> &params,
-                                    const std::vector<QubitIdType> &wires, bool inverse,
-                                    const std::vector<QubitIdType> &controlled_wires,
-                                    const std::vector<bool> &controlled_values)
+void OpenQasmDevice::NamedOperation(
+    const std::string &name, const std::vector<double> &params,
+    const std::vector<QubitIdType> &wires, bool inverse,
+    const std::vector<QubitIdType> &controlled_wires, const std::vector<bool> &controlled_values,
+    [[maybe_unused]] const std::vector<std::string> &optional_params)
 {
     RT_FAIL_IF(!controlled_wires.empty() || !controlled_values.empty(),
                "OpenQasm device does not support native quantum control.");

@@ -23,7 +23,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Ion/IR/IonOps.h"
-#include "Ion/Transforms/Passes.h"
 #include "Ion/Transforms/Patterns.h"
 #include "Ion/Transforms/oqd_database_managers.hpp"
 #include "Ion/Transforms/oqd_database_types.hpp"
@@ -107,10 +106,10 @@ struct GatesToPulsesPass : impl::GatesToPulsesPassBase<GatesToPulsesPass> {
             }
 
             builder.setInsertionPointToStart(&(op->getRegion(0).front()));
-            builder.create<ion::IonOp>(
-                op->getLoc(), IonType::get(ctx), builder.getStringAttr(ion.name),
-                builder.getF64FloatAttr(ion.mass), builder.getF64FloatAttr(ion.charge),
-                ion.position, builder.getArrayAttr(levels), builder.getArrayAttr(transitions));
+            ion::IonOp::create(builder, op->getLoc(), IonType::get(ctx),
+                               builder.getStringAttr(ion.name), builder.getF64FloatAttr(ion.mass),
+                               builder.getF64FloatAttr(ion.charge), ion.position,
+                               builder.getArrayAttr(levels), builder.getArrayAttr(transitions));
 
             SmallVector<Attribute> phonons;
             for (const Phonon &phonon : dataManager.getPhononParams()) {
@@ -118,7 +117,16 @@ struct GatesToPulsesPass : impl::GatesToPulsesPassBase<GatesToPulsesPass> {
             }
             // TODO: For now, we only print one phonon to be consistent with TriCal examples,
             // but we should print all of them eventually
-            builder.create<ion::ModesOp>(op->getLoc(), builder.getArrayAttr(phonons[0]));
+            ion::ModesOp::create(builder, op->getLoc(), builder.getArrayAttr(phonons[0]));
+        }
+
+        // Rewrite mid-circuit measurement ops into ion.parallelprotocol(ion.measure_pulse).
+        if (!dataManager.getDetectionBeamParams().empty()) {
+            RewritePatternSet measurePatterns(&getContext());
+            populateMeasureToPulsesPatterns(measurePatterns, dataManager);
+            if (failed(applyPatternsGreedily(op, std::move(measurePatterns)))) {
+                return signalPassFailure();
+            }
         }
 
         RewritePatternSet ionPatterns(&getContext());
@@ -131,10 +139,4 @@ struct GatesToPulsesPass : impl::GatesToPulsesPassBase<GatesToPulsesPass> {
 };
 
 } // namespace ion
-
-std::unique_ptr<Pass> createGatesToPulsesPass()
-{
-    return std::make_unique<ion::GatesToPulsesPass>();
-}
-
 } // namespace catalyst
