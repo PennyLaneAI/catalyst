@@ -317,7 +317,7 @@ def expanded_fun(static_args, *args_expanded):
     [1] - https://github.com/google/jax/blob/88a60b808c1f91260cc9e75b9aa2508aae5bc9f9/jax/_src/linear_util.py#L16
 
     """
-    (in_type, expansion_strategy) = static_args
+    in_type, expansion_strategy = static_args
     args_collapsed = [a for a, (_, k) in zip(args_expanded, in_type) if k]
     res_flat = yield args_collapsed, {}
     num_implicit_inputs = len([() for _, k in in_type if not k])

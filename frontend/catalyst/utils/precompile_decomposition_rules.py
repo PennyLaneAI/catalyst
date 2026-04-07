@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Utilities for AOT compiling PennyLane's decomposition rules to MLIR Bytecode."""
+
 import warnings
 from pathlib import Path
 

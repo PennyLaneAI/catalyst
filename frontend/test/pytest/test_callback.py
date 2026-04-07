@@ -13,7 +13,6 @@
 # limitations under the License.
 """Test callbacks"""
 
-
 from collections.abc import Sequence
 from functools import partial
 

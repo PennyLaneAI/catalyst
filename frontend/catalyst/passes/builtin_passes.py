@@ -53,7 +53,7 @@ def cancel_inverses(qnode):
     :class:`qml.SWAP <pennylane.SWAP>`
 
     Three-bit Gates:
-    - :class:`qml.Toffoli <pennylane.Toffoli>`
+    :class:`qml.Toffoli <pennylane.Toffoli>`
 
     .. note::
 
@@ -264,11 +264,11 @@ def diagonalize_measurements(
 
 
 def disentangle_cnot(qnode):
-    """A peephole optimization for replacing ``CNOT`` gates with single-qubit gates.
+    r"""A peephole optimization for replacing ``CNOT`` gates with single-qubit gates.
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`pennylane.qjit`.
+        This transform requires decorating the workflow with :func:`~.qjit`.
 
     Args:
         fn (QNode): the QNode to apply the pass to
@@ -323,10 +323,10 @@ def disentangle_swap(qnode):
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`pennylane.qjit`.
+        This transform requires decorating the workflow with :func:`~.qjit`.
 
     Args:
-        fn (QNode): the QNode to apply the pass to.
+        fn (QNode): the QNode to apply the pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -375,7 +375,7 @@ def disentangle_swap(qnode):
 
 
 def merge_rotations(qnode):
-    """Specify that the ``-merge-rotations`` MLIR compiler pass
+    r"""Specify that the ``-merge-rotations`` MLIR compiler pass
     for merging roations (peephole) will be applied.
 
     The full list of supported gates are as follows:
@@ -392,7 +392,6 @@ def merge_rotations(qnode):
     :class:`qml.CRot <pennylane.CRot>`,
     :class:`qml.MultiRZ <pennylane.MultiRZ>`.
 
-
     .. note::
 
         Unlike PennyLane :doc:`circuit transformations <introduction/compiling_circuits>`,
@@ -407,7 +406,7 @@ def merge_rotations(qnode):
         :func:`~.get_compilation_stage` function.
 
     Args:
-        fn (QNode): the QNode to apply the cancel inverses compiler pass to
+        fn (QNode): the QNode to apply the merge rotations compiler pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -446,7 +445,7 @@ def decompose_lowering(qnode):
     recursively.
 
     Args:
-        fn (QNode): the QNode to apply the cancel inverses compiler pass to
+        fn (QNode): the QNode to apply the decompose-lowering compiler pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -784,7 +783,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
     `Compilation Hub <https://pennylane.ai/compilation/pauli-product-rotations>`_.
 
     Args:
-        fn (QNode): QNode to apply the pass to.
+        fn (QNode): QNode to apply the pass to
         max_pauli_size (int):
             The maximum size of Pauli strings resulting from commutation. If a commutation results
             in a PPR that acts on more than ``max_pauli_size`` qubits, that commutation will not be
@@ -977,7 +976,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
     the `Compilation Hub <https://pennylane.ai/compilation/pauli-based-computation>`_.
 
     Args:
-        qnode (QNode): QNode to apply the pass to.
+        qnode (QNode): QNode to apply the pass to
         decompose_method (str): The method to use for decomposing non-Clifford PPRs.
             Options are ``"pauli-corrected"``, ``"auto-corrected"``, and ``"clifford-corrected"``.
             Defaults to ``"pauli-corrected"``.
@@ -1314,7 +1313,7 @@ def reduce_t_depth(qnode):
         ``reduce_t_depth``.
 
     Args:
-        qnode (QNode): QNode to apply the pass to.
+        qnode (QNode): the QNode to apply the pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -1417,7 +1416,7 @@ def ppr_to_mbqc(qnode):
         after :func:`~.passes.to_ppr`.
 
     Args:
-        fn (QNode): QNode to apply the pass to.
+        fn (QNode): the QNode to apply the pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -1494,7 +1493,7 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
         ``decompose_arbitrary_ppr``.
 
     Args:
-        qnode (QNode): QNode to apply the pass to.
+        qnode (QNode): the QNode to apply the pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`
