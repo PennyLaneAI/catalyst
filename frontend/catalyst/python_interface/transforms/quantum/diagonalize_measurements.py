@@ -223,7 +223,7 @@ class DiagonalizeFinalMeasurementsPattern(
                 ]
 
                 # pylint: disable = cell-var-from-loop
-                op.qubit.replace_by_if(qubit, lambda use: use in uses_to_change)
+                op.qubit.replace_uses_with_if(qubit, lambda use: use in uses_to_change)
                 for use in uses_to_change:
                     rewriter.notify_op_modified(use.operation)
 

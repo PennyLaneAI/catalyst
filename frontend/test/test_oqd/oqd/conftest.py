@@ -15,6 +15,7 @@
 """
 Pytest configuration file for OQD test suite.
 """
+
 import os
 from tempfile import TemporaryDirectory
 

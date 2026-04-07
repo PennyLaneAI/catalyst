@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module contains some helper functions for translating JAX
-primitives to MLIR"""
+"""This module contains some helper functions for translating JAX primitives to MLIR."""
 
 import copy
 import functools
@@ -25,8 +24,10 @@ from jaxlib.mlir.dialects.builtin import ModuleOp
 from jaxlib.mlir.dialects.func import CallOp
 from mlir_quantum.dialects._transform_ops_gen import ApplyRegisteredPassOp, NamedSequenceOp, YieldOp
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
+from pennylane.transforms.core import BoundTransform
 
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
+from catalyst.passes import PassPlugin
 
 
 def _all_expval(call_jaxpr: core.ClosedJaxpr) -> bool:
@@ -112,7 +113,6 @@ def lower_callable(ctx, callable_, call_jaxpr, pipelines=(), metadata=None, publ
     """
     if pipelines is None:
         pipelines = tuple()
-
     if isinstance(callable_, qml.QNode):
         return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipelines, metadata=metadata)
     return get_or_create_funcop(
@@ -121,13 +121,21 @@ def lower_callable(ctx, callable_, call_jaxpr, pipelines=(), metadata=None, publ
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
-def get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines, metadata=None, public=False):
+def get_or_create_funcop(
+    ctx,
+    callable_,
+    call_jaxpr,
+    pipelines: tuple[tuple[str, BoundTransform], ...],
+    metadata=None,
+    public=False,
+):
     """Get funcOp from cache, or create it from scratch
 
     Args:
         ctx: LoweringRuleContext
         callable_: python function
         call_jaxpr: jaxpr representing callable_
+        pipelines (tuple[tuple[str, BoundTransform], ...]): pipelines to be applied to the funcop
         metadata: additional metadata to distinguish different FuncOps
         public: whether the visibility should be marked public
 
@@ -136,10 +144,9 @@ def get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines, metadata=None, p
     """
     if metadata is None:
         metadata = tuple()
-    key = (callable_, *metadata, *pipelines)
-    if callable_ is not None:
-        if func_op := get_cached(ctx, key):
-            return func_op
+    key = (callable_, *metadata, *_lowered_pipelines(pipelines))
+    if func_op := get_cached(ctx, key):
+        return func_op
     func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=public)
     cache(ctx, key, func_op)
     return func_op
@@ -220,7 +227,7 @@ def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipelines, metadata):
         metadata = tuple()
     if callable_.static_argnums:
         return lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines)
-    key = (callable_, *metadata, *pipelines)
+    key = (callable_, *metadata, *_lowered_pipelines(pipelines))
     if func_op := get_cached(ctx, key):
         return func_op
     func_op = lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines)
@@ -319,17 +326,22 @@ class NestedModule:
         self.ctx.module_context = self.old_module_context
 
 
-def _lowered_options(args, kwargs):
-    lowered_options = {}
-    for arg in args:
-        lowered_options[str(arg)] = get_mlir_attribute_from_pyval(True)
-    for option, value in kwargs.items():
-        mlir_option = str(option).replace("_", "-")
-        lowered_options[mlir_option] = get_mlir_attribute_from_pyval(value)
-    return lowered_options
+def _lowered_options(_pass: BoundTransform | PassPlugin):
+    args = _pass.args if isinstance(_pass, BoundTransform) else _pass.options
+    kwargs = _pass.kwargs if isinstance(_pass, BoundTransform) else _pass.valued_options
+    return get_mlir_attribute_from_pyval(
+        {str(arg).replace("_", "-"): True for arg in args}
+        | {k.replace("_", "-"): v for k, v in kwargs.items()}
+    )
 
 
-def transform_module_lowering(jax_ctx: mlir.LoweringRuleContext, pipelines) -> bool:
+def _lowered_pipelines(pipelines: tuple[tuple[str, BoundTransform], ...]):
+    return tuple(
+        (name, tuple(_lowered_options(_pass) for _pass in pipeline)) for name, pipeline in pipelines
+    )
+
+
+def transform_module_lowering(jax_ctx: mlir.LoweringRuleContext, pipelines):
     """Generate a transform module embedded in the current module and schedule
     the transformations in pipeline"""
     module = jax_ctx.module_context.module
@@ -386,12 +398,9 @@ def transform_named_sequence_lowering(pipeline, sym_name):
     with ir.InsertionPoint(bb_named_sequence):
         target = bb_named_sequence.arguments[0]
         for _pass in pipeline:
-            if isinstance(_pass, qml.transforms.core.BoundTransform):
-                options = _lowered_options(_pass.args, _pass.kwargs)
-                name = _pass.pass_name
-            else:
-                options = _pass.get_options()
-                name = _pass.name
+            assert isinstance(_pass, (BoundTransform, PassPlugin))
+            name = _pass.pass_name if isinstance(_pass, BoundTransform) else _pass.name
+            options = _lowered_options(_pass)
             apply_registered_pass_op = ApplyRegisteredPassOp(
                 result=transform_mod_type,
                 target=target,

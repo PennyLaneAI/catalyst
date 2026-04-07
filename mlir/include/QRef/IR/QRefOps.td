@@ -87,6 +87,8 @@ def AllocQubitOp : Memory_Op<"alloc_qb"> {
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
+
+    let hasCanonicalizeMethod = 1;
 }
 
 def DeallocQubitOp : Memory_Op<"dealloc_qb"> {
@@ -102,6 +104,8 @@ def DeallocQubitOp : Memory_Op<"dealloc_qb"> {
     let assemblyFormat = [{
         $qubit attr-dict `:` type(operands)
     }];
+
+    let hasCanonicalizeMethod = 1;
 }
 
 def DeallocOp : Memory_Op<"dealloc"> {
@@ -370,17 +374,17 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [ParametrizedGate, AttrSizedOperand
     }];
 
     let arguments = (ins
-        F64:$params,
+        F64:$angle,
         UnitAttr:$adjoint,
         Variadic<QubitRefType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values
     );
 
     let assemblyFormat = [{
-        `(` $params `)` (`adj` $adjoint^)? attr-dict
+        `(` $angle `)` (`adj` $adjoint^)? attr-dict
         ( `ctrls` `(` $ctrl_qubits^ `)` )?
         ( `ctrlvals` `(` $ctrl_values^ `)` )?
-        `:` type($params) (`ctrls` type($ctrl_qubits)^ )?
+        ( `:` `ctrls` type($ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{

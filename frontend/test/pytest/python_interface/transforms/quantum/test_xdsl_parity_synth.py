@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the ParitySynth transform"""
+
 from collections import namedtuple
 from itertools import product
 
@@ -322,7 +323,7 @@ class TestParitySynthPass:
         """Test that a phase polynomial of two CNOTs separated by a rotation on the control
         is reduced when there are operations with regions (such as control flow)."""
         program = """
-            // CHECK: func.func @test_func([[ARG0:%.+]] : f64
+            // CHECK: func.func @test_func([[ARG0:%.+]]: f64
             func.func @test_func(%arg0: f64) {
                 %0 = INIT_QUBIT
                 %1 = INIT_QUBIT
@@ -614,10 +615,10 @@ class TestParitySynthIntegration:
         @qml.qnode(dev)
         def circuit(x: float):
             # Phase tensor
-            # CHECK: func.func public @circuit([[FLOAT_ARG:%.+]] : tensor<f64>)
+            # CHECK: func.func public @circuit([[FLOAT_ARG:%.+]]: tensor<f64>)
 
             # Qubit extraction for wire 0
-            # CHECK: [[ZERO:%.+]] = "stablehlo.constant"() <{value = dense<0>
+            # CHECK: [[ZERO:%.+]] = stablehlo.constant dense<0> : tensor<i64>
             # Ignore the first tensor.extract, that is for device allocation
             # CHECK: tensor.extract [[ZERO]][] : tensor<i64>
             # CHECK: [[Q0_IND:%.+]] = tensor.extract [[ZERO]][] : tensor<i64>
@@ -638,7 +639,7 @@ class TestParitySynthIntegration:
             @qml.for_loop(4)
             def loop_fn(_i):
                 # Qubit extraction for wire 0
-                # CHECK: [[ZERO_LOOP:%.+]] = "stablehlo.constant"() <{value = dense<0>
+                # CHECK: [[ZERO_LOOP:%.+]] = stablehlo.constant dense<0> : tensor<i64>
                 # CHECK: [[Q0_IND_LOOP:%.+]] = tensor.extract [[ZERO_LOOP]][] : tensor<i64>
                 # CHECK-NEXT: [[Q0_LOOP:%.+]] = quantum.extract {{%.+}}[[[Q0_IND_LOOP]]]
 
@@ -657,7 +658,7 @@ class TestParitySynthIntegration:
                 @qml.cond(x > 2.5)
                 def cond_fn():
                     # Qubit extraction for wire 0
-                    # CHECK: [[ZERO_IF:%.+]] = "stablehlo.constant"() <{value = dense<0>
+                    # CHECK: [[ZERO_IF:%.+]] = stablehlo.constant dense<0> : tensor<i64>
                     # CHECK: [[Q0_IND_IF:%.+]] = tensor.extract [[ZERO_IF]][] : tensor<i64>
                     # CHECK-NEXT: [[Q0_IF:%.+]] = quantum.extract {{%.+}}[[[Q0_IND_IF]]]
 

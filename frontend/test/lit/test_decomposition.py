@@ -243,7 +243,7 @@ def test_decompose_singleexcitationplus():
     """
     Test decomposition of single excitation plus.
     See
-    https://github.com/PennyLaneAI/pennylane/blob/master/pennylane/ops/qubit/qchem_ops.py
+    https://github.com/PennyLaneAI/pennylane/blob/main/pennylane/ops/qubit/qchem_ops.py
     for the decomposition of qml.SingleExcitationPlus
     """
     dev = get_custom_device_without(2, discards={"SingleExcitationPlus", "C(SingleExcitationPlus)"})
@@ -1105,7 +1105,7 @@ def test_decompose_lowering_with_gphase():
     @qml.qnode(qml.device("lightning.qubit", wires=3))
     # CHECK:  %0 = transform.apply_registered_pass "decompose-lowering"
     def circuit_22():
-        # CHECK:  quantum.gphase(%cst_0) :
+        # CHECK:  quantum.gphase(%cst_0)
         # CHECK-NEXT:  [[EXTRACTED:%.+]] = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
         # CHECK-NEXT:  [[OUT_QUBITS:%.+]] = quantum.custom "PhaseShift"(%cst) [[EXTRACTED]] : !quantum.bit
         # CHECK-NEXT:  {{%.+}} = quantum.custom "PhaseShift"(%cst) [[OUT_QUBITS]] : !quantum.bit

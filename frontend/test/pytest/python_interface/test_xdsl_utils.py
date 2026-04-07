@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit tests for xDSL utilities."""
+
 # pylint: disable=line-too-long
 
 import pennylane as qml
@@ -20,6 +21,7 @@ from jax import jit
 from jaxlib.mlir.ir import Module as jaxModule
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, func, tensor, test
+from xdsl_jax.dialects.stablehlo import ConstantOp as hloConstantOp
 
 from catalyst.python_interface import QuantumParser
 from catalyst.python_interface.conversion import (
@@ -34,7 +36,6 @@ from catalyst.python_interface.conversion import (
     xdsl_from_qjit,
     xdsl_module,
 )
-from catalyst.python_interface.dialects.stablehlo import ConstantOp as hloConstantOp
 from catalyst.python_interface.utils import get_constant_from_ssa, get_pyval_from_xdsl_attr
 
 pytestmark = pytest.mark.xdsl
