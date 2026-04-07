@@ -1357,9 +1357,9 @@ struct ValueSemanticsConversionPass
         });
 
         // Convert subroutines and their corresponding calls
-        // We traverse the call graph depth-first (which is guaranteed by the SCC iterator),
-        // so that a caller subroutine can correctly collect the qref operands on its call op
-        // to a callee subroutine.
+        // We traverse the call graph depth-first and post-order (which is guaranteed by the SCC
+        // iterator), so that a caller subroutine can correctly collect the qref operands on its
+        // call op to a callee subroutine.
         const CallGraph callGraph(mod);
         for (auto scc = llvm::scc_begin(&callGraph); !scc.isAtEnd(); ++scc) {
             if ((*scc->begin())->isExternal()) {

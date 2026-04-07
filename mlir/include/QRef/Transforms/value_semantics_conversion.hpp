@@ -111,6 +111,7 @@ DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumGate r
     return builder.getDenseI32ArrayAttr({non_ctrl_len, ctrl_len});
 }
 
+namespace {
 void _getNecessaryRegionRValuesImpl(Region &r, SetVector<Value> &necessaryRegionRValues,
                                     std::function<bool(Region &, Value)> isFromOutside)
 {
@@ -186,6 +187,7 @@ void _getNecessaryRegionRValuesImpl(Region &r, SetVector<Value> &necessaryRegion
         return !seenGetInfos.insert(info).second;
     });
 }
+} // namespace
 
 /**
  * @brief Collect the rQreg and rQubit Values that are captured into a region from above by closure.
