@@ -45,9 +45,14 @@ if (CATALYST_GTEST_AVAILABLE)
   list(APPEND DIALECT_TESTS_DEPEND CatalystUnitTests)
 endif()
 
+add_custom_target(create_test_bytecode quantum-opt --emit-bytecode --register-decomp-rule-resource ${CMAKE_CURRENT_SOURCE_DIR}/Quantum/GraphDecomposition/test_rules.mlir -o ${BYTECODE_PATH}
+    DEPENDS quantum-opt
+    BYPRODUCTS ${BYTECODE_PATH}
+)
+
 add_lit_testsuite(check-dialects "Run the regression tests for mlir dialects"
     ${TEST_SUITES}
-    DEPENDS ${DIALECT_TESTS_DEPEND}
+    DEPENDS ${DIALECT_TESTS_DEPEND} create_test_bytecode
 )
 
 set_target_properties(check-dialects PROPERTIES FOLDER "Tests")
