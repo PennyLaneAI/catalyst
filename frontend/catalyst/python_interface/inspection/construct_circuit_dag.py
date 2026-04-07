@@ -85,11 +85,22 @@ class _WireKind(Enum):
     DYNAMIC = auto()
 
 
+class _ClusterKind(Enum):
+    """Cluster types for internal tracking"""
+
+    FUNC = auto()
+    FOR_LOOP = auto()
+    WHILE_LOOP = auto()
+    CONDITIONAL = auto()
+    BRANCH = auto()
+    ADJOINT = auto()
+
+
 @dataclass(frozen=True)
 class ClusterEntry:
 
     uid: str
-    kind: Literal["func", "for_loop", "while_loop", "conditional", "branch", "adjoint"]
+    kind: _ClusterKind
 
 
 class VisualizationError(Exception):
@@ -374,7 +385,7 @@ class ConstructCircuitDAG:
             labeljust="l",
             cluster_uid=self._cluster_stack[-1].uid,
         )
-        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind="adjoint"))
+        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.ADJOINT))
 
         self._visit_region(operation.regions[0])
 
@@ -393,7 +404,7 @@ class ConstructCircuitDAG:
             labeljust="l",
             cluster_uid=self._cluster_stack[-1].uid,
         )
-        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind="for_loop"))
+        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.FOR_LOOP))
 
         self._visit_region(operation.regions[0])
 
@@ -407,7 +418,7 @@ class ConstructCircuitDAG:
             labeljust="l",
             cluster_uid=self._cluster_stack[-1].uid,
         )
-        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind="while_loop"))
+        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.WHILE_LOOP))
 
         for region in operation.regions:
             self._visit_region(region)
@@ -424,7 +435,7 @@ class ConstructCircuitDAG:
             labeljust="l",
             cluster_uid=self._cluster_stack[-1].uid,
         )
-        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind="conditional"))
+        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.CONDITIONAL))
 
         # Save wires state before all of the branches
         wire_map_before = deepcopy(self._wire_to_node_uids)
@@ -447,7 +458,7 @@ class ConstructCircuitDAG:
                 style="dashed",
                 cluster_uid=self._cluster_stack[-1].uid,
             )
-            self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind="branch"))
+            self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.BRANCH))
 
             # Make fresh wire map before going into region
             self._wire_to_node_uids = deepcopy(wire_map_before)
@@ -554,7 +565,7 @@ class ConstructCircuitDAG:
             label=label,
             cluster_uid=parent_cluster_uid,
         )
-        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind="func"))
+        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.FUNC))
 
         self._visit_block(operation.regions[0].blocks[0])
 
