@@ -78,14 +78,11 @@ _SKIPPED_OPS = (*_SKIPPED_QUANTUM_OPS, *_SKIPPED_PBC_OPS, *_SKIPPED_MBQC_OPS)
 _SUPPORTED_DIALECTS = {quantum.Quantum.name, pbc.PBC.name, mbqc.MBQC.name}
 
 
-
 class _WireKind(Enum):
     """Wire type for ordering dependencies."""
 
     DEVICE = auto()
     DYNAMIC = auto()
-
-
 
 
 @dataclass(frozen=True)
