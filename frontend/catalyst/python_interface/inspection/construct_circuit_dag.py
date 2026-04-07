@@ -174,15 +174,7 @@ class ConstructCircuitDAG:
     @_visualize_operation.register
     def _gate_op(
         self,
-        op: (
-            quantum.CustomOp
-            | quantum.GlobalPhaseOp
-            | quantum.QubitUnitaryOp
-            | quantum.MultiRZOp
-            | quantum.SetBasisStateOp
-            | quantum.SetStateOp
-            | quantum.PauliRotOp
-        ),
+        op: quantum.GateOp,
     ) -> None:
         """Generic handler for unitary gates."""
         # Create PennyLane instance
@@ -307,15 +299,9 @@ class ConstructCircuitDAG:
     # =====================
 
     @_visualize_operation.register
-    def _measurements(
+    def _terminal_measurements(
         self,
-        op: (
-            quantum.StateOp
-            | quantum.ExpvalOp
-            | quantum.VarianceOp
-            | quantum.SampleOp
-            | quantum.ProbsOp
-        ),
+        op: quantum.TerminalMeasurementOp,
     ) -> None:
         """Handler for all quantum measurement operations."""
 
