@@ -560,7 +560,7 @@ class ConstructCircuitDAG:
         # blocking
         if (
             before_dyn_node_uid == current_dyn_node_uid
-            and sum(1 for s in self._cluster_uid_stack if "conditional" in s) == 1
+            and sum(1 for s in self._cluster_uid_stack if self._is_branching_cluster(s)) == 1
         ):
             final_wire_map["dyn_wire"] = set()
 
