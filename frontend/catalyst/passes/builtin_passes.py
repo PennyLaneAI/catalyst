@@ -49,7 +49,7 @@ def cancel_inverses(qnode):
     :class:`qml.SWAP <pennylane.SWAP>`
 
     Three-bit Gates:
-    - :class:`qml.Toffoli <pennylane.Toffoli>`
+    :class:`qml.Toffoli <pennylane.Toffoli>`
 
     .. note::
 
@@ -140,12 +140,131 @@ def cancel_inverses(qnode):
     return qml.transform(pass_name="cancel-inverses")(qnode)
 
 
+def diagonalize_measurements(
+    qnode=None,
+    supported_base_obs: tuple[str, ...] = ("PauliZ", "Identity"),
+    to_eigvals: bool = False,
+):
+    """
+    Specify that the ``diagonalize-final-measurements`` compiler pass
+    will be applied, which diagonalizes measurements into the standard basis.
+
+    Args:
+        qnode (QNode): The QNode to apply the ``diagonalize_final_measurement`` compiler pass to.
+        supported_base_obs (tuple[str, ...]): A list of supported base observable names.
+            Allowed observables are ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard`` and ``Identity``.
+            ``PauliZ`` and ``Identity`` are always treated as supported, regardless of input. Defaults to
+            (``PauliZ``, ``Identity``).
+        to_eigvals (bool): Whether the diagonalization should create measurements using
+            eigenvalues and wires rather than observables. Defaults to ``False``.
+
+    Returns:
+        :class:`QNode <pennylane.QNode>`
+
+    .. note::
+        Unlike the PennyLane tape transform, :func:`pennylane.transforms.diagonalize_measurements`,
+        the QNode itself will not be changed or transformed by applying this decorator.
+
+        Unlike the PennyLane tape transform, ``supported_base_obs`` here only accepts a tuple of supported
+        base observable names, instead of the corresponding classes. The reason is that xDSL does not accept
+        class types as values of option-elements. For more details, please refer to the `xDSL repo <https://github.com/xdslproject/xdsl/blob/ba190d9ba1612807e7604374afa7eb2c1c3d2047/xdsl/utils/arg_spec.py#L315-L327>`__.
+
+        Unlike the PennyLane tape transform, only ``to_eigvals = False`` is supported. Setting ``to_eigvals`` as ``True``
+        will raise an error.
+
+        An error will be raised if non-commuting terms are encountered.
+
+    **Example**
+
+    The ``diagonalize-final-measurements`` compilation pass can be applied as a decorator on a QNode:
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from catalyst import qjit
+        from catalyst.passes import diagonalize_measurements
+
+        @qjit
+        @diagonalize_measurements(supported_base_obs=("PauliX",))
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit():
+            qml.Hadamard(0)
+            qml.RZ(1.1, 0)
+            qml.PhaseShift(0.22, 0)
+            return qml.expval(qml.Y(0))
+
+        expected_substr = 'transform.apply_registered_pass "diagonalize-final-measurements" with options = {"supported-base-obs" = ["PauliX"], "to-eigvals" = false}'
+
+    >>> expected_substr in circuit.mlir
+    True
+    >>> circuit()
+    0.9687151001182651
+
+    An error is raised if ``to_eigvals=True`` is passed as an option:
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from catalyst import qjit
+        from catalyst.passes import diagonalize_measurements
+
+        @diagonalize_measurements(to_eigvals=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit():
+            qml.Hadamard(0)
+            qml.PhaseShift(0.22, 0)
+            return qml.expval(qml.Y(0))
+
+        error_msg = None
+
+        try:
+            qjit(circuit)
+        except ValueError as e:
+            error_msg = str(e)
+
+    >>> print(error_msg)
+    Only to_eigvals = False is supported.
+
+    A compile error is raised if non-commuting terms are encountered:
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from pennylane.exceptions import CompileError
+        from catalyst import qjit
+        from catalyst.passes import diagonalize_measurements
+
+        @diagonalize_measurements
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit():
+            qml.Hadamard(0)
+            return qml.expval(qml.Y(0) + qml.X(0))
+
+        error_msg = None
+
+        try:
+            qjit(circuit)
+        except CompileError as e:
+            error_msg = str(e)
+
+    >>> print(error_msg)
+    Observables are not qubit-wise commuting. Please apply the `split-non-commuting` pass first.
+    """
+    if qnode is None:
+        return functools.partial(
+            diagonalize_measurements, supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
+        )
+    return qml.transform(pass_name="diagonalize-final-measurements")(
+        qnode, supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
+    )
+
+
 def disentangle_cnot(qnode):
-    """A peephole optimization for replacing ``CNOT`` gates with single-qubit gates.
+    r"""A peephole optimization for replacing ``CNOT`` gates with single-qubit gates.
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`pennylane.qjit`.
+        This transform requires decorating the workflow with :func:`~.qjit`.
 
     Args:
         fn (QNode): the QNode to apply the pass to
@@ -200,10 +319,10 @@ def disentangle_swap(qnode):
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`pennylane.qjit`.
+        This transform requires decorating the workflow with :func:`~.qjit`.
 
     Args:
-        fn (QNode): the QNode to apply the pass to.
+        fn (QNode): the QNode to apply the pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -252,7 +371,7 @@ def disentangle_swap(qnode):
 
 
 def merge_rotations(qnode):
-    """Specify that the ``-merge-rotations`` MLIR compiler pass
+    r"""Specify that the ``-merge-rotations`` MLIR compiler pass
     for merging roations (peephole) will be applied.
 
     The full list of supported gates are as follows:
@@ -269,7 +388,6 @@ def merge_rotations(qnode):
     :class:`qml.CRot <pennylane.CRot>`,
     :class:`qml.MultiRZ <pennylane.MultiRZ>`.
 
-
     .. note::
 
         Unlike PennyLane :doc:`circuit transformations <introduction/compiling_circuits>`,
@@ -284,7 +402,7 @@ def merge_rotations(qnode):
         :func:`~.get_compilation_stage` function.
 
     Args:
-        fn (QNode): the QNode to apply the cancel inverses compiler pass to
+        fn (QNode): the QNode to apply the merge rotations compiler pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -323,7 +441,7 @@ def decompose_lowering(qnode):
     recursively.
 
     Args:
-        fn (QNode): the QNode to apply the cancel inverses compiler pass to
+        fn (QNode): the QNode to apply the decompose-lowering compiler pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -458,7 +576,7 @@ def ions_decomposition(qnode):  # pragma: nocover
 
 
 def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
-    r"""A quantnum compilation pass to discretize
+    r"""A quantum compilation pass to discretize
     single-qubit RZ and PhaseShift gates into the Clifford+T basis or the PPR basis using the Ross-Selinger Gridsynth algorithm.
     Reference: https://arxiv.org/abs/1403.2975
 
@@ -661,7 +779,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
     `Compilation Hub <https://pennylane.ai/compilation/pauli-product-rotations>`_.
 
     Args:
-        fn (QNode): QNode to apply the pass to.
+        fn (QNode): QNode to apply the pass to
         max_pauli_size (int):
             The maximum size of Pauli strings resulting from commutation. If a commutation results
             in a PPR that acts on more than ``max_pauli_size`` qubits, that commutation will not be
@@ -854,7 +972,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
     the `Compilation Hub <https://pennylane.ai/compilation/pauli-based-computation>`_.
 
     Args:
-        qnode (QNode): QNode to apply the pass to.
+        qnode (QNode): QNode to apply the pass to
         decompose_method (str): The method to use for decomposing non-Clifford PPRs.
             Options are ``"pauli-corrected"``, ``"auto-corrected"``, and ``"clifford-corrected"``.
             Defaults to ``"pauli-corrected"``.
@@ -1191,7 +1309,7 @@ def reduce_t_depth(qnode):
         ``reduce_t_depth``.
 
     Args:
-        qnode (QNode): QNode to apply the pass to.
+        qnode (QNode): the QNode to apply the pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -1294,7 +1412,7 @@ def ppr_to_mbqc(qnode):
         after :func:`~.passes.to_ppr`.
 
     Args:
-        fn (QNode): QNode to apply the pass to.
+        fn (QNode): the QNode to apply the pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -1371,7 +1489,7 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
         ``decompose_arbitrary_ppr``.
 
     Args:
-        qnode (QNode): QNode to apply the pass to.
+        qnode (QNode): the QNode to apply the pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`

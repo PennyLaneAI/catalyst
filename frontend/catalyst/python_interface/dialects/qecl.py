@@ -20,6 +20,7 @@ For a complete description of this dialect, please see
 
     mlir/include/QecLogical/IR/QecLogicalDialect.td
 """
+
 from collections.abc import Sequence
 from typing import ClassVar, TypeAlias
 
