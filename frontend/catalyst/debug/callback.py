@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """This module enables runtime Python callbacks with no return values."""
+
 from catalyst.api_extensions.callbacks import base_callback
 
 

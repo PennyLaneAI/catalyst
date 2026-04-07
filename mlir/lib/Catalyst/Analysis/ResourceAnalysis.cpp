@@ -102,7 +102,7 @@ static std::string getPBCOpName(Operation *op)
 {
     return llvm::TypeSwitch<Operation *, std::string>(op)
         .Case<pbc::PPRotationOp>([](auto pprOp) -> std::string {
-            int16_t rk = pprOp.getRotationKindAttr().getValue().getSExtValue();
+            int8_t rk = pprOp.getRotationKind();
             if (rk == 0) {
                 return "PPR-identity";
             }
