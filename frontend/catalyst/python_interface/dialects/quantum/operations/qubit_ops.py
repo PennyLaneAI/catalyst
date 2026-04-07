@@ -15,6 +15,7 @@
 This file contains the definition of operations that create/destroy qubits
 and quantum registers in the Quantum dialect.
 """
+
 from xdsl.dialects.builtin import (
     I64,
     IntegerAttr,

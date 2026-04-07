@@ -32,6 +32,7 @@ Quoted from the object's docstring:
        - `QubitHandler.set(new_qreg_value)`
        - `QubitHandler[i] = new_qubit_value`
 """
+
 # pylint: disable=use-implicit-booleaness-not-comparison
 import textwrap
 

@@ -61,9 +61,7 @@ def compare_call_jaxprs(jaxpr1, jaxpr2, skip_eqns=(), ignore_order=False):
         assert inv1.aval == inv2.aval, f"{inv1.aval}, {inv2.aval}"
     for ov1, ov2 in zip(jaxpr1.outvars, jaxpr2.outvars):
         assert ov1.aval == ov2.aval
-    assert len(jaxpr1.eqns) == len(
-        jaxpr2.eqns
-    ), f"""
+    assert len(jaxpr1.eqns) == len(jaxpr2.eqns), f"""
     Number of equations differ: {len(jaxpr1.eqns)} vs {len(jaxpr2.eqns)},
     {jaxpr1.eqns} vs {jaxpr2.eqns}
     """
