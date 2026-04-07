@@ -287,6 +287,9 @@
   program. The xDSL version written in Python has been removed.
   [(#2604)](https://github.com/PennyLaneAI/catalyst/pull/2604)
 
+* Register manupulation API has been added to the quantum dialect.
+  [(#xxxx)](https://github.com/PennyLaneAI/catalyst/pull/xxxx)
+
 <h3>Improvements 🛠</h3>
 
 * A warning is issued when gridsynth pass is called with epsilon smaller than 1e-6 due to potential precision error.
