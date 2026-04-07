@@ -15,7 +15,6 @@
 A transform for the new MLIR-based Catalyst decomposition system.
 """
 
-
 from __future__ import annotations
 
 import functools

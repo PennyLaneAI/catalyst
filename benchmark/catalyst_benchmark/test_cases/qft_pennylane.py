@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """ChemVQE problem, PennyLane+Catalyst implementation"""
+
 from copy import deepcopy
 from dataclasses import dataclass
 

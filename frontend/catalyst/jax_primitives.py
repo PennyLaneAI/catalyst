@@ -1336,7 +1336,7 @@ def _gphase_lowering(
         ctrl_values_i1.append(p)
 
     GlobalPhaseOp(
-        params=param,
+        angle=param,
         out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
@@ -2906,13 +2906,10 @@ def subroutine_lowering(*args, **kwargs):
         retval = _pjit_lowering(*args, **kwargs)
     except NotImplementedError as e:
         if "MLIR translation rule for primitive" in str(e):
-            msg = (
-                str(e)
-                + """
+            msg = str(e) + """
                 This error sometimes occurs when using quantum operations
                 inside subroutines but calling them outside a qnode
             """
-            )
             raise NotImplementedError(msg) from e
         raise e
 

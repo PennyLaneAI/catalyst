@@ -60,8 +60,8 @@ GateEnum hashGate(CustomOp op)
 // Structure to define gate conversion rules
 struct GateConversion {
     SmallVector<StringRef> pauliOperators;
-    int64_t rotationKind;
-    GateConversion(SmallVector<StringRef> pauliOperators, int64_t rotationKind)
+    int8_t rotationKind;
+    GateConversion(SmallVector<StringRef> pauliOperators, int8_t rotationKind)
         : pauliOperators(pauliOperators), rotationKind(rotationKind)
     {
     }
@@ -103,18 +103,15 @@ void applySingleQubitConversion(CustomOp op, const ArrayRef<GateConversion> &gat
                                 ConversionPatternRewriter &rewriter)
 {
     Location loc = op->getLoc();
-    TypeRange types = op.getOutQubits().getType();
     ValueRange inQubits = op.getInQubits();
     PPRotationOp pprOp;
 
     for (auto gateConversion : gateConversions) {
         applyAdjointIfNeeded(gateConversion, op);
 
-        ArrayAttr pauliProduct = rewriter.getStrArrayAttr(gateConversion.pauliOperators);
-        pprOp = PPRotationOp::create(rewriter, loc, types, pauliProduct,
+        pprOp = PPRotationOp::create(rewriter, loc, gateConversion.pauliOperators,
                                      gateConversion.rotationKind, inQubits);
         inQubits = pprOp.getOutQubits();
-        types = pprOp.getOutQubits().getType();
     }
 
     rewriter.replaceOp(op, pprOp.getOutQubits());
@@ -141,28 +138,24 @@ LogicalResult controlledConversion(CustomOp op, StringRef P1, StringRef P2,
     rewriter.setInsertionPoint(op);
 
     // G0 = (P1 ⊗ P2)π/4
-    auto pauliProduct = rewriter.getStrArrayAttr(g0.pauliOperators);
     auto inQubitsValues = op.getInQubits();
-    auto outQubitsTypesList = op.getOutQubits().getType();
 
-    auto G0 = PPRotationOp::create(rewriter, loc, outQubitsTypesList, pauliProduct, g0.rotationKind,
-                                   inQubitsValues);
+    auto G0 =
+        PPRotationOp::create(rewriter, loc, g0.pauliOperators, g0.rotationKind, inQubitsValues);
 
     // G1 = (P1 ⊗ 1)−π/4
-    pauliProduct = rewriter.getStrArrayAttr(g1.pauliOperators);
     SmallVector<Value> inQubitsValues1{G0.getOutQubits()[0]};
     SmallVector<Type> outQubitsTypesList1{G0.getOutQubits()[0].getType()};
 
-    auto G1 = PPRotationOp::create(rewriter, loc, outQubitsTypesList1, pauliProduct,
-                                   g1.rotationKind, inQubitsValues1);
+    auto G1 =
+        PPRotationOp::create(rewriter, loc, g1.pauliOperators, g1.rotationKind, inQubitsValues1);
 
     // G2 = (1 ⊗ P2)−π/4
-    pauliProduct = rewriter.getStrArrayAttr(g2.pauliOperators);
     SmallVector<Value> inQubitsValues2{G0.getOutQubits()[1]};
     SmallVector<Type> inQubitsTypesList2{G0.getOutQubits()[1].getType()};
 
-    auto G2 = PPRotationOp::create(rewriter, loc, inQubitsTypesList2, pauliProduct, g1.rotationKind,
-                                   inQubitsValues2);
+    auto G2 =
+        PPRotationOp::create(rewriter, loc, g2.pauliOperators, g1.rotationKind, inQubitsValues2);
 
     rewriter.replaceOp(op, {G1.getOutQubits()[0], G2.getOutQubits()[0]});
     return success();
@@ -278,7 +271,8 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
     if (angleOpt.has_value()) {
         constexpr double PI = llvm::numbers::pi;
         constexpr double SPECIFIC_ANGLES[6] = {PI / 2, PI / 4, PI / 8, -PI / 8, -PI / 4, -PI / 2};
-        // We are choosing a very small tolerance to accomodate floating point precision issues.
+        constexpr int8_t SPECIFIC_DENOMINATORS[6] = {2, 4, 8, -8, -4, -2};
+        // We are choosing a very small tolerance to accommodate floating point precision issues.
         // We choose this because it is a few bits away from the precision allowed by float 64
         // and we assume the angles have magnitudes on the order of pi.
         constexpr double TOLERANCE = 1e-12;
@@ -288,20 +282,20 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
 
         auto angle = std::fmod(ppr_angle, PI);
 
-        if (std::abs(angle) < TOLERANCE) {
-            // If the angle is 0, we can just erase the PauliRotOp.
+        if (std::abs(angle) < TOLERANCE || PI - std::abs(angle) < TOLERANCE) {
+            // If the angle is 0 or pi, we can just erase the PauliRotOp.
             rewriter.replaceOp(op, inQubits);
             return success();
         }
 
-        for (auto specific_angle : SPECIFIC_ANGLES) {
+        for (auto [i, specific_angle] : llvm::enumerate(SPECIFIC_ANGLES)) {
             if (std::abs(angle - specific_angle) < TOLERANCE) {
-                int64_t rotationKind = static_cast<int64_t>(PI / specific_angle);
+                int8_t rotationKind = SPECIFIC_DENOMINATORS[i];
                 if (op.getAdjoint()) {
                     rotationKind = -rotationKind;
                 }
-                auto pprOp = PPRotationOp::create(rewriter, loc, outQubitTypes, pauliProduct,
-                                                  rotationKind, inQubits);
+                auto pprOp =
+                    PPRotationOp::create(rewriter, loc, pauliProduct, rotationKind, inQubits);
                 rewriter.replaceOp(op, pprOp.getOutQubits());
                 return success();
             }

@@ -27,7 +27,7 @@ from catalyst_benchmark.types import Problem
 
 def clause_nqubits(clause_list) -> int:
     """Problem-specific number of qubits"""
-    return max(map(max, clause_list)) + 1  # type:ignore # Number of input qubits
+    return max(map(max, clause_list)) + 1  # type: ignore # Number of input qubits
 
 
 def grover_loops(N) -> int:
