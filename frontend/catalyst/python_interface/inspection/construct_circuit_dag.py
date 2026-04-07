@@ -76,11 +76,13 @@ _SKIPPED_OPS = frozenset((*_SKIPPED_QUANTUM_OPS, *_SKIPPED_PBC_OPS, *_SKIPPED_MB
 
 from enum import Enum, auto
 
+
 class _WireKind(Enum):
     """Wire type for ordering dependencies."""
 
     DEVICE = auto()
     DYNAMIC = auto()
+
 
 class VisualizationError(Exception):
     """Custom visualization error."""
