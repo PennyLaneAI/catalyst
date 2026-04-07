@@ -347,12 +347,9 @@ class ConstructCircuitDAG:
                 device_node_uid: set[str] = self._wire_to_node_uids.get(_WireKind.DEVICE, set())
                 all_active = set().union(*self._wire_to_node_uids.values()) - device_node_uid
 
-                # If we just exited a conditional (and are not in a nested one currently)
+                # If we just exited a branching cluster (and are not in a nested one currently)
                 # We need to connect to everything seen so far as all branches are a possibility.
-                exited_conditional_cluster = self._is_branching_cluster(
-                    self._last_cluster_entry
-                ) and not any(self._is_branching_cluster(s) for s in self._cluster_stack)
-                if exited_conditional_cluster:
+                if self._exited_branching_cluster:
                     all_prev_uids = all_active
                 else:
                     # Otherwise, just connect to static nodes as they block dynamic
@@ -625,12 +622,9 @@ class ConstructCircuitDAG:
 
             all_active = set().union(*self._wire_to_node_uids.values())
 
-            # If we just exited a conditional (and are not in a nested one currently)
+            # If we just exited a branching cluster (and are not in a nested one currently)
             # We need to connect to everything seen so far as all branches are a possibility.
-            exited_conditional_cluster = self._is_branching_cluster(
-                self._last_cluster_entry
-            ) and not any(self._is_branching_cluster(s) for s in self._cluster_stack)
-            if exited_conditional_cluster:
+            if self._exited_branching_cluster:
                 return all_active
 
             # Otherwise, just connect to static nodes as they block dynamic
@@ -717,9 +711,23 @@ class ConstructCircuitDAG:
                 self._wire_to_node_uids[_WireKind.DYNAMIC] = set()
 
     def _is_branching_cluster(self, cluster: ClusterEntry | None) -> bool:
+        """
+        Whether or not the cluster is a cluster that results in
+        many branches (e.g. conditionals -> if/elif/else)
+        """
         if cluster is None:
             return False
         return cluster.kind == "conditional"
+
+    @property
+    def _exited_branching_cluster(self) -> bool:
+        """
+        Check if we just exited a branching cluster
+        and are not currently in a nested cluster.
+        """
+        return self._is_branching_cluster(self._last_cluster_entry) and not any(
+            self._is_branching_cluster(s) for s in self._cluster_stack
+        )
 
 
 def _flatten_if_op(operation: scf.IfOp) -> list[Region]:
