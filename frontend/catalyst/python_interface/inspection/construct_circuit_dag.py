@@ -679,14 +679,10 @@ class ConstructCircuitDAG:
         #
         # We don't want the RX in the final else condition to connect to the H(x)
 
-        after_conditional_cluster = self._is_branching_cluster(self._last_cluster_entry)
-        inside_final_else_condition = False
-        if len(self._cluster_stack) > 2:
-            inside_final_else_condition = self._is_branching_cluster(self._cluster_stack[-2])
         if (
             _WireKind.DYNAMIC in self._wire_to_node_uids
-            and after_conditional_cluster
-            and not inside_final_else_condition
+            and self._exited_branching_cluster
+            and not self._inside_branch
         ):
             prev_uids.update(self._wire_to_node_uids[_WireKind.DYNAMIC])
 
@@ -727,6 +723,13 @@ class ConstructCircuitDAG:
         """
         inside_branching_cluster = any(self._is_branching_cluster(s) for s in self._cluster_stack)
         return self._is_branching_cluster(self._last_cluster_entry) and not inside_branching_cluster
+
+    @property
+    def _inside_branch(self) -> bool:
+        """
+        Check to see if we're inside of a branch of a branching cluster.
+        """
+        return self._cluster_stack[-1].kind == "branch" if self._cluster_stack else False
 
 
 def _flatten_if_op(operation: scf.IfOp) -> list[Region]:
