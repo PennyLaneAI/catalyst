@@ -155,7 +155,8 @@ class MeasurementsFromSamplesPattern(RewritePattern):
     def match_and_rewrite(self, op: ir.Operation, rewriter: PatternRewriter, /):
         """Abstract method for measurements-from-samples match-and-rewrite patterns."""
 
-    def _get_parent_module(self, op: func.FuncOp) -> builtin.ModuleOp:
+    @staticmethod
+    def _get_parent_module(op: func.FuncOp) -> builtin.ModuleOp:
         """Get the first ancestral builtin.ModuleOp op of a given func.func op."""
         _op: ir.Operation | None = op
         while _op := _op.parent_op():
@@ -167,11 +168,12 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         assert isinstance(_op, builtin.ModuleOp)
         return _op
 
-    def _get_call_op(self, qnode: func.FuncOp):
+    @classmethod
+    def _get_call_op(cls, qnode: func.FuncOp):
         """Get the CallOp in another module function that calls this quantum_node. Postprocessing
         will be called to act on the output of that CallOp"""
 
-        module = self._get_parent_module(qnode)
+        module = cls._get_parent_module(qnode)
         qnode_name = qnode.sym_name.data
         all_call_ops = [op for op in module.body.walk() if isinstance(op, func.CallOp)]
         qnode_call_op = [op for op in all_call_ops if qnode_name in op.callee.string_value()]
@@ -905,46 +907,6 @@ def create_postprocessing_obs(obs, num_wires, math_op):
         return math_op(eigval_samples, axis=0)
 
     return _postprocessing
-
-@xdsl_module
-@jax.jit
-def _postprocessing_expval(samples):
-    """Post-processing to recover the expectation value from the given `samples` array for each
-    requested `column` in the array.
-
-    This function assumes that the samples are in the computational basis (0s and 1s) and that the
-    observable operand of the expectation value has eigenvalues +1 and -1.
-
-    Args:
-        samples (jax.core.ShapedArray): Array of samples, with shape (shots, wires).
-        column (int, jax.core.ShapedArray): Column index (or indices) of the `samples` array over
-            which the expectation value is computed.
-
-    Returns:
-        jax.core.ShapedArray: The expectation value for each requested column.
-    """
-    return jnp.mean(1.0 - 2.0 * samples[:, 0], axis=0)
-
-
-@xdsl_module
-@jax.jit
-def _postprocessing_var(samples):
-    """Post-processing to recover the variance from the given `samples` array for each requested
-    `column` in the array.
-
-    This function assumes that the samples are in the computational basis (0s and 1s) and that the
-    observable operand of the variance has eigenvalues +1 and -1.
-
-    Args:
-        samples (jax.core.ShapedArray): Array of samples, with shape (shots, wires).
-        column (int, jax.core.ShapedArray): Column index (or indices) of the `samples` array over
-            which the variance is computed.
-
-    Returns:
-        jax.core.ShapedArray: The variance for each requested column.
-    """
-    return jnp.var(1.0 - 2.0 * samples[:, 0], axis=0)
-
 
 @xdsl_module
 @jax.jit

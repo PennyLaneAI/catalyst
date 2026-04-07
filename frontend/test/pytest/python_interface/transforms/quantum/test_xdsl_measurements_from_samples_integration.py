@@ -202,6 +202,7 @@ class TestIntegrationWithOtherPasses:
         res = circuit()
         assert res == 1.0
 
+    #ToDo: use analytic test repo, make this more accurate. Make the same change to the var test even if it can't pass.
     @pytest.mark.parametrize("shots", [1, 2])
     @pytest.mark.parametrize(
         "initial_ops, expected_res",
