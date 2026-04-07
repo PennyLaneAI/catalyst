@@ -1622,6 +1622,8 @@ def graph_decomposition(
     )
 
     if "decompose-lowering" not in qnode.compile_pipeline:
-        qnode._compile_pipeline.add_transform(qml.transform(pass_name="decompose-lowering"))
+        qnode._compile_pipeline.add_transform(  # pylint: disable=protected-access
+            qml.transform(pass_name="decompose-lowering")
+        )
 
     return qml.transform(pass_name="graph-decomposition")(qnode, **options)

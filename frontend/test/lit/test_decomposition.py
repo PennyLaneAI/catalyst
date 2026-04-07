@@ -1600,10 +1600,10 @@ def test_graph_decomp_registered():
     # CHECK: transform.apply_registered_pass "graph-decomposition"
     @graph_decomposition(gate_set={qml.RX})
     @qml.qnode(qml.device("lightning.qubit", wires=2))
-    def circuit():
+    def catalyst_circuit():
         return
 
-    print(circuit.mlir)
+    print(catalyst_circuit.mlir)
 
     my_transform = qml.transform(pass_name="graph-decomposition")
 
@@ -1611,10 +1611,10 @@ def test_graph_decomp_registered():
     # CHECK: transform.apply_registered_pass "graph-decomposition"
     @my_transform(gate_set=["RX"])
     @qml.qnode(qml.device("lightning.qubit", wires=2))
-    def circuit():
+    def pennylane_circuit():
         return
 
-    print(circuit.mlir)
+    print(pennylane_circuit.mlir)
 
 
 test_graph_decomp_registered()
