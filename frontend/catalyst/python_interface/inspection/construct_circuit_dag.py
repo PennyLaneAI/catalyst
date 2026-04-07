@@ -725,9 +725,8 @@ class ConstructCircuitDAG:
         Check if we just exited a branching cluster
         and are not currently in a nested cluster.
         """
-        return self._is_branching_cluster(self._last_cluster_entry) and not any(
-            self._is_branching_cluster(s) for s in self._cluster_stack
-        )
+        inside_branching_cluster = any(self._is_branching_cluster(s) for s in self._cluster_stack)
+        return self._is_branching_cluster(self._last_cluster_entry) and not inside_branching_cluster
 
 
 def _flatten_if_op(operation: scf.IfOp) -> list[Region]:
