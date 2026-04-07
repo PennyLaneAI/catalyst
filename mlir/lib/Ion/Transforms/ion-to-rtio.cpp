@@ -19,6 +19,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/CSE.h"
@@ -46,6 +47,7 @@ namespace {
 
 constexpr StringLiteral rtioTransferMeasurementResults = "__rtio_transfer_measurement_results";
 constexpr StringLiteral rtioInitDataset = "__rtio_init_dataset";
+constexpr StringLiteral kParallelProtocolIdAttr = "parallel_protocol_id";
 
 /// Load a JSON file and convert it to an rtio.config attribute
 FailureOr<rtio::ConfigAttr> loadDeviceDbAsConfig(MLIRContext *ctx, StringRef filePath)
@@ -131,6 +133,12 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
     LogicalResult ParallelProtocolConversion(func::FuncOp funcOp, ConversionTarget &baseTarget,
                                              TypeConverter &typeConverter, MLIRContext *ctx)
     {
+        int64_t nextProtocolId = 0;
+        funcOp.walk([&](ion::ParallelProtocolOp op) {
+            op->setAttr(kParallelProtocolIdAttr,
+                        IntegerAttr::get(IndexType::get(ctx), nextProtocolId++));
+        });
+
         ConversionTarget target(baseTarget);
         target.addIllegalOp<ion::ParallelProtocolOp>();
 

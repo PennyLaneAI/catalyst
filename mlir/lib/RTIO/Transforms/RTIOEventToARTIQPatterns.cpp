@@ -70,10 +70,12 @@ struct PulseOpLowering : public OpConversionPattern<RTIOPulseOp> {
             return op->emitError("Cannot find ") << ARTIQFuncNames::setFrequency << " function";
         }
 
+        Type chTy = getTypeConverter()->convertType(op.getChannel().getType());
+        Value chVal = arith::ConstantOp::create(
+            rewriter, op.getLoc(), rewriter.getIntegerAttr(chTy, pulseGroupId(op)));
         Value amplitude = artiq.constF64(1.0);
         LLVM::CallOp::create(rewriter, op.getLoc(), setFreqFunc,
-                             ValueRange{adaptor.getChannel(), adaptor.getFrequency(),
-                                        adaptor.getPhase(), amplitude});
+                             ValueRange{chVal, adaptor.getFrequency(), adaptor.getPhase(), amplitude});
 
         Value newTime = artiq.nowMu();
         rewriter.replaceOp(op, newTime);
@@ -93,7 +95,8 @@ struct PulseOpLowering : public OpConversionPattern<RTIOPulseOp> {
                                 ConversionPatternRewriter &rewriter,
                                 ARTIQRuntimeBuilder &artiq) const
     {
-        Value channelAddr = computeChannelDeviceAddr(rewriter, op, adaptor.getChannel());
+        Value channelAddr =
+            computeChannelDeviceAddrForId(rewriter, op, pulseGroupId(op));
         Value durationMu = artiq.secToMu(adaptor.getDuration());
 
         // Enforce minimum pulse duration to avoid 0 duratoin events
@@ -271,15 +274,26 @@ struct DecomposePulsePattern : public OpRewritePattern<RTIOPulseOp> {
     }
 };
 
-/// Removes redundant transitive dependencies from sync operations
+/// Removes redundant syncs: unused result, unary identity, transitive operand redundancy.
 struct SimplifySyncPattern : public OpRewritePattern<RTIOSyncOp> {
     using OpRewritePattern::OpRewritePattern;
 
     LogicalResult matchAndRewrite(RTIOSyncOp op, PatternRewriter &rewriter) const override
     {
+        // Leftover merge with no consumer (e.g. duplicate sync in the schedule).
+        if (op.getSyncEvent().use_empty()) {
+            rewriter.eraseOp(op);
+            return success();
+        }
+
         auto events = op.getEvents();
-        if (events.size() <= 1) {
+        if (events.empty())
             return failure();
+
+        // Simplify unary sync
+        if (events.size() == 1) {
+            rewriter.replaceOp(op, events[0]);
+            return success();
         }
 
         // Find events that aren't reachable from other events
