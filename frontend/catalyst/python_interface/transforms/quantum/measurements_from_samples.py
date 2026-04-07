@@ -473,6 +473,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         assert self.call_op is not None
 
         # update the qnode to return the result of the SampleOp directly
+        assert self.qnode is not None
         return_op = self.qnode.get_return_op()
         assert return_op is not None, "QNode has no return op"
         return_op.operands[mp_index] = sample_op.results[0]
