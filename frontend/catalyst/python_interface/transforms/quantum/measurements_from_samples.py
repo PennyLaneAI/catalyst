@@ -117,13 +117,12 @@ class AddPostProcessingPattern(RewritePattern):
         rewriter.notify_op_modified(func_op)
 
         # create the outer (postprocessing) fn with the original node name
-        func_type = func_op.function_type
-        outer_fn = func.FuncOp(name=outer_fn_name, function_type=func_type, visibility="public")
+        outer_fn = func.FuncOp(name=outer_fn_name, function_type=func_op.function_type, visibility="public")
         rewriter.insert_op(outer_fn, InsertPoint.before(func_op))
 
         # call the renamed quantum_node inside the new outer FuncOp
-        call_args = outer_fn.function_type.inputs.data
-        result_types = func_type.outputs.data
+        call_args = outer_fn.body.block.args
+        result_types = outer_fn.function_type.outputs.data
         call_op = func.CallOp(qnode_name, call_args, result_types)
         outer_fn.body.block.add_op(call_op)
 
