@@ -651,39 +651,37 @@ class ConstructCircuitDAG:
             elif _WireKind.DEVICE in self._wire_to_node_uids:
                 prev_uids.update(self._wire_to_node_uids[_WireKind.DEVICE])
 
-        # Wire map contains both a dynamic wire and nodes on the static wires.
-        # Only connect to dynamic wire if we just came from a condition.
-        #
-        # For example,
-        #
-        # if x:
-        #   qml.X(0)
-        # else:
-        #   qml.Y(dyn)
-        # qml.Z(0)
-        #
-        # We should have both X and Y connecting to the Z.
-
-        # To do this carefully, we need to check if we're in a cluster's final
-        # else condition by looking two steps behind in the stack,
-        # _cluster_stack = [..., "conditional_cluster*", "cluster*"]
-        # This is required if we have situations like,
-        #
-        #    qml.H(x)
-        #    qml.S(0)
-        #    if x == 3:
-        #        if x == 2:
-        #            qml.H(0)
-        #    else:
-        #        qml.RX(0,0)
-        #
-        # We don't want the RX in the final else condition to connect to the H(x)
-
         if (
             _WireKind.DYNAMIC in self._wire_to_node_uids
             and self._exited_branching_cluster
             and not self._inside_branch
         ):
+
+            # Wire map contains both a dynamic wire and nodes on the static wires.
+            # Only connect to dynamic wire if we just came from a condition.
+            #
+            # For example,
+            #
+            # if x:
+            #   qml.X(0)
+            # else:
+            #   qml.Y(dyn)
+            # qml.Z(0)
+            #
+            # We should have both X and Y connecting to the Z.
+
+            # Also required for situations like,
+            #
+            #    qml.H(x)
+            #    qml.S(0)
+            #    if x == 3:
+            #        if x == 2:
+            #            qml.H(0)
+            #    else:
+            #        qml.RX(0,0)
+            #
+            # We don't want the RX in the final else condition to connect to the H(x)
+
             prev_uids.update(self._wire_to_node_uids[_WireKind.DYNAMIC])
 
         return prev_uids
