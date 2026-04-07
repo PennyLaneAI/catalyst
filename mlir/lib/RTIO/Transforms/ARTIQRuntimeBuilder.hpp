@@ -43,6 +43,10 @@ constexpr StringLiteral rtioOutput = "rtio_output";
 constexpr StringLiteral rtioInit = "rtio_init";
 constexpr StringLiteral rtioGetCounter = "rtio_get_counter";
 constexpr StringLiteral kernel = "__kernel__";
+// ARTIQ RPC runtime
+constexpr StringLiteral rpcSend = "rpc_send";
+constexpr StringLiteral rpcSendAsync = "rpc_send_async";
+constexpr StringLiteral rpcRecv = "rpc_recv";
 } // namespace ARTIQFuncNames
 
 //===----------------------------------------------------------------------===//
@@ -172,6 +176,35 @@ class ARTIQRuntimeBuilder {
         LLVM::CallOp::create(builder, getLoc(), func,
                              ValueRange{channelId, freqHz, phaseTurns, amplitude});
         return nowMu();
+    }
+
+    // RPC calls
+    // void rpc_send(int32_t service, {ptr,i32}* tag, void **args)
+    void rpcSend(Value serviceId, Value tagStructPtr, Value argsPtr)
+    {
+        Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+        auto func = ensureFunc(ARTIQFuncNames::rpcSend,
+                               LLVM::LLVMFunctionType::get(voidTy, {i32Ty, ptrTy, ptrTy}));
+        LLVM::CallOp::create(builder, getLoc(), func, ValueRange{serviceId, tagStructPtr, argsPtr});
+    }
+
+    // void rpc_send_async(int32_t service, {ptr,i32}* tag, void **args)
+    void rpcSendAsync(Value serviceId, Value tagStructPtr, Value argsPtr)
+    {
+        Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+        auto func = ensureFunc(ARTIQFuncNames::rpcSendAsync,
+                               LLVM::LLVMFunctionType::get(voidTy, {i32Ty, ptrTy, ptrTy}));
+        LLVM::CallOp::create(builder, getLoc(), func, ValueRange{serviceId, tagStructPtr, argsPtr});
+    }
+
+    // i32 rpc_recv(void *slot)
+    Value rpcRecv(Value slot)
+    {
+        Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+        auto func =
+            ensureFunc(ARTIQFuncNames::rpcRecv, LLVM::LLVMFunctionType::get(i32Ty, {ptrTy}));
+        auto call = LLVM::CallOp::create(builder, getLoc(), func, ValueRange{slot});
+        return call.getResult();
     }
 
     // TTL operations

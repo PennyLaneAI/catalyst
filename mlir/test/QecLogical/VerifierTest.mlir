@@ -139,3 +139,11 @@ func.func @test_gate_op_index_out_of_bounds_cnot_trgt(%b0 : !qecl.codeblock<1>, 
     %b2, %b3 = qecl.cnot %b0[0], %b1[1] : !qecl.codeblock<1>, !qecl.codeblock<1>
     return
 }
+
+// -----
+
+func.func @test_measure_op_index_out_of_bounds(%b : !qecl.codeblock<1>) {
+    // expected-error@below {{out-of-bounds index attribute}}
+    %mres, %b1 = qecl.measure %b[1] : i1, !qecl.codeblock<1>
+    return
+}

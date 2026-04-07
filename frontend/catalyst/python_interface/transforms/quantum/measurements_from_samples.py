@@ -123,7 +123,7 @@ class AddPostProcessingPattern(RewritePattern):
         rewriter.insert_op(outer_fn, InsertPoint.before(func_op))
 
         # call the renamed quantum_node inside the new outer FuncOp
-        call_args = outer_fn.body.block.args
+        call_args = outer_fn.function_type.inputs.data
         result_types = func_type.outputs.data
         call_op = func.CallOp(qnode_name, call_args, result_types)
         outer_fn.body.block.add_op(call_op)
@@ -147,8 +147,8 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         super().__init__()
 
         self._shots = None
-        self.qnode: func.FuncOp = None
-        self.call_op: func.CallOp = None
+        self.qnode: func.FuncOp | None = None
+        self.call_op: func.CallOp | None = None
         self.postprocessing_idx: int = 0
 
     @abstractmethod
@@ -157,15 +157,15 @@ class MeasurementsFromSamplesPattern(RewritePattern):
 
     def _get_parent_module(self, op: func.FuncOp) -> builtin.ModuleOp:
         """Get the first ancestral builtin.ModuleOp op of a given func.func op."""
-        while (op := op.parent_op()) and not isinstance(op, builtin.ModuleOp):
-            pass  # pragma: no cover
-        if op is None:
-            raise RuntimeError(  # pragma: no cover
-                "The given qnode func is not nested within a builtin.module. Please ensure the "
-                "qnode func is defined in a builtin.module."
-            )
+        _op: ir.Operation | None = op
+        while _op := _op.parent_op():
+            if isinstance(_op, builtin.ModuleOp):
+                break
+            if _op is None:
+                raise CompileError("...")
 
-        return op
+        assert isinstance(_op, builtin.ModuleOp)
+        return _op
 
     def _get_call_op(self, qnode: func.FuncOp):
         """Get the CallOp in another module function that calls this quantum_node. Postprocessing
@@ -496,7 +496,13 @@ class MeasurementsFromSamplesPattern(RewritePattern):
 
         return n_qubits
 
-    def update_returns(self, mp_index, sample_op, postprocessing_func_call_op, rewriter):
+    def update_returns(
+        self,
+        mp_index: int,
+        sample_op: quantum.SampleOp,
+        postprocessing_func_call_op: func.CallOp,
+        rewriter: PatternRewriter,
+    ):
         """Update the return structure so that the qnode returns the output of sample
         instead of the original output, and the outer function returns the output of
         post-processing instead of directly returning the output of calling the qnode.
@@ -514,8 +520,13 @@ class MeasurementsFromSamplesPattern(RewritePattern):
                 the outer function should return.
             rewriter (PatternRewriter): The xDSL pattern rewriter.
         """
+        assert self.qnode is not None
+        assert self.call_op is not None
+
         # update the qnode to return the result of the SampleOp directly
+        assert self.qnode is not None
         return_op = self.qnode.get_return_op()
+        assert return_op is not None, "QNode has no return op"
         return_op.operands[mp_index] = sample_op.results[0]
         rewriter.notify_op_modified(return_op)
 
@@ -539,6 +550,8 @@ class MeasurementsFromSamplesPattern(RewritePattern):
 class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
     """A rewrite pattern for the ``measurements_from_samples`` transform that matches and rewrites
     ``qml.expval()`` and ``qml.var()`` operations.
+
+    Note: only single-wire observables are currently supported
 
     Args:
         shots (int): The number of shots (e.g. as retrieved from the DeviceInitOp).
@@ -601,13 +614,13 @@ class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
                     postprocessing_module, matched_op, postprocessing_func_name
                 )
 
-            # get the tensor_op the original MP result is passed to
+            # get the from_elements_op the original MP result is passed to
             # from its uses get the index this result is returned at
-            tensor_op = list(matched_op.results[0].uses)[0].operation
+            from_elements_op = list(matched_op.results[0].uses)[0].operation
             assert isinstance(
-                tensor_op, tensor.FromElementsOp
-            ), f"Expected to find a tensor.from_elements op, but got {type(tensor_op).__name__}"
-            mp_index = list(tensor_op.results[0].uses)[0].index
+                from_elements_op, tensor.FromElementsOp
+            ), f"Expected a tensor.from_elements op, but got {type(from_elements_op).__name__}"
+            mp_index = list(from_elements_op.results[0].uses)[0].index
 
             # Insert the call to the post-processing function
             postprocessing_func_call_op = func.CallOp(
@@ -624,7 +637,7 @@ class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
             self.update_returns(mp_index, sample_op, postprocessing_func_call_op, rewriter)
 
             # delete now unused obs --> mp --> tensor chain
-            rewriter.erase_op(tensor_op)
+            rewriter.erase_op(from_elements_op)
             rewriter.erase_op(matched_op)
             if isinstance(observable_op, quantum.TensorOp):
                 inner_obs = [op.owner for op in observable_op.operands]
@@ -659,12 +672,13 @@ class ProbsPattern(MeasurementsFromSamplesPattern):
         for probs_op in probs_ops:
 
             compbasis_op = probs_op.operands[0].owner
+            assert isinstance(compbasis_op, quantum.ComputationalBasisOp)
 
             n_qubits = None
             if compbasis_op.qreg is not None:
                 n_qubits = self.get_n_qubits_from_qreg(compbasis_op.qreg)
 
-            elif not compbasis_op.qubits == ():
+            elif compbasis_op.qubits != ():
                 n_qubits = len(compbasis_op.qubits)
 
             assert (
@@ -777,8 +791,7 @@ def get_shots(quantum_node: func.FuncOp) -> int:
     """
 
     shots = _get_static_shots_value_from_device_op(quantum_node)
-    if not isinstance(shots, int):
-        raise TypeError(f"Expected `shots` to be an integer value but got {type(shots).__name__}")
+    assert isinstance(shots, int), "Expected `shots` to be an integer"
     if shots == 0:
         raise ValueError("The measurements_from_samples pass requires non-zero shots")
     return shots

@@ -13,10 +13,10 @@
 # limitations under the License.
 
 """Unit and integration tests for the unified compiler `measurements_from_samples` transform."""
+
 # pylint: disable=line-too-long
 
 import pytest
-from pennylane.exceptions import CompileError
 
 from catalyst.python_interface.transforms import (
     MeasurementsFromSamplesPass,
@@ -53,10 +53,11 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            // CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<5x1xf64>
-            // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.5x1xf64([[samples]]) :
+            // CHECK: [[raw_samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<5x1xf64>
+            // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.5x1xf64([[raw_samples]]) :
             // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
             // CHECK: func.return [[res]] : tensor<f64>
+            // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
             func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<5> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
@@ -91,10 +92,11 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            // CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<5x1xf64>
-            // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.5x1xf64([[samples]]) :
+            // CHECK: [[raw_samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<5x1xf64>
+            // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.5x1xf64([[raw_samples]]) :
             // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
             // CHECK: func.return [[res]] : tensor<f64>
+            // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
             func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
                 %0 = arith.constant 5 : i64
                 quantum.device shots(%0) ["", "", ""]
@@ -132,6 +134,7 @@ class TestMeasurementsFromSamplesPass:
             // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.4x1xf64([[samples]]) :
             // CHECK-SAME: (tensor<4x1xf64>) -> tensor<f64>
             // CHECK: func.return [[res]] : tensor<f64>
+            // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
             func.func public @circuit() -> (tensor<f64>) attributes {quantum.node} {
                 %0 = "stablehlo.constant"() <{value = 4 : i64}> : () -> i64
                 quantum.device shots(%0) ["", "", ""]
@@ -169,6 +172,7 @@ class TestMeasurementsFromSamplesPass:
             // CHECK: [[res:%.+]] = func.call @var_from_samples.tensor.3x1xf64([[samples]]) :
             // CHECK-SAME: (tensor<3x1xf64>) -> tensor<f64>
             // CHECK: func.return [[res]] : tensor<f64>
+            // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
             func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<3> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
@@ -207,6 +211,7 @@ class TestMeasurementsFromSamplesPass:
             // CHECK: [[res:%.+]] = func.call @probs_from_samples.tensor.3x1xf64([[samples]]) :
             // CHECK-SAME: (tensor<3x1xf64>) -> tensor<2xf64>
             // CHECK: func.return [[res]] : tensor<2xf64>
+            // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
             func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<3> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
@@ -243,6 +248,7 @@ class TestMeasurementsFromSamplesPass:
             // CHECK-LABEL: circuit
             // CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<7x1xf64>
             // CHECK: func.return [[samples]] : tensor<7x1xf64>
+            // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
             func.func public @circuit() -> (tensor<7x1xf64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<7> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
@@ -274,6 +280,7 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
+            // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
             func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
@@ -319,6 +326,7 @@ class TestMeasurementsFromSamplesPass:
             // CHECK: [[res0:%.+]] = func.call @expval_from_samples.tensor.5x1xf64([[samples0]]) :
             // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
             // CHECK: func.return [[res0]], [[res1]] : tensor<f64>, tensor<f64>
+            // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
             func.func public @circuit() -> (tensor<f64>, tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<5> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
@@ -367,6 +375,7 @@ class TestMeasurementsFromSamplesPass:
             // CHECK: [[res0:%.+]] = func.call @var_from_samples.tensor.5x1xf64([[samples0]]) :
             // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
             // CHECK: func.return [[res0]], [[res1]] : tensor<f64>, tensor<f64>
+            // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
             func.func public @circuit() -> (tensor<f64>, tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<5> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
@@ -414,6 +423,7 @@ class TestMeasurementsFromSamplesPass:
             // CHECK: [[res:%.+]] = func.call @probs_from_samples.tensor.3x2xf64([[samples]]) :
             // CHECK-SAME: (tensor<3x2xf64>) -> tensor<4xf64>
             // CHECK: func.return [[res]] : tensor<4xf64>
+            // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
             func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<3> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
@@ -452,6 +462,7 @@ class TestMeasurementsFromSamplesPass:
             // CHECK: [[res0:%.+]] = func.call @probs_from_samples.tensor.3x1xf64([[samples0]]) :
             // CHECK-SAME: (tensor<3x1xf64>) -> tensor<2xf64>
             // CHECK: func.return [[res0]], [[res1]] : tensor<2xf64>, tensor<2xf64>
+            // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
             func.func public @circuit() -> (tensor<f64>, tensor<f64>) attributes {quantum.node}  {
                 %0 = "stablehlo.constant"() <{value = dense<3> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>
@@ -499,7 +510,8 @@ class TestMeasurementsFromSamplesPass:
             // CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<1x1xf64>
             // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.1x1xf64([[samples]]) :
             // CHECK-SAME: (tensor<1x1xf64>) -> tensor<f64>
-            // CHECK: func.return [[res]] : tensor<f64>            
+            // CHECK: func.return [[res]] : tensor<f64>
+            // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}            
             func.func public @circuit() -> (tensor<f64>) attributes {quantum.node} {
                 %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
                 %1 = tensor.extract %0[] : tensor<i64>

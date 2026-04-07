@@ -97,7 +97,7 @@ func.func @test_paulirot_duplicate_qubits(%q0: !qref.bit, %angle: f64) {
 func.func @test_gphase_control(%q0: !qref.bit, %param: f64) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{number of controlling qubits in input (1) and controlling values (2) must be the same}}
-    qref.gphase(%param) ctrls (%q0) ctrlvals (%true, %true) : f64 ctrls !qref.bit
+    qref.gphase(%param) ctrls (%q0) ctrlvals (%true, %true) : ctrls !qref.bit
     return
 }
 
