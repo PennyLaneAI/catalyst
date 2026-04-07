@@ -532,11 +532,10 @@ def handle_transform(
 # pylint: disable=too-many-positional-arguments
 def trace_from_pennylane(
     fn,
-    static_argnums,
-    dynamic_args,
-    abstracted_axes,
-    sig,
+    args, 
     kwargs,
+    static_argnums,
+    abstracted_axes,
     skip_preprocess=False,
     debug_info=None,
 ):
@@ -545,19 +544,16 @@ def trace_from_pennylane(
 
     Args:
         fn(Callable): the user function to be traced
+        args (tuple): the positional arguments to the user functions
+        kwargs(Dict[str, Any]): keyword argumemts to the function.
         static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
             positions of static arguments.
-        dynamic_args(Seqence[Any]): the abstract values of the dynamic arguments.
         abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
             An experimental option to specify dynamic tensor shapes.
             This option affects the compilation of the annotated function.
             Function arguments with ``abstracted_axes`` specified will be compiled to ranked tensors
             with dynamic shapes. For more details, please see the Dynamically-shaped Arrays section
             below.
-        sig(Sequence[Any]): a tuple indicating the argument signature of the function. Static arguments
-            are indicated with their literal values, and dynamic arguments are indicated by abstract
-            values.
-        kwargs(Dict[str, Any]): keyword argumemts to the function.
         skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
             If ``True``, transforms used to preprocess and validate the user program before
             executing on a quantum backend will not be used. ``False`` by default.
@@ -568,7 +564,6 @@ def trace_from_pennylane(
         Tuple[Tuple[ShapedArray, bool]]: the return type of the captured JAXPR.
             The boolean indicates whether each result is a value returned by the user function.
         PyTreeDef: PyTree metadata of the function output
-        Tuple[Any]: the dynamic argument signature
     """
 
     # pylint: disable=import-outside-toplevel
@@ -616,6 +611,7 @@ def trace_from_pennylane(
 
         def wrapper(*inner_args, **inner_kwargs):
             plxpr, out_type, out_treedef = make_jaxpr2(fn, static_argnums=static_argnums)(*inner_args, **inner_kwargs)
+            print(out_type, out_treedef)
             flat_inputs = jax.tree.flatten((inner_args, inner_kwargs))[0]
             flat_inputs = [a for a in flat_inputs if qml.math.is_abstract(a)]
             abstract_shapes = []
@@ -627,12 +623,12 @@ def trace_from_pennylane(
 
             return _dummy_hop.bind(jaxpr=jaxpr, out_type=out_type, out_treedef=out_treedef)
         
-        nested_jaxpr = jax.make_jaxpr(wrapper, **make_jaxpr_kwargs)(*sig, **kwargs)
+        nested_jaxpr = jax.make_jaxpr(wrapper, **make_jaxpr_kwargs)(*args, **kwargs)
         jaxpr = nested_jaxpr.eqns[0].params['jaxpr']
         out_type = nested_jaxpr.eqns[0].params['out_type']
         out_treedef = nested_jaxpr.eqns[0].params['out_treedef']
 
-    return jaxpr, out_type, out_treedef, sig
+    return jaxpr, out_type, out_treedef
 
 
 def _apply_compiler_decompose_to_plxpr(
