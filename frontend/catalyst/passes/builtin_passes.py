@@ -1621,4 +1621,7 @@ def graph_decomposition(
         _builtin_rule_path=_builtin_rule_path,
     )
 
+    if "decompose-lowering" not in qnode.compile_pipeline:
+        qnode._compile_pipeline.add_transform(qml.transform(pass_name="decompose-lowering"))
+
     return qml.transform(pass_name="graph-decomposition")(qnode, **options)
