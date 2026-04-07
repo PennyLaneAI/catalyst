@@ -288,7 +288,7 @@
   [(#2604)](https://github.com/PennyLaneAI/catalyst/pull/2604)
 
 * Register manupulation API has been added to the quantum dialect.
-  [(#xxxx)](https://github.com/PennyLaneAI/catalyst/pull/xxxx)
+  [(#2654)](https://github.com/PennyLaneAI/catalyst/pull/2654)
 
 <h3>Improvements 🛠</h3>
 
