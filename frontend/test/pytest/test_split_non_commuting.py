@@ -291,5 +291,167 @@ def test_split_non_commuting_error_non_expval(measurement):
         circ()
 
 
+class TestSplitNonCommutingWires:
+    """Tests for the split-non-commuting pass with grouping_strategy='wires'."""
+
+    @pytest.mark.usefixtures("use_both_frontend")
+    def test_non_overlapping_single_group(self):
+        """Z(0), X(1), Y(2) on separate wires -> 1 group"""
+        dev = qp.device("lightning.qubit", wires=3)
+
+        @qjit
+        @qp.transform(pass_name="split-non-commuting")(grouping_strategy="wires")
+        @qp.qnode(dev)
+        def circ():
+            qp.RX(0.3, wires=0)
+            qp.RY(0.5, wires=1)
+            qp.RZ(0.7, wires=2)
+            return qp.expval(qp.Z(0)), qp.expval(qp.X(1)), qp.expval(qp.Y(2))
+
+        @qjit
+        @qp.qnode(dev)
+        def circ_ref():
+            qp.RX(0.3, wires=0)
+            qp.RY(0.5, wires=1)
+            qp.RZ(0.7, wires=2)
+            return qp.expval(qp.Z(0)), qp.expval(qp.X(1)), qp.expval(qp.Y(2))
+
+        assert np.allclose(circ(), circ_ref())
+
+    @pytest.mark.usefixtures("use_both_frontend")
+    def test_overlapping_two_groups(self):
+        """Z(0), X(1), Y(1): Z(0), X(1) in group 0, Y(1) in group 1."""
+        dev = qp.device("lightning.qubit", wires=2)
+
+        @qjit
+        @qp.transform(pass_name="split-non-commuting")(grouping_strategy="wires")
+        @qp.qnode(dev)
+        def circ():
+            qp.RX(0.4, wires=0)
+            qp.RY(0.6, wires=1)
+            return qp.expval(qp.Z(0)), qp.expval(qp.X(1)), qp.expval(qp.Y(1))
+
+        @qjit
+        @qp.qnode(dev)
+        def circ_ref():
+            qp.RX(0.4, wires=0)
+            qp.RY(0.6, wires=1)
+            return qp.expval(qp.Z(0)), qp.expval(qp.X(1)), qp.expval(qp.Y(1))
+
+        assert np.allclose(circ(), circ_ref())
+
+    @pytest.mark.usefixtures("use_both_frontend")
+    def test_tensor_overlap(self):
+        """Z(0)@Z(1) overlaps X(0) on wire 0 -> 2 groups."""
+        dev = qp.device("lightning.qubit", wires=2)
+
+        @qjit
+        @qp.transform(pass_name="split-non-commuting")(grouping_strategy="wires")
+        @qp.qnode(dev)
+        def circ():
+            qp.RX(0.3, wires=0)
+            qp.RY(0.5, wires=1)
+            return qp.expval(qp.Z(0) @ qp.Z(1)), qp.expval(qp.X(0))
+
+        @qjit
+        @qp.qnode(dev)
+        def circ_ref():
+            qp.RX(0.3, wires=0)
+            qp.RY(0.5, wires=1)
+            return qp.expval(qp.Z(0) @ qp.Z(1)), qp.expval(qp.X(0))
+
+        assert np.allclose(circ(), circ_ref())
+
+    @pytest.mark.usefixtures("use_both_frontend")
+    def test_hamiltonian_non_overlapping(self):
+        """Hamiltonian Z(0)+X(1)+2*Y(2): Z(0), X(1), Y(2) on separate wires -> 1 group."""
+        dev = qp.device("lightning.qubit", wires=3)
+
+        @qjit
+        @qp.transform(pass_name="split-non-commuting")(grouping_strategy="wires")
+        @qp.qnode(dev)
+        def circ():
+            qp.RX(0.3, wires=0)
+            qp.RY(0.5, wires=1)
+            qp.RZ(0.7, wires=2)
+            return qp.expval(qp.Z(0) + qp.X(1) + 2 * qp.Y(2))
+
+        @qjit
+        @qp.qnode(dev)
+        def circ_ref():
+            qp.RX(0.3, wires=0)
+            qp.RY(0.5, wires=1)
+            qp.RZ(0.7, wires=2)
+            return qp.expval(qp.Z(0) + qp.X(1) + 2 * qp.Y(2))
+
+        assert np.allclose(circ(), circ_ref())
+
+    @pytest.mark.usefixtures("use_both_frontend")
+    def test_hamiltonian_overlapping(self):
+        """Hamiltonian 0.5*Z(0)+3*X(1)+Y(1): Z(0), X(1) in group 0, Y(1) in group 1."""
+        dev = qp.device("lightning.qubit", wires=2)
+
+        @qjit
+        @qp.transform(pass_name="split-non-commuting")(grouping_strategy="wires")
+        @qp.qnode(dev)
+        def circ():
+            qp.RX(0.4, wires=0)
+            qp.RY(0.6, wires=1)
+            return qp.expval(0.5 * qp.Z(0) + 3 * qp.X(1) + qp.Y(1))
+
+        @qjit
+        @qp.qnode(dev)
+        def circ_ref():
+            qp.RX(0.4, wires=0)
+            qp.RY(0.6, wires=1)
+            return qp.expval(0.5 * qp.Z(0) + 3 * qp.X(1) + qp.Y(1))
+
+        assert np.allclose(circ(), circ_ref())
+
+    @pytest.mark.usefixtures("use_both_frontend")
+    def test_duplicate_observables(self):
+        """Z(0) appears twice, X(1) once -> deduplicated, single group."""
+        dev = qp.device("lightning.qubit", wires=2)
+
+        @qjit
+        @qp.transform(pass_name="split-non-commuting")(grouping_strategy="wires")
+        @qp.qnode(dev)
+        def circ():
+            qp.RX(0.3, wires=0)
+            qp.RY(0.5, wires=1)
+            return qp.expval(2 * qp.Z(0) + qp.Z(0))
+
+        @qjit
+        @qp.qnode(dev)
+        def circ_ref():
+            qp.RX(0.3, wires=0)
+            qp.RY(0.5, wires=1)
+            return qp.expval(2 * qp.Z(0) + qp.Z(0))
+
+        assert np.allclose(circ(), circ_ref())
+
+    @pytest.mark.usefixtures("use_both_frontend")
+    def test_multiple_hamiltonians_with_shared_observable(self):
+        """expval(2*Y(0)+X(1)), expval(3*X(1)): X(1) shared across MPs, deduplicated, 1 group"""
+        dev = qp.device("lightning.qubit", wires=2)
+
+        @qjit
+        @qp.transform(pass_name="split-non-commuting")(grouping_strategy="wires")
+        @qp.qnode(dev)
+        def circ():
+            qp.RX(0.4, wires=0)
+            qp.RY(0.6, wires=1)
+            return qp.expval(2 * qp.Y(0) + qp.X(1)), qp.expval(3 * qp.X(1))
+
+        @qjit
+        @qp.qnode(dev)
+        def circ_ref():
+            qp.RX(0.4, wires=0)
+            qp.RY(0.6, wires=1)
+            return qp.expval(2 * qp.Y(0) + qp.X(1)), qp.expval(3 * qp.X(1))
+
+        assert np.allclose(circ(), circ_ref())
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
