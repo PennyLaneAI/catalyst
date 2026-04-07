@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the draw function in the unified compiler inspection module."""
+
 # pylint: disable=unnecessary-lambda, protected-access, wrong-import-position
 
 from importlib.util import find_spec
@@ -617,7 +618,7 @@ class TestDrawGraph:
 
         with pytest.warns(
             UserWarning,
-            match="Level requested \\(100\\) is higher than the number of compilation passes present: 2",
+            match="Level requested \\(100\\) is higher than the number of compilation passes",
         ):
             _ = draw_graph(circuit, level=100)()
 
@@ -706,7 +707,7 @@ class TestDrawGraph:
     def test_empty_passpipeline(self):
         """Tests that it works with an empty pass pipeline."""
 
-        @qml.qjit
+        @qml.qjit(skip_preprocess=True)
         @qml.qnode(qml.device("null.qubit", wires=3))
         def circuit():
             qml.H(0)

@@ -120,6 +120,15 @@ struct GatesToPulsesPass : impl::GatesToPulsesPassBase<GatesToPulsesPass> {
             ion::ModesOp::create(builder, op->getLoc(), builder.getArrayAttr(phonons[0]));
         }
 
+        // Rewrite mid-circuit measurement ops into ion.parallelprotocol(ion.measure_pulse).
+        if (!dataManager.getDetectionBeamParams().empty()) {
+            RewritePatternSet measurePatterns(&getContext());
+            populateMeasureToPulsesPatterns(measurePatterns, dataManager);
+            if (failed(applyPatternsGreedily(op, std::move(measurePatterns)))) {
+                return signalPassFailure();
+            }
+        }
+
         RewritePatternSet ionPatterns(&getContext());
         populateGatesToPulsesPatterns(ionPatterns, dataManager);
 

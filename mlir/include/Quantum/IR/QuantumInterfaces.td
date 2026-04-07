@@ -17,42 +17,6 @@
 
 include "mlir/IR/OpBase.td"
 
-def QuantumRegion : OpInterface<"QuantumRegion"> {
-    let description = [{
-        This interface provides a generic way to interact with instructions that are
-        considered quantum regions. These are characterized by operating on a single
-        qubit register, and returning a new register value.
-    }];
-
-    let cppNamespace = "::catalyst::quantum";
-
-    let methods = [
-        InterfaceMethod<
-            "Return the quantum register operand.",
-            "mlir::Value", "getRegisterOperand", (ins), /*methodBody=*/[{
-                return $_op->getOperand(0);
-            }]
-        >,
-        InterfaceMethod<
-            "Return the quantum register result.",
-            "mlir::Value", "getRegisterResult", (ins), /*methodBody=*/[{
-                return $_op->getResult(0);
-            }]
-        >,
-    ];
-
-    let verify = [{
-
-        if ($_op->getNumOperands() != 1)
-            return $_op->emitOpError("must have exactly one operand (quantum register)");
-
-        if ($_op->getNumResults() != 1)
-            return $_op->emitOpError("must have exactly one result (quantum register)");
-
-        return mlir::success();
-    }];
-}
-
 def QuantumOperation : OpInterface<"QuantumOperation"> {
     let description = [{
         This interface provides a generic way to interact with instructions that are
@@ -79,26 +43,11 @@ def QuantumOperation : OpInterface<"QuantumOperation"> {
 
     let verify = [{
         auto gate = mlir::cast<ConcreteOp>($_op);
-        auto operands = gate.getQubitOperands();
-        auto results = gate.getQubitResults();
 
-        if (operands.size() != results.size()) {
+        if (gate.getQubitOperands().size() != gate.getQubitResults().size())
             return $_op->emitError() <<
-                "number of qubits in input (" << operands.size() << ") " <<
-                "and output (" << results.size() << ") must be the same";
-        }
-
-        if (!operands.empty()) {
-            mlir::Type refType = operands[0].getType();
-
-            // Check if all operands and results have the same type as refType
-            auto allMatch = [&](auto value) { return value.getType() == refType; };
-
-            if (!llvm::all_of(operands, allMatch) || !llvm::all_of(results, allMatch)) {
-                return $_op->emitOpError()
-                    << "requires all qubit operands and results to have the same type";
-            }
-        }
+                "number of qubits in input (" << gate.getQubitOperands().size() << ") " <<
+                "and output (" << gate.getQubitResults().size() << ") must be the same";
 
         return mlir::success();
     }];

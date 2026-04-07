@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit tests for the unified compiler's entry point."""
+
 # pylint: disable=line-too-long
 
 from dataclasses import dataclass
@@ -432,7 +433,8 @@ class TestCallbackIntegration:
         assert printed_modules[0] != printed_modules[1], "IR should differ between passes"
 
     @pytest.mark.usefixtures("use_capture")
-    def test_callback_run_integration(self, capsys):
+    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    def test_callback_run_integration(self, capsys, skip_preprocess):
         """Test that the callback is integrated into the pass pipeline with the Compiler.run() method"""
 
         def print_between_passes(_, module, __, pass_level=0):
@@ -442,7 +444,7 @@ class TestCallbackIntegration:
             print("=== Between Pass ===")
             print(module)
 
-        @qml.qjit
+        @qml.qjit(skip_preprocess=skip_preprocess)
         @iterative_cancel_inverses_pass
         @merge_rotations_pass
         @qml.qnode(qml.device("null.qubit", wires=2))
@@ -457,9 +459,15 @@ class TestCallbackIntegration:
         out = capsys.readouterr().out
         printed_modules = out.split("=== Between Pass ===")[1:]
 
-        assert (
-            len(printed_modules) == 2
-        ), "Callback should have been called twice (after each pass)."
+        if skip_preprocess:
+            assert (
+                len(printed_modules) == 2
+            ), "Callback should have been called twice (after each pass)."
+        else:
+            assert len(printed_modules) == 5, (
+                "Callback should have been called five times (after each pass, "
+                "including device preprocessing)."
+            )
 
         # callback after merge-rotations
         # We expect an `arith.addf` if rotations were merged

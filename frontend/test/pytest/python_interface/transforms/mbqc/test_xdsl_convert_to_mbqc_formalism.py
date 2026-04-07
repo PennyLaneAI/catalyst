@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the convert to MBQC formalism transform"""
+
 # pylint: disable=line-too-long
 
 import pennylane as qml
@@ -61,6 +62,7 @@ class TestConvertToMBQCFormalismPass:
                 %4 = quantum.custom "Identity"() %3 : !quantum.bit
                 // CHECK-NEXT: quantum.gphase
                 quantum.gphase %arg0
+                quantum.dealloc_qb %4 : !quantum.bit
                 return
             }
         """
@@ -78,7 +80,7 @@ class TestConvertToMBQCFormalismPass:
                 return
             }
 
-            // CHECK: func.func private @hadamard_in_mbqc(%0 : !quantum.bit) -> !quantum.bit attributes {mbqc_transform = none} {
+            // CHECK: func.func private @hadamard_in_mbqc(%0: !quantum.bit) -> !quantum.bit attributes {mbqc_transform = none} {
             // CHECK-NEXT: %1 = arith.constant dense<[true, false, true, false, false, true]> : tensor<6xi1>
             // CHECK-NEXT: %2 = mbqc.graph_state_prep(%1 : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !quantum.reg
             // CHECK-NEXT: %3 = quantum.extract %2[0] : !quantum.reg -> !quantum.bit
@@ -133,7 +135,7 @@ class TestConvertToMBQCFormalismPass:
                 return
             }
 
-            // CHECK: func.func private @s_in_mbqc(%0 : !quantum.bit) -> !quantum.bit attributes {mbqc_transform = none} {
+            // CHECK: func.func private @s_in_mbqc(%0: !quantum.bit) -> !quantum.bit attributes {mbqc_transform = none} {
             // CHECK-NEXT:   %1 = arith.constant dense<[true, false, true, false, false, true]> : tensor<6xi1>
             // CHECK-NEXT:   %2 = mbqc.graph_state_prep(%1 : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !quantum.reg
             // CHECK-NEXT:   %3 = quantum.extract %2[0] : !quantum.reg -> !quantum.bit
@@ -189,7 +191,7 @@ class TestConvertToMBQCFormalismPass:
                 %1 = quantum.custom "RZ"(%param0) %0 : !quantum.bit
                 return
             }
-            // CHECK: func.func private @rz_in_mbqc(%0 : f64, %1 : !quantum.bit) -> !quantum.bit attributes {mbqc_transform = none} {
+            // CHECK: func.func private @rz_in_mbqc(%0: f64, %1: !quantum.bit) -> !quantum.bit attributes {mbqc_transform = none} {
             // CHECK-NEXT:   %2 = arith.constant dense<[true, false, true, false, false, true]> : tensor<6xi1>
             // CHECK-NEXT:   %3 = mbqc.graph_state_prep(%2 : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !quantum.reg
             // CHECK-NEXT:   %4 = quantum.extract %3[0] : !quantum.reg -> !quantum.bit
@@ -250,7 +252,7 @@ class TestConvertToMBQCFormalismPass:
                 %1 = quantum.custom "RotXZX"(%param0, %param1, %param2) %0 : !quantum.bit
                 return
             }
-            // CHECK: func.func private @rotxzx_in_mbqc(%0 : f64, %1 : f64, %2 : f64, %3 : !quantum.bit) -> !quantum.bit attributes {mbqc_transform = none} {
+            // CHECK: func.func private @rotxzx_in_mbqc(%0: f64, %1: f64, %2: f64, %3: !quantum.bit) -> !quantum.bit attributes {mbqc_transform = none} {
             // CHECK-NEXT:  %4 = arith.constant dense<[true, false, true, false, false, true]> : tensor<6xi1>
             // CHECK-NEXT:  %5 = mbqc.graph_state_prep(%4 : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !quantum.reg
             // CHECK-NEXT:  %6 = quantum.extract %5[0] : !quantum.reg -> !quantum.bit
@@ -332,7 +334,7 @@ class TestConvertToMBQCFormalismPass:
                 %2, %3 = quantum.custom "CNOT"() %0, %1 : !quantum.bit, !quantum.bit
                 return
             }
-            // CHECK: func.func private @cnot_in_mbqc(%0 : !quantum.bit, %1 : !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {mbqc_transform = none} {
+            // CHECK: func.func private @cnot_in_mbqc(%0: !quantum.bit, %1: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {mbqc_transform = none} {
         """
 
         pipeline = (ConvertToMBQCFormalismPass(),)

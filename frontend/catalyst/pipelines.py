@@ -121,6 +121,12 @@ class CompileOptions:
             - ``"global"`` (default): Defer to ``qml.capture.enabled()``
             - ``True``: Force program capture on, regardless of global setting
             - ``False``: Force program capture off (use old frontend)
+        skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
+            If ``True``, transforms used to preprocess and validate the user program before
+            executing on a quantum backend will not be used, and the user is expected to ensure
+            the validity of the program themselves. If ``capture=False``, or ``capture="global"``
+            and ``qml.capture.enabled() == False``, this argument will be ignored. ``False``
+            by default.
     """
 
     verbose: Optional[bool] = False
@@ -144,6 +150,7 @@ class CompileOptions:
     pass_plugins: Optional[Set[Path]] = None
     dialect_plugins: Optional[Set[Path]] = None
     capture: bool | Literal["global"] = "global"
+    skip_preprocess: bool = False
 
     def __post_init__(self):
         # Convert keep_intermediate to Enum
@@ -151,21 +158,17 @@ class CompileOptions:
 
         # Check that async runs must not be seeded
         if self.async_qnodes and self.seed is not None:
-            raise CompileError(
-                """
+            raise CompileError("""
                 Seeding has no effect on asynchronous QNodes,
                 as the execution order of parallel runs is not guaranteed.
                 As such, seeding an asynchronous run is not supported.
-                """
-            )
+                """)
 
         # Check that seed is 32-bit unsigned int
         if (self.seed is not None) and (self.seed < 0 or self.seed > 2**32 - 1):
-            raise ValueError(
-                """
+            raise ValueError("""
                 Seed must be an unsigned 32-bit integer!
-                """
-            )
+                """)
 
         # Make the format of static_argnums easier to handle.
         static_argnums = self.static_argnums
@@ -244,9 +247,8 @@ def get_quantum_compilation_stage(_options: CompileOptions) -> List[str]:
         "inline-nested-module",
         "lower-mitigation",
         "adjoint-lowering",
-        # TODO: We can remove 2 passes below once PBC has its own pipeline.
+        # TODO: We can remove this pass below once PBC has its own pipeline.
         "lower-pbc-init-ops",
-        "unroll-conditional-ppr-ppm",
         "disable-assertion" if _options.disable_assertions else None,
     ]
     return list(filter(partial(is_not, None), user_transform_passes))
@@ -292,9 +294,7 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
     bufferization_options = """bufferize-function-boundaries
         allow-return-allocs-from-loops
         function-boundary-type-conversion=identity-layout-map
-        unknown-type-conversion=identity-layout-map""".replace(
-        "\n", " "
-    )
+        unknown-type-conversion=identity-layout-map""".replace("\n", " ")
     if options.async_qnodes:
         bufferization_options += " copy-before-write"
 
@@ -302,10 +302,12 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         "convert-tensor-to-linalg",  # tensor.pad
         "convert-elementwise-to-linalg",  # Must be run before --one-shot-bufferize
         "gradient-preprocess",
-        # "eliminate-empty-tensors",
         # Keep eliminate-empty-tensors commented out until benchmarks use more structure
         # and produce functions of reasonable size. Otherwise, eliminate-empty-tensors
         # will consume a significant amount of compile time along with one-shot-bufferize.
+        # "eliminate-empty-tensors",
+        # This pass is needed to avoid aliasing of the input buffer with the output buffer.
+        "mark-entry-point-args-non-writable",
         ####################
         "one-shot-bufferize{" + bufferization_options + "}",
         ####################

@@ -18,9 +18,6 @@ written using xDSL.
 Known Limitations
 -----------------
 
-  * Only measurements in the computational basis (or where the observable is a Pauli Z op) are
-    currently supported; for arbitrary observables we require an equivalent compilation pass of the
-    diagonalize_measurements transform.
   * The compilation pass assumes a static number of shots.
   * Usage patterns that are not yet supported with program capture are also not supported in the
     compilation pass. For example, operator arithmetic is not currently supported, such as
@@ -42,17 +39,22 @@ from xdsl import context, ir, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin, func, tensor
 from xdsl.pattern_rewriter import PatternRewriter, RewritePattern
 from xdsl.rewriter import InsertPoint
+from xdsl_jax.dialects import stablehlo
 
 from catalyst.python_interface.conversion import xdsl_module
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.pass_api import compiler_transform
+from catalyst.python_interface.transforms.quantum.diagonalize_measurements import (
+    DiagonalizeFinalMeasurementsPass,
+)
 
 
 @dataclass(frozen=True)
 class MeasurementsFromSamplesPass(passes.ModulePass):
     """Pass that replaces all terminal measurements in a program with a single
     :func:`pennylane.sample` measurement, and adds postprocessing instructions to recover the
-    original measurement.
+    original measurement. If observables are present in a basis other than Z, the pass
+    diagonalizes them before conversion to samples in the computational basis.
     """
 
     name = "measurements-from-samples"
@@ -60,6 +62,9 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the measurements-from-samples pass."""
         shots = _get_static_shots_value_from_first_device_op(op)
+
+        # diagonalize measurements before converting to samples
+        DiagonalizeFinalMeasurementsPass().apply(_ctx, op)
 
         greedy_applier = pattern_rewriter.GreedyRewritePatternApplier(
             [
@@ -551,6 +556,10 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
 
     Raises:
         CompileError: If `module` does not contain a quantum.DeviceInitOp.
+        CompileError: If the operator expected to contain shots values does not have `properties`.
+            This is the immediate issue that is observed when shots are dynamic, for instance as a
+            result of the shots SSA value originating from a block argument rather than from an
+            operation, such as an `arith.constant` op.
     """
     device_op = None
 
@@ -570,6 +579,11 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
 
     if isinstance(shots_extract_op, tensor.ExtractOp):
         shots_constant_op = shots_extract_op.operands[0].owner
+        if not hasattr(shots_constant_op, "properties"):
+            raise CompileError(
+                "Cannot get number of shots. Note that using a dynamic number of shots is not "
+                "supported with measurements-from-samples."
+            )
         shots_value_attribute: builtin.DenseIntOrFPElementsAttr = shots_constant_op.properties.get(
             "value"
         )
@@ -582,12 +596,13 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
 
         return shots_int_values[0]
 
-    if isinstance(shots_extract_op, arith.ConstantOp):
+    if isinstance(shots_extract_op, (arith.ConstantOp, stablehlo.ConstantOp)):
         shots_value_attribute: builtin.IntAttr = shots_extract_op.properties.get("value")
         return shots_value_attribute.value.data
 
     raise ValueError(
-        f"Expected owner of shots operand to be a tensor.ExtractOp or arith.ConstantOp but got "
+        "Expected owner of shots operand to be a tensor.ExtractOp, arith.ConstantOp or"
+        "stablehlo.ConstantOp but got "
         f"{type(shots_extract_op).__name__}"
     )
 
@@ -656,8 +671,12 @@ def _postprocessing_probs(samples):
     # which we currently do not support.
     # If Catalyst PR https://github.com/PennyLaneAI/catalyst/pull/1849 is merged, then we should be
     # able to use bincount.
-    counts = jnp.zeros(dim, dtype=int)
-    for i in indices.astype(int):
-        counts = counts.at[i].add(1)
+    init_counts = jnp.zeros(dim, dtype=int)
+
+    def body_fun(i, counts):
+        idx = indices[i].astype(int)
+        return counts.at[idx].add(1)
+
+    counts = jax.lax.fori_loop(0, n_samples, body_fun, init_counts)
 
     return counts / n_samples

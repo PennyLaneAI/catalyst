@@ -44,6 +44,7 @@
 #include "llvm/Transforms/Coroutines/CoroSplit.h"
 #include "llvm/Transforms/IPO/GlobalDCE.h"
 
+#include "mlir/Bytecode/BytecodeWriter.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/InitAllDialects.h"
@@ -753,6 +754,10 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         inType = InputType::MLIR;
         catalyst::utils::LinesCount::ModuleOp(*mlirModule);
         output.isCheckpointFound = options.checkpointStage == "mlir";
+
+        if (options.verbosity == Verbosity::All) {
+            llvm::outs() << "MLIR parsing successful" << "\n";
+        }
     }
     else {
         llvm::SMDiagnostic err;
@@ -767,6 +772,10 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         inType = InputType::LLVMIR;
         output.isCheckpointFound = options.checkpointStage == "LLVMIRTranslation";
         catalyst::utils::LinesCount::Module(*llvmModule);
+
+        if (options.verbosity == Verbosity::All) {
+            llvm::outs() << "LLVMIR parsing successful" << "\n";
+        }
     }
     if (failed(verifyInputType(options, inType))) {
         return failure();
@@ -789,6 +798,10 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             mlirModule->print(outIRStream, opPrintingFlags);
         }
         optTiming.stop();
+
+        if (options.verbosity == Verbosity::All) {
+            llvm::outs() << "quantum-opt transformations successful" << "\n";
+        }
     }
 
     if (runTranslate && (inType == InputType::MLIR)) {
@@ -818,6 +831,10 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             outIRStream << *llvmModule;
         }
         translateTiming.stop();
+
+        if (options.verbosity == Verbosity::All) {
+            llvm::outs() << "MLIR->LLVMIR translation successful" << "\n";
+        }
     }
 
     if (runLLC && (inType == InputType::LLVMIR)) {
@@ -893,6 +910,10 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
         outputTiming.stop();
         llcTiming.stop();
+
+        if (options.verbosity == Verbosity::All) {
+            llvm::outs() << "LLC object code generation successful" << "\n";
+        }
     }
 
     std::string errorMessage;
@@ -905,8 +926,13 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         // already handled
     }
     else if (output.outputFilename == "-" && mlirModule) {
-        mlirModule->print(outfile->os(), opPrintingFlags);
-        outfile->keep();
+        if (options.shouldEmitBytecode) {
+            return mlir::writeBytecodeToFile(mlirModule.get(), outfile->os());
+        }
+        else {
+            mlirModule->print(outfile->os(), opPrintingFlags);
+            outfile->keep();
+        }
     }
 
     if (options.keepIntermediate and output.outputFilename != "-") {
@@ -1088,7 +1114,8 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .pipelinesCfg = parsePipelines(CatalystPipeline),
                             .checkpointStage = CheckpointStage,
                             .loweringAction = LoweringAction,
-                            .dumpPassPipeline = DumpPassPipeline};
+                            .dumpPassPipeline = DumpPassPipeline,
+                            .shouldEmitBytecode = config.shouldEmitBytecode()};
 
     mlir::LogicalResult result = QuantumDriverMain(options, *output, registry);
 

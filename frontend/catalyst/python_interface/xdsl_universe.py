@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """xDSL universe for containing all dialects and passes."""
+
 from functools import partial
 
 from xdsl.passes import ModulePass
@@ -37,7 +38,7 @@ for name in dialects.__all__:
         names_to_dialects[d.name] = partial(dialect_accessor, d)
 
 # Create a map from pass names to their respective ModulePass. The transforms module
-# contains PassDispatcher instances as well as ModulePasses. We only want to collect
+# contains CompilerTransform instances as well as ModulePasses. We only want to collect
 # the ModulePasses. We cannot use issubclass with instances, which is why we first
 # check if isinstance(transform, type).
 names_to_passes = {}

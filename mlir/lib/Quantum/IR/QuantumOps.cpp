@@ -20,7 +20,6 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 #include "llvm/ADT/StringSet.h"
-#include "llvm/ADT/Twine.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 #include "QRef/IR/QRefOps.h"
@@ -217,19 +216,6 @@ LogicalResult ExtractOp::verify()
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected op to have a non-null index";
     }
-
-    const auto qregLevel = getQreg().getType().getLevel();
-    const auto qbitLevel = getQubit().getType().getLevel();
-
-    if (qregLevel != qbitLevel) {
-        const auto qregLevelStr = stringifyQubitLevel(qregLevel);
-        const auto qbitLevelStr = stringifyQubitLevel(qbitLevel);
-        Twine aReg = (qregLevel == QubitLevel::Abstract) ? "an " : "a ";
-        Twine aBit = (qbitLevel == QubitLevel::Abstract) ? "an " : "a ";
-        return emitOpError() << "type mismatch: extracting from " << aReg << qregLevelStr
-                             << " register should produce " << aReg << qregLevelStr
-                             << " qubit but this op returns " << aBit << qbitLevelStr << " qubit";
-    }
     return success();
 }
 
@@ -237,17 +223,6 @@ LogicalResult InsertOp::verify()
 {
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected op to have a non-null index";
-    }
-
-    const auto inQregLevel = getInQreg().getType().getLevel();
-    const auto qbitLevel = getQubit().getType().getLevel();
-
-    if (inQregLevel != qbitLevel) {
-        const auto inQregLevelStr = stringifyQubitLevel(inQregLevel);
-        const auto qbitLevelStr = stringifyQubitLevel(qbitLevel);
-        Twine aBit = (qbitLevel == QubitLevel::Abstract) ? "an " : "a ";
-        return emitOpError() << "type mismatch: cannot insert " << aBit << qbitLevelStr
-                             << " qubit into a register requiring " << inQregLevelStr << " qubits";
     }
     return success();
 }
@@ -335,11 +310,16 @@ LogicalResult QubitUnitaryOp::verify()
 
 static LogicalResult verifyInQNodeFunction(Operation *op)
 {
-    auto parentModule = op->getParentOfType<ModuleOp>();
-    auto rootModule = parentModule->getParentOfType<ModuleOp>();
-    bool inQuantumKernel = parentModule && rootModule;
-    if (!inQuantumKernel) {
-        return success(); // strict verification only for quantum kernels
+    // strict verification only for quantum kernels
+    // detection is a bit tricky until we have a dedicated operation, use heuristics for now
+    auto kernelModule = op->getParentOfType<ModuleOp>();
+    if (!kernelModule) {
+        return success();
+    }
+
+    auto modIt = kernelModule.getOps<ModuleOp>();
+    if (modIt.empty() || !(*modIt.begin())->hasAttr("transform.with_named_sequence")) {
+        return success();
     }
 
     auto parentFunc = op->getParentOfType<func::FuncOp>();
@@ -570,6 +550,19 @@ LogicalResult AdjointOp::verify()
 
     if (res.wasInterrupted()) {
         return emitOpError("quantum measurements are not allowed in the adjoint regions");
+    }
+
+    Block &b = this->getRegion().front();
+    if (b.getNumArguments() != this->getArgs().size()) {
+        return emitOpError("Adjoint op number of operands must be the same as the number of "
+                           "arguments on its block");
+    }
+
+    for (auto [operand, bbArg] : llvm::zip_equal(this->getArgs(), b.getArguments())) {
+        if (operand.getType() != bbArg.getType()) {
+            return emitOpError(
+                "Adjoint op operand types must be the same as the argument types on its block");
+        }
     }
 
     return success();

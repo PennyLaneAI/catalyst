@@ -93,7 +93,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
                 "PPM statistics is not available when there are conditionals or while loops.");
         }
 
-        int16_t rotationKind = op.getRotationKindAttr().getValue().getZExtValue();
+        int8_t rotationKind = op.getRotationKind();
         auto PauliProductAttr = op.getPauliProductAttr();
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
         StringRef funcName = parentFuncOp.getName();
@@ -157,16 +157,18 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             assert(!layer.empty() && "Layer is empty");
 
             auto op = layer.getOps().back();
-
-            int16_t absRk = 0;
-            if (auto pprOp = dyn_cast<PPRotationOp>(op.getOperation())) {
-                absRk = std::abs(static_cast<int16_t>(pprOp.getRotationKind()));
-            }
             auto parentFuncOp = op->getParentOfType<func::FuncOp>();
             StringRef funcName = parentFuncOp.getName();
             llvm::StringSaver saver(stringAllocator);
-            StringRef key = isPPR(op) ? saver.save("depth_pi" + std::to_string(absRk) + "_ppr")
-                                      : saver.save("depth_ppm");
+
+            StringRef key;
+            if (auto pprOp = dyn_cast<PPRotationOp>(op.getOperation())) {
+                key = saver.save("depth_pi" + std::to_string(std::abs(pprOp.getRotationKind())) +
+                                 "_ppr");
+            }
+            else {
+                key = saver.save("depth_ppm");
+            }
 
             PPMSpecs[funcName][key]++;
         }

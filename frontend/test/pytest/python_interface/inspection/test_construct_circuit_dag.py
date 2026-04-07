@@ -12,22 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit tests for the ConstructCircuitDAG utility."""
+
 # pylint: disable=unused-argument, unused-variable, too-many-public-methods, too-many-lines
 
 import re
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import jax
 import pennylane as qml
 import pytest
-from xdsl.dialects import test
+from xdsl.dialects import builtin, func, test
 from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir import Operation
 from xdsl.ir.core import Block, Region
 
 from catalyst import measure
 from catalyst.python_interface.conversion import parse_generic_to_xdsl_module, xdsl_from_qjit
 from catalyst.python_interface.inspection.construct_circuit_dag import (
     ConstructCircuitDAG,
+    VisualizationError,
     get_label,
 )
 from catalyst.python_interface.inspection.dag_builder import DAGBuilder
@@ -184,6 +187,19 @@ def assert_dag_structure(nodes, edges, expected_edges):
 @pytest.mark.usefixtures("use_both_frontend")
 class TestFuncOpVisualization:
     """Tests the visualization of FuncOps with bounding boxes"""
+
+    def test_external_empty_function_visualization_error(self):
+        """Regression test for #2541 issue."""
+
+        external_func = func.FuncOp.external("test_func", [], [])
+        module = builtin.ModuleOp(ops=[external_func])
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        expected_error = (
+            r"Calls to functions without a definition are not yet compatible.*test_func"
+        )
+        with pytest.raises(VisualizationError, match=expected_error):
+            utility.construct(module)
 
     def test_standard_qnode(self):
         """Tests that a standard QJIT'd QNode is visualized correctly"""
@@ -784,6 +800,22 @@ class TestGetLabel:
 @pytest.mark.usefixtures("use_both_frontend")
 class TestCreateStaticOperatorNodes:
     """Tests that operators with static parameters can be created and visualized as nodes."""
+
+    @pytest.mark.parametrize("dialect", ["quantum", "pbc", "mbqc"])
+    def test_unsupported_non_skipped_op_raises_visualization_error(self, dialect):
+        """Tests that an unknown non-skipped operator raises an error."""
+
+        unknown_op = MagicMock(spec=Operation)
+        unknown_op.dialect_name.return_value = dialect
+        unknown_op.name = f"{dialect}.fake_unsupported_nonskipped_op"
+        unknown_op.__class__ = type("FakeQuantumOp", (Operation,), {})
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        with pytest.raises(
+            VisualizationError, match=rf"{dialect}.fake_unsupported_nonskipped_op.*not supported"
+        ):
+            # pylint: disable=protected-access
+            utility._visit_operation(unknown_op)
 
     def test_custom_op(self):
         """Tests that the CustomOp operation node can be created and visualized."""

@@ -15,6 +15,7 @@
 This file contains the definition of operations representing measurements
 in the Quantum dialect.
 """
+
 from xdsl.dialects.builtin import I32, ComplexType, Float64Type, IntegerAttr, i1, i64
 from xdsl.ir import Operation
 from xdsl.irdl import (
@@ -73,7 +74,7 @@ class MeasureOp(IRDLOperation):
         self, in_qubit: QubitSSAValue | Operation, postselect: int | IntegerAttr | None = None
     ):
         if isinstance(postselect, int):
-            postselect = IntegerAttr.from_int_and_width(postselect, 32)
+            postselect = IntegerAttr(postselect, 32)
 
         if postselect is None:
             properties = {}

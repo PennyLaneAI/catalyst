@@ -14,6 +14,7 @@
 """
 Sets up the PLxPRToQuantumJaxprInterpreter for converting plxpr to catalyst jaxpr.
 """
+
 # pylint: disable=protected-access
 import textwrap
 from copy import copy
@@ -215,7 +216,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         wires = [self.init_qreg[w] for w in obs.wires]
         if obs.name == "Hermitian":
             return hermitian_p.bind(obs.data[0], *wires)
-        return namedobs_p.bind(*wires, *obs.data, kind=obs.name)
+        return namedobs_p.bind(wires[0], *obs.data, kind=obs.name)
 
     def _compbasis_obs(self, *wires):
         """Add a computational basis sampling observable."""
@@ -232,24 +233,16 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             if len(measurement.wires) == 0 and not isinstance(
                 measurement, qml.measurements.StateMP
             ):
-                raise CompileError(
-                    textwrap.dedent(
-                        """
+                raise CompileError(textwrap.dedent("""
                         Terminal measurements must take in an explicit list of wires when
                         dynamically allocated wires are present in the program.
-                        """
-                    )
-                )
+                        """))
 
             if any(is_dynamically_allocated_wire(w) for w in measurement.wires):
-                raise CompileError(
-                    textwrap.dedent(
-                        """
+                raise CompileError(textwrap.dedent("""
                         Terminal measurements cannot take in dynamically allocated wires
                         since they must be temporary.
-                        """
-                    )
-                )
+                        """))
 
     # pylint: disable=too-many-branches
     def interpret_measurement(self, measurement):
@@ -653,6 +646,7 @@ def handle_pauli_measure(self, *invals, pauli_word, **params):
     result, *out_qubits = outvals  # First element is the measurement result
     for in_qreg, w, new_wire in zip(in_qregs, invals, out_qubits):
         in_qreg[in_qreg.global_index_to_local_index(w)] = new_wire
+    result = jnp.astype(result, int)
     return result
 
 
@@ -709,10 +703,15 @@ def handle_measure(self, wire, reset, postselect):
             ]
         )
         out_wire = cond_p.bind(
-            result, out_wire, out_wire, branch_jaxprs=correction, num_implicit_outputs=None
+            result,
+            out_wire,
+            out_wire,
+            branch_jaxprs=correction,
+            num_implicit_outputs=None,
         )[0]
 
     in_qreg[in_qreg.global_index_to_local_index(wire)] = out_wire
+    result = jnp.astype(result, int)
     return result
 
 

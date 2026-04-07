@@ -95,6 +95,7 @@ def qjit(
     pass_plugins=None,
     dialect_plugins=None,
     capture="global",
+    skip_preprocess=False,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -182,6 +183,12 @@ def qjit(
               ``qml.capture.enable()`` globally.
             - ``False``: Force program capture off for this QJIT, using the old frontend,
               regardless of the global setting.
+        skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
+            If ``True``, transforms used to preprocess and validate the user program before
+            executing on a quantum backend will not be used, and the user is expected to ensure
+            the validity of the program themselves. If ``capture=False``, or ``capture="global"``
+            and ``qml.capture.enabled() == False``, this argument will be ignored. ``False``
+            by default.
 
     Returns:
         QJIT object.
@@ -700,10 +707,13 @@ class QJIT(CatalystCallable):
             bool: whether the provided arguments will require promotion to be used with the compiled
                   function
         """
+        opts = self.compile_options
+        assert opts.lower_to_llvm and opts.link, "invalid options for jit_compile"
+
         cached_fn, requires_promotion = self.fn_cache.lookup(args)
 
         if cached_fn is None:
-            if self.user_sig and not self.compile_options.static_argnums:
+            if self.user_sig and not opts.static_argnums:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
 
@@ -788,6 +798,7 @@ class QJIT(CatalystCallable):
                     abstracted_axes,
                     full_sig,
                     kwargs,
+                    skip_preprocess=self.compile_options.skip_preprocess,
                     debug_info=dbg,
                 )
             else:

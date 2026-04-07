@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Integration tests for the the PL capture in Catalyst."""
+
 # pylint: disable=too-many-lines
 
 from functools import partial
@@ -426,6 +427,29 @@ class TestCapture:
         expected_result = -1
 
         assert jnp.allclose(capture_result, expected_result)
+
+    @pytest.mark.parametrize("pred", [False, 0.0, 0])
+    def test_measure_as_condition(self, backend, pred):
+        """Test the integration for a circuit with a mid-circuit measurement used as a conditional
+        predicate.
+        """
+        device = qml.device(backend, wires=1)
+
+        qml.capture.enable()
+
+        @qjit(autograph=True)
+        @qml.qnode(device)
+        def captured_circuit():
+            m = qml.measure(wires=0)
+            if m == pred:
+                qml.X(0)
+            return qml.expval(qml.Z(0))
+
+        capture_result = captured_circuit()
+
+        qml.capture.disable()
+
+        assert jnp.allclose(capture_result, -1)
 
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_forloop(self, backend, theta):

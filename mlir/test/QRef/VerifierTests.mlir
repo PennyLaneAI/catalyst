@@ -97,7 +97,7 @@ func.func @test_paulirot_duplicate_qubits(%q0: !qref.bit, %angle: f64) {
 func.func @test_gphase_control(%q0: !qref.bit, %param: f64) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{number of controlling qubits in input (1) and controlling values (2) must be the same}}
-    qref.gphase(%param) ctrls (%q0) ctrlvals (%true, %true) : f64 ctrls !qref.bit
+    qref.gphase(%param) ctrls (%q0) ctrlvals (%true, %true) : ctrls !qref.bit
     return
 }
 
@@ -193,11 +193,24 @@ func.func @test_alloc_bad_static_size() {
 func.func @test_adjoint_op_no_MP(%r: !qref.reg<2>)
 {
     // expected-error@+1 {{quantum measurements are not allowed in the adjoint regions}}
-    qref.adjoint(%r) : !qref.reg<2> {
-    ^bb0(%arg0: !qref.reg<2>):
-        %q1 = qref.get %arg0[1] : !qref.reg<2> -> !qref.bit
+    qref.adjoint {
+    ^bb0():
+        %q1 = qref.get %r[1] : !qref.reg<2> -> !qref.bit
         %obs = qref.namedobs %q1 [ PauliX] : !quantum.obs
         %expval = quantum.expval %obs : f64
+    }
+    return
+}
+
+// -----
+
+func.func @test_adjoint_with_args(%r: !qref.reg<2>, %q: !qref.bit)
+{
+    // expected-error@+1 {{qref.adjoint op must have no arguments on its block}}
+    qref.adjoint {
+    ^bb0(%arg0: !qref.reg<2>):
+        %q1 = qref.get %arg0[1] : !qref.reg<2> -> !qref.bit
+        qref.custom "Hadamard"() %q1 : !qref.bit
     }
     return
 }
