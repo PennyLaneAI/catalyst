@@ -1605,6 +1605,17 @@ def test_graph_decomp_registered():
 
     print(circuit.mlir)
 
+    my_transform = qml.transform(pass_name="graph-decomposition")
+
+    @qjit(target="mlir", capture=True)
+    # CHECK: transform.apply_registered_pass "graph-decomposition"
+    @my_transform(gate_set=["RX"])
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def circuit():
+        return
+
+    print(circuit.mlir)
+
 
 test_graph_decomp_registered()
 
@@ -1738,3 +1749,37 @@ def test_cpp_decomp_builtin_rules():
 
 
 test_cpp_decomp_builtin_rules()
+
+
+def test_cpp_decomp_user_rules():
+    """Test that cpp decomp applies user rules."""
+
+    @decomposition_rule(is_qreg=True, op_type="PauliY")
+    def y_to_rx(wire):
+        qml.RX(np.pi, wire)
+
+    @decomposition_rule(is_qreg=True, op_type="PauliZ")
+    def z_to_rx(wire):
+        qml.RX(np.pi, wire)
+
+    @qml.qjit(target="mlir", capture=True)
+    @graph_decomposition(
+        gate_set={qml.RX}, fixed_decomps={qml.Y: y_to_rx}, alt_decomps={qml.Z: [z_to_rx]}
+    )
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circuit():
+        y_to_rx(jax.core.ShapedArray((1,), int))
+        z_to_rx(jax.core.ShapedArray((1,), int))
+        # CHECK-NOT: PauliY
+        # CHECK-NOT: PauliZ
+        # CHECK: RX
+        # CHECK: RX
+        # CHECK: return
+        qml.Y(0)
+        qml.Z(0)
+        return qml.probs()
+
+    print(circuit.mlir_opt)
+
+
+test_cpp_decomp_user_rules()
