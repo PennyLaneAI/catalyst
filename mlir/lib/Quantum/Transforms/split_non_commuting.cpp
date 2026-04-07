@@ -457,6 +457,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
                                      const llvm::DenseMap<int, int> &canonicalMeas,
                                      SymbolTable &modSymTable)
     {
+        // clone the entire function
         func::FuncOp groupFunc = funcOp.clone();
         std::string groupName = funcOp.getSymName().str() + ".group." + std::to_string(groupIdx);
         groupFunc.setSymName(groupName);
@@ -464,8 +465,13 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
 
         modSymTable.insert(groupFunc);
 
+        // Remove measurements from groups other than groupIdx
         removeOtherGroups(groupFunc, groupIdx, returnValueGroupIds);
+
+        // Remove duplicate measurements within the group
         deduplicateMeasurements(groupFunc, canonicalMeas);
+
+        // Distribute shots among groups
         distributeShots(groupFunc, numGroups);
 
         return groupFunc;
