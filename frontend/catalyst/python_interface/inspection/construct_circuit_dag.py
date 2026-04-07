@@ -722,7 +722,6 @@ class ConstructCircuitDAG:
         """
         if cluster is None:
             return False
-        # TODO: Add cluster.kind == "switch" once supported
         return cluster.kind == _ClusterKind.CONDITIONAL
 
     @property
