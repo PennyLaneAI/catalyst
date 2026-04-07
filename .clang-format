@@ -6,3 +6,19 @@ AccessModifierOffset: -2
 BreakBeforeBraces: Stroustrup
 FixNamespaceComments: true
 ColumnLimit: 100
+
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+
+IncludeCategories:
+  # System/STL
+  - Regex:    '^(<|")([^.]+)(>|")$'
+    Priority: 1
+
+  # Dependencies
+  - Regex:    '^(<|")(llvm|mlir|stablehlo|Enzyme|catch2|pybind11|nanobind|toml\+\+)(.*)\.(.+)(>|")$'
+    Priority: 2
+
+  # Local headers
+  - Regex:    '^(<|")([^.]+)\.(.+)(>|")$'
+    Priority: 3
