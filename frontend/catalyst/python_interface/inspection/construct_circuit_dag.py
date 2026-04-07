@@ -71,6 +71,7 @@ _SKIPPED_PBC_OPS = (
 # Any MBQC operation encountered will raise a
 # VisualizationError
 _SKIPPED_MBQC_OPS = ()
+_SKIPPED_OPS = frozenset((*_SKIPPED_QUANTUM_OPS, *_SKIPPED_PBC_OPS, *_SKIPPED_MBQC_OPS))
 
 
 class VisualizationError(Exception):
@@ -166,8 +167,7 @@ class ConstructCircuitDAG:
         # NOTE: Currently only visualizing "quantum" operations
         if op.dialect_name() not in {"quantum", "pbc", "mbqc"}:
             return
-        _SKIPPED_OPS = (*_SKIPPED_QUANTUM_OPS, *_SKIPPED_PBC_OPS, *_SKIPPED_MBQC_OPS)
-        if not isinstance(op, _SKIPPED_OPS):
+        if type(op) not in _SKIPPED_OPS:
             _ERROR_MSG = f"Visualization for operation '{op.name}' is currently not supported."
             raise VisualizationError(_ERROR_MSG)
 
