@@ -681,28 +681,20 @@ when working with classical control in Catalyst.
 Compatibility with PennyLane transforms
 ---------------------------------------
 
-PennyLane provides a wide variety of
-:doc:`transforms <code/qml_transforms>` that
-convert a circuit to one or more circuits.
+PennyLane provides a wide variety of :doc:`transforms <code/qml_transforms>`
+that convert a circuit to one or more circuits.
 
-Currently, most PennyLane transforms will work with Catalyst
-as long as:
-
-- The circuit does not include any Catalyst-specific features, such
-  as Catalyst control flow or measurement,
-
-- The QNode returns only lists of measurement processes,
-
-- AutoGraph is disabled, and
-
-- The transformation does not require or depend on the numeric value of
-  dynamic variables.
-
-This includes transforms that generate many circuits,
+Currently, most PennyLane transforms will work with Catalyst as long as
+the transformation does not require or depend on the numeric value of dynamic
+variables. This includes transforms that generate many circuits,
 
 .. code-block:: python
 
-    @qjit
+    import pennylane as qml
+
+    dev = qml.device("lightning.qubit", wires=1)
+
+    @qml.qjit
     @qml.transforms.split_non_commuting
     @qml.qnode(dev)
     def circuit(x):
@@ -716,8 +708,8 @@ as well as transforms that simply map the circuit to another:
 
 .. code-block:: python
 
-    @qjit
-    @qml.transforms.merge_rotations()
+    @qml.qjit
+    @qml.transforms.merge_rotations
     @qml.qnode(dev)
     def circuit(x):
         qml.RX(x, wires=0)
@@ -757,7 +749,88 @@ a single RX gate is being applied due to the rotation gate merger:
     ] a
   in (b,) }
 
-Note that currently PennyLane transforms **cannot** be applied when ``autograph=True``.
+When composing transforms, issues can arise when a transform must be applied
+as a tape transform, not a transform that modifies a program at the MLIR
+level. A transform will be applied as a tape transform in two cases:
+
+- The transform does not have an MLIR implementation in Catalyst.
+- Transforms up to and including the last transform that does not have an MLIR
+  implementation in Catalyst.
+
+Consider the following example that includes ``cancel_inverses``,
+``merge_rotations``, and ``commute_controlled``.
+
+.. code-block:: python
+
+    dev = qml.device("lightning.qubit", wires=3)
+
+    @qml.qjit
+    @qml.transforms.commute_controlled(direction="right") # applied as a tape transform
+    @qml.transforms.cancel_inverses(recursive=True) # applied as the MLIR pass
+    @qml.transforms.merge_rotations # applied as the MLIR pass
+    @qml.qnode(device=dev)
+    def circuit(theta):
+        qml.CZ(wires=[0, 2])
+        qml.X(2)
+        qml.S(wires=0)
+
+        qml.CNOT(wires=[0, 1])
+
+        qml.H(0)
+        qml.H(0)
+
+        qml.RX(theta, wires=1)
+        qml.RX(theta, wires=1)
+
+        return qml.expval(qml.Z(0))
+
+>>> circuit(0.1)
+Array(1., dtype=float64)
+
+The ``merge_rotations`` and ``cancel_inverses`` passes have an MLIR
+implementation (see the :mod:`catalyst.passes` module) and are applied using
+that implementation. The ``commute_controlled`` pass is applied as a tape
+transform since it does not have an MLIR implementation.
+
+However, if we were to swap ``cancel_inverses`` and ``commute_controlled`` like
+below, ``cancel_inverses`` would be applied as a tape transform since it does
+not have an MLIR implementation.
+
+.. code-block:: python
+
+    dev = qml.device("lightning.qubit", wires=3)
+
+    @qml.qjit
+    @qml.transforms.cancel_inverses(recursive=True) # applied as a tape transform
+    @qml.transforms.commute_controlled(direction="right") # applied as a tape transform
+    @qml.transforms.merge_rotations # applied as the MLIR pass
+    @qml.qnode(device=dev)
+    def circuit(theta):
+        qml.CZ(wires=[0, 2])
+        qml.X(2)
+        qml.S(wires=0)
+
+        qml.CNOT(wires=[0, 1])
+
+        qml.H(0)
+        qml.H(0)
+
+        qml.RX(theta, wires=1)
+        qml.RX(theta, wires=1)
+
+        return qml.expval(qml.Z(0))
+
+In addition to this internal discrepancy, an error will now be raised since the
+tape implementation of ``cancel_inverses`` does not have a ``recursive``
+keyword argument.
+
+>>> circuit(0.1)
+...
+CompileError: catalyst failed with error code 1: Failed to run pipeline: QuantumCompilationStage
+Compilation failed:
+circuit:10:14: error: <Pass-Options-Parser>: no such option recursive
+...
+While processing 'transform_cancel-inverses' pass While processing 'ApplyTransformSequencePass' pass While processing 'mlir::detail::OpToOpPassAdaptor' pass Failed to lower MLIR module
 
 Compatibility with PennyLane decompositions
 -------------------------------------------
@@ -1271,16 +1344,16 @@ the ``@qjit`` decorator is applied.
 Currently, however, this is not the case for the following functionalities.
 
 - **Graph-based decompositions**: Graph-based decompositions can be enabled via
-  :func:`pennylane.decomposition.enable_graph`. Scenarios can happen in which 
-  the graph may use different solutions non-deterministically if there exist 
+  :func:`pennylane.decomposition.enable_graph`. Scenarios can happen in which
+  the graph may use different solutions non-deterministically if there exist
   intermediate decompositions that have the same overall cost. This phenomenon
   is not an issue, except for in cases where intermediate gates are not
-  executable with ``qjit`` present. An example of such a gate is 
+  executable with ``qjit`` present. An example of such a gate is
   ``qml.PauliRot``; if an intermediate decomposition is chosen that includes
-  a ``qml.PauliRot`` instance, Catalyst cannot execute the program. If this 
+  a ``qml.PauliRot`` instance, Catalyst cannot execute the program. If this
   behaviour is encountered, this can be counteracted by adding a prohibitively
-  large penalty to the graph solution should it encounter a ``qml.PauliRot`` 
-  instance (e.g., 
+  large penalty to the graph solution should it encounter a ``qml.PauliRot``
+  instance (e.g.,
   ``qml.transforms.decomopose(..., gate_set={..., qml.PauliRot: 100_000})``).
 
 - **Measurement behaviour**: :func:`catalyst.measure` currently behaves
@@ -1304,19 +1377,19 @@ Currently, however, this is not the case for the following functionalities.
 
   - Related to the above point, in PennyLane, dynamic wire allocations do not
     increase the total number of wires used in the circuit. This is because
-    PennyLane treats the number of wires during device initialization (the 
-    ``qml.device("...", wires=N)``) as the device capacity. Briefly, when 
+    PennyLane treats the number of wires during device initialization (the
+    ``qml.device("...", wires=N)``) as the device capacity. Briefly, when
     ``qml.allocate()`` is encountered, PennyLane looks into the pool of existing
-    wires and chooses a suitable set of wires that is currently unused as the 
-    result of the allocation, instead of requesting additional wires from the 
-    device. However, Catalyst treats device wires as completely separate from 
+    wires and chooses a suitable set of wires that is currently unused as the
+    result of the allocation, instead of requesting additional wires from the
+    device. However, Catalyst treats device wires as completely separate from
     wires that are requested via ``qml.allocate``; they are two separate pools
     of memory, where wires requested with ``qml.allocate`` are in addition to
     initial ones from ``qml.device``. If the pool of wires from ``device`` is
-    called "device" and the pool of wires from ``qml.allocate`` is called 
-    "dynamic", future calls to ``qml.allocate`` can reuse wires from the 
-    dynamic pool, but not from the device pool. 
-     
+    called "device" and the pool of wires from ``qml.allocate`` is called
+    "dynamic", future calls to ``qml.allocate`` can reuse wires from the
+    dynamic pool, but not from the device pool.
+
   - Dynamically allocated wires cannot be used in quantum adjoints yet.
 
   .. code-block:: python
