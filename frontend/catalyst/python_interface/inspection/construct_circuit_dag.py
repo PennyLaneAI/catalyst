@@ -72,6 +72,15 @@ _SKIPPED_PBC_OPS = (
 # VisualizationError
 _SKIPPED_MBQC_OPS = ()
 
+_SKIPPED_OPS = frozenset((*_SKIPPED_QUANTUM_OPS, *_SKIPPED_PBC_OPS, *_SKIPPED_MBQC_OPS))
+
+from enum import Enum, auto
+
+class _WireKind(Enum):
+    """Wire type for ordering dependencies."""
+
+    DEVICE = auto()
+    DYNAMIC = auto()
 
 class VisualizationError(Exception):
     """Custom visualization error."""
@@ -166,23 +175,14 @@ class ConstructCircuitDAG:
         # NOTE: Currently only visualizing "quantum" operations
         if op.dialect_name() not in {"quantum", "pbc", "mbqc"}:
             return
-        _SKIPPED_OPS = (*_SKIPPED_QUANTUM_OPS, *_SKIPPED_PBC_OPS, *_SKIPPED_MBQC_OPS)
-        if not isinstance(op, _SKIPPED_OPS):
+        if type(op) not in _SKIPPED_OPS:
             _ERROR_MSG = f"Visualization for operation '{op.name}' is currently not supported."
             raise VisualizationError(_ERROR_MSG)
 
     @_visualize_operation.register
     def _gate_op(
         self,
-        op: (
-            quantum.CustomOp
-            | quantum.GlobalPhaseOp
-            | quantum.QubitUnitaryOp
-            | quantum.MultiRZOp
-            | quantum.SetBasisStateOp
-            | quantum.SetStateOp
-            | quantum.PauliRotOp
-        ),
+        op: quantum.GateOp,
     ) -> None:
         """Generic handler for unitary gates."""
         # Create PennyLane instance
@@ -307,15 +307,9 @@ class ConstructCircuitDAG:
     # =====================
 
     @_visualize_operation.register
-    def _measurements(
+    def _terminal_measurements(
         self,
-        op: (
-            quantum.StateOp
-            | quantum.ExpvalOp
-            | quantum.VarianceOp
-            | quantum.SampleOp
-            | quantum.ProbsOp
-        ),
+        op: quantum.TerminalMeasurementOp,
     ) -> None:
         """Handler for all quantum measurement operations."""
 
@@ -356,12 +350,12 @@ class ConstructCircuitDAG:
 
         if not meas.wires:
             # wires = [] means connect to all active wires
-            if "device" in self._wire_to_node_uids and len(self._wire_to_node_uids) == 1:
+            if _WireKind.DEVICE in self._wire_to_node_uids and len(self._wire_to_node_uids) == 1:
                 # Case 1: Only the device node in past history
-                all_prev_uids = self._wire_to_node_uids["device"]
+                all_prev_uids = self._wire_to_node_uids[_WireKind.DEVICE]
             else:
-                # Case 2: Wire map is "device" + other stuff
-                device_node_uid: set[str] = self._wire_to_node_uids.get("device", set())
+                # Case 2: Wire map is _WireKind.DEVICE + other stuff
+                device_node_uid: set[str] = self._wire_to_node_uids.get(_WireKind.DEVICE, set())
                 all_active = set().union(*self._wire_to_node_uids.values()) - device_node_uid
 
                 # If we just exited a conditional (and are not in a nested one currently)
@@ -504,10 +498,10 @@ class ConstructCircuitDAG:
                 #        qml.X(0)
                 #    qml.Z(x)
                 #
-                before_dyn_node_uid: set[str] = wire_map_before.get("dyn_wire", set())
-                current_dyn_node_uid: set[str] = self._wire_to_node_uids["dyn_wire"]
+                before_dyn_node_uid: set[str] = wire_map_before.get(_WireKind.DYNAMIC, set())
+                current_dyn_node_uid: set[str] = self._wire_to_node_uids[_WireKind.DYNAMIC]
                 if current_dyn_node_uid != before_dyn_node_uid and len(self._wire_to_node_uids) > 1:
-                    self._wire_to_node_uids["dyn_wire"] = set()
+                    self._wire_to_node_uids[_WireKind.DYNAMIC] = set()
                 region_wire_maps.append(self._wire_to_node_uids)
 
             # Pop branch cluster after processing to ensure
@@ -529,10 +523,10 @@ class ConstructCircuitDAG:
 
         # If new dynamic wires are encountered during the conditional
         # the old ones from before are useless
-        before_dyn_node_uid: set[str] = wire_map_before.get("dyn_wire", set())
-        current_dyn_node_uid: set[str] = final_wire_map["dyn_wire"]
+        before_dyn_node_uid: set[str] = wire_map_before.get(_WireKind.DYNAMIC, set())
+        current_dyn_node_uid: set[str] = final_wire_map[_WireKind.DYNAMIC]
         if before_dyn_node_uid and before_dyn_node_uid < current_dyn_node_uid:
-            final_wire_map["dyn_wire"] -= before_dyn_node_uid
+            final_wire_map[_WireKind.DYNAMIC] -= before_dyn_node_uid
 
         # If we went through a single conditional and no dynamic wires were
         # encountered, clear the dynamic wires from before as the cluster should be
@@ -541,7 +535,7 @@ class ConstructCircuitDAG:
             before_dyn_node_uid == current_dyn_node_uid
             and sum(1 for s in self._cluster_uid_stack if "conditional" in s) == 1
         ):
-            final_wire_map["dyn_wire"] = set()
+            final_wire_map[_WireKind.DYNAMIC] = set()
 
         # Pop IfOp cluster before leaving this handler
         self._last_cluster_uid = self._cluster_uid_stack.pop()
@@ -565,7 +559,7 @@ class ConstructCircuitDAG:
             penwidth=2,
         )
         self._node_uid_counter += 1
-        self._wire_to_node_uids["device"].add(node_uid)
+        self._wire_to_node_uids[_WireKind.DEVICE].add(node_uid)
 
     # =======================
     # FuncOp NESTING UTILITY
@@ -655,9 +649,9 @@ class ConstructCircuitDAG:
         #######################
 
         if is_dynamic:
-            if "device" in self._wire_to_node_uids:
+            if _WireKind.DEVICE in self._wire_to_node_uids:
                 # Pop device node as this dynamic node will always superceed it
-                device_node_uid: set[str] = self._wire_to_node_uids.pop("device")
+                device_node_uid: set[str] = self._wire_to_node_uids.pop(_WireKind.DEVICE)
                 if not self._wire_to_node_uids:
                     return device_node_uid
 
@@ -688,12 +682,12 @@ class ConstructCircuitDAG:
         if not prev_uids:
             # First time seeing this wire and no device node,
             # connect to the last seen dynamic node
-            if "dyn_wire" in self._wire_to_node_uids:
-                prev_uids.update(self._wire_to_node_uids["dyn_wire"])
+            if _WireKind.DYNAMIC in self._wire_to_node_uids:
+                prev_uids.update(self._wire_to_node_uids[_WireKind.DYNAMIC])
 
             # If no dynamic wire has been seen yet, connect to the device
-            elif "device" in self._wire_to_node_uids:
-                prev_uids.update(self._wire_to_node_uids["device"])
+            elif _WireKind.DEVICE in self._wire_to_node_uids:
+                prev_uids.update(self._wire_to_node_uids[_WireKind.DEVICE])
 
         # Wire map contains both a dynamic wire and nodes on the static wires.
         # Only connect to dynamic wire if we just came from a condition.
@@ -728,11 +722,11 @@ class ConstructCircuitDAG:
         if len(self._cluster_uid_stack) > 2:
             inside_final_else_condition = "conditional" in self._cluster_uid_stack[-2]
         if (
-            "dyn_wire" in self._wire_to_node_uids
+            _WireKind.DYNAMIC in self._wire_to_node_uids
             and after_conditional_cluster
             and not inside_final_else_condition
         ):
-            prev_uids.update(self._wire_to_node_uids["dyn_wire"])
+            prev_uids.update(self._wire_to_node_uids[_WireKind.DYNAMIC])
 
         return prev_uids
 
@@ -742,7 +736,7 @@ class ConstructCircuitDAG:
         if is_dynamic:
             # Update last seen dynamic wire
             self._wire_to_node_uids.clear()
-            self._wire_to_node_uids["dyn_wire"] = {node_uid}
+            self._wire_to_node_uids[_WireKind.DYNAMIC] = {node_uid}
         else:
             # Standard update for static wires
             for wire in wires:
@@ -752,7 +746,7 @@ class ConstructCircuitDAG:
             # no dynamic wires as the conditional cluster itself acts as
             # a dynamic barrier
             if "conditional" in self._last_cluster_uid:
-                self._wire_to_node_uids["dyn_wire"] = set()
+                self._wire_to_node_uids[_WireKind.DYNAMIC] = set()
 
 
 def _flatten_if_op(operation: scf.IfOp) -> list[Region]:
