@@ -15,6 +15,8 @@
 
 from collections import defaultdict
 from copy import deepcopy
+from dataclasses import dataclass
+from enum import Enum, auto
 from functools import singledispatch, singledispatchmethod
 from typing import Literal, Sequence
 
@@ -75,7 +77,6 @@ _SKIPPED_MBQC_OPS = ()
 _SKIPPED_OPS = (*_SKIPPED_QUANTUM_OPS, *_SKIPPED_PBC_OPS, *_SKIPPED_MBQC_OPS)
 _SUPPORTED_DIALECTS = {quantum.Quantum.name, pbc.PBC.name, mbqc.MBQC.name}
 
-from enum import Enum, auto
 
 
 class _WireKind(Enum):
@@ -85,7 +86,6 @@ class _WireKind(Enum):
     DYNAMIC = auto()
 
 
-from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
