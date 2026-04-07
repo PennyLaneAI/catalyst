@@ -29,7 +29,7 @@ from pennylane.ops import GlobalPhase
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region
 
-from catalyst.python_interface.dialects import pbc, quantum
+from catalyst.python_interface.dialects import mbqc, pbc, quantum
 from catalyst.python_interface.inspection.dag_builder import DAGBuilder
 from catalyst.python_interface.inspection.xdsl_conversion import (
     ssa_to_qml_wires,
@@ -73,6 +73,7 @@ _SKIPPED_PBC_OPS = (
 _SKIPPED_MBQC_OPS = ()
 
 _SKIPPED_OPS = frozenset((*_SKIPPED_QUANTUM_OPS, *_SKIPPED_PBC_OPS, *_SKIPPED_MBQC_OPS))
+_SUPPORTED_DIALECTS = {quantum.Quantum.name, pbc.PBC.name, mbqc.MBQC.name}
 
 from enum import Enum, auto
 
@@ -175,7 +176,7 @@ class ConstructCircuitDAG:
     @singledispatchmethod
     def _visualize_operation(self, op: Operation) -> None:
         # NOTE: Currently only visualizing "quantum" operations
-        if op.dialect_name() not in {"quantum", "pbc", "mbqc"}:
+        if op.dialect_name() not in _SUPPORTED_DIALECTS:
             return
         if type(op) not in _SKIPPED_OPS:
             _ERROR_MSG = f"Visualization for operation '{op.name}' is currently not supported."
