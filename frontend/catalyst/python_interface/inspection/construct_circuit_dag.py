@@ -366,13 +366,9 @@ class ConstructCircuitDAG:
 
                 # If we just exited a conditional (and are not in a nested one currently)
                 # We need to connect to everything seen so far as all branches are a possibility.
-                exited_conditional_cluster = (
-                    self._last_cluster_uid.startswith("conditional")
-                    or self._last_cluster_uid.startswith("switch")
-                ) and not any(
-                    s.startswith("conditional") or s.startswith("switch")
-                    for s in self._cluster_uid_stack
-                )
+                exited_conditional_cluster = self._is_branching_cluster(
+                    self._last_cluster_uid
+                ) and not any(self._is_branching_cluster(s) for s in self._cluster_uid_stack)
                 if exited_conditional_cluster:
                     all_prev_uids = all_active
                 else:
@@ -472,7 +468,12 @@ class ConstructCircuitDAG:
         labels = [f"case {i}" for i in range(len(operation.regions))]
         self._wire_to_node_uids = self._visit_branched_op(operation.regions, "switch", labels)
 
-    def _visit_branched_op(self, regions, cluster_label, branch_labels) -> dict[str | int, set[str]]:
+    def _is_branching_cluster(self, uid: str) -> bool:
+        return uid.startswith("conditional") or uid.startswith("switch")
+
+    def _visit_branched_op(
+        self, regions, cluster_label, branch_labels
+    ) -> dict[str | int, set[str]]:
         """Handles a branched operation."""
 
         uid = f"{cluster_label}_cluster{self._cluster_uid_counter}"
@@ -559,12 +560,7 @@ class ConstructCircuitDAG:
         # blocking
         if (
             before_dyn_node_uid == current_dyn_node_uid
-            and sum(
-                1
-                for s in self._cluster_uid_stack
-                if s.startswith("conditional") or s.startswith("switch")
-            )
-            == 1
+            and sum(1 for s in self._cluster_uid_stack if self._is_branching_cluster(s)) == 1
         ):
             final_wire_map["dyn_wire"] = set()
 
@@ -713,14 +709,9 @@ class ConstructCircuitDAG:
 
             # If we just exited a conditional (and are not in a nested one currently)
             # We need to connect to everything seen so far as all branches are a possibility.
-            exited_conditional_cluster = (
-                self._last_cluster_uid.startswith("conditional")
-                or self._last_cluster_uid.startswith("switch")
-                and not any(
-                    s.startswith("conditional") or s.startswith("switch")
-                    for s in self._cluster_uid_stack
-                )
-            )
+            exited_conditional_cluster = self._is_branching_cluster(
+                self._last_cluster_uid
+            ) and not any(self._is_branching_cluster(s) for s in self._cluster_uid_stack)
             if exited_conditional_cluster:
                 return all_active
 
@@ -776,9 +767,7 @@ class ConstructCircuitDAG:
         #
         # We don't want the RX in the final else condition to connect to the H(x)
 
-        after_conditional_cluster = self._last_cluster_uid.startswith(
-            "conditional"
-        ) or self._last_cluster_uid.startswith("switch")
+        after_conditional_cluster = self._is_branching_cluster(self._last_cluster_uid)
         inside_final_else_condition = False
         if len(self._cluster_uid_stack) > 2:
             inside_final_else_condition = self._cluster_uid_stack[-2].startswith(
@@ -808,9 +797,7 @@ class ConstructCircuitDAG:
             # If we just exited a conditional, update to have
             # no dynamic wires as the conditional cluster itself acts as
             # a dynamic barrier
-            if self._last_cluster_uid.startswith(
-                "conditional"
-            ) or self._last_cluster_uid.startswith("switch"):
+            if self._is_branching_cluster(self._last_cluster_uid):
                 self._wire_to_node_uids["dyn_wire"] = set()
 
 
