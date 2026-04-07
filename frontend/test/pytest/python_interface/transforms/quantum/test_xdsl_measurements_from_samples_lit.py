@@ -91,8 +91,8 @@ class TestMeasurementsFromSamplesPass:
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
-            // CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<5x1xf64>
-            // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.5x1xf64([[samples]]) :
+            // CHECK: [[raw_samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<5x1xf64>
+            // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.5x1xf64([[raw_samples]]) :
             // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
             // CHECK: func.return [[res]] : tensor<f64>
             // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
