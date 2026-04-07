@@ -723,7 +723,7 @@ class ConstructCircuitDAG:
         if cluster is None:
             return False
         # TODO: Add cluster.kind == "switch" once supported
-        return cluster.kind == "conditional"
+        return cluster.kind == _ClusterKind.CONDITIONAL
 
     @property
     def _exited_branching_cluster(self) -> bool:
@@ -739,7 +739,7 @@ class ConstructCircuitDAG:
         """
         Check to see if we're inside of a branch of a branching cluster.
         """
-        return self._cluster_stack[-1].kind == "branch" if self._cluster_stack else False
+        return self._cluster_stack[-1].kind == _ClusterKind.BRANCH if self._cluster_stack else False
 
 
 def _flatten_if_op(operation: scf.IfOp) -> list[Region]:
