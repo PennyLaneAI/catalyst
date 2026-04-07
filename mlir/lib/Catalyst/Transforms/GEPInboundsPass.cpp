@@ -42,12 +42,10 @@ struct GEPInboundsPass : impl::GEPInboundsPassBase<GEPInboundsPass> {
         RewritePatternSet patterns(&getContext());
 
         populateGEPInboundsPatterns(patterns);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
     }
 };
-
-std::unique_ptr<Pass> createGEPInboundsPass() { return std::make_unique<GEPInboundsPass>(); }
 
 } // namespace catalyst

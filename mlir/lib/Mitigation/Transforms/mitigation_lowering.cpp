@@ -22,7 +22,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Mitigation/IR/MitigationOps.h"
-#include "Mitigation/Transforms/Passes.h"
 #include "Mitigation/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
 
@@ -32,7 +31,6 @@ using namespace catalyst::mitigation;
 namespace catalyst {
 namespace mitigation {
 
-#define GEN_PASS_DECL_MITIGATIONLOWERINGPASS
 #define GEN_PASS_DEF_MITIGATIONLOWERINGPASS
 #include "Mitigation/Transforms/Passes.h.inc"
 
@@ -44,17 +42,11 @@ struct MitigationLoweringPass : impl::MitigationLoweringPassBase<MitigationLower
         RewritePatternSet mitigationPatterns(&getContext());
         populateLoweringPatterns(mitigationPatterns);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(mitigationPatterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(mitigationPatterns)))) {
             return signalPassFailure();
         }
     }
 };
 
 } // namespace mitigation
-
-std::unique_ptr<Pass> createMitigationLoweringPass()
-{
-    return std::make_unique<mitigation::MitigationLoweringPass>();
-}
-
 } // namespace catalyst

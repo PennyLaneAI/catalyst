@@ -16,10 +16,13 @@ import numpy as np
 import pennylane as qml
 import pytest
 from pennylane.tape import QuantumTape
+from pennylane_lightning.lightning_qubit.lightning_qubit import OperatorProperties
+from utils import get_custom_qjit_device
 
 from catalyst import cond, for_loop, qjit, while_loop
 from catalyst.api_extensions.control_flow import Cond, ForLoop, WhileLoop
 from catalyst.jax_tracer import HybridOp, has_nested_tapes
+from catalyst.utils.exceptions import CompileError
 
 
 def test_no_parameters(backend):
@@ -27,6 +30,7 @@ def test_no_parameters(backend):
 
     def circuit():
         qml.Identity(wires=0)
+        qml.Identity(wires=[0, 1])
 
         qml.PauliX(wires=1)
         qml.PauliY(wires=2)
@@ -88,7 +92,7 @@ def test_no_parameters(backend):
 
         return qml.state()
 
-    qjit_fn = qjit()(qml.qnode(qml.device(backend, wires=4))(circuit))
+    qjit_fn = qjit(qml.qnode(qml.device(backend, wires=4))(circuit))
     qml_fn = qml.qnode(qml.device("default.qubit", wires=4))(circuit)
 
     assert np.allclose(qjit_fn(), qml_fn())
@@ -123,6 +127,12 @@ def test_param(backend):
         qml.IsingZZ(x, wires=[0, 1])
         qml.IsingZZ(y, wires=[1, 2])
 
+        qml.SingleExcitation(x, wires=[0, 1])
+        qml.SingleExcitation(y, wires=[1, 2])
+
+        qml.DoubleExcitation(x, wires=[0, 1, 2, 3])
+        qml.DoubleExcitation(y, wires=[2, 3, 0, 1])
+
         qml.CRX(x, wires=[0, 1])
         qml.CRY(x, wires=[0, 1])
         qml.CRZ(x, wires=[0, 1])
@@ -135,6 +145,8 @@ def test_param(backend):
 
         qml.MultiRZ(x, wires=[0, 1, 2, 3])
 
+        qml.PCPhase(x, dim=2, wires=[0, 1, 2, 3])
+
         # Unsupported:
         # qml.PauliRot(x, 'IXYZ', wires=[0,1,2,3])
         # qml.U1(x, wires=0)
@@ -143,7 +155,7 @@ def test_param(backend):
 
         return qml.state()
 
-    qjit_fn = qjit()(qml.qnode(qml.device(backend, wires=4))(circuit))
+    qjit_fn = qjit(qml.qnode(qml.device(backend, wires=4))(circuit))
     qml_fn = qml.qnode(qml.device("default.qubit", wires=4))(circuit)
 
     assert np.allclose(qjit_fn(3.14, 0.6), qml_fn(3.14, 0.6))
@@ -196,7 +208,7 @@ def test_hybrid_op_repr(backend):
                 assert not has_nested_tapes(op)
         return qml.state()
 
-    qjit()(qml.qnode(qml.device(backend, wires=4))(circuit))(1)
+    qjit(qml.qnode(qml.device(backend, wires=4))(circuit))(1)
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
@@ -209,7 +221,7 @@ def test_qubitunitary_complex(inp, backend):
         qml.QubitUnitary(U1, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f)
         return g(x)
@@ -240,6 +252,38 @@ def test_multicontrolledx_via_paulix():
     assert "PauliX" in str(circuit.jaxpr)
 
     assert np.allclose(circuit(), circuit.original_function())
+
+
+def test_to_matrix_ops():
+    """Test that devices with ``to_matrix_ops`` should have support for ``QubitUnitary``."""
+    dev = get_custom_qjit_device(
+        num_wires=1,
+        discards=("QubitUnitary",),
+        additions={"Rot": OperatorProperties(True, True, False)},
+        to_matrix_ops={"Rot"},
+    )
+
+    def qfunc(x, y, z):
+        qml.Rot(x, y, z, wires=[0])
+        return qml.state()
+
+    circuit = qjit(qml.qnode(dev)(qfunc))
+
+    with pytest.raises(
+        CompileError, match="The device that specifies to_matrix_ops must support QubitUnitary"
+    ):
+        circuit(0.3, 0.4, 0.5)
+
+    # Test that if we pass `None`` for `to_matrix_ops`, and exclude `QubitUnitary` from the
+    # capabilities, the device can successfully compile the circuit by decomposing to the
+    # target gateset.
+    # Related to https://github.com/PennyLaneAI/pennylane-lightning/pull/1348
+    dev = get_custom_qjit_device(
+        num_wires=1, discards=("QubitUnitary", "Rot"), additions=set(), to_matrix_ops=None
+    )
+
+    circuit = qjit(qml.qnode(dev)(qfunc))
+    circuit(0.3, 0.4, 0.5)  # should compile successfully
 
 
 if __name__ == "__main__":

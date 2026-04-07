@@ -55,13 +55,13 @@
 
 #pragma once
 
-#include "mlir/IR/BuiltinOps.h"
 #include "llvm/Support/Debug.h"
+
+#include "mlir/IR/BuiltinOps.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 
-using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
 

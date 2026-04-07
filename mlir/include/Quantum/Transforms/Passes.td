@@ -17,31 +17,26 @@
 
 include "mlir/Pass/PassBase.td"
 
-def QuantumBufferizationPass : Pass<"quantum-bufferize"> {
-    let summary = "Bufferize tensors in quantum operations.";
-
-    let dependentDialects = [
-        "bufferization::BufferizationDialect",
-        "memref::MemRefDialect"
-    ];
-
-    let constructor = "catalyst::createQuantumBufferizationPass()";
-}
-
 def QuantumConversionPass : Pass<"convert-quantum-to-llvm"> {
     let summary = "Perform a dialect conversion from Quantum to LLVM (QIR).";
 
-    let dependentDialects = ["LLVM::LLVMDialect"];
+    let options = [
+        Option<
+            "useArrayBackedRegisters",
+            "use-array-backed-registers",
+            "bool",
+            default="false",
+            desc="Use the array-backed-registers conversion pattern for quantum.insert ops."
+        >
+    ];
 
-    let constructor = "catalyst::createQuantumConversionPass()";
+    let dependentDialects = ["LLVM::LLVMDialect"];
 }
 
 def EmitCatalystPyInterfacePass : Pass<"emit-catalyst-py-interface"> {
     let summary = "Emit catalyst python's default interface.";
 
     let dependentDialects = ["LLVM::LLVMDialect"];
-
-    let constructor = "catalyst::createEmitCatalystPyInterfacePass()";
 }
 
 def CopyGlobalMemRefPass : Pass<"cp-global-memref"> {
@@ -53,8 +48,6 @@ def CopyGlobalMemRefPass : Pass<"cp-global-memref"> {
         "scf::SCFDialect",
         "LLVM::LLVMDialect"
     ];
-
-    let constructor = "catalyst::createCopyGlobalMemRefPass()";
 }
 
 def AdjointLoweringPass : Pass<"adjoint-lowering"> {
@@ -67,59 +60,69 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
         "complex::ComplexDialect",
         "scf::SCFDialect"
     ];
-
-    let constructor = "catalyst::createAdjointLoweringPass()";
-}
-
-def AnnotateFunctionPass : Pass<"annotate-function"> {
-    let summary = "Annotate functions that contain a measurement operation.";
-
-    let dependentDialects = [
-        "catalyst::CatalystDialect",
-        "func::FuncDialect"
-    ];
-
-    let constructor = "catalyst::createAnnotateFunctionPass()";
 }
 
 def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let summary = "Given a qnode containing multiple tapes, split each tape into its own function.";
-
-    let constructor = "catalyst::createSplitMultipleTapesPass()";
 }
 
-def StaticCustomLoweringPass : Pass<"static-custom-lowering"> {
-    let summary = "Lower static custom ops to regular custom op with dynamic parameters.";
+def SplitNonCommutingPass : Pass<"split-non-commuting", "mlir::ModuleOp"> {
+    let summary = "Split quantum functions non-commuting observables into multiple executions.";
 
-    let constructor = "catalyst::createStaticCustomLoweringPass()";
+    let dependentDialects = ["arith::ArithDialect"];
 }
 
+def SplitToSingleTermsPass : Pass<"split-to-single-terms", "mlir::ModuleOp"> {
+    let summary = "Split quantum functions into single-term observables.";
+}
 
 // ----- Quantum circuit transformation passes begin ----- //
 // For example, automatic compiler peephole opts, etc.
 
 def IonsDecompositionPass : Pass<"ions-decomposition"> {
     let summary = "Decompose the gates to the set {RX, RY, MS}";
-
-    let constructor = "catalyst::createIonsDecompositionPass()";
 }
 
-def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
-    let summary = "Perform removal of chained operations that are self inverses.";
+def CancelInversesPass : Pass<"cancel-inverses"> {
+    let summary = "Perform removal of chained operations that are inverses.";
+}
 
-    let constructor = "catalyst::createRemoveChainedSelfInversePass()";
+def GridsynthPass : Pass<"gridsynth"> {
+    let summary = "Perform Ross-Selinger/Gridsynth decomposition.";
+
+    let options = [Option<
+        /*C++ var name=*/"epsilon",
+        /*CLI name=*/"epsilon",
+        /*Type=*/"double",
+       /*Default=*/"1e-4",
+       /*Description=*/"Maximum error tolerance for per-gate discretization.">,
+        Option<
+        /*C++ var name=*/"pprBasis",
+        /*CLI name=*/"ppr-basis",
+        /*Type=*/"bool",
+        /*Default=*/"false",
+        /*Description=*/desc="Whether to decompose into the PPR basis set instead of the standard Clifford+T basis set.">,];
+
+        let dependentDialects = [
+        "memref::MemRefDialect",
+        "scf::SCFDialect",
+        "catalyst::pbc::PBCDialect",
+    ];
 }
 
 def MergeRotationsPass : Pass<"merge-rotations"> {
     let summary = "Perform merging of chained rotation gates about the same axis.";
 
-    let constructor = "catalyst::createMergeRotationsPass()";
+    let dependentDialects = ["math::MathDialect"];
 }
 
-def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {
+def DecomposeLoweringPass : Pass<"decompose-lowering"> {
+    let summary = "Replace quantum operations with compiled decomposition rules.";
+}
+
+def DisentangleCNOTPass : Pass<"disentangle-cnot"> {
     let summary = "Replace a CNOT gate with two single qubit gates whenever possible.";
 
-    let constructor = "catalyst::createDisentangleCNOTPass()";
     let options = [
     Option<"EmitFSMStateRemark", "emit-FSM-state-remark",
            "bool", /*default=*/"false",
@@ -127,15 +130,33 @@ def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {
     ];
 }
 
-def DisentangleSWAPPass : Pass<"disentangle-SWAP"> {
+def DisentangleSWAPPass : Pass<"disentangle-swap"> {
     let summary = "Replace a SWAP gate with single qubit gates and a shorter SWAPZ gates whenever possible.";
 
-    let constructor = "catalyst::createDisentangleSWAPPass()";
     let options = [
     Option<"EmitFSMStateRemark", "emit-FSM-state-remark",
            "bool", /*default=*/"false",
            "Whether to emit the state analysis result from the simple states propagation FSM onto the gate operations.">,
     ];
+}
+
+def LoopBoundaryOptimizationPass : Pass<"loop-boundary"> {
+    let summary = "Perform loop boundary optimization to eliminate the redundancy of operations on loop boundary.";
+}
+
+def DynamicOneShotPass : Pass<"dynamic-one-shot", "mlir::ModuleOp"> {
+    let summary = "Apply the dynamic one-shot transform.";
+
+    let dependentDialects = [
+        "index::IndexDialect",
+        "tensor::TensorDialect",
+        "scf::SCFDialect",
+        "stablehlo::StablehloDialect"
+    ];
+}
+
+def CombineGlobalPhasesPass : Pass<"combine-global-phases", "mlir::ModuleOp"> {
+    let summary = "Scope-wise merging of global phase operators (safe).";
 }
 
 // ----- Quantum circuit transformation passes end ----- //

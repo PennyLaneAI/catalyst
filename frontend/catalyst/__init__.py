@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2022 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,12 +18,11 @@ This package contains the Catalyst Python interface.
 # pylint: disable=wrong-import-position
 
 import sys
-import types
 from os.path import dirname
 
 import jaxlib as _jaxlib
 
-_jaxlib_version = "0.4.28"
+_jaxlib_version = "0.7.1"
 if _jaxlib.__version__ != _jaxlib_version:
     import warnings
 
@@ -67,19 +66,6 @@ if not INSTALLED:
 # pylint: disable=protected-access
 sys.modules["mlir_quantum.ir"] = __import__("jaxlib.mlir.ir").mlir.ir
 sys.modules["mlir_quantum._mlir_libs"] = __import__("jaxlib.mlir._mlir_libs").mlir._mlir_libs
-# C++ extensions to the dialects are mocked out.
-sys.modules["mlir_quantum._mlir_libs._quantumDialects.gradient"] = types.ModuleType(
-    "mlir_quantum._mlir_libs._quantumDialects.gradient"
-)
-sys.modules["mlir_quantum._mlir_libs._quantumDialects.quantum"] = types.ModuleType(
-    "mlir_quantum._mlir_libs._quantumDialects.quantum"
-)
-sys.modules["mlir_quantum._mlir_libs._quantumDialects.catalyst"] = types.ModuleType(
-    "mlir_quantum._mlir_libs._quantumDialects.catalyst"
-)
-sys.modules["mlir_quantum._mlir_libs._quantumDialects.mitigation"] = types.ModuleType(
-    "mlir_quantum._mlir_libs._quantumDialects.mitigation"
-)
 
 from catalyst import debug, logging, passes
 from catalyst.api_extensions import *
@@ -90,11 +76,30 @@ from catalyst.compiler import CompileOptions
 from catalyst.debug.assertion import debug_assert
 from catalyst.jit import QJIT, qjit
 from catalyst.passes.pass_api import pipeline
+from catalyst.python_interface.inspection.draw import draw_graph
 from catalyst.utils.exceptions import (
     AutoGraphError,
     CompileError,
     DifferentiableCompileError,
+    PlxprCaptureCFCompatibilityError,
 )
+from catalyst.utils.precompile_decomposition_rules import (
+    BYTECODE_FILE_PATH,
+    precompile_decomp_rules,
+)
+
+# we ONLY want to compile on init for dev installs, where the caching should work correctly
+if (
+    not (
+        INSTALLED  # do not recompile on user installations
+        or os.getenv("DOCUTILSCONFIG")  # do not run for docs
+        or os.getenv("READTHEDOCS_CANONICAL_URL")  # do not run for RTD
+        or os.getenv("CI")  # do not run in CI
+    )
+    and not BYTECODE_FILE_PATH.exists()
+):  # pragma: no cover
+    precompile_decomp_rules()  # pragma: no cover
+
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising
@@ -175,18 +180,19 @@ while processing the following with AutoGraph:
     for x in params:
 """
 
-
 __all__ = (
     "qjit",
     "QJIT",
     "autograph_ignore_fallbacks",
     "autograph_strict_conversion",
     "AutoGraphError",
+    "PlxprCaptureCFCompatibilityError",
     "CompileError",
     "DifferentiableCompileError",
     "debug_assert",
     "CompileOptions",
     "debug",
+    "draw_graph",
     "passes",
     "pipeline",
     *_api_extension_list,

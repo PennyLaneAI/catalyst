@@ -21,16 +21,17 @@ of gradients, jacobians, jacobian-vector products, and more.
 import copy
 import functools
 import numbers
-from typing import Callable, Iterable, List, Optional, Union
+from collections.abc import Callable, Sequence
 
 import jax
-import jax.numpy as jnp
+import pennylane as qml
 from jax._src.api import _dtype
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten
+from jax.api_util import debug_info
 from pennylane import QNode
 
 import catalyst
-from catalyst.jax_extras import Jaxpr
+from catalyst.jax_extras import Jaxpr, make_jaxpr2
 from catalyst.jax_primitives import (
     GradParams,
     expval_p,
@@ -46,8 +47,9 @@ from catalyst.jax_tracer import Function, mark_gradient_tracing
 from catalyst.tracing.contexts import EvaluationContext, GradContext
 from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import DifferentiableCompileError
+from catalyst.utils.types import get_shape
 
-Differentiable = Union[Function, QNode]
+Differentiable = Function | QNode
 
 
 ## API ##
@@ -440,12 +442,12 @@ def jvp(f: Callable, params, tangents, *, method=None, h=None, argnums=None):
     (Array(0.78766064, dtype=float64), Array(-0.7011436, dtype=float64))
     """
 
-    def check_is_iterable(x, hint):
-        if not isinstance(x, Iterable):
-            raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
+    def check_is_sequence(x, hint):
+        if not isinstance(x, Sequence):
+            raise ValueError(f"jvp '{hint}' argument must be a Sequence, not {type(x)}")
 
-    check_is_iterable(params, "params")
-    check_is_iterable(tangents, "tangents")
+    check_is_sequence(params, "params")
+    check_is_sequence(tangents, "tangents")
 
     if EvaluationContext.is_tracing():
         scalar_out = False
@@ -456,7 +458,7 @@ def jvp(f: Callable, params, tangents, *, method=None, h=None, argnums=None):
 
         if len(tangents_flatten) != len(grad_params.expanded_argnums):
             raise TypeError(
-                "number of tangent and number of differentiable parameters in catalyst.jvp do not "
+                "number of tangents and number of differentiable parameters in catalyst.jvp do not "
                 "match; the number of parameters must be equal. "
                 f"Got {len(grad_params.expanded_argnums)} differentiable parameters and so expected "
                 f"as many tangents, but got {len(tangents_flatten)} instead."
@@ -474,10 +476,10 @@ def jvp(f: Callable, params, tangents, *, method=None, h=None, argnums=None):
                     f"{_dtype(p)}, but got tangent dtype {_dtype(t)} instead."
                 )
 
-            if jnp.shape(p) != jnp.shape(t):
+            if get_shape(p) != get_shape(t):
                 raise ValueError(
                     "catalyst.jvp called with different function params and tangent shapes; "
-                    f"got function params shape {jnp.shape(p)} and tangent shape {jnp.shape(t)}"
+                    f"got function params shape {get_shape(p)} and tangent shape {get_shape(t)}"
                 )
 
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
@@ -545,13 +547,14 @@ def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
     (Array([0.09983342, 0.04      , 0.02      ], dtype=float64),
      (Array([-0.43750208,  0.07      ], dtype=float64),))
     """
+    if qml.capture.enabled():
+        return qml.vjp(f, params, cotangents, method=method, h=h, argnums=argnums)
 
-    def check_is_iterable(x, hint):
-        if not isinstance(x, Iterable):
-            raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
+    def check_is_Sequence(x, hint):
+        if not isinstance(x, Sequence):
+            raise ValueError(f"vjp '{hint}' argument must be a Sequence, not {type(x)}")
 
-    check_is_iterable(params, "params")
-    check_is_iterable(cotangents, "cotangents")
+    check_is_Sequence(params, "params")
 
     if EvaluationContext.is_tracing():
         scalar_out = False
@@ -563,7 +566,10 @@ def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
         grad_params = _check_grad_params(method, scalar_out, h, argnums, len(args_flatten), in_tree)
 
         args_argnums = tuple(params[i] for i in grad_params.argnums)
-        _, in_tree = tree_flatten(args_argnums)
+        if isinstance(argnums, int) or argnums is None:
+            _, in_tree = tree_flatten(0)
+        else:
+            _, in_tree = tree_flatten(args_argnums)
 
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
@@ -584,11 +590,11 @@ def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
                     f"{_dtype(p)}, but got cotangent dtype {_dtype(t)} instead."
                 )
 
-            if jnp.shape(p) != jnp.shape(t):
+            if get_shape(p) != get_shape(t):
                 raise ValueError(
                     "catalyst.vjp called with different function output params and cotangent "
-                    f"shapes; got function output params shape {jnp.shape(p)} and cotangent shape "
-                    f"{jnp.shape(t)}"
+                    f"shapes; got function output params shape {get_shape(p)} and cotangent shape "
+                    f"{get_shape(t)}"
                 )
 
         cotangents, _ = tree_flatten(cotangents)
@@ -667,7 +673,7 @@ class GradCallable(CatalystCallable):
 
                     # It always returns list as required by catalyst control-flows
                     results = value_and_grad_p.bind(
-                        *input_data_flat, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+                        *input_data_flat, *jaxpr.consts, jaxpr=jaxpr, fn=fn, grad_params=grad_params
                     )
 
                     # value_and_grad returns two results: the values and the gradients,
@@ -686,7 +692,7 @@ class GradCallable(CatalystCallable):
 
                     # It always returns list as required by catalyst control-flows
                     results = grad_p.bind(
-                        *input_data_flat, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+                        *input_data_flat, *jaxpr.consts, jaxpr=jaxpr, fn=fn, grad_params=grad_params
                     )
 
                     # grad returns only the gradients,
@@ -717,8 +723,8 @@ class GradCallable(CatalystCallable):
 def _check_grad_params(
     method: str,
     scalar_out: bool,
-    h: Optional[float],
-    argnums: Optional[Union[int, List[int]]],
+    h: float | None,
+    argnums: int | list[int] | None,
     len_flatten_args: int,
     in_tree: PyTreeDef,
     with_value: bool = False,
@@ -745,7 +751,7 @@ def _check_grad_params(
     elif isinstance(argnums, list) and all(isinstance(i, int) for i in argnums):
         argnum_list = argnums
     else:
-        raise ValueError(f"argnums should be integer or a list of integers, not {argnums}")
+        raise ValueError(f"argnums should be an integer or a Sequence of integers, not {argnums}")
     # Compute the argnums of the pytree arg
     total_argnums = list(range(0, len_flatten_args))
     argnum_unflatten = tree_unflatten(in_tree, total_argnums)
@@ -807,8 +813,9 @@ def _make_jaxpr_check_differentiable(
     return the output tree."""
     method = grad_params.method
     with mark_gradient_tracing(method):
-        jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args, **kwargs)
-    _, out_tree = tree_flatten(shape)
+        jaxpr, _, out_tree = make_jaxpr2(
+            f, debug_info=debug_info("grad make jaxpr", f, args, kwargs)
+        )(*args, **kwargs)
 
     for pos, arg in enumerate(jaxpr.in_avals):
         if arg.dtype.kind != "f" and pos in grad_params.expanded_argnums:

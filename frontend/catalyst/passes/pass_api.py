@@ -12,20 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
-import functools
+from copy import copy
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import TypeAlias
 
-import pennylane as qml
+from pennylane.transforms.core import BoundTransform, CompilePipeline, transform
 
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.tracing.contexts import EvaluationContext
 
 PipelineDict: TypeAlias = dict[str, dict[str, str]]
 
 
-## API ##
 def pipeline(pass_pipeline: PipelineDict):
     """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode
     within a qjit-compiled program.
@@ -113,23 +112,13 @@ def pipeline(pass_pipeline: PipelineDict):
     Global and local (via ``@pipeline``) configurations can coexist, however local pass pipelines
     will always take precedence over global pass pipelines.
     """
+    new_pipeline: CompilePipeline = dict_to_compile_pipeline(pass_pipeline)
 
-    def _decorator(qnode=None):
-        if not isinstance(qnode, qml.QNode):
-            raise TypeError(f"A QNode is expected, got the classical function {qnode}")
-
-        clone = copy.copy(qnode)
-        clone.__name__ += "_transformed"
-
-        @functools.wraps(clone)
-        def wrapper(*args, **kwargs):
-            if EvaluationContext.is_tracing():
-                passes = kwargs.pop("pass_pipeline", [])
-                passes += dictionary_to_list_of_passes(pass_pipeline)
-                kwargs["pass_pipeline"] = passes
-            return clone(*args, **kwargs)
-
-        return wrapper
+    def _decorator(qnode):
+        new_qnode = copy(qnode)
+        # pylint: disable=protected-access
+        new_qnode._compile_pipeline = qnode._compile_pipeline + new_pipeline
+        return new_qnode
 
     return _decorator
 
@@ -160,22 +149,8 @@ def apply_pass(pass_name: str, *flags, **valued_options):
                 return qnode()
     """
 
-    def decorator(qnode):
-
-        if not isinstance(qnode, qml.QNode):
-            # Technically, this apply pass is general enough that it can apply to
-            # classical functions too. However, since we lack the current infrastructure
-            # to denote a function, let's limit it to qnodes
-            raise TypeError(f"A QNode is expected, got the classical function {qnode}")
-
-        @functools.wraps(qnode)
-        def qnode_call(*args, **kwargs):
-            pass_pipeline = kwargs.get("pass_pipeline", [])
-            pass_pipeline.append(Pass(pass_name, *flags, **valued_options))
-            kwargs["pass_pipeline"] = pass_pipeline
-            return qnode(*args, **kwargs)
-
-        return qnode_call
+    def decorator(obj):
+        return transform(pass_name=pass_name)(obj, *flags, **valued_options)
 
     return decorator
 
@@ -214,21 +189,8 @@ def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valu
     if not path_to_plugin.exists():
         raise FileNotFoundError(f"File '{path_to_plugin}' does not exist.")
 
-    def decorator(qnode):
-        if not isinstance(qnode, qml.QNode):
-            # Technically, this apply pass is general enough that it can apply to
-            # classical functions too. However, since we lack the current infrastructure
-            # to denote a function, let's limit it to qnodes
-            raise TypeError(f"A QNode is expected, got the classical function {qnode}")
-
-        @functools.wraps(qnode)
-        def qnode_call(*args, **kwargs):
-            pass_pipeline = kwargs.get("pass_pipeline", [])
-            pass_pipeline.append(PassPlugin(path_to_plugin, pass_name, *flags, **valued_options))
-            kwargs["pass_pipeline"] = pass_pipeline
-            return qnode(*args, **kwargs)
-
-        return qnode_call
+    def decorator(obj):
+        return transform(pass_name=pass_name)(obj, *flags, **valued_options)
 
     return decorator
 
@@ -271,23 +233,21 @@ class Pass:
 
     def get_options(self):
         """
-        Stringify options according to what mlir-opt expects.
-
-          ApplyRegisteredPassOp expects options to be a single StringAttr
-          which follows the same format as the one used with mlir-opt.
-
-        https://mlir.llvm.org/docs/Dialects/Transform/#transformapply_registered_pass-transformapplyregisteredpassop
-
-          Options passed to a pass are specified via the syntax {option1=value1 option2=value2 ...},
-          i.e., use space-separated key=value pairs for each option.
-
-        https://mlir.llvm.org/docs/Tutorials/MlirOpt/#running-a-pass-with-options
-
-        Experimentally we found that single-options also work without values.
+        Build a dictionary mapping option names to MLIR attributes.
+        ApplyRegisteredPassOp expects options to be a dictionary from strings to attributes.
+        See https://github.com/llvm/llvm-project/pull/143159
         """
-        retval = " ".join(f"{str(option)}" for option in self.options)
-        retval2 = " ".join(f"{str(key)}={str(value)}" for key, value in self.valued_options.items())
-        return " ".join([retval, retval2]).strip()
+        options_dict = {}
+        for option in self.options:
+            options_dict[str(option)] = get_mlir_attribute_from_pyval(True)
+
+        for option, value in self.valued_options.items():
+            # MLIR options are either CamelCase
+            # or spinal-case (kebab-case) which is not allowed in python
+            mlir_option = str(option).replace("_", "-")
+            options_dict[mlir_option] = get_mlir_attribute_from_pyval(value)
+
+        return options_dict
 
     def __repr__(self):
         return (
@@ -323,7 +283,11 @@ class PassPlugin(Pass):
     """
 
     def __init__(
-        self, path: Path, name: str, *options: list[str], **valued_options: dict[str, str]
+        self,
+        path: Path,
+        name: str,
+        *options: list[str],
+        **valued_options: dict[str, str],
     ):
         assert EvaluationContext.is_tracing()
         EvaluationContext.add_plugin(path)
@@ -331,28 +295,33 @@ class PassPlugin(Pass):
         super().__init__(name, *options, **valued_options)
 
 
-## PRIVATE ##
-def dictionary_to_list_of_passes(pass_pipeline: PipelineDict):
-    """Convert dictionary of passes into list of passes."""
+def dict_to_compile_pipeline(
+    pass_pipeline: PipelineDict | str | CompilePipeline | None, *flags, **valued_options
+) -> CompilePipeline:
+    """Convert dictionary of passes or single pass name into a compilation pipeline.
 
-    if pass_pipeline == None:
-        return []
+    Args:
+        pass_pipeline (dict | str | None): Either a dictionary of pass configurations
+            or a single pass name.
+        *flags: Optional flags for single pass
+        **valued_options: Optional valued options for single pass
+    """
+    if pass_pipeline is None:
+        return CompilePipeline()
 
-    if type(pass_pipeline) != dict:
-        return pass_pipeline
+    if isinstance(pass_pipeline, str):
+        t = transform(pass_name=pass_pipeline.replace("_", "-"))
+        bound_t = BoundTransform(t, *flags, **valued_options)
+        return CompilePipeline(bound_t)
 
-    passes = []
-    pass_names = _API_name_to_pass_name()
-    for API_name, pass_options in pass_pipeline.items():
-        name = pass_names.get(API_name, API_name)
-        passes.append(Pass(name, **pass_options))
-    return passes
+    if isinstance(pass_pipeline, dict):
+        passes = []
+        for name, pass_options in pass_pipeline.items():
+            t = transform(pass_name=name.replace("_", "-"))
+            # Pass options must be snake_case
+            pass_options = {k.replace("-", "_"): v for k, v in pass_options.items()}
+            bound_t = BoundTransform(t, kwargs=pass_options)
+            passes.append(bound_t)
+        return CompilePipeline(passes)
 
-
-def _API_name_to_pass_name():
-    return {
-        "cancel_inverses": "remove-chained-self-inverse",
-        "merge_rotations": "merge-rotations",
-        "ions_decomposition": "ions-decomposition",
-        "clifford_t_ppr": "convert-clifford-t-to-ppr",
-    }
+    return pass_pipeline

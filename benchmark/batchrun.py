@@ -12,17 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Measurement cycle management entry point"""
+
 import sys
 
-from catalyst_benchmark.toplevel import (
-    AP,
-    SYSHASH_ORIG,
-    SYSINFO,
-    collect,
-    load,
-    plot,
-    syshash,
-)
+from catalyst_benchmark.toplevel import AP, SYSHASH_ORIG, SYSINFO, collect, load, plot, syshash
 
 a = AP.parse_args(sys.argv[1:])
 if a.verbose:

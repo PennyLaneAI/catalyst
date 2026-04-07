@@ -14,13 +14,15 @@
 
 #define DEBUG_TYPE "ions-decomposition"
 
-#include "Catalyst/IR/CatalystDialect.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Patterns.h"
+#include "llvm/Support/Debug.h"
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/Support/Debug.h"
+
+#include "Catalyst/IR/CatalystDialect.h"
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Patterns.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -30,7 +32,6 @@ namespace catalyst {
 namespace quantum {
 
 #define GEN_PASS_DEF_IONSDECOMPOSITIONPASS
-#define GEN_PASS_DECL_IONSDECOMPOSITIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct IonsDecompositionPass : impl::IonsDecompositionPassBase<IonsDecompositionPass> {
@@ -46,22 +47,16 @@ struct IonsDecompositionPass : impl::IonsDecompositionPassBase<IonsDecomposition
         RewritePatternSet patternsCanonicalization(&getContext());
         catalyst::quantum::CustomOp::getCanonicalizationPatterns(patternsCanonicalization,
                                                                  &getContext());
-        if (failed(applyPatternsAndFoldGreedily(module, std::move(patternsCanonicalization)))) {
+        if (failed(applyPatternsGreedily(module, std::move(patternsCanonicalization)))) {
             return signalPassFailure();
         }
         RewritePatternSet patterns(&getContext());
         populateIonsDecompositionPatterns(patterns);
-        if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
             return signalPassFailure();
         }
     }
 };
 
 } // namespace quantum
-
-std::unique_ptr<Pass> createIonsDecompositionPass()
-{
-    return std::make_unique<quantum::IonsDecompositionPass>();
-}
-
 } // namespace catalyst

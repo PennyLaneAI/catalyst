@@ -15,10 +15,12 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
-namespace {
+namespace catalyst {
+namespace ion {
 
 //
 // Calibrated parameters
@@ -28,10 +30,18 @@ struct Beam {
     // This struct contains the calibrated beam parameters.
     double rabi, detuning;
     std::vector<int64_t> polarization, wavevector;
+    // Set for detection beams:
+    // transition_index maps to LevelTransition:
+    //   0=downstate->estate
+    //   1=downstate->estate2
+    //   2=upstate->estate
+    //   3=upstate->estate2
+    std::optional<int> transition_index;
 
     Beam(double _rabi, double _detuning, std::vector<int64_t> _polarization,
-         std::vector<int64_t> _wavevector)
-        : rabi(_rabi), detuning(_detuning), polarization(_polarization), wavevector(_wavevector)
+         std::vector<int64_t> _wavevector, std::optional<int> _transition_index = std::nullopt)
+        : rabi(_rabi), detuning(_detuning), polarization(_polarization), wavevector(_wavevector),
+          transition_index(_transition_index)
     {
     }
 };
@@ -99,4 +109,5 @@ struct Ion {
     }
 };
 
-} // namespace
+} // namespace ion
+} // namespace catalyst

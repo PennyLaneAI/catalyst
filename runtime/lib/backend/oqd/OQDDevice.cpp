@@ -19,8 +19,6 @@
 
 namespace Catalyst::Runtime::Device {
 
-auto OQDDevice::AllocateQubit() -> QubitIdType { RT_FAIL("Unsupported functionality"); }
-
 auto OQDDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
     for (size_t i = 0; i < num_qubits; i++) {
@@ -32,54 +30,43 @@ auto OQDDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
     std::vector<QubitIdType> result(num_qubits);
     std::generate_n(result.begin(), num_qubits,
                     [&]() { return this->qubit_manager.Allocate(num_qubits); });
+
+    RT_FAIL_IF(!this->initial_allocated_QubitIds.empty(),
+               "OQD device does not support dynamic qubit allocation")
+    this->initial_allocated_QubitIds.insert(result.begin(), result.end());
     return result;
 }
 
-void OQDDevice::ReleaseAllQubits()
+void OQDDevice::ReleaseQubits(const std::vector<QubitIdType> &qubits)
 {
+    std::set<QubitIdType> dealloc_Ids(qubits.begin(), qubits.end());
+    RT_FAIL_IF(this->initial_allocated_QubitIds != dealloc_Ids,
+               "OQD device does not support dynamic qubit allocation. Please ensure the "
+               "deallocation qubit ID array contains the same values as those produced by the "
+               "initial `AllocateQubits` call")
+    this->initial_allocated_QubitIds.clear();
+
     this->ion_specs = "";
     this->phonon_specs.clear();
     this->qubit_manager.ReleaseAll();
 }
 
-void OQDDevice::ReleaseQubit([[maybe_unused]] QubitIdType q)
-{
-    RT_FAIL("Unsupported functionality");
-}
-
-auto OQDDevice::GetNumQubits() const -> size_t { RT_FAIL("Unsupported functionality"); }
-
-void OQDDevice::StartTapeRecording()
-{
-    RT_FAIL_IF(tape_recording, "Cannot re-activate the cache manager");
-    tape_recording = true;
-    cache_manager.Reset();
-}
-
-void OQDDevice::StopTapeRecording()
-{
-    RT_FAIL_IF(!tape_recording, "Cannot stop an already stopped cache manager");
-    tape_recording = false;
-}
+auto OQDDevice::GetNumQubits() const -> size_t { RT_FAIL("GetNumQubits unsupported by device"); }
 
 void OQDDevice::SetDeviceShots([[maybe_unused]] size_t shots) { device_shots = shots; }
 
 auto OQDDevice::GetDeviceShots() const -> size_t { return device_shots; }
 
-auto OQDDevice::Zero() const -> Result { return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST); }
-
-auto OQDDevice::One() const -> Result { return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST); }
-
-void OQDDevice::NamedOperation(const std::string &name, const std::vector<double> &params,
-                               const std::vector<QubitIdType> &wires, bool inverse,
-                               const std::vector<QubitIdType> &controlled_wires,
-                               const std::vector<bool> &controlled_values)
+void OQDDevice::NamedOperation(const std::string &, const std::vector<double> &,
+                               const std::vector<QubitIdType> &, bool,
+                               const std::vector<QubitIdType> &, const std::vector<bool> &,
+                               const std::vector<std::string> &)
 {
-    RT_FAIL("Unsupported functionality");
+    RT_FAIL("NamedOperation unsupported by device");
 }
 
-void OQDDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                              const std::vector<QubitIdType> &wires, size_t shots)
+void OQDDevice::PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
+                              const std::vector<QubitIdType> &)
 {
     // Note that we do not support this in OQD device.
     // This is a just a fake readout method for testing purposes.
@@ -88,63 +75,14 @@ void OQDDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1>
     return;
 }
 
-void OQDDevice::PrintState() { RT_FAIL("Unsupported functionality"); }
-
-void OQDDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)
+auto OQDDevice::Measure(QubitIdType, std::optional<int32_t>) -> Result
 {
-    RT_FAIL("Unsupported functionality");
-}
-
-auto OQDDevice::Measure([[maybe_unused]] QubitIdType wire, std::optional<int32_t> postselect)
-    -> Result
-{
-    RT_FAIL("Unsupported functionality");
-}
-
-ObsIdType OQDDevice::Observable(ObsId, const std::vector<std::complex<double>> &,
-                                const std::vector<QubitIdType> &)
-{
-    RT_FAIL("Unsupported functionality");
-}
-
-ObsIdType OQDDevice::TensorObservable(const std::vector<ObsIdType> &)
-{
-    RT_FAIL("Unsupported functionality");
-};
-
-ObsIdType OQDDevice::HamiltonianObservable(const std::vector<double> &,
-                                           const std::vector<ObsIdType> &)
-{
-    RT_FAIL("Unsupported functionality");
-}
-
-void OQDDevice::MatrixOperation(const std::vector<std::complex<double>> &,
-                                const std::vector<QubitIdType> &, bool,
-                                const std::vector<QubitIdType> &, const std::vector<bool> &)
-{
-    RT_FAIL("Unsupported functionality");
-}
-
-double OQDDevice::Expval(ObsIdType) { RT_FAIL("Unsupported functionality"); };
-double OQDDevice::Var(ObsIdType) { RT_FAIL("Unsupported functionality"); };
-void OQDDevice::State(DataView<std::complex<double>, 1> &)
-{
-    RT_FAIL("Unsupported functionality");
-};
-void OQDDevice::Probs(DataView<double, 1> &) { RT_FAIL("Unsupported functionality"); };
-void OQDDevice::PartialProbs(DataView<double, 1> &, const std::vector<QubitIdType> &)
-{
-    RT_FAIL("Unsupported functionality");
-};
-void OQDDevice::Sample(DataView<double, 2> &, size_t) { RT_FAIL("Unsupported functionality"); };
-void OQDDevice::PartialSample(DataView<double, 2> &, const std::vector<QubitIdType> &, size_t)
-{
-    RT_FAIL("Unsupported functionality");
-}
-
-void OQDDevice::Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &)
-{
-    RT_FAIL("Unsupported functionality");
+    // Mid-circuit measurements are recorded into the OpenAPL JSON as MeasurePulse
+    // entries (via __catalyst__oqd__measure_pulse).
+    // The classical result returned here is a placeholder; actual measurement outcomes
+    // are determined at runtime by the trapped-ion hardware executing the OpenAPL program.
+    static constexpr bool RESULT_PLACEHOLDER = false;
+    return const_cast<Result>(&RESULT_PLACEHOLDER);
 }
 
 } // namespace Catalyst::Runtime::Device

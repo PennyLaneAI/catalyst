@@ -46,15 +46,10 @@ struct QnodeToAsyncLoweringPass : impl::QnodeToAsyncLoweringPassBase<QnodeToAsyn
 
         RewritePatternSet patterns(&getContext());
         populateQnodeToAsyncPatterns(patterns);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
     }
 };
-
-std::unique_ptr<Pass> createQnodeToAsyncLoweringPass()
-{
-    return std::make_unique<QnodeToAsyncLoweringPass>();
-}
 
 } // namespace catalyst

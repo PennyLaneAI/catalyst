@@ -32,8 +32,20 @@ from catalyst.jax_tracer import Function
 from catalyst.utils.callables import CatalystCallable
 
 
-def _is_odd_positive(numbers_list):
-    return all(isinstance(i, int) and i > 0 and i % 2 != 0 for i in numbers_list)
+def _check_is_odd_positive(numbers_list):
+    for n in numbers_list:
+        if not isinstance(n, int):
+            msg = f"Found non-integer {n} in scale_factors {numbers_list}.\n"
+            msg += "Only odd positive integers are allowed in scale_factors"
+            raise TypeError(msg)
+        if n < 0:
+            msg = "Found negative number {n} in scale_factors {numbers_list}.\n"
+            msg += "Only odd positive integers are allowed in scale_factors"
+            raise ValueError(msg)
+        if n % 2 == 0:
+            msg = f"Found even positive {n} in scale_factors {numbers_list}.\n"
+            msg += "Only odd positive integers are allowed in scale_factors"
+            raise ValueError(msg)
 
 
 ## API ##
@@ -107,11 +119,11 @@ def mitigate_with_zne(
 
     .. code-block:: python
 
-        from pennylane.transforms import exponential_extrapolate
+        from pennylane.noise import exponential_extrapolate
 
-        dev = qml.device("lightning.qubit", wires=2, shots=100000)
+        dev = qml.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev)
+        @qml.qnode(dev, shots=100000)
         def circuit(weights):
             qml.StronglyEntanglingLayers(weights, wires=[0, 1])
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
@@ -140,8 +152,7 @@ def mitigate_with_zne(
     elif extrapolate_kwargs is not None:
         extrapolate = functools.partial(extrapolate, **extrapolate_kwargs)
 
-    if not _is_odd_positive(scale_factors):
-        raise ValueError("The scale factors must be positive odd integers: {scale_factors}")
+    _check_is_odd_positive(scale_factors)
 
     return ZNECallable(fn, scale_factors, extrapolate, folding)
 
@@ -223,7 +234,7 @@ class ZNECallable(CatalystCallable):
 
 def polynomial_extrapolation(degree):
     """utility to generate polynomial fitting functions of arbitrary degree"""
-    return functools.partial(qml.transforms.poly_extrapolate, order=degree)
+    return functools.partial(qml.noise.poly_extrapolate, order=degree)
 
 
 ## PRIVATE ##

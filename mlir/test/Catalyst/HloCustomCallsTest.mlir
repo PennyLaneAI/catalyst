@@ -15,8 +15,10 @@
 // RUN: quantum-opt --hlo-custom-call-lowering --split-input-file %s | FileCheck %s
 
 func.func @custom_call(%arg0: tensor<3x3xf64>) -> tensor<3x3xf64> {
-    // CHECK: %0 = catalyst.custom_call fn("lapack_dgesdd") (%arg0) : (tensor<3x3xf64>) -> tensor<3x3xf64>
+    // CHECK: %cst = arith.constant dense<1> : tensor<i32>
+    // CHECK: %cst_0 = arith.constant dense<3> : tensor<i32>
+    // CHECK: %0 = catalyst.custom_call fn("lapack_dgesdd_ffi") (%cst, %cst_0, %cst_0, %arg0) : (tensor<i32>, tensor<i32>, tensor<i32>, tensor<3x3xf64>) -> tensor<3x3xf64>
     // CHECK: return %0 : tensor<3x3xf64>
-    %0 = mhlo.custom_call @lapack_dgesdd(%arg0) {api_version = 2 : i32, backend_config = "", operand_layouts = [dense<[0, 1]> : tensor<2xindex>], output_operand_aliases = [#mhlo.output_operand_alias<output_tuple_indices = [], operand_index = 0, operand_tuple_indices = []>], result_layouts = [dense<[0, 1]> : tensor<2xindex>]} : (tensor<3x3xf64>) -> tensor<3x3xf64>
+    %0 = stablehlo.custom_call @lapack_dgesdd_ffi(%arg0) {api_version = 2 : i32, backend_config = "", operand_layouts = [dense<[0, 1]> : tensor<2xindex>], output_operand_aliases = [#stablehlo.output_operand_alias<output_tuple_indices = [], operand_index = 0, operand_tuple_indices = []>], result_layouts = [dense<[0, 1]> : tensor<2xindex>]} : (tensor<3x3xf64>) -> tensor<3x3xf64>
     return %0 : tensor<3x3xf64>
 }

@@ -14,21 +14,17 @@
 
 """Unit test module for catalyst/device/decomposition.py"""
 
-import os
-import pathlib
 import platform
 
 import numpy as np
 import pennylane as qml
 import pytest
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
+from utils import CONFIG_CUSTOM_DEVICE
 
 from catalyst import CompileError, ctrl, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device.decomposition import catalyst_decomposer
-
-TEST_PATH = os.path.dirname(__file__)
-CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../../custom_device/custom_device.toml")
 
 
 class TestGateAliases:
@@ -90,7 +86,6 @@ class NoUnitaryDevice(qml.devices.Device):
 
     def __init__(self, shots=None, wires=None):
         super().__init__(wires=wires, shots=shots)
-        self.capabilities.operations.pop("QubitUnitary")
         self.qjit_capabilities = self.capabilities
 
     def apply(self, operations, **kwargs):
@@ -113,6 +108,9 @@ class NoUnitaryDevice(qml.devices.Device):
         return circuits, execution_config
 
 
+NoUnitaryDevice.capabilities.operations.pop("QubitUnitary")
+
+
 class TestControlledDecomposition:
     """Test behaviour around the decomposition of the `Controlled` class."""
 
@@ -122,20 +120,14 @@ class TestControlledDecomposition:
         dev = qml.device(backend, wires=4)
 
         class OpWithNoMatrix(qml.operation.Operation):
-            """Op without a matrix"""
-
-            num_wires = qml.operation.AnyWires
-
-            def matrix(self):
-                """matrix undefined"""
-                raise NotImplementedError()
+            """Op without a matrix or decomp"""
 
         @qml.qnode(dev)
         def f():
             ctrl(OpWithNoMatrix(wires=[0, 1]), control=[2, 3])
             return qml.probs()
 
-        with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported."):
+        with pytest.raises(CompileError, match="not supported with catalyst on this device"):
             qjit(f, target="jaxpr")
 
     def test_no_unitary_support(self):
@@ -143,8 +135,6 @@ class TestControlledDecomposition:
 
         class UnknownOp(qml.operation.Operation):
             """An unknown operation"""
-
-            num_wires = qml.operation.AnyWires
 
             def matrix(self):
                 """The matrix"""
@@ -158,8 +148,9 @@ class TestControlledDecomposition:
                     dtype=np.complex128,
                 )
 
-        dev = NoUnitaryDevice(4, wires=4)
+        dev = NoUnitaryDevice(wires=4)
 
+        @qml.set_shots(4)
         @qml.qnode(dev)
         def f():
             ctrl(UnknownOp(wires=[0, 1]), control=[2, 3])

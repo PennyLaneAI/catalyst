@@ -1,5 +1,8 @@
 add_mlir_library(MLIRCatalystUtils
     CallGraph.cpp
-    TBAAUtils.cpp
+    JSONUtils.cpp
+    PrintVersion.cpp
+    SCFUtils.cpp
     StaticAllocas.cpp
+    TBAAUtils.cpp
 )

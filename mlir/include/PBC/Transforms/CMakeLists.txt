@@ -1,0 +1,6 @@
+set(LLVM_TARGET_DEFINITIONS Passes.td)
+mlir_tablegen(PassesEnums.h.inc -gen-enum-decls)
+mlir_tablegen(PassesEnums.cpp.inc -gen-enum-defs)
+mlir_tablegen(Passes.h.inc -gen-pass-decls -name PBC)
+add_public_tablegen_target(MLIRPBCPassIncGen)
+add_mlir_doc(Passes PBCPasses ./ -gen-pass-doc)

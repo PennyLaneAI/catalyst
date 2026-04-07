@@ -14,12 +14,14 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mlir/Pass/Pass.h"
 
 namespace catalyst {
+namespace test {
 
-std::unique_ptr<mlir::Pass> createTestPass();
+#define GEN_PASS_DECL
+#define GEN_PASS_REGISTRATION
+#include "Test/Transforms/Passes.h.inc"
 
+} // namespace test
 } // namespace catalyst

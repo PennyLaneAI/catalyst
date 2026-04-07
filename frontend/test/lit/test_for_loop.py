@@ -15,9 +15,8 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 import pennylane as qml
-from utils import qjit_for_tests as qjit
 
-from catalyst import for_loop
+from catalyst import for_loop, qjit
 
 
 # CHECK-NOT: Verification failed

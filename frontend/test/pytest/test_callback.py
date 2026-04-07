@@ -13,7 +13,6 @@
 # limitations under the License.
 """Test callbacks"""
 
-
 from collections.abc import Sequence
 from functools import partial
 
@@ -31,18 +30,20 @@ from catalyst.utils.patching import Patcher
 # pylint: disable=protected-access,too-many-lines
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("arg", [1, 2, 3])
 def test_callback_no_tracing(arg):
     """Test that when there's no tracing the behaviour of identity
     stays the same."""
 
     @base_callback
-    def identity(x):
+    def identity(x) -> int:
         return x
 
     assert identity(arg) == arg
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("arg", [1, 2, 3])
 def test_purecallback_no_tracing(arg):
     """Test that when there's no tracing the behaviour of identity
@@ -55,6 +56,7 @@ def test_purecallback_no_tracing(arg):
     assert identity(arg) == arg
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_callback_no_returns_no_params(capsys):
     """Test callback no parameters no returns"""
 
@@ -62,7 +64,7 @@ def test_callback_no_returns_no_params(capsys):
     def my_callback() -> None:
         print("Hello erick")
 
-    @qml.qjit
+    @qjit
     def cir():
         my_callback()
         return None
@@ -75,6 +77,7 @@ def test_callback_no_returns_no_params(capsys):
     assert captured.out.strip() == "Hello erick"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_callback_twice(capsys):
     """Test callback no parameters no returns"""
 
@@ -82,7 +85,7 @@ def test_callback_twice(capsys):
     def my_callback():
         print("Hello erick")
 
-    @qml.qjit
+    @qjit
     def cir():
         my_callback()
         return None
@@ -94,7 +97,7 @@ def test_callback_twice(capsys):
     captured = capsys.readouterr()
     assert captured.out.strip() == "Hello erick"
 
-    @qml.qjit
+    @qjit
     def cir2():
         my_callback()
         return None
@@ -107,6 +110,7 @@ def test_callback_twice(capsys):
     assert captured.out.strip() == "Hello erick"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_callback_send_param(capsys):
     """Test callback with parameters no returns"""
 
@@ -114,7 +118,7 @@ def test_callback_send_param(capsys):
     def my_callback(n) -> None:
         print(n)
 
-    @qml.qjit
+    @qjit
     def cir(n):
         my_callback(n)
         return None
@@ -124,6 +128,7 @@ def test_callback_send_param(capsys):
     assert captured.out.strip() == "0"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_kwargs(capsys):
     """Test kwargs returns"""
 
@@ -132,7 +137,7 @@ def test_kwargs(capsys):
         for k, v in kwargs.items():
             print(k, v)
 
-    @qml.qjit
+    @qjit
     def cir(a, b, c):
         my_callback(a=a, b=b, c=c, d=3, e=4)
         return None
@@ -146,6 +151,7 @@ def test_kwargs(capsys):
         assert string in captured.out
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_simple_increment():
     """Test increment function"""
 
@@ -153,13 +159,14 @@ def test_simple_increment():
     def inc(arg) -> int:
         return arg + 1
 
-    @qml.qjit
+    @qjit
     def cir(arg):
         return inc(arg)
 
     assert np.allclose(cir(0), 1)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0, 3.14, complex(0.0, 1.0), jnp.array(0), jnp.array([1, 2, 3]), jnp.array([[1, 2], [2, 3]])],
@@ -175,31 +182,50 @@ def test_identity_types(arg):
         that you know will be the same type as the return type."""
         return arg
 
-    @qml.qjit
+    @qjit
     def cir(x):
         return identity(x)
 
     assert np.allclose(cir(arg), arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
-    [jnp.array(0), jnp.array(1)],
+    [0, 1, 2.0],
 )
-def test_identity_types_shaped_array(arg):
-    """Test callback with return values. Use ShapedArray to denote the type"""
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        jnp.float32,
+        jnp.float64,
+        jnp.int8,
+        jnp.int16,
+        jnp.int32,
+        jnp.int64,
+        jnp.uint8,
+        jnp.uint16,
+        jnp.uint32,
+        jnp.uint64,
+    ],
+)
+def test_identity_types_cast_shaped_array(arg, dtype):
+    """Test callback with arguments and return values of given types."""
+
+    arg_cast = jnp.array(arg, dtype=dtype)
 
     @base_callback
-    def identity(arg) -> jax.core.ShapedArray([], int):
+    def identity(arg: dtype) -> jax.core.ShapedArray([], dtype):
         return arg
 
-    @qml.qjit
+    @qjit
     def cir(x):
         return identity(x)
 
-    assert np.allclose(cir(arg), arg)
+    assert np.allclose(cir(arg_cast), arg_cast)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0],
@@ -211,13 +237,14 @@ def test_multiple_returns(arg):
     def identity(arg) -> (int, int):
         return arg, arg
 
-    @qml.qjit
+    @qjit
     def cir(x):
         return identity(x)
 
     assert np.allclose(cir(arg), (arg, arg))
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [jnp.array([0.0, 1.0, 2.0])],
@@ -229,7 +256,7 @@ def test_incorrect_return(arg):
     def identity(arg) -> int:
         return arg
 
-    @qml.qjit
+    @qjit
     def cir(x):
         return identity(x)
 
@@ -243,19 +270,21 @@ def test_incorrect_return(arg):
         cir(arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_pure_callback():
     """Test identity pure callback."""
 
     def identity(a):
         return a
 
-    @qml.qjit
+    @qjit
     def cir(x):
         return pure_callback(identity, float)(x)
 
     assert np.allclose(cir(0.0), 0.0)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_pure_callback_decorator():
     """Test identity pure callback."""
 
@@ -263,20 +292,21 @@ def test_pure_callback_decorator():
     def identity(a) -> float:
         return a
 
-    @qml.qjit
+    @qjit
     def cir(x):
         return identity(x)
 
     assert np.allclose(cir(0.0), 0.0)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_pure_callback_no_return_value():
     """Test identity pure callback no return."""
 
     def identity(a):
         return a
 
-    @qml.qjit
+    @qjit
     def cir(x):
         return pure_callback(identity)(x)
 
@@ -286,13 +316,14 @@ def test_pure_callback_no_return_value():
         cir(0.0)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_debug_callback(capsys):
     """Test debug callback"""
 
     def my_own_print(a):
         print(a)
 
-    @qml.qjit
+    @qjit
     def cir(x):
         debug.callback(my_own_print)(x)
         return None
@@ -305,6 +336,7 @@ def test_debug_callback(capsys):
     assert captured.out.strip() == "0"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_debug_callback_decorator(capsys):
     """Test debug callback"""
 
@@ -312,7 +344,7 @@ def test_debug_callback_decorator(capsys):
     def my_own_print(a):
         print(a)
 
-    @qml.qjit
+    @qjit
     def cir(x):
         my_own_print(x)
         return None
@@ -325,6 +357,7 @@ def test_debug_callback_decorator(capsys):
     assert captured.out.strip() == "0"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_debug_callback_returns_something(capsys):
     """Test io callback returns something"""
 
@@ -332,7 +365,7 @@ def test_debug_callback_returns_something(capsys):
         print(a)
         return 1
 
-    @qml.qjit
+    @qjit
     def cir(x):
         debug.callback(my_own_print)(x)
         return None
@@ -352,6 +385,7 @@ def test_debug_callback_returns_something(capsys):
         cir(0)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_io_callback_modify_global(capsys):
     """Test mutation"""
 
@@ -367,7 +401,7 @@ def test_io_callback_modify_global(capsys):
         nonlocal x
         print(x)
 
-    @qml.qjit
+    @qjit
     def cir():
         print_x()
         set_x_to(1)
@@ -379,6 +413,7 @@ def test_io_callback_modify_global(capsys):
     assert captured.out.strip() == "0\n1"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1)],
@@ -390,7 +425,7 @@ def test_no_return_list(arg):
     def callback_fn(x) -> float:
         return np.sin(x)
 
-    @qml.qjit
+    @qjit
     def f(x):
         res = callback_fn(x**2)
         assert not isinstance(res, Sequence)
@@ -399,6 +434,7 @@ def test_no_return_list(arg):
     f(arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1)],
@@ -414,13 +450,14 @@ def test_dictionary(arg):
     def callback_fn(x) -> {"helloworld": arg}:
         return {"helloworld": x}
 
-    @qml.qjit
+    @qjit
     def f(x):
         return callback_fn(x)["helloworld"]
 
     assert np.allclose(f(arg), arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_tuple_out():
     """Test with multiple tuples."""
 
@@ -428,7 +465,7 @@ def test_tuple_out():
     def callback_fn(x) -> (bool, bool):
         return x > 1.0, x > 2.0
 
-    @qml.qjit
+    @qjit
     def f(x):
         res = callback_fn(x**2)
         assert isinstance(res, tuple) and len(res) == 2
@@ -437,10 +474,11 @@ def test_tuple_out():
     f(0.1)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_numpy_ufuncs():
     """Test with numpy ufuncs."""
 
-    @qml.qjit
+    @qjit
     def f(x):
         y = pure_callback(np.sin, float)(x)
         return y
@@ -448,6 +486,7 @@ def test_numpy_ufuncs():
     assert np.allclose(np.sin(1.0 / 2.0), f(1.0 / 2.0))
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
@@ -459,13 +498,14 @@ def test_accelerate_device(arg):
     def identity(x):
         return x
 
-    @qml.qjit
+    @qjit
     def qjitted_fn(x):
         return identity(x)
 
     assert np.allclose(qjitted_fn(arg), arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
@@ -477,13 +517,14 @@ def test_accelerate_no_device(arg):
     def identity(x):
         return x
 
-    @qml.qjit
+    @qjit
     def qjitted_fn(x):
         return identity(x)
 
     assert np.allclose(qjitted_fn(arg), arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
@@ -491,7 +532,7 @@ def test_accelerate_no_device(arg):
 def test_accelerate_no_device_inside(arg):
     """Test with no device parameter accelerate is inside qjit"""
 
-    @qml.qjit
+    @qjit
     def qjitted_fn(x):
         @accelerate
         def identity(x):
@@ -502,6 +543,7 @@ def test_accelerate_no_device_inside(arg):
     assert np.allclose(qjitted_fn(arg), arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
@@ -513,13 +555,14 @@ def test_accelerate_no_device_autograph(arg):
     def identity(x):
         return x
 
-    @qml.qjit(autograph=True)
+    @qjit(autograph=True)
     def qjitted_fn(x):
         return identity(x)
 
     assert np.allclose(qjitted_fn(arg), arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
@@ -532,13 +575,14 @@ def test_accelerate_manual_jax_jit(arg):
     def identity(x):
         return x
 
-    @qml.qjit
+    @qjit
     def qjitted_fn(x):
         return identity(x)
 
     assert np.allclose(qjitted_fn(arg), arg)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_jax_jit_returns_nothing(capsys):
     """This is more a question for reviewer"""
 
@@ -546,7 +590,7 @@ def test_jax_jit_returns_nothing(capsys):
     def noop(x):
         jax.debug.print("x={x}", x=x)
 
-    @qml.qjit
+    @qjit
     def func(x: float):
         noop(x)
         return x
@@ -559,6 +603,7 @@ def test_jax_jit_returns_nothing(capsys):
     assert captured.out.strip() == "x=1.0"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_non_jax_jittable():
     """Test that error is raised when jax-jit fails"""
 
@@ -571,11 +616,12 @@ def test_non_jax_jittable():
     msg = "Function impossible must be jax.jit-able"
     with pytest.raises(ValueError, match=msg):
 
-        @qml.qjit
+        @qjit
         def func(x: bool):
             return impossible(x)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_that_jax_jit_is_called():
     """Test that jax.jit is called"""
 
@@ -594,7 +640,7 @@ def test_that_jax_jit_is_called():
         def identity(x):
             return x
 
-        @qml.qjit
+        @qjit
         def wrapper(x):
             return identity(x)
 
@@ -603,6 +649,7 @@ def test_that_jax_jit_is_called():
     assert called_jax_jit
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_callback_cache():
     """Test callback cache. This test is for coverage."""
 
@@ -610,7 +657,7 @@ def test_callback_cache():
     def hello_world():
         print("hello world")
 
-    @qml.qjit
+    @qjit
     def wrapper():
         hello_world()
         hello_world()
@@ -621,7 +668,7 @@ def test_inactive_debug_grad(capsys, arg):
     """Test that debug callback can be differentiated
     and not affects the output"""
 
-    @qml.qjit
+    @qjit
     @grad
     def identity(x: float):
         debug.print(x)
@@ -641,7 +688,7 @@ def test_inactive_debug_jacobian(capsys, arg):
     """Test that debug callback can be differentiated
     and not affects the output"""
 
-    @qml.qjit
+    @qjit
     @jacobian
     def identity(x):
         debug.print(x)
@@ -678,7 +725,7 @@ def test_active_grad_no_tape(scale):
     def bwd(_res, cot):
         return cot
 
-    @qml.qjit
+    @qjit
     @grad
     def wrapper(x):
         return scale * identity(x)
@@ -702,7 +749,7 @@ def test_active_grad_tape(scale):
     def bwd(res, cot):
         return cot * res
 
-    @qml.qjit
+    @qjit
     @grad
     def wrapper(x):
         return scale * identity(x)
@@ -728,7 +775,7 @@ def test_active_grad_many_residuals(scale, space):
     def bwd(res, cot):
         return cot * sum(res)
 
-    @qml.qjit
+    @qjit
     @grad
     def wrapper(x):
         return scale * identity(x)
@@ -757,7 +804,7 @@ def test_active_jacobian_many_residuals(scale, space):
     def bwd(res, cot):
         return cot * sum(res)
 
-    @qml.qjit
+    @qjit
     @jacobian
     def wrapper(x):
         return scale * identity(x)
@@ -790,7 +837,7 @@ def test_example_from_story(arg0, arg1):
         cos_x, sin_x, y = res  # Gets residuals computed in f_fwd
         return (cos_x * dy * y, sin_x * dy)
 
-    @qml.qjit
+    @qjit
     @grad
     def cost(x, y):
         return jnp.sin(some_func(jnp.cos(x), y))
@@ -821,7 +868,7 @@ def test_active_grad_inside_qjit(backend, scale):
     def bwd(_res, cot):
         return cot
 
-    @qml.qjit
+    @qjit
     @grad
     @qml.qnode(qml.device(backend, wires=1))
     def wrapper(x):
@@ -829,8 +876,7 @@ def test_active_grad_inside_qjit(backend, scale):
         qml.RX(param, wires=0)
         return qml.expval(qml.PauliZ(0))
 
-    @jax.jit
-    @qml.grad
+    @partial(qml.grad, argnums=0)
     @qml.qnode(qml.device(backend, wires=1))
     def wrapper_jit(x):
         param = scale * identity(x)
@@ -862,7 +908,7 @@ def test_array_input(arg):
         # parameter of the same shape
         return (jnp.array([cos_x0 * dy * x1, sin_x0 * dy]),)
 
-    @qml.qjit
+    @qjit
     @grad
     def cost(x):
         y = jnp.array([jnp.cos(x[0]), x[1]])
@@ -893,7 +939,7 @@ def test_array_in_scalar_out():
         cos_x0, sin_x0, x1 = res
         return (jnp.array([cos_x0 * dy * x1, sin_x0 * dy]),)
 
-    @qml.qjit
+    @qjit
     @grad
     def result(x):
         y = jnp.array([jnp.cos(x[0]), x[1]])
@@ -928,7 +974,7 @@ def test_scalar_in_array_out(dtype):
         x = res
         return (jnp.array([jnp.cos(x), -jnp.sin(x)]) @ dy,)
 
-    @qml.qjit
+    @qjit
     @grad
     def result(x):
         return jnp.sum(some_func(jnp.sin(x)))
@@ -961,7 +1007,7 @@ def test_scalar_in_array_out_float32_wrong():
         x = res
         return (jnp.array([jnp.cos(x), -jnp.sin(x)]) @ dy,)
 
-    @qml.qjit
+    @qjit
     @grad
     def result(x):
         return jnp.sum(some_func(jnp.sin(x)))
@@ -998,7 +1044,7 @@ def test_scalar_in_tuple_scalar_array_out():
         vjp1 = jnp.array([jnp.cos(x), -jnp.sin(x)]) @ dy[1]
         return (vjp0 + vjp1,)
 
-    @qml.qjit
+    @qjit
     @grad
     def result(x):
         a, b = some_func(jnp.sin(x))
@@ -1039,7 +1085,7 @@ def test_array_in_tuple_array_out():
         vjp1 = 2 * x * dy[1]
         return (vjp0 + vjp1,)
 
-    @qml.qjit
+    @qjit
     @grad
     def result(x):
         return jnp.dot(*some_func(jnp.sin(x)))
@@ -1076,7 +1122,7 @@ def test_tuple_array_in_tuple_array_out():
         vjp1 = dy[0] @ jnp.sin(x) + 2 * y * dy[1]
         return (vjp0, vjp1)
 
-    @qml.qjit
+    @qjit
     @partial(grad, argnums=[0, 1])
     def result(x, y):
         return jnp.dot(*some_func(x, y**2))
@@ -1121,7 +1167,7 @@ def test_pytree_in_pytree_out():
         vjp1 = dy["one"] @ jnp.sin(res["x"]) + 2 * res["y"] * dy["two"]
         return ({"x": vjp0, "y": vjp1},)
 
-    @qml.qjit
+    @qjit
     @grad
     def result(weights):
         weights["y"] = weights["y"] ** 2
@@ -1178,7 +1224,7 @@ def test_callback_backwards_function():
     def some_func_bwd(res, dy):
         return some_func_bwd_vjp(res, dy)
 
-    @qml.qjit
+    @qjit
     @grad
     def result(weights):
         weights["y"] = weights["y"] ** 2
@@ -1229,13 +1275,13 @@ def test_different_shapes():
     @pure_callback
     def fun_bwd_callback(cot) -> jnp.array([1.0, 1.0]):
         nonlocal f_vjp
-        return f_vjp(cot)
+        return f_vjp(cot)  # pylint: disable=not-callable
 
     @fun_callback.bwd
     def fun_bwd(_res, cot):
         return fun_bwd_callback(cot)
 
-    @qml.qjit
+    @qjit
     @jacobian
     def wrapper(x):
         return fun_callback(x)
@@ -1272,7 +1318,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions():
     @pure_callback
     def matrix_multiply_vjp(cotangents) -> A:
         nonlocal f_vjp
-        retval = f_vjp(cotangents)
+        retval = f_vjp(cotangents)  # pylint: disable=not-callable
         return retval
 
     @pure_callback
@@ -1287,7 +1333,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions():
     def matrix_multiply_bwd(_residuals, cotangents):
         return matrix_multiply_vjp(cotangents)
 
-    @qml.qjit
+    @qjit
     @jacobian
     def mul(X):
         return matrix_multiply_callback(X)
@@ -1324,7 +1370,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions2():
     def matrix_multiply_vjp(cotangents) -> A:
         nonlocal f_vjp
         nonlocal A, B
-        retval = f_vjp(cotangents)
+        retval = f_vjp(cotangents)  # pylint: disable=not-callable
         return retval[0]
 
     @pure_callback
@@ -1339,7 +1385,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions2():
     def matrix_multiply_bwd(_residuals, cotangents):
         return matrix_multiply_vjp(cotangents)
 
-    @qml.qjit
+    @qjit
     @jacobian
     def mul(X, Y):
         return matrix_multiply_callback(X, Y)
@@ -1378,7 +1424,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions3():
     def matrix_multiply_vjp(cotangents) -> (A, B):
         nonlocal f_vjp
         nonlocal A, B
-        retval = f_vjp(cotangents)
+        retval = f_vjp(cotangents)  # pylint: disable=not-callable
         return retval
 
     @pure_callback
@@ -1393,7 +1439,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions3():
     def matrix_multiply_bwd(_residuals, cotangents):
         return matrix_multiply_vjp(cotangents)
 
-    @qml.qjit
+    @qjit
     @jacobian(argnums=[0, 1])
     def mul(X, Y):
         return matrix_multiply_callback(X, Y)
@@ -1427,7 +1473,7 @@ def test_vjp_as_residual(arg, order):
 
         return callback_fn
 
-    @qml.qjit
+    @qjit
     @jacobian
     def hypothesis(x):
         expm = jax_callback(jax.scipy.linalg.expm, jax.ShapeDtypeStruct((2, 2), jnp.float64))
@@ -1451,7 +1497,7 @@ def test_vjp_as_residual(arg, order):
 def test_vjp_as_residual_automatic(arg, order):
     """Test automatic differentiation of accelerated function"""
 
-    @qml.qjit
+    @qjit
     @jacobian
     def hypothesis(x):
         return accelerate(jax.scipy.linalg.expm)(x)
@@ -1473,7 +1519,7 @@ def test_vjp_as_residual_automatic(arg, order):
 def test_example_from_epic(arg):
     """Test example from epic"""
 
-    @qml.qjit
+    @qjit
     @grad
     def hypothesis(x):
         expm = accelerate(jax.scipy.linalg.expm)
@@ -1493,7 +1539,7 @@ def test_example_from_epic(arg):
 def test_automatic_differentiation_of_accelerate():
     """Same but easier"""
 
-    @qml.qjit
+    @qjit
     @grad
     @accelerate
     def identity(x: float):
@@ -1543,7 +1589,7 @@ def test_error_incomplete_grad_only_reverse():
 def test_nested_accelerate_grad():
     """https://github.com/PennyLaneAI/catalyst/issues/1086"""
 
-    @qml.qjit
+    @qjit
     @grad
     def hypothesis(x):
         return accelerate(accelerate(jnp.sin))(x)

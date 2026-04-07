@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,9 +18,9 @@ from textwrap import dedent
 import numpy as np
 import pennylane as qml
 import pytest
-from utils import qjit_for_tests as qjit
 
-from catalyst import api_extensions, for_loop, measure, while_loop
+from catalyst import api_extensions, for_loop, measure, qjit, while_loop
+from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
 # pylint: disable=no-value-for-parameter,unused-argument
 
@@ -31,20 +31,22 @@ class TestLoopToJaxpr:
     def test_while_loop(self):
         """Check the while loop JAXPR."""
 
-        expected = dedent(
-            """
+        expected = dedent("""
             { lambda ; a:f64[]. let
                 b:i64[] c:f64[] = while_loop[
-                  body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:i64[] = add d 1 in (f, e) }
+                  body_jaxpr={ lambda ; d:i64[] e:f64[]. let
+                      f:i64[] = add d 1:i64[]
+                    in (f, e) }
                   body_nconsts=0
-                  cond_jaxpr={ lambda ; g:i64[] h:f64[]. let i:bool[] = lt g 10 in (i,) }
+                  cond_jaxpr={ lambda ; g:i64[] h:f64[]. let
+                      i:bool[] = lt g 10:i64[]
+                    in (i,) }
                   cond_nconsts=0
-                  nimplicit=0
+                  num_implicit_inputs=0
                   preserve_dimensions=True
-                ] 0 a
+                ] 0:i64[] a
               in (b, c) }
-            """
-        )
+            """)
 
         @qjit
         def circuit(x: float):
@@ -54,26 +56,25 @@ class TestLoopToJaxpr:
 
             return loop((0, x))
 
-        assert expected.strip() == str(circuit.jaxpr).strip()
+        result = circuit.jaxpr.pretty_print(use_color=False).strip()
+        assert expected.strip() == result
 
     def test_for_loop(self):
         """Check the for loop JAXPR."""
 
-        expected = dedent(
-            """
+        expected = dedent("""
             { lambda ; a:f64[] b:i64[]. let
                 c:i64[] d:f64[] = for_loop[
                   apply_reverse_transform=False
                   body_jaxpr={ lambda ; e:i64[] f:i64[] g:f64[]. let
-                      h:i64[] = add f 1
+                      h:i64[] = add f 1:i64[]
                     in (h, g) }
                   body_nconsts=0
-                  nimplicit=0
+                  num_implicit_inputs=0
                   preserve_dimensions=True
-                ] 0 b 1 0 0 a
+                ] 0:i64[] b 1:i64[] 0:i64[] 0:i64[] a
               in (c, d) }
-        """
-        )
+        """)
 
         @qjit
         def circuit(x: float, n: int):
@@ -83,7 +84,8 @@ class TestLoopToJaxpr:
 
             return loop((0, x))
 
-        assert expected.strip() == str(circuit.jaxpr).strip()
+        result = circuit.jaxpr.pretty_print(use_color=False).strip()
+        assert expected.strip() == result
 
 
 class TestWhileLoops:
@@ -250,6 +252,51 @@ class TestWhileLoops:
         assert circuit(5, 6) == 30  # 5 * 6
         assert circuit(4, 7) == 28  # 4 * 7
 
+    @pytest.mark.usefixtures("disable_capture")
+    def test_while_loop_raises_compatibility_error_with_capture(self):
+        """Test that while_loop raises PlxprCaptureCFCompatibilityError when
+        capture mode is enabled."""
+        qml.capture.enable()
+
+        def condition(i):
+            return i < 5
+
+        with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
+
+            @while_loop(condition)
+            def loop_fn(x):
+                return x + 1
+
+        # Verify the error message is specific and helpful
+        error_msg = str(exc_info.value)
+        assert "catalyst.while_loop is not supported with PennyLane's capture enabled" in error_msg
+
+    @pytest.mark.usefixtures("disable_capture")
+    def test_while_loop_raises_compatibility_error_with_capture_integration(self):
+        """Test that while_loop raises PlxprCaptureCFCompatibilityError when
+        capture mode is enabled."""
+        qml.capture.enable()
+
+        with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
+
+            @qml.qjit
+            @qml.qnode(qml.device("lightning.qubit", wires=3))
+            def test(n):
+                def condition(x):
+                    return x < n
+
+                @while_loop(condition)
+                def loop(i):
+                    qml.X(i)
+
+                loop()
+
+            test(4)
+
+        # Verify the error message is specific and helpful
+        error_msg = str(exc_info.value)
+        assert "catalyst.while_loop is not supported with PennyLane's capture enabled" in error_msg
+
 
 class TestForLoops:
     """Test the Catalyst for_loop operation."""
@@ -308,7 +355,7 @@ class TestForLoops:
     def test_dynamic_wires(self, backend):
         """Test for loops with iteration index-dependant wires."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=6))
         def circuit(n: int):
             qml.Hadamard(wires=0)
@@ -387,6 +434,47 @@ class TestForLoops:
 
         assert circuit(1)
         assert not circuit(0)
+
+    @pytest.mark.usefixtures("disable_capture")
+    def test_for_loop_raises_compatibility_error_with_capture(self):
+        """Test that for_loop raises PlxprCaptureCFCompatibilityError when
+        capture mode is enabled."""
+        # Enable capture mode
+        qml.capture.enable()
+
+        with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
+
+            @for_loop(0, 3, 1)
+            def loop_fn(i, acc):
+                return acc + i
+
+        # Verify the error message is specific and helpful
+        error_msg = str(exc_info.value)
+        assert "catalyst.for_loop is not supported with PennyLane's capture enabled" in error_msg
+
+    @pytest.mark.usefixtures("disable_capture")
+    def test_for_loop_raises_compatibility_error_with_capture_integration(self):
+        """Test that for_loop raises PlxprCaptureCFCompatibilityError when
+        capture mode is enabled."""
+        # Enable capture mode
+        qml.capture.enable()
+
+        with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
+
+            @qml.qjit
+            @qml.qnode(qml.device("lightning.qubit", wires=3))
+            def test(n):
+                @for_loop(0, n, 1)
+                def loop(i):
+                    qml.X(i)
+
+                loop()
+
+            test(4)
+
+        # Verify the error message is specific and helpful
+        error_msg = str(exc_info.value)
+        assert "catalyst.for_loop is not supported with PennyLane's capture enabled" in error_msg
 
 
 class TestClassicalCompilation:
@@ -719,8 +807,7 @@ class TestForLoopOperatorAccess:
 
             return qml.probs()
 
-        assert circuit()[0] == 1
-        assert circuit()[1] == 0
+        assert np.allclose(circuit(), [1, 0])
 
     def test_for_loop_access_classical(self):
         """Test ForLoop operation access in classical context."""
@@ -790,8 +877,7 @@ class TestWhileLoopOperatorAccess:
 
             return qml.probs()
 
-        assert circuit()[0] == 0
-        assert circuit()[1] == 1
+        assert np.allclose(circuit(), [0, 1])
 
     def test_while_loop_access_classical(self):
         """Test WhileLoop operation access in classical context."""

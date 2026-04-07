@@ -1,4 +1,4 @@
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023-2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,56 +12,71 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "MemRefUtils.hpp"
-
-#include "ExecutionContext.hpp"
-#include "OpenQasmBuilder.hpp"
-#include "OpenQasmDevice.hpp"
-#include "OpenQasmRunner.hpp"
-#include "RuntimeCAPI.h"
-
-#include <catch2/catch.hpp>
-
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include <pybind11/embed.h>
 
+#include "ExecutionContext.hpp"
+#include "MemRefUtils.hpp"
+#include "OpenQasmBuilder.hpp"
+#include "RuntimeCAPI.h"
+
+#include "OpenQasmDevice.hpp"
+#include "OpenQasmRunner.hpp"
+
+using namespace Catch::Matchers;
 using namespace Catalyst::Runtime::Device;
+
 using BType = OpenQasm::BuilderType;
+
+static void ensurePythonInterpreter()
+{
+    // Initializing the Python interpreter is required to run Braket-backed tests.
+    // We use pybind11 for this since nanobind has no intention to support embedding a Python
+    // interpreter in C++.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+}
 
 TEST_CASE("Test OpenQasmRunner base class", "[openqasm]")
 {
     // check the coverage support
     OpenQasm::OpenQasmRunner runner{};
     REQUIRE_THROWS_WITH(runner.runCircuit("", "", 0),
-                        Catch::Contains("[Function:runCircuit] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
+                        ContainsSubstring("[Function:runCircuit] Error in Catalyst Runtime: "
+                                          "Not implemented method"));
 
     REQUIRE_THROWS_WITH(runner.Probs("", "", 0, 0),
-                        Catch::Contains("[Function:Probs] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
+                        ContainsSubstring("[Function:Probs] Error in Catalyst Runtime: "
+                                          "Not implemented method"));
 
     REQUIRE_THROWS_WITH(runner.Sample("", "", 0, 0),
-                        Catch::Contains("[Function:Sample] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
+                        ContainsSubstring("[Function:Sample] Error in Catalyst Runtime: "
+                                          "Not implemented method"));
 
     REQUIRE_THROWS_WITH(runner.Expval("", "", 0),
-                        Catch::Contains("[Function:Expval] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
+                        ContainsSubstring("[Function:Expval] Error in Catalyst Runtime: "
+                                          "Not implemented method"));
 
     REQUIRE_THROWS_WITH(runner.Var("", "", 0),
-                        Catch::Contains("[Function:Var] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
+                        ContainsSubstring("[Function:Var] Error in Catalyst Runtime: "
+                                          "Not implemented method"));
 
     REQUIRE_THROWS_WITH(runner.State("", "", 0, 0),
-                        Catch::Contains("[Function:State] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
+                        ContainsSubstring("[Function:State] Error in Catalyst Runtime: "
+                                          "Not implemented method"));
 
     REQUIRE_THROWS_WITH(runner.Gradient("", "", 0, 0),
-                        Catch::Contains("[Function:Gradient] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
+                        ContainsSubstring("[Function:Gradient] Error in Catalyst Runtime: "
+                                          "Not implemented method"));
 }
 
 TEST_CASE("Test BraketRunner", "[openqasm]")
 {
+    ensurePythonInterpreter();
+
     OpenQasm::BraketBuilder builder{};
 
     builder.Register(OpenQasm::RegisterType::Qubit, "q", 2);
@@ -72,13 +87,6 @@ TEST_CASE("Test BraketRunner", "[openqasm]")
     builder.Gate("PauliY", {}, {}, {0}, false);
 
     auto &&circuit = builder.toOpenQasm();
-
-    // Initializing the Python interpreter is required to run the circuit.
-    // We use pybind11 for this since nanobind has no intention to support embedding a Python
-    // interpreter in C++.
-    if (!Py_IsInitialized()) {
-        pybind11::initialize_interpreter();
-    }
 
     OpenQasm::BraketRunner runner{};
 
@@ -111,6 +119,8 @@ TEST_CASE("Test BraketRunner", "[openqasm]")
 
 TEST_CASE("Test BraketRunner Expval and Var", "[openqasm]")
 {
+    ensurePythonInterpreter();
+
     OpenQasm::BraketBuilder builder{};
 
     builder.Register(OpenQasm::RegisterType::Qubit, "q", 2);
@@ -118,13 +128,6 @@ TEST_CASE("Test BraketRunner Expval and Var", "[openqasm]")
     builder.Gate("RX", {0.5}, {}, {0}, false);
     builder.Gate("Hadamard", {}, {}, {1}, false);
     builder.Gate("CNOT", {}, {}, {0, 1}, false);
-
-    // Initializing the Python interpreter is required to run the circuit.
-    // We use pybind11 for this since nanobind has no intention to support embedding a Python
-    // interpreter in C++.
-    if (!Py_IsInitialized()) {
-        pybind11::initialize_interpreter();
-    }
 
     OpenQasm::BraketRunner runner{};
 
@@ -144,7 +147,7 @@ TEST_CASE("Test BraketRunner Expval and Var", "[openqasm]")
         auto &&circuit_expval = builder.toOpenQasmWithCustomInstructions("");
 
         REQUIRE_THROWS_WITH(runner.Expval(circuit_expval, "default", 100),
-                            Catch::Contains("Unable to compute expectation value"));
+                            ContainsSubstring("Unable to compute expectation value"));
     }
 
     SECTION("Test BraketRunner::Var()")
@@ -163,7 +166,7 @@ TEST_CASE("Test BraketRunner Expval and Var", "[openqasm]")
         auto &&circuit_var = builder.toOpenQasmWithCustomInstructions("");
 
         REQUIRE_THROWS_WITH(runner.Var(circuit_var, "default", 100),
-                            Catch::Contains("Unable to compute variance"));
+                            ContainsSubstring("Unable to compute variance"));
     }
 }
 
@@ -175,8 +178,8 @@ TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
         CHECK(device.GetNumQubits() == 0);
 
         REQUIRE_THROWS_WITH(device.Circuit(),
-                            Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: "
-                                            "Invalid number of quantum register"));
+                            ContainsSubstring("[Function:toOpenQasm] Error in Catalyst Runtime: "
+                                              "Invalid number of quantum register"));
     }
 
     SECTION("Braket SV1")
@@ -185,8 +188,8 @@ TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
         CHECK(device.GetNumQubits() == 0);
 
         REQUIRE_THROWS_WITH(device.Circuit(),
-                            Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: "
-                                            "Invalid number of quantum register"));
+                            ContainsSubstring("[Function:toOpenQasm] Error in Catalyst Runtime: "
+                                              "Invalid number of quantum register"));
     }
 }
 
@@ -200,8 +203,8 @@ TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]")
 
     REQUIRE_THROWS_WITH(
         device->AllocateQubits(n - 1),
-        Catch::Contains("[Function:AllocateQubits] Error in Catalyst Runtime: Partial qubits "
-                        "allocation is not supported by OpenQasmDevice"));
+        ContainsSubstring("[Function:AllocateQubits] Error in Catalyst Runtime: Partial qubits "
+                          "allocation is not supported by OpenQasmDevice"));
 }
 
 TEST_CASE("Test the OpenQasmDevice setBasisState", "[openqasm]")
@@ -215,7 +218,7 @@ TEST_CASE("Test the OpenQasmDevice setBasisState", "[openqasm]")
     DataView<int8_t, 1> view(state);
     std::vector<QubitIdType> wires{0};
     REQUIRE_THROWS_WITH(device->SetBasisState(view, wires),
-                        Catch::Contains("Unsupported functionality"));
+                        ContainsSubstring("unsupported by device"));
 }
 
 TEST_CASE("Test the OpenQasmDevice setState", "[openqasm]")
@@ -228,8 +231,7 @@ TEST_CASE("Test the OpenQasmDevice setState", "[openqasm]")
     std::vector<std::complex<double>> state{{1.0, 0.0}};
     DataView<std::complex<double>, 1> view(state);
     std::vector<QubitIdType> wires{0};
-    REQUIRE_THROWS_WITH(device->SetState(view, wires),
-                        Catch::Contains("Unsupported functionality"));
+    REQUIRE_THROWS_WITH(device->SetState(view, wires), ContainsSubstring("unsupported by device"));
 }
 
 TEST_CASE("Test the bell pair circuit with BuilderType::Common", "[openqasm]")
@@ -258,6 +260,8 @@ TEST_CASE("Test the bell pair circuit with BuilderType::Common", "[openqasm]")
 TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::Braket",
           "[openqasm]")
 {
+    ensurePythonInterpreter();
+
     constexpr size_t shots{1000};
     std::unique_ptr<OpenQasmDevice> device =
         std::make_unique<OpenQasmDevice>("{device_type : braket.local.qubit, backend : default}");
@@ -286,7 +290,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         device->Probs(view);
 
         CHECK(probs[1] == probs[2]);
-        CHECK(probs[0] + probs[3] == Approx(1.f).margin(1e-5));
+        CHECK_THAT(probs[0] + probs[3], WithinAbs(1.0, 1e-5));
     }
 
     SECTION("PartialProbs")
@@ -295,7 +299,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         DataView<double, 1> view(probs);
         device->PartialProbs(view, std::vector<QubitIdType>{0, 1});
 
-        CHECK(probs[0] + probs[3] == Approx(1.f).margin(1e-5));
+        CHECK_THAT(probs[0] + probs[3], WithinAbs(1.0, 1e-5));
     }
 
     SECTION("Samples")
@@ -303,7 +307,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         std::vector<double> samples(shots * n);
         MemRefT<double, 2> buffer{samples.data(), samples.data(), 0, {shots, n}, {1, 1}};
         DataView<double, 2> view(buffer.data_aligned, buffer.offset, buffer.sizes, buffer.strides);
-        device->Sample(view, shots);
+        device->Sample(view);
 
         for (size_t i = 0; i < shots * n; i++) {
             CHECK((samples[i] == 0.f || samples[i] == 1.f));
@@ -315,7 +319,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         std::vector<double> samples(shots);
         MemRefT<double, 2> buffer{samples.data(), samples.data(), 0, {shots, 1}, {1, 1}};
         DataView<double, 2> view(buffer.data_aligned, buffer.offset, buffer.sizes, buffer.strides);
-        device->PartialSample(view, std::vector<QubitIdType>{0}, shots);
+        device->PartialSample(view, std::vector<QubitIdType>{0});
 
         for (size_t i = 0; i < shots; i++) {
             CHECK((samples[i] == 0.f || samples[i] == 1.f));
@@ -328,7 +332,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         std::vector<int64_t> counts(size);
         DataView<double, 1> eview(eigvals);
         DataView<int64_t, 1> cview(counts);
-        device->Counts(eview, cview, shots);
+        device->Counts(eview, cview);
 
         size_t sum = 0;
         for (size_t i = 0; i < size; i++) {
@@ -345,7 +349,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         std::vector<int64_t> counts(size);
         DataView<double, 1> eview(eigvals);
         DataView<int64_t, 1> cview(counts);
-        device->PartialCounts(eview, cview, std::vector<QubitIdType>{1}, shots);
+        device->PartialCounts(eview, cview, std::vector<QubitIdType>{1});
 
         size_t sum = 0;
         for (size_t i = 0; i < size; i++) {
@@ -360,7 +364,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         device->SetDeviceShots(0); // to get deterministic results
         auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto expval = device->Expval(obs);
-        CHECK(expval == Approx(0.0).margin(1e-5));
+        CHECK_THAT(expval, WithinAbs(0.0, 1e-5));
     }
 
     SECTION("Expval(x(0) @ h(1))")
@@ -370,7 +374,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto obs = device->TensorObservable({obs_x, obs_h});
         auto expval = device->Expval(obs);
-        CHECK(expval == Approx(0.7071067812).margin(1e-5));
+        CHECK_THAT(expval, WithinAbs(0.7071067812, 1e-5));
     }
 
     SECTION("Var(h(1))")
@@ -378,7 +382,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         device->SetDeviceShots(0); // to get deterministic results
         auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto expval = device->Var(obs);
-        CHECK(expval == Approx(1.0).margin(1e-5));
+        CHECK_THAT(expval, WithinAbs(1.0, 1e-5));
     }
 
     SECTION("Var(x(0) @ h(1))")
@@ -388,12 +392,14 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
         auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto obs = device->TensorObservable({obs_x, obs_h});
         auto expval = device->Var(obs);
-        CHECK(expval == Approx(0.5).margin(1e-5));
+        CHECK_THAT(expval, WithinAbs(0.5, 1e-5));
     }
 }
 
 TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket", "[openqasm]")
 {
+    ensurePythonInterpreter();
+
     constexpr size_t shots{1000};
     std::unique_ptr<OpenQasmDevice> device =
         std::make_unique<OpenQasmDevice>("{device_type : braket.local.qubit, backend : default}");
@@ -429,7 +435,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         DataView<double, 1> view(probs);
         device->Probs(view);
 
-        CHECK(probs[27] + probs[26] == Approx(1.f).margin(1e-5));
+        CHECK_THAT(probs[27] + probs[26], WithinAbs(1.0, 1e-5));
     }
 
     SECTION("PartialProbs")
@@ -438,7 +444,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         DataView<double, 1> view(probs);
         device->PartialProbs(view, std::vector<QubitIdType>{0, 1, 2, 3, 4});
 
-        CHECK(probs[27] + probs[26] == Approx(1.f).margin(1e-5));
+        CHECK_THAT(probs[27] + probs[26], WithinAbs(1.0, 1e-5));
     }
 
     SECTION("Samples")
@@ -446,7 +452,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         std::vector<double> samples(shots * n);
         MemRefT<double, 2> buffer{samples.data(), samples.data(), 0, {shots, n}, {1, 1}};
         DataView<double, 2> view(buffer.data_aligned, buffer.offset, buffer.sizes, buffer.strides);
-        device->Sample(view, shots);
+        device->Sample(view);
 
         for (size_t i = 0; i < shots * n; i++) {
             CHECK((samples[i] == 0.f || samples[i] == 1.f));
@@ -458,7 +464,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         std::vector<double> samples(shots);
         MemRefT<double, 2> buffer{samples.data(), samples.data(), 0, {shots, 1}, {1, 1}};
         DataView<double, 2> view(buffer.data_aligned, buffer.offset, buffer.sizes, buffer.strides);
-        device->PartialSample(view, std::vector<QubitIdType>{0}, shots);
+        device->PartialSample(view, std::vector<QubitIdType>{0});
 
         for (size_t i = 0; i < shots; i++) {
             CHECK((samples[i] == 0.f || samples[i] == 1.f));
@@ -471,7 +477,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         std::vector<int64_t> counts(size);
         DataView<double, 1> eview(eigvals);
         DataView<int64_t, 1> cview(counts);
-        device->Counts(eview, cview, shots);
+        device->Counts(eview, cview);
 
         size_t sum = 0;
         for (size_t i = 0; i < size; i++) {
@@ -488,7 +494,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         std::vector<int64_t> counts(size);
         DataView<double, 1> eview(eigvals);
         DataView<int64_t, 1> cview(counts);
-        device->PartialCounts(eview, cview, std::vector<QubitIdType>{1}, shots);
+        device->PartialCounts(eview, cview, std::vector<QubitIdType>{1});
 
         size_t sum = 0;
         for (size_t i = 0; i < size; i++) {
@@ -503,7 +509,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         device->SetDeviceShots(0); // to get deterministic results
         auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto expval = device->Expval(obs);
-        CHECK(expval == Approx(-0.7071067812).margin(1e-5));
+        CHECK_THAT(expval, WithinAbs(-0.7071067812, 1e-5));
     }
 
     SECTION("Expval(hermitian(1))")
@@ -517,7 +523,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         };
         auto obs = device->Observable(ObsId::Hermitian, matrix, std::vector<QubitIdType>{1});
         auto expval = device->Expval(obs);
-        CHECK(expval == Approx(0).margin(1e-5));
+        CHECK_THAT(expval, WithinAbs(0.0, 1e-5));
     }
 
     SECTION("Expval(x(0) @ h(1))")
@@ -527,11 +533,11 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto tp = device->TensorObservable({obs_z, obs_h});
         auto expval = device->Expval(tp);
-        CHECK(expval == Approx(0.7071067812).margin(1e-5));
+        CHECK_THAT(expval, WithinAbs(0.7071067812, 1e-5));
 
         auto obs = device->HamiltonianObservable({0.2}, {tp});
         REQUIRE_THROWS_WITH(device->Expval(obs),
-                            Catch::Contains("Unsupported observable: QasmHamiltonianObs"));
+                            ContainsSubstring("Unsupported observable: QasmHamiltonianObs"));
     }
 
     SECTION("Var(h(1))")
@@ -539,7 +545,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         device->SetDeviceShots(0); // to get deterministic results
         auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto var = device->Var(obs);
-        CHECK(var == Approx(0.5).margin(1e-5));
+        CHECK_THAT(var, WithinAbs(0.5, 1e-5));
     }
 
     SECTION("Var(hermitian(1))")
@@ -553,7 +559,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         };
         auto obs = device->Observable(ObsId::Hermitian, matrix, std::vector<QubitIdType>{1});
         auto var = device->Var(obs);
-        CHECK(var == Approx(1).margin(1e-5));
+        CHECK_THAT(var, WithinAbs(1.0, 1e-5));
     }
 
     SECTION("Var(x(0) @ h(1))")
@@ -563,16 +569,18 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto tp = device->TensorObservable({obs_z, obs_h});
         auto var = device->Var(tp);
-        CHECK(var == Approx(0.5).margin(1e-5));
+        CHECK_THAT(var, WithinAbs(0.5, 1e-5));
 
         auto obs = device->HamiltonianObservable({0.2}, {tp});
         REQUIRE_THROWS_WITH(device->Var(obs),
-                            Catch::Contains("Unsupported observable: QasmHamiltonianObs"));
+                            ContainsSubstring("Unsupported observable: QasmHamiltonianObs"));
     }
 }
 
 TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
 {
+    ensurePythonInterpreter();
+
     std::unique_ptr<OpenQasmDevice> device =
         std::make_unique<OpenQasmDevice>("{device_type : braket.local.qubit, backend : default}");
     device->SetDeviceShots(1000);
@@ -606,7 +614,7 @@ TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
         std::vector<double> probs(size);
         DataView<double, 1> view(probs);
         device->Probs(view);
-        CHECK(probs[1] == Approx(1.f).margin(1e-5));
+        CHECK_THAT(probs[1], WithinAbs(1.0, 1e-5));
     }
 
     SECTION("Expval(h(1))")
@@ -614,12 +622,14 @@ TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
         device->SetDeviceShots(0); // to get deterministic results
         auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto expval = device->Expval(obs);
-        CHECK(expval == Approx(-0.7071067812).margin(1e-5));
+        CHECK_THAT(expval, WithinAbs(-0.7071067812, 1e-5));
     }
 }
 
 TEST_CASE("Test PSWAP and ISWAP with BuilderType::Braket", "[openqasm]")
 {
+    ensurePythonInterpreter();
+
     std::unique_ptr<OpenQasmDevice> device =
         std::make_unique<OpenQasmDevice>("{device_type : braket.local.qubit, backend : default}");
     device->SetDeviceShots(1000);
@@ -633,7 +643,7 @@ TEST_CASE("Test PSWAP and ISWAP with BuilderType::Braket", "[openqasm]")
 
     auto obs = device->Observable(ObsId::PauliZ, {}, std::vector<QubitIdType>{1});
     auto expval = device->Expval(obs);
-    CHECK(expval == Approx(1).margin(1e-5));
+    CHECK_THAT(expval, WithinAbs(1.0, 1e-5));
 }
 
 TEST_CASE("Test MatrixOperation with OpenQasmDevice and BuilderType::Common", "[openqasm]")
@@ -648,7 +658,7 @@ TEST_CASE("Test MatrixOperation with OpenQasmDevice and BuilderType::Common", "[
     };
 
     REQUIRE_THROWS_WITH(device.MatrixOperation(matrix, {wires[0]}, false),
-                        Catch::Contains("Unsupported functionality"));
+                        ContainsSubstring("Unsupported functionality"));
 }
 
 TEST_CASE("Test __catalyst__rt__device_init registering the OpenQasm device", "[CoreQIS]")
@@ -658,10 +668,11 @@ TEST_CASE("Test __catalyst__rt__device_init registering the OpenQasm device", "[
     char device_aws[30] = "braket.aws.qubit";
 
 #if __has_include("OpenQasmDevice.hpp")
-    __catalyst__rt__device_init((int8_t *)device_aws, nullptr, nullptr, 0);
+    __catalyst__rt__device_init((int8_t *)device_aws, nullptr, nullptr, 0, false);
 #else
-    REQUIRE_THROWS_WITH(__catalyst__rt__device_init((int8_t *)device_aws, nullptr, nullptr, 0),
-                        Catch::Contains("cannot open shared object file"));
+    REQUIRE_THROWS_WITH(
+        __catalyst__rt__device_init((int8_t *)device_aws, nullptr, nullptr, 0, false),
+        ContainsSubstring("cannot open shared object file"));
 #endif
 
     __catalyst__rt__finalize();
@@ -671,10 +682,11 @@ TEST_CASE("Test __catalyst__rt__device_init registering the OpenQasm device", "[
     char device_local[30] = "braket.local.qubit";
 
 #if __has_include("OpenQasmDevice.hpp")
-    __catalyst__rt__device_init((int8_t *)device_local, nullptr, nullptr, 0);
+    __catalyst__rt__device_init((int8_t *)device_local, nullptr, nullptr, 0, false);
 #else
-    REQUIRE_THROWS_WITH(__catalyst__rt__device_init((int8_t *)(int8_t *), nullptr, nullptr, 0),
-                        Catch::Contains("cannot open shared object file"));
+    REQUIRE_THROWS_WITH(
+        __catalyst__rt__device_init((int8_t *)(int8_t *), nullptr, nullptr, 0, false),
+        ContainsSubstring("cannot open shared object file"));
 #endif
 
     __catalyst__rt__finalize();

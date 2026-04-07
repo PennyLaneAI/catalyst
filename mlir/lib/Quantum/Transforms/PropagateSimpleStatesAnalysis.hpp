@@ -18,11 +18,12 @@
 
 #include <map>
 
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/Debug.h"
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/Support/Debug.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -208,6 +209,8 @@ class PropagateSimpleStatesAnalysis {
         case QubitState::NOT_A_BASIS:
             return "NOT_A_BASIS";
         }
+
+        assert(false && "Invalid Enum value for `QubitState`");
     }
 
     bool isZero(QubitState qs) { return qs == QubitState::ZERO; }

@@ -18,6 +18,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/IRMapping.h"
 
+#include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "Ion/IR/IonOps.h"
 #include "Ion/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -28,25 +29,6 @@ using namespace catalyst::quantum;
 using json = nlohmann::json;
 
 namespace {
-
-LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
-                                           StringRef fnSymbol, Type fnType)
-{
-    Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
-
-    if (!fnDecl) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
-        rewriter.setInsertionPointToStart(mod.getBody());
-
-        fnDecl = rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), fnSymbol, fnType);
-    }
-    else {
-        assert(isa<LLVM::LLVMFuncOp>(fnDecl) && "QIR function declaration is not a LLVMFuncOp");
-    }
-
-    return cast<LLVM::LLVMFuncOp>(fnDecl);
-}
 
 LLVM::LLVMStructType createBeamStructType(MLIRContext *ctx, OpBuilder &rewriter, BeamAttr &beamAttr)
 {
@@ -72,32 +54,35 @@ Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, Beam
     auto polarization = beamAttr.getPolarization().asArrayRef();
     auto wavevector = beamAttr.getWavevector().asArrayRef();
 
-    Value beamStruct = rewriter.create<LLVM::UndefOp>(loc, beamStructType);
-    beamStruct = rewriter.create<LLVM::InsertValueOp>(
-        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, transitionIndex), 0);
-    beamStruct = rewriter.create<LLVM::InsertValueOp>(
-        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, rabi), 1);
-    beamStruct = rewriter.create<LLVM::InsertValueOp>(
-        loc, beamStruct, rewriter.create<LLVM::ConstantOp>(loc, detuning), 2);
+    Value beamStruct = LLVM::UndefOp::create(rewriter, loc, beamStructType);
+    beamStruct = LLVM::InsertValueOp::create(
+        rewriter, loc, beamStruct, LLVM::ConstantOp::create(rewriter, loc, transitionIndex),
+        SmallVector<int64_t>{0});
+    beamStruct = LLVM::InsertValueOp::create(rewriter, loc, beamStruct,
+                                             LLVM::ConstantOp::create(rewriter, loc, rabi),
+                                             SmallVector<int64_t>{1});
+    beamStruct = LLVM::InsertValueOp::create(rewriter, loc, beamStruct,
+                                             LLVM::ConstantOp::create(rewriter, loc, detuning),
+                                             SmallVector<int64_t>{2});
     for (size_t i = 0; i < polarization.size(); i++) {
-        Value polarizaitonConst = rewriter.create<LLVM::ConstantOp>(
-            loc, rewriter.getI64Type(),
+        Value polarizaitonConst = LLVM::ConstantOp::create(
+            rewriter, loc, rewriter.getI64Type(),
             rewriter.getIntegerAttr(rewriter.getI64Type(), polarization[i]));
-        beamStruct = rewriter.create<LLVM::InsertValueOp>(
-            loc, beamStruct, polarizaitonConst, ArrayRef<int64_t>({3, static_cast<int64_t>(i)}));
+        beamStruct = LLVM::InsertValueOp::create(rewriter, loc, beamStruct, polarizaitonConst,
+                                                 ArrayRef<int64_t>({3, static_cast<int64_t>(i)}));
     }
     for (size_t i = 0; i < wavevector.size(); i++) {
-        Value waveConst = rewriter.create<LLVM::ConstantOp>(
-            loc, rewriter.getI64Type(),
-            rewriter.getIntegerAttr(rewriter.getI64Type(), wavevector[i]));
-        beamStruct = rewriter.create<LLVM::InsertValueOp>(
-            loc, beamStruct, waveConst, ArrayRef<int64_t>({4, static_cast<int64_t>(i)}));
+        Value waveConst =
+            LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64Type(),
+                                     rewriter.getIntegerAttr(rewriter.getI64Type(), wavevector[i]));
+        beamStruct = LLVM::InsertValueOp::create(rewriter, loc, beamStruct, waveConst,
+                                                 ArrayRef<int64_t>({4, static_cast<int64_t>(i)}));
     }
     Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-    Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-    Value beamStructPtr = rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
-                                                          /*elementType=*/beamStructType, c1);
-    rewriter.create<LLVM::StoreOp>(loc, beamStruct, beamStructPtr);
+    Value c1 = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(1));
+    Value beamStructPtr = LLVM::AllocaOp::create(rewriter, loc, /*resultType=*/ptrType,
+                                                 /*elementType=*/beamStructType, c1);
+    LLVM::StoreOp::create(rewriter, loc, beamStruct, beamStructPtr);
     return beamStructPtr;
 }
 
@@ -248,6 +233,11 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
                 // keep track of parallel Pulses for the runtime call
                 parallelPulses.push_back(clonedPulseOp->getResult(0));
             }
+            else if (auto measurePulseOp = dyn_cast<catalyst::ion::MeasurePulseOp>(&regionOp)) {
+                auto *clonedMeasurePulseOp = rewriter.clone(regionOp, irMapping);
+                irMapping.map(regionOp.getResults(), clonedMeasurePulseOp->getResults());
+                parallelPulses.push_back(clonedMeasurePulseOp->getResult(0));
+            }
             else if (!isa<catalyst::ion::YieldOp>(&regionOp)) {
                 // Clone other operations (e.g., llvm.fdiv) that aren't YieldOp
                 auto *clonedRegionOp = rewriter.clone(regionOp, irMapping);
@@ -258,24 +248,24 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
         // Create an array of pulses
         Type pulseArrayType =
             LLVM::LLVMArrayType::get(conv->convertType(PulseType::get(ctx)), parallelPulses.size());
-        Value pulseArray = rewriter.create<LLVM::UndefOp>(loc, pulseArrayType);
+        Value pulseArray = LLVM::UndefOp::create(rewriter, loc, pulseArrayType);
         for (size_t i = 0; i < parallelPulses.size(); i++) {
-            auto convertedPulse = rewriter
-                                      .create<UnrealizedConversionCastOp>(
-                                          loc, LLVM::LLVMPointerType::get(ctx), parallelPulses[i])
-                                      .getResult(0);
-            pulseArray = rewriter.create<LLVM::InsertValueOp>(loc, pulseArray, convertedPulse, i);
+            auto convertedPulse =
+                UnrealizedConversionCastOp::create(rewriter, loc, LLVM::LLVMPointerType::get(ctx),
+                                                   parallelPulses[i])
+                    .getResult(0);
+            pulseArray = LLVM::InsertValueOp::create(rewriter, loc, pulseArray, convertedPulse, i);
         }
 
         Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
 
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        Value pulseArrayPtr = rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
-                                                              /*elementType=*/pulseArrayType, c1);
-        rewriter.create<LLVM::StoreOp>(loc, pulseArray, pulseArrayPtr);
+        Value c1 = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(1));
+        Value pulseArrayPtr = LLVM::AllocaOp::create(rewriter, loc, /*resultType=*/ptrType,
+                                                     /*elementType=*/pulseArrayType, c1);
+        LLVM::StoreOp::create(rewriter, loc, pulseArray, pulseArrayPtr);
 
-        Value pulseArraySize = rewriter.create<LLVM::ConstantOp>(
-            loc, rewriter.getI64IntegerAttr(parallelPulses.size()));
+        Value pulseArraySize = LLVM::ConstantOp::create(
+            rewriter, loc, rewriter.getI64IntegerAttr(parallelPulses.size()));
         SmallVector<Value> operands;
         operands.push_back(pulseArrayPtr);
         operands.push_back(pulseArraySize);
@@ -284,9 +274,9 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
         Type protocolFuncType = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
                                                             {ptrType, pulseArraySize.getType()});
         std::string protocolFuncName = "__catalyst__oqd__ParallelProtocol";
-        LLVM::LLVMFuncOp protocolFnDecl =
-            ensureFunctionDeclaration(rewriter, op, protocolFuncName, protocolFuncType);
-        rewriter.create<LLVM::CallOp>(loc, protocolFnDecl, operands);
+        LLVM::LLVMFuncOp protocolFnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, protocolFuncName, protocolFuncType);
+        LLVM::CallOp::create(rewriter, loc, protocolFnDecl, operands);
 
         SmallVector<Value> values;
         values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
@@ -296,39 +286,74 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
     }
 };
 
+LogicalResult buildPulseCall(Operation *op, Value inQubit, Value time, FloatAttr phaseAttr,
+                             BeamAttr beamAttr, StringRef qirName, const TypeConverter *conv,
+                             ConversionPatternRewriter &rewriter)
+{
+    Location loc = op->getLoc();
+    MLIRContext *ctx = op->getContext();
+
+    Value phase = LLVM::ConstantOp::create(rewriter, loc, phaseAttr);
+    Type qubitTy = conv->convertType(catalyst::ion::QubitType::get(ctx));
+    Value beamStructPtr = createBeamStruct(loc, rewriter, ctx, beamAttr);
+
+    SmallVector<Value> operands = {inQubit, time, phase, beamStructPtr};
+
+    Type qirSignature =
+        LLVM::LLVMFunctionType::get(conv->convertType(PulseType::get(ctx)),
+                                    {conv->convertType(qubitTy), time.getType(),
+                                     Float64Type::get(ctx), LLVM::LLVMPointerType::get(ctx)});
+    LLVM::LLVMFuncOp fnDecl =
+        catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(rewriter, op, qirName, qirSignature);
+    rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
+
+    return success();
+}
+
 struct PulseOpPattern : public OpConversionPattern<catalyst::ion::PulseOp> {
     using OpConversionPattern<catalyst::ion::PulseOp>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(catalyst::ion::PulseOp op, catalyst::ion::PulseOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
+        return buildPulseCall(op, adaptor.getInQubit(), op.getTime(), op.getPhase(), op.getBeam(),
+                              "__catalyst__oqd__pulse", getTypeConverter(), rewriter);
+    }
+};
+
+struct MeasurePulseOpPattern : public OpConversionPattern<catalyst::ion::MeasurePulseOp> {
+    using OpConversionPattern<catalyst::ion::MeasurePulseOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(catalyst::ion::MeasurePulseOp op,
+                                  catalyst::ion::MeasurePulseOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        return buildPulseCall(op, adaptor.getInQubit(), op.getTime(), op.getPhase(), op.getBeam(),
+                              "__catalyst__oqd__measure_pulse", getTypeConverter(), rewriter);
+    }
+};
+
+struct ReadoutBitOpPattern : public OpConversionPattern<catalyst::ion::ReadoutBitOp> {
+    using OpConversionPattern<catalyst::ion::ReadoutBitOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(catalyst::ion::ReadoutBitOp op,
+                                  catalyst::ion::ReadoutBitOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
-        const TypeConverter *conv = getTypeConverter();
+        Type ptrType = LLVM::LLVMPointerType::get(ctx);
 
-        auto time = op.getTime();
-        auto phase = rewriter.create<LLVM::ConstantOp>(loc, op.getPhase());
-        Type qubitTy = conv->convertType(catalyst::quantum::QubitType::get(ctx));
-        auto inQubit = adaptor.getInQubit();
-        auto beamAttr = op.getBeam();
+        Type readoutFuncType = LLVM::LLVMFunctionType::get(IntegerType::get(ctx, 1), {ptrType});
+        LLVM::LLVMFuncOp readoutFnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__oqd__readout_bit", readoutFuncType);
 
-        Value beamStructPtr = createBeamStruct(loc, rewriter, ctx, beamAttr);
+        Value mres =
+            LLVM::CallOp::create(rewriter, loc, readoutFnDecl, ValueRange{adaptor.getInQubit()})
+                .getResult();
 
-        SmallVector<Value> operands;
-        operands.push_back(inQubit);
-        operands.push_back(time);
-        operands.push_back(phase);
-        operands.push_back(beamStructPtr);
-
-        // Create the Ion stub function
-        Type qirSignature = LLVM::LLVMFunctionType::get(
-            conv->convertType(PulseType::get(ctx)),
-            {conv->convertType(qubitTy), time.getType(), Float64Type::get(ctx),
-             LLVM::LLVMPointerType::get(rewriter.getContext())});
-        std::string qirName = "__catalyst__oqd__pulse";
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
-
+        // Thread the qubit through unchanged; the physical qubit pointer is the same.
+        rewriter.replaceOp(op, {mres, adaptor.getInQubit()});
         return success();
     }
 };
@@ -343,6 +368,8 @@ void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePattern
     patterns.add<IonOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ModesOpPattern>(typeConverter, patterns.getContext());
     patterns.add<PulseOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<MeasurePulseOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<ReadoutBitOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ParallelProtocolOpPattern>(typeConverter, patterns.getContext());
 }
 

@@ -61,45 +61,29 @@
 #include "absl/base/dynamic_annotations.h"
 #endif
 
-namespace {
-
-inline int64_t catch_lapack_int_overflow(const std::string &source, int64_t value)
-{
-    if constexpr (sizeof(jax::lapack_int) == sizeof(int64_t)) {
-        return value;
-    }
-    else {
-        if (value > std::numeric_limits<jax::lapack_int>::max()) {
-            throw std::overflow_error(source + "(=" + std::to_string(value) +
-                                      ") exceeds maximum value of jax::lapack_int");
-        }
-        return value;
-    }
-}
-
-} // namespace
-
 namespace jax {
 
-static_assert(sizeof(lapack_int) == sizeof(int32_t), "Expected LAPACK integers to be 32-bit");
-
-// Trsm
+// Trsm (Triangular System Solver)
 // ~~~~
 
 template <typename T> typename RealTrsm<T>::FnType *RealTrsm<T>::fn = nullptr;
 
 template <typename T> void RealTrsm<T>::Kernel(void *out, void **data, XlaCustomCallStatus *)
 {
-    const int32_t left_side = *reinterpret_cast<int32_t *>(data[0]);
-    const int32_t lower = *reinterpret_cast<int32_t *>(data[1]);
-    const int32_t trans_a = *reinterpret_cast<int32_t *>(data[2]);
-    const int32_t diag = *reinterpret_cast<int32_t *>(data[3]);
-    const int m = *reinterpret_cast<int32_t *>(data[4]);
-    const int n = *reinterpret_cast<int32_t *>(data[5]);
-    const int batch = *reinterpret_cast<int32_t *>(data[6]);
-    const T alpha = *reinterpret_cast<T *>(data[7]);
-    const T *a = reinterpret_cast<T *>(data[8]);
-    T *b = reinterpret_cast<T *>(data[9]);
+    const uint8_t *diag_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char diag = static_cast<char>(*diag_tensor);
+    const uint8_t *side_tensor = reinterpret_cast<uint8_t *>(data[1]);
+    const char side = static_cast<char>(*side_tensor);
+    const uint8_t *trans_tensor = reinterpret_cast<uint8_t *>(data[2]);
+    const char trans = static_cast<char>(*trans_tensor);
+    const uint8_t *uplo_tensor = reinterpret_cast<uint8_t *>(data[3]);
+    const char uplo = static_cast<char>(*uplo_tensor);
+    const int batch = *reinterpret_cast<int32_t *>(data[7]);
+    const int m = *reinterpret_cast<int32_t *>(data[8]);
+    const int n = *reinterpret_cast<int32_t *>(data[9]);
+    const T *a = reinterpret_cast<T *>(data[10]);
+    T *b = reinterpret_cast<T *>(data[11]);
+    const T alpha = static_cast<T>(1);
 
     T *x = reinterpret_cast<T *>(out);
     if (x != b) {
@@ -109,13 +93,13 @@ template <typename T> void RealTrsm<T>::Kernel(void *out, void **data, XlaCustom
     }
 
     constexpr CBLAS_ORDER corder = CblasRowMajor;
-    const CBLAS_SIDE cside = left_side ? CblasLeft : CblasRight;
-    const CBLAS_UPLO cuplo = lower ? CblasLower : CblasUpper;
-    const CBLAS_TRANSPOSE ctransa = (trans_a == 1)   ? CblasTrans
-                                    : (trans_a == 2) ? CblasConjTrans
+    const CBLAS_SIDE cside = (side == 'L') ? CblasLeft : CblasRight;
+    const CBLAS_UPLO cuplo = (uplo == 'L') ? CblasLower : CblasUpper;
+    const CBLAS_TRANSPOSE ctransa = (trans == 'T')   ? CblasTrans
+                                    : (trans == 'C') ? CblasConjTrans
                                                      : CblasNoTrans;
-    const CBLAS_DIAG cdiag = diag ? CblasUnit : CblasNonUnit;
-    const int lda = left_side ? m : n;
+    const CBLAS_DIAG cdiag = (diag == 'U') ? CblasUnit : CblasNonUnit;
+    const int lda = (side == 'L') ? m : n;
     const int ldb = (corder == CblasColMajor) ? m : n; // Note: m if col-major, n if row-major
 
     const int64_t x_plus = static_cast<int64_t>(m) * static_cast<int64_t>(n);
@@ -132,16 +116,20 @@ template <typename T> typename ComplexTrsm<T>::FnType *ComplexTrsm<T>::fn = null
 
 template <typename T> void ComplexTrsm<T>::Kernel(void *out, void **data, XlaCustomCallStatus *)
 {
-    const int32_t left_side = *reinterpret_cast<int32_t *>(data[0]);
-    const int32_t lower = *reinterpret_cast<int32_t *>(data[1]);
-    const int32_t trans_a = *reinterpret_cast<int32_t *>(data[2]);
-    const int32_t diag = *reinterpret_cast<int32_t *>(data[3]);
-    const int m = *reinterpret_cast<int32_t *>(data[4]);
-    const int n = *reinterpret_cast<int32_t *>(data[5]);
-    const int batch = *reinterpret_cast<int32_t *>(data[6]);
-    const T *alpha = reinterpret_cast<T *>(data[7]);
-    const T *a = reinterpret_cast<T *>(data[8]);
-    T *b = reinterpret_cast<T *>(data[9]);
+    const uint8_t *diag_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char diag = static_cast<char>(*diag_tensor);
+    const uint8_t *side_tensor = reinterpret_cast<uint8_t *>(data[1]);
+    const char side = static_cast<char>(*side_tensor);
+    const uint8_t *trans_tensor = reinterpret_cast<uint8_t *>(data[2]);
+    const char trans = static_cast<char>(*trans_tensor);
+    const uint8_t *uplo_tensor = reinterpret_cast<uint8_t *>(data[3]);
+    const char uplo = static_cast<char>(*uplo_tensor);
+    const int batch = *reinterpret_cast<int32_t *>(data[7]);
+    const int m = *reinterpret_cast<int32_t *>(data[8]);
+    const int n = *reinterpret_cast<int32_t *>(data[9]);
+    const T *a = reinterpret_cast<T *>(data[10]);
+    T *b = reinterpret_cast<T *>(data[11]);
+    const T alpha = static_cast<T>(1);
 
     T *x = reinterpret_cast<T *>(out);
     if (x != b) {
@@ -151,20 +139,20 @@ template <typename T> void ComplexTrsm<T>::Kernel(void *out, void **data, XlaCus
     }
 
     constexpr CBLAS_ORDER corder = CblasRowMajor;
-    const CBLAS_SIDE cside = left_side ? CblasLeft : CblasRight;
-    const CBLAS_UPLO cuplo = lower ? CblasLower : CblasUpper;
-    const CBLAS_TRANSPOSE ctransa = (trans_a == 1)   ? CblasTrans
-                                    : (trans_a == 2) ? CblasConjTrans
+    const CBLAS_SIDE cside = (side == 'L') ? CblasLeft : CblasRight;
+    const CBLAS_UPLO cuplo = (uplo == 'L') ? CblasLower : CblasUpper;
+    const CBLAS_TRANSPOSE ctransa = (trans == 'T')   ? CblasTrans
+                                    : (trans == 'C') ? CblasConjTrans
                                                      : CblasNoTrans;
-    const CBLAS_DIAG cdiag = diag ? CblasUnit : CblasNonUnit;
-    const int lda = left_side ? m : n;
+    const CBLAS_DIAG cdiag = (diag == 'U') ? CblasUnit : CblasNonUnit;
+    const int lda = (side == 'L') ? m : n;
     const int ldb = (corder == CblasColMajor) ? m : n; // Note: m if col-major, n if row-major
 
     const int64_t x_plus = static_cast<int64_t>(m) * static_cast<int64_t>(n);
     const int64_t a_plus = static_cast<int64_t>(lda) * static_cast<int64_t>(lda);
 
     for (int i = 0; i < batch; ++i) {
-        fn(CblasRowMajor, cside, cuplo, ctransa, cdiag, m, n, alpha, a, lda, x, ldb);
+        fn(CblasRowMajor, cside, cuplo, ctransa, cdiag, m, n, &alpha, a, lda, x, ldb);
         x += x_plus;
         a += a_plus;
     }
@@ -175,7 +163,7 @@ template struct RealTrsm<double>;
 template struct ComplexTrsm<std::complex<float>>;
 template struct ComplexTrsm<std::complex<double>>;
 
-// Getrf
+// Getrf (LU Decomposition)
 // ~~~~~
 
 template <typename T> typename Getrf<T>::FnType *Getrf<T>::fn = nullptr;
@@ -213,7 +201,7 @@ template struct Getrf<double>;
 template struct Getrf<std::complex<float>>;
 template struct Getrf<std::complex<double>>;
 
-// Geqrf
+// Geqrf (QR Factorization)
 // ~~~~~
 
 template <typename T> typename Geqrf<T>::FnType *Geqrf<T>::fn = nullptr;
@@ -223,14 +211,10 @@ template <typename T> void Geqrf<T>::Kernel(void *out_tuple, void **data, XlaCus
     const int b = *(reinterpret_cast<int32_t *>(data[0]));
     const int m = *(reinterpret_cast<int32_t *>(data[1]));
     const int n = *(reinterpret_cast<int32_t *>(data[2]));
-    const int lwork = *(reinterpret_cast<int32_t *>(data[3]));
-    const T *a_in = reinterpret_cast<T *>(data[4]);
-
+    const T *a_in = reinterpret_cast<T *>(data[3]);
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
     T *tau = reinterpret_cast<T *>(out[1]);
-    int *info = reinterpret_cast<int *>(out[2]);
-    T *work = reinterpret_cast<T *>(out[3]);
 
     if (a_out != a_in) {
         std::memcpy(a_out, a_in,
@@ -242,10 +226,9 @@ template <typename T> void Geqrf<T>::Kernel(void *out_tuple, void **data, XlaCus
     const int lda = (corder == LAPACK_ROW_MAJOR) ? n : m;
 
     for (int i = 0; i < b; ++i) {
-        *info = fn(LAPACK_ROW_MAJOR, m, n, a_out, lda, tau);
+        fn(LAPACK_ROW_MAJOR, m, n, a_out, lda, tau);
         a_out += static_cast<int64_t>(m) * static_cast<int64_t>(n);
         tau += std::min(m, n);
-        ++info;
     }
 }
 
@@ -254,7 +237,7 @@ template struct Geqrf<double>;
 template struct Geqrf<std::complex<float>>;
 template struct Geqrf<std::complex<double>>;
 
-// Orgqr
+// Orgqr (Orthogonal Matrix from QR Decomposition)
 // ~~~~~
 
 template <typename T> typename Orgqr<T>::FnType *Orgqr<T>::fn = nullptr;
@@ -265,14 +248,10 @@ template <typename T> void Orgqr<T>::Kernel(void *out_tuple, void **data, XlaCus
     const int m = *(reinterpret_cast<int32_t *>(data[1]));
     const int n = *(reinterpret_cast<int32_t *>(data[2]));
     const int k = *(reinterpret_cast<int32_t *>(data[3]));
-    const int lwork = *(reinterpret_cast<int32_t *>(data[4]));
-    const T *a_in = reinterpret_cast<T *>(data[5]);
-    T *tau = reinterpret_cast<T *>(data[6]);
+    const T *a_in = reinterpret_cast<T *>(data[4]);
+    T *tau = reinterpret_cast<T *>(data[5]);
 
-    void **out = reinterpret_cast<void **>(out_tuple);
-    T *a_out = reinterpret_cast<T *>(out[0]);
-    int *info = reinterpret_cast<int *>(out[1]);
-    T *work = reinterpret_cast<T *>(out[2]);
+    T *a_out = reinterpret_cast<T *>(out_tuple);
 
     if (a_out != a_in) {
         std::memcpy(a_out, a_in,
@@ -284,10 +263,9 @@ template <typename T> void Orgqr<T>::Kernel(void *out_tuple, void **data, XlaCus
     const int lda = (corder == LAPACK_ROW_MAJOR) ? n : m;
 
     for (int i = 0; i < b; ++i) {
-        *info = fn(LAPACK_ROW_MAJOR, m, n, k, a_out, lda, tau);
+        fn(LAPACK_ROW_MAJOR, m, n, k, a_out, lda, tau);
         a_out += static_cast<int64_t>(m) * static_cast<int64_t>(n);
         tau += k;
-        ++info;
     }
 }
 
@@ -296,33 +274,34 @@ template struct Orgqr<double>;
 template struct Orgqr<std::complex<float>>;
 template struct Orgqr<std::complex<double>>;
 
-// Potrf
+// Potrf (Cholesky Factorization)
 // ~~~~~
 
 template <typename T> typename Potrf<T>::FnType *Potrf<T>::fn = nullptr;
 
 template <typename T> void Potrf<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int32_t lower = *(reinterpret_cast<int32_t *>(data[0]));
+    const uint8_t *uplo_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char uplo = static_cast<char>(*uplo_tensor);
     const int b = *(reinterpret_cast<int32_t *>(data[1]));
-    const int n = *(reinterpret_cast<int32_t *>(data[2]));
-    const T *a_in = reinterpret_cast<T *>(data[3]);
-    const char uplo = lower ? 'L' : 'U';
+    const int n_row = *(reinterpret_cast<int32_t *>(data[2]));
+    const int n_col = *(reinterpret_cast<int32_t *>(data[3]));
+    const T *a_in = reinterpret_cast<T *>(data[4]);
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
     int *info = reinterpret_cast<int *>(out[1]);
     if (a_out != a_in) {
         std::memcpy(a_out, a_in,
-                    static_cast<int64_t>(b) * static_cast<int64_t>(n) * static_cast<int64_t>(n) *
-                        sizeof(T));
+                    static_cast<int64_t>(b) * static_cast<int64_t>(n_row) *
+                        static_cast<int64_t>(n_col) * sizeof(T));
     }
 
     constexpr int corder = LAPACK_ROW_MAJOR;
 
     for (int i = 0; i < b; ++i) {
-        *info = fn(corder, uplo, n, a_out, n);
-        a_out += static_cast<int64_t>(n) * static_cast<int64_t>(n);
+        *info = fn(corder, uplo, n_col, a_out, n_col);
+        a_out += static_cast<int64_t>(n_row) * static_cast<int64_t>(n_col);
         ++info;
     }
 }
@@ -332,7 +311,9 @@ template struct Potrf<double>;
 template struct Potrf<std::complex<float>>;
 template struct Potrf<std::complex<double>>;
 
-// Gesdd
+// Gesdd (Singular Value Decomposition)
+// using a divide and conquer method
+// ~~~~~
 
 static char GesddJobz(bool job_opt_compute_uv, bool job_opt_full_matrices)
 {
@@ -389,13 +370,12 @@ template <typename T> typename RealGesdd<T>::FnType *RealGesdd<T>::fn = nullptr;
 
 template <typename T> void RealGesdd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int32_t job_opt_full_matrices = *(reinterpret_cast<int32_t *>(data[0]));
-    const int32_t job_opt_compute_uv = *(reinterpret_cast<int32_t *>(data[1]));
-    const int b = *(reinterpret_cast<int32_t *>(data[2]));
-    const int m = *(reinterpret_cast<int32_t *>(data[3]));
-    const int n = *(reinterpret_cast<int32_t *>(data[4]));
-    const int lwork = *(reinterpret_cast<int32_t *>(data[5]));
-    T *a_in = reinterpret_cast<T *>(data[6]);
+    const uint8_t *jobz_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char jobz = static_cast<char>(*jobz_tensor);
+    const int b = *(reinterpret_cast<int32_t *>(data[1]));
+    const int m = *(reinterpret_cast<int32_t *>(data[2]));
+    const int n = *(reinterpret_cast<int32_t *>(data[3]));
+    T *a_in = reinterpret_cast<T *>(data[4]);
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
@@ -403,16 +383,12 @@ template <typename T> void RealGesdd<T>::Kernel(void *out_tuple, void **data, Xl
     T *u = reinterpret_cast<T *>(out[2]);
     T *vt = reinterpret_cast<T *>(out[3]);
     int *info = reinterpret_cast<int *>(out[4]);
-    int *iwork = reinterpret_cast<int *>(out[5]);
-    T *work = reinterpret_cast<T *>(out[6]);
 
     if (a_out != a_in) {
         std::memcpy(a_out, a_in,
                     static_cast<int64_t>(b) * static_cast<int64_t>(m) * static_cast<int64_t>(n) *
                         sizeof(T));
     }
-
-    const char jobz = GesddJobz(job_opt_compute_uv, job_opt_full_matrices);
 
     constexpr int corder = LAPACK_ROW_MAJOR;
     const int lda = (corder == LAPACK_ROW_MAJOR) ? n : m;
@@ -435,13 +411,12 @@ template <typename T> typename ComplexGesdd<T>::FnType *ComplexGesdd<T>::fn = nu
 template <typename T>
 void ComplexGesdd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int32_t job_opt_full_matrices = *(reinterpret_cast<int32_t *>(data[0]));
-    const int32_t job_opt_compute_uv = *(reinterpret_cast<int32_t *>(data[1]));
-    const int b = *(reinterpret_cast<int32_t *>(data[2]));
-    const int m = *(reinterpret_cast<int32_t *>(data[3]));
-    const int n = *(reinterpret_cast<int32_t *>(data[4]));
-    const int lwork = *(reinterpret_cast<int32_t *>(data[5]));
-    T *a_in = reinterpret_cast<T *>(data[6]);
+    const uint8_t *jobz_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char jobz = static_cast<char>(*jobz_tensor);
+    const int b = *(reinterpret_cast<int32_t *>(data[1]));
+    const int m = *(reinterpret_cast<int32_t *>(data[2]));
+    const int n = *(reinterpret_cast<int32_t *>(data[3]));
+    T *a_in = reinterpret_cast<T *>(data[4]);
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
@@ -449,17 +424,12 @@ void ComplexGesdd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *
     T *u = reinterpret_cast<T *>(out[2]);
     T *vt = reinterpret_cast<T *>(out[3]);
     int *info = reinterpret_cast<int *>(out[4]);
-    int *iwork = reinterpret_cast<int *>(out[5]);
-    typename T::value_type *rwork = reinterpret_cast<typename T::value_type *>(out[6]);
-    T *work = reinterpret_cast<T *>(out[7]);
 
     if (a_out != a_in) {
         std::memcpy(a_out, a_in,
                     static_cast<int64_t>(b) * static_cast<int64_t>(m) * static_cast<int64_t>(n) *
                         sizeof(T));
     }
-
-    const char jobz = GesddJobz(job_opt_compute_uv, job_opt_full_matrices);
 
     constexpr int corder = LAPACK_ROW_MAJOR;
     const int lda = (corder == LAPACK_ROW_MAJOR) ? n : m;
@@ -482,24 +452,27 @@ template struct RealGesdd<double>;
 template struct ComplexGesdd<std::complex<float>>;
 template struct ComplexGesdd<std::complex<double>>;
 
-// Syevd/Heevd
-// ~~~~~~~~~~~
+// Syevd/Heevd (Eigenvalues and eigenvectors for Symmetric Matrices)
+// ~~~~~
 
 template <typename T> typename RealSyevd<T>::FnType *RealSyevd<T>::fn = nullptr;
 
 template <typename T> void RealSyevd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int32_t lower = *(reinterpret_cast<int32_t *>(data[0]));
-    const int b = *(reinterpret_cast<int32_t *>(data[1]));
-    const int n = *(reinterpret_cast<int32_t *>(data[2]));
-    const T *a_in = reinterpret_cast<T *>(data[3]);
+    const uint8_t *jobz_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char jobz = static_cast<char>(*jobz_tensor);
+    const uint8_t *uplo_tensor = reinterpret_cast<uint8_t *>(data[1]);
+    const char uplo = static_cast<char>(*uplo_tensor);
+    const int b = *(reinterpret_cast<int32_t *>(data[2]));
+    const int m = *(reinterpret_cast<int32_t *>(data[3]));
+    const int n = *(reinterpret_cast<int32_t *>(data[4]));
+    const T *a_in = reinterpret_cast<T *>(data[5]);
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
     T *w_out = reinterpret_cast<T *>(out[1]);
     int *info = reinterpret_cast<int *>(out[2]);
-    T *work = reinterpret_cast<T *>(out[3]);
-    int *iwork = reinterpret_cast<int *>(out[4]);
+
     if (a_out != a_in) {
         std::memcpy(a_out, a_in,
                     static_cast<int64_t>(b) * static_cast<int64_t>(n) * static_cast<int64_t>(n) *
@@ -507,8 +480,6 @@ template <typename T> void RealSyevd<T>::Kernel(void *out_tuple, void **data, Xl
     }
 
     constexpr int corder = LAPACK_ROW_MAJOR;
-    const char jobz = 'V';
-    const char uplo = lower ? 'L' : 'U';
 
     for (int i = 0; i < b; ++i) {
         *info = fn(corder, jobz, uplo, n, a_out, n, w_out);
@@ -523,18 +494,20 @@ template <typename T> typename ComplexHeevd<T>::FnType *ComplexHeevd<T>::fn = nu
 template <typename T>
 void ComplexHeevd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int32_t lower = *(reinterpret_cast<int32_t *>(data[0]));
-    const int b = *(reinterpret_cast<int32_t *>(data[1]));
-    const int n = *(reinterpret_cast<int32_t *>(data[2]));
-    const T *a_in = reinterpret_cast<T *>(data[3]);
+    const uint8_t *jobz_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char jobz = static_cast<char>(*jobz_tensor);
+    const uint8_t *uplo_tensor = reinterpret_cast<uint8_t *>(data[1]);
+    const char uplo = static_cast<char>(*uplo_tensor);
+    const int b = *(reinterpret_cast<int32_t *>(data[2]));
+    const int m = *(reinterpret_cast<int32_t *>(data[3]));
+    const int n = *(reinterpret_cast<int32_t *>(data[4]));
+    const T *a_in = reinterpret_cast<T *>(data[5]);
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
     typename T::value_type *w_out = reinterpret_cast<typename T::value_type *>(out[1]);
     int *info = reinterpret_cast<int *>(out[2]);
-    T *work = reinterpret_cast<T *>(out[3]);
-    typename T::value_type *rwork = reinterpret_cast<typename T::value_type *>(out[4]);
-    int *iwork = reinterpret_cast<int *>(out[5]);
+
     if (a_out != a_in) {
         std::memcpy(a_out, a_in,
                     static_cast<int64_t>(b) * static_cast<int64_t>(n) * static_cast<int64_t>(n) *
@@ -542,8 +515,6 @@ void ComplexHeevd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *
     }
 
     constexpr int corder = LAPACK_ROW_MAJOR;
-    const char jobz = 'V';
-    const char uplo = lower ? 'L' : 'U';
 
     for (int i = 0; i < b; ++i) {
         *info = fn(corder, jobz, uplo, n, a_out, n, w_out);
@@ -587,31 +558,34 @@ static void UnpackEigenvectors(int n, const T *im_eigenvalues, const T *packed,
     }
 }
 
-// Geev
-// ~~~~
+// Geev (Eigenvalues and eigenvectors for General Matrices)
+// ~~~~~
 
 template <typename T> typename RealGeev<T>::FnType *RealGeev<T>::fn = nullptr;
 
 template <typename T> void RealGeev<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int b = *(reinterpret_cast<int32_t *>(data[0]));
-    const int n_int = *(reinterpret_cast<int32_t *>(data[1]));
+    const uint8_t *jobvl_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char jobvl = static_cast<char>(*jobvl_tensor);
+    const uint8_t *jobvr_tensor = reinterpret_cast<uint8_t *>(data[1]);
+    const char jobvr = static_cast<char>(*jobvr_tensor);
+    const int b = *(reinterpret_cast<int32_t *>(data[2]));
+    const int n_int = *(reinterpret_cast<int32_t *>(data[4]));
     const int64_t n = n_int;
-    const char jobvl = *(reinterpret_cast<uint8_t *>(data[2]));
-    const char jobvr = *(reinterpret_cast<uint8_t *>(data[3]));
 
-    const T *a_in = reinterpret_cast<T *>(data[4]);
+    const T *a_in = reinterpret_cast<T *>(data[5]);
 
     void **out = reinterpret_cast<void **>(out_tuple);
-    T *a_work = reinterpret_cast<T *>(out[0]);
-    T *vl_work = reinterpret_cast<T *>(out[1]);
-    T *vr_work = reinterpret_cast<T *>(out[2]);
+    T *wr_out = reinterpret_cast<T *>(out[0]);
+    T *wi_out = reinterpret_cast<T *>(out[1]);
+    std::complex<T> *vl_out = reinterpret_cast<std::complex<T> *>(out[2]);
+    std::complex<T> *vr_out = reinterpret_cast<std::complex<T> *>(out[3]);
+    int *info = reinterpret_cast<int *>(out[4]);
 
-    T *wr_out = reinterpret_cast<T *>(out[3]);
-    T *wi_out = reinterpret_cast<T *>(out[4]);
-    std::complex<T> *vl_out = reinterpret_cast<std::complex<T> *>(out[5]);
-    std::complex<T> *vr_out = reinterpret_cast<std::complex<T> *>(out[6]);
-    int *info = reinterpret_cast<int *>(out[7]);
+    T *a_work = new T[n * n];
+    std::memcpy(a_work, a_in, n * n * sizeof(T));
+    T *vl_work = new T[n * n];
+    T *vr_work = new T[n * n];
 
     constexpr int corder = LAPACK_ROW_MAJOR;
 
@@ -665,22 +639,24 @@ template <typename T> typename ComplexGeev<T>::FnType *ComplexGeev<T>::fn = null
 template <typename T>
 void ComplexGeev<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int b = *(reinterpret_cast<int32_t *>(data[0]));
-    const int n_int = *(reinterpret_cast<int32_t *>(data[1]));
+    const uint8_t *jobvl_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char jobvl = static_cast<char>(*jobvl_tensor);
+    const uint8_t *jobvr_tensor = reinterpret_cast<uint8_t *>(data[1]);
+    const char jobvr = static_cast<char>(*jobvr_tensor);
+    const int b = *(reinterpret_cast<int32_t *>(data[2]));
+    const int n_int = *(reinterpret_cast<int32_t *>(data[4]));
     const int64_t n = n_int;
-    const char jobvl = *(reinterpret_cast<uint8_t *>(data[2]));
-    const char jobvr = *(reinterpret_cast<uint8_t *>(data[3]));
 
-    const T *a_in = reinterpret_cast<T *>(data[4]);
+    const T *a_in = reinterpret_cast<T *>(data[5]);
 
     void **out = reinterpret_cast<void **>(out_tuple);
-    T *a_work = reinterpret_cast<T *>(out[0]);
-    typename T::value_type *r_work = reinterpret_cast<typename T::value_type *>(out[1]);
+    T *w_out = reinterpret_cast<T *>(out[0]);
+    T *vl_out = reinterpret_cast<T *>(out[1]);
+    T *vr_out = reinterpret_cast<T *>(out[2]);
+    int *info = reinterpret_cast<int *>(out[3]);
 
-    T *w_out = reinterpret_cast<T *>(out[2]);
-    T *vl_out = reinterpret_cast<T *>(out[3]);
-    T *vr_out = reinterpret_cast<T *>(out[4]);
-    int *info = reinterpret_cast<int *>(out[5]);
+    T *a_work = new T[n * n];
+    std::memcpy(a_work, a_in, n * n * sizeof(T));
 
     constexpr int corder = LAPACK_ROW_MAJOR;
 
@@ -729,30 +705,28 @@ template struct RealGeev<double>;
 template struct ComplexGeev<std::complex<float>>;
 template struct ComplexGeev<std::complex<double>>;
 
-// Gees
-// ~~~~
-
+// Gees (Schur Decomposition)
+// ~~~~~
 template <typename T> typename RealGees<T>::FnType *RealGees<T>::fn = nullptr;
 
 template <typename T> void RealGees<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int b = *(reinterpret_cast<int32_t *>(data[0]));
-    const int n_int = *(reinterpret_cast<int32_t *>(data[1]));
+    const uint8_t *jobvs_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char jobvs = static_cast<char>(*jobvs_tensor);
+    const uint8_t *sort_tensor = reinterpret_cast<uint8_t *>(data[1]);
+    const char sort = static_cast<char>(*sort_tensor);
+    const int b = *(reinterpret_cast<int32_t *>(data[2]));
+    const int n_int = *(reinterpret_cast<int32_t *>(data[4]));
     const int64_t n = n_int;
-    const char jobvs = *(reinterpret_cast<uint8_t *>(data[2]));
-    const char sort = *(reinterpret_cast<uint8_t *>(data[3]));
+    const T *a_in = reinterpret_cast<T *>(data[5]);
 
-    const T *a_in = reinterpret_cast<T *>(data[4]);
-
-    // bool* select (T, T) = reinterpret_cast<bool* (T, T)>(data[5]);
     bool (*select)(T, T) = nullptr;
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
-
-    T *wr_out = reinterpret_cast<T *>(out[1]);
-    T *wi_out = reinterpret_cast<T *>(out[2]);
-    T *vs_out = reinterpret_cast<T *>(out[3]);
+    T *vs_out = reinterpret_cast<T *>(out[1]);
+    T *wr_out = reinterpret_cast<T *>(out[2]);
+    T *wi_out = reinterpret_cast<T *>(out[3]);
     int *sdim_out = reinterpret_cast<int *>(out[4]);
     int *info = reinterpret_cast<int *>(out[5]);
 
@@ -775,7 +749,7 @@ template <typename T> void RealGees<T>::Kernel(void *out_tuple, void **data, Xla
         ABSL_ANNOTATE_MEMORY_IS_INITIALIZED(wr_out, sizeof(T) * n);
         ABSL_ANNOTATE_MEMORY_IS_INITIALIZED(wi_out, sizeof(T) * n);
         ABSL_ANNOTATE_MEMORY_IS_INITIALIZED(vs_out, sizeof(T) * n * n);
-        ABSL_ANNOTATE_MEMORY_IS_INITIALIZED(info_out, sizeof(int));
+        ABSL_ANNOTATE_MEMORY_IS_INITIALIZED(info, sizeof(int));
 #endif
 
         a_in += n * n;
@@ -783,8 +757,8 @@ template <typename T> void RealGees<T>::Kernel(void *out_tuple, void **data, Xla
         wr_out += n;
         wi_out += n;
         vs_out += n * n;
-        ++sdim_out;
         ++info;
+        ++sdim_out;
     }
 }
 
@@ -793,24 +767,25 @@ template <typename T> typename ComplexGees<T>::FnType *ComplexGees<T>::fn = null
 template <typename T>
 void ComplexGees<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int b = *(reinterpret_cast<int32_t *>(data[0]));
-    const int n_int = *(reinterpret_cast<int32_t *>(data[1]));
+    const uint8_t *jobvs_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char jobvs = static_cast<char>(*jobvs_tensor);
+    const uint8_t *sort_tensor = reinterpret_cast<uint8_t *>(data[1]);
+    const char sort = static_cast<char>(*sort_tensor);
+    const int b = *(reinterpret_cast<int32_t *>(data[2]));
+    const int n_int = *(reinterpret_cast<int32_t *>(data[4]));
     const int64_t n = n_int;
-    const char jobvs = *(reinterpret_cast<uint8_t *>(data[2]));
-    const char sort = *(reinterpret_cast<uint8_t *>(data[3]));
 
-    const T *a_in = reinterpret_cast<T *>(data[4]);
+    const T *a_in = reinterpret_cast<T *>(data[5]);
 
     // bool* select (T, T) = reinterpret_cast<bool* (T, T)>(data[5]);
     bool (*select)(T) = nullptr;
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
-    typename T::value_type *r_work = reinterpret_cast<typename T::value_type *>(out[1]);
+    T *vs_out = reinterpret_cast<T *>(out[1]);
     T *w_out = reinterpret_cast<T *>(out[2]);
-    T *vs_out = reinterpret_cast<T *>(out[3]);
-    int *sdim_out = reinterpret_cast<int *>(out[4]);
-    int *info = reinterpret_cast<int *>(out[5]);
+    int *sdim_out = reinterpret_cast<int *>(out[3]);
+    int *info = reinterpret_cast<int *>(out[4]);
 
     constexpr int corder = LAPACK_ROW_MAJOR;
 
@@ -846,25 +821,23 @@ template struct RealGees<double>;
 template struct ComplexGees<std::complex<float>>;
 template struct ComplexGees<std::complex<double>>;
 
-// Gehrd
-
+// Gehrd (Hessenberg Decomposition)
+// ~~~~~
 template <typename T> typename Gehrd<T>::FnType *Gehrd<T>::fn = nullptr;
 
 template <typename T> void Gehrd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int32_t n = *reinterpret_cast<int32_t *>(data[0]);
+    const int32_t ihi = *reinterpret_cast<int32_t *>(data[0]);
     const int32_t ilo = *reinterpret_cast<int32_t *>(data[1]);
-    const int32_t ihi = *reinterpret_cast<int32_t *>(data[2]);
+    const int32_t batch = *reinterpret_cast<int32_t *>(data[2]);
     const int32_t lda = *reinterpret_cast<int32_t *>(data[3]);
-    const int32_t batch = *reinterpret_cast<int32_t *>(data[4]);
-    const int32_t lwork = *reinterpret_cast<int32_t *>(data[5]);
-    T *a = reinterpret_cast<T *>(data[6]);
+    const int32_t n = *reinterpret_cast<int32_t *>(data[4]);
+    T *a = reinterpret_cast<T *>(data[5]);
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
     T *tau = reinterpret_cast<T *>(out[1]);
     int *info = reinterpret_cast<int *>(out[2]);
-    T *work = reinterpret_cast<T *>(out[3]);
 
     if (a_out != a) {
         std::memcpy(a_out, a,
@@ -896,12 +869,13 @@ template <typename T> typename Sytrd<T>::FnType *Sytrd<T>::fn = nullptr;
 
 template <typename T> void Sytrd<T>::Kernel(void *out_tuple, void **data, XlaCustomCallStatus *)
 {
-    const int32_t n = *reinterpret_cast<int32_t *>(data[0]);
-    const int32_t lower = *reinterpret_cast<int32_t *>(data[1]);
+    const uint8_t *uplo_tensor = reinterpret_cast<uint8_t *>(data[0]);
+    const char cuplo = static_cast<char>(*uplo_tensor);
+    const int32_t batch = *reinterpret_cast<int32_t *>(data[1]);
     const int32_t lda = *reinterpret_cast<int32_t *>(data[2]);
-    const int32_t batch = *reinterpret_cast<int32_t *>(data[3]);
-    const int32_t lwork = *reinterpret_cast<int32_t *>(data[4]);
-    T *a = reinterpret_cast<T *>(data[5]);
+    const int32_t n = *reinterpret_cast<int32_t *>(data[3]);
+
+    T *a = reinterpret_cast<T *>(data[4]);
 
     void **out = reinterpret_cast<void **>(out_tuple);
     T *a_out = reinterpret_cast<T *>(out[0]);
@@ -910,7 +884,6 @@ template <typename T> void Sytrd<T>::Kernel(void *out_tuple, void **data, XlaCus
     Real *e = reinterpret_cast<Real *>(out[2]);
     T *tau = reinterpret_cast<T *>(out[3]);
     int *info = reinterpret_cast<int *>(out[4]);
-    T *work = reinterpret_cast<T *>(out[5]);
 
     if (a_out != a) {
         std::memcpy(a_out, a,
@@ -919,7 +892,6 @@ template <typename T> void Sytrd<T>::Kernel(void *out_tuple, void **data, XlaCus
     }
 
     constexpr int corder = LAPACK_ROW_MAJOR;
-    const char cuplo = lower ? 'L' : 'U';
 
     const int64_t a_plus = static_cast<int64_t>(lda) * static_cast<int64_t>(n);
 

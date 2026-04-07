@@ -816,3 +816,17 @@ class TestVectorizeMap:
             return x**2
 
         assert f.mlir is None
+
+    def test_vmap_dynamic_batch(self):
+        """Test unsupported case of a dynamic batch dimension."""
+
+        def f(n: int):
+
+            @vmap
+            def g(x):
+                return 2 * x
+
+            return g(jnp.ones((n,), dtype=float))
+
+        with pytest.raises(ValueError, match="Invalid batch size; cannot vmap over a dynamic"):
+            qjit(target="mlir")(f)

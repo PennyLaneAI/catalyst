@@ -18,10 +18,12 @@ Test that mcmc, num_burnin, and kernel_name are set in MLIR
 """
 
 import pennylane as qml
-from utils import qjit_for_tests as qjit
+
+from catalyst import qjit
 
 
 @qjit
+@qml.set_shots(1000)
 @qml.qnode(
     qml.device(
         "lightning.qubit",
@@ -29,7 +31,6 @@ from utils import qjit_for_tests as qjit
         mcmc=True,
         num_burnin=200,
         kernel_name="NonZeroRandom",
-        shots=1000,
     )
 )
 def circuit():

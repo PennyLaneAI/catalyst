@@ -11,7 +11,7 @@
               "class_": "Beam",
               "detuning": {
                 "class_": "MathNum",
-                "value": 157.0796
+                "value": 208570336271826.38
               },
               "phase": {
                 "class_": "MathNum",
@@ -24,7 +24,7 @@
               ],
               "rabi": {
                 "class_": "MathNum",
-                "value": 31.4159
+                "value": 62831853071.79586
               },
               "target": 0,
               "transition": {
@@ -45,11 +45,11 @@
                 },
                 "level2": {
                   "class_": "Level",
-                  "energy": 628.3185,
+                  "energy": 5.097485407861727e+15,
                   "label": "estate",
                   "nuclear": 0.5,
                   "orbital": 1.0,
-                  "principal": 5,
+                  "principal": 6,
                   "spin": 0.5,
                   "spin_orbital": 0.5,
                   "spin_orbital_nuclear": 1.0,
@@ -64,14 +64,14 @@
               ]
             },
             "class_": "Pulse",
-            "duration": 0.05000015915507752
+            "duration": 1.6597500000000003e-07
           },
           {
             "beam": {
               "class_": "Beam",
               "detuning": {
                 "class_": "MathNum",
-                "value": 157.0796
+                "value": 208570336271826.38
               },
               "phase": {
                 "class_": "MathNum",
@@ -84,7 +84,7 @@
               ],
               "rabi": {
                 "class_": "MathNum",
-                "value": 31.4159
+                "value": 62831853071.79586
               },
               "target": 0,
               "transition": {
@@ -93,7 +93,7 @@
                 "label": "upstate->estate",
                 "level1": {
                   "class_": "Level",
-                  "energy": 62.83185,
+                  "energy": 79438311838.67151,
                   "label": "upstate",
                   "nuclear": 0.5,
                   "orbital": 0.0,
@@ -105,11 +105,11 @@
                 },
                 "level2": {
                   "class_": "Level",
-                  "energy": 628.3185,
+                  "energy": 5.097485407861727e+15,
                   "label": "estate",
                   "nuclear": 0.5,
                   "orbital": 1.0,
-                  "principal": 5,
+                  "principal": 6,
                   "spin": 0.5,
                   "spin_orbital": 0.5,
                   "spin_orbital_nuclear": 1.0,
@@ -124,7 +124,7 @@
               ]
             },
             "class_": "Pulse",
-            "duration": 0.05000015915507752
+            "duration": 1.6597500000000003e-07
           }
         ]
       }
@@ -134,7 +134,7 @@
     "class_": "System",
     "ions": [
       {
-        "charge": 1.0,
+        "charge": -1.0,
         "class_": "Ion",
         "levels": [
           {
@@ -151,7 +151,7 @@
           },
           {
             "class_": "Level",
-            "energy": 62.83185,
+            "energy": 79438311838.67151,
             "label": "upstate",
             "nuclear": 0.5,
             "orbital": 0.0,
@@ -163,11 +163,11 @@
           },
           {
             "class_": "Level",
-            "energy": 628.3185,
+            "energy": 5.097485407861727e+15,
             "label": "estate",
             "nuclear": 0.5,
             "orbital": 1.0,
-            "principal": 5,
+            "principal": 6,
             "spin": 0.5,
             "spin_orbital": 0.5,
             "spin_orbital_nuclear": 1.0,
@@ -175,11 +175,11 @@
           },
           {
             "class_": "Level",
-            "energy": 1256.637,
+            "energy": 5.724861460783608e+15,
             "label": "estate2",
             "nuclear": 0.5,
             "orbital": 1.0,
-            "principal": 5,
+            "principal": 6,
             "spin": 0.5,
             "spin_orbital": 0.5,
             "spin_orbital_nuclear": 1.0,
@@ -211,11 +211,11 @@
             },
             "level2": {
               "class_": "Level",
-              "energy": 628.3185,
+              "energy": 5.097485407861727e+15,
               "label": "estate",
               "nuclear": 0.5,
               "orbital": 1.0,
-              "principal": 5,
+              "principal": 6,
               "spin": 0.5,
               "spin_orbital": 0.5,
               "spin_orbital_nuclear": 1.0,
@@ -241,11 +241,11 @@
             },
             "level2": {
               "class_": "Level",
-              "energy": 1256.637,
+              "energy": 5.724861460783608e+15,
               "label": "estate2",
               "nuclear": 0.5,
               "orbital": 1.0,
-              "principal": 5,
+              "principal": 6,
               "spin": 0.5,
               "spin_orbital": 0.5,
               "spin_orbital_nuclear": 1.0,
@@ -259,7 +259,7 @@
             "label": "upstate->estate",
             "level1": {
               "class_": "Level",
-              "energy": 62.83185,
+              "energy": 79438311838.67151,
               "label": "upstate",
               "nuclear": 0.5,
               "orbital": 0.0,
@@ -271,11 +271,11 @@
             },
             "level2": {
               "class_": "Level",
-              "energy": 628.3185,
+              "energy": 5.097485407861727e+15,
               "label": "estate",
               "nuclear": 0.5,
               "orbital": 1.0,
-              "principal": 5,
+              "principal": 6,
               "spin": 0.5,
               "spin_orbital": 0.5,
               "spin_orbital_nuclear": 1.0,
@@ -289,7 +289,7 @@
             "label": "upstate->estate2",
             "level1": {
               "class_": "Level",
-              "energy": 62.83185,
+              "energy": 79438311838.67151,
               "label": "upstate",
               "nuclear": 0.5,
               "orbital": 0.0,
@@ -301,11 +301,11 @@
             },
             "level2": {
               "class_": "Level",
-              "energy": 1256.637,
+              "energy": 5.724861460783608e+15,
               "label": "estate2",
               "nuclear": 0.5,
               "orbital": 1.0,
-              "principal": 5,
+              "principal": 6,
               "spin": 0.5,
               "spin_orbital": 0.5,
               "spin_orbital_nuclear": 1.0,
@@ -324,7 +324,7 @@
           0.0,
           0.0
         ],
-        "energy": 0.1
+        "energy": 6283185.307179586
       }
     ]
   }

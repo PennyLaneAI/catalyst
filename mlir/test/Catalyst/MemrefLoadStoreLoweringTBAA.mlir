@@ -35,8 +35,8 @@ module @my_model {
     llvm.func @my_func(...)
     llvm.func @__enzyme_autodiff0(...)
     func.func @func_i32(%arg0: memref<i32>, %arg1: memref<4xi32>) -> (memref<i32>, memref<4xi32>) {
-        // CHECK: [[castArg0:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<i32> to !llvm.struct<(ptr, ptr, i64)>
         // CHECK: [[castArg1:%.+]] = builtin.unrealized_conversion_cast %arg1 : memref<4xi32> to !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+        // CHECK: [[castArg0:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<i32> to !llvm.struct<(ptr, ptr, i64)>
         // CHECK: [[extract0:%.+]] = llvm.extractvalue [[castArg0]][1] : !llvm.struct<(ptr, ptr, i64)> 
         // CHECK: [[load:%.+]] = llvm.load [[extract0]] {tbaa = [[[tag]]]} : !llvm.ptr -> i32
         // CHECK: [[idx:%.+]] = index.constant 0
@@ -59,8 +59,8 @@ module @my_model {
 module @my_model {
     llvm.func @__enzyme_autodiff1(...)
     func.func @func_f32(%arg0: memref<f32>, %arg1: memref<4xf32>) -> (memref<f32>, memref<4xf32>) {
-        // CHECK: [[castArg0:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<f32> to !llvm.struct<(ptr, ptr, i64)>
         // CHECK: [[castArg1:%.+]] = builtin.unrealized_conversion_cast %arg1 : memref<4xf32> to !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+        // CHECK: [[castArg0:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<f32> to !llvm.struct<(ptr, ptr, i64)>
         // CHECK: [[extract0:%.+]] = llvm.extractvalue [[castArg0]][1] : !llvm.struct<(ptr, ptr, i64)> 
         // CHECK: [[load:%.+]] = llvm.load [[extract0]] {tbaa = [[[tag]]]} : !llvm.ptr -> f32
         // CHECK: [[idx:%.+]] = index.constant 0
@@ -83,8 +83,8 @@ module @my_model {
 module @my_model {
     llvm.func @__enzyme_autodiff1(...)
     func.func @func_f64(%arg0: memref<f64>, %arg1: memref<4xf64>) -> (memref<f64>, memref<4xf64>) {
-        // CHECK: [[castArg0:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<f64> to !llvm.struct<(ptr, ptr, i64)>
         // CHECK: [[castArg1:%.+]] = builtin.unrealized_conversion_cast %arg1 : memref<4xf64> to !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+        // CHECK: [[castArg0:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<f64> to !llvm.struct<(ptr, ptr, i64)>
         // CHECK: [[extract0:%.+]] = llvm.extractvalue [[castArg0]][1] : !llvm.struct<(ptr, ptr, i64)> 
         // CHECK: [[load:%.+]] = llvm.load [[extract0]] {tbaa = [[[tag]]]} : !llvm.ptr -> f64
         // CHECK: [[idx:%.+]] = index.constant 0
@@ -109,10 +109,10 @@ module @my_model {
 module @my_model {
     llvm.func @__enzyme_autodiff2(...)
     func.func @func_mix_f64_index(%arg0: memref<f64>, %arg1: memref<4xf64>, %arg2: memref<index>, %arg3: memref<3xindex>) -> (memref<4xf64>, memref<3xindex>) {
-        // CHECK: [[castArg0:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<f64> to !llvm.struct<(ptr, ptr, i64)>
-        // CHECK: [[castArg1:%.+]] = builtin.unrealized_conversion_cast %arg1 : memref<4xf64> to !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-        // CHECK: [[castArg2:%.+]] = builtin.unrealized_conversion_cast %arg2 : memref<index> to !llvm.struct<(ptr, ptr, i64)>
         // CHECK: [[castArg3:%.+]] = builtin.unrealized_conversion_cast %arg3 : memref<3xindex> to !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+        // CHECK: [[castArg2:%.+]] = builtin.unrealized_conversion_cast %arg2 : memref<index> to !llvm.struct<(ptr, ptr, i64)>
+        // CHECK: [[castArg1:%.+]] = builtin.unrealized_conversion_cast %arg1 : memref<4xf64> to !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+        // CHECK: [[castArg0:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<f64> to !llvm.struct<(ptr, ptr, i64)>
         // CHECK: [[extract0:%.+]] = llvm.extractvalue [[castArg0]][1] : !llvm.struct<(ptr, ptr, i64)> 
         // CHECK: [[load0:%.+]] = llvm.load [[extract0]] {tbaa = [[[tagdouble]]]} : !llvm.ptr -> f64
         // CHECK: [[idx:%.+]] = index.constant 0

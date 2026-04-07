@@ -9,6 +9,7 @@ pennylane_catalyst.egg-info
 # Testing files and directories
 .lit
 .pytest_cache
+__pennylane_resources_data_*.json
 
 # Packaging directories
 dist
@@ -16,6 +17,9 @@ frontend/bin
 frontend/catalyst/lib
 frontend/catalyst/_revision.py
 frontend/mlir_quantum
+frontend/cmake-build
+frontend/catalyst/include
+frontend/catalyst/resources
 
 # IDEs
 .vscode
@@ -24,13 +28,18 @@ frontend/mlir_quantum
 # Documentation
 doc/_build
 doc/code/api
+mlir/build-docs
 .ipynb*
 
 # Development
 venv
+.venv
 
 # Cache files
 .cache
 
 # Standalone-plugin example
 mlir/standalone
+
+# macOS
+.DS_Store

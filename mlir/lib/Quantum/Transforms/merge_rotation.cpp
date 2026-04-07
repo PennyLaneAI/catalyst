@@ -1,4 +1,4 @@
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023-2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,13 +14,18 @@
 
 #define DEBUG_TYPE "merge-rotation"
 
-#include "Catalyst/IR/CatalystDialect.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Patterns.h"
+#include "llvm/Support/Debug.h"
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/Support/Debug.h"
+
+#include "Catalyst/IR/CatalystDialect.h"
+#include "PBC/IR/PBCOps.h"
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Patterns.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -30,7 +35,6 @@ namespace catalyst {
 namespace quantum {
 
 #define GEN_PASS_DEF_MERGEROTATIONSPASS
-#define GEN_PASS_DECL_MERGEROTATIONSPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
@@ -44,30 +48,27 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
         Operation *module = getOperation();
 
         RewritePatternSet patternsCanonicalization(&getContext());
-        catalyst::quantum::StaticCustomOp::getCanonicalizationPatterns(patternsCanonicalization,
-                                                                       &getContext());
+
         catalyst::quantum::CustomOp::getCanonicalizationPatterns(patternsCanonicalization,
                                                                  &getContext());
         catalyst::quantum::MultiRZOp::getCanonicalizationPatterns(patternsCanonicalization,
                                                                   &getContext());
-        if (failed(applyPatternsAndFoldGreedily(module, std::move(patternsCanonicalization)))) {
+        catalyst::pbc::PPRotationOp::getCanonicalizationPatterns(patternsCanonicalization,
+                                                                 &getContext());
+        catalyst::pbc::PPRotationArbitraryOp::getCanonicalizationPatterns(patternsCanonicalization,
+                                                                          &getContext());
+        if (failed(applyPatternsGreedily(module, std::move(patternsCanonicalization)))) {
             return signalPassFailure();
         }
 
         RewritePatternSet patterns(&getContext());
+        populateLoopBoundaryPatterns(patterns, 1);
         populateMergeRotationsPatterns(patterns);
-
-        if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
             return signalPassFailure();
         }
     }
 };
 
 } // namespace quantum
-
-std::unique_ptr<Pass> createMergeRotationsPass()
-{
-    return std::make_unique<quantum::MergeRotationsPass>();
-}
-
 } // namespace catalyst

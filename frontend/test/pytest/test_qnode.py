@@ -27,7 +27,7 @@ from catalyst.device.qjit_device import QJITDevice
 def test_variable_capture(_in, _out):
     """Test closures (outer-scope variable capture) for quantum functions."""
 
-    @qjit()
+    @qjit
     def workflow(n: int):
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f(x: float):
@@ -54,7 +54,7 @@ def test_variable_capture(_in, _out):
 def test_variable_capture_multiple_devices(_in, _out, backend):
     """Test variable capture using multiple backend devices."""
 
-    @qjit()
+    @qjit
     def workflow(n: int):
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f(x: float):
@@ -101,7 +101,6 @@ def test_qfunc_output_shape_scalar():
         return res * 1j
 
 
-@pytest.mark.xfail(reason="Preserving scalars is preferred over preserving length-1 containers.")
 def test_qfunc_output_shape_list():
     """Check that length-1 list outputs of QNodes are preserved."""
 
@@ -132,7 +131,7 @@ def test_qnode_grad_method_stored_on_execution_config(grad_method, mocker):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliX(0))
 
-    qml.qjit(circ)(1.2)
+    qjit(circ)(1.2)
 
     assert spy.call_count == 1
     _, config = spy.spy_return
@@ -141,7 +140,7 @@ def test_qnode_grad_method_stored_on_execution_config(grad_method, mocker):
     def grad_circ(x: float):
         return grad(circ)(x)
 
-    qml.qjit(grad_circ)(1.2)
+    qjit(grad_circ)(1.2)
 
     assert spy.call_count == 2
     _, config = spy.spy_return

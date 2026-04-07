@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Unit tests for contents of c_template"""
+
 import numpy as np
 
 from catalyst.utils.c_template import CType, CVariable
@@ -76,7 +77,7 @@ class TestCVariable:
         """Test get array data for zero rank."""
         x = np.array(1)
         # pylint: disable=protected-access
-        assert CVariable._get_array_data(x) == x
+        assert CVariable._get_array_data(x) == "1"
 
     def test_get_array_data_nonzero_rank(self):
         """Test get array data for non-zero rank."""

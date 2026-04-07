@@ -3,13 +3,16 @@ add_mlir_public_c_api_library(QuantumCAPI
 
     LINK_LIBS PRIVATE
     MLIRCatalyst
-    MLIRCatalystTransforms
+    catalyst-transforms
+    catalyst-stablehlo-transforms
     MLIRQuantum
     quantum-transforms
-    MLIRQEC
-    qec-transforms
+    MLIRPBC
+    pbc-transforms
     MLIRGradient
     gradient-transforms
+    MLIRMBQC
+    mbqc-transforms
     MLIRMitigation
     mitigation-transforms
     MLIRIon

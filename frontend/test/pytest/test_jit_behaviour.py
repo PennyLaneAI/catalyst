@@ -23,9 +23,8 @@ import pennylane as qml
 import pytest
 from jax import numpy as jnp
 from numpy import pi
-from utils import qjit_for_tests as qjit
 
-from catalyst import for_loop, grad, measure
+from catalyst import for_loop, grad, measure, qjit
 from catalyst.jax_primitives import _scalar_abstractify
 from catalyst.tracing.type_signatures import (
     TypeCompatibility,
@@ -35,12 +34,15 @@ from catalyst.tracing.type_signatures import (
 )
 from catalyst.utils.exceptions import CompileError
 
+# pylint: disable=too-many-lines
+
 
 def f_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder."""
 
     @qjit
-    @qml.qnode(qml.device(backend, wires=wires, shots=shots))
+    @qml.set_shots(shots)
+    @qml.qnode(qml.device(backend, wires=wires))
     def f(x: float) -> bool:
         qml.RY(x, wires=0)
         return measure(wires=0)
@@ -52,7 +54,8 @@ def f_jit_builder(backend, wires=1, shots=1000):
     """Test JIT builder."""
 
     @qjit
-    @qml.qnode(qml.device(backend, wires=wires, shots=shots))
+    @qml.set_shots(shots)
+    @qml.qnode(qml.device(backend, wires=wires))
     def f(x):
         qml.RY(x, wires=0)
         return measure(wires=0)
@@ -64,7 +67,8 @@ def fsample_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder with the sample measurement process."""
 
     @qjit
-    @qml.qnode(qml.device(backend, wires=wires, shots=shots))
+    @qml.set_shots(shots)
+    @qml.qnode(qml.device(backend, wires=wires))
     def f(x: float):
         qml.RY(x, wires=0)
         return qml.sample()
@@ -488,7 +492,7 @@ class TestShots:
             wires = random.randint(1, max_wires)
             expected_shape = (shots, wires)
             f_aot = fsample_aot_builder(backend, wires=wires)
-            observed_val = f_aot(0.0, shots=shots)
+            observed_val = f_aot(0.0, shots=shots)  # pylint: disable=unexpected-keyword-arg
             observed_shape = jnp.shape(observed_val)
             # We are failing this test because of the type system.
             # If shots is specified AOT, we would need to recompile
@@ -848,7 +852,7 @@ class TestTracingQJITAnnotatedFunctions:
         mlir_v1 = workflow.mlir
 
         @qjit
-        def workflow(phi: float):
+        def workflow(phi: float):  # pylint: disable=function-redefined
             g = grad(qjit(circuit))
             return g(phi)
 
@@ -861,26 +865,72 @@ class TestDefaultAvailableIR:
     def test_mlir(self):
         """Test mlir."""
 
-        @qml.qjit  # Note that we are using the default qjit
+        @qjit  # Note that we are using the default qjit
         def f():
             return 1
 
         assert f.mlir
 
-    def test_qir(self, backend):
-        """Test qir."""
+    def test_llvmir(self, backend):
+        """Test llvmir."""
 
         @qml.qnode(qml.device(backend, wires=1))
         def f(x: float):
             qml.RX(x, wires=0)
             return qml.state()
 
-        @qml.qjit  # Note that we are using the default qjit
+        @qjit  # Note that we are using the default qjit
         def g(x: float):
             return f(x)
 
-        assert g.qir
-        assert "__catalyst__qis" in g.qir
+        assert g.llvmir
+        assert "__catalyst__qis" in g.llvmir
+
+    def test_mlir_opt(self, backend):
+        """Test mlir opt."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def f(x: float):
+            qml.RX(x, wires=0)
+            return qml.state()
+
+        @qjit  # Note that we are using the default qjit
+        def g(x: float):
+            return f(x)
+
+        assert g.mlir_opt
+        assert "__catalyst__qis" in g.mlir_opt
+
+    @pytest.mark.xdsl
+    @pytest.mark.usefixtures("use_capture")
+    def test_mlir_opt_using_xdsl_passes(self, backend):
+        """Test mlir opt using xDSL passes."""
+        # pylint: disable-next=import-outside-toplevel
+        from catalyst.python_interface.transforms import iterative_cancel_inverses_pass
+
+        @qjit
+        @iterative_cancel_inverses_pass
+        @qml.qnode(qml.device(backend, wires=1))
+        def f():
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=0)
+            return qml.state()
+
+        mlir_opt = f.mlir_opt
+        assert mlir_opt
+        assert not "__catalyst__qis__Hadamard" in mlir_opt
+
+    def test_jaxpr_target(self, backend):
+        """Test no mlir is generated for jaxpr target."""
+
+        @qjit(target="jaxpr")
+        @qml.qnode(qml.device(backend, wires=1))
+        def f(x: float):
+            qml.RX(x, wires=0)
+            return qml.state()
+
+        assert f.mlir_opt is None
+        assert f.mlir is None
 
 
 class TestAvoidVerification:

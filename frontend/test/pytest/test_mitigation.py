@@ -19,10 +19,13 @@ import jax
 import numpy as np
 import pennylane as qml
 import pytest
-from pennylane.transforms import exponential_extrapolate
+from pennylane.noise import exponential_extrapolate, poly_extrapolate
 
 import catalyst
-from catalyst.api_extensions.error_mitigation import polynomial_extrapolation
+from catalyst.api_extensions.error_mitigation import (
+    _check_is_odd_positive,
+    polynomial_extrapolation,
+)
 
 quadratic_extrapolation = polynomial_extrapolation(2)
 
@@ -131,8 +134,8 @@ def test_single_measurement_control_flow(params, folding):
     assert np.allclose(mitigated_qnode(params, 3), catalyst.qjit(circuit)(params, 3))
 
 
-@pytest.mark.parametrize("scale_factors", [[1.0, 3, 5, 7], [-1, 3, 5, 7], [1, 2, 5, 7]])
-def test_scale_factors_error(scale_factors):
+@pytest.mark.parametrize("scale_factors", [[-1, 3, 5, 7], [1, 2, 5, 7]])
+def test_scale_factors_value_error(scale_factors):
     """Test that when scale factors are not positive odd integer, it raises an error."""
 
     def circuit(x):
@@ -142,8 +145,28 @@ def test_scale_factors_error(scale_factors):
     def mitigated_function(args):
         return catalyst.mitigate_with_zne(circuit, scale_factors=scale_factors)(args)
 
-    with pytest.raises(ValueError, match="The scale factors must be positive odd integers:"):
+    with pytest.raises(
+        ValueError, match=".*Only odd positive integers are allowed in scale_factors"
+    ):
         mitigated_function(0.1)
+
+
+@pytest.mark.parametrize(
+    "scale_factors",
+    [
+        [jax.numpy.array([1, 3])],
+        jax.numpy.array([1, 3]),
+        [1.0, 3.0],
+        [complex(1, 0), complex(3, 0)],
+    ],
+)
+def test_scale_factors_type_error(scale_factors):
+    """Test that when using non-integer, it raises a TypeError."""
+
+    with pytest.raises(
+        TypeError, match=".*Only odd positive integers are allowed in scale_factors"
+    ):
+        _check_is_odd_positive(scale_factors)
 
 
 @pytest.mark.parametrize("extrapolation", [quadratic_extrapolation, exponential_extrapolate])
@@ -333,7 +356,7 @@ def test_zne_with_extrap_kwargs():
         return catalyst.mitigate_with_zne(
             circuit,
             scale_factors=[1, 3, 5, 7],
-            extrapolate=qml.transforms.poly_extrapolate,
+            extrapolate=poly_extrapolate,
             extrapolate_kwargs={"order": 2},
         )()
 
@@ -358,7 +381,7 @@ def test_exponential_extrapolation_with_kwargs():
         return catalyst.mitigate_with_zne(
             circuit,
             scale_factors=[1, 3, 5, 7],
-            extrapolate=qml.transforms.exponential_extrapolate,
+            extrapolate=exponential_extrapolate,
             extrapolate_kwargs={"asymptote": 3},
         )()
 
@@ -393,7 +416,7 @@ def test_jaxpr_with_const():
 
 def test_mcm_method_with_zne(backend):
     """Test that the dynamic_one_shot works with ZNE."""
-    dev = qml.device(backend, wires=1, shots=5)
+    dev = qml.device(backend, wires=1)
 
     def circuit():
         return qml.expval(qml.PauliZ(0))
@@ -403,12 +426,12 @@ def test_mcm_method_with_zne(backend):
     @catalyst.qjit
     def mitigated_circuit_1():
         s = [1, 3]
-        g = qml.QNode(circuit, dev, mcm_method="one-shot")
+        g = qml.set_shots(qml.QNode(circuit, dev, mcm_method="one-shot"), shots=5)
         return catalyst.mitigate_with_zne(g, scale_factors=s)()
 
     @catalyst.qjit
     def mitigated_circuit_2():
-        g = qml.QNode(circuit, dev)
+        g = qml.set_shots(qml.QNode(circuit, dev), shots=5)
         return catalyst.mitigate_with_zne(g, scale_factors=s)()
 
     observed = mitigated_circuit_1()

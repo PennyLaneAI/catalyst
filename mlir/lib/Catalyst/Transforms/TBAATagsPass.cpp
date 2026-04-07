@@ -12,20 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/DialectConversion.h"
-
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
-
-#include "Catalyst/Transforms/Passes.h"
-#include "Catalyst/Transforms/TBAAUtils.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/Transforms/Patterns.h"
+#include "Catalyst/Transforms/TBAAUtils.h"
 #include "Gradient/IR/GradientInterfaces.h"
 
 using namespace mlir;
@@ -33,7 +29,6 @@ using namespace mlir;
 namespace catalyst {
 
 #define GEN_PASS_DEF_MEMREFTOLLVMWITHTBAAPASS
-#define GEN_PASS_DECL_MEMREFTOLLVMWITHTBAAPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 } // namespace catalyst
@@ -85,8 +80,4 @@ void MemrefToLLVMWithTBAAPass::lowerMemrefWithTBAA(ModuleOp module)
     if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
         return signalPassFailure();
     }
-}
-std::unique_ptr<Pass> catalyst::createMemrefToLLVMWithTBAAPass()
-{
-    return std::make_unique<MemrefToLLVMWithTBAAPass>();
 }

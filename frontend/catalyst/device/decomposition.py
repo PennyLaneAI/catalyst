@@ -16,9 +16,11 @@
 This module contains the decomposition functions to pre-process tapes for
 compilation & execution on devices.
 """
+
 import copy
 import logging
 from functools import partial
+from typing import Union
 
 import jax
 import pennylane as qml
@@ -33,8 +35,16 @@ from pennylane.measurements import (
     SampleMP,
     VarianceMP,
 )
+from pennylane.transforms.decompose import _resolve_gate_set
 
 from catalyst.api_extensions import HybridCtrl
+from catalyst.device.op_support import (
+    is_active,
+    is_controllable,
+    is_differentiable,
+    is_invertible,
+    is_supported,
+)
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
@@ -47,7 +57,7 @@ logger.addHandler(logging.NullHandler())
 def check_alternative_support(op, capabilities: DeviceCapabilities):
     """Verify that aliased operations aren't supported via alternative definitions."""
 
-    if isinstance(op, qml.ops.Controlled):
+    if isinstance(op, qml.ops.Controlled) and type(op) is not qml.ops.ControlledOp:
         # "Cast" away the specialized class for gates like Toffoli, ControlledQubitUnitary, etc.
         supported = capabilities.operations.get(op.base.name)
         if supported and supported.controllable:
@@ -71,10 +81,8 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     if op.name in getattr(capabilities, "to_matrix_ops", {}):
         return _decompose_to_matrix(op)
 
-    if op.has_matrix and isinstance(op, qml.ops.Controlled):
-
-        # If the device supports unitary matrices, apply the fallback.
-        if "QubitUnitary" in capabilities.operations:
+    if isinstance(op, qml.ops.Controlled) and not op.has_decomposition:
+        if op.has_matrix and "QubitUnitary" in capabilities.operations:
             return _decompose_to_matrix(op)
 
     return op.decomposition()
@@ -82,7 +90,15 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
 
 @transform
 @debug_logger
-def catalyst_decompose(tape: qml.tape.QuantumTape, ctx, capabilities: DeviceCapabilities):
+def catalyst_decompose(
+    tape: qml.tape.QuantumTape,
+    capabilities: DeviceCapabilities,
+    grad_method: str = None,
+    target_gates=None,
+    num_work_wires=0,
+    fixed_decomps=None,
+    alt_decomps=None,
+):  # pylint: disable=too-many-arguments, too-many-positional-arguments
     """Decompose operations until the stopping condition is met.
 
     In a single call of the catalyst_decompose function, the PennyLane operations are decomposed
@@ -101,24 +117,52 @@ def catalyst_decompose(tape: qml.tape.QuantumTape, ctx, capabilities: DeviceCapa
     # are compatible with Catalyst's handling of initial state preparation. Currently, Catalyst
     # only supports qml.StatePrep and qml.BasisState. A default strategy for handling any PennyLane
     # operator of type qml.StatePrepBase will be needed before this conditional can be removed.
-    if len(tape) == 0 or type(tape[0]) in (qml.StatePrep, qml.BasisState):
-        skip_initial_state_prep = capabilities.initial_state_prep
+    skip_initial_state_prep = False
+    if len(tape) > 0 and type(tape[0]) in (qml.StatePrep, qml.BasisState):
+        if grad_method is None or not is_active(tape[0]):
+            skip_initial_state_prep = capabilities.initial_state_prep
+
+    if capabilities is None:
+        if grad_method is not None:
+            raise NotImplementedError(
+                "grad_method is not taken into account in catalyst_decompose if target_gates are "
+                "provided instead of device capabilities."
+            )
+        target_gates, stopping_condition = _resolve_gate_set(target_gates, None)
+        decomposer = None
     else:
-        skip_initial_state_prep = False
+        if target_gates is not None:
+            raise ValueError(
+                "target_gates are not taken into account in catalyst_decompose if device "
+                "capabilities are provided."
+            )
+
+        def stopping_condition(op):
+            return catalyst_acceptance(op, capabilities, grad_method)
+
+        decomposer = partial(catalyst_decomposer, capabilities=capabilities)
+
+    decompose_kwargs = {
+        "num_work_wires": num_work_wires,
+        "target_gates": target_gates,
+        "fixed_decomps": fixed_decomps,
+        "alt_decomps": alt_decomps,
+    }
 
     (toplevel_tape,), _ = decompose(
         tape,
-        stopping_condition=lambda op: bool(catalyst_acceptance(op, capabilities)),
+        stopping_condition=stopping_condition,
         skip_initial_state_prep=skip_initial_state_prep,
-        decomposer=partial(catalyst_decomposer, capabilities=capabilities),
+        decomposer=decomposer,
         name="catalyst on this device",
         error=CompileError,
+        **decompose_kwargs,
     )
 
     new_ops = []
     for op in toplevel_tape.operations:
         if has_nested_tapes(op):
-            op = _decompose_nested_tapes(op, ctx, capabilities)
+            op = _decompose_nested_tapes(op, capabilities, **decompose_kwargs)
         new_ops.append(op)
     tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
 
@@ -136,15 +180,17 @@ def _decompose_to_matrix(op):
     return [op]
 
 
-def _decompose_nested_tapes(op, ctx, capabilities: DeviceCapabilities):
+def _decompose_nested_tapes(op, capabilities: DeviceCapabilities, **decompose_kwargs):
     new_regions = []
     for region in op.regions:
         if region.quantum_tape is None:
             new_tape = None
         else:
-            with EvaluationContext.frame_tracing_context(ctx, region.trace):
+            with EvaluationContext.frame_tracing_context(region.trace):
                 tapes, _ = catalyst_decompose(
-                    region.quantum_tape, ctx=ctx, capabilities=capabilities
+                    region.quantum_tape,
+                    capabilities=capabilities,
+                    **decompose_kwargs,
                 )
                 new_tape = tapes[0]
         new_regions.append(
@@ -197,25 +243,28 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     return [new_tape], null_postprocessing
 
 
-def catalyst_acceptance(op: qml.operation.Operator, capabilities: DeviceCapabilities) -> str | None:
+def catalyst_acceptance(
+    op: qml.operation.Operator, capabilities: DeviceCapabilities, grad_method: Union[str, None]
+) -> Union[str, None]:
     """Check whether an Operator is supported and returns the name of the operation or None."""
 
-    op_support = capabilities.operations
+    if not is_differentiable(op, capabilities, grad_method):
+        return None
 
     if isinstance(op, qml.ops.Adjoint):
-        match = catalyst_acceptance(op.base, capabilities)
-        if match and op_support[match].invertible:
+        match = catalyst_acceptance(op.base, capabilities, grad_method)
+        if match and is_invertible(op.base, capabilities):
             return match
 
     # There are cases where a custom controlled gate, e.g., CH, is supported, but its
     # base, i.e., H, is not labeled controllable. In this case, we don't want to use
     # this branch to check the support for this operation.
     elif type(op) is qml.ops.ControlledOp:
-        match = catalyst_acceptance(op.base, capabilities)
-        if match and op_support[match].controllable:
+        match = catalyst_acceptance(op.base, capabilities, grad_method)
+        if match and is_controllable(op.base, capabilities):
             return match
 
-    elif op.name in op_support:
+    elif is_supported(op, capabilities):
         return op.name
 
     return None
@@ -240,6 +289,19 @@ def measurements_from_counts(tape, device_wires):
 
         Samples are not supported.
     """
+    changed = False
+    for meas in tape.measurements:
+        changed |= isinstance(meas, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP))
+        if isinstance(meas, CountsMP):
+            changed |= meas.obs is not None
+
+    def postprocessing(args):
+        if len(args) == 1:
+            return args[0]
+        return args
+
+    if not changed:
+        return [tape], postprocessing
 
     new_operations, measured_wires = _diagonalize_measurements(tape, device_wires=device_wires)
 
@@ -298,6 +360,19 @@ def measurements_from_samples(tape, device_wires):
 
         Counts are not supported.
     """
+    changed = False
+    for meas in tape.measurements:
+        changed |= isinstance(meas, (ExpectationMP, VarianceMP, ProbabilityMP, CountsMP))
+        if isinstance(meas, SampleMP):
+            changed |= meas.obs is not None
+
+    def postprocessing(args):
+        if len(args) == 1:
+            return args[0]
+        return args
+
+    if not changed:
+        return [tape], postprocessing
 
     new_operations, measured_wires = _diagonalize_measurements(tape, device_wires=device_wires)
 
@@ -309,7 +384,7 @@ def measurements_from_samples(tape, device_wires):
         results_processed = []
         for m in tape.measurements:
             if isinstance(m, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP)):
-                if len(tape.shots.shot_vector) > 1:
+                if tape.shots.has_partitioned_shots:
                     res = tuple(m.process_samples(s, measured_wires) for s in samples)
                 else:
                     res = m.process_samples(samples, measured_wires)

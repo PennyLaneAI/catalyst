@@ -11,6 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(ENABLE_CODE_COVERAGE "Enable code coverage" OFF)
 option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" OFF)
 option(RUNTIME_CLANG_TIDY "Enable Clang Tidy" OFF)
+option(RUNTIME_ENABLE_WARNINGS "Enable -Wall and -Werror" ON)
 
 option(ENABLE_OPENQASM "Build OpenQasm backend device" OFF)
 option(ENABLE_OQD "Build OQD backend device" OFF)
@@ -18,10 +19,12 @@ option(ENABLE_OQD "Build OQD backend device" OFF)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(runtime_includes "${PROJECT_SOURCE_DIR}/include")
-set(capi_utils_includes "${PROJECT_SOURCE_DIR}/lib/capi")
-set(backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/common")
-
+set(runtime_includes ${PROJECT_SOURCE_DIR}/include)
+set(capi_utils_includes ${PROJECT_SOURCE_DIR}/lib/capi)
+set(backend_utils_includes
+    ${PROJECT_SOURCE_DIR}/lib/backend/common
+    ${MLIR_INCLUDE_DIRS}                      # RunnerUtils.h
+)
 
 # Get LLVM hash to target from source tree.
 file(READ ../.dep-versions DEPENDENCY_VERSIONS)
@@ -50,71 +53,64 @@ find_package(Python REQUIRED
     OPTIONAL_COMPONENTS Development.Embed Development.SABIModule
 )
 
-if(RUNTIME_ENABLE_WARNINGS)
-    message(STATUS "Building with compiler warnings as errors enabled.")
-    add_compile_options(-Werror -Wall)
-endif()
-
 message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
 message(STATUS "ENABLE_OQD is ${ENABLE_OQD}.")
 
-set(devices_list)
-list(APPEND devices_list rtd_null_qubit)
-list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/null_qubit")
-
-if(ENABLE_OPENQASM)
-    list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/openqasm")
-    list(APPEND devices_list rtd_openqasm)
-endif()
-
-if(ENABLE_OQD)
-    list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/oqd")
-    list(APPEND devices_list rtd_oqd_device)
-endif()
-
-add_library(catalyst_qir_runtime INTERFACE)
-
-target_link_libraries(catalyst_qir_runtime INTERFACE ${devices_list} rt_capi)
-
-target_include_directories(catalyst_qir_runtime INTERFACE
-    ${runtime_includes}
-    ${backend_includes}
-    ${MLIR_INCLUDE_DIRS}
-)
-
-if(ENABLE_CODE_COVERAGE)
-    message(STATUS "ENABLE_CODE_COVERAGE is ON.")
-    if(APPLE)
-        target_compile_options(catalyst_qir_runtime INTERFACE -fprofile-instr-generate -fcoverage-mapping)
-        target_link_options(catalyst_qir_runtime INTERFACE -fprofile-instr-generate -fcoverage-mapping)
-    else()
-        target_compile_options(catalyst_qir_runtime INTERFACE -fprofile-arcs -ftest-coverage)
-        target_link_libraries(catalyst_qir_runtime INTERFACE gcov)
-    endif()
-endif()
-
+message(STATUS "ENABLE_CODE_COVERAGE is ${ENABLE_CODE_COVERAGE}.")
+message(STATUS "ENABLE_ADDRESS_SANITIZER is ${ENABLE_ADDRESS_SANITIZER}.")
+message(STATUS "RUNTIME_ENABLE_WARNINGS is ${RUNTIME_ENABLE_WARNINGS}.")
 
 if(ENABLE_ADDRESS_SANITIZER)
-    message(STATUS "ENABLE_ADDRESS_SANITIZER is ON.")
     add_compile_options(-fsanitize=address)
     add_link_options(-fsanitize=address)
+endif()
+
+if(RUNTIME_ENABLE_WARNINGS)
+    set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
+    add_compile_options(-Wall)
 endif()
 
 add_subdirectory(lib)
 add_subdirectory(tests)
 
 if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))
-# Don't rerun external project everytime we configure the runtime build.
-if(NOT EXISTS ${CMAKE_BINARY_DIR}/lib/liblapacke.3.dylib)
+    if(CMAKE_OSX_SYSROOT)
+        get_filename_component(OSX_SDK_PATH ${CMAKE_OSX_SYSROOT} REALPATH)
+    else()
+        message(STATUS "CMAKE_OSX_SYSROOT is not set, using xcrun to get the official SDK path")
+
+        # Use xcrun to get the official SDK path
+        execute_process(
+            COMMAND xcrun --sdk macosx --show-sdk-path
+            OUTPUT_VARIABLE XCRUN_SDK_PATH
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE XCRUN_RESULT
+        )
+
+        if(XCRUN_RESULT EQUAL 0)
+            # get the realpath of the SDK path
+            get_filename_component(OSX_SDK_PATH ${XCRUN_SDK_PATH} REALPATH)
+        else()
+            message(FATAL_ERROR "Failed to get the official SDK path since xcrun failed, try to run "
+                    "`xcrun --sdk macosx --show-sdk-path` for more information")
+        endif()
+    endif()
+
+    # Let CMake figure out, if rebuilding the external project is necessary
     ExternalProject_Add(lapacke-accelerate
         GIT_REPOSITORY https://github.com/lepus2589/accelerate-lapacke.git
-        GIT_TAG master
+        GIT_TAG v2.0.0
         PREFIX _lapacke-accelerate
-        CMAKE_ARGS "--preset accelerate-lapacke32"
-                   "-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_lapacke-accelerate/install"
-        INSTALL_COMMAND ${CMAKE_COMMAND} --build . --target install
-        COMMAND cp ${CMAKE_BINARY_DIR}/_lapacke-accelerate/install/lib/liblapacke.3.dylib ${CMAKE_BINARY_DIR}/lib
+        INSTALL_DIR _lapacke-accelerate/install
+        CMAKE_ARGS "--preset" "accelerate-lapacke32"
+                   "-DCMAKE_STAGING_PREFIX=<INSTALL_DIR>"
+                   "-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/lib"
+                   "-DCMAKE_OSX_SYSROOT=${OSX_SDK_PATH}"
+        INSTALL_COMMAND "${CMAKE_COMMAND}" --build <BINARY_DIR> --target install
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different "<INSTALL_DIR>/lib/liblapacke.3.dylib" "${CMAKE_BINARY_DIR}/lib"
+        LOG_CONFIGURE ON
+        LOG_INSTALL ON
+        LOG_BUILD ON
     )
     add_dependencies(rt_capi lapacke-accelerate)  # automatically build with the runtime
-endif()
-endif()
+endif()  # if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))

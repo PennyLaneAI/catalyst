@@ -1,4 +1,4 @@
-# Copyright 2025 Xanadu Quantum Technologies Inc.
+# Copyright 2023 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,59 +11,71 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+Pytest utilities for the Catalyst test suite.
+"""
 
-"""Module useful for writing tests which inspect mlir"""
+import os
+import pathlib
+import platform
 
-import copy
-import functools
+import pennylane as qml
 
-from catalyst.compiler import CompileOptions
-from catalyst.jit import QJIT
-from catalyst.utils.filesystem import WorkspaceManager
+from catalyst.compiler import get_lib_path
+from catalyst.device import get_device_capabilities
 
-# pylint: disable=unused-argument,too-many-arguments
-
-
-def qjit_for_tests(
-    fn=None,
-    *,
-    autograph=False,
-    autograph_include=(),
-    async_qnodes=False,
-    target="binary",
-    keep_intermediate=False,
-    verbose=False,
-    logfile=None,
-    pipelines=None,
-    static_argnums=None,
-    static_argnames=None,
-    abstracted_axes=None,
-    disable_assertions=False,
-    seed=None,
-    experimental_capture=False,
-    circuit_transform_pipeline=None,
-    pass_plugins=None,
-    dialect_plugins=None,
-):
-    """qjit function that constructs QJITForLitTests instead of regular QJIT"""
-    kwargs = copy.copy(locals())
-    kwargs.pop("fn")
-    if fn is None:
-        return functools.partial(qjit_for_tests, **kwargs)
-
-    return QJITForTests(fn, CompileOptions(**kwargs))
+TEST_PATH = os.path.dirname(__file__)
+CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")
 
 
-class QJITForTests(QJIT):
-    """QJIT subclass that always sets keep_intermediates but does not pollute the cwd"""
+def get_custom_qjit_device(num_wires, discards, additions, to_matrix_ops):
+    """Generate a custom device without gates in discards.
 
-    def __init__(self, *args, **kwargs):
-        compile_options = args[1]
-        compile_options.keep_intermediate = True
-        super().__init__(*(args[0], compile_options), **kwargs)
+    Args:
+        num_wires (int): The number of wires the device should have.
+        discards (set[str]): The set of gate names to discard from the device capabilities.
+        additions (dict[str, OperatorProperties]): A mapping of gate names to their properties
+            to add to the device capabilities.
+        to_matrix_ops (dict[str, OperatorProperties]): A mapping of gate names to their properties
+            to add to the device capabilities as gates that can be decomposed to matrices.
 
-    def _get_workspace(self):
-        """Get or create a workspace to use for compilation."""
-        workspace_name = self.__name__
-        preferred_workspace_dir = None
-        return WorkspaceManager.get_or_create_workspace(workspace_name, preferred_workspace_dir)
+    Returns:
+        qml.Device: A custom QJITDevice with the specified capabilities.
+    """
+
+    class CustomDevice(qml.devices.Device):
+        """Custom Gate Set Device"""
+
+        name = "lightning.qubit"
+        config_filepath = CONFIG_CUSTOM_DEVICE
+
+        # A lightning specific quirk is that gates that can be decomposed to matrices
+        # must be marked as such in the capabilities, so we allow passing in a separate
+        # dictionary for those.
+        _to_matrix_ops = to_matrix_ops
+
+        def __init__(self, wires=None):
+            super().__init__(wires=wires)
+            self.qjit_capabilities = get_device_capabilities(self)
+            for gate in discards:
+                self.qjit_capabilities.operations.pop(gate, None)
+            self.qjit_capabilities.operations.update(additions)
+
+        @staticmethod
+        def get_c_interface():
+            """Returns a tuple consisting of the device name, and
+            the location to the shared object with the C/C++ device implementation.
+            """
+
+            system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+            # Borrowing the NullQubit library:
+            lib_path = (
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
+            )
+            return "NullQubit", lib_path
+
+        def execute(self):
+            """Exececute the device (no)."""
+            raise RuntimeError("No execution for the custom device")
+
+    return CustomDevice(wires=num_wires)

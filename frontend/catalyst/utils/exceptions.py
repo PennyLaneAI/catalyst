@@ -24,3 +24,20 @@ class CompileError(Exception):
 
 class DifferentiableCompileError(CompileError):
     """An error indicating an invalid differentiation configuration."""
+
+
+class PlxprCaptureCFCompatibilityError(Exception):
+    """Error raised when Catalyst control flow is used with PennyLane capture enabled.
+
+    This error indicates that Catalyst's control flow functions (for_loop, while_loop, cond)
+    cannot be used in contexts where PennyLane's capture mode is active. Users should use
+    the corresponding PennyLane functions instead for compatibility with capture functionality.
+    """
+
+    def __init__(self, control_flow_type):
+        message = (
+            f"catalyst.{control_flow_type} is not supported with PennyLane's capture enabled. "
+            "For compatibility with program capture, please use the corresponding "
+            f"qml.{control_flow_type} instead. See the documentation for more information."
+        )
+        super().__init__(message)

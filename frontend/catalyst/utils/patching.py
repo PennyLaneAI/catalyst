@@ -17,6 +17,37 @@ Patcher module.
 """
 
 
+class DictPatchWrapper:
+    """A wrapper to enable dictionary item patching using attribute-like access.
+
+    This allows the Patcher class to patch dictionary items by wrapping the dictionary
+    and key into an object where the item can be accessed as an attribute.
+
+    Args:
+        dictionary: The dictionary to wrap
+        key: The key to access in the dictionary
+    """
+
+    def __init__(self, dictionary, key):
+        self.dictionary = dictionary
+        self.key = key
+
+    def __getattr__(self, name):
+        if name in ("dictionary", "key"):  # pragma: no cover
+            return object.__getattribute__(self, name)
+        if name == "value":
+            return self.dictionary[self.key]
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
+    def __setattr__(self, name, value):
+        if name in ("dictionary", "key"):
+            object.__setattr__(self, name, value)
+        elif name == "value":
+            self.dictionary[self.key] = value
+        else:  # pragma: no cover
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
+
 class Patcher:
     """Patcher, a class to replace object attributes.
 

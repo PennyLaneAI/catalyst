@@ -32,7 +32,7 @@ from catalyst import (
     ctrl,
     for_loop,
     grad,
-    while_loop,
+    qjit,
 )
 from catalyst.api_extensions import HybridAdjoint, HybridCtrl
 from catalyst.compiler import get_lib_path
@@ -68,7 +68,7 @@ def get_custom_device(
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
-            lightning_capabilities = get_device_capabilities(lightning_device)
+            lightning_capabilities = get_device_capabilities(lightning_device, shots=shots)
             custom_capabilities = deepcopy(lightning_capabilities)
             for gate in native_gates:
                 custom_capabilities.operations[gate] = OperatorProperties(True, True, True)
@@ -81,6 +81,10 @@ def get_custom_device(
             for obs in non_differentiable_obs:
                 custom_capabilities.observables[obs].differentiable = False
             self.qjit_capabilities = custom_capabilities
+
+        def preprocess(self, execution_config=None):
+            """Device preprocessing function."""
+            return lightning_device.preprocess(execution_config)
 
         @staticmethod
         def get_c_interface():
@@ -149,7 +153,7 @@ def test_unsupported_ops_raise_an_error():
         return qml.expval(qml.PauliX(0))
 
     with pytest.raises(CompileError, match="UnsupportedOp is not supported"):
-        qml.qjit(f)(1.2)
+        qjit(f)(1.2)
 
 
 def queue_ops(x, wires):
@@ -191,11 +195,11 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
-            qml.qjit(f)(1.2)
+            qjit(f)(1.2)
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -224,11 +228,11 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
-            qml.qjit(f)(1.2)
+            qjit(f)(1.2)
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -251,11 +255,11 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
-            qml.qjit(f)(1.2)
+            qjit(f)(1.2)
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -272,11 +276,11 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(CompileError, match="PauliZ is not controllable"):
-            qml.qjit(f)(1.2)
+            qjit(f)(1.2)
 
         with pytest.raises(CompileError, match="PauliZ is not controllable"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -305,11 +309,11 @@ class TestHybridOpVerification:
 
         with patch("catalyst.device.qjit_device.RUNTIME_OPERATIONS", runtime_ops_with_qctrl):
             with pytest.raises(CompileError, match="PauliZ is not controllable"):
-                qml.qjit(f)(1.2)
+                qjit(f)(1.2)
 
             with pytest.raises(CompileError, match="PauliZ is not controllable"):
 
-                @qml.qjit
+                @qjit
                 def cir(x: float):
                     return grad(f)(x)
 
@@ -326,11 +330,11 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(CompileError, match="HybridCtrl is not supported"):
-            qml.qjit(f)(1.2)
+            qjit(f)(1.2)
 
         with pytest.raises(CompileError, match="HybridCtrl is not supported"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -348,11 +352,11 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(CompileError, match="Cannot compile PennyLane control of the hybrid op"):
-            qml.qjit(f)(1.2)
+            qjit(f)(1.2)
 
         with pytest.raises(CompileError, match="Cannot compile PennyLane control of the hybrid op"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -370,11 +374,11 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(CompileError, match="Cannot compile PennyLane inverse of the hybrid op"):
-            qml.qjit(f)(1.2)
+            qjit(f)(1.2)
 
         with pytest.raises(CompileError, match="Cannot compile PennyLane inverse of the hybrid op"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -413,11 +417,11 @@ class TestHybridOpVerification:
 
         with patch("catalyst.device.qjit_device.RUNTIME_OPERATIONS", runtime_ops_with_qctrl):
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
-                qml.qjit(f)(1.2)
+                qjit(f)(1.2)
 
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
 
-                @qml.qjit
+                @qjit
                 def cir(x: float):
                     return grad(f)(x)
 
@@ -456,11 +460,11 @@ class TestHybridOpVerification:
 
         with patch("catalyst.device.qjit_device.RUNTIME_OPERATIONS", runtime_ops_with_qctrl):
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
-                qml.qjit(f)(1.2)
+                qjit(f)(1.2)
 
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
 
-                @qml.qjit
+                @qjit
                 def cir(x: float):
                     return grad(f)(x)
 
@@ -476,11 +480,11 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
-            qml.qjit(f)(1.2)
+            qjit(f)(1.2)
 
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -496,11 +500,11 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
-            qml.qjit(f)(1.2)
+            qjit(f)(1.2)
 
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -520,7 +524,7 @@ class TestObservableValidation:
             return qml.expval(qml.RX(1.2, 0))
 
         with pytest.raises(CompileError, match="RX.*not supported as an observable"):
-            qml.qjit(f)()
+            qjit(f)()
 
     @pytest.mark.parametrize(
         "measurements, invalid_op",
@@ -560,16 +564,16 @@ class TestObservableValidation:
         """Test that the validate_measurements transform raises an error (or not) as expected
         for different base observables."""
 
-        dev = qml.device(backend, wires=3, shots=2048)
-        qjit_capabilities = get_device_capabilities(dev)
+        dev = qml.device(backend, wires=3)
+        qjit_capabilities = get_device_capabilities(dev, shots=2048)
 
-        tape = qml.tape.QuantumScript([], measurements=measurements)
+        tape = qml.tape.QuantumScript([], measurements=measurements, shots=2048)
 
         if invalid_op:
             with pytest.raises(CompileError, match=f"{invalid_op}.*not supported as an observable"):
-                validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+                validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
         else:
-            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+            validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
 
     @pytest.mark.parametrize(
         "obs, obs_type",
@@ -586,17 +590,17 @@ class TestObservableValidation:
         type is supported/unsupported."""
 
         dev = qml.device(backend, wires=1)
-        dev_capabilities = get_device_capabilities(dev)
+        dev_capabilities = get_device_capabilities(dev, shots=None)
         qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
 
         tape = qml.tape.QuantumScript([], measurements=[qml.expval(obs)])
 
         # all good
-        validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+        validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
 
         del qjit_capabilities.observables[obs_type]
         with pytest.raises(CompileError, match="not supported as an observable"):
-            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+            validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
 
     def test_non_qjit_observables_raise_error(self, backend):
         """Test that an observable that is supported by the backend according to the
@@ -614,7 +618,7 @@ class TestObservableValidation:
         tape = qml.tape.QuantumScript([], measurements=[qml.expval(PauliX2(0))])
 
         with pytest.raises(CompileError, match="PauliX2 is not supported as an observable"):
-            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+            validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
 
     @pytest.mark.parametrize(
         "measurement", [qml.expval(qml.X(0)), qml.var(qml.X(0)), qml.sample(qml.X(0))]
@@ -624,19 +628,19 @@ class TestObservableValidation:
         than expval and var that include observables, and raises an error"""
 
         dev = qml.device("lightning.qubit", wires=1)
-        dev_capabilities = get_device_capabilities(dev)
+        dev_capabilities = get_device_capabilities(dev, shots=None)
         qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
 
         tape = qml.tape.QuantumScript([], measurements=[measurement])
 
         if isinstance(measurement, (ExpectationMP, VarianceMP)):
-            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+            validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
         else:
             with pytest.raises(
                 CompileError,
                 match="Only expectation value and variance measurements can accept observables",
             ):
-                validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+                validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
 
 
 class TestMeasurementTypeValidation:
@@ -656,29 +660,30 @@ class TestMeasurementTypeValidation:
         """Test that the validate_measurements transform raises a CompileError as
         expected for an unsupported MeasurementProcess"""
 
-        dev = qml.device("lightning.qubit", wires=1, shots=shots)
+        dev = qml.device("lightning.qubit", wires=1)
         tape = qml.tape.QuantumScript([], measurements=[measurement])
 
         qjit_capabilities = get_device_capabilities(dev)
         qjit_capabilities.measurement_processes.pop("ExpectationMP")
 
         with pytest.raises(CompileError, match=msg):
-            validate_measurements(tape, qjit_capabilities, dev.name, dev.shots)
+            validate_measurements(tape, qjit_capabilities, dev.name, shots)
 
     def test_state_measurements_rejected_with_shots(self):
         """Test that trying to measure a state on a device with finite shots
         raises a CompileError informing the user that shots must be None for
         state based measurements"""
 
-        dev = qml.device("lightning.qubit", wires=1, shots=100)
+        dev = qml.device("lightning.qubit", wires=1)
 
+        @qml.set_shots(100)
         @qml.qnode(dev)
         def f():
             qml.RX(1.23, 0)
             return qml.state()
 
         with pytest.raises(CompileError, match="Please specify shots=None."):
-            qml.qjit(f)()
+            qjit(f)()
 
     @pytest.mark.parametrize("measurement", [qml.sample, qml.counts])
     def test_sample_measurements_rejected_without_shots(self, measurement):
@@ -686,21 +691,22 @@ class TestMeasurementTypeValidation:
         without shots raises a CompileError informing the user that a
         finite number of shots is needed for sampling"""
 
-        dev = qml.device("lightning.qubit", wires=1, shots=None)
+        dev = qml.device("lightning.qubit", wires=1)
 
+        @qml.set_shots(None)
         @qml.qnode(dev)
         def f():
             qml.RX(1.23, 0)
             return measurement()
 
         with pytest.raises(CompileError, match="Please specify a finite number of shots."):
-            qml.qjit(f)()
+            qjit(f)()
 
     def test_unsupported_measurement_types_rejected(self):
         """Test that trying to use a measurement type that is generally unsupported by
         the device raises a CompileError"""
 
-        dev = qml.device("lightning.qubit", wires=1, shots=100)
+        dev = qml.device("lightning.qubit", wires=1)
 
         class MyMeasurement(qml.measurements.SampleMeasurement):
             """A custom measurement (not supported on lightning.qubit)"""
@@ -716,13 +722,14 @@ class TestMeasurementTypeValidation:
                 """overwrite ABC method"""
                 raise NotImplementedError
 
+        @qml.set_shots(100)
         @qml.qnode(dev)
         def f():
             qml.RX(1.23, 0)
             return MyMeasurement()
 
         with pytest.raises(CompileError, match="is not a supported measurement process"):
-            qml.qjit(f)()
+            qjit(f)()
 
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
@@ -742,7 +749,7 @@ class TestAdjointMethodVerification:
 
         with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -771,7 +778,7 @@ class TestAdjointMethodVerification:
 
         with pytest.raises(DifferentiableCompileError, match="PauliX.*non-differentiable"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -786,7 +793,7 @@ class TestAdjointMethodVerification:
             qml.RX(x, wires=0)
             return qml.probs()
 
-        qml.qjit(f)(1.2)
+        qjit(f)(1.2)
 
     def test_non_differentiable_gate_nested_cond(self):
         """Test that taking the adjoint diff of a tape containing a parameterized operation
@@ -810,7 +817,7 @@ class TestAdjointMethodVerification:
 
         with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -828,7 +835,7 @@ class TestAdjointMethodVerification:
 
         with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
 
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -863,49 +870,7 @@ class TestParameterShiftMethodVerification:
             DifferentiableCompileError, match="PauliX does not support analytic differentiation"
         ):
 
-            @qml.qjit
-            def cir(x: float):
-                return grad(f)(x)
-
-    @patch.object(qml.RX, "grad_method", "F")
-    def test_paramshift_gate_simple(self):
-        """Test that taking a parameter-shift gradient of a tape containing a parameterized
-        operation that doesn't support analytic differentiation raises an error."""
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
-        def f(_):
-            qml.RX(1.23, 0)
-            return qml.expval(qml.PauliX(0))
-
-        with pytest.raises(
-            DifferentiableCompileError, match="RX does not support analytic differentiation"
-        ):
-
-            @qml.qjit
-            def cir(x: float):
-                return grad(f)(x)
-
-    @patch.object(qml.RX, "grad_method", "F")
-    def test_paramshift_gate_while(self):
-        """Test that taking a parameter-shift gradient of a tape containing a WhileLoop HybridOp
-        containing a parameterized operation that doesn't support analytic differentiation raises
-        an error."""
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
-        def f(_):
-            @while_loop(lambda s: s > 0)
-            def loop(s):
-                qml.RX(1.23, 0)
-                return s + 1
-
-            loop(0)
-            return qml.expval(qml.PauliX(0))
-
-        with pytest.raises(
-            DifferentiableCompileError, match="RX does not support analytic differentiation"
-        ):
-
-            @qml.qjit
+            @qjit
             def cir(x: float):
                 return grad(f)(x)
 
@@ -920,7 +885,7 @@ def test_no_state_returns():
 
     with pytest.raises(DifferentiableCompileError, match="State returns.*forbidden"):
 
-        @qml.qjit
+        @qjit
         def cir(x: float):
             return grad(f)(x)
 
@@ -935,7 +900,7 @@ def test_no_variance_returns():
 
     with pytest.raises(DifferentiableCompileError, match="Variance returns.*forbidden"):
 
-        @qml.qjit
+        @qjit
         def cir(x: float):
             return grad(f)(x)
 

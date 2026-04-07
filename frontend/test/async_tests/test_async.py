@@ -13,13 +13,13 @@
 # limitations under the License.
 
 """Integration tests for the async execution of QNodes features."""
+
 import numpy as np
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
-from utils import qjit_for_tests as qjit
 
-from catalyst import adjoint, cond, for_loop, grad, measure, while_loop
+from catalyst import adjoint, cond, for_loop, grad, measure, qjit, while_loop
 
 # We are explicitly testing that when something is not assigned
 # the use is awaited.
@@ -59,8 +59,8 @@ def test_qnode_execution(backend):
     params = jnp.array([1.0, 2.0])
     compiled = qjit(async_qnodes=True)(multiple_qnodes)
     observed = compiled(params)
-    expected = qjit()(multiple_qnodes)(params)
-    assert "async_execute_fn" in compiled.qir
+    expected = qjit(multiple_qnodes)(params)
+    assert "async_execute_fn" in compiled.llvmir
     assert np.allclose(expected, observed)
 
 
@@ -84,10 +84,10 @@ def test_gradient(inp, diff_methods, backend):
     def interpreted(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f, device, diff_method="backprop")
-        h = qml.grad(g, argnum=0)
+        h = qml.grad(g, argnums=0)
         return h(x)
 
-    assert "async_execute_fn" in compiled.qir
+    assert "async_execute_fn" in compiled.llvmir
     assert np.allclose(compiled(inp), interpreted(inp))
 
 

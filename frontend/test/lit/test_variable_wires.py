@@ -14,10 +14,10 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+import numpy as np
 import pennylane as qml
-from utils import qjit_for_tests as qjit
 
-from catalyst import measure
+from catalyst import measure, qjit
 
 
 @qjit(target="mlir")
@@ -43,3 +43,28 @@ def f(arg0: float, arg1: int, arg2: int):
 
 
 print(f.mlir)
+
+# -----
+
+
+@qjit(target="mlir")
+@qml.qnode(qml.device("null.qubit", wires=2))
+# CHECK-LABEL: public @g()
+def g():
+    """
+    Test no extraneous insert ops.
+    """
+    wires = np.arange(2, dtype=int)
+
+    # CHECK: quantum.custom "PauliX"
+    qml.X(wires[0])
+
+    # CHECK-NOT: quantum.insert
+
+    # CHECK: quantum.custom "PauliY"
+    qml.Y(wires[1])
+
+    return
+
+
+print(g.mlir)

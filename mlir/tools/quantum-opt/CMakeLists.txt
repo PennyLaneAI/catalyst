@@ -5,24 +5,37 @@ set(LIBS
     ${dialect_libs}
     ${conversion_libs}
     ${extension_libs}
+    ExternalStablehloLib
     MLIROptLib
+    MLIRRegisterAllDialects
+    MLIRRegisterAllPasses
     MLIRCatalyst
-    MLIRCatalystTransforms
+    catalyst-analysis
+    catalyst-transforms
+    catalyst-stablehlo-transforms
     MLIRQuantum
     quantum-transforms
-    MLIRQEC
-    qec-transforms
+    MLIRQRef
+    qref-transforms
+    MLIRPBC
+    pbc-transforms
     MLIRGradient
     gradient-transforms
+    MLIRMBQC
+    mbqc-transforms
     MLIRMitigation
     mitigation-transforms
+    MLIRPauliFrame
+    pauli-frame-transforms
     MLIRIon
     ion-transforms
-    MhloRegisterDialects
-    StablehloRegister
+    MLIRRTIO
+    rtio-transforms
+    MLIRQecLogical
+    MLIRQecPhysical
     MLIRCatalystTest
+    MLIRCatalystUtils
     MLIRTestDialect
-    ${ALL_MHLO_PASSES}
 )
 
 add_mlir_tool(quantum-opt quantum-opt.cpp DEPENDS ${LIBS} SUPPORT_PLUGINS)

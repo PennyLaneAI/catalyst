@@ -23,6 +23,7 @@
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/SymbolTable.h"
 
 #include "Gradient/Utils/EinsumLinalgGeneric.h"
@@ -60,8 +61,6 @@ template <class T> std::vector<int64_t> _tovec(const T &x)
 
 LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rewriter) const
 {
-    MLIRContext *ctx = getContext();
-
     Location loc = op.getLoc();
 
     auto func_diff_operand_indices = computeDiffArgIndices(op.getDiffArgIndices());
@@ -93,11 +92,12 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
     assert(grad_result_types.size() == func_diff_operand_indices.size() * funcResultTypes.size() &&
            "GradOp does't seem to return a tuple of Jacobians");
 
-    auto fCallOp = rewriter.create<func::CallOp>(loc, calleeOp, calleeOperands);
+    auto fCallOp = func::CallOp::create(rewriter, loc, calleeOp, calleeOperands);
 
-    auto gradOp = rewriter.create<GradOp>(loc, grad_result_types, op.getMethod(), op.getCallee(),
-                                          calleeOperands, op.getDiffArgIndicesAttr(),
-                                          op.getFiniteDiffParamAttr());
+    auto gradOp = GradOp::create(rewriter, loc, grad_result_types, op.getMethod(), op.getCallee(),
+                                 calleeOperands, op.getDiffArgIndicesAttr(),
+                                 op.getFiniteDiffParamAttr(), /*arg_attrs=*/nullptr,
+                                 /*res_attrs=*/nullptr);
 
     std::vector<Value> einsumResults;
     for (size_t nout = 0; nout < funcResultTypes.size(); nout++) {
@@ -158,12 +158,10 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
             }
             else {
                 assert(acc.value().getType() == res.getType());
-
-                auto add_op = rewriter.create<linalg::ElemwiseBinaryOp>(
-                    loc, res.getType(), ValueRange({acc.value(), res}), acc.value(),
-                    linalg::BinaryFnAttr::get(ctx, linalg::BinaryFn::add),
-                    linalg::TypeFnAttr::get(ctx, linalg::TypeFn::cast_signed));
-                acc = add_op.getResultTensors()[0];
+                auto addOp =
+                    linalg::AddOp::create(rewriter, loc, res.getType(),
+                                          ValueRange{acc.value(), res}, ValueRange{acc.value()});
+                acc = addOp.getResultTensors()[0];
             }
         }
         assert(acc.has_value());
@@ -180,8 +178,6 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
 
 LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rewriter) const
 {
-    MLIRContext *ctx = getContext();
-
     Location loc = op.getLoc();
 
     auto func_diff_operand_indices = computeDiffArgIndices(op.getDiffArgIndices());
@@ -215,11 +211,12 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
     assert(grad_result_types.size() == func_diff_operand_indices.size() * funcResultTypes.size() &&
            "GradOp does't seem to return a tuple of Jacobians");
 
-    auto fCallOp = rewriter.create<func::CallOp>(loc, calleeOp, calleeOperands);
+    auto fCallOp = func::CallOp::create(rewriter, loc, calleeOp, calleeOperands);
 
-    auto gradOp = rewriter.create<GradOp>(loc, grad_result_types, op.getMethod(), op.getCallee(),
-                                          calleeOperands, op.getDiffArgIndicesAttr(),
-                                          op.getFiniteDiffParamAttr());
+    auto gradOp = GradOp::create(rewriter, loc, grad_result_types, op.getMethod(), op.getCallee(),
+                                 calleeOperands, op.getDiffArgIndicesAttr(),
+                                 op.getFiniteDiffParamAttr(), /*arg_attrs=*/nullptr,
+                                 /*res_attrs=*/nullptr);
 
     std::vector<Value> einsumResults;
     for (size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
@@ -276,11 +273,10 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
             else {
                 assert(acc.value().getType() == res.getType());
 
-                auto add_op = rewriter.create<linalg::ElemwiseBinaryOp>(
-                    loc, res.getType(), ValueRange({acc.value(), res}), acc.value(),
-                    linalg::BinaryFnAttr::get(ctx, linalg::BinaryFn::add),
-                    linalg::TypeFnAttr::get(ctx, linalg::TypeFn::cast_signed));
-                acc = add_op.getResultTensors()[0];
+                auto addOp =
+                    linalg::AddOp::create(rewriter, loc, res.getType(),
+                                          ValueRange{acc.value(), res}, ValueRange{acc.value()});
+                acc = addOp.getResultTensors()[0];
             }
         }
         assert(acc.has_value());

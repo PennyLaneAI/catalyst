@@ -16,9 +16,12 @@
 This module provides the implementation of AutoGraph primitives in terms of traceable Catalyst
 functions. The purpose is to convert imperative style code to functional or graph-style code.
 """
+
 import copy
 import functools
+import inspect
 import operator
+import textwrap
 import warnings
 from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 
@@ -60,7 +63,7 @@ def get_program_length(reference_tracers):
 
     if EvaluationContext.is_tracing():  # pragma: no branch
         jaxpr_frame = EvaluationContext.find_jaxpr_frame(reference_tracers)
-        num_jaxpr_eqns = len(jaxpr_frame.eqns)
+        num_jaxpr_eqns = len(jaxpr_frame.tracing_eqns)
 
     if EvaluationContext.is_quantum_tracing():
         quantum_queue = EvaluationContext.find_quantum_queue()
@@ -77,8 +80,8 @@ def reset_program_to_length(reference_tracers, num_jaxpr_eqns, num_tape_ops):
 
     if EvaluationContext.is_tracing():  # pragma: no branch
         jaxpr_frame = EvaluationContext.find_jaxpr_frame(reference_tracers)
-        while len(jaxpr_frame.eqns) > num_jaxpr_eqns:
-            jaxpr_frame.eqns.pop()
+        while len(jaxpr_frame.tracing_eqns) > num_jaxpr_eqns:
+            jaxpr_frame.tracing_eqns.pop()
 
     if EvaluationContext.is_quantum_tracing():
         quantum_queue = EvaluationContext.find_quantum_queue()
@@ -148,7 +151,7 @@ def assert_iteration_inputs(inputs, symbol_names):
     Additionally, these types need to be valid JAX types.
     """
 
-    for i, inp in enumerate(inputs):
+    for i, inp in enumerate(jax.tree.leaves(inputs)):
         if isinstance(inp, Undefined):
             raise AutoGraphError(
                 f"The variable '{inp}' is potentially uninitialized:\n"
@@ -178,7 +181,7 @@ def assert_iteration_results(inputs, outputs, symbol_names):
     variable was initialized with wrong type.
     """
 
-    for i, (inp, out) in enumerate(zip(inputs, outputs)):
+    for i, (inp, out) in enumerate(zip(jax.tree.leaves(inputs), jax.tree.leaves(outputs))):
         inp_t, out_t = jax.api_util.shaped_abstractify(inp), jax.api_util.shaped_abstractify(out)
         if inp_t.dtype != out_t.dtype or inp_t.shape != out_t.shape:
             raise AutoGraphError(
@@ -287,26 +290,21 @@ def for_stmt(
         enum_start = None
         iteration_array = None
     elif isinstance(iteration_target, CEnumerate):
-        start, stop, step = 0, len(iteration_target.iteration_target), 1
-        enum_start = iteration_target.start_idx
         try:
+            start, stop, step = 0, len(iteration_target.iteration_target), 1
+            enum_start = iteration_target.start_idx
             iteration_array = jnp.asarray(iteration_target.iteration_target)
         except:  # pylint: disable=bare-except
-            iteration_array = None
             fallback = True
     else:
-        start, stop, step = 0, len(iteration_target), 1
-        enum_start = None
         try:
+            start, stop, step = 0, len(iteration_target), 1
+            enum_start = None
             iteration_array = jnp.asarray(iteration_target)
         except:  # pylint: disable=bare-except
-            iteration_array = None
             fallback = True
 
     if catalyst.autograph_strict_conversion and fallback:
-        # pylint: disable=import-outside-toplevel
-        import inspect
-
         for_loop_info = get_source_code_info(inspect.stack()[1])
 
         raise AutoGraphError(
@@ -339,10 +337,6 @@ def for_stmt(
 
             fallback = True
             reset_program_to_length(reference_tracers, *num_instructions)
-
-            # pylint: disable=import-outside-toplevel
-            import inspect
-            import textwrap
 
             for_loop_info = get_source_code_info(inspect.stack()[1])
 
@@ -470,8 +464,6 @@ def get_source_code_info(tb_frame):
     Uses introspection on the call stack to extract the source map record from within AutoGraph
     statements. However, it is not guaranteed to find the source map and may return nothing.
     """
-    import inspect  # pylint: disable=import-outside-toplevel
-
     ag_source_map = None
 
     # Traverse frames in reverse to find caller with `ag_source_map` property:
@@ -534,22 +526,43 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         (ag_config, "CONVERSION_RULES", module_allowlist),
         (ag_py_builtins, "BUILTIN_FUNCTIONS_MAP", py_builtins_map),
     ):
-        # HOTFIX: pass through calls of known Catalyst wrapper functions
-        if fn in (
+        # List of known wrapper functions that should be handled specially
+        _known_wrapper_functions = (
             catalyst.adjoint,
             qml.adjoint,
+            qml.prod,
             catalyst.ctrl,
             qml.ctrl,
+            qml.grad,
+            qml.jacobian,
+            qml.vjp,
+            qml.jvp,
             catalyst.grad,
             catalyst.value_and_grad,
             catalyst.jacobian,
             catalyst.vjp,
+            qml.vjp,
             catalyst.jvp,
+            qml.jvp,
             catalyst.vmap,
             catalyst.mitigate_with_zne,
-        ):
-            assert args and callable(args[0])
+        )
+
+        # HOTFIX: pass through calls of known Catalyst wrapper functions
+        if fn in _known_wrapper_functions:
+            if not args:
+                raise ValueError(f"{fn.__name__} requires at least one argument")
+
+            # If first argument is already an operator, pass it through directly
+            if isinstance(args[0], qml.operation.Operator):
+                return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
+
+            # Otherwise, handle the callable case
             wrapped_fn = args[0]
+            if not callable(wrapped_fn):
+                raise ValueError(
+                    f"First argument to {fn.__name__} must be callable or an Operation"
+                )
 
             def passthrough_wrapper(*args, **kwargs):
                 return converted_call(wrapped_fn, args, kwargs, caller_fn_scope, options)
@@ -589,6 +602,34 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             new_qnode.func = qnode_call_wrapper
             return new_qnode(**new_kwargs)
 
+        # HOTFIX: Handle calls to functions that were decorated with "qml.prod"
+        # These decorators return wrapper functions that call the original function without
+        # autograph conversion. We detect these wrappers and unwrap them to convert the
+        # original function with autograph.
+        # TODO: remove once PL has dedicated way to propagate autograph through decorators
+        if hasattr(fn, "__wrapped__") and qml.prod.__module__ == fn.__module__:
+            original_fn = fn.__wrapped__
+
+            # Extract decorator arguments from the closure
+            # There is an assumption that the closure variables are
+            # the same as the decorator arguments
+            closure_vars = inspect.getclosurevars(fn)
+            decorator_kwargs = {
+                "id": closure_vars.nonlocals["id"],
+                "lazy": closure_vars.nonlocals["lazy"],
+            }
+
+            # Convert the original function with autograph
+            def converted_inner(*inner_args, **inner_kwargs):
+                return converted_call(
+                    original_fn, inner_args, inner_kwargs, caller_fn_scope, options
+                )
+
+            # Apply the decorator to the converted function and call it with the original kwargs
+            return qml.prod(converted_inner, **decorator_kwargs)(
+                *args, **(kwargs if kwargs is not None else {})
+            )
+
         return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
 
 
@@ -620,11 +661,11 @@ def set_item(target, i, x):
 
 
 def update_item_with_op(target, index, x, op):
-    """An implementation of the 'update_item_with_op' function from operator_update. The interface
-    is defined in operator_update.SingleIndexArrayOperatorUpdateTransformer, here we provide an
-    implementation in terms of Catalyst primitives. The idea is to accept an operator assignment
-    syntax for Jax arrays, to subsequently transform it under the hood into the set of 'at' and
-    operator calls that Autograph supports. E.g.:
+    """An implementation of the 'update_item_with_op' function for augmented assignments. Here we
+    provide an implementation in terms of Catalyst primitives. The idea is to accept an operator
+    assignment syntax for Jax arrays, to subsequently transform it under the hood into the set of
+    'at' and operator calls that Autograph supports. E.g.:
+
         target[i] **= x -> target = target.at[i].power(x)
 
     .. note::
@@ -633,9 +674,9 @@ def update_item_with_op(target, index, x, op):
         Autograph transformer. If you create a new transformer and want to support this feature,
         make sure you enable such option there as well.
     """
-    # Mapping of the gast attributes to the corresponding JAX operation
-    gast_op_map = {"mult": "multiply", "div": "divide", "add": "add", "sub": "add", "pow": "power"}
-    # Mapping of the gast attributes to the corresponding in-place operation
+    # Mapping of the ast attributes to the corresponding JAX operation
+    ast_op_map = {"mult": "multiply", "div": "divide", "add": "add", "sub": "add", "pow": "power"}
+    # Mapping of the ast attributes to the corresponding in-place operation
     inplace_operation_map = {
         "mult": "mul",
         "div": "truediv",
@@ -651,9 +692,9 @@ def update_item_with_op(target, index, x, op):
     # Otherwise, fallback to Python's default syntax.
     if isinstance(target, DynamicJaxprTracer):
         if isinstance(index, slice):
-            target = getattr(target.at[index.start : index.stop : index.step], gast_op_map[op])(x)
+            target = getattr(target.at[index.start : index.stop : index.step], ast_op_map[op])(x)
         else:
-            target = getattr(target.at[index], gast_op_map[op])(x)
+            target = getattr(target.at[index], ast_op_map[op])(x)
     else:
         # Use Python's in-place operator
         target[index] = getattr(operator, f"__i{inplace_operation_map[op]}__")(target[index], x)

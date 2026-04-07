@@ -58,7 +58,7 @@ void ParallelProtocolOp::build(OpBuilder &builder, OperationState &result, Value
     bodyBuilder(builder, loc, bodyBlock->getArguments());
 
     builder.setInsertionPointToEnd(bodyBlock);
-    builder.create<ion::YieldOp>(loc, bodyBlock->getArguments());
+    ion::YieldOp::create(builder, loc, bodyBlock->getArguments());
 }
 
 //===----------------------------------------------------------------------===//

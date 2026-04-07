@@ -13,24 +13,24 @@
 // limitations under the License.
 
 // RUN: quantum-opt %s --convert-ion-to-llvm --split-input-file -verify-diagnostics | FileCheck %s
-    
+
 // CHECK-LABEL: pulse_op
-func.func @pulse_op(%arg0: f64) -> !quantum.bit {
-    // Exttract the qubit
+func.func @pulse_op(%arg0: f64) -> !ion.qubit {
     // CHECK: %[[qureg:.*]] = quantum.alloc( 1) : !quantum.reg
     // CHECK: %[[qubit:.*]] = quantum.extract %[[qureg:.*]][ 0]
-    // CHECK: %[[qubit_ptr:.*]] = builtin.unrealized_conversion_cast %[[qubit:.*]] : !quantum.bit to !llvm.ptr
+    // CHECK: %[[ion_qubit:.*]] = builtin.unrealized_conversion_cast %[[qubit]] : !quantum.bit to !ion.qubit
+    // CHECK: %[[qubit_ptr:.*]] = builtin.unrealized_conversion_cast %[[ion_qubit]] : !ion.qubit to !llvm.ptr
 
     // Ensure constants are correctly defined
     // CHECK: %[[phase:.*]] = llvm.mlir.constant(0.000000e+00 : f64) : f64
 
     // Create the beam struct
-     
+
     // CHECK: %[[beam_struct_undef:.*]] = llvm.mlir.undef : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>
     // CHECK: %[[transition_index:.*]] = llvm.mlir.constant(0 : i64) : i64
     // CHECK: %[[beam_struct_transition_index:.*]] = llvm.insertvalue %[[transition_index:.*]], %[[beam_struct_undef:.*]][0] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>
     // CHECK: %[[rabi:.*]] = llvm.mlir.constant(1.010000e+01 : f64) : f64
-    // CHECK: %[[beam_struct_rabi:.*]] = llvm.insertvalue %[[rabi:.*]], %[[beam_struct_transition_index:.*]][1] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)> 
+    // CHECK: %[[beam_struct_rabi:.*]] = llvm.insertvalue %[[rabi:.*]], %[[beam_struct_transition_index:.*]][1] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>
     // CHECK: %[[detuning:.*]] = llvm.mlir.constant(1.111000e+01 : f64) : f64
     // CHECK: %[[beam_struct_detuning:.*]] = llvm.insertvalue %[[detuning:.*]], %[[beam_struct_rabi:.*]][2] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>
     // CHECK: %[[polarization_0:.*]] = llvm.mlir.constant(0 : i64) : i64
@@ -44,12 +44,13 @@ func.func @pulse_op(%arg0: f64) -> !quantum.bit {
     // CHECK: %[[c1:.*]] = llvm.mlir.constant(1 : i64) : i64
     // CHECK: %[[beam_ptr:.*]] = llvm.alloca %[[c1:.*]] x !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)> : (i64) -> !llvm.ptr
     // CHECK: llvm.store %[[beam_struct_wavevector_1:.*]], %[[beam_ptr:.*]] : !llvm.struct<(i64, f64, f64, array<2 x i64>, array<2 x i64>)>, !llvm.ptr
-    // CHECK: %[[pulse:.*]] = llvm.call @__catalyst__oqd__pulse(%[[qubit_ptr:.*]], %arg0, %[[phase:.*]], %[[beam_struct_wavevector_1:.*]]) : (!llvm.ptr, f64, f64, !llvm.ptr) -> !llvm.ptr
+    // CHECK: %[[pulse:.*]] = llvm.call @__catalyst__oqd__pulse(%[[qubit_ptr:.*]], %arg0, %[[phase:.*]], %[[beam_ptr:.*]]) : (!llvm.ptr, f64, f64, !llvm.ptr) -> !llvm.ptr
 
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+    %ion_qubit = builtin.unrealized_conversion_cast %1 : !quantum.bit to !ion.qubit
 
-    %2 = ion.pulse(%arg0: f64) %1 {
+    %2 = ion.pulse(%arg0: f64) %ion_qubit {
         beam=#ion.beam<
             transition_index=0,
             rabi=10.10,
@@ -60,5 +61,5 @@ func.func @pulse_op(%arg0: f64) -> !quantum.bit {
         phase=0.0
     } : !ion.pulse
 
-    return %1: !quantum.bit
+    return %ion_qubit: !ion.qubit
 }

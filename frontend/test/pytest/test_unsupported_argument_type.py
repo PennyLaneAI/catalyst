@@ -23,7 +23,7 @@ def test_strings_aot(backend):
     """Test strings AOT."""
 
     # Due to limitations in the frontend, we can only test qjit with scalar floats.
-    @qjit()
+    @qjit
     @qml.qnode(qml.device(backend, wires=2))
     def foo(x: float, y: float):
         val = jax.numpy.arctan2(x, y)
@@ -38,7 +38,7 @@ def test_strings_jit(backend):
     """Test strings JIT."""
 
     # Due to limitations in the frontend, we can only test qjit with scalar floats.
-    @qjit()
+    @qjit
     @qml.qnode(qml.device(backend, wires=2))
     def bar(x, y):
         val = jax.numpy.arctan2(x, y)

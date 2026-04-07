@@ -14,8 +14,10 @@
 """This module contains functions for lowering, compiling, and linking
 MLIR/LLVM representations.
 """
+
 import glob
 import importlib
+import io
 import logging
 import os
 import pathlib
@@ -29,7 +31,7 @@ from os import path
 from typing import List, Optional
 
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.pipelines import CompileOptions
+from catalyst.pipelines import CompileOptions, KeepIntermediateLevel
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.runtime_environment import get_cli_path, get_lib_path
@@ -169,6 +171,7 @@ class LinkerDriver:
             f"-l{lapack_lib_name}",  # required for custom_calls lib
             "-lcustom_calls",
             "-lmlir_async_runtime",
+            "-lrt_rsdecomp",
         ]
 
         # If OQD runtime capi is built, link to it as well
@@ -257,11 +260,150 @@ class LinkerDriver:
             fallback_compilers = LinkerDriver._default_fallback_compilers
         for compiler in LinkerDriver._available_compilers(fallback_compilers):
             success = LinkerDriver._attempt_link(compiler, flags, infile, outfile, options)
+            if options.verbose:
+                print("Shared object linking successful", file=options.logfile)
             if success:
                 return outfile
+
         msg = f"Unable to link {infile}. Please check the output for any error messages. If no "
         msg += "compiler was found by Catalyst, please specify a compatible one via $CATALYST_CC."
         raise CompileError(msg)
+
+
+def _get_catalyst_cli_cmd(*args, stdin=None):
+    """Just get the command, do not run it"""
+    cli_path = get_cli_path()
+    if not path.isfile(cli_path):
+        raise FileNotFoundError("catalyst executable was not found.")  # pragma: nocover
+
+    cmd = [cli_path]
+    for arg in args:
+        if not isinstance(arg, str):
+            cmd += [str(x) for x in arg]
+        else:
+            cmd += [str(arg)]
+
+    if stdin:
+        cmd += ["-"]
+
+    return cmd
+
+
+def _catalyst(*args, stdin=None, text=True):
+    """Raw interface to catalyst
+
+    echo ${stdin} | catalyst *args -
+    catalyst *args
+    """
+    cmd = _get_catalyst_cli_cmd(*args, stdin=stdin)
+    try:
+        result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=text)
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
+
+
+def _quantum_opt(*args, stdin=None, text=True):
+    """Raw interface to quantum-opt
+
+    echo ${stdin} | catalyst --tool=opt *args -
+    catalyst --tool=opt *args
+    """
+    return _catalyst(("--tool", "opt"), *args, stdin=stdin, text=text)
+
+
+def canonicalize(*args, stdin=None, options: Optional[CompileOptions] = None):
+    """Run opt with canonicalization
+
+    echo ${stdin} | catalyst --tool=opt \
+            --catalyst-pipeline='builtin.module(canonicalize)' *args -
+    catalyst --tool=opt \
+            --catalyst-pipeline='builtin.module(canonicalize)' *args
+
+    Returns stdout string
+    """
+    opts = ["--pass-pipeline", "builtin.module(canonicalize)"]
+    if options and options.use_nameloc:
+        opts.append("--use-nameloc-as-prefix")
+
+    return _quantum_opt(*opts, *args, stdin=stdin)
+
+
+def _options_to_cli_flags(options):
+    """CompileOptions -> list[str|Tuple[str, str]]"""
+
+    extra_args = []
+    pipelines = options.get_pipelines()
+    pipeline_str = ""
+
+    for pipeline in pipelines:
+        pipeline_name, passes = pipeline
+        passes_str = ";".join(passes)
+        pipeline_str += f"{pipeline_name}({passes_str}),"
+    extra_args += ["--catalyst-pipeline", pipeline_str]
+
+    for plugin in options.pass_plugins:
+        extra_args += [("--load-pass-plugin", plugin)]
+    for plugin in options.dialect_plugins:
+        extra_args += [("--load-dialect-plugin", plugin)]
+    if options.checkpoint_stage:
+        extra_args += [("--checkpoint-stage", options.checkpoint_stage)]
+
+    if not options.lower_to_llvm:
+        extra_args += [("--tool", "opt")]
+
+    if options.keep_intermediate:
+        extra_args += ["--keep-intermediate"]
+
+    match options.keep_intermediate:
+        case KeepIntermediateLevel.CHANGED:
+            extra_args += ["--save-ir-after-each=changed", "--dump-module-scope"]
+        case KeepIntermediateLevel.PASS:
+            extra_args += ["--save-ir-after-each=pass", "--dump-module-scope"]
+        case _:
+            pass
+
+    if options.use_nameloc:
+        extra_args += ["--use-nameloc-as-prefix"]
+
+    if options.verbose:
+        extra_args += ["--verbose"]
+
+    if options.async_qnodes:  # pragma: nocover
+        extra_args += ["--async-qnodes"]
+
+    return extra_args
+
+
+def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
+    """echo ${input} | catalyst *args -"""
+    # These are the options that may affect compilation
+    if not options:
+        return _catalyst(*args, stdin=stdin)
+
+    opts = _options_to_cli_flags(options)
+    return _catalyst(*opts, *args, stdin=stdin)
+
+
+def to_mlir_opt(
+    *args, stdin=None, options: Optional[CompileOptions] = None, using_python_compiler=False
+):
+    """echo ${input} | catalyst --tool=opt *args *opts -"""
+    # Check if we need to use the Python interface for xDSL passes
+    if using_python_compiler:
+        # Use the Python interface path for xDSL passes
+        # pylint: disable-next=import-outside-toplevel
+        from catalyst.python_interface import Compiler as UnifiedCompiler
+
+        compiler = UnifiedCompiler()
+        stdin = compiler.run(stdin, callback=None)
+
+    # These are the options that may affect compilation
+    if not options:
+        return _quantum_opt(*args, stdin=stdin)
+
+    opts = _options_to_cli_flags(options)
+    return _quantum_opt(*opts, *args, stdin=stdin)
 
 
 class Compiler:
@@ -281,43 +423,18 @@ class Compiler:
         Returns:
             cmd (str): The command to be executed.
         """
-        cli_build_path = get_cli_path()
-        if not path.isfile(cli_build_path):
-            raise FileNotFoundError("catalyst executable was not found.")  # pragma: nocover
-        cmd = [cli_build_path]
-        cmd += [tmp_infile_name, "-o", output_ir_name]
-        cmd += ["--module-name", module_name, "--workspace", str(workspace)]
-        if not self.options.lower_to_llvm:
-            cmd += ["--tool", "opt"]
-        if self.options.pass_plugins:
-            plugins = self.options.pass_plugins
-            for plugin in plugins:
-                cmd += ["--load-pass-plugin", str(plugin)]
-        if self.options.dialect_plugins:
-            plugins = self.options.dialect_plugins
-            for plugin in plugins:
-                cmd += ["--load-dialect-plugin", str(plugin)]
-        if self.options.keep_intermediate:
-            cmd += ["--keep-intermediate"]
-        # The async tests are not included as part of coverage.
-        if self.options.async_qnodes:  # pragma: nocover
-            cmd += ["--async-qnodes"]
-        if self.options.verbose:
-            cmd += ["--verbose"]
-        if self.options.checkpoint_stage:
-            cmd += ["--checkpoint-stage", self.options.checkpoint_stage]
-
-        cmd += ["-verify-each=false"]
-
-        pipeline_str = ""
-        for pipeline in self.options.get_pipelines():
-            pipeline_name, passes = pipeline
-            passes_str = ";".join(passes)
-            pipeline_str += f"{pipeline_name}({passes_str}),"
-        cmd += ["--catalyst-pipeline", pipeline_str]
-
+        opts = _options_to_cli_flags(self.options)
+        cmd = _get_catalyst_cli_cmd(
+            ("-o", output_ir_name),
+            ("--module-name", module_name),
+            ("--workspace", str(workspace)),
+            "-verify-each=false",
+            *opts,
+            tmp_infile_name,
+        )
         return cmd
 
+    # pylint: disable=too-many-branches
     @debug_logger
     def run_from_ir(self, ir: str, module_name: str, workspace: Directory):
         """Compile a shared object from a textual IR (MLIR or LLVM).
@@ -338,9 +455,6 @@ class Compiler:
         ), f"Compiler expects a Directory type, got {type(workspace)}."
         assert workspace.is_dir(), f"Compiler expects an existing directory, got {workspace}."
 
-        lower_to_llvm = self.options.lower_to_llvm or False
-        output_ir_ext = ".ll" if lower_to_llvm else ".mlir"
-
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
@@ -351,7 +465,7 @@ class Compiler:
             tmp_infile.write(ir)
 
         output_object_name = os.path.join(str(workspace), f"{module_name}.o")
-        output_ir_name = os.path.join(str(workspace), f"{module_name}{output_ir_ext}")
+        output_ir_name = os.path.join(str(workspace), f"{module_name}.ll")
 
         cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
         try:
@@ -366,12 +480,17 @@ class Compiler:
         except subprocess.CalledProcessError as e:  # pragma: nocover
             raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
-        with open(output_ir_name, "r", encoding="utf-8") as f:
-            out_IR = f.read()
+        if os.path.exists(output_ir_name):
+            with open(output_ir_name, "r", encoding="utf-8") as f:
+                out_IR = f.read()
+        else:
+            out_IR = None
 
-        if lower_to_llvm:
+        if self.options.link:
             output = LinkerDriver.run(output_object_name, options=self.options)
-            output_object_name = str(pathlib.Path(output).absolute())
+            output = str(pathlib.Path(output).absolute())
+        else:
+            output = None
 
         # Clean up temporary files
         if os.path.exists(tmp_infile_name):
@@ -379,7 +498,147 @@ class Compiler:
         if os.path.exists(output_ir_name):
             os.remove(output_ir_name)
 
-        return output_object_name, out_IR
+        return output, out_IR
+
+    def has_xdsl_passes_in_transform_modules(self, mlir_module):
+        """Check if the MLIR module contains xDSL passes in transform dialect.
+
+        This checks for the 'catalyst.uses_xdsl_passes' attribute that is set during
+        lowering on transform modules when xDSL passes are added to the transform pipeline.
+
+        Args:
+            mlir_module: MLIR module to check for xDSL passes
+
+        Returns:
+            bool: True if xDSL passes detected in any transform module
+        """
+
+        def has_both_attributes(attrs):
+            """Check if attributes dict has both required keys."""
+            try:
+                has_transform = (
+                    "transform.with_named_sequence" in attrs
+                    or "transform.with_named_sequence" in getattr(attrs, "keys", lambda: [])()
+                )
+                has_xdsl = (
+                    "catalyst.uses_xdsl_passes" in attrs
+                    or "catalyst.uses_xdsl_passes" in getattr(attrs, "keys", lambda: [])()
+                )
+                return has_transform and has_xdsl
+            except (AttributeError, KeyError, TypeError):
+                return False
+
+        def check_nested_operations(op):
+            """Check if any nested operation has the required attributes."""
+            regions = getattr(op, "regions", [])
+            if not regions:
+                return False
+
+            try:
+                for nested_op in regions[0].blocks[0].operations:
+                    attrs = getattr(nested_op, "attributes", None)
+                    if attrs and has_both_attributes(attrs):
+                        return True
+            except (AttributeError, IndexError):
+                pass
+            return False
+
+        try:
+            return any(
+                check_nested_operations(op)
+                for op in mlir_module.operation.regions[0].blocks[0].operations
+            )
+        except Exception:  # pylint: disable=broad-except
+            # If we can't check the attribute, assume no xDSL passes
+            return False
+
+    @debug_logger
+    def is_using_python_compiler(self, mlir_module=None):
+        """Returns true if we need the Python interface path.
+
+        This happens when:
+        1. xDSL plugin is explicitly loaded (legacy), OR
+        2. Module has xDSL passes in transform modules (detected via attribute)
+
+        Will also modify self.options.pass_plugins and self.options.dialect_plugins to remove
+        the xdsl plugin.
+
+        Args:
+            mlir_module: Optional MLIR module to check for xDSL passes attribute
+        """
+        xdsl_path = pathlib.Path("xdsl-does-not-use-a-real-path")
+
+        has_plugin = (
+            xdsl_path in self.options.pass_plugins or xdsl_path in self.options.dialect_plugins
+        )
+
+        if not has_plugin and mlir_module is None:
+            return False
+
+        has_xdsl_passes = mlir_module is not None and self.has_xdsl_passes_in_transform_modules(
+            mlir_module
+        )
+
+        if not has_plugin and not has_xdsl_passes:
+            return False
+
+        # Remove the fake plugin path from options before returning
+        if xdsl_path in self.options.pass_plugins:
+            plugins = self.options.pass_plugins
+            self.options.pass_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
+
+        if xdsl_path in self.options.dialect_plugins:
+            plugins = self.options.dialect_plugins
+            self.options.dialect_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
+
+        return True
+
+    def _create_xdsl_pass_save_callback(self, workspace):
+        """Create a callback function to save IR after each xdsl pass.
+
+        Args:
+            workspace: The workspace directory path
+
+        Returns:
+            Callable or None: The callback function if intermediate saving is enabled, None
+            otherwise
+        """
+        if not (workspace and self.options.keep_intermediate >= KeepIntermediateLevel.CHANGED):
+            return None
+
+        # pylint: disable-next=import-outside-toplevel
+        from xdsl.printer import Printer
+
+        user_transform_dir = os.path.join(str(workspace), "0_QuantumCompilationStage")
+        os.makedirs(user_transform_dir, exist_ok=True)
+
+        class SavePassIRCallback:
+            """Callback to save IR after each pass in python_interface."""
+
+            def __init__(self, transform_dir):
+                self.transform_dir = transform_dir
+                self.counter = 1
+
+            def __call__(self, previous_pass, module, _next_pass=None, **_kwargs):
+                """Save IR after each pass."""
+                # Only save after a pass has run (when previous_pass is not None)
+                if previous_pass is None:
+                    return
+
+                pass_name = (
+                    previous_pass.name if hasattr(previous_pass, "name") else str(previous_pass)
+                )
+                buffer = io.StringIO()
+                Printer(stream=buffer, print_generic_format=False).print_op(module)
+                ir_file = os.path.join(
+                    self.transform_dir,
+                    f"{self.counter}_{pass_name}.mlir",
+                )
+                with open(ir_file, "w", encoding="utf-8") as f:
+                    f.write(buffer.getvalue())
+                self.counter += 1
+
+        return SavePassIRCallback(user_transform_dir)
 
     @debug_logger
     def run(self, mlir_module, *args, **kwargs):
@@ -396,12 +655,33 @@ class Compiler:
         Returns:
             (str): filename of shared object
         """
+        using_python_compiler = self.is_using_python_compiler(mlir_module)
+        workspace = args[0] if args else kwargs.get("workspace")
+        module_name = str(mlir_module.operation.attributes["sym_name"]).replace('"', "")
+        ir = mlir_module.operation.get_asm(
+            binary=False, print_generic_op_form=using_python_compiler, assume_verified=True
+        )
+
+        # Save intermediate IR before any compiler transformation is applied
+        if workspace and self.options.keep_intermediate:
+            initial_ir_file = os.path.join(str(workspace), f"0_{module_name}.mlir")
+            with open(initial_ir_file, "w", encoding="utf-8") as f:
+                # We need to canonicalize the IR to get the pretty format
+                f.write(canonicalize(stdin=ir, options=self.options))
+
+        if using_python_compiler:
+            # We keep this module here to keep xDSL requirement optional
+            # Only move this is it has been decided that xDSL is no longer optional.
+            # pylint: disable-next=import-outside-toplevel
+            from catalyst.python_interface import Compiler as UnifiedCompiler
+
+            callback = self._create_xdsl_pass_save_callback(workspace)
+            compiler = UnifiedCompiler()
+            ir = compiler.run(ir, callback=callback)
 
         return self.run_from_ir(
-            mlir_module.operation.get_asm(
-                binary=False, print_generic_op_form=False, assume_verified=True
-            ),
-            str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
+            ir,
+            module_name,
             *args,
             **kwargs,
         )

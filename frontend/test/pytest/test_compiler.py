@@ -16,6 +16,7 @@
 Unit tests for LinkerDriver class
 """
 
+import io
 import os
 import pathlib
 import platform
@@ -29,9 +30,10 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import qjit
-from catalyst.compiler import CompileOptions, Compiler, LinkerDriver
+from catalyst import QJIT, qjit
+from catalyst.compiler import CompileOptions, Compiler, LinkerDriver, _options_to_cli_flags
 from catalyst.debug import instrumentation
+from catalyst.pipelines import KeepIntermediateLevel
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 
@@ -66,11 +68,14 @@ class TestCompilerOptions:
 
         @qjit(verbose=verbose, logfile=logfile, keep_intermediate=keep_intermediate)
         @qml.qnode(qml.device(backend, wires=1))
-        def workflow():
-            qml.PauliX(wires=0)
+        def workflow(x):
+            qml.RX(x, wires=0)
             return qml.state()
 
-        workflow()
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        workflow.use_cwd_for_workspace = False
+        workflow.jit_compile((1.2,))
+
         capture_result = capsys.readouterr()
         capture = capture_result.out + capture_result.err
         assert ("[SYSTEM]" in capture) if verbose else ("[SYSTEM]" not in capture)
@@ -91,6 +96,62 @@ class TestCompilerOptions:
         capture_result = capsys.readouterr()
         capture = capture_result.out + capture_result.err
         assert "[DIAGNOSTICS]" in capture
+
+    @pytest.mark.parametrize(
+        "input_value, expected_level",
+        [
+            (None, KeepIntermediateLevel.NONE),
+            (False, KeepIntermediateLevel.NONE),
+            (True, KeepIntermediateLevel.PIPELINE),
+            (0, KeepIntermediateLevel.NONE),
+            (1, KeepIntermediateLevel.PIPELINE),
+            (2, KeepIntermediateLevel.CHANGED),
+            (3, KeepIntermediateLevel.PASS),
+            ("none", KeepIntermediateLevel.NONE),
+            ("pipeline", KeepIntermediateLevel.PIPELINE),
+            ("changed", KeepIntermediateLevel.CHANGED),
+            ("pass", KeepIntermediateLevel.PASS),
+        ],
+    )
+    def test_keep_intermediate_levels_conversion(self, input_value, expected_level):
+        """Test that various inputs for keep_intermediate are correctly converted to Enum."""
+        options = CompileOptions(keep_intermediate=input_value)
+        assert options.keep_intermediate == expected_level
+
+    @pytest.mark.parametrize("invalid_input", [4, -1, "invalid_string", 4.0, []])
+    def test_keep_intermediate_invalid_inputs(self, invalid_input):
+        """Test that invalid inputs for keep_intermediate raise appropriate errors."""
+        with pytest.raises(ValueError, match="Invalid value for keep_intermediate:"):
+            CompileOptions(keep_intermediate=invalid_input)
+
+    def test_options_to_cli_flags_keep_intermediate_none(self):
+        """Test _options_to_cli_flags with KeepIntermediateLevel.NONE."""
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.NONE)
+        flags = _options_to_cli_flags(options)
+        assert "--keep-intermediate" not in flags
+        assert "--save-ir-after-each=pass" not in flags
+
+    def test_options_to_cli_flags_keep_intermediate_basic(self):
+        """Test _options_to_cli_flags with KeepIntermediateLevel.PIPELINE."""
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.PIPELINE)
+        flags = _options_to_cli_flags(options)
+        assert "--keep-intermediate" in flags
+        assert "--save-ir-after-each=pass" not in flags
+
+    def test_options_to_cli_flags_keep_intermediate_changed(self):
+        """Test _options_to_cli_flags with KeepIntermediateLevel.CHANGED."""
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED)
+        flags = _options_to_cli_flags(options)
+        assert "--keep-intermediate" in flags
+        assert "--save-ir-after-each=changed" in flags
+        assert "--dump-module-scope" in flags
+
+    def test_options_to_cli_flags_keep_intermediate_pass(self):
+        """Test _options_to_cli_flags with KeepIntermediateLevel.PASS."""
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.PASS)
+        flags = _options_to_cli_flags(options)
+        assert "--keep-intermediate" in flags
+        assert "--save-ir-after-each=pass" in flags
 
 
 class TestCompilerWarnings:
@@ -207,8 +268,41 @@ class TestCompilerState:
 
         assert f.jaxpr is None
         assert f.mlir is None
-        assert f.qir is None
+        assert f.llvmir is None
         assert f.compiled_function is None
+
+    def test_mlir_only_qjit_compile(self):
+        """Test that the QJIT compilation stage can be run without LLVM lowering or linking."""
+
+        test_pipes = [("test_pipe", ["canonicalize"])]
+
+        def f(x):
+            return x + 1.0
+
+        log = io.StringIO()  # for inspection
+        options = CompileOptions(
+            lower_to_llvm=False, link=False, pipelines=test_pipes, verbose=True, logfile=log
+        )
+
+        compiled = QJIT(f, options)
+        compiled.workspace = compiled._get_workspace()  # pylint: disable=protected-access
+
+        # Call individual QJIT stages
+        compiled.jaxpr, *_ = compiled.capture((0.5,))
+        compiled.mlir_module = compiled.generate_ir()
+        compiled.compile()
+
+        logtext = log.getvalue()
+        assert "MLIR parsing successful" in logtext
+        assert "opt transformations successful" in logtext
+        assert "LLVMIR translation successful" not in logtext
+        assert "object code generation successful" not in logtext
+        assert "Compilation successful" in logtext
+        assert "object linking successful" not in logtext
+
+        # since these are not advertised options, an assertion should be okay
+        with pytest.raises(AssertionError, match="invalid options for jit_compile"):
+            compiled(0.5)
 
     def test_callable_without_name(self):
         """Test that a callable without __name__ property can be compiled, if it is otherwise
@@ -234,19 +328,23 @@ class TestCompilerState:
             pipelines=[("EmptyPipeline1", [])] + pipelines + [("EmptyPipeline2", [])],
         )
         @qml.qnode(qml.device(backend, wires=1))
-        def workflow():
-            qml.PauliX(wires=0)
+        def workflow(x):
+            qml.RX(x, wires=0)
             return qml.state()
+
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        workflow.use_cwd_for_workspace = False
+        workflow.jit_compile((1.2,))
 
         compiler = workflow.compiler
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             compiler.get_output_of("EmptyPipeline1", workflow.workspace)
-        assert compiler.get_output_of("HLOLoweringPass", workflow.workspace)
-        assert compiler.get_output_of("QuantumCompilationPass", workflow.workspace)
+        assert compiler.get_output_of("HLOLoweringStage", workflow.workspace)
+        assert compiler.get_output_of("QuantumCompilationStage", workflow.workspace)
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             compiler.get_output_of("EmptyPipeline2", workflow.workspace)
-        assert compiler.get_output_of("BufferizationPass", workflow.workspace)
-        assert compiler.get_output_of("MLIRToLLVMDialect", workflow.workspace)
+        assert compiler.get_output_of("BufferizationStage", workflow.workspace)
+        assert compiler.get_output_of("MLIRToLLVMDialectConversion", workflow.workspace)
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             compiler.get_output_of("None-existing-pipeline", workflow.workspace)
         workflow.workspace.cleanup()
@@ -256,9 +354,13 @@ class TestCompilerState:
 
         @qjit(keep_intermediate=True)
         @qml.qnode(qml.device(backend, wires=1))
-        def workflow():
-            qml.PauliX(wires=0)
+        def workflow(x):
+            qml.RX(x, wires=0)
             return qml.state()
+
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        workflow.use_cwd_for_workspace = False
+        workflow.jit_compile((1.2,))
 
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             workflow.compiler.get_output_of("None-existing-pipeline", workflow.workspace)
@@ -312,7 +414,7 @@ class TestCompilerState:
         assert "Failed to lower MLIR module" in e.value.args[0]
         assert "While processing 'TestPass' pass " in e.value.args[0]
         assert stack_trace_pattern not in e.value.args[0]
-        assert isfile(os.path.join(str(compiled.workspace), "2_TestPass_FAILED.mlir"))
+        assert isfile(os.path.join(str(compiled.workspace), "2_AfterTestPass_FAILED.mlir"))
         compiled.workspace.cleanup()
 
         with pytest.raises(CompileError) as e:

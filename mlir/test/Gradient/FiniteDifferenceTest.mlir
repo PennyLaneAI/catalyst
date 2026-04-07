@@ -161,9 +161,12 @@ func.func private @funcMultiArg(%arg0: tensor<7xf64>, %arg1: f64) -> tensor<2xf6
     // CHECK:        [[BASE:%.+]] = call @funcMultiArg(%arg0, %arg1)
     // CHECK:        [[DIFF:%.+]] = tensor.generate
     // CHECK-NEXT:   ^bb0(%arg2: index, %arg3: index):
-    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[%arg3]
+    // CHECK:            [[MEMREF:%.+]] = bufferization.to_buffer %arg0
+    // CHECK:            [[COPY:%.+]] = bufferization.clone [[MEMREF]]
+    // CHECK:            [[TENSOR:%.+]] = bufferization.to_tensor [[COPY]]
+    // CHECK:            [[VAL:%.+]] = tensor.extract [[TENSOR]][%arg3]
     // CHECK:            [[ADD:%.+]] = arith.addf [[VAL]]
-    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[%arg3]
+    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into [[TENSOR]][%arg3]
     // CHECK:            [[EVAL:%.+]] = func.call @funcMultiArg([[SHIFTED]], %arg1)
     // CHECK:            [[SUB:%.+]] = arith.subf [[EVAL]], [[BASE]]
     // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][%arg2]
@@ -185,9 +188,12 @@ func.func private @funcMultiArg(%arg0: tensor<7xf64>, %arg1: f64) -> tensor<2xf6
     // CHECK:        [[BASE:%.+]] = call @funcMultiArg(%arg0, %arg1)
     // CHECK:        [[DIFF:%.+]] = tensor.generate
     // CHECK-NEXT:   ^bb0(%arg2: index, %arg3: index):
-    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[%arg3]
+    // CHECK:            [[MEMREF:%.+]] = bufferization.to_buffer %arg0
+    // CHECK:            [[COPY:%.+]] = bufferization.clone [[MEMREF]]
+    // CHECK:            [[TENSOR:%.+]] = bufferization.to_tensor [[COPY]]
+    // CHECK:            [[VAL:%.+]] = tensor.extract [[TENSOR]][%arg3]
     // CHECK:            [[ADD:%.+]] = arith.addf [[VAL]]
-    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[%arg3]
+    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into [[TENSOR]][%arg3]
     // CHECK:            [[EVAL:%.+]] = func.call @funcMultiArg([[SHIFTED]], %arg1)
     // CHECK:            [[SUB:%.+]] = arith.subf [[EVAL]], [[BASE]]
     // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][%arg2]
@@ -221,18 +227,24 @@ func.func private @funcMultiRes(%arg0: tensor<7xf64>) -> (f64, tensor<2xf64>) at
     // CHECK:        [[BASE:%.+]]:2 = call @funcMultiRes(%arg0)
     // CHECK:        [[DIFF:%.+]] = tensor.generate
     // CHECK-NEXT:   ^bb0(%arg1: index):
-    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[%arg1]
+    // CHECK:            [[MEMREF:%.+]] = bufferization.to_buffer %arg0
+    // CHECK:            [[COPY:%.+]] = bufferization.clone [[MEMREF]]
+    // CHECK:            [[TENSOR:%.+]] = bufferization.to_tensor [[COPY]]
+    // CHECK:            [[VAL:%.+]] = tensor.extract [[TENSOR]][%arg1]
     // CHECK:            [[ADD:%.+]] = arith.addf [[VAL]]
-    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[%arg1]
+    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into [[TENSOR]][%arg1]
     // CHECK:            [[EVAL:%.+]]:2 = func.call @funcMultiRes([[SHIFTED]])
     // CHECK:            [[RES:%.+]] = arith.subf [[EVAL]]#0, [[BASE]]#0
     // CHECK:            tensor.yield [[RES]]
     // CHECK:        [[R0:%.+]] = arith.divf [[DIFF]]
     // CHECK:        [[DIFF:%.+]] = tensor.generate
     // CHECK-NEXT:   ^bb0(%arg1: index, %arg2: index):
-    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[%arg2]
+    // CHECK:            [[MEMREF:%.+]] = bufferization.to_buffer %arg0
+    // CHECK:            [[COPY:%.+]] = bufferization.clone [[MEMREF]]
+    // CHECK:            [[TENSOR:%.+]] = bufferization.to_tensor [[COPY]]
+    // CHECK:            [[VAL:%.+]] = tensor.extract [[TENSOR]][%arg2]
     // CHECK:            [[ADD:%.+]] = arith.addf [[VAL]]
-    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[%arg2]
+    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into [[TENSOR]][%arg2]
     // CHECK:            [[EVAL:%.+]]:2 = func.call @funcMultiRes([[SHIFTED]])
     // CHECK:            [[SUB:%.+]] = arith.subf [[EVAL]]#1, [[BASE]]#1
     // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][%arg1]
@@ -267,9 +279,12 @@ func.func private @funcDynamicTensor(%arg0: tensor<?x3xf64>) -> tensor<2x?xf64> 
 
     // CHECK:        [[DIFF:%.+]] = tensor.generate [[DDIM0]], [[DDIM1]]
     // CHECK-NEXT:   ^bb0([[i0:%.+]]: index, [[i1:%.+]]: index, [[i2:%.+]]: index, [[i3:%.+]]: index):
-    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[[[i2]], [[i3]]]
+    // CHECK:            [[MEMREF:%.+]] = bufferization.to_buffer %arg0
+    // CHECK:            [[COPY:%.+]] = bufferization.clone [[MEMREF]]
+    // CHECK:            [[TENSOR:%.+]] = bufferization.to_tensor [[COPY]]
+    // CHECK:            [[VAL:%.+]] = tensor.extract [[TENSOR]][[[i2]], [[i3]]]
     // CHECK:            [[ADD:%.+]] = arith.addf [[VAL]], [[F64]]
-    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[[[i2]], [[i3]]]
+    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into [[TENSOR]][[[i2]], [[i3]]]
     // CHECK:            [[EVAL:%.+]] = func.call @funcDynamicTensor([[SHIFTED]])
     // CHECK:            [[SUB:%.+]] = arith.subf [[EVAL]], [[BASE]]
     // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][[[i0]], [[i1]]]

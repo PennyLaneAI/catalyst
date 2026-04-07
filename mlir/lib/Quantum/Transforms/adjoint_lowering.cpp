@@ -57,17 +57,11 @@ struct AdjointLoweringPass : impl::AdjointLoweringPassBase<AdjointLoweringPass> 
 
         RewritePatternSet patterns(&getContext());
         populateAdjointPatterns(patterns);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
     }
 };
 
 } // namespace quantum
-
-std::unique_ptr<Pass> createAdjointLoweringPass()
-{
-    return std::make_unique<quantum::AdjointLoweringPass>();
-}
-
 } // namespace catalyst

@@ -29,8 +29,7 @@ namespace gradient {
 struct ParameterShiftLowering : public OpRewritePattern<func::FuncOp> {
     using OpRewritePattern<func::FuncOp>::OpRewritePattern;
 
-    LogicalResult match(func::FuncOp op) const override;
-    void rewrite(func::FuncOp op, PatternRewriter &rewriter) const override;
+    LogicalResult matchAndRewrite(func::FuncOp op, PatternRewriter &rewriter) const override;
 
   private:
     static std::pair<int64_t, int64_t> analyzeFunction(func::FuncOp callee);

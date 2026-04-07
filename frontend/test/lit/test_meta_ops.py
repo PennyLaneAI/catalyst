@@ -15,7 +15,8 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 import pennylane as qml
-from utils import qjit_for_tests as qjit
+
+from catalyst import qjit
 
 
 # CHECK-LABEL: @adjoint_adjoint

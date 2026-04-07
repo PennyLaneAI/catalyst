@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2024-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,18 +20,14 @@ from catalyst.api_extensions.callbacks import accelerate, pure_callback
 from catalyst.api_extensions.control_flow import (
     Cond,
     ForLoop,
+    Switch,
     WhileLoop,
     cond,
     for_loop,
+    switch,
     while_loop,
 )
-from catalyst.api_extensions.differentiation import (
-    grad,
-    jacobian,
-    jvp,
-    value_and_grad,
-    vjp,
-)
+from catalyst.api_extensions.differentiation import grad, jacobian, jvp, value_and_grad, vjp
 from catalyst.api_extensions.error_mitigation import mitigate_with_zne
 from catalyst.api_extensions.function_maps import vmap
 from catalyst.api_extensions.quantum_operators import (
@@ -48,6 +44,7 @@ __all__ = (
     "pure_callback",
     "cond",
     "for_loop",
+    "switch",
     "while_loop",
     "ctrl",
     "grad",

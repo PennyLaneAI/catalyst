@@ -16,9 +16,7 @@ import numpy as np
 from mlir_quantum.runtime import (
     as_ctype,
 )
-from mlir_quantum.runtime import (
-    get_ranked_memref_descriptor as mlir_get_ranked_memref_descriptor,
-)
+from mlir_quantum.runtime import get_ranked_memref_descriptor as mlir_get_ranked_memref_descriptor
 from mlir_quantum.runtime import (
     get_unranked_memref_descriptor as mlir_get_unranked_memref_descriptor,
 )

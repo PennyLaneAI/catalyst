@@ -42,6 +42,11 @@
  */
 #define RT_ASSERT(expression) RT_FAIL_IF(!(expression), "Assertion: " #expression)
 
+/**
+ * @brief Macro that emits a non-fatal warning message to stderr.
+ */
+#define RT_WARN(message) std::cerr << "[Warning] Catalyst Runtime: " << (message) << "\n"
+
 namespace Catalyst::Runtime {
 
 /**
@@ -78,7 +83,7 @@ class RuntimeException : public std::exception {
                                 const char *function_name)
 {
     std::stringstream sstream;
-    sstream << "[" << file_name << "][Line:" << line << "][Function:" << function_name
+    sstream << "[" << file_name << ":" << line << "][Function:" << function_name
             << "] Error in Catalyst Runtime: " << message;
 
     throw RuntimeException(sstream.str());

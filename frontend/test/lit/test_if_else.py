@@ -17,9 +17,8 @@
 # pylint: disable=missing-function-docstring
 
 import pennylane as qml
-from utils import qjit_for_tests as qjit
 
-from catalyst import cond, measure
+from catalyst import cond, measure, qjit
 
 
 # CHECK-NOT: Verification failed
@@ -95,7 +94,7 @@ def circuit_single_gate(n: int):
     # CHECK:       [[b6:%[a-zA-Z0-9_]+]] = tensor.extract [[b_t6]]
     # CHECK:       [[qreg_out1:%.+]] = scf.if [[b6]]
     # CHECK-DAG:   [[q4:%[a-zA-Z0-9_]+]] = quantum.extract [[qreg_out]]
-    # CHECK-DAG:   [[q5:%[a-zA-Z0-9_]+]] = quantum.static_custom "RX" [3.140000e+00] [[q4]]
+    # CHECK-DAG: [[q5:%[a-zA-Z0-9_]+]] = quantum.custom "RX"({{%.+}}) [[q4]]
     # CHECK-DAG:   [[qreg_3:%[a-zA-Z0-9_]+]] = quantum.insert [[qreg_out]][ {{[%a-zA-Z0-9_]+}}], [[q5]]
     # CHECK:       scf.yield [[qreg_3]]
     # CHECK:       else
@@ -141,8 +140,7 @@ def circuit_single_gate(n: int):
         ),
     )(wires=0)
 
-    # CHECK:       [[qreg_ret:%.+]] = quantum.extract [[qreg_out2]][ 0]
-    # CHECK:       [[qobs:%.+]] = quantum.compbasis [[qreg_ret]] : !quantum.obs
+    # CHECK:       [[qobs:%.+]] = quantum.compbasis qreg [[qreg_out2]] : !quantum.obs
     # CHECK:       [[ret:%.+]] = quantum.probs [[qobs]]
     # CHECK:       return [[ret]]
     return qml.probs()

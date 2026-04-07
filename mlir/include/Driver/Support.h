@@ -17,8 +17,9 @@
 #include <filesystem>
 #include <string>
 
-#include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/raw_ostream.h"
+
+#include "mlir/Support/LogicalResult.h"
 
 #include "CompilerDriver.h"
 
@@ -30,7 +31,19 @@ void dumpToFile(const CompilerOptions &options, mlir::StringRef fileName, const 
 {
     using std::filesystem::path;
     std::error_code errCode;
-    std::string outFileName = path(options.workspace.str()) / path(fileName.str());
+    path fullPath = path(options.workspace.str()) / path(fileName.str());
+    std::string outFileName = fullPath.string();
+
+    // Create parent directories if they don't exist
+    path parentDir = fullPath.parent_path();
+    if (!std::filesystem::exists(parentDir)) {
+        std::filesystem::create_directories(parentDir, errCode);
+        if (errCode) {
+            CO_MSG(options, Verbosity::Urgent,
+                   "Unable to create directory: " << errCode.message() << "\n");
+            return;
+        }
+    }
 
     CO_MSG(options, Verbosity::Debug, "Dumping '" << outFileName << "'\n");
     llvm::raw_fd_ostream outfile{outFileName, errCode};

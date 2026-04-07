@@ -2,9 +2,9 @@ Installation
 ============
 
 
-Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64, x86_64)
+Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64)
 platforms, and pre-built binaries are being distributed via the Python Package Index (PyPI) for
-Python versions 3.10 and higher. To install it, simply run the following ``pip`` command:
+Python versions 3.11 and higher. To install it, simply run the following ``pip`` command:
 
 .. code-block:: console
 
@@ -18,6 +18,20 @@ Python versions 3.10 and higher. To install it, simply run the following ``pip``
 
     The easiest method of installation is to run ``xcode-select --install`` from the Terminal
     app.
+
+.. note::
+
+  Catalyst no longer supports macOS with x86_64 architecture after 0.11.0. This includes Macs running on Intel processors.
+
+  If you would like to use Catalyst on these systems, please install Catalyst version 0.11.0, PennyLane version 0.41.0, PennyLane-Lightning
+  version 0.41.0, and Jax version 0.4.28:
+
+  .. code-block:: console
+
+    pip install pennylane-catalyst==0.11.0
+    pip install pennylane==0.41.0
+    pip install pennylane-lightning==0.41.0
+    pip install jax==0.4.28
 
 Pre-built packages for Windows are not yet available, and compatibility is untested and cannot
 be guaranteed. If you would like to use Catalyst on Windows, we recommend trying the
@@ -47,10 +61,10 @@ you are encoutering issues, please consult the detailed guide
         | If not, you may receive ``'GLIBCXX_3.4.x' not found`` error when running ``make test``.
 
 
-      .. code-block:: console
+      .. code-block:: bash
 
         # Install common requirements
-        sudo apt install clang lld ccache libomp-dev ninja-build make cmake
+        sudo apt install clang lld ccache make
 
         # Clone the Catalyst repository
         git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
@@ -63,18 +77,17 @@ you are encoutering issues, please consult the detailed guide
         make all
 
         # Test that everything is built properly
-        make test
+        make pytest
 
    .. group-tab:: macOS
 
-      .. code-block:: console
+      .. code-block:: bash
 
         # Install XCode Command Line Tools and common requirements
         xcode-select --install
-        pip install cmake ninja
 
         # If not present yet, install Homebrew (https://brew.sh/)
-        brew install libomp ccache gfortran
+        brew install ccache gfortran
 
         # Add ccache drop-in compiler replacements to the PATH
         export PATH=/usr/local/opt/ccache/libexec:$PATH
@@ -90,7 +103,7 @@ you are encoutering issues, please consult the detailed guide
         make all
 
         # Test that everything is built properly
-        make test
+        make pytest
 
 
 Detailed Building From Source Guide
@@ -109,15 +122,14 @@ In order to build Catalyst from source, developers need to ensure the following 
 installed and available on the path (depending on the platform):
 
 - The `clang <https://clang.llvm.org/>`_ compiler, `LLD <https://lld.llvm.org/>`_ linker
-  (Linux only), `CCache <https://ccache.dev/>`_ compiler cache (optional, recommended), and
-  `OpenMP <https://www.openmp.org/>`_. Additionaly, the
-  `GFortran <https://fortran-lang.org/en/learn/os_setup/install_gfortran/>`_ compiler is
-  required on ARM macOS systems.
+  (Linux only), `CCache <https://ccache.dev/>`_ compiler cache (optional, recommended).
+  Additionally, the `GFortran <https://fortran-lang.org/en/learn/os_setup/install_gfortran/>`_
+  compiler is required on ARM macOS systems.
 
 - The `Ninja <https://ninja-build.org/>`_, `Make <https://www.gnu.org/software/make/>`_, and
-  `CMake <https://cmake.org/download/>`_ (v3.20 or greater) build tools.
+  `CMake <https://cmake.org/download/>`_ (v3.26 or greater, less than v4) build tools.
 
-- `Python <https://www.python.org/>`_ 3.10 or higher for the Python frontend.
+- `Python <https://www.python.org/>`_ 3.11 or higher for the Python frontend.
 
 - The Python package manager ``pip`` must be version 22.3 or higher.
 
@@ -130,12 +142,7 @@ They can be installed via:
 
       .. code-block:: console
 
-        sudo apt install clang lld ccache libomp-dev ninja-build make cmake
-
-      .. note::
-
-        If the CMake version available in your system is too old, you can also install up-to-date
-        versions of it via ``pip install cmake``.
+        sudo apt install clang lld ccache make
 
       .. tabs::
 
@@ -156,15 +163,14 @@ They can be installed via:
 
    .. group-tab:: macOS
 
-      On **macOS**, it is strongly recommended to install the official XCode Command Line Tools (for ``clang`` & ``make``).
-      The remaining packages can then be installed via ``pip`` and ``brew``.
-      If ``brew`` is not present yet, install it from https://brew.sh/:
+      On **macOS**, it is strongly recommended to install the official XCode Command Line Tools
+      (for ``clang`` & ``make``). The remaining packages can then be installed via ``pip`` and
+      ``brew``. If ``brew`` is not present yet, install it from https://brew.sh/:
 
       .. code-block:: console
 
         xcode-select --install
-        pip install cmake ninja
-        brew install libomp ccache gfortran
+        brew install ccache gfortran
         export PATH=/usr/local/opt/ccache/libexec:$PATH
 
 
@@ -286,12 +292,12 @@ To make Enzyme libraries discoverable to the compiler:
 
   export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
 
-To make required tools in ``llvm-project/build``, ``mlir-hlo/mhlo-build``, and
+To make required tools in ``llvm-project/build``, ``stablehlo/build``, and
 ``mlir/build`` discoverable to the compiler:
 
 .. code-block:: console
 
-  export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/mlir-hlo/mhlo-build/bin:$PWD/mlir/build/bin:$PATH"
+  export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/stablehlo/build/bin:$PWD/mlir/build/bin:$PATH"
 
 Tests
 ^^^^^
@@ -302,9 +308,12 @@ The following target runs all available test suites with the default execution d
 
   make test
 
-You can also test each module separately by using running the ``test-frontend``,
-``test-dialects``, and ``test-runtime`` targets instead. Jupyter Notebook demos are also testable
-via ``test-demos``.
+You can also test each module separately by running the ``test-frontend``,
+``test-dialects``, and ``test-runtime`` targets instead.
+Alternately, the ``test-frontend`` target can be broken up into two subsets,
+``make pytest`` and ``make lit``, where the pytest suite
+can be considered the "core" (and most important) test set.
+Jupyter Notebook demos are also testable via ``test-demos``.
 
 Additional Device Backends
 """"""""""""""""""""""""""
@@ -430,6 +439,30 @@ Known Issues
       If not, PyTest might try to use the default Python binary: ``/usr/bin/python3``.
       (See user's report `here <https://github.com/PennyLaneAI/catalyst/issues/377>`_)
 
+      .. raw:: html
+
+        <hr>
+
+      In some mac setups, it's possible that certain Catalyst libraries are compiled with a
+      different OSX deployment version than what Catalyst uses when compiling a user program.
+      In this case, you may see a *warning* like the following when using Catalyst:
+
+      .. code-block:: console
+
+        ld: warning: building for macOS-15.0, but linking with dylib '@rpath/libcustom_calls.so' which was built for newer version 15.7
+
+      While this warning does not prevent using Catalyst, if you would like to eliminate it, set the
+      following environment variable (adjust the value as needed given the warning you see):
+
+      .. code-block:: console
+
+        export MACOSX_DEPLOYMENT_TARGET=15.0
+
+      and then run ``make clean && make frontend``.
+
+      Note: Catalyst does not set any deployment targets, this issue likely arises due to differing
+      defaults in different build environments.
+
 Install a Frontend-Only Development Environment from TestPyPI Wheels
 --------------------------------------------------------------------
 
@@ -443,7 +476,7 @@ Essential Steps
 
 To activate the development environment, open a terminal and issue the following commands:
 
-.. code-block:: console
+.. code-block:: bash
 
   # Clone the Catalyst repository without submodules, as they are not needed for frontend
   # development

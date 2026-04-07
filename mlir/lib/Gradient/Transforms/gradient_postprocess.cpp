@@ -22,7 +22,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Gradient/IR/GradientOps.h"
-#include "Gradient/Transforms/Passes.h"
 #include "Gradient/Transforms/Patterns.h"
 
 using namespace mlir;
@@ -43,17 +42,11 @@ struct GradientPostprocessingPass
         RewritePatternSet patterns(&getContext());
         populatePostprocessingPatterns(patterns);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
     }
 };
 
 } // namespace gradient
-
-std::unique_ptr<Pass> createGradientPostprocessingPass()
-{
-    return std::make_unique<gradient::GradientPostprocessingPass>();
-}
-
 } // namespace catalyst

@@ -29,7 +29,7 @@ class TestKeywordArguments:
     def test_function_with_kwargs(self):
         """Test that a function works with keyword argeument."""
 
-        @qjit()
+        @qjit
         def f(x, y):
             return x * y
 
@@ -39,7 +39,7 @@ class TestKeywordArguments:
     def test_function_with_kwargs_partial(self):
         """Test that a function works with keyword argeument."""
 
-        @qjit()
+        @qjit
         def f(x, y):
             return x * y
 
@@ -50,7 +50,7 @@ class TestKeywordArguments:
         """Test that a qnode works with keyword argeument."""
         dev = qml.device(backend, wires=1)
 
-        @qjit()
+        @qjit
         @qml.qnode(dev)
         def circuit(x, c):
             qml.RY(c, 0)
@@ -63,7 +63,7 @@ class TestKeywordArguments:
         """Test that a qnode works with keyword argeument."""
         dev = qml.device(backend, wires=1)
 
-        @qjit()
+        @qjit
         @qml.qnode(dev)
         def circuit(x, c):
             qml.RX(x, wires=0)

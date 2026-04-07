@@ -16,11 +16,7 @@
 Public/internal API for the AutoGraph module.
 """
 
-from catalyst.autograph.transformer import (
-    autograph_source,
-    disable_autograph,
-    run_autograph,
-)
+from catalyst.autograph.transformer import autograph_source, disable_autograph, run_autograph
 
 __all__ = (
     "autograph_source",

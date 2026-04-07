@@ -22,7 +22,6 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Quantum/IR/QuantumDialect.h"
-#include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
 
 using namespace mlir;
@@ -31,6 +30,7 @@ using namespace catalyst::quantum;
 namespace catalyst {
 namespace quantum {
 
+#define GEN_PASS_DECL_QUANTUMCONVERSIONPASS
 #define GEN_PASS_DEF_QUANTUMCONVERSIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
@@ -80,7 +80,8 @@ struct QuantumConversionPass : impl::QuantumConversionPassBase<QuantumConversion
         RewritePatternSet patterns(context);
         cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
         populateFuncToLLVMConversionPatterns(typeConverter, patterns);
-        populateQIRConversionPatterns(typeConverter, patterns);
+        cf::populateAssertToLLVMConversionPattern(typeConverter, patterns);
+        populateQIRConversionPatterns(typeConverter, patterns, useArrayBackedRegisters);
 
         LLVMConversionTarget target(*context);
         target.addLegalOp<ModuleOp>();
@@ -92,10 +93,4 @@ struct QuantumConversionPass : impl::QuantumConversionPassBase<QuantumConversion
 };
 
 } // namespace quantum
-
-std::unique_ptr<Pass> createQuantumConversionPass()
-{
-    return std::make_unique<quantum::QuantumConversionPass>();
-}
-
 } // namespace catalyst

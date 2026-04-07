@@ -14,5 +14,4 @@
 
 """MLIR Dialect for Gradient dialect."""
 
-from .._mlir_libs._quantumDialects.gradient import *  # noqa: F401
 from ._gradient_ops_gen import *  # noqa: F401

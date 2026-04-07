@@ -15,7 +15,7 @@
 and the plotting. Measurement ranges and scales are all defined here as global dictionaries."""
 
 import sys
-from argparse import ArgumentParser
+from argparse import ArgumentParser, BooleanOptionalAction
 from argparse import Namespace as ParsedArguments
 from collections import defaultdict
 from copy import deepcopy
@@ -32,12 +32,7 @@ import altair as alt
 import pandas as pd
 import vl_convert as vlc
 from altair import Chart
-from catalyst_benchmark.types import (
-    BenchmarkResult,
-    BenchmarkResultV1,
-    BooleanOptionalAction,
-    Sysinfo,
-)
+from catalyst_benchmark.types import BenchmarkResult, BenchmarkResultV1, Sysinfo
 from pandas import DataFrame
 
 # fmt:off
@@ -219,7 +214,7 @@ def collect(a: ParsedArguments) -> None:  # noqa
             ofname, cmdline = ofile(a, *config)
             odname = dirname(ofname)
 
-            (cat, measure, problem, impl, nqubits, nlayers, diffmethod) = config
+            cat, measure, problem, impl, nqubits, nlayers, diffmethod = config
             if len(odname) > 0 and not a.dry_run:
                 makedirs(odname, exist_ok=True)
             pdesc = f"{problem}[{nqubits},{nlayers}]"
@@ -231,7 +226,7 @@ def collect(a: ParsedArguments) -> None:  # noqa
                 if a.dry_run:
                     print(f"{message} [DRYRUN]")
                 else:
-                    (fnqubits, fnlayers) = known_failures.get(
+                    fnqubits, fnlayers = known_failures.get(
                         (problem, measure, impl, diffmethod), (None, None)
                     )
                     if (nqubits or 0, nlayers or 0) >= (

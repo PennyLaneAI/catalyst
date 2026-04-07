@@ -16,23 +16,27 @@
 compilation of hybrid quantum-classical functions using Catalyst.
 """
 
+# pylint: disable=too-many-lines
+
 import copy
 import functools
 import inspect
 import logging
 import os
 import warnings
+from contextlib import contextmanager
 
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+from jax.api_util import debug_info
 from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
 
 import catalyst
 from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
-from catalyst.compiler import CompileOptions, Compiler
+from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvmir, to_mlir_opt
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
@@ -42,6 +46,7 @@ from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
     filter_static_args,
     get_abstract_signature,
+    get_arg_names,
     get_type_annotations,
     merge_static_argname_into_argnum,
     merge_static_args,
@@ -77,6 +82,7 @@ def qjit(
     async_qnodes=False,
     target="binary",
     keep_intermediate=False,
+    use_nameloc=False,
     verbose=False,
     logfile=None,
     pipelines=None,
@@ -85,10 +91,11 @@ def qjit(
     abstracted_axes=None,
     disable_assertions=False,
     seed=None,
-    experimental_capture=False,
     circuit_transform_pipeline=None,
     pass_plugins=None,
     dialect_plugins=None,
+    capture="global",
+    skip_preprocess=False,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -102,20 +109,29 @@ def qjit(
         a full of supported devices, please see :doc:`/dev/devices`.
 
     Args:
-        fn (Callable): the quantum or classical function
+        fn (Callable): The quantum or classical function.
         autograph (bool): Experimental support for automatically converting Python control
-            flow statements to Catalyst-compatible control flow. Currently supports Python ``if``,
-            ``elif``, ``else``, and ``for`` statements. Note that this feature requires an
-            available TensorFlow installation. For more details, see the
+            flow statements (including ``if`` statements, ``for`` and ``while`` loops) to
+            Catalyst-compatible control flow, and more. For more details, see the
             :doc:`AutoGraph guide </dev/autograph>`.
         autograph_include: A list of (sub)modules to be allow-listed for autograph conversion.
         async_qnodes (bool): Experimental support for automatically executing
             QNodes asynchronously, if supported by the device runtime.
-        target (str): the compilation target
-        keep_intermediate (bool): Whether or not to store the intermediate files throughout the
-            compilation. If ``True``, intermediate representations are available via the
-            :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
-            different stages in the optimization process.
+        target (str): The compilation target.
+        keep_intermediate (Union[str, int, bool]): Level controlling intermediate file generation.
+
+            - ``False`` or ``0`` or ``"none"`` or ``None`` (default): No intermediate file is kept.
+            - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
+            - ``2`` or ``"changed"``: Intermediate files are saved after each pass only if changed.
+            - ``3`` or ``"pass"``: Intermediate files are saved after each pass, even if unchanged.
+            If enabled, intermediate representations are available via the following attributes:
+
+            - :attr:`~.QJIT.jaxpr`: JAX program representation
+            - :attr:`~.QJIT.mlir`: MLIR representation after canonicalization
+            - :attr:`~.QJIT.mlir_opt`: MLIR representation after optimization
+            - :attr:`~.QJIT.llvmir`: LLVM IR representation
+        use_nameloc (bool): If ``True``, function parameter names are added to the IR as name
+            locations.
         verbose (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
             printed out.
         logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
@@ -124,9 +140,9 @@ def qjit(
             elements of this list are named sequences of MLIR passes to be executed. A ``None``
             value (the default) results in the execution of the default pipeline. This option is
             considered to be used by advanced users for low-level debugging purposes.
-        static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
+        static_argnums(int or Seqence[Int]): An index or a sequence of indices that specifies the
             positions of static arguments.
-        static_argnames(str or Seqence[str]): a string or a sequence of strings that specifies the
+        static_argnames(str or Seqence[str]): A string or a sequence of strings that specifies the
             names of static arguments.
         abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
             An experimental option to specify dynamic tensor shapes.
@@ -145,9 +161,6 @@ def qjit(
             :func:`qml.sample() <pennylane.sample>`, :func:`qml.counts() <pennylane.counts>`,
             :func:`qml.probs() <pennylane.probs>`, :func:`qml.expval() <pennylane.expval>`,
             :func:`qml.var() <pennylane.var>`.
-        experimental_capture (bool): If set to ``True``, the qjit decorator
-            will use PennyLane's experimental program capture capabilities
-            to capture the decorated function for compilation.
         circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
             A dictionary that specifies the quantum circuit transformation pass pipeline order,
             and optionally arguments for each pass in the pipeline. Keys of this dictionary
@@ -159,6 +172,23 @@ def qjit(
             If not specified, the default pass pipeline will be applied.
         pass_plugins (Optional[List[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[List[Path]]): List of paths to dialect plugins.
+        capture (str or bool): Controls whether to use PennyLane program capture for tracing.
+            This allows enabling capture locally for this QJIT without affecting the global
+            ``qml.capture.enabled()`` state.
+
+            - ``"global"`` (default): Defer to ``qml.capture.enabled()`` to decide whether
+              to use program capture.
+            - ``True``: Force program capture on for this QJIT, regardless of the global setting.
+              This allows using the new capture-based frontend without calling
+              ``qml.capture.enable()`` globally.
+            - ``False``: Force program capture off for this QJIT, using the old frontend,
+              regardless of the global setting.
+        skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
+            If ``True``, transforms used to preprocess and validate the user program before
+            executing on a quantum backend will not be used, and the user is expected to ensure
+            the validity of the program themselves. If ``capture=False``, or ``capture="global"``
+            and ``qml.capture.enabled() == False``, this argument will be ignored. ``False``
+            by default.
 
     Returns:
         QJIT object.
@@ -433,6 +463,57 @@ def qjit(
 
         the ``sum_abstracted`` function would only compile once and its definition would be
         reused for subsequent function calls.
+
+    .. _qubit_invariant_compilation:
+    .. details::
+        :title: Qubit-invariant compilation
+
+        In general, the inputs and outputs of the function being qjitted must have static types
+        and shapes. Otherwise, recompilation is triggered.
+
+        Out of all the :ref:`Catalyst-supported terminal measurements <measurements>`, there are
+        four that have a return shape that depend on the number of qubits. Namely, the return shape
+        of :func:`qml.probs() <pennylane.probs>` and :func:`qml.state() <pennylane.state>` is a 1D
+        array of size ``(2**num_qubits)``, the return shape of :func:`qml.sample() <pennylane.sample>`
+        is a 2D array of size ``(shots, num_qubits)``, and the return shape of
+        :func:`qml.counts() <pennylane.counts>` is two 1D arrays of size ``(2**num_qubits)``.
+        The general rule of recompilation mentioned above would imply that changing the number of qubits
+        in a workflow that returns any of these four measurements triggers recompilation.
+
+        However, Catalyst offers a powerful exception to this rule with **qubit-invariant compilation**:
+        the same compiled QNode can be invoked with a different number of qubits! This is especially
+        helpful for workflows where you would like to, for example, iterate through the wires without
+        knowing how many of them there are in advance. For instance, many workflows (such as `Grover's
+        algorithm <https://pennylane.ai/qml/demos/tutorial_grovers_algorithm>`_) have
+        an entangling layer at the beginning, where a Hadamard gate is applied to every wire.
+
+        To use this feature, the PennyLane device needs to be instantiated within the qjitted
+        function, or another function within its call graph. The ``wires`` parameter can then be
+        any (integer) program value, such as one of the function arguments.
+
+        .. code-block:: python
+
+            @qjit
+            def workflow(num_qubits):
+                print("compiling...")
+                dev = qml.device("lightning.qubit", wires=num_qubits)
+
+                @qml.qnode(dev)
+                def circuit():
+                    @catalyst.for_loop(0, num_qubits, 1)
+                    def entangle_all_qubits(i):
+                        qml.Hadamard(wires=i)
+                    entangle_all_qubits()
+
+                    return qml.probs()
+
+                return circuit()
+
+        >>> workflow(2)  # the first call, compilation occurs here
+        compiling...
+        [0.25 0.25 0.25 0.25]
+        >>> workflow(3)  # the precompiled quantum function is called
+        [0.125 0.125 0.125 0.125 0.125 0.125 0.125 0.125]
     """
     kwargs = copy.copy(locals())
     kwargs.pop("fn")
@@ -463,8 +544,8 @@ class QJIT(CatalystCallable):
                              object to compile, as is, without any modifications
     :ivar jaxpr: This attribute stores the Jaxpr compiled from the function as a string.
     :ivar mlir: This attribute stores the MLIR compiled from the function as a string.
-    :ivar qir: This attribute stores the QIR in LLVM IR form compiled from the function as a string.
-
+    :ivar llvmir: This attribute stores the LLVM IR representation compiled from the function as
+                  a string.
     """
 
     @debug_logger_init
@@ -486,6 +567,7 @@ class QJIT(CatalystCallable):
         # IRs are only available for the most recently traced function.
         self.jaxpr = None
         self.mlir_module = None
+        self.llvm_ir = None
         self.out_type = None
         self.overwrite_ir = None
         self.use_cwd_for_workspace = self.compile_options.keep_intermediate
@@ -499,7 +581,10 @@ class QJIT(CatalystCallable):
                 fn, compile_options.static_argnames, compile_options.static_argnums
             )
 
-        self.user_function = self.pre_compilation()
+        # Resolve effective capture mode and enforce it during pre_compilation
+        target_mode = self._get_effective_capture_mode()
+        with _ensure_capture_mode(target_mode):
+            self.user_function = self.pre_compilation()
 
         # Static arguments require values, so we cannot AOT compile.
         if self.user_sig is not None and not self.compile_options.static_argnums:
@@ -507,21 +592,50 @@ class QJIT(CatalystCallable):
 
         super().__init__("user_function")
 
+    def _get_effective_capture_mode(self):
+        """Calculate the effective capture mode for this QJIT instance.
+
+        This implements the 'scope enforcement' pattern: rather than managing
+        state transitions, we simply determine what the capture mode *must be*
+        for this QJIT and let the context manager handle the rest.
+
+        Returns:
+            bool: The effective capture mode.
+                - If capture='global', use current qml.capture.enabled() state
+                - If capture=True/False, use that explicit value
+        """
+        capture_option = self.compile_options.capture
+        if capture_option == "global":
+            # Defer to current global state
+            return qml.capture.enabled()
+        # Explicit True/False override
+        return capture_option
+
     @property
     def mlir(self):
-        """obtain the MLIR representation after canonicalization"""
+        """Obtain the MLIR representation after canonicalization"""
         # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
         if not self.mlir_module:
             return None
-        options = copy.deepcopy(self.compile_options)
-        options.pipelines = [("0_canonicalize", ["canonicalize"])]
-        options.lower_to_llvm = False
-        options.keep_intermediate = True
-        canonicalizer = Compiler(options)
 
-        # TODO: the in-memory and textual form are different after this, consider unification
-        _, mlir_string = canonicalizer.run(self.mlir_module, self.workspace)
-        return mlir_string
+        stdin = self.mlir_module.operation.get_asm(
+            enable_debug_info=self.compile_options.use_nameloc
+        )
+        return canonicalize(stdin=stdin, options=self.compile_options)
+
+    @property
+    def mlir_opt(self):
+        """Obtain the MLIR representation after optimization"""
+        if not self.mlir_module:
+            return None
+        using_python_compiler = self.compiler.is_using_python_compiler(self.mlir_module)
+        stdin = self.mlir_module.operation.get_asm(
+            print_generic_op_form=using_python_compiler,
+            enable_debug_info=self.compile_options.use_nameloc,
+        )
+        return to_mlir_opt(
+            stdin=stdin, options=self.compile_options, using_python_compiler=using_python_compiler
+        )
 
     @debug_logger
     def __call__(self, *args, **kwargs):
@@ -550,35 +664,37 @@ class QJIT(CatalystCallable):
     @debug_logger
     def aot_compile(self):
         """Compile Python function on initialization using the type hint signature."""
-
         self.workspace = self._get_workspace()
 
         # TODO: awkward, refactor or redesign the target feature
-        if self.compile_options.target in ("jaxpr", "mlir", "binary"):
+        if self.compile_options.target in ("jaxpr", "mlir", "llvmir", "binary"):
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
                 self.user_sig or ()
             )
 
-        if self.compile_options.target in ("mlir", "binary"):
+        if self.compile_options.target in ("mlir", "llvmir", "binary"):
             self.mlir_module = self.generate_ir()
 
-        if self.compile_options.target in ("binary",):
-            self.compiled_function, _ = self.compile()
+        if self.compile_options.target in ("llvmir", "binary"):
+            self.compiled_function, self.llvm_ir = self.compile()
+
+        if self.compile_options.target in ("binary",) and self.compile_options.link:
             self.fn_cache.insert(
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
 
     @property
-    def qir(self):
+    def llvmir(self):
         """LLVMIR textual representation."""
+        if self.llvm_ir is not None:
+            return self.llvm_ir
+
         if not self.mlir_module:
             return None
 
-        orig = copy.deepcopy(self.compile_options)
-        self.compile_options.keep_intermediate = True
-        _, _qir = self.compile()
-        self.compile_options = orig
-        return _qir
+        _mlir = str(self.mlir_module)
+        self.llvm_ir = to_llvmir(stdin=_mlir, options=self.compile_options)
+        return self.llvm_ir
 
     @debug_logger
     def jit_compile(self, args, **kwargs):
@@ -591,11 +707,13 @@ class QJIT(CatalystCallable):
             bool: whether the provided arguments will require promotion to be used with the compiled
                   function
         """
+        opts = self.compile_options
+        assert opts.lower_to_llvm and opts.link, "invalid options for jit_compile"
 
         cached_fn, requires_promotion = self.fn_cache.lookup(args)
 
         if cached_fn is None:
-            if self.user_sig and not self.compile_options.static_argnums:
+            if self.user_sig and not opts.static_argnums:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
 
@@ -611,7 +729,7 @@ class QJIT(CatalystCallable):
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
 
             self.mlir_module = self.generate_ir()
-            self.compiled_function, _ = self.compile()
+            self.compiled_function, self.llvm_ir = self.compile()
 
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
@@ -634,6 +752,12 @@ class QJIT(CatalystCallable):
     def pre_compilation(self):
         """Perform pre-processing tasks on the Python function, such as AST transformations."""
         if self.compile_options.autograph:
+            if qml.capture.enabled():
+                if self.compile_options.autograph_include:
+                    raise NotImplementedError(
+                        "capture autograph does not yet support autograph_include."
+                    )
+                return qml.capture.run_autograph(self.original_function)
             return run_autograph(self.original_function, *self.compile_options.autograph_include)
 
         return self.original_function
@@ -659,18 +783,50 @@ class QJIT(CatalystCallable):
         dynamic_sig = get_abstract_signature(dynamic_args)
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
-        if self.compile_options.experimental_capture:
-            return trace_from_pennylane(
-                self.user_function, static_argnums, abstracted_axes, full_sig, kwargs
-            )
+        dbg = debug_info("qjit_capture", self.user_function, args, kwargs)
+
+        # Scope Enforcement: Calculate effective mode and enter scope.
+        # The context manager handles ALL enabling/disabling/restoring.
+        target_mode = self._get_effective_capture_mode()
+        with _ensure_capture_mode(target_mode):
+            if target_mode:
+                # New capture pathway
+                return trace_from_pennylane(
+                    self.user_function,
+                    static_argnums,
+                    dynamic_args,
+                    abstracted_axes,
+                    full_sig,
+                    kwargs,
+                    skip_preprocess=self.compile_options.skip_preprocess,
+                    debug_info=dbg,
+                )
+            else:
+                # Legacy pathway
+                return self._trace_legacy_pathway(
+                    static_argnums, abstracted_axes, dynamic_sig, full_sig, kwargs, dbg
+                )
+
+    def _trace_legacy_pathway(
+        self, static_argnums, abstracted_axes, dynamic_sig, full_sig, kwargs, dbg
+    ):  # pylint: disable=too-many-arguments, too-many-positional-arguments
+        """Trace the function using the legacy (non-capture) pathway.
+
+        This method is used when qml.capture is disabled, using the old
+        QNode patching approach.
+        """
 
         def closure(qnode, *args, **kwargs):
             params = {}
             params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
             params["_out_tree_expected"] = []
+            params["_classical_return_indices"] = []
+            params["_num_mcm_expected"] = []
             default_pass_pipeline = self.compile_options.circuit_transform_pipeline
             pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
             params["pass_pipeline"] = pass_pipeline
+            params["debug_info"] = dbg
+
             return QFunc.__call__(
                 qnode,
                 *args,
@@ -682,11 +838,7 @@ class QJIT(CatalystCallable):
         ):
             # TODO: improve PyTree handling
             jaxpr, out_type, treedef, plugins = trace_to_jaxpr(
-                self.user_function,
-                static_argnums,
-                abstracted_axes,
-                full_sig,
-                kwargs,
+                self.user_function, static_argnums, abstracted_axes, full_sig, kwargs, dbg
             )
             self.compile_options.pass_plugins.update(plugins)
             self.compile_options.dialect_plugins.update(plugins)
@@ -701,8 +853,9 @@ class QJIT(CatalystCallable):
         Returns:
             Tuple[ir.Module, str]: the in-memory MLIR module and its string representation
         """
-
-        mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__)
+        mlir_module, ctx = lower_jaxpr_to_mlir(
+            self.jaxpr, self.__name__, get_arg_names(self.jaxpr.in_avals, self.original_function)
+        )
 
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)
@@ -717,7 +870,6 @@ class QJIT(CatalystCallable):
         Returns:
             Tuple[CompiledFunction, str]: the compilation result and LLVMIR
         """
-
         # WARNING: assumption is that the first function is the entry point to the compiled program.
         entry_point_func = self.mlir_module.body.operations[0]
         restype = entry_point_func.type.results
@@ -742,10 +894,12 @@ class QJIT(CatalystCallable):
         else:
             shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
 
+        if not self.compile_options.link:
+            return None, llvm_ir
+
         compiled_fn = CompiledFunction(
             shared_object, func_name, restype, self.out_type, self.compile_options
         )
-
         return compiled_fn, llvm_ir
 
     @instrument(has_finegrained=True)
@@ -760,7 +914,6 @@ class QJIT(CatalystCallable):
         Returns:
             Any: results of the execution arranged into the original function's output PyTrees
         """
-
         results = self.compiled_function(*args, **kwargs)
 
         # TODO: Move this to the compiled function object.
@@ -780,7 +933,6 @@ class QJIT(CatalystCallable):
 
     def _get_workspace(self):
         """Get or create a workspace to use for compilation."""
-
         workspace_name = self.__name__
         preferred_workspace_dir = os.getcwd() if self.use_cwd_for_workspace else None
 
@@ -816,7 +968,7 @@ class JAX_QJIT:
     def wrap_callback(qjit_function, *args, **kwargs):
         """Wrap a QJIT function inside a jax host callback."""
         data = jax.pure_callback(
-            qjit_function, qjit_function.jaxpr.out_avals, *args, vectorized=False, **kwargs
+            qjit_function, qjit_function.jaxpr.out_avals, *args, vmap_method="sequential", **kwargs
         )
 
         # Unflatten the return value w.r.t. the original PyTree definition if available
@@ -896,3 +1048,46 @@ class JAX_QJIT:
     @debug_logger
     def __call__(self, *args, **kwargs):
         return self.jaxed_function(*args, **kwargs)
+
+
+@contextmanager
+def _ensure_capture_mode(enable_capture: bool):
+    """Enforce the PennyLane capture state for the duration of the context.
+
+    This context manager safely transitions the global ``qml.capture`` state to
+    the requested state and guarantees restoration of the previous state upon
+    exit, regardless of exceptions.
+
+    This implements "scope enforcement" rather than "state management": you don't
+    care what the global state *was*; you only care what it *must be* for the
+    duration of this scope. The context manager handles all toggling automatically.
+
+    Args:
+        enable_capture (bool): The desired capture state within the context.
+            - ``True``: Enable PennyLane capture (use new capture pathway)
+            - ``False``: Disable PennyLane capture (use legacy pathway)
+
+    Note:
+        This context manager is re-entrant and nesting-safe. Nested calls will
+        each restore to their own previous state, protecting against nested
+        toggles drifting out of sync.
+    """
+    # 1. Snapshot the pre-existing state
+    was_enabled = qml.capture.enabled()
+
+    # 2. Enforce the requested state (only toggle if necessary)
+    if enable_capture and not was_enabled:
+        qml.capture.enable()
+    elif not enable_capture and was_enabled:
+        qml.capture.disable()
+
+    try:
+        yield
+    finally:
+        # 3. Restore the original state directly from snapshot
+        # We restore 'was_enabled' directly rather than just toggling back,
+        # which protects against nested toggles drifting out of sync.
+        if was_enabled:
+            qml.capture.enable()
+        else:
+            qml.capture.disable()

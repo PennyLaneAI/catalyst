@@ -5,16 +5,16 @@ message(STATUS "Using EnzymeConfig.cmake in: ${Enzyme_DIR}")
 find_library(ENZYME_LIB EnzymeStatic-${LLVM_VERSION_MAJOR} PATHS ${Enzyme_DIR}/Enzyme/)
 message(STATUS "Found Enzyme lib: ${ENZYME_LIB}")
 
-include_directories(${ENZYME_SRC_DIR}/enzyme/Enzyme)
+include_directories(SYSTEM ${ENZYME_SRC_DIR}/enzyme/Enzyme)
 
 # Experimentally found through removing items
 # from llvm/tools/llc/CMakeLists.txt.
 # It does make sense that we need the parser to parse MLIR
 # and the codegen to codegen.
 set(LLVM_LINK_COMPONENTS
-  AllTargetsAsmParsers
-  AllTargetsCodeGens
-  )
+    AllTargetsAsmParsers
+    AllTargetsCodeGens
+)
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
@@ -23,25 +23,36 @@ set(LIBS
     ${dialect_libs}
     ${conversion_libs}
     ${extension_libs}
+    ExternalStablehloLib
     MLIROptLib
     MLIRCatalyst
-    MLIRCatalystTransforms
+    catalyst-analysis
+    catalyst-transforms
+    catalyst-stablehlo-transforms
     MLIRQuantum
     quantum-transforms
-    MLIRQEC
-    qec-transforms
+    MLIRQRef
+    qref-transforms
+    MLIRPBC
+    pbc-transforms
     MLIRGradient
     gradient-transforms
+    MLIRMBQC
+    mbqc-transforms
     MLIRMitigation
     mitigation-transforms
+    MLIRPauliFrame
+    pauli-frame-transforms
     MLIRIon
     ion-transforms
-    MhloRegisterDialects
-    StablehloRegister
+    MLIRRTIO
+    rtio-transforms
+    MLIRQecLogical
+    MLIRQecPhysical
     MLIRCatalystTest
-    ${ALL_MHLO_PASSES}
     ${ENZYME_LIB}
     CatalystCompilerDriver
+    MLIRTestDialect
 )
 
 add_mlir_tool(catalyst-cli catalyst-cli.cpp SUPPORT_PLUGINS)

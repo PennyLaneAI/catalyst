@@ -26,7 +26,8 @@ from typing import Callable, Sequence
 import numpy as np
 import pennylane as qml
 from utils import print_jaxpr, print_mlir
-from utils import qjit_for_tests as qjit
+
+from catalyst import qjit
 
 
 def test_multiple_tape_transforms():
@@ -63,12 +64,14 @@ def test_multiple_tape_transforms():
 
     # CHECK: circuit_twotapes
     # CHECK: call_jaxpr={ lambda ;
-    # CHECK: qdevice[
+    # CHECK: device_init[
     # CHECK: ]
     # CHECK: qdealloc
-    # CHECK: qdevice[
+    # CHECK-NEXT: device_release
+    # CHECK: device_init[
     # CHECK: ]
     # CHECK: qdealloc
+    # CHECK-NEXT: device_release
     # CHECK-NEXT: {{.+}}:f64[] = add {{.+}} {{.+}}
     print_jaxpr(circuit_twotapes, [0.1, 0.2])
 

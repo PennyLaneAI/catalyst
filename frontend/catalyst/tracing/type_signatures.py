@@ -22,9 +22,10 @@ import inspect
 from typing import Callable
 
 import jax
+from jax._src.core import DShapedArray, shaped_abstractify
 from jax._src.interpreters.partial_eval import infer_lambda_input_type
 from jax._src.pjit import _flat_axes_specs
-from jax.api_util import shaped_abstractify
+from jax.core import AbstractValue
 from jax.tree_util import tree_flatten, tree_unflatten
 
 from catalyst.jax_extras import get_aval2
@@ -56,7 +57,7 @@ def params_are_annotated(fn: Callable):
     are_annotated = all(annotation is not inspect.Parameter.empty for annotation in annotations)
     if not are_annotated:
         return False
-    return all(isinstance(annotation, (type, jax.core.ShapedArray)) for annotation in annotations)
+    return all(isinstance(annotation, (type, AbstractValue)) for annotation in annotations)
 
 
 def get_type_annotations(fn: Callable):
@@ -323,3 +324,28 @@ def promote_arguments(target_signature, args):
         promoted_args.append(promoted_arg)
 
     return tree_unflatten(treedef, promoted_args)
+
+
+def get_arg_names(qjit_jaxpr_in_avals: tuple[AbstractValue, ...], qjit_original_function: Callable):
+    """Construct a list of argument names, with the size of qjit_jaxpr_in_avals, and fill it with
+    the names of the parameters of the original function signature.
+    The number of parameters of the original function could be different to the number of
+    elements in qjit_jaxpr_in_avals. For example, if a function with one parameter is invoked with a
+    dynamic argument, qjit_jaxpr_in_avals will contain two elements (a dynamically-shaped array, and
+    its type).
+
+    Args:
+        qjit_jaxpr_in_avals: list of abstract values that represent the inputs to the QJIT's JAXPR
+        qjit_original_function: QJIT's original function
+
+    Returns:
+        A list of argument names with the same number of elements than qjit_jaxpr_in_avals.
+        The argument names are assigned from the list of parameters of the original function,
+        in order, and until that list is empty. Then left to empty strings.
+    """
+    arg_names = [""] * len(qjit_jaxpr_in_avals)
+    param_values = [p.name for p in inspect.signature(qjit_original_function).parameters.values()]
+    for in_aval_index, in_aval in enumerate(qjit_jaxpr_in_avals):
+        if len(param_values) > 0 and type(in_aval) != DShapedArray:
+            arg_names[in_aval_index] = param_values.pop(0)
+    return arg_names
