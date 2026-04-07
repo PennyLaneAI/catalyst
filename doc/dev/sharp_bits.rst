@@ -793,8 +793,7 @@ that implementation. The ``commute_controlled`` pass is applied as a tape
 transform since it does not have an MLIR implementation.
 
 However, if we were to swap ``cancel_inverses`` and ``commute_controlled`` like
-below, ``cancel_inverses`` would be applied as a tape transform since it does
-not have an MLIR implementation.
+below, ``cancel_inverses`` would now be applied as a tape transform since it comes after ``commute_controlled``.
 
 .. code-block:: python
 
