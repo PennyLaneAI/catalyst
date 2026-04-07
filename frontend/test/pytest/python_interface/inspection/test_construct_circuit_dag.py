@@ -21,7 +21,7 @@ from unittest.mock import MagicMock, Mock
 import jax
 import pennylane as qml
 import pytest
-from xdsl.dialects import builtin, func, test
+from xdsl.dialects import test
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir import Operation
 from xdsl.ir.core import Block, Region
