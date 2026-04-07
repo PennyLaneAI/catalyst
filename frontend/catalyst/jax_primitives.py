@@ -625,7 +625,7 @@ def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr, **params):
 
     # Set the visibility of the decomposition rule to public
     # to avoid the elimination by the compiler
-    lower_callable(ctx, pyfun, func_jaxpr, public=True, **params)
+    lower_callable(ctx, pyfun, func_jaxpr, public=False, **params)
     return ()
 
 

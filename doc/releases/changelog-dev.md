@@ -282,6 +282,9 @@
   [(#2531)](https://github.com/PennyLaneAI/catalyst/pull/2531)
   [(#2619)](https://github.com/PennyLaneAI/catalyst/pull/2531)
 
+* Decomposition rules are lowered as private functions (instead of public).
+  [(#2658)](https://github.com/PennyLaneAI/catalyst/pull/2658)
+
 * A new optimization pass has been added to reduce the number of instructions in a quantum program,
   `--merge-global-phase`, which safely combines global phase instructions for each region in the
   program. The xDSL version written in Python has been removed.
