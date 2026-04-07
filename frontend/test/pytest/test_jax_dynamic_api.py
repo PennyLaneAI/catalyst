@@ -40,10 +40,10 @@ def assert_array_and_dtype_equal(a, b):
     assert a.dtype == b.dtype
 
 
-def test_qjit_abstracted_axes():
+def test_qjit_abstracted_axes(capture_mode):
     """Test that qjit accepts dynamical arguments."""
 
-    @qjit(abstracted_axes={0: "n"})
+    @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
     def identity(a):
         return a
 
@@ -112,7 +112,7 @@ def test_qnode_dynamic_structured_results():
 
 @pytest.mark.parametrize("dtype", DTYPES)
 @pytest.mark.parametrize("shape", SHAPES)
-def test_classical_tracing_init(shape, dtype):
+def test_classical_tracing_init(shape, dtype, capture_mode):
     """Test that tensor primitive work in the classical tracing mode"""
 
     assert_array_and_dtype_equal(
@@ -128,7 +128,7 @@ def test_classical_tracing_init(shape, dtype):
         qjit(lambda s: jnp.zeros(s, dtype))(shape), jnp.zeros(shape, dtype=dtype)
     )
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(s):
         res = jnp.empty(shape=s, dtype=dtype)
         return res
@@ -146,13 +146,13 @@ def test_classical_tracing_init(shape, dtype):
         jnp.abs,
     ],
 )
-def test_classical_tracing_unary_ops(op):
+def test_classical_tracing_unary_ops(op, capture_mode):
     """Test that tensor primitives work with basic unary operations"""
 
     shape = (3, 4)
     dtype = complex
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(s):
         return op(jnp.ones(s, dtype))
 
@@ -168,20 +168,20 @@ def test_classical_tracing_unary_ops(op):
         (lambda x, y: x / y),
     ],
 )
-def test_classical_tracing_binary_ops(op):
+def test_classical_tracing_binary_ops(op, capture_mode):
     """Test that tensor primitives work with basic binary operations"""
 
     shape = (3, 4)
     dtype = complex
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(s):
         return op(jnp.ones(s, dtype), jnp.ones(s, dtype))
 
     assert_array_and_dtype_equal(f(shape), op(jnp.ones(shape, dtype), jnp.ones(shape, dtype)))
 
 
-def test_classical_tracing_binary_ops_3D():
+def test_classical_tracing_binary_ops_3D(capture_mode):
     """Test that tensor primitives work with basic binary operations on 3D arrays"""
     # TODO: Merge with the binary operations test after fixing
     # pylint: disable=unnecessary-lambda-assignment
@@ -190,7 +190,7 @@ def test_classical_tracing_binary_ops_3D():
     dtype = complex
     op = lambda a, b: a + b
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(s):
         return op(jnp.ones(s, dtype), jnp.ones(s, dtype))
 
@@ -198,12 +198,12 @@ def test_classical_tracing_binary_ops_3D():
 
 
 @pytest.mark.parametrize("shape,idx", [((1, 2, 3), (0, 1, 2)), ((3,), (2,))])
-def test_access_dynamic_array_static_index(shape, idx):
+def test_access_dynamic_array_static_index(shape, idx, capture_mode):
     """Test accessing dynamic array elements using static indices"""
 
     dtype = complex
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(s):
         return jnp.ones(s, dtype)[idx]
 
@@ -213,12 +213,12 @@ def test_access_dynamic_array_static_index(shape, idx):
 
 
 @pytest.mark.parametrize("shape,idx", [((1, 2, 3), (0, 1, -2)), ((3,), (2,))])
-def test_access_dynamic_array_dynamic_index(shape, idx):
+def test_access_dynamic_array_dynamic_index(shape, idx, capture_mode):
     """Test accessing dynamic array elements using dynamic indices"""
 
     dtype = complex
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(s, i):
         return jnp.ones(s, dtype)[i]
 
@@ -229,12 +229,12 @@ def test_access_dynamic_array_dynamic_index(shape, idx):
 
 @pytest.mark.xfail(reason="MLIR is incompatible with our pipeline")
 @pytest.mark.parametrize("shape,idx,val", [((1, 2, 3), (0, 1, 2), 1j), ((3,), (2,), 0)])
-def test_modify_dynamic_array_dynamic_index(shape, idx, val):
+def test_modify_dynamic_array_dynamic_index(shape, idx, val, capture_mode):
     """Test dynamic array modification using dynamic indices"""
 
     dtype = complex
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(s, i):
         return jnp.ones(s, dtype).at[i].set(val)
 
@@ -244,13 +244,13 @@ def test_modify_dynamic_array_dynamic_index(shape, idx, val):
 
 
 @pytest.mark.xfail(reason="Slicing is not supported by JAX?")
-def test_slice_dynamic_array_dynamic_index():
+def test_slice_dynamic_array_dynamic_index(capture_mode):
     """Test dynamic array modification using dynamic indices"""
 
     shape = (1, 2, 3)
     dtype = complex
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(s):
         return jnp.ones(s, dtype)[0, 1, 0:1]
 
@@ -258,10 +258,10 @@ def test_slice_dynamic_array_dynamic_index():
     assert f"tensor<{'x'.join(['?']*len(shape))}xcomplex<f64>>" in f.mlir
 
 
-def test_classical_tracing_2():
+def test_classical_tracing_2(capture_mode):
     """Test that tensor primitive work in the classical tracing mode, the traced dimension case"""
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(x):
         return jnp.ones(shape=[1, x], dtype=int)
 
@@ -324,18 +324,18 @@ def test_quantum_tracing_2():
         [1, jnp.array(2, dtype=float)],
     ],
 )
-def test_invalid_shapes(bad_shape):
+def test_invalid_shapes(bad_shape, capture_mode):
     """Test the unsupported shape formats"""
 
     def f():
         return jnp.empty(shape=bad_shape, dtype=int)
 
     with pytest.raises(TypeError, match="Shapes must be 1D sequences of integer scalars"):
-        qjit(f)
+        qjit(f, capture=capture_mode)
 
 
 @pytest.mark.skip("Jax does not detect error in this use-case")
-def test_invalid_shapes_2():
+def test_invalid_shapes_2(capture_mode):
     """Test the unsupported shape formats"""
     bad_shape = jnp.array([[3, 2]], dtype=int)
 
@@ -343,13 +343,13 @@ def test_invalid_shapes_2():
         return jnp.empty(shape=bad_shape, dtype=int)
 
     with pytest.raises(TypeError):
-        qjit(f)
+        qjit(f, capture=capture_mode)
 
 
-def test_accessing_shapes():
+def test_accessing_shapes(capture_mode):
     """Test that dynamic tensor shapes are available for calculations"""
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(sz):
         a = jnp.ones((sz, sz))
         sa = jnp.array(a.shape)
@@ -358,25 +358,26 @@ def test_accessing_shapes():
     assert f(3) == 6
 
 
-def test_no_recompilation():
+def test_no_recompilation(capture_mode):
     """Test that the function is not recompiled when changing the argument shape across
     invocations."""
 
-    @qjit(abstracted_axes={0: "n"})
+    @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
     def i(x):
         return x
 
     i(jnp.array([1]))
+
     _id0 = id(i.compiled_function)
     i(jnp.array([1, 1]))
     _id1 = id(i.compiled_function)
     assert _id0 == _id1
 
 
-def test_array_indexing():
+def test_array_indexing(capture_mode):
     """Test the support of indexing of dynamically-shaped arrays"""
 
-    @qjit
+    @qjit(capture=capture_mode)
     def fun(sz, idx):
         r = jnp.ones((sz, 3, sz + 1), dtype=int)
         return r[idx, 2, idx]
@@ -385,10 +386,10 @@ def test_array_indexing():
     assert res == 1
 
 
-def test_array_assignment():
+def test_array_assignment(capture_mode):
     """Test the support of assigning a value to a dynamically-shaped array"""
 
-    @qjit
+    @qjit(capture=capture_mode)
     def fun(sz, idx, val):
         r = jnp.ones((sz, 3, sz), dtype=int)
         r = r.at[idx, 0, idx].set(val)
