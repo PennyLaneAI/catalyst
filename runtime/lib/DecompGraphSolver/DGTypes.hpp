@@ -45,14 +45,20 @@ namespace DecompGraph::Core {
  */
 struct OperatorNode {
     std::string name;
-    std::int64_t numWires{-1};
-    std::int64_t numParams{-1};
+    int numWires{-1};
+    int numParams{-1};
     bool adjoint{false};
 
     bool operator==(const OperatorNode &other) const
     {
-        return name == other.name && numWires == other.numWires && numParams == other.numParams &&
-               adjoint == other.adjoint;
+        // For equality, we consider numWires and numParams conditionally equal
+        // if they are not set to -1 (which indicates a wildcard that can match any value).
+        const bool default_wires =
+            (numWires == -1 || other.numWires == -1 || numWires == other.numWires);
+        const bool default_params =
+            (numParams == -1 || other.numParams == -1 || numParams == other.numParams);
+
+        return name == other.name && default_wires && default_params && adjoint == other.adjoint;
     }
     bool operator!=(const OperatorNode &other) const { return !(*this == other); }
 };
@@ -61,19 +67,21 @@ struct OperatorNode {
  * @brief A hash function for OperatorNode to be used in unordered containers.
  *
  * This struct provides a custom hash function for OperatorNode, allowing it to be used as
- * a key in unordered maps or sets. The hash is computed based on the name, number of wires,
- * and number of parameters.
+ * a key in unordered maps or sets. The hash is computed based on the name of the operator.
+ *
+ * Note: The hash function only considers the name of the operator for hashing, which means that
+ * different OperatorNode instances with the same name but different numWires, numParams, or
+ * adjoint values will have the same hash. This is intentional to allow for wildcard matching
+ * based on the name, but it also means that care must be taken when using OperatorNode
+ * instances (such as MultiRZ) that may have the same name but different parameters,
+ * as they will be treated as the same key in hash-based containers.
+ * The number of wires and parameters can be incoded in the name if needed to distinguish them
+ * in the hash when converting MLIR operations to OperatorNodes.
  */
 struct OperatorNodeHash {
     std::size_t operator()(const OperatorNode &node) const
     {
-        std::size_t h1 = std::hash<std::string>{}(node.name);
-        std::size_t h2 = std::hash<std::size_t>{}(node.numWires);
-        std::size_t h3 = std::hash<std::size_t>{}(node.numParams);
-        std::size_t h4 = std::hash<bool>{}(node.adjoint);
-
-        // Combine the hash values
-        return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3);
+        return std::hash<std::string>{}(node.name);
     }
 };
 
@@ -83,27 +91,7 @@ struct OperatorNodeHash {
 struct WeightedGateset {
     std::unordered_map<OperatorNode, double, OperatorNodeHash> ops;
 
-    [[nodiscard]] bool contains(const OperatorNode &op) const
-    {
-        // we are assuming that the gateset can be defined without numWires, numParams and adjoint,
-        // so we need to check iteratively for a matching operator in the gateset, allowing for
-        // flexible matching based on name only!
-        for (const auto &[gate_op, _] : ops) {
-            if (gate_op.name == op.name) {
-                // TODO: This can be fixed when we capture and lower
-                // the gateset as fully specified operators.
-                if (gate_op.adjoint == false && gate_op.numWires == -1 && gate_op.numParams == -1) {
-                    return true;
-                }
-                else if (gate_op == op) {
-                    return true;
-                }
-                return false;
-            }
-        }
-        return false;
-    }
-
+    [[nodiscard]] bool contains(const OperatorNode &op) const { return ops.find(op) != ops.end(); }
     [[nodiscard]] double getCost(const OperatorNode &op) const
     {
         auto it = ops.find(op);

@@ -137,10 +137,6 @@ Core::ChosenDecompRule DecompositionSolver::solveOperator(const Core::OperatorNo
     auto chosen = graph.isTargetGate(op) ? basisRule(op) : bestRule(op);
 
     if (!isInvalidRule(chosen)) {
-        // Debug: print the chosen rule for the operator
-        std::cerr << "Chosen rule for operator " << op.name << ": " << chosen.ruleName
-                  << " with cost " << chosen.totalCost << "\n"; // FIXME: remove after debugging
-
         solvedMap.emplace(op, chosen);
     }
     return chosen;

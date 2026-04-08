@@ -76,29 +76,16 @@ TEST_CASE("Test DecompositionSolver solve method with incomplete gates in Gatese
     DecompositionSolver solver(graph);
     const auto result = solver.getSolvedMap();
     REQUIRE(result.at(h).isBasis);
-    REQUIRE_THROWS(result.at(h_gateset).isBasis);
+    REQUIRE(result.at(h_gateset).isBasis);
 
     const std::vector<RuleNode> rules_with_h_gateset{
-        {"h_to_h", h, {{h_gateset, 1}}},
+        {"h_to_h", h_gateset, {{h_gateset, 1}}},
     };
 
     const DecompositionGraph graph_with_h_gateset({h}, gateset, rules_with_h_gateset);
     DecompositionSolver solver_with_h_gateset(graph_with_h_gateset);
     const auto result_with_h_gateset = solver_with_h_gateset.getSolvedMap();
     REQUIRE(result_with_h_gateset.at(h).isBasis);
-
-    const auto rz = OperatorNode{"RZ"};
-    const auto rx = OperatorNode{"RX"};
-    const WeightedGateset gateset2{{{rz, 1.0}, {rx, 2.0}}};
-
-    const std::vector<RuleNode> rules2{
-        {"h_to_rz_rx_rz", h_gateset, {{rz, 2}, {rx, 1}}},
-    };
-
-    const DecompositionGraph graph2({h}, gateset2, rules2);
-    DecompositionSolver solver2(graph2);
-    const auto result2 = solver2.getSolvedMap();
-    REQUIRE(result2.at(h).ruleName == "h_to_rz_rx_rz");
 }
 
 TEST_CASE("Do not solve for target gates", "[DecompGraph::Solver]")

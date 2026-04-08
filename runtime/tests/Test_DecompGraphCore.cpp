@@ -71,7 +71,7 @@ TEST_CASE("Test OperatorNodeHash", "[DecompGraph::Core]")
 
     const OperatorNodeHash hashFunc;
     REQUIRE(hashFunc(op1) == hashFunc(op2));
-    REQUIRE(hashFunc(op1) != hashFunc(op3));
+    REQUIRE(hashFunc(op1) == hashFunc(op3));
     REQUIRE(hashFunc(op1) != hashFunc(op4));
 }
 
