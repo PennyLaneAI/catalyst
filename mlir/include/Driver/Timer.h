@@ -60,7 +60,7 @@ template <IsRatio Duration = std::milli> class CPUTimeInstance {
      *
      * @return int64_t
      */
-    int64_t getTime()
+    double getTime()
     {
         if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t) == 0) {
             return static_cast<double>(t.tv_sec * Duration::den + t.tv_nsec);
