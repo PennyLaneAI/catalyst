@@ -72,18 +72,17 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
         # diagonalize measurements before converting to samples
         DiagonalizeFinalMeasurementsPass().apply(_ctx, op)
 
+        # add outer classical function to call quantum.nodes and apply post-processing
         pattern_rewriter.PatternRewriteWalker(
             AddPostProcessingPattern(pass_str="from_samples"),
             apply_recursively=False,
         ).rewrite_module(op)
 
-        greedy_applier = pattern_rewriter.GreedyRewritePatternApplier(
-            [
-                MeasurementsFromSamplesPattern(),
-            ]
-        )
-        walker = pattern_rewriter.PatternRewriteWalker(greedy_applier, apply_recursively=False)
-        walker.rewrite_module(op)
+        # match + rewrite expval, var and probs as sample + post-processing
+        pattern_rewriter.PatternRewriteWalker(
+            MeasurementsFromSamplesPattern(), 
+            apply_recursively=False
+        ).rewrite_module(op)
 
 
 measurements_from_samples_pass = compiler_transform(MeasurementsFromSamplesPass)
@@ -612,7 +611,6 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         if postprocessing_func_op is None:
             # TODO: Do we have to set the shape of the samples array statically here? Or can the
             # shape (shots, wire) be dynamic and given as SSA values?
-            # Same goes for the column/wire indices (the second argument).
             postprocessing_module = postprocessing_jit_func(
                 jax.core.ShapedArray([self._shots, n_qubits], float)
             )
@@ -686,7 +684,6 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         if postprocessing_func_op is None:
             # TODO: Do we have to set the shape of the samples array statically here? Or can the
             # shape (shots, wire) be dynamic and given as SSA values?
-            # Same goes for the column/wire indices (the second argument).
             postprocessing_module = _postprocessing_probs(
                 jax.core.ShapedArray([self._shots, n_qubits], float)
             )
