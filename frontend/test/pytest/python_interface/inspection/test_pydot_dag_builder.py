@@ -60,9 +60,9 @@ class TestUIDOwnership:
         uid2 = dag_builder.add_cluster(label="Y")
         assert uid1 != uid2
 
+
 class TestExceptions:
     """Tests the various exceptions defined in the class."""
-
 
     def test_edge_duplicate_source_destination(self):
         """Tests that a ValueError is raised when an edge is created with the
@@ -88,6 +88,7 @@ class TestExceptions:
         node_uid = dag_builder.add_node("node1")
         with pytest.raises(ValueError, match="Source is not found in the graph."):
             dag_builder.add_edge("0", node_uid)
+
 
 class TestAddMethods:
     """Test that elements can be added to the graph."""
@@ -175,26 +176,46 @@ class TestAddMethods:
         c0 = outer_cluster_list[0]
 
         inner_cluster_list = c0.get_subgraph(f"cluster_{inner_cluster_uid}")
-        assert inner_cluster_list, f"Inner cluster '{inner_cluster_uid}' not found in '{outer_cluster_uid}'"
+        assert (
+            inner_cluster_list
+        ), f"Inner cluster '{inner_cluster_uid}' not found in '{outer_cluster_uid}'"
         c1 = inner_cluster_list[0]
 
         # Check Level 0 (Root)
         assert root_graph.get_node(root_node_uid), f"{root_node_uid} not found in root"
-        assert root_graph.get_subgraph(f"cluster_{outer_cluster_uid}"), f"{outer_cluster_uid} not found in root"
-        assert not root_graph.get_node(outer_node_uid), f"{outer_node_uid} incorrectly found in root"
-        assert not root_graph.get_node(inner_node_uid), f"{inner_node_uid} incorrectly found in root"
-        assert not root_graph.get_subgraph(f"cluster_{inner_cluster_uid}"), f"{inner_cluster_uid} incorrectly found in root"
+        assert root_graph.get_subgraph(
+            f"cluster_{outer_cluster_uid}"
+        ), f"{outer_cluster_uid} not found in root"
+        assert not root_graph.get_node(
+            outer_node_uid
+        ), f"{outer_node_uid} incorrectly found in root"
+        assert not root_graph.get_node(
+            inner_node_uid
+        ), f"{inner_node_uid} incorrectly found in root"
+        assert not root_graph.get_subgraph(
+            f"cluster_{inner_cluster_uid}"
+        ), f"{inner_cluster_uid} incorrectly found in root"
 
         # Check Level 1 (c0)
         assert c0.get_node(outer_node_uid), f"{outer_node_uid} not found in {outer_cluster_uid}"
-        assert c0.get_subgraph(f"cluster_{inner_cluster_uid}"), f"{inner_cluster_uid} not found in {outer_cluster_uid}"
-        assert not c0.get_node(root_node_uid), f"{root_node_uid} incorrectly found in {outer_cluster_uid}"
-        assert not c0.get_node(inner_node_uid), f"{inner_node_uid} incorrectly found in {outer_cluster_uid}"
+        assert c0.get_subgraph(
+            f"cluster_{inner_cluster_uid}"
+        ), f"{inner_cluster_uid} not found in {outer_cluster_uid}"
+        assert not c0.get_node(
+            root_node_uid
+        ), f"{root_node_uid} incorrectly found in {outer_cluster_uid}"
+        assert not c0.get_node(
+            inner_node_uid
+        ), f"{inner_node_uid} incorrectly found in {outer_cluster_uid}"
 
         # Check Level 2 (c1)
         assert c1.get_node(inner_node_uid), f"{inner_node_uid} not found in {inner_cluster_uid}"
-        assert not c1.get_node(root_node_uid), f"{root_node_uid} incorrectly found in {inner_cluster_uid}"
-        assert not c1.get_node(outer_node_uid), f"{outer_node_uid} incorrectly found in {inner_cluster_uid}"
+        assert not c1.get_node(
+            root_node_uid
+        ), f"{root_node_uid} incorrectly found in {inner_cluster_uid}"
+        assert not c1.get_node(
+            outer_node_uid
+        ), f"{outer_node_uid} incorrectly found in {inner_cluster_uid}"
 
 
 class TestAttributes:
@@ -364,9 +385,7 @@ class TestOutput:
         dag_builder.to_file(filename + file_format)
 
         # make sure the function handles extensions correctly
-        mock_write.assert_called_once_with(
-            filename + (file_format or ".png"), format="png"
-        )
+        mock_write.assert_called_once_with(filename + (file_format or ".png"), format="png")
 
     @pytest.mark.parametrize("file_format", ["pdf", "svg", "jpeg"])
     def test_other_supported_formats(self, monkeypatch, file_format):
