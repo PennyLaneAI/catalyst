@@ -51,6 +51,9 @@ class TestIntegrationUsefulErrors:
     def test_dynamic_shots_raises_error(self, capture):
         """Test that when dynamic shots are provided, the pass raises an error"""
 
+        if capture is False:
+            pytest.xfail(reason="passes applied to workflows raise an error without program capture")
+
         @qml.qjit(capture=capture)
         @measurements_from_samples_pass
         def workflow(a, shots):
