@@ -86,7 +86,7 @@ class _WireKind(Enum):
 
 
 class _ClusterKind(Enum):
-    """Cluster types for internal tracking"""
+    """Defines the structural role for a cluster of operations."""
 
     FUNC = auto()
     FOR_LOOP = auto()
@@ -98,6 +98,7 @@ class _ClusterKind(Enum):
 
 @dataclass(frozen=True)
 class ClusterEntry:
+    """Unique descriptor for a cluster of operations."""
 
     uid: str
     kind: _ClusterKind
