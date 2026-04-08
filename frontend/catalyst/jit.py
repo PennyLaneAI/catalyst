@@ -793,7 +793,7 @@ class QJIT(CatalystCallable):
                 # New capture pathway
                 jaxpr, out_type, out_treedef = trace_from_pennylane(
                     self.user_function,
-                    args, 
+                    args,
                     kwargs,
                     static_argnums=static_argnums,
                     abstracted_axes=abstracted_axes,

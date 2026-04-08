@@ -62,9 +62,12 @@ from .qubit_handler import (
 
 _dummy_hop = jax.extend.core.Primitive("dummy_hop")
 _dummy_hop.multiple_results = True
+
+
 @_dummy_hop.def_abstract_eval
 def _dummy_abstract_eval(jaxpr, **kwargs):
     return jaxpr.out_avals
+
 
 def _tuple_to_slice(t):
     """Convert a tuple representation of a slice back to a slice object.
@@ -532,7 +535,7 @@ def handle_transform(
 # pylint: disable=too-many-positional-arguments
 def trace_from_pennylane(
     fn,
-    args, 
+    args,
     kwargs,
     static_argnums,
     abstracted_axes,
@@ -608,9 +611,10 @@ def trace_from_pennylane(
             # Therefore we need to coordinate them manually
             fn.static_argnums = static_argnums
 
-
         def wrapper(*inner_args, **inner_kwargs):
-            plxpr, out_type, out_treedef = make_jaxpr2(fn, static_argnums=static_argnums, debug_info=debug_info)(*inner_args, **inner_kwargs)
+            plxpr, out_type, out_treedef = make_jaxpr2(
+                fn, static_argnums=static_argnums, debug_info=debug_info
+            )(*inner_args, **inner_kwargs)
 
             flat_inputs = jax.tree.flatten((inner_args, inner_kwargs))[0]
             flat_inputs = [a for a in flat_inputs if qml.math.is_abstract(a)]
@@ -619,14 +623,16 @@ def trace_from_pennylane(
                 for s in a.shape:
                     if not isinstance(s, int) and s not in abstract_shapes:
                         abstract_shapes.append(s)
-            jaxpr = from_plxpr(plxpr, skip_preprocess=skip_preprocess)(*abstract_shapes, *flat_inputs)
+            jaxpr = from_plxpr(plxpr, skip_preprocess=skip_preprocess)(
+                *abstract_shapes, *flat_inputs
+            )
 
             return _dummy_hop.bind(jaxpr=jaxpr, out_type=out_type, out_treedef=out_treedef)
-        
+
         nested_jaxpr = jax.make_jaxpr(wrapper, **make_jaxpr_kwargs)(*args, **kwargs)
-        jaxpr = nested_jaxpr.eqns[0].params['jaxpr']
-        out_type = nested_jaxpr.eqns[0].params['out_type']
-        out_treedef = nested_jaxpr.eqns[0].params['out_treedef']
+        jaxpr = nested_jaxpr.eqns[0].params["jaxpr"]
+        out_type = nested_jaxpr.eqns[0].params["out_type"]
+        out_treedef = nested_jaxpr.eqns[0].params["out_treedef"]
 
     return jaxpr, out_type, out_treedef
 
