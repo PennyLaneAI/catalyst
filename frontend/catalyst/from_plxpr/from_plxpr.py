@@ -610,8 +610,8 @@ def trace_from_pennylane(
 
 
         def wrapper(*inner_args, **inner_kwargs):
-            plxpr, out_type, out_treedef = make_jaxpr2(fn, static_argnums=static_argnums)(*inner_args, **inner_kwargs)
-            print(out_type, out_treedef)
+            plxpr, out_type, out_treedef = make_jaxpr2(fn, static_argnums=static_argnums, debug_info=debug_info)(*inner_args, **inner_kwargs)
+
             flat_inputs = jax.tree.flatten((inner_args, inner_kwargs))[0]
             flat_inputs = [a for a in flat_inputs if qml.math.is_abstract(a)]
             abstract_shapes = []
