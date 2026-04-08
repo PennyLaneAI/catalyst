@@ -104,6 +104,10 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         inType = InputType::MLIR;
         catalyst::utils::LinesCount::call(*mlirModule);
         output.isCheckpointFound = options.checkpointStage == "mlir";
+
+        if (options.verbosity == Verbosity::All) {
+            llvm::outs() << "MLIR parsing successful" << "\n";
+        }
     }
     else {
         llvm::SMDiagnostic err;
@@ -118,6 +122,9 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         inType = InputType::LLVMIR;
         output.isCheckpointFound = options.checkpointStage == "LLVMIRTranslation";
         catalyst::utils::LinesCount::call(*llvmModule);
+        if (options.verbosity == Verbosity::All) {
+            llvm::outs() << "LLVMIR parsing successful" << "\n";
+        }
     }
     if (failed(verifyInputType(options, inType))) {
         return llvm::failure();
@@ -140,6 +147,9 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
             mlirModule->print(outIRStream, opPrintingFlags);
         }
         optTiming.stop();
+        if (options.verbosity == Verbosity::All) {
+            llvm::outs() << "quantum-opt transformations successful" << "\n";
+        }
     }
 
     if (runTranslate && (inType == InputType::MLIR)) {
@@ -169,6 +179,10 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
             outIRStream << *llvmModule;
         }
         translateTiming.stop();
+
+        if (options.verbosity == Verbosity::All) {
+            llvm::outs() << "MLIR->LLVMIR translation successful" << "\n";
+        }
     }
 
     if (runLLC && (inType == InputType::LLVMIR)) {
@@ -245,6 +259,10 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         }
         outputTiming.stop();
         llcTiming.stop();
+
+        if (options.verbosity == Verbosity::All) {
+            llvm::outs() << "LLC object code generation successful" << "\n";
+        }
     }
 
     std::string errorMessage;
