@@ -75,7 +75,7 @@ struct OperatorNode {
  * based on the name, but it also means that care must be taken when using OperatorNode
  * instances (such as MultiRZ) that may have the same name but different parameters,
  * as they will be treated as the same key in hash-based containers.
- * The number of wires and parameters can be incoded in the name if needed to distinguish them
+ * The number of wires and parameters can be encoded in the name if needed to distinguish them
  * in the hash when converting MLIR operations to OperatorNodes.
  */
 struct OperatorNodeHash {
