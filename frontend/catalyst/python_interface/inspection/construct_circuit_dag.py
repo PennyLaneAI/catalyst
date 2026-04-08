@@ -15,6 +15,8 @@
 
 from collections import defaultdict
 from copy import deepcopy
+from dataclasses import dataclass
+from enum import Enum, auto
 from functools import singledispatch, singledispatchmethod
 from typing import Sequence
 
@@ -30,7 +32,7 @@ from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region
 from xdsl.traits import SymbolTable
 
-from catalyst.python_interface.dialects import pbc, quantum
+from catalyst.python_interface.dialects import mbqc, pbc, quantum
 from catalyst.python_interface.inspection.dag_builder import DAGBuilder
 from catalyst.python_interface.inspection.xdsl_conversion import (
     ssa_to_qml_wires,
@@ -83,6 +85,35 @@ class _WireKind(Enum):
     DEVICE = auto()
     DYNAMIC = auto()
 
+_SKIPPED_OPS = (*_SKIPPED_QUANTUM_OPS, *_SKIPPED_PBC_OPS, *_SKIPPED_MBQC_OPS)
+_SUPPORTED_DIALECTS = {quantum.Quantum.name, pbc.PBC.name, mbqc.MBQC.name}
+
+
+class _WireKind(Enum):
+    """Wire type for ordering dependencies."""
+
+    DEVICE = auto()
+    DYNAMIC = auto()
+
+
+class _ClusterKind(Enum):
+    """Defines the structural role for a cluster of operations."""
+
+    FUNC = auto()
+    FOR_LOOP = auto()
+    WHILE_LOOP = auto()
+    CONDITIONAL = auto()
+    BRANCH = auto()
+    ADJOINT = auto()
+
+
+@dataclass(frozen=True)
+class ClusterEntry:
+    """Unique descriptor for a cluster of operations."""
+
+    uid: str
+    kind: _ClusterKind
+
 
 class VisualizationError(Exception):
     """Custom visualization error."""
@@ -108,32 +139,26 @@ class ConstructCircuitDAG:
         self.dag_builder: DAGBuilder = dag_builder
 
         # Keep track of nesting clusters using a stack
-        self._cluster_uid_stack: list[str] = []
+        self._cluster_stack: list[ClusterEntry] = []
 
         # Create a map of wire to node uid
-        # Keys represent static (int) or dynamic wires (str)
+        # Keys represent static (int) or dynamic wires (_WireKind)
         # Values represent the set of all node uids that are on that wire.
-        self._wire_to_node_uids: dict[str | int, set[str]] = defaultdict(set)
+        self._wire_to_node_uids: dict[_WireKind | int, set[str]] = defaultdict(set)
 
         # Track which node UIDs are dynamic
         self._dynamic_node_uids: set[str] = set()
 
-        # Use counter internally for UID
-        self._node_uid_counter: int = 0
-        self._cluster_uid_counter: int = 0
-
-        # Record last seen cluster UID
+        # Record last seen cluster type
         # as context for how to connect certain nodes
-        self._last_cluster_uid: str = ""
+        self._last_cluster_entry: ClusterEntry | None = None
 
     def _reset(self) -> None:
         """Resets the instance."""
-        self._cluster_uid_stack: list[str] = []
-        self._node_uid_counter: int = 0
-        self._cluster_uid_counter: int = 0
-        self._wire_to_node_uids: dict[str | int, set[str]] = defaultdict(set)
+        self._wire_to_node_uids: dict[_WireKind | int, set[str]] = defaultdict(set)
         self._dynamic_node_uids: set[str] = set()
-        self._last_cluster_uid: str = ""
+        self._cluster_stack: list[ClusterEntry] = []
+        self._last_cluster_entry: ClusterEntry | None = None
 
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module.
@@ -175,9 +200,9 @@ class ConstructCircuitDAG:
     @singledispatchmethod
     def _visualize_operation(self, op: Operation) -> None:
         # NOTE: Currently only visualizing "quantum" operations
-        if op.dialect_name() not in {"quantum", "pbc", "mbqc"}:
+        if op.dialect_name() not in _SUPPORTED_DIALECTS:
             return
-        if type(op) not in _SKIPPED_OPS:
+        if not isinstance(op, _SKIPPED_OPS):
             _ERROR_MSG = f"Visualization for operation '{op.name}' is currently not supported."
             raise VisualizationError(_ERROR_MSG)
 
@@ -191,16 +216,13 @@ class ConstructCircuitDAG:
         qml_op: Operator = xdsl_to_qml_op(op)
 
         # Add node to current cluster
-        node_uid = f"node{self._node_uid_counter}"
-        self.dag_builder.add_node(
-            uid=node_uid,
+        node_uid = self.dag_builder.add_node(
             label=get_label(qml_op),
-            cluster_uid=self._cluster_uid_stack[-1],
+            cluster_uid=self._cluster_stack[-1].uid,
             # NOTE: "record" allows us to use ports
             # (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
         )
-        self._node_uid_counter += 1
 
         # Unlike standard gates, GlobalPhase does not have data dependencies
         # (it does not act on specific wires). Consequently, it is rendered as
@@ -218,16 +240,13 @@ class ConstructCircuitDAG:
         meas: Operator = xdsl_to_qml_measurement(op)
 
         # Add node to current cluster
-        node_uid = f"node{self._node_uid_counter}"
-        self.dag_builder.add_node(
-            uid=node_uid,
+        node_uid = self.dag_builder.add_node(
             label=get_label(meas),
-            cluster_uid=self._cluster_uid_stack[-1],
+            cluster_uid=self._cluster_stack[-1].uid,
             # NOTE: "record" allows us to use ports
             # (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
         )
-        self._node_uid_counter += 1
 
         self._connect(meas.wires, node_uid)
 
@@ -261,17 +280,14 @@ class ConstructCircuitDAG:
         label = f"<name> PPR-{pw} ({angle})|<wire> {wires_str}"
 
         # Add node to current cluster
-        node_uid = f"node{self._node_uid_counter}"
-        self.dag_builder.add_node(
-            uid=node_uid,
+        node_uid = self.dag_builder.add_node(
             label=label,
-            cluster_uid=self._cluster_uid_stack[-1],
+            cluster_uid=self._cluster_stack[-1].uid,
             # NOTE: "record" allows us to use ports
             # (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
             **attrs,
         )
-        self._node_uid_counter += 1
 
         self._connect(wires, node_uid)
 
@@ -290,17 +306,14 @@ class ConstructCircuitDAG:
         pw = "".join(pw)
 
         # Add node to current cluster
-        node_uid = f"node{self._node_uid_counter}"
-        self.dag_builder.add_node(
-            uid=node_uid,
+        node_uid = self.dag_builder.add_node(
             label=f"<name> PPM-{pw}|<wire> {wires_str}",
-            cluster_uid=self._cluster_uid_stack[-1],
+            cluster_uid=self._cluster_stack[-1].uid,
             # NOTE: "record" allows us to use ports
             # (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
             fillcolor="#70B3F5",
         )
-        self._node_uid_counter += 1
 
         self._connect(wires, node_uid)
 
@@ -337,18 +350,15 @@ class ConstructCircuitDAG:
             case _:
                 return
 
-        node_uid = f"node{self._node_uid_counter}"
-        self.dag_builder.add_node(
-            uid=node_uid,
+        node_uid = self.dag_builder.add_node(
             label=get_label(meas),
-            cluster_uid=self._cluster_uid_stack[-1],
+            cluster_uid=self._cluster_stack[-1].uid,
             fillcolor="lightpink",
             color="lightpink3",
             # NOTE: "record" allows us to use ports
             # (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
         )
-        self._node_uid_counter += 1
 
         if not meas.wires:
             # wires = [] means connect to all active wires
@@ -360,12 +370,9 @@ class ConstructCircuitDAG:
                 device_node_uid: set[str] = self._wire_to_node_uids.get(_WireKind.DEVICE, set())
                 all_active = set().union(*self._wire_to_node_uids.values()) - device_node_uid
 
-                # If we just exited a conditional (and are not in a nested one currently)
+                # If we just exited a branching cluster (and are not in a nested one currently)
                 # We need to connect to everything seen so far as all branches are a possibility.
-                exited_conditional_cluster = self._is_branching_cluster(
-                    self._last_cluster_uid
-                ) and not any(self._is_branching_cluster(s) for s in self._cluster_uid_stack)
-                if exited_conditional_cluster:
+                if self._exited_branching_cluster:
                     all_prev_uids = all_active
                 else:
                     # Otherwise, just connect to static nodes as they block dynamic
@@ -385,19 +392,16 @@ class ConstructCircuitDAG:
     def _adjoint(self, operation: quantum.AdjointOp) -> None:
         """Handle a PennyLane adjoint operation."""
 
-        uid = f"cluster{self._cluster_uid_counter}"
-        self.dag_builder.add_cluster(
-            uid,
+        cluster_uid = self.dag_builder.add_cluster(
             label="adjoint",
             labeljust="l",
-            cluster_uid=self._cluster_uid_stack[-1],
+            cluster_uid=self._cluster_stack[-1].uid,
         )
-        self._cluster_uid_stack.append(uid)
-        self._cluster_uid_counter += 1
+        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.ADJOINT))
 
         self._visit_region(operation.regions[0])
 
-        self._cluster_uid_stack.pop()
+        self._cluster_stack.pop()
 
     # =============
     # CONTROL FLOW
@@ -407,37 +411,31 @@ class ConstructCircuitDAG:
     def _for_op(self, operation: scf.ForOp) -> None:
         """Handle an xDSL ForOp operation."""
 
-        uid = f"cluster{self._cluster_uid_counter}"
-        self.dag_builder.add_cluster(
-            uid,
+        cluster_uid = self.dag_builder.add_cluster(
             label="for loop",
             labeljust="l",
-            cluster_uid=self._cluster_uid_stack[-1],
+            cluster_uid=self._cluster_stack[-1].uid,
         )
-        self._cluster_uid_stack.append(uid)
-        self._cluster_uid_counter += 1
+        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.FOR_LOOP))
 
         self._visit_region(operation.regions[0])
 
-        self._cluster_uid_stack.pop()
+        self._cluster_stack.pop()
 
     @_visit_operation.register
     def _while_op(self, operation: scf.WhileOp) -> None:
         """Handle an xDSL WhileOp operation."""
-        uid = f"cluster{self._cluster_uid_counter}"
-        self.dag_builder.add_cluster(
-            uid,
+        cluster_uid = self.dag_builder.add_cluster(
             label="while loop",
             labeljust="l",
-            cluster_uid=self._cluster_uid_stack[-1],
+            cluster_uid=self._cluster_stack[-1].uid,
         )
-        self._cluster_uid_stack.append(uid)
-        self._cluster_uid_counter += 1
+        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.WHILE_LOOP))
 
         for region in operation.regions:
             self._visit_region(region)
 
-        self._cluster_uid_stack.pop()
+        self._cluster_stack.pop()
 
     @_visit_operation.register
     def _visit_if_op(self, operation: scf.IfOp) -> None:
@@ -472,34 +470,29 @@ class ConstructCircuitDAG:
     ) -> dict[str | int, set[str]]:
         """Handles a branched operation."""
 
-        uid = f"{cluster_label}_cluster{self._cluster_uid_counter}"
-        self.dag_builder.add_cluster(
-            uid,
+        # Create cluster for IfOp
+        cluster_uid = self.dag_builder.add_cluster(
             label=cluster_label,
             labeljust="l",
-            cluster_uid=self._cluster_uid_stack[-1],
+            cluster_uid=self._cluster_stack[-1].uid,
         )
-        self._cluster_uid_stack.append(uid)
-        self._cluster_uid_counter += 1
+        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.CONDITIONAL))
 
         # Save wires state before all of the branches
         wire_map_before = deepcopy(self._wire_to_node_uids)
 
-        region_wire_maps: list[dict[int | str, set[str]]] = []
+        region_wire_maps: list[dict[_WireKind | int, set[str]]] = []
 
         # Loop through each branch and visualize as a cluster
         for i, region in enumerate(regions):
 
-            uid = f"cluster{self._cluster_uid_counter}"
-            self.dag_builder.add_cluster(
-                uid,
+            cluster_uid = self.dag_builder.add_cluster(
                 label=branch_labels[i],
                 labeljust="l",
                 style="dashed",
-                cluster_uid=self._cluster_uid_stack[-1],
+                cluster_uid=self._cluster_stack[-1].uid,
             )
-            self._cluster_uid_stack.append(uid)
-            self._cluster_uid_counter += 1
+            self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.BRANCH))
 
             # Make fresh wire map before going into region
             self._wire_to_node_uids = deepcopy(wire_map_before)
@@ -529,15 +522,15 @@ class ConstructCircuitDAG:
 
             # Pop branch cluster after processing to ensure
             # logical branches are treated as 'parallel'
-            self._cluster_uid_stack.pop()
+            self._cluster_stack.pop()
 
         # Update affected wires with specific wires seen during branches
-        affected_wires: set[str | int] = set()
+        affected_wires: set[int | _WireKind] = set()
         for region_wire_map in region_wire_maps:
             affected_wires.update(region_wire_map.keys())
 
         # Update state to be the union of all branch wire maps
-        final_wire_map: dict[str | int, set[str]] = defaultdict(set)
+        final_wire_map: dict[int | _WireKind, set[str]] = defaultdict(set)
         for wire in affected_wires:
             all_nodes: set[str] = set()
             for region_wire_map in region_wire_maps:
@@ -556,12 +549,12 @@ class ConstructCircuitDAG:
         # blocking
         if (
             before_dyn_node_uid == current_dyn_node_uid
-            and sum(1 for s in self._cluster_uid_stack if self._is_branching_cluster(s)) == 1
+            and sum(1 for s in self._cluster_stack if self._is_branching_cluster(s)) == 1
         ):
             final_wire_map[_WireKind.DYNAMIC] = set()
 
         # Pop IfOp cluster before leaving this handler
-        self._last_cluster_uid = self._cluster_uid_stack.pop()
+        self._last_cluster_entry = self._cluster_stack.pop()
 
         return final_wire_map
 
@@ -572,16 +565,13 @@ class ConstructCircuitDAG:
     @_visualize_operation.register
     def _device_init(self, operation: quantum.DeviceInitOp) -> None:
         """Handles the initialization of a quantum device."""
-        node_uid = f"node{self._node_uid_counter}"
-        self.dag_builder.add_node(
-            node_uid,
+        node_uid = self.dag_builder.add_node(
             label=operation.device_name.data,
-            cluster_uid=self._cluster_uid_stack[-1],
+            cluster_uid=self._cluster_stack[-1].uid,
             fillcolor="grey",
             color="black",
             penwidth=2,
         )
-        self._node_uid_counter += 1
         self._wire_to_node_uids[_WireKind.DEVICE].add(node_uid)
 
     # =======================
@@ -629,15 +619,12 @@ class ConstructCircuitDAG:
         )
 
         # Create cluster representing the func
-        uid = f"cluster{self._cluster_uid_counter}"
-        parent_cluster_uid = None if not self._cluster_uid_stack else self._cluster_uid_stack[-1]
-        self.dag_builder.add_cluster(
-            uid,
+        parent_cluster_uid = None if not self._cluster_stack else self._cluster_stack[-1].uid
+        cluster_uid = self.dag_builder.add_cluster(
             label=label,
             cluster_uid=parent_cluster_uid,
         )
-        self._cluster_uid_counter += 1
-        self._cluster_uid_stack.append(uid)
+        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.FUNC))
 
         self._visit_block(operation.regions[0].blocks[0])
 
@@ -649,7 +636,7 @@ class ConstructCircuitDAG:
         parent_op = operation.parent_op()
 
         if not parent_op.sym_name.data.startswith("jit_"):
-            self._cluster_uid_stack.pop()
+            self._cluster_stack.pop()
 
         if parent_op.attributes.get("quantum.node", None) is not None:
             self._wire_to_node_uids = defaultdict(set)
@@ -703,12 +690,9 @@ class ConstructCircuitDAG:
 
             all_active = set().union(*self._wire_to_node_uids.values())
 
-            # If we just exited a conditional (and are not in a nested one currently)
+            # If we just exited a branching cluster (and are not in a nested one currently)
             # We need to connect to everything seen so far as all branches are a possibility.
-            exited_conditional_cluster = self._is_branching_cluster(
-                self._last_cluster_uid
-            ) and not any(self._is_branching_cluster(s) for s in self._cluster_uid_stack)
-            if exited_conditional_cluster:
+            if self._exited_branching_cluster:
                 return all_active
 
             # Otherwise, just connect to static nodes as they block dynamic
@@ -735,45 +719,37 @@ class ConstructCircuitDAG:
             elif _WireKind.DEVICE in self._wire_to_node_uids:
                 prev_uids.update(self._wire_to_node_uids[_WireKind.DEVICE])
 
-        # Wire map contains both a dynamic wire and nodes on the static wires.
-        # Only connect to dynamic wire if we just came from a condition.
-        #
-        # For example,
-        #
-        # if x:
-        #   qml.X(0)
-        # else:
-        #   qml.Y(dyn)
-        # qml.Z(0)
-        #
-        # We should have both X and Y connecting to the Z.
-
-        # To do this carefully, we need to check if we're in a cluster's final
-        # else condition by looking two steps behind in the stack,
-        # _cluster_uid_stack = [..., "conditional_cluster*", "cluster*"]
-        # This is required if we have situations like,
-        #
-        #    qml.H(x)
-        #    qml.S(0)
-        #    if x == 3:
-        #        if x == 2:
-        #            qml.H(0)
-        #    else:
-        #        qml.RX(0,0)
-        #
-        # We don't want the RX in the final else condition to connect to the H(x)
-
-        inside_final_else_condition = False
-        if len(self._cluster_uid_stack) > 2:
-            inside_final_else_condition = self._cluster_uid_stack[-2].startswith(
-                "conditional"
-            ) and self._cluster_uid_stack[-1].startswith("cluster")
-        after_conditional_cluster = self._is_branching_cluster(self._last_cluster_uid)
         if (
             _WireKind.DYNAMIC in self._wire_to_node_uids
-            and after_conditional_cluster
-            and not inside_final_else_condition
+            and self._exited_branching_cluster
+            and not self._inside_branch
         ):
+
+            # Wire map contains both a dynamic wire and nodes on the static wires.
+            # Only connect to dynamic wire if we just came from a condition.
+            #
+            # For example,
+            #
+            # if x:
+            #   qml.X(0)
+            # else:
+            #   qml.Y(dyn)
+            # qml.Z(0)
+            #
+            # We should have both X and Y connecting to the Z.
+
+            # Also required for situations like,
+            #
+            #    qml.H(x)
+            #    qml.S(0)
+            #    if x == 3:
+            #        if x == 2:
+            #            qml.H(0)
+            #    else:
+            #        qml.RX(0,0)
+            #
+            # We don't want the RX in the final else condition to connect to the H(x)
+
             prev_uids.update(self._wire_to_node_uids[_WireKind.DYNAMIC])
 
         return prev_uids
@@ -790,11 +766,36 @@ class ConstructCircuitDAG:
             for wire in wires:
                 self._wire_to_node_uids[wire] = {node_uid}
 
-            # If we just exited a conditional, update to have
-            # no dynamic wires as the conditional cluster itself acts as
+            # If we just exited a branching cluster, update to have
+            # no dynamic wires as the branching cluster itself acts as
             # a dynamic barrier
-            if self._is_branching_cluster(self._last_cluster_uid):
+            if self._is_branching_cluster(self._last_cluster_entry):
                 self._wire_to_node_uids[_WireKind.DYNAMIC] = set()
+
+    def _is_branching_cluster(self, cluster: ClusterEntry | None) -> bool:
+        """
+        Whether or not the cluster is a cluster that results in
+        many branches (e.g. conditionals -> if/elif/else)
+        """
+        if cluster is None:
+            return False
+        return cluster.kind == _ClusterKind.CONDITIONAL
+
+    @property
+    def _exited_branching_cluster(self) -> bool:
+        """
+        Check if we just exited a branching cluster
+        and are not currently in a nested cluster.
+        """
+        inside_branching_cluster = any(self._is_branching_cluster(s) for s in self._cluster_stack)
+        return self._is_branching_cluster(self._last_cluster_entry) and not inside_branching_cluster
+
+    @property
+    def _inside_branch(self) -> bool:
+        """
+        Check to see if we're inside of a branch of a branching cluster.
+        """
+        return self._cluster_stack[-1].kind == _ClusterKind.BRANCH if self._cluster_stack else False
 
 
 def _flatten_if_op(operation: scf.IfOp) -> list[Region]:

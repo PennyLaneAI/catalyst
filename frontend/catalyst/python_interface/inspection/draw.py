@@ -165,6 +165,10 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         tape transform will have already been applied before lowering to MLIR and will appear as
         the base state (``level=0``) in this visualization.
 
+        Lastly, ``catalyst.draw_graph`` is currently not compatible with dynamic wire allocation.
+        This includes :func:`pennylane.allocation.allocate` and dynamic wire allocation that may
+        occur in MLIR directly (via ``quantum.alloc_qb`` instructions).
+
     Args:
         qnode (QJIT):
             The input qjit-compiled QNode that is to be visualized. The QNode is assumed to be
@@ -192,10 +196,6 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         UserWarning:
             If the ``level`` argument provided is larger than the number of passes present in the
             compilation pipeline.
-
-        Lastly, ``catalyst.draw_graph`` is currently not compatible with dynamic wire allocation.
-        This includes :func:`pennylane.allocation.allocate` and dynamic wire allocation that may
-        occur in MLIR directly (via ``quantum.alloc_qb`` instructions).
 
     **Example**
 
