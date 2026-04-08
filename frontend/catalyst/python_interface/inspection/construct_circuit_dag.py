@@ -90,9 +90,11 @@ class _ClusterKind(Enum):
     """Defines the structural role for a cluster of operations."""
 
     FUNC = auto()
+    CALL = auto()
     FOR_LOOP = auto()
     WHILE_LOOP = auto()
     CONDITIONAL = auto()
+    SWITCH = auto()
     BRANCH = auto()
     ADJOINT = auto()
 
@@ -432,41 +434,39 @@ class ConstructCircuitDAG:
         """Handle an xDSL IfOp operation."""
         regions = _flatten_if_op(operation)
         labels = ["if"] + ["elif"] * (len(regions) - 2) + ["else"] if len(regions) > 1 else ["if"]
-        self._wire_to_node_uids = self._visit_branched_op(regions, "conditional", labels)
+        self._wire_to_node_uids = self._visit_branched_op(regions, _ClusterKind.CONDITIONAL, labels)
 
     @_visit_operation.register
     def _visit_switch_op(self, operation: scf.IndexSwitchOp) -> None:
         """Handle an xDSL IndexSwitchOp operation."""
-        if len(operation.regions) > 4:
-            node_uid = f"node{self._node_uid_counter}"
-            self.dag_builder.add_node(
-                node_uid,
+        _MAX_SWITCH_BRANCHES = 5
+        if len(operation.regions) > _MAX_SWITCH_BRANCHES:
+            node_uid = self.dag_builder.add_node(
                 label=f"switch ({len(operation.regions)} cases)",
-                cluster_uid=self._cluster_uid_stack[-1],
+                cluster_uid=self._cluster_stack[-1].uid,
                 fillcolor="#FFD580",
             )
-            self._node_uid_counter += 1
+            # NOTE: Treat this as a node with dynamic "wires"
             self._connect([], node_uid)
             return
 
         labels = [f"case {i}" for i in range(len(operation.regions))]
-        self._wire_to_node_uids = self._visit_branched_op(operation.regions, "switch", labels)
-
-    def _is_branching_cluster(self, uid: str) -> bool:
-        return uid.startswith("conditional") or uid.startswith("switch")
+        self._wire_to_node_uids = self._visit_branched_op(
+            operation.regions, _ClusterKind.SWITCH, labels
+        )
 
     def _visit_branched_op(
-        self, regions, cluster_label, branch_labels
+        self, regions: tuple[Region, ...], cluster_kind: _ClusterKind, branch_labels: list[str]
     ) -> dict[str | int, set[str]]:
         """Handles a branched operation."""
 
         # Create cluster for IfOp
         cluster_uid = self.dag_builder.add_cluster(
-            label=cluster_label,
+            label=cluster_kind.name.lower(),
             labeljust="l",
             cluster_uid=self._cluster_stack[-1].uid,
         )
-        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.CONDITIONAL))
+        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=cluster_kind))
 
         # Save wires state before all of the branches
         wire_map_before = deepcopy(self._wire_to_node_uids)
@@ -581,12 +581,11 @@ class ConstructCircuitDAG:
             return
 
         cluster_uid = self.dag_builder.add_cluster(
-            uid,
             label=callee_name,
             labeljust="l",
-            cluster_uid=self._cluster_uid_stack[-1],
+            cluster_uid=self._cluster_stack[-1].uid,
         )
-        self._cluster_uid_stack.append(cluster_uid)
+        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.CALL))
 
         self._visit_block(callee_func.regions[0].blocks[0])
 
@@ -767,7 +766,7 @@ class ConstructCircuitDAG:
         """
         if cluster is None:
             return False
-        return cluster.kind == _ClusterKind.CONDITIONAL
+        return cluster.kind == _ClusterKind.CONDITIONAL or cluster.kind == _ClusterKind.SWITCH
 
     @property
     def _exited_branching_cluster(self) -> bool:
