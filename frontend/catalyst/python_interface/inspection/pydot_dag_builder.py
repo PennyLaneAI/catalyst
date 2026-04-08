@@ -143,7 +143,7 @@ class PyDotDAGBuilder(DAGBuilder):
         label: str,
         cluster_uid: str | None = None,
         **attrs: Any,
-    ) -> str:
+    ) -> NodeUID:
         """Add a single node to the graph.
 
         Args:
