@@ -605,6 +605,9 @@
   `--convert-to-value-semantics`, optionally followed by `--canonicalize` for removing pairs of
   neighboring inverse `quantum.extract` and `quantum.insert` operations.
 
+* The frontend now generates MLIR in reference semantics when capture is enabled.
+  [(#????)](https://github.com/PennyLaneAI/catalyst/pull/????)
+
 * Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
   Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
   measurement logic inside an `scf.if` region rather than propagating the condition
