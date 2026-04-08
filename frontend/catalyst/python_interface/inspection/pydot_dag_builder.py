@@ -212,7 +212,7 @@ class PyDotDAGBuilder(DAGBuilder):
         label: str | None = None,
         cluster_uid: str | None = None,
         **attrs: Any,
-    ) -> str:
+    ) -> ClusterUID:
         """Add a single cluster to the graph.
 
         A cluster is a specific type of subgraph where the nodes and edges contained
