@@ -385,7 +385,7 @@ class ConstructCircuitDAG:
         """Handle a PennyLane adjoint operation."""
 
         cluster_uid = self.dag_builder.add_cluster(
-            label="adjoint",
+            label=_ClusterKind.ADJOINT.name.lower(),
             labeljust="l",
             cluster_uid=self._cluster_stack[-1].uid,
         )
@@ -404,7 +404,7 @@ class ConstructCircuitDAG:
         """Handle an xDSL ForOp operation."""
 
         cluster_uid = self.dag_builder.add_cluster(
-            label="for loop",
+            label=_ClusterKind.FOR_LOOP.name.lower().replace("_", " "),
             labeljust="l",
             cluster_uid=self._cluster_stack[-1].uid,
         )
@@ -418,7 +418,7 @@ class ConstructCircuitDAG:
     def _while_op(self, operation: scf.WhileOp) -> None:
         """Handle an xDSL WhileOp operation."""
         cluster_uid = self.dag_builder.add_cluster(
-            label="while loop",
+            label=_ClusterKind.WHILE_LOOP.name.lower().replace("_", " "),
             labeljust="l",
             cluster_uid=self._cluster_stack[-1].uid,
         )
