@@ -140,6 +140,7 @@ from pennylane.capture.primitives import quantum_subroutine_prim
 from pennylane.capture.primitives import value_and_grad_prim as pl_value_and_grad_prim
 from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
 
+import catalyst
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
     ClosedJaxpr,
@@ -222,7 +223,9 @@ class AbstractObs(AbstractValue):
 
         if isinstance(num_qubits_or_qreg, int):
             self.num_qubits = num_qubits_or_qreg
-        elif isinstance(num_qubits_or_qreg, AbstractQreg):
+        elif isinstance(
+            num_qubits_or_qreg, (AbstractQreg, catalyst.from_plxpr.qref_jax_primitives.QrefQreg)
+        ):
             self.qreg = num_qubits_or_qreg
 
     def __eq__(self, other):  # pragma: nocover
@@ -2057,7 +2060,11 @@ def counts_staging_rule(jaxpr_trace, _src, obs, *dynamic_shape, static_shape):
     """
 
     shape = _merge_dyn_shape(static_shape, dynamic_shape)
-    if obs.primitive in (compbasis_p, mcmobs_p):
+    if obs.primitive in (
+        compbasis_p,
+        catalyst.from_plxpr.qref_jax_primitives.qref_compbasis_p,
+        mcmobs_p,
+    ):
         if obs.num_qubits:
             if isinstance(shape[0], int):
                 assert shape == (2**obs.num_qubits,)
@@ -2220,7 +2227,7 @@ def state_staging_rule(jaxpr_trace, _src, obs, *dynamic_shape, static_shape):
     """
     The result shape of state_p is (2^num_qubits,).
     """
-    if obs.primitive is compbasis_p:
+    if obs.primitive in [compbasis_p, catalyst.from_plxpr.qref_jax_primitives.qref_compbasis_p]:
         assert not obs.num_qubits, """
         A "wires" argument should not be provided since state() always
         returns a pure state describing all wires in the device.
@@ -2904,10 +2911,13 @@ def subroutine_lowering(*args, **kwargs):
         retval = _pjit_lowering(*args, **kwargs)
     except NotImplementedError as e:
         if "MLIR translation rule for primitive" in str(e):
-            msg = str(e) + """
+            msg = (
+                str(e)
+                + """
                 This error sometimes occurs when using quantum operations
                 inside subroutines but calling them outside a qnode
             """
+            )
             raise NotImplementedError(msg) from e
         raise e
 

@@ -36,6 +36,10 @@ from pennylane.capture.primitives import quantum_subroutine_prim, transform_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
 
+from catalyst.from_plxpr.qref_jax_primitives import (
+    qref_compbasis_p,
+    qref_get_p,
+)
 from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import (
     AbstractQbit,
@@ -221,11 +225,10 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     def _compbasis_obs(self, *wires):
         """Add a computational basis sampling observable."""
         if wires:
-            qubits = [self.init_qreg[w] for w in wires]
-            return compbasis_p.bind(*qubits)
+            qubits = [qref_get_p.bind(self.init_qreg, w) for w in wires]
+            return qref_compbasis_p.bind(*qubits)
         else:
-            self.init_qreg.insert_all_dangling_qubits()
-            return compbasis_p.bind(self.init_qreg.get(), qreg_available=True)
+            return qref_compbasis_p.bind(self.init_qreg, qreg_available=True)
 
     def _check_measurement_with_dynamic_allocation(self, measurement):
         """Check some constraints regarding dynamic allocation."""
@@ -233,16 +236,24 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             if len(measurement.wires) == 0 and not isinstance(
                 measurement, qml.measurements.StateMP
             ):
-                raise CompileError(textwrap.dedent("""
+                raise CompileError(
+                    textwrap.dedent(
+                        """
                         Terminal measurements must take in an explicit list of wires when
                         dynamically allocated wires are present in the program.
-                        """))
+                        """
+                    )
+                )
 
             if any(is_dynamically_allocated_wire(w) for w in measurement.wires):
-                raise CompileError(textwrap.dedent("""
+                raise CompileError(
+                    textwrap.dedent(
+                        """
                         Terminal measurements cannot take in dynamically allocated wires
                         since they must be temporary.
-                        """))
+                        """
+                    )
+                )
 
     # pylint: disable=too-many-branches
     def interpret_measurement(self, measurement):

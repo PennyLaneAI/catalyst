@@ -128,7 +128,10 @@ def custom_lower_jaxpr_to_module(
     # Create a keepalives list that will be mutated during the lowering.
     keepalives = []
     host_callbacks = []
-    custom_lowering_rules = catalyst.jax_primitives.CUSTOM_LOWERING_RULES
+    custom_lowering_rules = (
+        catalyst.jax_primitives.CUSTOM_LOWERING_RULES
+        + catalyst.from_plxpr.qref_jax_primitives.CUSTOM_LOWERING_RULES
+    )
     lowering_params = LoweringParameters(override_lowering_rules=custom_lowering_rules)
     ctx = ModuleContext(
         backend=None,
@@ -207,10 +210,14 @@ def get_mlir_attribute_from_pyval(value):
             elif 0 <= value < 18446744073709551616:  # = 2**64
                 attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64), value)
             else:
-                raise CompileError(textwrap.dedent("""
+                raise CompileError(
+                    textwrap.dedent(
+                        """
                     Large interger attributes currently not supported in MLIR,
                     see https://github.com/llvm/llvm-project/issues/128072
-                    """))
+                    """
+                    )
+                )
 
         case float():
             attr = ir.FloatAttr.get(ir.F64Type.get(), value)
