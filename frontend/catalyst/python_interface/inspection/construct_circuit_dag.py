@@ -74,6 +74,7 @@ _SKIPPED_PBC_OPS = (
 # Any MBQC operation encountered will raise a
 # VisualizationError
 _SKIPPED_MBQC_OPS = ()
+
 _SKIPPED_OPS = (*_SKIPPED_QUANTUM_OPS, *_SKIPPED_PBC_OPS, *_SKIPPED_MBQC_OPS)
 _SUPPORTED_DIALECTS = {quantum.Quantum.name, pbc.PBC.name, mbqc.MBQC.name}
 
