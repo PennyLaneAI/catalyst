@@ -1569,6 +1569,10 @@ class Cond(HybridOp):
     """PennyLane's conditional operation."""
 
     binder = cond_p.bind
+    has_adjoint = True
+
+    def adjoint(self):
+        return qml.adjoint(lambda: qml.apply(self) and None)()
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         return trace_quantum_branches(self, ctx, device, trace, qrp)
@@ -1578,6 +1582,10 @@ class ForLoop(HybridOp):
     """PennyLane ForLoop Operation."""
 
     binder = for_p.bind
+    has_adjoint = True
+
+    def adjoint(self):
+        return qml.adjoint(lambda: qml.apply(self) and None)()
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         op = self
@@ -1659,6 +1667,10 @@ class WhileLoop(HybridOp):
     """PennyLane's while loop operation."""
 
     binder = while_p.bind
+    has_adjoint = True
+
+    def adjoint(self):
+        return qml.adjoint(lambda: qml.apply(self) and None)()
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         cond_trace = self.regions[0].trace
