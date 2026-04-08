@@ -749,6 +749,7 @@ QecLogical = Dialect(
         ExtractCodeblockOp,
         InsertCodeblockOp,
         EncodeOp,
+        NoiseOp,
         QecCycleOp,
         IdentityOp,
         PauliXOp,
