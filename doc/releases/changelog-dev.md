@@ -515,7 +515,7 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Refactors `draw_graph` implementation to improve maintaibility.
+* Refactors `draw_graph` implementation to improve maintainability.
   [(#2659)](https://github.com/PennyLaneAI/catalyst/pull/2659)
 
 * Bump `black` version to 26.3.1 to eliminate the vulnerability reported by dependabot.
