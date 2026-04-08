@@ -1803,3 +1803,25 @@ def test_cpp_decomp_user_rules():
 
 
 test_cpp_decomp_user_rules()
+
+
+def test_cpp_decomp_user_rule_cleanup():
+    """Test that user rules do not pollute the IR after the quantum compilation stage."""
+
+    @decomposition_rule(is_qreg=True, op_type="PauliX")
+    def x_to_h(wire):
+        return qml.H(wire)
+
+    @qjit(capture=True)
+    @graph_decomposition(gate_set={qml.H}, fixed_decomps={qml.X: x_to_h})
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circuit():
+        # CHECK-NOT: PauliX
+        # CHECK-NOT: x_to_h
+        x_to_h(jax.core.ShapedArray((1,), int))
+        qml.X(0)
+
+    print(circuit.mlir_opt)
+
+
+test_cpp_decomp_user_rule_cleanup()
