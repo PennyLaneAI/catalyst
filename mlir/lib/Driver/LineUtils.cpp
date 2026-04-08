@@ -54,7 +54,7 @@ inline static void print(const std::string &opStrBuf, const std::string &name)
 }
 
 /**
- * @brief
+ * @brief Store results of diagnostic data at the given location.
  *
  * @param opStrBuf
  * @param name
