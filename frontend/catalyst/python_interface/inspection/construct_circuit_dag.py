@@ -18,7 +18,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from enum import Enum, auto
 from functools import singledispatch, singledispatchmethod
-from typing import Literal, Sequence
+from typing import Sequence
 
 from pennylane.measurements import (
     ExpectationMP,

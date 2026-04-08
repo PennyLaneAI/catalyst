@@ -230,7 +230,7 @@ class PyDotDAGBuilder(DAGBuilder):
         Raises:
             ValueError: Cluster ID is already present in the graph.
         """
-        uid = f"cluster{self._cluster_counter}" 
+        uid = f"cluster{self._cluster_counter}"
         self._cluster_counter += 1
 
         # Use ChainMap so you don't need to construct a new dictionary
