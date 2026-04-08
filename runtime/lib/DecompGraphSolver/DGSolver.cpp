@@ -27,6 +27,23 @@
 #include "DGTypes.hpp"
 
 namespace DecompGraph::Solver {
+void showSolution(const Core::GraphResult &result)
+{
+    std::cerr << "Decomposition Solution:\n";
+    for (const auto &[op, rule] : result.optimizedMap) {
+        std::cerr << "  Operator: " << Core::print_op(op) << "\n";
+        std::cerr << "    Chosen Rule: " << rule.ruleName << (rule.isBasis ? " [basis]" : "")
+                  << "\n";
+        std::cerr << "    Total Cost: " << rule.totalCost << "\n";
+        std::cerr << "    Basis Counts:\n";
+        for (const auto &[basis_op, count] : rule.basisCounts) {
+            std::cerr << "      - " << Core::print_op(basis_op) << ": " << count << "\n";
+        }
+    }
+}
+} // namespace DecompGraph::Solver
+
+namespace DecompGraph::Solver {
 
 Core::ChosenDecompRule DecompositionSolver::basisRule(const Core::OperatorNode &op)
 {
@@ -151,8 +168,14 @@ Core::GraphResult DecompositionSolver::solve()
     for (const auto &root : result.solvedRoots) {
         const auto chosen_rule = solveOperator(root);
         if (isInvalidRule(chosen_rule)) {
-            graph.showGraph();                            // Debug: show the graph structure
-            throw Core::GraphSolverFailedError(root, {}); // all rules failed for this root operator
+            graph.showGraph();    // Debug: show the graph structure
+            showSolution(result); // Debug: show the partial solution before failure
+            std::vector<std::string> rules_error;
+            for (const auto &rule : graph.getAllRulesFor(root)) {
+                rules_error.push_back(rule.name);
+            }
+            throw Core::GraphSolverFailedError(
+                root, rules_error); // all rules failed for this root operator
         }
     }
 
