@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Contains the ConstructCircuitDAG tool for constructing a DAG from an xDSL module."""
-# pylint: disable=missing-function-docstring
 
 from collections import defaultdict
 from copy import deepcopy
