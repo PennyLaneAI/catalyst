@@ -64,6 +64,7 @@ _dummy_hop = jax.extend.core.Primitive("dummy_hop")
 _dummy_hop.multiple_results = True
 
 
+# pylint: disable=unused-argument
 @_dummy_hop.def_abstract_eval
 def _dummy_abstract_eval(jaxpr, **kwargs):
     return jaxpr.out_avals
