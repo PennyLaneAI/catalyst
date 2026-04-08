@@ -1590,20 +1590,71 @@ def graph_decomposition(
 
     **Example**
 
-    @qp.qjit
-    # decompose to device gateset implicitly at later stages
-    @qp.transform(pass_name="cancel-inverses") # secondary optimizations
-    @qp.decompose(
-        gate_set={qp.RX, qp.RZ}
-    ) # decompose to secondary gateset
-    @qp.transform(pass_name="merge-rotations") # apply optimizations to primary gateset
-    @qp.decompose(
-        gate_set={qp.PauliRot, qp.PauliMeasure},
-        fixed_decomps={custom_op: lambda op, wires: qp.PauliRot(np.pi / 4, "XZ", wires)},
-    ) # decompose to primary gateset
-    @qp.qnode(qp.device("lightning.qubit", wires=2))
-    def circuit():
-        custom_op(0)
+    .. code-block:: python
+
+        import pennylane as qp
+        import pennylane.numpy as np
+
+        from catalyst import qjit
+        from catalyst.jax_primitives import decomposition_rule
+        from catalyst.passes import cancel_inverses, graph_decomposition, merge_rotations
+
+
+        @decomposition_rule(op_type="PauliX")
+        def x_to_rx(wire: int):
+            qp.RX(np.pi, wire)
+
+
+        @decomposition_rule(op_type="PauliY")
+        def y_to_ry(wire: int):
+            qp.RY(np.pi, wire)
+
+
+        @decomposition_rule(op_type="Hadamard")
+        def h_to_rx_ry(wire: int):
+            qp.RX(np.pi / 2, wire)
+            qp.RY(np.pi / 2, wire)
+
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set={qp.Rot})
+        @merge_rotations
+        @graph_decomposition(
+            gate_set={qp.RX, qp.RY},
+            fixed_decomps={qp.PauliX: x_to_rx, qp.PauliY: y_to_ry},
+            alt_decomps={qp.H: [h_to_rx_ry]},
+        )
+        @cancel_inverses
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def circuit(x: float, y: float):
+            qp.H(0)
+            qp.H(0)
+            qp.RX(x, wires=0)
+            qp.PauliX(0)
+            qp.RY(y, wires=0)
+            qp.PauliY(0)
+            qp.RY(x + y, wires=0)
+
+            # custom decompsition rules
+            x_to_rx(int)
+            y_to_ry(int)
+            h_to_rx_ry(int)
+
+            return qp.state()
+
+    >>> print(qp.specs(circuit, level="device")(1.23, 4.56))
+    Device: lightning.qubit
+    Device wires: 2
+    Shots: Shots(total=None)
+    Level: device
+
+    Wire allocations: 2
+    Total gates: 2
+    Gate counts:
+    - Rot: 2
+    Measurements:
+    - state(all wires): 1
+    Depth: 2
     """
     if qnode is None:
         return functools.partial(
