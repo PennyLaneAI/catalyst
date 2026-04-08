@@ -35,7 +35,7 @@ from jaxlib.mlir.dialects.arith import (
 # once JAX updates to a compatible MLIR version
 # pylint: disable=ungrouped-imports
 from catalyst.jax_extras.patches import mock_attributes
-from catalyst.jax_primitives import AbstractObs, extract_scalar
+from catalyst.jax_primitives import AbstractObs, _named_obs_attribute, extract_scalar
 from catalyst.utils.patching import Patcher
 
 with Patcher(
@@ -54,6 +54,8 @@ with Patcher(
         ComputationalBasisOp,
         DeallocOp,
         GetOp,
+        HermitianOp,
+        NamedObsOp,
     )
 
 
@@ -128,7 +130,9 @@ qref_alloc_p = Primitive("qref_alloc")
 qref_dealloc_p = Primitive("qref_dealloc")
 qref_dealloc_p.multiple_results = True
 qref_get_p = Primitive("qref_get")
-qref_compbasis_p = Primitive("compbasis")
+qref_compbasis_p = Primitive("qref_compbasis")
+qref_namedobs_p = Primitive("qref_namedobs")
+qref_hermitian_p = Primitive("qref_hermitian")
 
 
 #
@@ -207,7 +211,7 @@ def _qref_get_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_
 # compbasis observable
 #
 @qref_compbasis_p.def_abstract_eval
-def _compbasis_abstract_eval(*qubits_or_qreg, qreg_available=False):
+def _qref_compbasis_abstract_eval(*qubits_or_qreg, qreg_available=False):
     if qreg_available:
         qreg = qubits_or_qreg[0]
         assert isinstance(qreg, QrefQreg)
@@ -244,9 +248,53 @@ def _qref_compbasis_lowering(
         return ComputationalBasisOp(result_type, qubits).results
 
 
+#
+# named observable
+#
+@qref_namedobs_p.def_abstract_eval
+def _qref_namedobs_abstract_eval(qubit, kind):
+    assert isinstance(qubit, QrefQubit)
+    return AbstractObs()
+
+
+def _qref_named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, kind: str):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    assert ir.OpaqueType.isinstance(qubit.type)
+    assert ir.OpaqueType(qubit.type).dialect_namespace == "qref"
+    assert ir.OpaqueType(qubit.type).data == "bit"
+
+    obsId = _named_obs_attribute(ctx, kind)
+    result_type = ir.OpaqueType.get("quantum", "obs", ctx)
+
+    return NamedObsOp(result_type, qubit, obsId).results
+
+
+#
+# hermitian observable
+#
+@qref_hermitian_p.def_abstract_eval
+def _hermitian_abstract_eval(matrix, *qubits):
+    for q in qubits:
+        assert isinstance(q, QrefQubit)
+    return AbstractObs()
+
+
+def _qref_hermitian_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qubits: tuple):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    result_type = ir.OpaqueType.get("quantum", "obs", ctx)
+
+    return HermitianOp(result_type, matrix, qubits).results
+
+
 CUSTOM_LOWERING_RULES = (
     (qref_alloc_p, _qref_alloc_lowering),
     (qref_dealloc_p, _qref_dealloc_lowering),
     (qref_get_p, _qref_get_lowering),
     (qref_compbasis_p, _qref_compbasis_lowering),
+    (qref_namedobs_p, _qref_named_obs_lowering),
+    (qref_hermitian_p, _qref_hermitian_lowering),
 )

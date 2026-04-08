@@ -39,6 +39,8 @@ from pennylane.measurements import CountsMP
 from catalyst.from_plxpr.qref_jax_primitives import (
     qref_compbasis_p,
     qref_get_p,
+    qref_hermitian_p,
+    qref_namedobs_p,
 )
 from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import (
@@ -217,10 +219,10 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                 coeffs, terms = obs.terms()
             terms = [self._obs(t) for t in terms]
             return hamiltonian_p.bind(jnp.stack(coeffs), *terms)
-        wires = [self.init_qreg[w] for w in obs.wires]
+        wires = [qref_get_p.bind(self.init_qreg, w) for w in obs.wires]
         if obs.name == "Hermitian":
-            return hermitian_p.bind(obs.data[0], *wires)
-        return namedobs_p.bind(wires[0], *obs.data, kind=obs.name)
+            return qref_hermitian_p.bind(obs.data[0], *wires)
+        return qref_namedobs_p.bind(wires[0], kind=obs.name)
 
     def _compbasis_obs(self, *wires):
         """Add a computational basis sampling observable."""

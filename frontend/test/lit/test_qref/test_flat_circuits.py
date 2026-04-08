@@ -16,6 +16,7 @@
 
 # pylint: disable=line-too-long
 
+import numpy as np
 import pennylane as qp
 
 
@@ -235,3 +236,148 @@ def test_counts2(i: int):
 
 
 print(test_counts2.mlir)
+
+
+# CHECK: func.func public @expval1() -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=2))
+def expval1():
+    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
+    # CHECK: [[alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK: [[obs:%.+]] = qref.namedobs [[q0]][ PauliX] : !quantum.obs
+    # CHECK: [[expval:%.+]] = quantum.expval [[obs]] : f64
+    # CHECK: qref.dealloc [[alloc]] : !qref.reg<2>
+    return qp.expval(qp.PauliX(0))
+
+
+print(expval1.mlir)
+
+
+# CHECK: func.func public @expval2() -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def expval2():
+    # CHECK: [[two:%.+]] = arith.constant 2 : i64
+    # CHECK: [[one:%.+]] = arith.constant 1 : i64
+    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
+    # CHECK: [[alloc:%.+]] = qref.alloc( 3) : !qref.reg<3>
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[obs0:%.+]] = qref.namedobs [[q0]][ PauliX] : !quantum.obs
+    # CHECK: [[q1:%.+]] = qref.get [[alloc]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[obs1:%.+]] = qref.namedobs [[q1]][ PauliZ] : !quantum.obs
+    # CHECK: [[q2:%.+]] = qref.get [[alloc]][[[two]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[obs2:%.+]] = qref.namedobs [[q2]][ Hadamard] : !quantum.obs
+    # CHECK: [[obs_tensor:%.+]] = quantum.tensor [[obs0]], [[obs1]], [[obs2]] : !quantum.obs
+    # CHECK: [[expval:%.+]] = quantum.expval [[obs_tensor]] : f64
+    # CHECK: qref.dealloc [[alloc]] : !qref.reg<3>
+    return qp.expval(qp.PauliX(0) @ qp.PauliZ(1) @ qp.Hadamard(2))
+
+
+print(expval2.mlir)
+
+
+# CHECK: func.func public @expval3(%arg0: tensor<2x2xcomplex<f64>>) -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=2))
+def expval3():
+    A = np.array([[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]])
+
+    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
+    # CHECK: [[alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK: [[obs:%.+]] = qref.hermitian(%arg0 : tensor<2x2xcomplex<f64>>) [[q0]] : !quantum.obs
+    # CHECK: [[expval:%.+]] = quantum.expval [[obs]] : f64
+    # CHECK: qref.dealloc [[alloc]] : !qref.reg<2>
+    return qp.expval(qp.Hermitian(A, wires=0))
+
+
+print(expval3.mlir)
+
+
+# CHECK: func.func public @expval4(%arg0: tensor<4x4xcomplex<f64>>) -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=2))
+def expval4():
+    B = np.array(
+        [
+            [complex(1.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+            [complex(2.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+            [complex(1.0, 0.0), complex(1.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+            [complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0)],
+        ]
+    )
+
+    # CHECK: [[one:%.+]] = arith.constant 1 : i64
+    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
+    # CHECK: [[alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[alloc]][[[one]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK: [[obs:%.+]] = qref.hermitian(%arg0 : tensor<4x4xcomplex<f64>>) [[q0]], [[q1]] : !quantum.obs
+    # CHECK: [[expval:%.+]] = quantum.expval [[obs]] : f64
+    # CHECK: qref.dealloc [[alloc]] : !qref.reg<2>
+    return qp.expval(qp.Hermitian(B, wires=[0, 1]))
+
+
+print(expval4.mlir)
+
+
+# CHECK: func.func public @expval5(%arg0: tensor<4x4xcomplex<f64>>) -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def expval5():
+    B = np.array(
+        [
+            [complex(1.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+            [complex(2.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+            [complex(1.0, 0.0), complex(1.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+            [complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0)],
+        ]
+    )
+
+    # CHECK: [[two:%.+]] = arith.constant 2 : i64
+    # CHECK: [[one:%.+]] = arith.constant 1 : i64
+    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
+    # CHECK: [[alloc:%.+]] = qref.alloc( 3) : !qref.reg<3>
+    # CHECK: [[q1:%.+]] = qref.get [[alloc]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[obs1:%.+]] = qref.namedobs [[q1]][ PauliX] : !quantum.obs
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[alloc]][[[two]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[obs2:%.+]] = qref.hermitian(%arg0 : tensor<4x4xcomplex<f64>>) [[q0]], [[q2]] : !quantum.obs
+    # CHECK: [[obs_tensor:%.+]] = quantum.tensor [[obs1]], [[obs2]] : !quantum.obs
+    # CHECK: [[expval:%.+]] = quantum.expval [[obs_tensor]] : f64
+    # CHECK: qref.dealloc [[alloc]] : !qref.reg<3>
+    return qp.expval(qp.PauliX(1) @ qp.Hermitian(B, wires=[0, 2]))
+
+
+print(expval5.mlir)
+
+
+# CHECK: func.func public @expval6() -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def expval6():
+    # CHECK: [[two:%.+]] = arith.constant 2 : i64
+    # CHECK: [[one:%.+]] = arith.constant 1 : i64
+    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
+    # CHECK: [[alloc:%.+]] = qref.alloc( 3) : !qref.reg<3>
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[obs0x:%.+]] = qref.namedobs [[q0]][ PauliX] : !quantum.obs
+    # CHECK: [[q1:%.+]] = qref.get [[alloc]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[obs1z:%.+]] = qref.namedobs [[q1]][ PauliZ] : !quantum.obs
+    # CHECK: [[t0:%.+]] = quantum.tensor [[obs0x]], [[obs1z]] : !quantum.obs
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[obs0z:%.+]] = qref.namedobs [[q0]][ PauliZ] : !quantum.obs
+    # CHECK: [[q2:%.+]] = qref.get [[alloc]][[[two]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[obs2h:%.+]] = qref.namedobs [[q2]][ Hadamard] : !quantum.obs
+    # CHECK: [[t1:%.+]] = quantum.tensor [[obs0z]], [[obs2h]] : !quantum.obs
+    # CHECK: [[obs:%.+]] = quantum.hamiltonian({{%.+}} : tensor<2xf64>) [[t0]], [[t1]]
+    # CHECK: [[expval:%.+]] = quantum.expval [[obs]] : f64
+    # CHECK: qref.dealloc [[alloc]] : !qref.reg<3>
+
+    coeffs = np.array([0.2, -0.543])
+    obs = [qp.PauliX(0) @ qp.PauliZ(1), qp.PauliZ(0) @ qp.Hadamard(2)]
+    return qp.expval(qp.Hamiltonian(coeffs, obs))
+
+
+print(expval6.mlir)
