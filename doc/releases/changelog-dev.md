@@ -282,6 +282,10 @@
   [(#2531)](https://github.com/PennyLaneAI/catalyst/pull/2531)
   [(#2619)](https://github.com/PennyLaneAI/catalyst/pull/2531)
 
+* Decomposition rules are lowered as private functions (instead of public).
+  [(#2658)](https://github.com/PennyLaneAI/catalyst/pull/2658)
+  [(#2660)](https://github.com/PennyLaneAI/catalyst/pull/2660)
+
 * A new optimization pass has been added to reduce the number of instructions in a quantum program,
   `--merge-global-phase`, which safely combines global phase instructions for each region in the
   program. The xDSL version written in Python has been removed.
@@ -514,6 +518,9 @@
   [(#2582)](https://github.com/PennyLaneAI/catalyst/pull/2582)
 
 <h3>Internal changes ⚙️</h3>
+
+* Refactors `draw_graph` implementation to improve maintainability.
+  [(#2659)](https://github.com/PennyLaneAI/catalyst/pull/2659)
 
 * Bump `black` version to 26.3.1 to eliminate the vulnerability reported by dependabot.
   [(#2650)](https://github.com/PennyLaneAI/catalyst/pull/2650)
