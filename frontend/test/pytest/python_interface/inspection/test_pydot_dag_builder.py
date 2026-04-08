@@ -49,12 +49,14 @@ class TestUIDOwnership:
     """Tests that the dag builder generates correct UIDs."""
 
     def test_add_node_returns_unique_uids(self):
+        """Ensures that 'add_node' creates unique IDs."""
         dag_builder = PyDotDAGBuilder()
         uid1 = dag_builder.add_node(label="X")
         uid2 = dag_builder.add_node(label="Y")
         assert uid1 != uid2
 
     def test_add_cluster_returns_unique_uids(self):
+        """Ensures that 'add_cluster' creates unique IDs."""
         dag_builder = PyDotDAGBuilder()
         uid1 = dag_builder.add_cluster(label="X")
         uid2 = dag_builder.add_cluster(label="Y")
