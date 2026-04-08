@@ -754,7 +754,7 @@ as a tape transform, not a transform that modifies a program at the MLIR
 level. A transform will be applied as a tape transform in two cases:
 
 - The transform does not have an MLIR implementation in Catalyst.
-- Transforms up to and including the last transform that does not have an MLIR
+- All transforms that precede an explicit tape transform. All transforms up to and including the last transform with no MLIR implementation will be applied as tape transforms. Transforms thereafter are applied as MLIR passes.
   implementation in Catalyst.
 
 Consider the following example that includes ``cancel_inverses``,
