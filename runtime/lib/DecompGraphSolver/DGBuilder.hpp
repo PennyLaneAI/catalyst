@@ -69,11 +69,14 @@ class DecompositionGraph {
     DecompositionGraph &operator=(DecompositionGraph &&other) noexcept;
 
     /**
-     * @brief Solves the graph decomposition problem and returns the resulting
-     * decomposition rules for the target gates.
+     * @brief Returns the list of root operators in the graph, which are the operators
+     * that we want to decompose into the target gateset.
      *
-     * @param op The operator node for which we want to find the best decomposition rule.
-     * @return The chosen decomposition rule for the given operator node.
+     * These are typically the operators that appear as outputs in the decomposition rules
+     * and are the starting points for the decomposition process. The solver will attempt to find
+     * optimal decompositions for these root operators based on the provided rules and gateset.
+     *
+     * @return The list of root operators in the graph.
      */
     [[nodiscard]] const std::vector<Core::OperatorNode> &getRoots() const noexcept;
 
