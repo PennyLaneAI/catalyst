@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "ParameterShift.hpp"
-
 #include <deque>
 #include <string>
 #include <vector>
@@ -27,6 +25,7 @@
 
 #include "Catalyst/Utils/StaticAllocas.h"
 #include "Gradient/Utils/GradientShape.h"
+#include "ParameterShift.hpp"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantum.h"

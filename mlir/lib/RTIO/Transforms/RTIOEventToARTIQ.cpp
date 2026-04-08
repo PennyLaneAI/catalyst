@@ -27,11 +27,10 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "ARTIQRuntimeBuilder.hpp"
 #include "RTIO/IR/RTIOOps.h"
 #include "RTIO/Transforms/Passes.h"
 #include "RTIO/Transforms/Patterns.h"
-
-#include "ARTIQRuntimeBuilder.hpp"
 #include "Utils.hpp"
 
 using namespace mlir;

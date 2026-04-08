@@ -21,7 +21,6 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
-
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"

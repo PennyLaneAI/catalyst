@@ -20,10 +20,9 @@
 #include "ExecutionContext.hpp"
 #include "MemRefUtils.hpp"
 #include "OpenQasmBuilder.hpp"
-#include "RuntimeCAPI.h"
-
 #include "OpenQasmDevice.hpp"
 #include "OpenQasmRunner.hpp"
+#include "RuntimeCAPI.h"
 
 using namespace Catch::Matchers;
 using namespace Catalyst::Runtime::Device;

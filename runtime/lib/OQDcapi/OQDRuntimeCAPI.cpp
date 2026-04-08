@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "OQDRuntimeCAPI.h"
+
 #include <fstream>
 #include <functional> // std::reference_wrapper
 #include <iostream>
@@ -19,8 +21,6 @@
 #include <vector>
 
 #include <nlohmann/json.hpp>
-
-#include "OQDRuntimeCAPI.h"
 
 using json = nlohmann::json;
 

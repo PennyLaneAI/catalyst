@@ -14,8 +14,9 @@
 
 #pragma once
 
-#include <dlfcn.h>
 #include <string_view>
+
+#include <dlfcn.h>
 
 #include "Exception.hpp"
 

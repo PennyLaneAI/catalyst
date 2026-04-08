@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include <dlfcn.h>
-
 #include <cstdio>
 #include <functional>
 #include <memory>
@@ -26,6 +24,8 @@
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
+
+#include <dlfcn.h>
 
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"

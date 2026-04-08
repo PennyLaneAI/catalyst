@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "RuntimeCAPI.h"
+
 #include <bitset>
 #include <cstdarg>
 #include <cstdlib>
@@ -30,8 +32,6 @@
 #include "QuantumDevice.hpp"
 #include "Timer.hpp"
 #include "Types.h"
-
-#include "RuntimeCAPI.h"
 
 namespace Catalyst::Runtime {
 

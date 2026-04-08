@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "Driver/HighResolutionOutputStrategy.h"
+
 #include "llvm/Support/Format.h"
 
 using namespace mlir;

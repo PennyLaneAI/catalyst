@@ -14,9 +14,9 @@
 #pragma once
 
 #include <cassert>
-#include <cstdlib>
-
 #include <chrono>
+#include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -26,8 +26,6 @@
 #include <string_view>
 #include <thread>
 #include <utility> // std::forward
-
-#include <ctime>
 
 // Note that this method returns CPU time on Linux/Unix-like systems,
 // and returns wall-clock time on Windows.

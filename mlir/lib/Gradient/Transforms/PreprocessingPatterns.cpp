@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "iostream"
-#include "llvm/Support/raw_ostream.h"
 
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"

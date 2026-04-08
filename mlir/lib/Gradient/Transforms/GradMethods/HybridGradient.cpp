@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "HybridGradient.hpp"
+
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
@@ -19,11 +21,9 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-#include "ClassicalJacobian.hpp"
-#include "HybridGradient.hpp"
-
 #include "Catalyst/Utils/CallGraph.h"
 #include "Catalyst/Utils/StaticAllocas.h"
+#include "ClassicalJacobian.hpp"
 #include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumInterfaces.h"

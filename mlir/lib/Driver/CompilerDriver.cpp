@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cassert>
+#include "Driver/CompilerDriver.h"
 
 #include <algorithm>
+#include <cassert>
 #include <filesystem>
 #include <iostream>
 #include <list>
@@ -24,6 +25,7 @@
 #include <string_view>
 #include <unordered_map>
 
+#include "Enzyme.h"
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -43,7 +45,6 @@
 #include "llvm/Transforms/Coroutines/CoroEarly.h"
 #include "llvm/Transforms/Coroutines/CoroSplit.h"
 #include "llvm/Transforms/IPO/GlobalDCE.h"
-
 #include "mlir/Bytecode/BytecodeWriter.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/DialectRegistry.h"
@@ -56,7 +57,6 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Target/LLVMIR/Export.h"
-
 #include "stablehlo/dialect/Register.h"
 #include "stablehlo/integrations/c/StablehloPasses.h"
 #include "stablehlo/transforms/Passes.h"
@@ -65,7 +65,6 @@
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Driver/CatalystLLVMTarget.h"
-#include "Driver/CompilerDriver.h"
 #include "Driver/HighResolutionOutputStrategy.h"
 #include "Driver/Pipelines.h"
 #include "Driver/Support.h"
@@ -84,8 +83,6 @@
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "RTIO/IR/RTIODialect.h"
 #include "RegisterAllPasses.h"
-
-#include "Enzyme.h"
 #include "Timer.hpp"
 
 using namespace mlir;

@@ -18,7 +18,6 @@
 #include <optional>
 
 #include "llvm/ADT/DenseMapInfo.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"

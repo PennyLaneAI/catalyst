@@ -25,12 +25,11 @@
 #include <unordered_map>
 #include <vector>
 
-#include "QuantumDevice.hpp"
-#include "QubitManager.hpp"
-
 #include "OpenQasmBuilder.hpp"
 #include "OpenQasmObsManager.hpp"
 #include "OpenQasmRunner.hpp"
+#include "QuantumDevice.hpp"
+#include "QubitManager.hpp"
 
 namespace Catalyst::Runtime::Device {
 class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {

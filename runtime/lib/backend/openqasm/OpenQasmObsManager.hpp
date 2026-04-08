@@ -21,9 +21,8 @@
 
 #include "Exception.hpp"
 #include "OpenQasmBuilder.hpp"
-#include "Utils.hpp"
-
 #include "Types.h"
+#include "Utils.hpp"
 
 namespace Catalyst::Runtime::Device::OpenQasm {
 

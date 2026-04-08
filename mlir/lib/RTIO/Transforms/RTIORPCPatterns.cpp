@@ -20,10 +20,9 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "ARTIQRuntimeBuilder.hpp"
 #include "RTIO/IR/RTIOOps.h"
 #include "RTIO/Transforms/Patterns.h"
-
-#include "ARTIQRuntimeBuilder.hpp"
 
 using namespace mlir;
 using namespace catalyst::rtio;

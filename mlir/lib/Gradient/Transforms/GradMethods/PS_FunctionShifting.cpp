@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "ParameterShift.hpp"
-
 #include <string>
 #include <vector>
 
@@ -22,6 +20,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
+#include "ParameterShift.hpp"
 #include "Quantum/IR/QuantumOps.h"
 
 namespace catalyst {
