@@ -80,6 +80,7 @@
 #include "PauliFrame/IR/PauliFrameDialect.h"
 #include "QecLogical/IR/QecLogicalDialect.h"
 #include "QecPhysical/IR/QecPhysicalDialect.h"
+#include "QRef/IR/QRefDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "RTIO/IR/RTIODialect.h"
@@ -389,6 +390,7 @@ void registerAllCatalystDialects(DialectRegistry &registry)
 
     // Catalyst
     registry.insert<CatalystDialect>();
+    registry.insert<qref::QRefDialect>();
     registry.insert<quantum::QuantumDialect>();
     registry.insert<pbc::PBCDialect>();
     registry.insert<mbqc::MBQCDialect>();
