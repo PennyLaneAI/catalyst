@@ -186,10 +186,10 @@ class TestIntegrationWithOtherPasses:
     """Tests the integration of the xDSL-basd MeasurementsFromSamplesPass with other key passes"""
 
     # todo: make this test analytic too - return 1.0 is not reliable
-    def test_integrate_with_decompose(self, capture):
+    def test_integrate_with_decompose(self, capture, run_filecheck_qjit):
         """Test that the measurements_from_samples pass works correctly when used in combination
         with the decompose pass."""
-        dev = qml.device("null.qubit", wires=4)
+        dev = qml.device("lightning.qubit", wires=4)
 
         @qml.qjit(target="mlir", capture=capture)
         @measurements_from_samples_pass
@@ -197,13 +197,18 @@ class TestIntegrationWithOtherPasses:
             qml.transforms.decompose,
             gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "RY", "GlobalPhase"},
         )
-        @qml.qnode(dev, shots=1000)
-        def circuit():
-            qml.CRX(0.1, wires=[0, 1])
-            return qml.expval(qml.Z(0))
+        @qml.qnode(dev, shots=5000)
+        def circuit(x):
+            # CHECK-NOT: quantum.custom "CRX"
+            # CHECK-NOT: quantum.expval
+            # CHECK: quantum.sample
+            qml.X(0)
+            qml.CRX(x, wires=[0, 1])
+            return qml.expval(qml.Z(1))
 
-        res = circuit()
-        assert res == 1.0
+        assert np.isclose(circuit(1.234), np.cos(1.234), atol=0.05)
+        run_filecheck_qjit(circuit)
+
 
     @pytest.mark.parametrize("coeff", [0.5, 2, -1.7])
     @pytest.mark.parametrize("phi", [0, np.pi, 0.1234, -1.25])
