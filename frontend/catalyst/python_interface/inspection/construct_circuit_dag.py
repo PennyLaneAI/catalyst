@@ -74,17 +74,6 @@ _SKIPPED_PBC_OPS = (
 # Any MBQC operation encountered will raise a
 # VisualizationError
 _SKIPPED_MBQC_OPS = ()
-_SKIPPED_OPS = frozenset((*_SKIPPED_QUANTUM_OPS, *_SKIPPED_PBC_OPS, *_SKIPPED_MBQC_OPS))
-
-from enum import Enum, auto
-
-
-class _WireKind(Enum):
-    """Wire identifiers for non-physical ordering dependencies."""
-
-    DEVICE = auto()
-    DYNAMIC = auto()
-
 _SKIPPED_OPS = (*_SKIPPED_QUANTUM_OPS, *_SKIPPED_PBC_OPS, *_SKIPPED_MBQC_OPS)
 _SUPPORTED_DIALECTS = {quantum.Quantum.name, pbc.PBC.name, mbqc.MBQC.name}
 
