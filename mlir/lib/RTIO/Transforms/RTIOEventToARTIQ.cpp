@@ -48,10 +48,50 @@ namespace rtio {
 
 namespace {
 
+/// Schedule newly discovered pulse groups, set their wait to the current chain event and produce a
+/// sync follow by the chain.
+static llvm::SmallVector<Value>
+schedulePulseGroups(ArrayRef<rtio::RTIOPulseOp> consumers, DenseSet<int64_t> &scheduled,
+                    DenseMap<int64_t, SmallVector<rtio::RTIOPulseOp>> &pulseGroups, Value &chain,
+                    OpBuilder &builder)
+{
+    auto eventType = rtio::EventType::get(builder.getContext());
+
+    SmallVector<int64_t> newGroupIds;
+    for (auto p : consumers) {
+        int64_t gid = pulseGroupId(p);
+        if (scheduled.insert(gid).second) {
+            newGroupIds.push_back(gid);
+        }
+    }
+    llvm::sort(newGroupIds);
+
+    for (int64_t gid : newGroupIds) {
+        auto &grp = pulseGroups[gid];
+        for (auto p : grp) {
+            p.setWait(chain);
+        }
+
+        OpBuilder::InsertionGuard g(builder);
+        builder.setInsertionPointAfter(grp.back());
+        SmallVector<Value> evts;
+        for (auto p : grp) {
+            evts.push_back(p.getEvent());
+        }
+        chain = rtio::RTIOSyncOp::create(builder, grp.back().getLoc(), eventType, evts);
+    }
+
+    llvm::SmallVector<Value> nextEvents;
+    for (auto p : consumers) {
+        nextEvents.push_back(p.getEvent());
+    }
+
+    return nextEvents;
+}
+
 /// Schedule pulses for executing on ARTIQ
 static void schedule(func::FuncOp funcOp, OpBuilder &builder)
 {
-    auto eventType = rtio::EventType::get(funcOp.getContext());
     if (funcOp.getBody().empty()) {
         return;
     }
@@ -105,32 +145,8 @@ static void schedule(func::FuncOp funcOp, OpBuilder &builder)
             }
         }
 
-        SmallVector<int64_t> newGroupIds;
-        for (auto p : consumers) {
-            int64_t gid = pulseGroupId(p);
-            if (scheduled.insert(gid).second) {
-                newGroupIds.push_back(gid);
-            }
-        }
-        llvm::sort(newGroupIds);
-
-        for (int64_t gid : newGroupIds) {
-            auto &grp = pulseGroups[gid];
-            for (auto p : grp) {
-                p.setWait(chain);
-            }
-
-            OpBuilder::InsertionGuard g(builder);
-            builder.setInsertionPointAfter(grp.back());
-            SmallVector<Value> evts;
-            for (auto p : grp) {
-                evts.push_back(p.getEvent());
-            }
-            chain = rtio::RTIOSyncOp::create(builder, grp.back().getLoc(), eventType, evts);
-        }
-
-        for (auto p : consumers)
-            worklist.push_back(p.getEvent());
+        auto nextEvents = schedulePulseGroups(consumers, scheduled, pulseGroups, chain, builder);
+        llvm::append_range(worklist, nextEvents);
     }
 }
 

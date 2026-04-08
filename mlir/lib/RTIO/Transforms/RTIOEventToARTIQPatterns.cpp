@@ -71,11 +71,12 @@ struct PulseOpLowering : public OpConversionPattern<RTIOPulseOp> {
         }
 
         Type chTy = getTypeConverter()->convertType(op.getChannel().getType());
-        Value chVal = arith::ConstantOp::create(
-            rewriter, op.getLoc(), rewriter.getIntegerAttr(chTy, pulseGroupId(op)));
+        Value chVal = arith::ConstantOp::create(rewriter, op.getLoc(),
+                                                rewriter.getIntegerAttr(chTy, pulseGroupId(op)));
         Value amplitude = artiq.constF64(1.0);
-        LLVM::CallOp::create(rewriter, op.getLoc(), setFreqFunc,
-                             ValueRange{chVal, adaptor.getFrequency(), adaptor.getPhase(), amplitude});
+        LLVM::CallOp::create(
+            rewriter, op.getLoc(), setFreqFunc,
+            ValueRange{chVal, adaptor.getFrequency(), adaptor.getPhase(), amplitude});
 
         Value newTime = artiq.nowMu();
         rewriter.replaceOp(op, newTime);
@@ -95,8 +96,7 @@ struct PulseOpLowering : public OpConversionPattern<RTIOPulseOp> {
                                 ConversionPatternRewriter &rewriter,
                                 ARTIQRuntimeBuilder &artiq) const
     {
-        Value channelAddr =
-            computeChannelDeviceAddrForId(rewriter, op, pulseGroupId(op));
+        Value channelAddr = computeChannelDeviceAddrForId(rewriter, op, pulseGroupId(op));
         Value durationMu = artiq.secToMu(adaptor.getDuration());
 
         // Enforce minimum pulse duration to avoid 0 duratoin events
