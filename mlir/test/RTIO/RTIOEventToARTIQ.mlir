@@ -51,18 +51,22 @@ module @circuit attributes {rtio.config = #rtio.config<{core_addr = "172.31.9.64
     %1 = rtio.channel : !rtio.channel<"dds", [2 : i64], 2>
     %3 = rtio.channel : !rtio.channel<"dds", [2 : i64], 0>
 
-    // Test rtio.pulse with wait on empty, should set frequency and generate TTL pulse
+    // Test rtio.pulse with wait on empty, generates TTL pulse
     // First pulse on channel 2 waiting on empty event
     // CHECK: llvm.call tail @now_mu()
     // CHECK: llvm.call tail @at_mu
-    // CHECK: llvm.call @__rtio_set_frequency
+    // CHECK: arith.maxsi
+    // CHECK: llvm.call tail @rtio_output
+    // CHECK: llvm.call fastcc tail @delay_mu
+    // CHECK: llvm.call tail @rtio_output
     // CHECK: llvm.call tail @now_mu()
-    %2 = rtio.pulse %1 duration(%cst_1) frequency(%cst_6) phase(%cst_7) wait(%0) {offset = 0 : i64} : <"dds", [2 : i64], 2> -> !rtio.event
+    %2 = rtio.pulse %1 duration(%cst_1) frequency(%cst_6) phase(%cst_7) wait(%0) {_group = 0 : i64} : <"dds", [2 : i64], 2> -> !rtio.event
 
     // Test parallel pulses, both wait on same event
     // CHECK: llvm.call tail @at_mu
-    // CHECK: llvm.call @__rtio_set_frequency
-    %4 = rtio.pulse %3 duration(%cst_1) frequency(%cst_6) phase(%cst_7) wait(%0) {offset = 0 : i64} : <"dds", [2 : i64], 0> -> !rtio.event
+    // CHECK: arith.maxsi
+    // CHECK: llvm.call tail @rtio_output
+    %4 = rtio.pulse %3 duration(%cst_1) frequency(%cst_6) phase(%cst_7) wait(%0) {_group = 0 : i64} : <"dds", [2 : i64], 0> -> !rtio.event
 
     // Test sequential pulse on same channel (duration via max(duration_mu, minTTL), not __rtio_sec_to_mu)
     // CHECK: llvm.call tail @at_mu
@@ -70,7 +74,7 @@ module @circuit attributes {rtio.config = #rtio.config<{core_addr = "172.31.9.64
     // CHECK: llvm.call tail @rtio_output
     // CHECK: llvm.call fastcc tail @delay_mu
     // CHECK: llvm.call tail @rtio_output
-    %5 = rtio.pulse %3 duration(%cst_1) frequency(%cst_6) phase(%cst_7) wait(%4) {offset = 0 : i64} : <"dds", [2 : i64], 0> -> !rtio.event
+    %5 = rtio.pulse %3 duration(%cst_1) frequency(%cst_6) phase(%cst_7) wait(%4) {_group = 0 : i64} : <"dds", [2 : i64], 0> -> !rtio.event
 
     // Test rtio.sync, synchronizes multiple events using maxsi
     // CHECK: arith.maxsi
@@ -78,12 +82,12 @@ module @circuit attributes {rtio.config = #rtio.config<{core_addr = "172.31.9.64
     %6 = rtio.sync %5, %2 : !rtio.event
 
     // Test multiple parallel pulses after sync
-    %7 = rtio.pulse %3 duration(%cst_0) frequency(%cst_5) phase(%cst_7) wait(%6) {offset = 0 : i64} : <"dds", [2 : i64], 0> -> !rtio.event
+    %7 = rtio.pulse %3 duration(%cst_0) frequency(%cst_5) phase(%cst_7) wait(%6) {_group = 1 : i64} : <"dds", [2 : i64], 0> -> !rtio.event
     %8 = rtio.channel : !rtio.channel<"dds", [2 : i64], 1>
-    %9 = rtio.pulse %8 duration(%cst_0) frequency(%cst_4) phase(%cst_7) wait(%6) {offset = 1 : i64} : <"dds", [2 : i64], 1> -> !rtio.event
-    %10 = rtio.pulse %1 duration(%cst_0) frequency(%cst_3) phase(%cst_7) wait(%6) {offset = 0 : i64} : <"dds", [2 : i64], 2> -> !rtio.event
+    %9 = rtio.pulse %8 duration(%cst_0) frequency(%cst_4) phase(%cst_7) wait(%6) {_group = 1 : i64} : <"dds", [2 : i64], 1> -> !rtio.event
+    %10 = rtio.pulse %1 duration(%cst_0) frequency(%cst_3) phase(%cst_7) wait(%6) {_group = 1 : i64} : <"dds", [2 : i64], 2> -> !rtio.event
     %11 = rtio.channel : !rtio.channel<"dds", [2 : i64], 3>
-    %12 = rtio.pulse %11 duration(%cst_0) frequency(%cst_2) phase(%cst_7) wait(%6) {offset = 1 : i64} : <"dds", [2 : i64], 3> -> !rtio.event
+    %12 = rtio.pulse %11 duration(%cst_0) frequency(%cst_2) phase(%cst_7) wait(%6) {_group = 1 : i64} : <"dds", [2 : i64], 3> -> !rtio.event
 
     // Test sync with 4 events
     // CHECK: arith.maxsi
@@ -93,9 +97,9 @@ module @circuit attributes {rtio.config = #rtio.config<{core_addr = "172.31.9.64
     %13 = rtio.sync %7, %9, %10, %12 : !rtio.event
 
     // Final pulses after sync
-    %14 = rtio.pulse %3 duration(%cst) frequency(%cst_6) phase(%cst_7) wait(%13) {offset = 0 : i64} : <"dds", [2 : i64], 0> -> !rtio.event
-    %15 = rtio.pulse %1 duration(%cst) frequency(%cst_6) phase(%cst_7) wait(%13) {offset = 0 : i64} : <"dds", [2 : i64], 2> -> !rtio.event
-    %16 = rtio.pulse %3 duration(%cst) frequency(%cst_6) phase(%cst_7) wait(%14) {offset = 0 : i64} : <"dds", [2 : i64], 0> -> !rtio.event
+    %14 = rtio.pulse %3 duration(%cst) frequency(%cst_6) phase(%cst_7) wait(%13) {_group = 2 : i64} : <"dds", [2 : i64], 0> -> !rtio.event
+    %15 = rtio.pulse %1 duration(%cst) frequency(%cst_6) phase(%cst_7) wait(%13) {_group = 2 : i64} : <"dds", [2 : i64], 2> -> !rtio.event
+    %16 = rtio.pulse %3 duration(%cst) frequency(%cst_6) phase(%cst_7) wait(%14) {_group = 3 : i64} : <"dds", [2 : i64], 0> -> !rtio.event
 
     // CHECK: return
     return
@@ -117,14 +121,12 @@ module @simple_sequential attributes {rtio.config = #rtio.config<{core_addr = "1
 
     %ch0 = rtio.channel : !rtio.channel<"dds", [2 : i64], 0>
 
-    // First pulse, sets frequency and generates TTL
-    // CHECK: llvm.call @__rtio_set_frequency
-    // CHECK: llvm.call fastcc tail @delay_mu
+    // First pulse, generates TTL
     // CHECK: arith.maxsi
     // CHECK: llvm.call tail @rtio_output
     // CHECK: llvm.call fastcc tail @delay_mu
     // CHECK: llvm.call tail @rtio_output
-    %1 = rtio.pulse %ch0 duration(%cst_dur) frequency(%cst_freq) phase(%cst_phase) wait(%0) {offset = 0 : i64} : <"dds", [2 : i64], 0> -> !rtio.event
+    %1 = rtio.pulse %ch0 duration(%cst_dur) frequency(%cst_freq) phase(%cst_phase) wait(%0) {_group = 0 : i64} : <"dds", [2 : i64], 0> -> !rtio.event
 
     // Second pulse, sequential, waits for first
     // CHECK: llvm.call tail @at_mu
@@ -132,7 +134,7 @@ module @simple_sequential attributes {rtio.config = #rtio.config<{core_addr = "1
     // CHECK: llvm.call tail @rtio_output
     // CHECK: llvm.call fastcc tail @delay_mu
     // CHECK: llvm.call tail @rtio_output
-    %2 = rtio.pulse %ch0 duration(%cst_dur) frequency(%cst_freq) phase(%cst_phase) wait(%1) {offset = 0 : i64} : <"dds", [2 : i64], 0> -> !rtio.event
+    %2 = rtio.pulse %ch0 duration(%cst_dur) frequency(%cst_freq) phase(%cst_phase) wait(%1) {_group = 1 : i64} : <"dds", [2 : i64], 0> -> !rtio.event
 
     // CHECK: return
     return
@@ -232,7 +234,7 @@ module @measure_rtio_to_artiq attributes {rtio.config = #rtio.config<{device_db 
     %cst_0 = arith.constant 1.000000e-04 : f64
     %0 = rtio.empty : !rtio.event
     %1 = rtio.channel : !rtio.channel<"ttl", [1 : i64], 0>
-    %2 = rtio.pulse %1 duration(%cst_0) frequency(%cst) phase(%cst) wait(%0) {_measurement, offset = 0 : i64} : <"ttl", [1 : i64], 0> -> !rtio.event
+    %2 = rtio.pulse %1 duration(%cst_0) frequency(%cst) phase(%cst) wait(%0) {_group = 0 : i64, _measurement} : <"ttl", [1 : i64], 0> -> !rtio.event
     %3 = rtio.readout %2 : !rtio.event -> i32
     return
   }

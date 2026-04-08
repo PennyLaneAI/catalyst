@@ -75,6 +75,32 @@ inline int32_t extractChannelId(mlir::Value channelValue)
     return type.getChannelId().getInt();
 }
 
+/// Get group id from pulse
+inline int64_t pulseGroupId(RTIOPulseOp op)
+{
+    assert(op->hasAttr("_group") && "pulse must have _group attr");
+    auto a = op->getAttrOfType<mlir::IntegerAttr>("_group");
+    return a.getInt();
+}
+
+/// Device RTIO address for a static logical channel id (used when `_group` holds the lane id).
+inline mlir::Value computeChannelDeviceAddrForId(mlir::OpBuilder &builder, mlir::Operation *op,
+                                                 int64_t channelId)
+{
+    mlir::Location loc = op->getLoc();
+    mlir::ModuleOp mod = op->getParentOfType<mlir::ModuleOp>();
+    auto configAttr = mod->getAttrOfType<ConfigAttr>(ConfigAttr::getModuleAttrName());
+    assert(configAttr && "configAttr not found");
+
+    mlir::Attribute leaf = device_db_detail::walkAttrPath(
+        configAttr, {"device_db", "ttl_urukul0_sw0", "arguments", "channel"});
+    assert(leaf && "device_db.ttl_urukul0_sw0.arguments.channel missing");
+    int64_t channelBase = mlir::cast<mlir::IntegerAttr>(leaf).getInt();
+
+    int32_t addr = static_cast<int32_t>((channelId + channelBase) << 8);
+    return mlir::arith::ConstantOp::create(builder, loc, builder.getI32IntegerAttr(addr));
+}
+
 /// Compute the device address for a given channel value.
 inline mlir::Value computeChannelDeviceAddr(mlir::OpBuilder &builder, mlir::Operation *op,
                                             mlir::Value channelValue)

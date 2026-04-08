@@ -45,8 +45,8 @@ module @circuit {
     %8 = arith.divf %6, %7 : f64
     %9 = builtin.unrealized_conversion_cast %2 : !quantum.bit to !ion.qubit
     // CHECK: %[[EMPTY:.*]] = rtio.empty : !rtio.event
-    // CHECK: %[[CH:.*]] = rtio.channel : !rtio.channel<"dds", [2 : i64], 2>
-    // CHECK: %[[PULSE:.*]] = rtio.pulse %[[CH]] duration(%{{.*}}) frequency(%{{.*}}) phase(%{{.*}}) wait(%[[EMPTY]])
+    // CHECK: %[[CH:.*]] = rtio.channel : !rtio.channel<"dds", [1 : i64], 0>
+    // CHECK: %[[PULSE:.*]] = rtio.pulse %[[CH]] {{.*}} wait(%[[EMPTY]])
     // CHECK: return
     %10 = ion.parallelprotocol(%9) : !ion.qubit {
     ^bb0(%arg0: !ion.qubit):
@@ -118,7 +118,7 @@ module @cnot_circuit {
     %10 = builtin.unrealized_conversion_cast %2 : !quantum.bit to !ion.qubit
 
     // CHECK: %[[EMPTY:.*]] = rtio.empty : !rtio.event
-    // CHECK: %[[CH0:.*]] = rtio.channel : !rtio.channel<"dds", [2 : i64], 0>
+    // CHECK: %[[CH0:.*]] = rtio.channel : !rtio.channel<"dds", [0 : i64], 0>
     // CHECK: %[[P1:.*]] = rtio.pulse %[[CH0]] {{.*}} wait(%[[EMPTY]])
     %11 = ion.parallelprotocol(%10) : !ion.qubit {
     ^bb0(%arg0: !ion.qubit):
@@ -147,14 +147,12 @@ module @cnot_circuit {
     %20 = builtin.unrealized_conversion_cast %3 : !quantum.bit to !ion.qubit
 
     // CHECK: %[[SYNC1:.*]] = rtio.sync %[[P1]], %[[EMPTY]] : !rtio.event
-    // CHECK: %[[P2:.*]] = rtio.pulse %[[CH0]] {{.*}} wait(%[[SYNC1]])
-    // CHECK: %[[CH1:.*]] = rtio.channel : !rtio.channel<"dds", [2 : i64], 1>
-    // CHECK: %[[P3:.*]] = rtio.pulse %[[CH1]] {{.*}} wait(%[[SYNC1]])
-    // CHECK: %[[CH2:.*]] = rtio.channel : !rtio.channel<"dds", [2 : i64], 2>
-    // CHECK: %[[P4:.*]] = rtio.pulse %[[CH2]] {{.*}} wait(%[[SYNC1]])
-    // CHECK: %[[CH3:.*]] = rtio.channel : !rtio.channel<"dds", [2 : i64], 3>
-    // CHECK: %[[P5:.*]] = rtio.pulse %[[CH3]] {{.*}} wait(%[[SYNC1]])
-    // CHECK: %[[SYNC2:.*]] = rtio.sync %[[P2]], %[[P3]], %[[P4]], %[[P5]] : !rtio.event
+    // CHECK: rtio.pulse {{.*}} wait(%[[SYNC1]]) {_group = 1
+    // CHECK: rtio.pulse {{.*}} wait(%[[SYNC1]]) {_group = 1
+    // CHECK: %[[CH1:.*]] = rtio.channel : !rtio.channel<"dds", [1 : i64], 0>
+    // CHECK: rtio.pulse {{.*}} wait(%[[SYNC1]]) {_group = 1
+    // CHECK: rtio.pulse {{.*}} wait(%[[SYNC1]]) {_group = 1
+    // CHECK: %[[SYNC2:.*]] = rtio.sync {{.*}} : !rtio.event
     %21:2 = ion.parallelprotocol(%19, %20) : !ion.qubit, !ion.qubit {
     ^bb0(%arg0: !ion.qubit, %arg1: !ion.qubit):
       %54 = ion.pulse(%18 : f64) %arg0 {beam = #ion.beam<transition_index = 0 : i64, rabi = 8885765876.3167324 : f64, detuning = 208570336271826.38 : f64, polarization = [0, 1, 0], wavevector = [-1, 0, 0]>, phase = 0.000000e+00 : f64} : !ion.pulse
@@ -185,7 +183,7 @@ module @cnot_circuit {
     %29 = arith.divf %27, %28 : f64
     %30 = builtin.unrealized_conversion_cast %22 : !quantum.bit to !ion.qubit
 
-    // CHECK: %[[P6:.*]] = rtio.pulse %[[CH0]] {{.*}} wait(%[[SYNC2]])
+    // CHECK: %[[P6:.*]] = rtio.pulse %[[CH0]] {{.*}} wait(%[[SYNC2]]) {_group = 2
     %31 = ion.parallelprotocol(%30) : !ion.qubit {
     ^bb0(%arg0: !ion.qubit):
       %54 = ion.pulse(%29 : f64) %arg0 {beam = #ion.beam<transition_index = 0 : i64, rabi = 62831853071.79586 : f64, detuning = 208570336271826.38 : f64, polarization = [1, 0, 0], wavevector = [0, 1, 0]>, phase = 0.000000e+00 : f64} : !ion.pulse
@@ -211,7 +209,7 @@ module @cnot_circuit {
     %38 = arith.divf %36, %37 : f64
     %39 = builtin.unrealized_conversion_cast %23 : !quantum.bit to !ion.qubit
 
-    // CHECK: %[[P7:.*]] = rtio.pulse %[[CH2]] {{.*}} wait(%[[SYNC2]])
+    // CHECK: %[[P7:.*]] = rtio.pulse %[[CH1]] {{.*}} wait(%[[SYNC2]]) {_group = 3
     %40 = ion.parallelprotocol(%39) : !ion.qubit {
     ^bb0(%arg0: !ion.qubit):
       %54 = ion.pulse(%38 : f64) %arg0 {beam = #ion.beam<transition_index = 0 : i64, rabi = 62831853071.79586 : f64, detuning = 208570336271826.38 : f64, polarization = [1, 0, 0], wavevector = [0, 1, 0]>, phase = 1.5707963267948966 : f64} : !ion.pulse
@@ -237,7 +235,7 @@ module @cnot_circuit {
     %47 = arith.divf %45, %46 : f64
     %48 = builtin.unrealized_conversion_cast %32 : !quantum.bit to !ion.qubit
 
-    // CHECK: %[[P8:.*]] = rtio.pulse %[[CH0]] {{.*}} wait(%[[P6]])
+    // CHECK: %[[P8:.*]] = rtio.pulse %[[CH0]] {{.*}} wait(%[[P6]]) {_group = 4
     %49 = ion.parallelprotocol(%48) : !ion.qubit {
     ^bb0(%arg0: !ion.qubit):
       %54 = ion.pulse(%47 : f64) %arg0 {beam = #ion.beam<transition_index = 0 : i64, rabi = 62831853071.79586 : f64, detuning = 208570336271826.38 : f64, polarization = [1, 0, 0], wavevector = [0, 1, 0]>, phase = 1.5707963267948966 : f64} : !ion.pulse
@@ -293,7 +291,7 @@ module @sequential_circuit {
     %ion_q0 = builtin.unrealized_conversion_cast %q0 : !quantum.bit to !ion.qubit
 
     // CHECK: %[[EMPTY:.*]] = rtio.empty : !rtio.event
-    // CHECK: %[[CH:.*]] = rtio.channel : !rtio.channel<"dds", [2 : i64], 0>
+    // CHECK: %[[CH:.*]] = rtio.channel : !rtio.channel<"dds", [0 : i64], 0>
     // CHECK: %[[PULSE1:.*]] = rtio.pulse %[[CH]] {{.*}} wait(%[[EMPTY]])
     %out1 = ion.parallelprotocol(%ion_q0) : !ion.qubit {
     ^bb0(%arg0: !ion.qubit):
@@ -356,7 +354,7 @@ module @loop_circuit {
 
     // Gate before the loop
     // CHECK: %[[EMPTY:.*]] = rtio.empty : !rtio.event
-    // CHECK: %[[CH0:.*]] = rtio.channel : !rtio.channel<"dds", [2 : i64], 0>
+    // CHECK: %[[CH0:.*]] = rtio.channel : !rtio.channel<"dds", [0 : i64], 0>
     // CHECK: %[[P0:.*]] = rtio.pulse %[[CH0]] {{.*}} wait(%[[EMPTY]])
     %10 = ion.parallelprotocol(%9) : !ion.qubit {
     ^bb0(%arg0: !ion.qubit):
@@ -369,8 +367,8 @@ module @loop_circuit {
 
     // Loop
     // CHECK: %[[LOOP:.*]] = scf.for {{.*}} iter_args(%[[ARG:.*]] = %[[P0]]) -> (!rtio.event) {
-    // CHECK:   %[[CH2_LOOP:.*]] = rtio.channel : !rtio.channel<"dds", [2 : i64], 2>
-    // CHECK:   %[[P_Q1:.*]] = rtio.pulse %[[CH2_LOOP]] {{.*}} wait(%[[ARG]])
+    // CHECK:   %[[CH1_LOOP:.*]] = rtio.channel : !rtio.channel<"dds", [1 : i64], 0>
+    // CHECK:   %[[P_Q1:.*]] = rtio.pulse %[[CH1_LOOP]] {{.*}} wait(%[[ARG]])
     // CHECK:   %[[P_Q0:.*]] = rtio.pulse %[[CH0]] {{.*}} wait(%[[ARG]])
     // CHECK:   %[[SYNC_LOOP:.*]] = rtio.sync %[[P_Q0]], %[[P_Q1]] : !rtio.event
     // CHECK:   scf.yield %[[SYNC_LOOP]] : !rtio.event
@@ -522,7 +520,7 @@ module @if_circuit {
 
     // Gate before the if
     // CHECK: %[[EMPTY:.*]] = rtio.empty : !rtio.event
-    // CHECK: %[[CH0:.*]] = rtio.channel : !rtio.channel<"dds", [2 : i64], 0>
+    // CHECK: %[[CH0:.*]] = rtio.channel : !rtio.channel<"dds", [0 : i64], 0>
     // CHECK: %[[P0:.*]] = rtio.pulse %[[CH0]] {{.*}} wait(%[[EMPTY]])
     %11 = ion.parallelprotocol(%10) : !ion.qubit {
     ^bb0(%arg1: !ion.qubit):
@@ -538,8 +536,8 @@ module @if_circuit {
     // TODO: it's not fully optimized yet, the P0 event is already dominated by the P_THEN event,
     //       so it's no need to sync P0 and P_THEN.
     // CHECK: %[[IF_RESULT:.*]] = scf.if {{.*}} -> (!rtio.event) {
-    // CHECK:   %[[CH2_THEN:.*]] = rtio.channel : !rtio.channel<"dds", [2 : i64], 2>
-    // CHECK:   %[[P_THEN:.*]] = rtio.pulse %[[CH2_THEN]] {{.*}} wait(%[[P0]])
+    // CHECK:   %[[CH1_THEN:.*]] = rtio.channel : !rtio.channel<"dds", [1 : i64], 0>
+    // CHECK:   %[[P_THEN:.*]] = rtio.pulse %[[CH1_THEN]] {{.*}} wait(%[[P0]])
     // CHECK:   %[[SYNC_THEN:.*]] = rtio.sync %[[P_THEN]], %[[P0]] : !rtio.event
     // CHECK:   scf.yield %[[SYNC_THEN]] : !rtio.event
     // CHECK: } else {
@@ -604,8 +602,8 @@ module @if_circuit {
     }
 
     // Gate after the if
-    // CHECK: %[[CH2_AFTER:.*]] = rtio.channel : !rtio.channel<"dds", [2 : i64], 2>
-    // CHECK: %[[P_AFTER:.*]] = rtio.pulse %[[CH2_AFTER]] {{.*}} wait(%[[IF_RESULT]])
+    // CHECK: %[[CH1_AFTER:.*]] = rtio.channel : !rtio.channel<"dds", [1 : i64], 0>
+    // CHECK: %[[P_AFTER:.*]] = rtio.pulse %[[CH1_AFTER]] {{.*}} wait(%[[IF_RESULT]])
     %16 = quantum.extract %15[ 1] : !quantum.reg -> !quantum.bit
     %cst_5 = arith.constant 12.566370614359172 : f64
     %17 = arith.remf %cst_0, %cst_5 : f64
@@ -687,7 +685,7 @@ module @measure_ion_to_rtio {
   }
 }
 
-// CHECK: rtio.pulse {{.*}} {_measurement
+// CHECK: rtio.pulse {{.*}}_measurement
 // CHECK: rtio.readout {{.*}} : !rtio.event -> i32
 // CHECK: func.func private @__rtio_init_dataset()
 // CHECK: rtio.rpc @init_dataset
