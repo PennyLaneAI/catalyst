@@ -580,15 +580,13 @@ class ConstructCircuitDAG:
         if is_external_function:
             return
 
-        uid = f"cluster{self._cluster_uid_counter}"
-        self.dag_builder.add_cluster(
+        cluster_uid = self.dag_builder.add_cluster(
             uid,
             label=callee_name,
             labeljust="l",
             cluster_uid=self._cluster_uid_stack[-1],
         )
-        self._cluster_uid_stack.append(uid)
-        self._cluster_uid_counter += 1
+        self._cluster_uid_stack.append(cluster_uid)
 
         self._visit_block(callee_func.regions[0].blocks[0])
 
