@@ -766,7 +766,7 @@ class ConstructCircuitDAG:
         """
         if cluster is None:
             return False
-        return cluster.kind == _ClusterKind.CONDITIONAL or cluster.kind == _ClusterKind.SWITCH
+        return cluster.kind in (_ClusterKind.CONDITIONAL, _ClusterKind.SWITCH)
 
     @property
     def _exited_branching_cluster(self) -> bool:
