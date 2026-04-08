@@ -758,16 +758,21 @@ level. A transform will be applied as a tape transform in two cases:
   implementation in Catalyst.
 
 Consider the following example that includes ``cancel_inverses``,
-``merge_rotations``, and ``commute_controlled``.
+``merge_rotations``, and a toy tape transform (that does nothing) called
+``tape_transform``.
 
 .. code-block:: python
+
+    @qml.transform
+    def tape_transform(tape):
+        return [tape,], lambda x: x[0]
 
     dev = qml.device("lightning.qubit", wires=3)
 
     @qml.qjit
-    @qml.transforms.commute_controlled(direction="right") # applied as a tape transform
-    @qml.transforms.cancel_inverses(recursive=True) # applied as the MLIR pass
-    @qml.transforms.merge_rotations # applied as the MLIR pass
+    @tape_transform # applied as a tape transform
+    @qml.transforms.cancel_inverses(recursive=True) # applied as a tape transform
+    @qml.transforms.merge_rotations # applied as a tape transform
     @qml.qnode(device=dev)
     def circuit(theta):
         qml.CZ(wires=[0, 2])
@@ -788,21 +793,22 @@ Consider the following example that includes ``cancel_inverses``,
 Array(1., dtype=float64)
 
 The ``merge_rotations`` and ``cancel_inverses`` passes have an MLIR
-implementation (see the :mod:`catalyst.passes` module) and are applied using
-that implementation. The ``commute_controlled`` pass is applied as a tape
-transform since it does not have an MLIR implementation.
+implementation (see the :mod:`catalyst.passes` module), but they are applied
+using their tape implementation since they each come before the
+``tape_transform``.
 
-However, if we were to swap ``cancel_inverses`` and ``commute_controlled`` like
-below, ``cancel_inverses`` would now be applied as a tape transform since it comes after ``commute_controlled``.
+However, if we were to swap ``cancel_inverses`` and ``tape_transform``,
+``cancel_inverses`` would now be applied as an MLIR pass since it comes after
+``tape_transform``.
 
 .. code-block:: python
 
     dev = qml.device("lightning.qubit", wires=3)
 
     @qml.qjit
-    @qml.transforms.cancel_inverses(recursive=True) # applied as a tape transform
-    @qml.transforms.commute_controlled(direction="right") # applied as a tape transform
-    @qml.transforms.merge_rotations # applied as the MLIR pass
+    @qml.transforms.cancel_inverses(recursive=True) # applied as an MLIR pass
+    @tape_transform # applied as a tape transform
+    @qml.transforms.merge_rotations # applied as a tape transform
     @qml.qnode(device=dev)
     def circuit(theta):
         qml.CZ(wires=[0, 2])
@@ -820,7 +826,7 @@ below, ``cancel_inverses`` would now be applied as a tape transform since it com
         return qml.expval(qml.Z(0))
 
 In addition to this internal discrepancy, an error will now be raised since the
-tape implementation of ``cancel_inverses`` does not have a ``recursive``
+MLIR implementation of ``cancel_inverses`` does not support the ``recursive``
 keyword argument.
 
 >>> circuit(0.1)
