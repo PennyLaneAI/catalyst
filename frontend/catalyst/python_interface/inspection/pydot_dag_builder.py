@@ -18,7 +18,7 @@ from collections import ChainMap
 from shutil import which
 from typing import Any
 
-from .dag_builder import DAGBuilder
+from .dag_builder import DAGBuilder, NodeUID, ClusterUID
 
 HAS_PYDOT = True
 try:
