@@ -196,10 +196,7 @@ class ConstructCircuitDAG:
             raise VisualizationError(_ERROR_MSG)
 
     @_visualize_operation.register
-    def _gate_op(
-        self,
-        op: quantum.GateOp,
-    ) -> None:
+    def _gate_op(self, op: quantum.GateOp) -> None:
         """Generic handler for unitary gates."""
         # Create PennyLane instance
         qml_op: Operator = xdsl_to_qml_op(op)
@@ -311,10 +308,7 @@ class ConstructCircuitDAG:
     # =====================
 
     @_visualize_operation.register
-    def _terminal_measurements(
-        self,
-        op: quantum.TerminalMeasurementOp,
-    ) -> None:
+    def _terminal_measurements(self, op: quantum.TerminalMeasurementOp) -> None:
         """Handler for all quantum measurement operations."""
 
         meas = None
