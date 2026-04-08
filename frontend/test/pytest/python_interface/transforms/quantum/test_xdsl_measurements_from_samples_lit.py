@@ -272,7 +272,6 @@ class TestMeasurementsFromSamplesPass:
         pipeline = (MeasurementsFromSamplesPass(),)
         run_filecheck(program, pipeline)
 
-    @pytest.mark.xfail(reason="Counts not supported", strict=True, raises=NotImplementedError)
     def test_1_wire_counts(self, run_filecheck):
         """Test the measurements-from-samples pass on a 1-wire circuit terminating with a counts
         measurement.
@@ -310,7 +309,40 @@ class TestMeasurementsFromSamplesPass:
         """
 
         pipeline = (MeasurementsFromSamplesPass(),)
-        run_filecheck(program, pipeline)
+        with pytest.raises(NotImplementedError, match="operations are not supported"):
+            run_filecheck(program, pipeline)
+            
+    def test_1_wire_state(self, run_filecheck):
+        """Test the measurements-from-samples pass on a 1-wire circuit terminating with a state
+        measurement. Note that this is not a valid IR, because state and shots don't work together.
+        We would expect to either encounter a "no shots" error from this pass (for a circuit with 
+        no shots) or a "state and shots are incompatible" error with shots when creating an IR.
+        """
+
+        program = """
+        builtin.module @module_circuit {
+            // CHECK-LABEL: circuit
+            // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
+            func.func public @circuit() -> (tensor<4xcomplex<f64>>) attributes {quantum.node}  {
+                %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
+                %1 = tensor.extract %0[] : tensor<i64>
+                quantum.device shots(%1) ["", "", ""]
+
+                // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.reg
+                %2 = "test.op"() : () -> !quantum.reg
+
+                // CHECK: [[compbasis:%.+]] = quantum.compbasis qreg [[q0]] : !quantum.obs
+                %3 = quantum.compbasis qreg %2 : !quantum.obs
+                %4 = quantum.state %3 : tensor<4xcomplex<f64>>
+
+                func.return %4 : tensor<4xcomplex<f64>>
+            }
+        }
+        """
+
+        pipeline = (MeasurementsFromSamplesPass(),)
+        with pytest.raises(NotImplementedError, match="operations are not supported"):
+            run_filecheck(program, pipeline)
 
     def test_2_wire_expval(self, run_filecheck):
         """Test the measurements-from-samples pass on a 2-wire circuit terminating with an expval(Z)
