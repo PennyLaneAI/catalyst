@@ -47,19 +47,21 @@ class TestPyTreesReturnValues:
         result = jitted_fn(params)
         assert jnp.allclose(result, expected)
 
-    def test_return_value_mcm(self, backend):
+    @pytest.mark.old_frontend
+    def test_return_value_mcm(self, backend, capture_mode):
         """Test that a qnode can return a scalar mcm."""
 
         @qml.qnode(qml.device(backend, wires=2))
         def circuit2():
             return measure(0)
 
-        jitted_fn = qjit(circuit2)
+        jitted_fn = qjit(circuit2, capture=capture_mode)
 
         result = jitted_fn()
         assert not result
 
-    def test_return_value_arrays(self, backend):
+    @pytest.mark.old_frontend
+    def test_return_value_arrays(self, backend, capture_mode):
         """Test arrays."""
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -68,7 +70,7 @@ class TestPyTreesReturnValues:
             qml.RX(params[1], wires=1)
             return qml.state()
 
-        jitted_fn = qjit(circuit1)
+        jitted_fn = qjit(circuit1, capture=capture_mode)
 
         params = [0.4, 0.8]
         result = jitted_fn(params)
@@ -81,7 +83,7 @@ class TestPyTreesReturnValues:
             qml.RX(params[1], wires=1)
             return [jnp.pi, qml.state()]
 
-        jitted_fn = qjit(circuit2)
+        jitted_fn = qjit(circuit2, capture=capture_mode)
 
         params = [0.4, 0.8]
         result = jitted_fn(params)
@@ -89,7 +91,8 @@ class TestPyTreesReturnValues:
         assert jnp.allclose(result[0], jnp.pi)
         assert jnp.allclose(result[1], ip_result)
 
-    def test_return_value_tuples(self, backend, tol_stochastic):
+    @pytest.mark.old_frontend
+    def test_return_value_tuples(self, backend, tol_stochastic, capture_mode):
         """Test tuples."""
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -100,7 +103,7 @@ class TestPyTreesReturnValues:
             m1 = measure(1)
             return (m0, m1)
 
-        jitted_fn = qjit(circuit1)
+        jitted_fn = qjit(circuit1, capture=capture_mode)
 
         result = jitted_fn()
         assert isinstance(result, tuple)
@@ -113,7 +116,7 @@ class TestPyTreesReturnValues:
             m1 = measure(1)
             return (((m0, m1), m0 + m1), m0 * m1)
 
-        jitted_fn = qjit(circuit2)
+        jitted_fn = qjit(circuit2, capture=capture_mode)
         result = jitted_fn()
         assert isinstance(result, tuple)
         assert isinstance(result[0], tuple)
@@ -134,7 +137,7 @@ class TestPyTreesReturnValues:
         params = [0.5, 0.6]
         expected_expval = 0.87758256
 
-        jitted_fn = qjit(circuit3)
+        jitted_fn = qjit(circuit3, capture=capture_mode)
         result = jitted_fn(params)
         assert isinstance(result, tuple)
         assert isinstance(result[0], tuple)
@@ -153,13 +156,13 @@ class TestPyTreesReturnValues:
         params = [0.5, 0.6]
         expected_expval = 0.87758256
 
-        jitted_fn = qjit(circuit4)
+        jitted_fn = qjit(circuit4, capture=capture_mode)
         result = jitted_fn(params)
         assert isinstance(result, tuple)
         assert len(result[0]) == 4
         assert jnp.allclose(result[1], expected_expval)
 
-        @qjit
+        @qjit(capture=capture_mode)
         def workflow(x):
             def _f(x):
                 return (2 * x, 3 * x)
@@ -191,11 +194,12 @@ class TestPyTreesReturnValues:
         assert jnp.allclose(result[0], result[2])
         assert jnp.allclose(result[1][0] + result[1][1], 1.0)
 
-    def test_return_value_cond(self, backend):
+    @pytest.mark.old_frontend
+    def test_return_value_cond(self, backend, capture_mode):
         """Test conditionals."""
 
         # QFunc Path.
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit1(n):
             @cond(n > 4)
@@ -217,7 +221,7 @@ class TestPyTreesReturnValues:
         assert res5[1] == (125, 625)
 
         # Classical Path.
-        @qjit
+        @qjit(capture=capture_mode)
         def circuit2(n):
             @cond(n > 4)
             def cond_fn():
@@ -241,11 +245,12 @@ class TestPyTreesReturnValues:
         assert res5["cond"][1] == (125, 625)
         assert res5["const"] == 5
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
-    def test_return_value_dict(self, backend, tol_stochastic, mcm_method):
+    def test_return_value_dict(self, backend, tol_stochastic, mcm_method, capture_mode):
         """Test dictionaries."""
 
-        if mcm_method == "one-shot" and qml.capture.enabled():
+        if mcm_method == "one-shot" and capture_mode:
             pytest.xfail()
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -257,7 +262,7 @@ class TestPyTreesReturnValues:
                 "w1": qml.expval(qml.PauliZ(1)),
             }
 
-        jitted_fn = qjit(circuit1)
+        jitted_fn = qjit(circuit1, capture=capture_mode)
 
         params = [0.2, 0.6]
         expected = {"w0": 0.98006658, "w1": 0.82533561}
@@ -281,7 +286,7 @@ class TestPyTreesReturnValues:
         params = [0.5, 0.6]
         expected_expval = 0.87758256
 
-        jitted_fn = qjit(circuit2)
+        jitted_fn = qjit(circuit2, capture=capture_mode)
         result = jitted_fn(params)
         assert isinstance(result, dict)
         assert isinstance(result["counts"], tuple)
@@ -312,7 +317,7 @@ class TestPyTreesReturnValues:
                 dtype=jnp.complex128,
             ),
         ]
-        jitted_fn = qjit(circuit2_snapshot)
+        jitted_fn = qjit(circuit2_snapshot, capture=capture_mode)
         result = jitted_fn(params)
         assert isinstance(result, tuple)
         assert isinstance(result[0], list)
@@ -340,13 +345,13 @@ class TestPyTreesReturnValues:
         params = [0.5, 0.6]
         expected_expval = 0.87758256
 
-        jitted_fn = qjit(circuit3)
+        jitted_fn = qjit(circuit3, capture=capture_mode)
         result = jitted_fn(params)
         assert isinstance(result, dict)
         assert len(result["state"]) == 4
         assert jnp.allclose(result["expval"]["z0"], expected_expval)
 
-        @qjit
+        @qjit(capture=capture_mode)
         def workflow1(param):
             return {"w": jnp.sin(param), "q": jnp.cos(param)}
 
@@ -358,7 +363,8 @@ class TestPyTreesReturnValues:
 class TestPyTreesFuncArgs:
     """Test QJIT workflows with PyTrees as function arguments."""
 
-    def test_args_dict(self, backend):
+    @pytest.mark.old_frontend
+    def test_args_dict(self, backend, capture_mode):
         """Test arguments dict."""
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -367,7 +373,7 @@ class TestPyTreesFuncArgs:
             qml.RX(params["b"][0], wires=1)
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)), params["a"][0]
 
-        jitted_fn = qjit(circuit1)
+        jitted_fn = qjit(circuit1, capture=capture_mode)
 
         params = {
             "a": [0.4, 0.6],
@@ -385,7 +391,7 @@ class TestPyTreesFuncArgs:
             qml.RX(params["b"][0], wires=1)
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)), params["a"]
 
-        jitted_fn = qjit(circuit2)
+        jitted_fn = qjit(circuit2, capture=capture_mode)
 
         params = {
             "a": {"c": (0.4, 0.6)},
@@ -406,7 +412,8 @@ class TestPyTreesFuncArgs:
             qml.RX(params1["b"][0] * params2[1], wires=1)
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
 
-    def test_promotion_unneeded(self, backend):
+    @pytest.mark.old_frontend
+    def test_promotion_unneeded(self, backend, capture_mode):
         """Test arguments list of lists."""
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -415,7 +422,7 @@ class TestPyTreesFuncArgs:
             qml.RX(params["b"][0], wires=1)
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)), params["a"][0]
 
-        jitted_fn = qjit(circuit1)
+        jitted_fn = qjit(circuit1, capture=capture_mode)
 
         params = {
             "a": [0.4, 0.6],
@@ -425,7 +432,8 @@ class TestPyTreesFuncArgs:
         jitted_fn(params)
         jitted_fn(params)
 
-    def test_promotion_needed(self, backend):
+    @pytest.mark.old_frontend
+    def test_promotion_needed(self, backend, capture_mode):
         """Test arguments list of lists."""
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -434,7 +442,7 @@ class TestPyTreesFuncArgs:
             qml.RX(params["b"][0], wires=1)
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)), params["a"][0]
 
-        jitted_fn = qjit(circuit1)
+        jitted_fn = qjit(circuit1, capture=capture_mode)
 
         params = {
             "a": [0.4, 0.6],
@@ -488,7 +496,7 @@ class TestPyTreesFuncArgs:
         assert jnp.allclose(res1, 0.59856565)
         assert jnp.allclose(res2, 1.79678625)
 
-    def test_args_grad(self, backend):
+    def test_args_grad(self, backend, capture_mode):
         """Test arguments with the grad operation."""
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -497,7 +505,7 @@ class TestPyTreesFuncArgs:
             qml.RX(params["b"][1], wires=1)
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
 
-        @qjit
+        @qjit(capture=capture_mode)
         def workflow1(params):
             g = qml.qnode(qml.device(backend, wires=1))(circuit1)
             h = grad(g)
@@ -520,7 +528,7 @@ class TestPyTreesFuncArgs:
             qml.RX(params["b"][0], wires=1)
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
 
-        @qjit
+        @qjit(capture=capture_mode)
         def workflow2(params):
             g = qml.qnode(qml.device(backend, wires=1))(circuit2)
             h = grad(g)
@@ -555,10 +563,11 @@ class TestPyTreesFuncArgs:
 
         circuit1(1, inp)
 
-    def test_args_used_in_measure(self, backend):
+    @pytest.mark.old_frontend
+    def test_args_used_in_measure(self, backend, capture_mode):
         """Argument is used directly in measurement"""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(dictionary):
             """q0 = 1; q1 = 0;"""
@@ -570,10 +579,11 @@ class TestPyTreesFuncArgs:
         result = circuit({"wire": 1})
         assert jnp.allclose(result, False)
 
-    def test_args_used_indirectly_in_measure(self, backend):
+    @pytest.mark.old_frontend
+    def test_args_used_indirectly_in_measure(self, backend, capture_mode):
         """Argument is used indirectly in measurement"""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(dictionary):
             """q0 = 1; q1 = 0;"""
