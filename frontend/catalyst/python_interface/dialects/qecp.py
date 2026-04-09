@@ -687,6 +687,7 @@ class CnotOp(IRDLOperation):
             result_types=(in_ctrl_qubit_type, in_trgt_qubit_type),
         )
 
+
 @irdl_op_definition
 class RotOp(IRDLOperation):
     """A physical Rot gate operation.
