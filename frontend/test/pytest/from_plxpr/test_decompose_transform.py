@@ -280,6 +280,48 @@ class TestGraphDecomposition:
         resources = qml.specs(circuit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
+    @pytest.mark.xfail(reason="graph-decomposition does not yet support adjoint or ctrl operations")
+    @pytest.mark.usefixtures("use_capture")
+    def test_adjoint(self):
+        """Test the graph_decomposition pass with adjoint operations."""
+
+        @qml.qjit(capture=True)
+        @graph_decomposition(
+            gate_set={"RY", "RX", "CZ", "GlobalPhase"},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def circuit():
+            qml.adjoint(qml.Hadamard(wires=2))
+            qml.adjoint(qml.CNOT(wires=[0, 1]))
+            qml.adjoint(qml.RX(0.5, wires=3))
+            qml.adjoint(qml.Toffoli(wires=[0, 1, 2]))
+            return qml.expval(qml.Z(0))
+
+        expected_resources = {'GlobalPhase': 24, 'CZ': 7, 'RX': 25, 'RY': 65}
+        resources = qml.specs(circuit, level="device")()["resources"].gate_types
+        assert resources == expected_resources
+
+    @pytest.mark.xfail(reason="graph-decomposition does not yet support adjoint or ctrl operations")
+    @pytest.mark.usefixtures("use_capture")
+    def test_ctrl(self):
+        """Test the graph_decomposition pass with controlled operations."""
+
+        @qml.qjit(capture=True)
+        @graph_decomposition(
+            gate_set={"RX", "RZ", "H", "CZ", "PauliRot"},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit():
+            qml.ctrl(qml.Hadamard(wires=1), 0)
+            qml.ctrl(qml.RY, control=0)(0.5, 1)
+            qml.ctrl(qml.PauliX, control=0)(1)
+            return qml.expval(qml.Z(0))
+
+        expected_resources = {"RX": 1, "RZ": 2, "H": 2, "CZ": 1}
+        resources = qml.specs(circuit, level="device")()["resources"].gate_types
+        assert resources == expected_resources
+
+
 class TestPlxPRDecomposition:
     """Test the PLxPR-based graph-based decomposition integration with from_plxpr."""
 
