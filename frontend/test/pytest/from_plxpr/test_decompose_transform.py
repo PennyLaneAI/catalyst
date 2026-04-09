@@ -36,6 +36,47 @@ class TestGraphDecomposition:
     """Test the graph decomposition transform."""
 
     @pytest.mark.usefixtures("use_capture")
+    def test_inordered_params_precompiled_rule(self):
+        """Test that unordered parameters in precompiled rules are handled correctly."""
+
+        @qml.qjit(capture=True)
+        @graph_decomposition(gate_set=[qml.RX, qml.RY, qml.RZ])
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(x, y, z):
+            qml.Rot(x, y, z, wires=0)
+            return qml.expval(qml.Z(0))
+
+        x = 0.5
+        y = 0.3
+        z = 0.2
+
+        assert qml.math.allclose([0.9553364891256059], circuit(x, y, z))
+
+        expected_resources = {'RY': 1, 'RZ': 2}
+        resources = qml.specs(circuit, level="device")(x, y, z)["resources"].gate_types
+        assert resources == expected_resources
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_decompose_multi_qubit_gates_precompiled(self):
+        """Test that multi-qubit gates are decomposed correctly using precompiled rules."""
+
+        @qml.qjit(capture=True)
+        @graph_decomposition(
+            gate_set={"RY", "RX", "CNOT", "Hadamard", "GlobalPhase"},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def circuit():
+            qml.SingleExcitation(0.5, wires=[0, 1])
+            qml.SingleExcitationPlus(0.5, wires=[0, 1])
+            qml.SingleExcitationMinus(0.5, wires=[0, 1])
+            qml.DoubleExcitation(0.5, wires=[0, 1, 2, 3])
+            return qml.expval(qml.Z(0))
+
+        expected_resources = {'GlobalPhase': 6, 'RX': 6, 'RY': 30, 'CNOT': 24, 'Hadamard': 12}
+        resources = qml.specs(circuit, level="device")()["resources"].gate_types
+        assert resources == expected_resources
+
+    @pytest.mark.usefixtures("use_capture")
     def test_alt_decomps(self):
         """Test the conversion of a circuit with a custom decomposition."""
 
@@ -164,6 +205,80 @@ class TestGraphDecomposition:
         resources = qml.specs(circuit, level="device")(1.23, 4.56)["resources"].gate_types
         assert resources == expected_resources
 
+    @pytest.mark.xfail(reason="only quantum.custom gates are currently supported with graph_decomposition")
+    @pytest.mark.usefixtures("use_capture")
+    def test_multirz_tensorlike(self):
+        """Test that TensorLike parameters in MultiRZ are handled correctly in rules."""
+
+        @graph_decomposition(op_type="MultiRZ")
+        def custom_multirz(params: TensorLike, wires: WiresLike, **__):
+            qml.CNOT(wires=(wires[2], wires[1]))
+            qml.CNOT(wires=(wires[1], wires[0]))
+            qml.RZ(params, wires=wires[0])
+            qml.CNOT(wires=(wires[1], wires[0]))
+            qml.CNOT(wires=(wires[2], wires[1]))
+
+        @qml.qjit(capture=True)
+        @graph_decomposition(
+            gate_set={qml.RY, qml.RX, qml.CNOT},
+            fixed_decomps={qml.MultiRZ: custom_multirz},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=3), shots=1000)
+        def circuit(x, y):
+            qml.MultiRZ(x + y, wires=[0, 1, 2])
+
+            # register custom decomposition rules
+            custom_multirz(TensorLike, [int, int, int])
+
+            return qml.expval(qml.Z(0))
+
+        expected_resources = {"RX": 1, "RY": 2, "CNOT": 4}
+        resources = qml.specs(circuit, level="device")(0.5, 0.3)["resources"].gate_types
+        assert resources == expected_resources
+
+    @pytest.mark.xfail(reason="graph-decomposition supports pre-compiled rules, alt_decomps and fix_decomps")
+    @pytest.mark.usefixtures("use_capture")
+    def test_ftqc_custom_ops(self):
+        """Test that ftqc Ops cannot be decomposed without defining rules."""
+
+        @qml.qjit(capture=True)
+        @graph_decomposition(
+            gate_set={"CNOT", "GlobalPhase", "RX", "RZ", "PauliRot"},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit():
+            qml.ftqc.RotXZX(0.5, 0.3, 0.7, wires=0)
+            return qml.expval(qml.X(0))
+
+        expected_resources = {"RX": 2, "RZ": 1}
+        resources = qml.specs(circuit, level="device")()["resources"].gate_types
+        assert resources == expected_resources
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_ftqc_rotxzx(self):
+        """Test qml.ftqc.RotXZX with alt_decomps."""
+
+        @decomposition_rule(op_type="RotXZX")
+        def _xzx_decompose(phi, theta, omega, wires, **__):
+            qml.RX(phi, wires=wires)
+            qml.RZ(theta, wires=wires)
+            qml.RX(omega, wires=wires)
+
+        @qml.qjit(capture=True)
+        @graph_decomposition(
+            gate_set={"CNOT", "GlobalPhase", "RX", "RZ", "PauliRot"},
+            alt_decomps={qml.ftqc.RotXZX: [_xzx_decompose]},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit():
+            qml.ftqc.RotXZX(0.5, 0.3, 0.7, wires=0)
+
+            _xzx_decompose(float, float, float, int)
+            return qml.expval(qml.X(0))
+
+        expected_resources = {"RX": 2, "RZ": 1}
+        resources = qml.specs(circuit, level="device")()["resources"].gate_types
+        assert resources == expected_resources
 
 class TestPlxPRDecomposition:
     """Test the PLxPR-based graph-based decomposition integration with from_plxpr."""
