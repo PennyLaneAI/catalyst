@@ -63,7 +63,7 @@ def test_qnode_abstracted_axis(capture_mode):
         qml.RX(s, 0)
         return qml.expval(qml.Z(0))
 
-    @qjit(abstracted_axes={0: "n"}, capture=capture_mpde)
+    @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
     def workflow(a):
         return circuit(a)
 
