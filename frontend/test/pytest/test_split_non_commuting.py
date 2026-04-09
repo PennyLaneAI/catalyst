@@ -296,8 +296,7 @@ class TestSplitNonCommutingWires:
 
     snc_pass = qp.transform(pass_name="split-non-commuting")(grouping_strategy="wires")
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_non_overlapping_single_group(self):
+    def test_non_overlapping_single_group(self, capture_mode):
         """Z(0), X(1), Y(2) on separate wires -> 1 group"""
         dev = qp.device("lightning.qubit", wires=3)
 
@@ -308,8 +307,8 @@ class TestSplitNonCommutingWires:
             qp.RX(0.7, wires=2)
             return qp.expval(qp.Z(0)), qp.expval(qp.X(1)), qp.expval(qp.Y(2))
 
-        circ_split = qjit(self.snc_pass(circ))
-        circ_ref = qjit(circ)
+        circ_split = qjit(self.snc_pass(circ), capture=capture_mode)
+        circ_ref = qjit(circ, capture=capture_mode)
         assert np.allclose(circ_split(), circ_ref())
 
     @pytest.mark.usefixtures("use_both_frontend")
