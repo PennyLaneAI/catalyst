@@ -13,7 +13,6 @@
 # limitations under the License.
 """This file contains the implementation of the PennyLane-xDSL integration API."""
 
-
 import io
 
 from jax._src.interpreters import mlir

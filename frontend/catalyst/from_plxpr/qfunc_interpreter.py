@@ -14,6 +14,7 @@
 """
 Sets up the PLxPRToQuantumJaxprInterpreter for converting plxpr to catalyst jaxpr.
 """
+
 # pylint: disable=protected-access
 import textwrap
 from copy import copy
@@ -232,24 +233,16 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             if len(measurement.wires) == 0 and not isinstance(
                 measurement, qml.measurements.StateMP
             ):
-                raise CompileError(
-                    textwrap.dedent(
-                        """
+                raise CompileError(textwrap.dedent("""
                         Terminal measurements must take in an explicit list of wires when
                         dynamically allocated wires are present in the program.
-                        """
-                    )
-                )
+                        """))
 
             if any(is_dynamically_allocated_wire(w) for w in measurement.wires):
-                raise CompileError(
-                    textwrap.dedent(
-                        """
+                raise CompileError(textwrap.dedent("""
                         Terminal measurements cannot take in dynamically allocated wires
                         since they must be temporary.
-                        """
-                    )
-                )
+                        """))
 
     # pylint: disable=too-many-branches
     def interpret_measurement(self, measurement):

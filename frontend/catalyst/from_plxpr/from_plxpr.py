@@ -14,6 +14,7 @@
 """
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
+
 # pylint: disable=protected-access
 
 import warnings
