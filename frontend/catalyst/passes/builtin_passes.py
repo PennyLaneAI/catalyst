@@ -1616,7 +1616,7 @@ def graph_decomposition(
             qp.RY(np.pi / 2, wire)
 
 
-        @qjit(capture=True, target="mlir")
+        @qjit(capture=True)
         @graph_decomposition(gate_set={qp.Rot})
         @merge_rotations
         @graph_decomposition(
@@ -1635,26 +1635,15 @@ def graph_decomposition(
             qp.PauliY(0)
             qp.RY(x + y, wires=0)
 
-            # custom decompsition rules
+            # custom decomposition rules
             x_to_rx(int)
             y_to_ry(int)
             h_to_rx_ry(int)
 
             return qp.state()
 
-    >>> print(qp.specs(circuit, level="device")(1.23, 4.56))
-    Device: lightning.qubit
-    Device wires: 2
-    Shots: Shots(total=None)
-    Level: device
-
-    Wire allocations: 2
-    Total gates: 2
-    Gate counts:
-    - Rot: 2
-    Measurements:
-    - state(all wires): 1
-    Depth: 2
+    >>> print(qp.specs(circuit, level="device")(1.23, 4.56).resources.gate_types)
+    {'Rot': 2}
     """
     if qnode is None:
         return functools.partial(
