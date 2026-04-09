@@ -695,7 +695,7 @@ class RotOp(IRDLOperation):
     ```mlir
     %1 = qecp.rot (%phi, %theta, %omega) %0 : !qecp.qubit<data>
     ```
-
+    NOTE: This operation is for physical noise injection only.
     """
 
     T: ClassVar = VarConstraint("T", anyPhysicalQubit)

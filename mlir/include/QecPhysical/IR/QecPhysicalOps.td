@@ -285,6 +285,10 @@ def CnotOp : QecPhysical_Op<"cnot", [
 def RotOp: QecPhysical_Op<"rot", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
     let summary = "A physical Rot gate operation.";
 
+    let description = [{
+        This operation is for physical noise injection only.
+    }];
+
     let arguments = (ins
         F64:$phi,
         F64:$theta,
