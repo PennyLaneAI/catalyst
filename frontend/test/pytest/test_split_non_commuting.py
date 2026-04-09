@@ -377,7 +377,7 @@ class TestSplitNonCommutingWires:
 
     @pytest.mark.usefixtures("use_both_frontend")
     def test_duplicate_observables(self):
-        """Z(0) appears twice, X(1) once -> deduplicated, single group."""
+        """Z(0) appears twice -> deduplicated, single group."""
         dev = qp.device("lightning.qubit", wires=2)
 
         @qp.qnode(dev)
