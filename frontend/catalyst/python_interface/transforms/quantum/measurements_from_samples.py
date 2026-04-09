@@ -44,12 +44,12 @@ from xdsl_jax.dialects import stablehlo
 from catalyst.python_interface.conversion import xdsl_module
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.pass_api import compiler_transform
+from catalyst.python_interface.transforms.quantum.diagonalize_measurements import (
+    DiagonalizeFinalMeasurementsPass,
+)
 from catalyst.python_interface.transforms.quantum.outline_qnode import (
     OutlineQNodePattern,
     get_call_op,
-)
-from catalyst.python_interface.transforms.quantum.diagonalize_measurements import (
-    DiagonalizeFinalMeasurementsPass,
 )
 
 

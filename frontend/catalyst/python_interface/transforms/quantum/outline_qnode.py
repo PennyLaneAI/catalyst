@@ -16,13 +16,8 @@
 calls the QNode, so that post-processing can be injected after the QNode call.
 """
 
-from abc import abstractmethod
-from dataclasses import dataclass
-from itertools import islice
-
-import jax
 from pennylane.exceptions import CompileError
-from xdsl import ir, pattern_rewriter
+from xdsl.ir import Operation
 from xdsl.dialects import builtin, func
 from xdsl.pattern_rewriter import PatternRewriter, RewritePattern
 from xdsl.rewriter import InsertPoint
@@ -97,7 +92,7 @@ class OutlineQNodePattern(RewritePattern):
 
 def _get_parent_module(op: func.FuncOp) -> builtin.ModuleOp:
     """Get the first ancestral builtin.ModuleOp op of a given func.func op."""
-    _op: ir.Operation | None = op
+    _op: Operation | None = op
     while _op := _op.parent_op():
         if isinstance(_op, builtin.ModuleOp):
             break
