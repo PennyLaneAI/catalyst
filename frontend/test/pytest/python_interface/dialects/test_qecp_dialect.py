@@ -292,7 +292,7 @@ class TestQecPhysicalOps:
             ),
         ],
     )
-    def test_qecp_op_constructor_hadamard(self, phi, theta, omega, qubit):
+    def test_qecp_op_constructor_rot(self, phi, theta, omega, qubit):
         """Test the constructor of the qecp.rot op."""
         rot_op = qecp.RotOp(phi, theta, omega, qubit)
         assert len(rot_op.operands) == 4
