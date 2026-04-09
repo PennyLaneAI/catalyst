@@ -45,6 +45,11 @@ from catalyst.python_interface.pass_api import compiler_transform
 from catalyst.python_interface.transforms.quantum.diagonalize_measurements import (
     DiagonalizeFinalMeasurementsPass,
 )
+from catalyst.python_interface.transforms.quantum.outline_qnode import (
+    OutlineQNodePattern,
+    get_call_op,
+)
+from catalyst.python_interface.utils import get_constant_from_ssa
 
 
 MEASUREMENT_PROCESS_TYPES = (
@@ -74,7 +79,7 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
 
         # add outer classical function to call quantum.nodes and apply post-processing
         pattern_rewriter.PatternRewriteWalker(
-            AddPostProcessingPattern(pass_str="from_samples"),
+            OutlineQNodePattern(pass_str="from_samples"),
             apply_recursively=False,
         ).rewrite_module(op)
 
@@ -86,55 +91,6 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
 
 
 measurements_from_samples_pass = compiler_transform(MeasurementsFromSamplesPass)
-
-
-class AddPostProcessingPattern(RewritePattern):
-    """RewritePattern for making each QNode into a classical function that
-    calls the QNode and performs post-processing."""
-
-    def __init__(self, pass_str: str):
-        super().__init__()
-        self._pass_str = pass_str
-
-    def match_and_rewrite(
-        self, func_op: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter, /
-    ):
-        """Transform a quantum node (qnode) to separate it into a quantum node
-        and an outer function that calls the quantum node. Subsequent patterns can then apply
-        postprocessing to the results of the call in the outer function when changes are made
-        to the quantum node.
-
-        The name of the quantum node is changed to original_name.pass_str, and the new outer
-        postprocessing function is given the original name.
-        """
-
-        if "quantum.node" not in func_op.attributes:
-            return
-
-        # get names of the postprocessing and quantum_node functions
-        outer_fn_name = func_op.sym_name.data
-        qnode_name = outer_fn_name + f".{self._pass_str}"
-
-        # update quantum_node name to include pass string
-        func_op.sym_name = builtin.StringAttr(qnode_name)
-        rewriter.notify_op_modified(func_op)
-
-        # create the outer (postprocessing) fn with the original node name
-        outer_fn = func.FuncOp(
-            name=outer_fn_name, function_type=func_op.function_type, visibility="public"
-        )
-        rewriter.insert_op(outer_fn, InsertPoint.before(func_op))
-
-        # call the renamed quantum_node inside the new outer FuncOp
-        call_args = outer_fn.body.block.args
-        result_types = outer_fn.function_type.outputs.data
-        call_op = func.CallOp(qnode_name, call_args, result_types)
-        outer_fn.body.block.add_op(call_op)
-
-        # add a ReturnOp in the new FuncOp returning quantum_node results
-        qnode_call_results = call_op.results
-        return_op = func.ReturnOp(*qnode_call_results)
-        outer_fn.body.block.add_op(return_op)
 
 
 class MeasurementsFromSamplesPattern(RewritePattern):
@@ -162,7 +118,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
 
         self._shots = get_shots(func_op)
         self.qnode = func_op
-        self.call_op = self._get_call_op(func_op)
+        self.call_op = get_call_op(func_op)
 
         measurement_processes = [op for op in self.qnode.body.walk() if isinstance(op, MEASUREMENT_PROCESS_TYPES)]
 
@@ -183,35 +139,6 @@ class MeasurementsFromSamplesPattern(RewritePattern):
                 # for completeness and to notify users that ``state`` mps are not supported
                 raise NotImplementedError("qml.state() operations are not supported.")
 
-
-    @staticmethod
-    def _get_parent_module(op: func.FuncOp) -> builtin.ModuleOp:
-        """Get the first ancestral builtin.ModuleOp op of a given func.func op."""
-        _op: ir.Operation | None = op
-        while _op := _op.parent_op():
-            if isinstance(_op, builtin.ModuleOp):
-                break
-            if _op is None:
-                raise CompileError("...")
-
-        assert isinstance(_op, builtin.ModuleOp)
-        return _op
-
-    @classmethod
-    def _get_call_op(cls, qnode: func.FuncOp):
-        """Get the CallOp in another module function that calls this quantum_node. Postprocessing
-        will be called to act on the output of that CallOp"""
-
-        module = cls._get_parent_module(qnode)
-        qnode_name = qnode.sym_name.data
-        all_call_ops = [op for op in module.body.walk() if isinstance(op, func.CallOp)]
-        qnode_call_op = [op for op in all_call_ops if qnode_name in op.callee.string_value()]
-        if not len(qnode_call_op) == 1:
-            raise CompileError(
-                f"Expected only one call_op for {qnode_name}, but received {qnode_call_op}"
-            )
-
-        return qnode_call_op[0]
 
     @classmethod
     def get_observable_op(cls, op: quantum.ExpvalOp | quantum.VarianceOp) -> quantum.NamedObsOp:
@@ -538,7 +465,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         instead of the original output, and the outer function returns the output of
         post-processing instead of directly returning the output of calling the qnode.
 
-        Also update result shapes in the CallOp for the Qnode call to reflect this change,
+        Also update result shapes in the CallOp for the QNode call to reflect this change,
         since this is not updated when modifying the ReturnOps.
 
         This function updates the self.qnode and self.call_op attributes on the Pattern.
@@ -547,21 +474,28 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             mp_index (int): The index of the measurement process to be updated. The
                 relevant function returns will be updated at this index.
             sample_op (quantum.SampleOp): The operation whose results the Qnode should return.
-            postprocessing_func_call_op (func.CallOp): The postprocessing CallOp whose results
-                the outer function should return.
+            postprocessing_func_call_op (func.CallOp): The postprocessing CallOp that accepts
+                results of the QNode CallOp. The outer function will be updated to return the
+                results of this operation instead of returning the QNode CallOp results directly.
             rewriter (PatternRewriter): The xDSL pattern rewriter.
         """
         assert self.qnode is not None
         assert self.call_op is not None
 
         # update the qnode to return the result of the SampleOp directly
-        assert self.qnode is not None
         return_op = self.qnode.get_return_op()
         assert return_op is not None, "QNode has no return op"
         return_op.operands[mp_index] = sample_op.results[0]
         rewriter.notify_op_modified(return_op)
+        self.qnode.update_function_type()
 
-        # update the outer function return to return postprocessed data instead of the raw data
+        # update the qnode CallOp in the outer function to reflect the new shape for returned data
+        result_types = self.qnode.function_type.outputs.data
+        new_call_op = func.CallOp(self.call_op.callee, self.call_op.arguments, result_types)
+        rewriter.replace_op(self.call_op, new_call_op)
+        self.call_op = new_call_op
+
+        # update the outer function to return postprocessed data instead of the raw data
         final_return = [
             use.operation
             for use in list(self.call_op.results[mp_index].uses)
@@ -569,13 +503,6 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         ][0]
         final_return.operands[mp_index] = postprocessing_func_call_op.results[0]
         rewriter.notify_op_modified(final_return)
-
-        # update the call op to correctly reflect the new shape of the returned data
-        self.qnode.update_function_type()
-        result_types = self.qnode.function_type.outputs.data
-        new_call_op = func.CallOp(self.call_op.callee, self.call_op.arguments, result_types)
-        rewriter.replace_op(self.call_op, new_call_op)
-        self.call_op = new_call_op
 
     def expval_and_var_to_samples(self, mp_op: quantum.ExpvalOp | quantum.VarianceOp, rewriter: PatternRewriter, /):
         """Rewrite quantum.ExpvalOp and quantum.VarianceOp to be expressed in terms of quantum.SampleOp and 
@@ -723,7 +650,10 @@ class MeasurementsFromSamplesPattern(RewritePattern):
 
 def get_shots(quantum_node: func.FuncOp) -> int:
     """Get the shots for a quantum.node. Extracts shots from the device and validates that shots
-    is a non-zero integer
+    are static, and a non-zero integer.
+
+    This function is meant to act on a FuncOp with the `quantum.node` attribute, which should only
+    contain a single quantum.DeviceInitOp op.
 
         Args:
         quantum_node (func.FuncOp): The quantum.node FuncOp containing the quantum.DeviceInitOp.
@@ -733,43 +663,10 @@ def get_shots(quantum_node: func.FuncOp) -> int:
 
     Raises:
         CompileError: If `quantum_node` does not contain a quantum.DeviceInitOp.
-        CompileError: If the operator expected to contain shots values does not have `properties`.
-            This is the immediate issue that is observed when shots are dynamic.
-        TypeError: if the extracted shots are not an int
+        CompileError: If its not possible to extract a static constant from the 
+            SSAValue for the shots
         ValueError: if the extracted shots are zero
 
-    """
-
-    shots = _get_static_shots_value_from_device_op(quantum_node)
-    assert isinstance(shots, int), "Expected `shots` to be an integer"
-    if shots == 0:
-        raise ValueError("The measurements_from_samples pass requires non-zero shots")
-    return shots
-
-
-def _get_static_shots_value_from_device_op(quantum_node: func.FuncOp) -> int:
-    """Returns the number of shots as a static (i.e. known at compile time) integer value from the
-    device-initialization op (quantum.DeviceInitOp) found in a `FuncOp`.
-
-    This function is meant to act on a FuncOp with the `quantum.node` attribute, which should only
-    contain a single quantum.DeviceInitOp op.
-
-    This function expects the number of shots to be an SSA value given as an operand to the
-    quantum.DeviceInitOp op. It also assumes that the number of shots is static, retrieving it from
-    the 'value' attribute of its corresponding constant op.
-
-    Args:
-        quantum_node (func.FuncOp): The quantum.node FuncOp containing the quantum.DeviceInitOp.
-
-    Returns:
-        int: The number of shots.
-
-    Raises:
-        CompileError: If `quantum_node` does not contain a quantum.DeviceInitOp.
-        CompileError: If the operator expected to contain shots values does not have `properties`.
-            This is the immediate issue that is observed when shots are dynamic, for instance as a
-            result of the shots SSA value originating from a block argument rather than from an
-            operation, such as an `arith.constant` op.
     """
     device_op = None
 
@@ -785,36 +682,17 @@ def _get_static_shots_value_from_device_op(quantum_node: func.FuncOp) -> int:
 
     # The number of shots is passed as an SSA value operand to the DeviceInitOp
     shots_operand = device_op.shots
-    shots_extract_op = shots_operand.owner
-
-    if isinstance(shots_extract_op, tensor.ExtractOp):
-        shots_constant_op = shots_extract_op.operands[0].owner
-        if not hasattr(shots_constant_op, "properties"):
-            raise CompileError(
-                "Cannot get number of shots. Note that using a dynamic number of shots is not "
-                "supported with measurements-from-samples."
-            )
-        shots_value_attribute: builtin.DenseIntOrFPElementsAttr = shots_constant_op.properties.get(
-            "value"
+    shots = get_constant_from_ssa(shots_operand)
+    if shots is None:
+        raise CompileError(
+            "Cannot get number of shots. Note that using a dynamic number of shots is not "
+            "supported with measurements-from-samples."
         )
-        if shots_value_attribute is None:
-            raise ValueError("Cannot get number of shots; the constant op has no 'value' attribute")
-
-        shots_int_values = shots_value_attribute.get_values()
-        if len(shots_int_values) != 1:
-            raise ValueError(f"Expected a single shots value, got {len(shots_int_values)}")
-
-        return shots_int_values[0]
-
-    if isinstance(shots_extract_op, (arith.ConstantOp, stablehlo.ConstantOp)):
-        shots_value_attribute: builtin.IntAttr = shots_extract_op.properties.get("value")
-        return shots_value_attribute.value.data
-
-    raise ValueError(
-        "Expected owner of shots operand to be a tensor.ExtractOp, arith.ConstantOp or"
-        "stablehlo.ConstantOp but got "
-        f"{type(shots_extract_op).__name__}"
-    )
+    
+    assert isinstance(shots, int), "Expected `shots` to be an integer"
+    if shots == 0:
+        raise ValueError("The measurements_from_samples pass requires non-zero shots")
+    return shots
 
 def create_postprocessing_obs(obs, num_wires, math_op):
 
