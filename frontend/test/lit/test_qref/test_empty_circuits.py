@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Unit tests for lowering allocation and observable primitives to reference semantics MLIR during
+PLxPR conversion.
+
+All circuits in this test file are empty, aka only an allocation at the front, and observables
+for the terminal measurements. There are no gates.
+"""
+
 # RUN: %PYTHON %s | FileCheck %s
 
 # pylint: disable=line-too-long
@@ -381,3 +389,85 @@ def expval6():
 
 
 print(expval6.mlir)
+
+
+# CHECK: func.func public @expval7(%arg0: tensor<4x4xcomplex<f64>>) -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=2))
+def expval7():
+    coeff = np.array([0.8, 0.2])
+    obs_matrix = np.array(
+        [
+            [0.5, 1.0j, 0.0, -3j],
+            [-1.0j, -1.1, 0.0, -0.1],
+            [0.0, 0.0, -0.9, 12.0],
+            [3j, -0.1, 12.0, 0.0],
+        ]
+    )
+
+    # CHECK: [[one:%.+]] = arith.constant 1 : i64
+    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
+    # CHECK: [[alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[alloc]][[[one]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK: [[hermitian:%.+]] = qref.hermitian(%arg0 : tensor<4x4xcomplex<f64>>) [[q0]], [[q1]] : !quantum.obs
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK: [[obs0x:%.+]] = qref.namedobs [[q0]][ PauliX] : !quantum.obs
+    # CHECK: [[hamiltonian:%.+]] = quantum.hamiltonian({{%.+}} : tensor<2xf64>) [[hermitian]], [[obs0x]] : !quantum.obs
+    # CHECK: [[expval:%.+]] = quantum.expval [[hamiltonian]] : f64
+    # CHECK: qref.dealloc [[alloc]] : !qref.reg<2>
+
+    obs = qp.Hermitian(obs_matrix, wires=[0, 1])
+    return qp.expval(qp.Hamiltonian(coeff, [obs, qp.PauliX(0)]))
+
+
+print(expval7.mlir)
+
+
+# CHECK: func.func public @var1(%arg0: tensor<i64>) -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=2))
+def var1(i: int):
+    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
+    # CHECK: [[alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK: [[i:%.+]] = tensor.extract %arg0[] : tensor<i64>
+    # CHECK: [[qi:%.+]] = qref.get [[alloc]][[[i]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK: [[obs:%.+]] = qref.namedobs [[qi]][ PauliX] : !quantum.obs
+    # CHECK: [[var:%.+]] = quantum.var [[obs]] : f64
+    # CHECK: qref.dealloc [[alloc]] : !qref.reg<2>
+    return qp.var(qp.PauliX(i))
+
+
+print(var1.mlir)
+
+
+# CHECK: func.func public @var2(%arg0: tensor<4x4xcomplex<f64>>, %arg1: tensor<i64>, %arg2: tensor<i64>) -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def var2(i: int, j: int):
+    B = np.array(
+        [
+            [complex(1.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+            [complex(2.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+            [complex(1.0, 0.0), complex(1.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+            [complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0)],
+        ]
+    )
+
+    # CHECK: [[one:%.+]] = arith.constant 1 : i64
+    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
+    # CHECK: [[alloc:%.+]] = qref.alloc( 3) : !qref.reg<3>
+    # CHECK: [[q1:%.+]] = qref.get [[alloc]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[obs1x:%.+]] = qref.namedobs [[q1]][ PauliX] : !quantum.obs
+    # CHECK: [[i:%.+]] = tensor.extract %arg1[] : tensor<i64>
+    # CHECK: [[qi:%.+]] = qref.get [[alloc]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[j:%.+]] = tensor.extract %arg2[] : tensor<i64>
+    # CHECK: [[qj:%.+]] = qref.get [[alloc]][[[j]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[hermitian:%.+]] = qref.hermitian(%arg0 : tensor<4x4xcomplex<f64>>) [[qi]], [[qj]] : !quantum.obs
+    # CHECK: [[tensor:%.+]] = quantum.tensor [[obs1x]], [[hermitian]] : !quantum.obs
+    # CHECK: [[var:%.+]] = quantum.var [[tensor]] : f64
+    # CHECK: qref.dealloc [[alloc]] : !qref.reg<3>
+    return qp.var(qp.PauliX(1) @ qp.Hermitian(B, wires=[i, j]))
+
+
+print(var2.mlir)
