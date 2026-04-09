@@ -32,7 +32,13 @@ from jaxlib.mlir.dialects.arith import (
 # once JAX updates to a compatible MLIR version
 # pylint: disable=ungrouped-imports
 from catalyst.jax_extras.patches import mock_attributes
-from catalyst.jax_primitives import AbstractObs, _named_obs_attribute, extract_scalar
+from catalyst.jax_primitives import (
+    AbstractObs,
+    _named_obs_attribute,
+    extract_scalar,
+    safe_cast_to_f64,
+)
+from catalyst.utils.extra_bindings import TensorExtractOp
 from catalyst.utils.patching import Patcher
 
 with Patcher(
@@ -49,10 +55,13 @@ with Patcher(
     from mlir_quantum.dialects.qref import (
         AllocOp,
         ComputationalBasisOp,
+        CustomOp,
         DeallocOp,
         GetOp,
         HermitianOp,
+        MultiRZOp,
         NamedObsOp,
+        PCPhaseOp,
     )
 
 
@@ -89,12 +98,7 @@ class QrefQreg(AbstractValue):
 
     def __init__(self, num_qubits=None):
         self.num_qubits = num_qubits
-
-        if num_qubits is None:
-            add_hash = 0
-        else:
-            add_hash = hash(num_qubits)
-        self.hash_value = hash("QrefQreg") + add_hash
+        self.hash_value = hash("QrefQreg") + hash(num_qubits)
 
     def __eq__(self, other):
         return isinstance(other, QrefQreg) and self.hash_value == other.hash_value
@@ -130,6 +134,8 @@ qref_get_p = Primitive("qref_get")
 qref_compbasis_p = Primitive("qref_compbasis")
 qref_namedobs_p = Primitive("qref_namedobs")
 qref_hermitian_p = Primitive("qref_hermitian")
+qref_qinst_p = Primitive("qref_qinst")
+qref_qinst_p.multiple_results = True
 
 
 #
@@ -202,6 +208,104 @@ def _qref_get_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_
 
     qubit_type = ir.OpaqueType.get("qref", "bit", ctx)
     return GetOp(qubit_type, qreg, idx=qubit_idx).results
+
+
+#
+# qref_qinst_p
+#
+@qref_qinst_p.def_abstract_eval
+def _qref_qinst_abstract_eval(
+    *qubits_or_params, op=None, qubits_len=0, params_len=0, ctrl_len=0, adjoint=False
+):
+    # The signature here is: (using * to denote zero or more)
+    # qubits*, params*, ctrl_qubits*, ctrl_values*
+    qubits = qubits_or_params[:qubits_len]
+    ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
+    all_qubits = qubits + ctrl_qubits
+    for idx in range(qubits_len + ctrl_len):
+        qubit = all_qubits[idx]
+        assert isinstance(qubit, QrefQubit)
+    return ()
+
+
+# pylint: disable=too-many-arguments
+def _qref_qinst_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *qubits_or_params,
+    op=None,
+    qubits_len=0,
+    params_len=0,
+    ctrl_len=0,
+    adjoint=False,
+):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    qubits = qubits_or_params[:qubits_len]
+    params = qubits_or_params[qubits_len : qubits_len + params_len]
+    ctrl_qubits = qubits_or_params[qubits_len + params_len : qubits_len + params_len + ctrl_len]
+    ctrl_values = qubits_or_params[qubits_len + params_len + ctrl_len :]
+
+    for qubit in qubits:
+        assert ir.OpaqueType.isinstance(qubit.type)
+        assert ir.OpaqueType(qubit.type).dialect_namespace == "qref"
+        assert ir.OpaqueType(qubit.type).data == "bit"
+
+    float_params = []
+    for p in params:
+        p = safe_cast_to_f64(p, op)
+        p = extract_scalar(p, op)
+
+        assert ir.F64Type.isinstance(
+            p.type
+        ), "Only scalar double parameters are allowed for quantum gates!"
+
+        float_params.append(p)
+
+    ctrl_values_i1 = []
+    for v in ctrl_values:
+        p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
+        ctrl_values_i1.append(p)
+
+    name_attr = ir.StringAttr.get(op)
+    name_str = str(name_attr)
+    name_str = name_str.replace('"', "")
+
+    if name_str == "MultiRZ":
+        assert len(float_params) == 1, "MultiRZ takes one float parameter"
+        float_param = float_params[0]
+        MultiRZOp(
+            theta=float_param,
+            qubits=qubits,
+            ctrl_qubits=ctrl_qubits,
+            ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        )
+        return ()
+
+    if name_str == "PCPhase":
+        assert len(float_params) == 2, "PCPhase takes two float parameters"
+        float_param = float_params[0]
+        dim_param = float_params[1]
+        PCPhaseOp(
+            theta=float_param,
+            dim=dim_param,
+            qubits=qubits,
+            ctrl_qubits=ctrl_qubits,
+            ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        )
+        return ()
+
+    CustomOp(
+        params=float_params,
+        qubits=qubits,
+        gate_name=name_attr,
+        ctrl_qubits=ctrl_qubits,
+        ctrl_values=ctrl_values_i1,
+        adjoint=adjoint,
+    )
+    return ()
 
 
 #
@@ -291,6 +395,7 @@ CUSTOM_LOWERING_RULES = (
     (qref_alloc_p, _qref_alloc_lowering),
     (qref_dealloc_p, _qref_dealloc_lowering),
     (qref_get_p, _qref_get_lowering),
+    (qref_qinst_p, _qref_qinst_lowering),
     (qref_compbasis_p, _qref_compbasis_lowering),
     (qref_namedobs_p, _qref_named_obs_lowering),
     (qref_hermitian_p, _qref_hermitian_lowering),
