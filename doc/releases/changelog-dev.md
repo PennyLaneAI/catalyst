@@ -289,6 +289,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* `abstracted_axes` now work with `qjit` and `capture=True`.
+  [(#2655)](https://github.com/PennyLaneAI/catalyst/pull/2655/)
+
 * A warning is issued when gridsynth pass is called with epsilon smaller than 1e-6 due to potential precision error.
   [(#2625)](https://github.com/PennyLaneAI/catalyst/pull/2625)
 
