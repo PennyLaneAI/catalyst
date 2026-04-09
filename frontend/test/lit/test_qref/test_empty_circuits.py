@@ -250,6 +250,9 @@ print(test_counts2.mlir)
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=2))
 def expval1():
+    """
+    Test an empty circuit with expval terminal measurement on a simple named observable.
+    """
     # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: [[alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
     # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
@@ -266,6 +269,9 @@ print(expval1.mlir)
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def expval2():
+    """
+    Test an empty circuit with expval terminal measurement on a tensor product observable.
+    """
     # CHECK: [[two:%.+]] = arith.constant 2 : i64
     # CHECK: [[one:%.+]] = arith.constant 1 : i64
     # CHECK: [[zero:%.+]] = arith.constant 0 : i64
@@ -289,6 +295,9 @@ print(expval2.mlir)
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=2))
 def expval3():
+    """
+    Test an empty circuit with expval terminal measurement on a Hermitian observable.
+    """
     A = np.array([[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]])
 
     # CHECK: [[zero:%.+]] = arith.constant 0 : i64
@@ -307,6 +316,10 @@ print(expval3.mlir)
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=2))
 def expval4():
+    """
+    Test an empty circuit with expval terminal measurement on a Hermitian observable on multiple
+    wires.
+    """
     B = np.array(
         [
             [complex(1.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
@@ -334,6 +347,10 @@ print(expval4.mlir)
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def expval5():
+    """
+    Test an empty circuit with expval terminal measurement on a tensor product between named and
+    Hermitian observables.
+    """
     B = np.array(
         [
             [complex(1.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
@@ -365,6 +382,10 @@ print(expval5.mlir)
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def expval6():
+    """
+    Test an empty circuit with expval terminal measurement on a Hamiltonian observable, with the
+    terms being tensor products.
+    """
     # CHECK: [[two:%.+]] = arith.constant 2 : i64
     # CHECK: [[one:%.+]] = arith.constant 1 : i64
     # CHECK: [[zero:%.+]] = arith.constant 0 : i64
@@ -395,6 +416,10 @@ print(expval6.mlir)
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=2))
 def expval7():
+    """
+    Test an empty circuit with expval terminal measurement on a Hamiltonian observable, with the
+    terms being Hermitian and named observables.
+    """
     coeff = np.array([0.8, 0.2])
     obs_matrix = np.array(
         [
@@ -428,6 +453,9 @@ print(expval7.mlir)
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=2))
 def var1(i: int):
+    """
+    Test an empty circuit with variance terminal measurement on a dynamic wires.
+    """
     # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: [[alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
     # CHECK: [[i:%.+]] = tensor.extract %arg0[] : tensor<i64>
@@ -445,6 +473,10 @@ print(var1.mlir)
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def var2(i: int, j: int):
+    """
+    Test an empty circuit with variance terminal measurement on a dynamic wires, with a tensor
+    product of named and Hermitian observables.
+    """
     B = np.array(
         [
             [complex(1.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
