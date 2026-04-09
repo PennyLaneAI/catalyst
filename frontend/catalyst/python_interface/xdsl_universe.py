@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """xDSL universe for containing all dialects and passes."""
+from functools import partial
 
 from functools import partial
 
