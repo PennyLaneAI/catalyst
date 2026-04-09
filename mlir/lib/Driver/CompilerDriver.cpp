@@ -86,7 +86,6 @@
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "RTIO/IR/RTIODialect.h"
 #include "RegisterAllPasses.h"
-#include "Timer.hpp"
 
 using namespace mlir;
 using namespace catalyst;
