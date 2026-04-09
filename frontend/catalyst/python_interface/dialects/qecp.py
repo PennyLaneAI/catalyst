@@ -26,10 +26,10 @@ from collections.abc import Sequence
 from typing import ClassVar, TypeAlias
 
 from xdsl.dialects.builtin import (
-    Float64Type,
     I64,
     ContainerOf,
     ContainerType,
+    Float64Type,
     IndexType,
     IntegerAttr,
     IntegerType,
