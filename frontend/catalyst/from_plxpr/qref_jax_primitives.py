@@ -16,9 +16,6 @@
 of quantum operations, measurements, and observables to reference semantics JAXPR.
 """
 
-import jax
-import numpy as np
-import pennylane as qml
 from jax._src.lib.mlir import ir
 from jax.core import AbstractValue
 from jax.extend.core import Primitive

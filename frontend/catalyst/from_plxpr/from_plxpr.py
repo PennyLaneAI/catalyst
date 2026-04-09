@@ -617,7 +617,6 @@ def trace_from_pennylane(
 
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
         jaxpr = from_plxpr(plxpr, skip_preprocess=skip_preprocess)(*plxpr.in_avals)
-        # breakpoint()
 
     return jaxpr, out_type, out_treedef, sig
 
