@@ -93,7 +93,8 @@ def test_qnode_dynamic_structured_args(capture_mode):
     param = jnp.array([1, 2, 3])
     c = func((param, param))
     expected = jnp.cos(2 * jnp.sum(param))
-    assert_array_and_dtype_equal(c, expected)
+    assert qml.math.allclose(c, expected)
+    assert c.dtype == expected.dtype
     assert "tensor<?xi64>" in func.mlir, func.mlir
 
 

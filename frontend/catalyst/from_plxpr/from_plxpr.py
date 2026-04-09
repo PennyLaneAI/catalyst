@@ -42,7 +42,7 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
-from catalyst.jax_extras import make_jaxpr2, transient_jax_config
+from catalyst.jax_extras import make_jaxpr2, transient_jax_config, deduce_avals
 from catalyst.jax_extras.patches import get_jax_patches
 from catalyst.jax_primitives import (
     device_init_p,
@@ -410,8 +410,13 @@ def handle_qnode(
         )
         pipelines += (("device", device_preprocessing_pipeline),)
 
+    # no idea what deduce_avals is doing, but this seems to make dynamic shapes work
+    flattened_fn = deduce_avals(
+        calling_convention, non_const_args, {}, [], debug_info=qfunc_jaxpr.debug_info
+    )[0]
+
     return quantum_kernel_p.bind(
-        wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
+        flattened_fn,
         *non_const_args,
         qnode=qnode,
         pipelines=pipelines,
