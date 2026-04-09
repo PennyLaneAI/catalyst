@@ -606,7 +606,7 @@
   neighboring inverse `quantum.extract` and `quantum.insert` operations.
 
 * The frontend now generates MLIR in reference semantics when capture is enabled.
-  [(#????)](https://github.com/PennyLaneAI/catalyst/pull/????)
+  [(#2663)](https://github.com/PennyLaneAI/catalyst/pull/2663)
   [(#2664)](https://github.com/PennyLaneAI/catalyst/pull/2664)
 
 * Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
