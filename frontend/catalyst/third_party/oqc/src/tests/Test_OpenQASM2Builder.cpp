@@ -18,7 +18,8 @@
 
 #include "OpenQASM2Builder.hpp"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #define TYPE_INFO(x) std::string(typeid(x).name())
 
@@ -34,9 +35,9 @@ TEST_CASE("Test lookup openqasm gate names from QIR -> OpenQasm map", "[openqasm
     CHECK(lookup_qasm_gate_name("Toffoli") == "ccx");
 
     // Check lookup an unsupported gate
-    REQUIRE_THROWS_WITH(
-        lookup_qasm_gate_name("ABC"),
-        Catch::Contains("The given QIR gate name is not supported by the OpenQASM builder"));
+    REQUIRE_THROWS_WITH(lookup_qasm_gate_name("ABC"),
+                        Catch::Matchers::ContainsSubstring(
+                            "The given QIR gate name is not supported by the OpenQASM builder"));
 }
 
 TEST_CASE("Test QasmRegister(type=Qubit) from OpenQasmBuilder", "[openqasm]")
@@ -59,9 +60,10 @@ TEST_CASE("Test QasmRegister(type=Qubit) from OpenQasmBuilder", "[openqasm]")
     std::string case2 = "reset qubits;\n";
     CHECK(reg.toOpenQASM2(RegisterMode::Reset) == case2);
 
-    REQUIRE_THROWS_WITH(reg.toOpenQASM2(static_cast<RegisterMode>(4)),
-                        Catch::Contains("[Function:toOpenQASM2] Error in Catalyst Runtime: "
-                                        "Unsupported OpenQasm register mode"));
+    REQUIRE_THROWS_WITH(
+        reg.toOpenQASM2(static_cast<RegisterMode>(4)),
+        Catch::Matchers::ContainsSubstring("[Function:toOpenQASM2] Error in Catalyst Runtime: "
+                                           "Unsupported OpenQasm register mode"));
 }
 
 TEST_CASE("Test QasmRegister(type=Bit) from OpenQasmBuilder", "[openqasm]")
@@ -86,13 +88,15 @@ TEST_CASE("Test QasmRegister(type=Bit) from OpenQasmBuilder", "[openqasm]")
 
     // Check edge cases
     auto reg_buggy = QASMRegister(static_cast<RegisterType>(3), "random", 5);
-    REQUIRE_THROWS_WITH(reg_buggy.toOpenQASM2(RegisterMode::Alloc),
-                        Catch::Contains("[Function:toOpenQASM2] Error in Catalyst Runtime: "
-                                        "Unsupported OpenQasm register type"));
+    REQUIRE_THROWS_WITH(
+        reg_buggy.toOpenQASM2(RegisterMode::Alloc),
+        Catch::Matchers::ContainsSubstring("[Function:toOpenQASM2] Error in Catalyst Runtime: "
+                                           "Unsupported OpenQasm register type"));
 
-    REQUIRE_THROWS_WITH(reg.toOpenQASM2(static_cast<RegisterMode>(4)),
-                        Catch::Contains("[Function:toOpenQASM2] Error in Catalyst Runtime: "
-                                        "Unsupported OpenQasm register mode"));
+    REQUIRE_THROWS_WITH(
+        reg.toOpenQASM2(static_cast<RegisterMode>(4)),
+        Catch::Matchers::ContainsSubstring("[Function:toOpenQASM2] Error in Catalyst Runtime: "
+                                           "Unsupported OpenQasm register mode"));
 }
 
 TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]")
@@ -140,8 +144,9 @@ TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]")
     // Check edge cases
     REQUIRE_THROWS_WITH(
         QASMGate("ABC", {}, {}),
-        Catch::Contains("[Function:lookup_qasm_gate_name] Error in Catalyst Runtime: The given QIR "
-                        "gate name is not supported by the OpenQASM builder"));
+        Catch::Matchers::ContainsSubstring(
+            "[Function:lookup_qasm_gate_name] Error in Catalyst Runtime: The given QIR "
+            "gate name is not supported by the OpenQASM builder"));
 }
 
 TEST_CASE("Test QasmMeasure from OpenQasmBuilder", "[openqasm]")

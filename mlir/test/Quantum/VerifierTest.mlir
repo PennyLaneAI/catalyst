@@ -486,6 +486,7 @@ func.func @expval_and_var_good(%q : !quantum.bit) attributes {quantum.node} {
 // -----
 
 module {
+module attributes {transform.with_named_sequence} {}
 func.func @measurement_without_qnode(%q : !quantum.bit) {
     %obs = quantum.namedobs %q[PauliZ] : !quantum.obs
     // expected-error@+1 {{requires parent function to carry 'quantum.node' attribute}}
@@ -497,6 +498,7 @@ func.func @measurement_without_qnode(%q : !quantum.bit) {
 // -----
 
 module {
+    module attributes {transform.with_named_sequence} {}
     %q = quantum.alloc_qb : !quantum.bit
     %obs = quantum.namedobs %q[PauliZ] : !quantum.obs
     // expected-error@+1 {{'quantum.expval' op must be nested inside a 'func.func' operation}}

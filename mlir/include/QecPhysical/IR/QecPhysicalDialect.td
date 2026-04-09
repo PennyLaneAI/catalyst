@@ -47,7 +47,22 @@ def QecPhysical_Dialect : Dialect {
 
         #### Example
 
-        [TODO: Fill in example once the basic ops are defined (future PR)]
+        ```mlir
+        %hr = qecp.alloc() : !qecp.hyperreg<3 x 1 x 7>
+        %c0 = qecp.extract_block %hr[0] : !qecp.hyperreg<3 x 1 x 7> -> !qecp.codeblock<1 x 7>
+
+        %q0 = qecp.extract %c0[0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+        %q6 = qecp.extract %c0[6] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+
+        %q7 = ... %q0 : !qecp.qubit<data>  // Ops on QEC physical qubits
+        %q8 = ... %q6 : !qecp.qubit<data>
+
+        %c1 = qecp.insert %c0[0], %q7 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        %c2 = qecp.insert %c1[0], %q8 : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+
+        %hr1 = qecp.insert_block %hr[0], %c2 : !qecp.hyperreg<3 x 1 x 7>, !qecp.codeblock<1 x 7>
+        qecp.dealloc %hr1 : !qecp.hyperreg<3 x 1 x 7>
+        ```
     }];
 
     /// This is the namespace of the dialect in MLIR, which is used as a prefix for types and ops.

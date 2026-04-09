@@ -91,6 +91,45 @@
   (force capture off). This enables safe testing and gradual migration to the capture system.
   [(#2457)](https://github.com/PennyLaneAI/catalyst/pull/2457)
 
+* Mid-circuit measurements (`qml.measure`) are now supported on the OQD backend.
+  A `qml.measure` call is lowered to an OpenAPL's `MeasurePulse` for fluorescence detection,
+  which is executed by the trapped-ion hardware at runtime.
+  [(#2508)](https://github.com/PennyLaneAI/catalyst/pull/2508)
+
+  To enable mid-circuit measurement, add a `[[detection_beam]]` section and a
+  `measurement_duration` field to the `gate.toml` calibration file:
+
+  For example:
+  ```toml
+  measurement_duration = 1e-4  # seconds
+
+  [[detection_beam]]
+  rabi       = 62831853071.79586
+  transition = "downstate_estate"
+  detuning   = 0.0
+  polarization = [1, 0, 0]
+  wavevector   = [0, 1, 0]
+  ```
+
+  The following circuit will produce an OpenAPL program with a `MeasurePulse`:
+
+  ```python
+  oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name="out.json")
+
+  @qjit(pipelines=OQD_PIPELINES)
+  @qml.set_shots(10)
+  @qml.qnode(oqd_dev)
+  def circuit():
+      qml.measure(wires=0)
+      return qml.counts(wires=0)
+
+  circuit()
+  ```
+
+  In addition, the MS gate beam lookup for this measurement testbench was redesigned:
+  sideband beam parameters are now read directly from the calibration database instead of being
+  computed from per-qubit phonon offsets.
+
 * OQD (Open Quantum Design) end-to-end pipeline is added to Catalyst.
   The pipeline supports compilation to LLVM IR using the `QJIT` constructor with `link=False`, enabling integration with ARTIQ's cross-compilation toolchain. The generated LLVM IR can be used with the internal `compile_to_artiq()` function from the third-party OQD repository to produce ARTIQ binaries.
   [(#2299)](https://github.com/PennyLaneAI/catalyst/pull/2299)
@@ -189,6 +228,10 @@
   only Pauli or Hadamard observables, the *qubit-wise commutativity* (QWC) check is applied.
   Otherwise, the more strict *non-overlapping observable* check is applied.
   [(#2538)](https://github.com/PennyLaneAI/catalyst/pull/2538)
+  [(#2633)](https://github.com/PennyLaneAI/catalyst/pull/2633)
+
+* The `diagonalize-final-measurements` xDSL pass is now available as a builtin pass accessible from the Catalyst frontend as `catalyst.passes.diagonalize_measurements`.
+  [(#2630)](https://github.com/PennyLaneAI/catalyst/pull/2630)
 
 * Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
   effectively filtering for decomposition rules in the MLIR-native decomposition framework.
@@ -237,9 +280,21 @@
 * Added a cache of pre-compiled PennyLane built-in decomposition rules for use with the C++ graph
   decomposition system.
   [(#2531)](https://github.com/PennyLaneAI/catalyst/pull/2531)
+  [(#2619)](https://github.com/PennyLaneAI/catalyst/pull/2531)
 
+* Decomposition rules are lowered as private functions (instead of public).
+  [(#2658)](https://github.com/PennyLaneAI/catalyst/pull/2658)
+  [(#2660)](https://github.com/PennyLaneAI/catalyst/pull/2660)
+
+* A new optimization pass has been added to reduce the number of instructions in a quantum program,
+  `--merge-global-phase`, which safely combines global phase instructions for each region in the
+  program. The xDSL version written in Python has been removed.
+  [(#2604)](https://github.com/PennyLaneAI/catalyst/pull/2604)
 
 <h3>Improvements 🛠</h3>
+
+* A warning is issued when gridsynth pass is called with epsilon smaller than 1e-6 due to potential precision error.
+  [(#2625)](https://github.com/PennyLaneAI/catalyst/pull/2625)
 
 * The `quantum.adjoint` operation can now take in multiple quantum values, allowing
   both qubits and registers, as opposed to constraining the operand to be a single quantum register.
@@ -272,11 +327,14 @@
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
   [(#2493)](https://github.com/PennyLaneAI/catalyst/pull/2493)
 
-* The PPR/PPM lowering passes (`lower-pbc-init-ops`, `unroll-conditional-ppr-ppm`) are now run
-  as part of the main quantum compilation pipeline. When using `to-ppr` and `ppr-to-ppm` transforms,
-  these passes are applied automatically during compilation; we no longer need to stack them
-  explicitly.
+* Programs expressed in the Pauli-based computation (PBC) representation can now be executed via the
+  runtime on supporting devices.
+  [(#2389)](https://github.com/PennyLaneAI/catalyst/pull/2389)
   [(#2460)](https://github.com/PennyLaneAI/catalyst/pull/2460)
+  [(#2460)](https://github.com/PennyLaneAI/catalyst/pull/2639)
+
+  The support includes new C-API targets for Pauli-product rotations and Pauli-product measurements,
+  including the conditional and multiplexed variants.
 
 * `null.qubit` resource tracking is now able to track measurements and observables. This output
   is also reflected in `qml.specs`.
@@ -303,6 +361,16 @@
   `shots` aren't set. Instead, an informative error message is raised.
   [(#2456)](https://github.com/PennyLaneAI/catalyst/pull/2456)
 
+* The quantum kernel abstraction in Catalyst's IR (a nested module operation with its own transform
+  schedule and entry point and subroutine functions representing a PennyLane QNode) has been
+  documented and equipped with additional verification. Transformation passes scheduled from the
+  frontend must ensure, and can rely on, the presence of the `quantum.node` attribute to indicate
+  which functions in the module represent a separate quantum execution (with device initialization,
+  shots configuration, and set of measurement processes).
+  [(#2483)](https://github.com/PennyLaneAI/catalyst/pull/2483)
+  [(#2497)](https://github.com/PennyLaneAI/catalyst/pull/2497)
+  [(#2597)](https://github.com/PennyLaneAI/catalyst/pull/2597)
+
 * Graph decomposition with qjit now accepts `num_work_wires`, and lowers and decomposes correctly
   with the `decompose-lowering` pass and with `qp.transforms.decompose`.
   [(#2470)](https://github.com/PennyLaneAI/catalyst/pull/2470)
@@ -313,6 +381,15 @@
 * A performance issue in the xDSL transform `measurements-from-samples` that was caused by the
   unrolling of a `for` loop for QNodes returning `probs` has been fixed.
   [(#2611)](https://github.com/PennyLaneAI/catalyst/pull/2611)
+
+* The `measurements-from-samples` pass now diagonalizes observables automatically before converting
+  to samples in the computational basis, removing the need to apply a diagonalization pass separately.
+  This behaviour matches the behaviour of the tape transform `measurements_from_samples` in PennyLane.
+  [(#2617)](https://github.com/PennyLaneAI/catalyst/pull/2617)
+
+* A more informative error message is now raised when a `measurements-from-samples` xDSL pass encounters a
+  program with dyanamic shots.
+  [#2616](https://github.com/PennyLaneAI/catalyst/pull/2616)
 
 <h3>Breaking changes 💔</h3>
 
@@ -330,7 +407,7 @@
 * `catalyst.jax_primitives.subroutine` has been moved to `qml.capture.subroutine`.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
 
-* The `StableHLO` dialect has been removed from Catalyst's Python interface module. 
+* The `StableHLO` dialect has been removed from Catalyst's Python interface module.
   Downstream users should now import StableHLO dialect definitions from `xdsl_jax.dialects.stablehlo` instead.
   [(#2588)](https://github.com/PennyLaneAI/catalyst/pull/2588)
 
@@ -361,6 +438,12 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fixed a bug where multiple `quantum.extract` operations from the same index were being created
+  when there are multiple named observables or Hermitian observables on that same wire index,
+  when capture is not enabled.
+  [(#2641)](https://github.com/PennyLaneAI/catalyst/pull/2641)
+  [(#2646)](https://github.com/PennyLaneAI/catalyst/pull/2646)
 
 * :func:`~pennylane.adjoint` can now be used on subroutines with classical arguments.
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
@@ -432,6 +515,18 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Refactors `draw_graph` implementation to improve maintainability.
+  [(#2659)](https://github.com/PennyLaneAI/catalyst/pull/2659)
+
+* Bump `black` version to 26.3.1 to eliminate the vulnerability reported by dependabot.
+  [(#2650)](https://github.com/PennyLaneAI/catalyst/pull/2650)
+
+* Updated Catalyst's Catch2 dependency to v3.11.0.
+  [(#2634)](https://github.com/PennyLaneAI/catalyst/pull/2634)
+
+* `rtio.rpc` operation is added to the RTIO dialect for OQD. It represents a host RPC call triggered by the kernel, optionally carrying runtime arguments and supporting both synchronous and async modes. The op is lowered to rpc_send / rpc_recv LLVM calls (the ARTIQ RPC wire protocol). It is required by both AWG control (program_awg, awg_close) and measurement result collection (set_dataset, transfer_data).
+  [(#2577)](https://github.com/PennyLaneAI/catalyst/pull/2577)
+
 * Updated Catalyst's xDSL dependencies to `xdsl` 0.59.0 and `xdsl-jax` 0.5.0.
   [(#2591)](https://github.com/PennyLaneAI/catalyst/pull/2591)
 
@@ -445,6 +540,8 @@
 
 * Catalyst internally uses the new unified transforms API rather than `PassPipelineWrapper`.
   [(#2525)](https://github.com/PennyLaneAI/catalyst/pull/2525)
+  [(#2614)](https://github.com/PennyLaneAI/catalyst/pull/2614)
+  [(#2647)](https://github.com/PennyLaneAI/catalyst/pull/2647)
 
 * Added an `EmptyPass` MLIR pass that does not transform the program for debugging and standing in for
   unimplemented transforms.
@@ -481,6 +578,7 @@
   but it is in reference semantics, whereas the existing `Quantum` dialect is in value semantics.
   [(#2320)](https://github.com/PennyLaneAI/catalyst/pull/2320)
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
+  [(#2492)](https://github.com/PennyLaneAI/catalyst/pull/2492)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
@@ -506,12 +604,23 @@
 
   Notice that qubit reference values are reusable.
 
+  An MLIR program in the `QRef` dialect can be converted to the `Quantum` dialect with the new pass
+  `--convert-to-value-semantics`, optionally followed by `--canonicalize` for removing pairs of
+  neighboring inverse `quantum.extract` and `quantum.insert` operations.
+
 * Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
   Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
   measurement logic inside an `scf.if` region rather than propagating the condition
   to inner PPM ops.
   [(#2511)](https://github.com/PennyLaneAI/catalyst/pull/2511)
 
+* The operands and assembly format of several PBC operations have been updated for clarity and
+  improved functionality.
+  [(#2637)](https://github.com/PennyLaneAI/catalyst/pull/2637)
+
+* A :class:`~.QJIT`'s ``compile`` method can now be used to run MLIR compilation without having
+  to generate LLVM IR and object code. Use with ``CompileOptions(lower_to_llvm=False, link=False)``.
+  [(#2599)](https://github.com/PennyLaneAI/catalyst/pull/2599)
 
 * Update `mlir_specs` to account for new `marker` functionality in PennyLane.
   [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
@@ -557,15 +666,10 @@
   [(#2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
   [(#2413)](https://github.com/PennyLaneAI/catalyst/pull/2413)
 
-* Added LLVM conversion patterns to lower PBC dialect operations to their corresponding runtime
-  CAPI calls.
-  This includes `pbc.ppr` and `pbc.ppr.arbitrary` (lowered to `__catalyst__qis__PauliRot`),
-  `pbc.ppm` (lowered to `__catalyst__qis__PauliMeasure`). This enables device execution of PBC
-  operations through the Catalyst runtime.
-  [(#2389)](https://github.com/PennyLaneAI/catalyst/pull/2389)
-
-* A new compiler pass `unroll-conditional-ppr-ppm` for lowering conditional PPR and PPMs
-  into normal PPR and PPMs with SCF dialect to support runtime execution.
+* A new compiler pass, `unroll-conditional-ppr-ppm`, has been added to convert conditional or
+  multiplexed Pauli-product rotations and measurements into their basic versions nested inside
+  conditionals (from the SCF dialect). Note that this is not needed for the standard execution
+  pipeline.
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
 
 * Increased format size for the `--mlir-timing` flag, displaying more decimals for better timing precision.
@@ -733,16 +837,40 @@
 * An experimental *QEC Logical* MLIR dialect has been added. An equivalent xDSL dialect has also
   been added for compatibility with the Python interface to Catalyst.
   [(#2512)](https://github.com/PennyLaneAI/catalyst/pull/2512)
+  [(#2535)](https://github.com/PennyLaneAI/catalyst/pull/2535)
+  [(#2543)](https://github.com/PennyLaneAI/catalyst/pull/2543)
+  [(#2544)](https://github.com/PennyLaneAI/catalyst/pull/2544)
+  [(#2547)](https://github.com/PennyLaneAI/catalyst/pull/2547)
+  [(#2549)](https://github.com/PennyLaneAI/catalyst/pull/2549)
+  [(#2665)](https://github.com/PennyLaneAI/catalyst/pull/2665)
 
 * An experimental *QEC Physical* MLIR dialect has been added. An equivalent xDSL dialect has also
   been added for compatibility with the Python interface to Catalyst.
   [(#2519)](https://github.com/PennyLaneAI/catalyst/pull/2519)
+  [(#2537)](https://github.com/PennyLaneAI/catalyst/pull/2537)
+  [(#2563)](https://github.com/PennyLaneAI/catalyst/pull/2563)
+  [(#2571)](https://github.com/PennyLaneAI/catalyst/pull/2571)
+  [(#2572)](https://github.com/PennyLaneAI/catalyst/pull/2572)
+  [(#2574)](https://github.com/PennyLaneAI/catalyst/pull/2574)
+  [(#2576)](https://github.com/PennyLaneAI/catalyst/pull/2576)
+
+* A number of deprecation warnings have been fixed in the compiler python interface.
+  [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
 
 <h3>Documentation 📝</h3>
+
+* The "Compatibility with PennyLane transforms" section of the
+  :doc:`Sharp bits and debugging tips <../dev/sharp_bits>` document has been updated to describe
+  potential oddities that can be encountered when composing PennyLane transforms together.
+  Additionally, some sharp bits listed were removed, as they are no longer sharp bits.
+  [(#2662)](https://github.com/PennyLaneAI/catalyst/pull/2662)
 
 * Docstrings for :func:`~.passes.disentangle_cnot` and :func:`~.passes.disentangle_swap` have been improved
   by using updated features for inspection and by calling them from the PennyLane frontend.
   [(#2546)](https://github.com/PennyLaneAI/catalyst/pull/2546)
+
+* Typos and rendering issues in various docstrings in the :mod:`catalyst.passes` module were fixed.
+  [(#2649)](https://github.com/PennyLaneAI/catalyst/pull/2649)
 
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
   [(#2406)](https://github.com/PennyLaneAI/catalyst/pull/2406)
@@ -754,6 +882,7 @@
   Catalyst to have a single source of truth for documentation, which will provide a better overall
   experience when consulting our documentation.
   [(#2481)](https://github.com/PennyLaneAI/catalyst/pull/2481)
+  [(#2629)](https://github.com/PennyLaneAI/catalyst/pull/2629)
 
   Several entry-points were added to ``setup.py`` for the Pauli-based computation compilation passes
   and the :func:`~.draw_graph` function. This allows for the ability to use Catalyst features from
@@ -771,11 +900,13 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
+Isaac De Vlugt,
 Marcus Edwards,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
 Jeffrey Kam,
+Joseph Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Mudit Pandey,

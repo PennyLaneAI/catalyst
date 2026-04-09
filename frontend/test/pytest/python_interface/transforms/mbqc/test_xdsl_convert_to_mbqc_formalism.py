@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the convert to MBQC formalism transform"""
+
 # pylint: disable=line-too-long
 
 import pennylane as qml

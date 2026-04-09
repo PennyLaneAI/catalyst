@@ -16,6 +16,7 @@
 This module provides the implementation of AutoGraph primitives in terms of traceable Catalyst
 functions. The purpose is to convert imperative style code to functional or graph-style code.
 """
+
 import copy
 import functools
 import inspect

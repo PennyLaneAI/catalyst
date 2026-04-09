@@ -28,6 +28,7 @@ from typing import TypeAlias
 
 from xdsl import context, passes, pattern_rewriter
 from xdsl.dialects import builtin
+from xdsl.ir import Operation
 from xdsl.pattern_rewriter import PatternRewriter, RewritePattern
 
 from catalyst.python_interface.dialects import mbqc, quantum
@@ -131,9 +132,13 @@ class DecomposeGraphStatePattern(RewritePattern):
         # Finally, erase the ops that have now been replaced with quantum ops
         rewriter.erase_op(graph_prep_op)
 
-        # Erase the constant op that returned the adjacency matrix only if it has no other uses
-        if graph_prep_op.adj_matrix.uses.get_length() == 0:
-            rewriter.erase_op(graph_prep_op.adj_matrix.owner)
+        # Erase the constant op that returned the adjacency matrix only if it has no other uses and
+        # it is an operation (and not e.g. a block argument)
+        adj_matrix_owner = graph_prep_op.adj_matrix.owner
+        if graph_prep_op.adj_matrix.uses.get_length() == 0 and isinstance(
+            adj_matrix_owner, Operation
+        ):
+            rewriter.erase_op(adj_matrix_owner)
 
 
 @dataclass(frozen=True)
@@ -175,9 +180,13 @@ class NullDecomposeGraphStatePattern(RewritePattern):
         # Finally, erase the ops that have now been replaced with quantum ops
         rewriter.erase_op(graph_prep_op)
 
-        # Erase the constant op that returned the adjacency matrix only if it has no other uses
-        if graph_prep_op.adj_matrix.uses.get_length() == 0:
-            rewriter.erase_op(graph_prep_op.adj_matrix.owner)
+        # Erase the constant op that returned the adjacency matrix only if it has no other uses and
+        # it is an operation (and not e.g. a block argument)
+        adj_matrix_owner = graph_prep_op.adj_matrix.owner
+        if graph_prep_op.adj_matrix.uses.get_length() == 0 and isinstance(
+            adj_matrix_owner, Operation
+        ):
+            rewriter.erase_op(adj_matrix_owner)
 
 
 def _parse_adj_matrix(graph_prep_op: mbqc.GraphStatePrepOp) -> list[int]:
@@ -193,6 +202,11 @@ def _parse_adj_matrix(graph_prep_op: mbqc.GraphStatePrepOp) -> list[int]:
         documentation for a description of this format.
     """
     adj_matrix_const_op = graph_prep_op.adj_matrix.owner
+    assert isinstance(adj_matrix_const_op, Operation), (
+        f"Expected graph adjacency matrix to be defined as the result of an operation, but got "
+        f"'{type(adj_matrix_const_op).__name__}'"
+    )
+
     adj_matrix_value = adj_matrix_const_op.properties.get("value")
     assert adj_matrix_value is not None and hasattr(
         adj_matrix_value, "data"

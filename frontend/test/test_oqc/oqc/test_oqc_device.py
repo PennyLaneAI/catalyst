@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test for the OQC device."""
+
 # pylint: disable=unused-argument,import-outside-toplevel,unused-import
 
 import os

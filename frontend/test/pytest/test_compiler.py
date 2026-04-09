@@ -16,6 +16,7 @@
 Unit tests for LinkerDriver class
 """
 
+import io
 import os
 import pathlib
 import platform
@@ -29,7 +30,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import qjit
+from catalyst import QJIT, qjit
 from catalyst.compiler import CompileOptions, Compiler, LinkerDriver, _options_to_cli_flags
 from catalyst.debug import instrumentation
 from catalyst.pipelines import KeepIntermediateLevel
@@ -269,6 +270,39 @@ class TestCompilerState:
         assert f.mlir is None
         assert f.llvmir is None
         assert f.compiled_function is None
+
+    def test_mlir_only_qjit_compile(self):
+        """Test that the QJIT compilation stage can be run without LLVM lowering or linking."""
+
+        test_pipes = [("test_pipe", ["canonicalize"])]
+
+        def f(x):
+            return x + 1.0
+
+        log = io.StringIO()  # for inspection
+        options = CompileOptions(
+            lower_to_llvm=False, link=False, pipelines=test_pipes, verbose=True, logfile=log
+        )
+
+        compiled = QJIT(f, options)
+        compiled.workspace = compiled._get_workspace()  # pylint: disable=protected-access
+
+        # Call individual QJIT stages
+        compiled.jaxpr, *_ = compiled.capture((0.5,))
+        compiled.mlir_module = compiled.generate_ir()
+        compiled.compile()
+
+        logtext = log.getvalue()
+        assert "MLIR parsing successful" in logtext
+        assert "opt transformations successful" in logtext
+        assert "LLVMIR translation successful" not in logtext
+        assert "object code generation successful" not in logtext
+        assert "Compilation successful" in logtext
+        assert "object linking successful" not in logtext
+
+        # since these are not advertised options, an assertion should be okay
+        with pytest.raises(AssertionError, match="invalid options for jit_compile"):
+            compiled(0.5)
 
     def test_callable_without_name(self):
         """Test that a callable without __name__ property can be compiled, if it is otherwise
