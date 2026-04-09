@@ -772,6 +772,8 @@ class TestPassByPassSpecs:
         @qml.qjit(autograph=True)
         @qml.qnode(dev)
         def circuit():
+            qml.PauliX(wires=1)
+
             for _ in range(3):
                 subroutine()
 
@@ -784,8 +786,8 @@ class TestPassByPassSpecs:
             shots=Shots(None),
             level="Before MLIR Passes",
             resources=SpecsResources(
-                gate_types={"Hadamard": 3},
-                gate_sizes={1: 3},
+                gate_types={"Hadamard": 3, "PauliX": 1},
+                gate_sizes={1: 4},
                 measurements={"probs(all wires)": 1},
                 num_allocs=3,
             ),
