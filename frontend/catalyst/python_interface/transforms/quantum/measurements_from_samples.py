@@ -51,6 +51,7 @@ from catalyst.python_interface.transforms.quantum.outline_qnode import (
     OutlineQNodePattern,
     get_call_op,
 )
+from catalyst.python_interface.utils import get_constant_from_ssa
 
 
 @dataclass(frozen=True)
@@ -643,7 +644,10 @@ class StatePattern(MeasurementsFromSamplesPattern):
 
 def get_shots(quantum_node: func.FuncOp) -> int:
     """Get the shots for a quantum.node. Extracts shots from the device and validates that shots
-    is a non-zero integer
+    are static, and a non-zero integer.
+
+    This function is meant to act on a FuncOp with the `quantum.node` attribute, which should only
+    contain a single quantum.DeviceInitOp op.
 
         Args:
         quantum_node (func.FuncOp): The quantum.node FuncOp containing the quantum.DeviceInitOp.
@@ -653,43 +657,10 @@ def get_shots(quantum_node: func.FuncOp) -> int:
 
     Raises:
         CompileError: If `quantum_node` does not contain a quantum.DeviceInitOp.
-        CompileError: If the operator expected to contain shots values does not have `properties`.
-            This is the immediate issue that is observed when shots are dynamic.
-        TypeError: if the extracted shots are not an int
+        CompileError: If its not possible to extract a static constant from the 
+            SSAValue for the shots
         ValueError: if the extracted shots are zero
 
-    """
-
-    shots = _get_static_shots_value_from_device_op(quantum_node)
-    assert isinstance(shots, int), "Expected `shots` to be an integer"
-    if shots == 0:
-        raise ValueError("The measurements_from_samples pass requires non-zero shots")
-    return shots
-
-
-def _get_static_shots_value_from_device_op(quantum_node: func.FuncOp) -> int:
-    """Returns the number of shots as a static (i.e. known at compile time) integer value from the
-    device-initialization op (quantum.DeviceInitOp) found in a `FuncOp`.
-
-    This function is meant to act on a FuncOp with the `quantum.node` attribute, which should only
-    contain a single quantum.DeviceInitOp op.
-
-    This function expects the number of shots to be an SSA value given as an operand to the
-    quantum.DeviceInitOp op. It also assumes that the number of shots is static, retrieving it from
-    the 'value' attribute of its corresponding constant op.
-
-    Args:
-        quantum_node (func.FuncOp): The quantum.node FuncOp containing the quantum.DeviceInitOp.
-
-    Returns:
-        int: The number of shots.
-
-    Raises:
-        CompileError: If `quantum_node` does not contain a quantum.DeviceInitOp.
-        CompileError: If the operator expected to contain shots values does not have `properties`.
-            This is the immediate issue that is observed when shots are dynamic, for instance as a
-            result of the shots SSA value originating from a block argument rather than from an
-            operation, such as an `arith.constant` op.
     """
     device_op = None
 
@@ -705,36 +676,17 @@ def _get_static_shots_value_from_device_op(quantum_node: func.FuncOp) -> int:
 
     # The number of shots is passed as an SSA value operand to the DeviceInitOp
     shots_operand = device_op.shots
-    shots_extract_op = shots_operand.owner
-
-    if isinstance(shots_extract_op, tensor.ExtractOp):
-        shots_constant_op = shots_extract_op.operands[0].owner
-        if not hasattr(shots_constant_op, "properties"):
-            raise CompileError(
-                "Cannot get number of shots. Note that using a dynamic number of shots is not "
-                "supported with measurements-from-samples."
-            )
-        shots_value_attribute: builtin.DenseIntOrFPElementsAttr = shots_constant_op.properties.get(
-            "value"
+    shots = get_constant_from_ssa(shots_operand)
+    if shots is None:
+        raise CompileError(
+            "Cannot get number of shots. Note that using a dynamic number of shots is not "
+            "supported with measurements-from-samples."
         )
-        if shots_value_attribute is None:
-            raise ValueError("Cannot get number of shots; the constant op has no 'value' attribute")
-
-        shots_int_values = shots_value_attribute.get_values()
-        if len(shots_int_values) != 1:
-            raise ValueError(f"Expected a single shots value, got {len(shots_int_values)}")
-
-        return shots_int_values[0]
-
-    if isinstance(shots_extract_op, (arith.ConstantOp, stablehlo.ConstantOp)):
-        shots_value_attribute: builtin.IntAttr = shots_extract_op.properties.get("value")
-        return shots_value_attribute.value.data
-
-    raise ValueError(
-        "Expected owner of shots operand to be a tensor.ExtractOp, arith.ConstantOp or"
-        "stablehlo.ConstantOp but got "
-        f"{type(shots_extract_op).__name__}"
-    )
+    
+    assert isinstance(shots, int), "Expected `shots` to be an integer"
+    if shots == 0:
+        raise ValueError("The measurements_from_samples pass requires non-zero shots")
+    return shots
 
 
 @xdsl_module
