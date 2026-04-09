@@ -282,7 +282,7 @@ def CnotOp : QecPhysical_Op<"cnot", [
  * %1 = qecp.rot (%phi, %theta, %omega) %0 : !qecp.qubit<data>
  * ```
  */
-class RotOp: QecPhysical_Op<"rot", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+def RotOp: QecPhysical_Op<"rot", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
     let summary = "A physical Rot gate operation.";
 
     let arguments = (ins
