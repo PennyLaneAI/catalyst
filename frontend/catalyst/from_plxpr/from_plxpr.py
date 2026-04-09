@@ -22,6 +22,7 @@ from functools import partial
 from typing import Callable
 
 import jax
+
 import pennylane as qml
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
@@ -42,7 +43,7 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
-from catalyst.jax_extras.patches import get_jax_patches
+from catalyst.jax_extras.patches import get_jax_patches, patched_make_eqn
 from catalyst.jax_primitives import (
     device_init_p,
     device_release_p,
@@ -224,8 +225,13 @@ def from_plxpr(
     )
     original_fn = partial(interpreter.eval, plxpr.jaxpr, plxpr.consts)
 
+
+
     def wrapped_fn(*args, **kwargs):
-        return jax.make_jaxpr(original_fn)(*args, **kwargs)
+        with Patcher(*get_jax_patches()):
+            # needs a repeat of the patches in case from_plxpr used independently
+            # outside of trace_From_pennylane
+            return jax.make_jaxpr(original_fn)(*args, **kwargs)
 
     return wrapped_fn
 
