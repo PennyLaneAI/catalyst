@@ -289,7 +289,7 @@ class Rot_Op<string mnemonic, list<Trait> traits = []> :
         F64:$phi,
         F64:$theta,
         F64:$omega,
-        QecPhysicalQubitType:$in_qubit,
+        QecPhysicalQubitType:$in_qubit
     );
 
     let results = (outs
