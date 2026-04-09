@@ -22,7 +22,6 @@ from functools import partial
 from typing import Callable
 
 import jax
-
 import pennylane as qml
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
@@ -41,7 +40,7 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
-from catalyst.jax_extras import make_jaxpr2, transient_jax_config, deduce_avals
+from catalyst.jax_extras import deduce_avals, make_jaxpr2, transient_jax_config
 from catalyst.jax_extras.patches import get_jax_patches
 from catalyst.jax_primitives import (
     device_init_p,
@@ -223,8 +222,6 @@ def from_plxpr(
         skip_preprocess=skip_preprocess, _preprocess_warn=_preprocess_warn
     )
     original_fn = partial(interpreter.eval, plxpr.jaxpr, plxpr.consts)
-
-
 
     def wrapped_fn(*args, **kwargs):
         with Patcher(*get_jax_patches()):
