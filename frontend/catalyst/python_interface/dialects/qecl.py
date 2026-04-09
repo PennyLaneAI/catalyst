@@ -355,7 +355,7 @@ class EncodeOp(IRDLOperation):
 
 @irdl_op_definition
 class NoiseOp(IRDLOperation):
-    """An operation indicates where to inject noise."""
+    """Inject physical noise on elements of a logical codeblock."""
 
     T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
 

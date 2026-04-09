@@ -125,7 +125,7 @@ def EncodeOp : QecLogical_Op<"encode", [AllTypesMatch<["in_codeblock", "out_code
 }
 
 def NoiseOp : QecLogical_Op<"noise", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
-    let summary = "An operation indicates where to inject noise.";
+    let summary = "Inject physical noise on elements of a logical codeblock.";
 
     let arguments = (ins
         LogicalCodeblockType:$in_codeblock
