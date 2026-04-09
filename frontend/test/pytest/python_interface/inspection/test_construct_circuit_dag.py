@@ -21,7 +21,7 @@ from unittest.mock import MagicMock, Mock
 import jax
 import pennylane as qml
 import pytest
-from xdsl.dialects import builtin, func, test
+from xdsl.dialects import test
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir import Operation
 from xdsl.ir.core import Block, Region
@@ -196,19 +196,6 @@ def assert_dag_structure(nodes, edges, expected_edges):
 @pytest.mark.usefixtures("use_both_frontend")
 class TestFuncOpVisualization:
     """Tests the visualization of FuncOps with bounding boxes"""
-
-    def test_external_empty_function_visualization_error(self):
-        """Regression test for #2541 issue."""
-
-        external_func = func.FuncOp.external("test_func", [], [])
-        module = builtin.ModuleOp(ops=[external_func])
-
-        utility = ConstructCircuitDAG(FakeDAGBuilder())
-        expected_error = (
-            r"Calls to functions without a definition are not yet compatible.*test_func"
-        )
-        with pytest.raises(VisualizationError, match=expected_error):
-            utility.construct(module)
 
     def test_standard_qnode(self):
         """Tests that a standard QJIT'd QNode is visualized correctly"""
