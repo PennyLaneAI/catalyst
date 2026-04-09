@@ -139,7 +139,8 @@ class CustomDeviceLimitedMPs(Device):
 class TestMeasurementTransforms:
     """Tests for transforms modifying measurements"""
 
-    def test_measurements_from_counts_multiple_measurements(self):
+    @pytest.mark.old_frontend  # Catalyst-specific measurements_from_counts transform
+    def test_measurements_from_counts_multiple_measurements(self, capture_mode):
         """Test the transforms for measurements_from_counts to other measurement types
         as part of the Catalyst pipeline."""
 
@@ -161,13 +162,15 @@ class TestMeasurementTransforms:
 
         transformed_circuit = measurements_from_counts(basic_circuit, dev.wires)
 
-        mlir = qjit(transformed_circuit, target="mlir").mlir
+        mlir = qjit(transformed_circuit, target="mlir", capture=capture_mode).mlir
         assert "expval" not in mlir
         assert "quantum.var" not in mlir
         assert "counts" in mlir
 
         theta = 1.9
-        expval_res, var_res, counts_res, probs_res = qjit(transformed_circuit, seed=37)(theta)
+        expval_res, var_res, counts_res, probs_res = qjit(
+            transformed_circuit, seed=37, capture=capture_mode
+        )(theta)
 
         expval_expected = np.sin(theta) * np.sin(theta / 2)
         var_expected = 1 - np.sin(2 * theta) ** 2
@@ -193,7 +196,8 @@ class TestMeasurementTransforms:
         assert np.isclose(eigval_counts_res[-1], counts_expected[-1], atol=200)
         assert np.isclose(eigval_counts_res[1], counts_expected[1], atol=200)
 
-    def test_measurements_from_samples_multiple_measurements(self):
+    @pytest.mark.old_frontend  # Catalyst-specific measurements_from_samples transform
+    def test_measurements_from_samples_multiple_measurements(self, capture_mode):
         """Test the transform measurements_from_samples with multiple measurement types
         as part of the Catalyst pipeline."""
 
@@ -215,14 +219,16 @@ class TestMeasurementTransforms:
 
         transformed_circuit = measurements_from_samples(basic_circuit, dev.wires)
 
-        mlir = qjit(transformed_circuit, target="mlir").mlir
+        mlir = qjit(transformed_circuit, target="mlir", capture=capture_mode).mlir
         assert "expval" not in mlir
         assert "quantum.var" not in mlir
         assert "sample" in mlir
 
         theta = 1.9
 
-        expval_res, var_res, sample_res, probs_res = qjit(transformed_circuit, seed=37)(theta)
+        expval_res, var_res, sample_res, probs_res = qjit(
+            transformed_circuit, seed=37, capture=capture_mode
+        )(theta)
 
         expval_expected = np.sin(theta) * np.sin(theta / 2)
         var_expected = 1 - np.sin(2 * theta) ** 2
@@ -238,6 +244,7 @@ class TestMeasurementTransforms:
         assert len(sample_res) == len(sample_expected)
         assert set(np.array(sample_res)) == set(sample_expected)
 
+    @pytest.mark.old_frontend  # Catalyst-specific measurement transforms and MLIR checking
     @pytest.mark.parametrize(
         "unsupported_measurement, measurement_transform, target_measurement",
         [
@@ -247,7 +254,7 @@ class TestMeasurementTransforms:
         ],
     )
     def test_measurement_from_readout_integration_if_no_observables_supported(
-        self, unsupported_measurement, measurement_transform, target_measurement
+        self, unsupported_measurement, measurement_transform, target_measurement, capture_mode
     ):
         """Test that for devices without observable support,  measurment_from_samples transform
         is applied as part of the Catalyst pipeline if the device only supports sample, and
@@ -275,7 +282,7 @@ class TestMeasurementTransforms:
             assert measurement_transform in transform_program
 
             # MLIR only contains target measurement
-            @qjit
+            @qjit(capture=capture_mode)
             @qml.set_shots(100)
             @qml.qnode(dev)
             def circuit(theta: float):
@@ -289,13 +296,14 @@ class TestMeasurementTransforms:
                     qml.probs(wires=[3, 4]),
                 )
 
-            mlir = qjit(circuit, target="mlir").mlir
+            mlir = qjit(circuit, target="mlir", capture=capture_mode).mlir
 
         assert "expval" not in mlir
         assert "quantum.var" not in mlir
         assert "probs" not in mlir
         assert target_measurement in mlir
 
+    @pytest.mark.old_frontend  # Catalyst-specific measurement transforms, CustomDeviceLimitedMPs, MLIR checking
     @pytest.mark.parametrize(
         "device_measurements, measurement_transform, target_measurement",
         [
@@ -305,7 +313,7 @@ class TestMeasurementTransforms:
         ],
     )
     def test_measurement_from_readout_if_only_readout_measurements_supported(
-        self, device_measurements, measurement_transform, target_measurement
+        self, device_measurements, measurement_transform, target_measurement, capture_mode
     ):
         """Test the measurment_from_samples transform is applied as part of the Catalyst pipeline
         if the device only supports sample, and measurement_from_counts transform is applied if
@@ -328,7 +336,7 @@ class TestMeasurementTransforms:
             assert measurement_transform in transform_program
 
             # MLIR only contains target measurement
-            @qjit
+            @qjit(capture=capture_mode)
             @qml.set_shots(1000)
             @qml.qnode(dev)
             def circuit(theta: float):
@@ -342,14 +350,15 @@ class TestMeasurementTransforms:
                     qml.probs(wires=[3, 4]),
                 )
 
-            mlir = qjit(circuit, target="mlir").mlir
+            mlir = qjit(circuit, target="mlir", capture=capture_mode).mlir
 
         assert "expval" not in mlir
         assert "quantum.var" not in mlir
         assert "probs" not in mlir
         assert target_measurement in mlir
 
-    def test_error_is_raised_if_no_observables_and_no_samples_or_counts(self, mocker):
+    @pytest.mark.old_frontend  # Catalyst-specific device capabilities and error handling
+    def test_error_is_raised_if_no_observables_and_no_samples_or_counts(self, mocker, capture_mode):
         """Test that for a device that doesn't support observables, if counts
         and sample are also both unsupported, an error is raised."""
 
@@ -371,9 +380,10 @@ class TestMeasurementTransforms:
             with pytest.raises(
                 RuntimeError, match="The device does not support observables or sample/counts"
             ):
-                qjit(circuit)()
+                qjit(circuit, capture=capture_mode)()
 
     # pylint: disable=unnecessary-lambda
+    @pytest.mark.old_frontend  # Catalyst-specific measurements_from_counts transform
     @pytest.mark.parametrize(
         "measurement",
         [
@@ -383,7 +393,7 @@ class TestMeasurementTransforms:
             lambda: qml.counts(qml.Y(1)),
         ],
     )
-    def test_measurement_from_counts_with_counts_measurement(self, measurement):
+    def test_measurement_from_counts_with_counts_measurement(self, measurement, capture_mode):
         """Test the measurment_from_counts transform with a single counts measurement as part of
         the Catalyst pipeline."""
 
@@ -399,7 +409,9 @@ class TestMeasurementTransforms:
 
         theta = 2.5
         counts_expected = circuit(theta)
-        res = qjit(measurements_from_counts(circuit, dev.wires), seed=37)(theta)
+        res = qjit(measurements_from_counts(circuit, dev.wires), seed=37, capture=capture_mode)(
+            theta
+        )
 
         # counts comparison by converting catalyst format to PL style eigvals dict
         basis_states, counts = res
@@ -429,6 +441,7 @@ class TestMeasurementTransforms:
                 assert np.isclose(res[1], expected_res[1], atol=100)
 
     # pylint: disable=unnecessary-lambda
+    @pytest.mark.old_frontend  # Catalyst-specific measurements_from_samples transform
     @pytest.mark.parametrize(
         "measurement",
         [
@@ -441,7 +454,7 @@ class TestMeasurementTransforms:
             lambda: qml.sample(qml.Y(1) @ qml.Y(0)),
         ],
     )
-    def test_measurement_from_samples_with_sample_measurement(self, measurement):
+    def test_measurement_from_samples_with_sample_measurement(self, measurement, capture_mode):
         """Test the measurment_from_counts transform with a single counts measurement as part of
         the Catalyst pipeline."""
 
@@ -455,7 +468,9 @@ class TestMeasurementTransforms:
             return measurement()
 
         theta = 2.5
-        res = qjit(measurements_from_samples(circuit, dev.wires), seed=37)(theta)
+        res = qjit(measurements_from_samples(circuit, dev.wires), seed=37, capture=capture_mode)(
+            theta
+        )
         # PL flattens N-by-1 2D result arrays into size-N 1D arrays, but Catalyst does not
         if len(measurement().wires) == 1:
             res = res.flatten()
@@ -470,6 +485,7 @@ class TestMeasurementTransforms:
         assert np.allclose(np.mean(res, axis=0), np.mean(samples_expected, axis=0), atol=0.05)
 
     # pylint: disable=unnecessary-lambda
+    @pytest.mark.old_frontend  # Catalyst-specific measurements_from_samples transform and MLIR checking
     @pytest.mark.parametrize(
         "input_measurement, expected_res",
         [
@@ -496,10 +512,7 @@ class TestMeasurementTransforms:
     )
     @pytest.mark.parametrize("shots", [3000, (3000, 3000), (3000, 4000), (3000, 3500, 4000)])
     def test_measurement_from_samples_single_measurement_analytic(
-        self,
-        input_measurement,
-        expected_res,
-        shots,
+        self, input_measurement, expected_res, shots, capture_mode
     ):
         """Test the measurement_from_samples transform with a single measurements as part of the
         Catalyst pipeline, for measurements whose outcome can be directly compared to an expected
@@ -507,7 +520,7 @@ class TestMeasurementTransforms:
 
         dev = qml.device("lightning.qubit", wires=4)
 
-        @qjit(seed=37)
+        @qjit(seed=37, capture=capture_mode)
         @partial(measurements_from_samples, device_wires=dev.wires)
         @qml.set_shots(shots)
         @qml.qnode(dev)
@@ -516,7 +529,7 @@ class TestMeasurementTransforms:
             qml.RX(theta / 2, 1)
             return input_measurement()
 
-        mlir = qjit(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir", capture=capture_mode).mlir
         assert "expval" not in mlir
         assert "sample" in mlir
 
@@ -530,6 +543,7 @@ class TestMeasurementTransforms:
         assert np.allclose(res, expected_res(theta), atol=0.05)
 
     # pylint: disable=unnecessary-lambda
+    @pytest.mark.old_frontend  # Catalyst-specific measurements_from_counts transform and MLIR checking
     @pytest.mark.parametrize(
         "input_measurement, expected_res",
         [
@@ -555,7 +569,7 @@ class TestMeasurementTransforms:
         ],
     )
     def test_measurement_from_counts_single_measurement_analytic(
-        self, input_measurement, expected_res
+        self, input_measurement, expected_res, capture_mode
     ):
         """Test the measurment_from_counts transform with a single measurements as part of the
         Catalyst pipeline, for measurements whose outcome can be directly compared to an expected
@@ -563,7 +577,7 @@ class TestMeasurementTransforms:
 
         dev = qml.device("lightning.qubit", wires=4)
 
-        @qjit(seed=37)
+        @qjit(seed=37, capture=capture_mode)
         @partial(measurements_from_counts, device_wires=dev.wires)
         @qml.set_shots(3000)
         @qml.qnode(dev)
@@ -572,7 +586,7 @@ class TestMeasurementTransforms:
             qml.RX(theta / 2, 1)
             return input_measurement()
 
-        mlir = qjit(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir", capture=capture_mode).mlir
         assert "expval" not in mlir
         assert "counts" in mlir
 
@@ -586,7 +600,8 @@ class TestMeasurementTransforms:
 
         assert np.allclose(res, expected_res(theta), atol=0.05)
 
-    def test_measurement_from_counts_raises_not_implemented(self):
+    @pytest.mark.old_frontend  # Catalyst-specific measurements_from_counts transform
+    def test_measurement_from_counts_raises_not_implemented(self, capture_mode):
         """Test that an measurement not supported by the measurements_from_counts or
         measurements_from_samples transform raises a NotImplementedError"""
 
@@ -602,9 +617,10 @@ class TestMeasurementTransforms:
         with pytest.raises(
             NotImplementedError, match="not implemented with measurements_from_counts"
         ):
-            qjit(circuit)
+            qjit(circuit, capture=capture_mode)
 
-    def test_measurement_from_samples_raises_not_implemented(self):
+    @pytest.mark.old_frontend  # Catalyst-specific measurements_from_samples transform
+    def test_measurement_from_samples_raises_not_implemented(self, capture_mode):
         """Test that an measurement not supported by the measurements_from_counts or
         measurements_from_samples transform raises a NotImplementedError"""
 
@@ -620,8 +636,9 @@ class TestMeasurementTransforms:
         with pytest.raises(
             NotImplementedError, match="not implemented with measurements_from_samples"
         ):
-            qjit(circuit)
+            qjit(circuit, capture=capture_mode)
 
+    @pytest.mark.old_frontend  # Catalyst-specific QJITDevice.preprocess and transform program checking
     @pytest.mark.parametrize(
         "unsupported_obs",
         [
@@ -634,7 +651,9 @@ class TestMeasurementTransforms:
             ("PauliX", "PauliY", "Hadamard"),
         ],
     )
-    def test_diagonalize_measurements_added_to_transforms(self, unsupported_obs, mocker):
+    def test_diagonalize_measurements_added_to_transforms(
+        self, unsupported_obs, mocker, capture_mode
+    ):
         """Test that the diagonalize_measurements transform is included in the CompilePipeline
         as expected when we are not diagonalizing everything to counts or samples, but some of
         {X, Y, Z, H} are not supported."""
@@ -660,7 +679,7 @@ class TestMeasurementTransforms:
             "catalyst.device.qjit_device.filter_device_capabilities_with_shots",
             Mock(return_value=config),
         ):
-            jitted_circuit = qjit(circuit)
+            jitted_circuit = qjit(circuit, capture=capture_mode)
 
             transform_program, _ = spy.spy_return
             assert split_non_commuting in transform_program
@@ -669,6 +688,7 @@ class TestMeasurementTransforms:
             assert len(jitted_circuit(1.2)) == len(expected_result) == 3
             assert np.allclose(jitted_circuit(1.2), expected_result)
 
+    @pytest.mark.old_frontend  # Catalyst-specific MLIR checking
     @pytest.mark.parametrize(
         "unsupported_obs",
         [
@@ -681,7 +701,7 @@ class TestMeasurementTransforms:
             ("PauliX", "PauliY", "Hadamard"),
         ],
     )
-    def test_diagonalize_measurements_applied_to_mlir(self, unsupported_obs, mocker):
+    def test_diagonalize_measurements_applied_to_mlir(self, unsupported_obs, mocker, capture_mode):
         """Test that the diagonalize_measurements transform is applied or not as when
         we are not diagonalizing everything to counts or samples, but not all of
         {X, Y, Z, H} are supported."""
@@ -692,7 +712,7 @@ class TestMeasurementTransforms:
         def circuit():
             return qml.expval(qml.X(0)), qml.var(qml.Y(1)), qml.expval(qml.Hadamard(2))
 
-        mlir = qjit(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir", capture=capture_mode).mlir
         for obs in unsupported_obs:
             assert f"{obs}] : !quantum.obs" in mlir
 
@@ -705,7 +725,7 @@ class TestMeasurementTransforms:
             "catalyst.device.qjit_device.filter_device_capabilities_with_shots",
             Mock(return_value=config),
         ):
-            mlir = qjit(circuit, target="mlir").mlir
+            mlir = qjit(circuit, target="mlir", capture=capture_mode).mlir
 
             for obs in unsupported_obs:
                 assert f"{obs}] : !quantum.obs" not in mlir
@@ -814,7 +834,8 @@ class TestMeasurementTransforms:
             (qml.X(0) + qml.X(1), qml.Y(0)),  # split into 3 seperate terms and distributed
         ],
     )
-    def test_split_non_commuting_execution(self, observables, mocker):
+    @pytest.mark.old_frontend  # Catalyst-specific device capability mocking and transform checking
+    def test_split_non_commuting_execution(self, observables, mocker, capture_mode):
         """Test that the results of the execution for a tape with non-commuting observables is
         consistent (on a backend that does, in fact, support non-commuting observables) regardless
         of whether split_non_commuting is applied or not as expected"""
@@ -838,7 +859,7 @@ class TestMeasurementTransforms:
             "catalyst.device.qjit_device.filter_device_capabilities_with_shots",
             Mock(return_value=config),
         ):
-            jitted_circuit = qjit(unjitted_circuit)
+            jitted_circuit = qjit(unjitted_circuit, capture=capture_mode)
             assert len(jitted_circuit(1.2)) == len(expected_result) == 2
             assert np.allclose(jitted_circuit(1.2), expected_result)
 
@@ -851,14 +872,15 @@ class TestMeasurementTransforms:
             "catalyst.device.qjit_device.filter_device_capabilities_with_shots",
             Mock(return_value=config),
         ):
-            jitted_circuit = qjit(unjitted_circuit)
+            jitted_circuit = qjit(unjitted_circuit, capture=capture_mode)
             assert len(jitted_circuit(1.2)) == len(expected_result) == 2
             assert np.allclose(jitted_circuit(1.2), unjitted_circuit(1.2))
 
         transform_program, _ = spy.spy_return
         assert split_non_commuting in transform_program
 
-    def test_split_to_single_terms_execution(self, mocker):
+    @pytest.mark.old_frontend  # Catalyst-specific device capability mocking and transform checking
+    def test_split_to_single_terms_execution(self, mocker, capture_mode):
         """Test that the results of the execution for a tape with multi-term observables is
         consistent (on a backend that does, in fact, support multi-term observables) regardless
         of whether split_to_single_terms is applied or not"""
@@ -883,7 +905,7 @@ class TestMeasurementTransforms:
         assert "Sum" in config.observables
 
         # test case where transform should not be applied
-        jitted_circuit = qjit(unjitted_circuit)
+        jitted_circuit = qjit(unjitted_circuit, capture=capture_mode)
         assert len(jitted_circuit(1.2)) == len(expected_result) == 2
         assert np.allclose(jitted_circuit(1.2), expected_result)
 
@@ -896,7 +918,7 @@ class TestMeasurementTransforms:
             "catalyst.device.qjit_device.filter_device_capabilities_with_shots",
             Mock(return_value=config),
         ):
-            jitted_circuit = qjit(unjitted_circuit)
+            jitted_circuit = qjit(unjitted_circuit, capture=capture_mode)
             assert len(jitted_circuit(1.2)) == len(expected_result) == 2
             assert np.allclose(jitted_circuit(1.2), unjitted_circuit(1.2))
 
@@ -907,11 +929,12 @@ class TestMeasurementTransforms:
 class TestTransform:
     """Test the measurement transforms implemented in Catalyst."""
 
-    def test_measurements_from_counts(self):
+    @pytest.mark.old_frontend  # Catalyst-specific measurements_from_counts transform
+    def test_measurements_from_counts(self, capture_mode):
         """Test the transfom measurements_from_counts."""
         device = qml.device("lightning.qubit", wires=4)
 
-        @qjit
+        @qjit(capture=capture_mode)
         @partial(measurements_from_counts, device_wires=device.wires)
         @qml.set_shots(1000)
         @qml.qnode(device=device)
@@ -946,11 +969,12 @@ class TestTransform:
         assert counts[0].shape == (8,)
         assert counts[1].shape == (8,)
 
+    @pytest.mark.old_frontend  # Catalyst-specific measurement transforms
     @pytest.mark.parametrize(
         "transform_measurement", (measurements_from_samples, measurements_from_counts)
     )
     @pytest.mark.parametrize("mcm_method", ("one-shot", "single-branch-statistics"))
-    def test_measurements_transform(self, mcm_method, transform_measurement):
+    def test_measurements_transform(self, mcm_method, transform_measurement, capture_mode):
         """Test raise an error when measurements_from_samples is used with one-shot."""
         device = qml.device("lightning.qubit", wires=2)
 
@@ -967,6 +991,6 @@ class TestTransform:
                 CompileError,
                 match=f"'{transform_measurement.__name__}' transform is not supported",
             ):
-                qjit(circuit)()
+                qjit(circuit, capture=capture_mode)()
         else:
-            qjit(circuit)()
+            qjit(circuit, capture=capture_mode)()
