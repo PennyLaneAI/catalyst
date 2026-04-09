@@ -859,6 +859,12 @@
 
 <h3>Documentation 📝</h3>
 
+* The "Compatibility with PennyLane transforms" section of the
+  :doc:`Sharp bits and debugging tips <../dev/sharp_bits>` document has been updated to describe
+  potential oddities that can be encountered when composing PennyLane transforms together.
+  Additionally, some sharp bits listed were removed, as they are no longer sharp bits.
+  [(#2662)](https://github.com/PennyLaneAI/catalyst/pull/2662)
+
 * Docstrings for :func:`~.passes.disentangle_cnot` and :func:`~.passes.disentangle_swap` have been improved
   by using updated features for inspection and by calling them from the PennyLane frontend.
   [(#2546)](https://github.com/PennyLaneAI/catalyst/pull/2546)

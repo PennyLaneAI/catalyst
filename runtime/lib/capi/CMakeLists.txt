@@ -10,7 +10,7 @@ target_include_directories(rt_capi
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${MLIR_INCLUDE_DIRS}                      # CRunnerUtils.h
-    ${PROJECT_SOURCE_DIR}/../mlir/lib/Driver  # Timer.hpp
+    ${PROJECT_SOURCE_DIR}/../mlir/include/   # "Driver/Timer.hpp"
 )
 
 target_link_libraries(rt_capi PRIVATE
