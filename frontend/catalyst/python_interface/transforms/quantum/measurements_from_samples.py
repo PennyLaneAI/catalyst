@@ -385,7 +385,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         instead of the original output, and the outer function returns the output of
         post-processing instead of directly returning the output of calling the qnode.
 
-        Also update result shapes in the CallOp for the Qnode call to reflect this change,
+        Also update result shapes in the CallOp for the QNode call to reflect this change,
         since this is not updated when modifying the ReturnOps.
 
         This function updates the self.qnode and self.call_op attributes on the Pattern.
