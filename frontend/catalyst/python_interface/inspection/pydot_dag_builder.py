@@ -18,7 +18,7 @@ from collections import ChainMap
 from shutil import which
 from typing import Any
 
-from .dag_builder import DAGBuilder
+from .dag_builder import ClusterUID, DAGBuilder, NodeUID
 
 HAS_PYDOT = True
 try:
@@ -101,6 +101,10 @@ class PyDotDAGBuilder(DAGBuilder):
         self._edges: list[dict[str, Any]] = []
         self._clusters: dict[str, dict[str, Any]] = {}
 
+        # Internal counter for UID generation
+        self._node_counter = 0
+        self._cluster_counter = 0
+
         _default_attrs: dict = {"fontname": "Helvetica"} if attrs is None else attrs
         self._default_node_attrs: dict = (
             {
@@ -136,11 +140,10 @@ class PyDotDAGBuilder(DAGBuilder):
 
     def add_node(
         self,
-        uid: str,
         label: str,
         cluster_uid: str | None = None,
         **attrs: Any,
-    ) -> None:
+    ) -> NodeUID:
         """Add a single node to the graph.
 
         Args:
@@ -153,8 +156,8 @@ class PyDotDAGBuilder(DAGBuilder):
             ValueError: Node ID is already present in the graph.
 
         """
-        if uid in self.nodes:
-            raise ValueError(f"Node ID {uid} already present in graph.")
+        uid = f"node{self._node_counter}"
+        self._node_counter += 1
 
         # Use ChainMap so you don't need to construct a new dictionary
         node_attrs: ChainMap = ChainMap(attrs, self._default_node_attrs)
@@ -172,6 +175,8 @@ class PyDotDAGBuilder(DAGBuilder):
             "cluster_uid": cluster_uid,
             "attrs": dict(node_attrs),
         }
+
+        return uid
 
     def add_edge(self, from_uid: str, to_uid: str, **attrs: Any) -> None:
         """Add a single directed edge between nodes in the graph.
@@ -204,28 +209,29 @@ class PyDotDAGBuilder(DAGBuilder):
 
     def add_cluster(
         self,
-        uid: str,
         label: str | None = None,
         cluster_uid: str | None = None,
         **attrs: Any,
-    ) -> None:
+    ) -> ClusterUID:
         """Add a single cluster to the graph.
 
         A cluster is a specific type of subgraph where the nodes and edges contained
         within it are visually and logically grouped.
 
         Args:
-            uid (str): Unique cluster ID to identify this cluster.
             label (str | None): Optional text to display as a label on the cluster when rendered.
             cluster_uid (str | None): Optional unique ID of the cluster this cluster belongs to.
                 If `None`, the cluster will be positioned on the base graph.
             **attrs (Any): Any additional styling keyword arguments.
 
+        Returns:
+            uid (str): The cluster's UID
+
         Raises:
             ValueError: Cluster ID is already present in the graph.
         """
-        if uid in self.clusters:
-            raise ValueError(f"Cluster ID {uid} already present in graph.")
+        uid = f"cluster{self._cluster_counter}"
+        self._cluster_counter += 1
 
         # Use ChainMap so you don't need to construct a new dictionary
         cluster_attrs: ChainMap = ChainMap(attrs, self._default_cluster_attrs)
@@ -246,6 +252,8 @@ class PyDotDAGBuilder(DAGBuilder):
             "cluster_uid": cluster_uid,
             "attrs": dict(cluster_attrs),
         }
+
+        return uid
 
     @property
     def nodes(self) -> dict[str, dict[str, Any]]:

@@ -14,6 +14,7 @@
 """
 Unit tests for xDSL pass-related functionality in the Compiler class.
 """
+
 # pylint: disable=protected-access
 
 import os
