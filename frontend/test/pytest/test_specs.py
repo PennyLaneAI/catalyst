@@ -510,6 +510,81 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
+    def test_circuit_with_args(self):
+        """Test using a mix of compiler passes and plain tape transforms"""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circ(x):
+            qml.RX(x * 1.0, 0)
+            qml.RX(x * 2.0, 0)
+            qml.RZ(x * 3.0, 1)
+            qml.RZ(x * 4.0, 1)
+            qml.Hadamard(0)
+            qml.Hadamard(0)
+            qml.CNOT([0, 1])
+            qml.CNOT([0, 1])
+            return qml.probs()
+
+        circ = qml.transforms.cancel_inverses(
+            circ
+        )  # Has to be applied as a tape transform because of the next transform
+        circ = dummy_transform(circ)  # Forces normal tape transform
+        circ = qml.transforms.merge_rotations(circ)  # Can be applied as an MLIR pass
+
+        circ = qjit(circ)
+
+        actual = qml.specs(circ, level="all")(3)
+        expected = CircuitSpecs(
+            device_name="lightning.qubit",
+            num_device_wires=2,
+            shots=Shots(None),
+            level=dict(
+                enumerate(
+                    (
+                        "Before Tape Transforms",
+                        "cancel_inverses",
+                        "dummy_transform",
+                        "Before MLIR Passes",
+                        "merge-rotations",
+                    )
+                )
+            ),
+            resources={
+                "Before Tape Transforms": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    gate_sizes={1: 6, 2: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "cancel_inverses": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "dummy_transform": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "Before MLIR Passes": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "merge-rotations": SpecsResources(
+                    gate_types={"RX": 1, "RZ": 1},
+                    gate_sizes={1: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+            },
+        )
+
+        check_specs_same(actual, expected)
+
     def test_all_mlir(self, simple_circuit):
         """Test using "all-mlir" level"""
 
@@ -721,9 +796,7 @@ class TestPassByPassSpecs:
     def test_ppr(self):
         """Test that PPRs are handled correctly."""
 
-        pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
-
-        @qml.qjit(pipelines=pipeline, target="mlir")
+        @qml.qjit(target="mlir")
         @catalyst.passes.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circ():

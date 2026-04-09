@@ -330,7 +330,8 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 
         if (nQubits == 0) {
             name += "(all wires)";
-        } else {
+        }
+        else {
             name += "(" + std::to_string(nQubits) + " wires)";
         }
         result.measurements[name] += 1;
