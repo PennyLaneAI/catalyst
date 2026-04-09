@@ -281,10 +281,10 @@ def CnotOp : QecPhysical_Op<"cnot", [
  * ```mlir
  * %1 = qecp.rot (%phi, %theta, %omega) %0 : !qecp.qubit<data>
  * ```
- *
  */
-class Rot_Op<string mnemonic, list<Trait> traits = []> :
-        QecPhysical_Op<mnemonic, traits> {
+class RotOp: QecPhysical_Op<"rot", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical Rot gate operation.";
+
     let arguments = (ins
         F64:$phi,
         F64:$theta,
