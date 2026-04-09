@@ -25,7 +25,6 @@ import jax
 
 import pennylane as qml
 from jax.extend.core import ClosedJaxpr, Jaxpr
-from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
