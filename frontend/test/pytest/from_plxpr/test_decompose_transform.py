@@ -29,7 +29,7 @@ from pennylane_lightning.lightning_qubit.lightning_qubit import (
 )
 
 from catalyst.jax_primitives import decomposition_rule
-from catalyst.passes import cancel_inverses, graph_decomposition, merge_rotations
+from catalyst.passes import graph_decomposition
 
 
 class TestGraphDecomposition:
