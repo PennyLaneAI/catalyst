@@ -44,6 +44,10 @@ from xdsl_jax.dialects import stablehlo
 from catalyst.python_interface.conversion import xdsl_module
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.pass_api import compiler_transform
+from catalyst.python_interface.transforms.quantum.outline_qnode import (
+    OutlineQNodePattern,
+    get_call_op,
+)
 from catalyst.python_interface.transforms.quantum.diagonalize_measurements import (
     DiagonalizeFinalMeasurementsPass,
 )
@@ -66,7 +70,7 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
         DiagonalizeFinalMeasurementsPass().apply(_ctx, op)
 
         pattern_rewriter.PatternRewriteWalker(
-            AddPostProcessingPattern(pass_str="from_samples"),
+            OutlineQNodePattern(pass_str="from_samples"),
             apply_recursively=False,
         ).rewrite_module(op)
 
@@ -83,55 +87,6 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
 
 
 measurements_from_samples_pass = compiler_transform(MeasurementsFromSamplesPass)
-
-
-class AddPostProcessingPattern(RewritePattern):
-    """RewritePattern for making each QNode into a classical function that
-    calls the QNode and performs post-processing."""
-
-    def __init__(self, pass_str: str):
-        super().__init__()
-        self._pass_str = pass_str
-
-    def match_and_rewrite(
-        self, func_op: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter, /
-    ):
-        """Transform a quantum node (qnode) to separate it into a quantum node
-        and an outer function that calls the quantum node. Subsequent patterns can then apply
-        postprocessing to the results of the call in the outer function when changes are made
-        to the quantum node.
-
-        The name of the quantum node is changed to original_name.pass_str, and the new outer
-        postprocessing function is given the original name.
-        """
-
-        if "quantum.node" not in func_op.attributes:
-            return
-
-        # get names of the postprocessing and quantum_node functions
-        outer_fn_name = func_op.sym_name.data
-        qnode_name = outer_fn_name + f".{self._pass_str}"
-
-        # update quantum_node name to include pass string
-        func_op.sym_name = builtin.StringAttr(qnode_name)
-        rewriter.notify_op_modified(func_op)
-
-        # create the outer (postprocessing) fn with the original node name
-        outer_fn = func.FuncOp(
-            name=outer_fn_name, function_type=func_op.function_type, visibility="public"
-        )
-        rewriter.insert_op(outer_fn, InsertPoint.before(func_op))
-
-        # call the renamed quantum_node inside the new outer FuncOp
-        call_args = outer_fn.body.block.args
-        result_types = outer_fn.function_type.outputs.data
-        call_op = func.CallOp(qnode_name, call_args, result_types)
-        outer_fn.body.block.add_op(call_op)
-
-        # add a ReturnOp in the new FuncOp returning quantum_node results
-        qnode_call_results = call_op.results
-        return_op = func.ReturnOp(*qnode_call_results)
-        outer_fn.body.block.add_op(return_op)
 
 
 class MeasurementsFromSamplesPattern(RewritePattern):
@@ -153,33 +108,6 @@ class MeasurementsFromSamplesPattern(RewritePattern):
     @abstractmethod
     def match_and_rewrite(self, op: ir.Operation, rewriter: PatternRewriter, /):
         """Abstract method for measurements-from-samples match-and-rewrite patterns."""
-
-    def _get_parent_module(self, op: func.FuncOp) -> builtin.ModuleOp:
-        """Get the first ancestral builtin.ModuleOp op of a given func.func op."""
-        _op: ir.Operation | None = op
-        while _op := _op.parent_op():
-            if isinstance(_op, builtin.ModuleOp):
-                break
-            if _op is None:
-                raise CompileError("...")
-
-        assert isinstance(_op, builtin.ModuleOp)
-        return _op
-
-    def _get_call_op(self, qnode: func.FuncOp):
-        """Get the CallOp in another module function that calls this quantum_node. Postprocessing
-        will be called to act on the output of that CallOp"""
-
-        module = self._get_parent_module(qnode)
-        qnode_name = qnode.sym_name.data
-        all_call_ops = [op for op in module.body.walk() if isinstance(op, func.CallOp)]
-        qnode_call_op = [op for op in all_call_ops if qnode_name in op.callee.string_value()]
-        if not len(qnode_call_op) == 1:
-            raise CompileError(
-                f"Expected only one call_op for {qnode_name}, but received {qnode_call_op}"
-            )
-
-        return qnode_call_op[0]
 
     @classmethod
     def get_observable_op(cls, op: quantum.ExpvalOp | quantum.VarianceOp) -> quantum.NamedObsOp:
@@ -466,21 +394,28 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             mp_index (int): The index of the measurement process to be updated. The
                 relevant function returns will be updated at this index.
             sample_op (quantum.SampleOp): The operation whose results the Qnode should return.
-            postprocessing_func_call_op (func.CallOp): The postprocessing CallOp whose results
-                the outer function should return.
+            postprocessing_func_call_op (func.CallOp): The postprocessing CallOp that accepts
+                results of the QNode CallOp. The outer function will be updated to return the
+                results of this operation instead of returning the QNode CallOp results directly.
             rewriter (PatternRewriter): The xDSL pattern rewriter.
         """
         assert self.qnode is not None
         assert self.call_op is not None
 
         # update the qnode to return the result of the SampleOp directly
-        assert self.qnode is not None
         return_op = self.qnode.get_return_op()
         assert return_op is not None, "QNode has no return op"
         return_op.operands[mp_index] = sample_op.results[0]
         rewriter.notify_op_modified(return_op)
+        self.qnode.update_function_type()
 
-        # update the outer function return to return postprocessed data instead of the raw data
+        # update the qnode CallOp in the outer function to reflect the new shape for returned data
+        result_types = self.qnode.function_type.outputs.data
+        new_call_op = func.CallOp(self.call_op.callee, self.call_op.arguments, result_types)
+        rewriter.replace_op(self.call_op, new_call_op)
+        self.call_op = new_call_op
+
+        # update the outer function to return postprocessed data instead of the raw data
         final_return = [
             use.operation
             for use in list(self.call_op.results[mp_index].uses)
@@ -488,13 +423,6 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         ][0]
         final_return.operands[mp_index] = postprocessing_func_call_op.results[0]
         rewriter.notify_op_modified(final_return)
-
-        # update the call op to correctly reflect the new shape of the returned data
-        self.qnode.update_function_type()
-        result_types = self.qnode.function_type.outputs.data
-        new_call_op = func.CallOp(self.call_op.callee, self.call_op.arguments, result_types)
-        rewriter.replace_op(self.call_op, new_call_op)
-        self.call_op = new_call_op
 
 
 class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
@@ -509,14 +437,14 @@ class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
 
     @pattern_rewriter.op_type_rewrite_pattern
     def match_and_rewrite(self, func_op: func.FuncOp, rewriter: PatternRewriter, /):
-        """Match and rewrite for quantum.ExpvalOp."""
+        """Match and rewrite for quantum.ExpvalOp and quantum.VarianceOp."""
 
         if "quantum.node" not in func_op.attributes:
             return
 
         self._shots = get_shots(func_op)
         self.qnode = func_op
-        self.call_op = self._get_call_op(func_op)
+        self.call_op = get_call_op(func_op)
 
         measurement_processes = [
             op
@@ -607,7 +535,7 @@ class ProbsPattern(MeasurementsFromSamplesPattern):
 
         self._shots = get_shots(func_op)
         self.qnode = func_op
-        self.call_op = self._get_call_op(func_op)
+        self.call_op = get_call_op(func_op)
 
         probs_ops = [op for op in self.qnode.body.walk() if isinstance(op, quantum.ProbsOp)]
 
