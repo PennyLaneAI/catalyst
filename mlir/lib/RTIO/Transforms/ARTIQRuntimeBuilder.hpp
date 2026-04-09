@@ -14,6 +14,10 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cmath>
+#include <random>
+
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -22,6 +26,7 @@
 
 #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "RTIO/IR/RTIOOps.h" // For ConfigAttr
+#include "Utils.hpp"
 
 namespace catalyst {
 namespace rtio {
@@ -42,11 +47,20 @@ constexpr StringLiteral delayMu = "delay_mu";
 constexpr StringLiteral rtioOutput = "rtio_output";
 constexpr StringLiteral rtioInit = "rtio_init";
 constexpr StringLiteral rtioGetCounter = "rtio_get_counter";
+constexpr StringLiteral rtioInitDataset = "__rtio_init_dataset";
+constexpr StringLiteral rtioTransferMeasurementResults = "__rtio_transfer_measurement_results";
 constexpr StringLiteral kernel = "__kernel__";
 // ARTIQ RPC runtime
 constexpr StringLiteral rpcSend = "rpc_send";
 constexpr StringLiteral rpcSendAsync = "rpc_send_async";
 constexpr StringLiteral rpcRecv = "rpc_recv";
+// RTIO input FIFO read
+constexpr StringLiteral rtioInputTimestamp = "rtio_input_timestamp";
+// Measurement helper functions
+constexpr StringLiteral gateRisingMu = "__rtio_gate_rising_mu";
+constexpr StringLiteral mockMeasure = "__rtio_mock_measure";
+constexpr StringLiteral rtioCount = "__rtio_count";
+constexpr StringLiteral waitUntilMu = "__rtio_wait_until_mu";
 } // namespace ARTIQFuncNames
 
 //===----------------------------------------------------------------------===//
@@ -54,6 +68,7 @@ constexpr StringLiteral rpcRecv = "rpc_recv";
 //===----------------------------------------------------------------------===//
 
 namespace ARTIQHardwareConfig {
+// Hardware constants
 constexpr double nanosecondPeriod = 1e-9;
 constexpr double ftwScaleFactor = 4.294967296;      // 2^32 / 1e9
 constexpr double powScaleFactor = 65536.0;          // 2^16
@@ -69,7 +84,44 @@ constexpr int32_t spiFlagsReleaseCS = 10; // SPI_CS_POLARITY | SPI_END (CS high 
 constexpr int64_t ioUpdatePulseWidth = 8;
 constexpr int64_t refPeriodMu = 8;   // RTIO reference period (Kasli = 8ns @ 125MHz RTIO clock)
 constexpr int64_t minTTLPulseMu = 8; // Minimum TTL pulse duration to avoid 0 duration events
+
+// Simulated fluorescence / DMD during measurement window
+constexpr int64_t simPhotonPulseOnMu = 100;
+constexpr int64_t simPhotonGapMu = 10;
+constexpr int64_t simPhotonPeriodMu = simPhotonPulseOnMu + simPhotonGapMu;
+constexpr int64_t measurementPhotonLeadMu = 10;
+constexpr int64_t measurementStartOffsetMu = 100000;
+constexpr int32_t defaultTtlInOutGateLatencyMu = 104;
+
+/// TTL6 trigger pulse fires 200 mu before start for Red Pitaya oscilloscope acquisition.
+constexpr int64_t scopeTriggerLeadMu = 200;
+
+/// Compute a Poisson-distributed simulated photon count
+inline int32_t computeSimulatedPhotonCount(int64_t durationMu)
+{
+    int64_t maxPhotons = (durationMu - measurementPhotonLeadMu) / simPhotonPeriodMu;
+    if (maxPhotons <= 0) {
+        return 0;
+    }
+
+    // convert duration (ns) to us
+    double durationUs = static_cast<double>(durationMu) / 1000.0;
+
+    static std::mt19937 rng(std::random_device{}());
+    std::poisson_distribution<int32_t> dist(durationUs);
+    int32_t count = dist(rng);
+
+    return std::min(static_cast<int64_t>(count), maxPhotons);
+}
+
 } // namespace ARTIQHardwareConfig
+
+struct MeasurementChannelAddrs {
+    int32_t gateRisingAddr = 0;
+    int32_t countChannel = 0;
+    int32_t acquisitionOutputAddr = 0;
+    int32_t dmdOutputAddr = 0;
+};
 
 //===----------------------------------------------------------------------===//
 // ARTIQ Runtime Builder
@@ -137,9 +189,26 @@ class ARTIQRuntimeBuilder {
         return call.getResult();
     }
 
+    void waitUntilMu(Value time)
+    {
+        ensureWaitUntilMuFunc();
+        auto func = getModule().lookupSymbol<LLVM::LLVMFuncOp>(ARTIQFuncNames::waitUntilMu);
+        auto call = LLVM::CallOp::create(builder, getLoc(), func, ValueRange{time});
+        call.setTailCallKind(LLVM::TailCallKind::Tail);
+    }
+
     // Duration conversion
     Value secToMu(Value durationSec)
     {
+        // Constant fold if the duration is a known constant
+        if (auto cst = durationSec.getDefiningOp<arith::ConstantOp>()) {
+            if (auto fAttr = dyn_cast<FloatAttr>(cst.getValue())) {
+                double sec = fAttr.getValueAsDouble();
+                int64_t mu =
+                    static_cast<int64_t>(std::round(sec / ARTIQHardwareConfig::nanosecondPeriod));
+                return constI64(mu);
+            }
+        }
         ensureSecToMuFunc();
         auto func = getModule().lookupSymbol<LLVM::LLVMFuncOp>(ARTIQFuncNames::secToMu);
         auto call = LLVM::CallOp::create(builder, getLoc(), func, ValueRange{durationSec});
@@ -207,10 +276,69 @@ class ARTIQRuntimeBuilder {
         return call.getResult();
     }
 
+    /// i64 rtio_input_timestamp(i64 deadline_mu, i32 channel), returns timestamp or -1.
+    Value rtioInputTimestamp(Value deadlineMu, Value inputChannelI32)
+    {
+        auto func = ensureFunc(ARTIQFuncNames::rtioInputTimestamp,
+                               LLVM::LLVMFunctionType::get(i64Ty, {i64Ty, i32Ty}));
+        auto call =
+            LLVM::CallOp::create(builder, getLoc(), func, ValueRange{deadlineMu, inputChannelI32});
+        return call.getResult();
+    }
+
     // TTL operations
     void ttlOn(Value channelAddr) { rtioOutput(channelAddr, constI32(1)); }
 
     void ttlOff(Value channelAddr) { rtioOutput(channelAddr, constI32(0)); }
+
+    /// void __rtio_gate_rising_mu(i32 sens_addr, i64 duration_mu)
+    void gateRisingMu(Value sensAddr, Value durationMu)
+    {
+        auto func = ensureFunc(ARTIQFuncNames::gateRisingMu,
+                               LLVM::LLVMFunctionType::get(voidTy, {i32Ty, i64Ty}));
+        LLVM::CallOp::create(builder, getLoc(), func, ValueRange{sensAddr, durationMu});
+    }
+
+    /// void __rtio_mock_measure(i64 start_mu, i32 ttl7_addr, i64 photon_count)
+    void mockMeasure(Value startMu, Value ttl7Addr, Value photonCount)
+    {
+        auto func = ensureFunc(ARTIQFuncNames::mockMeasure,
+                               LLVM::LLVMFunctionType::get(voidTy, {i64Ty, i32Ty, i64Ty}));
+        LLVM::CallOp::create(builder, getLoc(), func, ValueRange{startMu, ttl7Addr, photonCount});
+    }
+
+    /// i32 __rtio_count(i64 deadline, i32 channel), returns number of edges.
+    Value rtioCount(Value deadline, Value channel)
+    {
+        auto func = ensureFunc(ARTIQFuncNames::rtioCount,
+                               LLVM::LLVMFunctionType::get(i32Ty, {i64Ty, i32Ty}));
+        auto call = LLVM::CallOp::create(builder, getLoc(), func, ValueRange{deadline, channel});
+        return call.getResult();
+    }
+
+    /// Get the measurement channel addresses from the device_db
+    static MeasurementChannelAddrs getMeasurementChannelAddresses(ModuleOp module)
+    {
+        MeasurementChannelAddrs out;
+        auto configAttr = module->getAttrOfType<ConfigAttr>(ConfigAttr::getModuleAttrName());
+        if (!configAttr) {
+            return out;
+        }
+
+        static constexpr StringRef kDb = "device_db";
+        static constexpr StringRef kArgs = "arguments";
+        static constexpr StringRef kCh = "channel";
+
+        int64_t ttl0Raw = device_db_detail::intAtPath(configAttr, {kDb, "ttl0", kArgs, kCh});
+        int64_t ttl6Raw = device_db_detail::intAtPath(configAttr, {kDb, "ttl6", kArgs, kCh});
+        int64_t ttl7Raw = device_db_detail::intAtPath(configAttr, {kDb, "ttl7", kArgs, kCh});
+
+        out.gateRisingAddr = static_cast<int32_t>((ttl0Raw << 8) | 2);
+        out.countChannel = static_cast<int32_t>(ttl0Raw);
+        out.acquisitionOutputAddr = static_cast<int32_t>(ttl6Raw << 8);
+        out.dmdOutputAddr = static_cast<int32_t>(ttl7Raw << 8);
+        return out;
+    }
 
     // Constant creation helpers
     Value constI32(int32_t val)
@@ -238,9 +366,18 @@ class ARTIQRuntimeBuilder {
     /// This should be called before lowering patterns that depend on these functions.
     void ensureHelperFunctions()
     {
+        // Timing helpers
         ensureSecToMuFunc();
+        ensureWaitUntilMuFunc();
+
+        // Frequency setting
         ensureConfigSpiFunc();
         ensureSetFrequencyFunc();
+
+        // Measurement helper functions
+        ensureGateRisingMuFunc();
+        ensureMockMeasureFunc();
+        ensureCountFunc();
     }
 
   private:
@@ -423,31 +560,186 @@ class ARTIQRuntimeBuilder {
         auto configAttr = module->getAttrOfType<ConfigAttr>(ConfigAttr::getModuleAttrName());
         assert(configAttr && "rtio.config attribute not found on module");
 
-        auto getChannel = [&](ArrayRef<StringRef> path) -> int64_t {
-            Attribute current = configAttr;
-            for (StringRef key : path) {
-                if (auto dict = dyn_cast<DictionaryAttr>(current)) {
-                    current = dict.get(key);
-                }
-                else if (auto cfg = dyn_cast<ConfigAttr>(current)) {
-                    current = cfg.get(key);
-                }
-                else {
-                    return 0;
-                }
-            }
-            return cast<IntegerAttr>(current).getInt();
-        };
-
-        int64_t spiChannel = getChannel({"device_db", "spi_urukul0", "arguments", "channel"});
+        int64_t spiChannel = device_db_detail::intAtPath(
+            configAttr, {"device_db", "spi_urukul0", "arguments", "channel"});
         // chip_select from urukul0_ch0 is the base CS (typically 4)
         // ch0->CS=4, ch1->CS=5, ch2->CS=6, ch3->CS=7
-        int64_t csBase = getChannel({"device_db", "urukul0_ch0", "arguments", "chip_select"});
-        int64_t ioUpdateChannel =
-            getChannel({"device_db", "ttl_urukul0_io_update", "arguments", "channel"});
+        int64_t csBase = device_db_detail::intAtPath(
+            configAttr, {"device_db", "urukul0_ch0", "arguments", "chip_select"});
+        int64_t ioUpdateChannel = device_db_detail::intAtPath(
+            configAttr, {"device_db", "ttl_urukul0_io_update", "arguments", "channel"});
 
         return {static_cast<int32_t>(spiChannel << 8), static_cast<int32_t>(csBase),
                 static_cast<int32_t>(ioUpdateChannel << 8)};
+    }
+
+    /// Opens the TTL0 sensitivity gate for `duration_mu`
+    void ensureGateRisingMuFunc()
+    {
+        auto module = getModule();
+        if (module.lookupSymbol<LLVM::LLVMFuncOp>(ARTIQFuncNames::gateRisingMu)) {
+            return;
+        }
+
+        OpBuilder::InsertionGuard guard(builder);
+        builder.setInsertionPointToStart(module.getBody());
+
+        auto funcTy = LLVM::LLVMFunctionType::get(voidTy, {i32Ty, i64Ty});
+        auto func = LLVM::LLVMFuncOp::create(builder, getLoc(), ARTIQFuncNames::gateRisingMu,
+                                             funcTy, LLVM::Linkage::Internal);
+        Block *entry = func.addEntryBlock(builder);
+        builder.setInsertionPointToStart(entry);
+
+        Value sensAddr = entry->getArgument(0);
+        Value durationMu = entry->getArgument(1);
+
+        rtioOutput(sensAddr, constI32(1));
+        delayMu(durationMu);
+        rtioOutput(sensAddr, constI32(0));
+        LLVM::ReturnOp::create(builder, getLoc(), ValueRange{});
+    }
+
+    /// Simulated photon events:
+    /// ```
+    /// for i in 0..<photon_count>:
+    ///     fire TTL7 at start_mu + leadMu + i * periodMu
+    /// ```
+    void ensureMockMeasureFunc()
+    {
+        auto module = getModule();
+        if (module.lookupSymbol<LLVM::LLVMFuncOp>(ARTIQFuncNames::mockMeasure)) {
+            return;
+        }
+
+        OpBuilder::InsertionGuard guard(builder);
+        builder.setInsertionPointToStart(module.getBody());
+
+        auto funcTy = LLVM::LLVMFunctionType::get(voidTy, {i64Ty, i32Ty, i64Ty});
+        auto func = LLVM::LLVMFuncOp::create(builder, getLoc(), ARTIQFuncNames::mockMeasure, funcTy,
+                                             LLVM::Linkage::Internal);
+        Block *entry = func.addEntryBlock(builder);
+        builder.setInsertionPointToStart(entry);
+
+        Value startMu = entry->getArgument(0);
+        Value ttl7Addr = entry->getArgument(1);
+        Value photonCount = entry->getArgument(2);
+
+        Value periodMu = constI64(ARTIQHardwareConfig::simPhotonPeriodMu);
+        Value leadMu = constI64(ARTIQHardwareConfig::measurementPhotonLeadMu);
+        Value onMu = constI64(ARTIQHardwareConfig::simPhotonPulseOnMu);
+
+        Block *loopHead = new Block();
+        Block *body = new Block();
+        Block *exit = new Block();
+        func.getBody().push_back(loopHead);
+        func.getBody().push_back(body);
+        func.getBody().push_back(exit);
+        loopHead->addArgument(i64Ty, getLoc());
+
+        Value c0 = constI64(0);
+        LLVM::BrOp::create(builder, getLoc(), ValueRange{c0}, loopHead);
+
+        builder.setInsertionPointToStart(loopHead);
+        Value iv = loopHead->getArgument(0);
+        Value cond =
+            arith::CmpIOp::create(builder, getLoc(), arith::CmpIPredicate::slt, iv, photonCount);
+        LLVM::CondBrOp::create(builder, getLoc(), cond, body, exit);
+
+        builder.setInsertionPointToStart(body);
+        Value offset = arith::MulIOp::create(builder, getLoc(), iv, periodMu);
+        Value base = arith::AddIOp::create(builder, getLoc(), startMu, leadMu);
+        Value tPulse = arith::AddIOp::create(builder, getLoc(), base, offset);
+        atMu(tPulse);
+        ttlOn(ttl7Addr);
+        delayMu(onMu);
+        ttlOff(ttl7Addr);
+        Value ivNext = arith::AddIOp::create(builder, getLoc(), iv, constI64(1));
+        LLVM::BrOp::create(builder, getLoc(), ValueRange{ivNext}, loopHead);
+
+        builder.setInsertionPointToStart(exit);
+        LLVM::ReturnOp::create(builder, getLoc(), ValueRange{});
+    }
+
+    /// Count the number of edges on the given channel before the deadline
+    /// ```
+    /// count = 0
+    /// while rtio_input_timestamp(deadline, channel) > -1:
+    ///     count++
+    /// return count
+    /// ```
+    void ensureCountFunc()
+    {
+        auto module = getModule();
+        if (module.lookupSymbol<LLVM::LLVMFuncOp>(ARTIQFuncNames::rtioCount)) {
+            return;
+        }
+
+        OpBuilder::InsertionGuard guard(builder);
+        builder.setInsertionPointToStart(module.getBody());
+
+        auto funcTy = LLVM::LLVMFunctionType::get(i32Ty, {i64Ty, i32Ty});
+        auto func = LLVM::LLVMFuncOp::create(builder, getLoc(), ARTIQFuncNames::rtioCount, funcTy,
+                                             LLVM::Linkage::Internal);
+        Block *entry = func.addEntryBlock(builder);
+        builder.setInsertionPointToStart(entry);
+
+        Value deadline = entry->getArgument(0);
+        Value channel = entry->getArgument(1);
+
+        Block *loopHead = new Block();
+        Block *done = new Block();
+        func.getBody().push_back(loopHead);
+        func.getBody().push_back(done);
+        loopHead->addArgument(i32Ty, getLoc());
+
+        LLVM::BrOp::create(builder, getLoc(), ValueRange{constI32(0)}, loopHead);
+
+        builder.setInsertionPointToStart(loopHead);
+        Value count = loopHead->getArgument(0);
+        Value ts = rtioInputTimestamp(deadline, channel);
+        Value more =
+            arith::CmpIOp::create(builder, getLoc(), arith::CmpIPredicate::sgt, ts, constI64(-1));
+        Value countNext = arith::AddIOp::create(builder, getLoc(), count, constI32(1));
+        LLVM::CondBrOp::create(builder, getLoc(), more, loopHead, ValueRange{countNext}, done,
+                               ValueRange{});
+
+        builder.setInsertionPointToStart(done);
+        LLVM::ReturnOp::create(builder, getLoc(), ValueRange{count});
+    }
+
+    /// Busy-wait until the counter >= time
+    void ensureWaitUntilMuFunc()
+    {
+        auto module = getModule();
+        if (module.lookupSymbol<LLVM::LLVMFuncOp>(ARTIQFuncNames::waitUntilMu))
+            return;
+
+        OpBuilder::InsertionGuard guard(builder);
+        builder.setInsertionPointToStart(module.getBody());
+
+        auto funcTy = LLVM::LLVMFunctionType::get(voidTy, {i64Ty});
+        auto func = LLVM::LLVMFuncOp::create(builder, getLoc(), ARTIQFuncNames::waitUntilMu, funcTy,
+                                             LLVM::Linkage::Internal);
+        Block *entry = func.addEntryBlock(builder);
+        builder.setInsertionPointToStart(entry);
+
+        Value time = entry->getArgument(0);
+
+        Block *loopHead = new Block();
+        Block *exit = new Block();
+        func.getBody().push_back(loopHead);
+        func.getBody().push_back(exit);
+
+        LLVM::BrOp::create(builder, getLoc(), ValueRange{}, loopHead);
+
+        builder.setInsertionPointToStart(loopHead);
+        Value counter = rtioGetCounter();
+        Value cond =
+            arith::CmpIOp::create(builder, getLoc(), arith::CmpIPredicate::slt, counter, time);
+        LLVM::CondBrOp::create(builder, getLoc(), cond, loopHead, ValueRange{}, exit, ValueRange{});
+
+        builder.setInsertionPointToStart(exit);
+        LLVM::ReturnOp::create(builder, getLoc(), ValueRange{});
     }
 };
 
