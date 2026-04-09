@@ -19,6 +19,7 @@ from typing import cast
 import pytest
 from xdsl.dialects import test
 from xdsl.dialects.builtin import (
+    Float64Type,
     IndexType,
     IntegerAttr,
     IntegerType,
@@ -59,6 +60,7 @@ expected_ops_names = {
     "PauliZOp": "qecp.z",
     "HadamardOp": "qecp.hadamard",
     "SOp": "qecp.s",
+    "RotOp": "qecp.rot",
     "CnotOp": "qecp.cnot",
     "MeasureOp": "qecp.measure",
     "AssembleTannerGraphOp": "qecp.assemble_tanner",
@@ -272,6 +274,34 @@ class TestQecPhysicalOps:
         assert hadamard_op.operand_types[0] == qubit.type
         assert len(hadamard_op.result_types) == 1
         assert hadamard_op.result_types[0] == qubit.type
+
+    @pytest.mark.parametrize(
+        "qubit",
+        [
+            create_ssa_value(qecp.QecPhysicalQubitType("data")),
+            create_ssa_value(qecp.QecPhysicalQubitType("aux")),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "phi, theta, omega",
+        [
+            (
+                create_ssa_value(Float64Type()),
+                create_ssa_value(Float64Type()),
+                create_ssa_value(Float64Type()),
+            ),
+        ],
+    )
+    def test_qecp_op_constructor_hadamard(self, phi, theta, omega, qubit):
+        """Test the constructor of the qecp.rot op."""
+        rot_op = qecp.RotOp(phi, theta, omega, qubit)
+        assert len(rot_op.operands) == 4
+        assert rot_op.operand_types[0] == phi.type
+        assert rot_op.operand_types[1] == theta.type
+        assert rot_op.operand_types[2] == omega.type
+        assert rot_op.operand_types[3] == qubit.type
+        assert len(rot_op.result_types) == 1
+        assert rot_op.result_types[0] == qubit.type
 
     @pytest.mark.parametrize(
         "qubit",
