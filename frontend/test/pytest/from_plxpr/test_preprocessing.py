@@ -629,8 +629,6 @@ class TestIntegration:
         assert f2_pipelines[0][1][0].pass_name == "cancel-inverses"
 
         if skip_preprocess:
-            for w in recwarn:
-                print(w)
             assert len(f1_pipelines) == 1
             assert len(f2_pipelines) == 1
             assert len(recwarn) == 0
