@@ -154,6 +154,8 @@ Core::ChosenDecompRule DecompositionSolver::solveOperator(const Core::OperatorNo
     auto chosen = graph.isTargetGate(op) ? basisRule(op) : bestRule(op);
 
     if (!isInvalidRule(chosen)) {
+        std::cerr << "Solved operator: " << Core::print_op(op) << " with rule: " << chosen.ruleName
+                  << " (cost: " << chosen.totalCost << ")\n";
         solvedMap.emplace(op, chosen);
     }
     return chosen;
@@ -182,6 +184,9 @@ Core::GraphResult DecompositionSolver::solve()
     for (const auto &[op, entry] : solvedMap) {
         result.optimizedMap.emplace(op, entry);
     }
+
+    graph.showGraph();    // Debug: show the graph structure
+    showSolution(result); // Debug: show the partial solution before failure
 
     return result;
 }

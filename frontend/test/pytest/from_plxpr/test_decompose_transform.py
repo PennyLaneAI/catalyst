@@ -90,6 +90,7 @@ class TestGraphDecomposition:
         @graph_decomposition(
             gate_set={"H", "CZ", "GlobalPhase"},
             alt_decomps={qml.CNOT: [my_cnot]},
+            # _builtin_rule_path=None,
         )
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
@@ -137,6 +138,7 @@ class TestGraphDecomposition:
                 qml.Rot: rz_ry_rz,
                 qml.PauliY: ry_gp,
             },
+            # _builtin_rule_path=None,
         )
         @qml.qnode(qml.device("lightning.qubit", wires=3))
         def circuit():
@@ -268,7 +270,6 @@ class TestGraphDecomposition:
             qml.IsingXX(x, wires)
 
         @qml.qjit(capture=True)
-        # @qml.decompose(gate_set=qml.gate_sets.ROTATIONS_PLUS_CNOT)
         @graph_decomposition(
             gate_set=qml.gate_sets.ROTATIONS_PLUS_CNOT,
         )

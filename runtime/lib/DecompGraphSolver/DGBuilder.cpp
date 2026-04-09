@@ -122,11 +122,14 @@ struct DecompositionGraph::Impl {
             }
 
             const auto fixedIt = fixedDecomps.find(op);
+            std::cerr << "Processing operator: " << Core::print_op(op) << "\n";
             if (fixedIt != fixedDecomps.end()) {
+                std::cerr << "  Found fixed rule: " << fixedIt->second.name << "\n";
                 effectiveRules.push_back(
                     markRuleOrigin(fixedIt->second, Core::RuleOrigin::Fixed, op));
             }
             else {
+                std::cerr << "  No fixed rule found.\n";
                 const auto baseIt = baseByOutput.find(op);
                 if (baseIt != baseByOutput.end()) {
                     for (const auto &rule : baseIt->second) {
@@ -294,6 +297,9 @@ void DecompositionGraph::showGraph() const
         }
         else if (rule.origin == Core::RuleOrigin::Alternative) {
             std::cerr << " [alt]";
+        }
+        else {
+            std::cerr << " [default]";
         }
         std::cerr << "\n";
         std::cerr << "    Output: " << Core::print_op(rule.output) << "\n";
