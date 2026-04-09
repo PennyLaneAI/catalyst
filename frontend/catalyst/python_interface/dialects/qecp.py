@@ -687,7 +687,7 @@ class CnotOp(IRDLOperation):
             result_types=(in_ctrl_qubit_type, in_trgt_qubit_type),
         )
 
-
+@irdl_op_definition
 class RotOp(IRDLOperation):
     """A physical Rot gate operation.
 
@@ -698,6 +698,8 @@ class RotOp(IRDLOperation):
     """
 
     T: ClassVar = VarConstraint("T", anyPhysicalQubit)
+
+    name = "qecp.rot"
 
     assembly_format = """
            `(` $phi `,` $theta `,` $omega `)` $in_qubit attr-dict `:` type($out_qubit)
