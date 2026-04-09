@@ -53,38 +53,47 @@ def test_qjit_abstracted_axes(capture_mode):
     assert "tensor<?xi64>" in identity.mlir, identity.mlir
 
 
-def test_qnode_abstracted_axis():
+def test_qnode_abstracted_axis(capture_mode):
     """Test that qnode accepts dynamical arguments."""
 
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def circuit(a):
-        return a
+        assert qml.math.is_abstract(a.shape[0])
+        s = jnp.sum(a)
+        qml.RX(s, 0)
+        return qml.expval(qml.Z(0))
 
-    @qjit(abstracted_axes={0: "n"})
-    def identity(a):
+    @qjit(abstracted_axes={0: "n"}, capture=capture_mpde)
+    def workflow(a):
         return circuit(a)
 
     param = jnp.array([1, 2, 3])
-    result = identity(param)
+    result = workflow(param)
+    expected = jnp.cos(jnp.sum(param))
 
-    assert_array_and_dtype_equal(param, result)
-    assert "tensor<?xi64>" in identity.mlir, identity.mlir
+    assert_array_and_dtype_equal(expected, result)
+    assert "tensor<?xi64>" in workflow.mlir, workflow.mlir
 
 
-def test_qnode_dynamic_structured_args():
+def test_qnode_dynamic_structured_args(capture_mode):
     """Test that qnode accepts dynamically-shaped structured args"""
 
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def circuit(a_b):
-        return a_b[0] + a_b[1]
+        x = a_b[0] + a_b[1]
+        assert qml.math.is_abstract(x.shape[0])
+        phi = jnp.sum(x)
+        qml.RX(phi, 0)
+        return qml.expval(qml.Z(0))
 
-    @qjit(abstracted_axes={0: "n"})
+    @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
     def func(a_b):
         return circuit(a_b)
 
     param = jnp.array([1, 2, 3])
     c = func((param, param))
-    assert_array_and_dtype_equal(c, param + param)
+    expected = jnp.cos(2 * jnp.sum(param))
+    assert_array_and_dtype_equal(c, expected)
     assert "tensor<?xi64>" in func.mlir, func.mlir
 
 

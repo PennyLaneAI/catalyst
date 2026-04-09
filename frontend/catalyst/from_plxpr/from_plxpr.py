@@ -42,7 +42,7 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
-from catalyst.jax_extras.patches import patched_make_eqn
+from catalyst.jax_extras.patches import get_jax_patches
 from catalyst.jax_primitives import (
     device_init_p,
     device_release_p,
@@ -59,7 +59,12 @@ from .qubit_handler import (
     QubitIndexRecorder,
 )
 
-
+# dummy hop (higher order primitive) is used to just return a jaxpr
+# produced inside of a another jaxpr
+# for some reason, dynamic shapes only work if the same tracers are used as inputs
+# to capture the plxpr and as the arguments to the from_plxpr translation
+# this is really weird, but it works
+# used inside trace_from_pennylane
 _dummy_hop = jax.extend.core.Primitive("dummy_hop")
 _dummy_hop.multiple_results = True
 
@@ -219,14 +224,8 @@ def from_plxpr(
     )
     original_fn = partial(interpreter.eval, plxpr.jaxpr, plxpr.consts)
 
-    # pylint: disable=import-outside-toplevel
-    from jax._src.interpreters.partial_eval import DynamicJaxprTrace
-
     def wrapped_fn(*args, **kwargs):
-        with Patcher(
-            (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
-        ):
-            return jax.make_jaxpr(original_fn)(*args, **kwargs)
+        return jax.make_jaxpr(original_fn)(*args, **kwargs)
 
     return wrapped_fn
 
@@ -570,47 +569,22 @@ def trace_from_pennylane(
         PyTreeDef: PyTree metadata of the function output
     """
 
-    # pylint: disable=import-outside-toplevel
-    import jax._src.interpreters.partial_eval as pe
-    from jax._src.interpreters.partial_eval import DynamicJaxprTrace
-    from jax._src.lax import lax
-    from jax._src.pjit import jit_p
-
-    from catalyst.jax_extras.patches import (
-        get_aval2,
-        patched_drop_unused_vars,
-        patched_dyn_shape_staging_rule,
-        patched_pjit_staging_rule,
-    )
-    from catalyst.utils.patching import DictPatchWrapper
+    if isinstance(fn, qml.QNode) and static_argnums:
+        # `make_jaxpr2` sees the qnode
+        # The static_argnum on the wrapped function takes precedence over the
+        # one in `make_jaxpr`
+        # https://github.com/jax-ml/jax/blob/636691bba40b936b8b64a4792c1d2158296e9dd4/jax/_src/linear_util.py#L231
+        # Therefore we need to coordinate them manually
+        fn.static_argnums = static_argnums
 
     with transient_jax_config(
         {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
-    ), Patcher(
-        (pe, "_drop_unused_vars", patched_drop_unused_vars),
-        (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
-        (lax, "_dyn_shape_staging_rule", patched_dyn_shape_staging_rule),
-        (
-            jax._src.pjit,  # pylint: disable=protected-access
-            "pjit_staging_rule",
-            patched_pjit_staging_rule,
-        ),
-        (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
-        (pe, "get_aval", get_aval2),
-    ):
+    ), Patcher(*get_jax_patches()):
 
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
             "abstracted_axes": abstracted_axes,
         }
-
-        if isinstance(fn, qml.QNode) and static_argnums:
-            # `make_jaxpr2` sees the qnode
-            # The static_argnum on the wrapped function takes precedence over the
-            # one in `make_jaxpr`
-            # https://github.com/jax-ml/jax/blob/636691bba40b936b8b64a4792c1d2158296e9dd4/jax/_src/linear_util.py#L231
-            # Therefore we need to coordinate them manually
-            fn.static_argnums = static_argnums
 
         def wrapper(*inner_args, **inner_kwargs):
             plxpr, out_type, out_treedef = make_jaxpr2(
