@@ -3,6 +3,7 @@ set(LIBRARY_NAME qref-transforms)
 
 file(GLOB SRC
     value_semantics_conversion.cpp
+    verify_no_quantum_use_after_free.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
