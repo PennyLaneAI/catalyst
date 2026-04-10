@@ -19,9 +19,12 @@
 
 // CHECK-LABEL: func.func public @circ_no_overlap
 // CHECK-SAME: () -> (f64, f64, f64) attributes {quantum.node}
-// CHECK: quantum.namedobs %{{.*}}[ PauliZ]
-// CHECK: quantum.namedobs %{{.*}}[ PauliX]
-// CHECK: quantum.namedobs %{{.*}}[ PauliY]
+// CHECK: %[[Q0:.*]] = quantum.extract %{{.*}}[ 0]
+// CHECK: %[[Q1:.*]] = quantum.extract %{{.*}}[ 1]
+// CHECK: %[[Q2:.*]] = quantum.extract %{{.*}}[ 2]
+// CHECK: quantum.namedobs %[[Q0]][ PauliZ]
+// CHECK: quantum.namedobs %[[Q1]][ PauliX]
+// CHECK: quantum.namedobs %[[Q2]][ PauliY]
 // CHECK: quantum.expval
 // CHECK: quantum.expval
 // CHECK: quantum.expval
@@ -65,8 +68,10 @@ module {
 // CHECK: %[[SHOTS0:.*]] = arith.constant 50
 // CHECK: quantum.device shots(%[[SHOTS0]])
 // CHECK: quantum.alloc
-// CHECK: %[[OBS_Z0:.*]] = quantum.namedobs %{{.*}}[ PauliZ]
-// CHECK: %[[OBS_X1:.*]] = quantum.namedobs %{{.*}}[ PauliX]
+// CHECK: %[[Q0:.*]] = quantum.extract %{{.*}}[ 0]
+// CHECK: %[[Q1:.*]] = quantum.extract %{{.*}}[ 1]
+// CHECK: %[[OBS_Z0:.*]] = quantum.namedobs %[[Q0]][ PauliZ]
+// CHECK: %[[OBS_X1:.*]] = quantum.namedobs %[[Q1]][ PauliX]
 // CHECK: %[[EV0:.*]] = quantum.expval %[[OBS_Z0]]
 // CHECK: %[[EV1:.*]] = quantum.expval %[[OBS_X1]]
 // CHECK: quantum.dealloc
@@ -78,7 +83,8 @@ module {
 // CHECK: %[[SHOTS1:.*]] = arith.constant 50
 // CHECK: quantum.device shots(%[[SHOTS1]])
 // CHECK: quantum.alloc
-// CHECK: %[[OBS_Y1:.*]] = quantum.namedobs %{{.*}}[ PauliY]
+// CHECK: %[[Q1:.*]] = quantum.extract %{{.*}}[ 1]
+// CHECK: %[[OBS_Y1:.*]] = quantum.namedobs %[[Q1]][ PauliY]
 // CHECK: %[[EV2:.*]] = quantum.expval %[[OBS_Y1]]
 // CHECK: quantum.dealloc
 // CHECK: quantum.device_release
@@ -120,8 +126,10 @@ module {
 // CHECK-SAME: () -> f64 attributes {quantum.node}
 // CHECK: %[[SHOTS0:.*]] = arith.constant 50
 // CHECK: quantum.device shots(%[[SHOTS0]])
-// CHECK: %[[OBS_Z0:.*]] = quantum.namedobs %{{.*}}[ PauliZ]
-// CHECK: %[[OBS_Z1:.*]] = quantum.namedobs %{{.*}}[ PauliZ]
+// CHECK: %[[Q0:.*]] = quantum.extract %{{.*}}[ 0]
+// CHECK: %[[Q1:.*]] = quantum.extract %{{.*}}[ 1]
+// CHECK: %[[OBS_Z0:.*]] = quantum.namedobs %[[Q0]][ PauliZ]
+// CHECK: %[[OBS_Z1:.*]] = quantum.namedobs %[[Q1]][ PauliZ]
 // CHECK: %[[TENSOR:.*]] = quantum.tensor %[[OBS_Z0]], %[[OBS_Z1]]
 // CHECK: %[[EV0:.*]] = quantum.expval %[[TENSOR]]
 // CHECK: return %[[EV0]]
@@ -130,8 +138,9 @@ module {
 // CHECK-SAME: () -> f64 attributes {quantum.node}
 // CHECK: %[[SHOTS1:.*]] = arith.constant 50
 // CHECK: quantum.device shots(%[[SHOTS1]])
+// CHECK: %[[Q0:.*]] = quantum.extract %{{.*}}[ 0]
 // CHECK-NOT: quantum.tensor
-// CHECK: %[[OBS_X0:.*]] = quantum.namedobs %{{.*}}[ PauliX]
+// CHECK: %[[OBS_X0:.*]] = quantum.namedobs %[[Q0]][ PauliX]
 // CHECK: %[[EV1:.*]] = quantum.expval %[[OBS_X0]]
 // CHECK: return %[[EV1]]
 
@@ -169,8 +178,10 @@ module {
 // CHECK-LABEL: func.func private @circ_dup.group.0
 // CHECK-SAME: () -> (f64, f64) attributes {quantum.node}
 // CHECK: quantum.alloc
-// CHECK: %[[OBS_Z0:.*]] = quantum.namedobs %{{.*}}[ PauliZ]
-// CHECK: %[[OBS_X1:.*]] = quantum.namedobs %{{.*}}[ PauliX]
+// CHECK: %[[Q0:.*]] = quantum.extract %{{.*}}[ 0]
+// CHECK: %[[Q1:.*]] = quantum.extract %{{.*}}[ 1]
+// CHECK: %[[OBS_Z0:.*]] = quantum.namedobs %[[Q0]][ PauliZ]
+// CHECK: %[[OBS_X1:.*]] = quantum.namedobs %[[Q1]][ PauliX]
 // CHECK: %[[EV0:.*]] = quantum.expval %[[OBS_Z0]]
 // CHECK: %[[EV1:.*]] = quantum.expval %[[OBS_X1]]
 // CHECK-NOT: quantum.expval
@@ -215,8 +226,10 @@ module {
 // CHECK: %[[SHOTS0:.*]] = arith.constant 50
 // CHECK: quantum.device shots(%[[SHOTS0]])
 // CHECK: quantum.alloc
-// CHECK: %[[OBS_Y0:.*]] = quantum.namedobs %{{.*}}[ PauliY]
-// CHECK: %[[OBS_X1:.*]] = quantum.namedobs %{{.*}}[ PauliX]
+// CHECK: %[[Q0:.*]] = quantum.extract %{{.*}}[ 0]
+// CHECK: %[[Q1:.*]] = quantum.extract %{{.*}}[ 1]
+// CHECK: %[[OBS_Y0:.*]] = quantum.namedobs %[[Q0]][ PauliY]
+// CHECK: %[[OBS_X1:.*]] = quantum.namedobs %[[Q1]][ PauliX]
 // CHECK: %[[EV0:.*]] = quantum.expval %[[OBS_Y0]]
 // CHECK: %[[EV1:.*]] = quantum.expval %[[OBS_X1]]
 // CHECK-NOT: quantum.tensor
@@ -227,8 +240,10 @@ module {
 // CHECK: %[[SHOTS1:.*]] = arith.constant 50
 // CHECK: quantum.device shots(%[[SHOTS1]])
 // CHECK: quantum.alloc
-// CHECK: quantum.namedobs %{{.*}}[ PauliX]
-// CHECK: quantum.namedobs %{{.*}}[ PauliX]
+// CHECK: %[[Q0:.*]] = quantum.extract %{{.*}}[ 0]
+// CHECK: %[[Q1:.*]] = quantum.extract %{{.*}}[ 1]
+// CHECK: quantum.namedobs %[[Q0]][ PauliX]
+// CHECK: quantum.namedobs %[[Q1]][ PauliX]
 // CHECK: %[[TENSOR:.*]] = quantum.tensor
 // CHECK: %[[EV2:.*]] = quantum.expval %[[TENSOR]]
 // CHECK: return %[[EV2]]
@@ -262,9 +277,12 @@ module {
 
 // CHECK-LABEL: func.func public @circ_ham.single_terms
 // CHECK-SAME: attributes {quantum.node}
-// CHECK: quantum.namedobs %{{.*}}[ PauliZ]
-// CHECK: quantum.namedobs %{{.*}}[ PauliX]
-// CHECK: quantum.namedobs %{{.*}}[ PauliY]
+// CHECK: %[[Q0:.*]] = quantum.extract %{{.*}}[ 0]
+// CHECK: %[[Q1:.*]] = quantum.extract %{{.*}}[ 1]
+// CHECK: %[[Q2:.*]] = quantum.extract %{{.*}}[ 2]
+// CHECK: quantum.namedobs %[[Q0]][ PauliZ]
+// CHECK: quantum.namedobs %[[Q1]][ PauliX]
+// CHECK: quantum.namedobs %[[Q2]][ PauliY]
 // CHECK: quantum.expval
 // CHECK: quantum.expval
 // CHECK: quantum.expval
@@ -321,8 +339,10 @@ module {
 // CHECK-SAME: () -> (tensor<f64>, tensor<f64>) attributes {quantum.node}
 // CHECK: %[[SHOTS0:.*]] = arith.constant 50
 // CHECK: quantum.device shots(%[[SHOTS0]])
-// CHECK: quantum.namedobs %{{.*}}[ PauliZ]
-// CHECK: quantum.namedobs %{{.*}}[ PauliX]
+// CHECK: %[[Q0:.*]] = quantum.extract %{{.*}}[ 0]
+// CHECK: %[[Q1:.*]] = quantum.extract %{{.*}}[ 1]
+// CHECK: quantum.namedobs %[[Q0]][ PauliZ]
+// CHECK: quantum.namedobs %[[Q1]][ PauliX]
 // CHECK: quantum.expval
 // CHECK: quantum.expval
 // CHECK: return
@@ -331,7 +351,8 @@ module {
 // CHECK-SAME: () -> tensor<f64> attributes {quantum.node}
 // CHECK: %[[SHOTS1:.*]] = arith.constant 50
 // CHECK: quantum.device shots(%[[SHOTS1]])
-// CHECK: quantum.namedobs %{{.*}}[ PauliY]
+// CHECK: %[[Q1:.*]] = quantum.extract %{{.*}}[ 1]
+// CHECK: quantum.namedobs %[[Q1]][ PauliY]
 // CHECK: quantum.expval
 // CHECK: return
 
