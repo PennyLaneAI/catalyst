@@ -579,6 +579,7 @@
   [(#2320)](https://github.com/PennyLaneAI/catalyst/pull/2320)
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
   [(#2492)](https://github.com/PennyLaneAI/catalyst/pull/2492)
+  [(#2674)](https://github.com/PennyLaneAI/catalyst/pull/2674)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
@@ -607,6 +608,10 @@
   An MLIR program in the `QRef` dialect can be converted to the `Quantum` dialect with the new pass
   `--convert-to-value-semantics`, optionally followed by `--canonicalize` for removing pairs of
   neighboring inverse `quantum.extract` and `quantum.insert` operations.
+
+* A new pass `--verify-no-quantum-use-after-free` was added to the new `QRef` dialect, to verify
+  that there are no uses of quantum values after they have been deallocated.
+  [(#2674)](https://github.com/PennyLaneAI/catalyst/pull/2674)
 
 * Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
   Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
@@ -763,8 +768,12 @@
 * A new compiler pass `split-non-commuting` has been added for QNode functions that measure
   non-commuting observables. It facilitates execution on devices that don't natively support
   measuring multiple non-commuting observables simultaneously by splitting them into separate
-  circuit executions, one group per observable for now.
+  circuit executions. The pass supports a `grouping_strategy` option: the default (`None`) assigns
+  each observable to its own group, while `"wires"` groups observables on non-overlapping wires into
+  the same execution, reducing the total number of generated circuits. Duplicate observables are
+  measured only once and their results are reused.
   [(#2437)](https://github.com/PennyLaneAI/catalyst/pull/2437)
+  [(#2657)](https://github.com/PennyLaneAI/catalyst/pull/2657)
 
   **Relationship to `split-to-single-terms`:** The `split-non-commuting` pass internally runs
   `split-to-single-terms` first when processing Hamiltonian expectation values. The
@@ -779,7 +788,7 @@
   from catalyst import qjit
 
   @qjit
-  @qml.transform(pass_name="split-non-commuting")
+  @qml.transform(pass_name="split-non-commuting")(grouping_strategy="wires")
   @qml.qnode(qml.device("lightning.qubit", wires=3))
   def circuit():
       # Hamiltonian H = Z(0) + 2 * X(0) + 3 * Identity
@@ -842,6 +851,7 @@
   [(#2544)](https://github.com/PennyLaneAI/catalyst/pull/2544)
   [(#2547)](https://github.com/PennyLaneAI/catalyst/pull/2547)
   [(#2549)](https://github.com/PennyLaneAI/catalyst/pull/2549)
+  [(#2665)](https://github.com/PennyLaneAI/catalyst/pull/2665)
 
 * An experimental *QEC Physical* MLIR dialect has been added. An equivalent xDSL dialect has also
   been added for compatibility with the Python interface to Catalyst.
