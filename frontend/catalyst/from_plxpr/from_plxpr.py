@@ -61,10 +61,9 @@ from .qubit_handler import (
 
 # dummy hop (higher order primitive) is used to just return a jaxpr
 # produced inside of a another jaxpr
-# for some reason, dynamic shapes only work if the same tracers are used as inputs
-# to capture the plxpr and as the arguments to the from_plxpr translation
-# this is really weird, but it works
-# used inside trace_from_pennylane
+# we want to have the same tracers as inputs to plxpr capture and from_plxpr
+# translation, as this tells jax which inputs match which dynamic shapes
+# if we have concrete inputs to both, jax will get confused.
 _dummy_hop = jax.extend.core.Primitive("dummy_hop")
 _dummy_hop.multiple_results = True
 
@@ -607,6 +606,12 @@ def trace_from_pennylane(
             "abstracted_axes": abstracted_axes,
         }
 
+        # we want to have the same tracers as inputs to plxpr capture and from_plxpr
+        # translation, as this tells jax which inputs match which dynamic shapes
+        # if we have concrete inputs to both, jax will get confused.
+        # instead of passing in abstracted_axes, we pass in arguments with the
+        # dynamic shapes in the right place matching the correct inputs.
+        # really confusing, but this solution mostly seems to work
         def wrapper(*inner_args, **inner_kwargs):
             plxpr, out_type, out_treedef = make_jaxpr2(
                 fn, static_argnums=static_argnums, debug_info=debug_info
