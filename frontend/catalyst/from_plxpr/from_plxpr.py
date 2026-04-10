@@ -544,7 +544,7 @@ def _extract_abstract_shapes(flat_inputs):
     for a in flat_inputs:
         for s in a.shape:
             # need to us "is" for comparing tracers
-            if not isinstance(s, int) and not any(s is a for a in abstract_shapes):
+            if not isinstance(s, int) and not any(s is _a for _a in abstract_shapes):
                 abstract_shapes.append(s)
     return abstract_shapes
 
