@@ -387,6 +387,10 @@
   This behaviour matches the behaviour of the tape transform `measurements_from_samples` in PennyLane.
   [(#2617)](https://github.com/PennyLaneAI/catalyst/pull/2617)
 
+* The `measurements-from-samples` pass is refactored to follow the conventions for a qnode transform
+  as they are described in `catalyst.python_interace.transforms.qnode-transform-guide.md`.
+  [(#2605)](https://github.com/PennyLaneAI/catalyst/pull/2605)
+
 * A more informative error message is now raised when a `measurements-from-samples` xDSL pass encounters a
   program with dyanamic shots.
   [#2616](https://github.com/PennyLaneAI/catalyst/pull/2616)
