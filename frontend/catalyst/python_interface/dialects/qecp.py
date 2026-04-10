@@ -703,7 +703,7 @@ class RotOp(IRDLOperation):
     name = "qecp.rot"
 
     assembly_format = """
-           `(` $phi `,` $theta `,` $omega `)` $in_qubit attr-dict `:` type($out_qubit)
+           `(` $phi `,` $theta `,` $omega `)` $in_qubit attr-dict `:` type($in_qubit)
         """
 
     phi = operand_def(Float64Type())
