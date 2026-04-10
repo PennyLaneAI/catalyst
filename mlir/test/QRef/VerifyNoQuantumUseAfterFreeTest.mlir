@@ -74,3 +74,13 @@ func.func @test_use_after_free_alias() {
     qref.custom "PauliX"() %q_alias : !qref.bit
     return
 }
+
+// -----
+
+func.func @test_no_errors() {
+    %r = qref.alloc(3) : !qref.reg<3>
+    %q = qref.get %r[0] : !qref.reg<3> -> !qref.bit
+    qref.custom "PauliX"() %q : !qref.bit
+    qref.dealloc %r : !qref.reg<3>
+    return
+}
