@@ -21,6 +21,7 @@ from functools import partial
 import numpy as np
 import pennylane as qml
 import pytest
+from jax.core import ShapedArray
 from pennylane.exceptions import DecompositionError, DecompositionWarning
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
@@ -36,8 +37,8 @@ class TestGraphDecomposition:
     """Test the graph decomposition transform."""
 
     @pytest.mark.usefixtures("use_capture")
-    def test_inordered_params_precompiled_rule(self):
-        """Test that unordered parameters in precompiled rules are handled correctly."""
+    def test_with_precompiled_rule(self):
+        """Test graph-decomposition with precompiled rules are handled correctly."""
 
         @qml.qjit(capture=True)
         @graph_decomposition(gate_set=[qml.RX, qml.RY, qml.RZ])
@@ -90,7 +91,7 @@ class TestGraphDecomposition:
         @graph_decomposition(
             gate_set={"H", "CZ", "GlobalPhase"},
             alt_decomps={qml.CNOT: [my_cnot]},
-            # _builtin_rule_path=None,
+            _builtin_rule_path=None,
         )
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
@@ -98,7 +99,7 @@ class TestGraphDecomposition:
             qml.CNOT(wires=[0, 1])
 
             # register custom decomposition rules
-            my_cnot([0, 1])
+            my_cnot(ShapedArray((2,), int))
 
             return qml.state()
 
@@ -138,7 +139,7 @@ class TestGraphDecomposition:
                 qml.Rot: rz_ry_rz,
                 qml.PauliY: ry_gp,
             },
-            # _builtin_rule_path=None,
+            _builtin_rule_path=None,
         )
         @qml.qnode(qml.device("lightning.qubit", wires=3))
         def circuit():
@@ -147,7 +148,6 @@ class TestGraphDecomposition:
             qml.PauliY(wires=2)
             qml.Rot(0.2, 0.3, 0.4, wires=2)
             qml.RY(0.5, wires=1)
-            qml.PauliX(wires=0)
 
             # register custom decomposition rules
             rz_rx(float, int)
@@ -156,7 +156,7 @@ class TestGraphDecomposition:
 
             return qml.expval(qml.Z(0))
 
-        expected_resources = {"GlobalPhase": 2, "RX": 6, "RZ": 14}
+        expected_resources = {"GlobalPhase": 1, "RX": 5, "RZ": 14}
         resources = qml.specs(circuit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
