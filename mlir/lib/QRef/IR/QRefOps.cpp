@@ -14,7 +14,6 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/Dominance.h"
 #include "mlir/IR/OpImplementation.h"
 #include "llvm/ADT/StringSet.h"
 
@@ -158,31 +157,6 @@ LogicalResult DeallocQubitOp::canonicalize(DeallocQubitOp deallocQb,
 // QRef op verifiers.
 //===----------------------------------------------------------------------===//
 
-bool hasUseAfterFree(Value qubit, Operation *gate, DominanceInfo &domInfo)
-{
-    if (qubit.getDefiningOp() && isa<qref::GetOp>(qubit.getDefiningOp())) {
-        auto getOp = cast<qref::GetOp>(qubit.getDefiningOp());
-        Value qreg = getOp.getQreg();
-        for (Operation *user : qreg.getUsers()) {
-            if (auto deallocOp = dyn_cast<qref::DeallocOp>(user)) {
-                if (domInfo.properlyDominates(deallocOp, gate)) {
-                    return true;
-                }
-            }
-        }
-    }
-    else {
-        for (Operation *user : qubit.getUsers()) {
-            if (auto deallocQubitOp = dyn_cast<qref::DeallocQubitOp>(user)) {
-                if (domInfo.properlyDominates(deallocQubitOp, gate)) {
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
-}
-
 static const mlir::StringSet<> validPauliWords = {"X", "Y", "Z", "I"};
 
 LogicalResult AllocOp::verify()
@@ -214,41 +188,10 @@ LogicalResult AllocOp::verify()
     return success();
 }
 
-LogicalResult SetStateOp::verify()
-{
-    DominanceInfo domInfo(this->getOperation());
-    for (Value &qubit : getQubitOperands()) {
-        if (hasUseAfterFree(qubit, this->getOperation(), domInfo)) {
-            return emitOpError("Detected use of a qubit after deallocation");
-        }
-    }
-
-    return success();
-}
-
-LogicalResult SetBasisStateOp::verify()
-{
-    DominanceInfo domInfo(this->getOperation());
-    for (Value &qubit : getQubitOperands()) {
-        if (hasUseAfterFree(qubit, this->getOperation(), domInfo)) {
-            return emitOpError("Detected use of a qubit after deallocation");
-        }
-    }
-
-    return success();
-}
-
 LogicalResult CustomOp::verify()
 {
     if (getQubits().size() == 0) {
         return emitOpError("expected op to have at least one qubit");
-    }
-
-    DominanceInfo domInfo(this->getOperation());
-    for (Value &qubit : getQubitOperands()) {
-        if (hasUseAfterFree(qubit, this->getOperation(), domInfo)) {
-            return emitOpError("Detected use of a qubit after deallocation");
-        }
     }
 
     return success();
@@ -270,49 +213,6 @@ LogicalResult PauliRotOp::verify()
         return emitOpError() << "Only \"X\", \"Y\", \"Z\", and \"I\" are valid Pauli words.";
     }
 
-    DominanceInfo domInfo(this->getOperation());
-    for (Value &qubit : getQubitOperands()) {
-        if (hasUseAfterFree(qubit, this->getOperation(), domInfo)) {
-            return emitOpError("Detected use of a qubit after deallocation");
-        }
-    }
-
-    return success();
-}
-
-LogicalResult GlobalPhaseOp::verify()
-{
-    DominanceInfo domInfo(this->getOperation());
-    for (Value &qubit : getQubitOperands()) {
-        if (hasUseAfterFree(qubit, this->getOperation(), domInfo)) {
-            return emitOpError("Detected use of a qubit after deallocation");
-        }
-    }
-
-    return success();
-}
-
-LogicalResult MultiRZOp::verify()
-{
-    DominanceInfo domInfo(this->getOperation());
-    for (Value &qubit : getQubitOperands()) {
-        if (hasUseAfterFree(qubit, this->getOperation(), domInfo)) {
-            return emitOpError("Detected use of a qubit after deallocation");
-        }
-    }
-
-    return success();
-}
-
-LogicalResult PCPhaseOp::verify()
-{
-    DominanceInfo domInfo(this->getOperation());
-    for (Value &qubit : getQubitOperands()) {
-        if (hasUseAfterFree(qubit, this->getOperation(), domInfo)) {
-            return emitOpError("Detected use of a qubit after deallocation");
-        }
-    }
-
     return success();
 }
 
@@ -321,13 +221,6 @@ LogicalResult QubitUnitaryOp::verify()
     size_t dim = 1 << getQubits().size();
     if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim))) {
         return emitOpError("The Unitary matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
-    }
-
-    DominanceInfo domInfo(this->getOperation());
-    for (Value &qubit : getQubitOperands()) {
-        if (hasUseAfterFree(qubit, this->getOperation(), domInfo)) {
-            return emitOpError("Detected use of a qubit after deallocation");
-        }
     }
 
     return success();

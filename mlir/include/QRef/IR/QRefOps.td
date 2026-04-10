@@ -269,8 +269,6 @@ def SetStateOp : Gate_Op<"set_state"> {
     let assemblyFormat = [{
         `(` $in_state `)` $qubits attr-dict `:` type(operands)
     }];
-
-    let hasVerifier = 1;
 }
 
 
@@ -298,8 +296,6 @@ def SetBasisStateOp : Gate_Op<"set_basis_state"> {
     let assemblyFormat = [{
         `(` $basis_state`)` $qubits attr-dict `:` type(operands)
     }];
-
-    let hasVerifier = 1;
 }
 
 
@@ -404,8 +400,6 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [ParametrizedGate, AttrSizedOperand
             return mlir::MutableOperandRange(getOperation(), 0, 0);
         }
     }];
-
-    let hasVerifier = 1;
 }
 
 def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSegments]> {
@@ -443,7 +437,6 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSeg
     }];
 
     let hasCanonicalizeMethod = 1;
-    let hasVerifier = 1;
 }
 
 def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSegments]> {
@@ -491,7 +484,6 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSeg
     }];
 
     let hasCanonicalizeMethod = 1;
-    let hasVerifier = 1;
 }
 
 def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOperandSegments]> {
