@@ -22,7 +22,14 @@ set(DEPENDS
     MLIRIonPassIncGen
 )
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set_source_files_properties(${SRC} PROPERTIES 
+        COMPILE_OPTIONS "-Wno-deprecated-literal-operator;-Wno-covered-switch-default"
+    )
+endif()
+
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
+
 target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 target_include_directories(${LIBRARY_NAME} PUBLIC
                            .
@@ -33,18 +40,3 @@ target_link_libraries(${LIBRARY_NAME} PRIVATE
     tomlplusplus::tomlplusplus
     nlohmann_json::nlohmann_json
 )
-
-# toml++ source has a warning which we want to ignore. Surprisingly, the SYSTEM keyword does not
-# seem to affect the headers, at least with this specific warning (only present on clang, not gcc).
-if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
-set_source_files_properties(
-    ion-to-llvm.cpp
-    ion-to-rtio.cpp
-    IonToRTIOPatterns.cpp
-    ConversionPatterns.cpp
-    gates_to_pulses.cpp
-    GatesToPulsesPatterns.cpp
-    PROPERTIES
-    COMPILE_FLAGS "-Wno-covered-switch-default -Wno-deprecated-literal-operator"
-)
-endif()
