@@ -59,7 +59,7 @@ class TestBasicAbstractedAxes:
     def test_qjit_multiple_abstracted_axes(self, capture_mode):
         """Test qjit can have multiple abstracted_axes specified."""
 
-        @qjit(abstracted_axes={0:"a", 1:"b"}, capture=capture_mode)
+        @qjit(abstracted_axes={0: "a", 1: "b"}, capture=capture_mode)
         def identity(a):
             assert a.shape[0] is not a.shape[1]
             assert qml.math.is_abstract(a.shape[0])
@@ -74,7 +74,7 @@ class TestBasicAbstractedAxes:
     def test_qjit_multiple_abstracted_axes_matching(self, capture_mode):
         """Test that qjit can have multiple abstracted axes that match."""
 
-        @qjit(abstracted_axes=({0:"a", 1:"b"}, {0:"a"}), capture=capture_mode)
+        @qjit(abstracted_axes=({0: "a", 1: "b"}, {0: "a"}), capture=capture_mode)
         def identity(a, b):
             assert a.shape[0] is b.shape[0]
             assert a.shape[0] is not a.shape[1]
@@ -83,9 +83,9 @@ class TestBasicAbstractedAxes:
             assert qml.math.is_abstract(a.shape[1])
             assert qml.math.is_abstract(b.shape[0])
             return a, b
-        
-        param0 = jnp.ones((4,3))
-        param1 = jnp.ones((4,2))
+
+        param0 = jnp.ones((4, 3))
+        param1 = jnp.ones((4, 2))
         r0, r1 = identity(param0, param1)
         assert_array_and_dtype_equal(r0, param0)
         assert_array_and_dtype_equal(r1, param1)
@@ -100,10 +100,8 @@ class TestBasicAbstractedAxes:
             assert qml.math.is_abstract(a.shape[2])
             assert a.shape[1] == 3
             return a
-        
+
         assert aot.mlir is not None
-
-
 
     def test_qnode_abstracted_axis(self, capture_mode):
         """Test that qnode accepts dynamical arguments."""
@@ -125,7 +123,6 @@ class TestBasicAbstractedAxes:
 
         assert_array_and_dtype_equal(expected, result)
         assert "tensor<?xi64>" in workflow.mlir, workflow.mlir
-
 
     def test_qnode_dynamic_structured_args(self, capture_mode):
         """Test that qnode accepts dynamically-shaped structured args"""
@@ -164,6 +161,7 @@ class TestBasicAbstractedAxes:
         _id1 = id(i.compiled_function)
         assert _id0 == _id1
 
+
 class TestBasicArrayCreation:
     """Test that involve the creation of dynamic arrays with control flow."""
 
@@ -187,7 +185,6 @@ class TestBasicArrayCreation:
         assert_allclose(a, jnp.ones((4,)))
         assert_allclose(b, jnp.ones((5,)))
         assert "tensor<?xf64>" in func.mlir, func.mlir
-
 
     @pytest.mark.parametrize("dtype", DTYPES)
     @pytest.mark.parametrize("shape", SHAPES)
@@ -216,7 +213,6 @@ class TestBasicArrayCreation:
         assert_allclose(res.shape, shape)
         assert res.dtype == dtype
 
-
     @pytest.mark.parametrize(
         "op",
         [
@@ -236,7 +232,6 @@ class TestBasicArrayCreation:
             return op(jnp.ones(s, dtype))
 
         assert_array_and_dtype_equal(f(shape), op(jnp.ones(shape, dtype)))
-
 
     @pytest.mark.parametrize(
         "op",
@@ -259,7 +254,6 @@ class TestBasicArrayCreation:
 
         assert_array_and_dtype_equal(f(shape), op(jnp.ones(shape, dtype), jnp.ones(shape, dtype)))
 
-
     def test_classical_tracing_binary_ops_3D(self, capture_mode):
         """Test that tensor primitives work with basic binary operations on 3D arrays"""
         # TODO: Merge with the binary operations test after fixing
@@ -275,7 +269,6 @@ class TestBasicArrayCreation:
 
         assert_array_and_dtype_equal(f(shape), op(jnp.ones(shape, dtype), jnp.ones(shape, dtype)))
 
-
     @pytest.mark.parametrize("shape,idx", [((1, 2, 3), (0, 1, 2)), ((3,), (2,))])
     def test_access_dynamic_array_static_index(self, shape, idx, capture_mode):
         """Test accessing dynamic array elements using static indices"""
@@ -290,7 +283,6 @@ class TestBasicArrayCreation:
         assert f"tensor<{'x'.join(['?']*len(shape))}xcomplex<f64>>" in f.mlir
         assert "gather" in f.mlir
 
-
     @pytest.mark.parametrize("shape,idx", [((1, 2, 3), (0, 1, -2)), ((3,), (2,))])
     def test_access_dynamic_array_dynamic_index(self, shape, idx, capture_mode):
         """Test accessing dynamic array elements using dynamic indices"""
@@ -304,7 +296,6 @@ class TestBasicArrayCreation:
         assert f(shape, idx) == jnp.ones(shape, dtype)[idx]
         assert f"tensor<{'x'.join(['?']*len(shape))}xcomplex<f64>>" in f.mlir
         assert "gather" in f.mlir
-
 
     @pytest.mark.xfail(reason="MLIR is incompatible with our pipeline")
     @pytest.mark.parametrize("shape,idx,val", [((1, 2, 3), (0, 1, 2), 1j), ((3,), (2,), 0)])
@@ -321,7 +312,6 @@ class TestBasicArrayCreation:
         assert f"tensor<{'x'.join(['?']*len(shape))}xcomplex<f64>>" in f.mlir
         assert "gather" in f.mlir
 
-
     @pytest.mark.xfail(reason="Slicing is not supported by JAX?")
     def test_slice_dynamic_array_dynamic_index(self, capture_mode):
         """Test dynamic array modification using dynamic indices"""
@@ -336,7 +326,6 @@ class TestBasicArrayCreation:
         assert f(shape) == jnp.ones(shape, dtype)[0, 1, 0:1]
         assert f"tensor<{'x'.join(['?']*len(shape))}xcomplex<f64>>" in f.mlir
 
-
     def test_classical_tracing_2(self, capture_mode):
         """Test that tensor primitive work in the classical tracing mode, the traced dimension case"""
 
@@ -345,7 +334,6 @@ class TestBasicArrayCreation:
             return jnp.ones(shape=[1, x], dtype=int)
 
         assert_array_and_dtype_equal(f(3), jnp.ones((1, 3), dtype=int))
-
 
     @pytest.mark.skip("Jax does not detect error in this use-case")
     def test_invalid_shapes_2(self, capture_mode):
@@ -357,7 +345,6 @@ class TestBasicArrayCreation:
 
         with pytest.raises(TypeError):
             qjit(f, capture=capture_mode)
-
 
     @pytest.mark.parametrize(
         "bad_shape",

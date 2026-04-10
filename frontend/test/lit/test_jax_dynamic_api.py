@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """Unit tests for the AutoGraph source-to-source transformation feature."""
-
+# pylint: disable=cell-var-from-loop
 # RUN: %PYTHON %s | FileCheck %s
 
 import jax.numpy as jnp
@@ -31,7 +31,6 @@ for capture in [True, False]:
         """Test passing a dynamic argument"""
         # CHECK:        tensor<?xi64>
         return a
-
 
     print_mlir(test_qjit_dynamic_argument, jnp.array([1, 2, 3]))
 
@@ -67,7 +66,6 @@ for capture in [True, False]:
         # CHECK:       in ([[b]], [[c]]) }
         return jnp.ones((a + 1,), dtype=float)
 
-
     print_jaxpr(test_qjit_dynamic_result, 3)
 
 
@@ -98,17 +96,16 @@ for capture in [True, False]:
         # CHECK:        tensor<?x3x?xf64>
         return a
 
-
     print_mlir(test_qjit_aot, aot=True)
 
 
 for capture in [True, False]:
+
     @qjit(capture=capture)
     def test_qjit_indexing(sz):
         """Check the usage of stablehlo.gather for indexing"""
         r = jnp.ones((sz + 1,), dtype=int)
         # CHECK:        gather
         return r[0]
-
 
     print_mlir(test_qjit_indexing, 3)

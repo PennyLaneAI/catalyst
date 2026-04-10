@@ -539,6 +539,7 @@ def handle_transform(
     next_eval._pass_pipeline.insert(0, bound_pass)
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
+
 def _extract_abstract_shapes(flat_inputs):
     abstract_shapes = []
     for a in flat_inputs:
@@ -547,6 +548,7 @@ def _extract_abstract_shapes(flat_inputs):
             if not isinstance(s, int) and not any(s is a for a in abstract_shapes):
                 abstract_shapes.append(s)
     return abstract_shapes
+
 
 # pylint: disable=too-many-positional-arguments
 def trace_from_pennylane(

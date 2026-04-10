@@ -598,11 +598,13 @@ class TestOptionsToCliFlags:
         """
         observed = to_llvmir(stdin=mlir)
         # pylint: disable=line-too-long
-        expected = textwrap.dedent("""
+        expected = textwrap.dedent(
+            """
         define void @foo() {
           ret void
         }
-        """).strip()
+        """
+        ).strip()
         # pylint: enable=line-too-long
         assert expected in observed
 
@@ -618,13 +620,15 @@ class TestOptionsToCliFlags:
         """
 
         observed = to_mlir_opt(stdin=mlir)
-        expected = textwrap.dedent("""
+        expected = textwrap.dedent(
+            """
         module {
           llvm.func @foo() {
             llvm.return
           }
         }
-        """).strip()
+        """
+        ).strip()
         assert expected in observed
 
     def test_catalyst_error(self):
