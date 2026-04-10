@@ -16,10 +16,10 @@
 
 # pylint: disable=too-many-lines
 
+import jax
 import numpy as np
 import pennylane as qml
 import pytest
-import jax
 from jax import numpy as jnp
 from jax._src.source_info_util import current as current_source_info
 from numpy import array_equal
@@ -327,7 +327,8 @@ class TestBasicArrayCreation:
         assert f"tensor<{'x'.join(['?']*len(shape))}xcomplex<f64>>" in f.mlir
 
     def test_classical_tracing_2(self, capture_mode):
-        """Test that tensor primitive work in the classical tracing mode, the traced dimension case"""
+        """Test that tensor primitive work in the classical tracing mode,
+        the traced dimension case"""
 
         @qjit(capture=capture_mode)
         def f(x):
