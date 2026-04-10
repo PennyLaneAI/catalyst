@@ -38,9 +38,6 @@ namespace DecompGraph::Solver {
 
 class DecompositionSolver {
   public:
-    using SolutionType =
-        std::unordered_map<Core::OperatorNode, Core::ChosenDecompRule, Core::OperatorNodeHash>;
-
     /**
      * @brief Constructs a DecompositionSolver with the given decomposition graph.
      *
@@ -63,15 +60,6 @@ class DecompositionSolver {
      * root nodes.
      */
     Core::GraphResult solve();
-
-    /**
-     * @brief A helper method that returns all decomposition rules required for decomposing the
-     * given operations into the target gateset. This is used specially for the MLIR integration to
-     * extract the necessary rules for decomposing the operations present in the MLIR module.
-     *
-     * This method uses the cached results from the graph solver if available.
-     */
-    [[nodiscard]] SolutionType getSolvedMap();
 
   private:
     const DecompositionGraph &graph;
@@ -161,4 +149,5 @@ class DecompositionSolver {
         return rule.ruleName.empty();
     }
 };
+
 } // namespace DecompGraph::Solver

@@ -181,12 +181,9 @@ struct ChosenDecompRule {
 
 /**
  * @brief This represents the result of the graph decomposition, which includes the mapping
- * from operator nodes to their chosen decomposition rules, as well as the list of solved root nodes
- * in the graph.
+ * from operator nodes to their chosen decomposition rules.
  */
-struct GraphResult {
-    std::unordered_map<OperatorNode, ChosenDecompRule, OperatorNodeHash> optimizedMap;
-    std::vector<OperatorNode> solvedRoots;
-};
+using GraphResult =
+    std::unordered_map<Core::OperatorNode, Core::ChosenDecompRule, Core::OperatorNodeHash>;
 
 } // namespace DecompGraph::Core

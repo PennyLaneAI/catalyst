@@ -74,7 +74,7 @@ TEST_CASE("Test DecompositionSolver solve method with incomplete gates in Gatese
 
     const DecompositionGraph graph({h}, gateset, rules);
     DecompositionSolver solver(graph);
-    const auto result = solver.getSolvedMap();
+    const auto result = solver.solve();
     REQUIRE(result.at(h).isBasis);
     REQUIRE(result.at(h_gateset).isBasis);
 
@@ -84,7 +84,7 @@ TEST_CASE("Test DecompositionSolver solve method with incomplete gates in Gatese
 
     const DecompositionGraph graph_with_h_gateset({h}, gateset, rules_with_h_gateset);
     DecompositionSolver solver_with_h_gateset(graph_with_h_gateset);
-    const auto result_with_h_gateset = solver_with_h_gateset.getSolvedMap();
+    const auto result_with_h_gateset = solver_with_h_gateset.solve();
     REQUIRE(result_with_h_gateset.at(h).isBasis);
 }
 
@@ -101,7 +101,7 @@ TEST_CASE("Do not solve for target gates", "[DecompGraph::Solver]")
 
     const DecompositionGraph graph({h, rz}, gateset, rules);
     DecompositionSolver solver(graph);
-    const auto solutions = solver.getSolvedMap();
+    const auto solutions = solver.solve();
     REQUIRE(solutions.size() == 2);
     REQUIRE(solutions.at(h).isBasis);
     REQUIRE(solutions.at(h).totalCost == 2.0);
@@ -233,10 +233,8 @@ TEST_CASE("Test DecompositionSolver with one single operator", "[DecompGraph::So
     const DecompositionGraph graph({h}, gateset, rules);
     DecompositionSolver solver(graph);
     const auto result = solver.solve();
-    REQUIRE(result.solvedRoots.size() == 1);
-    REQUIRE(result.solvedRoots[0] == h);
-    REQUIRE(result.optimizedMap.size() == 4);
-    const auto &chosen_rule = result.optimizedMap.at(h);
+    REQUIRE(result.size() == 4);
+    const auto &chosen_rule = result.at(h);
     REQUIRE_FALSE(chosen_rule.isBasis);
     REQUIRE(chosen_rule.ruleName == "h_to_rz_rx_rz");
     REQUIRE(chosen_rule.inputs.size() == 2);
@@ -249,11 +247,11 @@ TEST_CASE("Test DecompositionSolver with one single operator", "[DecompGraph::So
     REQUIRE(chosen_rule.basisCounts.at(rz) == 2);
     REQUIRE(chosen_rule.basisCounts.at(rx) == 1);
 
-    const auto &rz_rule = result.optimizedMap.at(rz);
+    const auto &rz_rule = result.at(rz);
     REQUIRE(rz_rule.isBasis);
-    const auto &rx_rule = result.optimizedMap.at(rx);
+    const auto &rx_rule = result.at(rx);
     REQUIRE(rx_rule.isBasis);
-    const auto &ry_rule = result.optimizedMap.at(ry);
+    const auto &ry_rule = result.at(ry);
     REQUIRE(ry_rule.isBasis);
 }
 
@@ -281,19 +279,17 @@ TEST_CASE("Test the graph solver with intermediate ops and multiple rules", "[De
     DecompositionSolver solver(graph);
 
     const auto result = solver.solve();
-    REQUIRE(result.solvedRoots.size() == 1);
-    REQUIRE(result.solvedRoots[0] == customBellOp);
-    REQUIRE(result.optimizedMap.size() == 6);
-    const auto &chosen_rule = result.optimizedMap.at(customBellOp);
+    REQUIRE(result.size() == 6);
+    const auto &chosen_rule = result.at(customBellOp);
     REQUIRE_FALSE(chosen_rule.isBasis);
     REQUIRE(chosen_rule.ruleName == "bell_to_cnot_h");
 
-    const auto &chosen_rule_h = result.optimizedMap.at(h);
+    const auto &chosen_rule_h = result.at(h);
     REQUIRE_FALSE(chosen_rule_h.isBasis);
     REQUIRE(chosen_rule_h.ruleName == "h_to_rz_rx_rz");
 
     std::vector<std::string> expected_rule_names{"bell_to_cnot_h", "h_to_rz_rx_rz", "swap_to_cnot"};
-    for (const auto &[op, entry] : solver.getSolvedMap()) {
+    for (const auto &[op, entry] : result) {
         if (op == customBellOp) {
             REQUIRE(std::find(expected_rule_names.begin(), expected_rule_names.end(),
                               entry.ruleName) != expected_rule_names.end());
@@ -367,10 +363,8 @@ TEST_CASE("Test PauliX -> GlobalPhase(1), RX(1) decomposition", "[DecompGraph::S
     DecompositionSolver solver(graph);
 
     const auto result = solver.solve();
-    REQUIRE(result.solvedRoots.size() == 1);
-    REQUIRE(result.solvedRoots[0] == x);
-    REQUIRE(result.optimizedMap.size() == 3);
-    const auto &chosen_rule = result.optimizedMap.at(x);
+    REQUIRE(result.size() == 3);
+    const auto &chosen_rule = result.at(x);
     REQUIRE_FALSE(chosen_rule.isBasis);
     REQUIRE(chosen_rule.ruleName == "x_to_globalPhase_rx");
     REQUIRE(chosen_rule.inputs.size() == 2);
@@ -406,7 +400,7 @@ TEST_CASE("Test cyclic decomposition with multiple rules for the same operator",
     const WeightedGateset gateset{{{globalPhase, 1.0}, {rx, 1.0}, {rz, 1.0}}};
     const DecompositionGraph graph({hadamard}, gateset, rules);
     DecompositionSolver solver(graph);
-    const auto solutions = solver.getSolvedMap();
+    const auto solutions = solver.solve();
     const auto &h_solution = solutions.at(hadamard);
     REQUIRE_FALSE(h_solution.isBasis);
     REQUIRE(h_solution.ruleName == "__builtin__hadamard_to_rz_rx");
@@ -415,7 +409,7 @@ TEST_CASE("Test cyclic decomposition with multiple rules for the same operator",
     const WeightedGateset gateset2{{{globalPhase, 1.0}, {rx, 1.0}, {rz, 2.0}, {ry, 1.0}}};
     const DecompositionGraph graph2({hadamard}, gateset2, rules);
     DecompositionSolver solver2(graph2);
-    const auto solutions2 = solver2.getSolvedMap();
+    const auto solutions2 = solver2.solve();
     const auto &h_solution2 = solutions2.at(hadamard);
     REQUIRE(h_solution2.ruleName == "__builtin__hadamard_to_rz_ry");
 }
@@ -482,10 +476,8 @@ TEST_CASE("Test GraphSolver with fixed decomposition", "[DecompGraph::Solver]")
     DecompositionGraph graph({h}, gateset, rules, fixedDecomps);
     DecompositionSolver solver(graph);
     const auto result = solver.solve();
-    REQUIRE(result.solvedRoots.size() == 1);
-    REQUIRE(result.solvedRoots[0] == h);
-    REQUIRE(result.optimizedMap.size() == 3);
-    const auto &chosen_rule = result.optimizedMap.at(h);
+    REQUIRE(result.size() == 3);
+    const auto &chosen_rule = result.at(h);
     REQUIRE_FALSE(chosen_rule.isBasis);
     REQUIRE(chosen_rule.ruleName == "h_to_rz_rx_rz");
 }
@@ -509,10 +501,35 @@ TEST_CASE("Test GraphSolver with alternative decomposition", "[DecompGraph::Solv
     DecompositionGraph graph({h}, gateset, rules, {}, altDecomps);
     DecompositionSolver solver(graph);
     const auto result = solver.solve();
-    REQUIRE(result.solvedRoots.size() == 1);
-    REQUIRE(result.solvedRoots[0] == h);
-    REQUIRE(result.optimizedMap.size() == 3);
-    const auto &chosen_rule = result.optimizedMap.at(h);
+    REQUIRE(result.size() == 3);
+    const auto &chosen_rule = result.at(h);
     REQUIRE_FALSE(chosen_rule.isBasis);
     REQUIRE(chosen_rule.ruleName == "h_to_rz_rx_rz");
+}
+
+TEST_CASE("Test GraphSolver with MultiRZ decompositions", "[DecompGraph::Solver]")
+{
+    const OperatorNode multiRZ3{"MultiRZ3"};
+    const OperatorNode multiRZ5{"MultiRZ5"};
+    const OperatorNode rz{"RZ"};
+
+    const WeightedGateset gateset{{{rz, 1.0}}};
+
+    const std::vector<RuleNode> rules{
+        {"multiRZ3_to_rz", multiRZ3, {{rz, 3}}},
+        {"multiRZ5_to_rz", multiRZ5, {{rz, 5}}},
+    };
+
+    const DecompositionGraph graph({multiRZ3, multiRZ5}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+    REQUIRE(result.size() == 3);
+    const auto &chosen_rule_multiRZ3 = result.at(multiRZ3);
+    REQUIRE_FALSE(chosen_rule_multiRZ3.isBasis);
+    REQUIRE(chosen_rule_multiRZ3.ruleName == "multiRZ3_to_rz");
+    REQUIRE(chosen_rule_multiRZ3.totalCost == 1.0 * 3);
+    const auto &chosen_rule_multiRZ5 = result.at(multiRZ5);
+    REQUIRE_FALSE(chosen_rule_multiRZ5.isBasis);
+    REQUIRE(chosen_rule_multiRZ5.ruleName == "multiRZ5_to_rz");
+    REQUIRE(chosen_rule_multiRZ5.totalCost == 1.0 * 5);
 }

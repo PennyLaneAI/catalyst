@@ -103,7 +103,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         DecompositionGraph graph(setOfOps, targetGateSet, setOfRules, std::move(fixedDecomps),
                                  std::move(altDecomps));
         DecompositionSolver solver(graph);
-        auto solution = solver.getSolvedMap();
+        auto solution = solver.solve();
         llvm::errs() << "decomposition graph solved. solution size: " << solution.size() << "\n";
         ///////////////////////////
         // Step 3: Insert decomposition rules picked by the graph solver (solution) into the

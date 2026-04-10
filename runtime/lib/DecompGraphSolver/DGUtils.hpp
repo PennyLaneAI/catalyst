@@ -25,6 +25,8 @@
 #include <string>
 #include <vector>
 
+#include <iostream>
+
 #include "DGTypes.hpp"
 
 namespace DecompGraph::Core {
@@ -53,6 +55,21 @@ static inline auto graph_failed_message(const OperatorNode &op,
         }
     }
     return oss.str();
+}
+
+static inline void showSolution(const Core::GraphResult &result)
+{
+    std::cerr << "Decomposition Solution:\n";
+    for (const auto &[op, rule] : result) {
+        std::cerr << "  Operator: " << print_op(op) << "\n";
+        std::cerr << "    Chosen Rule: " << rule.ruleName << (rule.isBasis ? " [basis]" : "")
+                  << "\n";
+        std::cerr << "    Total Cost: " << rule.totalCost << "\n";
+        std::cerr << "    Basis Counts:\n";
+        for (const auto &[basis_op, count] : rule.basisCounts) {
+            std::cerr << "      - " << print_op(basis_op) << ": " << count << "\n";
+        }
+    }
 }
 
 class GraphError : public std::runtime_error {
