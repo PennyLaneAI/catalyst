@@ -29,8 +29,7 @@ using namespace catalyst;
 namespace {
 bool hasUseAfterFree(Value qubit, Operation *gate, DominanceInfo &domInfo)
 {
-    if (qubit.getDefiningOp() && isa<qref::GetOp>(qubit.getDefiningOp())) {
-        auto getOp = cast<qref::GetOp>(qubit.getDefiningOp());
+    if (auto getOp = qubit.getDefiningOp<qref::GetOp>()) {
         Value qreg = getOp.getQreg();
         for (Operation *user : qreg.getUsers()) {
             if (auto deallocOp = dyn_cast<qref::DeallocOp>(user)) {

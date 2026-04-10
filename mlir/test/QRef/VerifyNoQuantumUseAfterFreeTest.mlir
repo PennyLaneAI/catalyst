@@ -61,3 +61,16 @@ func.func @test_use_after_free_single_qubit_alloc_from_arg(%q: !qref.bit) {
     return
 }
 
+// -----
+
+func.func @test_use_after_free_alias() {
+    %r = qref.alloc(3) : !qref.reg<3>
+    %q = qref.get %r[0] : !qref.reg<3> -> !qref.bit
+    qref.custom "PauliX"() %q : !qref.bit
+    qref.dealloc %r : !qref.reg<3>
+
+    %q_alias = qref.get %r[0] : !qref.reg<3> -> !qref.bit
+    // expected-error@+1 {{Detected use of a qubit after deallocation}}
+    qref.custom "PauliX"() %q_alias : !qref.bit
+    return
+}
