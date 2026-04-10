@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Unit tests for the AutoGraph source-to-source transformation feature."""
+
 # pylint: disable=cell-var-from-loop
 # RUN: %PYTHON %s | FileCheck %s
 
@@ -22,7 +23,6 @@ from jax.core import ShapedArray
 from utils import print_jaxpr, print_mlir
 
 from catalyst import qjit
-
 
 for capture in [True, False]:
     # CHECK-LABEL: test_qjit_dynamic_argument
