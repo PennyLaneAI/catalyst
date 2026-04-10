@@ -27,6 +27,7 @@
 #include "mlir/ExecutionEngine/CRunnerUtils.h"
 
 #include "Driver/Timer.h"
+
 #include "Exception.hpp"
 #include "ExecutionContext.hpp"
 #include "MemRefUtils.hpp"

@@ -16,6 +16,7 @@
 
 #include <vector>
 
+#include "hlo-extensions/Transforms/Patterns.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
@@ -25,7 +26,6 @@
 #include "stablehlo/transforms/Passes.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
-#include "hlo-extensions/Transforms/Patterns.h"
 
 using namespace llvm;
 using namespace mlir;

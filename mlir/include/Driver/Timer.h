@@ -26,9 +26,8 @@
 #include <ratio>
 #include <string>
 #include <string_view>
-#include <utility> // std::forward
-
 #include <sys/time.h>
+#include <utility> // std::forward
 
 namespace catalyst::utils {
 

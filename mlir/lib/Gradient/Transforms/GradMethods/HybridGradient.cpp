@@ -23,12 +23,13 @@
 
 #include "Catalyst/Utils/CallGraph.h"
 #include "Catalyst/Utils/StaticAllocas.h"
-#include "ClassicalJacobian.hpp"
 #include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantum.h"
+
+#include "ClassicalJacobian.hpp"
 
 using namespace mlir;
 

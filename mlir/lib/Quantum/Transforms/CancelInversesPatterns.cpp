@@ -20,6 +20,7 @@
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
+
 #include "VerifyParentGateAnalysis.hpp"
 
 using llvm::dbgs;

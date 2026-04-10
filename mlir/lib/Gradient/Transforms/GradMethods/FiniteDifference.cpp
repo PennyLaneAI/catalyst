@@ -26,6 +26,7 @@
 
 #include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
+
 #include "HybridGradient.hpp"
 
 namespace catalyst {

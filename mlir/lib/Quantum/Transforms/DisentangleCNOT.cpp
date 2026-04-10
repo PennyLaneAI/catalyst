@@ -23,8 +23,9 @@
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
-#include "PropagateSimpleStatesAnalysis.hpp"
 #include "Quantum/IR/QuantumOps.h"
+
+#include "PropagateSimpleStatesAnalysis.hpp"
 
 using namespace mlir;
 using namespace catalyst;

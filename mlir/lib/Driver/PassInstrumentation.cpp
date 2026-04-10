@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Driver/PassInstrumentation.h"
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
 #include "Driver/CompilerDriver.h"
 #include "Driver/LineUtils.h"
-#include "Driver/PassInstrumentation.h"
 #include "Driver/Support.h"
-
 #include "Driver/Timer.h"
 
 namespace catalyst {

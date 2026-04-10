@@ -20,8 +20,9 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-#include "ParameterShift.hpp"
 #include "Quantum/IR/QuantumOps.h"
+
+#include "ParameterShift.hpp"
 
 namespace catalyst {
 namespace gradient {

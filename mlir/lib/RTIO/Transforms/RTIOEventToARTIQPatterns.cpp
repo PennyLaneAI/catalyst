@@ -18,9 +18,10 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#include "ARTIQRuntimeBuilder.hpp"
 #include "RTIO/IR/RTIOOps.h"
 #include "RTIO/Transforms/Patterns.h"
+
+#include "ARTIQRuntimeBuilder.hpp"
 #include "Utils.hpp"
 
 using namespace mlir;

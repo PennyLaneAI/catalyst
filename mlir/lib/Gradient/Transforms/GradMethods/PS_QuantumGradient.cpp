@@ -25,10 +25,11 @@
 
 #include "Catalyst/Utils/StaticAllocas.h"
 #include "Gradient/Utils/GradientShape.h"
-#include "ParameterShift.hpp"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantum.h"
+
+#include "ParameterShift.hpp"
 
 namespace catalyst {
 namespace gradient {

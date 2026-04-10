@@ -10,22 +10,25 @@ ColumnLimit: 100
 SortIncludes: CaseSensitive
 IncludeBlocks: Regroup
 
-# TODO: do we want to keep the main header (i.e. the header matching the current implementation file) uniquely sorted to the top?
-# This is not specified in the guidance docs, but is used by both google and llvm, and is the clang-format default.
+# NOTE: Ensure that lists are always sorted alphabetically.
+
 IncludeCategories:
   # System/STL
-  - Regex:    '^(<|")(([^.]+)|(std.*\.h))(>|")$'
+  - Regex:    '^(<|")(([^.]+)|((std.*|complex|sys.*)\.h))(>|")$'
     Priority: 1
 
   # Dependencies
-  # TODO: should ARTIQ, RTIO, OQC, OQD, OPENQASM* be included here? 
-  #   - Are they internal enough to be included in local headers? 
-  #   - Should they be sorted in a unique category for quantum dependencies/collaborations?
-  - Regex:    '^(<|")(llvm|mlir|stablehlo|Enzyme|catch2|pybind11|nanobind|toml\+\+|nlohmann|stim|gtest|boost|dlfcn)(.*)\.([hcp]+)(>|")$'
+  - Regex:    '^(<|")(llvm|Enzyme|absl|boost|catch2|dlfcn|gmock|gtest|hlo-extensions|jax_cpu_lapack_kernels|mlir|nanobind|nlohmann|numpy|pybind11|stablehlo|stim|toml\+\+|xla)(.*)\.([hcp]+)(>|")$'
     Priority: 2
 
   # Local headers
-  # TODO do we want to explicitly list our header prefixes (ex. Quantum, PBC, Gradient) or leave this as a catch-all?
-  # Listing would allow a separate catch-all that would identify unsorted headers, but requires more maintenance.
-  - Regex:    '^(<|")(.*)\.([hcp]+)(>|")$'
+  - Regex:    '^(<|")(CAPI|Catalyst|Driver|Gradient|GradMethods|Ion|MBQC|Mitigation|PBC|PauliFrame|QRef|QecLogical|QecPhysical|Quantum|RTIO|Standalone|Test)(.*\/.*)\.([hcp]+)(>|")$'
     Priority: 3
+
+  # Private headers
+  - Regex: '^(<|")([^\.\/]+)\.([hcp]+)(>|")$'
+    Priority: 4
+
+  # Unsorted headers (catch-all)
+  - Regex: '^(.*)$'
+    Priority: 5
