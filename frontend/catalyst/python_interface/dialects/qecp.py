@@ -29,6 +29,7 @@ from xdsl.dialects.builtin import (
     I64,
     ContainerOf,
     ContainerType,
+    Float64Type,
     IndexType,
     IntegerAttr,
     IntegerType,
@@ -688,6 +689,54 @@ class CnotOp(IRDLOperation):
 
 
 @irdl_op_definition
+class RotOp(IRDLOperation):
+    """A physical Rot gate operation.
+
+    ```mlir
+    %1 = qecp.rot (%phi, %theta, %omega) %0 : !qecp.qubit<data>
+    ```
+    NOTE: This operation is for physical noise injection only.
+    """
+
+    T: ClassVar = VarConstraint("T", anyPhysicalQubit)
+
+    name = "qecp.rot"
+
+    assembly_format = """
+           `(` $phi `,` $theta `,` $omega `)` $in_qubit attr-dict `:` type($in_qubit)
+        """
+
+    phi = operand_def(Float64Type())
+
+    theta = operand_def(Float64Type())
+
+    omega = operand_def(Float64Type())
+
+    in_qubit = operand_def(T)
+
+    out_qubit = result_def(T)
+
+    def __init__(
+        self,
+        phi: SSAValue[Float64Type],
+        theta: SSAValue[Float64Type],
+        omega: SSAValue[Float64Type],
+        in_qubit: QecPhysicalQubitSSAValue | Operation,
+    ):
+        in_qubit_type = get_physical_qubit_type(in_qubit)
+
+        super().__init__(
+            operands=(
+                phi,
+                theta,
+                omega,
+                in_qubit,
+            ),
+            result_types=(in_qubit_type,),
+        )
+
+
+@irdl_op_definition
 class MeasureOp(IRDLOperation):
     """A physical single-qubit projective measurement in the computational basis."""
 
@@ -825,6 +874,7 @@ QecPhysical = Dialect(
         PauliYOp,
         PauliZOp,
         HadamardOp,
+        RotOp,
         SOp,
         CnotOp,
         MeasureOp,
