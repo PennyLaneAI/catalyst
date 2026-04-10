@@ -42,6 +42,10 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
+from catalyst.from_plxpr.qref_jax_primitives import (
+    qref_alloc_p,
+    qref_dealloc_p,
+)
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
 from catalyst.jax_extras.patches import patched_make_eqn
 from catalyst.jax_primitives import (
@@ -369,14 +373,14 @@ def handle_qnode(
             auto_qubit_management=(device.wires is None),
             **_get_device_kwargs(device),
         )
-        qreg = qalloc_p.bind(len(device.wires))
-        self.init_qreg = QubitHandler(qreg, self.qubit_index_recorder)
+        qreg = qref_alloc_p.bind(len(device.wires))
+        self.init_qreg = qreg
+
         converter = PLxPRToQuantumJaxprInterpreter(
             device, shots, self.init_qreg, {}, self.qubit_index_recorder
         )
         retvals = converter(closed_jaxpr, *args)
-        self.init_qreg.insert_all_dangling_qubits()
-        qdealloc_p.bind(self.init_qreg.get())
+        qref_dealloc_p.bind(self.init_qreg)
         device_release_p.bind()
         return retvals
 
