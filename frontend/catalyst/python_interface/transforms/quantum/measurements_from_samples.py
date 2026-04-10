@@ -656,7 +656,7 @@ def get_shots(quantum_node: func.FuncOp) -> int:
 
     Raises:
         CompileError: If `quantum_node` does not contain a quantum.DeviceInitOp.
-        CompileError: If its not possible to extract a static constant from the 
+        CompileError: If its not possible to extract a static constant from the
             SSAValue for the shots
         ValueError: if the extracted shots are zero
 
@@ -681,7 +681,7 @@ def get_shots(quantum_node: func.FuncOp) -> int:
             "Cannot get number of shots. Note that using a dynamic number of shots is not "
             "supported with measurements-from-samples."
         )
-    
+
     assert isinstance(shots, int), "Expected `shots` to be an integer"
     if shots == 0:
         raise ValueError("The measurements_from_samples pass requires non-zero shots")

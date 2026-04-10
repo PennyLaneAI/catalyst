@@ -17,125 +17,231 @@
 # pylint: disable=line-too-long
 
 import pytest
+from xdsl.context import Context
+from xdsl.dialects import func, test
 
-from catalyst.python_interface.transforms import (
-    MeasurementsFromSamplesPass,
-)
+import pennylane as qml
+from pennylane.exceptions import CompileError
+
+from catalyst.python_interface import QuantumParser
+from catalyst.python_interface.conversion import xdsl_from_qjit
+from catalyst.python_interface.transforms.quantum.wrap_qnode import WrapQNodePass, get_call_op
+
 
 pytestmark = pytest.mark.xdsl
 
 
-class TestWrapQNodePass:
-    """Unit tests for the wrap-qnode pass."""
+class TestWrapQnode:
+    """Test that the utility pass WrapQNodePass behaves as expected"""
 
     def test_wrapping_single_quantum_node(self, run_filecheck):
-        """Test the wrap_qnode pass works as expected on a module containing a single quantum.node
-        """
+        """Test the wrap_qnode pass works as expected on a module containing a single quantum.node"""
 
-        raise RuntimeError
-    
         program = """
         builtin.module @module_circuit {
-            // CHECK-LABEL: circuit
-            // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
-            // CHECK: func.func public @circuit.some_pass_name{{.*}} attributes {quantum.node}
+            // CHECK: func.func public @circuit() -> tensor<f64> {
             func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
-                %0 = "stablehlo.constant"() <{value = dense<5> : tensor<i64>}> : () -> tensor<i64>
-                %1 = tensor.extract %0[] : tensor<i64>
-                quantum.device shots(%1) ["", "", ""]
-
-                // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
+                // CHECK: func.call @circuit.my_pass_name() : () -> tensor<f64>
+                // CHECK: func.func public @circuit.my_pass_name() -> tensor<f64> attributes {quantum.node}
+                // CHECK: "test.op"() : () -> !quantum.bit
                 // CHECK: quantum.namedobs
                 // CHECK: quantum.expval
-                %2 = "test.op"() : () -> !quantum.bit
-                %3 = quantum.namedobs %2[PauliZ] : !quantum.obs
-                %4 = quantum.expval %3 : f64
-                %5 = "tensor.from_elements"(%4) : (f64) -> tensor<f64>
-                func.return %5 : tensor<f64>
+                %0 = "test.op"() : () -> !quantum.bit
+                %1 = quantum.namedobs %0[PauliZ] : !quantum.obs
+                %2 = quantum.expval %1 : f64
+                %3 = "tensor.from_elements"(%2) : (f64) -> tensor<f64>
+                func.return %3 : tensor<f64>
             }
         }
         """
 
-        pipeline = (WrapQNodePass(),)
+        pipeline = (WrapQNodePass("my_pass_name"),)
         run_filecheck(program, pipeline)
 
     def test_wrapping_multiple_quantum_nodes(self, run_filecheck):
-        """Test the wrap_qnode pass works as expected on a module containing multiple quantum.nodes
-        """
-
-        raise RuntimeError
+        """Test the wrap_qnode pass works as expected on a module containing multiple quantum.nodes"""
 
         program = """
         builtin.module @module_circuit {
+            // CHECK: func.func public @circuit.1() -> tensor<f64> {
+            func.func public @circuit.1() -> (tensor<f64>) attributes {quantum.node} {
+                // CHECK: func.call @circuit.1.my_pass_name() : () -> tensor<f64>
+                // CHECK: func.func public @circuit.1.my_pass_name() -> tensor<f64> attributes {quantum.node}
+                %0 = "test.op"() : () -> !quantum.bit
+                %1 = quantum.namedobs %0[PauliZ] : !quantum.obs
+                %2 = quantum.expval %1 : f64
+                %3 = "tensor.from_elements"(%2) : (f64) -> tensor<f64>
+                func.return %3 : tensor<f64>
+            }
+            // CHECK: func.func public @circuit.2() -> tensor<f64> {
+            func.func public @circuit.2() -> (tensor<f64>) attributes {quantum.node} {
+                // CHECK: func.call @circuit.2.my_pass_name() : () -> tensor<f64>
+                // CHECK: func.func public @circuit.2.my_pass_name() -> tensor<f64> attributes {quantum.node}
+                %0 = "test.op"() : () -> !quantum.bit
+                %1 = quantum.namedobs %0[PauliZ] : !quantum.obs
+                %2 = quantum.expval %1 : f64
+                %3 = "tensor.from_elements"(%2) : (f64) -> tensor<f64>
+                func.return %3 : tensor<f64>
+            }
         }
         """
 
-        pipeline = (WrapQNodePass(),)
+        pipeline = (WrapQNodePass("my_pass_name"),)
         run_filecheck(program, pipeline)
 
-    def test_composability(self, run_filecheck):
-        """Test that we can apply the pass repeatedly to add nested classical functions 
-        for different post-processing steps"""
+    def test_nesting_classical_functions(self, run_filecheck):
+        """Test that we can apply the pass repeatedly to add nested classical functions
+        for different post-processing steps. The first pass applied renames the QNode
+        as circuit.a, and calls it within a new classical function, which retains the name
+        of the original quantum.node.
 
-        raise RuntimeError
+        The second pass wraps the new quantum.node, circuit.a, in a classical function (now
+        circuit.a), and renames the quantum.node to circuit.a.b.
+
+        In the end, the quantum.node is circuit.a.b, and there are two layers of classical
+        functions it is wrapped inside of, circuit.a and then circuit."""
 
         program = """
         builtin.module @module_circuit {
+            // CHECK: func.func public @circuit() -> tensor<f64> {
+            func.func public @circuit() -> (tensor<f64>) attributes {quantum.node}  {
+                // CHECK: func.call @circuit.a() : () -> tensor<f64>
+                // CHECK: func.func public @circuit.a() -> tensor<f64> {
+                // CHECK: func.call @circuit.a.b() : () -> tensor<f64>
+                // CHECK: func.func public @circuit.a.b() -> tensor<f64> attributes {quantum.node}
+                // CHECK: "test.op"() : () -> !quantum.bit
+                // CHECK: quantum.namedobs
+                // CHECK: quantum.expval
+                %0 = "test.op"() : () -> !quantum.bit
+                %1 = quantum.namedobs %0[PauliZ] : !quantum.obs
+                %2 = quantum.expval %1 : f64
+                %3 = "tensor.from_elements"(%2) : (f64) -> tensor<f64>
+                func.return %3 : tensor<f64>
+            }
         }
         """
 
-        pipeline = (WrapQNodePass(),)
+        pipeline = (WrapQNodePass("a"), WrapQNodePass("b"))
         run_filecheck(program, pipeline)
 
-    def test_composability(self, run_filecheck):
-        """Test that we can apply the pass repeatedly to add nested classical functions 
-        for different post-processing steps"""
-
-        raise RuntimeError
-
-        program = """
-        builtin.module @module_circuit {
-        }
-        """
-
-        pipeline = (WrapQNodePass(),)
-        run_filecheck(program, pipeline)
 
 class TestGetCallOp:
+    """Test that get_call_op behaves as expected when passed a func.FuncOp"""
 
-    def test_single_quantum_node(self):
-        raise RuntimeError
-    
-    def test_multiple_quantum_nodes(self):
-        raise RuntimeError
-    
-    def test_multiple_call_ops_raises_error(self):
-        raise RuntimeError
-    
+    def test_get_call_op(self):
+        """Test get_call_op retrieves the func.CallOp for a quantum.node that is
+        called within the module"""
+
+        program_str = """
+            builtin.module @module_circuit {
+            func.func public @circuit() -> tensor<f64> {
+                %0 = func.call @circuit.test_name() : () -> tensor<f64>
+                func.return %0 : tensor<f64>
+            }
+            func.func public @circuit.test_name() -> tensor<f64> attributes {quantum.node} {
+                %0 = "test.op"() : () -> !quantum.bit
+                %1 = quantum.namedobs %0[PauliZ] : !quantum.obs
+                %2 = quantum.expval %1 : f64
+                %3 = tensor.from_elements %2 : tensor<f64>
+                func.return %3 : tensor<f64>
+            }
+        }
+        """
+
+        ctx = Context(allow_unregistered=False)
+        xdsl_module = QuantumParser(ctx, program_str, extra_dialects=(test.Test,)).parse_module()
+
+        for op in xdsl_module.walk():
+            if isinstance(op, func.FuncOp) and "quantum.node" in op.attributes:
+                break
+
+        call_op = get_call_op(op)
+        assert isinstance(call_op, func.CallOp)
+        assert call_op.callee.string_value() == op.sym_name.data
+
+    def test_get_call_op_and_pass_integration(self):
+        """Test get_call_op retrieves the func.CallOp for a quantum.node when
+        WrapQNodePass has been applied"""
+
+        @xdsl_from_qjit
+        @qml.qjit
+        @qml.qnode(qml.device("null.qubit", wires=1))
+        def circ():
+            return qml.expval(qml.Z(0))
+
+        xdsl_module = circ()
+        WrapQNodePass("test").apply(None, xdsl_module)
+
+        for op in xdsl_module.walk():
+            if isinstance(op, func.FuncOp) and "quantum.node" in op.attributes:
+                break
+
+        call_op = get_call_op(op)
+        assert isinstance(call_op, func.CallOp)
+        assert call_op.callee.string_value() == op.sym_name.data
+
+    def test_multiple_calls_raises_error(self):
+
+        program_str = """
+            builtin.module @module_circuit {
+            func.func public @circuit() -> (tensor<f64>, tensor<f64>) {
+                %0 = func.call @circuit.test_name() : () -> tensor<f64>
+                %1 = func.call @circuit.test_name() : () -> tensor<f64>
+                func.return %0, %1 : tensor<f64>, tensor<f64>
+            }
+            func.func public @circuit.test_name() -> tensor<f64> attributes {quantum.node} {
+                %0 = "test.op"() : () -> !quantum.bit
+                %1 = quantum.namedobs %0[PauliZ] : !quantum.obs
+                %2 = quantum.expval %1 : f64
+                %3 = tensor.from_elements %2 : tensor<f64>
+                func.return %3 : tensor<f64>
+            }
+            }
+        """
+
+        xdsl_module = QuantumParser(
+            Context(), program_str, extra_dialects=(test.Test,)
+        ).parse_module()
+
+        for op in xdsl_module.walk():
+            if isinstance(op, func.FuncOp) and "quantum.node" in op.attributes:
+                break
+
+        with pytest.raises(
+            CompileError, match="Expected only one call_op for circuit.test_name, but received 2"
+        ):
+            _ = get_call_op(op)
+
     def test_no_module_raises_error(self):
-        raise RuntimeError
+        """Test that an error is raised if the quantum.node isn't inside a module"""
+        program_str = """
+            func.func public @circuit() -> (tensor<f64>, tensor<f64>) {
+                %0 = func.call @circuit.test_name() : () -> tensor<f64>
+                %1 = func.call @circuit.test_name() : () -> tensor<f64>
+                func.return %0, %1 : tensor<f64>, tensor<f64>
+            }
+            func.func public @circuit.test_name() -> tensor<f64> attributes {quantum.node} {
+                %0 = "test.op"() : () -> !quantum.bit
+                %1 = quantum.namedobs %0[PauliZ] : !quantum.obs
+                %2 = quantum.expval %1 : f64
+                %3 = tensor.from_elements %2 : tensor<f64>
+                func.return %3 : tensor<f64>
+            }
+        """
+
+        xdsl_module = QuantumParser(
+            Context(), program_str, extra_dialects=(test.Test,)
+        ).parse_module()
+
+        for op in xdsl_module.walk():
+            if isinstance(op, func.FuncOp) and "quantum.node" in op.attributes:
+                break
+
+        with pytest.raises(
+            CompileError, match="Expected only one call_op for circuit.test_name, but received 2"
+        ):
+            _ = get_call_op(op)
 
 
-class TestIntegrationWrapQNodePass:
-
-    def test_before_split_non_commuting():
-        """Test that the pass works as expected when post-processing is added 
-        before split-non-commuting"""
-
-        raise RuntimeError
-    
-    def test_after_split_non_commuting():
-        """Test that the pass works as expected when post-processing is added 
-        before split-non-commuting"""
-
-        raise RuntimeError
-    
-    def test_adding_postprocessing():
-        """Test that we can use the pass and the get_call_op function to add post-processing"""
-
-        raise RuntimeError
-    
-        
-    
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
