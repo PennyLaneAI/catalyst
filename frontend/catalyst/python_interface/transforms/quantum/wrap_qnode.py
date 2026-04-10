@@ -16,7 +16,10 @@
 calls the QNode, so that post-processing can be injected after the QNode call.
 """
 
+from dataclasses import dataclass
+
 from pennylane.exceptions import CompileError
+from xdsl import context, passes, pattern_rewriter
 from xdsl.ir import Operation
 from xdsl.dialects import builtin, func
 from xdsl.pattern_rewriter import PatternRewriter, RewritePattern
@@ -40,10 +43,93 @@ def get_call_op(qnode: func.FuncOp):
     return qnode_call_op[0]
 
 
-class OutlineQNodePattern(RewritePattern):
-    """RewritePattern putting a quantum.node into a classical function that
+# @dataclass(frozen=False)
+class WrapQNodePass(passes.ModulePass):
+    """This pass is a utility intended to be used with passes that map one 
+    quantum.node to another and add post-processing. The pass wraps each 
+    quantum.node in the program with a classical function that calls the 
+    quantum.node. Postprocessing can then be inserted after the call
+    by Patterns that add post-processing.
+
+        Args:
+            pass_str (str): The string used to label the QNode. This would generally
+            refer to the pass adding post-processing.
+
+    **Example**
+
+    Let's say we want to add a pass, SomePass, that modifies a QNode in a way that requires
+    post-processing. We can apply the WrapQNodePass before the Pattern for SomePase to wrap 
+    the QNodes in classical functions that call them:
+
+    .. code-block:: python
+
+        @dataclass(frozen=True)
+        class SomePass(passes.ModulePass):
+
+            name = "some-name"
+
+            def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
+            
+                WrapQNodePass("some_name").apply(_ctx, op)
+
+                pattern_rewriter.PatternRewriteWalker(
+                    SomePassPattern(),
+                    apply_recursively=False,
+                ).rewrite_module(op)
+    """
+
+    name = "wrap-qnode"
+
+    def __init__(self, pass_str: str):
+        """Initializes the class with a pass string that will be appended to 
+        the QNode function names. This pass string would typically indicate 
+        the pass that """
+        self.pass_str = pass_str
+
+    def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
+        """."""
+
+        pattern_rewriter.PatternRewriteWalker(
+            WrapQNodePattern(pass_str=self.pass_str),
+            apply_recursively=False,
+        ).rewrite_module(op)
+
+
+class WrapQNodePattern(RewritePattern):
+    """RewritePattern wrapping a quantum.node inside a classical function that
     calls the quantum.node. Postprocessing can then be inserted after the call
-    by Patterns that add post-processing."""
+    by Patterns that add post-processing.
+
+    The new classical function will have the name, inputs and output types as 
+    the QNode, so CallOps that previously called the QNode will now call the 
+    wrapper function. The QNode will have a string appended to its name to 
+    differentiate it from the wrapper function.
+
+        Args:
+            pass_str: The string used to label the QNode.
+    
+    **Example**
+
+    .. code-block:: python
+
+        @dataclass(frozen=True)
+        class SomePass(passes.ModulePass):
+
+            name = "some-name"
+
+            def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
+
+                pattern_rewriter.PatternRewriteWalker(
+                    OutlineQNodePattern(pass_str="some_name"),
+                    apply_recursively=False,
+                ).rewrite_module(op)
+
+                pattern_rewriter.PatternRewriteWalker(
+                    ModifyQnodeAndAddPostprocssingPattern(),
+                    apply_recursively=False,
+                ).rewrite_module(op)
+    
+    """
 
     # ToDo: add example, and include pass_str arg in the docstring
 

@@ -47,8 +47,8 @@ from catalyst.python_interface.pass_api import compiler_transform
 from catalyst.python_interface.transforms.quantum.diagonalize_measurements import (
     DiagonalizeFinalMeasurementsPass,
 )
-from catalyst.python_interface.transforms.quantum.outline_qnode import (
-    OutlineQNodePattern,
+from catalyst.python_interface.transforms.quantum.wrap_qnode import (
+    WrapQNodePass,
     get_call_op,
 )
 from catalyst.python_interface.utils import get_constant_from_ssa
@@ -70,11 +70,10 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
         # diagonalize measurements before converting to samples
         DiagonalizeFinalMeasurementsPass().apply(_ctx, op)
 
-        pattern_rewriter.PatternRewriteWalker(
-            OutlineQNodePattern(pass_str="from_samples"),
-            apply_recursively=False,
-        ).rewrite_module(op)
+        # wrap the quantum.nodes in classical functions to store post-processing
+        WrapQNodePass(pass_str="from_samples").apply(_ctx, op)
 
+        # apply the patterns for measurements_from_samples
         greedy_applier = pattern_rewriter.GreedyRewritePatternApplier(
             [
                 ExpvalAndVarPattern(),
