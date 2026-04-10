@@ -539,6 +539,14 @@ def handle_transform(
     next_eval._pass_pipeline.insert(0, bound_pass)
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
+def _extract_abstract_shapes(flat_inputs):
+    abstract_shapes = []
+    for a in flat_inputs:
+        for s in a.shape:
+            # need to us "is" for comparing tracers
+            if not isinstance(s, int) and not any(s is a for a in abstract_shapes):
+                abstract_shapes.append(s)
+    return abstract_shapes
 
 # pylint: disable=too-many-positional-arguments
 def trace_from_pennylane(
@@ -576,6 +584,9 @@ def trace_from_pennylane(
             The boolean indicates whether each result is a value returned by the user function.
         PyTreeDef: PyTree metadata of the function output
     """
+    if abstracted_axes and any(isinstance(arg, jax.core.ShapedArray) for arg in args):
+        # ShapedArrays incompatible with abstracted_axes, so need to create dummy arrays
+        args = [jax.numpy.empty(arg.shape, dtype=arg.dtype) for arg in args]
 
     if isinstance(fn, qml.QNode) and static_argnums:
         # `make_jaxpr2` sees the qnode
@@ -601,11 +612,7 @@ def trace_from_pennylane(
 
             flat_inputs = jax.tree.flatten((inner_args, inner_kwargs))[0]
             flat_inputs = [a for a in flat_inputs if qml.math.is_abstract(a)]
-            abstract_shapes = []
-            for a in flat_inputs:
-                for s in a.shape:
-                    if not isinstance(s, int) and s not in abstract_shapes:
-                        abstract_shapes.append(s)
+            abstract_shapes = _extract_abstract_shapes(flat_inputs)
             jaxpr = from_plxpr(plxpr, skip_preprocess=skip_preprocess)(
                 *abstract_shapes, *flat_inputs
             )
