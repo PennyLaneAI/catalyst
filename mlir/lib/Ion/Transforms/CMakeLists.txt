@@ -45,6 +45,6 @@ set_source_files_properties(
     gates_to_pulses.cpp
     GatesToPulsesPatterns.cpp
     PROPERTIES
-    COMPILE_FLAGS "-Wno-covered-switch-default"
+    COMPILE_FLAGS "-Wno-covered-switch-default -Wno-deprecated-literal-operator"
 )
 endif()
