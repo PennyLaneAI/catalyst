@@ -366,7 +366,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * @param ruleNameToFuncOp A mapping from rule names to their corresponding function
      * operations.
      */
-    void insertChosenRules(mlir::ModuleOp module, DecompositionSolver::SolutionType &solution,
+    void insertChosenRules(mlir::ModuleOp module, GraphResult &solution,
                            llvm::StringMap<mlir::OwningOpRef<func::FuncOp>> &ruleNameToFuncOp)
     {
         for (const auto &[_, chosenRule] : solution) {

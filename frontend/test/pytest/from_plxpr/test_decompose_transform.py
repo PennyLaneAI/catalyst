@@ -34,7 +34,7 @@ from catalyst.passes import graph_decomposition
 
 
 class TestGraphDecomposition:
-    """Test the graph decomposition transform."""
+    """Test the graph-decomposition built-in transform."""
 
     @pytest.mark.usefixtures("use_capture")
     def test_with_precompiled_rule(self):
