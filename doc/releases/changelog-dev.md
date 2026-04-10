@@ -609,6 +609,10 @@
   `--convert-to-value-semantics`, optionally followed by `--canonicalize` for removing pairs of
   neighboring inverse `quantum.extract` and `quantum.insert` operations.
 
+* A new pass `--verify-no-quantum-use-after-free` was added to the new `QRef` dialect, to verify
+  that there are no uses of quantum values after they have been deallocated.
+  [(#2674)](https://github.com/PennyLaneAI/catalyst/pull/2674)
+
 * Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
   Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
   measurement logic inside an `scf.if` region rather than propagating the condition
