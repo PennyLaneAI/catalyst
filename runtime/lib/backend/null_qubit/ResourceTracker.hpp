@@ -48,6 +48,12 @@ struct ResourceTracker final {
     bool compute_depth_;
     std::string resources_filename_;
 
+    /**
+     * @brief Update the depth of the circuit given by the wires and controlled wires.
+     *
+     * @param wires The wires the operation is being applied to
+     * @param controlled_wires The control wires the operation is being applied to
+     */
     void UpdateDepth(const std::vector<QubitIdType> &wires,
                      const std::vector<QubitIdType> &controlled_wires = {})
     {
