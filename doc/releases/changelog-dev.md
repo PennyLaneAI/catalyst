@@ -763,8 +763,12 @@
 * A new compiler pass `split-non-commuting` has been added for QNode functions that measure
   non-commuting observables. It facilitates execution on devices that don't natively support
   measuring multiple non-commuting observables simultaneously by splitting them into separate
-  circuit executions, one group per observable for now.
+  circuit executions. The pass supports a `grouping_strategy` option: the default (`None`) assigns
+  each observable to its own group, while `"wires"` groups observables on non-overlapping wires into
+  the same execution, reducing the total number of generated circuits. Duplicate observables are
+  measured only once and their results are reused.
   [(#2437)](https://github.com/PennyLaneAI/catalyst/pull/2437)
+  [(#2657)](https://github.com/PennyLaneAI/catalyst/pull/2657)
 
   **Relationship to `split-to-single-terms`:** The `split-non-commuting` pass internally runs
   `split-to-single-terms` first when processing Hamiltonian expectation values. The
@@ -779,7 +783,7 @@
   from catalyst import qjit
 
   @qjit
-  @qml.transform(pass_name="split-non-commuting")
+  @qml.transform(pass_name="split-non-commuting")(grouping_strategy="wires")
   @qml.qnode(qml.device("lightning.qubit", wires=3))
   def circuit():
       # Hamiltonian H = Z(0) + 2 * X(0) + 3 * Identity
