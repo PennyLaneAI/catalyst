@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iostream"
-
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -26,6 +24,8 @@
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Gradient/Utils/GradientShape.h"
+
+#include "iostream"
 
 using namespace mlir;
 using namespace catalyst::gradient;

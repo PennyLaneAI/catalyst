@@ -16,10 +16,10 @@
 #include <string>
 #include <typeinfo>
 
+#include "OpenQASM2Builder.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
-
-#include "OpenQASM2Builder.hpp"
 
 #define TYPE_INFO(x) std::string(typeid(x).name())
 

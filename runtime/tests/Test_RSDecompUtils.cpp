@@ -15,12 +15,12 @@
 #include <cstdint>
 #include <cstdio>
 
+#include "RSUtils.hpp"
+#include "Rings.hpp"
+
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
-
-#include "RSUtils.hpp"
-#include "Rings.hpp"
 
 using namespace Catch::Matchers;
 using namespace RSDecomp::Rings;

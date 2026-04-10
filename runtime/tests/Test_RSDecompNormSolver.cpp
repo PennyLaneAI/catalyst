@@ -15,12 +15,12 @@
 #include <cstdint>
 #include <cstdio>
 
+#include "NormSolver.hpp"
+
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators_all.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
-
-#include "NormSolver.hpp"
 
 using namespace Catch::Matchers;
 using namespace RSDecomp::NormSolver;

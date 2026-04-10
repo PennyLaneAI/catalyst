@@ -21,11 +21,11 @@
 #include <tuple>
 #include <vector>
 
-#include <boost/multiprecision/miller_rabin.hpp>
-#include <boost/random.hpp>
-
 #include "RSUtils.hpp"
 #include "Rings.hpp"
+
+#include <boost/multiprecision/miller_rabin.hpp>
+#include <boost/random.hpp>
 
 #define MAX_FACTORING_TRIALS 1000
 #define FACTORING_CACHE_SIZE 100000

@@ -16,9 +16,9 @@
 
 #include <string_view>
 
-#include <dlfcn.h>
-
 #include "Exception.hpp"
+
+#include <dlfcn.h>
 
 /**
  * @brief A utility struct to handle opening, closing and retrieving symbols

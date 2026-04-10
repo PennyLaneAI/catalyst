@@ -18,9 +18,10 @@
 #include "llvm/IR/Module.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Support/LogicalResult.h"
-#include <llvm/Target/TargetMachine.h>
 
 #include "CompilerDriver.h"
+
+#include <llvm/Target/TargetMachine.h>
 
 namespace catalyst {
 namespace driver {

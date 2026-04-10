@@ -14,12 +14,12 @@
 #include <cstdint>
 #include <cstdio>
 
+#include "NormalForms.hpp"
+
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators_all.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
-
-#include "NormalForms.hpp"
 
 using namespace Catch::Matchers;
 using namespace RSDecomp::NormalForms;

@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <mlir/Dialect/Arith/IR/Arith.h>
-
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Transforms/Patterns.h"
 #include "PBC/Utils/PauliStringWrapper.h"
 #include "Quantum/IR/QuantumOps.h"
+
+#include <mlir/Dialect/Arith/IR/Arith.h>
 
 using namespace mlir;
 using namespace catalyst;

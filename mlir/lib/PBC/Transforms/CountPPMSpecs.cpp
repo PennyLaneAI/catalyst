@@ -20,7 +20,6 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
-#include <nlohmann/json.hpp>
 
 #include "Catalyst/Utils/SCFUtils.h"
 #include "PBC/IR/PBCOpInterfaces.h"
@@ -28,6 +27,8 @@
 #include "PBC/Utils/PBCLayer.h"
 #include "PBC/Utils/PBCOpUtils.h"
 #include "Quantum/IR/QuantumOps.h"
+
+#include <nlohmann/json.hpp>
 
 using namespace llvm;
 using namespace mlir;
