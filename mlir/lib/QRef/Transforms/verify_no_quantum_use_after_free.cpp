@@ -70,7 +70,6 @@ struct VerifyNoQuantumUseAfterFreePass
         DominanceInfo domInfo(mod);
 
         WalkResult wr = mod->walk([&](qref::QuantumOperation qOp) {
-            llvm::errs() << "visiting qOp " << qOp << "\n";
             for (Value &qubit : qOp.getQubitOperands()) {
                 if (hasUseAfterFree(qubit, qOp, domInfo)) {
                     qOp.emitOpError("Detected use of a qubit after deallocation");
