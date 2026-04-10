@@ -582,6 +582,7 @@
   [(#2320)](https://github.com/PennyLaneAI/catalyst/pull/2320)
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
   [(#2492)](https://github.com/PennyLaneAI/catalyst/pull/2492)
+  [(#2674)](https://github.com/PennyLaneAI/catalyst/pull/2674)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
@@ -610,6 +611,10 @@
   An MLIR program in the `QRef` dialect can be converted to the `Quantum` dialect with the new pass
   `--convert-to-value-semantics`, optionally followed by `--canonicalize` for removing pairs of
   neighboring inverse `quantum.extract` and `quantum.insert` operations.
+
+* A new pass `--verify-no-quantum-use-after-free` was added to the new `QRef` dialect, to verify
+  that there are no uses of quantum values after they have been deallocated.
+  [(#2674)](https://github.com/PennyLaneAI/catalyst/pull/2674)
 
 * Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
   Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
@@ -860,6 +865,7 @@
   [(#2572)](https://github.com/PennyLaneAI/catalyst/pull/2572)
   [(#2574)](https://github.com/PennyLaneAI/catalyst/pull/2574)
   [(#2576)](https://github.com/PennyLaneAI/catalyst/pull/2576)
+  [(#2673)](https://github.com/PennyLaneAI/catalyst/pull/2673)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
