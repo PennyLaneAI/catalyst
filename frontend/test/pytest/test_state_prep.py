@@ -43,7 +43,11 @@ def generate_random_state(n=1, seed=None):
 
 @pytest.mark.parametrize(
     "state",
-    [np.array([1, 1]), np.array([np.sqrt(1 / 2), np.sqrt(1 / 2)]), np.array([0.5, 0.5, 0.5, 0.5])],
+    [
+        np.array([1, 1]),
+        np.array([np.sqrt(1 / 2), np.sqrt(1 / 2)]),
+        np.array([np.sqrt(1 / 2), np.sqrt(1 / 2), 0, 0]),
+    ],
     ids=["unnormalized_input", "normalized_input", "correct_input"],
 )
 def test_state_prep_pad_with_kwarg(state, capture_mode):
