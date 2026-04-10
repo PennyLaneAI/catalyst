@@ -250,6 +250,7 @@ def get_quantum_compilation_stage(_options: CompileOptions) -> List[str]:
         # TODO: We can remove this pass below once PBC has its own pipeline.
         "lower-pbc-init-ops",
         "disable-assertion" if _options.disable_assertions else None,
+        "symbol-dce",
     ]
     return list(filter(partial(is_not, None), user_transform_passes))
 

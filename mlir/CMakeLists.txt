@@ -68,6 +68,26 @@ set(STABLEHLO_LIBS
     VhloTypes
 )
 
+# Decomposition Graph Solver:
+if(NOT RUNTIME_LIB_DIR)
+    message(WARNING
+        "RUNTIME_LIB_DIR not set — decompsolver will not be linked. "
+        "Build the runtime project first and pass -DRUNTIME_LIB_DIR=<path>."
+    )
+else()
+    message(STATUS "RUNTIME_LIB_DIR is set to ${RUNTIME_LIB_DIR}. Linking decompsolver.")
+    add_library(decompsolver STATIC IMPORTED GLOBAL)
+    set_target_properties(decompsolver PROPERTIES
+        IMPORTED_LOCATION "${RUNTIME_LIB_DIR}/DecompGraphSolver/libdecompsolver.a"
+    )
+    target_include_directories(decompsolver INTERFACE
+        ${PROJECT_SOURCE_DIR}/../runtime/lib/DecompGraphSolver
+        ${PROJECT_SOURCE_DIR}/../runtime/include
+    )
+endif()
+
+
+
 foreach(STABLEHLO_LIB IN LISTS STABLEHLO_LIBS)
     add_library(${STABLEHLO_LIB} STATIC IMPORTED GLOBAL)
     set_property(TARGET ${STABLEHLO_LIB} PROPERTY
