@@ -23,11 +23,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include "QuantumDevice.hpp"
-#include "QubitManager.hpp"
-
 #include "OQCRunner.hpp"
 #include "OpenQASM2Builder.hpp"
+#include "QuantumDevice.hpp"
+#include "QubitManager.hpp"
 
 using namespace Catalyst::Runtime::OpenQASM2;
 

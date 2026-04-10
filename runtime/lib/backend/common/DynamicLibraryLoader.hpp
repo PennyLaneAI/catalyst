@@ -14,10 +14,11 @@
 
 #pragma once
 
-#include <dlfcn.h>
 #include <string_view>
 
 #include "Exception.hpp"
+
+#include <dlfcn.h>
 
 /**
  * @brief A utility struct to handle opening, closing and retrieving symbols

@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "QRef/IR/QRefOps.h"
+
+#include "llvm/ADT/StringSet.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
-#include "llvm/ADT/StringSet.h"
 
 #include "QRef/IR/QRefDialect.h"
-#include "QRef/IR/QRefOps.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 
 using namespace mlir;

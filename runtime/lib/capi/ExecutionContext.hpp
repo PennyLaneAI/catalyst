@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include <dlfcn.h>
-
 #include <cstdio>
 #include <functional>
 #include <memory>
@@ -30,6 +28,8 @@
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
 #include "Types.h"
+
+#include <dlfcn.h>
 
 namespace Catalyst::Runtime {
 

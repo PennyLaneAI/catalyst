@@ -15,6 +15,7 @@
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Tools/mlir-lsp-server/MlirLspServerMain.h"
+#include "stablehlo/dialect/Register.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Gradient/IR/GradientDialect.h"
@@ -28,8 +29,6 @@
 #include "QecPhysical/IR/QecPhysicalDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "RTIO/IR/RTIODialect.h"
-
-#include "stablehlo/dialect/Register.h"
 
 int main(int argc, char **argv)
 {

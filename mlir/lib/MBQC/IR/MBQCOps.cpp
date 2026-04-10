@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "MBQC/IR/MBQCOps.h"
+
 #include "mlir/IR/Builders.h"
 
 #include "MBQC/IR/MBQCDialect.h"
-#include "MBQC/IR/MBQCOps.h"
 
 using namespace mlir;
 using namespace catalyst::mbqc;

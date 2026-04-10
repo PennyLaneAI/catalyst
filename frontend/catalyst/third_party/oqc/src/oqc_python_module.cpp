@@ -18,11 +18,11 @@
 #include <string>
 #include <vector>
 
+#include "Exception.hpp"
+
 #include <pybind11/eval.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-
-#include "Exception.hpp"
 
 std::string program = R"(
 

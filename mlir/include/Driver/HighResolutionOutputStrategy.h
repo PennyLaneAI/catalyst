@@ -14,8 +14,8 @@
 
 #pragma once
 
-#include "mlir/Support/Timing.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/Support/Timing.h"
 
 class HighResolutionOutputStrategy : public mlir::OutputStrategy {
   public:

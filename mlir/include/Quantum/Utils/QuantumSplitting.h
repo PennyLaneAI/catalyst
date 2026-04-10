@@ -14,6 +14,13 @@
 
 #pragma once
 
+#include "Catalyst/IR/CatalystDialect.h"
+#include "Catalyst/IR/CatalystOps.h"
+#include "Quantum/IR/QuantumInterfaces.h"
+
+#include <mlir/Dialect/SCF/Transforms/Transforms.h>
+#include <mlir/IR/Value.h>
+
 namespace catalyst {
 namespace quantum {
 
