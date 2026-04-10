@@ -38,7 +38,6 @@
 //     return %r0#0, %r0#1, %r1
 //   }
 
-#include <llvm/ADT/SetOperations.h>
 #define DEBUG_TYPE "split-non-commuting"
 
 #include <deque>
@@ -101,38 +100,22 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
         return qubits;
     }
 
-    /// Two observables are equivalent if they have the same op kind, same attributes,
-    /// and their qubit operands are the same SSA values.
+    /// Two observables are equivalent if they have the same exact structure.
     static bool observablesEqual(Value lhs, Value rhs)
     {
+        if (lhs == rhs) {
+            return true;
+        }
         Operation *lhsDef = lhs.getDefiningOp();
         Operation *rhsDef = rhs.getDefiningOp();
         if (!lhsDef || !rhsDef) {
             return false;
         }
-        if (lhsDef->getName() != rhsDef->getName()) {
-            return false;
-        }
 
-        if (auto lhsNamed = dyn_cast<NamedObsOp>(lhsDef)) {
-            auto rhsNamed = cast<NamedObsOp>(rhsDef);
-            return lhsNamed.getType() == rhsNamed.getType() &&
-                   lhsNamed.getQubit() == rhsNamed.getQubit();
-        }
-
-        if (auto lhsTensor = dyn_cast<TensorOp>(lhsDef)) {
-            auto rhsTensor = cast<TensorOp>(rhsDef);
-            auto lhsTerms = lhsTensor.getTerms();
-            auto rhsTerms = rhsTensor.getTerms();
-            if (lhsTerms.size() != rhsTerms.size()) {
-                return false;
-            }
-            return llvm::none_of(llvm::zip(lhsTerms, rhsTerms), [](auto pair) {
-                return !observablesEqual(std::get<0>(pair), std::get<1>(pair));
-            });
-        }
-
-        return false;
+        return OperationEquivalence::isEquivalentTo(
+            lhsDef, rhsDef,
+            [](Value l, Value r) -> LogicalResult { return success(observablesEqual(l, r)); },
+            nullptr, OperationEquivalence::Flags::IgnoreLocations);
     }
 
     struct MeasInfo {
