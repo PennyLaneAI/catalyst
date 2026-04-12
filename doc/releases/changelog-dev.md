@@ -293,6 +293,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Added support for ``StatePrep`` kwargs ``pad_with`` and ``normalize`` with program capture enabled.
+  [(#2620)](https://github.com/PennyLaneAI/catalyst/pull/2620)
+
 * A warning is issued when gridsynth pass is called with epsilon smaller than 1e-6 due to potential precision error.
   [(#2625)](https://github.com/PennyLaneAI/catalyst/pull/2625)
 
