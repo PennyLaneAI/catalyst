@@ -604,7 +604,75 @@ class TestScfForPattern:
 class TestQuantumToQecLogicalPassIntegration:
     """Integration lit tests for the convert-quantum-to-qecl pass"""
 
-    # FIXME! This test never inserts qecl.encode ops
+    @pytest.mark.usefixtures("use_capture")
+    def test_circuit_basic(self, run_filecheck_qjit):
+        """Test the simplest possible circuit"""
+        dev = qml.device("null.qubit", wires=1)
+
+        @qml.qjit(target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qml.qnode(dev, shots=1)
+        def circuit():
+            # CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
+            # CHECK: qecl.extract_block {{%.+}}[0] : !qecl.hyperreg<1 x 1> -> !qecl.codeblock<1>
+            # CHECK: qecl.encode[zero]
+            # CHECK: qecl.insert_block {{%.+}}[0], {{%.+}}
+            # CHECK: qecl.extract_block
+            # CHECK: qecl.qec
+            # CHECK: qecl.hadamard {{%.+}}[0]
+            # CHECK: qecl.qec
+            # CHECK: qecl.measure {{%.+}}[0]
+            # CHECK: quantum.mcmobs
+            # CHECK: quantum.sample
+            # CHECK: qecl.insert_block
+            # CHECK: qecl.dealloc
+            qml.H(0)
+            m0 = qml.measure(0)
+            return qml.sample([m0])
+
+        run_filecheck_qjit(circuit)
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_ghz_circuit(self, run_filecheck_qjit):
+        dev = qml.device("null.qubit", wires=3)
+
+        @qml.qjit(target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qml.qnode(dev, shots=1)
+        def circuit():
+            # CHECK: qecl.alloc() : !qecl.hyperreg<3 x 1>
+            # CHECK: scf.for {{.*}} {
+            # CHECK:   qecl.extract_block
+            # CHECK:   qecl.encode[zero]
+            # CHECK:   qecl.insert_block
+            # CHECK:   scf.yield
+            # CHECK: }
+            # CHECK: qecl.extract_block
+            # CHECK: qecl.qec
+            # CHECK: qecl.hadamard
+            # CHECK: qecl.extract_block
+            # CHECK: qecl.qec
+            # CHECK: qecl.cnot
+            # CHECK: qecl.extract_block
+            # CHECK: qecl.qec
+            # CHECK: qecl.cnot
+            # CHECK: qecl.measure
+            # CHECK: qecl.measure
+            # CHECK: qecl.measure
+            # CHECK: quantum.mcmobs
+            # CHECK: quantum.sample
+            # CHECK: qecl.insert_block
+            # CHECK: qecl.dealloc
+            qml.H(0)
+            qml.CNOT([0, 1])
+            qml.CNOT([1, 2])
+            m0 = qml.measure(0)
+            m1 = qml.measure(1)
+            m2 = qml.measure(2)
+            return qml.sample([m0, m1, m2])
+
+        run_filecheck_qjit(circuit)
+
     @pytest.mark.usefixtures("use_capture")
     def test_circuit_with_for_loop_1(self, run_filecheck_qjit):
         """TODO
@@ -660,39 +728,5 @@ class TestQuantumToQecLogicalPassIntegration:
                 qml.H(i)
             m0 = qml.measure(0)
             return qml.sample([m0])
-
-        run_filecheck_qjit(circuit)
-
-    @pytest.mark.usefixtures("use_capture")
-    def test_ghz_circuit(self, run_filecheck_qjit):
-        dev = qml.device("null.qubit", wires=3)
-
-        @qml.qjit(target="mlir")
-        @convert_quantum_to_qecl_pass(k=1)
-        @qml.qnode(dev, shots=1)
-        def circuit():
-            # CHECK: qecl.alloc() : !qecl.hyperreg<3 x 1>
-            # CHECK: qecl.extract_block
-            # CHECK: qecl.encode[zero]
-            # CHECK: qecl.qec
-            # CHECK: qecl.hadamard
-            # CHECK: qecl.extract_block
-            # CHECK: qecl.encode[zero]
-            # CHECK: qecl.qec
-            # CHECK: qecl.cnot
-            # CHECK: qecl.extract_block
-            # CHECK: qecl.encode[zero]
-            # CHECK: qecl.qec
-            # CHECK: qecl.cnot
-            # CHECK: qecl.measure
-            # CHECK: qecl.measure
-            # CHECK: qecl.measure
-            qml.H(0)
-            qml.CNOT([0, 1])
-            qml.CNOT([1, 2])
-            m0 = qml.measure(0)
-            m1 = qml.measure(1)
-            m2 = qml.measure(2)
-            return qml.sample([m0, m1, m2])
 
         run_filecheck_qjit(circuit)
