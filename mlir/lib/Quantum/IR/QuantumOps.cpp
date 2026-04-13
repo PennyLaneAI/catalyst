@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/IR/SymbolTable.h"
 #include <llvm/Support/Casting.h>
 #include <mlir/IR/ValueRange.h>
-#include "mlir/IR/SymbolTable.h"
 #include <optional>
 #include <type_traits>
 
@@ -571,24 +571,20 @@ LogicalResult AdjointOp::verify()
     return success();
 }
 
-CallInterfaceCallable TemplateOp::getCallableForCallee() {
-    return getSymNameAttr();
-}
+CallInterfaceCallable TemplateOp::getCallableForCallee() { return getSymNameAttr(); }
 
-void TemplateOp::setCalleeFromCallable(CallInterfaceCallable callee) {
+void TemplateOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
     auto symRef = llvm::cast<SymbolRefAttr>(callee);
     setSymNameAttr(llvm::cast<FlatSymbolRefAttr>(symRef));
 }
 
-Operation::operand_range TemplateOp::getArgOperands() {
-    return getOperands();
-}
+Operation::operand_range TemplateOp::getArgOperands() { return getOperands(); }
 
-MutableOperandRange TemplateOp::getArgOperandsMutable() {
-    return MutableOperandRange(*this);
-}
+MutableOperandRange TemplateOp::getArgOperandsMutable() { return MutableOperandRange(*this); }
 
-LogicalResult TemplateOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+LogicalResult TemplateOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
     if (auto symName = getSymNameAttr()) {
         if (!symbolTable.lookupNearestSymbolFrom(*this, symName)) {
             return emitOpError() << "uses unknown symbol: " << symName;
@@ -597,16 +593,16 @@ LogicalResult TemplateOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     return success();
 }
 
-void TemplateOp::print(OpAsmPrinter &p) {
+void TemplateOp::print(OpAsmPrinter &p)
+{
     // 1. Subroutine Name
     p << " ";
     p.printAttribute(getSubroutineNameAttr());
 
     // 2. Variadic Inputs: (%arg0 : type, ...)
     p << "(";
-    llvm::interleaveComma(llvm::zip(getInputs(), getInputs().getTypes()), p, [&](auto pair) {
-        p << std::get<0>(pair) << " : " << std::get<1>(pair);
-    });
+    llvm::interleaveComma(llvm::zip(getInputs(), getInputs().getTypes()), p,
+                          [&](auto pair) { p << std::get<0>(pair) << " : " << std::get<1>(pair); });
     p << ")";
 
     // Increase indent for the multi-line operand/result block
@@ -615,9 +611,8 @@ void TemplateOp::print(OpAsmPrinter &p) {
 
     // 3. Second Line: qreg and qubit_inds
     p << "qreg " << getInQreg() << " qubit_inds (";
-    llvm::interleaveComma(llvm::zip(getQubitInds(), getQubitInds().getTypes()), p, [&](auto pair) {
-        p << std::get<0>(pair) << " : " << std::get<1>(pair);
-    });
+    llvm::interleaveComma(llvm::zip(getQubitInds(), getQubitInds().getTypes()), p,
+                          [&](auto pair) { p << std::get<0>(pair) << " : " << std::get<1>(pair); });
     p << ")";
 
     // 4. Third Line: Results
@@ -628,9 +623,11 @@ void TemplateOp::print(OpAsmPrinter &p) {
     auto varResTypes = getResults().getTypes();
     if (varResTypes.empty()) {
         p << "()";
-    } else if (varResTypes.size() == 1) {
+    }
+    else if (varResTypes.size() == 1) {
         p << varResTypes.front();
-    } else {
+    }
+    else {
         p << "(";
         llvm::interleaveComma(varResTypes, p);
         p << ")";
@@ -640,10 +637,9 @@ void TemplateOp::print(OpAsmPrinter &p) {
     p << " qreg " << getOutQreg().getType();
 
     // 5. Attribute Dictionary
-    p.printOptionalAttrDict(
-        getOperation()->getAttrs(),
-        {"subroutine_name", "param_map", "in_qubits_map", "static_data", "sym_name", "operand_segment_sizes"}
-    );
+    p.printOptionalAttrDict(getOperation()->getAttrs(),
+                            {"subroutine_name", "param_map", "in_qubits_map", "static_data",
+                             "sym_name", "operand_segment_sizes"});
 
     // 6. Indented Properties
     p.printNewline();
@@ -663,7 +659,8 @@ void TemplateOp::print(OpAsmPrinter &p) {
     p.decreaseIndent();
 }
 
-ParseResult TemplateOp::parse(OpAsmParser &parser, OperationState &result) {
+ParseResult TemplateOp::parse(OpAsmParser &parser, OperationState &result)
+{
     // 1. Parse Subroutine Name
     StringAttr subroutineName;
     if (parser.parseAttribute(subroutineName, "subroutine_name", result.attributes))
@@ -712,16 +709,15 @@ ParseResult TemplateOp::parse(OpAsmParser &parser, OperationState &result) {
 
     if (parser.resolveOperands(inputs, inputTypes, parser.getCurrentLocation(), result.operands) ||
         parser.resolveOperand(inQreg, inQregType, result.operands) ||
-        parser.resolveOperands(qubitInds, qubitIndTypes, parser.getCurrentLocation(), result.operands))
+        parser.resolveOperands(qubitInds, qubitIndTypes, parser.getCurrentLocation(),
+                               result.operands))
         return failure();
 
     // *** CRITICAL STEP FOR AttrSizedOperandSegments ***
-    result.addAttribute("operand_segment_sizes",
-        parser.getBuilder().getDenseI32ArrayAttr({
-            static_cast<int32_t>(inputs.size()),
-            1, // in_qreg
-            static_cast<int32_t>(qubitInds.size())
-        }));
+    result.addAttribute("operand_segment_sizes", parser.getBuilder().getDenseI32ArrayAttr(
+                                                     {static_cast<int32_t>(inputs.size()),
+                                                      1, // in_qreg
+                                                      static_cast<int32_t>(qubitInds.size())}));
 
     // 6. Parse Return Types
     if (parser.parseArrow())
@@ -734,7 +730,8 @@ ParseResult TemplateOp::parse(OpAsmParser &parser, OperationState &result) {
             if (parser.parseTypeList(varResTypes) || parser.parseRParen())
                 return failure();
         }
-    } else {
+    }
+    else {
         Type resType;
         if (parser.parseType(resType))
             return failure();
