@@ -44,6 +44,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_get_p,
     qref_hermitian_p,
     qref_namedobs_p,
+    qref_pauli_rot_p,
     qref_qinst_p,
 )
 from catalyst.jax_extras import jaxpr_pad_consts
@@ -51,23 +52,17 @@ from catalyst.jax_primitives import (
     AbstractQbit,
     MeasurementPlane,
     adjoint_p,
-    compbasis_p,
     cond_p,
     counts_p,
     decomprule_p,
     expval_p,
     gphase_p,
     hamiltonian_p,
-    hermitian_p,
     mcmobs_p,
     measure_in_basis_p,
     measure_p,
-    namedobs_p,
     pauli_measure_p,
-    pauli_rot_p,
     probs_p,
-    qalloc_p,
-    qdealloc_p,
     qinst_p,
     sample_p,
     set_basis_state_p,
@@ -370,7 +365,7 @@ def _pauli_rot_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint,
     pauli_word = hyperparameters["pauli_word"]
     ctrl_wires = invals[qubits_len + params_len : qubits_len + params_len + ctrl_len]
     ctrl_values = invals[qubits_len + params_len + ctrl_len :]
-    return pauli_rot_p.bind(
+    return qref_pauli_rot_p.bind(
         *[*wires, *params, *ctrl_wires, *ctrl_values],
         pauli_word=pauli_word,
         qubits_len=qubits_len,

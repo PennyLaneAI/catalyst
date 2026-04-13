@@ -178,3 +178,44 @@ def test_pcphase():
 
 
 print(test_pcphase.mlir)
+
+
+# CHECK: func.func public @test_pauli_rot() -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=4))
+def test_pauli_rot():
+    """
+    Test paulirot.
+    """
+    # CHECK-DAG: [[true:%.+]] = arith.constant true
+    # CHECK-DAG: [[false:%.+]] = arith.constant false
+    # CHECK-DAG: [[three:%.+]] = arith.constant 3 : i64
+    # CHECK-DAG: [[two:%.+]] = arith.constant 2 : i64
+    # CHECK-DAG: [[one:%.+]] = arith.constant 1 : i64
+    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
+    # CHECK-DAG: [[angle:%.+]] = arith.constant 1.000000e-01 : f64
+
+    # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
+
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: qref.paulirot ["X"]([[angle]]) [[q0]] : !qref.bit
+    qp.PauliRot(0.1, ["X"], wires=[0])
+
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][[[one]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][[[two]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: qref.paulirot ["Y", "I"]([[angle]]) [[q1]], [[q2]] : !qref.bit, !qref.bit
+    qp.PauliRot(0.1, ["Y", "I"], wires=[1, 2])
+
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][[[two]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[q3:%.+]] = qref.get [[reg]][[[three]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][[[one]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: qref.paulirot ["Z", "X"]([[angle]]) [[q2]], [[q3]] ctrls([[q0]], [[q1]]) ctrlvals([[true]], [[false]]) : !qref.bit, !qref.bit ctrls !qref.bit, !qref.bit
+    qp.ctrl(
+        qp.PauliRot(0.1, ["Z", "X"], wires=[2, 3]), control=[0, 1], control_values=[True, False]
+    )
+
+    return qp.expval(qp.X(0))
+
+
+print(test_pauli_rot.mlir)
