@@ -108,3 +108,34 @@ def test_dynamic_qubit_allocation(i: int):
 
 
 print(test_dynamic_qubit_allocation.mlir)
+
+
+# CHECK: func.func public @test_multirz() -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def test_multirz():
+    """
+    Test multirz.
+    """
+    # CHECK-DAG: [[true:%.+]] = arith.constant true
+    # CHECK-DAG: [[two:%.+]] = arith.constant 2 : i64
+    # CHECK-DAG: [[one:%.+]] = arith.constant 1 : i64
+    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
+    # CHECK-DAG: [[angle:%.+]] = arith.constant 1.000000e-01 : f64
+
+    # CHECK: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
+
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: qref.multirz([[angle]]) [[q1]] : !qref.bit
+    qp.MultiRZ(0.1, wires=1)
+
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][[[two]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: qref.multirz([[angle]]) [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit, !qref.bit ctrls !qref.bit
+    qp.ctrl(qp.MultiRZ, control=0, control_values=True)(0.1, wires=[1, 2])
+
+    return qp.expval(qp.X(0))
+
+
+print(test_multirz.mlir)
