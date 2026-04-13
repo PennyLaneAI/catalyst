@@ -275,6 +275,36 @@ def CnotOp : QecPhysical_Op<"cnot", [
     }];
 }
 
+/**
+ * A physical Rot gate operation.
+ *
+ * ```mlir
+ * %1 = qecp.rot (%phi, %theta, %omega) %0 : !qecp.qubit<data>
+ * ```
+ */
+def RotOp: QecPhysical_Op<"rot", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical Rot gate operation.";
+
+    let description = [{
+        This operation is for physical noise injection only.
+    }];
+
+    let arguments = (ins
+        F64:$phi,
+        F64:$theta,
+        F64:$omega,
+        QecPhysicalQubitType:$in_qubit
+    );
+
+    let results = (outs
+        QecPhysicalQubitType:$out_qubit
+    );
+
+    let assemblyFormat = [{
+        `(` $phi `,` $theta `,` $omega `)` $in_qubit attr-dict `:` qualified(type($in_qubit))
+    }];
+}
+
 def MeasureOp : QecPhysical_Op<"measure", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
     let summary = "A physical single-qubit projective measurement in the computational basis.";
 
