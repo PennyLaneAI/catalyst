@@ -277,3 +277,27 @@ def test_unitary():
 
 
 print(test_unitary.mlir)
+
+
+# CHECK: func.func public @test_set_state(%arg0: tensor<4xi64>) -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=4))
+def test_set_state():
+    """
+    Test set_state.
+    """
+    # CHECK-DAG: [[two:%.+]] = arith.constant 2 : i64
+    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
+
+    # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
+
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][[[two]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[state:%.+]] = stablehlo.convert %arg0 : (tensor<4xi64>) -> tensor<4xcomplex<f64>>
+    # CHECK: qref.set_state([[state]]) [[q0]], [[q2]] : tensor<4xcomplex<f64>>, !qref.bit, !qref.bit
+    qp.StatePrep(np.array([0, 0, 1, 0]), wires=[0, 2])
+
+    return qp.expval(qp.X(0))
+
+
+print(test_set_state.mlir)

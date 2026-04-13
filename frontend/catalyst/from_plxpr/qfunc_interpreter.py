@@ -47,6 +47,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_namedobs_p,
     qref_pauli_rot_p,
     qref_qinst_p,
+    qref_set_state_p,
     qref_unitary_p,
 )
 from catalyst.jax_extras import jaxpr_pad_consts
@@ -67,7 +68,6 @@ from catalyst.jax_primitives import (
     qinst_p,
     sample_p,
     set_basis_state_p,
-    set_state_p,
     state_p,
     tensorobs_p,
     var_p,
@@ -667,17 +667,13 @@ def handle_state_prep(self, *invals, n_wires, **kwargs):
     """Handle the conversion from plxpr to Catalyst jaxpr for the StatePrep primitive"""
     state_inval = invals[0]
     wires_inval = invals[1:]
+    in_qubits = [qref_get_p.bind(self.init_qreg, w) for w in wires_inval]
 
     # jnp.complex128 is the top element in the type promotion lattice so it is ok to do this:
     # https://jax.readthedocs.io/en/latest/type_promotion.html
     state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.complex128))
-    in_qregs, in_qubits = get_in_qubit_values(
-        wires_inval, self.qubit_index_recorder, self.init_qreg
-    )
-    out_wires = set_state_p.bind(*in_qubits, state)
 
-    for in_qreg, w, new_wire in zip(in_qregs, wires_inval, out_wires):
-        in_qreg[in_qreg.global_index_to_local_index(w)] = new_wire
+    qref_set_state_p.bind(*in_qubits, state)
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_measure_prim)

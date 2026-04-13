@@ -66,6 +66,7 @@ with Patcher(
         PauliRotOp,
         PCPhaseOp,
         QubitUnitaryOp,
+        SetStateOp,
     )
 
 
@@ -135,6 +136,8 @@ qref_alloc_p = Primitive("qref_alloc")
 qref_dealloc_p = Primitive("qref_dealloc")
 qref_dealloc_p.multiple_results = True
 qref_get_p = Primitive("qref_get")
+qref_set_state_p = Primitive("qref_state_prep")
+qref_set_state_p.multiple_results = True
 qref_qinst_p = Primitive("qref_qinst")
 qref_qinst_p.multiple_results = True
 qref_gphase_p = Primitive("qref_gphase")
@@ -218,6 +221,24 @@ def _qref_get_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_
 
     qubit_type = ir.OpaqueType.get("qref", "bit", ctx)
     return GetOp(qubit_type, qreg, idx=qubit_idx).results
+
+
+#
+# state_prep
+#
+@qref_set_state_p.def_abstract_eval
+def _qref_set_state_abstract_eval(*qubits_or_params):
+    """Abstract evaluation"""
+    return ()
+
+
+def _qref_set_state_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or_params):
+    """Lowering of set state"""
+    qubits_or_params = list(qubits_or_params)
+    param = qubits_or_params.pop()
+    qubits = qubits_or_params
+    SetStateOp(param, qubits).results
+    return ()
 
 
 #
@@ -597,6 +618,7 @@ CUSTOM_LOWERING_RULES = (
     (qref_alloc_p, _qref_alloc_lowering),
     (qref_dealloc_p, _qref_dealloc_lowering),
     (qref_get_p, _qref_get_lowering),
+    (qref_set_state_p, _qref_set_state_lowering),
     (qref_qinst_p, _qref_qinst_lowering),
     (qref_gphase_p, _qref_gphase_lowering),
     (qref_pauli_rot_p, _qref_pauli_rot_lowering),
