@@ -14,11 +14,11 @@ IncludeBlocks: Regroup
 
 IncludeCategories:
   # System/STL
-  - Regex:    '^(<)(([^.]+)|((std.*|complex|sys.*)\.h))(>)$'
+  - Regex:    '^(<)(([^.]+)|((std.*|complex|sys.*|dlfcn)\.h))(>)$'
     Priority: 1
 
   # Dependencies
-  - Regex:    '^(")(llvm|Enzyme|absl|boost|catch2|dlfcn|gmock|gtest|hlo-extensions|jax_cpu_lapack_kernels|mlir|nanobind|nlohmann|numpy|pybind11|stablehlo|stim|toml\+\+|xla)(.*)\.([hcp]+)(")$'
+  - Regex:    '^(")(llvm|Enzyme|absl|boost|catch2|gmock|gtest|hlo-extensions|jax_cpu_lapack_kernels|mlir|nanobind|nlohmann|numpy|pybind11|stablehlo|stim|toml\+\+|xla)(.*)\.([hcp]+)(")$'
     Priority: 2
 
   # Local headers
