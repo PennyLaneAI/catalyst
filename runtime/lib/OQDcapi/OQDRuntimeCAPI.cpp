@@ -15,12 +15,12 @@
 #include "OQDRuntimeCAPI.h"
 
 #include <fstream>
-#include <functional> // std::reference_wrapper
-#include <iostream>
 #include <unordered_map>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "nlohmann/json.hpp"
+
+#include "Exception.hpp"
 
 using json = nlohmann::json;
 

@@ -15,7 +15,6 @@
 #pragma once
 
 #include <complex>
-#include <memory>
 #include <optional>
 #include <random>
 #include <vector>

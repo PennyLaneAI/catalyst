@@ -16,9 +16,8 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-#include <cmath>
+#include <cstddef>
 #include <cstdint>
-#include <limits>
 
 #ifdef __cplusplus
 extern "C" {

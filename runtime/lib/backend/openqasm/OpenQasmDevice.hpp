@@ -17,9 +17,7 @@
 #define __device_openqasm
 
 #include <algorithm>
-#include <bitset>
 #include <memory>
-#include <numeric>
 #include <set>
 #include <string>
 #include <unordered_map>

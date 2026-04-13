@@ -15,12 +15,11 @@
 #pragma once
 
 #include <array>
-#include <cmath>
 #include <complex>
 #include <optional>
 
-#include <boost/multiprecision/cpp_dec_float.hpp>
-#include <boost/multiprecision/cpp_int.hpp>
+#include "boost/multiprecision/cpp_dec_float.hpp"
+#include "boost/multiprecision/cpp_int.hpp"
 
 namespace RSDecomp::Rings {
 

@@ -15,21 +15,17 @@
 #pragma once
 
 #include <cstdio>
-#include <functional>
+#include <dlfcn.h>
 #include <memory>
 #include <mutex>
 #include <random>
 #include <string>
 #include <string_view>
 #include <tuple>
-#include <unordered_map>
 #include <unordered_set>
 
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
-#include "Types.h"
-
-#include <dlfcn.h>
 
 namespace Catalyst::Runtime {
 

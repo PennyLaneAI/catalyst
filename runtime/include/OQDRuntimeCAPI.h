@@ -18,8 +18,8 @@
 
 #include <array>
 #include <cstdint>
+#include <vector>
 
-#include "Exception.hpp"
 #include "Types.h"
 
 #ifdef __cplusplus
