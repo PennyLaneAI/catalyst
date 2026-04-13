@@ -16,7 +16,6 @@
 
 #include <memory>
 
-#include "hlo-extensions/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
 #include "mlir/Conversion/BufferizationToMemRef/BufferizationToMemRef.h"
@@ -48,6 +47,7 @@
 #include "PBC/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
+#include "hlo-extensions/Transforms/Passes.h"
 
 using namespace mlir;
 
