@@ -597,7 +597,7 @@ class TestForLoopDynamicShapes:
             return qml.expval(qml.Z(0))
 
         result = f(3)
-        expected = jnp.cos(6) # 2*np.ones(3)
+        expected = jnp.cos(6)  # 2*np.ones(3)
         assert qml.math.allclose(result, expected)
 
     def test_qnode_forloop_indbidx_outdbidx(self, capture_mode):
@@ -625,7 +625,7 @@ class TestForLoopDynamicShapes:
         expected_a = jnp.cos(3)
         expected_b = jnp.cos(4)
         assert jnp.allclose(res_a, expected_a)
-        assert jnp.allclose(res_b, expected_b) 
+        assert jnp.allclose(res_b, expected_b)
 
     def test_qnode_forloop_abstracted_axes(self, capture_mode):
         """Test for-loops with mixed input and output dimension variables during the quantum tracing.
@@ -712,7 +712,6 @@ class TestForLoopDynamicShapes:
 
         _id3 = id(circuit.compiled_function)
         assert _id0 == _id3
-
 
 
 def test_quantum_tracing_1():
