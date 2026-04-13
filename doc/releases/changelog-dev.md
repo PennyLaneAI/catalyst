@@ -293,6 +293,16 @@
 
 <h3>Improvements 🛠</h3>
 
+* Added support for ``StatePrep`` kwargs ``pad_with`` and ``normalize`` with program capture enabled.
+  [(#2620)](https://github.com/PennyLaneAI/catalyst/pull/2620)
+  
+* `abstracted_axes` now work with `qjit` and `capture=True`.
+  [(#2655)](https://github.com/PennyLaneAI/catalyst/pull/2655)
+
+* Added support for ``PauliRot`` and ``PauliMeasure`` execution on the `null.qubit` device, which enables
+  runtime resource tracking for those operations.
+  [(#2627)](https://github.com/PennyLaneAI/catalyst/pull/2627)
+
 * A warning is issued when gridsynth pass is called with epsilon smaller than 1e-6 due to potential precision error.
   [(#2625)](https://github.com/PennyLaneAI/catalyst/pull/2625)
 
@@ -403,6 +413,7 @@
 
 * `catalyst.from_plxpr.register_transforms` as a way to access MLIR passes from Python has been removed in favour of the new unified transforms API. MLIR passes can be accessed from Python using `qml.transform(pass_name="some-pass-name")`.
   [(#2509)](https://github.com/PennyLaneAI/catalyst/pull/2509)
+  [(#2680)](https://github.com/PennyLaneAI/catalyst/pull/2680)
 
 * `catalyst.jax_primitives.subroutine` has been moved to `qml.capture.subroutine`.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
@@ -862,6 +873,7 @@
   [(#2572)](https://github.com/PennyLaneAI/catalyst/pull/2572)
   [(#2574)](https://github.com/PennyLaneAI/catalyst/pull/2574)
   [(#2576)](https://github.com/PennyLaneAI/catalyst/pull/2576)
+  [(#2673)](https://github.com/PennyLaneAI/catalyst/pull/2673)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
