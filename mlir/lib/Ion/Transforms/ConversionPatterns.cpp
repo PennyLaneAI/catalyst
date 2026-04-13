@@ -15,13 +15,12 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/IRMapping.h"
+#include "nlohmann/json.hpp"
 
 #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "Ion/IR/IonOps.h"
 #include "Ion/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
-
-#include <nlohmann/json.hpp>
 
 using namespace mlir;
 using namespace catalyst::ion;

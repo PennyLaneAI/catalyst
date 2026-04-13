@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "DataView.hpp"
+#include "Exception.hpp"
 #include "Types.h"
 
 // A helper template macro to generate the <IDENTIFIER>Factory function by

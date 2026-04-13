@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include <mlir/IR/DialectRegistry.h>
+#include "mlir/IR/DialectRegistry.h"
 
 namespace catalyst {
 namespace quantum {

@@ -21,8 +21,6 @@
 #include "oqd_database_types.hpp"
 #include "oqd_database_utils.hpp"
 
-#include <toml++/toml.hpp>
-
 namespace catalyst {
 namespace ion {
 

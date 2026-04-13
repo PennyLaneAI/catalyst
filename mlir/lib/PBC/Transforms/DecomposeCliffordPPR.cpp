@@ -14,16 +14,16 @@
 
 #define DEBUG_TYPE "decompose-clifford-ppr"
 
+#include "mlir/Dialect/Arith/IR/Arith.h" // for arith::XOrIOp and arith::ConstantOp
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/Value.h"
+
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Transforms/PPRDecomposeUtils.h"
 #include "PBC/Transforms/Patterns.h"
 #include "PBC/Utils/PauliStringWrapper.h"
 #include "Quantum/IR/QuantumOps.h"
-
-#include <mlir/Dialect/Arith/IR/Arith.h> // for arith::XOrIOp and arith::ConstantOp
-#include <mlir/Dialect/SCF/IR/SCF.h>
-#include <mlir/IR/Builders.h>
-#include <mlir/IR/Value.h>
 
 using namespace mlir;
 using namespace catalyst::pbc;
