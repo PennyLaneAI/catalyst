@@ -47,6 +47,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_namedobs_p,
     qref_pauli_rot_p,
     qref_qinst_p,
+    qref_unitary_p,
 )
 from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import (
@@ -69,7 +70,6 @@ from catalyst.jax_primitives import (
     set_state_p,
     state_p,
     tensorobs_p,
-    unitary_p,
     var_p,
 )
 from catalyst.utils.exceptions import CompileError
@@ -315,7 +315,7 @@ def _qubit_unitary_bind_call(
     wires = invals[:qubits_len]
     mat = invals[qubits_len]
     ctrl_inputs = invals[qubits_len + 1 :]
-    return unitary_p.bind(
+    return qref_unitary_p.bind(
         mat, *wires, *ctrl_inputs, qubits_len=qubits_len, ctrl_len=ctrl_len, adjoint=adjoint
     )
 

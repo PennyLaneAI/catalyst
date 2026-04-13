@@ -24,6 +24,7 @@ from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.arith import (
     ExtUIOp,
 )
+from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
@@ -64,6 +65,7 @@ with Patcher(
         NamedObsOp,
         PauliRotOp,
         PCPhaseOp,
+        QubitUnitaryOp,
     )
 
 
@@ -139,6 +141,8 @@ qref_gphase_p = Primitive("qref_gphase")
 qref_gphase_p.multiple_results = True
 qref_pauli_rot_p = Primitive("qref_pauli_rot")
 qref_pauli_rot_p.multiple_results = True
+qref_unitary_p = Primitive("qref_unitary")
+qref_unitary_p.multiple_results = True
 qref_compbasis_p = Primitive("qref_compbasis")
 qref_namedobs_p = Primitive("qref_namedobs")
 qref_hermitian_p = Primitive("qref_hermitian")
@@ -437,6 +441,76 @@ def _qref_pauli_rot_lowering(
 
 
 #
+# qubit unitary operation
+#
+@qref_unitary_p.def_abstract_eval
+def _qref_unitary_abstract_eval(matrix, *qubits, qubits_len=0, ctrl_len=0, adjoint=False):
+    for idx in range(qubits_len + ctrl_len):
+        qubit = qubits[idx]
+        assert isinstance(qubit, QrefQubit)
+    return ()
+
+
+def _qref_unitary_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    matrix: ir.Value,
+    *qubits_or_controlled: tuple,
+    qubits_len=0,
+    ctrl_len=0,
+    adjoint=False,
+):
+    qubits = qubits_or_controlled[:qubits_len]
+    ctrl_qubits = qubits_or_controlled[qubits_len : qubits_len + ctrl_len]
+    ctrl_values = qubits_or_controlled[qubits_len + ctrl_len :]
+
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    for q in qubits:
+        assert ir.OpaqueType.isinstance(q.type)
+        assert ir.OpaqueType(q.type).dialect_namespace == "qref"
+        assert ir.OpaqueType(q.type).data == "bit"
+
+    matrix_type = matrix.type
+    is_tensor = ir.RankedTensorType.isinstance(matrix_type)
+    shape = ir.RankedTensorType(matrix_type).shape if is_tensor else None
+    is_2d_tensor = len(shape) == 2 if is_tensor else False
+    if not is_2d_tensor:
+        raise TypeError("QubitUnitary must be a 2 dimensional tensor.")
+
+    possibly_complex_type = ir.RankedTensorType(matrix_type).element_type
+    is_complex = ir.ComplexType.isinstance(possibly_complex_type)
+    is_f64_type = False
+
+    if is_complex:
+        complex_type = ir.ComplexType(possibly_complex_type)
+        possibly_f64_type = complex_type.element_type
+        is_f64_type = ir.F64Type.isinstance(possibly_f64_type)
+
+    is_complex_f64_type = is_complex and is_f64_type
+    if not is_complex_f64_type:
+        f64_type = ir.F64Type.get()
+        complex_f64_type = ir.ComplexType.get(f64_type)
+        tensor_complex_f64_type = ir.RankedTensorType.get(shape, complex_f64_type)
+        matrix = StableHLOConvertOp(tensor_complex_f64_type, matrix).result
+
+    ctrl_values_i1 = []
+    for v in ctrl_values:
+        p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
+        ctrl_values_i1.append(p)
+
+    QubitUnitaryOp(
+        matrix=matrix,
+        qubits=qubits,
+        ctrl_qubits=ctrl_qubits,
+        ctrl_values=ctrl_values_i1,
+        adjoint=adjoint,
+    ).results
+
+    return ()
+
+
+#
 # compbasis observable
 #
 @qref_compbasis_p.def_abstract_eval
@@ -526,6 +600,7 @@ CUSTOM_LOWERING_RULES = (
     (qref_qinst_p, _qref_qinst_lowering),
     (qref_gphase_p, _qref_gphase_lowering),
     (qref_pauli_rot_p, _qref_pauli_rot_lowering),
+    (qref_unitary_p, _qref_unitary_lowering),
     (qref_compbasis_p, _qref_compbasis_lowering),
     (qref_namedobs_p, _qref_named_obs_lowering),
     (qref_hermitian_p, _qref_hermitian_lowering),
