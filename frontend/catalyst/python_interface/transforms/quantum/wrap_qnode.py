@@ -16,8 +16,6 @@
 calls the QNode, so that post-processing can be injected after the QNode call.
 """
 
-from dataclasses import dataclass
-
 from pennylane.exceptions import CompileError
 from xdsl import context, passes, pattern_rewriter
 from xdsl.ir import Operation
