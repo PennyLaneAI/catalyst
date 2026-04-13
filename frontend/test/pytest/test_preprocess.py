@@ -664,7 +664,7 @@ class TestAdjointCallableLazyFalse:
 
                 @for_loop(0, 3, 1)
                 def loop(i):
-                    qml.RX(0.5, wires=i)
+                    qml.RY(0.5, wires=i)
                     qml.CNOT(wires=[i, i + 1])
 
                 loop()
