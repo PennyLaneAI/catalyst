@@ -297,7 +297,11 @@
   [(#2620)](https://github.com/PennyLaneAI/catalyst/pull/2620)
   
 * `abstracted_axes` now work with `qjit` and `capture=True`.
-  [(#2655)](https://github.com/PennyLaneAI/catalyst/pull/2655/)
+  [(#2655)](https://github.com/PennyLaneAI/catalyst/pull/2655)
+
+* Added support for ``PauliRot`` and ``PauliMeasure`` execution on the `null.qubit` device, which enables
+  runtime resource tracking for those operations.
+  [(#2627)](https://github.com/PennyLaneAI/catalyst/pull/2627)
 
 * A warning is issued when gridsynth pass is called with epsilon smaller than 1e-6 due to potential precision error.
   [(#2625)](https://github.com/PennyLaneAI/catalyst/pull/2625)
