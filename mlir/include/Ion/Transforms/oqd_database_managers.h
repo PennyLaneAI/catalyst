@@ -18,8 +18,8 @@
 #include <cassert>
 #include <set>
 
-#include "oqd_database_types.hpp"
-#include "oqd_database_utils.hpp"
+#include "oqd_database_types.h"
+#include "oqd_database_utils.h"
 
 namespace catalyst {
 namespace ion {
