@@ -25,4 +25,8 @@ def ValueSemanticsConversionPass : Pass<"convert-to-value-semantics"> {
     ];
 }
 
+def VerifyNoQuantumUseAfterFreePass : Pass<"verify-no-quantum-use-after-free"> {
+    let summary = "Verify that the quantum program has no uses of qubits or registers after they have been deallocated";
+}
+
 #endif // QREF_PASSES

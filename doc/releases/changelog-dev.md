@@ -282,6 +282,10 @@
   [(#2531)](https://github.com/PennyLaneAI/catalyst/pull/2531)
   [(#2619)](https://github.com/PennyLaneAI/catalyst/pull/2531)
 
+* Decomposition rules are lowered as private functions (instead of public).
+  [(#2658)](https://github.com/PennyLaneAI/catalyst/pull/2658)
+  [(#2660)](https://github.com/PennyLaneAI/catalyst/pull/2660)
+
 * A new optimization pass has been added to reduce the number of instructions in a quantum program,
   `--merge-global-phase`, which safely combines global phase instructions for each region in the
   program. The xDSL version written in Python has been removed.
@@ -289,9 +293,12 @@
 
 <h3>Improvements 🛠</h3>
 
+* `abstracted_axes` now work with `qjit` and `capture=True`.
+  [(#2655)](https://github.com/PennyLaneAI/catalyst/pull/2655)
+
 * Added support for ``PauliRot`` and ``PauliMeasure`` execution on the `null.qubit` device, which enables
   runtime resource tracking for those operations.
-  [(#2625)](https://github.com/PennyLaneAI/catalyst/pull/2625)
+  [(#2627)](https://github.com/PennyLaneAI/catalyst/pull/2627)
 
 * A warning is issued when gridsynth pass is called with epsilon smaller than 1e-6 due to potential precision error.
   [(#2625)](https://github.com/PennyLaneAI/catalyst/pull/2625)
@@ -443,6 +450,7 @@
   when there are multiple named observables or Hermitian observables on that same wire index,
   when capture is not enabled.
   [(#2641)](https://github.com/PennyLaneAI/catalyst/pull/2641)
+  [(#2646)](https://github.com/PennyLaneAI/catalyst/pull/2646)
 
 * :func:`~pennylane.adjoint` can now be used on subroutines with classical arguments.
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
@@ -514,6 +522,12 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Refactors `draw_graph` implementation to improve maintainability.
+  [(#2659)](https://github.com/PennyLaneAI/catalyst/pull/2659)
+
+* Bump `black` version to 26.3.1 to eliminate the vulnerability reported by dependabot.
+  [(#2650)](https://github.com/PennyLaneAI/catalyst/pull/2650)
+
 * Updated Catalyst's Catch2 dependency to v3.11.0.
   [(#2634)](https://github.com/PennyLaneAI/catalyst/pull/2634)
 
@@ -572,6 +586,7 @@
   [(#2320)](https://github.com/PennyLaneAI/catalyst/pull/2320)
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
   [(#2492)](https://github.com/PennyLaneAI/catalyst/pull/2492)
+  [(#2674)](https://github.com/PennyLaneAI/catalyst/pull/2674)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
@@ -600,6 +615,10 @@
   An MLIR program in the `QRef` dialect can be converted to the `Quantum` dialect with the new pass
   `--convert-to-value-semantics`, optionally followed by `--canonicalize` for removing pairs of
   neighboring inverse `quantum.extract` and `quantum.insert` operations.
+
+* A new pass `--verify-no-quantum-use-after-free` was added to the new `QRef` dialect, to verify
+  that there are no uses of quantum values after they have been deallocated.
+  [(#2674)](https://github.com/PennyLaneAI/catalyst/pull/2674)
 
 * Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
   Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
@@ -756,8 +775,12 @@
 * A new compiler pass `split-non-commuting` has been added for QNode functions that measure
   non-commuting observables. It facilitates execution on devices that don't natively support
   measuring multiple non-commuting observables simultaneously by splitting them into separate
-  circuit executions, one group per observable for now.
+  circuit executions. The pass supports a `grouping_strategy` option: the default (`None`) assigns
+  each observable to its own group, while `"wires"` groups observables on non-overlapping wires into
+  the same execution, reducing the total number of generated circuits. Duplicate observables are
+  measured only once and their results are reused.
   [(#2437)](https://github.com/PennyLaneAI/catalyst/pull/2437)
+  [(#2657)](https://github.com/PennyLaneAI/catalyst/pull/2657)
 
   **Relationship to `split-to-single-terms`:** The `split-non-commuting` pass internally runs
   `split-to-single-terms` first when processing Hamiltonian expectation values. The
@@ -772,7 +795,7 @@
   from catalyst import qjit
 
   @qjit
-  @qml.transform(pass_name="split-non-commuting")
+  @qml.transform(pass_name="split-non-commuting")(grouping_strategy="wires")
   @qml.qnode(qml.device("lightning.qubit", wires=3))
   def circuit():
       # Hamiltonian H = Z(0) + 2 * X(0) + 3 * Identity
@@ -835,6 +858,7 @@
   [(#2544)](https://github.com/PennyLaneAI/catalyst/pull/2544)
   [(#2547)](https://github.com/PennyLaneAI/catalyst/pull/2547)
   [(#2549)](https://github.com/PennyLaneAI/catalyst/pull/2549)
+  [(#2665)](https://github.com/PennyLaneAI/catalyst/pull/2665)
 
 * An experimental *QEC Physical* MLIR dialect has been added. An equivalent xDSL dialect has also
   been added for compatibility with the Python interface to Catalyst.
@@ -845,15 +869,25 @@
   [(#2572)](https://github.com/PennyLaneAI/catalyst/pull/2572)
   [(#2574)](https://github.com/PennyLaneAI/catalyst/pull/2574)
   [(#2576)](https://github.com/PennyLaneAI/catalyst/pull/2576)
+  [(#2673)](https://github.com/PennyLaneAI/catalyst/pull/2673)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
 
 <h3>Documentation 📝</h3>
 
+* The "Compatibility with PennyLane transforms" section of the
+  :doc:`Sharp bits and debugging tips <../dev/sharp_bits>` document has been updated to describe
+  potential oddities that can be encountered when composing PennyLane transforms together.
+  Additionally, some sharp bits listed were removed, as they are no longer sharp bits.
+  [(#2662)](https://github.com/PennyLaneAI/catalyst/pull/2662)
+
 * Docstrings for :func:`~.passes.disentangle_cnot` and :func:`~.passes.disentangle_swap` have been improved
   by using updated features for inspection and by calling them from the PennyLane frontend.
   [(#2546)](https://github.com/PennyLaneAI/catalyst/pull/2546)
+
+* Typos and rendering issues in various docstrings in the :mod:`catalyst.passes` module were fixed.
+  [(#2649)](https://github.com/PennyLaneAI/catalyst/pull/2649)
 
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
   [(#2406)](https://github.com/PennyLaneAI/catalyst/pull/2406)
@@ -883,6 +917,7 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
+Isaac De Vlugt,
 Marcus Edwards,
 Lillian Frederiksen,
 Sengthai Heng,
