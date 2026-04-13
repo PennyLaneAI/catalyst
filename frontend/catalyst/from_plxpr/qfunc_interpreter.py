@@ -175,9 +175,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         control_wires = control_wires + self.control_wires
         control_values = control_values + self.control_values
 
-        # if any(not qreg.is_qubit_mode() and qreg.expired for qreg in in_qregs + in_ctrl_qregs):
-        #     raise CompileError(f"Deallocated qubits cannot be used, but used in {op.name}.")
-
         if (fn := _special_op_bind_call.get(type(op))) is not None:
             bind_fn = partial(fn, hyperparameters=op.hyperparameters)
         else:
@@ -350,7 +347,7 @@ def _pcphase_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint, h
     ctrl_inputs = invals[qubits_len + 2 :]
     ctrl_wires = invals[qubits_len + 1 : -len(ctrl_inputs)]
 
-    return qinst_p.bind(
+    return qref_qinst_p.bind(
         *wires,
         angle,
         dim,

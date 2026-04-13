@@ -139,3 +139,42 @@ def test_multirz():
 
 
 print(test_multirz.mlir)
+
+
+# CHECK: func.func public @test_pcphase() -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def test_pcphase():
+    """
+    Test pcphase.
+    """
+    # CHECK-DAG: [[true:%.+]] = arith.constant true
+    # CHECK-DAG: [[two:%.+]] = arith.constant 2 : i64
+    # CHECK-DAG: [[one:%.+]] = arith.constant 1 : i64
+    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
+    # CHECK-DAG: [[stablehlo_two:%.+]] = stablehlo.constant dense<2> : tensor<i64>
+    # CHECK-DAG: [[stablehlo_one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+    # CHECK-DAG: [[angle:%.+]] = arith.constant 1.000000e-01 : f64
+
+    # CHECK: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
+
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][[[two]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[_two:%.+]] = stablehlo.convert [[stablehlo_two]] : (tensor<i64>) -> tensor<f64>
+    # CHECK: [[dim_2:%.+]] = tensor.extract [[_two]][] : tensor<f64>
+    # CHECK: qref.pcphase([[angle]], [[dim_2]]) [[q0]], [[q1]], [[q2]] : !qref.bit, !qref.bit, !qref.bit
+    qp.PCPhase(0.1, dim=2, wires=[0, 1, 2])
+
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][[[two]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[_one:%.+]] = stablehlo.convert [[stablehlo_one]] : (tensor<i64>) -> tensor<f64>
+    # CHECK: [[dim_1:%.+]] = tensor.extract [[_one]][] : tensor<f64>
+    # CHECK: qref.pcphase([[angle]], [[dim_1]]) [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit, !qref.bit ctrls !qref.bit
+    qp.ctrl(qp.PCPhase, control=0, control_values=True)(0.1, dim=1, wires=[1, 2])
+
+    return qp.expval(qp.X(0))
+
+
+print(test_pcphase.mlir)
