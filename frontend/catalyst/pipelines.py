@@ -230,6 +230,7 @@ def get_quantum_compilation_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs quantum compilation"""
 
     user_transform_passes = [
+        "verify-no-quantum-use-after-free",
         "convert-to-value-semantics",
         "canonicalize",
         # We want the invariant that transforms that generate multiple

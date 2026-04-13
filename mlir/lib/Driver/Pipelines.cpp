@@ -56,6 +56,7 @@ namespace driver {
 
 void createQuantumCompilationStage(OpPassManager &pm)
 {
+    pm.addPass(catalyst::qref::createVerifyNoQuantumUseAfterFreePass());
     pm.addPass(catalyst::qref::createValueSemanticsConversionPass());
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(catalyst::quantum::createSplitMultipleTapesPass());
