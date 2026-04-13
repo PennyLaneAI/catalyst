@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -49,7 +51,7 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
 Value getPauliProductPtr(Location loc, OpBuilder &rewriter, ModuleOp mod, ArrayAttr pauliProduct)
 {
     std::string pauliWord;
-    for (auto attr : pauliProduct) {
+    for (Attribute attr : pauliProduct) {
         pauliWord += cast<StringAttr>(attr).getValue().str();
     }
     std::string pauliWordKey = "pauli_word_" + pauliWord;

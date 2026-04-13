@@ -331,6 +331,21 @@ func.func @multirz(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit,
 
 // -----
 
+// CHECK: llvm.func @__catalyst__qis__PauliRot(!llvm.ptr, f64, !llvm.ptr, i1, i64, ...)
+
+// CHECK-LABEL: @paulirot
+func.func @paulirot(%q0 : !quantum.bit, %angle : f64) -> (!quantum.bit) {
+    // CHECK-DAG: [[ctrue:%.+]] = llvm.mlir.constant(true) : i1
+    // CHECK-DAG: llvm.mlir.addressof @pauli_word_X : !llvm.ptr
+    // CHECK-DAG: [[pauliPtr:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<2 x i8>
+    // CHECK-DAG: [[numQubits:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: llvm.call @__catalyst__qis__PauliRot([[pauliPtr]], {{%.+}}, {{%.+}}, [[ctrue]], [[numQubits]], %arg0)
+    %out = quantum.paulirot ["X"](%angle) %q0 : !quantum.bit
+    return %out : !quantum.bit
+}
+
+// -----
+
 // CHECK: llvm.func @__catalyst__qis__PCPhase(f64, f64, !llvm.ptr, i64, ...)
 
 // CHECK-LABEL: @pcphase

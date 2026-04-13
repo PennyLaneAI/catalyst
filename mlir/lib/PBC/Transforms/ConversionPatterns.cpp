@@ -17,6 +17,7 @@
 #include "llvm/Support/MathExtras.h" // for llvm::numbers::pi
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -46,8 +47,6 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
     {
         Location loc = op.getLoc();
         ModuleOp mod = op->template getParentOfType<ModuleOp>();
-
-        Value pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct());
 
         Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
 
@@ -83,9 +82,10 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
             static_assert(!std::is_same_v<T, T>(), "unexpected type in templated rewrite");
         }
 
+        Value pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct());
         Value modifiersPtr = LLVM::ZeroOp::create(rewriter, loc, ptrType);
-        createPauliRotCall(loc, rewriter, op, pauliWordPtr, thetaValue, modifiersPtr, cond,
-                           adaptor.getInQubits());
+        createPauliRotCall(loc, rewriter, op.getOperation(), pauliWordPtr, thetaValue, modifiersPtr,
+                           cond, adaptor.getInQubits());
 
         // Replace the op with the input qubits
         rewriter.replaceOp(op, adaptor.getInQubits());
