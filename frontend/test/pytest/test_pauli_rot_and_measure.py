@@ -157,7 +157,6 @@ def test_pauli_rot_to_ppr_pauli_word_error():
 
             return f()
 
-
 @pytest.mark.usefixtures("use_capture")
 def test_pauli_measure_to_ppr_pauli_word_error():
     """Test that unsupported pauli words raises `ValueError`."""
@@ -176,3 +175,17 @@ def test_pauli_measure_to_ppr_pauli_word_error():
                 qml.pauli_measure("A", wires=0)
 
             return f()
+
+@pytest.mark.usefixtures("use_capture")
+def test_controlled_pauli_rot_failure():
+    """
+    Test that controlled PauliRot fails at runtime.
+    """
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def workflow():
+        qml.ctrl(qml.PauliRot(np.pi / 4, "X", wires=0), control=1)
+        return qml.probs()
+
+    with pytest.raises(RuntimeError, match="Controlled PauliRot is not supported"):
+        workflow()
