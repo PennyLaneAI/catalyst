@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <llvm/Support/Casting.h>
+#include <mlir/IR/ValueRange.h>
+#include "mlir/IR/SymbolTable.h"
 #include <optional>
 #include <type_traits>
 
@@ -563,6 +566,213 @@ LogicalResult AdjointOp::verify()
             return emitOpError(
                 "Adjoint op operand types must be the same as the argument types on its block");
         }
+    }
+
+    return success();
+}
+
+CallInterfaceCallable TemplateOp::getCallableForCallee() {
+    return getSymNameAttr();
+}
+
+void TemplateOp::setCalleeFromCallable(CallInterfaceCallable callee) {
+    auto symRef = llvm::cast<SymbolRefAttr>(callee);
+    setSymNameAttr(llvm::cast<FlatSymbolRefAttr>(symRef));
+}
+
+Operation::operand_range TemplateOp::getArgOperands() {
+    return getOperands();
+}
+
+MutableOperandRange TemplateOp::getArgOperandsMutable() {
+    return MutableOperandRange(*this);
+}
+
+LogicalResult TemplateOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+    if (auto symName = getSymNameAttr()) {
+        if (!symbolTable.lookupNearestSymbolFrom(*this, symName)) {
+            return emitOpError() << "uses unknown symbol: " << symName;
+        }
+    }
+    return success();
+}
+
+void TemplateOp::print(OpAsmPrinter &p) {
+    // 1. Subroutine Name
+    p << " ";
+    p.printAttribute(getSubroutineNameAttr());
+
+    // 2. Variadic Inputs: (%arg0 : type, ...)
+    p << "(";
+    llvm::interleaveComma(llvm::zip(getInputs(), getInputs().getTypes()), p, [&](auto pair) {
+        p << std::get<0>(pair) << " : " << std::get<1>(pair);
+    });
+    p << ")";
+
+    // Increase indent for the multi-line operand/result block
+    p.increaseIndent();
+    p.printNewline();
+
+    // 3. Second Line: qreg and qubit_inds
+    p << "qreg " << getInQreg() << " qubit_inds (";
+    llvm::interleaveComma(llvm::zip(getQubitInds(), getQubitInds().getTypes()), p, [&](auto pair) {
+        p << std::get<0>(pair) << " : " << std::get<1>(pair);
+    });
+    p << ")";
+
+    // 4. Third Line: Results
+    p.printNewline();
+    p << "-> ";
+
+    // Print the variadic results (!restype0, !restype1, ...)
+    auto varResTypes = getResults().getTypes();
+    if (varResTypes.empty()) {
+        p << "()";
+    } else if (varResTypes.size() == 1) {
+        p << varResTypes.front();
+    } else {
+        p << "(";
+        llvm::interleaveComma(varResTypes, p);
+        p << ")";
+    }
+
+    // Print the explicit type for out_qreg
+    p << " qreg " << getOutQreg().getType();
+
+    // 5. Attribute Dictionary
+    p.printOptionalAttrDict(
+        getOperation()->getAttrs(),
+        {"subroutine_name", "param_map", "in_qubits_map", "static_data", "sym_name", "operand_segment_sizes"}
+    );
+
+    // 6. Indented Properties
+    p.printNewline();
+    p << "param_map = " << getParamMap();
+
+    p.printNewline();
+    p << "in_qubits_map = " << getInQubitsMap();
+
+    p.printNewline();
+    p << "static_data = " << getStaticData();
+
+    if (auto sym = getSymNameAttr()) {
+        p.printNewline();
+        p << "sym_name = " << sym;
+    }
+
+    p.decreaseIndent();
+}
+
+ParseResult TemplateOp::parse(OpAsmParser &parser, OperationState &result) {
+    // 1. Parse Subroutine Name
+    StringAttr subroutineName;
+    if (parser.parseAttribute(subroutineName, "subroutine_name", result.attributes))
+        return failure();
+
+    // 2. Parse Variadic Inputs
+    SmallVector<OpAsmParser::UnresolvedOperand> inputs;
+    SmallVector<Type> inputTypes;
+    auto parseInputAndType = [&]() -> ParseResult {
+        OpAsmParser::UnresolvedOperand operand;
+        Type type;
+        if (parser.parseOperand(operand) || parser.parseColon() || parser.parseType(type))
+            return failure();
+        inputs.push_back(operand);
+        inputTypes.push_back(type);
+        return success();
+    };
+
+    if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, parseInputAndType))
+        return failure();
+
+    // 3. Parse single qreg (Implicit Type)
+    OpAsmParser::UnresolvedOperand inQreg;
+    if (parser.parseKeyword("qreg") || parser.parseOperand(inQreg))
+        return failure();
+
+    // 4. Parse qubit_inds
+    SmallVector<OpAsmParser::UnresolvedOperand> qubitInds;
+    SmallVector<Type> qubitIndTypes;
+    auto parseQubitAndType = [&]() -> ParseResult {
+        OpAsmParser::UnresolvedOperand operand;
+        Type type;
+        if (parser.parseOperand(operand) || parser.parseColon() || parser.parseType(type))
+            return failure();
+        qubitInds.push_back(operand);
+        qubitIndTypes.push_back(type);
+        return success();
+    };
+
+    if (parser.parseKeyword("qubit_inds") ||
+        parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, parseQubitAndType))
+        return failure();
+
+    // 5. Resolve Operands
+    Type inQregType = QuregType::get(parser.getContext());
+
+    if (parser.resolveOperands(inputs, inputTypes, parser.getCurrentLocation(), result.operands) ||
+        parser.resolveOperand(inQreg, inQregType, result.operands) ||
+        parser.resolveOperands(qubitInds, qubitIndTypes, parser.getCurrentLocation(), result.operands))
+        return failure();
+
+    // *** CRITICAL STEP FOR AttrSizedOperandSegments ***
+    result.addAttribute("operand_segment_sizes",
+        parser.getBuilder().getDenseI32ArrayAttr({
+            static_cast<int32_t>(inputs.size()),
+            1, // in_qreg
+            static_cast<int32_t>(qubitInds.size())
+        }));
+
+    // 6. Parse Return Types
+    if (parser.parseArrow())
+        return failure();
+
+    // Parse Variadic Results Types
+    SmallVector<Type> varResTypes;
+    if (succeeded(parser.parseOptionalLParen())) {
+        if (failed(parser.parseOptionalRParen())) {
+            if (parser.parseTypeList(varResTypes) || parser.parseRParen())
+                return failure();
+        }
+    } else {
+        Type resType;
+        if (parser.parseType(resType))
+            return failure();
+        varResTypes.push_back(resType);
+    }
+
+    // Parse out_qreg Type explicitly (as required by the new string format)
+    Type outQregType;
+    if (parser.parseKeyword("qreg") || parser.parseType(outQregType))
+        return failure();
+
+    // Append types to result.types in exactly the order defined in ODS
+    result.addTypes(varResTypes);
+    result.addTypes(outQregType);
+
+    // 7. Parse Attribute Dictionary
+    if (parser.parseOptionalAttrDict(result.attributes))
+        return failure();
+
+    // 8. Parse Indented Properties
+    DictionaryAttr paramMap, inQubitsMap, staticData;
+
+    if (parser.parseKeyword("param_map") || parser.parseEqual() ||
+        parser.parseAttribute(paramMap, "param_map", result.attributes))
+        return failure();
+
+    if (parser.parseKeyword("in_qubits_map") || parser.parseEqual() ||
+        parser.parseAttribute(inQubitsMap, "in_qubits_map", result.attributes))
+        return failure();
+
+    if (parser.parseKeyword("static_data") || parser.parseEqual() ||
+        parser.parseAttribute(staticData, "static_data", result.attributes))
+        return failure();
+
+    FlatSymbolRefAttr symName;
+    if (succeeded(parser.parseOptionalKeyword("sym_name"))) {
+        if (parser.parseEqual() || parser.parseAttribute(symName, "sym_name", result.attributes))
+            return failure();
     }
 
     return success();

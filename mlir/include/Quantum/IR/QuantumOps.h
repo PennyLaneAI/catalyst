@@ -23,8 +23,10 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
+#include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 
 #include "Quantum/IR/QuantumDialect.h"
