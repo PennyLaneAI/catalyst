@@ -196,8 +196,8 @@ func.func @test_gate_op_cnot(
 
 // -----
 
-func.func @test_noise(%arg0 : !qecp.codeblock<1>) {
-    %0 = qecp.noise %arg0 : !qecp.codeblock<1>
+func.func @test_noise(%arg0 : !qecp.codeblock<1 x 7>) {
+    %0 = qecp.noise %arg0 : !qecp.codeblock<1 x 7>
     func.return
 }
 
