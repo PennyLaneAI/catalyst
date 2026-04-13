@@ -628,8 +628,8 @@ class TestForLoopDynamicShapes:
         assert jnp.allclose(res_b, expected_b)
 
     def test_qnode_forloop_abstracted_axes(self, capture_mode):
-        """Test for-loops with mixed input and output dimension variables during the quantum tracing.
-        Use abstracted_axes as the source of dynamism."""
+        """Test for-loops with mixed input and output dimension variables during the quantum
+        tracing. Use abstracted_axes as the source of dynamism."""
 
         @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
         @qml.qnode(qml.device("lightning.qubit", wires=4))
