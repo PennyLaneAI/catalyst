@@ -219,3 +219,29 @@ def test_pauli_rot():
 
 
 print(test_pauli_rot.mlir)
+
+
+# CHECK: func.func public @test_global_phase() -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=4))
+def test_global_phase():
+    """
+    Test global phase.
+    """
+    # CHECK-DAG: [[true:%.+]] = arith.constant true
+    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
+    # CHECK-DAG: [[angle:%.+]] = arith.constant 0.78539816339744828 : f64
+
+    # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
+
+    # CHECK: qref.gphase([[angle]])
+    qp.GlobalPhase(np.pi / 4)
+
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: qref.gphase([[angle]]) ctrls([[q0]]) ctrlvals([[true]]) : ctrls !qref.bit
+    qp.ctrl(qp.GlobalPhase(np.pi / 4), control=[0])
+
+    return qp.expval(qp.X(0))
+
+
+print(test_global_phase.mlir)

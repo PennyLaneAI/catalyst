@@ -42,6 +42,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_compbasis_p,
     qref_dealloc_p,
     qref_get_p,
+    qref_gphase_p,
     qref_hermitian_p,
     qref_namedobs_p,
     qref_pauli_rot_p,
@@ -56,7 +57,6 @@ from catalyst.jax_primitives import (
     counts_p,
     decomprule_p,
     expval_p,
-    gphase_p,
     hamiltonian_p,
     mcmobs_p,
     measure_in_basis_p,
@@ -322,7 +322,7 @@ def _qubit_unitary_bind_call(
 
 # pylint: disable=unused-argument, too-many-arguments
 def _gphase_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint, hyperparameters):
-    return gphase_p.bind(*invals[qubits_len:], ctrl_len=ctrl_len, adjoint=adjoint)
+    return qref_gphase_p.bind(*invals[qubits_len:], ctrl_len=ctrl_len, adjoint=adjoint)
 
 
 # pylint: disable=too-many-arguments
