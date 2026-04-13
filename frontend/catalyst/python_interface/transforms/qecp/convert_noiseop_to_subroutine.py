@@ -23,10 +23,10 @@ from typing import NoReturn, cast
 from xdsl import builder, context, passes, pattern_rewriter
 
 from xdsl.context import Context
-from xdsl.dialects import arith, builtin, scf
+from xdsl.dialects import arith, builtin, scf, tensor
 from xdsl.dialects.builtin import func
 from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType
-from xdsl.ir import Block, Operation, SSAValue
+from xdsl.ir import Block, Operation, SSAValue, Region
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
@@ -41,6 +41,7 @@ from xdsl.transforms.reconcile_unrealized_casts import ReconcileUnrealizedCastsP
 from catalyst.python_interface.dialects import qecl, qecp, quantum
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 from catalyst.utils.exceptions import CompileError
+from catalyst.python_interface.inspection.xdsl_conversion import _tensor_shape_from_ssa
 
 @dataclass(frozen=True)
 class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
@@ -53,58 +54,71 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
 
 
     def _create_noise_subroutine(self, k, n, number_errors):
-        """Create a subroutine for injecting physical noise mimic with Rot gates.
+        """Create a subroutine (func.FuncOp) operation for injecting physical noise mimic with Rot gates.
+        The subroutine takes a physical codeblock, the indices of qubits and the corresponding rotation 
+        parameters to be injected as inputs, and returns the noisy physical codeblock after error injection. 
+
+        NOTE: The random rotation parameters and qubit indices are generated randomly
+        from a `qnode` function.
+        
         Args:
-            gate_name (str): Name of the gate.
+            k (int): The number of logical qubits of a physical codeblock.
+            n (int): The number of physical qubits of a physical codeblock.
+            number_errors (int): The number of errors to be injected.
 
         Returns:
             The corresponding subroutine (func.FuncOp).
         """
-        # ensure the order of parameters are aligned with customOp
-        input_types = (builtin.IntegerType(), qecp.PhysicalCodeblockType(k, n))
+        # 1. Define the input and output types of the subroutine
+        # The input types include: 1, a physical codeblock; 2, number of errors (rot operations); 3, a tensor containing rotation parameters for rot operations (errors). 
+        codeblock_type = qecp.PhysicalCodeblockType(k, n)
+        errors_indices_type = builtin.TensorType(element_type=builtin.IntegerType(64), shape=[number_errors,])
+        rotation_params_type = builtin.TensorType(element_type=builtin.Float64Type(), shape=[number_errors, 3])
+        input_types = (codeblock_type, errors_indices_type, rotation_params_type)
 
-        output_types = (qecp.PhysicalCodeblockType(k, n))
+        # The output type is the noisy physical codeblock
+        output_types = (codeblock_type,)
 
         block = Block(arg_types=input_types)
 
         with builder.ImplicitBuilder(block):
-            in_codeblock = block.args[-1]
-            number_errors = block.args[0]
+            # 1. Get the input arguments
+            in_codeblock, errors_indices, rotation_params = block.args
 
-            # 2. Define loop bounds
+            # 2. Define for loop bounds
             start = arith.ConstantOp(IndexType.get(), 0)
-            stop = number_errors
+            stop = arith.ConstantOp.from_int_and_width(_tensor_shape_from_ssa(errors_indices)[0], 64)
             step = arith.ConstantOp(IndexType.get(), 1)
 
-            phi = random.uniform(0, math.pi)
-            theta = random.uniform(0, math.pi)
-            omega = random.uniform(0, math.pi)
-
+            zero = arith.ConstantOp.from_int_and_width(0, 64)
+            one = arith.ConstantOp.from_int_and_width(1, 64)
+            two = arith.ConstantOp.from_int_and_width(2, 64)
             
+            loop_body = Block(arg_types=(IndexType(), codeblock_type))
 
-            loop = scf.ForOp(start, stop, step, iter_args=, body=)
+            for_loop = scf.ForOp(start, stop, step, iter_args=(in_codeblock, ), body=loop_body)
 
+            with builder.ImplicitBuilder(loop_body) as (index_var, current_codeblock):
+                index_var_int = arith.IndexCastOp(index_var, IntegerType(64))
 
+                # Get the qubit index for error injection from the input codeblock
+                # Note that the qubit index is generated randomly from a `qnode` function and
+                qubit_index = tensor.ExtractOp(errors_indices, indices=[index_var_int])
+                # Get the rotation parameters for the current error to be injected
+                phi = tensor.ExtractOp(rotation_params, indices=[index_var_int, zero])
+                theta = tensor.ExtractOp(rotation_params, indices=[index_var_int, one])
+                omega = tensor.ExtractOp(rotation_params, indices=[index_var_int, two])
 
-            cz_op = CustomOp(in_qubits=[in_qubits[0], graph_qubit_dict[2]], gate_name="CZ")
+                # Create the Rot operation for error injection
+                rot_op = qecp.RotOp(current_codeblock, qubit_index, phi, theta, omega)
 
-            graph_qubit_dict[1], graph_qubit_dict[2] = cz_op.results
+                # Yield the updated codeblock
+                scf.YieldOp(rot_op.results[0])
+            
+            returned_codeblock = for_loop.results[0]
 
-            mres, graph_qubit_dict = self._queue_measurements(gate_name, graph_qubit_dict, params)
-
-            # The following could be removed to support Pauli tracker
-            by_product_correction = self._insert_byprod_corrections(
-                gate_name, mres, graph_qubit_dict[5]
-            )
-
-            graph_qubit_dict[5] = by_product_correction
-
-            for node in graph_qubit_dict:
-                if node not in [5]:
-                    _ = DeallocQubitOp(graph_qubit_dict[node])
-
-            func.ReturnOp(graph_qubit_dict[5])
-
+            func.ReturnOp(returned_codeblock)
+        
         region = Region([block])
         # pylint: disable=line-too-long
         # Note that visibility is set as private to ensure the subroutines that are
@@ -112,13 +126,13 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
         # ["symbol-dce"](https://github.com/PennyLaneAI/catalyst/blob/372c376eb821e830da778fdc8af423eeb487eab6/frontend/catalyst/pipelines.py#L248)_
         # pass was added to the pipeline.
         funcOp = func.FuncOp(
-            gate_name.lower() + "_in_mbqc",
+            "noise_injection_subroutine",
             (input_types, output_types),
             visibility="private",
             region=region,
         )
-        # Add an attribute to the mbqc transform subroutine
-        funcOp.attributes["mbqc_transform"] = builtin.NoneAttr()
+        # Add an attribute to the noise injection subroutine
+        funcOp.attributes["qecp_noise_injection"] = builtin.NoneAttr()
         return funcOp
 
 
