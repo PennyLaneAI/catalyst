@@ -18,6 +18,8 @@
 #include <cassert>
 #include <set>
 
+#include "toml++/toml.hpp"
+
 #include "oqd_database_types.h"
 #include "oqd_database_utils.h"
 
