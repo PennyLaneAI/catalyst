@@ -16,14 +16,16 @@
 
 This module contains the implementation of the xDSL quantum-to-qecl dialect-conversion pass.
 """
+
 import math
 from dataclasses import dataclass
 from typing import NoReturn, cast
 
+from xdsl.builder import ImplicitBuilder
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, scf
 from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType
-from xdsl.ir import Block, Operation, SSAValue
+from xdsl.ir import Block, BlockArgument, Operation, SSAValue
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
@@ -44,7 +46,13 @@ from catalyst.utils.exceptions import CompileError
 
 @dataclass(frozen=True)
 class AllocOpConversion(RewritePattern):
-    """Converts `quantum.alloc` ops to equivalent `qecl.alloc` ops."""
+    """Converts `quantum.alloc` ops to equivalent `qecl.alloc` ops.
+
+    While the `quantum.alloc` implicitly initializes all qubits within the allocated register to the
+    abstract |0> state, the logical codeblocks within a hyper-register must be explicitly
+    initialized to the logical |0> state by means of an *encoding* protocol. The appropriate
+    encoding ops are inserted in this conversion pattern.
+    """
 
     k: int
 
@@ -58,22 +66,101 @@ class AllocOpConversion(RewritePattern):
                 f"a dynamic number of qubits"
             )
 
-        assert isinstance(nqubits_attr, IntegerAttr), (
-            f"Expected attribute 'nqubits_attr' of {op.name} op to have type '{IntegerAttr.name}', "
-            f"but got {nqubits_attr.name}"
+        assert isinstance(nqubits_attr, expected_type := IntegerAttr), (
+            f"Expected attribute 'nqubits_attr' of {op.name} op to have type "
+            f"'{expected_type.name}', but got {nqubits_attr.name}"
         )
-        nqubits = nqubits_attr.value.data
 
+        nqubits = nqubits_attr.value.data
         hyper_reg_width = math.ceil(nqubits / self.k)
-        rewriter.replace_op(
-            op,
-            [
-                alloc_op := qecl.AllocOp(
-                    qecl.LogicalHyperRegisterType(width=hyper_reg_width, k=self.k)
-                ),
-                _cast_to_qureg(alloc_op.hyper_reg),
-            ],
+
+        alloc_op = qecl.AllocOp(qecl.LogicalHyperRegisterType(width=hyper_reg_width, k=self.k))
+        encoding_ops = self._get_hyper_reg_encoding_ops(alloc_op)
+        last_encoding_op = encoding_ops[-1]
+
+        assert len(last_encoding_op.result_types) == 1 and isinstance(
+            last_encoding_op.result_types[0], expected_type := qecl.LogicalHyperRegisterType
+        ), (
+            f"Expected last encoding op to return type '{expected_type.name}', but got "
+            f"{last_encoding_op.result_types[0].name}"
         )
+
+        ops_to_insert = (
+            alloc_op,
+            *encoding_ops,
+            _cast_to_qureg(last_encoding_op.results[0]),
+        )
+
+        rewriter.replace_op(op, ops_to_insert)
+
+    @classmethod
+    def _get_hyper_reg_encoding_ops(cls, alloc_op: qecl.AllocOp) -> tuple[Operation, ...]:
+        """Helper function to get the operations that encode each codeblock in the hyper-register."""
+        hyper_reg = alloc_op.hyper_reg
+        hyper_reg_width = hyper_reg.type.width.value.data
+
+        assert (
+            hyper_reg_width >= 1
+        ), f"Expected hyper-register width >= 1, but got width {hyper_reg_width}"
+
+        ops_to_insert: tuple[Operation, ...] = ()
+
+        if hyper_reg_width == 1:
+            # No need to loop, insert encode op directly
+            ops_to_insert = (
+                extract_op := qecl.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=0),
+                encode_op := qecl.EncodeOp(extract_op.codeblock, init_state="zero"),
+                qecl.InsertCodeblockOp(
+                    in_hyper_reg=hyper_reg, idx=0, codeblock=encode_op.out_codeblock
+                ),
+            )
+
+        else:
+            # Loop over all codeblocks in the hyper-register and encode them to logical zero state
+            # Ops for lower bound, upper bound, and step size
+            lb_op = arith.ConstantOp.from_int_and_width(0, IndexType())
+            ub_op = arith.ConstantOp.from_int_and_width(hyper_reg_width, IndexType())
+            step_op = arith.ConstantOp.from_int_and_width(1, IndexType())
+
+            for_body = Block(
+                [],
+                arg_types=(builtin.IndexType(), alloc_op.hyper_reg.type),
+            )
+
+            for_each_codeblock_op = scf.ForOp(
+                lb=lb_op,
+                ub=ub_op,
+                step=step_op,
+                iter_args=(alloc_op.hyper_reg,),
+                body=for_body,
+            )
+
+            # Build the body of the for loop. On each iteration, extract the codeblock at the
+            # iteration index, encode it, and re-insert into hyper-register. Finally, yield the
+            # updated hyper-register.
+            with ImplicitBuilder(for_each_codeblock_op.body):
+                indvar = cast(BlockArgument[IndexType], for_each_codeblock_op.body.block.args[0])
+                hyper_reg = cast(
+                    BlockArgument[qecl.LogicalHyperRegisterType],
+                    for_each_codeblock_op.body.block.args[1],
+                )
+
+                extract_op = qecl.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=indvar)
+                encode_op = qecl.EncodeOp(extract_op.codeblock, init_state="zero")
+                insert_op = qecl.InsertCodeblockOp(
+                    in_hyper_reg=hyper_reg, idx=indvar, codeblock=encode_op.out_codeblock
+                )
+                scf.YieldOp(insert_op.out_hyper_reg)
+
+            ops_to_insert = (
+                lb_op,
+                ub_op,
+                step_op,
+                for_each_codeblock_op,
+            )
+
+        assert ops_to_insert != ()
+        return ops_to_insert
 
 
 # MARK: Extract Op Pattern
@@ -81,80 +168,46 @@ class AllocOpConversion(RewritePattern):
 
 @dataclass(frozen=True)
 class ExtractOpConversion(RewritePattern):
-    """Converts `quantum.extract` ops to equivalent `qecl.extract_block` ops."""
+    """Converts `quantum.extract` ops to equivalent `qecl.extract_block` ops.
+
+    Every time we extract a codeblock from a hyper-register, we perform a cycle of error correction
+    on that codeblock.
+    """
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: quantum.ExtractOp, rewriter: PatternRewriter):
         """Rewrite pattern for `quantum.extract` ops."""
-
-        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
-
-        # If we extract immediately after an alloc operation, we must also insert ops to perform
-        # encoding and a QEC cycle. Cases where we don't immediately extract are typically around
-        # control-flow operations.
         # Recall that the `alloc` conversion pattern inserts a builtin.unrealized_conversion_cast
         # op immediately after the alloc that converts from qecl.hyperreg -> quantum.reg.
         qreg_owner_op = op.qreg.owner
-        if isinstance(qreg_owner_op, builtin.UnrealizedConversionCastOp) and isinstance(
-            qreg_owner_op.operand_types[0], qecl.LogicalHyperRegisterType
+        if not (
+            isinstance(qreg_owner_op, builtin.UnrealizedConversionCastOp)
+            and isinstance(qreg_owner_op.operand_types[0], qecl.LogicalHyperRegisterType)
         ):
-            conv_cast_qreg_owner_op = qreg_owner_op.operands[0].owner
-
-            # Convert type quantum.reg -> qecl.hyperreg
-            # (to be resolved by ReconcileUnrealizedCastsPass)
-            conv_cast_op = builtin.UnrealizedConversionCastOp.get(
-                (qreg_owner_op.results[0],), (qreg_owner_op.operands[0].type,)
-            )
-            extract_codeblock_op = qecl.ExtractCodeblockOp(
-                hyper_reg=conv_cast_op.results[0], idx=idx
-            )
-
-            if isinstance(conv_cast_qreg_owner_op, qecl.AllocOp):
-                ops_to_insert = [
-                    conv_cast_op,
-                    extract_codeblock_op,
-                    encode_op := qecl.EncodeOp(
-                        in_codeblock=extract_codeblock_op.codeblock,
-                        init_state=qecl.LogicalCodeblockInitState.Zero,
-                    ),
-                    qec_cycle_op := qecl.QecCycleOp(in_codeblock=encode_op.out_codeblock),
-                    _cast_to_qubit(qec_cycle_op.out_codeblock),
-                ]
-
-            else:
-                ops_to_insert = [
-                    conv_cast_op,
-                    extract_codeblock_op,
-                    _cast_to_qubit(extract_codeblock_op.codeblock),
-                ]
-
-        else:
-            # In this case, the extract op uses a register that originated from an op other than
-            # `alloc`. In this case, we need to trace up the SSA graph until we find a qecl.alloc +
-            # builtin.unrealized_conversion_cast op pair to determine the correct hyper-register
-            # type.
-            #
-            # TODO!!!
-            # owner_op = qreg_owner_op
-            # while True:
-            #     if self._is_op_conv_cast_after_alloc(owner_op):
-            #         break
-
-            #     if isinstance(owner_op, Operation) and len(owner_op.operands) == 1:
-            #         owner_op = owner_op.operands[0].owner
-
-            # ops_to_insert = []
-
-            # Maybe we don't need this? And we just error out?
+            # TODO: We will need to also support the case where a quantum.extract op does not
+            # immediately follow a `quantum.alloc` op, e.g.
+            # %0 = quantum.alloc(1) : !quantum.reg
+            # %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+            # %2 = "test.op"(%0) : (!quantum.reg) -> !quantum.reg
+            # %3 = quantum.extract %2[0] : !quantum.reg -> !quantum.bit
             _raise_failed_to_convert_op_compile_error(op)
 
-        rewriter.replace_op(op, ops_to_insert)
+        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
 
-    @classmethod
-    def _is_op_conv_cast_after_alloc(cls, candidate_op: Operation | Block):
-        return isinstance(candidate_op, builtin.UnrealizedConversionCastOp) and isinstance(
-            candidate_op.operand_types[0], qecl.LogicalHyperRegisterType
+        ops_to_insert = (
+            # Convert type quantum.reg -> qecl.hyperreg
+            # (to be resolved by ReconcileUnrealizedCastsPass)
+            conv_cast_op := builtin.UnrealizedConversionCastOp.get(
+                (qreg_owner_op.results[0],), (qreg_owner_op.operands[0].type,)
+            ),
+            extract_codeblock_op := qecl.ExtractCodeblockOp(
+                hyper_reg=conv_cast_op.results[0], idx=idx
+            ),
+            qec_cycle_op := qecl.QecCycleOp(in_codeblock=extract_codeblock_op.codeblock),
+            _cast_to_qubit(qec_cycle_op.out_codeblock),
         )
+
+        rewriter.replace_op(op, ops_to_insert)
 
 
 # MARK: Insert Op Pattern
@@ -166,35 +219,34 @@ class InsertOpConversion(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: quantum.InsertOp, rewriter: PatternRewriter):
         """Rewrite pattern for `quantum.insert` ops."""
-
-        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
-
         in_qreg_owner_op = op.in_qreg.owner
         qubit_owner_op = op.qubit.owner
-        if (
+        if not (
             isinstance(qubit_owner_op, builtin.UnrealizedConversionCastOp)
             and isinstance(qubit_owner_op.operand_types[0], qecl.LogicalCodeblockType)
             and isinstance(in_qreg_owner_op, builtin.UnrealizedConversionCastOp)
             and isinstance(in_qreg_owner_op.operand_types[0], qecl.LogicalHyperRegisterType)
         ):
+            _raise_failed_to_convert_op_compile_error(op)
+
+        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
+
+        ops_to_insert = (
             # Convert types quantum.reg -> qecl.hyperreg and quantum.qubit -> qecl.codeblock
             # (to be resolved by ReconcileUnrealizedCastsPass)
-            ops_to_insert = [
-                qreg_conv_cast_op := builtin.UnrealizedConversionCastOp.get(
-                    (in_qreg_owner_op.results[0],), (in_qreg_owner_op.operands[0].type,)
-                ),
-                qubit_conv_cast_op := builtin.UnrealizedConversionCastOp.get(
-                    (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
-                ),
-                insert_codeblock_op := qecl.InsertCodeblockOp(
-                    in_hyper_reg=qreg_conv_cast_op.results[0],
-                    idx=idx,
-                    codeblock=qubit_conv_cast_op.results[0],
-                ),
-                _cast_to_qureg(insert_codeblock_op.out_hyper_reg),
-            ]
-        else:
-            _raise_failed_to_convert_op_compile_error(op)
+            qreg_conv_cast_op := builtin.UnrealizedConversionCastOp.get(
+                (in_qreg_owner_op.results[0],), (in_qreg_owner_op.operands[0].type,)
+            ),
+            qubit_conv_cast_op := builtin.UnrealizedConversionCastOp.get(
+                (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
+            ),
+            insert_codeblock_op := qecl.InsertCodeblockOp(
+                in_hyper_reg=qreg_conv_cast_op.results[0],
+                idx=idx,
+                codeblock=qubit_conv_cast_op.results[0],
+            ),
+            _cast_to_qureg(insert_codeblock_op.out_hyper_reg),
+        )
 
         rewriter.replace_op(op, ops_to_insert)
 
@@ -210,17 +262,18 @@ class DeallocOpConversion(RewritePattern):
         """Rewrite pattern for `quantum.dealloc` ops."""
 
         qreg_owner_op = op.qreg.owner
-        if isinstance(qreg_owner_op, builtin.UnrealizedConversionCastOp) and isinstance(
-            qreg_owner_op.operand_types[0], qecl.LogicalHyperRegisterType
+        if not (
+            isinstance(qreg_owner_op, builtin.UnrealizedConversionCastOp)
+            and isinstance(qreg_owner_op.operand_types[0], qecl.LogicalHyperRegisterType)
         ):
-            ops_to_insert = [
-                conv_cast_op := builtin.UnrealizedConversionCastOp.get(
-                    (qreg_owner_op.results[0],), (qreg_owner_op.operands[0].type,)
-                ),
-                qecl.DeallocOp(hyper_reg=conv_cast_op.results[0]),
-            ]
-        else:
             _raise_failed_to_convert_op_compile_error(op)
+
+        ops_to_insert = (
+            conv_cast_op := builtin.UnrealizedConversionCastOp.get(
+                (qreg_owner_op.results[0],), (qreg_owner_op.operands[0].type,)
+            ),
+            qecl.DeallocOp(hyper_reg=conv_cast_op.results[0]),
+        )
 
         rewriter.replace_op(op, ops_to_insert)
 
@@ -252,28 +305,32 @@ class CustomOpConversion(RewritePattern):
             case "Hadamard":
                 assert len(op.in_qubits) == 1
                 qubit_owner_op = op.in_qubits[0].owner
-                if isinstance(qubit_owner_op, builtin.UnrealizedConversionCastOp) and isinstance(
-                    qubit_owner_op.operand_types[0], qecl.LogicalCodeblockType
+                if not (
+                    isinstance(qubit_owner_op, builtin.UnrealizedConversionCastOp)
+                    and isinstance(qubit_owner_op.operand_types[0], qecl.LogicalCodeblockType)
                 ):
-                    ops_to_insert = [
+                    _raise_failed_to_convert_op_compile_error(op)
+                else:
+                    ops_to_insert = (
                         conv_cast_op := builtin.UnrealizedConversionCastOp.get(
                             (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
                         ),
                         gate_op := qecl.HadamardOp(in_codeblock=conv_cast_op.results[0], idx=0),
                         qec_cycle_op := qecl.QecCycleOp(in_codeblock=gate_op.out_codeblock),
                         _cast_to_qubit(qec_cycle_op.out_codeblock),
-                    ]
-                else:
-                    _raise_failed_to_convert_op_compile_error(op)
+                    )
 
             case "S":
                 adjoint = bool(op.properties.get("adjoint"))
                 assert len(op.in_qubits) == 1
                 qubit_owner_op = op.in_qubits[0].owner
-                if isinstance(qubit_owner_op, builtin.UnrealizedConversionCastOp) and isinstance(
-                    qubit_owner_op.operand_types[0], qecl.LogicalCodeblockType
+                if not (
+                    isinstance(qubit_owner_op, builtin.UnrealizedConversionCastOp)
+                    and isinstance(qubit_owner_op.operand_types[0], qecl.LogicalCodeblockType)
                 ):
-                    ops_to_insert = [
+                    _raise_failed_to_convert_op_compile_error(op)
+                else:
+                    ops_to_insert = (
                         conv_cast_op := builtin.UnrealizedConversionCastOp.get(
                             (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
                         ),
@@ -282,21 +339,21 @@ class CustomOpConversion(RewritePattern):
                         ),
                         qec_cycle_op := qecl.QecCycleOp(in_codeblock=gate_op.out_codeblock),
                         _cast_to_qubit(qec_cycle_op.out_codeblock),
-                    ]
-                else:
-                    _raise_failed_to_convert_op_compile_error(op)
+                    )
 
             case "CNOT":
                 assert len(op.in_qubits) == 2
                 ctrl_qubit_owner_op = op.in_qubits[0].owner
                 trgt_qubit_owner_op = op.in_qubits[1].owner
-                if (
+                if not (
                     isinstance(ctrl_qubit_owner_op, builtin.UnrealizedConversionCastOp)
                     and isinstance(ctrl_qubit_owner_op.operand_types[0], qecl.LogicalCodeblockType)
                     and isinstance(trgt_qubit_owner_op, builtin.UnrealizedConversionCastOp)
                     and isinstance(trgt_qubit_owner_op.operand_types[0], qecl.LogicalCodeblockType)
                 ):
-                    ops_to_insert = [
+                    _raise_failed_to_convert_op_compile_error(op)
+                else:
+                    ops_to_insert = (
                         ctrl_conv_cast_op := builtin.UnrealizedConversionCastOp.get(
                             (ctrl_qubit_owner_op.results[0],),
                             (ctrl_qubit_owner_op.operands[0].type,),
@@ -319,10 +376,8 @@ class CustomOpConversion(RewritePattern):
                         ),
                         ctrl_conv_cast_op := _cast_to_qubit(ctrl_qecl_cycle_op.out_codeblock),
                         trgt_conv_cast_op := _cast_to_qubit(trgt_qecl_cycle_op.out_codeblock),
-                    ]
+                    )
                     new_results = (ctrl_conv_cast_op.results[0], trgt_conv_cast_op.results[0])
-                else:
-                    _raise_failed_to_convert_op_compile_error(op)
 
             case _:
                 raise NotImplementedError(
@@ -353,19 +408,20 @@ class MeasureOpConversion(RewritePattern):
         new_results = None
 
         qubit_owner_op = op.in_qubit.owner
-        if isinstance(qubit_owner_op, builtin.UnrealizedConversionCastOp) and isinstance(
-            qubit_owner_op.operand_types[0], qecl.LogicalCodeblockType
+        if not (
+            isinstance(qubit_owner_op, builtin.UnrealizedConversionCastOp)
+            and isinstance(qubit_owner_op.operand_types[0], qecl.LogicalCodeblockType)
         ):
-            ops_to_insert = [
+            _raise_failed_to_convert_op_compile_error(op)
+        else:
+            ops_to_insert = (
                 conv_cast_op := builtin.UnrealizedConversionCastOp.get(
                     (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
                 ),
                 measure_op := qecl.MeasureOp(in_codeblock=conv_cast_op.results[0], idx=0),
                 conv_cast_op := _cast_to_qubit(measure_op.out_codeblock),
-            ]
+            )
             new_results = (measure_op.mres, conv_cast_op.results[0])
-        else:
-            _raise_failed_to_convert_op_compile_error(op)
 
         rewriter.replace_op(op, ops_to_insert, new_results=new_results)
 

@@ -36,7 +36,7 @@ def fixture_quantum_to_qecl_pipeline_k_2():
     return (ConvertQuantumToQecLogicalPass(k=2),)
 
 
-# MARK: Test Op Conversion Patterns
+# MARK: TestAllocPattern
 
 
 @pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
@@ -51,36 +51,56 @@ class TestAllocPattern:
         """
         program = """
         func.func @test_program() {
-            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
+            // CHECK: [[hreg10:%.+]] = qecl.alloc() : !qecl.hyperreg<1 x 1>
+            // CHECK: [[cb10:%.+]] = qecl.extract_block [[hreg10]][0]
+            // CHECK: [[cb11:%.+]] = qecl.encode[zero] [[cb10]]
+            // CHECK: [[hreg11:%.+]] = qecl.insert_block [[hreg10]][0], [[cb11]]
             // CHECK-NOT: quantum.alloc
             %0 = quantum.alloc(1) : !quantum.reg
 
-            // CHECK: qecl.alloc() : !qecl.hyperreg<2 x 1>
+            // CHECK: [[hreg20:%.+]] = qecl.alloc() : !qecl.hyperreg<2 x 1>
+            // CHECK: [[lb:%.+]] = arith.constant 0 : index
+            // CHECK: [[ub:%.+]] = arith.constant 2 : index
+            // CHECK: [[step:%.+]] = arith.constant 1 : index
+            // CHECK: [[hreg21:%.+]] = scf.for [[idx:%.+]] = [[lb]] to [[ub]] step [[step]] iter_args([[hreg2arg:%.+]] = [[hreg20]])
+            // CHECK:     [[cb20:%.+]] = qecl.extract_block [[hreg2arg]][[[idx]]]
+            // CHECK:     [[cb21:%.+]] = qecl.encode[zero] [[cb20]]
+            // CHECK:     [[hreg22:%.+]] = qecl.insert_block [[hreg2arg]][[[idx]]], [[cb21]]
+            // CHECK:     scf.yield [[hreg22]]
+            // CHECK: }
             // CHECK-NOT: quantum.alloc
             %1 = quantum.alloc(2) : !quantum.reg
 
-            // CHECK: qecl.alloc() : !qecl.hyperreg<3 x 1>
+            // CHECK: [[hreg30:%.+]] = qecl.alloc() : !qecl.hyperreg<3 x 1>
+            // CHECK: [[lb:%.+]] = arith.constant 0 : index
+            // CHECK: [[ub:%.+]] = arith.constant 3 : index
+            // CHECK: [[step:%.+]] = arith.constant 1 : index
+            // CHECK: [[hreg31:%.+]] = scf.for [[idx:%.+]] = [[lb]] to [[ub]] step [[step]] iter_args([[hreg3arg:%.+]] = [[hreg30]])
+            // CHECK:     [[cb30:%.+]] = qecl.extract_block [[hreg3arg]][[[idx]]]
+            // CHECK:     [[cb31:%.+]] = qecl.encode[zero] [[cb30]]
+            // CHECK:     [[hreg32:%.+]] = qecl.insert_block [[hreg3arg]][[[idx]]], [[cb31]]
+            // CHECK:     scf.yield [[hreg32]]
+            // CHECK: }
             // CHECK-NOT: quantum.alloc
             %2 = quantum.alloc(3) : !quantum.reg
-
-            // CHECK: qecl.alloc() : !qecl.hyperreg<4 x 1>
-            // CHECK-NOT: quantum.alloc
-            %3 = quantum.alloc(4) : !quantum.reg
 
             return
         }
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
-    def test_alloc_with_use_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+    def test_alloc_k_1_with_use(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """Test the conversion of `quantum.alloc` ops includes the appropriate
         `unrealized_conversion_cast` ops when the quantum register has at least one use.
         """
         program = """
         func.func @test_program() {
-            // CHECK: [[hreg:%.+]] = qecl.alloc() : !qecl.hyperreg<1 x 1>
-            // CHECK: [[conv_cast_reg:%.+]] = builtin.unrealized_conversion_cast [[hreg]] : !qecl.hyperreg<1 x 1> to !quantum.reg
-            // CHECK: "test.op"([[conv_cast_reg]]) : (!quantum.reg) -> !quantum.reg
+            // CHECK: [[hreg0:%.+]] = qecl.alloc() : !qecl.hyperreg<1 x 1>
+            // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]][0]
+            // CHECK: [[cb1:%.+]] = qecl.encode[zero] [[cb0]]
+            // CHECK: [[hreg1:%.+]] = qecl.insert_block [[hreg0]][0], [[cb1]]
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[hreg1]] : !qecl.hyperreg<1 x 1> to !quantum.reg
+            // CHECK: "test.op"([[conv_cast]]) : (!quantum.reg) -> !quantum.reg
             // CHECK-NOT: quantum.alloc
             %0 = quantum.alloc(1) : !quantum.reg
             %1 = "test.op"(%0) : (!quantum.reg) -> !quantum.reg
@@ -102,8 +122,8 @@ class TestAllocPattern:
             // CHECK: [[n_cst:%.+]] = arith.constant 1 : i64
             %0 = arith.constant 1 : i64
 
-            // CHECK: qecl.alloc([[n_cst]]) : !qecl.hyperreg<? x 1>
             // CHECK-NOT: quantum.alloc
+            // CHECK: qecl.alloc([[n_cst]]) : !qecl.hyperreg<? x 1>
             %1 = quantum.alloc(%0) : !quantum.reg
 
             return
@@ -142,38 +162,40 @@ class TestAllocPattern:
         run_filecheck(program, quantum_to_qecl_pipeline_k_2)
 
 
+# MARK: TestExtractPattern
+
+
 @pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
 class TestExtractPattern:
     """Unit tests for the `extract` conversion pattern of the convert-quantum-to-qecl pass."""
 
-    def test_extract_width_1_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+    def test_extract_k_1_width_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """Test that `quantum.extract` ops are converted to their corresponding `qecl.extract_block`
-        ops for registers with width = 1 and for k = 1. Also check that `qecl.encode[zero]` and
-        `qecl.qec` ops are inserted after the `qecl.extract_block` op, since the codeblock is
-        extracted immediately after a `qecl.alloc()` op.
+        ops for registers with width = 1 and for k = 1. Also check that a `qecl.qec` op is inserted
+        after the `qecl.extract_block` op.
 
         In this case, the extract index is static.
         """
         program = """
         func.func @test_program() {
-            // CHECK: [[hreg0:%.+]] = qecl.alloc
+            // CHECK: [[hreg0:%.+]] = "test.op"() : () -> !qecl.hyperreg<1 x 1>
             // CHECK-NOT: builtin.unrealized_conversion_cast
-            %0 = quantum.alloc(1) : !quantum.reg
+            %0 = "test.op"() : () -> !qecl.hyperreg<1 x 1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.hyperreg<1 x 1> to !quantum.reg
 
             // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]][0] : !qecl.hyperreg<1 x 1> -> !qecl.codeblock<1>
-            // CHECK: [[cb1:%.+]] = qecl.encode[zero] [[cb0]] : !qecl.codeblock<1>
-            // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
-            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
-            %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+            // CHECK: [[cb1:%.+]] = qecl.qec [[cb0]] : !qecl.codeblock<1>
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb1]] : !qecl.codeblock<1> to !quantum.bit
+            %2 = quantum.extract %1[0] : !quantum.reg -> !quantum.bit
 
             // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
-            %2 = "test.op"(%1) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
             return
         }
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
-    def test_extract_width_1_dyn_idx_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+    def test_extract_k_1_width_1_dyn_idx(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """Test that `quantum.extract` ops are converted to their corresponding `qecl.extract_block`
         ops for registers with width = 1 and for k = 1.
 
@@ -181,122 +203,116 @@ class TestExtractPattern:
         """
         program = """
         func.func @test_program(%arg0 : i64) {
-            // CHECK: [[hreg0:%.+]] = qecl.alloc
+            // CHECK: [[hreg0:%.+]] = "test.op"() : () -> !qecl.hyperreg<1 x 1>
             // CHECK-NOT: builtin.unrealized_conversion_cast
-            %0 = quantum.alloc(1) : !quantum.reg
+            %0 = "test.op"() : () -> !qecl.hyperreg<1 x 1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.hyperreg<1 x 1> to !quantum.reg
 
             // CHECK: [[idx:%.+]] = arith.index_cast %arg0 : i64 to index
             // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]][[[idx]]] : !qecl.hyperreg<1 x 1> -> !qecl.codeblock<1>
-            // CHECK: [[cb1:%.+]] = qecl.encode[zero] [[cb0]] : !qecl.codeblock<1>
-            // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
-            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
-            %1 = quantum.extract %0[%arg0] : !quantum.reg -> !quantum.bit
+            // CHECK: [[cb1:%.+]] = qecl.qec [[cb0]] : !qecl.codeblock<1>
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb1]] : !qecl.codeblock<1> to !quantum.bit
+            %2 = quantum.extract %1[%arg0] : !quantum.reg -> !quantum.bit
 
             // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
-            %2 = "test.op"(%1) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
             return
         }
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
-    def test_extract_width_2_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+    def test_extract_k_1_width_2(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """Test that `quantum.extract` ops are converted to their corresponding `qecl.extract_block`
-        ops for registers with width = 2 and for k = 1. Also check that `qecl.encode[zero]` and
-        `qecl.qec` ops are inserted after each `qecl.extract_block` op.
+        ops for registers with width = 2 and for k = 1. Also check that a `qecl.qec` op is inserted
+        after each `qecl.extract_block` op.
         """
         program = """
         func.func @test_program() {
-            // CHECK: [[hreg0:%.+]] = qecl.alloc
+            // CHECK: [[hreg0:%.+]] = "test.op"() : () -> !qecl.hyperreg<2 x 1>
             // CHECK-NOT: builtin.unrealized_conversion_cast
-            %0 = quantum.alloc(2) : !quantum.reg
+            %0 = "test.op"() : () -> !qecl.hyperreg<2 x 1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.hyperreg<2 x 1> to !quantum.reg
 
             // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]][0] : !qecl.hyperreg<2 x 1> -> !qecl.codeblock<1>
-            // CHECK: [[cb1:%.+]] = qecl.encode[zero] [[cb0]] : !qecl.codeblock<1>
-            // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
-            // CHECK: [[conv_cast1:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
-            %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+            // CHECK: [[cb1:%.+]] = qecl.qec [[cb0]] : !qecl.codeblock<1>
+            // CHECK: [[conv_cast1:%.+]] = builtin.unrealized_conversion_cast [[cb1]] : !qecl.codeblock<1> to !quantum.bit
+            %2 = quantum.extract %1[0] : !quantum.reg -> !quantum.bit
 
-            // CHECK: [[cb3:%.+]] = qecl.extract_block [[hreg0]][1] : !qecl.hyperreg<2 x 1> -> !qecl.codeblock<1>
-            // CHECK: [[cb4:%.+]] = qecl.encode[zero] [[cb3]] : !qecl.codeblock<1>
-            // CHECK: [[cb5:%.+]] = qecl.qec [[cb4]] : !qecl.codeblock<1>
-            // CHECK: [[conv_cast2:%.+]] = builtin.unrealized_conversion_cast [[cb5]] : !qecl.codeblock<1> to !quantum.bit
-            %2 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
-
-            // CHECK: "test.op"([[conv_cast1]]) : (!quantum.bit) -> !quantum.bit
-            // CHECK: "test.op"([[conv_cast2]]) : (!quantum.bit) -> !quantum.bit
-            %3 = "test.op"(%1) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
-            %4 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
-            return
-        }
-        """
-        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
-
-    @pytest.mark.xfail(reason="Not supported yet", raises=CompileError)
-    def test_extract_width_1_multiple_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
-        """Test that `quantum.extract` ops are converted to their corresponding `qecl.extract_block`
-        ops for registers with width = 1 and for k = 1, and that the `qecl.encode[zero]` and
-        `qecl.qec` ops are only inserted after the initial alloc+extract_block op and not after
-        subsequent extract_block ops.
-        """
-        program = """
-        func.func @test_program() {
-            // CHECK: [[hreg0:%.+]] = qecl.alloc
-            // CHECK-NOT: builtin.unrealized_conversion_cast
-            %0 = quantum.alloc(1) : !quantum.reg
-
-            // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]][0] : !qecl.hyperreg<1 x 1> -> !qecl.codeblock<1>
-            // CHECK: [[cb1:%.+]] = qecl.encode[zero] [[cb0]] : !qecl.codeblock<1>
-            // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
-            // CHECK: [[conv_cast1:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
-            %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
-
-            %2 = "test.op"(%0) : (!quantum.reg) -> !quantum.reg
-
-            // CHECK: [[cb3:%.+]] = qecl.extract_block [[hreg1]][0] : !qecl.hyperreg<1 x 1> -> !qecl.codeblock<1>
+            // CHECK: [[cb2:%.+]] = qecl.extract_block [[hreg0]][1] : !qecl.hyperreg<2 x 1> -> !qecl.codeblock<1>
+            // CHECK: [[cb3:%.+]] = qecl.qec [[cb2]] : !qecl.codeblock<1>
             // CHECK: [[conv_cast2:%.+]] = builtin.unrealized_conversion_cast [[cb3]] : !qecl.codeblock<1> to !quantum.bit
-            // CHECK-NOT: qecl.encode
-            // CHECK-NOT: qecl.qec
-            %3 = quantum.extract %2[0] : !quantum.reg -> !quantum.bit
+            %3 = quantum.extract %1[1] : !quantum.reg -> !quantum.bit
 
             // CHECK: "test.op"([[conv_cast1]]) : (!quantum.bit) -> !quantum.bit
             // CHECK: "test.op"([[conv_cast2]]) : (!quantum.bit) -> !quantum.bit
-            %4 = "test.op"(%1) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            %4 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
             %5 = "test.op"(%3) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
             return
         }
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
-    def test_extract_with_scf_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
-        """TODO"""
-        pass
+    @pytest.mark.xfail(reason="Not supported yet", raises=CompileError)
+    def test_extract_k_1_width_1_multiple(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that `quantum.extract` ops are converted to their corresponding `qecl.extract_block`
+        ops for registers with width = 1 and for k = 1. In this case there are multiple extract
+        operations interleaved with other ops.
+        """
+        program = """
+        func.func @test_program() {
+            // CHECK: [[hreg0:%.+]] = "test.op"() : () -> !qecl.hyperreg<1 x 1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.hyperreg<1 x 1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.hyperreg<1 x 1> to !quantum.reg
+
+            // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]][0] : !qecl.hyperreg<1 x 1> -> !qecl.codeblock<1>
+            // CHECK: [[cb1:%.+]] = qecl.qec [[cb0]] : !qecl.codeblock<1>
+            // CHECK: [[conv_cast1:%.+]] = builtin.unrealized_conversion_cast [[cb1]] : !qecl.codeblock<1> to !quantum.bit
+            %2 = quantum.extract %1[0] : !quantum.reg -> !quantum.bit
+
+            %3 = "test.op"(%1) : (!quantum.reg) -> !quantum.reg
+
+            // CHECK: [[cb2:%.+]] = qecl.extract_block [[hreg1]][0] : !qecl.hyperreg<1 x 1> -> !qecl.codeblock<1>
+            // CHECK: [[conv_cast2:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
+            // CHECK-NOT: qecl.encode
+            // CHECK-NOT: qecl.qec
+            %4 = quantum.extract %3[0] : !quantum.reg -> !quantum.bit
+
+            // CHECK: "test.op"([[conv_cast1]]) : (!quantum.bit) -> !quantum.bit
+            // CHECK: "test.op"([[conv_cast2]]) : (!quantum.bit) -> !quantum.bit
+            %5 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            %6 = "test.op"(%4) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            return
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
     @pytest.mark.xfail(reason="Only k = 1 is supported", raises=NotImplementedError)
-    def test_extract_width_1_k_2(self, run_filecheck, quantum_to_qecl_pipeline_k_2):
+    def test_extract_k_2_width_1(self, run_filecheck, quantum_to_qecl_pipeline_k_2):
         """Test that `quantum.extract` ops are converted to their corresponding `qecl.extract_block`
         ops for registers with width = 1 and for k = 2.
         """
         program = """
         func.func @test_program() {
-            // CHECK: [[hreg0:%.+]] = qecl.alloc
+            // CHECK: [[hreg0:%.+]] = "test.op"() : () -> !qecl.hyperreg<1 x 2>
             // CHECK-NOT: builtin.unrealized_conversion_cast
-            %0 = quantum.alloc(1) : !quantum.reg
+            %0 = "test.op"() : () -> !qecl.hyperreg<1 x 2>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.hyperreg<1 x 2> to !quantum.reg
 
             // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]][0] : !qecl.hyperreg<1 x 2> -> !qecl.codeblock<2>
-            // CHECK: [[cb1:%.+]] = qecl.encode[zero] [[cb0]] : !qecl.codeblock<2>
-            // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<2>
-            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
-            %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+            // CHECK: [[cb1:%.+]] = qecl.qec [[cb0]] : !qecl.codeblock<2>
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb1]] : !qecl.codeblock<1> to !quantum.bit
+            %2 = quantum.extract %1[0] : !quantum.reg -> !quantum.bit
 
             // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
-            %2 = "test.op"(%1) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
             return
         }
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_2)
 
     @pytest.mark.xfail(reason="Only k = 1 is supported", raises=NotImplementedError)
-    def test_extract_width_2_k_2(self, run_filecheck, quantum_to_qecl_pipeline_k_2):
+    def test_extract_k_2_width_2(self, run_filecheck, quantum_to_qecl_pipeline_k_2):
         """Test that `quantum.extract` ops are converted to their corresponding `qecl.extract_block`
         ops for registers with width = 2 and for k = 2.
 
@@ -305,87 +321,102 @@ class TestExtractPattern:
         """
         program = """
         func.func @test_program() {
-            // CHECK: [[hreg0:%.+]] = qecl.alloc
+            // CHECK: [[hreg0:%.+]] = "test.op"() : () -> !qecl.hyperreg<2 x 2>
             // CHECK-NOT: builtin.unrealized_conversion_cast
-            %0 = quantum.alloc(2) : !quantum.reg
+            %0 = "test.op"() : () -> !qecl.hyperreg<2 x 2>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.hyperreg<2 x 2> to !quantum.reg
 
-            // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]][0] : !qecl.hyperreg<1 x 2> -> !qecl.codeblock<2>
-            // CHECK: [[cb1:%.+]] = qecl.encode[zero] [[cb0]] : !qecl.codeblock<2>
-            // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<2>
-            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<2> to !quantum.bit
+            // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]][0] : !qecl.hyperreg<2 x 2> -> !qecl.codeblock<2>
+            // CHECK: [[cb1:%.+]] = qecl.qec [[cb0]] : !qecl.codeblock<2>
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb1]] : !qecl.codeblock<2> to !quantum.bit
             // CHECK-NOT: qecl.extract_block
-            // CHECK-NOT: qecl.encode
             // CHECK-NOT: qecl.qec
-            %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
-            %2 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
+            %2 = quantum.extract %1[0] : !quantum.reg -> !quantum.bit
+            %3 = quantum.extract %1[1] : !quantum.reg -> !quantum.bit
 
             // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
             // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
-            %3 = "test.op"(%1) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
             %4 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            %5 = "test.op"(%3) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
             return
         }
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_2)
 
 
+# MARK: TestInsertPattern
+
+
 @pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
 class TestInsertPattern:
     """Unit tests for the `insert` conversion pattern of the convert-quantum-to-qecl pass."""
 
-    def test_insert_width_1_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+    def test_insert_k_1_width_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """Test that `quantum.insert` ops are converted to their corresponding `qecl.insert_block`
         ops for a registers with width = 1 and for k = 1.
         """
         program = """
         func.func @test_program() {
-            // CHECK: [[hreg0:%.+]] = qecl.alloc
-            %0 = quantum.alloc(1) : !quantum.reg
-            %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+            // CHECK: [[hreg0:%.+]] = "test.op"() : () -> !qecl.hyperreg<1 x 1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.hyperreg<1 x 1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.hyperreg<1 x 1> to !quantum.reg
 
-            // CHECK: [[hreg1:%.+]] = qecl.insert_block [[hreg0]][0], {{%.+}} : !qecl.hyperreg<1 x 1>, !qecl.codeblock<1>
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %2 = "test.op"() : () -> !qecl.codeblock<1>
+            %3 = builtin.unrealized_conversion_cast %2 : !qecl.codeblock<1> to !quantum.bit
+
+            // CHECK: [[hreg1:%.+]] = qecl.insert_block [[hreg0]][0], [[cb0]] : !qecl.hyperreg<1 x 1>, !qecl.codeblock<1>
             // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[hreg1]] : !qecl.hyperreg<1 x 1> to !quantum.reg
-            %2 = quantum.insert %0[0], %1 : !quantum.reg, !quantum.bit
+            %4 = quantum.insert %1[0], %3 : !quantum.reg, !quantum.bit
 
             // CHECK: "test.op"([[conv_cast]]) : (!quantum.reg) -> !quantum.reg
-            %3 = "test.op"(%2) : (!quantum.reg) -> !quantum.reg  // To prevent DCE
+            %5 = "test.op"(%4) : (!quantum.reg) -> !quantum.reg  // To prevent DCE
             return
         }
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+
+# MARK: TestDeallocPattern
 
 
 class TestDeallocPattern:
     """Unit tests for the `dealloc` conversion pattern of the convert-quantum-to-qecl pass."""
 
-    def test_dealloc_width_1_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+    def test_dealloc_k_1_width_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """Test that `quantum.dealloc` ops are converted to their corresponding `qecl.dealloc` ops
         for a registers with width = 1 and for k = 1.
         """
         program = """
         func.func @test_program() {
-            // CHECK: [[hreg0:%.+]] = qecl.alloc
-            %0 = quantum.alloc(1) : !quantum.reg
+            // CHECK: [[hreg0:%.+]] = "test.op"() : () -> !qecl.hyperreg<1 x 1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.hyperreg<1 x 1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.hyperreg<1 x 1> to !quantum.reg
 
             // CHECK: qecl.dealloc [[hreg0]]  : !qecl.hyperreg<1 x 1>
-            quantum.dealloc %0 : !quantum.reg
+            quantum.dealloc %1 : !quantum.reg
 
             return
         }
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
-    def test_dealloc_width_2_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+    def test_dealloc_k_1_width_2(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """Test that `quantum.dealloc` ops are converted to their corresponding `qecl.dealloc` ops
         for a registers with width = 2 and for k = 1.
         """
         program = """
         func.func @test_program() {
-            // CHECK: [[hreg0:%.+]] = qecl.alloc() : !qecl.hyperreg<2 x 1>
-            %0 = quantum.alloc(2) : !quantum.reg
+            // CHECK: [[hreg0:%.+]] = "test.op"() : () -> !qecl.hyperreg<2 x 1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.hyperreg<2 x 1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.hyperreg<2 x 1> to !quantum.reg
 
             // CHECK: qecl.dealloc [[hreg0]]  : !qecl.hyperreg<2 x 1>
-            quantum.dealloc %0 : !quantum.reg
+            quantum.dealloc %1 : !quantum.reg
 
             return
         }
@@ -393,22 +424,27 @@ class TestDeallocPattern:
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
     @pytest.mark.xfail(reason="Only k = 1 is supported", raises=NotImplementedError)
-    def test_dealloc_width_1_k_2(self, run_filecheck, quantum_to_qecl_pipeline_k_2):
+    def test_dealloc_k_2_width_1(self, run_filecheck, quantum_to_qecl_pipeline_k_2):
         """Test that `quantum.dealloc` ops are converted to their corresponding `qecl.dealloc` ops
         for a registers with width = 1 and for k = 2.
         """
         program = """
         func.func @test_program() {
-            // CHECK: [[hreg0:%.+]] = qecl.alloc() : !qecl.hyperreg<1 x 2>
-            %0 = quantum.alloc(1) : !quantum.reg
+            // CHECK: [[hreg0:%.+]] = "test.op"() : () -> !qecl.hyperreg<1 x 2>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.hyperreg<1 x 2>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.hyperreg<1 x 2> to !quantum.reg
 
             // CHECK: qecl.dealloc [[hreg0]]  : !qecl.hyperreg<1 x 2>
-            quantum.dealloc %0 : !quantum.reg
+            quantum.dealloc %1 : !quantum.reg
 
             return
         }
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_2)
+
+
+# MARK: TestGatePattern
 
 
 @pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
@@ -423,12 +459,10 @@ class TestGatePattern:
         """
         program = """
         func.func @test_program() {
-            // CHECK: qecl.alloc
-            // CHECK: qecl.extract_block
-            // CHECK: qecl.encode[zero]
-            // CHECK: [[cb0:%.+]] = qecl.qec
-            %0 = quantum.alloc(1) : !quantum.reg
-            %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
 
             // CHECK: [[cb1:%.+]] = qecl.hadamard [[cb0]][0] : !qecl.codeblock<1>
             // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
@@ -448,12 +482,10 @@ class TestGatePattern:
         """
         program = """
         func.func @test_program() {
-            // CHECK: qecl.alloc
-            // CHECK: qecl.extract_block
-            // CHECK: qecl.encode[zero]
-            // CHECK: [[cb0:%.+]] = qecl.qec
-            %0 = quantum.alloc(1) : !quantum.reg
-            %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
 
             // CHECK: [[cb1:%.+]] = qecl.s [[cb0]][0] : !qecl.codeblock<1>
             // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
@@ -477,46 +509,48 @@ class TestGatePattern:
         """
         program = """
         func.func @test_program() {
-            // CHECK: qecl.alloc
-            // CHECK: qecl.extract_block
-            // CHECK: qecl.encode[zero]
-            // CHECK: [[cb0:%.+]] = qecl.qec
-            // CHECK: qecl.extract_block
-            // CHECK: qecl.encode[zero]
-            // CHECK: [[cb1:%.+]] = qecl.qec
-            %0 = quantum.alloc(2) : !quantum.reg
-            %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
-            %2 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+
+            // CHECK: [[cb1:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %2 = "test.op"() : () -> !qecl.codeblock<1>
+            %3 = builtin.unrealized_conversion_cast %2 : !qecl.codeblock<1> to !quantum.bit
 
             // CHECK: [[cb2:%.+]], [[cb3:%.+]] = qecl.cnot [[cb0]][0], [[cb1]][0] : !qecl.codeblock<1>, !qecl.codeblock<1>
             // CHECK: [[cb4:%.+]] = qecl.qec [[cb2]] : !qecl.codeblock<1>
             // CHECK: [[cb5:%.+]] = qecl.qec [[cb3]] : !qecl.codeblock<1>
             // CHECK: [[conv_cast1:%.+]] = builtin.unrealized_conversion_cast [[cb4]] : !qecl.codeblock<1> to !quantum.bit
             // CHECK: [[conv_cast2:%.+]] = builtin.unrealized_conversion_cast [[cb5]] : !qecl.codeblock<1> to !quantum.bit
-            %3, %4 = quantum.custom "CNOT"() %1, %2 : !quantum.bit, !quantum.bit
+            %4, %5 = quantum.custom "CNOT"() %1, %3 : !quantum.bit, !quantum.bit
 
             // CHECK: "test.op"([[conv_cast1]], [[conv_cast2]]) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
-            %5, %6 = "test.op"(%3, %4) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)  // To prevent DCE
+            %6, %7 = "test.op"(%4, %5) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)  // To prevent DCE
             return
         }
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
 
+# MARK: TestMeasurePattern
+
+
 @pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
 class TestMeasurePattern:
+    """Unit tests for the `measure` op conversion pattern of the convert-quantum-to-qecl pass."""
+
     def test_measure_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """Test that measurement ops (`quantum.measure`) are converted to their corresponding
         `qecl.measure` ops for k = 1.
         """
         program = """
         func.func @test_program() {
-            // CHECK: qecl.alloc
-            // CHECK: qecl.extract_block
-            // CHECK: qecl.encode[zero]
-            // CHECK: [[cb0:%.+]] = qecl.qec
-            %0 = quantum.alloc(1) : !quantum.reg
-            %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
 
             // CHECK: [[mres:%.+]], [[cb1:%.+]] = qecl.measure [[cb0]][0] : i1, !qecl.codeblock<1>
             // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb1]] : !qecl.codeblock<1> to !quantum.bit
@@ -530,8 +564,13 @@ class TestMeasurePattern:
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
 
+# MARK: TestScfForPattern
+
+
 @pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
-class TestTodo:
+class TestScfForPattern:
+    """Unit tests for the `scf.for` op conversion pattern of the convert-quantum-to-qecl pass."""
+
     def test_conversion_with_scf_for_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """TODO"""
         program = """
@@ -540,18 +579,20 @@ class TestTodo:
             %c1 = arith.constant 1 : index
             %c2 = arith.constant 2 : index
 
-            // CHECK: [[hreg:%.+]] = qecl.alloc
-            %0 = quantum.alloc( 1) : !quantum.reg
+            // CHECK: [[hreg0:%.+]] = "test.op"() : () -> !qecl.hyperreg<1 x 1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.hyperreg<1 x 1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.hyperreg<1 x 1> to !quantum.reg
 
-            // CHECK: [[res:%.+]] = scf.for %arg0 = %c0 to %c2 step %c1 iter_args(%arg1 = [[hreg]]) -> (!qecl.hyperreg<1 x 1>)
-            %1 = scf.for %arg0 = %c0 to %c2 step %c1 iter_args(%arg1 = %0) -> (!quantum.reg) {
+            // CHECK: [[res:%.+]] = scf.for %arg0 = %c0 to %c2 step %c1 iter_args(%arg1 = [[hreg0]]) -> (!qecl.hyperreg<1 x 1>)
+            %2 = scf.for %arg0 = %c0 to %c2 step %c1 iter_args(%arg1 = %1) -> (!quantum.reg) {
                 // CHECK: scf.yield %arg1 : !qecl.hyperreg<1 x 1>
                 scf.yield %arg1 : !quantum.reg
             }
 
             // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[res]] : !qecl.hyperreg<1 x 1> to !quantum.reg
             // CHECK: return [[conv_cast]] : !quantum.reg
-            return %1 : !quantum.reg
+            return %2 : !quantum.reg
         }
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
@@ -562,6 +603,65 @@ class TestTodo:
 
 class TestQuantumToQecLogicalPassIntegration:
     """Integration lit tests for the convert-quantum-to-qecl pass"""
+
+    # FIXME! This test never inserts qecl.encode ops
+    @pytest.mark.usefixtures("use_capture")
+    def test_circuit_with_for_loop_1(self, run_filecheck_qjit):
+        """TODO
+
+        Simplest case with for loop.
+        """
+        dev = qml.device("null.qubit", wires=1)
+
+        @qml.qjit(target="mlir", autograph=True)
+        @convert_quantum_to_qecl_pass(k=1)
+        @qml.qnode(dev, shots=1)
+        def circuit():
+            for i in range(2):
+                qml.H(0)
+            m0 = qml.measure(0)
+            return qml.sample([m0])
+
+        run_filecheck_qjit(circuit)
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_circuit_with_for_loop_2(self, run_filecheck_qjit):
+        """TODO
+
+        Simplest case with for loop, where the loop is preceded by a gate op.
+        """
+        dev = qml.device("null.qubit", wires=1)
+
+        @qml.qjit(target="mlir", autograph=True)
+        @convert_quantum_to_qecl_pass(k=1)
+        @qml.qnode(dev, shots=1)
+        def circuit():
+            qml.H(0)
+            for i in range(2):
+                qml.H(0)
+            m0 = qml.measure(0)
+            return qml.sample([m0])
+
+        run_filecheck_qjit(circuit)
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_circuit_with_for_loop_3(self, run_filecheck_qjit):
+        """TODO
+
+        Wire index is loop variable.
+        """
+        dev = qml.device("null.qubit", wires=1)
+
+        @qml.qjit(target="mlir", autograph=True)
+        @convert_quantum_to_qecl_pass(k=1)
+        @qml.qnode(dev, shots=1)
+        def circuit():
+            for i in range(2):
+                qml.H(i)
+            m0 = qml.measure(0)
+            return qml.sample([m0])
+
+        run_filecheck_qjit(circuit)
 
     @pytest.mark.usefixtures("use_capture")
     def test_ghz_circuit(self, run_filecheck_qjit):

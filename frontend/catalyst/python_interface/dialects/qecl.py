@@ -354,7 +354,7 @@ class EncodeOp(IRDLOperation):
 class NoiseOp(IRDLOperation):
     """Inject physical noise on elements of a logical codeblock."""
 
-    T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
+    T: ClassVar = VarConstraint("T", base(LogicalCodeblockType))
 
     name = "qecl.noise"
 
