@@ -62,6 +62,7 @@ expected_ops_names = {
     "SOp": "qecp.s",
     "RotOp": "qecp.rot",
     "CnotOp": "qecp.cnot",
+    "NoiseOp": "qecp.noise",
     "MeasureOp": "qecp.measure",
     "AssembleTannerGraphOp": "qecp.assemble_tanner",
     "DecodeEsmCssOp": "qecp.decode_esm_css",
@@ -400,6 +401,14 @@ class TestQecPhysicalOps:
         assert len(decode_physical_meas_op.result_types) == 1
         assert decode_physical_meas_op.result_types[0] == result_type
 
+    def test_qecp_op_constructor_noise(self):
+        """Test the constructor of the qecp.noise op."""
+        noise_op = qecp.NoiseOp(in_codeblock=self._get_codeblock_value())
+        assert len(noise_op.result_types) == 1
+        assert isinstance(noise_op.result_types[0], qecp.PhysicalCodeblockType)
+        assert noise_op.result_types[0].k == self.k
+        assert noise_op.result_types[0].n == self.n
+
 
 @pytest.mark.parametrize(
     "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
@@ -523,6 +532,9 @@ def test_assembly_format(run_filecheck, pretty_print):
     // CHECK: [[mres1:%.+]], [[qa9:%.+]] = qecp.measure [[qa8]] : i1, !qecp.qubit<aux>
     %mres0, %qd9 = qecp.measure %qd8 : i1, !qecp.qubit<data>
     %mres1, %qa9 = qecp.measure %qa8 : i1, !qecp.qubit<aux>
+
+    // CHECK: [[block2:%.+]] = qecp.noise [[block1]] : !qecp.codeblock<1 x 7>
+    %block2 = qecp.noise %block1 : !qecp.codeblock<1 x 7>
 
     // CHECK: [[tgraph:%.+]] = qecp.assemble_tanner [[row_idx]], [[col_ptr]] : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
     %tgraph = qecp.assemble_tanner %row_idx, %col_ptr : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>

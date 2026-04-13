@@ -305,6 +305,22 @@ def RotOp: QecPhysical_Op<"rot", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
     }];
 }
 
+def NoiseOp : QecPhysical_Op<"noise", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
+    let summary = "Inject physical noise on elements of a physical codeblock.";
+
+    let arguments = (ins
+        PhysicalCodeblockType:$in_codeblock
+    );
+
+    let results = (outs
+        PhysicalCodeblockType:$out_codeblock
+    );
+
+    let assemblyFormat = [{
+        $in_codeblock attr-dict `:` qualified(type($in_codeblock))
+    }];
+}
+
 def MeasureOp : QecPhysical_Op<"measure", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
     let summary = "A physical single-qubit projective measurement in the computational basis.";
 
