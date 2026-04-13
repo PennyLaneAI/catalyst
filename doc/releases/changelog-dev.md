@@ -293,6 +293,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Added support for ``StatePrep`` kwargs ``pad_with`` and ``normalize`` with program capture enabled.
+  [(#2620)](https://github.com/PennyLaneAI/catalyst/pull/2620)
+  
 * `abstracted_axes` now work with `qjit` and `capture=True`.
   [(#2655)](https://github.com/PennyLaneAI/catalyst/pull/2655/)
 
