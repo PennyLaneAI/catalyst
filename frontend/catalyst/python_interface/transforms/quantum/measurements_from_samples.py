@@ -37,7 +37,6 @@ from xdsl import context, ir, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin, func, tensor
 from xdsl.pattern_rewriter import PatternRewriter, RewritePattern
 from xdsl.rewriter import InsertPoint
-from xdsl_jax.dialects import stablehlo
 
 from catalyst.python_interface.conversion import xdsl_module
 from catalyst.python_interface.dialects import quantum
@@ -45,8 +44,8 @@ from catalyst.python_interface.pass_api import compiler_transform
 from catalyst.python_interface.transforms.quantum.diagonalize_measurements import (
     DiagonalizeFinalMeasurementsPass,
 )
-from catalyst.python_interface.transforms.quantum.outline_qnode import (
-    OutlineQNodePattern,
+from catalyst.python_interface.transforms.quantum.wrap_qnode import (
+    WrapQNodePass,
     get_call_op,
 )
 from catalyst.python_interface.utils import get_constant_from_ssa
@@ -77,11 +76,8 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
         # diagonalize measurements before converting to samples
         DiagonalizeFinalMeasurementsPass().apply(_ctx, op)
 
-        # add outer classical function to call quantum.nodes and apply post-processing
-        pattern_rewriter.PatternRewriteWalker(
-            OutlineQNodePattern(pass_str="from_samples"),
-            apply_recursively=False,
-        ).rewrite_module(op)
+        # wrap the quantum.nodes in classical functions to store post-processing
+        WrapQNodePass(pass_str="from_samples").apply(_ctx, op)
 
         # match + rewrite expval, var and probs as sample + post-processing
         pattern_rewriter.PatternRewriteWalker(
@@ -663,7 +659,7 @@ def get_shots(quantum_node: func.FuncOp) -> int:
 
     Raises:
         CompileError: If `quantum_node` does not contain a quantum.DeviceInitOp.
-        CompileError: If its not possible to extract a static constant from the 
+        CompileError: If its not possible to extract a static constant from the
             SSAValue for the shots
         ValueError: if the extracted shots are zero
 
@@ -688,7 +684,7 @@ def get_shots(quantum_node: func.FuncOp) -> int:
             "Cannot get number of shots. Note that using a dynamic number of shots is not "
             "supported with measurements-from-samples."
         )
-    
+
     assert isinstance(shots, int), "Expected `shots` to be an integer"
     if shots == 0:
         raise ValueError("The measurements_from_samples pass requires non-zero shots")
