@@ -740,7 +740,7 @@ class RotOp(IRDLOperation):
 class NoiseOp(IRDLOperation):
     """Inject physical noise on elements of a physical codeblock."""
 
-    T: ClassVar = VarConstraint("T", PhysicalCodeblockType)
+    T: ClassVar = VarConstraint("T", anyPhysicalCodeblock)
 
     name = "qecp.noise"
 
