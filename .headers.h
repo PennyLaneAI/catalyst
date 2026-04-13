@@ -1,15 +1,7 @@
 #include <algorithm>
-#include <algorithm> // generate_n
-#include <algorithm>
-#include <algorithm> // std::find
-#include <algorithm>
 #include <array>
-#include <bitset>
 #include <cassert>
-#include <cassert> // assert
 #include <chrono>
-#include <cmath>
-#include <cmath> // std::ceil()
 #include <cmath>
 #include <complex.h>
 #include <complex>
@@ -23,15 +15,10 @@
 #include <cstring>
 #include <ctime>
 #include <deque>
+#include <dlfcn.h>
 #include <exception>
 #include <filesystem>
-#include <filesystem> // path
-#include <filesystem>
 #include <fstream>
-#include <fstream> // ifstream
-#include <fstream>
-#include <functional>
-#include <functional> // std::reference_wrapper
 #include <iomanip>
 #include <ios>
 #include <iostream>
@@ -48,7 +35,6 @@
 #include <random>
 #include <ratio>
 #include <regex>
-#include <regex> //regex
 #include <set>
 #include <sstream>
 #include <stdbool.h>
@@ -61,20 +47,26 @@
 #include <sys/time.h>
 #include <tuple>
 #include <type_traits>
-#include <typeinfo>
 #include <unordered_map>
 #include <unordered_set>
-#include <utility>
-#include <utility> // std::forward
-#include <utility> // std::move
 #include <utility>
 #include <variant>
 #include <vector>
 
 #include "Enzyme.h"
 #include "absl/base/dynamic_annotations.h"
+#include "boost/multiprecision/cpp_dec_float.hpp"
+#include "boost/multiprecision/cpp_int.hpp"
+#include "boost/multiprecision/miller_rabin.hpp"
+#include "boost/random.hpp"
+#include "catch2/catch_session.hpp"
+#include "catch2/catch_template_test_macros.hpp"
+#include "catch2/catch_test_macros.hpp"
+#include "catch2/generators/catch_generators.hpp"
+#include "catch2/generators/catch_generators_range.hpp"
+#include "catch2/matchers/catch_matchers_floating_point.hpp"
+#include "catch2/matchers/catch_matchers_string.hpp"
 #include "gmock/gmock.h"
-#include "gmock/gmock.h" // HasSubstr
 #include "gtest/gtest.h"
 #include "hlo-extensions/Transforms/Passes.h"
 #include "hlo-extensions/Transforms/Patterns.h"
@@ -92,29 +84,13 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/StringRef.h" // llvm::StringRef
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
-#include "llvm/ADT/TypeSwitch.h"
-#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
-#include "llvm/ADT/TypeSwitch.h"
-#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
-#include "llvm/ADT/TypeSwitch.h"
-#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
-#include "llvm/ADT/TypeSwitch.h" // needed for enums
-#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
-#include "llvm/ADT/TypeSwitch.h"
-#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/LLVMContext.h" // llvm::LLVMContext
 #include "llvm/IR/LegacyPassManager.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Module.h" // llvm::Module
 #include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/MC/TargetRegistry.h"
@@ -132,18 +108,10 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/LogicalResult.h"
-#include "llvm/Support/LogicalResult.h" // llvm::LogicalResult
-#include "llvm/Support/LogicalResult.h"
 #include "llvm/Support/MathExtras.h"
-#include "llvm/Support/MathExtras.h" // for llvm::numbers::pi
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/MemoryBuffer.h" // llvm::MemoryBuffer
 #include "llvm/Support/SMLoc.h"
-#include "llvm/Support/SMLoc.h" // llvm::SMLoc
 #include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/SourceMgr.h" // llvm::SMDiagnostic
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/SourceMgr.h" // llvm::SourceMgr
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/raw_ostream.h"
@@ -168,7 +136,6 @@
 #include "mlir/Bindings/Python/PybindAdaptors.h"
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/Bytecode/BytecodeWriter.h"
-#include "mlir/Bytecode/BytecodeWriter.h" // mlir::writeBytecodeToFile
 #include "mlir/CAPI/Registration.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
@@ -188,8 +155,6 @@
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/TensorToLinalg/TensorToLinalgPass.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Arith/IR/Arith.h" // for arith::XOrIOp and arith::ConstantOp
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -215,15 +180,13 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
+#include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h" // TF:llvm-project
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
-#include "mlir/ExecutionEngine/CRunnerUtils.h"
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
@@ -231,31 +194,16 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinOps.h" // mlir::ModuleOp
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinOps.h" // mlir::ModuleOp
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/Diagnostics.h" // mlir::Diagnostic
-#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/DialectImplementation.h"
-#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
-#include "mlir/IR/DialectImplementation.h"
-#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
-#include "mlir/IR/DialectImplementation.h"
-#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
-#include "mlir/IR/DialectRegistry.h"
-#include "mlir/IR/DialectRegistry.h" // mlir::DialectRegistry
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/Location.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/MLIRContext.h" // mlir::MLIRContext
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
@@ -263,7 +211,6 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/OwningOpRef.h"
-#include "mlir/IR/OwningOpRef.h" // mlir::OwningOpRef
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Region.h"
 #include "mlir/IR/RegionKindInterface.h"
@@ -290,18 +237,11 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassInstrumentation.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Pass/PassManager.h" // mlir::PassManager
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Pass/PassManager.h" // for PassManager
-#include "mlir/Pass/PassManager.h"
 #include "mlir/Rewrite/FrozenRewritePatternSet.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
-#include "mlir/Support/LogicalResult.h" // llvm::LogicalResult
-#include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/Timing.h"
-#include "mlir/Support/Timing.h" // mlir::DefaultTimingManager, mlir::TimingScope
 #include "mlir/Support/WalkResult.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
@@ -319,16 +259,24 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/InliningUtils.h"
 #include "mlir/Transforms/Passes.h"
-#include "mlir/Transforms/Passes.h" // for createCSEPass
-#include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/WalkPatternRewriteDriver.h"
+#include "nanobind/eval.h"
+#include "nanobind/nanobind.h"
+#include "nlohmann/json.hpp"
 #include "numpy/ndarrayobject.h"
+#include "pybind11/embed.h"
+#include "pybind11/eval.h"
+#include "pybind11/pybind11.h"
 #include "stablehlo/conversions/linalg/transforms/Passes.h"
 #include "stablehlo/dialect/Register.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/integrations/c/StablehloPasses.h"
 #include "stablehlo/transforms/Passes.h"
 #include "stablehlo/transforms/optimization/Passes.h"
+#include "stim/mem/simd_word.h"
+#include "stim/stabilizers/flex_pauli_string.h"
+#include "stim/stabilizers/pauli_string.h"
+#include "toml++/toml.hpp"
 #include "xla/service/custom_call_status.h"
 
 #include "CAPI/Dialects.h"
@@ -348,7 +296,6 @@
 #include "Catalyst/Utils/SCFUtils.h"
 #include "Catalyst/Utils/StaticAllocas.h"
 #include "Catalyst/Utils/frontend_catalyst_version_py.h"
-#include "Catalyst/Utils/frontend_catalyst_version_py.h" // CATALYST_VERSION
 #include "Driver/CatalystLLVMTarget.h"
 #include "Driver/CompilerDriver.h"
 #include "Driver/HighResolutionOutputStrategy.h"
@@ -397,8 +344,6 @@
 #include "PBC/IR/PBCDialect.h"
 #include "PBC/IR/PBCOpInterfaces.h"
 #include "PBC/IR/PBCOps.h"
-#include "PBC/IR/PBCOps.h" // for FabricateOp
-#include "PBC/IR/PBCOps.h"
 #include "PBC/Transforms/PPRDecomposeUtils.h"
 #include "PBC/Transforms/Passes.h"
 #include "PBC/Transforms/Patterns.h"
@@ -427,10 +372,6 @@
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/IR/QuantumOps.h" // for quantum.extract op
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/IR/QuantumOps.h" // for quantum::AllocQubitOp
-#include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/Transforms/Passes.h"
@@ -438,8 +379,6 @@
 #include "Quantum/Utils/QuantumSplitting.h"
 #include "Quantum/Utils/RemoveQuantum.h"
 #include "RTIO/IR/RTIODialect.h"
-#include "RTIO/IR/RTIOOps.h"
-#include "RTIO/IR/RTIOOps.h" // For ConfigAttr
 #include "RTIO/IR/RTIOOps.h"
 #include "RTIO/Transforms/Passes.h"
 #include "RTIO/Transforms/Patterns.h"
@@ -561,8 +500,6 @@
 #include "PBC/IR/PBCOpsTypes.h.inc"
 #include "PBC/Transforms/Passes.h.inc"
 #include "PBC/Transforms/PassesEnums.h.inc"
-#include "PBC/Transforms/PassesEnums.h.inc" // need for DecomposeMethod
-#include "PBC/Transforms/PassesEnums.h.inc" // for DecomposeMethod
 #include "PauliFrame/IR/PauliFrameAttributes.cpp.inc"
 #include "PauliFrame/IR/PauliFrameAttributes.h.inc"
 #include "PauliFrame/IR/PauliFrameEnums.cpp.inc"
@@ -633,45 +570,3 @@
 #include "Test/Transforms/Passes.h.inc"
 #include "hlo-extensions/Transforms/Passes.h.inc"
 #include "hlo-extensions/Transforms/generated_stablehlo_legalize_to_standard.cpp.inc"
-#include "iostream"
-#include <Exception.hpp>
-#include <NullQubit.hpp>
-#include <QuantumDevice.hpp>
-#include <boost/multiprecision/cpp_dec_float.hpp>
-#include <boost/multiprecision/cpp_int.hpp>
-#include <boost/multiprecision/miller_rabin.hpp>
-#include <boost/random.hpp>
-#include <catch2/catch_approx.hpp>
-#include <catch2/catch_session.hpp>
-#include <catch2/catch_template_test_macros.hpp>
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/generators/catch_generators_all.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
-#include <catch2/matchers/catch_matchers_range_equals.hpp>
-#include <catch2/matchers/catch_matchers_string.hpp>
-#include <catch2/matchers/catch_matchers_vector.hpp>
-#include <dlfcn.h>
-#include <llvm/Target/TargetMachine.h>
-#include <mlir/Dialect/Arith/IR/Arith.h>
-#include <mlir/Dialect/Arith/IR/Arith.h> // for arith::XOrIOp and arith::ConstantOp
-#include <mlir/Dialect/Arith/IR/Arith.h>
-#include <mlir/Dialect/SCF/IR/SCF.h>
-#include <mlir/Dialect/SCF/Transforms/Transforms.h>
-#include <mlir/IR/Builders.h>
-#include <mlir/IR/DialectRegistry.h>
-#include <mlir/IR/Location.h>
-#include <mlir/IR/PatternMatch.h>
-#include <mlir/IR/Value.h>
-#include <mlir/Support/LogicalResult.h>
-#include <nanobind/eval.h>
-#include <nanobind/nanobind.h>
-#include <nanobind/stl/string.h>
-#include <nlohmann/json.hpp>
-#include <pybind11/embed.h>
-#include <pybind11/eval.h>
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <stim/mem/simd_word.h>
-#include <stim/stabilizers/flex_pauli_string.h>
-#include <stim/stabilizers/pauli_string.h>
-#include <toml++/toml.hpp>
