@@ -132,7 +132,7 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
             region=region,
         )
         # Add an attribute to the noise injection subroutine
-        funcOp.attributes["qecp_noise_injection"] = builtin.NoneAttr()
+        funcOp.attributes[f"{n}x{k}_code_noise"] = builtin.NoneAttr()
         return funcOp
 
 
