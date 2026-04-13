@@ -301,3 +301,29 @@ def test_set_state():
 
 
 print(test_set_state.mlir)
+
+
+# CHECK: func.func public @test_set_basis_state(%arg0: tensor<4xi64>) -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=4))
+def test_set_basis_state():
+    """
+    Test set_basis_state.
+    """
+    # CHECK-DAG: [[three:%.+]] = arith.constant 3 : i64
+    # CHECK-DAG: [[two:%.+]] = arith.constant 2 : i64
+    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
+
+    # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
+
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][[[two]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[q3:%.+]] = qref.get [[reg]][[[three]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[state:%.+]] = stablehlo.convert {{%.+}} : tensor<4xi1>
+    # CHECK: qref.set_basis_state([[state]]) [[q0]], [[q2]], [[q3]] : tensor<4xi1>, !qref.bit, !qref.bit, !qref.bit
+    qp.BasisState(np.array([0, 0, 1, 0]), wires=[0, 2, 3])
+
+    return qp.expval(qp.X(0))
+
+
+print(test_set_basis_state.mlir)
