@@ -71,6 +71,32 @@ def test_custom_op(i: int):
 print(test_custom_op.mlir)
 
 
+# CHECK: func.func public @test_measure() -> tensor<2xf64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def test_measure():
+    """
+    Test measure.
+    """
+    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
+    # CHECK: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
+
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[mres:%.+]] = qref.measure [[q0]] : i1
+    # CHECK: [[mres_tensori1:%.+]] = tensor.from_elements [[mres]] : tensor<i1>
+    m = qp.measure(0)
+
+    # CHECK: [[mres_tensori64:%.+]] = stablehlo.convert [[mres_tensori1]] : (tensor<i1>) -> tensor<i64>
+    # CHECK: [[mres_tensori1:%.+]] = stablehlo.convert [[mres_tensori64]] : (tensor<i64>) -> tensor<i1>
+    # CHECK: [[mres_i1:%.+]] = tensor.extract [[mres_tensori1]][] : tensor<i1>
+    # CHECK: [[mcmobs:%.+]] = quantum.mcmobs [[mres_i1]] : !quantum.obs
+    # CHECK: [[probs:%.+]] = quantum.probs [[mcmobs]] : tensor<2xf64>
+    return qp.probs(op=m)
+
+
+print(test_measure.mlir)
+
+
 # CHECK: func.func public @test_dynamic_qubit_allocation(%arg0: tensor<i64>) -> tensor<f64>
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))

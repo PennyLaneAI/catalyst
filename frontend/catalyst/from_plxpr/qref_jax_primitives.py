@@ -17,7 +17,7 @@ of quantum operations, measurements, and observables to reference semantics JAXP
 """
 
 from jax._src.lib.mlir import ir
-from jax.core import AbstractValue
+from jax.core import AbstractValue, ShapedArray
 from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
@@ -39,7 +39,7 @@ from catalyst.jax_primitives import (
     extract_scalar,
     safe_cast_to_f64,
 )
-from catalyst.utils.extra_bindings import TensorExtractOp
+from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.patching import Patcher
 
 with Patcher(
@@ -61,6 +61,7 @@ with Patcher(
         GetOp,
         GlobalPhaseOp,
         HermitianOp,
+        MeasureOp,
         MultiRZOp,
         NamedObsOp,
         PauliRotOp,
@@ -149,6 +150,7 @@ qref_pauli_rot_p = Primitive("qref_pauli_rot")
 qref_pauli_rot_p.multiple_results = True
 qref_unitary_p = Primitive("qref_unitary")
 qref_unitary_p.multiple_results = True
+qref_measure_p = Primitive("qref_measure")
 qref_compbasis_p = Primitive("qref_compbasis")
 qref_namedobs_p = Primitive("qref_namedobs")
 qref_hermitian_p = Primitive("qref_hermitian")
@@ -553,6 +555,40 @@ def _qref_unitary_lowering(
 
 
 #
+# measure
+#
+@qref_measure_p.def_abstract_eval
+def _qref_measure_abstract_eval(qubit, postselect: int = None):
+    assert isinstance(qubit, QrefQubit)
+    return ShapedArray((), bool)
+
+
+def _qref_measure_lowering(
+    jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, postselect: int = None
+):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    assert ir.OpaqueType.isinstance(qubit.type)
+    assert ir.OpaqueType(qubit.type).dialect_namespace == "qref"
+    assert ir.OpaqueType(qubit.type).data == "bit"
+
+    # Prepare postselect attribute
+    if postselect is not None:
+        i32_type = ir.IntegerType.get_signless(32, ctx)
+        postselect = ir.IntegerAttr.get(i32_type, postselect)
+
+    result_type = ir.IntegerType.get_signless(1)
+
+    result = MeasureOp(result_type, qubit, postselect=postselect).results[0]
+
+    result_from_elements_op = ir.RankedTensorType.get((), result.type)
+    from_elements_op = FromElementsOp(result_from_elements_op, result)
+
+    return (from_elements_op.results[0],)
+
+
+#
 # compbasis observable
 #
 @qref_compbasis_p.def_abstract_eval
@@ -645,6 +681,7 @@ CUSTOM_LOWERING_RULES = (
     (qref_gphase_p, _qref_gphase_lowering),
     (qref_pauli_rot_p, _qref_pauli_rot_lowering),
     (qref_unitary_p, _qref_unitary_lowering),
+    (qref_measure_p, _qref_measure_lowering),
     (qref_compbasis_p, _qref_compbasis_lowering),
     (qref_namedobs_p, _qref_named_obs_lowering),
     (qref_hermitian_p, _qref_hermitian_lowering),

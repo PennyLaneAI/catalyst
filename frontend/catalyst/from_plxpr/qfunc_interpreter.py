@@ -44,6 +44,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_get_p,
     qref_gphase_p,
     qref_hermitian_p,
+    qref_measure_p,
     qref_namedobs_p,
     qref_pauli_rot_p,
     qref_qinst_p,
@@ -676,10 +677,8 @@ def handle_state_prep(self, *invals, n_wires, **kwargs):
 def handle_measure(self, wire, reset, postselect):
     """Handle the conversion from plxpr to Catalyst jaxpr for the mid-circuit measure primitive."""
 
-    in_qreg, in_wire = (
-        _[0] for _ in get_in_qubit_values([wire], self.qubit_index_recorder, self.init_qreg)
-    )
-    result, out_wire = measure_p.bind(in_wire, postselect=postselect)
+    in_qubit = qref_get_p.bind(self.init_qreg, wire)
+    result = qref_measure_p.bind(in_qubit, postselect=postselect)
 
     if reset:
         # Constants need to be passed as input values for some reason I forgot about.
@@ -697,7 +696,6 @@ def handle_measure(self, wire, reset, postselect):
             num_implicit_outputs=None,
         )[0]
 
-    in_qreg[in_qreg.global_index_to_local_index(wire)] = out_wire
     result = jnp.astype(result, int)
     return result
 
