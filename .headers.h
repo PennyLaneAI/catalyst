@@ -69,8 +69,6 @@
 #include "catch2/matchers/catch_matchers_string.hpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "hlo-extensions/Transforms/Passes.h"
-#include "hlo-extensions/Transforms/Patterns.h"
 #include "jax_cpu_lapack_kernels/lapack_kernels.hpp"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -390,6 +388,8 @@
 #include "Standalone/StandalonePasses.h"
 #include "Standalone/StandaloneTypes.h"
 #include "Test/Transforms/Passes.h"
+#include "hlo-extensions/Transforms/Passes.h"
+#include "hlo-extensions/Transforms/Patterns.h"
 
 #include "ARTIQRuntimeBuilder.hpp"
 #include "Adjoint.hpp"
