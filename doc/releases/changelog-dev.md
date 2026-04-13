@@ -289,7 +289,7 @@
 
 <h3>Improvements 🛠</h3>
 
-* Added support for PauliRot and PauliMeasure mock execution on `null.qubit` devices, which enableed
+* Added support for ``PauliRot`` and ``PauliMeasure`` execution on the `null.qubit` device, which enables
   runtime resource tracking for those operations.
   [(#2625)](https://github.com/PennyLaneAI/catalyst/pull/2625)
 
