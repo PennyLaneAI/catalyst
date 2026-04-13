@@ -19,6 +19,7 @@
 
 #include "nanobind/eval.h"
 #include "nanobind/nanobind.h"
+#include "nanobind/stl/string.h"
 
 const std::string program = R"(
 import numpy as np
