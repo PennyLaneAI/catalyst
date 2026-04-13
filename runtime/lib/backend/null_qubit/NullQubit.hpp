@@ -15,6 +15,7 @@
 #pragma once
 
 #include <algorithm> // generate_n
+#include <cmath>
 #include <complex>
 #include <cstdio>
 #include <optional>
@@ -22,8 +23,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#include <cmath>
 
 #include "DataView.hpp"
 #include "QuantumDevice.hpp"

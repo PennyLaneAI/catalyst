@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -262,6 +263,7 @@
 #include "mlir/Transforms/WalkPatternRewriteDriver.h"
 #include "nanobind/eval.h"
 #include "nanobind/nanobind.h"
+#include "nanobind/stl/string.h"
 #include "nlohmann/json.hpp"
 #include "numpy/ndarrayobject.h"
 #include "pybind11/embed.h"
@@ -329,8 +331,8 @@
 #include "Ion/Transforms/Passes.h"
 #include "Ion/Transforms/Patterns.h"
 #include "Ion/Transforms/ValueTracing.h"
-#include "Ion/Transforms/oqd_database_managers.hpp"
-#include "Ion/Transforms/oqd_database_types.hpp"
+#include "Ion/Transforms/oqd_database_managers.h"
+#include "Ion/Transforms/oqd_database_types.h"
 #include "MBQC/IR/MBQCDialect.h"
 #include "MBQC/IR/MBQCInterfaces.h"
 #include "MBQC/IR/MBQCOps.h"
@@ -436,8 +438,8 @@
 #include "VerifyParentGateAnalysis.hpp"
 #include "Zne.hpp"
 #include "lapack_kernels.hpp"
-#include "oqd_database_types.hpp"
-#include "oqd_database_utils.hpp"
+#include "oqd_database_types.h"
+#include "oqd_database_utils.h"
 
 #include "Catalyst/IR/CatalystOps.cpp.inc"
 #include "Catalyst/IR/CatalystOps.h.inc"
