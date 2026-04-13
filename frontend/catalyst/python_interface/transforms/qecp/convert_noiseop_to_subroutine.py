@@ -126,7 +126,7 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
         # ["symbol-dce"](https://github.com/PennyLaneAI/catalyst/blob/372c376eb821e830da778fdc8af423eeb487eab6/frontend/catalyst/pipelines.py#L248)_
         # pass was added to the pipeline.
         funcOp = func.FuncOp(
-            "noise_injection_subroutine",
+            f"{n}x{k}_code_noise_subroutine",
             (input_types, output_types),
             visibility="private",
             region=region,
