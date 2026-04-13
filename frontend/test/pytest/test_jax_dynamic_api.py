@@ -601,7 +601,8 @@ class TestForLoopDynamicShapes:
         assert qml.math.allclose(result, expected)
 
     def test_qnode_forloop_indbidx_outdbidx(self, capture_mode):
-        """Test for-loops with mixed input and output dimension variables during the quantum tracing."""
+        """Test for-loops with mixed input and output dimension variables during the
+        quantum tracing."""
 
         @qjit(capture=capture_mode)
         @qml.qnode(qml.device("lightning.qubit", wires=4))
