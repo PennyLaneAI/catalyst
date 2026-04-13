@@ -14,6 +14,8 @@
 
 #include "OpenQasmDevice.hpp"
 
+#include <bitset>
+
 #include "Exception.hpp"
 
 namespace Catalyst::Runtime::Device {
