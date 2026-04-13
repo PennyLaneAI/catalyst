@@ -21,8 +21,6 @@
 
 using namespace Catch::Matchers;
 
-using namespace Catalyst::Runtime;
-
 TEST_CASE("Test DataView Pre-Increment Iterator - double, 1", "[DataView]")
 {
     double data_aligned[3] = {1.0, 1.1, 1.2};
