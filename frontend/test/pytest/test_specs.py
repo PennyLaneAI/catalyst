@@ -342,6 +342,7 @@ class TestPassByPassSpecs:
             check_specs_header_same(actual, single_level_specs, skip_level=True)
             check_specs_resources_same(res, single_level_specs["resources"])
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_negative_levels(self, simple_circuit):
         """Test that negative levels are handled correctly."""
 
