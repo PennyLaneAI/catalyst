@@ -1756,8 +1756,8 @@ class TestAdjointOfTemplates:
 
             return qml.expval(qml.Z(0))
 
-        with pytest.raises(cat.CompileError, match=r"Adjoint\(Switch.+\) not supported"):
-            qjit(circuit)
+        result = qjit(circuit)(0)
+        assert np.isclose(result, 1.0)
 
 
 if __name__ == "__main__":
