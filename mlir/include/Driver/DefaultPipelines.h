@@ -62,7 +62,8 @@ const PipelineList pipelineList{
       "detensorize-scf", "detensorize-function-boundary", "canonicalize", "symbol-dce"}},
     {"gradient-lowering-pipeline", {"annotate-invalid-gradient-functions", "lower-gradients"}},
     {"bufferization-pipeline",
-     {"convert-tensor-to-linalg",      // tensor.pad
+     {//"inline",
+      "convert-tensor-to-linalg",      // tensor.pad
       "convert-elementwise-to-linalg", // must be run before --one-shot-bufferize
       "gradient-preprocess", "eliminate-empty-tensors",
       // This pass is needed to avoid aliasing of the input buffer with the output buffer.
