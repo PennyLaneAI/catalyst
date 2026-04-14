@@ -805,7 +805,7 @@ class TestAdjointCtrl:
         catalyst_xpr = from_plxpr(plxpr)()
 
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
-        for_loop_xpr = qfunc_xpr.eqns[2].params["body_jaxpr"]
+        for_loop_xpr = qfunc_xpr.eqns[2].params["jaxpr_body_fn"]
 
         for i in [0, 1, 2]:
             assert for_loop_xpr.eqns[i].primitive == qextract_p
