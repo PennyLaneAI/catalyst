@@ -295,7 +295,7 @@
 
 * Added support for ``StatePrep`` kwargs ``pad_with`` and ``normalize`` with program capture enabled.
   [(#2620)](https://github.com/PennyLaneAI/catalyst/pull/2620)
-  
+
 * `abstracted_axes` now work with `qjit` and `capture=True`.
   [(#2655)](https://github.com/PennyLaneAI/catalyst/pull/2655)
 
@@ -600,6 +600,7 @@
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
   [(#2492)](https://github.com/PennyLaneAI/catalyst/pull/2492)
   [(#2674)](https://github.com/PennyLaneAI/catalyst/pull/2674)
+  [(#2642)](https://github.com/PennyLaneAI/catalyst/pull/2642)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
