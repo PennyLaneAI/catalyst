@@ -489,6 +489,11 @@
   tools like `xdsl-opt` to work with Catalyst's custom Python dialects.
   [(#2471)](https://github.com/PennyLaneAI/catalyst/pull/2471)
 
+* Fix symbolic adjoint support for control flow operation. This means operators who are the target
+  of `qp.adjoint` but require decomposition can have decompositions with control flow in them,
+  which would previously raise an error. Adjoint on functions is unaffected.
+  [(#2667)](https://github.com/PennyLaneAI/catalyst/pull/2667)
+
 * Fix a bug with the xDSL `ParitySynth` pass that caused failure when the QNode being transformed
   contained operations with regions.
   [(#2408)](https://github.com/PennyLaneAI/catalyst/pull/2408)

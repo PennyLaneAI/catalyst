@@ -502,6 +502,10 @@ class HybridAdjoint(HybridOp):
         in reverse. Note that decomposition of control flow ops like for loops are only supported
         in the compiler."""
         assert len(self.regions) == 1, "Expected a single nested region for HybridAdjoint"
+        assert not any(
+            isinstance(op, HybridOp) and not isinstance(op, (HybridAdjoint, HybridCtrl))
+            for op in self.regions[0].quantum_tape.operations
+        ), "Cannot decompose Adjoint(HybridOp) in PennyLane"
 
         return [
             create_adjoint_op(op, lazy=True)
@@ -596,7 +600,7 @@ class HybridCtrl(HybridOp):
 
     def decomposition(self):
         """Compute quantum decomposition of the gate by recursively scanning the nested tape and
-        distributing the quantum control operaiton over the tape operations."""
+        distributing the quantum control operation over the tape operations."""
         assert len(self.regions) == 1, "HybridCtrl is expected to have one region"
 
         _check_no_measurements(self.regions[0].quantum_tape)
