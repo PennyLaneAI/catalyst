@@ -14,17 +14,16 @@
 
 #define DEBUG_TYPE "resource-analysis"
 
+#include "Catalyst/Analysis/ResourceAnalysis.h"
+
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
 
-#include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
-
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"

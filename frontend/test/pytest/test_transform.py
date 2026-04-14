@@ -1399,9 +1399,6 @@ def test_dynamic_one_shot(backend):
     assert expected_shape == observed_shape
 
 
-@pytest.mark.xfail(
-    reason="QJIT fails with ValueError: Eagerly computing the adjoint (lazy=False) is only supported on single operators."
-)
 def test_pattern_matching_optimization(backend):
     """Test pattern_matching_optimization"""
 
