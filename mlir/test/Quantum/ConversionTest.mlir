@@ -350,7 +350,7 @@ func.func @paulirot(%q0 : !quantum.bit, %angle : f64) -> (!quantum.bit) {
 
 // CHECK-LABEL: @controlled_paulirot
 func.func @controlled_paulirot(%q0 : !quantum.bit, %q1 : !quantum.bit, %angle : f64) -> (!quantum.bit) {
-    // CHECK: [[alloca:%.+]] = llvm.alloca %5 x !llvm.struct<(i1, i64, ptr, ptr)> : (i64) -> !llvm.ptr
+    // CHECK: [[alloca:%.+]] = llvm.alloca {{%.+}} x !llvm.struct<(i1, i64, ptr, ptr)> : (i64) -> !llvm.ptr
     // CHECK: llvm.mlir.addressof @pauli_word_X : !llvm.ptr
     // CHECK: [[pauliPtr:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<2 x i8>
     // CHECK: [[ctrue:%.+]] = llvm.mlir.constant(true) : i1
