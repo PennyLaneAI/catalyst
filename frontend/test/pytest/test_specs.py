@@ -833,8 +833,13 @@ class TestPassByPassSpecs:
         def circuit(x):
             if x > 0.5:
                 qml.Hadamard(0)
+                qml.PauliX(0)
             else:
                 qml.PauliX(0)
+                if x < 2:
+                    qml.PauliX(0)
+                else:
+                    qml.PauliZ(0)
 
             return qml.expval(qml.PauliX(0))
 
@@ -845,8 +850,8 @@ class TestPassByPassSpecs:
             shots=Shots(None),
             level="Before MLIR Passes",
             resources=SpecsResources(
-                gate_types={"Hadamard": 1, "PauliX": 1},
-                gate_sizes={1: 2},
+                gate_types={"Hadamard": 1, "PauliX": 2, "PauliZ": 1},
+                gate_sizes={1: 4},
                 measurements={"expval(PauliX)": 1},
                 num_allocs=1,
             ),
