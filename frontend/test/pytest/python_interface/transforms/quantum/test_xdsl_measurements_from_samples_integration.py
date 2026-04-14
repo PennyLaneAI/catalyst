@@ -188,7 +188,6 @@ class TestIntegrationUsefulErrors:
 class TestIntegrationWithOtherPasses:
     """Tests the integration of the xDSL-basd MeasurementsFromSamplesPass with other key passes"""
 
-    # todo: make this test analytic too - return 1.0 is not reliable
     def test_integrate_with_decompose(self, capture, run_filecheck_qjit):
         """Test that the measurements_from_samples pass works correctly when used in combination
         with the decompose pass."""
