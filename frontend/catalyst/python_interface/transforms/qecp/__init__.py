@@ -14,6 +14,13 @@
 
 """xDSL API for qecp transforms"""
 
-# from .lower_noiseop import .
+from .convert_noiseop_to_subroutine import (
+    ConvertNoiseOpToSubroutinePass,
+    convert_noiseop_to_subroutine_pass,
+)
 
-__all__ = []
+__all__ = [
+    # Passes
+    "ConvertNoiseOpToSubroutinePass",
+    "convert_noiseop_to_subroutine_pass",
+]
