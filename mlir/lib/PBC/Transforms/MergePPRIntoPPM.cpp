@@ -15,7 +15,6 @@
 #define DEBUG_TYPE "merge-ppr-ppm"
 
 #include "llvm/Support/Casting.h"
-
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
 

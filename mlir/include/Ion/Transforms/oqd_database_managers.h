@@ -18,10 +18,10 @@
 #include <cassert>
 #include <set>
 
-#include <toml++/toml.hpp>
+#include "toml++/toml.hpp"
 
-#include "oqd_database_types.hpp"
-#include "oqd_database_utils.hpp"
+#include "oqd_database_types.h"
+#include "oqd_database_utils.h"
 
 namespace catalyst {
 namespace ion {

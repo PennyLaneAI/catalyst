@@ -15,7 +15,6 @@
 #include <cstdint>
 
 #include "llvm/Support/MathExtras.h" // for llvm::numbers::pi
-
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
