@@ -490,7 +490,7 @@ jobs:
 
     - name: Install PennyLane branch
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@for-loop-closure
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@for-loop-reverse-iteration
 
     - name: Verify Graphviz installation
       run: |
@@ -582,7 +582,7 @@ jobs:
 
     - name: Install PennyLane branch
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@for-loop-closure
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@for-loop-reverse-iteration
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -649,7 +649,7 @@ jobs:
 
     - name: Install PennyLane branch
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@for-loop-closure
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@for-loop-reverse-iteration
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
