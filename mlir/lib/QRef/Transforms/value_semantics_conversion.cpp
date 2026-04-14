@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "QRef/IR/QRefDialect.h"
 #define DEBUG_TYPE "value-semantics-conversion"
+
+#include "value_semantics_conversion.h"
 
 #include <cstdint>
 #include <optional>
@@ -39,14 +40,13 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/WalkResult.h"
 
+#include "QRef/IR/QRefDialect.h"
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
 #include "QRef/IR/QRefTypes.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
-
-#include "value_semantics_conversion.h"
 
 using namespace mlir;
 using namespace catalyst;
