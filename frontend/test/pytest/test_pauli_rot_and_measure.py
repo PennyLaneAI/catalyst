@@ -17,7 +17,7 @@
 import numpy as np
 import pennylane as qml
 import pytest
-from pennylane.transforms.decompositions import to_ppr
+from pennylane.transforms import to_ppr
 
 from catalyst import qjit
 

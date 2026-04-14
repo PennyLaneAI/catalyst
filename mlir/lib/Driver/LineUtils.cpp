@@ -12,18 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cassert>
+#include "Driver/LineUtils.h"
 
 #include <algorithm>
+#include <cassert>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 
+#include "llvm/IR/Module.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassInstrumentation.h"
-#include "llvm/IR/Module.h"
-
-#include "Driver/LineUtils.h"
 
 namespace {
 

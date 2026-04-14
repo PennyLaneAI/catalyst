@@ -16,8 +16,6 @@
 
 #include <vector>
 
-#include <Exception.hpp>
-
 /**
  * A multi-dimensional view for MemRef-like and std::vector<T> types.
  *
