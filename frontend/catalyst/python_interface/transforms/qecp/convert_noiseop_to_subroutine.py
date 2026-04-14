@@ -141,9 +141,9 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
                 # Yield the updated codeblock
                 scf.YieldOp(updated_codeblock.results[0])
 
-            returned_codeblock = for_loop.results[0]
+            noisy_codeblock = for_loop.results[0]
 
-            func.ReturnOp(returned_codeblock)
+            func.ReturnOp(noisy_codeblock)
 
         region = Region([block])
         # pylint: disable=line-too-long
@@ -185,7 +185,9 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
         for k, n in codeblocks:
             noise_subroutine = self._create_noise_subroutine(k, n, self._number_errors)
             op.regions[0].blocks.first.add_op(noise_subroutine)
-            noise_subroutine_dict[_get_noise_subroutine_name(k, n, self._number_errors)] = noise_subroutine
+            noise_subroutine_dict[_get_noise_subroutine_name(k, n, self._number_errors)] = (
+                noise_subroutine
+            )
 
         pattern_rewriter.PatternRewriteWalker(
             pattern_rewriter.GreedyRewritePatternApplier(

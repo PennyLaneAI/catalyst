@@ -64,7 +64,6 @@ class TestConvertNoiseOpToSubroutinePass:
         pipeline = (ConvertNoiseOpToSubroutinePass(number_errors=1),)
         run_filecheck(program, pipeline)
 
-    
     def test_with_several_errors_lowering(self, run_filecheck):
         """Test that a qecp.noise operation can be lowered to a subroutine injecting several errors"""
 
@@ -103,7 +102,6 @@ class TestConvertNoiseOpToSubroutinePass:
 
         pipeline = (ConvertNoiseOpToSubroutinePass(number_errors=3),)
         run_filecheck(program, pipeline)
-
 
     def test_with_several_noise_op_lowering(self, run_filecheck):
         """Test that several qecp.noise operation can be lowered to a subroutine.
@@ -151,4 +149,3 @@ class TestConvertNoiseOpToSubroutinePass:
 
         pipeline = (ConvertNoiseOpToSubroutinePass(number_errors=1),)
         run_filecheck(program, pipeline)
-
