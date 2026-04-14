@@ -676,8 +676,11 @@ def handle_state_prep(self, *invals, n_wires, **kwargs):
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_measure_prim)
 def handle_measure(self, wire, reset, postselect):
     """Handle the conversion from plxpr to Catalyst jaxpr for the mid-circuit measure primitive."""
+    if isinstance(wire, DynamicJaxprTracer) and isinstance(wire.val.aval, QrefQubit):
+        in_qubit = wire
+    else:
+        in_qubit = qref_get_p.bind(self.init_qreg, wire)
 
-    in_qubit = qref_get_p.bind(self.init_qreg, wire)
     result = qref_measure_p.bind(in_qubit, postselect=postselect)
 
     if reset:

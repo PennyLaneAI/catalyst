@@ -97,7 +97,7 @@ def test_measure():
 print(test_measure.mlir)
 
 
-# CHECK: func.func public @test_dynamic_qubit_allocation(%arg0: tensor<i64>) -> tensor<f64>
+# CHECK: func.func public @test_dynamic_qubit_allocation(%arg0: tensor<2x2xf64>, %arg1: tensor<i64>) -> tensor<f64>
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_dynamic_qubit_allocation(i: int):
@@ -118,11 +118,29 @@ def test_dynamic_qubit_allocation(i: int):
         # CHECK: qref.custom "PauliX"() [[alloc_q0]] : !qref.bit
         qp.X(q[0])
 
-        # CHECK: [[i:%.+]] = tensor.extract %arg0[] : tensor<i64>
+        # CHECK: [[i:%.+]] = tensor.extract %arg1[] : tensor<i64>
         # CHECK: [[qi:%.+]] = qref.get [[reg_device]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
         # CHECK: [[q2:%.+]] = qref.get [[reg_device]][[[two]]] : !qref.reg<3>, i64 -> !qref.bit
         # CHECK: qref.custom "CNOT"() [[qi]], [[q2]] ctrls([[alloc_q1]]) ctrlvals([[false]]) : !qref.bit, !qref.bit ctrls !qref.bit
         qp.ctrl(qp.CNOT, control=q[1], control_values=False)(wires=[i, 2])
+
+        # CHECK: qref.multirz({{%.+}}) [[alloc_q1]] : !qref.bit
+        qp.MultiRZ(0.1, wires=q[1])
+
+        # CHECK: qref.pcphase({{%.+}}, {{%.+}}) [[alloc_q0]], [[alloc_q1]] : !qref.bit, !qref.bit
+        qp.PCPhase(0.1, dim=0, wires=[q[0], q[1]])
+
+        # CHECK: qref.gphase({{%.+}}) ctrls([[alloc_q0]]) ctrlvals({{%.+}}) : ctrls !qref.bit
+        qp.ctrl(qp.GlobalPhase(np.pi / 4), control=[q[0]])
+
+        # CHECK: qref.paulirot ["X"]({{%.+}}) [[alloc_q0]] : !qref.bit
+        qp.PauliRot(0.1, ["X"], wires=q[0])
+
+        # CHECK: qref.unitary({{%.+}} : tensor<2x2xcomplex<f64>>) [[alloc_q1]] : !qref.bit
+        qp.QubitUnitary(np.identity(2), wires=q[1])
+
+        # CHECK: {{%.+}} = qref.measure [[alloc_q0]] : i1
+        qp.measure(q[0])
 
     # CHECK: qref.dealloc [[reg_alloc]] : !qref.reg<2>
 
