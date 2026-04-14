@@ -186,7 +186,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         if isinstance(op, quantum.HamiltonianOp):
             raise CompileError(
                 "Encountered a quantum.HamiltonianOp while applying `measurements_from_samples`. "
-                "This is not supported with Catalyst. Apply `qp.transforms.split_non_commuting` "
+                "This is not supported with Catalyst. Apply `qml.transforms.split_non_commuting` "
                 "to split the HamiltonianOp into separate terms."
             )
 

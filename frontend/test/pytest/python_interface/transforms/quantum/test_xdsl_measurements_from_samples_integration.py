@@ -169,13 +169,13 @@ class TestIntegrationUsefulErrors:
                 return qml.sample(wires=[0]), qml.expval(qml.X(0))
 
     @pytest.mark.parametrize("obs", (2 * qml.X(0), qml.X(1) + qml.X(2)))
-    def test_hamlitonianop_raises_error(self, obs, capture):
+    def test_hamiltonianop_raises_error(self, obs, capture):
         """Test that a circuit with a HamiltonianOp observable raises an error message
         instructing the user to apply `split-non-commuting` first"""
 
         dev = qml.device("lightning.qubit", wires=2)
 
-        with pytest.raises(CompileError, match="apply `qml.transforms.split_non_commuting`"):
+        with pytest.raises(CompileError, match="Apply `qml.transforms.split_non_commuting`"):
 
             @qml.qjit(capture=capture)
             @measurements_from_samples_pass
