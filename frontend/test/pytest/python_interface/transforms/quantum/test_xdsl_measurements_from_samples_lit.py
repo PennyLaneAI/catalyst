@@ -353,9 +353,9 @@ class TestMeasurementsFromSamplesPass:
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
             // CHECK: [[samples0:%.+]], [[samples1:%.+]] = func.call @circuit.from_samples() : () -> (tensor<5x1xf64>, tensor<5x1xf64>)
-            // CHECK: [[res1:%.+]] = func.call @expval_from_samples.tensor.5x1xf64([[samples1]]) :
-            // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
             // CHECK: [[res0:%.+]] = func.call @expval_from_samples.tensor.5x1xf64([[samples0]]) :
+            // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
+            // CHECK: [[res1:%.+]] = func.call @expval_from_samples.tensor.5x1xf64([[samples1]]) :
             // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
             // CHECK: func.return [[res0]], [[res1]] : tensor<f64>, tensor<f64>
             // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
@@ -402,9 +402,9 @@ class TestMeasurementsFromSamplesPass:
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
             // CHECK: [[samples0:%.+]], [[samples1:%.+]] = func.call @circuit.from_samples() : () -> (tensor<5x1xf64>, tensor<5x1xf64>)
-            // CHECK: [[res1:%.+]] = func.call @var_from_samples.tensor.5x1xf64([[samples1]]) :
-            // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
             // CHECK: [[res0:%.+]] = func.call @var_from_samples.tensor.5x1xf64([[samples0]]) :
+            // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
+            // CHECK: [[res1:%.+]] = func.call @var_from_samples.tensor.5x1xf64([[samples1]]) :
             // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
             // CHECK: func.return [[res0]], [[res1]] : tensor<f64>, tensor<f64>
             // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
@@ -489,9 +489,9 @@ class TestMeasurementsFromSamplesPass:
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
             // CHECK: [[samples0:%.+]], [[samples1:%.+]] = func.call @circuit.from_samples() : () -> (tensor<3x1xf64>, tensor<3x1xf64>)
-            // CHECK: [[res1:%.+]] = func.call @probs_from_samples.tensor.3x1xf64([[samples1]]) :
-            // CHECK-SAME: (tensor<3x1xf64>) -> tensor<2xf64>
             // CHECK: [[res0:%.+]] = func.call @probs_from_samples.tensor.3x1xf64([[samples0]]) :
+            // CHECK-SAME: (tensor<3x1xf64>) -> tensor<2xf64>
+            // CHECK: [[res1:%.+]] = func.call @probs_from_samples.tensor.3x1xf64([[samples1]]) :
             // CHECK-SAME: (tensor<3x1xf64>) -> tensor<2xf64>
             // CHECK: func.return [[res0]], [[res1]] : tensor<2xf64>, tensor<2xf64>
             // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}

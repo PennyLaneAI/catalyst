@@ -94,6 +94,8 @@ class MeasurementsFromSamplesPattern(RewritePattern):
     all terminal measurements in a program with a single :func:`pennylane.sample` measurement, and
     adds postprocessing instructions to recover the original measurement.
 
+    This pass supports Expval, Var, Sample and Probs. Expval and Var can have a TensorOp or NambedObsOp observable. A CompileError is raised if the observable is a HamiltonianOp; applying split_non_commuting 
+
     Args:
         shots (int): The number of shots (e.g. as retrieved from the DeviceInitOp).
     """
@@ -118,7 +120,9 @@ class MeasurementsFromSamplesPattern(RewritePattern):
 
         measurement_processes = [op for op in self.qnode.body.walk() if isinstance(op, MEASUREMENT_PROCESS_TYPES)]
 
-        for mp_op in measurement_processes:
+        # post-processing calls will be injected at the same point for all MPs 
+        # adding calls starting with the final MP ensures call order matches MP order
+        for mp_op in measurement_processes[::-1]:
             if isinstance(mp_op, quantum.ExpvalOp | quantum.VarianceOp):
                 self.expval_and_var_to_samples(mp_op, rewriter)
             elif isinstance(mp_op, quantum.ProbsOp):
