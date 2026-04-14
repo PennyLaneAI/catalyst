@@ -149,6 +149,7 @@ class AllocOpConversion(RewritePattern):
     def _get_hyper_reg_encoding_ops(
         cls, hyper_reg: SSAValue[qecl.LogicalHyperRegisterType]
     ) -> tuple[Operation, ...]:
+        # pylint: disable=line-too-long
         """Helper function to get the operations that encode each codeblock in the hyper-register."""
         hyper_reg_width = hyper_reg.type.width.value.data
 
@@ -560,6 +561,7 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
     k: int
 
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
+        """Apply the convert-quantum-to-qecl pass."""
         if self.k != 1:
             raise NotImplementedError(
                 f"The {self.name} only supports QEC codes where the number of logical qubits per "
