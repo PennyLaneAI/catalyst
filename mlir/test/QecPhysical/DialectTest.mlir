@@ -196,6 +196,13 @@ func.func @test_gate_op_cnot(
 
 // -----
 
+func.func @test_noise(%arg0 : !qecp.codeblock<1 x 7>) {
+    %0 = qecp.noise %arg0 : !qecp.codeblock<1 x 7>
+    func.return
+}
+
+// -----
+
 func.func @test_tanner_graph_type(%arg0 : !qecp.tanner_graph<8, 6, i32>) {
     func.return
 }
