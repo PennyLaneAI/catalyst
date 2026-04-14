@@ -1742,7 +1742,7 @@ class TestAdjointOfTemplates:
         assert np.allclose(circuit(True), 1.0 / np.sqrt(2))
 
     def test_adjoint_switch(self, backend):
-        """Catalyst's adjoint algorithm doesn't work on switch yet."""
+        """Test operator adjoint works on the switch operation."""
 
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(s: int):
