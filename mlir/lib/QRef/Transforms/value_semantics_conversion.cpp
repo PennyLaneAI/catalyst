@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "QRef/IR/QRefDialect.h"
 #define DEBUG_TYPE "value-semantics-conversion"
-
-#include "value_semantics_conversion.h"
 
 #include <cstdint>
 #include <optional>
@@ -46,6 +45,8 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
+
+#include "value_semantics_conversion.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -141,11 +142,8 @@ bool isQrefSubroutine(func::FuncOp f)
         return false;
     }
 
-    MLIRContext *ctx = f->getContext();
-    auto *qrefDialect = ctx->getLoadedDialect<qref::QRefDialect>();
-
-    WalkResult walkResult = f.walk([qrefDialect](Operation *op) {
-        if (op->getDialect() == qrefDialect) {
+    WalkResult walkResult = f.walk([](Operation *op) {
+        if (isa<qref::QRefDialect>(op->getDialect())) {
             return WalkResult::interrupt();
         }
         if (func::CallOp callOp = dyn_cast<func::CallOp>(op)) {
