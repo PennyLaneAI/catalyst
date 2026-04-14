@@ -290,6 +290,7 @@ class TestIntegrationWithOtherPasses:
 
         run_filecheck_qjit(circuit_compiled)
 
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
     @pytest.mark.parametrize("coeff", [1.3, -4])
     @pytest.mark.parametrize("phi1, phi2", [(0, 0), (-0.57, 0), (0, 2.34), (-0.57, 2.34)])
     def test_expval_sum_with_split_non_commuting(
@@ -318,13 +319,13 @@ class TestIntegrationWithOtherPasses:
             qml.transform(pass_name="measurements-from-samples"),
         )
 
-        # ToDo: becomes 2 executions of 5000 shots each, can go back to 5000 once #2657 merges
-        circ = qml.set_shots(circuit, 10000)
+        circ = qml.set_shots(circuit, 5000)
         circuit_compiled = qml.qjit(pipeline(circ), capture=capture)
 
         assert np.isclose(expected_res, circuit_compiled(), atol=0.1)
         run_filecheck_qjit(circuit_compiled)
 
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
     @pytest.mark.xfail(reason="split-non-commuting doesn't support var")
     @pytest.mark.parametrize("coeff", [1.3, -4])
     @pytest.mark.parametrize("phi1, phi2", [(0, 0), (-0.57, 0), (0, 2.34), (-0.57, 2.34)])
@@ -406,6 +407,7 @@ class TestMeasurementsFromSamplesIntegration:
 
         run_filecheck_qjit(circuit)
 
+    # pylint: disable=unnecessary-lambda
     @pytest.mark.parametrize("phi", [0, np.pi / 3, 0.4568])
     @pytest.mark.parametrize(
         "initial_op, mp, obs, expected_res",
