@@ -25,7 +25,6 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
-
 #include "mlir/Bytecode/BytecodeWriter.h" // mlir::writeBytecodeToFile
 #include "mlir/IR/BuiltinOps.h"           // mlir::ModuleOp
 #include "mlir/IR/Diagnostics.h"          // mlir::Diagnostic
@@ -35,7 +34,6 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/Timing.h" // mlir::DefaultTimingManager, mlir::TimingScope
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
-
 #include "stablehlo/integrations/c/StablehloPasses.h"
 #include "stablehlo/transforms/optimization/Passes.h"
 

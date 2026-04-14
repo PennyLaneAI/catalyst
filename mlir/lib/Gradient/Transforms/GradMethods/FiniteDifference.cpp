@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "FiniteDifference.hpp"
-#include "HybridGradient.hpp"
 
 #include <algorithm>
 #include <sstream>
@@ -27,6 +26,8 @@
 
 #include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
+
+#include "HybridGradient.hpp"
 
 namespace catalyst {
 namespace gradient {
