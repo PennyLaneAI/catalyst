@@ -680,7 +680,7 @@ class TestAdjointCallableLazyFalse:
     def test_adjoint_callable_lazy_false_with_nested_hybrid_adjoint(self):
         """Test adjoint(callable, lazy=False) when the callable contains a HybridAdjoint.
 
-        It's expected to produce a HybridAdjoint of HybridAdjoint(Z) so that the MLIR
+        It's expected to produce a HybridAdjoint of HybridAdjoint(RX) so that the MLIR
         adjoint-lowering pass can handle the reversal.
         """
 
@@ -688,7 +688,7 @@ class TestAdjointCallableLazyFalse:
 
         def g():
             qml.H(0)
-            qml.adjoint(lambda: qml.Z(0) and None)()
+            qml.adjoint(lambda: qml.RX(1.23, 0) and None)()
             qml.X(0)
 
         @qjit(capture=False)
