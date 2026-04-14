@@ -677,6 +677,30 @@ class TestAdjointCallableLazyFalse:
         result = circuit()
         assert np.isclose(result[0], 1.0)
 
+    def test_adjoint_callable_lazy_false_with_nested_hybrid_adjoint(self):
+        """Test adjoint(callable, lazy=False) when the callable contains a HybridAdjoint.
+
+        It's expected to produce a HybridAdjoint of HybridAdjoint(Z) so that the MLIR
+        adjoint-lowering pass can handle the reversal.
+        """
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        def g():
+            qml.H(0)
+            qml.adjoint(lambda: qml.Z(0) and None)()
+            qml.X(0)
+
+        @qjit(capture=False)
+        @qml.qnode(dev)
+        def circuit():
+            g()
+            qml.adjoint(g, lazy=False)()
+            return qml.state()
+
+        result = circuit()
+        assert np.isclose(result[0], 1.0)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

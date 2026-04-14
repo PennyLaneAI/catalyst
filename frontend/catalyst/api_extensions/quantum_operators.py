@@ -409,8 +409,9 @@ class AdjointCallable:
             self.target(*args, **kwargs)
 
         for op in reversed(tape.operations):
-            # HybridAdjoint and HybridCtrl can be handled by create_adjoint_op directly
-            if isinstance(op, HybridOp) and not isinstance(op, (HybridAdjoint, HybridCtrl)):
+            # For Adjoint of HybridAdjoint, we still create the HybridAdjoint of HybridAdjoint, so
+            # that the MLIR adjoint-lowering pass can handle the reversal.
+            if isinstance(op, HybridOp):
                 AdjointCallable(lambda bound_op=op: qml.apply(bound_op) and None, lazy=True)()
             else:
                 create_adjoint_op(op, lazy=False)
