@@ -64,8 +64,7 @@ const PipelineList pipelineList{
     {"bufferization-pipeline",
      {"convert-tensor-to-linalg",      // tensor.pad
       "convert-elementwise-to-linalg", // must be run before --one-shot-bufferize
-      "gradient-preprocess",
-      "eliminate-empty-tensors",
+      "gradient-preprocess", "eliminate-empty-tensors",
       // This pass is needed to avoid aliasing of the input buffer with the output buffer.
       "mark-entry-point-args-non-writable",
       ////////////////////
@@ -79,8 +78,9 @@ const PipelineList pipelineList{
       // TODO: migrate to new buffer deallocation "buffer-deallocation-pipeline"
       "func.func(buffer-deallocation)", "convert-arraylist-to-memref",
       "convert-bufferization-to-memref",
-      "canonicalize", // must be after convert-bufferization-to-memref
-                      // otherwise there are issues in lowering of dynamic tensors.
+      // Must be after convert-bufferization-to-memref.
+      // Otherwise there are issues in lowering of dynamic tensors.
+      "canonicalize",
       //"cse",
       "cp-global-memref"}},
     {"llvm-dialect-lowering-pipeline",
@@ -88,8 +88,8 @@ const PipelineList pipelineList{
       //"async-func-to-async-runtime",
       //"async-to-async-runtime",
       //"convert-async-to-llvm",
-      "expand-realloc", "convert-gradient-to-llvm",
-      "memrefcpy-to-linalgcpy", "func.func(convert-linalg-to-loops)", "convert-scf-to-cf",
+      "expand-realloc", "convert-gradient-to-llvm", "memrefcpy-to-linalgcpy",
+      "func.func(convert-linalg-to-loops)", "convert-scf-to-cf",
       // This pass expands memref ops that modify the metadata of a memref (sizes, offsets,
       // strides) into a sequence of easier to analyze constructs. In particular, this pass
       // transforms ops into explicit sequence of operations that model the effect of this
@@ -105,7 +105,7 @@ const PipelineList pipelineList{
       "memref-to-llvm-tbaa", // load and store are converted to llvm with tbaa tags
       "finalize-memref-to-llvm{use-generic-functions}", "convert-index-to-llvm",
       "convert-catalyst-to-llvm",
-      "convert-pbc-to-llvm",  // TODO: remove this once PBC has its own pipeline
+      "convert-pbc-to-llvm", // TODO: remove this once PBC has its own pipeline
       "convert-quantum-to-llvm",
       // There should be no identical code folding
       // (`mergeIdenticalBlocks` in the MLIR source code)
