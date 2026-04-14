@@ -14,7 +14,55 @@
 
 """Quantum to QEC Logical dialect conversion.
 
-This module contains the implementation of the xDSL quantum-to-qecl dialect-conversion pass.
+This module contains the implementation of the xDSL convert-quantum-to-qecl dialect-conversion pass.
+
+Example
+-------
+
+Before:
+
+```mlir
+func.func public @circuit() -> tensor<1x1xi64> attributes {quantum.node} {
+  %c1_i64 = arith.constant 1 : i64
+  quantum.device shots(%c1_i64) ["", "", ""]
+  %0 = quantum.alloc( 1) : !quantum.reg
+  %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+  %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
+  %mres, %out_qubit = quantum.measure %out_qubits : i1, !quantum.bit
+  %2 = quantum.mcmobs %mres : !quantum.obs
+  %3 = quantum.sample %2 : tensor<1x1xf64>
+  %4 = stablehlo.convert %3 : (tensor<1x1xf64>) -> tensor<1x1xi64>
+  %5 = quantum.insert %0[ 0], %out_qubit : !quantum.reg, !quantum.bit
+  quantum.dealloc %5 : !quantum.reg
+  quantum.device_release
+  return %4 : tensor<1x1xi64>
+}
+```
+
+After applying convert-quantum-to-qecl:
+
+```mlir
+func.func public @circuit() -> tensor<1x1xi64> attributes {quantum.node} {
+  %c1_i64 = arith.constant 1 : i64
+  quantum.device shots(%c1_i64) ["", "", ""]
+  %0 = qecl.alloc() : !qecl.hyperreg<1 x 1>
+  %1 = qecl.extract_block %0[0] : !qecl.hyperreg<1 x 1> -> !qecl.codeblock<1>
+  %2 = qecl.encode[zero] %1 : !qecl.codeblock<1>
+  %3 = qecl.insert_block %0[0], %2 : !qecl.hyperreg<1 x 1>, !qecl.codeblock<1>
+  %4 = qecl.extract_block %3[0] : !qecl.hyperreg<1 x 1> -> !qecl.codeblock<1>
+  %out_qubits = qecl.qec %4 : !qecl.codeblock<1>
+  %out_qubits_1 = qecl.hadamard %out_qubits[0] : !qecl.codeblock<1>
+  %out_qubits_2 = qecl.qec %out_qubits_1 : !qecl.codeblock<1>
+  %mres, %5 = qecl.measure %out_qubits_2[0] : i1, !qecl.codeblock<1>
+  %6 = quantum.mcmobs %mres : !quantum.obs
+  %7 = quantum.sample %6 : tensor<1x1xf64>
+  %8 = stablehlo.convert %7 : (tensor<1x1xf64>) -> tensor<1x1xi64>
+  %9 = qecl.insert_block %3[0], %5 : !qecl.hyperreg<1 x 1>, !qecl.codeblock<1>
+  qecl.dealloc %9 : !qecl.hyperreg<1 x 1>
+  quantum.device_release
+  func.return %8 : tensor<1x1xi64>
+}
+```
 """
 
 import math

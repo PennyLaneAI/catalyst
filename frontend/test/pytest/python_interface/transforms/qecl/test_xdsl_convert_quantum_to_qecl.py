@@ -606,10 +606,10 @@ class TestQuantumToQecLogicalPassIntegration:
 
     @pytest.mark.usefixtures("use_capture")
     def test_circuit_basic(self, run_filecheck_qjit):
-        """Test the simplest possible circuit"""
+        """Test the convert-quantum-to-qecl pass on the simplest possible, non-trivial circuit."""
         dev = qml.device("null.qubit", wires=1)
 
-        @qml.qjit(target="mlir")
+        @qml.qjit(target="mlir", keep_intermediate=True)
         @convert_quantum_to_qecl_pass(k=1)
         @qml.qnode(dev, shots=1)
         def circuit():
@@ -633,7 +633,8 @@ class TestQuantumToQecLogicalPassIntegration:
         run_filecheck_qjit(circuit)
 
     @pytest.mark.usefixtures("use_capture")
-    def test_ghz_circuit(self, run_filecheck_qjit):
+    def test_circuit_ghz(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a GHZ circuit."""
         dev = qml.device("null.qubit", wires=3)
 
         @qml.qjit(target="mlir")
