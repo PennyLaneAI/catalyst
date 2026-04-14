@@ -36,12 +36,12 @@ class TestConvertNoiseOpToSubroutinePass:
 
                     // CHECK-NEXT: [[qubit_indices:%.*]] = arith.constant dense<{{.*}}> : tensor<1xi64>
                     // CHECK-NEXT: [[rotation_params:%.*]] = arith.constant dense<[{{.*}}]> : tensor<1x3xf64>
-                    // CHECK-NEXT: func.call @noise_subroutine_code1x7([[codeblock]], [[qubit_indices]], [[rotation_params]])
+                    // CHECK-NEXT: func.call @noise_subroutine_code1x7x1([[codeblock]], [[qubit_indices]], [[rotation_params]])
                     %1 = qecp.noise %0 : !qecp.codeblock<1 x 7>
                     return
                 }
-                // CHECK-LABEL: func.func private @noise_subroutine_code1x7([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<1xi64>, [[rotation_params:%.*]]: tensor<1x3xf64>)
-                // CHECK-SAME: attributes {noise_subroutine_code1x7 = none}
+                // CHECK-LABEL: func.func private @noise_subroutine_code1x7x1([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<1xi64>, [[rotation_params:%.*]]: tensor<1x3xf64>)
+                // CHECK-SAME: attributes {noise_subroutine_code1x7x1 = none}
                 // CHECK-NEXT: [[num_errors:%.*]] = arith.constant 1 : i64
                 // CHECK-NEXT: [[zero:%.*]] = arith.constant 0 : i64
                 // CHECK-NEXT: [[one:%.*]] = arith.constant 1 : i64
@@ -76,12 +76,12 @@ class TestConvertNoiseOpToSubroutinePass:
 
                     // CHECK-NEXT: [[qubit_indices:%.*]] = arith.constant dense<[{{.*}}]> : tensor<3xi64>
                     // CHECK-NEXT: [[rotation_params:%.*]] = arith.constant dense<[{{.*}}]> : tensor<3x3xf64>
-                    // CHECK-NEXT: func.call @noise_subroutine_code1x7([[codeblock]], [[qubit_indices]], [[rotation_params]])
+                    // CHECK-NEXT: func.call @noise_subroutine_code1x7x3([[codeblock]], [[qubit_indices]], [[rotation_params]])
                     %1 = qecp.noise %0 : !qecp.codeblock<1 x 7>
                     return
                 }
-                // CHECK-LABEL: func.func private @noise_subroutine_code1x7([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<3xi64>, [[rotation_params:%.*]]: tensor<3x3xf64>)
-                // CHECK-SAME: attributes {noise_subroutine_code1x7 = none}
+                // CHECK-LABEL: func.func private @noise_subroutine_code1x7x3([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<3xi64>, [[rotation_params:%.*]]: tensor<3x3xf64>)
+                // CHECK-SAME: attributes {noise_subroutine_code1x7x3 = none}
                 // CHECK-NEXT: [[num_errors:%.*]] = arith.constant 3 : i64
                 // CHECK-NEXT: [[zero:%.*]] = arith.constant 0 : i64
                 // CHECK-NEXT: [[one:%.*]] = arith.constant 1 : i64
@@ -118,18 +118,18 @@ class TestConvertNoiseOpToSubroutinePass:
 
                     // CHECK-NEXT: [[qubit_indices0:%.*]] = arith.constant dense<{{.*}}> : tensor<1xi64>
                     // CHECK-NEXT: [[rotation_params0:%.*]] = arith.constant dense<[{{.*}}]> : tensor<1x3xf64>
-                    // CHECK-NEXT: [[noisy_codeblock0:%.*]] = func.call @noise_subroutine_code1x7([[codeblock]], [[qubit_indices0]], [[rotation_params0]])
+                    // CHECK-NEXT: [[noisy_codeblock0:%.*]] = func.call @noise_subroutine_code1x7x1([[codeblock]], [[qubit_indices0]], [[rotation_params0]])
                     %1 = qecp.noise %0 : !qecp.codeblock<1 x 7>
 
                     // CHECK-NEXT: [[qubit_indices1:%.*]] = arith.constant dense<{{.*}}> : tensor<1xi64>
                     // CHECK-NEXT: [[rotation_params1:%.*]] = arith.constant dense<[{{.*}}]> : tensor<1x3xf64>
-                    // CHECK-NEXT: [[noisy_codeblock1:%.*]] = func.call @noise_subroutine_code1x7([[noisy_codeblock0]], [[qubit_indices1]], [[rotation_params1]])
+                    // CHECK-NEXT: [[noisy_codeblock1:%.*]] = func.call @noise_subroutine_code1x7x1([[noisy_codeblock0]], [[qubit_indices1]], [[rotation_params1]])
                     %2 = qecp.noise %1 : !qecp.codeblock<1 x 7>
 
                     return
                 }
-                // CHECK-COUNT-1: func.func private @noise_subroutine_code1x7([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<1xi64>, [[rotation_params:%.*]]: tensor<1x3xf64>)
-                // CHECK-SAME: attributes {noise_subroutine_code1x7 = none}
+                // CHECK-COUNT-1: func.func private @noise_subroutine_code1x7x1([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<1xi64>, [[rotation_params:%.*]]: tensor<1x3xf64>)
+                // CHECK-SAME: attributes {noise_subroutine_code1x7x1 = none}
                 // CHECK-NEXT: [[num_errors:%.*]] = arith.constant 1 : i64
                 // CHECK-NEXT: [[zero:%.*]] = arith.constant 0 : i64
                 // CHECK-NEXT: [[one:%.*]] = arith.constant 1 : i64
