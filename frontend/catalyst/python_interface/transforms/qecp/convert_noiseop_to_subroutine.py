@@ -18,33 +18,24 @@ This module contains the implementation of the xDSL convert-noiseop-to-subroutin
 
 import math
 import random
-from dataclasses import dataclass
-from typing import NoReturn, cast
 
 from xdsl import builder, context, passes, pattern_rewriter
-from xdsl.context import Context
 from xdsl.dialects import arith, builtin, func, scf, tensor
-from xdsl.dialects.builtin import FloatAttr, IndexType, IntegerAttr, IntegerType
-from xdsl.ir import Block, Operation, Region, SSAValue
-from xdsl.passes import ModulePass
-from xdsl.pattern_rewriter import (
-    GreedyRewritePatternApplier,
-    PatternRewriter,
-    PatternRewriteWalker,
-    RewritePattern,
-    op_type_rewrite_pattern,
-)
+from xdsl.dialects.builtin import IndexType, IntegerType
+from xdsl.ir import Block, Region
 from xdsl.rewriter import InsertPoint
-from xdsl.transforms.reconcile_unrealized_casts import ReconcileUnrealizedCastsPass
 
-from catalyst.python_interface.dialects import qecl, qecp, quantum
+from catalyst.python_interface.dialects import qecp
 from catalyst.python_interface.inspection.xdsl_conversion import _tensor_shape_from_ssa
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
-from catalyst.utils.exceptions import CompileError
+
+_NUM_ROT_PARAMS = 3
+
 
 def _get_noise_subroutine_name(k, n):
     """Get the name of the noise injection subroutine for a given codeblock type."""
     return "noise_subroutine_code" + str(k) + "x" + str(n)
+
 
 class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
     """Pass that converts qecl.noise operations to subroutines in the qecp layer."""
@@ -55,9 +46,10 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
         self._number_errors = options.get("number_errors", 1)
 
     def _create_noise_subroutine(self, k, n, number_errors):
-        """Create a subroutine (func.FuncOp) operation for injecting physical noise mimic with Rot gates.
-        The subroutine takes a physical codeblock, the indices of qubits and the corresponding rotation
-        parameters to be injected as inputs, and returns the noisy physical codeblock after error injection.
+        """Create a subroutine (func.FuncOp) operation for injecting physical noise mimic with Rot
+        gates. The subroutine takes a physical codeblock, the qubit indices and the corresponding
+        rotation parameters to be injected as inputs, and returns the noisy physical codeblock after
+        error injection.
 
         NOTE: The random rotation parameters and qubit indices are generated randomly
         from a `qnode` function.
@@ -71,7 +63,10 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
             The corresponding subroutine (func.FuncOp).
         """
         # 1. Define the input and output types of the subroutine
-        # The input types include: 1, a physical codeblock; 2, number of errors (rot operations); 3, a tensor containing rotation parameters for rot operations (errors).
+        # The input types include:
+        # 1, a physical codeblock;
+        # 2, number of errors (rot operations);
+        # 3, a tensor containing rotation parameters for rot operations (errors).
         codeblock_type = qecp.PhysicalCodeblockType(k, n)
         errors_indices_type = builtin.TensorType(
             element_type=builtin.IntegerType(64),
@@ -80,7 +75,7 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
             ],
         )
         rotation_params_type = builtin.TensorType(
-            element_type=builtin.Float64Type(), shape=[number_errors, 3]
+            element_type=builtin.Float64Type(), shape=[number_errors, _NUM_ROT_PARAMS]
         )
         input_types = (codeblock_type, errors_indices_type, rotation_params_type)
 
@@ -223,17 +218,19 @@ class ConvertNoiseOpToSubroutinePattern(
     ):
         k = op.in_codeblock.type.k.value.data
         n = op.in_codeblock.type.n.value.data
-        num_rot_params = 3
 
-        # Create random qubit indices and rotation parameters for error injection, which are generated randomly from a `qnode` function.
-        # Note that the random qubit indices and rotation parameters are generated in the Python layer and
-        # passed to the noise injection subroutine as inputs, which allows us to inject different errors for different shots in the execution phase.
+        # Create random qubit indices and rotation parameters for error injection, which are
+        # generated randomly from a `qnode` function.
+        # Note that the random qubit indices and rotation parameters are generated in the Python
+        # layer and passed to the noise injection subroutine as inputs, which allows us to inject
+        # different errors for different qecp.noise instances in the execution phase.
         qubit_indices = random.sample(range(n), self._number_errors)
         rotation_params = []
-        for _ in range(self._number_errors * num_rot_params):
+        for _ in range(self._number_errors * _NUM_ROT_PARAMS):
             rotation_params.append(random.uniform(0, 2 * math.pi))
 
-        # Insert a tensor constant operation for the qubit indices and rotation parameters, which will be passed to the noise injection subroutine as inputs.
+        # Insert a tensor constant operation for the qubit indices and rotation parameters, which
+        # will be passed to the noise injection subroutine as inputs.
         qubit_indices_constantop = arith.ConstantOp(
             builtin.DenseIntOrFPElementsAttr.from_list(
                 type=builtin.TensorType(builtin.IntegerType(64), shape=(self._number_errors,)),
@@ -243,7 +240,9 @@ class ConvertNoiseOpToSubroutinePattern(
 
         rotation_params_constantop = arith.ConstantOp(
             builtin.DenseIntOrFPElementsAttr.from_list(
-                type=builtin.TensorType(builtin.Float64Type(), shape=(self._number_errors, 3)),
+                type=builtin.TensorType(
+                    builtin.Float64Type(), shape=(self._number_errors, _NUM_ROT_PARAMS)
+                ),
                 data=rotation_params,
             )
         )

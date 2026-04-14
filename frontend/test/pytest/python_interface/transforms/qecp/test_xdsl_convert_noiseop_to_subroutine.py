@@ -13,20 +13,14 @@
 # limitations under the License.
 """Unit test module for the xDSL implementation of the convert_noiseop_to_subroutine pass"""
 
-import re
 
-import numpy as np
-import pennylane as qml
 import pytest
-from pennylane.exceptions import CompileError
 
 from catalyst.python_interface.transforms.qecp import (
     ConvertNoiseOpToSubroutinePass,
-    convert_noiseop_to_subroutine_pass,
 )
 
 pytestmark = pytest.mark.xdsl
-
 
 class TestConvertNoiseOpToSubroutinePass:
     """Unit tests for the convert-noiseop-to-subroutine pass."""
