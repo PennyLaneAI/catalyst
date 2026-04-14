@@ -23,12 +23,19 @@
 //     return %ev0, %ev1, %ev2
 //   }
 //
-// The pass produces:
+// With grouping_strategy="" (default), each observable gets its own group:
 //   func.func @circuit() -> (f64, f64, f64) {
 //     %r0 = call @circuit.group.0()  // ev0
 //     %r1 = call @circuit.group.1()  // ev1
 //     %r2 = call @circuit.group.2()  // ev2
 //     return %r0, %r1, %r2
+//   }
+//
+// With grouping_strategy="wires", observables on non-overlapping wires share a group:
+//   func.func @circuit() -> (f64, f64, f64) {
+//     %r0:2 = call @circuit.group.0()  // ev0, ev1 (different wires)
+//     %r1   = call @circuit.group.1()  // ev2 (overlaps with ev0)
+//     return %r0#0, %r0#1, %r1
 //   }
 
 #define DEBUG_TYPE "split-non-commuting"
@@ -37,10 +44,8 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
-
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -67,24 +72,137 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     /// Check if an operation is a supported measurement operation
     static bool isSupportedMeasOp(Operation *op) { return isa<ExpvalOp>(op); }
 
-    /// Calculate the number of groups: one group per observable
-    static int calculateNumGroups(func::FuncOp funcOp)
+    /// Collect the qubit SSA values an observable acts on.
+    /// For NamedObsOp: the single qubit operand.
+    /// For TensorOp: the union of qubits from all sub-observables.
+    static llvm::DenseSet<Value> getObservableQubits(Value obs)
     {
-        int groupId = 0;
-        funcOp.walk([&](Operation *op) {
-            if (isSupportedMeasOp(op)) {
-                Builder builder(op->getContext());
-                op->setAttr("group", builder.getI64IntegerAttr(static_cast<int64_t>(groupId)));
-                groupId++;
-            }
-        });
+        llvm::DenseSet<Value> qubits;
+        Operation *defOp = obs.getDefiningOp();
+        if (!defOp) {
+            return qubits;
+        }
 
-        return groupId;
+        if (auto namedObs = dyn_cast<NamedObsOp>(defOp)) {
+            qubits.insert(namedObs.getQubit());
+            return qubits;
+        }
+
+        if (auto tensorOp = dyn_cast<TensorOp>(defOp)) {
+            for (Value term : tensorOp.getTerms()) {
+                auto termQubits = getObservableQubits(term);
+                qubits.insert(termQubits.begin(), termQubits.end());
+            }
+            return qubits;
+        }
+
+        return qubits;
     }
 
-    /// Trace back from a return value through the SSA graph to find which
-    /// group's measurement produced it. Returns the group id, or -1 if not found.
-    static int findGroupForReturnValue(Value returnValue)
+    /// Two observables are equivalent if they have the same exact structure.
+    static bool observablesEqual(Value lhs, Value rhs)
+    {
+        if (lhs == rhs) {
+            return true;
+        }
+        Operation *lhsDef = lhs.getDefiningOp();
+        Operation *rhsDef = rhs.getDefiningOp();
+        if (!lhsDef || !rhsDef) {
+            return false;
+        }
+
+        return OperationEquivalence::isEquivalentTo(
+            lhsDef, rhsDef,
+            [](Value l, Value r) -> LogicalResult { return success(observablesEqual(l, r)); },
+            nullptr, OperationEquivalence::Flags::IgnoreLocations);
+    }
+
+    struct MeasInfo {
+        int idx;
+        MeasurementProcess measurementOp;
+        Value obs;
+        llvm::DenseSet<Value> qubits;
+    };
+
+    /// Assign each measurement to a group. With the default strategy, each measurement gets its own
+    /// group. And with "wires", measurements on non-overlapping wires are packed into the same
+    /// group and also handles deduplication to canonicalize identical observables.
+    /// This function updates the following maps:
+    /// - measInfos:     a list of all measurements and their information.
+    /// - measToGroup:   maps a measurement index to a group index.
+    /// - canonicalMeas: maps a measurement index to a canonical measurement index.
+    static int assignGroups(func::FuncOp funcOp, const std::string &strategy,
+                            SmallVector<MeasInfo> &measInfos, llvm::DenseMap<int, int> &measToGroup,
+                            llvm::DenseMap<int, int> &canonicalMeas)
+    {
+        // Collect all measurements and assign them to groups.
+        int measIdx = 0;
+        funcOp.walk([&](Operation *op) {
+            if (!isSupportedMeasOp(op)) {
+                return;
+            }
+            auto measurementOp = cast<MeasurementProcess>(op);
+            Value obs = measurementOp.getObs();
+            MeasInfo info{.idx = measIdx,
+                          .measurementOp = measurementOp,
+                          .obs = obs,
+                          .qubits = getObservableQubits(obs)};
+            measInfos.push_back(info);
+
+            Builder builder(op->getContext());
+            op->setAttr("group", builder.getI64IntegerAttr(static_cast<int64_t>(measIdx)));
+            measIdx++;
+        });
+
+        // Deduplicate and assign groups for measurements.
+        SmallVector<int> uniqueIndices;
+        SmallVector<llvm::DenseSet<Value>> groupQubits;
+        for (int i = 0; i < static_cast<int>(measInfos.size()); ++i) {
+            auto currentObs = measInfos[i].obs;
+            auto &currentQubits = measInfos[i].qubits;
+
+            // Check if this observable already appeared.
+            auto matchIdx = llvm::find_if(uniqueIndices, [&](int j) {
+                return observablesEqual(measInfos[j].obs, currentObs);
+            });
+            if (matchIdx != uniqueIndices.end()) {
+                canonicalMeas[i] = *matchIdx;
+                measToGroup[i] = measToGroup[*matchIdx];
+                continue;
+            }
+
+            // For non-duplicate measurements, add this to uniqueIndices.
+            uniqueIndices.push_back(i);
+
+            // Assign a group for this measurement.
+            if (strategy == "wires") {
+                // find a group that doesn't overlap with the current qubits.
+                auto it = llvm::find_if(groupQubits, [&](const llvm::DenseSet<Value> &group) {
+                    return llvm::none_of(currentQubits, [&](Value q) { return group.count(q); });
+                });
+
+                // create a new group if no overlap is found.
+                if (it == groupQubits.end()) {
+                    it = &groupQubits.emplace_back();
+                }
+                it->insert(currentQubits.begin(), currentQubits.end());
+
+                // assign the new group index to the measurement.
+                measToGroup[i] = static_cast<int>(it - groupQubits.begin());
+            }
+            else {
+                measToGroup[i] = static_cast<int>(uniqueIndices.size()) - 1;
+            }
+        }
+
+        int numGroups = (strategy == "wires") ? static_cast<int>(groupQubits.size())
+                                              : static_cast<int>(uniqueIndices.size());
+        return numGroups;
+    }
+
+    /// Find the measurement index that a return value traces back to.
+    /// Returns -1 if not found.
+    static int findMeasIdxForReturnValue(Value returnValue)
     {
         SmallVector<Operation *, 4> worklist;
         llvm::SmallPtrSet<Operation *, 4> visited;
@@ -120,11 +238,12 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     /// - groupPositions: group_id -> list of positions in the return operand list
     /// - returnValueGroupIds: list of group_ids for each return value
     ///
-    /// Return values that don't trace back to any measurement (e.g. constants produced by
-    /// `split-to-single-terms` for Identity observables) are assigned to group 0 so that group 0's
-    /// function computes and returns them.
+    /// Also tracks, for each return value, which measurement index it traces to.
+    /// Return values that don't trace back to any measurement are assigned to group 0.
     static std::pair<llvm::DenseMap<int, SmallVector<int>>, SmallVector<int>>
-    analyzeGroupReturnPositions(func::FuncOp funcOp, int numGroups)
+    analyzeGroupReturnPositions(func::FuncOp funcOp, int numGroups,
+                                const llvm::DenseMap<int, int> &measToGroup,
+                                SmallVector<int> &returnValueMeasIds)
     {
         Operation *returnOp = funcOp.front().getTerminator();
 
@@ -135,16 +254,13 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
 
         SmallVector<int> returnValueGroupIds;
         returnValueGroupIds.reserve(returnOp->getNumOperands());
+        returnValueMeasIds.reserve(returnOp->getNumOperands());
 
         for (auto [position, returnValue] : llvm::enumerate(returnOp->getOperands())) {
-            int groupId = findGroupForReturnValue(returnValue);
-
-            // For those return values that don't trace back to any supported measurement, assign
-            // them to group 0. For example, constants produced by `split-to-single-terms` for
-            // Identity observables are assigned to group 0.
-            if (groupId == -1) {
-                groupId = 0;
-            }
+            int measIdx = findMeasIdxForReturnValue(returnValue);
+            returnValueMeasIds.push_back(measIdx);
+            // lookup the group id for the measurement index. Return 0 if not found.
+            int groupId = measToGroup.lookup_or(measIdx, 0);
             groupPositions[groupId].push_back(static_cast<int>(position));
             returnValueGroupIds.push_back(groupId);
         }
@@ -191,34 +307,11 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
         function_interface_impl::setAllResultAttrDicts(funcOp, newResAttrs);
     }
 
-    /// Remove measurement operations (and their observable / intermediate chains) that do not
-    /// belong to the target group.
-    static void removeGroup(func::FuncOp groupFunc, int targetGroup,
-                            ArrayRef<int> returnValueGroupIds)
+    /// Walk the def chain upward from the given seed operations and erase dead
+    /// operations (those with no remaining uses), stopping at qubit/qreg boundaries.
+    static void eraseDeadOps(ArrayRef<Operation *> seedOps)
     {
-        Operation *returnOp = groupFunc.front().getTerminator();
-
-        // Identify return values that belong to other groups.
-        llvm::DenseSet<Value> returnValuesToRemove;
-        for (auto [position, operand] : llvm::enumerate(returnOp->getOperands())) {
-            int groupId = returnValueGroupIds[position];
-            bool keep = (groupId == targetGroup);
-            if (!keep) {
-                returnValuesToRemove.insert(operand);
-            }
-        }
-
-        std::deque<Operation *> removeOps;
-        for (Value val : returnValuesToRemove) {
-            if (Operation *defOp = val.getDefiningOp()) {
-                removeOps.push_back(defOp);
-            }
-        }
-
-        // Update return statement first (drops uses of the removed values)
-        updateReturnStatement(groupFunc, returnValuesToRemove);
-
-        // Walk the def chain upward and erase dead operations, stopping at qubit/qreg boundaries
+        std::deque<Operation *> removeOps(seedOps.begin(), seedOps.end());
         llvm::SmallPtrSet<Operation *, 4> visited;
         while (!removeOps.empty()) {
             Operation *op = removeOps.front();
@@ -244,6 +337,58 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
 
             op->erase();
         }
+    }
+
+    /// Remove the given return values from the function, then erase dead def chains.
+    static void removeReturnValues(func::FuncOp funcOp, const llvm::DenseSet<Value> &toRemove)
+    {
+        if (toRemove.empty()) {
+            return;
+        }
+        SmallVector<Operation *> seedOps;
+        for (Value val : toRemove) {
+            if (Operation *defOp = val.getDefiningOp()) {
+                seedOps.push_back(defOp);
+            }
+        }
+        updateReturnStatement(funcOp, toRemove);
+        eraseDeadOps(seedOps);
+    }
+
+    /// Remove return values that belong to groups other than targetGroup.
+    static void removeOtherGroups(func::FuncOp groupFunc, int targetGroup,
+                                  ArrayRef<int> returnValueGroupIds)
+    {
+        Operation *returnOp = groupFunc.front().getTerminator();
+        llvm::DenseSet<Value> toRemove;
+        for (auto [pos, operand] : llvm::enumerate(returnOp->getOperands())) {
+            if (returnValueGroupIds[pos] != targetGroup)
+                toRemove.insert(operand);
+        }
+        removeReturnValues(groupFunc, toRemove);
+    }
+
+    /// Remove duplicate measurements within a group function, keeping only the first occurrence of
+    /// each canonical observable.
+    static void deduplicateMeasurements(func::FuncOp groupFunc,
+                                        const llvm::DenseMap<int, int> &canonicalMeas)
+    {
+        Operation *returnOp = groupFunc.front().getTerminator();
+        llvm::DenseSet<Value> toRemove;
+        llvm::DenseSet<int> seen;
+
+        for (Value operand : returnOp->getOperands()) {
+            int measIdx = findMeasIdxForReturnValue(operand);
+            if (measIdx < 0) {
+                continue;
+            }
+            auto canonIt = canonicalMeas.find(measIdx);
+            int effectiveIdx = (canonIt != canonicalMeas.end()) ? canonIt->second : measIdx;
+            if (!seen.insert(effectiveIdx).second) {
+                toRemove.insert(operand);
+            }
+        }
+        removeReturnValues(groupFunc, toRemove);
     }
 
     /// Distribute device shots among group functions by dividing the original shots by the number
@@ -288,9 +433,11 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
 
     /// Create a duplicate function for the given group index.
     /// Clones the original function, removes measurements from other groups,
-    /// and inserts the new function into the module.
+    /// deduplicates measurements within the group, and inserts the new function into the module.
     func::FuncOp createGroupFunction(func::FuncOp funcOp, int groupIdx, int numGroups,
-                                     ArrayRef<int> returnValueGroupIds, SymbolTable &modSymTable)
+                                     ArrayRef<int> returnValueGroupIds,
+                                     const llvm::DenseMap<int, int> &canonicalMeas,
+                                     SymbolTable &modSymTable)
     {
         // clone the entire function
         func::FuncOp groupFunc = funcOp.clone();
@@ -301,7 +448,10 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
         modSymTable.insert(groupFunc);
 
         // Remove measurements from groups other than groupIdx
-        removeGroup(groupFunc, groupIdx, returnValueGroupIds);
+        removeOtherGroups(groupFunc, groupIdx, returnValueGroupIds);
+
+        // Remove duplicate measurements within the group
+        deduplicateMeasurements(groupFunc, canonicalMeas);
 
         // Distribute shots among groups
         distributeShots(groupFunc, numGroups);
@@ -312,7 +462,9 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     /// Replace the original function body with calls to the group functions.
     /// The return values are reassembled in the original order.
     void replaceOriginalWithCalls(func::FuncOp funcOp, ArrayRef<func::FuncOp> groupFunctions,
-                                  const llvm::DenseMap<int, SmallVector<int>> &groupReturnPositions)
+                                  const llvm::DenseMap<int, SmallVector<int>> &groupReturnPositions,
+                                  const llvm::DenseMap<int, int> &canonicalMeas,
+                                  ArrayRef<int> returnValueMeasIds)
     {
         Block &originalBlock = funcOp.front();
 
@@ -331,35 +483,33 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
         SmallVector<Value> callArgs(originalBlock.getArguments().begin(),
                                     originalBlock.getArguments().end());
 
-        llvm::DenseMap<int, SmallVector<Value>> groupResults;
-
-        for (int groupId = 0; groupId < static_cast<int>(groupFunctions.size()); ++groupId) {
-            func::FuncOp groupFunc = groupFunctions[groupId];
+        // Call each group function.
+        SmallVector<SmallVector<Value>> groupResults;
+        for (func::FuncOp groupFunc : groupFunctions) {
             auto callOp = func::CallOp::create(builder, loc, groupFunc, callArgs);
-            groupResults[groupId] =
-                SmallVector<Value>(callOp.getResults().begin(), callOp.getResults().end());
+            groupResults.emplace_back(callOp.getResults().begin(), callOp.getResults().end());
         }
 
-        // Calculate total number of return values
-        int totalReturns = 0;
-        for (auto &entry : groupReturnPositions) {
-            totalReturns += static_cast<int>(entry.second.size());
-        }
-
-        SmallVector<Value> finalReturnValues(totalReturns);
-
+        // Map each return position to the correct group call result.
+        // Duplicates share a result slot through their canonical measIdx.
+        SmallVector<Value> finalReturnValues(returnValueMeasIds.size());
         for (auto &[groupId, positions] : groupReturnPositions) {
             auto &groupVals = groupResults[groupId];
-            assert(static_cast<int>(groupVals.size()) == static_cast<int>(positions.size()) &&
-                   "number of group values and positions must match");
+            llvm::DenseMap<int, int> canonToResultIdx;
+            int nextResult = 0;
 
-            for (int i = 0; i < static_cast<int>(positions.size()); ++i) {
-                finalReturnValues[positions[i]] = groupVals[i];
+            for (int pos : positions) {
+                int measIdx = returnValueMeasIds[pos];
+                auto canonIt = canonicalMeas.find(measIdx);
+                int effectiveIdx = (canonIt != canonicalMeas.end()) ? canonIt->second : measIdx;
+
+                auto [it, inserted] = canonToResultIdx.try_emplace(effectiveIdx, nextResult);
+                if (inserted) {
+                    nextResult++;
+                }
+                finalReturnValues[pos] = groupVals[it->second];
             }
         }
-
-        assert(llvm::all_of(finalReturnValues, [](Value v) { return v != nullptr; }) &&
-               "all return values must be filled");
 
         func::ReturnOp::create(builder, loc, finalReturnValues);
     }
@@ -404,38 +554,46 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
 
         // Collect qnode functions to process
         SmallVector<func::FuncOp> funcsToProcess;
-        moduleOp.walk([&](func::FuncOp funcOp) {
+        for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
             if (funcOp->hasAttrOfType<UnitAttr>("quantum.node")) {
                 funcsToProcess.push_back(funcOp);
             }
-        });
+        }
 
         for (func::FuncOp funcOp : funcsToProcess) {
             // Simplify the identity-expval to a constant 1.0.
             simplifyIdentityExpval(funcOp);
 
-            // Calculate the number of groups (no grouping strategy for now)
-            int numGroups = calculateNumGroups(funcOp);
+            // Calculate the number of groups and assign groups for measurements
+            SmallVector<MeasInfo> measInfos;
+            llvm::DenseMap<int, int> measToGroup;
+            llvm::DenseMap<int, int> canonicalMeas;
 
-            // If there is only one group, no need to split the execution.
-            if (numGroups <= 1) {
+            int numGroups =
+                assignGroups(funcOp, groupingStrategy, measInfos, measToGroup, canonicalMeas);
+
+            // Skip if nothing to do. Still proceed with 1 group when duplicates exist so
+            // deduplicateMeasurements can remove redundant expvals from the group function.
+            if (numGroups == 0 || (numGroups <= 1 && canonicalMeas.empty())) {
                 continue;
             }
 
             // Analyze return value positions for each group
+            SmallVector<int> returnValueMeasIds;
             auto [groupReturnPositions, returnValueGroupIds] =
-                analyzeGroupReturnPositions(funcOp, numGroups);
+                analyzeGroupReturnPositions(funcOp, numGroups, measToGroup, returnValueMeasIds);
 
             // Create a duplicate function for each group
             SymbolTable modSymTable(moduleOp);
             SmallVector<func::FuncOp> groupFunctions;
             for (int i = 0; i < numGroups; ++i) {
-                groupFunctions.push_back(
-                    createGroupFunction(funcOp, i, numGroups, returnValueGroupIds, modSymTable));
+                groupFunctions.push_back(createGroupFunction(
+                    funcOp, i, numGroups, returnValueGroupIds, canonicalMeas, modSymTable));
             }
 
             // Replace original function body with calls to group functions
-            replaceOriginalWithCalls(funcOp, groupFunctions, groupReturnPositions);
+            replaceOriginalWithCalls(funcOp, groupFunctions, groupReturnPositions, canonicalMeas,
+                                     returnValueMeasIds);
             funcOp->removeAttr("quantum.node");
         }
     }

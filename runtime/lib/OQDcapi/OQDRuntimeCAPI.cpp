@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "OQDRuntimeCAPI.h"
+
 #include <fstream>
-#include <functional> // std::reference_wrapper
-#include <iostream>
 #include <unordered_map>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "nlohmann/json.hpp"
 
-#include "OQDRuntimeCAPI.h"
+#include "Exception.hpp"
 
 using json = nlohmann::json;
 

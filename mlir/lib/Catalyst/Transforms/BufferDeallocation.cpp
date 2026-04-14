@@ -75,7 +75,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/SetOperations.h"
-
 #include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/BufferUtils.h"

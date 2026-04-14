@@ -15,7 +15,6 @@
 #pragma once
 
 #include "llvm/ADT/SmallVector.h"
-
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Value.h"
 

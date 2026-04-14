@@ -15,7 +15,6 @@
 #define DEBUG_TYPE "split-to-single-terms"
 
 #include "llvm/ADT/DenseMap.h"
-
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -25,10 +24,10 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
+#include "stablehlo/dialect/StablehloOps.h"
 
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "stablehlo/dialect/StablehloOps.h"
 
 using namespace mlir;
 using namespace catalyst;
