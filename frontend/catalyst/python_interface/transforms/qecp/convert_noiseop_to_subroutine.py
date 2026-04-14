@@ -89,11 +89,7 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
             in_codeblock, errors_indices, rotation_params = block.args
 
             # 2. Define for loop bounds
-            start = arith.ConstantOp.from_int_and_width(0, 64)
-            stop = arith.ConstantOp.from_int_and_width(
-                _tensor_shape_from_ssa(errors_indices)[0], 64
-            )
-            step = arith.ConstantOp.from_int_and_width(1, 64)
+            num_errors = arith.ConstantOp.from_int_and_width(number_errors, 64)
 
             zero = arith.ConstantOp.from_int_and_width(0, 64)
             one = arith.ConstantOp.from_int_and_width(1, 64)
@@ -101,7 +97,9 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
 
             loop_body = Block(arg_types=(IndexType(), codeblock_type))
 
-            for_loop = scf.ForOp(start, stop, step, iter_args=(in_codeblock,), body=loop_body)
+            for_loop = scf.ForOp(
+                lb=zero, ub=num_errors, step=one, iter_args=(in_codeblock,), body=loop_body
+            )
 
             with builder.ImplicitBuilder(loop_body) as (index_var, current_codeblock):
                 index_var_int = arith.IndexCastOp(index_var, IntegerType(64))
@@ -221,7 +219,7 @@ class ConvertNoiseOpToSubroutinePattern(
 
         # Create random qubit indices and rotation parameters for error injection, which are
         # generated randomly from a `qnode` function.
-        # Note that the random qubit indices and rotation parameters are generated in the Python
+        # NOTE: that the random qubit indices and rotation parameters are generated in the Python
         # layer and passed to the noise injection subroutine as inputs, which allows us to inject
         # different errors for different qecp.noise instances in the execution phase.
         qubit_indices = random.sample(range(n), self._number_errors)
