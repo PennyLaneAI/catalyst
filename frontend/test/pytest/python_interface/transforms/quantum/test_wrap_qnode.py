@@ -27,7 +27,6 @@ from catalyst.python_interface import QuantumParser
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.transforms.quantum.wrap_qnode import WrapQNodePass, get_call_op
 
-
 pytestmark = pytest.mark.xdsl
 
 
