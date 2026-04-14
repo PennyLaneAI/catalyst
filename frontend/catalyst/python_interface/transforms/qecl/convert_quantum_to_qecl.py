@@ -82,7 +82,6 @@ from xdsl.pattern_rewriter import (
     RewritePattern,
     op_type_rewrite_pattern,
 )
-from xdsl.rewriter import InsertPoint
 from xdsl.transforms.reconcile_unrealized_casts import ReconcileUnrealizedCastsPass
 
 from catalyst.python_interface.dialects import qecl, quantum
@@ -474,82 +473,6 @@ class MeasureOpConversion(RewritePattern):
         rewriter.replace_op(op, ops_to_insert, new_results=new_results)
 
 
-# MARK: Scf.For Op Pattern
-
-
-class ScfForOpConversion(RewritePattern):
-    """TODO"""
-
-    @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: scf.ForOp, rewriter: PatternRewriter):
-        if any(
-            isinstance(result_type, qecl.LogicalHyperRegisterType)
-            for result_type in op.result_types
-        ):
-            # This op has already been converted
-            return
-
-        # Steps:
-        #   1. Insert conv_cast op before the for op (reg -> hyperreg)
-        #   2. Replace yield op with conv-cast (reg -> hyperreg) + updated yield op
-        #   3. Update return type of for op (if necessary)
-        #   4. Insert conv_cast op after the for op (hyperreg -> reg)
-        iter_args = op.iter_args
-
-        for i, iter_arg in enumerate(iter_args):
-            if (
-                isinstance(iter_arg.type, quantum.QuregType)
-                and isinstance(iter_arg.owner, builtin.UnrealizedConversionCastOp)
-                and isinstance(iter_arg.owner.operand_types[0], qecl.LogicalHyperRegisterType)
-            ):
-                conv_cast_op = builtin.UnrealizedConversionCastOp.get(
-                    (iter_arg,), (iter_arg.owner.operand_types[0],)
-                )
-                rewriter.insert_op(conv_cast_op, InsertPoint.before(rewriter.current_operation))
-                rewriter.replace_uses_with_if(
-                    iter_arg.owner.results[0],
-                    conv_cast_op.results[0],
-                    lambda use: use.operation is not conv_cast_op,
-                )
-
-                # The first block arg is the indexing arg
-                i_block_arg = i + 1
-
-                rewriter.replace_value_with_new_type(
-                    op.body.block.args[i_block_arg], iter_arg.owner.operand_types[0]
-                )
-
-                conv_cast_op = _cast_to_qureg(op.body.block.args[i_block_arg])
-                assert op.body.ops.first is not None
-                rewriter.insert_op(conv_cast_op, InsertPoint.before(op.body.ops.first))
-                rewriter.replace_uses_with_if(
-                    op.body.block.args[i_block_arg],
-                    conv_cast_op.results[0],
-                    lambda use: use.operation is not conv_cast_op,
-                )
-
-        yield_op = op.body.ops.last
-        assert isinstance(yield_op, scf.YieldOp)
-
-        for i, yield_arg in enumerate(yield_op.arguments):
-            conv_cast_op = builtin.UnrealizedConversionCastOp.get(
-                (yield_arg,), (op.iter_args[i].type,)
-            )
-            rewriter.insert_op(conv_cast_op, InsertPoint.before(yield_op))
-            rewriter.replace_uses_with_if(
-                yield_arg, conv_cast_op.results[0], lambda use: use.operation is not conv_cast_op
-            )
-            rewriter.replace_value_with_new_type(op.results[i], conv_cast_op.results[0].type)
-
-        for result in op.results:
-            if isinstance(result.type, qecl.LogicalHyperRegisterType):
-                conv_cast_op = _cast_to_qureg(result)
-                rewriter.insert_op(conv_cast_op, InsertPoint.after(rewriter.current_operation))
-                rewriter.replace_uses_with_if(
-                    result, conv_cast_op.results[0], lambda use: use.operation is not conv_cast_op
-                )
-
-
 # MARK: Helpers
 
 
@@ -643,7 +566,6 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
                     DeallocOpConversion(),
                     CustomOpConversion(),
                     MeasureOpConversion(),
-                    ScfForOpConversion(),
                 ]
             )
         ).rewrite_module(op)
