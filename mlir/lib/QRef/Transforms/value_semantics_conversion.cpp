@@ -644,11 +644,10 @@ OpTy migrateOpToValueSemantics(IRRewriter &builder, Operation *qrefOp, QubitValu
 void _getNecessaryRegionRValuesImpl(Region &r, SetVector<Value> &necessaryRegionRValues,
                                     std::function<bool(Region &, Value)> isFromOutside)
 {
-    auto *qrefDialect = r.getContext()->getLoadedDialect<qref::QRefDialect>();
     llvm::SmallDenseSet<Value, 8> rQregsTakenIn;
 
     r.walk([&](Operation *op) {
-        if (op->getDialect() != qrefDialect && !isa<func::CallOp>(op)) {
+        if (!isa<qref::QRefDialect>(op->getDialect()) && !isa<func::CallOp>(op)) {
             return;
         }
         if (isa<qref::GetOp>(op)) {
@@ -1680,7 +1679,6 @@ namespace llvm {
 
 // Boilerplate to enable using `rQubitGetOpInfo` as DenseMap keys.
 template <> struct DenseMapInfo<rQubitGetOpInfo> {
-
     static inline rQubitGetOpInfo getEmptyKey()
     {
         return rQubitGetOpInfo(DenseMapInfo<Value>::getEmptyKey(), -1);
