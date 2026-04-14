@@ -40,7 +40,7 @@ const PipelineList pipelineList{
       // Run the transform sequence defined in the MLIR module
       "builtin.module(apply-transform-sequence)",
       // Nested modules are something that will be used in the future
-      // for making device specific transformations.
+      // for making device-specific transformations.
       // Since at the moment, nothing in the runtime is using them
       // and there is no lowering for them,
       // we inline them to preserve the semantics. We may choose to
@@ -63,15 +63,16 @@ const PipelineList pipelineList{
     {"gradient-lowering-pipeline", {"annotate-invalid-gradient-functions", "lower-gradients"}},
     {"bufferization-pipeline",
      {//"inline",
-      "convert-tensor-to-linalg",      // tensor.pad
-      "convert-elementwise-to-linalg", // must be run before --one-shot-bufferize
+      // tensor.pad
+      "convert-tensor-to-linalg",
+      // Must be run before --one-shot-bufferize.
+      "convert-elementwise-to-linalg",
       "gradient-preprocess", "eliminate-empty-tensors",
       // This pass is needed to avoid aliasing of the input buffer with the output buffer.
       "mark-entry-point-args-non-writable",
-      ////////////////////
       "one-shot-bufferize",
-      ////////////////////
-      "canonicalize", // remove dead memrefToTensorOp's
+      // Remove dead memrefToTensorOp's
+      "canonicalize",
       "gradient-postprocess",
       // Introduced during gradient-bufferize of callbacks
       "func.func(buffer-hoisting)", "func.func(buffer-loop-hoisting)",
@@ -80,7 +81,7 @@ const PipelineList pipelineList{
       "func.func(buffer-deallocation)", "convert-arraylist-to-memref",
       "convert-bufferization-to-memref",
       // Must be after convert-bufferization-to-memref.
-      // Otherwise there are issues in lowering of dynamic tensors.
+      // Otherwise, there are issues in the lowering of dynamic tensors.
       "canonicalize",
       //"cse",
       "cp-global-memref"}},
@@ -93,17 +94,20 @@ const PipelineList pipelineList{
       "func.func(convert-linalg-to-loops)", "convert-scf-to-cf",
       // This pass expands memref ops that modify the metadata of a memref (sizes, offsets,
       // strides) into a sequence of easier to analyze constructs. In particular, this pass
-      // transforms ops into explicit sequence of operations that model the effect of this
+      // transforms ops into an explicit sequence of operations that model the effect of this
       // operation on the different metadata. This pass uses affine constructs to materialize
       // these effects. Concretely, expanded-strided-metadata is used to decompose
       // memref.subview as it has no lowering in -finalize-memref-to-llvm.
       "expand-strided-metadata", "lower-affine",
-      "arith-expand", // some arith ops (ceildivsi) require expansion to be lowered to llvm
-      "convert-complex-to-standard", // added for complex.exp lowering
+      // Some arith ops (ceildivsi) require expansion to be lowered to llvm.
+      "arith-expand",
+      // Added for complex.exp lowering.
+      "convert-complex-to-standard",
       "convert-complex-to-llvm", "convert-math-to-llvm",
       // Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
       "convert-math-to-libm", "convert-arith-to-llvm",
-      "memref-to-llvm-tbaa", // load and store are converted to llvm with tbaa tags
+      // Load and store are converted to LLVM with TBAA tags.
+      "memref-to-llvm-tbaa",
       "finalize-memref-to-llvm{use-generic-functions}", "convert-index-to-llvm",
       "convert-catalyst-to-llvm",
       "convert-pbc-to-llvm", // TODO: remove this once PBC has its own pipeline
