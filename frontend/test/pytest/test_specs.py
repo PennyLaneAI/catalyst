@@ -588,6 +588,50 @@ class TestPassByPassSpecs:
     def test_all_mlir(self, simple_circuit):
         """Test using "all-mlir" level"""
 
+        simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
+        simple_circuit = qml.transforms.merge_rotations(
+            simple_circuit
+        )  # Can be applied as an MLIR pass
+
+        simple_circuit = qjit(simple_circuit)
+
+        actual = qml.specs(simple_circuit, level="all-mlir")()
+        expected = CircuitSpecs(
+            device_name="lightning.qubit",
+            num_device_wires=2,
+            shots=Shots(None),
+            level={
+                0: "Before MLIR Passes",
+                1: "cancel-inverses",
+                2: "merge-rotations",
+            },
+            resources={
+                "Before MLIR Passes": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    gate_sizes={1: 6, 2: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "cancel-inverses": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "merge-rotations": SpecsResources(
+                    gate_types={"RX": 1, "RZ": 1},
+                    gate_sizes={1: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+            },
+        )
+
+        check_specs_same(actual, expected)
+
+    def test_all_mlir_with_tape_transforms(self, simple_circuit):
+        """Test using "all-mlir" level"""
+
         simple_circuit = qml.transforms.cancel_inverses(
             simple_circuit
         )  # Has to be applied as a tape transform because of the next transform
@@ -604,8 +648,8 @@ class TestPassByPassSpecs:
             num_device_wires=2,
             shots=Shots(None),
             level={
-                2: "Before MLIR Passes",
-                3: "merge-rotations",
+                3: "Before MLIR Passes",
+                4: "merge-rotations",
             },
             resources={
                 "Before MLIR Passes": SpecsResources(
