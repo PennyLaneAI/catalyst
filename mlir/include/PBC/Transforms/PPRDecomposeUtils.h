@@ -15,9 +15,8 @@
 #ifndef PBC_TRANSFORMS_DECOMPOSE_UTILS_H
 #define PBC_TRANSFORMS_DECOMPOSE_UTILS_H
 
-#include <mlir/IR/Location.h>
-#include <mlir/IR/PatternMatch.h>
-#include <mlir/Support/LogicalResult.h>
+#include "mlir/IR/Location.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace catalyst {
 namespace pbc {

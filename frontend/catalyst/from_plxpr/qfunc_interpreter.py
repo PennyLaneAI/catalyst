@@ -678,6 +678,20 @@ def handle_state_prep(self, *invals, n_wires, **kwargs):
     state_inval = invals[0]
     wires_inval = invals[1:]
 
+    normalize = kwargs.get("normalize", False)
+    pad_with = kwargs.get("pad_with")
+    if pad_with is not None:
+        normalize = True
+        n_states = state_inval.shape[-1]
+        dim = 2**n_wires
+        if n_states < dim:
+            pad_with = jnp.array(pad_with, dtype=state_inval.dtype)
+            state_inval = jax.lax.pad(state_inval, pad_with, [(0, dim - n_states, 0)])
+
+    if normalize:
+        norm = jnp.linalg.norm(state_inval)
+        state_inval /= norm
+
     # jnp.complex128 is the top element in the type promotion lattice so it is ok to do this:
     # https://jax.readthedocs.io/en/latest/type_promotion.html
     state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.complex128))

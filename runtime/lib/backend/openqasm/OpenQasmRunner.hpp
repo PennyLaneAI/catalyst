@@ -15,11 +15,7 @@
 #pragma once
 
 #include <complex>
-#include <mutex>
-#include <optional>
 #include <string>
-#include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include "DynamicLibraryLoader.hpp"
