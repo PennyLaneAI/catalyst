@@ -16,12 +16,11 @@
 
 # pylint: disable=line-too-long
 
+import pennylane as qml
 import pytest
+from pennylane.exceptions import CompileError
 from xdsl.context import Context
 from xdsl.dialects import func, test
-
-import pennylane as qml
-from pennylane.exceptions import CompileError
 
 from catalyst.python_interface import QuantumParser
 from catalyst.python_interface.conversion import xdsl_from_qjit
