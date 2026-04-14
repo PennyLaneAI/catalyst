@@ -42,8 +42,8 @@ TEST_CASE("Test DecompositionGraph construction", "[DecompGraph::Solver]")
 
     const DecompositionGraph graph({h}, gateset, rules);
 
-    REQUIRE(graph.getRoots().size() == 1);
-    REQUIRE(graph.getRoots()[0] == h);
+    REQUIRE(graph.getRootOps().size() == 1);
+    REQUIRE(graph.getRootOps()[0] == h);
     REQUIRE(graph.getGateset().ops.size() == 2);
     REQUIRE(graph.getGateset().contains(rz));
     REQUIRE(graph.getGateset().contains(rx));
@@ -125,28 +125,28 @@ TEST_CASE("Test DecompositionGraph copy and move semantics", "[DecompGraph::Solv
 
     // Test copy constructor
     DecompositionGraph copyConstructedGraph(graph);
-    REQUIRE(copyConstructedGraph.getRoots() == graph.getRoots());
+    REQUIRE(copyConstructedGraph.getRootOps() == graph.getRootOps());
     REQUIRE(copyConstructedGraph.getGateset().ops == graph.getGateset().ops);
     REQUIRE(copyConstructedGraph.getRules().size() == graph.getRules().size());
     REQUIRE(copyConstructedGraph.getRules()[0].name == graph.getRules()[0].name);
 
     // Test copy assignment operator
     DecompositionGraph copyAssignedGraph = graph;
-    REQUIRE(copyAssignedGraph.getRoots() == graph.getRoots());
+    REQUIRE(copyAssignedGraph.getRootOps() == graph.getRootOps());
     REQUIRE(copyAssignedGraph.getGateset().ops == graph.getGateset().ops);
     REQUIRE(copyAssignedGraph.getRules().size() == graph.getRules().size());
     REQUIRE(copyAssignedGraph.getRules()[0].name == graph.getRules()[0].name);
 
     // Test move constructor
     DecompositionGraph moveConstructedGraph(std::move(graph));
-    REQUIRE(moveConstructedGraph.getRoots() == copyConstructedGraph.getRoots());
+    REQUIRE(moveConstructedGraph.getRootOps() == copyConstructedGraph.getRootOps());
     REQUIRE(moveConstructedGraph.getGateset().ops == copyConstructedGraph.getGateset().ops);
     REQUIRE(moveConstructedGraph.getRules().size() == copyConstructedGraph.getRules().size());
     REQUIRE(moveConstructedGraph.getRules()[0].name == copyConstructedGraph.getRules()[0].name);
 
     // Test move assignment operator
     DecompositionGraph moveAssignedGraph = std::move(copyAssignedGraph);
-    REQUIRE(moveAssignedGraph.getRoots() == copyConstructedGraph.getRoots());
+    REQUIRE(moveAssignedGraph.getRootOps() == copyConstructedGraph.getRootOps());
     REQUIRE(moveAssignedGraph.getGateset().ops == copyConstructedGraph.getGateset().ops);
     REQUIRE(moveAssignedGraph.getRules().size() == copyConstructedGraph.getRules().size());
     REQUIRE(moveAssignedGraph.getRules()[0].name == copyConstructedGraph.getRules()[0].name);

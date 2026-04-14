@@ -49,23 +49,24 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
     void runOnOperation() final
     {
-        llvm::errs() << "targetGateSetOption\n";
-        for (auto item : targetGateSetOption) {
-            llvm::errs() << "\t" << item << ",\n";
-        }
-        llvm::errs() << "\n";
+        // Debugging output for command-line options
+        // llvm::errs() << "targetGateSetOption\n";
+        // for (auto item : targetGateSetOption) {
+        //     llvm::errs() << "\t" << item << ",\n";
+        // }
+        // llvm::errs() << "\n";
 
-        llvm::errs() << "fixedDecompsOption\n";
-        for (auto item : fixedDecompsOption) {
-            llvm::errs() << "\t" << item << ",\n";
-        }
-        llvm::errs() << "\n";
+        // llvm::errs() << "fixedDecompsOption\n";
+        // for (auto item : fixedDecompsOption) {
+        //     llvm::errs() << "\t" << item << ",\n";
+        // }
+        // llvm::errs() << "\n";
 
-        llvm::errs() << "altDecompsOption\n";
-        for (auto item : altDecompsOption) {
-            llvm::errs() << "\t" << item << ",\n";
-        }
-        llvm::errs() << "\n";
+        // llvm::errs() << "altDecompsOption\n";
+        // for (auto item : altDecompsOption) {
+        //     llvm::errs() << "\t" << item << ",\n";
+        // }
+        // llvm::errs() << "\n";
 
         ///////////////////////////
         // Step 1: Gather inputs for graph
@@ -95,25 +96,21 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 2: Build and solve the decomposition graph
-        llvm::errs() << "building decomposition graph...\n";
         FixedDecomps fixedDecomps = buildFixedDecomps(opToFixedDecompName, setOfRules);
         AltDecomps altDecomps = buildAltDecomps(opToAltDecompNames, setOfRules);
         DecompositionGraph graph(setOfOps, targetGateSet, setOfRules, std::move(fixedDecomps),
                                  std::move(altDecomps));
         DecompositionSolver solver(graph);
         auto solution = solver.solve();
-        llvm::errs() << "decomposition graph solved. solution size: " << solution.size() << "\n";
         ///////////////////////////
         // Step 3: Insert decomposition rules picked by the graph solver (solution) into the
         // module
         insertChosenRules(module, solution, ruleNameToFuncOp);
-        llvm::errs() << "chosen rules inserted into module.\n";
 
         ///////////////////////////
         // Step 4: Run decompose-lowering to apply the decomposition rules
         PassManager pm(&getContext());
         pm.addPass(createDecomposeLoweringPass());
-        llvm::errs() << "running decompose-lowering pass...\n";
 
         if (failed(pm.run(module))) {
             return signalPassFailure();
@@ -122,7 +119,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         ///////////////////////////
         // Step 5: Re-introduce (all) user rules for future decompositions
         for (auto &rule : allUserRules) {
-            llvm::errs() << "re-adding user rules " << rule.get().getName() << "\n";
             module.getBody()->push_back(rule.release());
         }
 
@@ -144,12 +140,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             ruleName.consume_back("\"");
 
             if (ruleName.empty()) {
-                llvm::errs() << opName
-                             << " was given in fixed-decomps, but no rule was specified. Skipping "
-                                "this rule.\n";
                 return;
             }
-            llvm::errs() << "adding fixed decomp " << ruleName << " for " << opName << "\n";
             opToFixedDecompName[opName.str()] = ruleName.str();
             userRuleNames.push_back(ruleName.str());
         }
@@ -178,8 +170,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 if (!ruleNameRef.empty()) {
                     opRulesList.push_back(ruleNameRef.str());
                     userRuleNames.push_back(ruleNameRef.str());
-                    llvm::errs() << "adding alt decomp " << ruleNameRef << " for " << opName
-                                 << "\n";
                 }
             }
         }
@@ -215,7 +205,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             mlir::parseSourceFile<mlir::ModuleOp>(filename, config);
 
         if (!moduleOp) {
-            llvm::errs() << "failed to find module\n";
             return;
         }
 
@@ -246,16 +235,12 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         llvm::SmallVector<mlir::func::FuncOp> userRules;
 
-        llvm::errs() << "scanning for user rules\n";
-
         module.walk([&](mlir::func::FuncOp func) {
-            llvm::errs() << "walking module found function with name " << func.getName() << "\n";
             if (func->hasAttr("target_gate")) {
                 userRules.push_back(func);
                 if (std::find(userRuleNames.begin(), userRuleNames.end(), func.getName()) !=
                     userRuleNames.end()) {
                     graphRules.push_back(mlir::OwningOpRef<mlir::func::FuncOp>(func.clone()));
-                    llvm::errs() << "found user rule with name " << func.getName() << "\n";
                 }
             }
             return WalkResult::skip();
@@ -295,8 +280,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         loadBuiltInDecompositionRules(filename, module.getContext(), graphRules);
         loadUserDecompositionRules(module, userRuleNames, graphRules, userRules);
 
-        llvm::errs() << "writing rules\n";
-
         for (auto &ruleOpRef : graphRules) {
             RuleNode ruleNode;
             mlir::func::FuncOp func = ruleOpRef.get(); // access the op
@@ -334,22 +317,15 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                         ruleNode.inputs.push_back(term);
                     }
                     else {
-                        llvm::errs() << "Resource " << operation.getName() << " in rule "
-                                     << ruleNode.name << " has non-integer multiplicity "
-                                     << operation.getValue() << ". Skipping this resource.\n";
                         continue; // skip this resource if multiplicity is not an integer
                     }
                 }
             }
             else {
-                llvm::errs() << "Rule " << ruleNode.name
-                             << " is missing 'resources' attribute. Skipping this rule.\n";
                 continue; // skip this rule if resources attribute is missing
             }
-            llvm::errs() << ruleNode.name << " for " << ruleNode.output.name << ", ";
             rules.push_back(std::move(ruleNode));
         }
-        llvm::errs() << "\nregistered rules\n";
 
         return;
     }
@@ -372,9 +348,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 continue; // skip basis rules as they don't correspond to actual decomposition
                           // functions to insert
             }
-            llvm::errs() << "inserting rule: " << chosenRule.ruleName << " for op "
-                         << chosenRule.op.name << "\n";
-
             auto it = ruleNameToFuncOp.find(chosenRule.ruleName);
 
             if (it == ruleNameToFuncOp.end()) {
@@ -415,8 +388,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         for (const auto &[opName, ruleName] : opToFixedDecompName) {
             auto it = rulesByName.find(ruleName);
             if (it == rulesByName.end()) {
-                llvm::errs() << "Warning: fixed-decomp rule '" << ruleName << "' for operator '"
-                             << opName << "' not found in available rules. Skipping.\n";
                 continue;
             }
 
@@ -464,8 +435,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             for (const auto &ruleName : ruleNames) {
                 auto it = rulesByName.find(ruleName);
                 if (it == rulesByName.end()) {
-                    llvm::errs() << "Warning: alt-decomp rule '" << ruleName << "' for operator '"
-                                 << opName << "' not found in available rules. Skipping.\n";
                     continue;
                 }
                 altRules.push_back(*(it->second));

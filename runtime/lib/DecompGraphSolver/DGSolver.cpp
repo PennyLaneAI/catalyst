@@ -25,15 +25,17 @@
 
 #include "DGTypes.hpp"
 
+using namespace DecompGraph::Core;
+
 namespace DecompGraph::Solver {
 
-Core::ChosenDecompRule DecompositionSolver::basisRule(const Core::OperatorNode &op)
+ChosenDecompRule DecompositionSolver::basisRule(const OperatorNode &op)
 {
     if (!graph.isTargetGate(op)) {
         return invalidRule(op); // not a target gate, so no valid basis rule
     }
 
-    Core::ChosenDecompRule solution;
+    ChosenDecompRule solution;
     solution.op = op;
     solution.isBasis = true;
     solution.totalCost = graph.getGateset().getCost(op);
@@ -42,9 +44,9 @@ Core::ChosenDecompRule DecompositionSolver::basisRule(const Core::OperatorNode &
     return solution;
 }
 
-Core::ChosenDecompRule DecompositionSolver::evalRule(const Core::RuleNode &rule)
+ChosenDecompRule DecompositionSolver::evalRule(const RuleNode &rule)
 {
-    Core::ChosenDecompRule solution;
+    ChosenDecompRule solution;
     solution.ruleName = rule.name;
     solution.isBasis = false;
     solution.inputs = rule.inputs;
@@ -52,7 +54,7 @@ Core::ChosenDecompRule DecompositionSolver::evalRule(const Core::RuleNode &rule)
 
     double total_cost = 0.0;
     for (const auto &input : rule.inputs) {
-        Core::ChosenDecompRule child;
+        ChosenDecompRule child;
         child = solveOperator(input.op);
         if (isInvalidRule(child)) {
             // if any input cannot be solved, this rule is invalid
@@ -72,14 +74,14 @@ Core::ChosenDecompRule DecompositionSolver::evalRule(const Core::RuleNode &rule)
     return solution;
 }
 
-Core::ChosenDecompRule DecompositionSolver::bestRule(const Core::OperatorNode &op)
+ChosenDecompRule DecompositionSolver::bestRule(const OperatorNode &op)
 {
     const auto &all_rules = graph.getAllRulesFor(op);
     if (all_rules.empty()) {
         return invalidRule(op); // no valid rules
     }
 
-    std::optional<Core::ChosenDecompRule> best_rule;
+    std::optional<ChosenDecompRule> best_rule;
 
     for (const auto &rule : all_rules) {
         auto candidate = evalRule(rule);
@@ -96,7 +98,7 @@ Core::ChosenDecompRule DecompositionSolver::bestRule(const Core::OperatorNode &o
     return best_rule.value();
 }
 
-Core::ChosenDecompRule DecompositionSolver::solveOperator(const Core::OperatorNode &op)
+ChosenDecompRule DecompositionSolver::solveOperator(const OperatorNode &op)
 {
     // Check if the operator has already been solved
     if (const auto it = solvedMap.find(op); it != solvedMap.end()) {
@@ -109,13 +111,12 @@ Core::ChosenDecompRule DecompositionSolver::solveOperator(const Core::OperatorNo
 
     // RAII guard for the visited set to check/solve the graph recursively
     struct VisitGuard {
-        std::unordered_set<Core::OperatorNode, Core::OperatorNodeHash> &visited_;
-        std::vector<Core::OperatorNode> &solvingStack_;
-        const Core::OperatorNode &currentNode_;
+        std::unordered_set<OperatorNode, OperatorNodeHash> &visited_;
+        std::vector<OperatorNode> &solvingStack_;
+        const OperatorNode &currentNode_;
 
-        explicit VisitGuard(std::unordered_set<Core::OperatorNode, Core::OperatorNodeHash> &visited,
-                            std::vector<Core::OperatorNode> &solvingStack,
-                            const Core::OperatorNode &node)
+        explicit VisitGuard(std::unordered_set<OperatorNode, OperatorNodeHash> &visited,
+                            std::vector<OperatorNode> &solvingStack, const OperatorNode &node)
             : visited_(visited), solvingStack_(solvingStack), currentNode_(node)
         {
             visited_.insert(currentNode_);         // add to visited in case of exceptions
@@ -136,26 +137,24 @@ Core::ChosenDecompRule DecompositionSolver::solveOperator(const Core::OperatorNo
     auto chosen = graph.isTargetGate(op) ? basisRule(op) : bestRule(op);
 
     if (!isInvalidRule(chosen)) {
-        std::cerr << "Solved operator: " << Core::print_op(op) << " with rule: " << chosen.ruleName
-                  << " (cost: " << chosen.totalCost << ")\n";
         solvedMap.emplace(op, chosen);
     }
     return chosen;
 }
 
-Core::GraphResult DecompositionSolver::solve()
+GraphResult DecompositionSolver::solve()
 {
     // Return cached solution if already solved
     if (!solvedMap.empty()) {
         return solvedMap;
     }
 
-    for (const auto &root : graph.getRoots()) {
+    for (const auto &root : graph.getRootOps()) {
         const auto chosen_rule = solveOperator(root);
         if (isInvalidRule(chosen_rule)) {
             // Debugging output:
             graph.showGraph();
-            Core::showSolution(solvedMap);
+            showSolution(solvedMap);
 
             // Prepare error msg:
             std::vector<std::string> rules_error;
@@ -163,8 +162,8 @@ Core::GraphResult DecompositionSolver::solve()
                 rules_error.push_back(rule.name);
             }
 
-            throw Core::GraphSolverFailedError(
-                root, rules_error); // all rules failed for this root operator
+            throw GraphSolverFailedError(root,
+                                         rules_error); // all rules failed for this root operator
         }
     }
 

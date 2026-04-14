@@ -78,7 +78,7 @@ class DecompositionGraph {
      *
      * @return The list of root operators in the graph.
      */
-    [[nodiscard]] const std::vector<Core::OperatorNode> &getRoots() const noexcept;
+    [[nodiscard]] const std::vector<Core::OperatorNode> &getRootOps() const noexcept;
 
     /**
      * @brief Returns the target gateset for the graph decomposition problem, which includes

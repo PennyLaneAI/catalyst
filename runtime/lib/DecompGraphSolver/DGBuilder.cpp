@@ -25,6 +25,8 @@
 
 #include <boost/graph/adjacency_list.hpp>
 
+using namespace DecompGraph::Core;
+
 namespace DecompGraph::Solver {
 
 struct DecompositionGraph::Impl {
@@ -53,21 +55,20 @@ struct DecompositionGraph::Impl {
     using Vertex = boost::graph_traits<BbGraph>::vertex_descriptor;
 
     BbGraph graph;
-    std::vector<Core::OperatorNode> operators;
-    Core::WeightedGateset gateset;
-    std::vector<Core::RuleNode> rules;
-    Core::FixedDecomps fixedDecomps;
-    Core::AltDecomps altDecomps;
+    std::vector<OperatorNode> operators;
+    WeightedGateset gateset;
+    std::vector<RuleNode> rules;
+    FixedDecomps fixedDecomps;
+    AltDecomps altDecomps;
 
-    std::unordered_map<Core::OperatorNode, OperatorId, Core::OperatorNodeHash> opToId;
-    std::vector<Core::OperatorNode> idToOp;
+    std::unordered_map<OperatorNode, OperatorId, OperatorNodeHash> opToId;
+    std::vector<OperatorNode> idToOp;
     std::unordered_map<OperatorId, Vertex> opIdToVertex;
 
     std::unordered_map<RuleId, Vertex> ruleIdToVertex;
-    std::unordered_map<Core::OperatorNode, std::vector<Core::RuleNode>, Core::OperatorNodeHash>
-        opToRules;
+    std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash> opToRules;
 
-    OperatorId registerOp(const Core::OperatorNode &op)
+    OperatorId registerOp(const OperatorNode &op)
     {
         const auto it = opToId.find(op);
         if (it != opToId.end()) {
@@ -83,20 +84,18 @@ struct DecompositionGraph::Impl {
         return newId;
     }
 
-    static Core::RuleNode markRuleOrigin(Core::RuleNode rule, Core::RuleOrigin origin,
-                                         const Core::OperatorNode &op)
+    static RuleNode markRuleOrigin(RuleNode rule, RuleOrigin origin, const OperatorNode &op)
     {
         if (rule.output != op) {
-            throw Core::RuleInvalidOverrideError(
-                origin == Core::RuleOrigin::Fixed ? "fixed" : "alternative", op, rule);
+            throw RuleInvalidOverrideError(origin == RuleOrigin::Fixed ? "fixed" : "alternative",
+                                           op, rule);
         }
         rule.origin = origin;
         return rule;
     }
 
-    Impl(std::vector<Core::OperatorNode> _operators, Core::WeightedGateset _gateset,
-         std::vector<Core::RuleNode> _rules, Core::FixedDecomps _fixedDecomps = {},
-         Core::AltDecomps _altDecomps = {})
+    Impl(std::vector<OperatorNode> _operators, WeightedGateset _gateset,
+         std::vector<RuleNode> _rules, FixedDecomps _fixedDecomps = {}, AltDecomps _altDecomps = {})
         : operators(std::move(_operators)), gateset(std::move(_gateset)), rules(std::move(_rules)),
           fixedDecomps(std::move(_fixedDecomps)), altDecomps(std::move(_altDecomps))
     {
@@ -105,32 +104,27 @@ struct DecompositionGraph::Impl {
 
     void materializeRules()
     {
-        std::unordered_map<Core::OperatorNode, std::vector<Core::RuleNode>, Core::OperatorNodeHash>
-            baseByOutput;
+        std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash> baseByOutput;
         baseByOutput.reserve(rules.size());
         for (auto &rule : rules) {
-            rule.origin = Core::RuleOrigin::Default;
+            rule.origin = RuleOrigin::Default;
             baseByOutput[rule.output].push_back(rule);
         }
 
-        std::vector<Core::RuleNode> effectiveRules;
+        std::vector<RuleNode> effectiveRules;
         effectiveRules.reserve(rules.size());
-        std::unordered_set<Core::OperatorNode, Core::OperatorNodeHash> seenOutputs;
+        std::unordered_set<OperatorNode, OperatorNodeHash> seenOutputs;
 
-        auto appendRulesForOutput = [&](const Core::OperatorNode &op) {
+        auto appendRulesForOutput = [&](const OperatorNode &op) {
             if (!seenOutputs.insert(op).second) {
                 return;
             }
 
             const auto fixedIt = fixedDecomps.find(op);
-            std::cerr << "Processing operator: " << Core::print_op(op) << "\n";
             if (fixedIt != fixedDecomps.end()) {
-                std::cerr << "  Found fixed rule: " << fixedIt->second.name << "\n";
-                effectiveRules.push_back(
-                    markRuleOrigin(fixedIt->second, Core::RuleOrigin::Fixed, op));
+                effectiveRules.push_back(markRuleOrigin(fixedIt->second, RuleOrigin::Fixed, op));
             }
             else {
-                std::cerr << "  No fixed rule found.\n";
                 const auto baseIt = baseByOutput.find(op);
                 if (baseIt != baseByOutput.end()) {
                     for (const auto &rule : baseIt->second) {
@@ -142,8 +136,7 @@ struct DecompositionGraph::Impl {
             const auto altIt = altDecomps.find(op);
             if (altIt != altDecomps.end()) {
                 for (const auto &altRule : altIt->second) {
-                    effectiveRules.push_back(
-                        markRuleOrigin(altRule, Core::RuleOrigin::Alternative, op));
+                    effectiveRules.push_back(markRuleOrigin(altRule, RuleOrigin::Alternative, op));
                 }
             }
         };
@@ -198,10 +191,9 @@ struct DecompositionGraph::Impl {
     }
 };
 
-DecompositionGraph::DecompositionGraph(std::vector<Core::OperatorNode> operators,
-                                       Core::WeightedGateset gateset,
-                                       std::vector<Core::RuleNode> rules,
-                                       Core::FixedDecomps fixedDecomps, Core::AltDecomps altDecomps)
+DecompositionGraph::DecompositionGraph(std::vector<OperatorNode> operators, WeightedGateset gateset,
+                                       std::vector<RuleNode> rules, FixedDecomps fixedDecomps,
+                                       AltDecomps altDecomps)
     : impl(std::make_unique<Impl>(std::move(operators), std::move(gateset), std::move(rules),
                                   std::move(fixedDecomps), std::move(altDecomps)))
 {
@@ -227,27 +219,27 @@ DecompositionGraph &DecompositionGraph::operator=(const DecompositionGraph &othe
 
 DecompositionGraph &DecompositionGraph::operator=(DecompositionGraph &&other) noexcept = default;
 
-[[nodiscard]] const std::vector<Core::OperatorNode> &DecompositionGraph::getRoots() const noexcept
+[[nodiscard]] const std::vector<OperatorNode> &DecompositionGraph::getRootOps() const noexcept
 {
     return impl->operators;
 }
 
-[[nodiscard]] const Core::WeightedGateset &DecompositionGraph::getGateset() const noexcept
+[[nodiscard]] const WeightedGateset &DecompositionGraph::getGateset() const noexcept
 {
     return impl->gateset;
 }
 
-[[nodiscard]] const std::vector<Core::RuleNode> &DecompositionGraph::getRules() const noexcept
+[[nodiscard]] const std::vector<RuleNode> &DecompositionGraph::getRules() const noexcept
 {
     return impl->rules;
 }
 
-[[nodiscard]] const Core::FixedDecomps &DecompositionGraph::getFixedDecomps() const noexcept
+[[nodiscard]] const FixedDecomps &DecompositionGraph::getFixedDecomps() const noexcept
 {
     return impl->fixedDecomps;
 }
 
-[[nodiscard]] const Core::AltDecomps &DecompositionGraph::getAltDecomps() const noexcept
+[[nodiscard]] const AltDecomps &DecompositionGraph::getAltDecomps() const noexcept
 {
     return impl->altDecomps;
 }
@@ -256,12 +248,11 @@ std::size_t DecompositionGraph::getNumRules() const { return impl->rules.size();
 
 std::size_t DecompositionGraph::getNumOperators() const { return impl->operators.size(); }
 
-const Core::RuleNode &DecompositionGraph::getRule(RuleId id) const { return impl->rules[id]; }
+const RuleNode &DecompositionGraph::getRule(RuleId id) const { return impl->rules[id]; }
 
-const std::vector<Core::RuleNode> &
-DecompositionGraph::getAllRulesFor(const Core::OperatorNode &op) const
+const std::vector<RuleNode> &DecompositionGraph::getAllRulesFor(const OperatorNode &op) const
 {
-    static const std::vector<Core::RuleNode> empty;
+    static const std::vector<RuleNode> empty;
     const auto it = impl->opToRules.find(op);
     if (it != impl->opToRules.end()) {
         return it->second;
@@ -269,12 +260,12 @@ DecompositionGraph::getAllRulesFor(const Core::OperatorNode &op) const
     return empty;
 }
 
-bool DecompositionGraph::isTargetGate(const Core::OperatorNode &op) const
+bool DecompositionGraph::isTargetGate(const OperatorNode &op) const
 {
     return impl->gateset.contains(op);
 }
 
-bool DecompositionGraph::hasOperator(const Core::OperatorNode &op) const
+bool DecompositionGraph::hasOperator(const OperatorNode &op) const
 {
     return impl->opToId.find(op) != impl->opToId.end();
 }
@@ -285,7 +276,7 @@ void DecompositionGraph::showGraph() const
     // Show all operators by their names
     std::cerr << "Operators:\n";
     for (const auto &[op, id] : impl->opToId) {
-        std::cerr << "  ID " << id << ": " << Core::print_op(op) << "\n";
+        std::cerr << "  ID " << id << ": " << print_op(op) << "\n";
     }
 
     // Show all rules by their names and their input/output operators
@@ -293,20 +284,20 @@ void DecompositionGraph::showGraph() const
     for (const auto &[ruleId, _] : impl->ruleIdToVertex) {
         const auto &rule = impl->rules[ruleId];
         std::cerr << "  Rule ID " << ruleId << ": " << rule.name;
-        if (rule.origin == Core::RuleOrigin::Fixed) {
+        if (rule.origin == RuleOrigin::Fixed) {
             std::cerr << " [fixed]";
         }
-        else if (rule.origin == Core::RuleOrigin::Alternative) {
+        else if (rule.origin == RuleOrigin::Alternative) {
             std::cerr << " [alt]";
         }
         else {
             std::cerr << " [default]";
         }
         std::cerr << "\n";
-        std::cerr << "    Output: " << Core::print_op(rule.output) << "\n";
+        std::cerr << "    Output: " << print_op(rule.output) << "\n";
         std::cerr << "    Inputs:\n";
         for (const auto &input : rule.inputs) {
-            std::cerr << "      - " << Core::print_op(input.op)
+            std::cerr << "      - " << print_op(input.op)
                       << " (multiplicity: " << input.multiplicity << ")\n";
         }
     }
@@ -314,7 +305,7 @@ void DecompositionGraph::showGraph() const
     // Show target gateset
     std::cerr << "Target Gateset:\n";
     for (const auto &[op, cost] : impl->gateset.ops) {
-        std::cerr << "  " << Core::print_op(op) << " with cost " << cost << "\n";
+        std::cerr << "  " << print_op(op) << " with cost " << cost << "\n";
     }
 }
 
