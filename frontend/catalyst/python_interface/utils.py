@@ -57,7 +57,7 @@ def get_constant_from_ssa(value: SSAValue) -> Number | None:
     if not isinstance(value.type, ShapedType):
         owner = value.owner
 
-        if isinstance(owner, (arithConstantOp, hloConstantOp)):
+        if isinstance(owner, arithConstantOp):
             const_attr = owner.value
             return const_attr.value.data
 
