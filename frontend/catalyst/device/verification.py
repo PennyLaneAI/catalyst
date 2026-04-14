@@ -43,7 +43,7 @@ from pennylane.ops import (
 )
 from pennylane.tape import QuantumTape
 
-from catalyst.api_extensions import Cond, ForLoop, HybridAdjoint, HybridCtrl, WhileLoop, Switch
+from catalyst.api_extensions import Cond, ForLoop, HybridAdjoint, HybridCtrl, Switch, WhileLoop
 from catalyst.device.op_support import (
     EMPTY_PROPERTIES,
     is_active,
