@@ -52,7 +52,9 @@ class TestIntegrationUsefulErrors:
         """Test that when dynamic shots are provided, the pass raises an error"""
 
         if capture is False:
-            pytest.xfail(reason="passes applied to workflows raise an error without program capture")
+            pytest.xfail(
+                reason="passes applied to workflows raise an error without program capture"
+            )
 
         @qml.qjit(capture=capture)
         @measurements_from_samples_pass
@@ -166,9 +168,9 @@ class TestIntegrationUsefulErrors:
             def circuit():
                 return qml.sample(wires=[0]), qml.expval(qml.X(0))
 
-    @pytest.mark.parametrize("obs", (2*qml.X(0), qml.X(1) + qml.X(2)))
+    @pytest.mark.parametrize("obs", (2 * qml.X(0), qml.X(1) + qml.X(2)))
     def test_hamlitonianop_raises_error(self, obs, capture):
-        """Test that a circuit with a HamiltonianOp observable raises an error message 
+        """Test that a circuit with a HamiltonianOp observable raises an error message
         instructing the user to apply `split-non-commuting` first"""
 
         dev = qml.device("lightning.qubit", wires=2)
@@ -180,6 +182,7 @@ class TestIntegrationUsefulErrors:
             @qml.qnode(dev, shots=1000)
             def circuit():
                 return qml.expval(obs)
+
 
 @pytest.mark.parametrize("capture", [True, False])
 class TestIntegrationWithOtherPasses:
@@ -209,7 +212,6 @@ class TestIntegrationWithOtherPasses:
         assert np.isclose(circuit(1.234), np.cos(1.234), atol=0.05)
         run_filecheck_qjit(circuit)
 
-
     @pytest.mark.parametrize("coeff", [0.5, 2, -1.7])
     @pytest.mark.parametrize("phi", [0, np.pi, 0.1234, -1.25])
     def test_expval_sprod_with_split_non_commuting(self, coeff, phi, capture, run_filecheck_qjit):
@@ -231,11 +233,15 @@ class TestIntegrationWithOtherPasses:
         expected_res = coeff * np.cos(phi)
         assert np.allclose(expected_res, circuit()), "Sanity check failed, is expected_res correct?"
 
-        pipeline = qml.CompilePipeline(qml.transform(pass_name="split-non-commuting"), qml.transform(pass_name="measurements-from-samples"))
+        pipeline = qml.CompilePipeline(
+            qml.transform(pass_name="split-non-commuting"),
+            qml.transform(pass_name="measurements-from-samples"),
+        )
 
         circ = qml.set_shots(circuit, 6000)
         circuit_compiled = qml.qjit(
-            pipeline(circ), capture=capture,
+            pipeline(circ),
+            capture=capture,
         )
 
         assert np.isclose(expected_res, circuit_compiled(), atol=0.05)
@@ -264,16 +270,20 @@ class TestIntegrationWithOtherPasses:
             # CHECK: quantum.sample
             return qml.var(coeff * qml.Z(wires=0))
 
-        # var for the observable is (1-cos(phi)**2), and var scales 
+        # var for the observable is (1-cos(phi)**2), and var scales
         # as Var(a*X) = a^2 * Var(X) for constant a
-        expected_res = coeff**2 * (1-np.cos(phi)**2)
+        expected_res = coeff**2 * (1 - np.cos(phi) ** 2)
         assert np.isclose(expected_res, circuit()), "Sanity check failed, is expected_res correct?"
 
-        pipeline = qml.CompilePipeline(qml.transform(pass_name="split-non-commuting"), qml.transform(pass_name="measurements-from-samples"))
-        
+        pipeline = qml.CompilePipeline(
+            qml.transform(pass_name="split-non-commuting"),
+            qml.transform(pass_name="measurements-from-samples"),
+        )
+
         circ = qml.set_shots(circuit, 5000)
         circuit_compiled = qml.qjit(
-            pipeline(circ), capture=capture,
+            pipeline(circ),
+            capture=capture,
         )
 
         assert np.isclose(expected_res, circuit_compiled(), atol=0.05)
@@ -282,7 +292,9 @@ class TestIntegrationWithOtherPasses:
 
     @pytest.mark.parametrize("coeff", [1.3, -4])
     @pytest.mark.parametrize("phi1, phi2", [(0, 0), (-0.57, 0), (0, 2.34), (-0.57, 2.34)])
-    def test_expval_sum_with_split_non_commuting(self, coeff, phi1, phi2, capture, run_filecheck_qjit):
+    def test_expval_sum_with_split_non_commuting(
+        self, coeff, phi1, phi2, capture, run_filecheck_qjit
+    ):
         """Test the measurements_from_samples transform on a device with two wires and terminal
         measurements that require an observable (i.e. expval and var).
 
@@ -296,15 +308,18 @@ class TestIntegrationWithOtherPasses:
             qml.RX(phi2, wires=1)
             # CHECK-NOT: quantum.expval
             # CHECK: quantum.sample
-            return qml.expval(coeff*qml.Z(wires=0) + qml.Y(1))
-        
+            return qml.expval(coeff * qml.Z(wires=0) + qml.Y(1))
+
         expected_res = coeff * np.cos(phi1) - np.sin(phi2)
         assert np.isclose(expected_res, circuit()), "Sanity check failed, is expected_res correct?"
 
-        pipeline = qml.CompilePipeline(qml.transform(pass_name="split-non-commuting"), qml.transform(pass_name="measurements-from-samples"))
-        
+        pipeline = qml.CompilePipeline(
+            qml.transform(pass_name="split-non-commuting"),
+            qml.transform(pass_name="measurements-from-samples"),
+        )
+
         # ToDo: becomes 2 executions of 5000 shots each, can go back to 5000 once #2657 merges
-        circ = qml.set_shots(circuit, 10000) 
+        circ = qml.set_shots(circuit, 10000)
         circuit_compiled = qml.qjit(pipeline(circ), capture=capture)
 
         assert np.isclose(expected_res, circuit_compiled(), atol=0.1)
@@ -327,13 +342,16 @@ class TestIntegrationWithOtherPasses:
             qml.RX(phi2, wires=1)
             # CHECK-NOT: quantum.expval
             # CHECK: quantum.sample
-            return qml.var(coeff*qml.Z(wires=0) + qml.Y(1))
-        
-        expected_res = coeff**2 * (1-np.cos(phi1)**2) + (1-np.sin(phi2)**2)
+            return qml.var(coeff * qml.Z(wires=0) + qml.Y(1))
+
+        expected_res = coeff**2 * (1 - np.cos(phi1) ** 2) + (1 - np.sin(phi2) ** 2)
         assert np.isclose(expected_res, circuit()), "Sanity check failed, is expected_res correct?"
 
-        pipeline = qml.CompilePipeline(qml.transform(pass_name="split-non-commuting"), qml.transform(pass_name="measurements-from-samples"))
-        circ = qml.set_shots(circuit, 5000) 
+        pipeline = qml.CompilePipeline(
+            qml.transform(pass_name="split-non-commuting"),
+            qml.transform(pass_name="measurements-from-samples"),
+        )
+        circ = qml.set_shots(circuit, 5000)
         circuit_compiled = qml.qjit(pipeline(circ), capture=capture)
 
         assert np.isclose(expected_res, circuit_compiled(), atol=0.05)
@@ -356,6 +374,7 @@ class TestIntegrationWithOtherPasses:
         phi = 0.768
         res = circuit(phi)
         assert np.isclose(res, -np.sin(phi), atol=0.05)
+
 
 @pytest.mark.parametrize("capture", [True, False])
 class TestMeasurementsFromSamplesIntegration:
@@ -387,7 +406,7 @@ class TestMeasurementsFromSamplesIntegration:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.parametrize("phi", [0, np.pi/3, 0.4568])
+    @pytest.mark.parametrize("phi", [0, np.pi / 3, 0.4568])
     @pytest.mark.parametrize(
         "initial_op, mp, obs, expected_res",
         [
@@ -402,7 +421,7 @@ class TestMeasurementsFromSamplesIntegration:
                 qml.RX,
                 qml.var,
                 qml.Z,
-                lambda phi: 1-np.cos(phi)**2,
+                lambda phi: 1 - np.cos(phi) ** 2,
             ),
             # PauliX observables
             pytest.param(
@@ -415,7 +434,7 @@ class TestMeasurementsFromSamplesIntegration:
                 qml.RY,
                 qml.var,
                 qml.X,
-                lambda phi: 1-np.sin(phi)**2,
+                lambda phi: 1 - np.sin(phi) ** 2,
             ),
             # PauliY observables
             pytest.param(
@@ -428,7 +447,7 @@ class TestMeasurementsFromSamplesIntegration:
                 qml.RX,
                 qml.var,
                 qml.Y,
-                lambda phi: 1-np.sin(phi)**2,
+                lambda phi: 1 - np.sin(phi) ** 2,
             ),
         ],
     )
@@ -451,11 +470,14 @@ class TestMeasurementsFromSamplesIntegration:
             # CHECK: quantum.sample
             return mp(obs(wires=0))
 
-        assert np.isclose(expected_res(phi), circuit_ref()), "Sanity check failed, is expected_res correct?"
-        
+        assert np.isclose(
+            expected_res(phi), circuit_ref()
+        ), "Sanity check failed, is expected_res correct?"
+
         circ = qml.set_shots(circuit_ref, 5000)
         circuit_compiled = qml.qjit(
-            measurements_from_samples_pass(circ), capture=capture,
+            measurements_from_samples_pass(circ),
+            capture=capture,
         )
 
         run_filecheck_qjit(circuit_compiled)
@@ -480,7 +502,10 @@ class TestMeasurementsFromSamplesIntegration:
             # CHECK: quantum.sample
             return qml.probs(wires=0)
 
-        expected_res = [0.5*(1+np.cos(omega)*np.cos(phi)), 0.5*(1-np.cos(omega)*np.cos(phi))]
+        expected_res = [
+            0.5 * (1 + np.cos(omega) * np.cos(phi)),
+            0.5 * (1 - np.cos(omega) * np.cos(phi)),
+        ]
         assert np.allclose(
             expected_res, circuit_ref(), atol=0.005
         ), "Sanity check failed, is expected_res correct?"
@@ -562,11 +587,14 @@ class TestMeasurementsFromSamplesIntegration:
 
     # -------------------------------------------------------------------------------------------- #
 
-    @pytest.mark.parametrize("angles", [(0, 0), (0, np.pi), (np.pi, 0), (0.74, 0.123), (-1.23, 0.86)])
-    @pytest.mark.parametrize("mp, expected_res",
+    @pytest.mark.parametrize(
+        "angles", [(0, 0), (0, np.pi), (np.pi, 0), (0.74, 0.123), (-1.23, 0.86)]
+    )
+    @pytest.mark.parametrize(
+        "mp, expected_res",
         [
             (qml.expval, lambda angles: (np.cos(angles[0]), -np.sin(angles[1]))),
-            (qml.var, lambda angles: (1-np.cos(angles[0])**2, 1-np.sin(angles[1])**2)),
+            (qml.var, lambda angles: (1 - np.cos(angles[0]) ** 2, 1 - np.sin(angles[1]) ** 2)),
         ],
     )
     # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -591,7 +619,9 @@ class TestMeasurementsFromSamplesIntegration:
             # CHECK: quantum.sample
             return mp(qml.Z(wires=0)), mp(qml.Y(wires=1))
 
-        assert np.allclose(expected_res(angles), circuit_ref()), "Sanity check failed, is expected_res correct?"
+        assert np.allclose(
+            expected_res(angles), circuit_ref()
+        ), "Sanity check failed, is expected_res correct?"
         circ_shots = qml.set_shots(circuit_ref, 5000)
         circuit_compiled = qml.qjit(
             measurements_from_samples_pass(circ_shots),
@@ -604,11 +634,14 @@ class TestMeasurementsFromSamplesIntegration:
 
     # -------------------------------------------------------------------------------------------- #
 
-    @pytest.mark.parametrize("angles", [(0, 0), (0, np.pi), (np.pi, 0), (0.74, 0.123), (-1.23, 0.86)])
-    @pytest.mark.parametrize("mp, expected_res",
+    @pytest.mark.parametrize(
+        "angles", [(0, 0), (0, np.pi), (np.pi, 0), (0.74, 0.123), (-1.23, 0.86)]
+    )
+    @pytest.mark.parametrize(
+        "mp, expected_res",
         [
             (qml.expval, lambda angles: (np.cos(angles[0]) * -np.sin(angles[1]))),
-            (qml.var, lambda angles: ((1 - np.cos(angles[0])**2 * np.sin(angles[1])**2))),
+            (qml.var, lambda angles: ((1 - np.cos(angles[0]) ** 2 * np.sin(angles[1]) ** 2))),
         ],
     )
     def test_exec_2_wire_with_tensor_obs(self, angles, mp, expected_res, capture):
@@ -626,7 +659,9 @@ class TestMeasurementsFromSamplesIntegration:
             qml.RX(phi=angles[1], wires=1)
             return mp(qml.Z(wires=0) @ qml.Y(wires=1))
 
-        assert np.allclose(expected_res(angles), circuit_ref()), "Sanity check failed, is expected_res correct?"
+        assert np.allclose(
+            expected_res(angles), circuit_ref()
+        ), "Sanity check failed, is expected_res correct?"
 
         circ_shots = qml.set_shots(circuit_ref, 5000)
         circuit_compiled = qml.qjit(measurements_from_samples_pass(circ_shots), capture=capture)
@@ -650,13 +685,13 @@ class TestMeasurementsFromSamplesIntegration:
             # CHECK: quantum.sample
             return qml.probs()
 
-        x1 = np.cos(phi/2)**2 / 2
-        x2 = np.sin(phi/2)**2 / 2
+        x1 = np.cos(phi / 2) ** 2 / 2
+        x2 = np.sin(phi / 2) ** 2 / 2
         expected_res = np.array([x1, x2, x1, x2])
         assert np.allclose(
             expected_res, circuit_ref()
         ), "Sanity check failed, is expected_res correct?"
-        
+
         circ_shots = qml.set_shots(circuit_ref, 5000)
         circuit_compiled = qml.qjit(measurements_from_samples_pass(circ_shots), capture=capture)
 
@@ -681,10 +716,12 @@ class TestMeasurementsFromSamplesIntegration:
             # CHECK: quantum.sample
             return qml.probs(wires=0), qml.probs(wires=1)
 
-        probs1 = np.array([np.cos(phi/2)**2, np.sin(phi/2)**2])
-        probs2 = np.array([np.cos(-phi/2)**2, np.sin(-phi/2)**2])
+        probs1 = np.array([np.cos(phi / 2) ** 2, np.sin(phi / 2) ** 2])
+        probs2 = np.array([np.cos(-phi / 2) ** 2, np.sin(-phi / 2) ** 2])
 
-        assert np.allclose([probs1, probs2], circuit_ref()), "Sanity check failed, is expected_res correct?"
+        assert np.allclose(
+            [probs1, probs2], circuit_ref()
+        ), "Sanity check failed, is expected_res correct?"
 
         circ_shots = qml.set_shots(circuit_ref, 5000)
         circuit_compiled = qml.qjit(measurements_from_samples_pass(circ_shots), capture=capture)
@@ -696,7 +733,9 @@ class TestMeasurementsFromSamplesIntegration:
     # -------------------------------------------------------------------------------------------- #
 
     @pytest.mark.parametrize("theta", [0, -1.23, 0.765])
-    def test_measurements_from_samples_multiple_measurements(self, theta, capture, run_filecheck_qjit):
+    def test_measurements_from_samples_multiple_measurements(
+        self, theta, capture, run_filecheck_qjit
+    ):
         """Test the transform measurements_from_samples with multiple measurement types
         as part of the Catalyst pipeline."""
 
@@ -727,7 +766,7 @@ class TestMeasurementsFromSamplesIntegration:
         expval_res, var_res, probs_res = circuit(theta)
 
         expval_expected = np.sin(theta) * np.sin(theta / 2)
-        var_expected = 1 - np.sin(theta/2) ** 2
+        var_expected = 1 - np.sin(theta / 2) ** 2
         probs_expected = [np.cos(theta / 2) ** 2, np.sin(theta / 2) ** 2]
 
         assert np.isclose(expval_res, expval_expected, atol=0.05)

@@ -311,11 +311,11 @@ class TestMeasurementsFromSamplesPass:
         pipeline = (MeasurementsFromSamplesPass(),)
         with pytest.raises(NotImplementedError, match="operations are not supported"):
             run_filecheck(program, pipeline)
-            
+
     def test_1_wire_state(self, run_filecheck):
         """Test the measurements-from-samples pass on a 1-wire circuit terminating with a state
         measurement. Note that this is not a valid IR, because state and shots don't work together.
-        We would expect to either encounter a "no shots" error from this pass (for a circuit with 
+        We would expect to either encounter a "no shots" error from this pass (for a circuit with
         no shots) or a "state and shots are incompatible" error with shots when creating an IR.
         """
 
@@ -575,7 +575,7 @@ class TestMeasurementsFromSamplesPass:
         run_filecheck(program, pipeline)
 
     def test_expval_tensor_obs(self, run_filecheck):
-        """Test the measurements-from-samples pass on a circuit terminating with the variance 
+        """Test the measurements-from-samples pass on a circuit terminating with the variance
         of a 3-wire tensor, including non-Z observables.
         """
 
@@ -624,9 +624,9 @@ class TestMeasurementsFromSamplesPass:
 
         pipeline = (MeasurementsFromSamplesPass(),)
         run_filecheck(program, pipeline)
-    
+
     def test_var_tensor_obs(self, run_filecheck):
-        """Test the measurements-from-samples pass on a circuit terminating with the variance 
+        """Test the measurements-from-samples pass on a circuit terminating with the variance
         of a 3-wire tensor, including non-Z observables.
         """
 
@@ -675,7 +675,7 @@ class TestMeasurementsFromSamplesPass:
 
         pipeline = (MeasurementsFromSamplesPass(),)
         run_filecheck(program, pipeline)
-        
-    
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

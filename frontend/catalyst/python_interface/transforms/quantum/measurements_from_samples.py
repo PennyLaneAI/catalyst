@@ -56,25 +56,26 @@ MEASUREMENT_PROCESS_TYPES = (
     quantum.ExpvalOp,
     quantum.ProbsOp,
     quantum.SampleOp,
-    quantum.StateOp, 
+    quantum.StateOp,
     quantum.VarianceOp,
 )
+
 
 @dataclass(frozen=True)
 class MeasurementsFromSamplesPass(passes.ModulePass):
     """Pass that replaces all terminal measurements in a program with
     :func:`pennylane.sample` measurements, and adds postprocessing instructions to recover the
-    original measurement. 
+    original measurement.
 
-    This pass supports ExpvalOp, VarianceOp, SampleOp and ProbsOp. ExpvalOp and VarianceOp 
-    are supported with either a TensorOp or NambedObsOp observable. 
-    
-    .. note:: 
+    This pass supports ExpvalOp, VarianceOp, SampleOp and ProbsOp. ExpvalOp and VarianceOp
+    are supported with either a TensorOp or NambedObsOp observable.
 
-      HamiltonianOp is not supported directly; instead, it requires application of the 
+    .. note::
+
+      HamiltonianOp is not supported directly; instead, it requires application of the
       split-non-commuting pass before this pass.
 
-    If observables are present in a basis other than Z, the pass diagonalizes them before 
+    If observables are present in a basis other than Z, the pass diagonalizes them before
     conversion to samples in the computational basis.
     """
 
@@ -91,8 +92,7 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
 
         # match + rewrite expval, var and probs as sample + post-processing
         pattern_rewriter.PatternRewriteWalker(
-            MeasurementsFromSamplesPattern(), 
-            apply_recursively=False
+            MeasurementsFromSamplesPattern(), apply_recursively=False
         ).rewrite_module(op)
 
 
@@ -114,12 +114,12 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         self.postprocessing_idx: int = 0
 
     def match_and_rewrite(self, func_op: func.FuncOp, rewriter: PatternRewriter, /):
-        """Matches all FuncOps and, if they have the quantum.node attribute, rewrites them 
-        so that the terminal measurements are replaced with sample measurements and 
-        postprocessing instructions to recover the original measurement. 
+        """Matches all FuncOps and, if they have the quantum.node attribute, rewrites them
+        so that the terminal measurements are replaced with sample measurements and
+        postprocessing instructions to recover the original measurement.
 
-        This Pattern supports ExpvalOp, VarianceOp, SampleOp and ProbsOp. ExpvalOp and VarianceOp 
-        are supported with either a TensorOp or NambedObsOp observable. 
+        This Pattern supports ExpvalOp, VarianceOp, SampleOp and ProbsOp. ExpvalOp and VarianceOp
+        are supported with either a TensorOp or NambedObsOp observable.
         """
 
         if "quantum.node" not in func_op.attributes:
@@ -129,9 +129,11 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         self.qnode = func_op
         self.call_op = get_call_op(func_op)
 
-        measurement_processes = [op for op in self.qnode.body.walk() if isinstance(op, MEASUREMENT_PROCESS_TYPES)]
+        measurement_processes = [
+            op for op in self.qnode.body.walk() if isinstance(op, MEASUREMENT_PROCESS_TYPES)
+        ]
 
-        # post-processing calls will be injected at the same point for all MPs 
+        # post-processing calls will be injected at the same point for all MPs
         # adding calls starting with the final MP ensures call order matches MP order
         for mp_op in measurement_processes[::-1]:
             if isinstance(mp_op, quantum.ExpvalOp | quantum.VarianceOp):
@@ -141,19 +143,20 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             elif isinstance(mp_op, quantum.SampleOp):
                 pass
             elif isinstance(mp_op, quantum.CountsOp):
-                # Currently ``qml.counts()`` is unsupported due to differences in return 
-                # type/shape in PennyLane and Catalyst. It may be supported at a later time. 
+                # Currently ``qml.counts()`` is unsupported due to differences in return
+                # type/shape in PennyLane and Catalyst. It may be supported at a later time.
                 # It is included for completeness and to notify users that it is unsupported.
                 raise NotImplementedError("qml.counts() operations are not supported.")
             elif isinstance(mp_op, quantum.StateOp):
-                # It is not possible to recover a quantum state from samples; this is included 
+                # It is not possible to recover a quantum state from samples; this is included
                 # for completeness and to notify users that ``state`` mps are not supported
                 raise NotImplementedError("qml.state() operations are not supported.")
 
-
     @classmethod
-    def get_observable_op(cls, op: quantum.ExpvalOp | quantum.VarianceOp) -> quantum.NamedObsOp | quantum.TensorOp:
-        """Return the observable op (quantum.NamedObsOp or quantum.TensorOp) given as an input 
+    def get_observable_op(
+        cls, op: quantum.ExpvalOp | quantum.VarianceOp
+    ) -> quantum.NamedObsOp | quantum.TensorOp:
+        """Return the observable op (quantum.NamedObsOp or quantum.TensorOp) given as an input
         operand to `op`.
 
         We assume that `op` is either a quantum.ExpvalOp or quantum.VarianceOp, but this is not
@@ -172,30 +175,32 @@ class MeasurementsFromSamplesPattern(RewritePattern):
 
     @staticmethod
     def _validate_observable_op(op: quantum.NamedObsOp | quantum.TensorOp):
-        """Validate that the observable op is a quantum.NamedObsOp in the Z basis, or TensorOp of 
+        """Validate that the observable op is a quantum.NamedObsOp in the Z basis, or TensorOp of
         NamedObsOps in the Z basis.
 
         Raises:
             CompileError: If the observable is a quantum.HamiltonianOp
-            NotImplementedError: If the observable is anything but a PauliZ quantum.NamedObsOp 
+            NotImplementedError: If the observable is anything but a PauliZ quantum.NamedObsOp
                 (or quantum.TensorOp of them).
         """
         if isinstance(op, quantum.HamiltonianOp):
-            raise CompileError("Encountered a quantum.HamiltonianOp while applying `measurements_from_samples`. This is not supported with Catalyst. " \
-            "Please apply `qml.transforms.split_non_commuting` prior to `measurements_from_samples` to split the Hamiltonian into separate terms.")
+            raise CompileError(
+                "Encountered a quantum.HamiltonianOp while applying `measurements_from_samples`. This is not supported with Catalyst. "
+                "Please apply `qml.transforms.split_non_commuting` prior to `measurements_from_samples` to split the Hamiltonian into separate terms."
+            )
 
         if isinstance(op, quantum.NamedObsOp):
             if op.type.data != "PauliZ":
                 raise NotImplementedError(
-                    "Expected all observables to be diagonalized before application of rewrite" 
+                    "Expected all observables to be diagonalized before application of rewrite"
                     f"pattern, but received '{op.type.data}'"
                 )
-            
+
         elif isinstance(op, quantum.TensorOp):
             for obs in op.operands:
                 if obs.owner.type.data != "PauliZ":
                     raise NotImplementedError(
-                        "Expected all observables to be diagonalized before application of" 
+                        "Expected all observables to be diagonalized before application of"
                         f"rewrite pattern, but received '{op.type.data}'"
                     )
 
@@ -205,19 +210,21 @@ class MeasurementsFromSamplesPattern(RewritePattern):
                 "quantum.TensorOp, but received "
                 f"{type(op).__name__}"
             )
-        
+
     @staticmethod
     def get_observable_op_qubits(op: quantum.NamedObsOp | quantum.TensorOp):
         """Get a list of all qubits in the observable"""
 
-        assert isinstance(op, quantum.NamedObsOp | quantum.TensorOp), f"expected quantum.NamedObsOp or quantum.TensorOp but received {type(op)}"
+        assert isinstance(
+            op, quantum.NamedObsOp | quantum.TensorOp
+        ), f"expected quantum.NamedObsOp or quantum.TensorOp but received {type(op)}"
 
         if isinstance(op, quantum.NamedObsOp):
             in_qubits = op.operands
 
         elif isinstance(op, quantum.TensorOp):
             in_qubits = [obs.owner.operands[0] for obs in op.operands]
-        
+
         return in_qubits
 
     @staticmethod
@@ -323,9 +330,9 @@ class MeasurementsFromSamplesPattern(RewritePattern):
 
         The post-processing function recovers the original measurement process result from the
         samples array. This post-postprocessing function is optionally renamed to `name`, if given.
-        
-        All helper function names are appended with the index for the current post-processing function. 
-        This is to avoid overlapping names generated by the post-processing functions for different 
+
+        All helper function names are appended with the index for the current post-processing function.
+        This is to avoid overlapping names generated by the post-processing functions for different
         measurement processes.
 
         Args:
@@ -486,9 +493,11 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         final_return.operands[mp_index] = postprocessing_func_call_op.results[0]
         rewriter.notify_op_modified(final_return)
 
-    def expval_and_var_to_samples(self, mp_op: quantum.ExpvalOp | quantum.VarianceOp, rewriter: PatternRewriter):
-        """Rewrite quantum.ExpvalOp and quantum.VarianceOp to be expressed in terms of 
-        quantum.SampleOp and post-processing. The measurement op can contain a quantum.NamedObsOp 
+    def expval_and_var_to_samples(
+        self, mp_op: quantum.ExpvalOp | quantum.VarianceOp, rewriter: PatternRewriter
+    ):
+        """Rewrite quantum.ExpvalOp and quantum.VarianceOp to be expressed in terms of
+        quantum.SampleOp and post-processing. The measurement op can contain a quantum.NamedObsOp
         or a quantum.TensorOp; quantum.HamiltonianOp is not supported."""
 
         observable_op = self.get_observable_op(mp_op)
@@ -503,11 +512,17 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         # inserted
         match mp_op:
             case quantum.ExpvalOp():
-                postprocessing_func_name = f"expval_from_samples.tensor.{self._shots}x{n_qubits}xf64"
-                postprocessing_jit_func = create_postprocessing_obs(observable_op, n_qubits, jnp.mean)
+                postprocessing_func_name = (
+                    f"expval_from_samples.tensor.{self._shots}x{n_qubits}xf64"
+                )
+                postprocessing_jit_func = create_postprocessing_obs(
+                    observable_op, n_qubits, jnp.mean
+                )
             case quantum.VarianceOp():
                 postprocessing_func_name = f"var_from_samples.tensor.{self._shots}x{n_qubits}xf64"
-                postprocessing_jit_func = create_postprocessing_obs(observable_op, n_qubits, jnp.var)
+                postprocessing_jit_func = create_postprocessing_obs(
+                    observable_op, n_qubits, jnp.var
+                )
             case _:
                 assert False, (
                     f"Expected a quantum.ExpvalOp or quantum.VarianceOp, but got "
@@ -677,25 +692,26 @@ def get_shots(quantum_node: func.FuncOp) -> int:
         raise ValueError("The measurements_from_samples pass requires non-zero shots")
     return shots
 
+
 def create_postprocessing_obs(obs, num_wires, math_op):
-    """Finds the eigenvalues for the observable and uses them to generate the post-processing 
+    """Finds the eigenvalues for the observable and uses them to generate the post-processing
     function for an expectation value or variance. Supports NamedObsOp and TensorOp."""
 
     powers_of_two = 2 ** jnp.arange(num_wires)[::-1]
-    
+
     if isinstance(obs, quantum.NamedObsOp):
         eigvals = jnp.array([1, -1])
-        
+
     elif isinstance(obs, quantum.TensorOp):
         eigvals = []
         for op in range(num_wires):
-            eigvals.append(
-                math.expand_vector(jnp.array([1, -1]), [op], range(num_wires))
-            )
+            eigvals.append(math.expand_vector(jnp.array([1, -1]), [op], range(num_wires)))
         eigvals = jnp.prod(jnp.asarray(eigvals), axis=0)
-    
+
     else:
-        raise CompileError(f"Tried to get eigenvalues function but encountered unknown observable {obs}")
+        raise CompileError(
+            f"Tried to get eigenvalues function but encountered unknown observable {obs}"
+        )
 
     @xdsl_module
     @jax.jit
@@ -716,6 +732,7 @@ def create_postprocessing_obs(obs, num_wires, math_op):
         return math_op(eigval_samples, axis=0)
 
     return _postprocessing
+
 
 @xdsl_module
 @jax.jit
