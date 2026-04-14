@@ -117,7 +117,7 @@ func.func @main(%arg0: f64, %arg1: i64) -> () attributes {quantum.node} {
 // -----
 
 
-// CHECK: func.func @test_no_extract_before_call(%arg0: f64, %arg1: i64, %arg2: !quantum.reg) -> !quantum.reg {
+// CHECK: func.func @test_no_extract_before_call_with_static_idx(%arg0: f64, %arg1: i64, %arg2: !quantum.reg) -> !quantum.reg {
 // CHECK:     [[extract_i:%.+]] = quantum.extract %arg2[%arg1] : !quantum.reg -> !quantum.bit
 // CHECK:     [[extract_0:%.+]] = quantum.extract %arg2[ 0] : !quantum.reg -> !quantum.bit
 // CHECK:     [[ROT:%.+]]:2 = quantum.custom "Rot"(%arg0) [[extract_i]], [[extract_0]] : !quantum.bit, !quantum.bit
@@ -127,7 +127,7 @@ func.func @main(%arg0: f64, %arg1: i64) -> () attributes {quantum.node} {
 // CHECK:     return [[insert_0]] : !quantum.reg
 // CHECK: }
 
-func.func @test_no_extract_before_call(%reg: !qref.reg<2>, %param: f64, %idx: i64) -> () {
+func.func @test_no_extract_before_call_with_static_idx(%reg: !qref.reg<2>, %param: f64, %idx: i64) -> () {
     %qi = qref.get %reg[%idx] : !qref.reg<2>, i64 -> !qref.bit
     %q0 = qref.get %reg[0] : !qref.reg<2> -> !qref.bit
     qref.custom "Rot"(%param) %qi, %q0 : !qref.bit, !qref.bit
@@ -145,10 +145,10 @@ func.func @main(%arg0: f64, %arg1: i64) -> () attributes {quantum.node} {
     %r2_0 = qref.alloc(2) : !qref.reg<2>
     %r2_1 = qref.alloc(2) : !qref.reg<2>
 
-    // CHECK: [[first_call:%.+]] = call @test_no_extract_before_call(%arg0, %arg1, [[r2_0]]) : (f64, i64, !quantum.reg) -> !quantum.reg
-    // CHECK: [[second_call:%.+]] = call @test_no_extract_before_call(%arg0, %arg1, [[r2_1]]) : (f64, i64, !quantum.reg) -> !quantum.reg
-    func.call @test_no_extract_before_call(%r2_0, %arg0, %arg1) : (!qref.reg<2>, f64, i64) -> ()
-    func.call @test_no_extract_before_call(%r2_1, %arg0, %arg1) : (!qref.reg<2>, f64, i64) -> ()
+    // CHECK: [[first_call:%.+]] = call @test_no_extract_before_call_with_static_idx(%arg0, %arg1, [[r2_0]]) : (f64, i64, !quantum.reg) -> !quantum.reg
+    // CHECK: [[second_call:%.+]] = call @test_no_extract_before_call_with_static_idx(%arg0, %arg1, [[r2_1]]) : (f64, i64, !quantum.reg) -> !quantum.reg
+    func.call @test_no_extract_before_call_with_static_idx(%r2_0, %arg0, %arg1) : (!qref.reg<2>, f64, i64) -> ()
+    func.call @test_no_extract_before_call_with_static_idx(%r2_1, %arg0, %arg1) : (!qref.reg<2>, f64, i64) -> ()
 
     // CHECK: quantum.dealloc [[first_call]] : !quantum.reg
     // CHECK: quantum.dealloc [[second_call]] : !quantum.reg
