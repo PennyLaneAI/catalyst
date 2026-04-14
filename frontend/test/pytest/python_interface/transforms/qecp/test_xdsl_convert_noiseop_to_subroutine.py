@@ -39,7 +39,7 @@ class TestConvertNoiseOpToSubroutinePass:
                 func.func @test_func() attributes {quantum.node} {
                     %0 = "test.op"() : () -> !qecp.codeblock<1 x 7>
 
-                    // CHECK: func.call @7x1_code_noise_subroutine
+                    // CHECK: func.call @noise_subroutine_code1x7
                     %1 = qecp.noise %0 : !qecp.codeblock<1 x 7>
                     return
                 }

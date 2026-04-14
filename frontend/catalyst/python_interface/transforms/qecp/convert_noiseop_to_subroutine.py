@@ -42,6 +42,9 @@ from catalyst.python_interface.inspection.xdsl_conversion import _tensor_shape_f
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 from catalyst.utils.exceptions import CompileError
 
+def _get_noise_subroutine_name(k, n):
+    """Get the name of the noise injection subroutine for a given codeblock type."""
+    return "noise_subroutine_code" + str(k) + "x" + str(n)
 
 class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
     """Pass that converts qecl.noise operations to subroutines in the qecp layer."""
@@ -155,14 +158,15 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
         # not called (dead code) can be eliminated as the
         # ["symbol-dce"](https://github.com/PennyLaneAI/catalyst/blob/372c376eb821e830da778fdc8af423eeb487eab6/frontend/catalyst/pipelines.py#L248)_
         # pass was added to the pipeline.
+        symbol_name = _get_noise_subroutine_name(k, n)
         funcOp = func.FuncOp(
-            f"{n}x{k}_code_noise_subroutine",
+            symbol_name,
             (input_types, output_types),
             visibility="private",
             region=region,
         )
         # Add an attribute to the noise injection subroutine
-        funcOp.attributes[f"{n}x{k}_code_noise"] = builtin.NoneAttr()
+        funcOp.attributes[_get_noise_subroutine_name(k, n)] = builtin.NoneAttr()
         return funcOp
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
@@ -188,7 +192,7 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
         for k, n in codeblocks:
             noise_subroutine = self._create_noise_subroutine(k, n, self._number_errors)
             op.regions[0].blocks.first.add_op(noise_subroutine)
-            noise_subroutine_dict[f"{n}x{k}_code_noise_subroutine"] = noise_subroutine
+            noise_subroutine_dict[_get_noise_subroutine_name(k, n)] = noise_subroutine
 
         pattern_rewriter.PatternRewriteWalker(
             pattern_rewriter.GreedyRewritePatternApplier(
@@ -248,7 +252,7 @@ class ConvertNoiseOpToSubroutinePattern(
         rewriter.insert_op(qubit_indices_constantop, InsertPoint.before(op))
         rewriter.insert_op(rotation_params_constantop, InsertPoint.before(op))
 
-        callee = builtin.SymbolRefAttr(f"{n}x{k}_code_noise_subroutine")
+        callee = builtin.SymbolRefAttr(_get_noise_subroutine_name(k, n))
 
         arguments = [
             op.in_codeblock,
@@ -257,7 +261,7 @@ class ConvertNoiseOpToSubroutinePattern(
         ]
 
         return_types = self.noise_subroutine_dict[
-            f"{n}x{k}_code_noise_subroutine"
+            _get_noise_subroutine_name(k, n)
         ].function_type.outputs.data
         callOp = func.CallOp(callee, arguments, return_types)
         rewriter.insert_op(callOp, InsertPoint.before(op))
