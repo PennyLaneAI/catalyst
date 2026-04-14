@@ -50,7 +50,6 @@ from catalyst.python_interface.transforms.quantum.wrap_qnode import (
 )
 from catalyst.python_interface.utils import get_constant_from_ssa
 
-
 MEASUREMENT_PROCESS_TYPES = (
     quantum.CountsOp,
     quantum.ExpvalOp,
