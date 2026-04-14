@@ -391,23 +391,30 @@ class AdjointCallable:
         else:
             raise ValueError(f"Expected a callable or a qml.Operator, not {target}")
 
-        if not self.lazy and not self.single_op:
-            # Supporting this for a qfunc is technically possible by invoking the decomposition on
-            # HybridAdjoint with laza=False, however one would need to outline the classical jaxpr
-            # into the outer scope, and possibly re-mapping tracers in the quantum operators,
-            # in order to avoid escaped tracers which indicate an invalid program.
-            raise ValueError(
-                "Eagerly computing the adjoint (lazy=False) is only supported on single operators."
-            )
-
     def __call__(self, *args, **kwargs):
         if self.single_op:
             base_op = self.target if self.instantiated else self.target(*args, **kwargs)
             return create_adjoint_op(base_op, self.lazy)
 
+        if not self.lazy:
+            return self._expand_adjoint_callable(args, kwargs)
+
         tracing_artifacts = self.trace_body(args, kwargs)
         dbg = tracing_artifacts[3]
         return HybridAdjoint(*tracing_artifacts[0:3], debug_info=dbg)
+
+    def _expand_adjoint_callable(self, args, kwargs):
+        """Expand a callable into individual ops, then reverse and adjoint each one."""
+        with QueuingManager.stop_recording(), QuantumTape() as tape:
+            self.target(*args, **kwargs)
+
+        for op in reversed(tape.operations):
+            # For Adjoint of HybridAdjoint, we still create the HybridAdjoint of HybridAdjoint, so
+            # that the MLIR adjoint-lowering pass can handle the reversal.
+            if isinstance(op, HybridOp):
+                AdjointCallable(lambda bound_op=op: qml.apply(bound_op) and None, lazy=True)()
+            else:
+                create_adjoint_op(op, lazy=False)
 
     def trace_body(self, args, kwargs):
         """Generate a HybridOpRegion for use by Catalyst."""
@@ -502,6 +509,10 @@ class HybridAdjoint(HybridOp):
         in reverse. Note that decomposition of control flow ops like for loops are only supported
         in the compiler."""
         assert len(self.regions) == 1, "Expected a single nested region for HybridAdjoint"
+        assert not any(
+            isinstance(op, HybridOp) and not isinstance(op, (HybridAdjoint, HybridCtrl))
+            for op in self.regions[0].quantum_tape.operations
+        ), "Cannot decompose Adjoint(HybridOp) in PennyLane"
 
         return [
             create_adjoint_op(op, lazy=True)
@@ -596,7 +607,7 @@ class HybridCtrl(HybridOp):
 
     def decomposition(self):
         """Compute quantum decomposition of the gate by recursively scanning the nested tape and
-        distributing the quantum control operaiton over the tape operations."""
+        distributing the quantum control operation over the tape operations."""
         assert len(self.regions) == 1, "HybridCtrl is expected to have one region"
 
         _check_no_measurements(self.regions[0].quantum_tape)
