@@ -25,7 +25,7 @@ from xdsl.dialects.builtin import IndexType, IntegerType
 from xdsl.ir import Block, Region
 from xdsl.rewriter import InsertPoint
 
-from catalyst.python_interface.dialects import qecp
+from catalyst.python_interface.dialects import qecl, qecp
 from catalyst.python_interface.inspection.xdsl_conversion import _tensor_shape_from_ssa
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 
@@ -44,6 +44,7 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
 
     def __init__(self, **options):
         self._number_errors = options.get("number_errors", 1)
+        self._n = options.get("n", 7)
 
     def _create_noise_subroutine(self, k, n, number_errors):
         """Create a subroutine (func.FuncOp) operation for injecting physical noise mimic with Rot
@@ -170,28 +171,29 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
         # ["symbol-dce"](https://github.com/PennyLaneAI/catalyst/blob/372c376eb821e830da778fdc8af423eeb487eab6/frontend/catalyst/pipelines.py#L248)_
         # pass could eliminate the unreferenced subroutines.
         # Collect different types of codeblocks in a module.
-        codeblocks = set()
+        k = None
         noise_subroutine_dict = {}
 
         for op_ in op.walk():
             if isinstance(op_, func.FuncOp) and "quantum.node" in op_.attributes:
                 for op_ in op_.walk():
-                    if isinstance(op_, qecp.NoiseOp):
-                        codeblocks.add(
-                            (op_.in_codeblock.type.k.value.data, op_.in_codeblock.type.n.value.data)
-                        )
+                    if isinstance(op_, qecl.NoiseOp):
+                        k = op_.in_codeblock.type.k.value.data
                         break
 
-        for k, n in codeblocks:
-            noise_subroutine = self._create_noise_subroutine(k, n, self._number_errors)
-            op.regions[0].blocks.first.add_op(noise_subroutine)
-            noise_subroutine_dict[_get_noise_subroutine_name(k, n, self._number_errors)] = (
-                noise_subroutine
-            )
+        noise_subroutine = self._create_noise_subroutine(k, self._n, self._number_errors)
+        op.regions[0].blocks.first.add_op(noise_subroutine)
+        noise_subroutine_dict[_get_noise_subroutine_name(k, self._n, self._number_errors)] = (
+            noise_subroutine
+        )
 
         pattern_rewriter.PatternRewriteWalker(
             pattern_rewriter.GreedyRewritePatternApplier(
-                [ConvertNoiseOpToSubroutinePattern(noise_subroutine_dict, self._number_errors)]
+                [
+                    ConvertNoiseOpToSubroutinePattern(
+                        noise_subroutine_dict, self._n, self._number_errors
+                    )
+                ]
             ),
             apply_recursively=False,
         ).rewrite_module(op)
@@ -205,26 +207,31 @@ class ConvertNoiseOpToSubroutinePattern(
 ):  # pylint: disable=too-few-public-methods
     """RewritePattern for converting to the MBQC formalism."""
 
-    def __init__(self, noise_subroutine_dict, number_errors):
+    def __init__(self, noise_subroutine_dict, n, number_errors):
         self.noise_subroutine_dict = noise_subroutine_dict
+        self._n = n
         self._number_errors = number_errors
 
     @pattern_rewriter.op_type_rewrite_pattern
     def match_and_rewrite(
         self,
-        op: qecp.NoiseOp,
+        op: qecl.NoiseOp,
         rewriter: pattern_rewriter.PatternRewriter,
         /,
     ):
         k = op.in_codeblock.type.k.value.data
-        n = op.in_codeblock.type.n.value.data
 
+        in_block_cast = builtin.UnrealizedConversionCastOp.get(
+            op.in_codeblock, qecp.PhysicalCodeblockType(k, self._n)
+        )
+        rewriter.insert_op(in_block_cast, InsertPoint.before(op))
+        
         # Create random qubit indices and rotation parameters for error injection, which are
         # generated randomly from a `qnode` function.
         # NOTE: that the random qubit indices and rotation parameters are generated in the Python
         # layer and passed to the noise injection subroutine as inputs, which allows us to inject
         # different errors for different qecp.noise instances in the execution phase.
-        qubit_indices = random.sample(range(n), self._number_errors)
+        qubit_indices = random.sample(range(self._n), self._number_errors)
         rotation_params = []
         for _ in range(self._number_errors * _NUM_ROT_PARAMS):
             rotation_params.append(random.uniform(0, 2 * math.pi))
@@ -251,18 +258,22 @@ class ConvertNoiseOpToSubroutinePattern(
         rewriter.insert_op(qubit_indices_constantop, InsertPoint.before(op))
         rewriter.insert_op(rotation_params_constantop, InsertPoint.before(op))
 
-        callee = builtin.SymbolRefAttr(_get_noise_subroutine_name(k, n, self._number_errors))
+        callee = builtin.SymbolRefAttr(_get_noise_subroutine_name(k, self._n, self._number_errors))
 
         arguments = [
-            op.in_codeblock,
+            in_block_cast.results[0],
             qubit_indices_constantop.results[0],
             rotation_params_constantop.results[0],
         ]
 
         return_types = self.noise_subroutine_dict[
-            _get_noise_subroutine_name(k, n, self._number_errors)
+            _get_noise_subroutine_name(k, self._n, self._number_errors)
         ].function_type.outputs.data
         callOp = func.CallOp(callee, arguments, return_types)
         rewriter.insert_op(callOp, InsertPoint.before(op))
-        rewriter.replace_all_uses_with(op.out_codeblock, callOp.results[0])
+        cast_op = builtin.UnrealizedConversionCastOp.get(
+            callOp.results[0], op.out_codeblock.type
+        )
+        rewriter.insert_op(cast_op, InsertPoint.before(op))
+        rewriter.replace_all_uses_with(op.out_codeblock, cast_op.results[0])
         rewriter.erase_op(op)

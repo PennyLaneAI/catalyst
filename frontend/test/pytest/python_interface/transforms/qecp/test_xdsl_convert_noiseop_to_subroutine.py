@@ -31,13 +31,15 @@ class TestConvertNoiseOpToSubroutinePass:
         program = """
             builtin.module @module_circuit {
                 func.func @test_func() attributes {quantum.node} {
-                    // CHECK: [[codeblock:%.*]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
-                    %0 = "test.op"() : () -> !qecp.codeblock<1 x 7>
+                    // CHECK: [[codeblock:%.*]] = "test.op"() : () -> !qecl.codeblock<1>
+                    // CHECK-NEXT: [[casted_codeblock:%.*]] = builtin.unrealized_conversion_cast [[codeblock:%.*]] : !qecl.codeblock<1> to !qecp.codeblock<1 x 7>
+                    %0 = "test.op"() : () -> !qecl.codeblock<1>
 
                     // CHECK-NEXT: [[qubit_indices:%.*]] = arith.constant dense<{{.*}}> : tensor<1xi64>
                     // CHECK-NEXT: [[rotation_params:%.*]] = arith.constant dense<[{{.*}}]> : tensor<1x3xf64>
-                    // CHECK-NEXT: func.call @noise_subroutine_code1x7x1([[codeblock]], [[qubit_indices]], [[rotation_params]])
-                    %1 = qecp.noise %0 : !qecp.codeblock<1 x 7>
+                    // CHECK-NEXT: func.call @noise_subroutine_code1x7x1([[casted_codeblock]], [[qubit_indices]], [[rotation_params]])
+                    // CHECK-NEXT: [[casted_logical_codeblock:%.*]] = builtin.unrealized_conversion_cast [[casted_codeblock:%.*]] : !qecp.codeblock<1 x 7> to !qecl.codeblock<1>
+                    %1 = qecl.noise %0 : !qecl.codeblock<1>
                     return
                 }
                 // CHECK-LABEL: func.func private @noise_subroutine_code1x7x1([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<1xi64>, [[rotation_params:%.*]]: tensor<1x3xf64>)
@@ -70,13 +72,15 @@ class TestConvertNoiseOpToSubroutinePass:
         program = """
             builtin.module @module_circuit {
                 func.func @test_func() attributes {quantum.node} {
-                    // CHECK: [[codeblock:%.*]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
-                    %0 = "test.op"() : () -> !qecp.codeblock<1 x 7>
+                    // CHECK: [[codeblock:%.*]] = "test.op"() : () -> !qecl.codeblock<1>
+                    // CHECK-NEXT: [[casted_codeblock:%.*]] = builtin.unrealized_conversion_cast [[codeblock:%.*]] : !qecl.codeblock<1> to !qecp.codeblock<1 x 7>
+                    %0 = "test.op"() : () -> !qecl.codeblock<1>
 
                     // CHECK-NEXT: [[qubit_indices:%.*]] = arith.constant dense<[{{.*}}]> : tensor<3xi64>
                     // CHECK-NEXT: [[rotation_params:%.*]] = arith.constant dense<[{{.*}}]> : tensor<3x3xf64>
-                    // CHECK-NEXT: func.call @noise_subroutine_code1x7x3([[codeblock]], [[qubit_indices]], [[rotation_params]])
-                    %1 = qecp.noise %0 : !qecp.codeblock<1 x 7>
+                    // CHECK-NEXT: func.call @noise_subroutine_code1x7x3([[casted_codeblock]], [[qubit_indices]], [[rotation_params]])
+                    // CHECK-NEXT: [[casted_logical_codeblock:%.*]] = builtin.unrealized_conversion_cast [[casted_codeblock:%.*]] : !qecp.codeblock<1 x 7> to !qecl.codeblock<1>
+                    %1 = qecl.noise %0 : !qecl.codeblock<1>
                     return
                 }
                 // CHECK-LABEL: func.func private @noise_subroutine_code1x7x3([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<3xi64>, [[rotation_params:%.*]]: tensor<3x3xf64>)
@@ -111,18 +115,22 @@ class TestConvertNoiseOpToSubroutinePass:
         program = """
             builtin.module @module_circuit {
                 func.func @test_func() attributes {quantum.node} {
-                    // CHECK: [[codeblock:%.*]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
-                    %0 = "test.op"() : () -> !qecp.codeblock<1 x 7>
+                    // CHECK: [[codeblock:%.*]] = "test.op"() : () -> !qecl.codeblock<1>
+                    // CHECK-NEXT: [[casted_codeblock:%.*]] = builtin.unrealized_conversion_cast [[codeblock:%.*]] : !qecl.codeblock<1> to !qecp.codeblock<1 x 7>
+                    %0 = "test.op"() : () -> !qecl.codeblock<1>
 
                     // CHECK-NEXT: [[qubit_indices0:%.*]] = arith.constant dense<{{.*}}> : tensor<1xi64>
                     // CHECK-NEXT: [[rotation_params0:%.*]] = arith.constant dense<[{{.*}}]> : tensor<1x3xf64>
-                    // CHECK-NEXT: [[noisy_codeblock0:%.*]] = func.call @noise_subroutine_code1x7x1([[codeblock]], [[qubit_indices0]], [[rotation_params0]])
-                    %1 = qecp.noise %0 : !qecp.codeblock<1 x 7>
+                    // CHECK-NEXT: [[noisy_codeblock0:%.*]] = func.call @noise_subroutine_code1x7x1([[casted_codeblock]], [[qubit_indices0]], [[rotation_params0]])
+                    // CHECK-NEXT: [[casted_logical_codeblock0:%.*]] = builtin.unrealized_conversion_cast [[noisy_codeblock0:%.*]] : !qecp.codeblock<1 x 7> to !qecl.codeblock<1>
+                    %1 = qecl.noise %0 : !qecl.codeblock<1>
 
-                    // CHECK-NEXT: [[qubit_indices1:%.*]] = arith.constant dense<{{.*}}> : tensor<1xi64>
+                    // CHECK-NEXT: [[casted_codeblock:%.*]] = builtin.unrealized_conversion_cast [[casted_logical_codeblock0:%.*]] : !qecl.codeblock<1> to !qecp.codeblock<1 x 7>
+                    // CHECK: [[qubit_indices1:%.*]] = arith.constant dense<{{.*}}> : tensor<1xi64>
                     // CHECK-NEXT: [[rotation_params1:%.*]] = arith.constant dense<[{{.*}}]> : tensor<1x3xf64>
-                    // CHECK-NEXT: [[noisy_codeblock1:%.*]] = func.call @noise_subroutine_code1x7x1([[noisy_codeblock0]], [[qubit_indices1]], [[rotation_params1]])
-                    %2 = qecp.noise %1 : !qecp.codeblock<1 x 7>
+                    // CHECK-NEXT: [[noisy_codeblock1:%.*]] = func.call @noise_subroutine_code1x7x1([[casted_codeblock]], [[qubit_indices1]], [[rotation_params1]])
+                    // CHECK-NEXT: [[casted_logical_codeblock1:%.*]] = builtin.unrealized_conversion_cast [[noisy_codeblock1:%.*]] : !qecp.codeblock<1 x 7> to !qecl.codeblock<1>
+                    %2 = qecl.noise %1 : !qecl.codeblock<1>
 
                     return
                 }
