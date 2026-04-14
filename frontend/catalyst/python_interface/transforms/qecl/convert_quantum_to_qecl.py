@@ -15,6 +15,7 @@
 """Quantum to QEC Logical dialect conversion.
 
 This module contains the implementation of the xDSL convert-quantum-to-qecl dialect-conversion pass.
+To apply this pass, the logical codeblock size, k, must be known.
 
 Example
 -------
@@ -39,7 +40,7 @@ func.func public @circuit() -> tensor<1x1xi64> attributes {quantum.node} {
 }
 ```
 
-After applying convert-quantum-to-qecl:
+After applying convert-quantum-to-qecl (with k = 1):
 
 ```mlir
 func.func public @circuit() -> tensor<1x1xi64> attributes {quantum.node} {
@@ -67,7 +68,7 @@ func.func public @circuit() -> tensor<1x1xi64> attributes {quantum.node} {
 
 import math
 from dataclasses import dataclass
-from typing import NoReturn, cast
+from typing import NoReturn, TypeGuard, cast
 
 from xdsl.builder import ImplicitBuilder
 from xdsl.context import Context
@@ -95,8 +96,8 @@ from catalyst.utils.exceptions import CompileError
 class AllocOpConversion(RewritePattern):
     """Converts `quantum.alloc` ops to equivalent `qecl.alloc` ops.
 
-    While the `quantum.alloc` implicitly initializes all qubits within the allocated register to the
-    abstract |0> state, the logical codeblocks within a hyper-register must be explicitly
+    While the `quantum.alloc` implicitly initializes all abstract qubits within the allocated
+    register to the |0> state, the logical codeblocks within a hyper-register must be explicitly
     initialized to the logical |0> state by means of an *encoding* protocol. The appropriate
     encoding ops are inserted in this conversion pattern.
     """
@@ -122,14 +123,18 @@ class AllocOpConversion(RewritePattern):
         hyper_reg_width = math.ceil(nqubits / self.k)
 
         alloc_op = qecl.AllocOp(qecl.LogicalHyperRegisterType(width=hyper_reg_width, k=self.k))
-        encoding_ops = self._get_hyper_reg_encoding_ops(alloc_op)
+        encoding_ops = self._get_hyper_reg_encoding_ops(alloc_op.hyper_reg)
         last_encoding_op = encoding_ops[-1]
 
-        assert len(last_encoding_op.result_types) == 1 and isinstance(
-            last_encoding_op.result_types[0], expected_type := qecl.LogicalHyperRegisterType
+        assert (
+            results_len := len(last_encoding_op.result_types)
+        ) == 1, f"Expected last encoding op to have exactly 1 result, but got {results_len}"
+        assert isinstance(
+            received_type := last_encoding_op.result_types[0],
+            expected_type := qecl.LogicalHyperRegisterType,
         ), (
             f"Expected last encoding op to return type '{expected_type.name}', but got "
-            f"{last_encoding_op.result_types[0].name}"
+            f"{received_type.name}"
         )
 
         ops_to_insert = (
@@ -141,9 +146,10 @@ class AllocOpConversion(RewritePattern):
         rewriter.replace_op(op, ops_to_insert)
 
     @classmethod
-    def _get_hyper_reg_encoding_ops(cls, alloc_op: qecl.AllocOp) -> tuple[Operation, ...]:
+    def _get_hyper_reg_encoding_ops(
+        cls, hyper_reg: SSAValue[qecl.LogicalHyperRegisterType]
+    ) -> tuple[Operation, ...]:
         """Helper function to get the operations that encode each codeblock in the hyper-register."""
-        hyper_reg = alloc_op.hyper_reg
         hyper_reg_width = hyper_reg.type.width.value.data
 
         assert (
@@ -153,7 +159,7 @@ class AllocOpConversion(RewritePattern):
         ops_to_insert: tuple[Operation, ...] = ()
 
         if hyper_reg_width == 1:
-            # No need to loop, insert encode op directly
+            # No need to loop, insert encode op directly.
             ops_to_insert = (
                 extract_op := qecl.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=0),
                 encode_op := qecl.EncodeOp(extract_op.codeblock, init_state="zero"),
@@ -163,22 +169,22 @@ class AllocOpConversion(RewritePattern):
             )
 
         else:
-            # Loop over all codeblocks in the hyper-register and encode them to logical zero state
-            # Ops for lower bound, upper bound, and step size
+            # Loop over all codeblocks in the hyper-register and encode them to logical zero state.
+            # Ops for lower bound, upper bound, and step size.
             lb_op = arith.ConstantOp.from_int_and_width(0, IndexType())
             ub_op = arith.ConstantOp.from_int_and_width(hyper_reg_width, IndexType())
             step_op = arith.ConstantOp.from_int_and_width(1, IndexType())
 
             for_body = Block(
                 [],
-                arg_types=(builtin.IndexType(), alloc_op.hyper_reg.type),
+                arg_types=(builtin.IndexType(), hyper_reg.type),
             )
 
             for_each_codeblock_op = scf.ForOp(
                 lb=lb_op,
                 ub=ub_op,
                 step=step_op,
-                iter_args=(alloc_op.hyper_reg,),
+                iter_args=(hyper_reg,),
                 body=for_body,
             )
 
@@ -206,7 +212,7 @@ class AllocOpConversion(RewritePattern):
                 for_each_codeblock_op,
             )
 
-        assert ops_to_insert != ()
+        assert ops_to_insert, "Sequence of ops to insert is empty"
         return ops_to_insert
 
 
@@ -227,16 +233,15 @@ class ExtractOpConversion(RewritePattern):
         # Recall that the `alloc` conversion pattern inserts a builtin.unrealized_conversion_cast
         # op immediately after the alloc that converts from qecl.hyperreg -> quantum.reg.
         qreg_owner_op = op.qreg.owner
-        if not (
-            isinstance(qreg_owner_op, builtin.UnrealizedConversionCastOp)
-            and isinstance(qreg_owner_op.operand_types[0], qecl.LogicalHyperRegisterType)
-        ):
+        if not _is_type_convertible(qreg_owner_op, qecl.LogicalHyperRegisterType):
             # TODO: We will need to also support the case where a quantum.extract op does not
-            # immediately follow a `quantum.alloc` op, e.g.
-            # %0 = quantum.alloc(1) : !quantum.reg
-            # %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
-            # %2 = "test.op"(%0) : (!quantum.reg) -> !quantum.reg
-            # %3 = quantum.extract %2[0] : !quantum.reg -> !quantum.bit
+            # immediately follow a `quantum.alloc` op, e.g. when a block takes in a register as an
+            # argument, or if there is some other op that acts on the register in-between alloc and
+            # extract:
+            #   %0 = quantum.alloc(1) : !quantum.reg
+            #   %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+            #   %2 = "some.op"(%0) : (!quantum.reg) -> !quantum.reg
+            #   %3 = quantum.extract %2[0] : !quantum.reg -> !quantum.bit
             _raise_failed_to_convert_op_compile_error(op)
 
         idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
@@ -269,10 +274,8 @@ class InsertOpConversion(RewritePattern):
         in_qreg_owner_op = op.in_qreg.owner
         qubit_owner_op = op.qubit.owner
         if not (
-            isinstance(qubit_owner_op, builtin.UnrealizedConversionCastOp)
-            and isinstance(qubit_owner_op.operand_types[0], qecl.LogicalCodeblockType)
-            and isinstance(in_qreg_owner_op, builtin.UnrealizedConversionCastOp)
-            and isinstance(in_qreg_owner_op.operand_types[0], qecl.LogicalHyperRegisterType)
+            _is_type_convertible(qubit_owner_op, qecl.LogicalCodeblockType)
+            and _is_type_convertible(in_qreg_owner_op, qecl.LogicalHyperRegisterType)
         ):
             _raise_failed_to_convert_op_compile_error(op)
 
@@ -309,10 +312,7 @@ class DeallocOpConversion(RewritePattern):
         """Rewrite pattern for `quantum.dealloc` ops."""
 
         qreg_owner_op = op.qreg.owner
-        if not (
-            isinstance(qreg_owner_op, builtin.UnrealizedConversionCastOp)
-            and isinstance(qreg_owner_op.operand_types[0], qecl.LogicalHyperRegisterType)
-        ):
+        if not _is_type_convertible(qreg_owner_op, qecl.LogicalHyperRegisterType):
             _raise_failed_to_convert_op_compile_error(op)
 
         ops_to_insert = (
@@ -352,10 +352,7 @@ class CustomOpConversion(RewritePattern):
             case "Hadamard":
                 assert len(op.in_qubits) == 1
                 qubit_owner_op = op.in_qubits[0].owner
-                if not (
-                    isinstance(qubit_owner_op, builtin.UnrealizedConversionCastOp)
-                    and isinstance(qubit_owner_op.operand_types[0], qecl.LogicalCodeblockType)
-                ):
+                if not _is_type_convertible(qubit_owner_op, qecl.LogicalCodeblockType):
                     _raise_failed_to_convert_op_compile_error(op)
                 else:
                     ops_to_insert = (
@@ -368,15 +365,12 @@ class CustomOpConversion(RewritePattern):
                     )
 
             case "S":
-                adjoint = bool(op.properties.get("adjoint"))
                 assert len(op.in_qubits) == 1
                 qubit_owner_op = op.in_qubits[0].owner
-                if not (
-                    isinstance(qubit_owner_op, builtin.UnrealizedConversionCastOp)
-                    and isinstance(qubit_owner_op.operand_types[0], qecl.LogicalCodeblockType)
-                ):
+                if not _is_type_convertible(qubit_owner_op, qecl.LogicalCodeblockType):
                     _raise_failed_to_convert_op_compile_error(op)
                 else:
+                    adjoint = bool(op.properties.get("adjoint"))
                     ops_to_insert = (
                         conv_cast_op := builtin.UnrealizedConversionCastOp.get(
                             (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
@@ -393,10 +387,8 @@ class CustomOpConversion(RewritePattern):
                 ctrl_qubit_owner_op = op.in_qubits[0].owner
                 trgt_qubit_owner_op = op.in_qubits[1].owner
                 if not (
-                    isinstance(ctrl_qubit_owner_op, builtin.UnrealizedConversionCastOp)
-                    and isinstance(ctrl_qubit_owner_op.operand_types[0], qecl.LogicalCodeblockType)
-                    and isinstance(trgt_qubit_owner_op, builtin.UnrealizedConversionCastOp)
-                    and isinstance(trgt_qubit_owner_op.operand_types[0], qecl.LogicalCodeblockType)
+                    _is_type_convertible(ctrl_qubit_owner_op, qecl.LogicalCodeblockType)
+                    and _is_type_convertible(trgt_qubit_owner_op, qecl.LogicalCodeblockType)
                 ):
                     _raise_failed_to_convert_op_compile_error(op)
                 else:
@@ -455,10 +447,7 @@ class MeasureOpConversion(RewritePattern):
         new_results = None
 
         qubit_owner_op = op.in_qubit.owner
-        if not (
-            isinstance(qubit_owner_op, builtin.UnrealizedConversionCastOp)
-            and isinstance(qubit_owner_op.operand_types[0], qecl.LogicalCodeblockType)
-        ):
+        if not _is_type_convertible(qubit_owner_op, qecl.LogicalCodeblockType):
             _raise_failed_to_convert_op_compile_error(op)
         else:
             ops_to_insert = (
@@ -491,9 +480,9 @@ def _get_idx_value_or_attr_from_extract_or_insert_op(
             idx = cast(SSAValue[IndexType], op.idx)
         elif isinstance(op.idx.type, IntegerType):
             # Insert cast operation integer -> index
-            arith_op = arith.IndexCastOp(op.idx, IndexType())
-            rewriter.insert_op(arith_op)
-            idx = cast(SSAValue[IndexType], arith_op.result)
+            index_cast_op = arith.IndexCastOp(op.idx, IndexType())
+            rewriter.insert_op(index_cast_op)
+            idx = cast(SSAValue[IndexType], index_cast_op.result)
         else:
             assert False, (
                 f"Expected idx value '{op.idx}' to have type 'IndexType' or 'IntegerType', "
@@ -527,6 +516,26 @@ def _cast_to_qubit(value: SSAValue) -> builtin.UnrealizedConversionCastOp:
         f"'{quantum.QubitType.name}', but got {value.type}"
     )
     return builtin.UnrealizedConversionCastOp.get((value,), (quantum.QubitType(),))
+
+
+def _is_type_convertible(
+    op_or_block: Operation | Block, expected_type: type
+) -> TypeGuard[builtin.UnrealizedConversionCastOp]:
+    """Determine if the given operation returns a type that can be converted to the expected type.
+
+    Specifically, this function checks if the given operation is a
+    `builtin.unrealized_conversion_cast` op whose operand is of the expected type. If it is, then
+    another `builtin.unrealized_conversion_cast` can be inserted after it to "undo" the unrealized
+    conversion cast. These pairs of `unrealized_conversion_cast` ops are removed by applying the
+    `ReconcileUnrealizedCastsPass` at the end of the pass.
+
+    The input argument can be of type `Operation | Block` since this function is typically used by
+    passing in the owner of an SSA value; if the SSA value is a block argument, then it's owner is a
+    Block.
+    """
+    return isinstance(op_or_block, builtin.UnrealizedConversionCastOp) and isinstance(
+        op_or_block.operand_types[0], expected_type
+    )
 
 
 def _raise_failed_to_convert_op_compile_error(op: Operation) -> NoReturn:

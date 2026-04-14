@@ -28,11 +28,17 @@ pytestmark = pytest.mark.xdsl
 
 @pytest.fixture(name="quantum_to_qecl_pipeline_k_1", scope="module")
 def fixture_quantum_to_qecl_pipeline_k_1():
+    """Fixture that returns the compilation pipeline containing the convert-quantum-to-qecl with
+    k = 1.
+    """
     return (ConvertQuantumToQecLogicalPass(k=1),)
 
 
 @pytest.fixture(name="quantum_to_qecl_pipeline_k_2", scope="module")
 def fixture_quantum_to_qecl_pipeline_k_2():
+    """Fixture that returns the compilation pipeline containing the convert-quantum-to-qecl with
+    k = 2.
+    """
     return (ConvertQuantumToQecLogicalPass(k=2),)
 
 
@@ -354,6 +360,8 @@ class TestInsertPattern:
     def test_insert_k_1_width_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """Test that `quantum.insert` ops are converted to their corresponding `qecl.insert_block`
         ops for a registers with width = 1 and for k = 1.
+
+        In this case, the insertion index is static.
         """
         program = """
         func.func @test_program() {
@@ -370,6 +378,36 @@ class TestInsertPattern:
             // CHECK: [[hreg1:%.+]] = qecl.insert_block [[hreg0]][0], [[cb0]] : !qecl.hyperreg<1 x 1>, !qecl.codeblock<1>
             // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[hreg1]] : !qecl.hyperreg<1 x 1> to !quantum.reg
             %4 = quantum.insert %1[0], %3 : !quantum.reg, !quantum.bit
+
+            // CHECK: "test.op"([[conv_cast]]) : (!quantum.reg) -> !quantum.reg
+            %5 = "test.op"(%4) : (!quantum.reg) -> !quantum.reg  // To prevent DCE
+            return
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_insert_k_1_width_1_dyn_idx(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that `quantum.insert` ops are converted to their corresponding `qecl.insert_block`
+        ops for a registers with width = 1 and for k = 1.
+
+        In this case, the insertion index is dynamic.
+        """
+        program = """
+        func.func @test_program(%arg0 : i64) {
+            // CHECK: [[hreg0:%.+]] = "test.op"() : () -> !qecl.hyperreg<1 x 1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.hyperreg<1 x 1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.hyperreg<1 x 1> to !quantum.reg
+
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %2 = "test.op"() : () -> !qecl.codeblock<1>
+            %3 = builtin.unrealized_conversion_cast %2 : !qecl.codeblock<1> to !quantum.bit
+
+            // CHECK: [[idx:%.+]] = arith.index_cast %arg0 : i64 to index
+            // CHECK: [[hreg1:%.+]] = qecl.insert_block [[hreg0]][[[idx]]], [[cb0]] : !qecl.hyperreg<1 x 1>, !qecl.codeblock<1>
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[hreg1]] : !qecl.hyperreg<1 x 1> to !quantum.reg
+            %4 = quantum.insert %1[%arg0], %3 : !quantum.reg, !quantum.bit
 
             // CHECK: "test.op"([[conv_cast]]) : (!quantum.reg) -> !quantum.reg
             %5 = "test.op"(%4) : (!quantum.reg) -> !quantum.reg  // To prevent DCE
