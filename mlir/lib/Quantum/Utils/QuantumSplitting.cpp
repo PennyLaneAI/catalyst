@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Quantum/Utils/QuantumSplitting.h"
+
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
@@ -24,7 +26,6 @@
 #include "Catalyst/IR/CatalystOps.h"
 #include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/QuantumSplitting.h"
 
 using namespace mlir;
 using namespace catalyst;
