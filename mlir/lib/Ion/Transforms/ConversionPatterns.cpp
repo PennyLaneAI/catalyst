@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <nlohmann/json.hpp>
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/IRMapping.h"
+#include "nlohmann/json.hpp"
 
 #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "Ion/IR/IonOps.h"

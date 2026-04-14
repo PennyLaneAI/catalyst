@@ -14,6 +14,8 @@
 
 #define DEBUG_TYPE "value-semantics-conversion"
 
+#include "QRef/Transforms/value_semantics_conversion.h"
+
 #include <cstdint>
 #include <optional>
 #include <utility>
@@ -23,7 +25,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Block.h"
@@ -39,7 +40,6 @@
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
 #include "QRef/IR/QRefTypes.h"
-#include "QRef/Transforms/value_semantics_conversion.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"

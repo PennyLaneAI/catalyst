@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "PBC/Utils/PBCOpUtils.h"
+
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 #include "PBC/IR/PBCOpInterfaces.h"
-#include "PBC/Utils/PBCOpUtils.h"
 #include "PBC/Utils/PauliStringWrapper.h"
 
 namespace catalyst {
