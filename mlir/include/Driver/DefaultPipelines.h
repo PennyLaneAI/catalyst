@@ -66,14 +66,11 @@ const PipelineList pipelineList{
       // tensor.pad
       "convert-tensor-to-linalg",
       // Must be run before --one-shot-bufferize.
-      "convert-elementwise-to-linalg",
-      "gradient-preprocess", "eliminate-empty-tensors",
+      "convert-elementwise-to-linalg", "gradient-preprocess", "eliminate-empty-tensors",
       // This pass is needed to avoid aliasing of the input buffer with the output buffer.
-      "mark-entry-point-args-non-writable",
-      "one-shot-bufferize",
+      "mark-entry-point-args-non-writable", "one-shot-bufferize",
       // Remove dead memrefToTensorOp's
-      "canonicalize",
-      "gradient-postprocess",
+      "canonicalize", "gradient-postprocess",
       // Introduced during gradient-bufferize of callbacks
       "func.func(buffer-hoisting)", "func.func(buffer-loop-hoisting)",
       "func.func(promote-buffers-to-stack)",
@@ -102,14 +99,12 @@ const PipelineList pipelineList{
       // Some arith ops (ceildivsi) require expansion to be lowered to llvm.
       "arith-expand",
       // Added for complex.exp lowering.
-      "convert-complex-to-standard",
-      "convert-complex-to-llvm", "convert-math-to-llvm",
+      "convert-complex-to-standard", "convert-complex-to-llvm", "convert-math-to-llvm",
       // Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
       "convert-math-to-libm", "convert-arith-to-llvm",
       // Load and store are converted to LLVM with TBAA tags.
-      "memref-to-llvm-tbaa",
-      "finalize-memref-to-llvm{use-generic-functions}", "convert-index-to-llvm",
-      "convert-catalyst-to-llvm",
+      "memref-to-llvm-tbaa", "finalize-memref-to-llvm{use-generic-functions}",
+      "convert-index-to-llvm", "convert-catalyst-to-llvm",
       "convert-pbc-to-llvm", // TODO: remove this once PBC has its own pipeline
       "convert-quantum-to-llvm",
       // There should be no identical code folding
