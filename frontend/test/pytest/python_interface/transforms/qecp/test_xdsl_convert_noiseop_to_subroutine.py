@@ -25,8 +25,8 @@ pytestmark = pytest.mark.xdsl
 class TestConvertNoiseOpToSubroutinePass:
     """Unit tests for the convert-noiseop-to-subroutine pass."""
 
-    def test_with_pauli_z(self, run_filecheck):
-        """Test that a PauliZ observable is not affected by diagonalization"""
+    def test_with_single_noise_op_lowering(self, run_filecheck):
+        """Test that a qecp.noise operation can be lowered to a subroutine"""
 
         program = """
             builtin.module @module_circuit {
