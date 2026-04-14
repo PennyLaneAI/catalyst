@@ -126,7 +126,7 @@ class TestConvertNoiseOpToSubroutinePass:
                     %1 = qecl.noise %0 : !qecl.codeblock<1>
 
                     // CHECK-NEXT: [[casted_codeblock:%.*]] = builtin.unrealized_conversion_cast [[casted_logical_codeblock0:%.*]] : !qecl.codeblock<1> to !qecp.codeblock<1 x 7>
-                    // CHECK: [[qubit_indices1:%.*]] = arith.constant dense<{{.*}}> : tensor<1xi64>
+                    // CHECK-NEXT: [[qubit_indices1:%.*]] = arith.constant dense<{{.*}}> : tensor<1xi64>
                     // CHECK-NEXT: [[rotation_params1:%.*]] = arith.constant dense<[{{.*}}]> : tensor<1x3xf64>
                     // CHECK-NEXT: [[noisy_codeblock1:%.*]] = func.call @noise_subroutine_code1x7x1([[casted_codeblock]], [[qubit_indices1]], [[rotation_params1]])
                     // CHECK-NEXT: [[casted_logical_codeblock1:%.*]] = builtin.unrealized_conversion_cast [[noisy_codeblock1:%.*]] : !qecp.codeblock<1 x 7> to !qecl.codeblock<1>

@@ -180,6 +180,8 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
                     if isinstance(op_, qecl.NoiseOp):
                         k = op_.in_codeblock.type.k.value.data
                         break
+        if k is None:
+            return
 
         noise_subroutine = self._create_noise_subroutine(k, self._n, self._number_errors)
         op.regions[0].blocks.first.add_op(noise_subroutine)
@@ -225,7 +227,7 @@ class ConvertNoiseOpToSubroutinePattern(
             op.in_codeblock, qecp.PhysicalCodeblockType(k, self._n)
         )
         rewriter.insert_op(in_block_cast, InsertPoint.before(op))
-        
+
         # Create random qubit indices and rotation parameters for error injection, which are
         # generated randomly from a `qnode` function.
         # NOTE: that the random qubit indices and rotation parameters are generated in the Python
@@ -271,9 +273,7 @@ class ConvertNoiseOpToSubroutinePattern(
         ].function_type.outputs.data
         callOp = func.CallOp(callee, arguments, return_types)
         rewriter.insert_op(callOp, InsertPoint.before(op))
-        cast_op = builtin.UnrealizedConversionCastOp.get(
-            callOp.results[0], op.out_codeblock.type
-        )
+        cast_op = builtin.UnrealizedConversionCastOp.get(callOp.results[0], op.out_codeblock.type)
         rewriter.insert_op(cast_op, InsertPoint.before(op))
         rewriter.replace_all_uses_with(op.out_codeblock, cast_op.results[0])
         rewriter.erase_op(op)
