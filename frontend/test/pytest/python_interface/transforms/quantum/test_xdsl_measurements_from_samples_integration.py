@@ -248,12 +248,12 @@ class TestIntegrationWithOtherPasses:
 
         run_filecheck_qjit(circuit_compiled)
 
-    @pytest.mark.xfail(reason="split-non-commuting doesn't support var")
+    @pytest.mark.xfail(reason="split-non-commuting doesn't support var", strict=True)
     @pytest.mark.parametrize("coeff", [0.5, 2, -1.7])
     @pytest.mark.parametrize("phi", [0, np.pi, 0.1234, -1.25])
     def test_var_sprod_with_split_non_commuting(self, coeff, phi, capture, run_filecheck_qjit):
-        """Test the measurements_from_samples transform on a device with two wires and terminal
-        measurements that require an observable (i.e. expval and var).
+        """Test the measurements_from_samples transform with a variance of an SProd. This only
+        works with split-non-commuting applied, to remove the HamiltonianOps.
 
         In this test, the terminal measurements are performed on the combination of both wires.
         """
@@ -481,7 +481,6 @@ class TestMeasurementsFromSamplesIntegration:
         )
 
         run_filecheck_qjit(circuit_compiled)
-
         assert np.isclose(expected_res(phi), circuit_compiled(), atol=0.05)
 
     # -------------------------------------------------------------------------------------------- #
@@ -517,7 +516,6 @@ class TestMeasurementsFromSamplesIntegration:
         )
 
         run_filecheck_qjit(circuit_compiled)
-
         assert np.allclose(expected_res, circuit_compiled(), atol=0.05)
 
     # -------------------------------------------------------------------------------------------- #
@@ -629,7 +627,6 @@ class TestMeasurementsFromSamplesIntegration:
         )
 
         run_filecheck_qjit(circuit_compiled)
-
         assert np.allclose(expected_res(angles), circuit_compiled(), atol=0.05)
 
     # -------------------------------------------------------------------------------------------- #

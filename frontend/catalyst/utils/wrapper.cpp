@@ -13,7 +13,8 @@
 // limitations under the License.
 
 #include <csignal>
-#include <nanobind/nanobind.h>
+
+#include "nanobind/nanobind.h"
 
 // TODO: Periodically check and increment version.
 // https://endoflife.date/numpy

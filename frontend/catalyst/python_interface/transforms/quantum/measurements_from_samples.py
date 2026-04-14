@@ -616,13 +616,6 @@ class MeasurementsFromSamplesPattern(RewritePattern):
                 postprocessing_module, probs_op, postprocessing_func_name
             )
 
-        # Insert the call to the post-processing function
-        postprocessing_func_call_op = func.CallOp(
-            callee=builtin.SymbolRefAttr(postprocessing_func_op.sym_name),
-            arguments=[sample_op.results[0]],
-            return_types=[builtin.TensorType(builtin.Float64Type(), shape=(2**n_qubits,))],
-        )
-
         # get the index the probs MP result is returned at
         result_index = list(probs_op.results[0].uses)[0].index
 

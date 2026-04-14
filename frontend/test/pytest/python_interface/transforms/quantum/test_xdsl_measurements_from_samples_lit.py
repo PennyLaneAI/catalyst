@@ -271,6 +271,7 @@ class TestMeasurementsFromSamplesPass:
     def test_2_wire_expval(self, run_filecheck):
         """Test the measurements-from-samples pass on a 2-wire circuit terminating with an expval(Z)
         measurement on each wire. Includes a non-diagonalized operation (pass inserts diagonalizing gate).
+        measurement on each wire. Includes a non-diagonalized operation (pass inserts diagonalizing gate).
         """
 
         program = """

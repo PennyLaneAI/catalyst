@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "PBC/IR/PBCOps.h"
+
 #include "llvm/ADT/TypeSwitch.h" // needed for enums
 #include "llvm/Support/LogicalResult.h"
-
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Region.h"
 
-#include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumDialect.h"
 
 using namespace mlir;

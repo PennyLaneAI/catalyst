@@ -69,6 +69,18 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
 def SplitNonCommutingPass : Pass<"split-non-commuting", "mlir::ModuleOp"> {
     let summary = "Split quantum functions non-commuting observables into multiple executions.";
 
+    let options = [
+        Option<
+            "groupingStrategy",
+            "grouping-strategy",
+            "std::string",
+            /*default=*/"\"\"",
+            "Grouping strategy for observables. "
+            "\"\" (default) assigns each observable its own group. "
+            "\"wires\" groups observables on non-overlapping wires."
+        >
+    ];
+
     let dependentDialects = ["arith::ArithDialect"];
 }
 

@@ -124,6 +124,22 @@ def EncodeOp : QecLogical_Op<"encode", [AllTypesMatch<["in_codeblock", "out_code
     }];
 }
 
+def NoiseOp : QecLogical_Op<"noise", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
+    let summary = "Inject physical noise on elements of a logical codeblock.";
+
+    let arguments = (ins
+        LogicalCodeblockType:$in_codeblock
+    );
+
+    let results = (outs
+        LogicalCodeblockType:$out_codeblock
+    );
+
+    let assemblyFormat = [{
+        $in_codeblock attr-dict `:` qualified(type($in_codeblock))
+    }];
+}
+
 def QecCycleOp : QecLogical_Op<"qec", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
     let summary = "Perform a single cycle of a quantum error-correction protocol.";
 
