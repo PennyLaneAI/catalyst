@@ -13,7 +13,6 @@
 # limitations under the License.
 """Unit test module for the xDSL implementation of the convert_noiseop_to_subroutine pass"""
 
-
 import pytest
 
 from catalyst.python_interface.transforms.qecp import (
@@ -21,6 +20,7 @@ from catalyst.python_interface.transforms.qecp import (
 )
 
 pytestmark = pytest.mark.xdsl
+
 
 class TestConvertNoiseOpToSubroutinePass:
     """Unit tests for the convert-noiseop-to-subroutine pass."""
