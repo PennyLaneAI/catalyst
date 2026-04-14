@@ -60,6 +60,7 @@ bool isQrefSubroutine(func::FuncOp f)
         if (func::CallOp callOp = dyn_cast<func::CallOp>(op)) {
             auto funcOp = mlir::SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
                 callOp, callOp.getCalleeAttr());
+            assert(funcOp && "calling a non-existent subroutine");
             if (isQrefSubroutine(funcOp)) {
                 return WalkResult::interrupt();
             }
@@ -207,9 +208,7 @@ void stageCallOpForConversion(IRRewriter &builder, func::CallOp callOp,
             newCallArgs.push_back(oldCallArgs[std::get<unsigned>(newArgsInfo)]);
         }
         else {
-            std::pair _pair = std::get<std::pair<unsigned, uint64_t>>(newArgsInfo);
-            unsigned oldCallArgIdx = _pair.first;
-            unsigned extractIdx = _pair.second;
+            auto [oldCallArgIdx, extractIdx] = std::get<std::pair<unsigned, uint64_t>>(newArgsInfo);
             assert(isa<qref::QuregType>(oldCallArgs[oldCallArgIdx].getType()) && "Expected rQreg");
             auto getOp = qref::GetOp::create(builder, loc, qref::QubitType::get(ctx),
                                              oldCallArgs[oldCallArgIdx], nullptr,

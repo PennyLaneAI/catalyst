@@ -243,7 +243,7 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
 void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker);
 void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker);
 void handleSubroutine(IRRewriter &builder, func::FuncOp f,
-                      SetVector<Value> &rValuesUsedBySubroutine);
+                      const SetVector<Value> &rValuesUsedBySubroutine);
 
 // Main driver
 void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker);
