@@ -663,16 +663,9 @@ void _getNecessaryRegionRValuesImpl(Region &r, SetVector<Value> &necessaryRegion
                 }
             }
             else if (isa<qref::QubitType>(v.getType())) {
-                if (isa<BlockArgument>(v) || !isa<qref::GetOp>(v.getDefiningOp())) {
-                    // Ignore allocations from inside the region itself
-                    if (isFromOutside(r, v)) {
-                        necessaryRegionRValues.insert(v);
-                    }
-                }
-                else {
+                if (auto getOp = v.getDefiningOp<qref::GetOp>()) {
                     Value rQreg = getRSourceRegisterValue(v);
                     if (isFromOutside(r, rQreg)) {
-                        auto getOp = cast<qref::GetOp>(v.getDefiningOp());
                         if (getOp.getIdx()) {
                             // dynamic extract index, must take in the reg
                             necessaryRegionRValues.insert(rQreg);
@@ -681,6 +674,12 @@ void _getNecessaryRegionRValuesImpl(Region &r, SetVector<Value> &necessaryRegion
                         else {
                             necessaryRegionRValues.insert(v);
                         }
+                    }
+                }
+                else {
+                    // Ignore allocations from inside the region itself
+                    if (isFromOutside(r, v)) {
+                        necessaryRegionRValues.insert(v);
                     }
                 }
             }
@@ -703,7 +702,7 @@ void _getNecessaryRegionRValuesImpl(Region &r, SetVector<Value> &necessaryRegion
     // Remove aliasing get ops
     DenseSet<rQubitGetOpInfo> seenGetInfos;
     necessaryRegionRValues.remove_if([&](const Value &v) {
-        if (isa<BlockArgument>(v) || !isa<qref::GetOp>(v.getDefiningOp())) {
+        if (!v.getDefiningOp<qref::GetOp>()) {
             return false;
         }
 
