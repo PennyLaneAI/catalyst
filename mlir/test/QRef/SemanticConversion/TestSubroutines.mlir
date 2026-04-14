@@ -354,12 +354,12 @@ func.func @main(%arg0: i1) -> () attributes {quantum.node} {
 // -----
 
 
-// CHECK:   func.func @test_nested_callsite(%arg0: !quantum.bit, %arg1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+// CHECK:   func.func @test_callsite_in_nested_region(%arg0: !quantum.bit, %arg1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
 // CHECK:     [[CNOT:%.+]]:2 = quantum.custom "CNOT"() %arg0, %arg1 : !quantum.bit, !quantum.bit
 // CHECK:     return [[CNOT]]#0, [[CNOT]]#1 : !quantum.bit, !quantum.bit
 // CHECK:   }
 
-func.func @test_nested_callsite(%reg: !qref.reg<2>, %q: !qref.bit) -> () {
+func.func @test_callsite_in_nested_region(%reg: !qref.reg<2>, %q: !qref.bit) -> () {
     %q0 = qref.get %reg[0] : !qref.reg<2> -> !qref.bit
     qref.custom "CNOT"() %q, %q0 : !qref.bit, !qref.bit
     return
@@ -385,10 +385,10 @@ func.func @main(%arg0: i1) -> () attributes {quantum.node} {
         // CHECK: [[loopOut:%.+]]:3 = scf.for %arg1 = {{%.+}} to {{%.+}} step {{%.+}} iter_args(%arg2 = [[q]], %arg3 = [[q0]], %arg4 = [[q1]])
         // CHECK-SAME:   -> (!quantum.bit, !quantum.bit, !quantum.bit)
         scf.for %i = %start to %stop step %step {
-            // CHECK: [[first_call:%.+]]:2 = func.call @test_nested_callsite(%arg2, %arg3) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
-            // CHECK: [[second_call:%.+]]:2 = func.call @test_nested_callsite([[first_call]]#0, %arg4) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
-            func.call @test_nested_callsite(%r0, %q) : (!qref.reg<2>, !qref.bit) -> ()
-            func.call @test_nested_callsite(%r1, %q) : (!qref.reg<2>, !qref.bit) -> ()
+            // CHECK: [[first_call:%.+]]:2 = func.call @test_callsite_in_nested_region(%arg2, %arg3) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+            // CHECK: [[second_call:%.+]]:2 = func.call @test_callsite_in_nested_region([[first_call]]#0, %arg4) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+            func.call @test_callsite_in_nested_region(%r0, %q) : (!qref.reg<2>, !qref.bit) -> ()
+            func.call @test_callsite_in_nested_region(%r1, %q) : (!qref.reg<2>, !qref.bit) -> ()
 
             // CHECK: scf.yield [[second_call]]#0, [[first_call]]#1, [[second_call]]#1 : !quantum.bit, !quantum.bit, !quantum.bit
         }
@@ -448,5 +448,20 @@ func.func @main() attributes {quantum.node} {
 
     // CHECK: quantum.dealloc [[insert]] : !quantum.reg
     qref.dealloc %r : !qref.reg<1>
+    return
+}
+
+
+// -----
+
+
+func.func @callee(%r: !qref.reg<1>) {
+    func.call @caller(%r) : (!qref.reg<1>) -> ()
+    return
+}
+
+// expected-error@+1 {{Quantum subroutine call graphs must not have cycles}}
+func.func @caller(%r: !qref.reg<1>) {
+    func.call @callee(%r) : (!qref.reg<1>) -> ()
     return
 }
