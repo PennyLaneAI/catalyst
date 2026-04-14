@@ -23,12 +23,13 @@
 #include "llvm/IR/Module.h"         // llvm::Module
 #include "llvm/Support/SourceMgr.h" // llvm::SMDiagnostic
 #include "llvm/Support/raw_ostream.h"
-
-#include "mlir/IR/BuiltinOps.h"         // mlir::ModuleOp
-#include "mlir/IR/DialectRegistry.h"    // mlir::DialectRegistry
-#include "mlir/IR/MLIRContext.h"        // mlir::MLIRContext
-#include "mlir/IR/OwningOpRef.h"        // mlir::OwningOpRef
-#include "mlir/Pass/PassManager.h"      // mlir::PassManager
+#include "mlir/IR/BuiltinOps.h"      // mlir::ModuleOp
+#include "mlir/IR/DialectRegistry.h" // mlir::DialectRegistry
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/MLIRContext.h"   // mlir::MLIRContext
+#include "mlir/IR/OwningOpRef.h"   // mlir::OwningOpRef
+#include "mlir/Pass/PassManager.h" // mlir::PassManager
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/LogicalResult.h" // llvm::LogicalResult
 #include "mlir/Support/Timing.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"

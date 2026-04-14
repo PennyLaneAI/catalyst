@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include "mlir/CAPI/Registration.h"
+#include "mlir-c/IR.h"
 
 #ifdef __cplusplus
 extern "C" {

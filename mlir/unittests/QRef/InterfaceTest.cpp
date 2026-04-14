@@ -16,14 +16,13 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-
+#include "llvm/Support/SourceMgr.h"
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/AsmParser/AsmParserState.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Parser/Parser.h"
-#include "llvm/Support/SourceMgr.h"
 
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
