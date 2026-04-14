@@ -16,12 +16,13 @@
  * @file DGSolver.cpp
  */
 
+#include "DGSolver.hpp"
+
 #include <algorithm>
 #include <optional>
 #include <unordered_set>
 #include <vector>
 
-#include "DGSolver.hpp"
 #include "DGTypes.hpp"
 
 namespace DecompGraph::Solver {

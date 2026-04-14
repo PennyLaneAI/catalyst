@@ -16,13 +16,14 @@
  * @file DGBuilder.cpp
  */
 
-#include <boost/graph/adjacency_list.hpp>
+#include "DGBuilder.hpp"
 
 #include <iostream>
 #include <variant>
 
-#include "DGBuilder.hpp"
 #include "DGUtils.hpp"
+
+#include <boost/graph/adjacency_list.hpp>
 
 namespace DecompGraph::Solver {
 
