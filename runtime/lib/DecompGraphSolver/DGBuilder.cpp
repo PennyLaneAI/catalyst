@@ -131,12 +131,13 @@ struct DecompositionGraph::Impl {
                         effectiveRules.push_back(rule);
                     }
                 }
-            }
 
-            const auto altIt = altDecomps.find(op);
-            if (altIt != altDecomps.end()) {
-                for (const auto &altRule : altIt->second) {
-                    effectiveRules.push_back(markRuleOrigin(altRule, RuleOrigin::Alternative, op));
+                const auto altIt = altDecomps.find(op);
+                if (altIt != altDecomps.end()) {
+                    for (const auto &altRule : altIt->second) {
+                        effectiveRules.push_back(
+                            markRuleOrigin(altRule, RuleOrigin::Alternative, op));
+                    }
                 }
             }
         };

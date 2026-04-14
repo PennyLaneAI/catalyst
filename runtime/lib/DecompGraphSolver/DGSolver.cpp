@@ -67,7 +67,7 @@ ChosenDecompRule DecompositionSolver::evalRule(const RuleNode &rule)
         }
     }
 
-    if (total_cost == 0.0) {
+    if (rule.inputs.empty() && total_cost == 0.0) {
         return invalidRule(solution.op); // invalid rule
     }
     solution.totalCost = total_cost;

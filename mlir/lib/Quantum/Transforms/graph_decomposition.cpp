@@ -140,7 +140,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             ruleName.consume_back("\"");
 
             if (ruleName.empty()) {
-                return;
+                continue;
             }
             opToFixedDecompName[opName.str()] = ruleName.str();
             userRuleNames.push_back(ruleName.str());
@@ -350,11 +350,11 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
             auto it = ruleNameToFuncOp.find(chosenRule.ruleName);
 
-            if (it == ruleNameToFuncOp.end()) {
-                llvm::errs() << "Rule " << chosenRule.ruleName << " not found\n";
-            }
-            if (!it->second) {
-                llvm::errs() << "Rule " << chosenRule.ruleName << " has already been added!\n";
+            if (it == ruleNameToFuncOp.end() || !it->second) {
+                // skip if the rule is not found or
+                // the function op is null or
+                // it is already moved
+                continue;
             }
             module.push_back(it->second.release());
         }

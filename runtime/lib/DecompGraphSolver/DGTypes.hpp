@@ -40,6 +40,9 @@ namespace DecompGraph::Core {
  * This information is crucial for the graph decomposition solver to determine how operators
  * can be combined and decomposed to achieve the desired target gateset while optimizing for
  * resource usage.
+ *
+ * TODO: Fix the equality with wildcards for numWires and numParams
+ * when adding support for operators with dynamic numbers of wires/params.
  */
 struct OperatorNode {
     std::string name;
