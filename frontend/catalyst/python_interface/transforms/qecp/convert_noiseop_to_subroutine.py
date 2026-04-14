@@ -23,8 +23,8 @@ from typing import NoReturn, cast
 
 from xdsl import builder, context, passes, pattern_rewriter
 from xdsl.context import Context
-from xdsl.dialects import arith, builtin, scf, tensor
-from xdsl.dialects.builtin import FloatAttr, IndexType, IntegerAttr, IntegerType, func
+from xdsl.dialects import arith, builtin, func, scf, tensor
+from xdsl.dialects.builtin import FloatAttr, IndexType, IntegerAttr, IntegerType
 from xdsl.ir import Block, Operation, Region, SSAValue
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
@@ -43,7 +43,6 @@ from catalyst.python_interface.pass_api.compiler_transform import compiler_trans
 from catalyst.utils.exceptions import CompileError
 
 
-@dataclass(frozen=True)
 class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
     """Pass that converts qecl.noise operations to subroutines in the qecp layer."""
 
@@ -92,11 +91,11 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
             in_codeblock, errors_indices, rotation_params = block.args
 
             # 2. Define for loop bounds
-            start = arith.ConstantOp(IndexType.get(), 0)
+            start = arith.ConstantOp.from_int_and_width(0, 64)
             stop = arith.ConstantOp.from_int_and_width(
                 _tensor_shape_from_ssa(errors_indices)[0], 64
             )
-            step = arith.ConstantOp(IndexType.get(), 1)
+            step = arith.ConstantOp.from_int_and_width(1, 64)
 
             zero = arith.ConstantOp.from_int_and_width(0, 64)
             one = arith.ConstantOp.from_int_and_width(1, 64)
@@ -111,19 +110,40 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
 
                 # Get the qubit index for error injection from the input codeblock
                 # Note that the qubit index is generated randomly from a `qnode` function and
-                qubit_index = tensor.ExtractOp(errors_indices, indices=[index_var_int])
+                qubit_index = tensor.ExtractOp(
+                    errors_indices,
+                    indices=[index_var_int],
+                    result_type=errors_indices.type.element_type,
+                )
                 # Get the rotation parameters for the current error to be injected
-                phi = tensor.ExtractOp(rotation_params, indices=[index_var_int, zero])
-                theta = tensor.ExtractOp(rotation_params, indices=[index_var_int, one])
-                omega = tensor.ExtractOp(rotation_params, indices=[index_var_int, two])
+                phi = tensor.ExtractOp(
+                    rotation_params,
+                    indices=[index_var_int, zero],
+                    result_type=rotation_params.type.element_type,
+                )
+                theta = tensor.ExtractOp(
+                    rotation_params,
+                    indices=[index_var_int, one],
+                    result_type=rotation_params.type.element_type,
+                )
+                omega = tensor.ExtractOp(
+                    rotation_params,
+                    indices=[index_var_int, two],
+                    result_type=rotation_params.type.element_type,
+                )
 
                 # Extract a phyiscal qubit from the current codeblock
                 extracted_phyiscal_qubit = qecp.ExtractQubitOp(current_codeblock, qubit_index)
                 # Create the Rot operation with the extracted qubit for error injection
                 rot_op = qecp.RotOp(phi, theta, omega, extracted_phyiscal_qubit)
 
+                # Insert the phyiscal qubit with noise back to the codeblock
+                updated_codeblock = qecp.InsertQubitOp(
+                    current_codeblock, qubit_index, rot_op.results[0]
+                )
+
                 # Yield the updated codeblock
-                scf.YieldOp(rot_op.results[0])
+                scf.YieldOp(updated_codeblock.results[0])
 
             returned_codeblock = for_loop.results[0]
 
@@ -178,7 +198,7 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
         ).rewrite_module(op)
 
 
-convert_noiseop_to_subroutine = compiler_transform(ConvertNoiseOpToSubroutinePass)
+convert_noiseop_to_subroutine_pass = compiler_transform(ConvertNoiseOpToSubroutinePass)
 
 
 class ConvertNoiseOpToSubroutinePattern(
@@ -212,14 +232,15 @@ class ConvertNoiseOpToSubroutinePattern(
         # Insert a tensor constant operation for the qubit indices and rotation parameters, which will be passed to the noise injection subroutine as inputs.
         qubit_indices_constantop = arith.ConstantOp(
             builtin.DenseIntOrFPElementsAttr.from_list(
-                type=builtin.TensorType(builtin.IntegerType(64), shape=()), data=(qubit_indices,)
+                type=builtin.TensorType(builtin.IntegerType(64), shape=(self._number_errors,)),
+                data=qubit_indices,
             )
         )
 
         rotation_params_constantop = arith.ConstantOp(
             builtin.DenseIntOrFPElementsAttr.from_list(
-                type=builtin.TensorType(builtin.Float64Type(64), shape=(self._number_errors, 3)),
-                data=(rotation_params,),
+                type=builtin.TensorType(builtin.Float64Type(), shape=(self._number_errors, 3)),
+                data=rotation_params,
             )
         )
 
