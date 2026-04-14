@@ -20,12 +20,13 @@ import numpy as np
 import pennylane as qml
 import pytest
 
+from pennylane.capture.primitives import for_loop_prim
+
 import catalyst
 from catalyst import qjit
 from catalyst.from_plxpr import from_plxpr
 from catalyst.jax_primitives import (
     adjoint_p,
-    for_p,
     get_call_jaxpr,
     qalloc_p,
     qextract_p,
@@ -846,16 +847,22 @@ class TestControlFlow:
 
         print(catalyst_jaxpr)
 
-        assert eqn.primitive == for_p
-        assert eqn.params["apply_reverse_transform"] == reverse
-        assert eqn.params["body_nconsts"] == 0
-        assert eqn.params["num_implicit_inputs"] == 0
-        assert eqn.params["preserve_dimensions"] is True
+        assert eqn.primitive == for_loop_prim
+        assert eqn.params['abstract_shapes_slice'] == (0,0,1)
+        assert eqn.params['args_slice'] == (0,1,1)
+        assert eqn.params['consts_slice'] == (0,0,1)
 
-        assert eqn.invars[0].val == start
-        assert eqn.invars[1].val == stop
-        assert eqn.invars[2].val == step
-        assert eqn.invars[3].val == start
+        assert len(eqn.params['jaxpr_body_fn'].eqns) == 3 if reverse else 1
+
+        if reverse:
+            assert eqn.invars[0].val == 0
+            assert eqn.invars[1].val == 3
+            assert eqn.invars[2].val == 1
+        else:
+            assert eqn.invars[0].val == start
+            assert eqn.invars[1].val == stop
+            assert eqn.invars[2].val == step
+
 
     def test_while_loop_outside_qnode(self):
         """Test that a while loop outside a qnode can be translated."""
