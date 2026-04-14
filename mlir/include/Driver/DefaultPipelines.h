@@ -47,7 +47,11 @@ const PipelineList pipelineList{
       // keep inlining modules targeting the Catalyst runtime.
       // But qnodes targeting other backends may choose to lower
       // this into something else.
-      "inline-nested-module", "lower-mitigation", "adjoint-lowering", "disable-assertion"}},
+      "inline-nested-module", "lower-mitigation", "adjoint-lowering",
+      // TODO: we can remove the following 2 passes once PBC has its own pipeline.
+      "lower-pbc-init-ops",
+      //"unroll-conditional-ppr-ppm",
+      "disable-assertion"}},
     {"hlo-lowering-pipeline",
      {"canonicalize", "func.func(chlo-legalize-to-stablehlo)",
       "func.func(stablehlo-legalize-control-flow)",
@@ -58,33 +62,33 @@ const PipelineList pipelineList{
       "detensorize-scf", "detensorize-function-boundary", "canonicalize", "symbol-dce"}},
     {"gradient-lowering-pipeline", {"annotate-invalid-gradient-functions", "lower-gradients"}},
     {"bufferization-pipeline",
-     {"inline",
-      "convert-tensor-to-linalg",      // tensor.pad
+     {"convert-tensor-to-linalg",      // tensor.pad
       "convert-elementwise-to-linalg", // must be run before --one-shot-bufferize
       "gradient-preprocess",
-      // Keep eliminate-empty-tensors commented out until benchmarks use more structure
-      // and produce functions of reasonable size. Otherwise, eliminate-empty-tensors
-      // will consume a significant amount of compile time along with one-shot-bufferize.
-      //
-      // "eliminate-empty-tensors",
+      "eliminate-empty-tensors",
+      // This pass is needed to avoid aliasing of the input buffer with the output buffer.
+      "mark-entry-point-args-non-writable",
+      ////////////////////
       "one-shot-bufferize",
+      ////////////////////
       "canonicalize", // remove dead memrefToTensorOp's
       "gradient-postprocess",
       // Introduced during gradient-bufferize of callbacks
       "func.func(buffer-hoisting)", "func.func(buffer-loop-hoisting)",
-      // TODO: investigate re-adding this after new buffer dealloc pipeline
-      //       removed due to high stack memory use in nested structures
-      // "func.func(promote-buffers-to-stack)",
+      "func.func(promote-buffers-to-stack)",
       // TODO: migrate to new buffer deallocation "buffer-deallocation-pipeline"
       "func.func(buffer-deallocation)", "convert-arraylist-to-memref",
       "convert-bufferization-to-memref",
       "canonicalize", // must be after convert-bufferization-to-memref
                       // otherwise there are issues in lowering of dynamic tensors.
-                      // "cse",
+      //"cse",
       "cp-global-memref"}},
     {"llvm-dialect-lowering-pipeline",
-     {"qnode-to-async-lowering", "async-func-to-async-runtime", "async-to-async-runtime",
-      "convert-async-to-llvm", "expand-realloc", "convert-gradient-to-llvm",
+     {//"qnode-to-async-lowering",
+      //"async-func-to-async-runtime",
+      //"async-to-async-runtime",
+      //"convert-async-to-llvm",
+      "expand-realloc", "convert-gradient-to-llvm",
       "memrefcpy-to-linalgcpy", "func.func(convert-linalg-to-loops)", "convert-scf-to-cf",
       // This pass expands memref ops that modify the metadata of a memref (sizes, offsets,
       // strides) into a sequence of easier to analyze constructs. In particular, this pass
@@ -100,7 +104,9 @@ const PipelineList pipelineList{
       "convert-math-to-libm", "convert-arith-to-llvm",
       "memref-to-llvm-tbaa", // load and store are converted to llvm with tbaa tags
       "finalize-memref-to-llvm{use-generic-functions}", "convert-index-to-llvm",
-      "convert-catalyst-to-llvm", "convert-quantum-to-llvm",
+      "convert-catalyst-to-llvm",
+      "convert-pbc-to-llvm",  // TODO: remove this once PBC has its own pipeline
+      "convert-quantum-to-llvm",
       // There should be no identical code folding
       // (`mergeIdenticalBlocks` in the MLIR source code)
       // between convert-async-to-llvm and add-exception-handling.
