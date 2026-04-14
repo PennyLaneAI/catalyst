@@ -824,6 +824,62 @@ class TestPassByPassSpecs:
             "sample(all wires)": 1,
         }
 
+    @pytest.mark.usefixtures("use_both_frontend")
+    def test_conditionals(self):
+        """Test that conditionals are handled correctly."""
+
+        @qml.qjit(autograph=True)
+        @qml.qnode(qml.device("null.qubit", wires=1))
+        def circuit(x):
+            if x > 0.5:
+                qml.Hadamard(0)
+            else:
+                qml.PauliX(0)
+
+            return qml.expval(qml.PauliX(0))
+
+        actual = qml.specs(circuit, level=0)(3)
+        expected = CircuitSpecs(
+            device_name="null.qubit",
+            num_device_wires=1,
+            shots=Shots(None),
+            level="Before MLIR Passes",
+            resources=SpecsResources(
+                gate_types={"Hadamard": 1, "PauliX": 1},
+                gate_sizes={1: 2},
+                measurements={"expval(PauliX)": 1},
+                num_allocs=1,
+            ),
+        )
+
+    @pytest.mark.usefixtures("use_both_frontend")
+    def test_loops(self):
+        """Test that static loops are handled correctly and that resources are counted
+        according to the number of iterations (including nested loops)."""
+
+        @qml.qjit
+        @qml.qnode(qml.device("null.qubit", wires=1))
+        def circuit():
+            for _ in range(5):
+                qml.PauliX(0)
+                for _ in range(3):
+                    qml.Hadamard(0)
+            return qml.expval(qml.PauliX(0))
+
+        actual = qml.specs(circuit, level=0)()
+        expected = CircuitSpecs(
+            device_name="null.qubit",
+            num_device_wires=1,
+            shots=Shots(None),
+            level="Before MLIR Passes",
+            resources=SpecsResources(
+                gate_types={"Hadamard": 15, "PauliX": 5},
+                gate_sizes={1: 20},
+                measurements={"expval(PauliX)": 1},
+                num_allocs=1,
+            ),
+        )
+
     def test_split_non_commuting_tape(self):
         """Test that qml.transforms.split_non_commuting works as expected"""
 
