@@ -188,6 +188,15 @@ LogicalResult AllocOp::verify()
     return success();
 }
 
+LogicalResult CustomOp::verify()
+{
+    if (getQubits().size() == 0) {
+        return emitOpError("expected op to have at least one qubit");
+    }
+
+    return success();
+}
+
 LogicalResult PauliRotOp::verify()
 {
     size_t pauliWordLength = getPauliProduct().size();
@@ -204,14 +213,6 @@ LogicalResult PauliRotOp::verify()
         return emitOpError() << "Only \"X\", \"Y\", \"Z\", and \"I\" are valid Pauli words.";
     }
 
-    return success();
-}
-
-LogicalResult CustomOp::verify()
-{
-    if (getQubits().size() == 0) {
-        return emitOpError("expected op to have at least one qubit");
-    }
     return success();
 }
 

@@ -20,6 +20,7 @@ For a complete description of this dialect, please see
 
     mlir/include/QecLogical/IR/QecLogicalDialect.td
 """
+
 from collections.abc import Sequence
 from typing import ClassVar, TypeAlias
 
@@ -350,6 +351,33 @@ class EncodeOp(IRDLOperation):
         super().__init__(
             operands=operands, result_types=(in_codeblock_type,), properties=properties
         )
+
+
+@irdl_op_definition
+class NoiseOp(IRDLOperation):
+    """Inject physical noise on elements of a logical codeblock."""
+
+    T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
+
+    name = "qecl.noise"
+
+    in_codeblock = operand_def(T)
+
+    out_codeblock = result_def(T)
+
+    assembly_format = """
+            $in_codeblock attr-dict `:` type($in_codeblock)
+        """
+
+    def __init__(
+        self,
+        in_codeblock: LogicalCodeBlockSSAValue | Operation,
+    ):
+        operands = (in_codeblock,)
+
+        in_codeblock_type = get_logical_codeblock_type(in_codeblock)
+
+        super().__init__(operands=operands, result_types=(in_codeblock_type,))
 
 
 @irdl_op_definition
@@ -721,6 +749,7 @@ QecLogical = Dialect(
         ExtractCodeblockOp,
         InsertCodeblockOp,
         EncodeOp,
+        NoiseOp,
         QecCycleOp,
         IdentityOp,
         PauliXOp,

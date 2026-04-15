@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Unit tests for contents of c_template"""
+
 import numpy as np
 
 from catalyst.utils.c_template import CType, CVariable

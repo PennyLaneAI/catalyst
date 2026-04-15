@@ -60,9 +60,8 @@ void createQuantumCompilationStage(OpPassManager &pm)
     pm.addPass(catalyst::createInlineNestedModulePass());
     pm.addPass(catalyst::mitigation::createMitigationLoweringPass());
     pm.addPass(catalyst::quantum::createAdjointLoweringPass());
-    // TODO: We can remove 2 passes below once PBC has its own pipeline.
+    // TODO: We can remove this pass below once PBC has its own pipeline.
     pm.addPass(catalyst::pbc::createLowerPBCInitOpsPass());
-    pm.addPass(catalyst::pbc::createUnrollConditionalPPRPPMPass());
     pm.addPass(catalyst::createDisableAssertionPass());
 }
 void createHloLoweringStage(OpPassManager &pm)
@@ -233,3 +232,19 @@ std::vector<Pipeline> getDefaultPipeline()
 
 } // namespace driver
 } // namespace catalyst
+
+namespace llvm {
+
+raw_ostream &operator<<(raw_ostream &oss, const catalyst::driver::Pipeline &p)
+{
+    oss << "Pipeline('" << p.getName() << "', [";
+    bool first = true;
+    for (const auto &i : p.getPasses()) {
+        oss << (first ? "" : ", ") << i;
+        first = false;
+    }
+    oss << "])";
+    return oss;
+}
+
+}; // namespace llvm

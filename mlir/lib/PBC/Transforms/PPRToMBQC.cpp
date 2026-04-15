@@ -164,8 +164,7 @@ void constructKernelOperation(SmallVector<Value> &qubits, Value &measResult, PBC
         qubits[0] = measOp.getOutQubit();
     }
     else if (auto pprOp = dyn_cast<PPRotationOp>(op.getOperation())) {
-        int16_t signedRk = static_cast<int16_t>(pprOp.getRotationKind());
-        double rk = 2 * (llvm::numbers::pi / (static_cast<double>(signedRk)));
+        double rk = 2 * (llvm::numbers::pi / (static_cast<double>(pprOp.getRotationKind())));
         qubits[0] = buildSingleQubitGate(qubits[0], "RZ", {rk}, rewriter).getOutQubits().front();
     }
     else if (auto pprArbitraryOp = dyn_cast<PPRotationArbitraryOp>(op.getOperation())) {

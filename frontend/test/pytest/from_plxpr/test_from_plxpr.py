@@ -19,7 +19,8 @@ import jax
 import numpy as np
 import pennylane as qml
 import pytest
-from pennylane.capture.primitives import for_loop_prim as pl_for_loop_prim
+
+from pennylane.capture.primitives import for_loop_prim
 
 import catalyst
 from catalyst import qjit
@@ -61,9 +62,7 @@ def compare_call_jaxprs(jaxpr1, jaxpr2, skip_eqns=(), ignore_order=False):
         assert inv1.aval == inv2.aval, f"{inv1.aval}, {inv2.aval}"
     for ov1, ov2 in zip(jaxpr1.outvars, jaxpr2.outvars):
         assert ov1.aval == ov2.aval
-    assert len(jaxpr1.eqns) == len(
-        jaxpr2.eqns
-    ), f"""
+    assert len(jaxpr1.eqns) == len(jaxpr2.eqns), f"""
     Number of equations differ: {len(jaxpr1.eqns)} vs {len(jaxpr2.eqns)},
     {jaxpr1.eqns} vs {jaxpr2.eqns}
     """
@@ -846,19 +845,24 @@ class TestControlFlow:
 
         eqn = catalyst_jaxpr.eqns[0]
 
-        assert eqn.primitive == pl_for_loop_prim
-        assert eqn.params["consts_slice"] == (0, 0, 1)
-        assert eqn.params["abstract_shapes_slice"] == (0, 0, 1)
-        assert eqn.params["args_slice"] == (0, 1, 1)
+        print(catalyst_jaxpr)
+
+        assert eqn.primitive == for_loop_prim
+        assert eqn.params['abstract_shapes_slice'] == (0,0,1)
+        assert eqn.params['args_slice'] == (0,1,1)
+        assert eqn.params['consts_slice'] == (0,0,1)
+
+        assert len(eqn.params['jaxpr_body_fn'].eqns) == 3 if reverse else 1
 
         if reverse:
-            assert eqn.invars[0].val == 0  # start
-            assert eqn.invars[1].val == 3  # num iterations
-            assert eqn.invars[2].val == 1  # step
+            assert eqn.invars[0].val == 0
+            assert eqn.invars[1].val == 3
+            assert eqn.invars[2].val == 1
         else:
             assert eqn.invars[0].val == start
             assert eqn.invars[1].val == stop
             assert eqn.invars[2].val == step
+
 
     def test_while_loop_outside_qnode(self):
         """Test that a while loop outside a qnode can be translated."""

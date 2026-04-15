@@ -31,8 +31,7 @@ class TestLoopToJaxpr:
     def test_while_loop(self):
         """Check the while loop JAXPR."""
 
-        expected = dedent(
-            """
+        expected = dedent("""
             { lambda ; a:f64[]. let
                 b:i64[] c:f64[] = while_loop[
                   body_jaxpr={ lambda ; d:i64[] e:f64[]. let
@@ -47,8 +46,7 @@ class TestLoopToJaxpr:
                   preserve_dimensions=True
                 ] 0:i64[] a
               in (b, c) }
-            """
-        )
+            """)
 
         @qjit
         def circuit(x: float):
@@ -64,8 +62,7 @@ class TestLoopToJaxpr:
     def test_for_loop(self):
         """Check the for loop JAXPR."""
 
-        expected = dedent(
-            """
+        expected = dedent("""
             { lambda ; a:f64[] b:i64[]. let
                 c:i64[] d:f64[] = for_loop[
                   apply_reverse_transform=False
@@ -77,8 +74,7 @@ class TestLoopToJaxpr:
                   preserve_dimensions=True
                 ] 0:i64[] b 1:i64[] 0:i64[] 0:i64[] a
               in (c, d) }
-        """
-        )
+        """)
 
         @qjit
         def circuit(x: float, n: int):

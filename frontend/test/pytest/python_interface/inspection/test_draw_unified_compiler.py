@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the draw function in the unified compiler inspection module."""
+
 # pylint: disable=unnecessary-lambda, protected-access, wrong-import-position
 
 from importlib.util import find_spec

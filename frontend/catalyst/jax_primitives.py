@@ -625,9 +625,7 @@ def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr, **params):
     The step is the compilation of the definition of the function fn.
     """
 
-    # Set the visibility of the decomposition rule to public
-    # to avoid the elimination by the compiler
-    lower_callable(ctx, pyfun, func_jaxpr, public=True, **params)
+    lower_callable(ctx, pyfun, func_jaxpr, **params)
     return ()
 
 
@@ -3038,13 +3036,10 @@ def subroutine_lowering(*args, **kwargs):
         retval = _pjit_lowering(*args, **kwargs)
     except NotImplementedError as e:
         if "MLIR translation rule for primitive" in str(e):
-            msg = (
-                str(e)
-                + """
+            msg = str(e) + """
                 This error sometimes occurs when using quantum operations
                 inside subroutines but calling them outside a qnode
             """
-            )
             raise NotImplementedError(msg) from e
         raise e
 

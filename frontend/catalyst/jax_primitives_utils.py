@@ -27,6 +27,7 @@ from mlir_quantum.dialects.catalyst import LaunchKernelOp
 from pennylane.transforms.core import BoundTransform
 
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
+from catalyst.passes import PassPlugin
 
 
 def _all_expval(call_jaxpr: core.ClosedJaxpr) -> bool:
@@ -93,7 +94,7 @@ def lower_jaxpr(ctx, jaxpr, metadata=None, fn=None):
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
-def lower_callable(ctx, callable_, call_jaxpr, pipelines=(), metadata=None, public=False):
+def lower_callable(ctx, callable_, call_jaxpr, pipelines=(), metadata=None):
     """Lowers _callable to MLIR.
 
     If callable_ is a qnode, then we will first create a module, then
@@ -105,7 +106,6 @@ def lower_callable(ctx, callable_, call_jaxpr, pipelines=(), metadata=None, publ
       ctx: LoweringRuleContext
       callable_: python function
       call_jaxpr: jaxpr representing callable_
-      public: whether the visibility should be marked public
 
     Returns:
       FuncOp
@@ -114,9 +114,7 @@ def lower_callable(ctx, callable_, call_jaxpr, pipelines=(), metadata=None, publ
         pipelines = tuple()
     if isinstance(callable_, qml.QNode):
         return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipelines, metadata=metadata)
-    return get_or_create_funcop(
-        ctx, callable_, call_jaxpr, pipelines, metadata=metadata, public=public
-    )
+    return get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines, metadata=metadata)
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
@@ -126,7 +124,6 @@ def get_or_create_funcop(
     call_jaxpr,
     pipelines: tuple[tuple[str, BoundTransform], ...],
     metadata=None,
-    public=False,
 ):
     """Get funcOp from cache, or create it from scratch
 
@@ -136,7 +133,6 @@ def get_or_create_funcop(
         call_jaxpr: jaxpr representing callable_
         pipelines (tuple[tuple[str, BoundTransform], ...]): pipelines to be applied to the funcop
         metadata: additional metadata to distinguish different FuncOps
-        public: whether the visibility should be marked public
 
     Returns:
         FuncOp
@@ -146,19 +142,18 @@ def get_or_create_funcop(
     key = (callable_, *metadata, *_lowered_pipelines(pipelines))
     if func_op := get_cached(ctx, key):
         return func_op
-    func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=public)
+    func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr)
     cache(ctx, key, func_op)
     return func_op
 
 
-def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
+def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
     """Lower callable to either a FuncOp
 
     Args:
         ctx: LoweringRuleContext
         callable_: python function
         call_jaxpr: jaxpr representing callable_
-        public: whether the visibility should be marked public
 
     Returns:
         FuncOp
@@ -186,8 +181,6 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
     kwargs["num_const_args"] = num_const_args
 
     func_op = mlir.lower_jaxpr_to_fun(**kwargs)
-    if public:
-        func_op.attributes["sym_visibility"] = ir.StringAttr.get("public")
 
     if isinstance(callable_, qml.QNode):
         func_op.attributes["quantum.node"] = ir.UnitAttr.get()
@@ -325,10 +318,12 @@ class NestedModule:
         self.ctx.module_context = self.old_module_context
 
 
-def _lowered_options(_pass: BoundTransform):
+def _lowered_options(_pass: BoundTransform | PassPlugin):
+    args = _pass.args if isinstance(_pass, BoundTransform) else _pass.options
+    kwargs = _pass.kwargs if isinstance(_pass, BoundTransform) else _pass.valued_options
     return get_mlir_attribute_from_pyval(
-        {str(arg).replace("_", "-"): True for arg in _pass.args}
-        | {k.replace("_", "-"): v for k, v in _pass.kwargs.items()}
+        {str(arg).replace("_", "-"): True for arg in args}
+        | {k.replace("_", "-"): v for k, v in kwargs.items()}
     )
 
 
@@ -395,9 +390,9 @@ def transform_named_sequence_lowering(pipeline, sym_name):
     with ir.InsertionPoint(bb_named_sequence):
         target = bb_named_sequence.arguments[0]
         for _pass in pipeline:
-            assert isinstance(_pass, BoundTransform)
+            assert isinstance(_pass, (BoundTransform, PassPlugin))
+            name = _pass.pass_name if isinstance(_pass, BoundTransform) else _pass.name
             options = _lowered_options(_pass)
-            name = _pass.pass_name
             apply_registered_pass_op = ApplyRegisteredPassOp(
                 result=transform_mod_type,
                 target=target,
