@@ -133,26 +133,28 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
 
     let options = [
         ListOption<
-        /*C++ name*/"targetGateSetOption",
-        /*CLI name*/"gate-set",
-        /*Type*/"std::string",
-        /*Description*/"The accepted gates to decompose to.">,
+            /*C++ name*/"targetGateSetOption",
+            /*CLI name*/"gate-set",
+            /*Type*/"std::string",
+            /*Description*/"The accepted gates to decompose to.">,
         ListOption<
-        /*C++ name*/"fixedDecompsOption",
-        /*CLI name*/"fixed-decomps",
-        /*Type*/"std::string",
-        /*Description*/"Maps an operator to a decomposition rule that will be applied.">,
+            /*C++ name*/"fixedDecompsOption",
+            /*CLI name*/"fixed-decomps",
+            /*Type*/"std::string",
+            /*Description*/"Maps an operator to a decomposition rule that will be applied.">,
         ListOption<
-        /*C++ name*/"altDecompsOption",
-        /*CLI name*/"alt-decomps",
-        /*Type*/"std::string",
-        /*Description*/"Maps an operator to a `|` separated list of alternative decomposition rules that will be considered alongside any built-in rules for the operator.">,
+            /*C++ name*/"altDecompsOption",
+            /*CLI name*/"alt-decomps",
+            /*Type*/"std::string",
+            /*Description*/
+            "Maps an operator to a `|` separated list of alternative decomposition "
+            "rules that will be considered alongside any built-in rules for the operator.">,
         Option<
-        /*C++ name*/"bytecodeRulesFile",
-        /*CLI name*/"bytecode-rules",
-        /*Type*/"std::string",
-        /*Default*/[{ "./frontend/catalyst/resources/decomposition_rules.mlirbc" }],
-        /*Description*/"A path to a bytecode file of compiled decomposition rules.">
+            /*C++ name*/"bytecodeRulesFile",
+            /*CLI name*/"bytecode-rules",
+            /*Type*/"std::string",
+            /*Default*/[{ "./frontend/catalyst/resources/decomposition_rules.mlirbc" }],
+            /*Description*/"A path to a bytecode file of compiled decomposition rules.">
     ];
 
     let dependentDialects = [
