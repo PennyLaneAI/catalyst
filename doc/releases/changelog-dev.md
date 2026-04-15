@@ -888,6 +888,9 @@
   [(#2576)](https://github.com/PennyLaneAI/catalyst/pull/2576)
   [(#2673)](https://github.com/PennyLaneAI/catalyst/pull/2673)
 
+* An experimental pass to convert `qecl.noise` operations in the *QEC Logical* layer to subroutine calls in the *QEC Phyiscal* layer.
+  [(#2678)](https://github.com/PennyLaneAI/catalyst/pull/2678)
+
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
 
