@@ -530,6 +530,12 @@ jobs:
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
 
+    - name: Run qref frontend lit tests
+      run: |
+        for file in ./frontend/test/lit/test_qref/*; do\
+		      python3 "$$file" | l./lvm-build/bin/FileCheck "$$file";\
+	      done
+
     - name: Run Python Pytest/Lit Tests
       run: |
         COVERAGE_REPORT="xml" \
@@ -550,65 +556,6 @@ jobs:
         # We skip them for now. These demos should be properly moved to the qml repo.
         MDD_BENCHMARK_PRECISION=1 \
         python3 -m pytest demos -k "tutorial_qft_arithmetics.ipynb" --nbmake
-
-  frontend-tests-qref:
-    name: Frontend Tests, temporary CI action, only for qref lit tests
-    needs: [constants, llvm, runtime, quantum, determine_runner]
-    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
-    strategy:
-      matrix:
-        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
-
-    steps:
-    - name: Checkout Catalyst repo
-      uses: actions/checkout@v4
-
-    - name: Set up Python # Ensure the "primary" python version is used
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ needs.constants.outputs.primary_python_version }}
-
-    - name: Install Deps
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libasan6 make
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install -r requirements.txt
-        make frontend
-
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache@v4
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
-        fail-on-cache-miss: true
-
-    - name: Download Quantum Build Artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: quantum-build-${{ matrix.compiler }}
-        path: quantum-build
-
-    - name: Download Catalyst-Runtime Artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: runtime-build-${{ matrix.compiler }}
-        path: runtime-build/lib
-
-    - name: Add Frontend Dependencies to PATH
-      run: |
-        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
-        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
-        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
-
-    - name: Run qref frontend lit tests
-      run: |
-        for file in ./frontend/test/lit/test_qref/*; do\
-		      python3 "$$file" | l./lvm-build/bin/FileCheck "$$file";\
-	      done
 
   frontend-tests-lightning-kokkos:
     name: Frontend Tests (backend="lightning.kokkos")
