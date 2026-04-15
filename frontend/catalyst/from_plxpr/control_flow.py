@@ -40,62 +40,11 @@ from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import cond_p, for_p, while_p
 
 
-def _calling_convention(
-    interpreter, closed_jaxpr, *args_plus_qregs, outer_dynqreg_handlers=(), return_qreg=True
-):
-    # Arg structure (all args are tracers, since this function is to be `make_jaxpr`'d):
-    # Regular args, then dynamically allocated qregs, then global qreg
-    # TODO: merge dynamically allocaed qregs into regular args?
-    # But this is tricky, since qreg arguments need all the SSA value semantics conversion infra
-    # and are different from the regular plain arguments.
-    *args_plus_dynqregs, global_qreg = args_plus_qregs
-    num_dynamic_alloced_qregs = len(outer_dynqreg_handlers)
-    args, dynalloced_qregs = (
-        args_plus_dynqregs[: len(args_plus_dynqregs) - num_dynamic_alloced_qregs],
-        args_plus_dynqregs[len(args_plus_dynqregs) - num_dynamic_alloced_qregs :],
-    )
-
+def _calling_convention(interpreter, closed_jaxpr, *args):
     # Launch a new interpreter for the body region
-    # A new interpreter's root qreg value needs a new recorder
     converter = copy(interpreter)
-    converter.qubit_index_recorder = QubitIndexRecorder()
-    init_qreg = QubitHandler(global_qreg, converter.qubit_index_recorder)
-    converter.init_qreg = init_qreg
-
-    # add dynamic qregs to recorder
-    qreg_map = {}
-    dyn_qreg_handlers = []
-    for dyn_qreg, outer_dynqreg_handler in zip(
-        dynalloced_qregs, outer_dynqreg_handlers, strict=True
-    ):
-        dyn_qreg_handler = QubitHandler(dyn_qreg, converter.qubit_index_recorder)
-        dyn_qreg_handlers.append(dyn_qreg_handler)
-
-        # plxpr global wire index does not change across scopes
-        # So scope arg dynamic qregs need to have the same root hash as their corresponding
-        # qreg tracers outside
-        dyn_qreg_handler.root_hash = outer_dynqreg_handler.root_hash
-
-        # Each qreg argument of the subscope corresponds to a qreg from the outer scope
-        qreg_map[outer_dynqreg_handler] = dyn_qreg_handler
-
-    # The new interpreter's recorder needs to be updated to include the qreg args
-    # of this scope, instead of the outer qregs
-    for k, outer_dynqreg_handler in interpreter.qubit_index_recorder.map.items():
-        if outer_dynqreg_handler in qreg_map:
-            converter.qubit_index_recorder[k] = qreg_map[outer_dynqreg_handler]
-
     retvals = converter(closed_jaxpr, *args)
-    if not return_qreg:
-        return retvals
-
-    init_qreg.insert_all_dangling_qubits()
-
-    # Return all registers
-    for dyn_qreg_handler in dyn_qreg_handlers:
-        dyn_qreg_handler.insert_all_dangling_qubits()
-        retvals.append(dyn_qreg_handler.get())
-    return *retvals, converter.init_qreg.get()
+    return retvals
 
 
 def _to_bool_if_not(arg):
@@ -281,18 +230,9 @@ def handle_for_loop(
     assert jaxpr_body_fn is not None
     args = plxpr_invals[_tuple_to_slice(args_slice)]
 
-    # Add the iteration start and the qreg to the args
-    self.init_qreg.insert_all_dangling_qubits()
-
-    dynalloced_qregs, dynalloced_wire_global_indices = _get_dynamically_allocated_qregs(
-        plxpr_invals, self.qubit_index_recorder, self.init_qreg
-    )
-
-    start_plus_args_plus_qreg = [
+    start_plus_args = [
         start,
         *args,
-        *[dyn_qreg.get() for dyn_qreg in dynalloced_qregs],
-        self.init_qreg.get(),
     ]
 
     consts = plxpr_invals[_tuple_to_slice(consts_slice)]
@@ -303,19 +243,16 @@ def handle_for_loop(
         _calling_convention,
         self,
         jaxpr,
-        outer_dynqreg_handlers=dynalloced_qregs,
     )
-    converted_jaxpr_branch = jax.make_jaxpr(f)(*start_plus_args_plus_qreg)
+    converted_jaxpr_branch = jax.make_jaxpr(f)(*start_plus_args)
 
     converted_closed_jaxpr_branch = ClosedJaxpr(
         convert_constvars_jaxpr(converted_jaxpr_branch.jaxpr), ()
     )
 
     # Build Catalyst compatible input values
-    # strip global wire indices of dynamic wires
     new_consts = converted_jaxpr_branch.consts
-    new_consts = tuple(const for const in new_consts if const not in dynalloced_wire_global_indices)
-    for_loop_invals = [*new_consts, start, stop, step, *start_plus_args_plus_qreg]
+    for_loop_invals = [*new_consts, start, stop, step, *start_plus_args]
 
     # Config additional for loop settings
     apply_reverse_transform = isinstance(step, int) and step < 0
@@ -330,15 +267,6 @@ def handle_for_loop(
         preserve_dimensions=True,
     )
 
-    # Output structure:
-    # First a list of dynamically allocated qregs, then the global qreg
-    # Update the current qreg and remove it from the output values.
-    self.init_qreg.set(outvals.pop())
-
-    for dyn_qreg in reversed(dynalloced_qregs):
-        dyn_qreg.set(outvals.pop())
-
-    # Return only the output values that match the plxpr output values
     return outvals
 
 
