@@ -40,6 +40,7 @@ from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
+from catalyst.device.qjit_device import is_dynamic_wires
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
 from catalyst.from_plxpr.qref_jax_primitives import (
     qref_alloc_p,
@@ -374,7 +375,12 @@ def handle_qnode(
             auto_qubit_management=(device.wires is None),
             **_get_device_kwargs(device),
         )
-        qreg = qref_alloc_p.bind(len(device.wires))
+
+        # https://github.com/PennyLaneAI/pennylane/pull/9248
+        assert not is_dynamic_wires(
+            device.wires
+        ), "plxpr does not support dynamic number of wires on the device yet"
+        qreg = qref_alloc_p.bind(static_num_qubits=len(device.wires))
         self.init_qreg = qreg
 
         converter = PLxPRToQuantumJaxprInterpreter(device, shots, self.init_qreg, {})
