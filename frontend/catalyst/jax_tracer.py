@@ -938,7 +938,7 @@ def trace_quantum_operations(
     return qrp
 
 
-# pylint: disable=too-many-branches,complex-method
+# pylint: disable=too-many-branches
 @debug_logger
 def trace_observables(
     obs: Optional[Operator],
