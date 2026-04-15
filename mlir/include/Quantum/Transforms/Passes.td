@@ -128,7 +128,7 @@ def MergeRotationsPass : Pass<"merge-rotations"> {
     let dependentDialects = ["math::MathDialect"];
 }
 
-def GraphDecompositionPass : Pass<"graph-decomposition"> {
+def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
     let summary = "Decompose gates using an MLIR-native graph-based framework.";
 
     let description = [{
