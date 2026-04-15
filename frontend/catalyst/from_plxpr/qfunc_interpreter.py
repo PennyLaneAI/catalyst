@@ -117,7 +117,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         shots,
         init_qreg,
         cache,
-        qubit_index_recorder,
         *,
         control_wires=(),
         control_values=(),
@@ -125,7 +124,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         self.device = device
         self.shots = shots
         self.init_qreg = init_qreg
-        self.qubit_index_recorder = qubit_index_recorder
         self.subroutine_cache = cache
         self.control_wires = control_wires
         """Any control wires used for a subroutine."""
@@ -397,7 +395,7 @@ def handle_qml_alloc(self, *, num_wires, state=None, restored=False):
     ), "number of dynamically allocated qubits must be statically known"
 
     self.has_dynamic_allocation = True
-    new_qreg = qref_alloc_p.bind(num_wires)
+    new_qreg = qref_alloc_p.bind(static_num_qubits=num_wires)
     return [qref_get_p.bind(new_qreg, i) for i in range(num_wires)]
 
 
