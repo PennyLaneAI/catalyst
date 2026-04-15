@@ -315,17 +315,17 @@
   from catalyst.passes import cancel_inverses, graph_decomposition, merge_rotations
 
 
-  @decomposition_rule(op_type="PauliX")
+  @decomposition_rule(op_type=qp.PauliX)
   def x_to_rx(wire: int):
       qp.RX(np.pi, wire)
 
 
-  @decomposition_rule(op_type="PauliY")
+  @decomposition_rule(op_type=qp.PauliY)
   def y_to_ry(wire: int):
       qp.RY(np.pi, wire)
 
 
-  @decomposition_rule(op_type="Hadamard")
+  @decomposition_rule(op_type=qp.Hadamard)
   def h_to_rx_ry(wire: int):
       qp.RX(np.pi / 2, wire)
       qp.RY(np.pi / 2, wire)
@@ -335,7 +335,7 @@
   @graph_decomposition(gate_set={qp.Rot})
   @merge_rotations
   @graph_decomposition(
-      gate_set={qp.RX: 1, qp.RY: 1, qml.Rot: 10},
+      gate_set={qp.RX: 1.0, qp.RY: 1.0, qp.Rot: 5.0},
       fixed_decomps={qp.PauliX: x_to_rx, qp.PauliY: y_to_ry},
       alt_decomps={qp.H: [h_to_rx_ry]},
   )

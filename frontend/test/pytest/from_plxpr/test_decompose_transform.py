@@ -93,7 +93,7 @@ class TestGraphDecomposition:
     def test_alt_decomps(self):
         """Test the conversion of a circuit with a custom decomposition."""
 
-        @decomposition_rule(op_type="CNOT")
+        @decomposition_rule(op_type=qml.CNOT)
         def my_cnot(wires):
             qml.H(wires=wires[1])
             qml.CZ(wires=wires)
@@ -122,21 +122,21 @@ class TestGraphDecomposition:
     def test_fixed_rules(self):
         """Test the decompose lowering pass with custom decomposition rules."""
 
-        @decomposition_rule(op_type="RY")
+        @decomposition_rule(op_type=qml.RY)
         def rz_rx(phi, wires: WiresLike, **__):
             """Decomposition of RY gate using RZ and RX gates."""
             qml.RZ(-np.pi / 2, wires=wires)
             qml.RX(phi, wires=wires)
             qml.RZ(np.pi / 2, wires=wires)
 
-        @decomposition_rule(op_type="Rot")
+        @decomposition_rule(op_type=qml.Rot)
         def rz_ry_rz(phi, theta, omega, wires: WiresLike, **__):
             """Decomposition of Rot gate using RZ and RY gates."""
             qml.RZ(phi, wires=wires)
             qml.RY(theta, wires=wires)
             qml.RZ(omega, wires=wires)
 
-        @decomposition_rule(op_type="PauliY")
+        @decomposition_rule(op_type=qml.PauliY)
         def ry_gp(wires: WiresLike, **__):
             """Decomposition of PauliY gate using RY and GlobalPhase gates."""
             qml.RY(np.pi, wires=wires)
@@ -194,15 +194,15 @@ class TestGraphDecomposition:
     def test_multi_graph_decomposition(self):
         """Test that multiple graph-decomposition builtin transforms can be applied."""
 
-        @decomposition_rule(op_type="PauliX")
+        @decomposition_rule(op_type=qml.PauliX)
         def x_to_rx(wire: int):
             qml.RX(np.pi, wire)
 
-        @decomposition_rule(op_type="PauliY")
+        @decomposition_rule(op_type=qml.PauliY)
         def y_to_ry(wire: int):
             qml.RY(np.pi, wire)
 
-        @decomposition_rule(op_type="Hadamard")
+        @decomposition_rule(op_type=qml.Hadamard)
         def h_to_rx_ry(wire: int):
             qml.RX(np.pi / 2, wire)
             qml.RY(np.pi / 2, wire)
@@ -380,7 +380,7 @@ class TestGraphDecomposition:
     def test_work_wires(self):
         """Test that graph decomposition supports work_wires."""
 
-        @decomposition_rule(op_type="CRX")
+        @decomposition_rule(op_type=qml.CRX)
         def my_decomp(angle, wires, **_):
             def true_func():
                 qml.CNOT(wires)
