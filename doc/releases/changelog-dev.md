@@ -429,7 +429,7 @@
 <h3>Bug fixes 🐛</h3>
 
 * Fixed incorrect measurement names and missing loop/subroutine resource counts in the
-  `resource-tracker` MLIR pass used by :func:`~pennylane.specs`.
+  `resource-tracker` MLIR pass.
   [(#2695)](https://github.com/PennyLaneAI/catalyst/pull/2695)
 
 * :func:`~pennylane.adjoint` can now be used on subroutines with classical arguments.
