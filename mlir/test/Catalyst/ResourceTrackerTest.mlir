@@ -128,6 +128,31 @@ func.func @estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !quantum
 
 // -----
 
+// For loop with indirect bounds (resolveConstantIndex through index_cast + addi)
+
+// CHECK-LABEL: "resolve_constant_index_loop"
+// CHECK: "operations"
+// CHECK-DAG: "Hadamard(1)": 7
+func.func @resolve_constant_index_loop(%arg0: !quantum.bit) -> !quantum.bit {
+    %c0_i64 = arith.constant 0 : i64
+    %c3_i64 = arith.constant 3 : i64
+    %c4_i64 = arith.constant 4 : i64
+    %c1_i64 = arith.constant 1 : i64
+    %ub_i64 = arith.addi %c3_i64, %c4_i64 : i64
+    %c0 = arith.index_cast %c0_i64 : i64 to index
+    %ub = arith.index_cast %ub_i64 : i64 to index
+    %c1 = arith.index_cast %c1_i64 : i64 to index
+
+    %q = scf.for %iter = %c0 to %ub step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+        %out = quantum.custom "Hadamard"() %arg1 : !quantum.bit
+        scf.yield %out : !quantum.bit
+    }
+
+    return %q : !quantum.bit
+}
+
+// -----
+
 // If-else branching (take max per op)
 
 // CHECK-LABEL: "if_else_branching"

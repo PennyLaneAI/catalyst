@@ -153,8 +153,9 @@ static std::string getObservableName(Operation *obsOp)
 /// e.g. "MidCircuitMeasure", "expval(PauliZ)", "sample(all wires)", "probs(2 wires)".
 static std::string getMeasurementName(Operation *op)
 {
-    if (isa<quantum::MeasureOp>(op))
+    if (isa<quantum::MeasureOp>(op)) {
         return "MidCircuitMeasure";
+    }
 
     std::string baseName =
         llvm::TypeSwitch<Operation *, std::string>(op)
@@ -166,8 +167,9 @@ static std::string getMeasurementName(Operation *op)
             .Case<quantum::StateOp>([](auto) { return "state"; })
             .Default([](Operation *o) { return o->getName().getStringRef().str(); });
 
-    if (auto measProc = dyn_cast<quantum::MeasurementProcess>(op))
+    if (auto measProc = dyn_cast<quantum::MeasurementProcess>(op)) {
         return baseName + "(" + getObservableName(measProc.getObs().getDefiningOp()) + ")";
+    }
 
     return baseName;
 }
@@ -231,8 +233,9 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
 static std::optional<int64_t> resolveConstantIndex(Value val)
 {
     Operation *op = val.getDefiningOp();
-    if (!op)
+    if (!op) {
         return std::nullopt;
+    }
 
     StringRef opName = op->getName().getStringRef();
 
@@ -242,8 +245,9 @@ static std::optional<int64_t> resolveConstantIndex(Value val)
         return std::nullopt;
     }
 
-    if (isa<arith::IndexCastOp, arith::IndexCastUIOp>(op))
+    if (isa<arith::IndexCastOp, arith::IndexCastUIOp>(op)) {
         return resolveConstantIndex(op->getOperand(0));
+    }
 
     if (isa<arith::AddIOp, arith::SubIOp, arith::MulIOp>(op)) {
         auto lhs = resolveConstantIndex(op->getOperand(0));
@@ -257,8 +261,9 @@ static std::optional<int64_t> resolveConstantIndex(Value val)
         return *lhs * *rhs;
     }
 
-    if (auto extractOp = dyn_cast<tensor::ExtractOp>(op))
+    if (auto extractOp = dyn_cast<tensor::ExtractOp>(op)) {
         return resolveConstantIndex(extractOp.getTensor());
+    }
 
     if (auto fromElemOp = dyn_cast<tensor::FromElementsOp>(op)) {
         if (fromElemOp.getNumOperands() > 0)
@@ -266,8 +271,9 @@ static std::optional<int64_t> resolveConstantIndex(Value val)
         return std::nullopt;
     }
 
-    if (opName == "stablehlo.convert" || opName == "stablehlo.broadcast_in_dim")
+    if (opName == "stablehlo.convert" || opName == "stablehlo.broadcast_in_dim") {
         return resolveConstantIndex(op->getOperand(0));
+    }
 
     if (opName == "stablehlo.add" || opName == "stablehlo.subtract") {
         auto lhs = resolveConstantIndex(op->getOperand(0));
