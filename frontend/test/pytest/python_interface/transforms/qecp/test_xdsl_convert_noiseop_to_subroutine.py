@@ -157,3 +157,35 @@ class TestConvertNoiseOpToSubroutinePass:
 
         pipeline = (ConvertNoiseOpToSubroutinePass(number_errors=1),)
         run_filecheck(program, pipeline)
+
+    def test_with_single_noise_op_with_gateops(self, run_filecheck):
+        """Test that qecp.noise with gate operations can be lowered to a subroutine"""
+
+        program = """
+            builtin.module @module_circuit {
+                func.func @test_func() attributes {quantum.node} {
+                    // CHECK: [[codeblock:%.*]] = "test.op"() : () -> !qecl.codeblock<1>
+                    %0 = "test.op"() : () -> !qecl.codeblock<1>
+
+                    // CHECK-NEXT: [[codeblock:%.*]] = qecl.hadamard [[codeblock:%.*]][0] : !qecl.codeblock<1>
+                    %1 = qecl.hadamard %0[0] : !qecl.codeblock<1>
+
+                    // CHECK-NEXT: [[casted_codeblock:%.*]] = builtin.unrealized_conversion_cast [[codeblock:%.*]] : !qecl.codeblock<1> to !qecp.codeblock<1 x 7>
+
+                    // CHECK-NEXT: [[qubit_indices:%.*]] = arith.constant dense<{{.*}}> : tensor<1xi64>
+                    // CHECK-NEXT: [[rotation_params:%.*]] = arith.constant dense<[{{.*}}]> : tensor<1x3xf64>
+                    // CHECK-NEXT: func.call @noise_subroutine_code1x7x1([[casted_codeblock]], [[qubit_indices]], [[rotation_params]])
+                    // CHECK-NEXT: [[casted_logical_codeblock:%.*]] = builtin.unrealized_conversion_cast [[casted_codeblock:%.*]] : !qecp.codeblock<1 x 7> to !qecl.codeblock<1>
+                    %2 = qecl.noise %1 : !qecl.codeblock<1>
+
+                    // CHECK-NEXT: [[casted_logical_codeblock:%.*]] = qecl.qec [[casted_logical_codeblock:%.*]] : !qecl.codeblock<1>
+                    %3 = qecl.qec %2 : !qecl.codeblock<1>
+                    return
+                }
+                // CHECK-COUNT-1: func.func private @noise_subroutine_code1x7x1([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<1xi64>, [[rotation_params:%.*]]: tensor<1x3xf64>)
+                // CHECK-SAME: attributes {noise_subroutine_code1x7x1 = none}
+            }
+            """
+
+        pipeline = (ConvertNoiseOpToSubroutinePass(number_errors=1),)
+        run_filecheck(program, pipeline)

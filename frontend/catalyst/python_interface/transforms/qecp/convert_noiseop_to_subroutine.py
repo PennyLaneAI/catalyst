@@ -26,7 +26,6 @@ from xdsl.ir import Block, Region
 from xdsl.rewriter import InsertPoint
 
 from catalyst.python_interface.dialects import qecl, qecp
-from catalyst.python_interface.inspection.xdsl_conversion import _tensor_shape_from_ssa
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 
 _NUM_ROT_PARAMS = 3
@@ -233,6 +232,7 @@ class ConvertNoiseOpToSubroutinePattern(
         # NOTE: that the random qubit indices and rotation parameters are generated in the Python
         # layer and passed to the noise injection subroutine as inputs, which allows us to inject
         # different errors for different qecp.noise instances in the execution phase.
+        # NOTE: Another option: the logic below could be replaced with jax.random.uniform
         qubit_indices = random.sample(range(self._n), self._number_errors)
         rotation_params = []
         for _ in range(self._number_errors * _NUM_ROT_PARAMS):
