@@ -131,10 +131,6 @@ def MergeRotationsPass : Pass<"merge-rotations"> {
 def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
     let summary = "Decompose gates using an MLIR-native graph-based framework.";
 
-    let description = [{
-        Example Usage:
-        
-
     let options = [
         ListOption<
         /*C++ name*/"targetGateSetOption",
