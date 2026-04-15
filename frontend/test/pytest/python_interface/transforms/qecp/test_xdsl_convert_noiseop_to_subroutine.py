@@ -30,7 +30,7 @@ class TestConvertNoiseOpToSubroutinePass:
     """Unit tests for the convert-noiseop-to-subroutine pass."""
 
     def test_with_single_noise_op_lowering(self, run_filecheck):
-        """Test that a qecp.noise operation can be lowered to a subroutine"""
+        """Test that a qecl.noise operation can be lowered to a subroutine"""
 
         program = """
             builtin.module @module_circuit {
@@ -70,7 +70,7 @@ class TestConvertNoiseOpToSubroutinePass:
         run_filecheck(program, pipeline)
 
     def test_with_several_errors_lowering(self, run_filecheck):
-        """Test that a qecp.noise operation can be lowered to a subroutine injecting several errors"""
+        """Test that a qecl.noise operation can be lowered to a subroutine injecting several errors"""
 
         program = """
             builtin.module @module_circuit {
@@ -110,7 +110,7 @@ class TestConvertNoiseOpToSubroutinePass:
         run_filecheck(program, pipeline)
 
     def test_with_several_noise_op_lowering(self, run_filecheck):
-        """Test that several qecp.noise operation can be lowered to a subroutine.
+        """Test that several qecl.noise operation can be lowered to a subroutine.
         NOTE: This test uses CHECK-COUNT-1 to verify that only one subroutine is generated.
         """
 
@@ -158,7 +158,7 @@ class TestConvertNoiseOpToSubroutinePass:
         run_filecheck(program, pipeline)
 
     def test_with_single_noise_op_with_gateops(self, run_filecheck):
-        """Test that qecp.noise with gate operations can be lowered to a subroutine"""
+        """Test that qecl.noise with qecl gate operations can be lowered to a subroutine"""
 
         program = """
             builtin.module @module_circuit {
@@ -183,6 +183,34 @@ class TestConvertNoiseOpToSubroutinePass:
                 }
                 // CHECK-COUNT-1: func.func private @noise_subroutine_code1x7x1([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<1xi64>, [[rotation_params:%.*]]: tensor<1x3xf64>)
                 // CHECK-SAME: attributes {noise_subroutine_code1x7x1 = none}
+            }
+            """
+
+        pipeline = (ConvertNoiseOpToSubroutinePass(number_errors=1),)
+        run_filecheck(program, pipeline)
+
+    def test_with_module_without_noise_ops(self, run_filecheck):
+        """Test that a module without qecl.noise operations is unchanged by the pass."""
+
+        program = """
+            builtin.module @module_circuit {
+                func.func @test_func() attributes {quantum.node} {
+                    // CHECK: [[codeblock:%.*]] = "test.op"() : () -> !qecl.codeblock<1>
+                    %0 = "test.op"() : () -> !qecl.codeblock<1>
+
+                    // CHECK-NEXT: [[codeblock:%.*]] = qecl.hadamard [[codeblock:%.*]][0] : !qecl.codeblock<1>
+                    %1 = qecl.hadamard %0[0] : !qecl.codeblock<1>
+
+                    // CHECK-NEXT: [[codeblock:%.*]] = qecl.qec [[codeblock:%.*]] : !qecl.codeblock<1>
+                    %2 = qecl.qec %1 : !qecl.codeblock<1>
+
+                    // CHECK-NEXT: [[codeblock:%.*]] = qecl.identity [[codeblock:%.*]] : !qecl.codeblock<1>
+                    %3 = qecl.identity %2 : !qecl.codeblock<1>
+
+                    // CHECK-NOT: func.call @noise_subroutine_code
+                    return
+                }
+                // CHECK-NOT: func.func private @noise_subroutine_code
             }
             """
 
