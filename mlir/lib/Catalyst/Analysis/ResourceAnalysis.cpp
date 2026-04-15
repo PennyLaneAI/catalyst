@@ -17,15 +17,14 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
+#include "Catalyst/Utils/ConstantResolve.h"
 
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
@@ -131,8 +130,9 @@ static int getPBCQubitCount(Operation *op)
 /// Mirrors the Python `xdsl_to_qml_measurement_name` in xdsl_conversion.py.
 static std::string getObservableName(Operation *obsOp)
 {
-    if (!obsOp)
+    if (!obsOp) {
         return "all wires";
+    }
 
     return llvm::TypeSwitch<Operation *, std::string>(obsOp)
         .Case<quantum::ComputationalBasisOp>([](auto cbOp) {
@@ -228,71 +228,6 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
     entryFuncName = entryFunc.str();
 }
 
-/// Recursively resolve a Value to an integer constant.
-/// Mirrors the Python `resolve_constant_params` in xdsl_conversion.py.
-static std::optional<int64_t> resolveConstantIndex(Value val)
-{
-    Operation *op = val.getDefiningOp();
-    if (!op) {
-        return std::nullopt;
-    }
-
-    StringRef opName = op->getName().getStringRef();
-
-    if (auto constOp = dyn_cast<arith::ConstantOp>(op)) {
-        if (auto intAttr = dyn_cast<IntegerAttr>(constOp.getValue()))
-            return intAttr.getValue().getSExtValue();
-        return std::nullopt;
-    }
-
-    if (isa<arith::IndexCastOp, arith::IndexCastUIOp>(op)) {
-        return resolveConstantIndex(op->getOperand(0));
-    }
-
-    if (isa<arith::AddIOp, arith::SubIOp, arith::MulIOp>(op)) {
-        auto lhs = resolveConstantIndex(op->getOperand(0));
-        auto rhs = resolveConstantIndex(op->getOperand(1));
-        if (!lhs || !rhs)
-            return std::nullopt;
-        if (isa<arith::AddIOp>(op))
-            return *lhs + *rhs;
-        if (isa<arith::SubIOp>(op))
-            return *lhs - *rhs;
-        return *lhs * *rhs;
-    }
-
-    if (auto extractOp = dyn_cast<tensor::ExtractOp>(op)) {
-        return resolveConstantIndex(extractOp.getTensor());
-    }
-
-    if (auto fromElemOp = dyn_cast<tensor::FromElementsOp>(op)) {
-        if (fromElemOp.getNumOperands() > 0)
-            return resolveConstantIndex(fromElemOp.getOperand(0));
-        return std::nullopt;
-    }
-
-    if (opName == "stablehlo.convert" || opName == "stablehlo.broadcast_in_dim") {
-        return resolveConstantIndex(op->getOperand(0));
-    }
-
-    if (opName == "stablehlo.add" || opName == "stablehlo.subtract") {
-        auto lhs = resolveConstantIndex(op->getOperand(0));
-        auto rhs = resolveConstantIndex(op->getOperand(1));
-        if (!lhs || !rhs)
-            return std::nullopt;
-        return (opName == "stablehlo.add") ? *lhs + *rhs : *lhs - *rhs;
-    }
-
-    // Dense splat integer constant (covers stablehlo.constant dense<N>, etc.)
-    DenseIntElementsAttr denseAttr;
-    if (op->getNumResults() > 0 && matchPattern(op->getResult(0), m_Constant(&denseAttr)) &&
-        denseAttr.isSplat()) {
-        return denseAttr.getSplatValue<llvm::APInt>().getSExtValue();
-    }
-
-    return std::nullopt;
-}
-
 void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint)
 {
     ResourceResult bodyResult;
@@ -307,9 +242,9 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
         bodyResult.multiplyByScalar(tripCount->getSExtValue());
     }
     else {
-        auto lb = resolveConstantIndex(forOp.getLowerBound());
-        auto ub = resolveConstantIndex(forOp.getUpperBound());
-        auto step = resolveConstantIndex(forOp.getStep());
+        auto lb = resolveConstantInt(forOp.getLowerBound());
+        auto ub = resolveConstantInt(forOp.getUpperBound());
+        auto step = resolveConstantInt(forOp.getStep());
         if (lb && ub && step && *step != 0 && *ub > *lb) {
             int64_t tripCount = (*ub - *lb + *step - 1) / *step;
             bodyResult.multiplyByScalar(tripCount);
