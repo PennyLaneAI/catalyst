@@ -200,9 +200,6 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
         ).rewrite_module(op)
 
 
-convert_noiseop_to_subroutine_pass = compiler_transform(ConvertNoiseOpToSubroutinePass)
-
-
 class ConvertNoiseOpToSubroutinePattern(
     pattern_rewriter.RewritePattern
 ):  # pylint: disable=too-few-public-methods
@@ -277,3 +274,7 @@ class ConvertNoiseOpToSubroutinePattern(
         rewriter.insert_op(cast_op, InsertPoint.before(op))
         rewriter.replace_all_uses_with(op.out_codeblock, cast_op.results[0])
         rewriter.erase_op(op)
+
+# TODOs: Add integration tests for the following line once the quantum-to-qecl pass is in.
+convert_noiseop_to_subroutine_pass = compiler_transform(ConvertNoiseOpToSubroutinePass) # pragma: no cover
+
