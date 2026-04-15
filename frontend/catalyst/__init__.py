@@ -94,7 +94,6 @@ if (
         INSTALLED  # do not recompile on user installations
         or os.getenv("DOCUTILSCONFIG")  # do not run for docs
         or os.getenv("READTHEDOCS_CANONICAL_URL")  # do not run for RTD
-        or os.getenv("CI")  # do not run in CI
     )
     and not BYTECODE_FILE_PATH.exists()
 ):  # pragma: no cover
