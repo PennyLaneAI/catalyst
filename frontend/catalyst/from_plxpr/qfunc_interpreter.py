@@ -117,7 +117,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         shots,
         init_qreg,
         cache,
-        qubit_index_recorder,
         *,
         control_wires=(),
         control_values=(),
@@ -125,7 +124,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         self.device = device
         self.shots = shots
         self.init_qreg = init_qreg
-        self.qubit_index_recorder = qubit_index_recorder
         self.subroutine_cache = cache
         self.control_wires = control_wires
         """Any control wires used for a subroutine."""

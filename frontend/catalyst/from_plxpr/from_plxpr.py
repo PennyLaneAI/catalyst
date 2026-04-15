@@ -50,18 +50,12 @@ from catalyst.jax_extras.patches import get_jax_patches
 from catalyst.jax_primitives import (
     device_init_p,
     device_release_p,
-    qalloc_p,
-    qdealloc_p,
     quantum_kernel_p,
 )
 from catalyst.utils.patching import Patcher
 
 from .device_utils import create_device_preprocessing_pipeline
 from .qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
-from .qubit_handler import (
-    QubitHandler,
-    QubitIndexRecorder,
-)
 
 # dummy hop (higher order primitive) is used to just return a jaxpr
 # produced inside of a another jaxpr
@@ -316,9 +310,6 @@ def handle_qnode(
     self, *args, qnode, device, shots_len, execution_config, qfunc_jaxpr, n_consts, batch_dims=None
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
-
-    self.qubit_index_recorder = QubitIndexRecorder()
-
     if shots_len > 1:
         raise NotImplementedError("shot vectors are not yet supported for catalyst conversion.")
 
@@ -386,9 +377,7 @@ def handle_qnode(
         qreg = qref_alloc_p.bind(len(device.wires))
         self.init_qreg = qreg
 
-        converter = PLxPRToQuantumJaxprInterpreter(
-            device, shots, self.init_qreg, {}, self.qubit_index_recorder
-        )
+        converter = PLxPRToQuantumJaxprInterpreter(device, shots, self.init_qreg, {})
         retvals = converter(closed_jaxpr, *args)
         qref_dealloc_p.bind(self.init_qreg)
         device_release_p.bind()
