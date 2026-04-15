@@ -33,7 +33,15 @@ _NUM_ROT_PARAMS = 3
 
 
 def _get_noise_subroutine_name(k, n, number_errors):
-    """Get the symbol name of the noise injection subroutine for a given codeblock type."""
+    """Get the symbol name of the noise injection subroutine for a given codeblock type.
+    Args:
+        k (int): The number of logical qubits of a physical codeblock.
+        n (int): The number of physical data qubits of a physical codeblock.
+        number_errors (int): The number of errors to be injected.
+    Returns:
+        str: The symbol name of the noise injection subroutine.
+    """
+
     return "noise_subroutine_code" + str(k) + "x" + str(n) + "x" + str(number_errors)
 
 
@@ -42,8 +50,8 @@ class ConvertNoiseOpToSubroutinePattern(
 ):  # pylint: disable=too-few-public-methods
     """RewritePattern for converting to the MBQC formalism."""
 
-    def __init__(self, noise_subroutine_dict, n, number_errors):
-        self.noise_subroutine_dict = noise_subroutine_dict
+    def __init__(self, noise_subroutine, n, number_errors):
+        self.noise_subroutine = noise_subroutine
         self._n = n
         self._number_errors = number_errors
 
@@ -94,7 +102,7 @@ class ConvertNoiseOpToSubroutinePattern(
         rewriter.insert_op(qubit_indices_constantop, InsertPoint.before(op))
         rewriter.insert_op(rotation_params_constantop, InsertPoint.before(op))
 
-        callee = builtin.SymbolRefAttr(_get_noise_subroutine_name(k, self._n, self._number_errors))
+        callee = builtin.SymbolRefAttr(self.noise_subroutine.sym_name)
 
         arguments = [
             in_block_cast.results[0],
@@ -102,9 +110,7 @@ class ConvertNoiseOpToSubroutinePattern(
             rotation_params_constantop.results[0],
         ]
 
-        return_types = self.noise_subroutine_dict[
-            _get_noise_subroutine_name(k, self._n, self._number_errors)
-        ].function_type.outputs.data
+        return_types = self.noise_subroutine.function_type.outputs.data
         callOp = func.CallOp(callee, arguments, return_types)
         rewriter.insert_op(callOp, InsertPoint.before(op))
         cast_op = builtin.UnrealizedConversionCastOp.get(callOp.results[0], op.out_codeblock.type)
@@ -119,6 +125,15 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
     name = "convert-noiseop-to-subroutine"
 
     def __init__(self, **options):
+        """Initialize the pass with the given options.
+        The options include:
+        1. number_errors: the number of errors to be injected for each noise operation.
+        Defaults to 1, which is the number of errors that can be corrected by the Steane
+        code.
+        2. n: the number of physical data qubits of per codeblocks. Defaults to 7, which
+        is the number of physical data qubits for the Steane code. NOTE: this option is
+        expected to be specified in the `qecl-to-qecp` skeleton pass.
+        """
         self._number_errors = options.get("number_errors", 1)
         self._n = options.get("n", 7)
 
@@ -248,34 +263,30 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
         # pass could eliminate the unreferenced subroutines.
         # Collect different types of codeblocks in a module.
         k = None
-        noise_subroutine_dict = {}
 
+        # Traverse the module to find the codeblock type (k).
         for op_ in op.walk():
             if isinstance(op_, func.FuncOp) and "quantum.node" in op_.attributes:
                 for op_ in op_.walk():
                     if isinstance(op_, qecl.NoiseOp):
                         k = op_.in_codeblock.type.k.value.data
                         break
+        # Skip the conversion if there is no noise operation in the module.
         if k is None:
             return
 
+        # Insert a noise injection subroutine into the module.
         noise_subroutine = self._create_noise_subroutine(k, self._n, self._number_errors)
         op.regions[0].blocks.first.add_op(noise_subroutine)
-        noise_subroutine_dict[_get_noise_subroutine_name(k, self._n, self._number_errors)] = (
-            noise_subroutine
-        )
 
         pattern_rewriter.PatternRewriteWalker(
             pattern_rewriter.GreedyRewritePatternApplier(
-                [
-                    ConvertNoiseOpToSubroutinePattern(
-                        noise_subroutine_dict, self._n, self._number_errors
-                    )
-                ]
+                [ConvertNoiseOpToSubroutinePattern(noise_subroutine, self._n, self._number_errors)]
             ),
             apply_recursively=False,
         ).rewrite_module(op)
 
+        # Pass to reconcile unrealized casts after the conversion.
         ReconcileUnrealizedCastsPass().apply(_ctx, op)
 
 
