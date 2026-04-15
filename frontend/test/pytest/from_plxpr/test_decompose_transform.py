@@ -51,7 +51,6 @@ def _normalize_gate_types(gate_types):
 class TestGraphDecomposition:
     """Test the graph-decomposition built-in transform."""
 
-    @pytest.mark.usefixtures("use_capture")
     def test_with_precompiled_rule(self):
         """Test graph-decomposition with precompiled rules are handled correctly."""
 
@@ -72,7 +71,6 @@ class TestGraphDecomposition:
         resources = qml.specs(circuit, level="device")(x, y, z)["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.usefixtures("use_capture")
     def test_decompose_multi_qubit_gates_precompiled(self):
         """Test that multi-qubit gates are decomposed correctly using precompiled rules."""
 
@@ -92,7 +90,6 @@ class TestGraphDecomposition:
         resources = qml.specs(circuit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.usefixtures("use_capture")
     def test_alt_decomps(self):
         """Test the conversion of a circuit with a custom decomposition."""
 
@@ -122,7 +119,6 @@ class TestGraphDecomposition:
         resources = qml.specs(circuit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.usefixtures("use_capture")
     def test_fixed_rules(self):
         """Test the decompose lowering pass with custom decomposition rules."""
 
@@ -175,7 +171,6 @@ class TestGraphDecomposition:
         resources = qml.specs(circuit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.usefixtures("use_capture")
     def test_multi_passes(self):
         """Test the graph_decomposition pass with other passes."""
 
@@ -196,7 +191,6 @@ class TestGraphDecomposition:
         resources = qml.specs(circuit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.usefixtures("use_capture")
     def test_multi_graph_decomposition(self):
         """Test that multiple graph-decomposition builtin transforms can be applied."""
 
@@ -246,7 +240,6 @@ class TestGraphDecomposition:
     @pytest.mark.xfail(
         reason="only quantum.custom gates are currently supported with graph_decomposition"
     )
-    @pytest.mark.usefixtures("use_capture")
     def test_multirz(self):
         """Test that TensorLike parameters in MultiRZ are handled correctly in rules."""
 
@@ -276,7 +269,6 @@ class TestGraphDecomposition:
         resources = qml.specs(circuit, level="device")(0.5, 0.3)["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.usefixtures("use_capture")
     def test_with_subroutine(self):
         """Test that decompositions can happen inside subroutines."""
 
@@ -301,7 +293,6 @@ class TestGraphDecomposition:
         assert qml.math.allclose(r1, np.cos(0.5))
         assert qml.math.allclose(r2, np.cos(1.2))
 
-    @pytest.mark.usefixtures("use_capture")
     def test_ftqc_rotxzx(self):
         """Test qml.ftqc.RotXZX with alt_decomps."""
 
@@ -330,7 +321,6 @@ class TestGraphDecomposition:
     @pytest.mark.xfail(
         reason="graph-decomposition supports pre-compiled rules, alt_decomps and fix_decomps"
     )
-    @pytest.mark.usefixtures("use_capture")
     def test_ftqc_custom_ops(self):
         """Test that ftqc Ops cannot be decomposed without defining rules."""
 
@@ -348,7 +338,6 @@ class TestGraphDecomposition:
         assert resources == expected_resources
 
     @pytest.mark.xfail(reason="graph-decomposition does not yet support adjoint or ctrl operations")
-    @pytest.mark.usefixtures("use_capture")
     def test_adjoint(self):
         """Test the graph_decomposition pass with adjoint operations."""
 
@@ -369,7 +358,6 @@ class TestGraphDecomposition:
         assert resources == expected_resources
 
     @pytest.mark.xfail(reason="graph-decomposition does not yet support adjoint or ctrl operations")
-    @pytest.mark.usefixtures("use_capture")
     def test_ctrl(self):
         """Test the graph_decomposition pass with controlled operations."""
 
@@ -389,7 +377,6 @@ class TestGraphDecomposition:
         assert resources == expected_resources
 
     @pytest.mark.xfail(reason="graph-decomposition does not yet support work wires")
-    @pytest.mark.usefixtures("use_capture")
     def test_work_wires(self):
         """Test that graph decomposition supports work_wires."""
 

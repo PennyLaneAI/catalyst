@@ -15,6 +15,7 @@
 #define DEBUG_TYPE "graph-decomposition"
 
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -50,23 +51,26 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     void runOnOperation() final
     {
         // Debugging output for command-line options
-        // llvm::errs() << "targetGateSetOption\n";
-        // for (auto item : targetGateSetOption) {
-        //     llvm::errs() << "\t" << item << ",\n";
-        // }
-        // llvm::errs() << "\n";
+        LLVM_DEBUG(llvm::dbgs() << "Running GraphDecompositionPass with options:\n");
+        LLVM_DEBUG({
+            llvm::dbgs() << "targetGateSetOption\n";
+            for (auto item : targetGateSetOption) {
+                llvm::dbgs() << "\t" << item << ",\n";
+            }
+            llvm::dbgs() << "\n";
 
-        // llvm::errs() << "fixedDecompsOption\n";
-        // for (auto item : fixedDecompsOption) {
-        //     llvm::errs() << "\t" << item << ",\n";
-        // }
-        // llvm::errs() << "\n";
+            llvm::dbgs() << "fixedDecompsOption\n";
+            for (auto item : fixedDecompsOption) {
+                llvm::dbgs() << "\t" << item << ",\n";
+            }
+            llvm::dbgs() << "\n";
 
-        // llvm::errs() << "altDecompsOption\n";
-        // for (auto item : altDecompsOption) {
-        //     llvm::errs() << "\t" << item << ",\n";
-        // }
-        // llvm::errs() << "\n";
+            llvm::dbgs() << "altDecompsOption\n";
+            for (auto item : altDecompsOption) {
+                llvm::dbgs() << "\t" << item << ",\n";
+            }
+            llvm::dbgs() << "\n";
+        });
 
         ///////////////////////////
         // Step 1: Gather inputs for graph
@@ -205,6 +209,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             mlir::parseSourceFile<mlir::ModuleOp>(filename, config);
 
         if (!moduleOp) {
+            mlir::emitError(mlir::UnknownLoc::get(context))
+                << "failed to load built-in decomposition rules from '" << filename
+                << "': the rules file could not be parsed";
             return;
         }
 
@@ -252,8 +259,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         }
     }
 
-    void getOperators([[maybe_unused]] ModuleOp module,
-                      [[maybe_unused]] std::vector<OperatorNode> &operators)
+    void getOperators(ModuleOp module, std::vector<OperatorNode> &operators)
     {
         module.walk([&](CustomOp op) {
             OperatorNode node;
@@ -305,6 +311,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             if (auto resourcesAttr = func->getAttrOfType<DictionaryAttr>("resources")) {
                 DictionaryAttr operations =
                     mlir::dyn_cast<DictionaryAttr>(resourcesAttr.get("operations"));
+                if (!operations) {
+                    continue; // skip this rule if operations attribute is missing or not a
+                              // dictionary
+                }
                 for (const auto &operation : operations) {
                     RuleTerm term;
                     auto res_int = operation.getValue();
@@ -358,7 +368,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
             module.push_back(it->second.release());
         }
-    };
+    }
 
     /**
      * @brief Convert the parsed fixed-decomposition mapping (op name → rule name)
