@@ -601,6 +601,7 @@
   [(#2492)](https://github.com/PennyLaneAI/catalyst/pull/2492)
   [(#2674)](https://github.com/PennyLaneAI/catalyst/pull/2674)
   [(#2642)](https://github.com/PennyLaneAI/catalyst/pull/2642)
+  [(#2692)](https://github.com/PennyLaneAI/catalyst/pull/2692)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
