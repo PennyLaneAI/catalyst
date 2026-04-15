@@ -602,6 +602,7 @@
   [(#2492)](https://github.com/PennyLaneAI/catalyst/pull/2492)
   [(#2674)](https://github.com/PennyLaneAI/catalyst/pull/2674)
   [(#2642)](https://github.com/PennyLaneAI/catalyst/pull/2642)
+  [(#2692)](https://github.com/PennyLaneAI/catalyst/pull/2692)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
@@ -692,6 +693,7 @@
 * Added lowering of `pbc.ppm`, `pbc.ppr`, and `quantum.paulirot` to the runtime CAPI and QuantumDevice C++ API.
   [(#2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
   [(#2413)](https://github.com/PennyLaneAI/catalyst/pull/2413)
+  [(#2683)](https://github.com/PennyLaneAI/catalyst/pull/2683)
 
 * A new compiler pass, `unroll-conditional-ppr-ppm`, has been added to convert conditional or
   multiplexed Pauli-product rotations and measurements into their basic versions nested inside
