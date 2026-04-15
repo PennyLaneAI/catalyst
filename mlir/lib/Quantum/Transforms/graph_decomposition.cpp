@@ -15,6 +15,7 @@
 #define DEBUG_TYPE "graph-decomposition"
 
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -74,17 +75,24 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 1: Gather inputs for graph
+        ModuleOp module = getOperation();
         std::vector<OperatorNode> setOfOps;
         std::vector<RuleNode> setOfRules;
         llvm::StringMap<mlir::OwningOpRef<func::FuncOp>> ruleNameToFuncOp;
-        llvm::SmallVector<std::string> userRuleNames;
+        llvm::StringSet<> userRuleNames;
         llvm::SmallVector<mlir::OwningOpRef<func::FuncOp>>
             allUserRules; // includes rules unused in this decomp
         llvm::StringMap<std::string> opToFixedDecompName;
         llvm::StringMap<llvm::SmallVector<std::string>> opToAltDecompNames;
         WeightedGateset targetGateSet;
 
-        ModuleOp module = cast<ModuleOp>(getOperation());
+        // Index rules by name for O(1) lookup instead of scanning the vector
+        // for every fixed-decomp entry.
+        llvm::StringMap<const RuleNode *> rulesByName(setOfRules.size());
+        for (const auto &rule : setOfRules) {
+            rulesByName[rule.name] = &rule;
+        }
+
         // get names for fixed and alt decomps
         parseFixedDecomps(opToFixedDecompName, userRuleNames);
         parseAltDecomps(opToAltDecompNames, userRuleNames);
@@ -94,14 +102,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         // NOTE: getOperators must be after getRuleNodes, which removes user rules from the module.
         // This prevents operators in user rules from being added to the graph.
-        getRuleNodes(module, bytecodeRulesFile, setOfRules, userRuleNames, allUserRules,
-                     ruleNameToFuncOp);
-        getOperators(module, setOfOps);
+        getRuleNodes(bytecodeRulesFile, setOfRules, userRuleNames, allUserRules, ruleNameToFuncOp);
+        getOperators(setOfOps);
 
         ///////////////////////////
         // Step 2: Build and solve the decomposition graph
-        FixedDecomps fixedDecomps = buildFixedDecomps(opToFixedDecompName, setOfRules);
-        AltDecomps altDecomps = buildAltDecomps(opToAltDecompNames, setOfRules);
+        FixedDecomps fixedDecomps = buildFixedDecomps(opToFixedDecompName, rulesByName);
+        AltDecomps altDecomps = buildAltDecomps(opToAltDecompNames, rulesByName);
         DecompositionGraph graph(setOfOps, targetGateSet, setOfRules, std::move(fixedDecomps),
                                  std::move(altDecomps));
         DecompositionSolver solver(graph);
@@ -109,7 +116,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         ///////////////////////////
         // Step 3: Insert decomposition rules picked by the graph solver (solution) into the
         // module
-        insertChosenRules(module, solution, ruleNameToFuncOp);
+        insertChosenRules(solution, ruleNameToFuncOp);
 
         ///////////////////////////
         // Step 4: Run decompose-lowering to apply the decomposition rules
@@ -132,7 +139,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
   private:
     void parseFixedDecomps(llvm::StringMap<std::string> &opToFixedDecompName,
-                           llvm::SmallVectorImpl<std::string> &userRuleNames)
+                           llvm::StringSet<> &userRuleNames)
     {
         for (const std::string &opRulePair : fixedDecompsOption) {
             llvm::StringRef pairRef(opRulePair);
@@ -147,12 +154,12 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 continue;
             }
             opToFixedDecompName[opName.str()] = ruleName.str();
-            userRuleNames.push_back(ruleName.str());
+            userRuleNames.insert(ruleName.str());
         }
     }
 
     void parseAltDecomps(llvm::StringMap<llvm::SmallVector<std::string>> &opToAltDecompNames,
-                         llvm::SmallVectorImpl<std::string> &userRuleNames)
+                         llvm::StringSet<> &userRuleNames)
     {
         for (const std::string &opRulesPair : altDecompsOption) {
             llvm::StringRef pairRef(opRulesPair);
@@ -173,7 +180,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 ruleNameRef.consume_back("\"");
                 if (!ruleNameRef.empty()) {
                     opRulesList.push_back(ruleNameRef.str());
-                    userRuleNames.push_back(ruleNameRef.str());
+                    userRuleNames.insert(ruleNameRef.str());
                 }
             }
         }
@@ -201,9 +208,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     }
 
     void loadBuiltInDecompositionRules(
-        llvm::StringRef filename, mlir::MLIRContext *context,
+        llvm::StringRef filename,
         llvm::SmallVector<mlir::OwningOpRef<mlir::func::FuncOp>> &ruleRegistry)
     {
+        mlir::MLIRContext *context = &getContext();
         mlir::ParserConfig config(context);
         mlir::OwningOpRef<mlir::ModuleOp> moduleOp =
             mlir::parseSourceFile<mlir::ModuleOp>(filename, config);
@@ -226,10 +234,11 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * @brief Remove user rules from the module, loading into
      */
     LogicalResult
-    loadUserDecompositionRules(ModuleOp module, llvm::SmallVector<std::string> &userRuleNames,
+    loadUserDecompositionRules(llvm::StringSet<> &userRuleNames,
                                llvm::SmallVector<mlir::OwningOpRef<mlir::func::FuncOp>> &graphRules,
                                llvm::SmallVector<mlir::OwningOpRef<mlir::func::FuncOp>> &rules)
     {
+        mlir::ModuleOp module = getOperation();
         if (userRuleNames.empty()) {
             return success();
         }
@@ -247,8 +256,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         module.walk([&](mlir::func::FuncOp func) {
             if (func->hasAttr("target_gate")) {
                 userRules.push_back(func);
-                if (std::find(userRuleNames.begin(), userRuleNames.end(), func.getName()) !=
-                    userRuleNames.end()) {
+                if (userRuleNames.contains(func.getName())) {
                     graphRules.push_back(mlir::OwningOpRef<mlir::func::FuncOp>(func.clone()));
                 }
             }
@@ -262,9 +270,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         return success();
     }
 
-    void getOperators(ModuleOp module, std::vector<OperatorNode> &operators)
+    void getOperators(std::vector<OperatorNode> &operators)
     {
-        module.walk([&](CustomOp op) {
+        getOperation().walk([&](CustomOp op) {
             OperatorNode node;
             node.name = op.getGateName().str();
             auto inQubits = op.getInQubits();
@@ -280,14 +288,14 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * @brief create RuleNodes for each rule available to be used in graph decomposition. These
      * rules are added to the rules parameter.
      */
-    void getRuleNodes(ModuleOp module, llvm::StringRef filename, std::vector<RuleNode> &rules,
-                      llvm::SmallVector<std::string> &userRuleNames,
+    void getRuleNodes(llvm::StringRef filename, std::vector<RuleNode> &rules,
+                      llvm::StringSet<> &userRuleNames,
                       llvm::SmallVector<mlir::OwningOpRef<func::FuncOp>> &userRules,
                       llvm::StringMap<mlir::OwningOpRef<func::FuncOp>> &ruleNameToFuncOp)
     {
         llvm::SmallVector<mlir::OwningOpRef<mlir::func::FuncOp>> graphRules;
-        loadBuiltInDecompositionRules(filename, module.getContext(), graphRules);
-        if (failed(loadUserDecompositionRules(module, userRuleNames, graphRules, userRules))) {
+        loadBuiltInDecompositionRules(filename, graphRules);
+        if (failed(loadUserDecompositionRules(userRuleNames, graphRules, userRules))) {
             return signalPassFailure();
         }
 
@@ -350,14 +358,14 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * later use in the decompose-lowering patterns to apply the decomposition rules and rewrite
      * the quantum operations.
      *
-     * @param module The MLIR module to insert the chosen decomposition rules into.
      * @param solution The chosen decomposition rules from the graph solver.
      * @param ruleNameToFuncOp A mapping from rule names to their corresponding function
      * operations.
      */
-    void insertChosenRules(mlir::ModuleOp module, GraphResult &solution,
+    void insertChosenRules(GraphResult &solution,
                            llvm::StringMap<mlir::OwningOpRef<func::FuncOp>> &ruleNameToFuncOp)
     {
+        mlir::ModuleOp module = getOperation();
         for (const auto &[_, chosenRule] : solution) {
             if (chosenRule.isBasis) {
                 continue; // skip basis rules as they don't correspond to actual decomposition
@@ -387,15 +395,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * @return Core::FixedDecomps  Mapping from OperatorNode to its fixed RuleNode.
      */
     FixedDecomps buildFixedDecomps(const llvm::StringMap<std::string> &opToFixedDecompName,
-                                   const std::vector<RuleNode> &setOfRules)
+                                   const llvm::StringMap<const RuleNode *> &rulesByName)
     {
-        // Index rules by name for O(1) lookup instead of scanning the vector
-        // for every fixed-decomp entry.
-        std::unordered_map<std::string, const RuleNode *> rulesByName;
-        rulesByName.reserve(setOfRules.size());
-        for (const auto &rule : setOfRules) {
-            rulesByName.emplace(rule.name, &rule);
-        }
 
         FixedDecomps fixedDecomps;
         fixedDecomps.reserve(opToFixedDecompName.size());
@@ -427,16 +428,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      */
     AltDecomps
     buildAltDecomps(const llvm::StringMap<llvm::SmallVector<std::string>> &opToAltDecompNames,
-                    const std::vector<RuleNode> &setOfRules)
+                    const llvm::StringMap<const RuleNode *> &rulesByName)
     {
-        // Reuse the same index as buildFixedDecomps. If both are called,
-        // consider building the index once and passing it in.
-        std::unordered_map<std::string, const RuleNode *> rulesByName;
-        rulesByName.reserve(setOfRules.size());
-        for (const auto &rule : setOfRules) {
-            rulesByName.emplace(rule.name, &rule);
-        }
-
         AltDecomps altDecomps;
         altDecomps.reserve(opToAltDecompNames.size());
 
