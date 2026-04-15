@@ -31,6 +31,7 @@ struct PipelineInfo {
 using PipelineNames = std::vector<std::string>;
 using PipelineList = std::vector<PipelineInfo>;
 
+// clang-format off
 const PipelineList pipelineList{
     {"quantum-compilation-pipeline",
      {// We want the invariant that transforms that generate multiple
@@ -47,65 +48,98 @@ const PipelineList pipelineList{
       // keep inlining modules targeting the Catalyst runtime.
       // But qnodes targeting other backends may choose to lower
       // this into something else.
-      "inline-nested-module", "lower-mitigation", "adjoint-lowering",
+      "inline-nested-module",
+      "lower-mitigation",
+      "adjoint-lowering",
       // TODO: we can remove the following 2 passes once PBC has its own pipeline.
       "lower-pbc-init-ops",
+      // Disabled pass
+      // -------------
       //"unroll-conditional-ppr-ppm",
       "disable-assertion"}},
     {"hlo-lowering-pipeline",
-     {"canonicalize", "func.func(chlo-legalize-to-stablehlo)",
+     {"canonicalize",
+      "func.func(chlo-legalize-to-stablehlo)",
       "func.func(stablehlo-legalize-control-flow)",
-      "func.func(stablehlo-aggressive-simplification)", "stablehlo-legalize-to-linalg",
-      "func.func(stablehlo-legalize-to-std)", "func.func(stablehlo-legalize-sort)",
-      "stablehlo-convert-to-signless", "canonicalize", "scatter-lowering",
-      "hlo-custom-call-lowering", "cse", "func.func(linalg-detensorize{aggressive-mode})",
-      "detensorize-scf", "detensorize-function-boundary", "canonicalize", "symbol-dce"}},
-    {"gradient-lowering-pipeline", {"annotate-invalid-gradient-functions", "lower-gradients"}},
+      "func.func(stablehlo-aggressive-simplification)",
+      "stablehlo-legalize-to-linalg",
+      "func.func(stablehlo-legalize-to-std)",
+      "func.func(stablehlo-legalize-sort)",
+      "stablehlo-convert-to-signless",
+      "canonicalize",
+      "scatter-lowering",
+      "hlo-custom-call-lowering",
+      "cse",
+      "func.func(linalg-detensorize{aggressive-mode})",
+      "detensorize-scf",
+      "detensorize-function-boundary",
+      "canonicalize",
+      "symbol-dce"}},
+    {"gradient-lowering-pipeline",
+     {"annotate-invalid-gradient-functions",
+      "lower-gradients"}},
     {"bufferization-pipeline",
-     {//"inline",
-      // tensor.pad
+     {// tensor.pad
       "convert-tensor-to-linalg",
       // Must be run before --one-shot-bufferize.
-      "convert-elementwise-to-linalg", "gradient-preprocess", "eliminate-empty-tensors",
+      "convert-elementwise-to-linalg",
+      "gradient-preprocess",
+      "eliminate-empty-tensors",
       // This pass is needed to avoid aliasing of the input buffer with the output buffer.
-      "mark-entry-point-args-non-writable", "one-shot-bufferize",
+      "mark-entry-point-args-non-writable",
+      "one-shot-bufferize",
       // Remove dead memrefToTensorOp's
-      "canonicalize", "gradient-postprocess",
+      "canonicalize",
+      "gradient-postprocess",
       // Introduced during gradient-bufferize of callbacks
-      "func.func(buffer-hoisting)", "func.func(buffer-loop-hoisting)",
+      "func.func(buffer-hoisting)",
+      "func.func(buffer-loop-hoisting)",
       "func.func(promote-buffers-to-stack)",
       // TODO: migrate to new buffer deallocation "buffer-deallocation-pipeline"
-      "func.func(buffer-deallocation)", "convert-arraylist-to-memref",
+      "func.func(buffer-deallocation)",
+      "convert-arraylist-to-memref",
       "convert-bufferization-to-memref",
       // Must be after convert-bufferization-to-memref.
       // Otherwise, there are issues in the lowering of dynamic tensors.
       "canonicalize",
+      // Disabled pass
+      // -------------
       //"cse",
       "cp-global-memref"}},
     {"llvm-dialect-lowering-pipeline",
-     {//"qnode-to-async-lowering",
-      //"async-func-to-async-runtime",
-      //"async-to-async-runtime",
-      //"convert-async-to-llvm",
-      "expand-realloc", "convert-gradient-to-llvm", "memrefcpy-to-linalgcpy",
-      "func.func(convert-linalg-to-loops)", "convert-scf-to-cf",
+     {"qnode-to-async-lowering",
+      "async-func-to-async-runtime",
+      "async-to-async-runtime",
+      "convert-async-to-llvm",
+      "expand-realloc",
+      "convert-gradient-to-llvm",
+      "memrefcpy-to-linalgcpy",
+      "func.func(convert-linalg-to-loops)",
+      "convert-scf-to-cf",
       // This pass expands memref ops that modify the metadata of a memref (sizes, offsets,
       // strides) into a sequence of easier to analyze constructs. In particular, this pass
       // transforms ops into an explicit sequence of operations that model the effect of this
       // operation on the different metadata. This pass uses affine constructs to materialize
       // these effects. Concretely, expanded-strided-metadata is used to decompose
       // memref.subview as it has no lowering in -finalize-memref-to-llvm.
-      "expand-strided-metadata", "lower-affine",
+      "expand-strided-metadata",
+      "lower-affine",
       // Some arith ops (ceildivsi) require expansion to be lowered to llvm.
       "arith-expand",
       // Added for complex.exp lowering.
-      "convert-complex-to-standard", "convert-complex-to-llvm", "convert-math-to-llvm",
+      "convert-complex-to-standard",
+      "convert-complex-to-llvm",
+      "convert-math-to-llvm",
       // Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
-      "convert-math-to-libm", "convert-arith-to-llvm",
+      "convert-math-to-libm",
+      "convert-arith-to-llvm",
       // Load and store are converted to LLVM with TBAA tags.
-      "memref-to-llvm-tbaa", "finalize-memref-to-llvm{use-generic-functions}",
-      "convert-index-to-llvm", "convert-catalyst-to-llvm",
-      "convert-pbc-to-llvm", // TODO: remove this once PBC has its own pipeline
+      "memref-to-llvm-tbaa",
+      "finalize-memref-to-llvm{use-generic-functions}",
+      "convert-index-to-llvm",
+      "convert-catalyst-to-llvm",
+      // TODO: remove this once PBC has its own pipeline
+      "convert-pbc-to-llvm",
       "convert-quantum-to-llvm",
       // There should be no identical code folding
       // (`mergeIdenticalBlocks` in the MLIR source code)
@@ -113,10 +147,15 @@ const PipelineList pipelineList{
       // So, if there's a pass from the beginning of this list to here that does folding,
       // add-exception-handling will fail to add async.drop_ref correctly.
       // See https://github.com/PennyLaneAI/catalyst/pull/995
-      "add-exception-handling", "emit-catalyst-py-interface",
+      "add-exception-handling",
+      "emit-catalyst-py-interface",
       // Remove any dead casts as the final pass expects to remove all existing casts,
       // but only those that form a loop back to the original type.
-      "canonicalize", "reconcile-unrealized-casts", "gep-inbounds", "register-inactive-callback"}}};
+      "canonicalize",
+      "reconcile-unrealized-casts",
+      "gep-inbounds",
+      "register-inactive-callback"}}};
+// clang-format on
 
 PipelineNames getPipelineNames()
 {
