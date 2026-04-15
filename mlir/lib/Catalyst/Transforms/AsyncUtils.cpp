@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Catalyst/Transforms/AsyncUtils.h"
+
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-
-#include "Catalyst/Transforms/AsyncUtils.h"
 
 using namespace mlir;
 

@@ -39,7 +39,6 @@ from xdsl import context, ir, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin, func, tensor
 from xdsl.pattern_rewriter import PatternRewriter, RewritePattern
 from xdsl.rewriter import InsertPoint
-from xdsl_jax.dialects import stablehlo
 
 from catalyst.python_interface.conversion import xdsl_module
 from catalyst.python_interface.dialects import quantum
@@ -47,6 +46,11 @@ from catalyst.python_interface.pass_api import compiler_transform
 from catalyst.python_interface.transforms.quantum.diagonalize_measurements import (
     DiagonalizeFinalMeasurementsPass,
 )
+from catalyst.python_interface.transforms.quantum.wrap_qnode import (
+    WrapQNodePass,
+    get_call_op,
+)
+from catalyst.python_interface.utils import get_constant_from_ssa
 
 
 @dataclass(frozen=True)
@@ -61,17 +65,20 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the measurements-from-samples pass."""
-        shots = _get_static_shots_value_from_first_device_op(op)
 
         # diagonalize measurements before converting to samples
         DiagonalizeFinalMeasurementsPass().apply(_ctx, op)
 
+        # wrap the quantum.nodes in classical functions to store post-processing
+        WrapQNodePass(pass_str="from_samples").apply(_ctx, op)
+
+        # apply the patterns for measurements_from_samples
         greedy_applier = pattern_rewriter.GreedyRewritePatternApplier(
             [
-                ExpvalAndVarPattern(shots),
-                ProbsPattern(shots),
-                CountsPattern(shots),
-                StatePattern(shots),
+                ExpvalAndVarPattern(),
+                ProbsPattern(),
+                CountsPattern(),
+                StatePattern(),
             ]
         )
         walker = pattern_rewriter.PatternRewriteWalker(greedy_applier, apply_recursively=False)
@@ -90,14 +97,12 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         shots (int): The number of shots (e.g. as retrieved from the DeviceInitOp).
     """
 
-    def __init__(self, shots: int):
+    def __init__(self):
         super().__init__()
-        assert isinstance(
-            shots, int
-        ), f"Expected `shots` to be an integer value but got {type(shots).__name__}"
-        if shots == 0:
-            raise ValueError("The measurements_from_samples pass requires non-zero shots")
-        self._shots = shots
+
+        self._shots = None
+        self.qnode: func.FuncOp | None = None
+        self.call_op: func.CallOp | None = None
 
     @abstractmethod
     def match_and_rewrite(self, op: ir.Operation, rewriter: PatternRewriter, /):
@@ -368,81 +373,148 @@ class MeasurementsFromSamplesPattern(RewritePattern):
 
         return n_qubits
 
+    def update_returns(
+        self,
+        mp_index: int,
+        sample_op: quantum.SampleOp,
+        postprocessing_func_call_op: func.CallOp,
+        rewriter: PatternRewriter,
+    ):
+        """Update the return structure so that the qnode returns the output of sample
+        instead of the original output, and the outer function returns the output of
+        post-processing instead of directly returning the output of calling the qnode.
+
+        Also update result shapes in the CallOp for the QNode call to reflect this change,
+        since this is not updated when modifying the ReturnOps.
+
+        This function updates the self.qnode and self.call_op attributes on the Pattern.
+
+        Args:
+            mp_index (int): The index of the measurement process to be updated. The
+                relevant function returns will be updated at this index.
+            sample_op (quantum.SampleOp): The operation whose results the Qnode should return.
+            postprocessing_func_call_op (func.CallOp): The postprocessing CallOp that accepts
+                results of the QNode CallOp. The outer function will be updated to return the
+                results of this operation instead of returning the QNode CallOp results directly.
+            rewriter (PatternRewriter): The xDSL pattern rewriter.
+        """
+        assert self.qnode is not None
+        assert self.call_op is not None
+
+        # update the qnode to return the result of the SampleOp directly
+        return_op = self.qnode.get_return_op()
+        assert return_op is not None, "QNode has no return op"
+        return_op.operands[mp_index] = sample_op.results[0]
+        rewriter.notify_op_modified(return_op)
+        self.qnode.update_function_type()
+
+        # update the qnode CallOp in the outer function to reflect the new shape for returned data
+        result_types = self.qnode.function_type.outputs.data
+        new_call_op = func.CallOp(self.call_op.callee, self.call_op.arguments, result_types)
+        rewriter.replace_op(self.call_op, new_call_op)
+        self.call_op = new_call_op
+
+        # update the outer function to return postprocessed data instead of the raw data
+        final_return = [
+            use.operation
+            for use in list(self.call_op.results[mp_index].uses)
+            if isinstance(use.operation, func.ReturnOp)
+        ][0]
+        final_return.operands[mp_index] = postprocessing_func_call_op.results[0]
+        rewriter.notify_op_modified(final_return)
+
 
 class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
     """A rewrite pattern for the ``measurements_from_samples`` transform that matches and rewrites
     ``qml.expval()`` and ``qml.var()`` operations.
+
+    Note: only single-wire observables are currently supported
 
     Args:
         shots (int): The number of shots (e.g. as retrieved from the DeviceInitOp).
     """
 
     @pattern_rewriter.op_type_rewrite_pattern
-    def match_and_rewrite(
-        self, matched_op: quantum.ExpvalOp | quantum.VarianceOp, rewriter: PatternRewriter, /
-    ):
-        """Match and rewrite for quantum.ExpvalOp."""
-        observable_op = self.get_observable_op(matched_op)
-        in_qubit = observable_op.operands[0]
-        compbasis_op = self.insert_compbasis_op(in_qubit, observable_op, rewriter)
-        sample_op = self.insert_sample_op(compbasis_op, self._shots, 1, rewriter)
+    def match_and_rewrite(self, func_op: func.FuncOp, rewriter: PatternRewriter, /):
+        """Match and rewrite for quantum.ExpvalOp and quantum.VarianceOp."""
 
-        # Insert the post-processing function into current module or get handle to it if already
-        # inserted
-        match matched_op:
-            case quantum.ExpvalOp():
-                postprocessing_func_name = f"expval_from_samples.tensor.{self._shots}x1xf64"
-                postprocessing_jit_func = _postprocessing_expval
-            case quantum.VarianceOp():
-                postprocessing_func_name = f"var_from_samples.tensor.{self._shots}x1xf64"
-                postprocessing_jit_func = _postprocessing_var
-            case _:
-                assert False, (
-                    f"Expected a quantum.ExpvalOp or quantum.VarianceOp, but got "
-                    f"{type(matched_op).__name__}"
+        if "quantum.node" not in func_op.attributes:
+            return
+
+        self._shots = get_shots(func_op)
+        self.qnode = func_op
+        self.call_op = get_call_op(func_op)
+
+        measurement_processes = [
+            op
+            for op in self.qnode.body.walk()
+            if isinstance(op, (quantum.VarianceOp, quantum.ExpvalOp))
+        ]
+
+        for matched_op in measurement_processes:
+
+            observable_op = self.get_observable_op(matched_op)
+            in_qubit = observable_op.operands[0]
+            compbasis_op = self.insert_compbasis_op(in_qubit, observable_op, rewriter)
+            sample_op = self.insert_sample_op(compbasis_op, self._shots, 1, rewriter)
+
+            # Insert the post-processing function into current module or get handle to it if already
+            # inserted
+            match matched_op:
+                case quantum.ExpvalOp():
+                    postprocessing_func_name = f"expval_from_samples.tensor.{self._shots}x1xf64"
+                    postprocessing_jit_func = _postprocessing_expval
+                case quantum.VarianceOp():
+                    postprocessing_func_name = f"var_from_samples.tensor.{self._shots}x1xf64"
+                    postprocessing_jit_func = _postprocessing_var
+                case _:
+                    assert False, (
+                        f"Expected a quantum.ExpvalOp or quantum.VarianceOp, but got "
+                        f"{type(matched_op).__name__}"
+                    )
+
+            postprocessing_func_op = self.get_postprocessing_func_op_from_block_by_name(
+                matched_op.parent_op().parent, postprocessing_func_name
+            )
+
+            if postprocessing_func_op is None:
+                # TODO: Do we have to set the shape of the samples array statically here? Or can the
+                # shape (shots, wire) be dynamic and given as SSA values?
+                # Same goes for the column/wire indices (the second argument).
+                postprocessing_module = postprocessing_jit_func(
+                    jax.core.ShapedArray([self._shots, 1], float)
                 )
 
-        postprocessing_func_op = self.get_postprocessing_func_op_from_block_by_name(
-            matched_op.parent_op().parent, postprocessing_func_name
-        )
+                postprocessing_func_op = self.get_postprocessing_funcs_from_module_and_insert(
+                    postprocessing_module, matched_op, postprocessing_func_name
+                )
 
-        if postprocessing_func_op is None:
-            # TODO: Do we have to set the shape of the samples array statically here? Or can the
-            # shape (shots, wire) be dynamic and given as SSA values?
-            # Same goes for the column/wire indices (the second argument).
-            postprocessing_module = postprocessing_jit_func(
-                jax.core.ShapedArray([self._shots, 1], float), 0
+            # get the from_elements_op the original MP result is passed to
+            # from its uses get the index this result is returned at
+            from_elements_op = list(matched_op.results[0].uses)[0].operation
+            assert isinstance(
+                from_elements_op, tensor.FromElementsOp
+            ), f"Expected a tensor.from_elements op, but got {type(from_elements_op).__name__}"
+            mp_index = list(from_elements_op.results[0].uses)[0].index
+
+            # Insert the call to the post-processing function
+            postprocessing_func_call_op = func.CallOp(
+                callee=builtin.SymbolRefAttr(postprocessing_func_op.sym_name),
+                arguments=[self.call_op.results[mp_index]],
+                return_types=[builtin.TensorType(builtin.Float64Type(), shape=())],
+            )
+            rewriter.insert_op(
+                postprocessing_func_call_op, insertion_point=InsertPoint.after(self.call_op)
             )
 
-            postprocessing_func_op = self.get_postprocessing_funcs_from_module_and_insert(
-                postprocessing_module, matched_op, postprocessing_func_name
-            )
+            # update the returns of the QNode (to return the raw samples) and the
+            # outer function (to return the post-processed values)
+            self.update_returns(mp_index, sample_op, postprocessing_func_call_op, rewriter)
 
-        # Insert the op that specifies which column in the samples array to access.
-        # TODO: This also assumes MP acts on a single wire (hence we always use column 0 of the
-        # samples here); what if MP acts on multiple wires?
-        column_index_op = self.insert_constant_int_op(
-            0, insert_point=InsertPoint.after(sample_op), rewriter=rewriter
-        )
-
-        # Insert the call to the post-processing function
-        postprocessing_func_call_op = func.CallOp(
-            callee=builtin.FlatSymbolRefAttr(postprocessing_func_op.sym_name),
-            arguments=[sample_op.results[0], column_index_op],
-            return_types=[builtin.TensorType(builtin.Float64Type(), shape=())],
-        )
-
-        # The op to replace is not the expval/var op itself, but the tensor.from_elements
-        # op that follows
-        op_to_replace = list(matched_op.results[0].uses)[0].operation
-        assert isinstance(
-            op_to_replace, tensor.FromElementsOp
-        ), f"Expected to replace a tensor.from_elements op, but got {type(op_to_replace).__name__}"
-        rewriter.replace_op(op_to_replace, postprocessing_func_call_op)
-
-        # Finally, erase the expval/var op and its associated observable op
-        rewriter.erase_op(matched_op)
-        rewriter.erase_op(observable_op)
+            # delete now unused obs --> mp --> tensor chain
+            rewriter.erase_op(from_elements_op)
+            rewriter.erase_op(matched_op)
+            rewriter.erase_op(observable_op)
 
 
 class ProbsPattern(MeasurementsFromSamplesPattern):
@@ -454,51 +526,82 @@ class ProbsPattern(MeasurementsFromSamplesPattern):
     """
 
     @pattern_rewriter.op_type_rewrite_pattern
-    def match_and_rewrite(self, probs_op: quantum.ProbsOp, rewriter: PatternRewriter, /):
+    def match_and_rewrite(self, func_op: func.FuncOp, rewriter: PatternRewriter, /):
         """Match and rewrite for quantum.ProbsOp."""
-        compbasis_op = probs_op.operands[0].owner
 
-        n_qubits = None
-        if compbasis_op.qreg is not None:
-            n_qubits = self.get_n_qubits_from_qreg(compbasis_op.qreg)
+        if "quantum.node" not in func_op.attributes:
+            return
 
-        elif not compbasis_op.qubits == ():
-            n_qubits = len(compbasis_op.qubits)
+        self._shots = get_shots(func_op)
+        self.qnode = func_op
+        self.call_op = get_call_op(func_op)
 
-        assert (
-            n_qubits is not None
-        ), "Unable to determine number of qubits from quantum.compbasis op"
+        probs_ops = [op for op in self.qnode.body.walk() if isinstance(op, quantum.ProbsOp)]
 
-        sample_op = self.insert_sample_op(compbasis_op, self._shots, n_qubits, rewriter)
+        for probs_op in probs_ops:
 
-        # Insert the post-processing function into current module or
-        # get handle to it if already inserted
-        postprocessing_func_name = f"probs_from_samples.tensor.{self._shots}x{n_qubits}xf64"
+            compbasis_op = probs_op.operands[0].owner
+            assert isinstance(compbasis_op, quantum.ComputationalBasisOp)
 
-        postprocessing_func_op = self.get_postprocessing_func_op_from_block_by_name(
-            probs_op.parent_op().parent, postprocessing_func_name
-        )
+            n_qubits = None
+            if compbasis_op.qreg is not None:
+                n_qubits = self.get_n_qubits_from_qreg(compbasis_op.qreg)
 
-        if postprocessing_func_op is None:
-            # TODO: Do we have to set the shape of the samples array statically here? Or can the
-            # shape (shots, wire) be dynamic and given as SSA values?
-            # Same goes for the column/wire indices (the second argument).
-            postprocessing_module = _postprocessing_probs(
-                jax.core.ShapedArray([self._shots, n_qubits], float)
+            elif compbasis_op.qubits != ():
+                n_qubits = len(compbasis_op.qubits)
+
+            assert (
+                n_qubits is not None
+            ), "Unable to determine number of qubits from quantum.compbasis op"
+
+            sample_op = self.insert_sample_op(compbasis_op, self._shots, n_qubits, rewriter)
+
+            # Insert the post-processing function into current module or
+            # get handle to it if already inserted
+            postprocessing_func_name = f"probs_from_samples.tensor.{self._shots}x{n_qubits}xf64"
+
+            postprocessing_func_op = self.get_postprocessing_func_op_from_block_by_name(
+                probs_op.parent_op().parent, postprocessing_func_name
             )
 
-            postprocessing_func_op = self.get_postprocessing_funcs_from_module_and_insert(
-                postprocessing_module, probs_op, postprocessing_func_name
+            if postprocessing_func_op is None:
+                # TODO: Do we have to set the shape of the samples array statically here? Or can the
+                # shape (shots, wire) be dynamic and given as SSA values?
+                # Same goes for the column/wire indices (the second argument).
+                postprocessing_module = _postprocessing_probs(
+                    jax.core.ShapedArray([self._shots, n_qubits], float)
+                )
+
+                postprocessing_func_op = self.get_postprocessing_funcs_from_module_and_insert(
+                    postprocessing_module, probs_op, postprocessing_func_name
+                )
+
+            # Insert the call to the post-processing function
+            postprocessing_func_call_op = func.CallOp(
+                callee=builtin.SymbolRefAttr(postprocessing_func_op.sym_name),
+                arguments=[sample_op.results[0]],
+                return_types=[builtin.TensorType(builtin.Float64Type(), shape=(2**n_qubits,))],
             )
 
-        # Insert the call to the post-processing function
-        postprocessing_func_call_op = func.CallOp(
-            callee=builtin.FlatSymbolRefAttr(postprocessing_func_op.sym_name),
-            arguments=[sample_op.results[0]],
-            return_types=[builtin.TensorType(builtin.Float64Type(), shape=(2**n_qubits,))],
-        )
+            # get the index the probs MP result is returned at
+            result_index = list(probs_op.results[0].uses)[0].index
 
-        rewriter.replace_matched_op(postprocessing_func_call_op)
+            # Insert the call to the post-processing function
+            postprocessing_func_call_op = func.CallOp(
+                callee=builtin.SymbolRefAttr(postprocessing_func_op.sym_name),
+                arguments=[self.call_op.results[result_index]],
+                return_types=[builtin.TensorType(builtin.Float64Type(), shape=(2**n_qubits,))],
+            )
+            rewriter.insert_op(
+                postprocessing_func_call_op, insertion_point=InsertPoint.after(self.call_op)
+            )
+
+            # update the returns of the QNode (to return raw samples) and the
+            # outer function (to return post-processed values)
+            self.update_returns(result_index, sample_op, postprocessing_func_call_op, rewriter)
+
+            # delete now unused probs_op
+            rewriter.erase_op(probs_op)
 
 
 class CountsPattern(MeasurementsFromSamplesPattern):
@@ -537,33 +640,29 @@ class StatePattern(MeasurementsFromSamplesPattern):
         raise NotImplementedError("qml.state() operations are not supported.")
 
 
-def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> int:
-    """Returns the number of shots as a static (i.e. known at compile time) integer value from the
-    first instance of a device-initialization op (quantum.DeviceInitOp) found in `module`.
+def get_shots(quantum_node: func.FuncOp) -> int:
+    """Get the shots for a quantum.node. Extracts shots from the device and validates that shots
+    are static, and a non-zero integer.
 
-    If `module` contains multiple quantum.DeviceInitOp ops, only the number of shots from the
-    *first* instance is used, and the others are ignored.
+    This function is meant to act on a FuncOp with the `quantum.node` attribute, which should only
+    contain a single quantum.DeviceInitOp op.
 
-    This function expects the number of shots to be an SSA value given as an operand to the
-    quantum.DeviceInitOp op. It also assumes that the number of shots is static, retrieving it from
-    the 'value' attribute of its corresponding constant op.
-
-    Args:
-        module (builtin.ModuleOp): The MLIR module containing the quantum.DeviceInitOp.
+        Args:
+        quantum_node (func.FuncOp): The quantum.node FuncOp containing the quantum.DeviceInitOp.
 
     Returns:
         int: The number of shots.
 
     Raises:
-        CompileError: If `module` does not contain a quantum.DeviceInitOp.
-        CompileError: If the operator expected to contain shots values does not have `properties`.
-            This is the immediate issue that is observed when shots are dynamic, for instance as a
-            result of the shots SSA value originating from a block argument rather than from an
-            operation, such as an `arith.constant` op.
+        CompileError: If `quantum_node` does not contain a quantum.DeviceInitOp.
+        CompileError: If its not possible to extract a static constant from the
+            SSAValue for the shots
+        ValueError: if the extracted shots are zero
+
     """
     device_op = None
 
-    for op in module.body.walk():
+    for op in quantum_node.body.walk():
         if isinstance(op, quantum.DeviceInitOp):
             device_op = op
             break
@@ -575,41 +674,22 @@ def _get_static_shots_value_from_first_device_op(module: builtin.ModuleOp) -> in
 
     # The number of shots is passed as an SSA value operand to the DeviceInitOp
     shots_operand = device_op.shots
-    shots_extract_op = shots_operand.owner
-
-    if isinstance(shots_extract_op, tensor.ExtractOp):
-        shots_constant_op = shots_extract_op.operands[0].owner
-        if not hasattr(shots_constant_op, "properties"):
-            raise CompileError(
-                "Cannot get number of shots. Note that using a dynamic number of shots is not "
-                "supported with measurements-from-samples."
-            )
-        shots_value_attribute: builtin.DenseIntOrFPElementsAttr = shots_constant_op.properties.get(
-            "value"
+    shots = get_constant_from_ssa(shots_operand)
+    if shots is None:
+        raise CompileError(
+            "Cannot get number of shots. Note that using a dynamic number of shots is not "
+            "supported with measurements-from-samples."
         )
-        if shots_value_attribute is None:
-            raise ValueError("Cannot get number of shots; the constant op has no 'value' attribute")
 
-        shots_int_values = shots_value_attribute.get_values()
-        if len(shots_int_values) != 1:
-            raise ValueError(f"Expected a single shots value, got {len(shots_int_values)}")
-
-        return shots_int_values[0]
-
-    if isinstance(shots_extract_op, (arith.ConstantOp, stablehlo.ConstantOp)):
-        shots_value_attribute: builtin.IntAttr = shots_extract_op.properties.get("value")
-        return shots_value_attribute.value.data
-
-    raise ValueError(
-        "Expected owner of shots operand to be a tensor.ExtractOp, arith.ConstantOp or"
-        "stablehlo.ConstantOp but got "
-        f"{type(shots_extract_op).__name__}"
-    )
+    assert isinstance(shots, int), "Expected `shots` to be an integer"
+    if shots == 0:
+        raise ValueError("The measurements_from_samples pass requires non-zero shots")
+    return shots
 
 
 @xdsl_module
 @jax.jit
-def _postprocessing_expval(samples, column):
+def _postprocessing_expval(samples):
     """Post-processing to recover the expectation value from the given `samples` array for each
     requested `column` in the array.
 
@@ -624,12 +704,12 @@ def _postprocessing_expval(samples, column):
     Returns:
         jax.core.ShapedArray: The expectation value for each requested column.
     """
-    return jnp.mean(1.0 - 2.0 * samples[:, column], axis=0)
+    return jnp.mean(1.0 - 2.0 * samples[:, 0], axis=0)
 
 
 @xdsl_module
 @jax.jit
-def _postprocessing_var(samples, column):
+def _postprocessing_var(samples):
     """Post-processing to recover the variance from the given `samples` array for each requested
     `column` in the array.
 
@@ -644,7 +724,7 @@ def _postprocessing_var(samples, column):
     Returns:
         jax.core.ShapedArray: The variance for each requested column.
     """
-    return jnp.var(1.0 - 2.0 * samples[:, column], axis=0)
+    return jnp.var(1.0 - 2.0 * samples[:, 0], axis=0)
 
 
 @xdsl_module
