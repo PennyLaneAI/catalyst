@@ -968,6 +968,9 @@ def trace_observables(
         else:
             qubits = qrp.extract(wires, allow_reuse=True)
             obs_tracers = compbasis_p.bind(*qubits)
+            for w, q in zip(wires, qubits, strict=True):
+                if w not in qrp.cache:
+                    qrp.insert([w], [q])
     elif isinstance(obs, KNOWN_NAMED_OBS):
         # The MLIR NamedObs operation only takes in a single qubit value, instead of a variadic
         # range.
