@@ -107,6 +107,7 @@ std::optional<double> resolveConstant(Value val)
     }
 
     // stablehlo ops (matched by name to avoid header dependency)
+    // OpName is used to avoid header dependency
     StringRef opName = op->getName().getStringRef();
 
     if (opName == "stablehlo.constant") {
