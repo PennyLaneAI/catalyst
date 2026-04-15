@@ -158,8 +158,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         }
     }
 
-    void parseOperatorName(llvm::StringRef rawName, OperatorNode &opNode) {}
-
     void parseAltDecomps(llvm::StringMap<llvm::SmallVector<std::string>> &opToAltDecompNames,
                          llvm::StringSet<> &userRuleNames)
     {
@@ -400,7 +398,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     FixedDecomps buildFixedDecomps(const llvm::StringMap<std::string> &opToFixedDecompName,
                                    const llvm::StringMap<const RuleNode *> &rulesByName)
     {
-
         FixedDecomps fixedDecomps;
         fixedDecomps.reserve(opToFixedDecompName.size());
 
