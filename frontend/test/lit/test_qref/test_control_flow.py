@@ -58,3 +58,50 @@ def test_for_loop_basic(size: int, angle: float):
 
 
 print(test_for_loop_basic.mlir)
+
+
+# CHECK: func.func public @test_for_loop_with_dynamic_allocation() -> tensor<f64>
+@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def test_for_loop_with_dynamic_allocation():
+    """
+    Test for loop with dynamic qubit allocation
+    """
+
+    # CHECK-DAG: [[zero_index:%.+]] = arith.constant 0 : index
+    # CHECK-DAG: [[one_index:%.+]] = arith.constant 1 : index
+    # CHECK-DAG: [[three_index:%.+]] = arith.constant 3 : index
+    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
+
+    # CHECK-DAG: [[reg_device:%.+]] = qref.alloc( 3) : !qref.reg<3>
+
+    # CHECK: scf.for %arg0 = [[zero_index]] to [[three_index]] step [[one_index]] {
+    # CHECK:   [[i:%.+]] = arith.index_cast %arg0 : index to i64
+    # CHECK:   [[reg_loop:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK:   [[q0_loop:%.+]] = qref.get [[reg_loop]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK:   [[qi:%.+]] = qref.get [[reg_device]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK:   qref.custom "CNOT"() [[q0_loop]], [[qi]] : !qref.bit, !qref.bit
+    # CHECK:   qref.dealloc [[reg_loop]] : !qref.reg<2>
+    # CHECK: }
+
+    for i in range(3):
+        with qp.allocate(2) as q:
+            qp.CNOT(wires=[q[0], i])
+
+    # CHECK: [[reg_loop:%.+]] = qref.alloc( 1) : !qref.reg<1>
+    # CHECK: [[q0_loop:%.+]] = qref.get [[reg_loop]][[[zero]]] : !qref.reg<1>, i64 -> !qref.bit
+    # CHECK: scf.for %arg0 = [[zero_index]] to [[three_index]] step [[one_index]] {
+    # CHECK:   [[i:%.+]] = arith.index_cast %arg0 : index to i64
+    # CHECK:   [[qi:%.+]] = qref.get [[reg_device]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK:   qref.custom "CNOT"() [[q0_loop]], [[qi]] : !qref.bit, !qref.bit
+    # CHECK: }
+    # CHECK: qref.dealloc [[reg_loop]] : !qref.reg<1>
+
+    with qp.allocate(1) as q:
+        for i in range(3):
+            qp.CNOT(wires=[q[0], i])
+
+    return qp.expval(qp.X(0))
+
+
+print(test_for_loop_with_dynamic_allocation.mlir)
