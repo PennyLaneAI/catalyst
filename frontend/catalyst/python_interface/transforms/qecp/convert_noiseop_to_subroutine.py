@@ -24,6 +24,7 @@ from xdsl.dialects import arith, builtin, func, scf, tensor
 from xdsl.dialects.builtin import IndexType, IntegerType
 from xdsl.ir import Block, Region
 from xdsl.rewriter import InsertPoint
+from xdsl.transforms.reconcile_unrealized_casts import ReconcileUnrealizedCastsPass
 
 from catalyst.python_interface.dialects import qecl, qecp
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
@@ -34,6 +35,82 @@ _NUM_ROT_PARAMS = 3
 def _get_noise_subroutine_name(k, n, number_errors):
     """Get the symbol name of the noise injection subroutine for a given codeblock type."""
     return "noise_subroutine_code" + str(k) + "x" + str(n) + "x" + str(number_errors)
+
+
+class ConvertNoiseOpToSubroutinePattern(
+    pattern_rewriter.RewritePattern
+):  # pylint: disable=too-few-public-methods
+    """RewritePattern for converting to the MBQC formalism."""
+
+    def __init__(self, noise_subroutine_dict, n, number_errors):
+        self.noise_subroutine_dict = noise_subroutine_dict
+        self._n = n
+        self._number_errors = number_errors
+
+    @pattern_rewriter.op_type_rewrite_pattern
+    def match_and_rewrite(
+        self,
+        op: qecl.NoiseOp,
+        rewriter: pattern_rewriter.PatternRewriter,
+        /,
+    ):
+        k = op.in_codeblock.type.k.value.data
+
+        in_block_cast = builtin.UnrealizedConversionCastOp.get(
+            op.in_codeblock, qecp.PhysicalCodeblockType(k, self._n)
+        )
+        rewriter.insert_op(in_block_cast, InsertPoint.before(op))
+
+        # Create random qubit indices and rotation parameters for error injection, which are
+        # generated randomly from a `qnode` function.
+        # NOTE: that the random qubit indices and rotation parameters are generated in the Python
+        # layer and passed to the noise injection subroutine as inputs, which allows us to inject
+        # different errors for different qecp.noise instances in the execution phase.
+        # NOTE: Another option: the logic below could be replaced with jax.random.uniform
+        qubit_indices = random.sample(range(self._n), self._number_errors)
+        rotation_params = []
+        for _ in range(self._number_errors * _NUM_ROT_PARAMS):
+            rotation_params.append(random.uniform(0, 2 * math.pi))
+
+        # Insert a tensor constant operation for the qubit indices and rotation parameters, which
+        # will be passed to the noise injection subroutine as inputs.
+        qubit_indices_constantop = arith.ConstantOp(
+            builtin.DenseIntOrFPElementsAttr.from_list(
+                type=builtin.TensorType(builtin.IntegerType(64), shape=(self._number_errors,)),
+                data=qubit_indices,
+            )
+        )
+
+        rotation_params_constantop = arith.ConstantOp(
+            builtin.DenseIntOrFPElementsAttr.from_list(
+                type=builtin.TensorType(
+                    builtin.Float64Type(), shape=(self._number_errors, _NUM_ROT_PARAMS)
+                ),
+                data=rotation_params,
+            )
+        )
+
+        # Insert qubit indices and rotation parameters tensor constants before the noise op
+        rewriter.insert_op(qubit_indices_constantop, InsertPoint.before(op))
+        rewriter.insert_op(rotation_params_constantop, InsertPoint.before(op))
+
+        callee = builtin.SymbolRefAttr(_get_noise_subroutine_name(k, self._n, self._number_errors))
+
+        arguments = [
+            in_block_cast.results[0],
+            qubit_indices_constantop.results[0],
+            rotation_params_constantop.results[0],
+        ]
+
+        return_types = self.noise_subroutine_dict[
+            _get_noise_subroutine_name(k, self._n, self._number_errors)
+        ].function_type.outputs.data
+        callOp = func.CallOp(callee, arguments, return_types)
+        rewriter.insert_op(callOp, InsertPoint.before(op))
+        cast_op = builtin.UnrealizedConversionCastOp.get(callOp.results[0], op.out_codeblock.type)
+        rewriter.insert_op(cast_op, InsertPoint.before(op))
+        rewriter.replace_all_uses_with(op.out_codeblock, cast_op.results[0])
+        rewriter.erase_op(op)
 
 
 class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
@@ -199,82 +276,10 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
             apply_recursively=False,
         ).rewrite_module(op)
 
+        ReconcileUnrealizedCastsPass().apply(_ctx, op)
 
-class ConvertNoiseOpToSubroutinePattern(
-    pattern_rewriter.RewritePattern
-):  # pylint: disable=too-few-public-methods
-    """RewritePattern for converting to the MBQC formalism."""
-
-    def __init__(self, noise_subroutine_dict, n, number_errors):
-        self.noise_subroutine_dict = noise_subroutine_dict
-        self._n = n
-        self._number_errors = number_errors
-
-    @pattern_rewriter.op_type_rewrite_pattern
-    def match_and_rewrite(
-        self,
-        op: qecl.NoiseOp,
-        rewriter: pattern_rewriter.PatternRewriter,
-        /,
-    ):
-        k = op.in_codeblock.type.k.value.data
-
-        in_block_cast = builtin.UnrealizedConversionCastOp.get(
-            op.in_codeblock, qecp.PhysicalCodeblockType(k, self._n)
-        )
-        rewriter.insert_op(in_block_cast, InsertPoint.before(op))
-
-        # Create random qubit indices and rotation parameters for error injection, which are
-        # generated randomly from a `qnode` function.
-        # NOTE: that the random qubit indices and rotation parameters are generated in the Python
-        # layer and passed to the noise injection subroutine as inputs, which allows us to inject
-        # different errors for different qecp.noise instances in the execution phase.
-        # NOTE: Another option: the logic below could be replaced with jax.random.uniform
-        qubit_indices = random.sample(range(self._n), self._number_errors)
-        rotation_params = []
-        for _ in range(self._number_errors * _NUM_ROT_PARAMS):
-            rotation_params.append(random.uniform(0, 2 * math.pi))
-
-        # Insert a tensor constant operation for the qubit indices and rotation parameters, which
-        # will be passed to the noise injection subroutine as inputs.
-        qubit_indices_constantop = arith.ConstantOp(
-            builtin.DenseIntOrFPElementsAttr.from_list(
-                type=builtin.TensorType(builtin.IntegerType(64), shape=(self._number_errors,)),
-                data=qubit_indices,
-            )
-        )
-
-        rotation_params_constantop = arith.ConstantOp(
-            builtin.DenseIntOrFPElementsAttr.from_list(
-                type=builtin.TensorType(
-                    builtin.Float64Type(), shape=(self._number_errors, _NUM_ROT_PARAMS)
-                ),
-                data=rotation_params,
-            )
-        )
-
-        # Insert qubit indices and rotation parameters tensor constants before the noise op
-        rewriter.insert_op(qubit_indices_constantop, InsertPoint.before(op))
-        rewriter.insert_op(rotation_params_constantop, InsertPoint.before(op))
-
-        callee = builtin.SymbolRefAttr(_get_noise_subroutine_name(k, self._n, self._number_errors))
-
-        arguments = [
-            in_block_cast.results[0],
-            qubit_indices_constantop.results[0],
-            rotation_params_constantop.results[0],
-        ]
-
-        return_types = self.noise_subroutine_dict[
-            _get_noise_subroutine_name(k, self._n, self._number_errors)
-        ].function_type.outputs.data
-        callOp = func.CallOp(callee, arguments, return_types)
-        rewriter.insert_op(callOp, InsertPoint.before(op))
-        cast_op = builtin.UnrealizedConversionCastOp.get(callOp.results[0], op.out_codeblock.type)
-        rewriter.insert_op(cast_op, InsertPoint.before(op))
-        rewriter.replace_all_uses_with(op.out_codeblock, cast_op.results[0])
-        rewriter.erase_op(op)
 
 # TODOs: Add integration tests for the following line once the quantum-to-qecl pass is in.
-convert_noiseop_to_subroutine_pass = compiler_transform(ConvertNoiseOpToSubroutinePass) # pragma: no cover
-
+convert_noiseop_to_subroutine_pass = compiler_transform(
+    ConvertNoiseOpToSubroutinePass
+)  # pragma: no cover
