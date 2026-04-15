@@ -86,6 +86,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         llvm::StringMap<llvm::SmallVector<std::string>> opToAltDecompNames;
         WeightedGateset targetGateSet;
 
+        // Index rules by name for O(1) lookup instead of scanning the vector
+        // for every fixed-decomp entry.
+        llvm::StringMap<const RuleNode *> rulesByName(setOfRules.size());
+        for (const auto &rule : setOfRules) {
+            rulesByName[rule.name] = &rule;
+        }
+
         // get names for fixed and alt decomps
         parseFixedDecomps(opToFixedDecompName, userRuleNames);
         parseAltDecomps(opToAltDecompNames, userRuleNames);
@@ -101,8 +108,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 2: Build and solve the decomposition graph
-        FixedDecomps fixedDecomps = buildFixedDecomps(opToFixedDecompName, setOfRules);
-        AltDecomps altDecomps = buildAltDecomps(opToAltDecompNames, setOfRules);
+        FixedDecomps fixedDecomps = buildFixedDecomps(opToFixedDecompName, rulesByName);
+        AltDecomps altDecomps = buildAltDecomps(opToAltDecompNames, rulesByName);
         DecompositionGraph graph(setOfOps, targetGateSet, setOfRules, std::move(fixedDecomps),
                                  std::move(altDecomps));
         DecompositionSolver solver(graph);
@@ -387,15 +394,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * @return Core::FixedDecomps  Mapping from OperatorNode to its fixed RuleNode.
      */
     FixedDecomps buildFixedDecomps(const llvm::StringMap<std::string> &opToFixedDecompName,
-                                   const std::vector<RuleNode> &setOfRules)
+                                   const llvm::StringMap<const RuleNode *> &rulesByName)
     {
-        // Index rules by name for O(1) lookup instead of scanning the vector
-        // for every fixed-decomp entry.
-        std::unordered_map<std::string, const RuleNode *> rulesByName;
-        rulesByName.reserve(setOfRules.size());
-        for (const auto &rule : setOfRules) {
-            rulesByName.emplace(rule.name, &rule);
-        }
 
         FixedDecomps fixedDecomps;
         fixedDecomps.reserve(opToFixedDecompName.size());
@@ -427,16 +427,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      */
     AltDecomps
     buildAltDecomps(const llvm::StringMap<llvm::SmallVector<std::string>> &opToAltDecompNames,
-                    const std::vector<RuleNode> &setOfRules)
+                    const llvm::StringMap<const RuleNode *> &rulesByName)
     {
-        // Reuse the same index as buildFixedDecomps. If both are called,
-        // consider building the index once and passing it in.
-        std::unordered_map<std::string, const RuleNode *> rulesByName;
-        rulesByName.reserve(setOfRules.size());
-        for (const auto &rule : setOfRules) {
-            rulesByName.emplace(rule.name, &rule);
-        }
-
         AltDecomps altDecomps;
         altDecomps.reserve(opToAltDecompNames.size());
 
