@@ -225,19 +225,21 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     /**
      * @brief Remove user rules from the module, loading into
      */
-    void
+    LogicalResult
     loadUserDecompositionRules(ModuleOp module, llvm::SmallVector<std::string> &userRuleNames,
                                llvm::SmallVector<mlir::OwningOpRef<mlir::func::FuncOp>> &graphRules,
                                llvm::SmallVector<mlir::OwningOpRef<mlir::func::FuncOp>> &rules)
     {
         if (userRuleNames.empty()) {
-            return;
+            return success();
         }
 
         PassManager pm(&getContext());
         pm.addPass(createRegisterDecompRuleResourcePass());
         if (failed(pm.run(module))) {
-            return signalPassFailure();
+            module.emitError() << "failed to load user decomposition rules: unable to run resource "
+                                  "annotation pass";
+            return failure();
         }
 
         llvm::SmallVector<mlir::func::FuncOp> userRules;
@@ -257,6 +259,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             rule->remove();
             rules.push_back(mlir::OwningOpRef<mlir::func::FuncOp>(rule));
         }
+        return success();
     }
 
     void getOperators(ModuleOp module, std::vector<OperatorNode> &operators)
@@ -284,7 +287,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     {
         llvm::SmallVector<mlir::OwningOpRef<mlir::func::FuncOp>> graphRules;
         loadBuiltInDecompositionRules(filename, module.getContext(), graphRules);
-        loadUserDecompositionRules(module, userRuleNames, graphRules, userRules);
+        if (failed(loadUserDecompositionRules(module, userRuleNames, graphRules, userRules))) {
+            return signalPassFailure();
+        }
 
         for (auto &ruleOpRef : graphRules) {
             RuleNode ruleNode;
