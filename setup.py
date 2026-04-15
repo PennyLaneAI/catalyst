@@ -376,11 +376,12 @@ elif system_platform == "Darwin":
 
 project_root_dir = os.path.abspath(os.path.dirname(__file__))
 frontend_dir = os.path.join(project_root_dir, "frontend")
+driver_dir = os.path.join(project_root_dir, "mlir", "lib", "Driver")
 
 ext_modules = [
     custom_calls_extension,
     CMakeExtension("catalyst.utils.wrapper", sourcedir=frontend_dir),
-    CMakeExtension("catalyst.default_pipelines", sourcedir=frontend_dir),
+    CMakeExtension("catalyst.default_pipelines", sourcedir=driver_dir),
 ]
 
 options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x030C0000 else {}
