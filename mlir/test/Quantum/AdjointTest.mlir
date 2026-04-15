@@ -362,10 +362,13 @@ func.func private @adjoint_index_switch(%idx: index) -> !quantum.reg {
   // CHECK:       [[popped:%.+]] = catalyst.list_pop
   // CHECK:       scf.index_switch [[popped]]
   // CHECK:       case 0 {
+  // CHECK:         "Hadamard"() {{%.+}} adj
   // CHECK:         "PauliX"() {{%.+}} adj
   // CHECK:       case 1 {
+  // CHECK:         "T"() {{%.+}} adj
   // CHECK:         "PauliY"() {{%.+}} adj
   // CHECK:       default {
+  // CHECK:         "S"() {{%.+}} adj
   // CHECK:         "PauliZ"() {{%.+}} adj
 
   %1 = quantum.adjoint(%0) : !quantum.reg {
@@ -373,20 +376,23 @@ func.func private @adjoint_index_switch(%idx: index) -> !quantum.reg {
     %sw = scf.index_switch %idx -> !quantum.reg
     case 0 {
       %q = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
-      %r = quantum.custom "PauliX"() %q : !quantum.bit
-      %out = quantum.insert %arg0[ 0], %r : !quantum.reg, !quantum.bit
+      %r0 = quantum.custom "PauliX"() %q : !quantum.bit
+      %r1 = quantum.custom "Hadamard"() %r0 : !quantum.bit
+      %out = quantum.insert %arg0[ 0], %r1 : !quantum.reg, !quantum.bit
       scf.yield %out : !quantum.reg
     }
     case 1 {
       %q = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
-      %r = quantum.custom "PauliY"() %q : !quantum.bit
-      %out = quantum.insert %arg0[ 0], %r : !quantum.reg, !quantum.bit
+      %r0 = quantum.custom "PauliY"() %q : !quantum.bit
+      %r1 = quantum.custom "T"() %r0 : !quantum.bit
+      %out = quantum.insert %arg0[ 0], %r1 : !quantum.reg, !quantum.bit
       scf.yield %out : !quantum.reg
     }
     default {
       %q = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
-      %r = quantum.custom "PauliZ"() %q : !quantum.bit
-      %out = quantum.insert %arg0[ 0], %r : !quantum.reg, !quantum.bit
+      %r0 = quantum.custom "PauliZ"() %q : !quantum.bit
+      %r1 = quantum.custom "S"() %r0 : !quantum.bit
+      %out = quantum.insert %arg0[ 0], %r1 : !quantum.reg, !quantum.bit
       scf.yield %out : !quantum.reg
     }
     quantum.yield %sw : !quantum.reg
