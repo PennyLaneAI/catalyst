@@ -737,33 +737,6 @@ class RotOp(IRDLOperation):
 
 
 @irdl_op_definition
-class NoiseOp(IRDLOperation):
-    """Inject physical noise on elements of a physical codeblock."""
-
-    T: ClassVar = VarConstraint("T", anyPhysicalCodeblock)
-
-    name = "qecp.noise"
-
-    in_codeblock = operand_def(T)
-
-    out_codeblock = result_def(T)
-
-    assembly_format = """
-            $in_codeblock attr-dict `:` type($in_codeblock)
-        """
-
-    def __init__(
-        self,
-        in_codeblock: PhysicalCodeBlockSSAValue | Operation,
-    ):
-        operands = (in_codeblock,)
-
-        in_codeblock_type = get_physical_codeblock_type(in_codeblock)
-
-        super().__init__(operands=operands, result_types=(in_codeblock_type,))
-
-
-@irdl_op_definition
 class MeasureOp(IRDLOperation):
     """A physical single-qubit projective measurement in the computational basis."""
 
@@ -905,7 +878,6 @@ QecPhysical = Dialect(
         SOp,
         CnotOp,
         MeasureOp,
-        NoiseOp,
         AssembleTannerGraphOp,
         DecodeEsmCssOp,
         DecodePhysicalMeasurementOp,
