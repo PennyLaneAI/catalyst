@@ -202,8 +202,8 @@ class TestConvertNoiseOpToSubroutinePass:
                     // CHECK-NEXT: [[codeblock:%.*]] = qecl.qec [[codeblock:%.*]] : !qecl.codeblock<1>
                     %2 = qecl.qec %1 : !qecl.codeblock<1>
 
-                    // CHECK-NEXT: [[codeblock:%.*]] = qecl.identity [[codeblock:%.*]] : !qecl.codeblock<1>
-                    %3 = qecl.identity %2 : !qecl.codeblock<1>
+                    // CHECK-NEXT: [[codeblock:%.*]] = qecl.identity [[codeblock:%.*]][0] : !qecl.codeblock<1>
+                    %3 = qecl.identity %2[0] : !qecl.codeblock<1>
 
                     // CHECK-NOT: func.call @noise_subroutine_code
                     return
