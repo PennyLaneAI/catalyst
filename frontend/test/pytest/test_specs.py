@@ -536,7 +536,126 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
+    def test_circuit_with_args(self):
+        """Test using a mix of compiler passes and plain tape transforms"""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circ(x):
+            qml.RX(x * 1.0, 0)
+            qml.RX(x * 2.0, 0)
+            qml.RZ(x * 3.0, 1)
+            qml.RZ(x * 4.0, 1)
+            qml.Hadamard(0)
+            qml.Hadamard(0)
+            qml.CNOT([0, 1])
+            qml.CNOT([0, 1])
+            return qml.probs()
+
+        circ = qml.transforms.cancel_inverses(
+            circ
+        )  # Has to be applied as a tape transform because of the next transform
+        circ = dummy_transform(circ)  # Forces normal tape transform
+        circ = qml.transforms.merge_rotations(circ)  # Can be applied as an MLIR pass
+
+        circ = qjit(circ)
+
+        actual = qml.specs(circ, level="all")(3)
+        expected = CircuitSpecs(
+            device_name="lightning.qubit",
+            num_device_wires=2,
+            shots=Shots(None),
+            level=dict(
+                enumerate(
+                    (
+                        "Before Tape Transforms",
+                        "cancel_inverses",
+                        "dummy_transform",
+                        "Before MLIR Passes",
+                        "merge-rotations",
+                    )
+                )
+            ),
+            resources={
+                "Before Tape Transforms": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    gate_sizes={1: 6, 2: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "cancel_inverses": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "dummy_transform": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "Before MLIR Passes": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "merge-rotations": SpecsResources(
+                    gate_types={"RX": 1, "RZ": 1},
+                    gate_sizes={1: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+            },
+        )
+
+        check_specs_same(actual, expected)
+
     def test_all_mlir(self, simple_circuit):
+        """Test using "all-mlir" level"""
+
+        simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
+        simple_circuit = qml.transforms.merge_rotations(
+            simple_circuit
+        )  # Can be applied as an MLIR pass
+
+        simple_circuit = qjit(simple_circuit)
+
+        actual = qml.specs(simple_circuit, level="all-mlir")()
+        expected = CircuitSpecs(
+            device_name="lightning.qubit",
+            num_device_wires=2,
+            shots=Shots(None),
+            level={
+                0: "Before MLIR Passes",
+                1: "cancel-inverses",
+                2: "merge-rotations",
+            },
+            resources={
+                "Before MLIR Passes": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    gate_sizes={1: 6, 2: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "cancel-inverses": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "merge-rotations": SpecsResources(
+                    gate_types={"RX": 1, "RZ": 1},
+                    gate_sizes={1: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+            },
+        )
+
+        check_specs_same(actual, expected)
+
+    def test_all_mlir_with_tape_transforms(self, simple_circuit):
         """Test using "all-mlir" level"""
 
         simple_circuit = qml.transforms.cancel_inverses(
@@ -555,8 +674,8 @@ class TestPassByPassSpecs:
             num_device_wires=2,
             shots=Shots(None),
             level={
-                2: "Before MLIR Passes",
-                3: "merge-rotations",
+                3: "Before MLIR Passes",
+                4: "merge-rotations",
             },
             resources={
                 "Before MLIR Passes": SpecsResources(
@@ -723,6 +842,8 @@ class TestPassByPassSpecs:
         @qml.qjit(autograph=True)
         @qml.qnode(dev)
         def circuit():
+            qml.PauliX(wires=1)
+
             for _ in range(3):
                 subroutine()
 
@@ -735,8 +856,8 @@ class TestPassByPassSpecs:
             shots=Shots(None),
             level="Before MLIR Passes",
             resources=SpecsResources(
-                gate_types={"Hadamard": 3},
-                gate_sizes={1: 3},
+                gate_types={"Hadamard": 3, "PauliX": 1},
+                gate_sizes={1: 4},
                 measurements={"probs(all wires)": 1},
                 num_allocs=3,
             ),
@@ -747,9 +868,7 @@ class TestPassByPassSpecs:
     def test_ppr(self):
         """Test that PPRs are handled correctly."""
 
-        pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
-
-        @qml.qjit(pipelines=pipeline, target="mlir")
+        @qml.qjit(target="mlir")
         @catalyst.passes.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circ():

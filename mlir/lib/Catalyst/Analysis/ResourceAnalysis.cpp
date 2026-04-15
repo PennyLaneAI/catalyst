@@ -325,6 +325,14 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     if (isa<quantum::MeasureOp, quantum::SampleOp, quantum::CountsOp, quantum::ExpvalOp,
             quantum::VarianceOp, quantum::ProbsOp, quantum::StateOp>(op)) {
         std::string name = getMeasurementName(op);
+        int nQubits = getGateQubitCount(op);
+
+        if (nQubits == 0) {
+            name += "(all wires)";
+        }
+        else {
+            name += "(" + std::to_string(nQubits) + " wires)";
+        }
         result.measurements[name] += 1;
         return;
     }
