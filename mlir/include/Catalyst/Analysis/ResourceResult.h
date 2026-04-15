@@ -49,6 +49,9 @@ struct ResourceResult {
     // from quantum.device op
     std::string deviceName;
 
+    // whether this function carries the `quantum.node` attribute
+    bool isQnode = false;
+
     // merge another ResourceResult into this one
     void mergeWith(const ResourceResult &other, MergeMethod method = MergeMethod::Sum);
 

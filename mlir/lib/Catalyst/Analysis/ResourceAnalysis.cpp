@@ -17,8 +17,10 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
 
@@ -125,18 +127,49 @@ static int getPBCQubitCount(Operation *op)
         .Default(0);
 }
 
-/// Get the measurement name for a quantum measurement op.
+/// Resolve the observable name from its defining operation.
+/// Mirrors the Python `xdsl_to_qml_measurement_name` in xdsl_conversion.py.
+static std::string getObservableName(Operation *obsOp)
+{
+    if (!obsOp)
+        return "all wires";
+
+    return llvm::TypeSwitch<Operation *, std::string>(obsOp)
+        .Case<quantum::ComputationalBasisOp>([](auto cbOp) {
+            unsigned n = cbOp.getQubits().size();
+            return n == 0 ? std::string("all wires") : std::to_string(n) + " wires";
+        })
+        .Case<quantum::NamedObsOp>(
+            [](auto op) { return stringifyNamedObservable(op.getType()).str(); })
+        .Case<quantum::TensorOp>(
+            [](auto op) { return "Prod(num_terms=" + std::to_string(op.getTerms().size()) + ")"; })
+        .Case<quantum::HamiltonianOp>([](auto op) {
+            return "Hamiltonian(num_terms=" + std::to_string(op.getTerms().size()) + ")";
+        })
+        .Default([](Operation *) { return std::string("all wires"); });
+}
+
+/// Get the full measurement name including observable info.
+/// e.g. "MidCircuitMeasure", "expval(PauliZ)", "sample(all wires)", "probs(2 wires)".
 static std::string getMeasurementName(Operation *op)
 {
-    return llvm::TypeSwitch<Operation *, std::string>(op)
-        .Case<quantum::MeasureOp>([](auto) { return "MidCircuitMeasure"; })
-        .Case<quantum::SampleOp>([](auto) { return "sample"; })
-        .Case<quantum::CountsOp>([](auto) { return "counts"; })
-        .Case<quantum::ExpvalOp>([](auto) { return "expval"; })
-        .Case<quantum::VarianceOp>([](auto) { return "var"; })
-        .Case<quantum::ProbsOp>([](auto) { return "probs"; })
-        .Case<quantum::StateOp>([](auto) { return "state"; })
-        .Default([](Operation *o) { return o->getName().getStringRef().str(); });
+    if (isa<quantum::MeasureOp>(op))
+        return "MidCircuitMeasure";
+
+    std::string baseName =
+        llvm::TypeSwitch<Operation *, std::string>(op)
+            .Case<quantum::SampleOp>([](auto) { return "sample"; })
+            .Case<quantum::CountsOp>([](auto) { return "counts"; })
+            .Case<quantum::ExpvalOp>([](auto) { return "expval"; })
+            .Case<quantum::VarianceOp>([](auto) { return "var"; })
+            .Case<quantum::ProbsOp>([](auto) { return "probs"; })
+            .Case<quantum::StateOp>([](auto) { return "state"; })
+            .Default([](Operation *o) { return o->getName().getStringRef().str(); });
+
+    if (auto measProc = dyn_cast<quantum::MeasurementProcess>(op))
+        return baseName + "(" + getObservableName(measProc.getObs().getDefiningOp()) + ")";
+
+    return baseName;
 }
 
 //===----------------------------------------------------------------------===//
@@ -169,6 +202,9 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
             }
         }
 
+        // TODO: deprecate `qnode` once it is fully deprecated.
+        result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node") ||
+                         funcOp->hasAttrOfType<UnitAttr>("qnode");
         funcResults[funcOp.getName()] = std::move(result);
 
         // main/entry function is the first function with no declaration
@@ -178,9 +214,77 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
     });
 
     assert(!entryFunc.empty() && "expected at least one non-declaration function");
-    resolveFunctionCalls(entryFunc);
+
+    // Resolve function calls for all analyzed functions, not just the entry.
+    // The entry function (e.g. jit_circuit) may use catalyst.launch_kernel
+    // instead of func.call, so only resolving the entry would miss callees
+    // inside nested qnode functions.
+    for (auto &funcEntry : funcResults) {
+        resolveFunctionCalls(funcEntry.getKey());
+    }
 
     entryFuncName = entryFunc.str();
+}
+
+/// Recursively resolve a Value to an integer constant.
+/// Mirrors the Python `resolve_constant_params` in xdsl_conversion.py.
+static std::optional<int64_t> resolveConstantIndex(Value val)
+{
+    Operation *op = val.getDefiningOp();
+    if (!op)
+        return std::nullopt;
+
+    StringRef opName = op->getName().getStringRef();
+
+    if (auto constOp = dyn_cast<arith::ConstantOp>(op)) {
+        if (auto intAttr = dyn_cast<IntegerAttr>(constOp.getValue()))
+            return intAttr.getValue().getSExtValue();
+        return std::nullopt;
+    }
+
+    if (isa<arith::IndexCastOp, arith::IndexCastUIOp>(op))
+        return resolveConstantIndex(op->getOperand(0));
+
+    if (isa<arith::AddIOp, arith::SubIOp, arith::MulIOp>(op)) {
+        auto lhs = resolveConstantIndex(op->getOperand(0));
+        auto rhs = resolveConstantIndex(op->getOperand(1));
+        if (!lhs || !rhs)
+            return std::nullopt;
+        if (isa<arith::AddIOp>(op))
+            return *lhs + *rhs;
+        if (isa<arith::SubIOp>(op))
+            return *lhs - *rhs;
+        return *lhs * *rhs;
+    }
+
+    if (auto extractOp = dyn_cast<tensor::ExtractOp>(op))
+        return resolveConstantIndex(extractOp.getTensor());
+
+    if (auto fromElemOp = dyn_cast<tensor::FromElementsOp>(op)) {
+        if (fromElemOp.getNumOperands() > 0)
+            return resolveConstantIndex(fromElemOp.getOperand(0));
+        return std::nullopt;
+    }
+
+    if (opName == "stablehlo.convert" || opName == "stablehlo.broadcast_in_dim")
+        return resolveConstantIndex(op->getOperand(0));
+
+    if (opName == "stablehlo.add" || opName == "stablehlo.subtract") {
+        auto lhs = resolveConstantIndex(op->getOperand(0));
+        auto rhs = resolveConstantIndex(op->getOperand(1));
+        if (!lhs || !rhs)
+            return std::nullopt;
+        return (opName == "stablehlo.add") ? *lhs + *rhs : *lhs - *rhs;
+    }
+
+    // Dense splat integer constant (covers stablehlo.constant dense<N>, etc.)
+    DenseIntElementsAttr denseAttr;
+    if (op->getNumResults() > 0 && matchPattern(op->getResult(0), m_Constant(&denseAttr)) &&
+        denseAttr.isSplat()) {
+        return denseAttr.getSplatValue<llvm::APInt>().getSExtValue();
+    }
+
+    return std::nullopt;
 }
 
 void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint)
@@ -195,6 +299,15 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
     }
     else if (auto tripCount = forOp.getStaticTripCount()) {
         bodyResult.multiplyByScalar(tripCount->getSExtValue());
+    }
+    else {
+        auto lb = resolveConstantIndex(forOp.getLowerBound());
+        auto ub = resolveConstantIndex(forOp.getUpperBound());
+        auto step = resolveConstantIndex(forOp.getStep());
+        if (lb && ub && step && *step != 0 && *ub > *lb) {
+            int64_t tripCount = (*ub - *lb + *step - 1) / *step;
+            bodyResult.multiplyByScalar(tripCount);
+        }
     }
     result.mergeWith(bodyResult);
 }
@@ -325,16 +438,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     // Measurements
     if (isa<quantum::MeasureOp, quantum::SampleOp, quantum::CountsOp, quantum::ExpvalOp,
             quantum::VarianceOp, quantum::ProbsOp, quantum::StateOp>(op)) {
-        std::string name = getMeasurementName(op);
-        int nQubits = getGateQubitCount(op);
-
-        if (nQubits == 0) {
-            name += "(all wires)";
-        }
-        else {
-            name += "(" + std::to_string(nQubits) + " wires)";
-        }
-        result.measurements[name] += 1;
+        result.measurements[getMeasurementName(op)] += 1;
         return;
     }
 

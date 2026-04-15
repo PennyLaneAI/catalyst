@@ -200,6 +200,62 @@ func.func @measurement_ops() {
 
 // -----
 
+// Observable-based measurements
+
+// CHECK-LABEL: "observable_measurements"
+// CHECK: "measurements"
+// CHECK-DAG: "expval(Hamiltonian(num_terms=2))": 1
+// CHECK-DAG: "expval(Prod(num_terms=2))": 1
+// CHECK-DAG: "sample(1 wires)": 1
+// CHECK-DAG: "sample(all wires)": 1
+// CHECK-DAG: "probs(all wires)": 1
+// CHECK-DAG: "expval(PauliZ)": 1
+// CHECK-DAG: "var(PauliX)": 1
+func.func @observable_measurements() {
+    %0 = quantum.alloc( 3) : !quantum.reg
+    %q0 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %q1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %q2 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+
+    // expval(Hamiltonian(num_terms=2))
+    %obs_z0 = quantum.namedobs %q0[ PauliZ] : !quantum.obs
+    %obs_x1 = quantum.namedobs %q1[ PauliX] : !quantum.obs
+    %coeffs = arith.constant dense<[0.2, -0.543]> : tensor<2xf64>
+    %ham = quantum.hamiltonian(%coeffs : tensor<2xf64>) %obs_z0, %obs_x1 : !quantum.obs
+    %ev1 = quantum.expval %ham : f64
+
+    // expval(Prod(num_terms=2))
+    %obs_z0b = quantum.namedobs %q0[ PauliZ] : !quantum.obs
+    %obs_z1 = quantum.namedobs %q1[ PauliZ] : !quantum.obs
+    %tensor_obs = quantum.tensor %obs_z0b, %obs_z1 : !quantum.obs
+    %ev2 = quantum.expval %tensor_obs : f64
+
+    // sample(1 wires) -- computational basis with 1 qubit
+    %cb1 = quantum.compbasis qubits %q2 : !quantum.obs
+    %s1 = quantum.sample %cb1 : tensor<10x1xf64>
+
+    // sample(all wires) -- computational basis with no explicit qubits
+    %cb_all = quantum.compbasis : !quantum.obs
+    %s2 = quantum.sample %cb_all : tensor<10x3xf64>
+
+    // probs(all wires)
+    %cb_all2 = quantum.compbasis : !quantum.obs
+    %p = quantum.probs %cb_all2 : tensor<3xf64>
+
+    // expval(PauliZ)
+    %obs_z2 = quantum.namedobs %q2[ PauliZ] : !quantum.obs
+    %ev3 = quantum.expval %obs_z2 : f64
+
+    // var(PauliX)
+    %obs_x0 = quantum.namedobs %q0[ PauliX] : !quantum.obs
+    %v1 = quantum.var %obs_x0 : f64
+
+    quantum.dealloc %0 : !quantum.reg
+    return
+}
+
+// -----
+
 // Function call resolution
 
 // CHECK-LABEL: "caller_func"
@@ -370,5 +426,24 @@ func.func private @shared_helper(%arg0: !quantum.bit) -> !quantum.bit {
 func.func @second_qnode(%arg0: !quantum.bit) -> !quantum.bit {
     %r1 = func.call @shared_helper(%arg0) : (!quantum.bit) -> !quantum.bit
     %out = quantum.custom "PauliX"() %r1 : !quantum.bit
+    return %out : !quantum.bit
+}
+
+// -----
+
+// qnode attribute marking
+
+// CHECK-LABEL: "my_helper"
+// CHECK: "qnode": false
+
+// CHECK-LABEL: "my_qnode"
+// CHECK: "qnode": true
+func.func @my_qnode(%arg0: !quantum.bit) -> !quantum.bit attributes {quantum.node} {
+    %r = func.call @my_helper(%arg0) : (!quantum.bit) -> !quantum.bit
+    return %r : !quantum.bit
+}
+
+func.func private @my_helper(%arg0: !quantum.bit) -> !quantum.bit {
+    %out = quantum.custom "Hadamard"() %arg0 : !quantum.bit
     return %out : !quantum.bit
 }

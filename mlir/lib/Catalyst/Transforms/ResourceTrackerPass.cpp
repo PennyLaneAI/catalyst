@@ -166,6 +166,7 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
             funcObj["num_alloc_qubits"] = static_cast<int64_t>(result.numAllocQubits);
             funcObj["num_arg_qubits"] = static_cast<int64_t>(result.numArgQubits);
             funcObj["device_name"] = result.deviceName;
+            funcObj["qnode"] = result.isQnode;
 
             root[funcEntry.getKey()] = std::move(funcObj);
 
@@ -192,6 +193,7 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
             std::strftime(buffer, sizeof(buffer), "_%Y%m%d_%H%M%S", now_tm);
 
             file_name += std::string(buffer);
+            llvm::outs() << llvm::formatv("{0:2}", jsonValue).str() << "\n";
         }
 
         std::ofstream ofile(file_name);
