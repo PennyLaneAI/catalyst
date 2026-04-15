@@ -2616,7 +2616,7 @@ def _for_loop_lowering(
     assert [lower_bound.type, upper_bound.type, step.type] == all_param_types_plus_consts[
         body_nconsts + num_implicit_inputs : body_nconsts + num_implicit_inputs + 3
     ]
-    # assert [val.type for val in body_consts] == all_param_types_plus_consts[:body_nconsts]
+    assert [val.type for val in body_consts] == all_param_types_plus_consts[:body_nconsts]
 
     result_types = [v.type for v in loop_args]
     assert result_types == [
