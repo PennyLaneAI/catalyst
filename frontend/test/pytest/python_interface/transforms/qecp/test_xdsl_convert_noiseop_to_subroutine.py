@@ -13,10 +13,8 @@
 # limitations under the License.
 """Unit test module for the xDSL implementation of the convert_noiseop_to_subroutine pass"""
 
-"""
-TODOs: We need to add integration tests for the convert_noiseop_to_subroutine_pass pass once 
-the quantum-to-qecl pass is implemented, which will allow us to verify that the pass works correctly in the context of a full compilation pipeline. The tests should verify that qecp.noise operations are correctly lowered to subroutines and that the generated subroutines have the expected structure and behavior. 
-"""
+# pylint: disable=line-too-long
+
 import pytest
 
 from catalyst.python_interface.transforms.qecp import (
