@@ -1745,8 +1745,13 @@ struct ValueSemanticsConversionPass
         // iterator), so that a caller subroutine can correctly collect the qref operands on its
         // call op to a callee subroutine.
         const CallGraph callGraph(mod);
+
         for (auto scc = llvm::scc_begin(&callGraph); !scc.isAtEnd(); ++scc) {
             if ((*scc->begin())->isExternal()) {
+                continue;
+            }
+
+            if (!isa<func::FuncOp>((*scc->begin())->getCallableRegion()->getParentOp())) {
                 continue;
             }
 
