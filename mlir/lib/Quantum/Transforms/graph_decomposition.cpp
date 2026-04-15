@@ -158,6 +158,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         }
     }
 
+    void parseOperatorName(llvm::StringRef rawName, OperatorNode &opNode) {}
+
     void parseAltDecomps(llvm::StringMap<llvm::SmallVector<std::string>> &opToAltDecompNames,
                          llvm::StringSet<> &userRuleNames)
     {
@@ -285,8 +287,27 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     }
 
     /**
-     * @brief create RuleNodes for each rule available to be used in graph decomposition. These
-     * rules are added to the rules parameter.
+     * @brief Helper to parse a gate name into an OperatorNode.
+     * Handles patterns like "Adjoint(GateName)" and "GateName(metadata)".
+     */
+    OperatorNode parseOperator(llvm::StringRef rawName)
+    {
+        OperatorNode node;
+        llvm::StringRef name = rawName;
+
+        // Handle Adjoint wrapper
+        if (name.consume_front("Adjoint(") && name.consume_back(")")) {
+            node.adjoint = true;
+        }
+
+        // Handle metadata/wire info in parentheses (e.g., "RX(1)" -> "RX")
+        // .split('(').first returns everything before the first paren
+        node.name = name.split('(').first.trim().str();
+        return node;
+    }
+
+    /**
+     * @brief Create RuleNodes for each rule available to be used in graph decomposition.
      */
     void getRuleNodes(llvm::StringRef filename, std::vector<RuleNode> &rules,
                       llvm::StringSet<> &userRuleNames,
@@ -294,63 +315,45 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                       llvm::StringMap<mlir::OwningOpRef<func::FuncOp>> &ruleNameToFuncOp)
     {
         llvm::SmallVector<mlir::OwningOpRef<mlir::func::FuncOp>> graphRules;
+
+        // Load rules from bytecode and user-defined passes
         loadBuiltInDecompositionRules(filename, graphRules);
         if (failed(loadUserDecompositionRules(userRuleNames, graphRules, userRules))) {
             return signalPassFailure();
         }
 
         for (auto &ruleOpRef : graphRules) {
+            mlir::func::FuncOp func = ruleOpRef.get();
+            llvm::StringRef ruleName = func.getName();
+
+            // 1. Mandatory Attribute Check (Target Gate and Resources)
+            auto targetGateAttr = func->getAttrOfType<StringAttr>("target_gate");
+            auto resourcesAttr = func->getAttrOfType<DictionaryAttr>("resources");
+            if (!targetGateAttr || !resourcesAttr)
+                continue;
+
+            // 2. Extract 'operations' dictionary from resources
+            auto operations =
+                mlir::dyn_cast_or_null<DictionaryAttr>(resourcesAttr.get("operations"));
+            if (!operations)
+                continue;
+
+            // 3. Populate RuleNode
             RuleNode ruleNode;
-            mlir::func::FuncOp func = ruleOpRef.get(); // access the op
-            ruleNode.name = func.getName().str();
+            ruleNode.name = ruleName.str();
+            ruleNode.output = parseOperator(targetGateAttr.getValue());
+
+            for (const auto &namedAttr : operations) {
+                if (auto intAttr = mlir::dyn_cast<IntegerAttr>(namedAttr.getValue())) {
+                    ruleNode.inputs.push_back({parseOperator(namedAttr.getName().strref()),
+                                               static_cast<uint32_t>(intAttr.getInt())});
+                }
+            }
+
+            // 4. Finalize: move the OpRef to the map to keep IR alive and store the node
             ruleNameToFuncOp[ruleNode.name] = std::move(ruleOpRef);
-
-            // Set output OperatorNode
-            if (auto outputGateAttr = func->getAttrOfType<StringAttr>("target_gate")) {
-                OperatorNode outputNode;
-                outputNode.name = outputGateAttr.getValue().str();
-                if (outputNode.name.starts_with("Adjoint(") && outputNode.name.ends_with(")")) {
-                    outputNode.adjoint = true;
-                    outputNode.name =
-                        llvm::StringRef(outputNode.name).drop_front(8).drop_back(1).str();
-                }
-                ruleNode.output = outputNode;
-            }
-            else {
-                continue; // skip this rule if target_gate attribute is missing
-            }
-
-            // Convert resources attribute
-            if (auto resourcesAttr = func->getAttrOfType<DictionaryAttr>("resources")) {
-                DictionaryAttr operations =
-                    mlir::dyn_cast<DictionaryAttr>(resourcesAttr.get("operations"));
-                if (!operations) {
-                    continue; // skip this rule if operations attribute is missing or not a
-                              // dictionary
-                }
-                for (const auto &operation : operations) {
-                    RuleTerm term;
-                    auto res_int = operation.getValue();
-                    if (auto intAttr = mlir::dyn_cast<IntegerAttr>(res_int)) {
-                        term.op.name = operation.getName().str();
-                        if (term.op.name.find("(") != std::string::npos) {
-                            term.op.name = term.op.name.substr(0, term.op.name.find("("));
-                        }
-                        term.multiplicity = intAttr.getInt();
-                        ruleNode.inputs.push_back(term);
-                    }
-                    else {
-                        continue; // skip this resource if multiplicity is not an integer
-                    }
-                }
-            }
-            else {
-                continue; // skip this rule if resources attribute is missing
-            }
             rules.push_back(std::move(ruleNode));
         }
-
-        return;
     }
 
     /**
