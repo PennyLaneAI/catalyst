@@ -1564,8 +1564,14 @@ def graph_decomposition(
     _builtin_rule_path: Path = BYTECODE_FILE_PATH,
 ):
     R"""
-    Specify that the ``-graph-decomposition`` MLIR compiler pass for applying optimal gate
-    decompositions should be applied to the decorated QNode during :func:`~.qjit` compilation.
+    Specify that the ``-graph-decomposition`` MLIR compiler pass for applying the graph-based
+    decomposition should be applied to the decorated QNode during :func:`~.qjit` compilation.
+
+    The graph-based decomposition pass decomposes gates into a weighted target ``gate_set``
+    by applying user-provided and built-in decomposition rules. The graph-based framework
+    allows multiple decomposition rules to be defined for a quantum operation,
+    and the graph solver will determine the optimal decomposition rules to apply,
+    minimizing the overall gate count or the cost according to user-specified weights.
 
     .. note::
 
