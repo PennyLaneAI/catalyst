@@ -39,19 +39,7 @@ except (ImportError, ModuleNotFoundError):
     deps_available = False
 
 
-def pytest_addoption(parser: pytest.Parser):
-    """Register custom command line options to pytest."""
-    parser.addoption(
-        "--debug-pipeline",
-        action="store_true",
-        help=(
-            "For tests that use the run_filecheck fixture, display the full xDSL module IR before "
-            "and after applying a compilation pipeline",
-        ),
-    )
-
-
-@pytest.fixture(name="debug_pipeline", scope="session")
+@pytest.fixture(scope="session", name="debug_pipeline")
 def debug_pipeline_fixture(request: pytest.FixtureRequest):
     """Returns whether the --debug-pipeline command line option has been given."""
     return request.config.getoption("--debug-pipeline")
