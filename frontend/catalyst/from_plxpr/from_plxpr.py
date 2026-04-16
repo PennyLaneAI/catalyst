@@ -244,9 +244,11 @@ class OperationCollectorInterpreter(PlxprInterpreter):
         self.operations = set()
         super().__init__()
 
-    def interpret_operation(self, op):
+    def interpret_operation(self, op: qml.operation.Operator):
         self.operations.add(op)
-        return op
+        data, struct = jax.tree_util.tree_flatten(op)
+        return jax.tree_util.tree_unflatten(struct, data)
+
 
 class WorkflowInterpreter(PlxprInterpreter):
     """An interpreter that converts a qnode primitive from a plxpr variant to a catalyst jaxpr variant."""
@@ -452,6 +454,19 @@ def handle_qnode(
                 tkwargs=self.decompose_tkwargs,
             )
 
+            # Fallback to the legacy decomposition if the graph-based decomposition failed
+            if not graph_succeeded:
+                # Remove the decompose-lowering pass from the pipeline
+                self._pass_pipeline = [
+                    p for p in self._pass_pipeline if p.pass_name != "decompose-lowering"
+                ]
+                closed_jaxpr = _apply_compiler_decompose_to_plxpr(
+                    inner_jaxpr=closed_jaxpr.jaxpr,
+                    consts=closed_jaxpr.consts,
+                    ncargs=non_const_args,
+                    tkwargs=self.decompose_tkwargs,
+                )
+
     def calling_convention(*args):
         device_init_p.bind(
             shots,
@@ -584,6 +599,31 @@ def handle_transform(
     transform_name = getattr(transform._plxpr_transform, "__name__", None)
     if transform_name == "decompose_plxpr_to_plxpr":
         use_graph = qml.decomposition.enabled_graph()
+        if use_graph and _is_cxx_graph_decompose_supported(pl_tkwargs):
+            if self.requires_decompose_lowering:
+                raise NotImplementedError(
+                    "Mixing C++ graph decomposition with legacy decomposition fallback is not yet supported."
+                )
+
+            next_eval = copy(self)
+            next_eval.graph_decompose_tkwargs.append(pl_tkwargs)
+            t = qml.transform(pass_name="graph-decomposition")
+            bound_pass = qml.transforms.core.BoundTransform(
+                t,
+                kwargs=prepare_decomposition_options(
+                    gate_set=pl_tkwargs.get("gate_set", []),
+                    fixed_decomps=pl_tkwargs.get("fixed_decomps"),
+                    alt_decomps=pl_tkwargs.get("alt_decomps"),
+                ),
+            )
+            next_eval._pass_pipeline.insert(0, bound_pass)
+            return next_eval.eval(inner_jaxpr, consts, *non_const_args)
+
+        if self.graph_decompose_tkwargs:
+            raise NotImplementedError(
+                "Mixing C++ graph decomposition with legacy decomposition fallback is not yet supported."
+            )
+
         return _handle_decompose_transform(
             self, inner_jaxpr, consts, non_const_args, pl_tkwargs, use_graph
         )
@@ -830,6 +870,7 @@ def _get_operator_name(op):
     # as we deal with such ops later in the decomposition graph.
     return getattr(op._primitive, "name", "NoNameOp")
 
+
 def _union_decompose_gatesets(tkwargs_list):
     """Union the gate sets from a list of qml.decompose transform kwargs."""
 
@@ -842,6 +883,7 @@ def _union_decompose_gatesets(tkwargs_list):
                 seen.add(key)
                 gate_set.append(op)
     return gate_set
+
 
 def _compile_explicit_graph_decomposition_rules(inner_jaxpr, consts, tkwargs_list, ncargs):
     """Compile user-provided fixed/alternative rules for the C++ graph pass."""
@@ -884,3 +926,46 @@ def _compile_explicit_graph_decomposition_rules(inner_jaxpr, consts, tkwargs_lis
                 requires_copy=requires_copy,
                 pauli_word=pauli_word,
             )
+
+
+def _unwrap_decomposition_rule(rule):
+    """Return the underlying callable implementing a PennyLane decomposition rule."""
+
+    return getattr(rule, "_impl", rule)
+
+
+def _rule_uses_work_wires(rule) -> bool:
+    """Whether a PennyLane decomposition rule declares work wires."""
+
+    spec = getattr(rule, "_work_wire_spec", None)
+    if spec is None:
+        return False
+    if callable(spec):
+        return True
+    return bool(spec)
+
+
+def _is_cxx_graph_decompose_supported(tkwargs) -> bool:
+    """Whether a qml.decompose invocation can be routed to the C++ graph pass."""
+
+    if tkwargs.get("stopping_condition") is not None:
+        return False
+
+    for mapping_name in ("fixed_decomps", "alt_decomps"):
+        mapping = tkwargs.get(mapping_name) or {}
+        for op, rules in mapping.items():
+            op_name = _get_operator_name(op)
+            if op_name not in COMPILER_OPS_FOR_DECOMPOSITION:
+                return False
+
+            num_wires, _ = COMPILER_OPS_FOR_DECOMPOSITION[op_name]
+            if num_wires == -1:
+                return False
+
+            if mapping_name == "fixed_decomps":
+                rules = [rules]
+
+            if any(_rule_uses_work_wires(rule) for rule in rules):
+                return False
+
+    return True

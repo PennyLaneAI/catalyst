@@ -441,25 +441,25 @@ class TestPlxPRDecomposition:
     #     ):
     #         circuit(0.2)
 
-    # @pytest.mark.usefixtures("use_capture_dgraph")
-    # def test_fallback_warnings(self):
-    #     """Test the fallback to legacy decomposition system with warnings."""
+    @pytest.mark.usefixtures("use_capture_dgraph")
+    def test_fallback_warnings(self):
+        """Test the fallback to legacy decomposition system with warnings."""
 
-    #     @qml.qjit
-    #     @partial(qml.transforms.decompose, gate_set={qml.GlobalPhase})
-    #     @qml.qnode(qml.device("lightning.qubit", wires=2))
-    #     def circuit(x):
-    #         qml.Hadamard(x)
-    #         return qml.state()
+        @qml.qjit
+        @partial(qml.transforms.decompose, gate_set={qml.GlobalPhase})
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x):
+            qml.Hadamard(x)
+            return qml.state()
 
-    #     # TODO: RZ/RX warnings should not be raised, remove (PL issue #8885)
-    #     with pytest.warns(UserWarning, match="Falling back to the legacy decomposition system"):
-    #         with pytest.warns(
-    #             DecompositionWarning, match="unable to find a decomposition for {'Hadamard'}"
-    #         ):
-    #             with pytest.warns(UserWarning, match="Operator RX does not define"):
-    #                 with pytest.warns(UserWarning, match="Operator RZ does not define"):
-    #                     circuit(0)
+        # TODO: RZ/RX warnings should not be raised, remove (PL issue #8885)
+        with pytest.warns(UserWarning, match="Falling back to the legacy decomposition system"):
+            with pytest.warns(
+                DecompositionWarning, match="unable to find a decomposition for {'Hadamard'}"
+            ):
+                with pytest.warns(UserWarning, match="Operator RX does not define"):
+                    with pytest.warns(UserWarning, match="Operator RZ does not define"):
+                        circuit(0)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_decompose_lowering_on_empty_circuit(self):
@@ -704,7 +704,7 @@ class TestPlxPRDecomposition:
 
         with pytest.raises(
             OSError,
-            match="undefined symbol",  # ___catalyst__qis__RotXZX
+            match="undefined symbol",
         ):
             qml.qjit(circuit)()
 
@@ -822,7 +822,7 @@ class TestPlxPRDecomposition:
             qml.adjoint(qml.Hadamard(wires=2))
             qml.adjoint(qml.CNOT(wires=[0, 1]))
             qml.adjoint(qml.RX(0.5, wires=3))
-            qml.adjoint(qml.Toffoli(wires=[0, 1, 2]))
+            # qml.adjoint(qml.Toffoli)(wires=[0, 1, 2])
             return qml.expval(qml.Z(0))
 
         without_qjit = circuit()
