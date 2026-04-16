@@ -753,13 +753,15 @@ def TemplateOp : Memory_Op<"template", [DeclareOpInterfaceMethods<CallOpInterfac
         Variadic<AnyType>:$inputs,
         QuregType:$in_qreg,
         Variadic<1DTensorOf<[I64]>>:$qubit_inds,
+        Optional<1DTensorOf<[I64]>>:$in_ctrl_inds,
+        Optional<1DTensorOf<[I1]>>:$in_ctrl_vals,
+        UnitAttr:$adjoint,
         DictionaryAttr:$param_map,
         DictionaryAttr:$in_qubits_map,
         DictionaryAttr:$static_data,
         OptionalAttr<FlatSymbolRefAttr>:$sym_name,
         OptionalAttr<DictArrayAttr>:$arg_attrs,
         OptionalAttr<DictArrayAttr>:$res_attrs
-        // TODO: Add ctrl, adjoint related stuff
     );
 
     let results = (outs
