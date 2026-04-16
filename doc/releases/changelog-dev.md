@@ -293,10 +293,6 @@
 
 <h3>Improvements 🛠</h3>
 
-* The legacy frontend no longer registers `qml.allocate()` and `qml.deallocate()` onto the qjit device
-  capabilities, since dynamic qubit allocation is only implemented for the capture frontend.
-  [(#2696)](https://github.com/PennyLaneAI/catalyst/pull/2696)
-
 * Added support for ``StatePrep`` kwargs ``pad_with`` and ``normalize`` with program capture enabled.
   [(#2620)](https://github.com/PennyLaneAI/catalyst/pull/2620)
 
@@ -539,6 +535,10 @@
   [(#2582)](https://github.com/PennyLaneAI/catalyst/pull/2582)
 
 <h3>Internal changes ⚙️</h3>
+
+* The legacy frontend no longer registers `qml.allocate()` and `qml.deallocate()` onto the qjit device
+  capabilities, since dynamic qubit allocation is only implemented for the capture frontend.
+  [(#2696)](https://github.com/PennyLaneAI/catalyst/pull/2696)
 
 * Refactors `draw_graph` implementation to improve maintainability.
   [(#2659)](https://github.com/PennyLaneAI/catalyst/pull/2659)
