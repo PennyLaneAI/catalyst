@@ -15,6 +15,7 @@
 """
 Utility code for keeping paths
 """
+
 import os
 import os.path
 import sys
@@ -22,6 +23,8 @@ import sysconfig
 from pathlib import Path
 
 from catalyst._configuration import INSTALLED
+from catalyst._revision import __revision__
+from catalyst._version import __version__
 
 package_root = os.path.dirname(__file__)
 
@@ -42,7 +45,11 @@ DEFAULT_BIN_PATHS = {
     "cli": os.path.join(package_root, "../../../mlir/build/bin"),
 }
 
-BYTECODE_FILE_PATH = Path(__file__).parent.parent / Path("resources/decomposition_rules.mlirbc")
+BYTECODE_FILE_PATH = (
+    Path(__file__).parent.parent
+    / Path("resources")
+    / Path("decomposition_rules_" + (__version__ if INSTALLED else __revision__) + ".mlirbc")
+)
 
 
 def get_lib_path(project, env_var):
