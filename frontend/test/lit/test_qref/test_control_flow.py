@@ -60,6 +60,89 @@ def test_for_loop_basic(size: int, angle: float):
 print(test_for_loop_basic.mlir)
 
 
+# CHECK: func.func public @test_for_loop_nested(%arg0: tensor<i64>) -> tensor<8xcomplex<f64>>
+@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def test_for_loop_nested(size: int):
+    """
+    Test nested for loop
+    """
+
+    # CHECK-DAG: [[one_index:%.+]] = arith.constant 1 : index
+    # CHECK-DAG: [[zero_index:%.+]] = arith.constant 0 : index
+    # CHECK-DAG: [[size:%.+]] = tensor.extract %arg0[] : tensor<i64>
+    # CHECK-DAG: [[size_index:%.+]] = arith.index_cast [[size]] : i64 to index
+
+    # CHECK-DAG: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
+
+    # CHECK: scf.for %arg1 = [[zero_index]] to [[size_index]] step [[one_index]] {
+    # CHECK:   [[i:%.+]] = arith.index_cast %arg1 : index to i64
+    # CHECK:   [[size:%.+]] = tensor.extract %arg0[] : tensor<i64>
+    # CHECK:   [[size_index:%.+]] = arith.index_cast [[size]] : i64 to index
+    # CHECK:   scf.for %arg2 = [[zero_index]] to [[size_index]] step [[one_index]] {
+    # CHECK:     [[j:%.+]] = arith.index_cast %arg2 : index to i64
+    # CHECK:     [[qi:%.+]] = qref.get [[reg]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK:     [[qj:%.+]] = qref.get [[reg]][[[j]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK:     qref.custom "CNOT"() [[qi]], [[qj]] : !qref.bit, !qref.bit
+    # CHECK:   }
+    # CHECK: }
+
+    for i in range(size):
+        for j in range(size):
+            qp.CNOT(wires=[i, j])
+
+    return qp.state()
+
+
+print(test_for_loop_nested.mlir)
+
+
+# CHECK: func.func public @test_for_loop_with_result(%arg0: tensor<i64>) -> tensor<8xcomplex<f64>>
+@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def test_for_loop_with_result(size: int):
+    """
+    Test for loop with results
+    """
+
+    # CHECK-DAG: [[one_index:%.+]] = arith.constant 1 : index
+    # CHECK-DAG: [[zero_index:%.+]] = arith.constant 0 : index
+    # CHECK-DAG: [[size:%.+]] = tensor.extract %arg0[] : tensor<i64>
+    # CHECK-DAG: [[size_index:%.+]] = arith.index_cast [[size]] : i64 to index
+    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
+
+    # CHECK-DAG: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
+    # CHECK-DAG: [[sum:%.+]] = stablehlo.constant dense<0> : tensor<i64>
+
+    # CHECK: [[loopOut:%.+]] = scf.for %arg1 = [[zero_index]] to [[size_index]] step [[one_index]]
+    # CHECK-SAME:    iter_args(%arg2 = [[sum]]) -> (tensor<i64>) {
+    # CHECK:   [[i:%.+]] = arith.index_cast %arg1 : index to i64
+    # CHECK:   [[qi:%.+]] = qref.get [[reg]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK:   [[mres_i1:%.+]] = qref.measure [[qi]] : i1
+    # CHECK:   [[mres_tensori1:%.+]] = tensor.from_elements [[mres_i1]] : tensor<i1>
+    # CHECK:   [[mres_tensori64:%.+]] = stablehlo.convert [[mres_tensori1]] : (tensor<i1>) -> tensor<i64>
+    # CHECK:   [[sum_looparg:%.+]] = stablehlo.convert %arg2 : tensor<i64>
+    # CHECK:   [[add:%.+]] = stablehlo.add [[sum_looparg]], [[mres_tensori64]] : tensor<i64>
+    # CHECK:   scf.yield [[add]] : tensor<i64>
+    # CHECK: }
+
+    sum = 0
+    for i in range(size):
+        m = qp.measure(i)
+        sum += m
+
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[loopOut_tensorf64:%.+]] = stablehlo.convert [[loopOut]] : (tensor<i64>) -> tensor<f64>
+    # CHECK: [[angle:%.+]] = tensor.extract [[loopOut_tensorf64]][] : tensor<f64>
+    # CHECK: qref.custom "RX"([[angle]]) [[q0]] : !qref.bit
+    qp.RX(sum, wires=0)
+
+    return qp.state()
+
+
+print(test_for_loop_with_result.mlir)
+
+
 # CHECK: func.func public @test_for_loop_with_dynamic_allocation() -> tensor<f64>
 @qp.qjit(capture=True, autograph=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
