@@ -15,10 +15,11 @@
 """Inject noise into a QEC logical IR."""
 
 from dataclasses import dataclass
-from xdsl import passes, context
+
+from xdsl import context, passes, pattern_rewriter
 from xdsl.dialects import builtin
-from xdsl import pattern_rewriter
 from xdsl.rewriter import InsertPoint
+
 from catalyst.python_interface.dialects import qecl
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 
@@ -35,11 +36,7 @@ class InjectNoiseToQECLPattern(pattern_rewriter.RewritePattern):
     ):
         """Inject a qecl.noise operation for each qecl.qec operation in the QEC logical IR."""
 
-        codeblock = None
-        for result in qecop.operands[0].owner.results:
-            if result == qecop.in_codeblock:
-                codeblock = result
-                break
+        codeblock = qecop.in_codeblock
         noiseop = qecl.NoiseOp(codeblock)
         rewriter.insert_op(noiseop, InsertPoint.before(qecop))
 
