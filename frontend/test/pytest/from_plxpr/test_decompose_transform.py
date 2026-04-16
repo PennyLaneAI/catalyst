@@ -418,35 +418,39 @@ class TestGraphDecomposition:
 class TestPlxPRDecomposition:
     """Test the PLxPR-based graph-based decomposition integration with from_plxpr."""
 
-    # @pytest.mark.usefixtures("use_capture_dgraph")
-    # def test_with_multiple_decomps_transforms(self):
-    #     """Test that a circuit with multiple decompositions and transforms can be converted."""
+    @pytest.mark.usefixtures("use_capture_dgraph")
+    def test_with_multiple_decomps_transforms(self):
+        """Test that a circuit with multiple decompositions and transforms can be converted."""
 
-    #     @qml.qjit(target="mlir")
-    #     @partial(
-    #         qml.transforms.decompose,
-    #         gate_set={"RX", "RY"},
-    #     )
-    #     @partial(
-    #         qml.transforms.decompose,
-    #         gate_set={"NOT", "GlobalPhase"},
-    #     )
-    #     @qml.qnode(qml.device("lightning.qubit", wires=0))
-    #     def circuit(x):
-    #         qml.GlobalPhase(x)
-    #         return qml.expval(qml.PauliX(0))
+        @qml.qjit
+        @qml.decompose(gate_set={qml.Rot})
+        @qml.transforms.merge_rotations
+        @qml.decompose(
+            gate_set={qml.GlobalPhase, qml.RX, qml.RY},
+        )
+        @qml.transforms.cancel_inverses
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x: float, y: float):
+            qml.H(0)
+            qml.H(0)
+            qml.RX(x, wires=0)
+            qml.PauliX(0)
+            qml.RY(y, wires=0)
+            qml.PauliY(0)
+            qml.RY(x + y, wires=0)
 
-    #     with pytest.raises(
-    #         NotImplementedError, match="Multiple decomposition transforms are not yet supported."
-    #     ):
-    #         circuit(0.2)
+            return qml.state()
+
+        expected_resources = {"GlobalPhase": 2, "Rot": 5}
+        resources = qml.specs(circuit, level="device")(1.23, 4.56)["resources"].gate_types
+        assert resources == expected_resources
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_fallback_warnings(self):
         """Test the fallback to legacy decomposition system with warnings."""
 
         @qml.qjit
-        @partial(qml.transforms.decompose, gate_set={qml.GlobalPhase})
+        @qml.decompose(gate_set={qml.GlobalPhase})
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit(x):
             qml.Hadamard(x)
@@ -465,10 +469,7 @@ class TestPlxPRDecomposition:
     def test_decompose_lowering_on_empty_circuit(self):
         """Test that the decompose lowering pass works on an empty circuit."""
 
-        @partial(
-            qml.transforms.decompose,
-            gate_set={"RX", "RY"},
-        )
+        @qml.decompose(gate_set={"RX", "RY"})
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
             return qml.expval(qml.X(0))
@@ -492,8 +493,7 @@ class TestPlxPRDecomposition:
             qml.CZ(wires=wires)
             qml.H(wires=wires[1])
 
-        @partial(
-            qml.transforms.decompose,
+        @qml.decompose(
             gate_set={"H", "CZ", "GlobalPhase"},
             alt_decomps={qml.CNOT: [my_cnot]},
         )
@@ -538,8 +538,7 @@ class TestPlxPRDecomposition:
 
         qml.decomposition.enable_graph()
 
-        @partial(
-            qml.transforms.decompose,
+        @qml.decompose(
             gate_set={"RX", "RZ", "GlobalPhase"},
             fixed_decomps={
                 qml.RY: rz_rx,
@@ -578,8 +577,7 @@ class TestPlxPRDecomposition:
             qml.CNOT(wires=(wires[1], wires[0]))
             qml.CNOT(wires=(wires[2], wires[1]))
 
-        @partial(
-            qml.transforms.decompose,
+        @qml.decompose(
             gate_set={"RY", "RX", qml.CNOT},
             fixed_decomps={qml.MultiRZ: custom_multirz},
         )
@@ -603,7 +601,7 @@ class TestPlxPRDecomposition:
     def test_inordered_params(self):
         """Test that unordered parameters in rules are handled correctly."""
 
-        @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
+        @qml.decompose(gate_set=[qml.RX, qml.RY, qml.RZ])
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit(x, y, z):
             qml.Rot(x, y, z, wires=0)
@@ -634,8 +632,7 @@ class TestPlxPRDecomposition:
         def stopping_condition(op):
             return op.name == "MultiRZ"
 
-        @partial(
-            qml.transforms.decompose,
+        @qml.decompose(
             gate_set=[qml.RX, qml.RY, qml.RZ],
             stopping_condition=stopping_condition,
         )
@@ -662,8 +659,7 @@ class TestPlxPRDecomposition:
 
         device = qml.device("lightning.qubit", wires=4)
 
-        @partial(
-            qml.transforms.decompose,
+        @qml.decompose(
             gate_set=[qml.CNOT, qml.PauliZ],
             stopping_condition=lightning_stopping_condition,
         )
@@ -693,10 +689,7 @@ class TestPlxPRDecomposition:
     def test_gateset_with_rotxzx(self):
         """Test the runtime raises an error if RotXZX is not decomposed."""
 
-        @partial(
-            qml.transforms.decompose,
-            gate_set={qml.ftqc.RotXZX},
-        )
+        @qml.decompose(gate_set={qml.ftqc.RotXZX})
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
             qml.ftqc.RotXZX(0.5, 0.3, 0.7, wires=0)
@@ -712,10 +705,7 @@ class TestPlxPRDecomposition:
     def test_ftqc_rotxzx(self):
         """Test that FTQC RotXZX decomposition works with from_plxpr."""
 
-        @partial(
-            qml.transforms.decompose,
-            gate_set={"CNOT", "GlobalPhase", "RX", "RZ", "PauliRot"},
-        )
+        @qml.decompose(gate_set={"CNOT", "GlobalPhase", "RX", "RZ", "PauliRot"})
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
             qml.ftqc.RotXZX(0.5, 0.3, 0.7, wires=0)
@@ -736,10 +726,7 @@ class TestPlxPRDecomposition:
     def test_multirz(self):
         """Test that multirz decomposition works with from_plxpr."""
 
-        @partial(
-            qml.transforms.decompose,
-            gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "Rot", "GlobalPhase"},
-        )
+        @qml.decompose(gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "Rot", "GlobalPhase"})
         @qml.qnode(qml.device("lightning.qubit", wires=4))
         def circuit():
             qml.Hadamard(0)
@@ -765,10 +752,7 @@ class TestPlxPRDecomposition:
     def test_gphase(self):
         """Test that the decompose lowering pass works with GlobalPhase."""
 
-        @partial(
-            qml.transforms.decompose,
-            gate_set={"RX", "RY", "GlobalPhase"},
-        )
+        @qml.decompose(gate_set={"RX", "RY", "GlobalPhase"})
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
             qml.GlobalPhase(0.5)
@@ -789,10 +773,7 @@ class TestPlxPRDecomposition:
     def test_multi_qubits(self):
         """Test that the decompose lowering pass works with multi-qubit gates."""
 
-        @partial(
-            qml.transforms.decompose,
-            gate_set={"RY", "RX", "CNOT", "Hadamard", "GlobalPhase"},
-        )
+        @qml.decompose(gate_set={"RY", "RX", "CNOT", "Hadamard", "GlobalPhase"})
         @qml.qnode(qml.device("lightning.qubit", wires=4))
         def circuit():
             qml.SingleExcitation(0.5, wires=[0, 1])
@@ -813,10 +794,7 @@ class TestPlxPRDecomposition:
     def test_adjoint(self):
         """Test the decompose lowering pass with adjoint operations."""
 
-        @partial(
-            qml.transforms.decompose,
-            gate_set={"RY", "RX", "CZ", "GlobalPhase"},
-        )
+        @qml.decompose(gate_set={"RY", "RX", "CZ", "GlobalPhase"})
         @qml.qnode(qml.device("lightning.qubit", wires=4))
         def circuit():
             qml.adjoint(qml.Hadamard(wires=2))
@@ -838,10 +816,7 @@ class TestPlxPRDecomposition:
     def test_ctrl(self):
         """Test the decompose lowering pass with controlled operations."""
 
-        @partial(
-            qml.transforms.decompose,
-            gate_set={"RX", "RZ", "H", "CZ", "PauliRot"},
-        )
+        @qml.decompose(gate_set={"RX", "RZ", "H", "CZ", "PauliRot"})
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
             qml.ctrl(qml.Hadamard(wires=1), 0)
@@ -862,10 +837,7 @@ class TestPlxPRDecomposition:
     def test_template_qft(self):
         """Test the decompose lowering pass with the QFT template."""
 
-        @partial(
-            qml.transforms.decompose,
-            gate_set={"RX", "RY", "CNOT", "GlobalPhase", "PauliRot"},
-        )
+        @qml.decompose(gate_set={"RX", "RY", "CNOT", "GlobalPhase", "PauliRot"})
         @qml.qnode(qml.device("lightning.qubit", wires=4))
         def circuit():
             qml.QFT(wires=[0, 1, 2, 3])
@@ -887,10 +859,7 @@ class TestPlxPRDecomposition:
 
         @qml.transforms.merge_rotations
         @qml.transforms.cancel_inverses
-        @partial(
-            qml.transforms.decompose,
-            gate_set=frozenset({"RZ", "RY", "CNOT", "GlobalPhase"}),
-        )
+        @qml.decompose(gate_set=frozenset({"RZ", "RY", "CNOT", "GlobalPhase"}))
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
             qml.PauliX(0)
@@ -957,8 +926,7 @@ class TestPlxPRDecomposition:
         with expectation:
 
             @qml.qjit
-            @partial(
-                qml.transforms.decompose,
+            @qml.decompose(
                 gate_set={qml.CNOT, qml.H, qml.X, "Conditional", "MidMeasure"},
                 fixed_decomps={qml.CRX: my_decomp},
                 num_work_wires=num_work_wires,
