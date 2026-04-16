@@ -283,6 +283,7 @@ clean:
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 	rm -rf .benchmarks
+	rm -rf frontend/catalyst/resources
 
 clean-all: clean clean-mlir clean-runtime clean-oqc
 clean-catalyst: clean clean-dialects clean-runtime clean-oqc
