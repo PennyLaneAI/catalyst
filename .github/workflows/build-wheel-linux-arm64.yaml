@@ -390,6 +390,9 @@ jobs:
         OQC_BUILD_DIR="$GITHUB_WORKSPACE/oqc-build" \
         ENZYME_BUILD_DIR="$GITHUB_WORKSPACE/enzyme-build" \
         make wheel
+        PYTHON_PATH=$GITHUB_WORKSPACE/frontend $(PYTHON) -m frontend.catalyst.utils.precompile_decomposition_rules
+        rm dist/*.whl
+        make wheel
 
     - name: Repair wheel using auditwheel
       run: |
