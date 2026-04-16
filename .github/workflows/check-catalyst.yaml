@@ -533,8 +533,9 @@ jobs:
     - name: Run qref frontend lit tests
       run: |
         for file in ./frontend/test/lit/test_qref/*; do\
-		      python3 "$$file" | l./lvm-build/bin/FileCheck "$$file";\
-	      done
+        echo "Testing $$file"\;
+        python3 "$$file" | l./lvm-build/bin/FileCheck "$$file";\
+        done
 
     - name: Run Python Pytest/Lit Tests
       run: |
