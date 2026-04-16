@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "OQDDevice.hpp"
+
 #include <algorithm>
 
-#include "OQDDevice.hpp"
 #include "OQDRuntimeCAPI.h"
 
 namespace Catalyst::Runtime::Device {

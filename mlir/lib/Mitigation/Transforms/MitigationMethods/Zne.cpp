@@ -21,16 +21,16 @@
 #include <vector>
 
 #include "llvm/ADT/SmallPtrSet.h"
-
-#include "Catalyst/Utils/CallGraph.h"
-#include "Mitigation/IR/MitigationOps.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/RemoveQuantum.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
+
+#include "Catalyst/Utils/CallGraph.h"
+#include "Mitigation/IR/MitigationOps.h"
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Utils/RemoveQuantum.h"
 
 namespace catalyst {
 namespace mitigation {

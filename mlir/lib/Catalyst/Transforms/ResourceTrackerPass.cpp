@@ -15,7 +15,6 @@
 #define DEBUG_TYPE "resource-tracker"
 
 #include "llvm/Support/JSON.h"
-
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
