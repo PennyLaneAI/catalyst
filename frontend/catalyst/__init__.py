@@ -96,6 +96,7 @@ if (
     )
     and not BYTECODE_FILE_PATH.exists()
 ):  # pragma: no cover
+    BYTECODE_FILE_PATH.parent.mkdir(exist_ok=True)
     for file in BYTECODE_FILE_PATH.parent.iterdir():
         if file.is_file() and file.name.startswith("decomposition_rules"):
             file.unlink()

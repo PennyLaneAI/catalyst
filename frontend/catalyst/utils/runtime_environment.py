@@ -48,7 +48,7 @@ DEFAULT_BIN_PATHS = {
 BYTECODE_FILE_PATH = (
     Path(__file__).parent.parent
     / Path("resources")
-    / Path("decomposition_rules_" + (__version__ if INSTALLED else __revision__) + ".mlirbc")
+    / Path("decomposition_rules_" + (__revision__ if __revision__ else __version__) + ".mlirbc")
 )
 
 
