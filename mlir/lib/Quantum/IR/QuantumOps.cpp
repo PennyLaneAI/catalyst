@@ -607,7 +607,7 @@ void TemplateOp::print(OpAsmPrinter &p)
     p.printNewline();
 
     // 3. qreg and qubit_inds
-    p << "qreg " << getInQreg() << " qubit_inds (";
+    p << "in_qreg (" << getInQreg() << ") qubit_inds (";
     llvm::interleaveComma(llvm::zip(getQubitInds(), getQubitInds().getTypes()), p,
                           [&](auto pair) { p << std::get<0>(pair) << " : " << std::get<1>(pair); });
     p << ")";
@@ -642,14 +642,14 @@ void TemplateOp::print(OpAsmPrinter &p)
         p << "()";
     }
     else if (varResTypes.size() == 1) {
-        p << varResTypes.front();
+        p << "(" << varResTypes.front() << ")";
     }
     else {
         p << "(";
         llvm::interleaveComma(varResTypes, p);
         p << ")";
     }
-    p << " qreg " << getOutQreg().getType();
+    p << " out_qreg (" << getOutQreg().getType() << ")";
 
     // 6. Indented Properties
     p.printNewline();
@@ -700,7 +700,8 @@ ParseResult TemplateOp::parse(OpAsmParser &parser, OperationState &result)
 
     // 3. Parse single qreg
     OpAsmParser::UnresolvedOperand inQreg;
-    if (parser.parseKeyword("qreg") || parser.parseOperand(inQreg))
+    if (parser.parseKeyword("in_qreg") || parser.parseLParen() || parser.parseOperand(inQreg) ||
+        parser.parseRParen())
         return failure();
 
     // 4. Parse qubit_inds
@@ -790,7 +791,8 @@ ParseResult TemplateOp::parse(OpAsmParser &parser, OperationState &result)
     }
 
     Type outQregType;
-    if (parser.parseKeyword("qreg") || parser.parseType(outQregType))
+    if (parser.parseKeyword("out_qreg") || parser.parseLParen() || parser.parseType(outQregType) ||
+        parser.parseRParen())
         return failure();
 
     result.addTypes(varResTypes);
