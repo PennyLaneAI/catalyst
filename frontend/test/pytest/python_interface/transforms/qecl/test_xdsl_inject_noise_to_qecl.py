@@ -49,3 +49,38 @@ class TestInjectNoiseToQECLPass:
         pipeline = (InjectNoiseToQECLPass(),)
 
         run_filecheck(program, pipeline)
+
+
+class TestInjectNoiseToQECLPassIntegration:
+    """Integration lit tests for the inject-noise-to-qecl pass"""
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_inject_noise_to_qecl_pass_integration(self, run_filecheck_qjit):
+        """Test the inject-noise-to-qecl pass on the simplest possible, non-trivial circuit."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @qml.qjit(target="mlir")
+        @inject_noise_to_qecl_pass
+        @convert_quantum_to_qecl_pass(k=1)
+        @qml.qnode(dev, shots=1)
+        def circuit():
+            # CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
+            # CHECK: qecl.extract_block {{%.+}}[0] : !qecl.hyperreg<1 x 1> -> !qecl.codeblock<1>
+            # CHECK: qecl.encode[zero]
+            # CHECK: qecl.insert_block {{%.+}}[0], {{%.+}}
+            # CHECK: qecl.extract_block
+            # CHECK: qecl.noise
+            # CHECK: qecl.qec
+            # CHECK: qecl.hadamard {{%.+}}[0]
+            # CHECK: qecl.noise
+            # CHECK: qecl.qec
+            # CHECK: qecl.measure {{%.+}}[0]
+            # CHECK: quantum.mcmobs
+            # CHECK: quantum.sample
+            # CHECK: qecl.insert_block
+            # CHECK: qecl.dealloc
+            qml.H(0)
+            m0 = qml.measure(0)
+            return qml.sample([m0])
+
+        run_filecheck_qjit(circuit)
