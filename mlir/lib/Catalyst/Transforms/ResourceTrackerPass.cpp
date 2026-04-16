@@ -128,58 +128,68 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
         }
     }
 
+    /// Serialize a single ResourceResult into a JSON object.
+    static llvm::json::Object resultToJson(const ResourceResult &result)
+    {
+        llvm::json::Object funcObj;
+
+        llvm::json::Object opsObj;
+        for (const auto &opEntry : result.operations) {
+            StringRef opName = opEntry.getKey();
+            for (const auto &sizeEntry : opEntry.getValue()) {
+                int nQubits = sizeEntry.first;
+                int64_t count = sizeEntry.second;
+                std::string key = opName.str() + "(" + std::to_string(nQubits) + ")";
+                opsObj[key] = count;
+            }
+        }
+        funcObj["operations"] = std::move(opsObj);
+
+        llvm::json::Object measObj;
+        for (const auto &entry : result.measurements) {
+            measObj[entry.getKey()] = entry.getValue();
+        }
+        funcObj["measurements"] = std::move(measObj);
+
+        llvm::json::Object classObj;
+        for (const auto &entry : result.classicalInstructions) {
+            classObj[entry.getKey()] = entry.getValue();
+        }
+        funcObj["classical_instructions"] = std::move(classObj);
+
+        llvm::json::Object fcObj;
+        for (const auto &entry : result.functionCalls) {
+            fcObj[entry.getKey()] = entry.getValue();
+        }
+        funcObj["function_calls"] = std::move(fcObj);
+
+        funcObj["num_qubits"] = static_cast<int64_t>(result.numQubits());
+        funcObj["num_alloc_qubits"] = static_cast<int64_t>(result.numAllocQubits);
+        funcObj["num_arg_qubits"] = static_cast<int64_t>(result.numArgQubits);
+        funcObj["device_name"] = result.deviceName;
+        funcObj["qnode"] = result.isQnode;
+        funcObj["has_branches"] = result.hasBranches;
+        funcObj["has_dyn_loop"] = result.hasDynLoop;
+
+        return funcObj;
+    }
+
     /// Serialize all per-function ResourceResults into a JSON string.
+    /// qnode functions are inserted first so that the PennyLane reader
+    /// (which uses the first entry) picks the correct function.
     std::string buildJsonString(const llvm::StringMap<ResourceResult> &results) const
     {
         llvm::json::Object root;
 
         for (const auto &funcEntry : results) {
-            llvm::json::Object funcObj;
-            const ResourceResult &result = funcEntry.getValue();
-
-            // Operations
-            llvm::json::Object opsObj;
-            for (const auto &opEntry : result.operations) {
-                StringRef opName = opEntry.getKey();
-                for (const auto &sizeEntry : opEntry.getValue()) {
-                    int nQubits = sizeEntry.first;
-                    int64_t count = sizeEntry.second;
-                    std::string key = opName.str() + "(" + std::to_string(nQubits) + ")";
-                    opsObj[key] = count;
-                }
+            if (funcEntry.getValue().isQnode) {
+                root[funcEntry.getKey()] = resultToJson(funcEntry.getValue());
             }
-            funcObj["operations"] = std::move(opsObj);
-
-            // Measurements
-            llvm::json::Object measObj;
-            for (const auto &entry : result.measurements) {
-                measObj[entry.getKey()] = entry.getValue();
+        }
+        for (const auto &funcEntry : results) {
+            if (!funcEntry.getValue().isQnode) {
+                root[funcEntry.getKey()] = resultToJson(funcEntry.getValue());
             }
-            funcObj["measurements"] = std::move(measObj);
-
-            // Classical instructions
-            llvm::json::Object classObj;
-            for (const auto &entry : result.classicalInstructions) {
-                classObj[entry.getKey()] = entry.getValue();
-            }
-            funcObj["classical_instructions"] = std::move(classObj);
-
-            // Function calls
-            llvm::json::Object fcObj;
-            for (const auto &entry : result.functionCalls) {
-                fcObj[entry.getKey()] = entry.getValue();
-            }
-            funcObj["function_calls"] = std::move(fcObj);
-
-            funcObj["num_qubits"] = static_cast<int64_t>(result.numQubits());
-            funcObj["num_alloc_qubits"] = static_cast<int64_t>(result.numAllocQubits);
-            funcObj["num_arg_qubits"] = static_cast<int64_t>(result.numArgQubits);
-            funcObj["device_name"] = result.deviceName;
-            funcObj["qnode"] = result.isQnode;
-            funcObj["has_branches"] = result.hasBranches;
-            funcObj["has_dyn_loop"] = result.hasDynLoop;
-
-            root[funcEntry.getKey()] = std::move(funcObj);
         }
 
         llvm::json::Value jsonValue(std::move(root));
