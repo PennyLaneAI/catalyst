@@ -23,7 +23,6 @@ import jax
 from jax.extend.core import ClosedJaxpr
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
-from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
 
 from catalyst.from_plxpr.from_plxpr import (
@@ -35,7 +34,7 @@ from catalyst.from_plxpr.qubit_handler import (
     _get_dynamically_allocated_qregs,
 )
 from catalyst.jax_extras import jaxpr_pad_consts
-from catalyst.jax_primitives import cond_p, for_p, while_p
+from catalyst.jax_primitives import cond_p, while_p
 
 
 def _calling_convention(interpreter, closed_jaxpr, *args):
@@ -151,120 +150,6 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
         dyn_qreg.set(outvals.pop())
 
     # Return only the output values that match the plxpr output values
-    return outvals
-
-
-# pylint: disable=unused-argument, too-many-arguments
-@WorkflowInterpreter.register_primitive(plxpr_for_loop_prim)
-def workflow_for_loop(
-    self,
-    start,
-    stop,
-    step,
-    *plxpr_invals,
-    jaxpr_body_fn,
-    consts_slice,
-    args_slice,
-    abstract_shapes_slice,
-):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the for loop primitive
-
-    Args:
-        consts_slice: Tuple (start, stop, step) to slice consts from plxpr_invals
-        args_slice: Tuple (start, stop, step) to slice args from plxpr_invals
-        abstract_shapes_slice: Tuple (start, stop, step) to slice abstract shapes
-    """
-    assert jaxpr_body_fn is not None
-    args = plxpr_invals[_tuple_to_slice(args_slice)]
-
-    consts = plxpr_invals[_tuple_to_slice(consts_slice)]
-
-    converter = copy(self)
-    evaluator = partial(converter.eval, jaxpr_body_fn, consts)
-
-    converted_jaxpr_branch = jax.make_jaxpr(evaluator)(start, *args)
-    converted_closed_jaxpr_branch = ClosedJaxpr(
-        convert_constvars_jaxpr(converted_jaxpr_branch.jaxpr), ()
-    )
-
-    # Config additional for loop settings
-    apply_reverse_transform = isinstance(step, int) and step < 0
-
-    return for_p.bind(
-        *converted_jaxpr_branch.consts,
-        start,
-        stop,
-        step,
-        start,
-        *args,
-        body_jaxpr=converted_closed_jaxpr_branch,
-        body_nconsts=len(consts),
-        apply_reverse_transform=apply_reverse_transform,
-        num_implicit_inputs=0,
-        preserve_dimensions=True,
-    )
-
-
-# pylint: disable=unused-argument, too-many-arguments
-@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_for_loop_prim)
-def handle_for_loop(
-    self,
-    start,
-    stop,
-    step,
-    *plxpr_invals,
-    jaxpr_body_fn,
-    consts_slice,
-    args_slice,
-    abstract_shapes_slice,
-):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the for loop primitive
-
-    Args:
-        consts_slice: Tuple (start, stop, step) to slice consts from plxpr_invals
-        args_slice: Tuple (start, stop, step) to slice args from plxpr_invals
-        abstract_shapes_slice: Tuple (start, stop, step) to slice abstract shapes
-    """
-    assert jaxpr_body_fn is not None
-    args = plxpr_invals[_tuple_to_slice(args_slice)]
-
-    start_plus_args = [
-        start,
-        *args,
-    ]
-
-    consts = plxpr_invals[_tuple_to_slice(consts_slice)]
-
-    jaxpr = ClosedJaxpr(jaxpr_body_fn, consts)
-
-    f = partial(
-        _calling_convention,
-        self,
-        jaxpr,
-    )
-    converted_jaxpr_branch = jax.make_jaxpr(f)(*start_plus_args)
-
-    converted_closed_jaxpr_branch = ClosedJaxpr(
-        convert_constvars_jaxpr(converted_jaxpr_branch.jaxpr), ()
-    )
-
-    # Build Catalyst compatible input values
-    new_consts = converted_jaxpr_branch.consts
-    for_loop_invals = [*new_consts, start, stop, step, *start_plus_args]
-
-    # Config additional for loop settings
-    apply_reverse_transform = isinstance(step, int) and step < 0
-
-    # Perform the binding
-    outvals = for_p.bind(
-        *for_loop_invals,
-        body_jaxpr=converted_closed_jaxpr_branch,
-        body_nconsts=len(new_consts),
-        apply_reverse_transform=apply_reverse_transform,
-        num_implicit_inputs=0,
-        preserve_dimensions=True,
-    )
-
     return outvals
 
 
