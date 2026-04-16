@@ -19,6 +19,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "PBC/IR/PBCDialect.h"
+
 #include "PBC/Transforms/PassesEnums.h.inc" // need for DecomposeMethod
 
 namespace catalyst {

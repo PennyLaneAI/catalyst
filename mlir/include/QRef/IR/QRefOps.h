@@ -17,7 +17,6 @@
 #include <optional>
 
 #include "llvm/ADT/StringRef.h"
-
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"

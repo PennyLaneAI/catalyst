@@ -17,15 +17,16 @@
 #include <array>
 #include <cassert> // assert
 
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Math/IR/Math.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 
 #include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
+
 #include "VerifyParentGateAnalysis.hpp"
 
 using llvm::dbgs;

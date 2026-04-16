@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "QecPhysical/IR/QecPhysicalOps.h"
+
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/PatternMatch.h"
-#include "llvm/Support/Casting.h"
-#include "llvm/Support/LogicalResult.h"
 
 #include "QecPhysical/IR/QecPhysicalAttrDefs.h"
 #include "QecPhysical/IR/QecPhysicalDialect.h"
-#include "QecPhysical/IR/QecPhysicalOps.h"
 #include "QecPhysical/IR/QecPhysicalTypes.h"
 
 using namespace mlir;
