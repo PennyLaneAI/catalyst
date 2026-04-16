@@ -15,8 +15,11 @@
 """xDSL API for qecl transforms"""
 
 from .convert_quantum_to_qecl import ConvertQuantumToQecLogicalPass, convert_quantum_to_qecl_pass
+from .inject_noise_to_qecl import InjectNoiseToQECLPass, inject_noise_to_qecl_pass
 
 __all__ = [
     "ConvertQuantumToQecLogicalPass",
     "convert_quantum_to_qecl_pass",
+    "InjectNoiseToQECLPass",
+    "inject_noise_to_qecl_pass",
 ]
