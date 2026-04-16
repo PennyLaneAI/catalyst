@@ -460,6 +460,7 @@ def handle_while_loop(
         cond_slice=cond_slice,
         args_slice=args_slice,
     )
+    outvals = list(outvals)
 
     # We assume the last output value is the returned qreg.
     # Update the current qreg and remove it from the output values.
