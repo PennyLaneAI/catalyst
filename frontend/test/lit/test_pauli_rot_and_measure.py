@@ -20,7 +20,7 @@ from functools import partial
 
 import numpy as np
 import pennylane as qml
-from pennylane.transforms.decompositions import (
+from pennylane.transforms import (
     commute_ppr,
     merge_ppr_ppm,
     ppm_compilation,
