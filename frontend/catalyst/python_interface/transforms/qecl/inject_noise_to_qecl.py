@@ -42,7 +42,13 @@ class InjectNoiseToQECLPattern(pattern_rewriter.RewritePattern):
                 break
         noiseop = qecl.NoiseOp(codeblock)
         rewriter.insert_op(noiseop, InsertPoint.before(qecop))
-        rewriter.replace_all_uses_with(codeblock, noiseop.results[0])
+
+        uses_to_change = [use for use in codeblock.uses if use.operation is not noiseop]
+
+        # pylint: disable = cell-var-from-loop
+        codeblock.replace_uses_with_if(noiseop.results[0], lambda use: use in uses_to_change)
+        for use in uses_to_change:
+            rewriter.notify_op_modified(use.operation)
 
 
 @dataclass(frozen=True)
