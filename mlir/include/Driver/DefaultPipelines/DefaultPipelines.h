@@ -81,7 +81,12 @@ const PipelineList pipelineList{
       // Must be run before --one-shot-bufferize.
       "convert-elementwise-to-linalg",
       "gradient-preprocess",
-      "eliminate-empty-tensors",
+      /* [DISABLED PASS]
+       * Keep eliminate-empty-tensors commented out until benchmarks use more structure
+       * and produce functions of reasonable size. Otherwise, eliminate-empty-tensors
+       * will consume a significant amount of compile time along with one-shot-bufferize.
+       * "eliminate-empty-tensors",
+       */
       // This pass is needed to avoid aliasing of the input buffer with the output buffer.
       "mark-entry-point-args-non-writable",
       "one-shot-bufferize",
@@ -91,7 +96,11 @@ const PipelineList pipelineList{
       // Introduced during gradient-bufferize of callbacks
       "func.func(buffer-hoisting)",
       "func.func(buffer-loop-hoisting)",
-      "func.func(promote-buffers-to-stack)",
+      /* [DISABLED PASS]
+       * TODO: investigate re-adding this after new buffer deallocation pipeline.
+       *       Removed due to high-stack memory use in nested structures.
+       * "func.func(promote-buffers-to-stack)",
+       */
       // TODO: migrate to new buffer deallocation "buffer-deallocation-pipeline"
       "func.func(buffer-deallocation)",
       "convert-arraylist-to-memref",
@@ -99,9 +108,9 @@ const PipelineList pipelineList{
       // Must be after convert-bufferization-to-memref.
       // Otherwise, there are issues in the lowering of dynamic tensors.
       "canonicalize",
-      // Disabled pass
-      // -------------
-      //"cse",
+      /* [DISABLED PASS]
+       * "cse",
+       */
       "cp-global-memref"}},
     {"llvm-dialect-lowering-pipeline",
      {"qnode-to-async-lowering",
