@@ -51,8 +51,8 @@ def pytest_addoption(parser: pytest.Parser):
     )
 
 
-@pytest.fixture(scope="session")
-def debug_pipeline(request: pytest.FixtureRequest):
+@pytest.fixture(name="debug_pipeline", scope="session")
+def debug_pipeline_fixture(request: pytest.FixtureRequest):
     """Returns whether the --debug-pipeline command line option has been given."""
     return request.config.getoption("--debug-pipeline")
 
