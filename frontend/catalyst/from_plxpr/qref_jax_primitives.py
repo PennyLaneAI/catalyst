@@ -281,6 +281,9 @@ def _hermitian_abstract_eval(matrix, *qubits):
 
 
 def _qref_hermitian_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qubits: tuple):
+    assert isinstance(matrix.type, ir.RankedTensorType)
+    assert isinstance(matrix.type.element_type, ir.ComplexType)
+
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
