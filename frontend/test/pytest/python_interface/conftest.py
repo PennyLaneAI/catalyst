@@ -53,11 +53,16 @@ def pytest_addoption(parser: pytest.Parser):
 
 @pytest.fixture(scope="session")
 def debug_pipeline(request: pytest.FixtureRequest):
+    """Returns whether the --debug-pipeline command line option has been given."""
     return request.config.getoption("--debug-pipeline")
 
 
 @contextmanager
 def debug_step(message, enabled=True):
+    """A convenience context manager that prints a debug message before running a block of code.
+
+    If the block of code executes without error, "OK" is appended to the debug message.
+    """
     if enabled:
         print(f"[DEBUG] {message}... ", end="", flush=True)
 
