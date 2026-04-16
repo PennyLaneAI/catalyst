@@ -503,3 +503,38 @@ def var2(i: int, j: int):
 
 
 print(var2.mlir)
+
+
+# CHECK: func.func public @test_multiple_terminal_measurements() -> (tensor<8xf64>, tensor<1000x1xi64>, tensor<f64>, tensor<f64>)
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3), shots=1000)
+def test_multiple_terminal_measurements():
+    """
+    Test an empty circuit with multiple terminal measurements.
+    """
+    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
+    # CHECK: quantum.device
+    # CHECK: [[alloc:%.+]] = qref.alloc( 3) : !qref.reg<3>
+
+    # CHECK: [[compbasis:%.+]] = qref.compbasis(qreg [[alloc]] : !qref.reg<3>) : !quantum.obs
+    # CHECK: [[probs:%.+]] = quantum.probs [[compbasis]] : tensor<8xf64>
+
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[compbasis:%.+]] = qref.compbasis qubits [[q0]] : !quantum.obs
+    # CHECK: [[sample:%.+]] = quantum.sample [[compbasis]] : tensor<1000x1xf64>
+
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[Xobs:%.+]] = qref.namedobs [[q0]][ PauliX] : !quantum.obs
+    # CHECK: [[expval:%.+]] = quantum.expval [[Xobs]] : f64
+
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[Yobs:%.+]] = qref.namedobs [[q0]][ PauliY] : !quantum.obs
+    # CHECK: [[var:%.+]] = quantum.var [[Yobs]] : f64
+
+    # CHECK: qref.dealloc [[alloc]] : !qref.reg<3>
+    # CHECK: quantum.device_release
+
+    return qp.probs(), qp.sample(wires=[0]), qp.expval(qp.X(0)), qp.var(qp.Y(0))
+
+
+print(test_multiple_terminal_measurements.mlir)

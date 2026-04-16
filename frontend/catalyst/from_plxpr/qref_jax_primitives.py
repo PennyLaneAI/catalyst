@@ -188,6 +188,7 @@ def _qref_alloc_lowering(
 #
 # qref_dealloc_p
 #
+# pylint: disable=unused-argument
 @qref_dealloc_p.def_abstract_eval
 def _qref_dealloc_abstract_eval(qreg):
     return ()
@@ -203,6 +204,7 @@ def _qref_dealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
 #
 # qref_get_p
 #
+# pylint: disable=unused-argument
 @qref_get_p.def_abstract_eval
 def _qref_get_abstract_eval(qreg, qubit_idx):
     assert isinstance(qreg, QrefQreg), f"Expected QrefQreg, got {qreg}"
@@ -634,6 +636,7 @@ def _qref_compbasis_lowering(
 #
 # named observable
 #
+# pylint: disable=unused-argument
 @qref_namedobs_p.def_abstract_eval
 def _qref_namedobs_abstract_eval(qubit, kind):
     assert isinstance(qubit, QrefQubit)
@@ -657,6 +660,7 @@ def _qref_named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value,
 #
 # hermitian observable
 #
+# pylint: disable=unused-argument
 @qref_hermitian_p.def_abstract_eval
 def _hermitian_abstract_eval(matrix, *qubits):
     for q in qubits:
@@ -665,6 +669,9 @@ def _hermitian_abstract_eval(matrix, *qubits):
 
 
 def _qref_hermitian_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qubits: tuple):
+    assert isinstance(matrix.type, ir.RankedTensorType)
+    assert isinstance(matrix.type.element_type, ir.ComplexType)
+
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
