@@ -293,8 +293,15 @@
 
 <h3>Improvements 🛠</h3>
 
+* Added support for ``StatePrep`` kwargs ``pad_with`` and ``normalize`` with program capture enabled.
+  [(#2620)](https://github.com/PennyLaneAI/catalyst/pull/2620)
+
 * `abstracted_axes` now work with `qjit` and `capture=True`.
-  [(#2655)](https://github.com/PennyLaneAI/catalyst/pull/2655/)
+  [(#2655)](https://github.com/PennyLaneAI/catalyst/pull/2655)
+
+* Added support for ``PauliRot`` and ``PauliMeasure`` execution on the `null.qubit` device, which enables
+  runtime resource tracking for those operations.
+  [(#2627)](https://github.com/PennyLaneAI/catalyst/pull/2627)
 
 * A warning is issued when gridsynth pass is called with epsilon smaller than 1e-6 due to potential precision error.
   [(#2625)](https://github.com/PennyLaneAI/catalyst/pull/2625)
@@ -390,6 +397,10 @@
   This behaviour matches the behaviour of the tape transform `measurements_from_samples` in PennyLane.
   [(#2617)](https://github.com/PennyLaneAI/catalyst/pull/2617)
 
+* The `measurements-from-samples` pass is refactored to follow the conventions for a qnode transform
+  as they are described in `catalyst.python_interace.transforms.qnode-transform-guide.md`.
+  [(#2605)](https://github.com/PennyLaneAI/catalyst/pull/2605)
+
 * A more informative error message is now raised when a `measurements-from-samples` xDSL pass encounters a
   program with dyanamic shots.
   [#2616](https://github.com/PennyLaneAI/catalyst/pull/2616)
@@ -406,6 +417,7 @@
 
 * `catalyst.from_plxpr.register_transforms` as a way to access MLIR passes from Python has been removed in favour of the new unified transforms API. MLIR passes can be accessed from Python using `qml.transform(pass_name="some-pass-name")`.
   [(#2509)](https://github.com/PennyLaneAI/catalyst/pull/2509)
+  [(#2680)](https://github.com/PennyLaneAI/catalyst/pull/2680)
 
 * `catalyst.jax_primitives.subroutine` has been moved to `qml.capture.subroutine`.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
@@ -443,10 +455,11 @@
 <h3>Bug fixes 🐛</h3>
 
 * Fixed a bug where multiple `quantum.extract` operations from the same index were being created
-  when there are multiple named observables or Hermitian observables on that same wire index,
-  when capture is not enabled.
+  when there are multiple computational basis observables, named observables or Hermitian
+  observables on that same wire index, when capture is not enabled.
   [(#2641)](https://github.com/PennyLaneAI/catalyst/pull/2641)
   [(#2646)](https://github.com/PennyLaneAI/catalyst/pull/2646)
+  [(#2693)](https://github.com/PennyLaneAI/catalyst/pull/2693)
 
 * :func:`~pennylane.adjoint` can now be used on subroutines with classical arguments.
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
@@ -476,6 +489,11 @@
 * Fix `CATALYST_XDSL_UNIVERSE` to correctly define the available dialects and transforms, allowing
   tools like `xdsl-opt` to work with Catalyst's custom Python dialects.
   [(#2471)](https://github.com/PennyLaneAI/catalyst/pull/2471)
+
+* Fix symbolic adjoint support for control flow operation. This means operators who are the target
+  of `qp.adjoint` but require decomposition can have decompositions with control flow in them,
+  which would previously raise an error. Adjoint on functions is unaffected.
+  [(#2667)](https://github.com/PennyLaneAI/catalyst/pull/2667)
 
 * Fix a bug with the xDSL `ParitySynth` pass that caused failure when the QNode being transformed
   contained operations with regions.
@@ -583,6 +601,8 @@
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
   [(#2492)](https://github.com/PennyLaneAI/catalyst/pull/2492)
   [(#2674)](https://github.com/PennyLaneAI/catalyst/pull/2674)
+  [(#2642)](https://github.com/PennyLaneAI/catalyst/pull/2642)
+  [(#2692)](https://github.com/PennyLaneAI/catalyst/pull/2692)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
@@ -673,6 +693,7 @@
 * Added lowering of `pbc.ppm`, `pbc.ppr`, and `quantum.paulirot` to the runtime CAPI and QuantumDevice C++ API.
   [(#2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
   [(#2413)](https://github.com/PennyLaneAI/catalyst/pull/2413)
+  [(#2683)](https://github.com/PennyLaneAI/catalyst/pull/2683)
 
 * A new compiler pass, `unroll-conditional-ppr-ppm`, has been added to convert conditional or
   multiplexed Pauli-product rotations and measurements into their basic versions nested inside

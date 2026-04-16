@@ -19,7 +19,6 @@ import jax
 import numpy as np
 import pennylane as qml
 import pytest
-
 from pennylane.capture.primitives import for_loop_prim
 
 import catalyst
@@ -848,11 +847,11 @@ class TestControlFlow:
         print(catalyst_jaxpr)
 
         assert eqn.primitive == for_loop_prim
-        assert eqn.params['abstract_shapes_slice'] == (0,0,1)
-        assert eqn.params['args_slice'] == (0,1,1)
-        assert eqn.params['consts_slice'] == (0,0,1)
+        assert eqn.params["abstract_shapes_slice"] == (0, 0, 1)
+        assert eqn.params["args_slice"] == (0, 1, 1)
+        assert eqn.params["consts_slice"] == (0, 0, 1)
 
-        assert len(eqn.params['jaxpr_body_fn'].eqns) == 3 if reverse else 1
+        assert len(eqn.params["jaxpr_body_fn"].eqns) == 3 if reverse else 1
 
         if reverse:
             assert eqn.invars[0].val == 0
@@ -862,7 +861,6 @@ class TestControlFlow:
             assert eqn.invars[0].val == start
             assert eqn.invars[1].val == stop
             assert eqn.invars[2].val == step
-
 
     def test_while_loop_outside_qnode(self):
         """Test that a while loop outside a qnode can be translated."""
