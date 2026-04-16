@@ -249,6 +249,9 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
             int64_t tripCount = (*ub - *lb + *step - 1) / *step;
             bodyResult.multiplyByScalar(tripCount);
         }
+        else {
+            result.hasDynLoop = true;
+        }
     }
     result.mergeWith(bodyResult);
 }
@@ -263,12 +266,17 @@ void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &re
         int64_t iters = estAttr.getValue().getSExtValue();
         bodyResult.multiplyByScalar(iters);
     }
+    else {
+        result.hasDynLoop = true;
+    }
 
     result.mergeWith(bodyResult);
 }
 
 void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint)
 {
+    result.hasBranches = true;
+
     ResourceResult thenResult;
     analyzeRegion(ifOp.getThenRegion(), thenResult, isAdjoint);
 
@@ -283,6 +291,8 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
 void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, ResourceResult &result,
                                             bool isAdjoint)
 {
+    result.hasBranches = true;
+
     ResourceResult maxResult;
     bool first = true;
 

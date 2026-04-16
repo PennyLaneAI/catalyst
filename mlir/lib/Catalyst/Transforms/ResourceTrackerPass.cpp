@@ -73,9 +73,23 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
                 accumulateStats(funcEntry.getValue());
             }
         }
+        std::string jsonStr = "";
+
+        if (outputJson || printJson) {
+            jsonStr = buildJsonString(results);
+        }
 
         if (outputJson) {
-            printJsonOutput(results);
+            if (outputFname.empty()) {
+                writeJsonToFile(jsonStr, generateFileName(results));
+            }
+            else {
+                writeJsonToFile(jsonStr, outputFname);
+            }
+        }
+
+        if (printJson) {
+            printJsonOutput(jsonStr);
         }
 
         markAllAnalysesPreserved();
@@ -114,16 +128,11 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
         }
     }
 
-    /**
-     * @brief Print the resource results as JSON to stdout.
-     *
-     * @param results The map of function names to ResourceResults to print.
-     */
-    void printJsonOutput(const llvm::StringMap<ResourceResult> &results) const
+    /// Serialize all per-function ResourceResults into a JSON string.
+    std::string buildJsonString(const llvm::StringMap<ResourceResult> &results) const
     {
         llvm::json::Object root;
 
-        StringRef jit_fn_name("");
         for (const auto &funcEntry : results) {
             llvm::json::Object funcObj;
             const ResourceResult &result = funcEntry.getValue();
@@ -167,39 +176,51 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
             funcObj["num_arg_qubits"] = static_cast<int64_t>(result.numArgQubits);
             funcObj["device_name"] = result.deviceName;
             funcObj["qnode"] = result.isQnode;
+            funcObj["has_branches"] = result.hasBranches;
+            funcObj["has_dyn_loop"] = result.hasDynLoop;
 
             root[funcEntry.getKey()] = std::move(funcObj);
-
-            if (funcEntry.getKey().starts_with("jit_")) {
-                jit_fn_name = funcEntry.getKey().drop_front(4);
-            }
         }
 
         llvm::json::Value jsonValue(std::move(root));
+        return llvm::formatv("{0:2}", jsonValue).str() + "\n";
+    }
 
-        std::string file_name = outputFname;
+    /// Print JSON to stdout.
+    void printJsonOutput(const std::string &jsonStr) const { llvm::outs() << jsonStr; }
 
-        if (file_name == "") {
-            // If no output filename is specified, make one
-            file_name = "__mlir_resources_";
-            file_name += jit_fn_name;
+    /// Write JSON to a file.
+    static void writeJsonToFile(const std::string &jsonStr, const std::string &fileName)
+    {
+        std::ofstream ofile(fileName);
+        assert(ofile.is_open() && "Invalid file to store resource results");
+        ofile << jsonStr;
+        ofile.close();
+    }
 
-            auto now = std::chrono::system_clock::now();
-            std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
-
-            std::tm *now_tm = std::localtime(&now_time_t);
-
-            char buffer[32]; // Large enough for "_YYYYMMDD_HHMMSS\0"
-            std::strftime(buffer, sizeof(buffer), "_%Y%m%d_%H%M%S", now_tm);
-
-            file_name += std::string(buffer);
-            llvm::outs() << llvm::formatv("{0:2}", jsonValue).str() << "\n";
+    /// Generate a timestamped filename for the JSON output.
+    static std::string generateFileName(const llvm::StringMap<ResourceResult> &results)
+    {
+        StringRef jit_fn_name("");
+        for (const auto &funcEntry : results) {
+            if (funcEntry.getKey().starts_with("jit_")) {
+                jit_fn_name = funcEntry.getKey().drop_front(4);
+                break;
+            }
         }
 
-        std::ofstream ofile(file_name);
-        assert(ofile.is_open() && "Invalid file to store resource results");
-        ofile << llvm::formatv("{0:2}", jsonValue).str() << "\n";
-        ofile.close();
+        std::string file_name = "__mlir_resources_";
+        file_name += jit_fn_name;
+
+        auto now = std::chrono::system_clock::now();
+        std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
+        std::tm *now_tm = std::localtime(&now_time_t);
+
+        char buffer[32]; // Large enough for "_YYYYMMDD_HHMMSS\0"
+        std::strftime(buffer, sizeof(buffer), "_%Y%m%d_%H%M%S", now_tm);
+        file_name += std::string(buffer);
+
+        return file_name;
     }
 };
 

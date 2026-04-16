@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "PBC/IR/PBCOpInterfaces.h"
 #include "PBC/Utils/PBCOpUtils.h"
+#include "PBC/IR/PBCOpInterfaces.h"
 #include "PBC/Utils/PauliStringWrapper.h"
 
 namespace catalyst {

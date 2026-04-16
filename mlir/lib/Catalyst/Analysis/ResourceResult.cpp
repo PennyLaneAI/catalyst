@@ -75,6 +75,9 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
     }
     numAllocQubits = applyMerge(numAllocQubits, other.numAllocQubits, method);
     numArgQubits = applyMerge(numArgQubits, other.numArgQubits, method);
+
+    hasBranches = hasBranches || other.hasBranches;
+    hasDynLoop = hasDynLoop || other.hasDynLoop;
 }
 
 void ResourceResult::multiplyByScalar(int64_t scalar)
@@ -148,6 +151,8 @@ std::string ResourceResult::toJson(int indent) const
     root["num_alloc_qubits"] = numAllocQubits;
     root["num_arg_qubits"] = numArgQubits;
     root["device_name"] = deviceName;
+    root["has_branches"] = hasBranches;
+    root["has_dyn_loop"] = hasDynLoop;
 
     llvm::json::Value jsonValue(std::move(root));
     std::string result;

@@ -28,8 +28,8 @@ namespace catalyst {
 /// Returns std::nullopt if the value cannot be statically resolved.
 std::optional<double> resolveConstant(mlir::Value val);
 
-/// Convenience wrapper that resolves to int64_t.
-/// Returns std::nullopt if the value cannot be resolved or is not integral.
+/// Convenience wrapper that resolves to int64_t by truncating the result.
+/// Returns std::nullopt if the value cannot be resolved.
 std::optional<int64_t> resolveConstantInt(mlir::Value val);
 
 } // namespace catalyst
