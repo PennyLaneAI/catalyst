@@ -25,7 +25,6 @@ from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
-from pennylane.math import is_abstract
 
 from catalyst.from_plxpr.from_plxpr import (
     PLxPRToQuantumJaxprInterpreter,
