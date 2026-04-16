@@ -209,7 +209,7 @@ endif
 	MDD_BENCHMARK_PRECISION=1 \
 	$(ASAN_COMMAND) $(PYTHON) -m pytest demos -k "tutorial_qft_arithmetics.ipynb" --nbmake $(PYTEST_FLAGS)
 
-wheel:
+wheel: builtin-decomp-rules
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
 
 	# Copy libs to frontend/catalyst/lib
