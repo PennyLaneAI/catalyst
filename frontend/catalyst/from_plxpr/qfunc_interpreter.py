@@ -36,6 +36,12 @@ from pennylane.capture.primitives import quantum_subroutine_prim, transform_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
 
+from catalyst.from_plxpr.qref_jax_primitives import (
+    qref_compbasis_p,
+    qref_get_p,
+    qref_hermitian_p,
+    qref_namedobs_p,
+)
 from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import (
     AbstractQbit,
@@ -111,7 +117,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         shots,
         init_qreg,
         cache,
-        qubit_index_recorder,
         *,
         control_wires=(),
         control_values=(),
@@ -119,7 +124,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         self.device = device
         self.shots = shots
         self.init_qreg = init_qreg
-        self.qubit_index_recorder = qubit_index_recorder
         self.subroutine_cache = cache
         self.control_wires = control_wires
         """Any control wires used for a subroutine."""
@@ -213,19 +217,18 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                 coeffs, terms = obs.terms()
             terms = [self._obs(t) for t in terms]
             return hamiltonian_p.bind(jnp.stack(coeffs), *terms)
-        wires = [self.init_qreg[w] for w in obs.wires]
+        wires = [qref_get_p.bind(self.init_qreg, w) for w in obs.wires]
         if obs.name == "Hermitian":
-            return hermitian_p.bind(obs.data[0], *wires)
-        return namedobs_p.bind(wires[0], *obs.data, kind=obs.name)
+            return qref_hermitian_p.bind(obs.data[0], *wires)
+        return qref_namedobs_p.bind(wires[0], kind=obs.name)
 
     def _compbasis_obs(self, *wires):
         """Add a computational basis sampling observable."""
         if wires:
-            qubits = [self.init_qreg[w] for w in wires]
-            return compbasis_p.bind(*qubits)
+            qubits = [qref_get_p.bind(self.init_qreg, w) for w in wires]
+            return qref_compbasis_p.bind(*qubits)
         else:
-            self.init_qreg.insert_all_dangling_qubits()
-            return compbasis_p.bind(self.init_qreg.get(), qreg_available=True)
+            return qref_compbasis_p.bind(self.init_qreg, qreg_available=True)
 
     def _check_measurement_with_dynamic_allocation(self, measurement):
         """Check some constraints regarding dynamic allocation."""
