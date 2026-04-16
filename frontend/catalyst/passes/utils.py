@@ -23,6 +23,12 @@ from pennylane.decomposition.utils import to_name
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 
+def _rule_name(rule):
+    """Return the canonical symbol name for a decomposition rule."""
+
+    return getattr(getattr(rule, "_impl", rule), "__name__")
+
+
 def prepare_decomposition_options(
     gate_set: Iterable[type | str] | dict[type | str, float],
     fixed_decomps: dict | None = None,
@@ -46,7 +52,7 @@ def prepare_decomposition_options(
     if not isinstance(gate_set, dict):
         gate_set = {to_name(op): 1.0 for op in gate_set}
     else:
-        gate_set = {to_name(op): cost for op, cost in gate_set.items()}
+        gate_set = {to_name(op): float(cost) for op, cost in gate_set.items()}
 
     options: dict[str, dict | tuple | str] = {
         "gate-set": gate_set,
@@ -55,13 +61,13 @@ def prepare_decomposition_options(
 
     if fixed_decomps:
         options |= {
-            "fixed-decomps": {to_name(op): rule.__name__ for op, rule in fixed_decomps.items()}
+            "fixed-decomps": {to_name(op): _rule_name(rule) for op, rule in fixed_decomps.items()}
         }
 
     if alt_decomps:
         options |= {
             "alt-decomps": {
-                to_name(op): tuple(rule.__name__ for rule in rules)
+                to_name(op): tuple(_rule_name(rule) for rule in rules)
                 for op, rules in alt_decomps.items()
             }
         }

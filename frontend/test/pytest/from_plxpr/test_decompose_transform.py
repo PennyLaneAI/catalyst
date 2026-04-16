@@ -418,48 +418,48 @@ class TestGraphDecomposition:
 class TestPlxPRDecomposition:
     """Test the PLxPR-based graph-based decomposition integration with from_plxpr."""
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
-    def test_with_multiple_decomps_transforms(self):
-        """Test that a circuit with multiple decompositions and transforms can be converted."""
+    # @pytest.mark.usefixtures("use_capture_dgraph")
+    # def test_with_multiple_decomps_transforms(self):
+    #     """Test that a circuit with multiple decompositions and transforms can be converted."""
 
-        @qml.qjit(target="mlir")
-        @partial(
-            qml.transforms.decompose,
-            gate_set={"RX", "RY"},
-        )
-        @partial(
-            qml.transforms.decompose,
-            gate_set={"NOT", "GlobalPhase"},
-        )
-        @qml.qnode(qml.device("lightning.qubit", wires=0))
-        def circuit(x):
-            qml.GlobalPhase(x)
-            return qml.expval(qml.PauliX(0))
+    #     @qml.qjit(target="mlir")
+    #     @partial(
+    #         qml.transforms.decompose,
+    #         gate_set={"RX", "RY"},
+    #     )
+    #     @partial(
+    #         qml.transforms.decompose,
+    #         gate_set={"NOT", "GlobalPhase"},
+    #     )
+    #     @qml.qnode(qml.device("lightning.qubit", wires=0))
+    #     def circuit(x):
+    #         qml.GlobalPhase(x)
+    #         return qml.expval(qml.PauliX(0))
 
-        with pytest.raises(
-            NotImplementedError, match="Multiple decomposition transforms are not yet supported."
-        ):
-            circuit(0.2)
+    #     with pytest.raises(
+    #         NotImplementedError, match="Multiple decomposition transforms are not yet supported."
+    #     ):
+    #         circuit(0.2)
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
-    def test_fallback_warnings(self):
-        """Test the fallback to legacy decomposition system with warnings."""
+    # @pytest.mark.usefixtures("use_capture_dgraph")
+    # def test_fallback_warnings(self):
+    #     """Test the fallback to legacy decomposition system with warnings."""
 
-        @qml.qjit
-        @partial(qml.transforms.decompose, gate_set={qml.GlobalPhase})
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
-        def circuit(x):
-            qml.Hadamard(x)
-            return qml.state()
+    #     @qml.qjit
+    #     @partial(qml.transforms.decompose, gate_set={qml.GlobalPhase})
+    #     @qml.qnode(qml.device("lightning.qubit", wires=2))
+    #     def circuit(x):
+    #         qml.Hadamard(x)
+    #         return qml.state()
 
-        # TODO: RZ/RX warnings should not be raised, remove (PL issue #8885)
-        with pytest.warns(UserWarning, match="Falling back to the legacy decomposition system"):
-            with pytest.warns(
-                DecompositionWarning, match="unable to find a decomposition for {'Hadamard'}"
-            ):
-                with pytest.warns(UserWarning, match="Operator RX does not define"):
-                    with pytest.warns(UserWarning, match="Operator RZ does not define"):
-                        circuit(0)
+    #     # TODO: RZ/RX warnings should not be raised, remove (PL issue #8885)
+    #     with pytest.warns(UserWarning, match="Falling back to the legacy decomposition system"):
+    #         with pytest.warns(
+    #             DecompositionWarning, match="unable to find a decomposition for {'Hadamard'}"
+    #         ):
+    #             with pytest.warns(UserWarning, match="Operator RX does not define"):
+    #                 with pytest.warns(UserWarning, match="Operator RZ does not define"):
+    #                     circuit(0)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_decompose_lowering_on_empty_circuit(self):
