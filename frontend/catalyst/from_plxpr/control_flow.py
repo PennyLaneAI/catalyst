@@ -32,8 +32,6 @@ from catalyst.from_plxpr.from_plxpr import (
     _tuple_to_slice,
 )
 from catalyst.from_plxpr.qubit_handler import (
-    QubitHandler,
-    QubitIndexRecorder,
     _get_dynamically_allocated_qregs,
 )
 from catalyst.jax_extras import jaxpr_pad_consts
