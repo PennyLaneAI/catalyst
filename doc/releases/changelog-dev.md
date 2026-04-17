@@ -2,6 +2,42 @@
 
 <h3>New features since last release</h3>
 
+* Combining ``GlobalPhase`` operations into one single operation is now possible with the
+  :func:`catalyst.passes.combine_global_phases` pass.
+  [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
+
+  ```python
+  import pennylane as qml
+  import catalyst
+
+  @qml.qjit(capture=True)
+  @catalyst.passes.combine_global_phases
+  @qml.qnode(qml.device("lightning.qubit", wires=5))
+  def circuit():
+      qml.GlobalPhase(0)
+      qml.GlobalPhase(1)
+      qml.GlobalPhase(2)
+      qml.GlobalPhase(3)
+      qml.GlobalPhase(4)
+      return qml.state()
+  ```
+
+  ```pycon
+  >>> print(qml.specs(circuit, level=2)())
+  Device: lightning.qubit
+  Device wires: 5
+  Shots: Shots(total=None)
+  Level: combine-global-phases (MLIR-1)
+  <BLANKLINE>
+  Wire allocations: 5
+  Total gates: 1
+  Gate counts:
+  - GlobalPhase: 1
+  Measurements:
+  - state(all wires): 1
+  Depth: Not computed
+  ```
+
 * A new `~.CompilationPass` class has been added that abstracts away compiler-level details for
   seamless compilation pass creation. Used in tandem with :func:`~.compiler_transform`, compilation
   passes can be created entirely in Python and used on QNodes within a :func:`~.qjit`'d workflow.
@@ -366,6 +402,50 @@
 
 <h3>Improvements 🛠</h3>
 
+* The :func:`~.passes.parity_synth` can now be invoked from the ``passes`` module.
+  [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
+
+  ```python
+  import pennylane as qml
+  import catalyst
+
+  dev = qml.device("lightning.qubit", wires=2)
+
+  @qml.qjit(capture=True)
+  @catalyst.passes.parity_synth
+  @qml.qnode(dev)
+  def circuit(x: float, y: float, z: float):
+      qml.CNOT((0, 1))
+      qml.RZ(x, 1)
+      qml.CNOT((0, 1))
+      qml.RX(y, 1)
+      qml.CNOT((1, 0))
+      qml.RZ(z, 1)
+      qml.CNOT((1, 0))
+      return qml.state()
+  ```
+
+  ```pycon
+  >>> print(qml.specs(circuit)(0.52, 0.12, 0.2))
+  Device: lightning.qubit
+  Device wires: 2
+  Shots: Shots(total=None)
+  Level: device
+
+  Wire allocations: 2
+  Total gates: 5
+  Gate counts:
+  - RX: 1
+  - RZ: 2
+  - CNOT: 2
+  Measurements:
+  - state(all wires): 1
+  Depth: 5
+  ```
+
+  Note as well that this compilation pass used to be named ``parity_synth_pass``.
+
+
 * `qml.for_loop` now supports dynamic shapes with program capture `qjit(capture=True)`.
   [(#2603)](https://github.com/PennyLaneAI/catalyst/pull/2603/)
 
@@ -482,6 +562,12 @@
   [#2616](https://github.com/PennyLaneAI/catalyst/pull/2616)
 
 <h3>Breaking changes 💔</h3>
+
+* The ``catalyst.python_interface.transforms.parity_synth_pass`` and
+  ``catalyst.python_interface.transforms.combine_global_phases_pass`` transforms have been renamed
+  to ``catalyst.python_interface.transforms.parity_synth`` and
+  ``catalyst.python_interface.transforms.combine_global_phases``, respectively.
+  [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
 
 * The ``-disentangle-CNOT`` and ``-disentangle-SWAP`` Catalyst CLI commands have been renamed to
   ``-disentangle-cnot`` and ``-disentangle-swap`` (all lower-case).

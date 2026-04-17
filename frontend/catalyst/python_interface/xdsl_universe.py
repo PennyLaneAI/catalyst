@@ -51,7 +51,7 @@ for name in transforms.__all__:
         # We use partial so that the correct value of `t` is returned by the function.
         # Without it, the function created by each loop iteration returns the `t` from
         # the last iteration of the loop
-        names_to_passes[t.name] = partial(transform_accessor, t)
+        names_to_passes[t.name] = partial(transform_accessor, t)  # pylint: disable=no-member
 
 # The Universe is used to expose custom dialects and transforms to xDSL. It is
 # specified as an entry point in PennyLane's pyproject.toml file, which makes
