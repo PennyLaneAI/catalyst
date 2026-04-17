@@ -743,11 +743,10 @@ class TestWhileLoopDynamicShapes:
             return qml.expval(qml.Z(0)), qml.expval(qml.Z(1))
 
         result = f([2, 3])
-        expected0 = -1 # three flips
+        expected0 = -1  # three flips
         expected1 = jnp.cos(6)
         assert qml.math.allclose(result[0], expected0)
         assert qml.math.allclose(result[1], expected1)
-
 
     def test_quantum_tracing_2(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
@@ -815,7 +814,6 @@ class TestWhileLoopDynamicShapes:
         result = f(3)
         assert qml.math.allclose(result, jnp.cos(4))
 
-
     def test_qnode_whileloop_capture(self, capture_mode):
         """Tests that while-loop primitive can capture variables from the outer scope"""
 
@@ -834,7 +832,6 @@ class TestWhileLoopDynamicShapes:
 
         result = f(3)
         assert qml.math.allclose(result, jnp.cos(9))
-
 
     def test_qnode_whileloop_abstracted_axes(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum while. Use abstracted_axes as
@@ -858,7 +855,6 @@ class TestWhileLoopDynamicShapes:
         result = f(a, b)
         assert qml.math.allclose(result, jnp.cos(6))
 
-
     def test_qnode_whileloop_shared_indbidx(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -880,7 +876,6 @@ class TestWhileLoopDynamicShapes:
 
         result = f(3)
         assert qml.math.allclose(result, jnp.cos(6))
-
 
     def test_qnode_whileloop_indbidx_outdbidx(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum while"""
@@ -907,7 +902,6 @@ class TestWhileLoopDynamicShapes:
         assert qml.math.allclose(res_a, jnp.cos(6))
         assert qml.math.allclose(res_b, jnp.cos(4))
 
-
     def test_qnode_whileloop_outer(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -929,7 +923,6 @@ class TestWhileLoopDynamicShapes:
         res_a = f(3)
         assert qml.math.allclose(res_a, jnp.cos(6))
 
-
     def test_qjit_whileloop_1(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -950,7 +943,6 @@ class TestWhileLoopDynamicShapes:
         expected = jnp.ones(4)
         assert_array_and_dtype_equal(result, expected)
 
-
     def test_qjit_whileloop_2(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -970,7 +962,6 @@ class TestWhileLoopDynamicShapes:
         result = f(3)
         expected = jnp.ones(4)
         assert_array_and_dtype_equal(result, expected)
-
 
     def test_qjit_whileloop_shared_dimensions(self, capture_mode):
         """Test catalyst while loop primitive's preserve dimensions option"""
@@ -993,7 +984,6 @@ class TestWhileLoopDynamicShapes:
         assert_array_and_dtype_equal(result[0], expected[0])
         assert_array_and_dtype_equal(result[1], expected[1])
 
-
     def test_qjit_whileloop_shared_indbidx(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -1013,7 +1003,6 @@ class TestWhileLoopDynamicShapes:
         result = f(3)
         expected = 2 * jnp.ones(3)
         assert_array_and_dtype_equal(result, expected)
-
 
     def test_qjit_whileloop_indbidx_outdbidx(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum while"""
@@ -1036,7 +1025,6 @@ class TestWhileLoopDynamicShapes:
         assert_array_and_dtype_equal(res_a, 2 * jnp.ones(3))
         assert_array_and_dtype_equal(res_b, jnp.ones(4))
 
-
     def test_qjit_whileloop_outer(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -1055,7 +1043,6 @@ class TestWhileLoopDynamicShapes:
 
         res_a = f(3)
         assert_array_and_dtype_equal(res_a, jnp.ones(3))
-
 
     def test_qjit_whileloop_capture(self, capture_mode):
         """Tests that while-loop primitive can capture variables from the outer scope"""

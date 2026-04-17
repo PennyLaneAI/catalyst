@@ -135,12 +135,12 @@ with Patcher(
     )
 
 from pennylane.capture.primitives import for_loop_prim as pl_for_loop_prim
-from pennylane.capture.primitives import while_loop_prim as pl_while_loop_prim
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
 from pennylane.capture.primitives import quantum_subroutine_prim
 from pennylane.capture.primitives import value_and_grad_prim as pl_value_and_grad_prim
 from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
+from pennylane.capture.primitives import while_loop_prim as pl_while_loop_prim
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
@@ -2609,7 +2609,7 @@ def _pl_while_loop_lowering(
     body_block = while_op_scf.regions[1].blocks.append(*args_types)
     body_ctx = jax_ctx.replace(name_stack=name_stack.extend("body"))
     with ir.InsertionPoint(body_block):
-        body_args = tuple(body_block.arguments[-len(args):])
+        body_args = tuple(body_block.arguments[-len(args) :])
         params = body_consts + body_args
 
         new_body_jaxpr = jaxpr_body_fn.replace(
@@ -2630,7 +2630,6 @@ def _pl_while_loop_lowering(
         YieldOp(out)
 
     return while_op_scf.results
-
 
 
 #

@@ -883,12 +883,13 @@ class TestControlFlow:
         eqn = catalyst_xpr.eqns[0]
 
         assert eqn.primitive == while_loop_prim
-        assert eqn.params['args_slice'] == (2, None, 1)
-        assert eqn.params['body_slice'] == (0,1,1)
-        assert eqn.params['cond_slice'] == (1, 2, 1)
+        assert eqn.params["args_slice"] == (2, None, None)
+        assert eqn.params["body_slice"] == (0, 1, 1)
+        assert eqn.params["cond_slice"] == (1, 2, 1)
 
-        assert eqn.params['jaxpr_body_fn'].eqns[0].primitive.name == "add"
-        assert eqn.params['jaxpr_cond_fn'].eqns[-1].primitive.name == "lt"
+        assert eqn.params["jaxpr_body_fn"].eqns[0].primitive.name == "add"
+        assert eqn.params["jaxpr_cond_fn"].eqns[-1].primitive.name == "lt"
+
 
 class TestHybridPrograms:
     """from_plxpr conversion tests for hybrid programs."""

@@ -341,6 +341,7 @@ def handle_for_loop(
     # Return only the output values that match the plxpr output values
     return outvals
 
+
 # pylint: disable=too-many-arguments
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_while_loop_prim)
 def handle_while_loop(
@@ -400,7 +401,6 @@ def handle_while_loop(
     cond_slice = (0, len(new_consts_cond), 1)
     body_slice = (cond_slice[1], len(new_consts_body) + cond_slice[1], 1)
     args_slice = (body_slice[1], None, 1)
-
 
     # Perform the binding
     outvals = plxpr_while_loop_prim.bind(
