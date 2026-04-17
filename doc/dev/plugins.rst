@@ -180,6 +180,36 @@ You will also need to make the following change:
      include_directories(${MLIR_INCLUDE_DIRS})
      include_directories(${STANDALONE_SOURCE_DIR}/include)
 
+A last set of changes to the build process.
+These changes will prevent the previous changes from being overriden.
+
+.. code-block:: diff
+
+    diff --git a/mlir/Makefile b/mlir/Makefile
+    index 595141576..2f91aa01f 100644
+    --- a/mlir/Makefile
+    +++ b/mlir/Makefile
+    @@ -51,7 +51,7 @@ help:
+            @echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
+     
+     .PHONY: all
+    -all: llvm mhlo enzyme dialects plugin
+    +all: llvm mhlo enzyme dialects
+     
+     .PHONY: llvm
+     llvm: TARGET_FILE := $(MK_DIR)/llvm-project/mlir/lib/Dialect/Bufferization/Transforms/BufferDeallocation.cpp
+    @@ -133,10 +133,6 @@ enzyme:
+     
+     .PHONY: plugin
+     plugin:
+    -       [ -f $(MK_DIR)/standalone ] || cp -r $(MK_DIR)/llvm-project/mlir/examples/standalone .
+    -       @if patch -p0 --dry-run -N < $(MK_DIR)/patches/test-plugin-with-catalyst.patch > /dev/null 2>&1; then \
+    -               patch -p0 < $(MK_DIR)/patches/test-plugin-with-catalyst.patch; \
+    -       fi
+            cmake -B standalone/build -G Ninja \
+                    -DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
+                    -DLLVM_EXTERNAL_LIT=$(LLVM_EXTERNAL_LIT) \
+
 With these changes, you should now be able to use ``make all`` and build the standalone plugin.
 Please note that the location of the ``StandalonePlugin.so`` shared object has changed.
 It will now be stored in the ``mlir/build/lib/`` folder.
