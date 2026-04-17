@@ -510,10 +510,10 @@ class TestCatalystOnlyControlled:
                 qml.SemiAdder(
                     x_wires=x_wires,
                     y_wires=output,
-                    work_wires=work_wires[1:len(output)],
+                    work_wires=work_wires[1 : len(output)],
                 ),
                 control=work_wires[:1],
-                work_wires=work_wires[len(output):],
+                work_wires=work_wires[len(output) :],
                 work_wire_type=work_wire_type,
             )
 
@@ -548,12 +548,12 @@ class TestCatalystOnlyControlled:
         work_wires = [-1, 8, 9, 10, 11]
 
         def _func():
-            qml.SemiAdder(x_wires=x_wires, y_wires=output, work_wires=work_wires[1:len(output)])
+            qml.SemiAdder(x_wires=x_wires, y_wires=output, work_wires=work_wires[1 : len(output)])
 
         hybrid_ctrl = C_ctrl(
             _func,
             control=work_wires[:1],
-            work_wires=work_wires[len(output):],
+            work_wires=work_wires[len(output) :],
             work_wire_type=work_wire_type,
         )()
         assert hybrid_ctrl.work_wire_type == work_wire_type
