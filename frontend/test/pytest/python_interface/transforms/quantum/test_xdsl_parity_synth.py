@@ -24,7 +24,7 @@ from pennylane.transforms.intermediate_reps import phase_polynomial
 
 from catalyst.python_interface.transforms import (
     ParitySynthPass,
-    parity_synth_pass,
+    parity_synth,
 )
 from catalyst.python_interface.transforms.quantum.parity_synth import _parity_network_synth
 
@@ -514,8 +514,7 @@ class TestParitySynthIntegration:
             return qml.state()
 
         raw_circuit = qml.qjit(circuit)
-        compiled_circuit = qml.qjit(parity_synth_pass(circuit))
-
+        compiled_circuit = qml.qjit(parity_synth(circuit))
         run_filecheck_qjit(compiled_circuit)
         args = (0.6, 0.2, -1.8)
         assert np.allclose(raw_circuit(*args), compiled_circuit(*args))
@@ -601,7 +600,7 @@ class TestParitySynthIntegration:
             return qml.state()
 
         raw_circuit = qml.qjit(circuit)
-        compiled_circuit = qml.qjit(parity_synth_pass(circuit))
+        compiled_circuit = qml.qjit(parity_synth(circuit))
 
         run_filecheck_qjit(compiled_circuit)
         args = (0.6, 0.2, -1.8)
@@ -683,7 +682,7 @@ class TestParitySynthIntegration:
             return qml.state()
 
         raw_circuit = qml.qjit(circuit)
-        compiled_circuit = qml.qjit(parity_synth_pass(circuit))
+        compiled_circuit = qml.qjit(parity_synth(circuit))
 
         run_filecheck_qjit(compiled_circuit)
         for x in [0.5, 1.5, 2.5, 3.5]:

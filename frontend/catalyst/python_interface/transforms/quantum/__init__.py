@@ -23,6 +23,7 @@ from .measurements_from_samples import (
     measurements_from_samples_pass,
 )
 from .merge_rotations import MergeRotationsPass, merge_rotations_pass
+from .parity_synth import ParitySynthPass, parity_synth
 
 __all__ = [
     "diagonalize_final_measurements_pass",
@@ -33,4 +34,6 @@ __all__ = [
     "MeasurementsFromSamplesPass",
     "merge_rotations_pass",
     "MergeRotationsPass",
+    "parity_synth",
+    "ParitySynthPass",
 ]
