@@ -18,6 +18,7 @@ file(GLOB SRC
     decompose_lowering.cpp
     DecomposeLoweringPatterns.cpp
     dynamic_one_shot.cpp
+    graph_decomposition.cpp
     merge_global_phase.cpp
     gridsynth.cpp
     GridsynthPatterns.cpp
@@ -36,6 +37,7 @@ set(LIBS
     ${conversion_libs}
     MLIRQuantum
     ExternalStablehloLib
+    decompsolver
 )
 
 set(DEPENDS
