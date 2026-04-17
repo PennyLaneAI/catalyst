@@ -884,8 +884,8 @@ class TestControlFlow:
 
         assert eqn.primitive == while_loop_prim
         assert eqn.params["args_slice"] == (2, None, None)
-        assert eqn.params["body_slice"] == (0, 1, 1)
-        assert eqn.params["cond_slice"] == (1, 2, 1)
+        assert eqn.params["body_slice"] == (0, 1, None)
+        assert eqn.params["cond_slice"] == (1, 2, None)
 
         assert eqn.params["jaxpr_body_fn"].eqns[0].primitive.name == "add"
         assert eqn.params["jaxpr_cond_fn"].eqns[-1].primitive.name == "lt"
