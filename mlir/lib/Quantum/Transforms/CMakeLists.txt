@@ -46,13 +46,13 @@ set(DEPENDS
 )
 
 add_mlir_library(${LIBRARY_NAME} STATIC
-${SRC}
-LINK_LIBS
-PRIVATE
-${LIBS}
-$<TARGET_OBJECTS:decompsolver>
-DEPENDS
-${DEPENDS}
+    ${SRC}
+    LINK_LIBS
+    PRIVATE
+    ${LIBS}
+    $<TARGET_OBJECTS:decompsolver>
+    DEPENDS
+    ${DEPENDS}
 )
 target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 target_include_directories(${LIBRARY_NAME} PUBLIC
