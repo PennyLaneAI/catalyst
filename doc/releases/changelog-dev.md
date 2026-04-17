@@ -536,6 +536,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The legacy frontend no longer registers `qml.allocate()` and `qml.deallocate()` onto the qjit device
+  capabilities, since dynamic qubit allocation is only implemented for the capture frontend.
+  [(#2696)](https://github.com/PennyLaneAI/catalyst/pull/2696)
+
 * Refactors `draw_graph` implementation to improve maintainability.
   [(#2659)](https://github.com/PennyLaneAI/catalyst/pull/2659)
 
@@ -890,6 +894,10 @@
 
 * An experimental pass to convert `qecl.noise` operations in the *QEC Logical* layer to subroutine calls in the *QEC Phyiscal* layer.
   [(#2678)](https://github.com/PennyLaneAI/catalyst/pull/2678)
+
+* A new, experimental compiler pass `convert-qecl-to-qecp` has been added to lower operations
+  from the QEC Logical (`qecl`) dialect into the QEC Physical (`qecp`) dialect.
+  [(#2697)](https://github.com/PennyLaneAI/catalyst/pull/2697)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)

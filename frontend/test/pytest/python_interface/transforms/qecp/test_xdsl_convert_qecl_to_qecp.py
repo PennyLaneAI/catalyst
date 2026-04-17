@@ -12,19 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""xDSL API for qecp transforms"""
+"""Test module for the convert-qecl-to-qecp dialect-conversion transform."""
 
-from .convert_qecl_to_qecp import ConvertQecLogicalToQecPhysicalPass, convert_qecl_to_qecp_pass
-from .convert_noiseop_to_subroutine import (
-    ConvertNoiseOpToSubroutinePass,
-    convert_noiseop_to_subroutine_pass,
-)
+import pytest
 
+# from catalyst.python_interface.transforms.qecp import (
+#     ConvertQecLogicalToQecPhysicalPass,
+#     convert_qecl_to_qecp,
+# )
 
-__all__ = [
-    # Passes
-    "ConvertQecLogicalToQecPhysicalPass",
-    "convert_qecl_to_qecp_pass",
-    "ConvertNoiseOpToSubroutinePass",
-    "convert_noiseop_to_subroutine_pass",
-]
+pytestmark = pytest.mark.xdsl
