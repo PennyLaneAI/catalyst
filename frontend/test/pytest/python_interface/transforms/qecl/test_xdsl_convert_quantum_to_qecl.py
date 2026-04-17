@@ -491,6 +491,98 @@ class TestGatePattern:
     pass.
     """
 
+    def test_gate_identity_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that Identity gates (`quantum.custom "Identity"() ops) are converted to their
+        corresponding `qecl.identity` ops for k = 1.
+        """
+        program = """
+        func.func @test_program() {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+
+            // CHECK: [[cb1:%.+]] = qecl.identity [[cb0]][0] : !qecl.codeblock<1>
+            // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
+            %2 = quantum.custom "Identity"() %1 : !quantum.bit
+
+            // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
+            %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            return
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_gate_pauli_x_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that PauliX gates (`quantum.custom "PauliX"() ops) are converted to their
+        corresponding `qecl.x` ops for k = 1.
+        """
+        program = """
+        func.func @test_program() {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+
+            // CHECK: [[cb1:%.+]] = qecl.x [[cb0]][0] : !qecl.codeblock<1>
+            // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
+            %2 = quantum.custom "PauliX"() %1 : !quantum.bit
+
+            // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
+            %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            return
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_gate_pauli_y_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that PauliX gates (`quantum.custom "PauliY"() ops) are converted to their
+        corresponding `qecl.y` ops for k = 1.
+        """
+        program = """
+        func.func @test_program() {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+
+            // CHECK: [[cb1:%.+]] = qecl.y [[cb0]][0] : !qecl.codeblock<1>
+            // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
+            %2 = quantum.custom "PauliY"() %1 : !quantum.bit
+
+            // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
+            %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            return
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_gate_pauli_z_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that PauliX gates (`quantum.custom "PauliZ"() ops) are converted to their
+        corresponding `qecl.z` ops for k = 1.
+        """
+        program = """
+        func.func @test_program() {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+
+            // CHECK: [[cb1:%.+]] = qecl.z [[cb0]][0] : !qecl.codeblock<1>
+            // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
+            %2 = quantum.custom "PauliZ"() %1 : !quantum.bit
+
+            // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
+            %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            return
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
     def test_gate_hadamard_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """Test that Hadamard gates (`quantum.custom "Hadamard"() ops) are converted to their
         corresponding `qecl.hadamard` ops for k = 1.
