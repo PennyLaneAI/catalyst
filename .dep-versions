@@ -8,7 +8,7 @@ enzyme=v0.0.238
 
 # For a custom PL version, update the package version here and at
 # 'doc/requirements.txt'
-pennylane=0.45.0-dev57
+pennylane=git+https://github.com/PennyLaneAI/pennylane.git@ci/catalyst-phase-grad-stub
 
 # For a custom LQ/LK version, update the package version here and at
 # 'doc/requirements.txt'
