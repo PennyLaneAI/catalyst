@@ -71,7 +71,7 @@ class ConvertNoiseOpToSubroutinePattern(
         rewriter.insert_op(in_block_cast, InsertPoint.before(op))
 
         # Create random qubit indices and rotation parameters for error injection, which are
-        # generated randomly from a `qnode` function.
+        # generated randomly from the python random module.
         # NOTE: that the random qubit indices and rotation parameters are generated in the Python
         # layer and passed to the noise injection subroutine as inputs, which allows us to inject
         # different errors for different qecp.noise instances in the execution phase.
@@ -253,11 +253,6 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the convert-qecl-noise-to-qecp-noise pass."""
-        # pylint: disable=line-too-long
-        # Insert a noise subroutine to the module in the qecp layer.
-        # Note that the visibility of those subroutines are set as private, which ensure the
-        # ["symbol-dce"](https://github.com/PennyLaneAI/catalyst/blob/372c376eb821e830da778fdc8af423eeb487eab6/frontend/catalyst/pipelines.py#L248)_
-        # pass could eliminate the unreferenced subroutines.
         # Collect different types of codeblocks in a module.
         k = None
 
