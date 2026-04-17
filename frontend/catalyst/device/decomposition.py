@@ -38,6 +38,7 @@ from pennylane.measurements import (
 from pennylane.transforms.decompose import _resolve_gate_set
 
 from catalyst.api_extensions import HybridCtrl
+from catalyst.api_extensions.quantum_operators import HybridAdjoint
 from catalyst.device.op_support import (
     is_active,
     is_controllable,
@@ -128,7 +129,10 @@ def catalyst_decompose(
                 "grad_method is not taken into account in catalyst_decompose if target_gates are "
                 "provided instead of device capabilities."
             )
-        target_gates, stopping_condition = _resolve_gate_set(target_gates, None)
+        target_gates, gate_set_stopping_condition = _resolve_gate_set(target_gates, None)
+        stopping_condition = lambda op: (
+            isinstance(op, HybridAdjoint) or gate_set_stopping_condition(op)
+        )
         decomposer = None
     else:
         if target_gates is not None:
@@ -252,6 +256,8 @@ def catalyst_acceptance(
         return None
 
     if isinstance(op, qml.ops.Adjoint):
+        if has_nested_tapes(op.base):
+            return None
         match = catalyst_acceptance(op.base, capabilities, grad_method)
         if match and is_invertible(op.base, capabilities):
             return match
