@@ -491,6 +491,98 @@ class TestGatePattern:
     pass.
     """
 
+    def test_gate_identity_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that Identity gates (`quantum.custom "Identity"() ops) are converted to their
+        corresponding `qecl.identity` ops for k = 1.
+        """
+        program = """
+        func.func @test_program() {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+
+            // CHECK: [[cb1:%.+]] = qecl.identity [[cb0]][0] : !qecl.codeblock<1>
+            // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
+            %2 = quantum.custom "Identity"() %1 : !quantum.bit
+
+            // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
+            %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            return
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_gate_pauli_x_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that PauliX gates (`quantum.custom "PauliX"() ops) are converted to their
+        corresponding `qecl.x` ops for k = 1.
+        """
+        program = """
+        func.func @test_program() {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+
+            // CHECK: [[cb1:%.+]] = qecl.x [[cb0]][0] : !qecl.codeblock<1>
+            // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
+            %2 = quantum.custom "PauliX"() %1 : !quantum.bit
+
+            // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
+            %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            return
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_gate_pauli_y_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that PauliX gates (`quantum.custom "PauliY"() ops) are converted to their
+        corresponding `qecl.y` ops for k = 1.
+        """
+        program = """
+        func.func @test_program() {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+
+            // CHECK: [[cb1:%.+]] = qecl.y [[cb0]][0] : !qecl.codeblock<1>
+            // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
+            %2 = quantum.custom "PauliY"() %1 : !quantum.bit
+
+            // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
+            %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            return
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_gate_pauli_z_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that PauliX gates (`quantum.custom "PauliZ"() ops) are converted to their
+        corresponding `qecl.z` ops for k = 1.
+        """
+        program = """
+        func.func @test_program() {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+
+            // CHECK: [[cb1:%.+]] = qecl.z [[cb0]][0] : !qecl.codeblock<1>
+            // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
+            %2 = quantum.custom "PauliZ"() %1 : !quantum.bit
+
+            // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
+            %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            return
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
     def test_gate_hadamard_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """Test that Hadamard gates (`quantum.custom "Hadamard"() ops) are converted to their
         corresponding `qecl.hadamard` ops for k = 1.
@@ -571,6 +663,22 @@ class TestGatePattern:
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
+    def test_unsupported_gate_raises_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that attempting to convert an unknown/unsupported gate raise a CompileError."""
+        program = """
+        func.func @test_program() {
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+            %2 = quantum.custom "Unknown"() %1 : !quantum.bit
+            %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit // To prevent DCE
+            return
+        }
+        """
+        with pytest.raises(
+            CompileError, match="Conversion of op 'quantum.custom' only supports gates"
+        ):
+            run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
 
 # MARK: TestMeasurePattern
 
@@ -600,6 +708,109 @@ class TestMeasurePattern:
         }
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+
+# MARK: TestInvalidInputIR
+
+
+class TestInvalidInputIR:
+    """Unit tests for invalid input IR"""
+
+    def test_unconvertible_extract(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that attempting to convert a `quantum.extract` op raises a CompileError when there
+        is insufficient information to convert the `quantum` type(s) to `qecl` types(s).
+        """
+        program = """
+        func.func @test_program() {
+            %0 = "test.op"() : () -> !quantum.reg
+            %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+            %2 = "test.op"(%1) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            return
+        }
+        """
+        with pytest.raises(CompileError, match="Failed to convert op"):
+            run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_unconvertible_insert(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that attempting to convert a `quantum.insert` op raises a CompileError when there
+        is insufficient information to convert the `quantum` type(s) to `qecl` types(s).
+        """
+        program = """
+        func.func @test_program() {
+            %0 = "test.op"() : () -> !quantum.reg
+            %1 = "test.op"() : () -> !quantum.bit
+            %2 = quantum.insert %0[0], %1 : !quantum.reg, !quantum.bit
+            %3 = "test.op"(%2) : (!quantum.reg) -> !quantum.reg  // To prevent DCE
+            return
+        }
+        """
+        with pytest.raises(CompileError, match="Failed to convert op"):
+            run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_unconvertible_dealloc(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that attempting to convert a `quantum.dealloc` op raises a CompileError when there
+        is insufficient information to convert the `quantum` type(s) to `qecl` types(s).
+        """
+        program = """
+        func.func @test_program() {
+            %0 = "test.op"() : () -> !quantum.reg
+            quantum.dealloc %0 : !quantum.reg
+            return
+        }
+        """
+        with pytest.raises(CompileError, match="Failed to convert op"):
+            run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_unconvertible_gate_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that attempting to convert a `quantum.custom` op raises a CompileError when there
+        is insufficient information to convert the `quantum` type(s) to `qecl` types(s).
+
+        In this case the `quantum.custom` op is a single-qubit gate.
+        """
+        program = """
+        func.func @test_program() {
+            %0 = "test.op"() : () -> !quantum.bit
+            %1 = quantum.custom "Hadamard"() %0 : !quantum.bit
+            %2 = "test.op"(%1) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            return
+        }
+        """
+        with pytest.raises(CompileError, match="Failed to convert op"):
+            run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_unconvertible_gate_2(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that attempting to convert a `quantum.custom` op raises a CompileError when there
+        is insufficient information to convert the `quantum` type(s) to `qecl` types(s).
+
+        In this case the `quantum.custom` op is a two-qubit gate.
+        """
+        program = """
+        func.func @test_program() {
+            %0 = "test.op"() : () -> !quantum.bit
+            %1 = "test.op"() : () -> !quantum.bit
+            %2, %3 = quantum.custom "CNOT"() %0, %1 : !quantum.bit, !quantum.bit
+            %4 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            %5 = "test.op"(%3) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            return
+        }
+        """
+        with pytest.raises(CompileError, match="Failed to convert op"):
+            run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_unconvertible_measure(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that attempting to convert a `quantum.measure` op raises a CompileError when there
+        is insufficient information to convert the `quantum` type(s) to `qecl` types(s).
+        """
+        program = """
+        func.func @test_program() {
+            %0 = "test.op"() : () -> !quantum.bit
+            %1, %2 = quantum.measure %0 : i1, !quantum.bit
+            %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            return
+        }
+        """
+        with pytest.raises(CompileError, match="Failed to convert op"):
+            run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
 
 # MARK: Integration Tests

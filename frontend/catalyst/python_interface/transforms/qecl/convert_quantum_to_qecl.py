@@ -64,6 +64,17 @@ func.func public @circuit() -> tensor<1x1xi64> attributes {quantum.node} {
   func.return %8 : tensor<1x1xi64>
 }
 ```
+
+Known Limitations
+-----------------
+
+The convert-quantum-to-qecl pass does not support the following cases:
+
+  * QEC codes where the number of logical qubits per codeblock, k, is greater than 1.
+  * `quantum.alloc` ops with a dynamic number of qubits.
+  * Programs with non-Clifford gates; specifically any gates other than I, X, Y, Z, Hadamard, S or
+    CNOT.
+  * Programs with control-flow operations (scf.for, scf.if, etc.).
 """
 
 import math
@@ -354,38 +365,8 @@ class CustomOpConversion(RewritePattern):
         new_results = None
 
         match gate_name:
-            case "Hadamard":
-                assert len(op.in_qubits) == 1
-                qubit_owner_op = op.in_qubits[0].owner
-                if not _is_type_convertible(qubit_owner_op, qecl.LogicalCodeblockType):
-                    _raise_failed_to_convert_op_compile_error(op)
-                else:
-                    ops_to_insert = (
-                        conv_cast_op := builtin.UnrealizedConversionCastOp.get(
-                            (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
-                        ),
-                        gate_op := qecl.HadamardOp(in_codeblock=conv_cast_op.results[0], idx=0),
-                        qec_cycle_op := qecl.QecCycleOp(in_codeblock=gate_op.out_codeblock),
-                        _cast_to_qubit(qec_cycle_op.out_codeblock),
-                    )
-
-            case "S":
-                assert len(op.in_qubits) == 1
-                qubit_owner_op = op.in_qubits[0].owner
-                if not _is_type_convertible(qubit_owner_op, qecl.LogicalCodeblockType):
-                    _raise_failed_to_convert_op_compile_error(op)
-                else:
-                    adjoint = bool(op.properties.get("adjoint"))
-                    ops_to_insert = (
-                        conv_cast_op := builtin.UnrealizedConversionCastOp.get(
-                            (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
-                        ),
-                        gate_op := qecl.SOp(
-                            in_codeblock=conv_cast_op.results[0], idx=0, adjoint=adjoint
-                        ),
-                        qec_cycle_op := qecl.QecCycleOp(in_codeblock=gate_op.out_codeblock),
-                        _cast_to_qubit(qec_cycle_op.out_codeblock),
-                    )
+            case "Identity" | "PauliX" | "PauliY" | "PauliZ" | "Hadamard" | "S":
+                ops_to_insert = self._get_qecl_ops_for_single_qubit_gate(op)
 
             case "CNOT":
                 assert len(op.in_qubits) == 2
@@ -424,12 +405,58 @@ class CustomOpConversion(RewritePattern):
                     new_results = (ctrl_conv_cast_op.results[0], trgt_conv_cast_op.results[0])
 
             case _:
-                raise NotImplementedError(
-                    f"Conversion of op '{op.name}' only supports gates 'Hadamard', 'S' and 'CNOT', "
-                    f"but got {gate_name}"
+                raise CompileError(
+                    f"Conversion of op '{op.name}' only supports gates 'Identity', 'PauliX', "
+                    f"'PauliY', 'PauliZ', 'Hadamard', 'S' and 'CNOT', but got '{gate_name}'"
                 )
 
         rewriter.replace_op(op, ops_to_insert, new_results=new_results)
+
+    @classmethod
+    def _get_qecl_ops_for_single_qubit_gate(cls, op: quantum.CustomOp) -> tuple[Operation, ...]:
+        """Helper function that returns the sequence of qecl operations to insert given the matched
+        quantum.custom op.
+        """
+        assert len(op.in_qubits) == 1
+
+        qubit_owner_op = op.in_qubits[0].owner
+        if not _is_type_convertible(qubit_owner_op, qecl.LogicalCodeblockType):
+            _raise_failed_to_convert_op_compile_error(op)
+
+        conv_cast_op = builtin.UnrealizedConversionCastOp.get(
+            (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
+        )
+
+        gate_name = op.gate_name.data
+
+        match gate_name:
+            case "Identity":
+                qecl_gate_op = qecl.IdentityOp(in_codeblock=conv_cast_op.results[0], idx=0)
+            case "PauliX":
+                qecl_gate_op = qecl.PauliXOp(in_codeblock=conv_cast_op.results[0], idx=0)
+            case "PauliY":
+                qecl_gate_op = qecl.PauliYOp(in_codeblock=conv_cast_op.results[0], idx=0)
+            case "PauliZ":
+                qecl_gate_op = qecl.PauliZOp(in_codeblock=conv_cast_op.results[0], idx=0)
+            case "Hadamard":
+                qecl_gate_op = qecl.HadamardOp(in_codeblock=conv_cast_op.results[0], idx=0)
+            case "S":
+                adjoint = bool(op.properties.get("adjoint"))
+                qecl_gate_op = qecl.SOp(
+                    in_codeblock=conv_cast_op.results[0], idx=0, adjoint=adjoint
+                )
+            case _:
+                assert False, (
+                    f"Expected single-qubit gate from set {{'Identity', 'PauliX', 'PauliY', "
+                    f"'PauliZ', 'Hadamard', 'S'}}, but got '{gate_name}'"
+                )
+
+        return (
+            conv_cast_op,
+            qecl_gate_op,
+            qec_cycle_op := qecl.QecCycleOp(in_codeblock=qecl_gate_op.out_codeblock),
+            _cast_to_qubit(qec_cycle_op.out_codeblock),
+        )
 
 
 # MARK: Measure Op Pattern
