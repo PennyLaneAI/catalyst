@@ -58,7 +58,7 @@ class InjectNoiseToQECLPattern(pattern_rewriter.RewritePattern):
 class InjectNoiseToQECLPass(passes.ModulePass):
     """Pass to inject noise into a QEC logical IR."""
 
-    name = "inject-noiseop-to-qecl"
+    name = "inject-noise-to-qecl"
 
     def apply(self, ctx: context.Context, op: builtin.ModuleOp) -> None:
         pattern_rewriter.PatternRewriteWalker(
