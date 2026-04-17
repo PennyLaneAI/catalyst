@@ -146,7 +146,9 @@ class MeasurementsFromSamplesPattern(RewritePattern):
                 case "quantum.state":
                     # It is not possible to recover a quantum state from samples; this is included
                     # for completeness and to notify users that ``state`` mps are not supported
-                    raise CompileError("qml.state() operations are not compatible with conversion to samples.")
+                    raise CompileError(
+                        "qml.state() operations are not compatible with conversion to samples."
+                    )
 
     @classmethod
     def get_observable_op(
@@ -197,7 +199,8 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             for obs in op.operands:
                 if not isinstance(obs.owner, quantum.NamedObsOp):
                     raise CompileError(
-                        f"Expected all terms in TensorOp to be quantum.NambedObsOp, but encountered {obs.owner}"
+                        f"Expected all terms in TensorOp to be quantum.NambedObsOp," 
+                        f"but encountered {obs.owner}"
                     )
                 if obs.owner.type.data != "PauliZ":
                     raise NotImplementedError(
@@ -225,7 +228,8 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             for obs in op.operands:
                 if not isinstance(obs.owner, quantum.NamedObsOp):
                     raise CompileError(
-                        f"Expected all terms in TensorOp to be quantum.NambedObsOp, but encountered {obs.owner}"
+                        "Expected all terms in TensorOp to be quantum.NambedObsOp," 
+                        f"but encountered {obs.owner}"
                     )
             return [obs.owner.operands[0] for obs in op.operands]
 
@@ -241,7 +245,8 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         given reference operation, `ref_op`, using the supplied `rewriter`.
 
         Args:
-            in_qubits (Sequence[SSAValue]): A sequence of SSA value used as input to the computational-basis op.
+            in_qubits (Sequence[SSAValue]): A sequence of SSA value used as input to the 
+                computational-basis op.
             ref_op (Operation): The reference op before which the quantum.ComputationalBasisOp is
                 inserted.
             rewriter (PatternRewriter): The xDSL pattern rewriter.
@@ -580,7 +585,8 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             for o in inner_obs:
                 if not isinstance(o, quantum.NamedObsOp):
                     raise CompileError(
-                        f"Expected all terms in TensorOp to be quantum.NambedObsOp, but encountered {o}"
+                        f"Expected all terms in TensorOp to be quantum.NambedObsOp," 
+                        f"but encountered {o}"
                     )
                 rewriter.erase_op(o)
         else:
