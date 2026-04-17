@@ -14,13 +14,13 @@
 
 // RUN: quantum-opt %s --convert-ion-to-llvm --split-input-file -verify-diagnostics | FileCheck %s
 
-// CHECK: llvm.func @__catalyst__oqd__readout_bit(!llvm.ptr) -> i1
+// CHECK: llvm.func @__catalyst__oqd__readout_bit(!llvm.ptr) -> i32
 // CHECK: llvm.func @__catalyst__oqd__measure_pulse(!llvm.ptr, f64, f64, !llvm.ptr) -> !llvm.ptr
 // CHECK: llvm.func @__catalyst__oqd__pulse(!llvm.ptr, f64, f64, !llvm.ptr) -> !llvm.ptr
 // CHECK: llvm.func @__catalyst__oqd__ParallelProtocol(!llvm.ptr, i64)
 
 // CHECK-LABEL: parallel_protocol_op
-func.func public @parallel_protocol_op(%arg0: f64) -> i1 {
+func.func public @parallel_protocol_op(%arg0: f64) -> i32 {
 
     // Get wire number
     // CHECK: {{.+}} = quantum.alloc( 1) : !quantum.reg
@@ -87,7 +87,7 @@ func.func public @parallel_protocol_op(%arg0: f64) -> i1 {
     // CHECK: llvm.call @__catalyst__oqd__ParallelProtocol(%[[pulse_array_ptr_3:.*]], %[[pulse_array_size_3:.*]]) : (!llvm.ptr, i64)
 
     // Readout; qubit wire is threaded through unchanged
-    // CHECK: %[[mres:.*]] = llvm.call @__catalyst__oqd__readout_bit([[wire]]) : (!llvm.ptr) -> i1
+    // CHECK: %[[cnt:.*]] = llvm.call @__catalyst__oqd__readout_bit([[wire]]) : (!llvm.ptr) -> i32
 
     %qreg = quantum.alloc( 1) : !quantum.reg
     %q0 = quantum.extract %qreg[ 0] : !quantum.reg -> !quantum.bit
@@ -160,6 +160,6 @@ func.func public @parallel_protocol_op(%arg0: f64) -> i1 {
             ion.yield %arg1 : !ion.qubit
     }
 
-    %mres, %out_qubit = ion.readout_bit %pp2 : i1, !ion.qubit
-    return %mres : i1
+    %out_qubit, %cnt_val = ion.readout_bit %pp2 : !ion.qubit, i32
+    return %cnt_val : i32
 }
