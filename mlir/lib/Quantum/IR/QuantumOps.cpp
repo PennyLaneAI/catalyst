@@ -569,33 +569,13 @@ LogicalResult AdjointOp::verify()
     return success();
 }
 
-CallInterfaceCallable TemplateOp::getCallableForCallee() { return getSymNameAttr(); }
-
-void TemplateOp::setCalleeFromCallable(CallInterfaceCallable callee)
-{
-    auto symRef = llvm::cast<SymbolRefAttr>(callee);
-    setSymNameAttr(llvm::cast<FlatSymbolRefAttr>(symRef));
-}
-
-Operation::operand_range TemplateOp::getArgOperands() { return getOperands(); }
-
-MutableOperandRange TemplateOp::getArgOperandsMutable() { return MutableOperandRange(*this); }
-
-LogicalResult TemplateOp::verifySymbolUses(SymbolTableCollection &symbolTable)
-{
-    if (auto symName = getSymNameAttr()) {
-        if (!symbolTable.lookupNearestSymbolFrom(*this, symName)) {
-            return emitOpError() << "uses unknown symbol: " << symName;
-        }
-    }
-    return success();
-}
+// -----
 
 void TemplateOp::print(OpAsmPrinter &p)
 {
-    // 1. Subroutine Name
+    // 1. Template Name
     p << " ";
-    p.printAttribute(getSubroutineNameAttr());
+    p.printAttribute(getTemplateNameAttr());
 
     // 2. Variadic Inputs: (%arg0 : type, ...)
     p << "(";
@@ -635,21 +615,7 @@ void TemplateOp::print(OpAsmPrinter &p)
 
     // 5. Results
     p.printNewline();
-    p << "-> ";
-
-    auto varResTypes = getResults().getTypes();
-    if (varResTypes.empty()) {
-        p << "()";
-    }
-    else if (varResTypes.size() == 1) {
-        p << "(" << varResTypes.front() << ")";
-    }
-    else {
-        p << "(";
-        llvm::interleaveComma(varResTypes, p);
-        p << ")";
-    }
-    p << " out_qreg (" << getOutQreg().getType() << ")";
+    p << "-> " << getOutQreg().getType();
 
     // 6. Indented Properties
     p.printNewline();
@@ -661,25 +627,19 @@ void TemplateOp::print(OpAsmPrinter &p)
     p.printNewline();
     p << "static_data = " << getStaticData();
 
-    if (auto sym = getSymNameAttr()) {
-        p.printNewline();
-        p << "sym_name = " << sym;
-    }
-
     // 7. Attribute Dictionary
-    // Notice "adjoint" is added to the elided list so it doesn't double-print!
     p.printOptionalAttrDict(getOperation()->getAttrs(),
-                            {"subroutine_name", "param_map", "in_qubits_map", "static_data",
-                             "sym_name", "operand_segment_sizes", "adjoint"});
+                            {"template_name", "param_map", "in_qubits_map", "static_data",
+                             "operand_segment_sizes", "adjoint"});
 
     p.decreaseIndent();
 }
 
 ParseResult TemplateOp::parse(OpAsmParser &parser, OperationState &result)
 {
-    // 1. Parse Subroutine Name
-    StringAttr subroutineName;
-    if (parser.parseAttribute(subroutineName, "subroutine_name", result.attributes))
+    // 1. Parse template Name
+    StringAttr templateName;
+    if (parser.parseAttribute(templateName, "template_name", result.attributes))
         return failure();
 
     // 2. Parse Variadic Inputs
@@ -776,26 +736,10 @@ ParseResult TemplateOp::parse(OpAsmParser &parser, OperationState &result)
     if (parser.parseArrow())
         return failure();
 
-    SmallVector<Type> varResTypes;
-    if (succeeded(parser.parseOptionalLParen())) {
-        if (failed(parser.parseOptionalRParen())) {
-            if (parser.parseTypeList(varResTypes) || parser.parseRParen())
-                return failure();
-        }
-    }
-    else {
-        Type resType;
-        if (parser.parseType(resType))
-            return failure();
-        varResTypes.push_back(resType);
-    }
-
     Type outQregType;
-    if (parser.parseKeyword("out_qreg") || parser.parseLParen() || parser.parseType(outQregType) ||
-        parser.parseRParen())
+    if (parser.parseType(outQregType))
         return failure();
 
-    result.addTypes(varResTypes);
     result.addTypes(outQregType);
 
     // 9. Parse Indented Properties
@@ -812,12 +756,6 @@ ParseResult TemplateOp::parse(OpAsmParser &parser, OperationState &result)
     if (parser.parseKeyword("static_data") || parser.parseEqual() ||
         parser.parseAttribute(staticData, "static_data", result.attributes))
         return failure();
-
-    FlatSymbolRefAttr symName;
-    if (succeeded(parser.parseOptionalKeyword("sym_name"))) {
-        if (parser.parseEqual() || parser.parseAttribute(symName, "sym_name", result.attributes))
-            return failure();
-    }
 
     // 10. Parse Attribute Dictionary
     if (parser.parseOptionalAttrDict(result.attributes))

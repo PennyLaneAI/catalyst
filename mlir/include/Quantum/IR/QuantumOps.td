@@ -741,15 +741,13 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect
 
 // -----
 
-def TemplateOp : Memory_Op<"template", [DeclareOpInterfaceMethods<CallOpInterface>,
-                                        DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-                                        AttrSizedOperandSegments]> {
+def TemplateOp : Quantum_Op<"template", [NoMemoryEffect, AttrSizedOperandSegments, AllTypesMatch<["in_qreg", "out_qreg"]>]> {
 
     let summary = "Operation to represent quantum gates with arbitrary signatures";
     let description = [{}];
 
     let arguments = (ins
-        StrAttr:$subroutine_name,
+        StrAttr:$template_name,
         Variadic<AnyType>:$inputs,
         QuregType:$in_qreg,
         Variadic<1DTensorOf<[I64]>>:$qubit_inds,
@@ -758,14 +756,10 @@ def TemplateOp : Memory_Op<"template", [DeclareOpInterfaceMethods<CallOpInterfac
         UnitAttr:$adjoint,
         DictionaryAttr:$param_map,
         DictionaryAttr:$in_qubits_map,
-        DictionaryAttr:$static_data,
-        OptionalAttr<FlatSymbolRefAttr>:$sym_name,
-        OptionalAttr<DictArrayAttr>:$arg_attrs,
-        OptionalAttr<DictArrayAttr>:$res_attrs
+        DictionaryAttr:$static_data
     );
 
     let results = (outs
-        Variadic<AnyType>:$results,
         QuregType:$out_qreg
     );
 
