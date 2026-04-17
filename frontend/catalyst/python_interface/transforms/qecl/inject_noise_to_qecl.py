@@ -36,16 +36,21 @@ class InjectNoiseToQECLPattern(pattern_rewriter.RewritePattern):
     ):
         """Inject a qecl.noise operation for each qecl.qec operation in the QEC logical IR."""
 
+        # 1. Create a qecl.noise operation and insert it before the qecl.qec operation.
         codeblock = qecop.in_codeblock
         noiseop = qecl.NoiseOp(codeblock)
         rewriter.insert_op(noiseop, InsertPoint.before(qecop))
 
+        # 2. Replace all uses of the codeblock with the output of the noise operation,
+        # except for the first use (the qecl.noise operation).
         codeblock.replace_uses_with_if(
-            noiseop.out_codeblock, lambda use: use.operation is not noiseop
+            noiseop.out_codeblock, lambda use: use is not codeblock.first_use
         )
 
+        # 3. Notify the rewriter that all operations using the codeblock have been modified,
+        # except for the first use (the qecl.noise operation).
         for use in codeblock.uses:
-            if use.operation is not noiseop:
+            if use is not codeblock.first_use:
                 rewriter.notify_op_modified(use.operation)
 
 
