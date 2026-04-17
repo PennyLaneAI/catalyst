@@ -965,7 +965,7 @@ def test_vjp_argument_type_checks_correct_inputs(diff_method, vjp_fn):
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_vjp_argument_type_checks_incompatible_n_inputs(diff_method):
+def test_vjp_argument_type_checks_incompatible_n_inputs(capture_mode, diff_method):
     """Tests error handling of Catalyst's vjp when the number of function output params
     and cotangent arguments are incompatible.
     """
@@ -975,7 +975,7 @@ def test_vjp_argument_type_checks_incompatible_n_inputs(diff_method):
         match=("number of cotangent and number of function output parameters in"),
     ):
 
-        @qjit
+        @qjit(capture=capture_mode)
         def C_workflow():
             # If `f` returns two outputs, then `cotangents` must have length 2
             x = (1.0,)
