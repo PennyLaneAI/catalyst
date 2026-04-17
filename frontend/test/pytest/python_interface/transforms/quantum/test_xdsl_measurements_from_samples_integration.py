@@ -193,7 +193,7 @@ class TestIntegrationWithOtherPasses:
         with the decompose pass."""
         dev = qml.device("lightning.qubit", wires=4)
 
-        @qml.qjit(target="mlir", capture=capture)
+        @qml.qjit(target="mlir", capture=capture, seed=12)
         @measurements_from_samples_pass
         @partial(
             qml.transforms.decompose,
@@ -241,6 +241,7 @@ class TestIntegrationWithOtherPasses:
         circuit_compiled = qml.qjit(
             pipeline(circ),
             capture=capture,
+            seed=34,
         )
 
         assert np.isclose(expected_res, circuit_compiled(), atol=0.05)
@@ -259,10 +260,6 @@ class TestIntegrationWithOtherPasses:
 
         dev = qml.device("lightning.qubit", wires=2)
 
-        @qml.qjit
-        @qml.transform(pass_name="measurements-from-samples")
-        @qml.transform(pass_name="split-non-commuting")
-        @qml.qnode(dev, shots=5000)
         def circuit():
             qml.RX(phi, 0)
             # CHECK-NOT: quantum.var
@@ -283,6 +280,7 @@ class TestIntegrationWithOtherPasses:
         circuit_compiled = qml.qjit(
             pipeline(circ),
             capture=capture,
+            seed=56,
         )
 
         assert np.isclose(expected_res, circuit_compiled(), atol=0.05)
@@ -319,7 +317,7 @@ class TestIntegrationWithOtherPasses:
         )
 
         circ = qml.set_shots(circuit, 5000)
-        circuit_compiled = qml.qjit(pipeline(circ), capture=capture)
+        circuit_compiled = qml.qjit(pipeline(circ), capture=capture, seed=78)
 
         assert np.isclose(expected_res, circuit_compiled(), atol=0.1)
         run_filecheck_qjit(circuit_compiled)
@@ -352,7 +350,7 @@ class TestIntegrationWithOtherPasses:
             qml.transform(pass_name="measurements-from-samples"),
         )
         circ = qml.set_shots(circuit, 5000)
-        circuit_compiled = qml.qjit(pipeline(circ), capture=capture)
+        circuit_compiled = qml.qjit(pipeline(circ), capture=capture, seed=91)
 
         assert np.isclose(expected_res, circuit_compiled(), atol=0.05)
         run_filecheck_qjit(circuit_compiled)
@@ -363,7 +361,7 @@ class TestIntegrationWithOtherPasses:
 
         dev = qml.device("lightning.qubit", wires=4)
 
-        @qml.qjit(capture=capture)
+        @qml.qjit(capture=capture, seed=23)
         @measurements_from_samples_pass
         @qml.transform(pass_name="diagonalize-final-measurements")
         @qml.qnode(dev, shots=3000)
@@ -479,6 +477,7 @@ class TestMeasurementsFromSamplesIntegration:
         circuit_compiled = qml.qjit(
             measurements_from_samples_pass(circ),
             capture=capture,
+            seed=45,
         )
 
         run_filecheck_qjit(circuit_compiled)
@@ -514,6 +513,7 @@ class TestMeasurementsFromSamplesIntegration:
         circuit_compiled = qml.qjit(
             measurements_from_samples_pass(circ_shots),
             capture=capture,
+            seed=67,
         )
 
         run_filecheck_qjit(circuit_compiled)
@@ -548,6 +548,7 @@ class TestMeasurementsFromSamplesIntegration:
             circuit_compiled = qml.qjit(
                 measurements_from_samples_pass(circuit_ref),
                 capture=capture,
+                seed=89,
             )
 
             assert np.array_equal(expected_res, _counts_catalyst_to_pl(*circuit_compiled()))
@@ -578,6 +579,7 @@ class TestMeasurementsFromSamplesIntegration:
         circuit_compiled = qml.qjit(
             measurements_from_samples_pass(circuit_ref),
             capture=capture,
+            seed=123,
         )
 
         expected_res = expected_res_base * np.ones(shape=(shots, 1), dtype=int)
@@ -625,6 +627,7 @@ class TestMeasurementsFromSamplesIntegration:
         circuit_compiled = qml.qjit(
             measurements_from_samples_pass(circ_shots),
             capture=capture,
+            seed=234,
         )
 
         run_filecheck_qjit(circuit_compiled)
@@ -662,7 +665,9 @@ class TestMeasurementsFromSamplesIntegration:
         ), "Sanity check failed, is expected_res correct?"
 
         circ_shots = qml.set_shots(circuit_ref, 5000)
-        circuit_compiled = qml.qjit(measurements_from_samples_pass(circ_shots), capture=capture)
+        circuit_compiled = qml.qjit(
+            measurements_from_samples_pass(circ_shots), capture=capture, seed=456
+        )
 
         assert np.allclose(expected_res(angles), circuit_compiled(), atol=0.05)
 
@@ -691,7 +696,9 @@ class TestMeasurementsFromSamplesIntegration:
         ), "Sanity check failed, is expected_res correct?"
 
         circ_shots = qml.set_shots(circuit_ref, 5000)
-        circuit_compiled = qml.qjit(measurements_from_samples_pass(circ_shots), capture=capture)
+        circuit_compiled = qml.qjit(
+            measurements_from_samples_pass(circ_shots), capture=capture, seed=567
+        )
 
         run_filecheck_qjit(circuit_compiled)
 
@@ -722,7 +729,9 @@ class TestMeasurementsFromSamplesIntegration:
         ), "Sanity check failed, is expected_res correct?"
 
         circ_shots = qml.set_shots(circuit_ref, 5000)
-        circuit_compiled = qml.qjit(measurements_from_samples_pass(circ_shots), capture=capture)
+        circuit_compiled = qml.qjit(
+            measurements_from_samples_pass(circ_shots), capture=capture, seed=678
+        )
 
         run_filecheck_qjit(circuit_compiled)
 
@@ -739,7 +748,7 @@ class TestMeasurementsFromSamplesIntegration:
 
         dev = qml.device("lightning.qubit", wires=4)
 
-        @qml.qjit(capture=capture)
+        @qml.qjit(capture=capture, seed=789)
         @measurements_from_samples_pass
         @qml.set_shots(5000)
         @qml.qnode(dev)
