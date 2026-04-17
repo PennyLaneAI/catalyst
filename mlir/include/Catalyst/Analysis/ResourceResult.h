@@ -49,6 +49,15 @@ struct ResourceResult {
     // from quantum.device op
     std::string deviceName;
 
+    // whether this function carries the `quantum.node` attribute
+    bool isQnode = false;
+
+    // whether the function contains conditional control flow (scf.if / scf.index_switch)
+    bool hasBranches = false;
+
+    // whether any loop has a trip count that could not be statically resolved
+    bool hasDynLoop = false;
+
     // merge another ResourceResult into this one
     void mergeWith(const ResourceResult &other, MergeMethod method = MergeMethod::Sum);
 
