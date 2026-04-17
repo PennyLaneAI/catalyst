@@ -17,7 +17,6 @@
 # pylint: disable=line-too-long
 
 import pytest
-
 from pennylane.exceptions import CompileError
 
 from catalyst.python_interface.transforms import (
