@@ -497,6 +497,71 @@ class TestCatalystOnlyControlled:
         assert new_qctrl._control_wires == [1]  # pylint: disable=protected-access
         assert new_qctrl.regions[0].quantum_tape.operations[0].wires == Wires([0])
 
+    @pytest.mark.parametrize("work_wire_type", ["zeroed", "borrowed"])
+    def test_qctrl_work_wire_type_operator(self, work_wire_type):
+        """Test that work_wire_type is preserved on a Controlled op inside qjit"""
+        x_wires = [0, 1, 2, 3]
+        output = [4, 5, 6, 7]
+        work_wires = [-1, 8, 9, 10, 11, 12]
+
+        @qjit
+        def func():
+            return PL_ctrl(
+                qml.SemiAdder(
+                    x_wires=x_wires,
+                    y_wires=output,
+                    work_wires=work_wires[1:len(output)],
+                ),
+                control=work_wires[:1],
+                work_wires=work_wires[len(output):],
+                work_wire_type=work_wire_type,
+            )
+
+        op = func()
+        assert op.hyperparameters["work_wire_type"] == work_wire_type
+        assert op.work_wire_type == work_wire_type
+        assert op.control_wires == Wires([-1])
+        assert op.work_wires == Wires([11, 12])
+
+        @qjit
+        def func_native():
+            return C_ctrl(
+                qml.SemiAdder(
+                    x_wires=x_wires,
+                    y_wires=output,
+                    work_wires=work_wires[1 : len(output)],
+                ),
+                control=work_wires[:1],
+                work_wires=work_wires[len(output) :],
+                work_wire_type=work_wire_type,
+            )
+
+        op = func_native()
+        assert op.hyperparameters["work_wire_type"] == work_wire_type
+        assert op.work_wire_type == work_wire_type
+
+    @pytest.mark.parametrize("work_wire_type", ["zeroed", "borrowed"])
+    def test_qctrl_work_wire_type_callable(self, work_wire_type):
+        """Test that work_wire_type is preserved on a Controlled op when wrapping a callable"""
+        x_wires = [0, 1, 2, 3]
+        output = [4, 5, 6, 7]
+        work_wires = [-1, 8, 9, 10, 11]
+
+        def _func():
+            qml.SemiAdder(x_wires=x_wires, y_wires=output, work_wires=work_wires[1:len(output)])
+
+        hybrid_ctrl = C_ctrl(
+            _func,
+            control=work_wires[:1],
+            work_wires=work_wires[len(output):],
+            work_wire_type=work_wire_type,
+        )()
+        assert hybrid_ctrl.work_wire_type == work_wire_type
+
+        decomposed = hybrid_ctrl.decomposition()
+        assert len(decomposed) == 1
+        assert decomposed[0].hyperparameters["work_wire_type"] == work_wire_type
+
     def test_control_outside_qjit(self):
         """Test that the Catalyst control function can be used without jitting."""
 
