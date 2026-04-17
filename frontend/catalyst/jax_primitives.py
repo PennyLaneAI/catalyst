@@ -362,12 +362,14 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None
     Denotes the creation of a quantum definition in the intermediate representation.
 
     Args:
-        func (Callable): the subroutine to apply in place of the replaced gate.
-        is_qreg (bool): ???
-        num_params (int): ???
-        pauli_word (???): ???
-        op_type (str): the name attribute of the MLIR representation of the op type to be
-                       replaced.
+        func (Callable): The function defining the decomposition rule.
+        is_qreg (bool): Indicates if the qubits involved in the decomposition are represented
+            as a quantum register. Defaults to True.
+        num_params (int): The number of parameters for the decomposition rule. Defaults to 0.
+        pauli_word (str | None): The Pauli word associated with the decomposition rule.
+            Defaults to None.
+        op_type (str | None | Operation): The type of operation that the decomposition rule
+            applies to. Defaults to None.
 
     .. note::
 
@@ -382,7 +384,7 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None
         qp.capture.enable() # remember to enable capture
 
 
-        @decomposition_rule(is_qreg=True, op_type="RY") # specify the op type to decompose
+        @decomposition_rule(is_qreg=True, op_type=qp.RY) # specify the op type to decompose
         def my_decomp(angle, wires):
             qp.RX(-pi / 2, wires[0])
             qp.RZ(angle, wires[0])
@@ -421,6 +423,12 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None
     assert not is_qreg or (
         is_qreg and num_params == 0
     ), "Decomposition rules with `qreg` do not require `num_params`."
+
+    if op_type is not None and not isinstance(op_type, str):
+        if issubclass(op_type, qml.operation.Operation):
+            op_type = op_type.__name__
+        else:
+            raise ValueError("op_type must be a string or a pennylane operator.")
 
     if func is None:
         return functools.partial(
