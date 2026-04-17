@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.26
+cmake_minimum_required(VERSION 3.26)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -76,8 +76,6 @@ install(TARGETS decompsolver
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
         RUNTIME DESTINATION bin)
-
-target_compile_options(decompsolver PRIVATE -Wno-error -Wno-cast-qual)
 
 target_link_libraries(decompsolver
     PRIVATE Boost::graph
