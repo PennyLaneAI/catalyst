@@ -21,7 +21,6 @@ find_package(Boost ${MIN_BOOST_VERSION} COMPONENTS random graph QUIET)
 if (Boost_FOUND)
     message(STATUS "Found System Boost ${Boost_VERSION}")
     set(CATALYST_BOOST_FETCHED FALSE CACHE BOOL "Boost was found on the system" FORCE)
-    # target_link_libraries(decompsolver PUBLIC Boost::random Boost::graph)
 else()
     message(STATUS "Boost >= ${MIN_BOOST_VERSION} not found on system. Fetching...")
 
