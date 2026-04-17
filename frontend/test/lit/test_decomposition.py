@@ -1602,7 +1602,7 @@ def test_default_decomps():
     # two allocates/releases, for default register + work wires
     # CHECK: allocate
     # CHECK: allocate
-    # CHECK: ChangeOpBasis
+    # CHECK: TemporaryAND
     # CHECK: release
     # CHECK: release
     print(circuit.mlir_opt)
