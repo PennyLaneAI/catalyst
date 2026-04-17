@@ -134,7 +134,7 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
     # the number of errors to be injected for each noise operation. Defaults to 1.
     number_errors: int = 1
 
-    def _create_noise_subroutine(self, k, n, number_errors):
+    def _create_noise_subroutine(self, k):
         """Create a subroutine (func.FuncOp) operation for injecting physical noise mimic with Rot
         gates. The subroutine takes a physical codeblock, the qubit indices and the corresponding
         rotation parameters to be injected as inputs, and returns the noisy physical codeblock after
@@ -145,8 +145,6 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
 
         Args:
             k (int): The number of logical qubits of a physical codeblock.
-            n (int): The number of physical qubits of a physical codeblock.
-            number_errors (int): The number of errors to be injected.
 
         Returns:
             The corresponding subroutine (func.FuncOp).
@@ -156,15 +154,15 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
         # 1, a physical codeblock;
         # 2, number of errors (rot operations);
         # 3, a tensor containing rotation parameters for rot operations (errors).
-        codeblock_type = qecp.PhysicalCodeblockType(k, n)
+        codeblock_type = qecp.PhysicalCodeblockType(k, self.n)
         errors_indices_type = builtin.TensorType(
             element_type=builtin.IntegerType(64),
             shape=[
-                number_errors,
+                self.number_errors,
             ],
         )
         rotation_params_type = builtin.TensorType(
-            element_type=builtin.Float64Type(), shape=[number_errors, _NUM_ROT_PARAMS]
+            element_type=builtin.Float64Type(), shape=[self.number_errors, _NUM_ROT_PARAMS]
         )
         input_types = (codeblock_type, errors_indices_type, rotation_params_type)
 
@@ -178,7 +176,7 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
             in_codeblock, errors_indices, rotation_params = block.args
 
             # 2. Define for loop bounds
-            num_errors = arith.ConstantOp.from_int_and_width(number_errors, 64)
+            num_errors = arith.ConstantOp.from_int_and_width(self.number_errors, 64)
 
             zero = arith.ConstantOp.from_int_and_width(0, 64)
             one = arith.ConstantOp.from_int_and_width(1, 64)
@@ -240,7 +238,7 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
         # not called (dead code) can be eliminated as the
         # ["symbol-dce"](https://github.com/PennyLaneAI/catalyst/blob/372c376eb821e830da778fdc8af423eeb487eab6/frontend/catalyst/pipelines.py#L248)_
         # pass was added to the pipeline.
-        symbol_name = _get_noise_subroutine_name(k, n, number_errors)
+        symbol_name = _get_noise_subroutine_name(k, self.n, self.number_errors)
         funcOp = func.FuncOp(
             symbol_name,
             (input_types, output_types),
@@ -248,7 +246,9 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
             region=region,
         )
         # Add an attribute to the noise injection subroutine
-        funcOp.attributes[_get_noise_subroutine_name(k, n, number_errors)] = builtin.NoneAttr()
+        funcOp.attributes[_get_noise_subroutine_name(k, self.n, self.number_errors)] = (
+            builtin.UnitAttr()
+        )
         return funcOp
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
@@ -273,7 +273,7 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
             return
 
         # Insert a noise injection subroutine into the module.
-        noise_subroutine = self._create_noise_subroutine(k, self.n, self.number_errors)
+        noise_subroutine = self._create_noise_subroutine(k)
         assert op.regions[0].blocks.first is not None
         op.regions[0].blocks.first.add_op(noise_subroutine)
 
