@@ -27,6 +27,7 @@ Known Limitations
     for more information.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import islice
 
@@ -212,7 +213,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             )
 
     @staticmethod
-    def get_observable_op_qubits(op: quantum.NamedObsOp | quantum.TensorOp):
+    def get_observable_op_qubits(op: quantum.NamedObsOp | quantum.TensorOp) -> Sequence[ir.SSAValue]:
         """Get a list of all qubits in the observable"""
 
         assert isinstance(
@@ -226,7 +227,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
 
     @staticmethod
     def insert_compbasis_op(
-        in_qubits: ir.SSAValue, ref_op: ir.Operation, rewriter: PatternRewriter
+        in_qubits: Sequence[ir.SSAValue], ref_op: ir.Operation, rewriter: PatternRewriter
     ) -> quantum.ComputationalBasisOp:
         """Create and insert a computational-basis op (quantum.ComputationalBasisOp).
 
@@ -234,7 +235,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         given reference operation, `ref_op`, using the supplied `rewriter`.
 
         Args:
-            in_qubits (SSAValue): A list of SSA value used as input to the computational-basis op.
+            in_qubits (Sequence[SSAValue]): A sequence of SSA value used as input to the computational-basis op.
             ref_op (Operation): The reference op before which the quantum.ComputationalBasisOp is
                 inserted.
             rewriter (PatternRewriter): The xDSL pattern rewriter.
@@ -375,7 +376,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             prev_op = postprocessing_func_op
             for _op in islice(postprocessing_module.body.ops, 1, None):
                 helper_op = _op.clone()
-                # if the helper_op calls any functions in the module, also rellabel those callees
+                # if the helper_op calls any functions in the module, also relabel those callees
                 for op in helper_op.body.walk():
                     if isinstance(op, func.CallOp):
                         new_name = op.callee.string_value() + f"_{self.postprocessing_idx}"
