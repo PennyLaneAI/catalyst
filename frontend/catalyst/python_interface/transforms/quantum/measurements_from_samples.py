@@ -52,15 +52,6 @@ from catalyst.python_interface.transforms.quantum.wrap_qnode import (
 )
 from catalyst.python_interface.utils import get_constant_from_ssa
 
-MEASUREMENT_PROCESS_TYPES = (
-    quantum.CountsOp,
-    quantum.ExpvalOp,
-    quantum.ProbsOp,
-    quantum.SampleOp,
-    quantum.StateOp,
-    quantum.VarianceOp,
-)
-
 
 @dataclass(frozen=True)
 class MeasurementsFromSamplesPass(passes.ModulePass):
@@ -131,27 +122,31 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         self.call_op = get_call_op(func_op)
 
         measurement_processes = [
-            op for op in self.qnode.body.walk() if isinstance(op, MEASUREMENT_PROCESS_TYPES)
+            op for op in self.qnode.body.walk() if isinstance(op, quantum.TerminalMeasurementOp)
         ]
 
         # post-processing calls will be injected at the same point for all MPs
         # adding calls starting with the final MP ensures call order matches MP order
         for mp_op in measurement_processes[::-1]:
-            if isinstance(mp_op, quantum.ExpvalOp | quantum.VarianceOp):
-                self.expval_and_var_to_samples(mp_op, rewriter)
-            elif isinstance(mp_op, quantum.ProbsOp):
-                self.probs_to_samples(mp_op, rewriter)
-            elif isinstance(mp_op, quantum.SampleOp):
-                pass
-            elif isinstance(mp_op, quantum.CountsOp):
-                # Currently ``qml.counts()`` is unsupported due to differences in return
-                # type/shape in PennyLane and Catalyst. It may be supported at a later time.
-                # It is included for completeness and to notify users that it is unsupported.
-                raise NotImplementedError("qml.counts() operations are not supported.")
-            elif isinstance(mp_op, quantum.StateOp):
-                # It is not possible to recover a quantum state from samples; this is included
-                # for completeness and to notify users that ``state`` mps are not supported
-                raise NotImplementedError("qml.state() operations are not supported.")
+            print(mp_op.name)
+            match mp_op.name:
+                case "quantum.expval":
+                    self.expval_and_var_to_samples(mp_op, rewriter)
+                case "quantum.var":
+                    self.expval_and_var_to_samples(mp_op, rewriter)
+                case "quantum.probs":
+                    self.probs_to_samples(mp_op, rewriter)
+                case "quantum.sample":
+                    pass
+                case "quantum.counts":
+                    # Currently ``qml.counts()`` is unsupported due to differences in return
+                    # type/shape in PennyLane and Catalyst. It may be supported at a later time.
+                    # It is included for completeness and to notify users that it is unsupported.
+                    raise NotImplementedError("qml.counts() operations are not supported.")
+                case "quantum.state":
+                    # It is not possible to recover a quantum state from samples; this is included
+                    # for completeness and to notify users that ``state`` mps are not supported
+                    raise NotImplementedError("qml.state() operations are not supported.")
 
     @classmethod
     def get_observable_op(
@@ -200,6 +195,10 @@ class MeasurementsFromSamplesPattern(RewritePattern):
 
         elif isinstance(op, quantum.TensorOp):
             for obs in op.operands:
+                if not isinstance(obs.owner, quantum.NamedObsOp):
+                    raise CompileError(
+                        f"Expected all terms in TensorOp to be quantum.NambedObsOp, but encountered {obs.owner}"
+                    )
                 if obs.owner.type.data != "PauliZ":
                     raise NotImplementedError(
                         "Expected all observables to be diagonalized before application of"
@@ -213,7 +212,9 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             )
 
     @staticmethod
-    def get_observable_op_qubits(op: quantum.NamedObsOp | quantum.TensorOp) -> Sequence[ir.SSAValue]:
+    def get_observable_op_qubits(
+        op: quantum.NamedObsOp | quantum.TensorOp,
+    ) -> Sequence[ir.SSAValue]:
         """Get a list of all qubits in the observable"""
 
         assert isinstance(
@@ -221,6 +222,11 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         ), f"expected quantum.NamedObsOp or quantum.TensorOp but received {type(op)}"
 
         if isinstance(op, quantum.TensorOp):
+            for obs in op.operands:
+                if not isinstance(obs.owner, quantum.NamedObsOp):
+                    raise CompileError(
+                        f"Expected all terms in TensorOp to be quantum.NambedObsOp, but encountered {obs.owner}"
+                    )
             return [obs.owner.operands[0] for obs in op.operands]
 
         return op.operands
@@ -572,6 +578,10 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             inner_obs = [op.owner for op in observable_op.operands]
             rewriter.erase_op(observable_op)
             for o in inner_obs:
+                if not isinstance(o, quantum.NamedObsOp):
+                    raise CompileError(
+                        f"Expected all terms in TensorOp to be quantum.NambedObsOp, but encountered {o}"
+                    )
                 rewriter.erase_op(o)
         else:
             rewriter.erase_op(observable_op)
