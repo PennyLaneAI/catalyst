@@ -710,6 +710,40 @@ class TestMeasurePattern:
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
 
+# MARK: TestScfForPattern
+
+
+@pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
+class TestScfForPattern:
+    """Unit tests for the `scf.for` op conversion pattern of the convert-quantum-to-qecl pass."""
+
+    def test_conversion_with_scf_for_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """TODO"""
+        program = """
+        func.func @test_program() -> !quantum.reg {
+            %c0 = arith.constant 0 : index
+            %c1 = arith.constant 1 : index
+            %c2 = arith.constant 2 : index
+
+            // CHECK: [[hreg0:%.+]] = "test.op"() : () -> !qecl.hyperreg<1 x 1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.hyperreg<1 x 1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.hyperreg<1 x 1> to !quantum.reg
+
+            // CHECK: [[res:%.+]] = scf.for %arg0 = %c0 to %c2 step %c1 iter_args(%arg1 = [[hreg0]]) -> (!qecl.hyperreg<1 x 1>)
+            %2 = scf.for %arg0 = %c0 to %c2 step %c1 iter_args(%arg1 = %1) -> (!quantum.reg) {
+                // CHECK: scf.yield %arg1 : !qecl.hyperreg<1 x 1>
+                scf.yield %arg1 : !quantum.reg
+            }
+
+            // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[res]] : !qecl.hyperreg<1 x 1> to !quantum.reg
+            // CHECK: return [[conv_cast]] : !quantum.reg
+            return %2 : !quantum.reg
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+
 # MARK: TestInvalidInputIR
 
 
@@ -886,5 +920,63 @@ class TestQuantumToQecLogicalPassIntegration:
             m1 = qml.measure(1)
             m2 = qml.measure(2)
             return qml.sample([m0, m1, m2])
+
+        run_filecheck_qjit(circuit)
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_circuit_with_for_loop_1(self, run_filecheck_qjit):
+        """TODO
+
+        Simplest case with for loop.
+        """
+        dev = qml.device("null.qubit", wires=1)
+
+        @qml.qjit(target="mlir", autograph=True)
+        @convert_quantum_to_qecl_pass(k=1)
+        @qml.qnode(dev, shots=1)
+        def circuit():
+            for i in range(2):
+                qml.H(0)
+            m0 = qml.measure(0)
+            return qml.sample([m0])
+
+        run_filecheck_qjit(circuit)
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_circuit_with_for_loop_2(self, run_filecheck_qjit):
+        """TODO
+
+        Simplest case with for loop, where the loop is preceded by a gate op.
+        """
+        dev = qml.device("null.qubit", wires=1)
+
+        @qml.qjit(target="mlir", autograph=True)
+        @convert_quantum_to_qecl_pass(k=1)
+        @qml.qnode(dev, shots=1)
+        def circuit():
+            qml.H(0)
+            for i in range(2):
+                qml.H(0)
+            m0 = qml.measure(0)
+            return qml.sample([m0])
+
+        run_filecheck_qjit(circuit)
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_circuit_with_for_loop_3(self, run_filecheck_qjit):
+        """TODO
+
+        Wire index is loop variable.
+        """
+        dev = qml.device("null.qubit", wires=1)
+
+        @qml.qjit(target="mlir", autograph=True)
+        @convert_quantum_to_qecl_pass(k=1)
+        @qml.qnode(dev, shots=1)
+        def circuit():
+            for i in range(2):
+                qml.H(i)
+            m0 = qml.measure(0)
+            return qml.sample([m0])
 
         run_filecheck_qjit(circuit)
