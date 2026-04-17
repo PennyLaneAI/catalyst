@@ -127,9 +127,7 @@ def _run_filecheck_impl(
     )
 
     exit_code = matcher.run()
-    assert (
-        exit_code == 0
-    ), f"""
+    assert exit_code == 0, f"""
         filecheck failed with exit code {exit_code}.
 
         Original program string:

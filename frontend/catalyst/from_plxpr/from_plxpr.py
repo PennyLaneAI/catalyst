@@ -545,10 +545,9 @@ def trace_from_pennylane(
         # Therefore we need to coordinate them manually
         fn.static_argnums = static_argnums
 
-    with (
-        transient_jax_config({"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}),
-        Patcher(*get_jax_patches()),
-    ):
+    with transient_jax_config(
+        {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
+    ), Patcher(*get_jax_patches()):
 
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
