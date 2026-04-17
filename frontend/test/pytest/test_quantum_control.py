@@ -458,7 +458,9 @@ class TestCatalystOnlyControlled:
 
         assert circuit(0.1) == qml.wires.Wires([1, 0, 3])
 
-    @pytest.mark.xfail(reason="ctrl.wires fails in control-flow branches is not supported")
+    @pytest.mark.xfail(
+        strict=False, reason="ctrl.wires fails in control-flow branches is not supported"
+    )
     def test_qctrl_wires_controlflow(self, backend):
         """Test the wires property of HybridCtrl with control flow branches"""
 
@@ -497,7 +499,9 @@ class TestCatalystOnlyControlled:
         assert new_qctrl._control_wires == [1]  # pylint: disable=protected-access
         assert new_qctrl.regions[0].quantum_tape.operations[0].wires == Wires([0])
 
-    @pytest.mark.xfail(reason="Disable due to circular dependency between Catalyst and PennyLane")
+    @pytest.mark.xfail(
+        strict=False, reason="Disable due to circular dependency between Catalyst and PennyLane"
+    )
     @pytest.mark.parametrize("work_wire_type", ["zeroed", "borrowed"])
     def test_qctrl_work_wire_type_operator(self, work_wire_type):
         """Test that work_wire_type is preserved on a Controlled op inside qjit"""
