@@ -12,18 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""xDSL API for qecp transforms"""
+"""xDSL API for qecl transforms"""
 
-from .convert_noiseop_to_subroutine import (
-    ConvertNoiseOpToSubroutinePass,
-    convert_noiseop_to_subroutine_pass,
-)
-from .convert_qecl_to_qecp import ConvertQecLogicalToQecPhysicalPass, convert_qecl_to_qecp_pass
+from .convert_quantum_to_qecl import ConvertQuantumToQecLogicalPass, convert_quantum_to_qecl_pass
 
 __all__ = [
-    # Passes
-    "ConvertQecLogicalToQecPhysicalPass",
-    "convert_qecl_to_qecp_pass",
-    "ConvertNoiseOpToSubroutinePass",
-    "convert_noiseop_to_subroutine_pass",
+    "ConvertQuantumToQecLogicalPass",
+    "convert_quantum_to_qecl_pass",
 ]
