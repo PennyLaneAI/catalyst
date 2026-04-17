@@ -146,7 +146,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
                 case "quantum.state":
                     # It is not possible to recover a quantum state from samples; this is included
                     # for completeness and to notify users that ``state`` mps are not supported
-                    raise NotImplementedError("qml.state() operations are not supported.")
+                    raise CompileError("qml.state() operations are not compatible with conversion to samples.")
 
     @classmethod
     def get_observable_op(

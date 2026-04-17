@@ -18,6 +18,8 @@
 
 import pytest
 
+from pennylane.exceptions import CompileError
+
 from catalyst.python_interface.transforms import (
     MeasurementsFromSamplesPass,
 )
@@ -196,6 +198,7 @@ class TestMeasurementsFromSamplesPass:
         pipeline = (MeasurementsFromSamplesPass(),)
         run_filecheck(program, pipeline)
 
+    @pytest.mark.xfail(reason="Counts not supported", strict=True, raises=NotImplementedError)
     def test_1_wire_counts(self, run_filecheck):
         """Test the measurements-from-samples pass on a 1-wire circuit terminating with a counts
         measurement.
@@ -233,8 +236,7 @@ class TestMeasurementsFromSamplesPass:
         """
 
         pipeline = (MeasurementsFromSamplesPass(),)
-        with pytest.raises(NotImplementedError, match="operations are not supported"):
-            run_filecheck(program, pipeline)
+        run_filecheck(program, pipeline)
 
     def test_1_wire_state(self, run_filecheck):
         """Test the measurements-from-samples pass on a 1-wire circuit terminating with a state
@@ -265,7 +267,7 @@ class TestMeasurementsFromSamplesPass:
         """
 
         pipeline = (MeasurementsFromSamplesPass(),)
-        with pytest.raises(NotImplementedError, match="operations are not supported"):
+        with pytest.raises(CompileError, match="operations are not compatible with"):
             run_filecheck(program, pipeline)
 
     def test_2_wire_expval(self, run_filecheck):
