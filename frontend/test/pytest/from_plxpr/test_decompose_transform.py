@@ -422,11 +422,31 @@ class TestPlxPRDecomposition:
     def test_with_multiple_decomps_transforms(self):
         """Test that a circuit with multiple decompositions and transforms can be converted."""
 
-        @qml.qjit
-        @qml.decompose(gate_set={qml.Rot})
+        @qml.register_resources({qml.RX: 1})
+        def x_to_rx(wires: int):
+            qml.RX(np.pi, wires)
+
+
+        @qml.register_resources({qml.RY: 1})
+        def y_to_ry(wires: int):
+            qml.RY(np.pi, wires)
+
+
+        @qml.register_resources({qml.RX: 1, qml.RY: 1})
+        def h_to_rx_ry(wires: int):
+            qml.RX(np.pi / 2, wires)
+            qml.RY(np.pi / 2, wires)
+
+
+        @qml.qjit(target="mlir")
+        @qml.decompose(
+            gate_set={"Rot"},
+        )
         @qml.transforms.merge_rotations
         @qml.decompose(
-            gate_set={qml.GlobalPhase, qml.RX, qml.RY},
+            gate_set={qml.RX: 1.0, qml.RY: 1.0, qml.Rot: 5.0},
+            fixed_decomps={qml.PauliX: x_to_rx, qml.PauliY: y_to_ry},
+            alt_decomps={qml.H: [h_to_rx_ry]},
         )
         @qml.transforms.cancel_inverses
         @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -438,10 +458,9 @@ class TestPlxPRDecomposition:
             qml.RY(y, wires=0)
             qml.PauliY(0)
             qml.RY(x + y, wires=0)
-
             return qml.state()
 
-        expected_resources = {"GlobalPhase": 2, "Rot": 5}
+        expected_resources = {"Rot": 2}
         resources = qml.specs(circuit, level="device")(1.23, 4.56)["resources"].gate_types
         assert resources == expected_resources
 

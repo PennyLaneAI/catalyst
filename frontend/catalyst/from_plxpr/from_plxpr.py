@@ -329,48 +329,18 @@ def handle_qnode(
     consts = args[shots_len : n_consts + shots_len]
     non_const_args = args[shots_len + n_consts :]
 
-    # closed_jaxpr = (
-    #     ClosedJaxpr(qfunc_jaxpr, consts)
-    #     if not self.requires_decompose_lowering
-    #     else _apply_compiler_decompose_to_plxpr(
-    #         inner_jaxpr=qfunc_jaxpr,
-    #         consts=consts,
-    #         ncargs=non_const_args,
-    #         tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
-    #     )
-    # )
-
     graph_succeeded = False
-    # if stopping_condition := self.decompose_tkwargs.get("stopping_condition"):
-    #     # Use the plxpr decompose transform and ignore graph decomposition
-    #     # See https://github.com/PennyLaneAI/catalyst/pull/2472.
-    #     closed_jaxpr = _apply_compiler_decompose_to_plxpr(
-    #         inner_jaxpr=qfunc_jaxpr,
-    #         consts=consts,
-    #         ncargs=non_const_args,
-    #         tkwargs={"gate_set": self.decompose_tkwargs.get("gate_set", [])},
-    #         stopping_condition=stopping_condition,
     if self.requires_decompose_lowering and self.graph_decompose_tkwargs:
         raise NotImplementedError(
             "Mixing legacy and C++ graph decomposition transforms is not yet supported."
         )
-    # elif not qml.decomposition.enabled_graph() and self.requires_decompose_lowering:
-    #     # Use the plxpr decompose transform when graph is disabled
     if self.graph_decompose_tkwargs:
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
             consts=consts,
             ncargs=non_const_args,
-            # tkwargs={"gate_set": self.decompose_tkwargs.get("gate_set", [])},
             tgateset=_union_decompose_gatesets(self.graph_decompose_tkwargs),
         )
-        # elif qml.decomposition.enabled_graph() and self.requires_decompose_lowering:
-        #     closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
-        #         inner_jaxpr=closed_jaxpr.jaxpr,
-        #         consts=closed_jaxpr.consts,
-        #         tkwargs=self.decompose_tkwargs,
-        #         ncargs=non_const_args,
-        #     )
         if len(self.graph_decompose_tkwargs) == 1:
             closed_jaxpr = _compile_explicit_graph_decomposition_rules(
                 inner_jaxpr=closed_jaxpr.jaxpr,
@@ -416,12 +386,6 @@ def handle_qnode(
                 tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
             )
         )
-        # # Fallback to the legacy decomposition if the graph-based decomposition failed
-        # if not graph_succeeded:
-        #     # Remove the decompose-lowering pass from the pipeline
-        #     self._pass_pipeline = [
-        #         p for p in self._pass_pipeline if p.pass_name != "decompose-lowering"
-        #     ]
         if stopping_condition := self.decompose_tkwargs.get("stopping_condition"):
             # Use the plxpr decompose transform and ignore graph decomposition
             # See https://github.com/PennyLaneAI/catalyst/pull/2472.
@@ -875,7 +839,6 @@ def _union_decompose_gatesets(tkwargs_list):
                 gate_set.append(op)
     return gate_set
 
-
 class CustomRuleInterpreter(PlxprInterpreter):
     """Interpreter that collects quantum operations from a qfunc jaxpr."""
 
@@ -884,16 +847,12 @@ class CustomRuleInterpreter(PlxprInterpreter):
         super().__init__()
 
     def _create_rule(self, op, rule):
-        rule_impl = _unwrap_decomposition_rule(rule)
+        rule_impl = self._unwrap_decomposition_rule(rule)
         op_name = _get_operator_name(op)
         num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op_name]
         requires_copy = num_wires == -1
-        actual_num_wires = (
-            len(op.wires)
-            if issubclass(op, qml.operation.Operation) and requires_copy
-            else num_wires
-        )
-
+        actual_num_wires = len(op.wires) if issubclass(op, qml.operation.Operation) and requires_copy else num_wires
+        
         _create_decomposition_rule(
             rule_impl,
             op_name=op_name,
@@ -901,6 +860,11 @@ class CustomRuleInterpreter(PlxprInterpreter):
             num_params=num_params,
             requires_copy=requires_copy,
         )
+
+    def _unwrap_decomposition_rule(self, rule):
+        """Return the underlying callable implementing a PennyLane decomposition rule."""
+
+        return getattr(rule, "_impl", rule)
 
     def cleanup(self):
         """Cleanup after interpretation."""
@@ -911,34 +875,15 @@ class CustomRuleInterpreter(PlxprInterpreter):
                 for rule in rules:
                     self._create_rule(op, rule)
 
-
 def _compile_explicit_graph_decomposition_rules(inner_jaxpr, consts, tkwargs_list, ncargs):
     """Compile user-provided fixed/alternative rules for the C++ graph pass."""
 
-    capture_custom_rules_interpreter = CustomRuleInterpreter(tkwargs_list=tkwargs_list)
+    capture_custom_rules_interpreter = CustomRuleInterpreter(tkwargs_list = tkwargs_list)
 
     def custom_rule_wrapper(*args):
         return capture_custom_rules_interpreter.eval(inner_jaxpr, consts, *args)
-
+    
     return jax.make_jaxpr(custom_rule_wrapper)(*ncargs)
-
-
-def _unwrap_decomposition_rule(rule):
-    """Return the underlying callable implementing a PennyLane decomposition rule."""
-
-    return getattr(rule, "_impl", rule)
-
-
-def _rule_uses_work_wires(rule) -> bool:
-    """Whether a PennyLane decomposition rule declares work wires."""
-
-    spec = getattr(rule, "_work_wire_spec", None)
-    if spec is None:
-        return False
-    if callable(spec):
-        return True
-    return bool(spec)
-
 
 def _is_cxx_graph_decompose_supported(tkwargs) -> bool:
     """Whether a qml.decompose invocation can be routed to the C++ graph pass."""
@@ -964,3 +909,14 @@ def _is_cxx_graph_decompose_supported(tkwargs) -> bool:
                 return False
 
     return True
+
+def _rule_uses_work_wires(rule) -> bool:
+    """Whether a PennyLane decomposition rule declares work wires."""
+
+    spec = getattr(rule, "_work_wire_spec", None)
+    if spec is None:
+        return False
+    if callable(spec):
+        return True
+    return bool(spec)
+

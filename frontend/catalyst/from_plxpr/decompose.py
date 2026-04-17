@@ -263,7 +263,6 @@ def _create_decomposition_rule(
     num_params: int,
     requires_copy: bool = False,
     pauli_word: str | None = None,
-    is_qreg=True,
 ):
     """Create a decomposition rule from a callable.
     See also: :func:`~.decomposition_rule`.
@@ -276,7 +275,6 @@ def _create_decomposition_rule(
             to avoid mutating the original. This is required for operations
             with a variable number of wires (e.g., MultiRZ, GlobalPhase).
         pauli_word (str | None): The Pauli word for PauliRot and PauliMeasure operations.
-        is_qreg (bool): Whether the decomposition rule is for a quantum register operation.
     """
 
     sig_func = inspect.signature(func)
@@ -322,7 +320,11 @@ def _create_decomposition_rule(
             # Pass a dummy array of zeros with the correct number of wires
             # This is required for the decomposition_rule to work correctly
             # as it expects an array-like input for wires
-            args.append(qml.math.array([0] * num_wires, like="jax"))
+            if num_wires == 1 and typ is not WiresLike:
+                # avoid passing an array reduce the traced LOC!
+                args.append(int)
+            else:
+                args.append(qml.math.array([0] * num_wires, like="jax"))
         elif typ is int:  # pragma: no cover
             # This is only for cases where the rule has an int parameter
             # e.g., dimension in some gates. Not that common though!
@@ -352,7 +354,7 @@ def _create_decomposition_rule(
 
     # Note that we shouldn't pass args as kwargs to decomposition_rule
     # JAX doesn't like it and it may fail to preserve the order of args.
-    return decomposition_rule(func_cp, pauli_word=pauli_word, is_qreg=is_qreg)(*args)
+    return decomposition_rule(func_cp, pauli_word=pauli_word)(*args)
 
 
 # pylint: disable=protected-access
