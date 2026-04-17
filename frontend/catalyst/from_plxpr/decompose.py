@@ -274,6 +274,7 @@ def _create_decomposition_rule(
         requires_copy (bool): Whether to create a copy of the function
             to avoid mutating the original. This is required for operations
             with a variable number of wires (e.g., MultiRZ, GlobalPhase).
+        pauli_word (str | None): The Pauli word for PauliRot and PauliMeasure operations.
     """
 
     sig_func = inspect.signature(func)
@@ -319,7 +320,11 @@ def _create_decomposition_rule(
             # Pass a dummy array of zeros with the correct number of wires
             # This is required for the decomposition_rule to work correctly
             # as it expects an array-like input for wires
-            args.append(qml.math.array([0] * num_wires, like="jax"))
+            if num_wires == 1 and typ is not WiresLike:
+                # avoid passing an array reduce the traced LOC!
+                args.append(int)
+            else:
+                args.append(qml.math.array([0] * num_wires, like="jax"))
         elif typ is int:  # pragma: no cover
             # This is only for cases where the rule has an int parameter
             # e.g., dimension in some gates. Not that common though!
