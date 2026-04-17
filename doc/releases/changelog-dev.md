@@ -293,6 +293,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* `qml.for_loop` now supports dynamic shapes with program capture `qjit(capture=True)`.
+  [(#2603)](https://github.com/PennyLaneAI/catalyst/pull/2603/)
+
 * Added support for ``StatePrep`` kwargs ``pad_with`` and ``normalize`` with program capture enabled.
   [(#2620)](https://github.com/PennyLaneAI/catalyst/pull/2620)
 
@@ -535,6 +538,10 @@
   [(#2582)](https://github.com/PennyLaneAI/catalyst/pull/2582)
 
 <h3>Internal changes ⚙️</h3>
+
+* Removes unnessary registrations for the various gradient primitives in `from_plxpr` when we
+  are able to just inherit the base behaviour from `PlxprInterpreter`.
+  [(#2706)](https://github.com/PennyLaneAI/catalyst/pull/2706/)
 
 * The legacy frontend no longer registers `qml.allocate()` and `qml.deallocate()` onto the qjit device
   capabilities, since dynamic qubit allocation is only implemented for the capture frontend.
