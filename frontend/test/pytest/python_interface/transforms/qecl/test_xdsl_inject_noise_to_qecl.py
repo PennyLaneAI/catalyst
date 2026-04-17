@@ -22,7 +22,6 @@ from catalyst.python_interface.transforms.qecl import (
     convert_quantum_to_qecl_pass,
     inject_noise_to_qecl_pass,
 )
-from catalyst.utils.exceptions import CompileError
 
 pytestmark = pytest.mark.xdsl
 
