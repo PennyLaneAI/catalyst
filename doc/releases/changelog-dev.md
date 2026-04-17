@@ -496,7 +496,7 @@
   [(#2667)](https://github.com/PennyLaneAI/catalyst/pull/2667)
 
 * The adjoint lowering pass now supports `switch` operation as well. Previously, using
-  `qml.adjoint` on a circuit containing a `switch` would raise a `CompileError`. The MLIR
+  `qp.adjoint` on a circuit containing a `switch` would raise a `CompileError`. The MLIR
   `--adjoint-lowering` pass has been updated to support this usage.
   [(#2691)](https://github.com/PennyLaneAI/catalyst/pull/2691)
 
