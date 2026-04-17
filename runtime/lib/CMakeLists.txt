@@ -8,8 +8,7 @@ endif()
 # This is the version tested and shipped with Ubuntu 24 apt.
 # Using older versions (e.g. 1.66 on rhel8 or 1.74 on Ubuntu 22)
 # can cause failure, or will require linking the Boost random library
-# explicitly. When using 1.83 or newer, the decompsolver target
-# will not require external linking to Boost libraries.
+# explicitly.
 set(MIN_BOOST_VERSION 1.83.0)
 
 include(FetchContent)
@@ -46,7 +45,6 @@ endif()
 add_subdirectory(capi)
 add_subdirectory(backend)
 add_subdirectory(registry)
-add_subdirectory(DecompGraphSolver)
 add_subdirectory(RSDecompRuntime)
 
 if(ENABLE_OQD)
