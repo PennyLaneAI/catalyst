@@ -2566,7 +2566,8 @@ def _pl_while_loop_lowering(
     cond_consts = plxpr_invals[slice(*cond_slice)]
     args = plxpr_invals[slice(*args_slice)]
 
-    args_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
+    all_args_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
+    args_types = all_args_types[slice(*args_slice)]
 
     while_op_scf = WhileOp(args_types, args)
 
@@ -2618,7 +2619,6 @@ def _pl_while_loop_lowering(
             dim_var_values=jax_ctx.dim_var_values,
             const_lowering=jax_ctx.const_lowering,
         )
-
         YieldOp(out)
 
     return while_op_scf.results

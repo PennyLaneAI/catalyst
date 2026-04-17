@@ -810,7 +810,7 @@ class TestWhileLoopDynamicShapes:
 
             a2, _ = loop(a, 0)
             qml.RX(jnp.sum(a2), 0)
-            return a2
+            return qml.expval(qml.Z(0))
 
         result = f(3)
         assert qml.math.allclose(result, jnp.cos(4))
