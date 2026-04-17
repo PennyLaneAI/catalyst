@@ -63,6 +63,7 @@ from catalyst.jax_primitives import (
     set_basis_state_p,
     set_state_p,
     state_p,
+    template_p,
     tensorobs_p,
     unitary_p,
     var_p,
@@ -128,6 +129,18 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         self.has_dynamic_allocation = False
 
         super().__init__()
+
+    def interpret_operation_eqn(self, eqn):
+        """Interpret an equation corresponding to an operator."""
+        if getattr(eqn.primitive, "prototype_op") is True:
+            return self.interpret_operation2_eqn(eqn)
+
+        return super().interpret_operation_eqn(eqn)
+
+    def interpret_operation2_eqn(self, eqn):
+        """Interpret Operator2."""
+        self.init_qreg.insert_all_dangling_qubits()
+        return
 
     def interpret_operation(self, op, is_adjoint=False, control_values=(), control_wires=()):
         """Re-bind a pennylane operation as a catalyst instruction.
@@ -233,16 +246,24 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             if len(measurement.wires) == 0 and not isinstance(
                 measurement, qml.measurements.StateMP
             ):
-                raise CompileError(textwrap.dedent("""
+                raise CompileError(
+                    textwrap.dedent(
+                        """
                         Terminal measurements must take in an explicit list of wires when
                         dynamically allocated wires are present in the program.
-                        """))
+                        """
+                    )
+                )
 
             if any(is_dynamically_allocated_wire(w) for w in measurement.wires):
-                raise CompileError(textwrap.dedent("""
+                raise CompileError(
+                    textwrap.dedent(
+                        """
                         Terminal measurements cannot take in dynamically allocated wires
                         since they must be temporary.
-                        """))
+                        """
+                    )
+                )
 
     # pylint: disable=too-many-branches
     def interpret_measurement(self, measurement):
