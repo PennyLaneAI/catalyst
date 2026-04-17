@@ -56,7 +56,6 @@
 #pragma once
 
 #include "llvm/Support/Debug.h"
-
 #include "mlir/IR/BuiltinOps.h"
 
 #include "Catalyst/IR/CatalystDialect.h"

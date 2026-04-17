@@ -938,6 +938,19 @@ def trace_quantum_operations(
     return qrp
 
 
+def insert_observable_wires_into_cache(qrp, wires, qubits):
+    """
+    When there are multiple observables (compbasis, named or Hermitian), they could be on the same
+    wire.
+    qrp.insert ensures the extracted wires are added to cache, however this call is only
+    allowed on wires that aren't already in the cache.
+    """
+    for w, q in zip(wires, qubits, strict=True):
+        if w not in qrp.cache:
+            qrp.insert([w], [q])
+
+
+# pylint: disable=too-many-branches
 @debug_logger
 def trace_observables(
     obs: Optional[Operator],
@@ -967,13 +980,23 @@ def trace_observables(
         else:
             qubits = qrp.extract(wires, allow_reuse=True)
             obs_tracers = compbasis_p.bind(*qubits)
+            insert_observable_wires_into_cache(qrp, wires, qubits)
     elif isinstance(obs, KNOWN_NAMED_OBS):
-        qubits = qrp.extract(wires, allow_reuse=True)
+        # The MLIR NamedObs operation only takes in a single qubit value, instead of a variadic
+        # range.
+        # This is fine for most named observables, but qml.Identity can take in multiple wires
+        # While the current logic here assumes there is only one wire on the observable, this
+        # won't actually lead to wrong execution results, since the only exception is the identity
+        # But of course we should fix this at some time.
+        # TODO: make the NamedObs op take in multiple qubit values
+        qubits = qrp.extract([wires[0]], allow_reuse=True)
         obs_tracers = namedobs_p.bind(qubits[0], kind=type(obs).__name__)
+        insert_observable_wires_into_cache(qrp, [wires[0]], [qubits[0]])
     elif isinstance(obs, qml.Hermitian):
         # TODO: remove once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = hermitian_p.bind(jax.numpy.asarray(*obs.parameters), *qubits)
+        insert_observable_wires_into_cache(qrp, wires, qubits)
     elif isinstance(obs, qml.ops.op_math.Prod):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = tensorobs_p.bind(*nested_obs)

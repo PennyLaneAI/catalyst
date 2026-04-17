@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <catch2/catch_approx.hpp>
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_string.hpp>
-#include <cstdint>
-#include <cstdio>
+#include "catch2/catch_test_macros.hpp"
+#include "catch2/matchers/catch_matchers_floating_point.hpp"
 
 #include "GridProblems.hpp"
 
@@ -199,9 +196,9 @@ TEST_CASE("Test GridIterator", "[RSDecomp][GridProblems]")
             std::complex<double> final_complex = u_sol_complex / denominator;
 
             double expected_real = std::cos(theta);
-            REQUIRE(final_complex.real() == Catch::Approx(expected_real).margin(epsilon));
+            REQUIRE_THAT(final_complex.real(), WithinAbs(expected_real, epsilon));
             double expected_imag = std::sin(theta);
-            REQUIRE(final_complex.imag() == Catch::Approx(expected_imag).margin(epsilon));
+            REQUIRE_THAT(final_complex.imag(), WithinAbs(expected_imag, epsilon));
         }
     }
 }

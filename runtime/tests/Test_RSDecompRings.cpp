@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <catch2/catch_approx.hpp>
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_string.hpp>
-#include <cstdio>
+#include "catch2/catch_test_macros.hpp"
+#include "catch2/matchers/catch_matchers_floating_point.hpp"
+#include "catch2/matchers/catch_matchers_string.hpp"
 
 #include "Rings.cpp"
 
@@ -96,8 +95,8 @@ TEST_CASE("Test ZOmega class", "[RSDecomp][Rings]")
     CHECK(z2.norm4() == 14788);
 
     auto z1_complex = z1.to_complex();
-    CHECK(z1_complex.real() == Catch::Approx(5.41421356237309).margin(tol));
-    CHECK(z1_complex.imag() == Catch::Approx(4.82842712474619).margin(tol));
+    CHECK_THAT(z1_complex.real(), WithinAbs(5.41421356237309, tol));
+    CHECK_THAT(z1_complex.imag(), WithinAbs(4.82842712474619, tol));
     CHECK(z1.parity() == 0);
     CHECK(z2.parity() == 0);
     CHECK(ZOmega(0, 0, 1, 1).parity() == 1);
@@ -107,12 +106,11 @@ TEST_CASE("Test ZOmega class", "[RSDecomp][Rings]")
 
     ZOmega z1_conj = z1.conj();
     CHECK(z1_conj == ZOmega(-3, -2, -1, 4));
-    CHECK(z1_conj.to_complex().real() == Catch::Approx(std::conj(z1_complex).real()).margin(tol));
-    CHECK(z1_conj.to_complex().imag() == Catch::Approx(std::conj(z1_complex).imag()).margin(tol));
+    CHECK_THAT(z1_conj.to_complex().real(), WithinAbs(std::conj(z1_complex).real(), tol));
+    CHECK_THAT(z1_conj.to_complex().imag(), WithinAbs(std::conj(z1_complex).imag(), tol));
 
-    CHECK(
-        z2.norm2().to_complex().real() ==
-        Catch::Approx((std::abs(z2.to_complex()) * std::abs(z2.conj().to_complex()))).margin(tol));
+    CHECK_THAT(z2.norm2().to_complex().real(),
+               WithinAbs((std::abs(z2.to_complex()) * std::abs(z2.conj().to_complex())), tol));
 
     CHECK((z1 - ZOmega(2, 2, 2, 0)).to_sqrt_two() == ZSqrtTwo(4, 1));
 }

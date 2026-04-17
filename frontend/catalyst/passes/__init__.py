@@ -38,8 +38,10 @@ from catalyst.passes.builtin_passes import (
     combine_global_phases,
     commute_ppr,
     decompose_arbitrary_ppr,
+    diagonalize_measurements,
     disentangle_cnot,
     disentangle_swap,
+    graph_decomposition,
     gridsynth,
     ions_decomposition,
     merge_ppr_ppm,
@@ -53,8 +55,11 @@ from catalyst.passes.builtin_passes import (
     to_ppr,
 )
 from catalyst.passes.pass_api import Pass, PassPlugin, apply_pass, apply_pass_plugin
+from catalyst.passes.utils import prepare_decomposition_options
 
 __all__ = (
+    "prepare_decomposition_options",
+    "graph_decomposition",
     "gridsynth",
     "to_ppr",
     "commute_ppr",
@@ -68,6 +73,7 @@ __all__ = (
     "merge_rotations",
     "parity_synth",
     "combine_global_phases",
+    "diagonalize_measurements",
     "disentangle_cnot",
     "disentangle_swap",
     "ions_decomposition",

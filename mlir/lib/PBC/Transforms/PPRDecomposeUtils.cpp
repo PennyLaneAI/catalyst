@@ -12,21 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Quantum/IR/QuantumOps.h" // for quantum::AllocQubitOp
-
-#include "PBC/IR/PBCOps.h" // for FabricateOp
 #include "PBC/Transforms/PPRDecomposeUtils.h"
+
+#include "PBC/IR/PBCOps.h"         // for FabricateOp
+#include "Quantum/IR/QuantumOps.h" // for quantum::AllocQubitOp
 
 namespace catalyst {
 namespace pbc {
 
-std::pair<mlir::StringRef, uint16_t>
-determinePauliAndRotationSignOfMeasurement(bool avoidPauliYMeasure)
+std::pair<mlir::StringRef, bool> determinePauliAndSignOfMeasurement(bool avoidPauliYMeasure)
 {
     if (avoidPauliYMeasure) {
-        return std::make_pair("Z", 1);
+        return std::make_pair("Z", 0);
     }
-    return std::make_pair("Y", -1);
+    return std::make_pair("Y", 1);
 }
 
 mlir::OpResult initializeZeroOrPlusI(bool avoidPauliYMeasure, mlir::Location loc,

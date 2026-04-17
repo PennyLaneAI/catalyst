@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Gradient/IR/GradientOps.h"
+
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-
 #include "Gradient/IR/GradientDialect.h"
-#include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/annotate_invalid_gradient_functions.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"

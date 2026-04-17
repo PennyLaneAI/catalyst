@@ -17,15 +17,16 @@
 #include <array>
 #include <cassert> // assert
 
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Math/IR/Math.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 
 #include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
+
 #include "VerifyParentGateAnalysis.hpp"
 
 using llvm::dbgs;
@@ -439,25 +440,22 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
         Location loc = op.getLoc();
         ValueRange mergeOpOutQubits;
         if constexpr (std::is_same_v<OpType, PPRotationOp>) {
-            int16_t opRotation = static_cast<int16_t>(op.getRotationKind());
-            int16_t parentOpRotation = static_cast<int16_t>(parentOp.getRotationKind());
+            int8_t opRotation = op.getRotationKind();
+            int8_t parentOpRotation = parentOp.getRotationKind();
 
             if (std::abs(opRotation) != std::abs(parentOpRotation)) {
                 return failure();
             }
 
-            int16_t newAngle = opRotation / 2;
+            int8_t newAngle = opRotation / 2;
 
             // remove identity operations
             if (opRotation == -parentOpRotation || std::abs(newAngle) == 1) {
                 mergeOpOutQubits = parentOpInQubits;
             }
             else {
-                mergeOpOutQubits = PPRotationOp::create(rewriter, loc,
-                                                        /*pauli_product=*/newPauliProduct,
-                                                        /*rotationKind=*/newAngle,
-                                                        /*in_qubits=*/newInQubits,
-                                                        /*condition=*/opCondition)
+                mergeOpOutQubits = PPRotationOp::create(rewriter, loc, newPauliProduct, newAngle,
+                                                        newInQubits, opCondition)
                                        .getOutQubits();
             }
         }
@@ -467,11 +465,8 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
             auto newAngle =
                 arith::AddFOp::create(rewriter, loc, opRotation, parentOpRotation).getResult();
 
-            mergeOpOutQubits = PPRotationArbitraryOp::create(rewriter, loc,
-                                                             /*pauli_product=*/newPauliProduct,
-                                                             /*arbitrary_angle=*/newAngle,
-                                                             /*in_qubits=*/newInQubits,
-                                                             /*condition=*/opCondition)
+            mergeOpOutQubits = PPRotationArbitraryOp::create(rewriter, loc, newPauliProduct,
+                                                             newAngle, newInQubits, opCondition)
                                    .getOutQubits();
         }
 

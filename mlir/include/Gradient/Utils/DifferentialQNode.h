@@ -15,7 +15,6 @@
 #pragma once
 
 #include "llvm/ADT/StringRef.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace catalyst {

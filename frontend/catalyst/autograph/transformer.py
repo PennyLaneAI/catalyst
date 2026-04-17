@@ -20,6 +20,7 @@ Here, we integrate AutoGraph into Catalyst to improve the UX and allow programme
 Python control flow and other imperative expressions rather than the functional equivalents provided
 by Catalyst.
 """
+
 import copy
 import functools
 import inspect

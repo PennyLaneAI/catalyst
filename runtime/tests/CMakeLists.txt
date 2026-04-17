@@ -3,7 +3,7 @@ Include(FetchContent)
 FetchContent_Declare(
     Catch2
     GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_TAG        v3.8.0
+    GIT_TAG        v3.11.0
 )
 
 # Raised by Catch2 with GCC-13, so we disable it here before including their project.
@@ -21,7 +21,7 @@ execute_process(
 find_package(pybind11 CONFIG REQUIRED)
 
 # Required for catch_discover_tests().
-list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/contrib)
+list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 
 # Modify `ctest` to only run the supported subset of tests.
 include(CTest)
@@ -152,3 +152,17 @@ target_link_libraries(runner_tests_rsdecomp_runtime PRIVATE
 )
 
 catch_discover_tests(runner_tests_rsdecomp_runtime)
+
+# Decomposition Graph test suite
+add_executable(runner_tests_decompsolver)
+target_sources(runner_tests_decompsolver PRIVATE
+    Test_DecompGraphCore.cpp
+    Test_DecompGraphSolver.cpp
+)
+target_link_libraries(runner_tests_decompsolver PRIVATE
+    Catch2WithMain
+    catalyst_runtime_testing
+    decompsolver
+)
+
+catch_discover_tests(runner_tests_decompsolver)

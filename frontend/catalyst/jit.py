@@ -707,10 +707,13 @@ class QJIT(CatalystCallable):
             bool: whether the provided arguments will require promotion to be used with the compiled
                   function
         """
+        opts = self.compile_options
+        assert opts.lower_to_llvm and opts.link, "invalid options for jit_compile"
+
         cached_fn, requires_promotion = self.fn_cache.lookup(args)
 
         if cached_fn is None:
-            if self.user_sig and not self.compile_options.static_argnums:
+            if self.user_sig and not opts.static_argnums:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
 
@@ -788,16 +791,16 @@ class QJIT(CatalystCallable):
         with _ensure_capture_mode(target_mode):
             if target_mode:
                 # New capture pathway
-                return trace_from_pennylane(
+                jaxpr, out_type, out_treedef = trace_from_pennylane(
                     self.user_function,
-                    static_argnums,
-                    dynamic_args,
-                    abstracted_axes,
-                    full_sig,
+                    args,
                     kwargs,
+                    static_argnums=static_argnums,
+                    abstracted_axes=abstracted_axes,
                     skip_preprocess=self.compile_options.skip_preprocess,
                     debug_info=dbg,
                 )
+                return jaxpr, out_type, out_treedef, full_sig
             else:
                 # Legacy pathway
                 return self._trace_legacy_pathway(

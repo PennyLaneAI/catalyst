@@ -15,19 +15,17 @@
 #pragma once
 
 #include <algorithm>
-#include <bitset>
 #include <memory>
-#include <numeric>
 #include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-#include "QuantumDevice.hpp"
-#include "QubitManager.hpp"
-
 #include "OQCRunner.hpp"
 #include "OpenQASM2Builder.hpp"
+#include "QuantumDevice.hpp"
+#include "QubitManager.hpp"
+#include "Utils.hpp"
 
 using namespace Catalyst::Runtime::OpenQASM2;
 

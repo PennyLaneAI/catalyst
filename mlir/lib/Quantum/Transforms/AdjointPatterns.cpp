@@ -23,7 +23,6 @@
 
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
-
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
@@ -296,7 +295,7 @@ class AdjointGenerator {
         }
 
         auto clone = cast<pbc::PPRotationOp>(builder.clone(*ppr, remappedValues));
-        clone.setRotationKind(ppr.getRotationKind() * (-1));
+        clone.setRotationKind(-ppr.getRotationKind());
 
         for (const auto &[qubitResult, qubitOperand] :
              llvm::zip(clone.getOutQubits(), ppr.getInQubits())) {
