@@ -126,7 +126,7 @@ class ConvertNoiseOpToSubroutinePattern(
 class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
     """Pass that converts qecl.noise operations to subroutines in the qecp layer."""
 
-    name = "convert-qecl-noise-to-qecp-noise-subroutine"
+    name = "convert-qecl-noise-to-qecp-noise"
 
     # the number of physical data qubits of per codeblocks. NOTE: this option is expected to
     # be specified in the `qecl-to-qecp` skeleton pass.
@@ -252,7 +252,7 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
         return funcOp
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
-        """Apply the convert-qecl-noise-to-qecp-noise-subroutine pass."""
+        """Apply the convert-qecl-noise-to-qecp-noise pass."""
         # pylint: disable=line-too-long
         # Insert a noise subroutine to the module in the qecp layer.
         # Note that the visibility of those subroutines are set as private, which ensure the
