@@ -394,9 +394,9 @@ class CustomOpConversion(RewritePattern):
                     new_results = (ctrl_conv_cast_op.results[0], trgt_conv_cast_op.results[0])
 
             case _:
-                raise NotImplementedError(
+                raise CompileError(
                     f"Conversion of op '{op.name}' only supports gates 'Identity', 'PauliX', "
-                    f"'PauliY', 'PauliZ', 'Hadamard', 'S' and 'CNOT', but got {gate_name}"
+                    f"'PauliY', 'PauliZ', 'Hadamard', 'S' and 'CNOT', but got '{gate_name}'"
                 )
 
         rewriter.replace_op(op, ops_to_insert, new_results=new_results)

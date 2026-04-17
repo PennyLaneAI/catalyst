@@ -663,6 +663,21 @@ class TestGatePattern:
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
+    def test_unsupported_gate_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        program = """
+        func.func @test_program() {
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+            %2 = quantum.custom "Unknown"() %1 : !quantum.bit
+            %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit // To prevent DCE
+            return
+        }
+        """
+        with pytest.raises(
+            CompileError, match="Conversion of op 'quantum.custom' only supports gates"
+        ):
+            run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
 
 # MARK: TestMeasurePattern
 
