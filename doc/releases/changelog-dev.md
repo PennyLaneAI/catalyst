@@ -536,6 +536,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Removes unnessary registrations for the various gradient primitives in `from_plxpr` when we
+  are able to just inherit the base behaviour from `PlxprInterpreter`.
+  [(#2706)](https://github.com/PennyLaneAI/catalyst/pull/2706/)
+
 * The legacy frontend no longer registers `qml.allocate()` and `qml.deallocate()` onto the qjit device
   capabilities, since dynamic qubit allocation is only implemented for the capture frontend.
   [(#2696)](https://github.com/PennyLaneAI/catalyst/pull/2696)
