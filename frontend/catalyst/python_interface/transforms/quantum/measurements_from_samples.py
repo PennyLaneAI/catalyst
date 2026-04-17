@@ -199,7 +199,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             for obs in op.operands:
                 if not isinstance(obs.owner, quantum.NamedObsOp):
                     raise CompileError(
-                        f"Expected all terms in TensorOp to be quantum.NambedObsOp," 
+                        f"Expected all terms in TensorOp to be quantum.NambedObsOp,"
                         f"but encountered {obs.owner}"
                     )
                 if obs.owner.type.data != "PauliZ":
@@ -228,7 +228,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             for obs in op.operands:
                 if not isinstance(obs.owner, quantum.NamedObsOp):
                     raise CompileError(
-                        "Expected all terms in TensorOp to be quantum.NambedObsOp," 
+                        "Expected all terms in TensorOp to be quantum.NambedObsOp,"
                         f"but encountered {obs.owner}"
                     )
             return [obs.owner.operands[0] for obs in op.operands]
@@ -245,7 +245,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         given reference operation, `ref_op`, using the supplied `rewriter`.
 
         Args:
-            in_qubits (Sequence[SSAValue]): A sequence of SSA value used as input to the 
+            in_qubits (Sequence[SSAValue]): A sequence of SSA value used as input to the
                 computational-basis op.
             ref_op (Operation): The reference op before which the quantum.ComputationalBasisOp is
                 inserted.
@@ -585,7 +585,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             for o in inner_obs:
                 if not isinstance(o, quantum.NamedObsOp):
                     raise CompileError(
-                        f"Expected all terms in TensorOp to be quantum.NambedObsOp," 
+                        f"Expected all terms in TensorOp to be quantum.NambedObsOp,"
                         f"but encountered {o}"
                     )
                 rewriter.erase_op(o)
