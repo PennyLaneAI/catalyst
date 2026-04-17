@@ -289,6 +289,37 @@ class TestIntegrationWithOtherPasses:
 
         run_filecheck_qjit(circuit_compiled)
 
+    @pytest.mark.xfail(reason="split-non-commuting doesn't support var")
+    @pytest.mark.parametrize("coeff", [1.3, -4])
+    @pytest.mark.parametrize("phi", [0, -0.57, 2.34])
+    def test_expval_sprod_with_split_non_commuting(self, coeff, phi, capture, run_filecheck_qjit):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed on the combination of both wires.
+        """
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev)
+        def circuit():
+            qml.RX(phi, wires=0)
+            # CHECK-NOT: quantum.expval
+            # CHECK: quantum.sample
+            return qml.var(coeff * qml.Z(wires=0))
+
+        expected_res = coeff * np.cos(phi)
+        assert np.isclose(expected_res, circuit()), "Sanity check failed, is expected_res correct?"
+
+        pipeline = qml.CompilePipeline(
+            qml.transform(pass_name="split-non-commuting"),
+            qml.transform(pass_name="measurements-from-samples"),
+        )
+        circ = qml.set_shots(circuit, 5000)
+        circuit_compiled = qml.qjit(pipeline(circ), capture=capture)
+
+        assert np.isclose(expected_res, circuit_compiled(), atol=0.05)
+        run_filecheck_qjit(circuit_compiled)
+
     # pylint: disable=too-many-arguments,too-many-positional-arguments
     @pytest.mark.parametrize("coeff", [1.3, -4])
     @pytest.mark.parametrize("phi1, phi2", [(0, 0), (-0.57, 0), (0, 2.34), (-0.57, 2.34)])
@@ -322,6 +353,37 @@ class TestIntegrationWithOtherPasses:
         circuit_compiled = qml.qjit(pipeline(circ), capture=capture)
 
         assert np.isclose(expected_res, circuit_compiled(), atol=0.1)
+        run_filecheck_qjit(circuit_compiled)
+
+    @pytest.mark.xfail(reason="split-non-commuting doesn't support var")
+    @pytest.mark.parametrize("coeff", [1.3, -4])
+    @pytest.mark.parametrize("phi", [0, -0.57, 2.34])
+    def test_var_sprod_with_split_non_commuting(self, coeff, phi, capture, run_filecheck_qjit):
+        """Test the measurements_from_samples transform on a device with two wires and terminal
+        measurements that require an observable (i.e. expval and var).
+
+        In this test, the terminal measurements are performed on the combination of both wires.
+        """
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev)
+        def circuit():
+            qml.RX(phi, wires=0)
+            # CHECK-NOT: quantum.expval
+            # CHECK: quantum.sample
+            return qml.var(coeff * qml.Z(wires=0))
+
+        expected_res = coeff**2 * (1 - np.cos(phi) ** 2)
+        assert np.isclose(expected_res, circuit()), "Sanity check failed, is expected_res correct?"
+
+        pipeline = qml.CompilePipeline(
+            qml.transform(pass_name="split-non-commuting"),
+            qml.transform(pass_name="measurements-from-samples"),
+        )
+        circ = qml.set_shots(circuit, 5000)
+        circuit_compiled = qml.qjit(pipeline(circ), capture=capture)
+
+        assert np.isclose(expected_res, circuit_compiled(), atol=0.05)
         run_filecheck_qjit(circuit_compiled)
 
     # pylint: disable=too-many-arguments,too-many-positional-arguments
