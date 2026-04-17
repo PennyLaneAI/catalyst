@@ -45,6 +45,7 @@
 #include "Gradient/Transforms/Passes.h"
 #include "Mitigation/Transforms/Passes.h"
 #include "PBC/Transforms/Passes.h"
+#include "QRef/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
 #include "hlo-extensions/Transforms/Passes.h"
@@ -56,6 +57,8 @@ namespace driver {
 
 void createQuantumCompilationStage(OpPassManager &pm)
 {
+    pm.addPass(catalyst::qref::createValueSemanticsConversionPass());
+    pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(catalyst::quantum::createSplitMultipleTapesPass());
     pm.addNestedPass<ModuleOp>(catalyst::createApplyTransformSequencePass());
     pm.addPass(catalyst::createInlineNestedModulePass());

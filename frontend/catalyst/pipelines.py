@@ -230,6 +230,8 @@ def get_quantum_compilation_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs quantum compilation"""
 
     user_transform_passes = [
+        "convert-to-value-semantics",
+        "canonicalize",
         # We want the invariant that transforms that generate multiple
         # tapes will generate multiple qnodes. One for each tape.
         # Split multiple tapes enforces that invariant.
