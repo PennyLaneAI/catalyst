@@ -84,7 +84,7 @@ def use_both_frontend(request):
         yield
 
 
-@pytest.fixture(params=[pytest.param(True, marks=pytest.mark.capture), False], ids=["capture=True", "capture=False"])
+@pytest.fixture(params=[pytest.param(True, marks=pytest.mark.capture), pytest.param(False, marks=pytest.mark.old_frontend)], ids=["capture=True", "capture=False"])
 def capture_mode(request):
     """Parametrize tests to run with capture=True and capture=False.
 
