@@ -64,6 +64,17 @@ func.func public @circuit() -> tensor<1x1xi64> attributes {quantum.node} {
   func.return %8 : tensor<1x1xi64>
 }
 ```
+
+Known Limitations
+-----------------
+
+The convert-quantum-to-qecl pass does not support the following cases:
+
+  * QEC codes where the number of logical qubits per codeblock, k, is greater than 1.
+  * `quantum.alloc` ops with a dynamic number of qubits.
+  * Programs with non-Clifford gates; specifically any gates other than I, X, Y, Z, Hadamard, S or
+    CNOT.
+  * Programs with control-flow operations (scf.for, scf.if, etc.).
 """
 
 import math
