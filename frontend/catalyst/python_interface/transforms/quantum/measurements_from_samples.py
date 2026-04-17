@@ -203,7 +203,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
                 if obs.owner.type.data != "PauliZ":
                     raise NotImplementedError(
                         "Expected all observables to be diagonalized before application of"
-                        f"rewrite pattern, but received '{op.type.data}'"
+                        f"rewrite pattern, but received '{obs.owner.type.data}'"
                     )
 
         else:
