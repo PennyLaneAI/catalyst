@@ -25,7 +25,7 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax._src.sharding_impls import UNSPECIFIED
 from jax._src.tree_util import tree_flatten
-from jax.extend.core import ClosedJaxpr
+from jax.extend.core import ClosedJaxpr, JaxprEqn
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture import PlxprInterpreter, pause
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
@@ -132,15 +132,32 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
     def interpret_operation_eqn(self, eqn):
         """Interpret an equation corresponding to an operator."""
-        if getattr(eqn.primitive, "prototype_op") is True:
+        if getattr(eqn.primitive, "prototype_op", False) is True:
             return self.interpret_operation2_eqn(eqn)
 
         return super().interpret_operation_eqn(eqn)
 
-    def interpret_operation2_eqn(self, eqn):
+    def interpret_operation2_eqn(self, eqn: JaxprEqn):
         """Interpret Operator2."""
         self.init_qreg.insert_all_dangling_qubits()
-        return
+        invals = (self.read(invar) for invar in eqn.invars)
+
+        eqn_params = dict(eqn.params)
+        dyn_argnames = eqn_params.pop("dyn_argnames", ())
+        wire_argnames = eqn_params.pop("wire_argnames", ())
+
+        template_params = {
+            "template_name": eqn.primitive.name,
+            "dyn_argnames": dyn_argnames,
+            "wire_argnames": wire_argnames,
+            "ctrl": False,
+            "adjoint": False,
+            **eqn_params,
+        }
+
+        out = template_p.bind(*invals, self.init_qreg.get(), **template_params)
+        self.init_qreg.set(out)
+        return out
 
     def interpret_operation(self, op, is_adjoint=False, control_values=(), control_wires=()):
         """Re-bind a pennylane operation as a catalyst instruction.
