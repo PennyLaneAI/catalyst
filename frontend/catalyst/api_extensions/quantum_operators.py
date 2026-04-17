@@ -532,6 +532,7 @@ class HybridAdjoint(HybridOp):
 class CtrlCallable:
     """Callable wrapper to produce a ctrl instance."""
 
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
     def __init__(self, target, control, control_values, work_wires, work_wire_type="borrowed"):
         self.target = target
         self.control_wires = control
