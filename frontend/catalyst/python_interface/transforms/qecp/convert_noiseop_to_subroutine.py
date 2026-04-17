@@ -18,6 +18,7 @@ This module contains the implementation of the xDSL convert-noiseop-to-subroutin
 
 import math
 import random
+from dataclasses import dataclass
 
 from xdsl import builder, context, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin, func, scf, tensor
@@ -42,13 +43,13 @@ def _get_noise_subroutine_name(k, n, number_errors):
         str: The symbol name of the noise injection subroutine.
     """
 
-    return "noise_subroutine_code" + str(k) + "x" + str(n) + "x" + str(number_errors)
+    return f"noise_subroutine_code_{k}x{n}x{number_errors}"
 
 
 class ConvertNoiseOpToSubroutinePattern(
     pattern_rewriter.RewritePattern
 ):  # pylint: disable=too-few-public-methods
-    """RewritePattern for converting to the MBQC formalism."""
+    """RewritePattern for converting to qecl.noise operations to subroutines in the qecp layer."""
 
     def __init__(self, noise_subroutine, n, number_errors):
         self.noise_subroutine = noise_subroutine
@@ -65,7 +66,7 @@ class ConvertNoiseOpToSubroutinePattern(
         k = op.in_codeblock.type.k.value.data
 
         in_block_cast = builtin.UnrealizedConversionCastOp.get(
-            op.in_codeblock, qecp.PhysicalCodeblockType(k, self._n)
+            (op.in_codeblock,), (qecp.PhysicalCodeblockType(k, self._n),)
         )
         rewriter.insert_op(in_block_cast, InsertPoint.before(op))
 
@@ -113,29 +114,25 @@ class ConvertNoiseOpToSubroutinePattern(
         return_types = self.noise_subroutine.function_type.outputs.data
         callOp = func.CallOp(callee, arguments, return_types)
         rewriter.insert_op(callOp, InsertPoint.before(op))
-        cast_op = builtin.UnrealizedConversionCastOp.get(callOp.results[0], op.out_codeblock.type)
+        cast_op = builtin.UnrealizedConversionCastOp.get(
+            (callOp.results[0],), (op.out_codeblock.type,)
+        )
         rewriter.insert_op(cast_op, InsertPoint.before(op))
         rewriter.replace_all_uses_with(op.out_codeblock, cast_op.results[0])
         rewriter.erase_op(op)
 
 
+@dataclass(frozen=True)
 class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
     """Pass that converts qecl.noise operations to subroutines in the qecp layer."""
 
-    name = "convert-noiseop-to-subroutine"
+    name = "convert-qecl-noise-to-qecp-noise-subroutine"
 
-    def __init__(self, **options):
-        """Initialize the pass with the given options.
-        The options include:
-        1. number_errors: the number of errors to be injected for each noise operation.
-        Defaults to 1, which is the number of errors that can be corrected by the Steane
-        code.
-        2. n: the number of physical data qubits of per codeblocks. Defaults to 7, which
-        is the number of physical data qubits for the Steane code. NOTE: this option is
-        expected to be specified in the `qecl-to-qecp` skeleton pass.
-        """
-        self._number_errors = options.get("number_errors", 1)
-        self._n = options.get("n", 7)
+    # the number of physical data qubits of per codeblocks. NOTE: this option is expected to
+    # be specified in the `qecl-to-qecp` skeleton pass.
+    n: int
+    # the number of errors to be injected for each noise operation. Defaults to 1.
+    number_errors: int = 1
 
     def _create_noise_subroutine(self, k, n, number_errors):
         """Create a subroutine (func.FuncOp) operation for injecting physical noise mimic with Rot
@@ -220,12 +217,12 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
                     result_type=rotation_params.type.element_type,
                 )
 
-                # Extract a phyiscal qubit from the current codeblock
-                extracted_phyiscal_qubit = qecp.ExtractQubitOp(current_codeblock, qubit_index)
+                # Extract a physical qubit from the current codeblock
+                extracted_physical_qubit = qecp.ExtractQubitOp(current_codeblock, qubit_index)
                 # Create the Rot operation with the extracted qubit for error injection
-                rot_op = qecp.RotOp(phi, theta, omega, extracted_phyiscal_qubit)
+                rot_op = qecp.RotOp(phi, theta, omega, extracted_physical_qubit)
 
-                # Insert the phyiscal qubit with noise back to the codeblock
+                # Insert the physical qubit with noise back to the codeblock
                 updated_codeblock = qecp.InsertQubitOp(
                     current_codeblock, qubit_index, rot_op.results[0]
                 )
@@ -255,9 +252,9 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
         return funcOp
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
-        """Apply the convert-noiseop-to-subroutine pass."""
+        """Apply the convert-qecl-noise-to-qecp-noise-subroutine pass."""
         # pylint: disable=line-too-long
-        # Insert subroutines for all gates in the MBQC gate set to the module.
+        # Insert a noise subroutine to the module in the qecp layer.
         # Note that the visibility of those subroutines are set as private, which ensure the
         # ["symbol-dce"](https://github.com/PennyLaneAI/catalyst/blob/372c376eb821e830da778fdc8af423eeb487eab6/frontend/catalyst/pipelines.py#L248)_
         # pass could eliminate the unreferenced subroutines.
@@ -276,13 +273,12 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
             return
 
         # Insert a noise injection subroutine into the module.
-        noise_subroutine = self._create_noise_subroutine(k, self._n, self._number_errors)
+        noise_subroutine = self._create_noise_subroutine(k, self.n, self.number_errors)
+        assert op.regions[0].blocks.first is not None
         op.regions[0].blocks.first.add_op(noise_subroutine)
 
         pattern_rewriter.PatternRewriteWalker(
-            pattern_rewriter.GreedyRewritePatternApplier(
-                [ConvertNoiseOpToSubroutinePattern(noise_subroutine, self._n, self._number_errors)]
-            ),
+            ConvertNoiseOpToSubroutinePattern(noise_subroutine, self.n, self.number_errors),
             apply_recursively=False,
         ).rewrite_module(op)
 

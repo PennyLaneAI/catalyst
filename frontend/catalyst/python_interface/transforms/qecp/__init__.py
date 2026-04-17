@@ -14,12 +14,11 @@
 
 """xDSL API for qecp transforms"""
 
-from .convert_qecl_to_qecp import ConvertQecLogicalToQecPhysicalPass, convert_qecl_to_qecp_pass
 from .convert_noiseop_to_subroutine import (
     ConvertNoiseOpToSubroutinePass,
     convert_noiseop_to_subroutine_pass,
 )
-
+from .convert_qecl_to_qecp import ConvertQecLogicalToQecPhysicalPass, convert_qecl_to_qecp_pass
 
 __all__ = [
     # Passes

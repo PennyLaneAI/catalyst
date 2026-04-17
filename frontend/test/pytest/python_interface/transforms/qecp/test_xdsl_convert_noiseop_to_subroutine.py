@@ -24,6 +24,7 @@ from catalyst.python_interface.transforms.qecp import (
 pytestmark = pytest.mark.xdsl
 
 
+@pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
 class TestConvertNoiseOpToSubroutinePass:
     """Unit tests for the convert-noiseop-to-subroutine pass."""
 
@@ -39,12 +40,12 @@ class TestConvertNoiseOpToSubroutinePass:
 
                     // CHECK-NEXT: [[qubit_indices:%.*]] = arith.constant dense<{{.*}}> : tensor<1xi64>
                     // CHECK-NEXT: [[rotation_params:%.*]] = arith.constant dense<[{{.*}}]> : tensor<1x3xf64>
-                    // CHECK-NEXT: func.call @noise_subroutine_code1x7x1([[casted_codeblock]], [[qubit_indices]], [[rotation_params]])
+                    // CHECK-NEXT: func.call @noise_subroutine_code_1x7x1([[casted_codeblock]], [[qubit_indices]], [[rotation_params]])
                     %1 = qecl.noise %0 : !qecl.codeblock<1>
                     return
                 }
-                // CHECK-LABEL: func.func private @noise_subroutine_code1x7x1([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<1xi64>, [[rotation_params:%.*]]: tensor<1x3xf64>)
-                // CHECK-SAME: attributes {noise_subroutine_code1x7x1 = none}
+                // CHECK-LABEL: func.func private @noise_subroutine_code_1x7x1([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<1xi64>, [[rotation_params:%.*]]: tensor<1x3xf64>)
+                // CHECK-SAME: attributes {noise_subroutine_code_1x7x1 = none}
                 // CHECK-NEXT: [[num_errors:%.*]] = arith.constant 1 : i64
                 // CHECK-NEXT: [[zero:%.*]] = arith.constant 0 : i64
                 // CHECK-NEXT: [[one:%.*]] = arith.constant 1 : i64
@@ -64,7 +65,7 @@ class TestConvertNoiseOpToSubroutinePass:
             }
             """
 
-        pipeline = (ConvertNoiseOpToSubroutinePass(number_errors=1),)
+        pipeline = (ConvertNoiseOpToSubroutinePass(n=7, number_errors=1),)
         run_filecheck(program, pipeline)
 
     def test_with_several_errors_lowering(self, run_filecheck):
@@ -79,12 +80,12 @@ class TestConvertNoiseOpToSubroutinePass:
 
                     // CHECK-NEXT: [[qubit_indices:%.*]] = arith.constant dense<[{{.*}}]> : tensor<3xi64>
                     // CHECK-NEXT: [[rotation_params:%.*]] = arith.constant dense<[{{.*}}]> : tensor<3x3xf64>
-                    // CHECK-NEXT: func.call @noise_subroutine_code1x7x3([[casted_codeblock]], [[qubit_indices]], [[rotation_params]])
+                    // CHECK-NEXT: func.call @noise_subroutine_code_1x7x3([[casted_codeblock]], [[qubit_indices]], [[rotation_params]])
                     %1 = qecl.noise %0 : !qecl.codeblock<1>
                     return
                 }
-                // CHECK-LABEL: func.func private @noise_subroutine_code1x7x3([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<3xi64>, [[rotation_params:%.*]]: tensor<3x3xf64>)
-                // CHECK-SAME: attributes {noise_subroutine_code1x7x3 = none}
+                // CHECK-LABEL: func.func private @noise_subroutine_code_1x7x3([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<3xi64>, [[rotation_params:%.*]]: tensor<3x3xf64>)
+                // CHECK-SAME: attributes {noise_subroutine_code_1x7x3 = none}
                 // CHECK-NEXT: [[num_errors:%.*]] = arith.constant 3 : i64
                 // CHECK-NEXT: [[zero:%.*]] = arith.constant 0 : i64
                 // CHECK-NEXT: [[one:%.*]] = arith.constant 1 : i64
@@ -104,7 +105,7 @@ class TestConvertNoiseOpToSubroutinePass:
             }
             """
 
-        pipeline = (ConvertNoiseOpToSubroutinePass(number_errors=3),)
+        pipeline = (ConvertNoiseOpToSubroutinePass(n=7, number_errors=3),)
         run_filecheck(program, pipeline)
 
     def test_with_several_noise_op_lowering(self, run_filecheck):
@@ -121,18 +122,18 @@ class TestConvertNoiseOpToSubroutinePass:
 
                     // CHECK-NEXT: [[qubit_indices0:%.*]] = arith.constant dense<{{.*}}> : tensor<1xi64>
                     // CHECK-NEXT: [[rotation_params0:%.*]] = arith.constant dense<[{{.*}}]> : tensor<1x3xf64>
-                    // CHECK-NEXT: [[noisy_codeblock0:%.*]] = func.call @noise_subroutine_code1x7x1([[casted_codeblock]], [[qubit_indices0]], [[rotation_params0]])
+                    // CHECK-NEXT: [[noisy_codeblock0:%.*]] = func.call @noise_subroutine_code_1x7x1([[casted_codeblock]], [[qubit_indices0]], [[rotation_params0]])
                     %1 = qecl.noise %0 : !qecl.codeblock<1>
 
                     // CHECK-NEXT: [[qubit_indices1:%.*]] = arith.constant dense<{{.*}}> : tensor<1xi64>
                     // CHECK-NEXT: [[rotation_params1:%.*]] = arith.constant dense<[{{.*}}]> : tensor<1x3xf64>
-                    // CHECK-NEXT: [[noisy_codeblock1:%.*]] = func.call @noise_subroutine_code1x7x1([[noisy_codeblock0]], [[qubit_indices1]], [[rotation_params1]])
+                    // CHECK-NEXT: [[noisy_codeblock1:%.*]] = func.call @noise_subroutine_code_1x7x1([[noisy_codeblock0]], [[qubit_indices1]], [[rotation_params1]])
                     %2 = qecl.noise %1 : !qecl.codeblock<1>
 
                     return
                 }
-                // CHECK-COUNT-1: func.func private @noise_subroutine_code1x7x1([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<1xi64>, [[rotation_params:%.*]]: tensor<1x3xf64>)
-                // CHECK-SAME: attributes {noise_subroutine_code1x7x1 = none}
+                // CHECK-COUNT-1: func.func private @noise_subroutine_code_1x7x1([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<1xi64>, [[rotation_params:%.*]]: tensor<1x3xf64>)
+                // CHECK-SAME: attributes {noise_subroutine_code_1x7x1 = none}
                 // CHECK-NEXT: [[num_errors:%.*]] = arith.constant 1 : i64
                 // CHECK-NEXT: [[zero:%.*]] = arith.constant 0 : i64
                 // CHECK-NEXT: [[one:%.*]] = arith.constant 1 : i64
@@ -152,7 +153,7 @@ class TestConvertNoiseOpToSubroutinePass:
             }
             """
 
-        pipeline = (ConvertNoiseOpToSubroutinePass(number_errors=1),)
+        pipeline = (ConvertNoiseOpToSubroutinePass(n=7, number_errors=1),)
         run_filecheck(program, pipeline)
 
     def test_with_single_noise_op_with_gateops(self, run_filecheck):
@@ -171,7 +172,7 @@ class TestConvertNoiseOpToSubroutinePass:
 
                     // CHECK-NEXT: [[qubit_indices:%.*]] = arith.constant dense<{{.*}}> : tensor<1xi64>
                     // CHECK-NEXT: [[rotation_params:%.*]] = arith.constant dense<[{{.*}}]> : tensor<1x3xf64>
-                    // CHECK-NEXT: func.call @noise_subroutine_code1x7x1([[casted_codeblock]], [[qubit_indices]], [[rotation_params]])
+                    // CHECK-NEXT: func.call @noise_subroutine_code_1x7x1([[casted_codeblock]], [[qubit_indices]], [[rotation_params]])
                     // CHECK-NEXT: [[casted_logical_codeblock:%.*]] = builtin.unrealized_conversion_cast [[casted_codeblock:%.*]] : !qecp.codeblock<1 x 7> to !qecl.codeblock<1>
                     %2 = qecl.noise %1 : !qecl.codeblock<1>
 
@@ -179,12 +180,12 @@ class TestConvertNoiseOpToSubroutinePass:
                     %3 = qecl.qec %2 : !qecl.codeblock<1>
                     return
                 }
-                // CHECK-COUNT-1: func.func private @noise_subroutine_code1x7x1([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<1xi64>, [[rotation_params:%.*]]: tensor<1x3xf64>)
-                // CHECK-SAME: attributes {noise_subroutine_code1x7x1 = none}
+                // CHECK-COUNT-1: func.func private @noise_subroutine_code_1x7x1([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<1xi64>, [[rotation_params:%.*]]: tensor<1x3xf64>)
+                // CHECK-SAME: attributes {noise_subroutine_code_1x7x1 = none}
             }
             """
 
-        pipeline = (ConvertNoiseOpToSubroutinePass(number_errors=1),)
+        pipeline = (ConvertNoiseOpToSubroutinePass(n=7, number_errors=1),)
         run_filecheck(program, pipeline)
 
     def test_with_module_without_noise_ops(self, run_filecheck):
@@ -212,5 +213,5 @@ class TestConvertNoiseOpToSubroutinePass:
             }
             """
 
-        pipeline = (ConvertNoiseOpToSubroutinePass(number_errors=1),)
+        pipeline = (ConvertNoiseOpToSubroutinePass(n=7, number_errors=1),)
         run_filecheck(program, pipeline)
