@@ -18,6 +18,7 @@ This package contains the Catalyst Python interface.
 # pylint: disable=wrong-import-position
 
 import sys
+from os import getenv
 from os.path import dirname
 
 import jaxlib as _jaxlib
@@ -88,17 +89,20 @@ from catalyst.utils.precompile_decomposition_rules import (
     precompile_decomp_rules,
 )
 
-# we ONLY want to compile on init for dev installs, where the caching should work correctly
-if (
-    not (
-        INSTALLED  # do not recompile on user installations
-        or os.getenv("DOCUTILSCONFIG")  # do not run for docs
-        or os.getenv("READTHEDOCS_CANONICAL_URL")  # do not run for RTD
-        or os.getenv("CI")  # do not run in CI
-    )
-    and not BYTECODE_FILE_PATH.exists()
-):  # pragma: no cover
-    precompile_decomp_rules()  # pragma: no cover
+# # we ONLY want to compile on init for dev installs, where the caching should work correctly
+# if (
+#     not (
+#         getenv("DOCUTILSCONFIG")  # do not run for docs
+#         or getenv("READTHEDOCS_CANONICAL_URL")  # do not run for RTD
+#     )
+#     and not BYTECODE_FILE_PATH.exists()
+# ):  # pragma: no cover
+#     BYTECODE_FILE_PATH.parent.mkdir(exist_ok=True)
+#     for file in BYTECODE_FILE_PATH.parent.iterdir():
+#         if file.is_file() and file.name.startswith("decomposition_rules"):
+#             file.unlink()
+
+#     precompile_decomp_rules()  # pragma: no cover
 
 
 autograph_ignore_fallbacks = False
