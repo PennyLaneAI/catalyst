@@ -973,6 +973,10 @@
   [(#2576)](https://github.com/PennyLaneAI/catalyst/pull/2576)
   [(#2673)](https://github.com/PennyLaneAI/catalyst/pull/2673)
 
+* A new, experimental compiler pass `convert-quantum-to-qecl` has been added to lower operations
+  from the `quantum` dialect into the QEC Logical (`qecl`) dialect.
+  [(#2589)](https://github.com/PennyLaneAI/catalyst/pull/2589)
+
 * A new, experimental compiler pass `convert-qecl-to-qecp` has been added to lower operations
   from the QEC Logical (`qecl`) dialect into the QEC Physical (`qecp`) dialect.
   [(#2697)](https://github.com/PennyLaneAI/catalyst/pull/2697)
