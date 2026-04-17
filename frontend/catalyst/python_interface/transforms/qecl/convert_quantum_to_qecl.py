@@ -245,6 +245,8 @@ class ExtractOpConversion(RewritePattern):
             #   %3 = quantum.extract %2[0] : !quantum.reg -> !quantum.bit
             _raise_failed_to_convert_op_compile_error(op)
 
+        # NOTE: For now we assume k=1, so the quantum.extract index maps 1:1 with the
+        # qecl.extract_block index.
         idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
 
         ops_to_insert = (
@@ -280,6 +282,8 @@ class InsertOpConversion(RewritePattern):
         ):
             _raise_failed_to_convert_op_compile_error(op)
 
+        # NOTE: As with extract ops, for now we assume k=1, so the quantum.insert index maps 1:1
+        # with the qecl.insert_block index.
         idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
 
         ops_to_insert = (
