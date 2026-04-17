@@ -488,6 +488,10 @@ jobs:
         sudo apt-get install -y graphviz
         make frontend
 
+    - name: Install PennyLane from feature branch
+      run: |
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane.git@ci/catalyst-phase-grad-stub
+
     - name: Verify Graphviz installation
       run: |
         dot -V
