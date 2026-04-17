@@ -3020,7 +3020,6 @@ CUSTOM_LOWERING_RULES = (
     (switch_p, _switch_lowering),
     (while_p, _while_loop_lowering),
     (for_p, _for_loop_lowering),
-    (pl_for_loop_prim, _pl_for_loop_lowering),
     (grad_p, _grad_lowering),
     (pl_for_loop_prim, _pl_for_loop_lowering),
     (pl_jac_prim, _capture_grad_lowering),
