@@ -389,10 +389,18 @@ def _template_lowering(
     for i, w in enumerate(wire_argnames):
         in_qubits_map[w] = (i,)
 
+    static_data = {k: v for k, v in kwargs.items() if v is not None}
+
     template_name = get_mlir_attribute_from_pyval(template_name)
     param_map = get_mlir_attribute_from_pyval(param_map)
     in_qubits_map = get_mlir_attribute_from_pyval(in_qubits_map)
-    static_data = get_mlir_attribute_from_pyval(kwargs)
+    static_data = get_mlir_attribute_from_pyval(static_data)
+
+    attrs = {}
+    if static_data:
+        attrs["static_data"] = static_data
+    if param_map:
+        attrs["param_map"] = param_map
 
     return TemplateOp(
         template_name=template_name,
@@ -402,10 +410,9 @@ def _template_lowering(
         in_ctrl_inds=ctrl_inds,
         in_ctrl_vals=ctrl_vals,
         adjoint=adjoint,
-        param_map=param_map,
         in_qubits_map=in_qubits_map,
-        static_data=static_data,
         out_qreg=out_qreg_type,
+        **attrs,
     ).results
 
 

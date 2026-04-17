@@ -618,19 +618,38 @@ void TemplateOp::print(OpAsmPrinter &p)
     p << "-> " << getOutQreg().getType();
 
     // 6. Indented Properties
-    p.printNewline();
-    p << "param_map = " << getParamMap();
+    if (auto paramMap = getParamMap()) {
+        p.printNewline();
+        p << "param_map = " << paramMap;
+    }
 
     p.printNewline();
     p << "in_qubits_map = " << getInQubitsMap();
 
-    p.printNewline();
-    p << "static_data = " << getStaticData();
+    if (auto staticData = getStaticData()) {
+        p.printNewline();
+        p << "static_data = " << staticData;
+    }
 
     // 7. Attribute Dictionary
-    p.printOptionalAttrDict(getOperation()->getAttrs(),
-                            {"template_name", "param_map", "in_qubits_map", "static_data",
-                             "operand_segment_sizes", "adjoint"});
+    SmallVector<StringRef> elidedAttrs = {
+        "template_name", "param_map", "in_qubits_map", "static_data",
+        "operandSegmentSizes", "adjoint"
+    };
+
+    // Check if there's anything left to print
+    bool hasExtraAttrs = false;
+    for (auto attr : getOperation()->getAttrs()) {
+        if (!llvm::is_contained(elidedAttrs, attr.getName().getValue())) {
+            hasExtraAttrs = true;
+            break;
+        }
+    }
+
+    if (hasExtraAttrs) {
+        p.printNewline();
+        p.printOptionalAttrDict(getOperation()->getAttrs(), elidedAttrs);
+    }
 
     p.decreaseIndent();
 }
@@ -724,13 +743,15 @@ ParseResult TemplateOp::parse(OpAsmParser &parser, OperationState &result)
     }
 
     // 7. Set AttrSizedSegments
-    result.addAttribute("operand_segment_sizes", parser.getBuilder().getDenseI32ArrayAttr({
-                                                     static_cast<int32_t>(inputs.size()),
-                                                     1, // in_qreg is strictly 1
-                                                     static_cast<int32_t>(qubitInds.size()),
-                                                     hasCtrls ? 1 : 0,   // 0 or 1
-                                                     hasCtrlVals ? 1 : 0 // 0 or 1
-                                                 }));
+    // Use the generated getter here too!
+    result.addAttribute("operandSegmentSizes",
+        parser.getBuilder().getDenseI32ArrayAttr({
+            static_cast<int32_t>(inputs.size()),
+            1, // in_qreg is strictly 1
+            static_cast<int32_t>(qubitInds.size()),
+            hasCtrls ? 1 : 0,   // 0 or 1
+            hasCtrlVals ? 1 : 0 // 0 or 1
+        }));
 
     // 8. Parse Return Types
     if (parser.parseArrow())
@@ -743,19 +764,25 @@ ParseResult TemplateOp::parse(OpAsmParser &parser, OperationState &result)
     result.addTypes(outQregType);
 
     // 9. Parse Indented Properties
-    DictionaryAttr paramMap, inQubitsMap, staticData;
+    DictionaryAttr inQubitsMap;
 
-    if (parser.parseKeyword("param_map") || parser.parseEqual() ||
-        parser.parseAttribute(paramMap, "param_map", result.attributes))
-        return failure();
+    // Parse optional param_map
+    if (succeeded(parser.parseOptionalKeyword("param_map"))) {
+        DictionaryAttr paramMap;
+        if (parser.parseEqual() || parser.parseAttribute(paramMap, "param_map", result.attributes))
+            return failure();
+    }
 
     if (parser.parseKeyword("in_qubits_map") || parser.parseEqual() ||
         parser.parseAttribute(inQubitsMap, "in_qubits_map", result.attributes))
         return failure();
 
-    if (parser.parseKeyword("static_data") || parser.parseEqual() ||
-        parser.parseAttribute(staticData, "static_data", result.attributes))
-        return failure();
+    // Parse optional static_data
+    if (succeeded(parser.parseOptionalKeyword("static_data"))) {
+        DictionaryAttr staticData;
+        if (parser.parseEqual() || parser.parseAttribute(staticData, "static_data", result.attributes))
+            return failure();
+    }
 
     // 10. Parse Attribute Dictionary
     if (parser.parseOptionalAttrDict(result.attributes))

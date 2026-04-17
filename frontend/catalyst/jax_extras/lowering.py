@@ -233,10 +233,7 @@ def get_mlir_attribute_from_pyval(value):
                     raise CompileError(
                         f"Dictionary keys for MLIR DictionaryAttr must be strings, got: {type(k)}"
                     )
-                if v is None:
-                    named_attrs[k] = get_mlir_attribute_from_pyval("null")
-                else:
-                    named_attrs[k] = get_mlir_attribute_from_pyval(v)
+                named_attrs[k] = get_mlir_attribute_from_pyval(v)
             attr = ir.DictAttr.get(named_attrs)
 
         case _:

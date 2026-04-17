@@ -754,9 +754,9 @@ def TemplateOp : Quantum_Op<"template", [NoMemoryEffect, AttrSizedOperandSegment
         Optional<1DTensorOf<[I64]>>:$in_ctrl_inds,
         Optional<1DTensorOf<[I1]>>:$in_ctrl_vals,
         UnitAttr:$adjoint,
-        DictionaryAttr:$param_map,
+        OptionalAttr<DictionaryAttr>:$param_map,
         DictionaryAttr:$in_qubits_map,
-        DictionaryAttr:$static_data
+        OptionalAttr<DictionaryAttr>:$static_data
     );
 
     let results = (outs
