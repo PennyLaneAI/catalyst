@@ -972,6 +972,9 @@
   [(#2576)](https://github.com/PennyLaneAI/catalyst/pull/2576)
   [(#2673)](https://github.com/PennyLaneAI/catalyst/pull/2673)
 
+* An experimental pass to convert `qecl.noise` operations in the *QEC Logical* layer to subroutine calls in the *QEC Phyiscal* layer.
+  [(#2678)](https://github.com/PennyLaneAI/catalyst/pull/2678)
+
 * A new, experimental compiler pass `convert-quantum-to-qecl` has been added to lower operations
   from the `quantum` dialect into the QEC Logical (`qecl`) dialect.
   [(#2589)](https://github.com/PennyLaneAI/catalyst/pull/2589)
