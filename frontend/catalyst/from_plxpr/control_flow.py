@@ -21,7 +21,6 @@ from functools import partial
 
 import jax
 from jax.extend.core import ClosedJaxpr
-from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
@@ -37,7 +36,7 @@ from catalyst.from_plxpr.qubit_handler import (
     _get_dynamically_allocated_qregs,
 )
 from catalyst.jax_extras import jaxpr_pad_consts
-from catalyst.jax_primitives import cond_p, while_p
+from catalyst.jax_primitives import cond_p
 
 
 def _calling_convention(
@@ -341,52 +340,6 @@ def handle_for_loop(
 
     # Return only the output values that match the plxpr output values
     return outvals
-
-
-# pylint: disable=too-many-arguments
-@WorkflowInterpreter.register_primitive(plxpr_while_loop_prim)
-def workflow_while_loop(
-    self,
-    *plxpr_invals,
-    jaxpr_body_fn,
-    jaxpr_cond_fn,
-    body_slice,
-    cond_slice,
-    args_slice,
-):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the while loop primitive
-
-    Args:
-        body_slice: Tuple (start, stop, step) to slice body consts from plxpr_invals
-        cond_slice: Tuple (start, stop, step) to slice cond consts from plxpr_invals
-        args_slice: Tuple (start, stop, step) to slice args from plxpr_invals
-    """
-    consts_body = plxpr_invals[_tuple_to_slice(body_slice)]
-    consts_cond = plxpr_invals[_tuple_to_slice(cond_slice)]
-    args = plxpr_invals[_tuple_to_slice(args_slice)]
-
-    evaluator_body = partial(copy(self).eval, jaxpr_body_fn, consts_body)
-    new_body_jaxpr = jax.make_jaxpr(evaluator_body)(*args)
-    evaluator_cond = partial(copy(self).eval, jaxpr_cond_fn, consts_cond)
-    new_cond_jaxpr = jax.make_jaxpr(evaluator_cond)(*args)
-
-    # Build Catalyst compatible input values
-    while_loop_invals = [*new_body_jaxpr.consts, *new_cond_jaxpr.consts,  *args]
-
-    body_slice = (0, len(new_body_jaxpr.consts), 1)
-    cond_slice = (body_slice[1], len(new_cond_jaxpr.consts) + body_slice[1], 1)
-    args_slice = (cond_slice[1], None, 1)
-
-
-    return plxpr_while_loop_prim.bind(
-        *while_loop_invals,
-        jaxpr_body_fn=new_body_jaxpr.jaxpr,
-        jaxpr_cond_fn=new_cond_jaxpr.jaxpr,
-        body_slice=body_slice,
-        cond_slice=cond_slice,
-        args_slice=args_slice,
-    )
-
 
 # pylint: disable=too-many-arguments
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_while_loop_prim)
