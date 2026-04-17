@@ -496,10 +496,13 @@ def make_jaxpr2(
     @wraps(fun)
     def make_jaxpr_f(*args, **kwargs):
         # TODO: re-use `deduce_avals` here.
-        with Patcher(
-            (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
-            (jax._src.lax.slicing, "gather_p", gather2_p),
-        ), ExitStack():
+        with (
+            Patcher(
+                (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
+                (jax._src.lax.slicing, "gather_p", gather2_p),
+            ),
+            ExitStack(),
+        ):
             f = wrap_init(fun, debug_info=debug_info)
             if static_argnums:
                 argnums = [static_argnums] if isinstance(static_argnums, int) else static_argnums

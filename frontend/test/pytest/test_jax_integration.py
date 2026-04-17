@@ -600,10 +600,12 @@ class TestJAXMLIRAttributeGetter:
         """
         with pytest.raises(
             CompileError,
-            match=textwrap.dedent("""
+            match=textwrap.dedent(
+                """
             Large interger attributes currently not supported in MLIR,
             see https://github.com/llvm/llvm-project/issues/128072
-            """),
+            """
+            ),
         ):
             with ctx, loc:
                 _ = get_mlir_attribute_from_pyval(2**100)

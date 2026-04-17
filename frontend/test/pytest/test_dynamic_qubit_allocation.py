@@ -579,10 +579,12 @@ def test_terminal_MP_all_wires(backend):
 
     with pytest.raises(
         CompileError,
-        match=textwrap.dedent("""
+        match=textwrap.dedent(
+            """
             Terminal measurements must take in an explicit list of wires when
             dynamically allocated wires are present in the program.
-            """),
+            """
+        ),
     ):
 
         @qjit
@@ -601,10 +603,12 @@ def test_terminal_MP_dynamic_wires(backend):
 
     with pytest.raises(
         CompileError,
-        match=textwrap.dedent("""
+        match=textwrap.dedent(
+            """
             Terminal measurements cannot take in dynamically allocated wires
             since they must be temporary.
-            """),
+            """
+        ),
     ):
 
         @qjit

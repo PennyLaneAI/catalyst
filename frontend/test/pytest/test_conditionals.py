@@ -47,7 +47,8 @@ class TestCondToJaxpr:
         """Check the JAXPR of simple conditional function."""
         # pylint: disable=line-too-long
 
-        expected = dedent("""
+        expected = dedent(
+            """
             { lambda ; a:i64[]. let
                 b:bool[] = eq a 5:i64[]
                 c:i64[] = cond[
@@ -56,7 +57,8 @@ class TestCondToJaxpr:
                   num_implicit_outputs=0
                 ] b a a
               in (c,) }
-            """)
+            """
+        )
 
         @qjit
         def circuit(n: int):

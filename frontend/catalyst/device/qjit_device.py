@@ -390,10 +390,14 @@ class QJITDevice(qml.devices.Device):
             isinstance(shots, qml.measurements.shots.Shots) and shots.total_shots is None
         )
         if shots_not_provided and _requires_shots(self.capabilities):
-            raise CompileError(textwrap.dedent(f"""
+            raise CompileError(
+                textwrap.dedent(
+                    f"""
                 {self.original_device.name} does not support analytical simulation.
                 Please supply the number of shots on the qnode.
-                """))
+                """
+                )
+            )
         capabilities = filter_device_capabilities_with_shots(
             capabilities=self.capabilities,
             shots_present=bool(shots),
