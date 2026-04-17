@@ -976,8 +976,8 @@
   from the `quantum` dialect into the QEC Logical (`qecl`) dialect.
   [(#2589)](https://github.com/PennyLaneAI/catalyst/pull/2589)
 
-* Add an experimental compiler pass `inject-noise-to-qecl` has been added to inject 
-noise operations into the QEC Logical (`qecl`) layer. This pass is expected to be applied after the `convert-quantum-to-qecl` pass.
+* An experimental compiler pass `inject-noise-to-qecl` has been added to inject noise operations  
+  into the QEC Logical (`qecl`) layer to validate QEC protocols under development.
   [(#2705)](https://github.com/PennyLaneAI/catalyst/pull/2705)
 
 * A new, experimental compiler pass `convert-qecl-to-qecp` has been added to lower operations

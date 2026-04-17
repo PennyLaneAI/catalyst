@@ -41,6 +41,9 @@ class TestInjectNoiseToQECLPass:
             // CHECK: qecl.qec [[cb1:%.+]] : !qecl.codeblock<1>
             %1 = qecl.qec %0 : !qecl.codeblock<1>
 
+            // CHECK: [[mres:%.+]], [[cb2:%.+]] = qecl.measure [[cb1]][0] : i1, !qecl.codeblock<1>
+            %3, %2 = qecl.measure %0[0] : i1, !qecl.codeblock<1>
+
             return
         }
         """
