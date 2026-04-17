@@ -295,8 +295,7 @@ def handle_for_loop(
         *abstract_shapes,
         start,
         *args,
-        *[dyn_qreg.get() for dyn_qreg in dynalloced_qregs],
-        qregs[-1],
+        *qregs,
     ]
 
     jaxpr = ClosedJaxpr(jaxpr_body_fn, consts)

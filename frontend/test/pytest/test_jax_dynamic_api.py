@@ -714,6 +714,10 @@ class TestForLoopDynamicShapes:
         _id3 = id(circuit.compiled_function)
         assert _id0 == _id3
 
+        res_0 = circuit(x1, x2)
+        _id0 = id(circuit.compiled_function)
+
+
 class TestWhileLoopDynamicShapes:
     """Test that while loop works with dynamic shapes."""
 
