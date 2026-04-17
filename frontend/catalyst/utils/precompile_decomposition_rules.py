@@ -67,7 +67,7 @@ COMPILER_OPS_FOR_DECOMPOSITION = {
     qp.S,
     qp.SWAP,
     qp.T,
-    qp.Toffoli,
+    # qp.Toffoli, // adjoint not supported
     qp.U1,
     qp.U2,
     qp.U3,

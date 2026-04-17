@@ -1686,7 +1686,7 @@ def test_cpp_decomp_empty_args():
     # CHECK: transform.apply_registered_pass "graph-decomposition"
     # CHECK-NOT: fixed-decomps
     # CHECK-NOT: alt-decomps
-    # CHECK: "bytecode-rules" = "{{.*}}/decomposition_rules.mlirbc"
+    # CHECK: "bytecode-rules" = "{{.*}}/decomposition_rules{{.*}}.mlirbc"
     @graph_decomposition(gate_set={qml.RX})
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def circuit():
@@ -1698,7 +1698,7 @@ def test_cpp_decomp_empty_args():
     # CHECK: transform.apply_registered_pass "graph-decomposition"
     # CHECK-NOT: fixed-decomps
     # CHECK-NOT: alt-decomps
-    # CHECK: "bytecode-rules" = "{{.*}}/decomposition_rules.mlirbc"
+    # CHECK: "bytecode-rules" = "{{.*}}/decomposition_rules{{.*}}.mlirbc"
     @graph_decomposition(gate_set={qml.RX}, fixed_decomps={}, alt_decomps={})
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def circuit2():

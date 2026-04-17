@@ -135,7 +135,6 @@ def test_bytecode_file():
 
     assert "_isingxy_to_h_cy" in rules
     assert "_doublexcit" in rules
-    assert "_toffoli_to_ppr" in rules
     assert "_pauliz_to_ps" in rules
     assert "_cphase_to_ppr" in rules
     assert "_crot" in rules
