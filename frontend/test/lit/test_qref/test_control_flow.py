@@ -148,7 +148,7 @@ print(test_for_loop_with_result.mlir)
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_for_loop_with_dynamic_shapes(size: int):
     """
-    Test for loop with results
+    Test for loop with dynamically shaped results
     """
 
     # CHECK-DAG: [[one_index:%.+]] = arith.constant 1 : index
