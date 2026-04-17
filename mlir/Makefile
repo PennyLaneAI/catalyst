@@ -197,7 +197,7 @@ dialects:
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli check-unit-tests runner_tests_dgsolver
 
-	# Check Catch2 tests
+	# Check Catch2 unit tests
 	$(DIALECTS_BUILD_DIR)/unittests/DecompGraphSolver/runner_tests_dgsolver --reporter compact 2>/dev/null
 
 .PHONY: dialect-docs
