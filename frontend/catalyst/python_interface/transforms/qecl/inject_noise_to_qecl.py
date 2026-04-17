@@ -40,12 +40,13 @@ class InjectNoiseToQECLPattern(pattern_rewriter.RewritePattern):
         noiseop = qecl.NoiseOp(codeblock)
         rewriter.insert_op(noiseop, InsertPoint.before(qecop))
 
-        uses_to_change = [use for use in codeblock.uses if use.operation is not noiseop]
+        codeblock.replace_uses_with_if(
+            noiseop.out_codeblock, lambda use: use.operation is not noiseop
+        )
 
-        # pylint: disable = cell-var-from-loop
-        codeblock.replace_uses_with_if(noiseop.results[0], lambda use: use in uses_to_change)
-        for use in uses_to_change:
-            rewriter.notify_op_modified(use.operation)
+        for use in codeblock.uses:
+            if use.operation is not noiseop:
+                rewriter.notify_op_modified(use.operation)
 
 
 @dataclass(frozen=True)
@@ -56,7 +57,7 @@ class InjectNoiseToQECLPass(passes.ModulePass):
 
     def apply(self, ctx: context.Context, op: builtin.ModuleOp) -> None:
         pattern_rewriter.PatternRewriteWalker(
-            pattern_rewriter.GreedyRewritePatternApplier([InjectNoiseToQECLPattern()]),
+            InjectNoiseToQECLPattern(),
             apply_recursively=False,
         ).rewrite_module(op)
 
