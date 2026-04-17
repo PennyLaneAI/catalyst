@@ -263,6 +263,7 @@ def _create_decomposition_rule(
     num_params: int,
     requires_copy: bool = False,
     pauli_word: str | None = None,
+    is_qreg=True,
 ):
     """Create a decomposition rule from a callable.
     See also: :func:`~.decomposition_rule`.
@@ -274,6 +275,8 @@ def _create_decomposition_rule(
         requires_copy (bool): Whether to create a copy of the function
             to avoid mutating the original. This is required for operations
             with a variable number of wires (e.g., MultiRZ, GlobalPhase).
+        pauli_word (str | None): The Pauli word for PauliRot and PauliMeasure operations.
+        is_qreg (bool): Whether the decomposition rule is for a quantum register operation.
     """
 
     sig_func = inspect.signature(func)
@@ -349,7 +352,7 @@ def _create_decomposition_rule(
 
     # Note that we shouldn't pass args as kwargs to decomposition_rule
     # JAX doesn't like it and it may fail to preserve the order of args.
-    return decomposition_rule(func_cp, pauli_word=pauli_word)(*args)
+    return decomposition_rule(func_cp, pauli_word=pauli_word, is_qreg=is_qreg)(*args)
 
 
 # pylint: disable=protected-access

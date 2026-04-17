@@ -237,19 +237,6 @@ def from_plxpr(
     return wrapped_fn
 
 
-class OperationCollectorInterpreter(PlxprInterpreter):
-    """Interpreter that collects quantum operations from a qfunc jaxpr."""
-
-    def __init__(self):
-        self.operations = set()
-        super().__init__()
-
-    def interpret_operation(self, op: qml.operation.Operator):
-        self.operations.add(op)
-        data, struct = jax.tree_util.tree_flatten(op)
-        return jax.tree_util.tree_unflatten(struct, data)
-
-
 class WorkflowInterpreter(PlxprInterpreter):
     """An interpreter that converts a qnode primitive from a plxpr variant to a catalyst jaxpr variant."""
 
@@ -385,6 +372,13 @@ def handle_qnode(
         #         ncargs=non_const_args,
         #     )
         if len(self.graph_decompose_tkwargs) == 1:
+            closed_jaxpr = _compile_explicit_graph_decomposition_rules(
+                inner_jaxpr=closed_jaxpr.jaxpr,
+                consts=closed_jaxpr.consts,
+                tkwargs_list=self.graph_decompose_tkwargs,
+                ncargs=non_const_args,
+            )
+
             _, graph_succeeded = _collect_and_compile_graph_solutions(
                 inner_jaxpr=closed_jaxpr.jaxpr,
                 consts=closed_jaxpr.consts,
@@ -403,7 +397,7 @@ def handle_qnode(
                     tkwargs=self.graph_decompose_tkwargs[0],
                 )
         else:
-            _compile_explicit_graph_decomposition_rules(
+            closed_jaxpr = _compile_explicit_graph_decomposition_rules(
                 inner_jaxpr=closed_jaxpr.jaxpr,
                 consts=closed_jaxpr.consts,
                 tkwargs_list=self.graph_decompose_tkwargs,
@@ -529,10 +523,7 @@ transforms_to_passes = {
 
 def _set_decompose_lowering_state(self):
     """Set requires_decompose_lowering and decompose_tkwargs; raise if already set."""
-    if not self.requires_decompose_lowering:
-        self.requires_decompose_lowering = True
-    else:
-        raise NotImplementedError("Multiple decomposition transforms are not yet supported.")
+    self.requires_decompose_lowering = True
 
 
 # pylint: disable=too-many-positional-arguments
@@ -885,47 +876,51 @@ def _union_decompose_gatesets(tkwargs_list):
     return gate_set
 
 
+class CustomRuleInterpreter(PlxprInterpreter):
+    """Interpreter that collects quantum operations from a qfunc jaxpr."""
+
+    def __init__(self, tkwargs_list=[]):
+        self.tkwargs_list = tkwargs_list
+        super().__init__()
+
+    def _create_rule(self, op, rule):
+        rule_impl = _unwrap_decomposition_rule(rule)
+        op_name = _get_operator_name(op)
+        num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op_name]
+        requires_copy = num_wires == -1
+        actual_num_wires = (
+            len(op.wires)
+            if issubclass(op, qml.operation.Operation) and requires_copy
+            else num_wires
+        )
+
+        _create_decomposition_rule(
+            rule_impl,
+            op_name=op_name,
+            num_wires=actual_num_wires,
+            num_params=num_params,
+            requires_copy=requires_copy,
+        )
+
+    def cleanup(self):
+        """Cleanup after interpretation."""
+        for tkwargs in self.tkwargs_list:
+            for op, rule in (tkwargs.get("fixed_decomps") or {}).items():
+                self._create_rule(op, rule)
+            for op, rules in (tkwargs.get("alt_decomps") or {}).items():
+                for rule in rules:
+                    self._create_rule(op, rule)
+
+
 def _compile_explicit_graph_decomposition_rules(inner_jaxpr, consts, tkwargs_list, ncargs):
     """Compile user-provided fixed/alternative rules for the C++ graph pass."""
 
-    rules_by_op = {}
-    for tkwargs in tkwargs_list:
-        for op, rule in (tkwargs.get("fixed_decomps") or {}).items():
-            rules_by_op.setdefault(_get_operator_name(op), []).append(rule)
-        for op, rules in (tkwargs.get("alt_decomps") or {}).items():
-            rules_by_op.setdefault(_get_operator_name(op), []).extend(rules)
+    capture_custom_rules_interpreter = CustomRuleInterpreter(tkwargs_list=tkwargs_list)
 
-    if not rules_by_op:
-        return
+    def custom_rule_wrapper(*args):
+        return capture_custom_rules_interpreter.eval(inner_jaxpr, consts, *args)
 
-    collector = OperationCollectorInterpreter()
-    collector.eval(inner_jaxpr, consts, *ncargs)
-
-    compiled_specs = set()
-    for op in collector.operations:
-        op_name = op.name
-        if op_name not in rules_by_op or op_name not in COMPILER_OPS_FOR_DECOMPOSITION:
-            continue
-
-        num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op_name]
-        requires_copy = num_wires == -1
-        actual_num_wires = len(op.wires) if requires_copy else num_wires
-        pauli_word = getattr(op, "hyperparameters", {}).get("pauli_word")
-
-        for rule in rules_by_op[op_name]:
-            impl = _unwrap_decomposition_rule(rule)
-            spec = (impl.__name__, op_name, actual_num_wires, pauli_word)
-            if spec in compiled_specs:
-                continue
-            compiled_specs.add(spec)
-            _create_decomposition_rule(
-                impl,
-                op_name=op_name,
-                num_wires=actual_num_wires,
-                num_params=num_params,
-                requires_copy=requires_copy,
-                pauli_word=pauli_word,
-            )
+    return jax.make_jaxpr(custom_rule_wrapper)(*ncargs)
 
 
 def _unwrap_decomposition_rule(rule):
