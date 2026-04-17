@@ -70,6 +70,12 @@ struct DecompositionGraph::Impl {
 
     OperatorId registerOp(const OperatorNode &op)
     {
+        if (op.adjoint) {
+            throw GraphError(
+                "Adjoint operators are not supported in the decomposition graph, got: " +
+                print_op(op));
+        }
+
         const auto it = opToId.find(op);
         if (it != opToId.end()) {
             return it->second;
