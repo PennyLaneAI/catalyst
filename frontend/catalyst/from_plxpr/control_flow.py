@@ -21,7 +21,6 @@ from functools import partial
 
 import jax
 from jax.extend.core import ClosedJaxpr
-from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
@@ -37,7 +36,7 @@ from catalyst.from_plxpr.qubit_handler import (
     _get_dynamically_allocated_qregs,
 )
 from catalyst.jax_extras import jaxpr_pad_consts
-from catalyst.jax_primitives import cond_p, while_p
+from catalyst.jax_primitives import cond_p
 
 
 def _calling_convention(
@@ -344,53 +343,6 @@ def handle_for_loop(
 
 
 # pylint: disable=too-many-arguments
-@WorkflowInterpreter.register_primitive(plxpr_while_loop_prim)
-def workflow_while_loop(
-    self,
-    *plxpr_invals,
-    jaxpr_body_fn,
-    jaxpr_cond_fn,
-    body_slice,
-    cond_slice,
-    args_slice,
-):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the while loop primitive
-
-    Args:
-        body_slice: Tuple (start, stop, step) to slice body consts from plxpr_invals
-        cond_slice: Tuple (start, stop, step) to slice cond consts from plxpr_invals
-        args_slice: Tuple (start, stop, step) to slice args from plxpr_invals
-    """
-    consts_body = plxpr_invals[_tuple_to_slice(body_slice)]
-    consts_cond = plxpr_invals[_tuple_to_slice(cond_slice)]
-    args = plxpr_invals[_tuple_to_slice(args_slice)]
-
-    evaluator_body = partial(copy(self).eval, jaxpr_body_fn, consts_body)
-    new_body_jaxpr = jax.make_jaxpr(evaluator_body)(*args)
-    evaluator_cond = partial(copy(self).eval, jaxpr_cond_fn, consts_cond)
-    new_cond_jaxpr = jax.make_jaxpr(evaluator_cond)(*args)
-
-    converted_body_closed_jaxpr_branch = ClosedJaxpr(
-        convert_constvars_jaxpr(new_body_jaxpr.jaxpr), ()
-    )
-    converted_cond_closed_jaxpr_branch = ClosedJaxpr(
-        convert_constvars_jaxpr(new_cond_jaxpr.jaxpr), ()
-    )
-    # Build Catalyst compatible input values
-    while_loop_invals = [*new_cond_jaxpr.consts, *new_body_jaxpr.consts, *args]
-
-    return while_p.bind(
-        *while_loop_invals,
-        cond_jaxpr=converted_cond_closed_jaxpr_branch,
-        body_jaxpr=converted_body_closed_jaxpr_branch,
-        cond_nconsts=len(new_cond_jaxpr.consts),
-        body_nconsts=len(new_body_jaxpr.consts),
-        num_implicit_inputs=0,
-        preserve_dimensions=True,
-    )
-
-
-# pylint: disable=too-many-arguments
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_while_loop_prim)
 def handle_while_loop(
     self,
@@ -424,12 +376,8 @@ def handle_while_loop(
     jaxpr = ClosedJaxpr(jaxpr_body_fn, consts_body)
 
     f = partial(_calling_convention, self, jaxpr, outer_dynqreg_handlers=dynalloced_qregs)
-    converted_body_jaxpr_branch = jax.make_jaxpr(f)(*args_plus_qreg)
-    new_consts_body = converted_body_jaxpr_branch.consts
-
-    converted_body_closed_jaxpr_branch = ClosedJaxpr(
-        convert_constvars_jaxpr(converted_body_jaxpr_branch.jaxpr), ()
-    )
+    converted_body_jaxpr = jax.make_jaxpr(f)(*args_plus_qreg)
+    new_consts_body = converted_body_jaxpr.consts
 
     # Convert for condition from plxpr to Catalyst jaxpr
     # We need to be able to handle arbitrary plxpr here.
@@ -442,29 +390,28 @@ def handle_while_loop(
         _calling_convention, self, jaxpr, outer_dynqreg_handlers=dynalloced_qregs, return_qreg=False
     )
 
-    converted_cond_jaxpr_branch = jax.make_jaxpr(f_remove_qreg)(*args_plus_qreg)
-
-    converted_cond_closed_jaxpr_branch = ClosedJaxpr(
-        convert_constvars_jaxpr(converted_cond_jaxpr_branch.jaxpr), ()
-    )
+    converted_cond_jaxpr = jax.make_jaxpr(f_remove_qreg)(*args_plus_qreg)
 
     # Build Catalyst compatible input values
-    new_consts_cond = converted_cond_jaxpr_branch.consts
+    new_consts_cond = converted_cond_jaxpr.consts
     new_consts_body = tuple(
         const for const in new_consts_body if const not in dynalloced_wire_global_indices
     )
     while_loop_invals = [*new_consts_cond, *new_consts_body, *args_plus_qreg]
+    cond_slice = (0, len(new_consts_cond), 1)
+    body_slice = (cond_slice[1], len(new_consts_body) + cond_slice[1], 1)
+    args_slice = (body_slice[1], None, 1)
 
     # Perform the binding
-    outvals = while_p.bind(
+    outvals = plxpr_while_loop_prim.bind(
         *while_loop_invals,
-        cond_jaxpr=converted_cond_closed_jaxpr_branch,
-        body_jaxpr=converted_body_closed_jaxpr_branch,
-        cond_nconsts=len(new_consts_cond),
-        body_nconsts=len(new_consts_body),
-        num_implicit_inputs=0,
-        preserve_dimensions=True,
+        jaxpr_body_fn=converted_body_jaxpr.jaxpr,
+        jaxpr_cond_fn=converted_cond_jaxpr.jaxpr,
+        body_slice=body_slice,
+        cond_slice=cond_slice,
+        args_slice=args_slice,
     )
+    outvals = list(outvals)
 
     # We assume the last output value is the returned qreg.
     # Update the current qreg and remove it from the output values.
