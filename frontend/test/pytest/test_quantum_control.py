@@ -289,7 +289,7 @@ class TestControlled:
         def native_controlled():
             qml.ctrl(
                 qml.QubitUnitary(
-                    jnp.array(  # pyright: ignore[reportArgumentType]
+                    jnp.array(
                         [
                             [0.70710678 + 0.0j, 0.70710678 + 0.0j],
                             [0.70710678 + 0.0j, -0.70710678 + 0.0j],
