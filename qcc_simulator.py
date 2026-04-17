@@ -16,7 +16,7 @@ Usage:
   python qcc_simulator.py circuit.py --lang pennylane
   python qcc_simulator.py circuit.py --lang qiskit
   python qcc_simulator.py --batch circuits/
-  python qcc_simulator.py --batch circuits/ --no-simulation
+  python qcc_simulator.py --batch circuits/ --simulation
   python qcc_simulator.py --batch circuits/ --verbose
   python qcc_simulator.py --batch circuits/ --report out.txt
   python qcc_simulator.py circuit.qasm --no-color
@@ -767,7 +767,7 @@ def parse_args() -> argparse.Namespace:
             "  python qcc_simulator.py circuit.qasm\n"
             "  python qcc_simulator.py circuit.py --lang pennylane\n"
             "  python qcc_simulator.py --batch test_translation_qasm3/qasm3_circuits/\n"
-            "  python qcc_simulator.py --batch circuits/ --no-simulation\n"
+            "  python qcc_simulator.py --batch circuits/ --simulation\n"
             "  python qcc_simulator.py --batch circuits/ --verbose\n"
             "  python qcc_simulator.py --batch circuits/ --report report.txt\n"
         ),
@@ -785,8 +785,8 @@ def parse_args() -> argparse.Namespace:
         help="Run all circuits in DIR"
     )
     parser.add_argument(
-        "--no-simulation", action="store_true",
-        help="Skip Stage 6 Aer simulation (faster)"
+        "--simulation", action="store_true",
+        help="Enable Stage 6 Aer simulation (disabled by default)"
     )
     parser.add_argument(
         "--verbose", action="store_true",
@@ -826,7 +826,7 @@ def main() -> int:
             runner = BatchRunner(
                 renderer,
                 verbose=args.verbose,
-                no_simulation=args.no_simulation,
+                no_simulation=not args.simulation,
             )
             return runner.run(args.batch)
 
@@ -839,7 +839,7 @@ def main() -> int:
             runner = PipelineRunner(
                 renderer,
                 verbose=args.verbose,
-                no_simulation=args.no_simulation,
+                no_simulation=not args.simulation,
             )
             result = runner.run(path, lang)
             return 0 if result["passed"] else 1
