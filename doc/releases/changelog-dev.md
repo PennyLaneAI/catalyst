@@ -293,9 +293,12 @@
 
 <h3>Improvements 🛠</h3>
 
+* `qml.for_loop` now supports dynamic shapes with program capture `qjit(capture=True)`.
+  [(#2603)](https://github.com/PennyLaneAI/catalyst/pull/2603/)
+
 * Added support for ``StatePrep`` kwargs ``pad_with`` and ``normalize`` with program capture enabled.
   [(#2620)](https://github.com/PennyLaneAI/catalyst/pull/2620)
-  
+
 * `abstracted_axes` now work with `qjit` and `capture=True`.
   [(#2655)](https://github.com/PennyLaneAI/catalyst/pull/2655)
 
@@ -455,10 +458,11 @@
 <h3>Bug fixes 🐛</h3>
 
 * Fixed a bug where multiple `quantum.extract` operations from the same index were being created
-  when there are multiple named observables or Hermitian observables on that same wire index,
-  when capture is not enabled.
+  when there are multiple computational basis observables, named observables or Hermitian
+  observables on that same wire index, when capture is not enabled.
   [(#2641)](https://github.com/PennyLaneAI/catalyst/pull/2641)
   [(#2646)](https://github.com/PennyLaneAI/catalyst/pull/2646)
+  [(#2693)](https://github.com/PennyLaneAI/catalyst/pull/2693)
 
 * :func:`~pennylane.adjoint` can now be used on subroutines with classical arguments.
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
@@ -535,6 +539,14 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Removes unnessary registrations for the various gradient primitives in `from_plxpr` when we
+  are able to just inherit the base behaviour from `PlxprInterpreter`.
+  [(#2706)](https://github.com/PennyLaneAI/catalyst/pull/2706/)
+
+* The legacy frontend no longer registers `qml.allocate()` and `qml.deallocate()` onto the qjit device
+  capabilities, since dynamic qubit allocation is only implemented for the capture frontend.
+  [(#2696)](https://github.com/PennyLaneAI/catalyst/pull/2696)
+
 * Refactors `draw_graph` implementation to improve maintainability.
   [(#2659)](https://github.com/PennyLaneAI/catalyst/pull/2659)
 
@@ -600,6 +612,8 @@
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
   [(#2492)](https://github.com/PennyLaneAI/catalyst/pull/2492)
   [(#2674)](https://github.com/PennyLaneAI/catalyst/pull/2674)
+  [(#2642)](https://github.com/PennyLaneAI/catalyst/pull/2642)
+  [(#2692)](https://github.com/PennyLaneAI/catalyst/pull/2692)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
@@ -690,6 +704,7 @@
 * Added lowering of `pbc.ppm`, `pbc.ppr`, and `quantum.paulirot` to the runtime CAPI and QuantumDevice C++ API.
   [(#2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
   [(#2413)](https://github.com/PennyLaneAI/catalyst/pull/2413)
+  [(#2683)](https://github.com/PennyLaneAI/catalyst/pull/2683)
 
 * A new compiler pass, `unroll-conditional-ppr-ppm`, has been added to convert conditional or
   multiplexed Pauli-product rotations and measurements into their basic versions nested inside
@@ -887,6 +902,10 @@
 * A new, experimental compiler pass `convert-quantum-to-qecl` has been added to lower operations
   from the `quantum` dialect into the QEC Logical (`qecl`) dialect.
   [(#2589)](https://github.com/PennyLaneAI/catalyst/pull/2589)
+
+* A new, experimental compiler pass `convert-qecl-to-qecp` has been added to lower operations
+  from the QEC Logical (`qecl`) dialect into the QEC Physical (`qecp`) dialect.
+  [(#2697)](https://github.com/PennyLaneAI/catalyst/pull/2697)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
