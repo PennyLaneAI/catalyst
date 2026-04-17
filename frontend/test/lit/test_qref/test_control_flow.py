@@ -21,7 +21,7 @@ PLxPR conversion.
 
 # pylint: disable=line-too-long
 
-import numpy as np
+from jax import numpy as jnp
 import pennylane as qp
 
 
@@ -141,6 +141,45 @@ def test_for_loop_with_result(size: int):
 
 
 print(test_for_loop_with_result.mlir)
+
+
+# CHECK: func.func public @test_for_loop_with_dynamic_shapes(%arg0: tensor<i64>) -> tensor<8xcomplex<f64>>
+@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def test_for_loop_with_dynamic_shapes(size: int):
+    """
+    Test for loop with results
+    """
+
+    # CHECK-DAG: [[one_index:%.+]] = arith.constant 1 : index
+    # CHECK-DAG: [[zero_index:%.+]] = arith.constant 0 : index
+    # CHECK-DAG: [[size:%.+]] = tensor.extract %arg0[] : tensor<i64>
+    # CHECK-DAG: [[size_index:%.+]] = arith.index_cast [[size]] : i64 to index
+    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
+
+    # CHECK-DAG: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
+    # CHECK-DAG: [[sum:%.+]] = stablehlo.dynamic_broadcast_in_dim {{.+}} -> tensor<?xf64>
+
+    # CHECK: [[loopOut:%.+]] = scf.for %arg1 = [[zero_index]] to [[size_index]] step [[one_index]]
+    # CHECK-SAME:    iter_args(%arg2 = [[sum]]) -> (tensor<?xf64>) {
+    # CHECK:    [[add:%.+]] = stablehlo.add %arg2, %arg2 : tensor<?xf64>
+    # CHECK:    scf.yield [[add]] : tensor<?xf64>
+    # CHECK: }
+    x = jnp.zeros(size)
+    for i in range(size):
+        x += x
+
+    # CHECK: [[reduce:%.+]] = stablehlo.reduce([[loopOut]]
+    # CHECK-SAME:   applies stablehlo.add
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[reduce_f64:%.+]] = tensor.extract [[reduce]][] : tensor<f64>
+    # CHECK: qref.custom "RX"([[reduce_f64]]) [[q0]] : !qref.bit
+    qp.RX(jnp.sum(x), wires=0)
+
+    return qp.state()
+
+
+print(test_for_loop_with_dynamic_shapes.mlir)
 
 
 # CHECK: func.func public @test_for_loop_with_dynamic_allocation() -> tensor<f64>
