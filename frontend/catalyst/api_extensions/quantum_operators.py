@@ -31,6 +31,7 @@ from jax._src.tree_util import tree_flatten
 from jax.api_util import debug_info
 from jax.core import get_aval
 from pennylane import QueuingManager
+from pennylane.decomposition.resources import resolve_work_wire_type
 from pennylane.operation import Operator
 from pennylane.ops.op_math.adjoint import create_adjoint_op
 from pennylane.ops.op_math.controlled import create_controlled_op
@@ -262,6 +263,7 @@ def ctrl(
     control: List[Any],
     control_values: Optional[List[Any]] = None,
     work_wires: Optional[List[Any]] = None,
+    work_wire_type: str = "borrowed",
 ) -> Callable:
     """Create a method that applies a controlled version of the provided op. This function is the
     Catalyst version of the ``qml.ctrl`` that supports Catalyst hybrid operations such as loops and
@@ -274,6 +276,7 @@ def ctrl(
         control_values (List[bool], optional): The value(s) the control wire(s) should take.
             Integers other than 0 or 1 will be treated as ``int(bool(x))``.
         work_wires (Any): Any auxiliary wires that can be used in the decomposition
+        work_wire_type (str): The type of work wire(s), can be ``"zeroed"`` or ``"borrowed"``.
 
     Returns:
         (function or :class:`~.operation.Operator`): If an Operator is provided, returns a
@@ -318,7 +321,13 @@ def ctrl(
             f"to the lenght of control ({len(control)})"
         )
 
-    res = CtrlCallable(f, control, control_values=control_values, work_wires=work_wires)
+    res = CtrlCallable(
+        f,
+        control,
+        control_values=control_values,
+        work_wires=work_wires,
+        work_wire_type=work_wire_type,
+    )
     return res() if isinstance(f, Operator) else res
 
 
@@ -523,11 +532,13 @@ class HybridAdjoint(HybridOp):
 class CtrlCallable:
     """Callable wrapper to produce a ctrl instance."""
 
-    def __init__(self, target, control, control_values, work_wires):
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
+    def __init__(self, target, control, control_values, work_wires, work_wire_type="borrowed"):
         self.target = target
         self.control_wires = control
         self.control_values = control_values
         self.work_wires = work_wires
+        self.work_wire_type = work_wire_type
 
         if isinstance(target, Operator):
             # Case 1. Support an initialized operation as the base target
@@ -548,7 +559,11 @@ class CtrlCallable:
         if self.single_op:
             base_op = self.target if self.instantiated else self.target(*args, **kwargs)
             return create_controlled_op(
-                base_op, self.control_wires, self.control_values, self.work_wires
+                base_op,
+                self.control_wires,
+                self.control_values,
+                self.work_wires,
+                work_wire_type=self.work_wire_type,
             )
 
         tracing_artifacts = self.trace_body(args, kwargs)
@@ -558,6 +573,7 @@ class CtrlCallable:
             control_wires=self.control_wires,
             control_values=self.control_values,
             work_wires=self.work_wires,
+            work_wire_type=self.work_wire_type,
         )
 
     def trace_body(self, args, kwargs):
@@ -589,9 +605,17 @@ class CtrlCallable:
 class HybridCtrl(HybridOp):
     """Catalyst quantum ctrl operation support for both operations and callables"""
 
-    def __init__(self, *tracing_artifacts, control_wires, control_values=None, work_wires=None):
+    def __init__(
+        self,
+        *tracing_artifacts,
+        control_wires,
+        control_values=None,
+        work_wires=None,
+        work_wire_type="borrowed",
+    ):
         self._control_wires = qml.wires.Wires(control_wires)
         self._work_wires = qml.wires.Wires([] if work_wires is None else work_wires)
+        self._work_wire_type = work_wire_type
         if control_values is None:
             self._control_values = [True] * len(self._control_wires)
         elif isinstance(control_values, (int, bool)):
@@ -617,6 +641,7 @@ class HybridCtrl(HybridOp):
             self._control_wires,
             self._control_values,
             self._work_wires,
+            self._work_wire_type,
         )
 
     @property
@@ -645,6 +670,11 @@ class HybridCtrl(HybridOp):
         """Optional wires that can be used in the expansion of this op."""
         return self._work_wires
 
+    @property
+    def work_wire_type(self):
+        """The type of work wires provided"""
+        return self._work_wire_type
+
     def map_wires(self, wire_map):
         """Map wires to new wires according to wire_map"""
         new_ops = []
@@ -661,6 +691,7 @@ def ctrl_distribute(
     control_wires: List[Any],
     control_values: List[Any],
     work_wires: Optional[List[Any]] = None,
+    work_wire_type: str = "borrowed",
 ) -> QuantumTape:
     """Distribute the quantum control operation, described by ``control_wires`` and
     ``control_values``, over all the operations on the nested quantum tape.
@@ -683,11 +714,21 @@ def ctrl_distribute(
     for op in tape.operations:
         if has_nested_tapes(op):
             if isinstance(op, HybridCtrl):
+                # For nested HybridCtrl, resolve the combined work_wire_type first.
+                # This is the same as the logic in PennyLane:
+                # `pennylane/ops/op_math/controlled.py:create_controlled_op`
+                combined_work_wire_type = resolve_work_wire_type(
+                    qml.wires.Wires(work_wires) if work_wires is not None else qml.wires.Wires([]),
+                    work_wire_type,
+                    op.work_wires,
+                    op.work_wire_type,
+                )
                 nested_ops = ctrl_distribute(
                     op.regions[0].quantum_tape,
                     control_wires + op.control_wires,
                     control_values + op.control_values,
                     work_wires + op.work_wires,
+                    combined_work_wire_type,
                 )
                 new_ops.extend(nested_ops)
             else:
@@ -700,7 +741,11 @@ def ctrl_distribute(
 
                     with trace_manager:
                         nested_ops = ctrl_distribute(
-                            region.quantum_tape, control_wires, control_values, work_wires
+                            region.quantum_tape,
+                            control_wires,
+                            control_values,
+                            work_wires,
+                            work_wire_type,
                         )
                         region.quantum_tape = QuantumTape(
                             nested_ops, region.quantum_tape.measurements
@@ -713,6 +758,7 @@ def ctrl_distribute(
                 control=control_wires,
                 control_values=control_values,
                 work_wires=work_wires,
+                work_wire_type=work_wire_type,
             )
             new_ops.append(create_adjoint_op(ctrl_op, lazy=True))
         else:
@@ -721,6 +767,7 @@ def ctrl_distribute(
                 control=control_wires,
                 control_values=control_values,
                 work_wires=work_wires,
+                work_wire_type=work_wire_type,
             )
             new_ops.append(ctrl_op)
     return new_ops
