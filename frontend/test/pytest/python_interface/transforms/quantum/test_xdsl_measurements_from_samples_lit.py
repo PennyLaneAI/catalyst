@@ -17,6 +17,7 @@
 # pylint: disable=line-too-long
 
 import pytest
+from pennylane.exceptions import CompileError
 
 from catalyst.python_interface.transforms import (
     MeasurementsFromSamplesPass,
@@ -236,6 +237,38 @@ class TestMeasurementsFromSamplesPass:
         pipeline = (MeasurementsFromSamplesPass(),)
         run_filecheck(program, pipeline)
 
+    def test_1_wire_state(self, run_filecheck):
+        """Test the measurements-from-samples pass on a 1-wire circuit terminating with a state
+        measurement. Note that this is not a valid IR, because state and shots don't work together.
+        We would expect to either encounter a "no shots" error from this pass (for a circuit with
+        no shots) or a "state and shots are incompatible" error with shots when creating an IR.
+        """
+
+        program = """
+        builtin.module @module_circuit {
+            // CHECK-LABEL: circuit
+            // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
+            func.func public @circuit() -> (tensor<4xcomplex<f64>>) attributes {quantum.node}  {
+                %0 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
+                %1 = tensor.extract %0[] : tensor<i64>
+                quantum.device shots(%1) ["", "", ""]
+
+                // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.reg
+                %2 = "test.op"() : () -> !quantum.reg
+
+                // CHECK: [[compbasis:%.+]] = quantum.compbasis qreg [[q0]] : !quantum.obs
+                %3 = quantum.compbasis qreg %2 : !quantum.obs
+                %4 = quantum.state %3 : tensor<4xcomplex<f64>>
+
+                func.return %4 : tensor<4xcomplex<f64>>
+            }
+        }
+        """
+
+        pipeline = (MeasurementsFromSamplesPass(),)
+        with pytest.raises(CompileError, match="operations are not compatible with"):
+            run_filecheck(program, pipeline)
+
     def test_2_wire_expval(self, run_filecheck):
         """Test the measurements-from-samples pass on a 2-wire circuit terminating with an expval(Z)
         measurement on each wire. Includes a non-diagonalized operation (pass inserts diagonalizing gate).
@@ -245,9 +278,9 @@ class TestMeasurementsFromSamplesPass:
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
             // CHECK: [[samples0:%.+]], [[samples1:%.+]] = func.call @circuit.from_samples() : () -> (tensor<5x1xf64>, tensor<5x1xf64>)
-            // CHECK: [[res1:%.+]] = func.call @expval_from_samples.tensor.5x1xf64([[samples1]]) :
-            // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
             // CHECK: [[res0:%.+]] = func.call @expval_from_samples.tensor.5x1xf64([[samples0]]) :
+            // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
+            // CHECK: [[res1:%.+]] = func.call @expval_from_samples.tensor.5x1xf64([[samples1]]) :
             // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
             // CHECK: func.return [[res0]], [[res1]] : tensor<f64>, tensor<f64>
             // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
@@ -294,9 +327,9 @@ class TestMeasurementsFromSamplesPass:
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
             // CHECK: [[samples0:%.+]], [[samples1:%.+]] = func.call @circuit.from_samples() : () -> (tensor<5x1xf64>, tensor<5x1xf64>)
-            // CHECK: [[res1:%.+]] = func.call @var_from_samples.tensor.5x1xf64([[samples1]]) :
-            // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
             // CHECK: [[res0:%.+]] = func.call @var_from_samples.tensor.5x1xf64([[samples0]]) :
+            // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
+            // CHECK: [[res1:%.+]] = func.call @var_from_samples.tensor.5x1xf64([[samples1]]) :
             // CHECK-SAME: (tensor<5x1xf64>) -> tensor<f64>
             // CHECK: func.return [[res0]], [[res1]] : tensor<f64>, tensor<f64>
             // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
@@ -381,9 +414,9 @@ class TestMeasurementsFromSamplesPass:
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
             // CHECK: [[samples0:%.+]], [[samples1:%.+]] = func.call @circuit.from_samples() : () -> (tensor<3x1xf64>, tensor<3x1xf64>)
-            // CHECK: [[res1:%.+]] = func.call @probs_from_samples.tensor.3x1xf64([[samples1]]) :
-            // CHECK-SAME: (tensor<3x1xf64>) -> tensor<2xf64>
             // CHECK: [[res0:%.+]] = func.call @probs_from_samples.tensor.3x1xf64([[samples0]]) :
+            // CHECK-SAME: (tensor<3x1xf64>) -> tensor<2xf64>
+            // CHECK: [[res1:%.+]] = func.call @probs_from_samples.tensor.3x1xf64([[samples1]]) :
             // CHECK-SAME: (tensor<3x1xf64>) -> tensor<2xf64>
             // CHECK: func.return [[res0]], [[res1]] : tensor<2xf64>, tensor<2xf64>
             // CHECK: func.func public @circuit.from_samples{{.*}} attributes {quantum.node}
@@ -425,7 +458,7 @@ class TestMeasurementsFromSamplesPass:
         pipeline = (MeasurementsFromSamplesPass(),)
         run_filecheck(program, pipeline)
 
-    def test_expval_from_sample_with_diagonalize(self, run_filecheck):
+    def test_expval_from_sample_diagonalizes(self, run_filecheck):
         """Test that diagonalization is performed as expected when the circuit contains non-Z observables"""
 
         program = """
@@ -460,6 +493,108 @@ class TestMeasurementsFromSamplesPass:
                 func.return %6 : tensor<f64>
             }
             // CHECK-LABEL: func.func public @expval_from_samples.tensor.1x1xf64
+        }
+        """
+
+        pipeline = (MeasurementsFromSamplesPass(),)
+        run_filecheck(program, pipeline)
+
+    def test_expval_tensor_obs(self, run_filecheck):
+        """Test the measurements-from-samples pass on a circuit terminating with the variance
+        of a 3-wire tensor, including non-Z observables.
+        """
+
+        program = """
+        builtin.module @module_circuit {
+            // CHECK-LABEL: circuit
+            // CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<5x3xf64>
+            // CHECK: [[res:%.+]] = func.call @expval_from_samples.tensor.5x3xf64([[samples]]) :
+            // CHECK-SAME: (tensor<5x3xf64>) -> tensor<f64>
+            // CHECK: func.return [[res]] : tensor<f64>
+            func.func public @circuit() -> tensor<f64> attributes {quantum.node}  {
+                %0 = "stablehlo.constant"() <{value = dense<5> : tensor<i64>}> : () -> tensor<i64>
+                %1 = tensor.extract %0[] : tensor<i64>
+                quantum.device shots(%1) ["", "", ""]
+
+                // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
+                // CHECK: [[q1:%.+]] = "test.op"() : () -> !quantum.bit
+                // CHECK: [[q2:%.+]] = "test.op"() : () -> !quantum.bit
+                %2 = "test.op"() : () -> !quantum.bit
+                %3 = "test.op"() : () -> !quantum.bit
+                %4 = "test.op"() : () -> !quantum.bit
+
+                // CHECK-NOT: quantum.namedobs
+                // CHECK-NOT: quantum.tensor
+                // CHECK: [[q0_1:%.+]] = quantum.custom "Hadamard"() [[q0]]
+                // CHECK: [[q1_1:%.+]] = quantum.custom "PauliZ"() [[q1]]
+                // CHECK: [[q1_2:%.+]] = quantum.custom "S"() [[q1_1]]
+                // CHECK: [[q1_3:%.+]] = quantum.custom "Hadamard"() [[q1_2]]
+                // CHECK: [[obs0:%.+]] = quantum.compbasis qubits [[q0_1]], [[q1_3]], [[q2]] : !quantum.obs
+                %5 = quantum.namedobs %2[PauliX] : !quantum.obs
+                %6 = quantum.namedobs %3[PauliY] : !quantum.obs
+                %7 = quantum.namedobs %4[PauliZ] : !quantum.obs
+                %8 = quantum.tensor %5, %6, %7 : !quantum.obs
+
+                // CHECK: [[samples:%.+]] = quantum.sample [[obs0]] : tensor<5x3xf64>
+                // CHECK-NOT: quantum.expval
+                %9 = quantum.expval %8 : f64
+                %10 = "tensor.from_elements"(%9) : (f64) -> tensor<f64>
+
+                // CHECK: func.return [[samples]] : tensor<5x3xf64>
+                func.return %10 : tensor<f64>
+            }
+            // CHECK-LABEL: func.func public @expval_from_samples.tensor.5x3xf64
+        }
+        """
+
+        pipeline = (MeasurementsFromSamplesPass(),)
+        run_filecheck(program, pipeline)
+
+    def test_var_tensor_obs(self, run_filecheck):
+        """Test the measurements-from-samples pass on a circuit terminating with the variance
+        of a 3-wire tensor, including non-Z observables.
+        """
+
+        program = """
+        builtin.module @module_circuit {
+            // CHECK-LABEL: circuit
+            // CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<5x3xf64>
+            // CHECK: [[res:%.+]] = func.call @var_from_samples.tensor.5x3xf64([[samples]]) :
+            // CHECK-SAME: (tensor<5x3xf64>) -> tensor<f64>
+            // CHECK: func.return [[res]] : tensor<f64>
+            func.func public @circuit() -> tensor<f64> attributes {quantum.node}  {
+                %0 = "stablehlo.constant"() <{value = dense<5> : tensor<i64>}> : () -> tensor<i64>
+                %1 = tensor.extract %0[] : tensor<i64>
+                quantum.device shots(%1) ["", "", ""]
+
+                // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
+                // CHECK: [[q1:%.+]] = "test.op"() : () -> !quantum.bit
+                // CHECK: [[q2:%.+]] = "test.op"() : () -> !quantum.bit
+                %2 = "test.op"() : () -> !quantum.bit
+                %3 = "test.op"() : () -> !quantum.bit
+                %4 = "test.op"() : () -> !quantum.bit
+
+                // CHECK-NOT: quantum.namedobs
+                // CHECK-NOT: quantum.tensor
+                // CHECK: [[q0_1:%.+]] = quantum.custom "Hadamard"() [[q0]]
+                // CHECK: [[q1_1:%.+]] = quantum.custom "PauliZ"() [[q1]]
+                // CHECK: [[q1_2:%.+]] = quantum.custom "S"() [[q1_1]]
+                // CHECK: [[q1_3:%.+]] = quantum.custom "Hadamard"() [[q1_2]]
+                // CHECK: [[obs0:%.+]] = quantum.compbasis qubits [[q0_1]], [[q1_3]], [[q2]] : !quantum.obs
+                %5 = quantum.namedobs %2[PauliX] : !quantum.obs
+                %6 = quantum.namedobs %3[PauliY] : !quantum.obs
+                %7 = quantum.namedobs %4[PauliZ] : !quantum.obs
+                %8 = quantum.tensor %5, %6, %7 : !quantum.obs
+
+                // CHECK: [[samples:%.+]] = quantum.sample [[obs0]] : tensor<5x3xf64>
+                // CHECK-NOT: quantum.var
+                %9 = quantum.var %8 : f64
+                %10 = "tensor.from_elements"(%9) : (f64) -> tensor<f64>
+
+                // CHECK: func.return [[samples]] : tensor<5x3xf64>
+                func.return %10 : tensor<f64>
+            }
+            // CHECK-LABEL: func.func public @var_from_samples.tensor.5x3xf64
         }
         """
 
