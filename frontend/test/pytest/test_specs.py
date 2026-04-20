@@ -1037,7 +1037,8 @@ class TestPassByPassSpecs:
         check_specs_same(actual, expected)
 
     def test_loop_warning(self):
-        """Test that a warning is raised when dynamic loops are present in the circuit, as resource counting may be inaccurate."""
+        """Test that a warning is raised when dynamic loops are present in the circuit,
+        as resource counting may be inaccurate."""
 
         @qml.qjit(autograph=True)
         @qml.qnode(qml.device("null.qubit", wires=1))
