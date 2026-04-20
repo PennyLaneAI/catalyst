@@ -15,18 +15,18 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 
 from catalyst import measure, qjit
 
 
 @qjit(target="mlir")
 def workflow(n: int):
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK-LABEL: public @f
     # CHECK-NOT: public @f
     def f(x: float):
-        qml.RX(x, wires=n)
+        qp.RX(x, wires=n)
         return measure(wires=n)
 
     return f(jnp.pi) + f(jnp.pi)

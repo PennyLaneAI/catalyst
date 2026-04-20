@@ -18,7 +18,7 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 from jax.core import ShapedArray
 from utils import print_jaxpr, print_mlir
 
@@ -44,7 +44,7 @@ def test_qnode_dynamic_arg(a):
     # CHECK:         [[c:.]]:i64[InDBIdx(val=0)] = quantum_kernel[
     # CHECK:                                  ] [[a]] [[b]]
     # CHECK:       in ([[c]],) }
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def _circuit(a):
         return a
 
@@ -78,7 +78,7 @@ def test_qnode_dynamic_result(a):
     # CHECK:         {{.+}}:i64[] [[c:.]]:f64[OutDBIdx(val=0)] = quantum_kernel[
     # CHECK:                                                ] [[a]]
     # CHECK:       in ([[c]],) }
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def _circuit(a):
         return jnp.ones((a + 1,), dtype=float)
 

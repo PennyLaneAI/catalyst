@@ -14,7 +14,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import pennylane as qml
+import pennylane as qp
 from jax import numpy as jnp
 
 from catalyst import measure, qjit
@@ -33,12 +33,12 @@ from catalyst.debug import get_compilation_stage
 
 # CHECK-LABEL: test_ewise_arctan2
 @qjit(keep_intermediate=True)
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_ewise_arctan2(x, y):
     # CHECK: math.atan2
     # CHECK-SAME: f64
     val = jnp.arctan2(x, y)
-    qml.RZ(val, wires=0)
+    qp.RZ(val, wires=0)
     return measure(wires=0)
 
 
@@ -58,20 +58,20 @@ print(get_compilation_stage(test_ewise_arctan2, "BufferizationStage"))
 # jnp.gcd
 # def test_ewise_lcm (x, y):
 #    val = jnp.lcm (x.astype(int), y.astype(int))
-#    qml.RZ (val.astype(float), wires=0)
-#    qml.sample (qml.PauliZ (wires=0))
+#    qp.RZ (val.astype(float), wires=0)
+#    qp.sample (qp.PauliZ (wires=0))
 # However, it likely falls in relying in another function
 # and we currently support only leaf functions.
 
 
 @qjit(keep_intermediate=True)
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 # CHECK-LABEL: test_ewise_add
 def test_ewise_add(x, y):
     # CHECK: arith.addf
     # CHECK-SAME: f64
     val = jnp.add(x, y)
-    qml.RZ(val, wires=0)
+    qp.RZ(val, wires=0)
     return measure(wires=0)
 
 
@@ -81,12 +81,12 @@ print(get_compilation_stage(test_ewise_add, "BufferizationStage"))
 
 # CHECK-LABEL: test_ewise_mult
 @qjit(keep_intermediate=True)
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_ewise_mult(x, y):
     # CHECK: arith.mulf
     # CHECK-SAME: f64
     val = jnp.multiply(x, y)
-    qml.RZ(val, wires=0)
+    qp.RZ(val, wires=0)
     return measure(wires=0)
 
 
@@ -96,12 +96,12 @@ print(get_compilation_stage(test_ewise_mult, "BufferizationStage"))
 
 # CHECK-LABEL: test_ewise_div
 @qjit(keep_intermediate=True)
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_ewise_div(x, y):
     # CHECK: arith.divf
     # CHECK-SAME: f64
     val = jnp.divide(x, y)
-    qml.RZ(val, wires=0)
+    qp.RZ(val, wires=0)
     return measure(wires=0)
 
 
@@ -111,12 +111,12 @@ print(get_compilation_stage(test_ewise_div, "BufferizationStage"))
 
 # CHECK-LABEL: test_ewise_power
 @qjit(keep_intermediate=True)
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_ewise_power(x, y):
     # CHECK: math.powf
     # CHECK-SAME: f64
     val = jnp.power(x, y.astype(int))
-    qml.RZ(val, wires=0)
+    qp.RZ(val, wires=0)
     return measure(wires=0)
 
 
@@ -126,12 +126,12 @@ print(get_compilation_stage(test_ewise_power, "BufferizationStage"))
 
 # CHECK-LABEL: test_ewise_sub
 @qjit(keep_intermediate=True)
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_ewise_sub(x, y):
     # CHECK: arith.subf
     # CHECK-SAME: f64
     val = jnp.subtract(x, y)
-    qml.RZ(val, wires=0)
+    qp.RZ(val, wires=0)
     return measure(wires=0)
 
 
@@ -140,13 +140,13 @@ print(get_compilation_stage(test_ewise_sub, "BufferizationStage"))
 
 
 @qjit(keep_intermediate=True)
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 # CHECK-LABEL: test_ewise_true_div
 def test_ewise_true_div(x, y):
     # CHECK: arith.divf
     # CHECK-SAME: f64
     val = jnp.true_divide(x, y)
-    qml.RZ(val, wires=0)
+    qp.RZ(val, wires=0)
     return measure(wires=0)
 
 
@@ -160,12 +160,12 @@ print(get_compilation_stage(test_ewise_true_div, "BufferizationStage"))
 
 # CHECK-LABEL: test_ewise_float_power
 @qjit(keep_intermediate=True)
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_ewise_float_power(x, y):
     # CHECK: math.powf
     # CHECK-SAME: f64
     val = jnp.float_power(x, y)
-    qml.RZ(val, wires=0)
+    qp.RZ(val, wires=0)
     return measure(wires=0)
 
 
@@ -185,12 +185,12 @@ print(get_compilation_stage(test_ewise_float_power, "BufferizationStage"))
 
 # CHECK-LABEL: test_ewise_maximum
 @qjit(keep_intermediate=True)
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_ewise_maximum(x, y):
     # CHECK: arith.maximumf
     # CHECK-SAME: f64
     val = jnp.maximum(x, y)
-    qml.RZ(val, wires=0)
+    qp.RZ(val, wires=0)
     return measure(wires=0)
 
 
@@ -203,12 +203,12 @@ print(get_compilation_stage(test_ewise_maximum, "BufferizationStage"))
 
 # CHECK-LABEL: test_ewise_minimum
 @qjit(keep_intermediate=True)
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_ewise_minimum(x, y):
     # CHECK: arith.minimumf
     # CHECK-SAME: f64
     val = jnp.minimum(x, y)
-    qml.RZ(val, wires=0)
+    qp.RZ(val, wires=0)
     return measure(wires=0)
 
 

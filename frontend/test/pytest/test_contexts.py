@@ -14,7 +14,7 @@
 
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import accelerate, cond, grad, jacobian, measure, qjit, while_loop
@@ -177,7 +177,7 @@ class TestEvaluationModes:
         with EvaluationContext(EvaluationMode.INTERPRETATION):
             wrapper(EvaluationMode.INTERPRETATION)()
         qjit(wrapper(EvaluationMode.CLASSICAL_COMPILATION))()
-        qjit(qml.qnode(qml.device(backend, wires=1))(wrapper(EvaluationMode.QUANTUM_COMPILATION)))()
+        qjit(qp.qnode(qp.device(backend, wires=1))(wrapper(EvaluationMode.QUANTUM_COMPILATION)))()
 
 
 class TestTracing:
@@ -185,10 +185,10 @@ class TestTracing:
         """Test fixed tracing."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             m = measure(wires=0)
-            qml.RX(m + 0.0, wires=0)
+            qp.RX(m + 0.0, wires=0)
             return m
 
         assert not circuit()
@@ -205,20 +205,20 @@ class TestTracing:
 
             @cond(m)
             def cond_fn():
-                qml.PauliX(wires=wires)
+                qp.PauliX(wires=wires)
 
             cond_fn()
 
             return m
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def circuit(n):
             @while_loop(lambda i: i < n)
             def loop(i):
-                qml.Hadamard(wires=0)
-                qml.Hadamard(wires=1)
-                qml.Hadamard(wires=2)
+                qp.Hadamard(wires=0)
+                qp.Hadamard(wires=1)
+                qp.Hadamard(wires=2)
 
                 m0 = reset_measure(wires=0)
                 m1 = reset_measure(wires=1)
@@ -234,9 +234,9 @@ class TestTracing:
         """Test discarded measurements."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit():
-            qml.state()
+            qp.state()
             return
 
         assert circuit() is None
@@ -245,15 +245,15 @@ class TestTracing:
         """Test mixed result types."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             @while_loop(lambda _, repeat: repeat)
             def repeat_until_false(i, _):
-                qml.Hadamard(0)
+                qp.Hadamard(0)
                 return i + 1, measure(0)
 
             n_iter, _ = repeat_until_false(0, True)
-            return n_iter, qml.state()
+            return n_iter, qp.state()
 
         n_iter, state = circuit()
         assert n_iter > 0
@@ -263,9 +263,9 @@ class TestTracing:
 def test_complex_dialect(backend):
     """Test that we can use functions that turn into complex dialect operations in MLIR."""
 
-    @qml.qnode(qml.device(backend, wires=1))
+    @qp.qnode(qp.device(backend, wires=1))
     def circuit():
-        return qml.state()
+        return qp.state()
 
     @qjit
     def workflow():

@@ -19,7 +19,7 @@ from typing import Iterable
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 from jax._src.tree_util import tree_flatten
 from pennylane import adjoint, cond, for_loop, grad, qjit
@@ -34,11 +34,11 @@ class TestPyTreesReturnValues:
     def test_return_value_float(self, backend):
         """Test constant."""
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit1(params):
-            qml.RX(params[0], wires=0)
-            qml.RX(params[1], wires=1)
-            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
+            qp.RX(params[0], wires=0)
+            qp.RX(params[1], wires=1)
+            return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1))
 
         jitted_fn = qjit(circuit1)
 
@@ -50,7 +50,7 @@ class TestPyTreesReturnValues:
     def test_return_value_mcm(self, backend):
         """Test that a qnode can return a scalar mcm."""
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit2():
             return measure(0)
 
@@ -62,11 +62,11 @@ class TestPyTreesReturnValues:
     def test_return_value_arrays(self, backend):
         """Test arrays."""
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit1(params):
-            qml.RX(params[0], wires=0)
-            qml.RX(params[1], wires=1)
-            return qml.state()
+            qp.RX(params[0], wires=0)
+            qp.RX(params[1], wires=1)
+            return qp.state()
 
         jitted_fn = qjit(circuit1)
 
@@ -75,11 +75,11 @@ class TestPyTreesReturnValues:
         ip_result = circuit1(params)
         assert jnp.allclose(result, ip_result)
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit2(params):
-            qml.RX(params[0], wires=0)
-            qml.RX(params[1], wires=1)
-            return [jnp.pi, qml.state()]
+            qp.RX(params[0], wires=0)
+            qp.RX(params[1], wires=1)
+            return [jnp.pi, qp.state()]
 
         jitted_fn = qjit(circuit2)
 
@@ -92,10 +92,10 @@ class TestPyTreesReturnValues:
     def test_return_value_tuples(self, backend, tol_stochastic):
         """Test tuples."""
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit1():
-            qml.Hadamard(0)
-            qml.CNOT(wires=[0, 1])
+            qp.Hadamard(0)
+            qp.CNOT(wires=[0, 1])
             m0 = measure(0)
             m1 = measure(1)
             return (m0, m1)
@@ -105,10 +105,10 @@ class TestPyTreesReturnValues:
         result = jitted_fn()
         assert isinstance(result, tuple)
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit2():
-            qml.Hadamard(0)
-            qml.CNOT(wires=[0, 1])
+            qp.Hadamard(0)
+            qp.CNOT(wires=[0, 1])
             m0 = measure(0)
             m1 = measure(1)
             return (((m0, m1), m0 + m1), m0 * m1)
@@ -121,14 +121,14 @@ class TestPyTreesReturnValues:
         assert result[0][0][0] + result[0][0][1] == result[0][1]
         assert result[0][0][0] * result[0][0][1] == result[1]
 
-        @qml.set_shots(1000)
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.set_shots(1000)
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit3(params):
-            qml.RX(params[0], wires=0)
-            qml.RX(params[1], wires=1)
+            qp.RX(params[0], wires=0)
+            qp.RX(params[1], wires=1)
             return (
-                qml.counts(),
-                qml.expval(qml.PauliZ(0)),
+                qp.counts(),
+                qp.expval(qp.PauliZ(0)),
             )
 
         params = [0.5, 0.6]
@@ -140,14 +140,14 @@ class TestPyTreesReturnValues:
         assert isinstance(result[0], tuple)
         assert jnp.allclose(result[1], expected_expval, atol=tol_stochastic, rtol=tol_stochastic)
 
-        @qml.set_shots(None)
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.set_shots(None)
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit4(params):
-            qml.RX(params[0], wires=0)
-            qml.RX(params[1], wires=1)
+            qp.RX(params[0], wires=0)
+            qp.RX(params[1], wires=1)
             return (
-                qml.state(),
-                qml.expval(qml.PauliZ(0)),
+                qp.state(),
+                qp.expval(qp.PauliZ(0)),
             )
 
         params = [0.5, 0.6]
@@ -175,11 +175,11 @@ class TestPyTreesReturnValues:
     def test_return_value_hybrid(self, backend):
         """Test tuples."""
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit1():
-            qml.Hadamard(0)
-            qml.CNOT(wires=[0, 1])
-            return qml.var(qml.PauliZ(1))
+            qp.Hadamard(0)
+            qp.CNOT(wires=[0, 1])
+            return qp.var(qp.PauliZ(1))
 
         @qjit
         def workflow1(param):
@@ -196,7 +196,7 @@ class TestPyTreesReturnValues:
 
         # QFunc Path.
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit1(n):
             @cond(n > 4)
             def cond_fn():
@@ -245,16 +245,16 @@ class TestPyTreesReturnValues:
     def test_return_value_dict(self, backend, tol_stochastic, mcm_method):
         """Test dictionaries."""
 
-        if mcm_method == "one-shot" and qml.capture.enabled():
+        if mcm_method == "one-shot" and qp.capture.enabled():
             pytest.xfail()
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit1(params):
-            qml.RX(params[0], wires=0)
-            qml.RX(params[1], wires=1)
+            qp.RX(params[0], wires=0)
+            qp.RX(params[1], wires=1)
             return {
-                "w0": qml.expval(qml.PauliZ(0)),
-                "w1": qml.expval(qml.PauliZ(1)),
+                "w0": qp.expval(qp.PauliZ(0)),
+                "w1": qp.expval(qp.PauliZ(1)),
             }
 
         jitted_fn = qjit(circuit1)
@@ -266,15 +266,15 @@ class TestPyTreesReturnValues:
         assert jnp.allclose(result["w0"], expected["w0"])
         assert jnp.allclose(result["w1"], expected["w1"])
 
-        @qml.set_shots(1000)
-        @qml.qnode(qml.device(backend, wires=2), mcm_method=mcm_method)
+        @qp.set_shots(1000)
+        @qp.qnode(qp.device(backend, wires=2), mcm_method=mcm_method)
         def circuit2(params):
-            qml.RX(params[0], wires=0)
-            qml.RX(params[1], wires=1)
+            qp.RX(params[0], wires=0)
+            qp.RX(params[1], wires=1)
             return {
-                "counts": qml.counts(),
+                "counts": qp.counts(),
                 "expval": {
-                    "z0": qml.expval(qml.PauliZ(0)),
+                    "z0": qp.expval(qp.PauliZ(0)),
                 },
             }
 
@@ -289,17 +289,17 @@ class TestPyTreesReturnValues:
             result["expval"]["z0"], expected_expval, atol=tol_stochastic, rtol=tol_stochastic
         )
 
-        @qml.set_shots(1000)
-        @qml.qnode(qml.device(backend, wires=2), mcm_method=mcm_method)
+        @qp.set_shots(1000)
+        @qp.qnode(qp.device(backend, wires=2), mcm_method=mcm_method)
         def circuit2_snapshot(params):
-            qml.Snapshot()
-            qml.RX(params[0], wires=0)
-            qml.RX(params[1], wires=1)
-            qml.Snapshot()
+            qp.Snapshot()
+            qp.RX(params[0], wires=0)
+            qp.RX(params[1], wires=1)
+            qp.Snapshot()
             return {
-                "counts": qml.counts(),
+                "counts": qp.counts(),
                 "expval": {
-                    "z0": qml.expval(qml.PauliZ(0)),
+                    "z0": qp.expval(qp.PauliZ(0)),
                 },
             }
 
@@ -325,15 +325,15 @@ class TestPyTreesReturnValues:
             result[1]["expval"]["z0"], expected_expval, atol=tol_stochastic, rtol=tol_stochastic
         )
 
-        @qml.set_shots(None)
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.set_shots(None)
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit3(params):
-            qml.RX(params[0], wires=0)
-            qml.RX(params[1], wires=1)
+            qp.RX(params[0], wires=0)
+            qp.RX(params[1], wires=1)
             return {
-                "state": qml.state(),
+                "state": qp.state(),
                 "expval": {
-                    "z0": qml.expval(qml.PauliZ(0)),
+                    "z0": qp.expval(qp.PauliZ(0)),
                 },
             }
 
@@ -361,11 +361,11 @@ class TestPyTreesFuncArgs:
     def test_args_dict(self, backend):
         """Test arguments dict."""
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit1(params):
-            qml.RX(params["a"][0], wires=0)
-            qml.RX(params["b"][0], wires=1)
-            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)), params["a"][0]
+            qp.RX(params["a"][0], wires=0)
+            qp.RX(params["b"][0], wires=1)
+            return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1)), params["a"][0]
 
         jitted_fn = qjit(circuit1)
 
@@ -379,11 +379,11 @@ class TestPyTreesFuncArgs:
         assert jnp.allclose(result[0], expected)
         assert jnp.allclose(result[1], params["a"][0])
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit2(params):
-            qml.RX(params["a"]["c"][0], wires=0)
-            qml.RX(params["b"][0], wires=1)
-            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)), params["a"]
+            qp.RX(params["a"]["c"][0], wires=0)
+            qp.RX(params["b"][0], wires=1)
+            return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1)), params["a"]
 
         jitted_fn = qjit(circuit2)
 
@@ -400,20 +400,20 @@ class TestPyTreesFuncArgs:
         assert jnp.allclose(result[1]["c"][0], params["a"]["c"][0])
         assert jnp.allclose(result[1]["c"][1], params["a"]["c"][1])
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit3(params1, params2):
-            qml.RX(params1["a"][0] * params2[0], wires=0)
-            qml.RX(params1["b"][0] * params2[1], wires=1)
-            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
+            qp.RX(params1["a"][0] * params2[0], wires=0)
+            qp.RX(params1["b"][0] * params2[1], wires=1)
+            return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1))
 
     def test_promotion_unneeded(self, backend):
         """Test arguments list of lists."""
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit1(params):
-            qml.RX(params["a"][0], wires=0)
-            qml.RX(params["b"][0], wires=1)
-            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)), params["a"][0]
+            qp.RX(params["a"][0], wires=0)
+            qp.RX(params["b"][0], wires=1)
+            return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1)), params["a"][0]
 
         jitted_fn = qjit(circuit1)
 
@@ -428,11 +428,11 @@ class TestPyTreesFuncArgs:
     def test_promotion_needed(self, backend):
         """Test arguments list of lists."""
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit1(params):
-            qml.RX(params["a"][0], wires=0)
-            qml.RX(params["b"][0], wires=1)
-            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)), params["a"][0]
+            qp.RX(params["a"][0], wires=0)
+            qp.RX(params["b"][0], wires=1)
+            return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1)), params["a"][0]
 
         jitted_fn = qjit(circuit1)
 
@@ -469,11 +469,11 @@ class TestPyTreesFuncArgs:
         def workflow2(params1, params2):
             """A hybrid workflow"""
 
-            @qml.qnode(qml.device(backend, wires=2))
+            @qp.qnode(qp.device(backend, wires=2))
             def circuit(params):
-                qml.RX(params["a"][0], wires=0)
-                qml.RX(params["b"][0], wires=1)
-                return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
+                qp.RX(params["a"][0], wires=0)
+                qp.RX(params["b"][0], wires=1)
+                return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1))
 
             res1 = circuit(params1)
             return jnp.sin(res1), res1 * params2[1]
@@ -491,15 +491,15 @@ class TestPyTreesFuncArgs:
     def test_args_grad(self, backend):
         """Test arguments with the grad operation."""
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit1(params):
-            qml.RX(params["a"][0], wires=0)
-            qml.RX(params["b"][1], wires=1)
-            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
+            qp.RX(params["a"][0], wires=0)
+            qp.RX(params["b"][1], wires=1)
+            return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1))
 
         @qjit
         def workflow1(params):
-            g = qml.qnode(qml.device(backend, wires=1))(circuit1)
+            g = qp.qnode(qp.device(backend, wires=1))(circuit1)
             h = grad(g)
             return h(params)
 
@@ -514,15 +514,15 @@ class TestPyTreesFuncArgs:
         assert np.allclose(result_flatten, result_flatten_expected)
         assert tree == tree_expected
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit2(params):
-            qml.RX(params["a"][0], wires=0)
-            qml.RX(params["b"][0], wires=1)
-            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
+            qp.RX(params["a"][0], wires=0)
+            qp.RX(params["b"][0], wires=1)
+            return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1))
 
         @qjit
         def workflow2(params):
-            g = qml.qnode(qml.device(backend, wires=1))(circuit2)
+            g = qp.qnode(qp.device(backend, wires=1))(circuit2)
             h = grad(g)
             return h(params)
 
@@ -543,15 +543,15 @@ class TestPyTreesFuncArgs:
         """Test arguments with control-flows operations."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit1(n, params):
             @for_loop(0, n, 1)
             def loop(i):
-                qml.RX(params[i], wires=i)
+                qp.RX(params[i], wires=i)
                 return ()
 
             loop()  # pylint: disable=no-value-for-parameter
-            return qml.state()
+            return qp.state()
 
         circuit1(1, inp)
 
@@ -559,10 +559,10 @@ class TestPyTreesFuncArgs:
         """Argument is used directly in measurement"""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(dictionary):
             """q0 = 1; q1 = 0;"""
-            qml.RX(jnp.pi, wires=0)
+            qp.RX(jnp.pi, wires=0)
             return measure(dictionary["wire"])
 
         result = circuit({"wire": 0})
@@ -574,10 +574,10 @@ class TestPyTreesFuncArgs:
         """Argument is used indirectly in measurement"""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(dictionary):
             """q0 = 1; q1 = 0;"""
-            qml.RX(jnp.pi, wires=0)
+            qp.RX(jnp.pi, wires=0)
             return measure((dictionary["wire"] + 1) % 2)
 
         result = circuit({"wire": 0})
@@ -591,15 +591,15 @@ class TestPyTreesFuncArgs:
 
         def subroutine(wires):
             for wire in wires:
-                qml.PauliX(wire)
+                qp.PauliX(wire)
 
-        dev = qml.device(backend, wires=3)
+        dev = qp.device(backend, wires=3)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def test_function():
             adjoint(subroutine)(dev.wires)
-            return qml.probs()
+            return qp.probs()
 
         test_function()
 

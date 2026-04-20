@@ -23,7 +23,7 @@ import pathlib
 import platform
 from typing import Optional
 
-import pennylane as qml
+import pennylane as qp
 from pennylane.devices import Device
 from pennylane.devices.execution_config import ExecutionConfig
 
@@ -63,8 +63,8 @@ class CustomDevice(Device):
         if execution_config is None:
             execution_config = ExecutionConfig()
 
-        transform_program = qml.CompilePipeline()
-        transform_program.add_transform(qml.transforms.split_non_commuting)
+        transform_program = qp.CompilePipeline()
+        transform_program.add_transform(qp.transforms.split_non_commuting)
         return transform_program, execution_config
 
 
@@ -76,16 +76,16 @@ def test_circuit():
     dev = CustomDevice(wires=2)
 
     @qjit(target="mlir")
-    @qml.set_shots(2048)
-    @qml.qnode(device=dev)
+    @qp.set_shots(2048)
+    @qp.qnode(device=dev)
     def circuit():
         # CHECK:   quantum.custom "Hadamard"
-        qml.Hadamard(wires=0)
+        qp.Hadamard(wires=0)
         # CHECK:   quantum.custom "CNOT"
-        qml.CNOT(wires=[0, 1])
+        qp.CNOT(wires=[0, 1])
         # CHECK:   quantum.namedobs [[QBIT:.*]][ PauliZ]
         # CHECK:   quantum.expval
-        return qml.expval(qml.PauliZ(wires=0))
+        return qp.expval(qp.PauliZ(wires=0))
 
     print(circuit.mlir)
 
@@ -103,11 +103,11 @@ def test_preprocess():
     dev = CustomDevice(wires=2)
 
     @qjit(target="mlir")
-    @qml.set_shots(2048)
-    @qml.qnode(device=dev)
+    @qp.set_shots(2048)
+    @qp.qnode(device=dev)
     def circuit_split():
-        qml.Hadamard(wires=0)
-        qml.CNOT(wires=[0, 1])
+        qp.Hadamard(wires=0)
+        qp.CNOT(wires=[0, 1])
         # CHECK:   quantum.custom "Hadamard"
         # CHECK:   quantum.custom "CNOT"
         # CHECK:   quantum.namedobs [[QBIT:.*]][ PauliZ]
@@ -115,7 +115,7 @@ def test_preprocess():
         # CHECK-NOT:   quantum.custom "CNOT"
         # CHECK:   quantum.namedobs [[QBIT:.*]][ PauliY]
         # CHECK:    return [[RETURN:.*]]: tensor<f64>, tensor<f64>
-        return qml.expval(qml.PauliZ(wires=0)), qml.expval(qml.PauliY(wires=0))
+        return qp.expval(qp.PauliZ(wires=0)), qp.expval(qp.PauliY(wires=0))
 
     print(circuit_split.mlir)
 

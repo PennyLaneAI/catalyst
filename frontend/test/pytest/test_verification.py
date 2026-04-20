@@ -18,7 +18,7 @@ import platform
 from copy import deepcopy
 from unittest.mock import patch
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 from pennylane.devices.capabilities import OperatorProperties
 from pennylane.measurements import ExpectationMP, VarianceMP
@@ -53,9 +53,9 @@ def get_custom_device(
 ):
     """Generate a custom device where certain gates are marked as non-differensiable."""
 
-    lightning_device = qml.device("lightning.qubit", wires=0)
+    lightning_device = qp.device("lightning.qubit", wires=0)
 
-    class CustomDevice(qml.devices.Device):
+    class CustomDevice(qp.devices.Device):
         """Custom Gate Set Device"""
 
         name = lightning_device.name
@@ -112,7 +112,7 @@ def get_custom_device(
     return CustomDevice(**kwargs)
 
 
-@qml.transform
+@qp.transform
 def null_transform(tape, *args, **kwargs):
     """A null transform that passes on the tape and the null post processing function.
     Used to overwrite transforms in the device preprocess with mocker when we want to
@@ -121,7 +121,7 @@ def null_transform(tape, *args, **kwargs):
     return (tape,), lambda x: x[0]
 
 
-class PauliX2(qml.PauliX):
+class PauliX2(qp.PauliX):
     """Test operation without the analytic gradient"""
 
     name = "PauliX2"
@@ -135,7 +135,7 @@ class PauliX2(qml.PauliX):
 def test_unsupported_ops_raise_an_error():
     """Test that an unsupported op raises an error"""
 
-    class MyOp(qml.operation.Operator):
+    class MyOp(qp.operation.Operator):
         """An unsupported operation"""
 
         @property
@@ -147,10 +147,10 @@ def test_unsupported_ops_raise_an_error():
             """No decomposition is implemented"""
             raise NotImplementedError()
 
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def f(_):
         MyOp(wires=0)
-        return qml.expval(qml.PauliX(0))
+        return qp.expval(qp.PauliX(0))
 
     with pytest.raises(CompileError, match="UnsupportedOp is not supported"):
         qjit(f)(1.2)
@@ -159,18 +159,18 @@ def test_unsupported_ops_raise_an_error():
 def queue_ops(x, wires):
     """Queue two operators. To be used to create HybridAdjoint
     and HybridCtrl instances for testing"""
-    qml.RX(x, wires=wires)
-    qml.Z(wires)
+    qp.RX(x, wires=wires)
+    qp.Z(wires)
 
 
 # callables to return adjoint ops via different contruction methods
-adj_operator = lambda x, wires: adjoint(qml.RX(x, wires))  # instantiated op (Adjoint)
-adj_op_callable = lambda x, wires: adjoint(qml.RX)(x, wires)  # op callable (Adjoint)
+adj_operator = lambda x, wires: adjoint(qp.RX(x, wires))  # instantiated op (Adjoint)
+adj_op_callable = lambda x, wires: adjoint(qp.RX)(x, wires)  # op callable (Adjoint)
 adj_op_multiple = lambda x, wires: adjoint(queue_ops)(x, wires)  # op queue (HybridAdjoint)
 
 # callables to return controlled ops via different construction methods
-ctrl_operator = lambda x, wires: ctrl(qml.Z(wires), control=[1, 2, 3])  # (Controlled)
-ctrl_op_callable = lambda x, wires: ctrl(qml.Z, control=[1, 2, 3])(wires)  # (Controlled)
+ctrl_operator = lambda x, wires: ctrl(qp.Z(wires), control=[1, 2, 3])  # (Controlled)
+ctrl_op_callable = lambda x, wires: ctrl(qp.Z, control=[1, 2, 3])(wires)  # (Controlled)
 ctrl_op_multiple = lambda x, wires: ctrl(queue_ops, control=[1, 2, 3])(x, wires)  # (HybridCtrl)
 
 
@@ -188,11 +188,11 @@ class TestHybridOpVerification:
 
         dev = get_custom_device(non_invertible_gates={"RX"}, wires=1)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def f(x):
             op = op_fn(x, wires=0)
             assert isinstance(op, op_type), f"op expected to be {op_type} but got {type(op)}"
-            return qml.expval(qml.PauliX(0))
+            return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
             qjit(f)(1.2)
@@ -211,7 +211,7 @@ class TestHybridOpVerification:
         """Emulate a device with a non-invertible gate inside an Adjoint that
         is further nested in a Cond operation."""
 
-        @qml.qnode(get_custom_device(non_invertible_gates={"RX"}, wires=1))
+        @qp.qnode(get_custom_device(non_invertible_gates={"RX"}, wires=1))
         def f(x):
             @cond(True)
             def true_path():
@@ -225,7 +225,7 @@ class TestHybridOpVerification:
 
             true_path()
 
-            return qml.expval(qml.PauliX(0))
+            return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
             qjit(f)(1.2)
@@ -244,7 +244,7 @@ class TestHybridOpVerification:
         """Emulate a device with a non-invertible gate inside an Adjoint that
         is further nested in a For operation."""
 
-        @qml.qnode(get_custom_device(non_invertible_gates={"RX"}, wires=1))
+        @qp.qnode(get_custom_device(non_invertible_gates={"RX"}, wires=1))
         def f(x):
             @for_loop(0, 10, 1)
             def loop(_i):
@@ -252,7 +252,7 @@ class TestHybridOpVerification:
                 assert isinstance(op, op_type), f"op expected to be {op_type} but got {type(op)}"
 
             loop()
-            return qml.expval(qml.PauliX(0))
+            return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
             qjit(f)(1.2)
@@ -267,13 +267,13 @@ class TestHybridOpVerification:
     def test_non_controllable_gate_pennylane(self, op_fn):
         """Emulate a device with a non-controllable gate applied inside a PL control."""
 
-        @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=4))
+        @qp.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=4))
         def f(x: float):
             op = op_fn(x, wires=0)
             assert isinstance(
                 op, Controlled
-            ), f"op expected to be qml.ops.Controlled but got {type(op)}"
-            return qml.expval(qml.PauliX(0))
+            ), f"op expected to be qp.ops.Controlled but got {type(op)}"
+            return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="PauliZ is not controllable"):
             qjit(f)(1.2)
@@ -292,7 +292,7 @@ class TestHybridOpVerification:
         # adding HybridCtrl to the list of native gates for the custom base device and by patching
         # the list of RUNTIME_OPERATIONS for the QJIT device to include HybridCtrl for this test.
 
-        @qml.qnode(
+        @qp.qnode(
             get_custom_device(
                 native_gates={"HybridCtrl"}, non_controllable_gates={"PauliZ"}, wires=4
             )
@@ -300,7 +300,7 @@ class TestHybridOpVerification:
         def f(x: float):
             op = ctrl_op_multiple(x, wires=0)
             assert isinstance(op, HybridCtrl), f"op expected to be HybridCtrl but got {type(op)}"
-            return qml.expval(qml.PauliX(0))
+            return qp.expval(qp.PauliX(0))
 
         runtime_ops_with_qctrl = deepcopy(RUNTIME_OPERATIONS)
         runtime_ops_with_qctrl["HybridCtrl"] = OperatorProperties(
@@ -323,11 +323,11 @@ class TestHybridOpVerification:
         # TODO: If you are deleting this test because HybridCtrl support has been added, consider
         # updating the tests that patch RUNTIME_OPERATIONS to inclue HybridCtrl accordingly
 
-        @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=4))
+        @qp.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=4))
         def f(x: float):
             op = ctrl_op_multiple(x, wires=0)
             assert isinstance(op, HybridCtrl), f"op expected to be HybridCtrl but got {type(op)}"
-            return qml.expval(qml.PauliX(0))
+            return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="HybridCtrl is not supported"):
             qjit(f)(1.2)
@@ -342,14 +342,14 @@ class TestHybridOpVerification:
         """Test that a PennyLane Controlled op with a HybridOp as its base is
         caught in verification"""
 
-        @qml.qnode(get_custom_device(wires=4))
+        @qp.qnode(get_custom_device(wires=4))
         def f(x: float):
             op = Controlled(adj_op_multiple(x, wires=0), control_wires=[1, 2, 3])
             assert isinstance(op, Controlled), f"op expected to be Controlled but got {type(op)}"
             assert isinstance(
                 op.base, HybridAdjoint
             ), f"base op expected to be HybridAdjoint but got {type(op)}"
-            return qml.expval(qml.PauliX(0))
+            return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="Cannot compile PennyLane control of the hybrid op"):
             qjit(f)(1.2)
@@ -364,14 +364,14 @@ class TestHybridOpVerification:
         """Test that a PennyLane Controlled op with a HybridOp as its base is caught
         in verification"""
 
-        @qml.qnode(get_custom_device(wires=4))
+        @qp.qnode(get_custom_device(wires=4))
         def f(x: float):
             op = Adjoint(adj_op_multiple(x, wires=0))
             assert isinstance(op, Adjoint), f"op expected to be Adjoint but got {type(op)}"
             assert isinstance(
                 op.base, HybridAdjoint
             ), f"base op expected to be HybridAdjoint but got {type(op)}"
-            return qml.expval(qml.PauliX(0))
+            return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="Cannot compile PennyLane inverse of the hybrid op"):
             qjit(f)(1.2)
@@ -397,18 +397,18 @@ class TestHybridOpVerification:
             if adjoint_type == HybridAdjoint:
                 adj_op_multiple(x, wires)
             else:
-                adjoint(qml.Z(0))
-            qml.Z(1)
+                adjoint(qp.Z(0))
+            qp.Z(1)
 
         device_kwargs = {f"non_{unsupported_gate_attribute}_gates": {"PauliZ"}}
 
-        @qml.qnode(get_custom_device(native_gates={"HybridCtrl"}, wires=4, **device_kwargs))
+        @qp.qnode(get_custom_device(native_gates={"HybridCtrl"}, wires=4, **device_kwargs))
         def f(x: float):
             op = ctrl(_ops, control=[2, 3, 4])(x, wires=0)
             assert isinstance(op, HybridCtrl), f"expected HybridCtrl but got {type(op)}"
             base = op.regions[0].quantum_tape.operations[0]
             assert isinstance(base, adjoint_type), f"expected {adjoint_type} but got {type(op)}"
-            return qml.expval(qml.PauliX(0))
+            return qp.expval(qp.PauliX(0))
 
         runtime_ops_with_qctrl = deepcopy(RUNTIME_OPERATIONS)
         runtime_ops_with_qctrl["HybridCtrl"] = OperatorProperties(
@@ -441,17 +441,17 @@ class TestHybridOpVerification:
                 ctrl_op_multiple(x, wires)
             else:
                 ctrl_operator(x, wires)
-            qml.Z(1)
+            qp.Z(1)
 
         device_kwargs = {f"non_{unsupported_gate_attribute}_gates": {"PauliZ"}}
 
-        @qml.qnode(get_custom_device(native_gates={"HybridCtrl"}, wires=4, **device_kwargs))
+        @qp.qnode(get_custom_device(native_gates={"HybridCtrl"}, wires=4, **device_kwargs))
         def f(x: float):
             op = adjoint(_ops)(x, wires=0)
             base = op.regions[0].quantum_tape.operations[0]
             assert isinstance(op, HybridAdjoint), f"expected HybridAdjoint but got {type(op)}"
             assert isinstance(base, ctrl_type), f"expected {ctrl_type} but got {type(op)}"
-            return qml.expval(qml.PauliX(0))
+            return qp.expval(qp.PauliX(0))
 
         runtime_ops_with_qctrl = deepcopy(RUNTIME_OPERATIONS)
         runtime_ops_with_qctrl["HybridCtrl"] = OperatorProperties(
@@ -474,10 +474,10 @@ class TestHybridOpVerification:
 
         device_kwargs = {f"non_{unsupported_gate_attribute}_gates": {"PauliZ"}}
 
-        @qml.qnode(get_custom_device(wires=4, **device_kwargs))
+        @qp.qnode(get_custom_device(wires=4, **device_kwargs))
         def f(x: float):
-            Controlled(Adjoint(qml.Z(0)), control_wires=[1, 2, 3])
-            return qml.expval(qml.PauliX(0))
+            Controlled(Adjoint(qp.Z(0)), control_wires=[1, 2, 3])
+            return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
             qjit(f)(1.2)
@@ -494,10 +494,10 @@ class TestHybridOpVerification:
 
         device_kwargs = {f"non_{unsupported_gate_attribute}_gates": {"PauliZ"}}
 
-        @qml.qnode(get_custom_device(wires=4, **device_kwargs))
+        @qp.qnode(get_custom_device(wires=4, **device_kwargs))
         def f(x: float):
-            Adjoint(Controlled(qml.Z(0), control_wires=[1, 2, 3]))
-            return qml.expval(qml.PauliX(0))
+            Adjoint(Controlled(qp.Z(0), control_wires=[1, 2, 3]))
+            return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
             qjit(f)(1.2)
@@ -516,12 +516,12 @@ class TestObservableValidation:
         """Test that including an unsupported observable in a measurement raises an
         error when jitting the circuit"""
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def f():
-            qml.RX(1.23, 0)
-            return qml.expval(qml.RX(1.2, 0))
+            qp.RX(1.23, 0)
+            return qp.expval(qp.RX(1.2, 0))
 
         with pytest.raises(CompileError, match="RX.*not supported as an observable"):
             qjit(f)()
@@ -529,45 +529,45 @@ class TestObservableValidation:
     @pytest.mark.parametrize(
         "measurements, invalid_op",
         [
-            ([qml.expval(qml.X(0))], None),  # single obs
-            ([qml.expval(qml.RX(1.2, 0))], "RX"),
-            ([qml.var(qml.X(0) @ qml.Y(2))], None),  # prod
-            ([qml.var(qml.X(0) @ qml.RY(1.23, 2))], "RY"),
+            ([qp.expval(qp.X(0))], None),  # single obs
+            ([qp.expval(qp.RX(1.2, 0))], "RX"),
+            ([qp.var(qp.X(0) @ qp.Y(2))], None),  # prod
+            ([qp.var(qp.X(0) @ qp.RY(1.23, 2))], "RY"),
             (
-                [qml.var((2 * qml.X(0) @ qml.Y(2)) @ (2 * qml.X(3)) @ qml.Y(1))],
+                [qp.var((2 * qp.X(0) @ qp.Y(2)) @ (2 * qp.X(3)) @ qp.Y(1))],
                 None,
             ),  # nested prod+sprod
-            ([qml.var((2 * qml.X(0) @ qml.Y(2)) @ (2 * qml.RY(1.2, 3)) @ qml.Y(1))], "RY"),
-            ([qml.var((2 * qml.X(0) @ qml.RY(1.2, 2)) @ (2 * qml.X(3)) @ qml.Y(1))], "RY"),
-            ([qml.var(qml.X(1) + qml.Y(2))], None),  # sum
-            ([qml.var(qml.RX(1.23, 1) + qml.Y(2))], "RX"),
-            ([qml.expval(2 * qml.Z(1))], None),  # sprod
-            ([qml.expval(2 * qml.RZ(1.23, 1))], "RZ"),
-            ([qml.expval(qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]))], None),  # hamiltonian
-            ([qml.expval(qml.Hamiltonian([2, 3], [qml.X(0), qml.RY(2.3, 1)]))], "RY"),
-            ([qml.expval(qml.Hamiltonian([2, 3], [qml.Y(0), PauliX2(1)]))], "PauliX2"),
-            ([qml.sample(), qml.expval(qml.X(0))], None),  # with empty sample
-            ([qml.sample(), qml.expval(qml.RX(1.2, 0))], "RX"),
+            ([qp.var((2 * qp.X(0) @ qp.Y(2)) @ (2 * qp.RY(1.2, 3)) @ qp.Y(1))], "RY"),
+            ([qp.var((2 * qp.X(0) @ qp.RY(1.2, 2)) @ (2 * qp.X(3)) @ qp.Y(1))], "RY"),
+            ([qp.var(qp.X(1) + qp.Y(2))], None),  # sum
+            ([qp.var(qp.RX(1.23, 1) + qp.Y(2))], "RX"),
+            ([qp.expval(2 * qp.Z(1))], None),  # sprod
+            ([qp.expval(2 * qp.RZ(1.23, 1))], "RZ"),
+            ([qp.expval(qp.Hamiltonian([2, 3], [qp.X(0), qp.Y(1)]))], None),  # hamiltonian
+            ([qp.expval(qp.Hamiltonian([2, 3], [qp.X(0), qp.RY(2.3, 1)]))], "RY"),
+            ([qp.expval(qp.Hamiltonian([2, 3], [qp.Y(0), PauliX2(1)]))], "PauliX2"),
+            ([qp.sample(), qp.expval(qp.X(0))], None),  # with empty sample
+            ([qp.sample(), qp.expval(qp.RX(1.2, 0))], "RX"),
             # sample with observable is currently unsupported
-            # ([qml.sample(qml.X(0)), qml.expval(qml.X(0))], None),
-            # ([qml.sample(qml.RX(1.2, 0)), qml.expval(qml.X(0))], "RX"),
-            ([qml.probs(wires=0), qml.var(qml.X(1) + qml.Y(2))], None),  # with probs
-            ([qml.probs(wires=0), qml.var(qml.RX(1.23, 1) + qml.Y(2))], "RX"),
-            ([qml.counts(), qml.expval(qml.X(0))], None),  # with empty counts
-            ([qml.counts(), qml.expval(qml.RX(1.2, 0))], "RX"),
+            # ([qp.sample(qp.X(0)), qp.expval(qp.X(0))], None),
+            # ([qp.sample(qp.RX(1.2, 0)), qp.expval(qp.X(0))], "RX"),
+            ([qp.probs(wires=0), qp.var(qp.X(1) + qp.Y(2))], None),  # with probs
+            ([qp.probs(wires=0), qp.var(qp.RX(1.23, 1) + qp.Y(2))], "RX"),
+            ([qp.counts(), qp.expval(qp.X(0))], None),  # with empty counts
+            ([qp.counts(), qp.expval(qp.RX(1.2, 0))], "RX"),
             # counts with observable is currently unsupported
-            # ([qml.counts(qml.Y(0)), qml.expval(qml.X(0))], None),  # with counts with observable
-            # ([qml.counts(qml.RX(1.23, 0)), qml.expval(qml.X(0))], "RX"),
+            # ([qp.counts(qp.Y(0)), qp.expval(qp.X(0))], None),  # with counts with observable
+            # ([qp.counts(qp.RX(1.23, 0)), qp.expval(qp.X(0))], "RX"),
         ],
     )
     def test_validate_measurements_transform(self, backend, measurements, invalid_op):
         """Test that the validate_measurements transform raises an error (or not) as expected
         for different base observables."""
 
-        dev = qml.device(backend, wires=3)
+        dev = qp.device(backend, wires=3)
         qjit_capabilities = get_device_capabilities(dev, shots=2048)
 
-        tape = qml.tape.QuantumScript([], measurements=measurements, shots=2048)
+        tape = qp.tape.QuantumScript([], measurements=measurements, shots=2048)
 
         if invalid_op:
             with pytest.raises(CompileError, match=f"{invalid_op}.*not supported as an observable"):
@@ -578,10 +578,10 @@ class TestObservableValidation:
     @pytest.mark.parametrize(
         "obs, obs_type",
         [
-            (qml.X(0) @ qml.Y(1), "Prod"),
-            (2 * qml.Y(1), "SProd"),
-            (qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]), "LinearCombination"),
-            (qml.X(0) + 2 * qml.Y(1), "Sum"),
+            (qp.X(0) @ qp.Y(1), "Prod"),
+            (2 * qp.Y(1), "SProd"),
+            (qp.Hamiltonian([2, 3], [qp.X(0), qp.Y(1)]), "LinearCombination"),
+            (qp.X(0) + 2 * qp.Y(1), "Sum"),
         ],
     )
     def test_arithmetic_ops_validation(self, obs, obs_type, backend):
@@ -589,11 +589,11 @@ class TestObservableValidation:
         for different observables composed of other base observables, when the overall observable
         type is supported/unsupported."""
 
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
         dev_capabilities = get_device_capabilities(dev, shots=None)
         qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
 
-        tape = qml.tape.QuantumScript([], measurements=[qml.expval(obs)])
+        tape = qp.tape.QuantumScript([], measurements=[qp.expval(obs)])
 
         # all good
         validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
@@ -606,7 +606,7 @@ class TestObservableValidation:
         """Test that an observable that is supported by the backend according to the
         TOML file, but is not supported by Catalyst, raises an error in validation"""
 
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
         dev_capabilities = get_device_capabilities(dev)
 
         dev_capabilities.observables.update(
@@ -615,23 +615,23 @@ class TestObservableValidation:
 
         qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
 
-        tape = qml.tape.QuantumScript([], measurements=[qml.expval(PauliX2(0))])
+        tape = qp.tape.QuantumScript([], measurements=[qp.expval(PauliX2(0))])
 
         with pytest.raises(CompileError, match="PauliX2 is not supported as an observable"):
             validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
 
     @pytest.mark.parametrize(
-        "measurement", [qml.expval(qml.X(0)), qml.var(qml.X(0)), qml.sample(qml.X(0))]
+        "measurement", [qp.expval(qp.X(0)), qp.var(qp.X(0)), qp.sample(qp.X(0))]
     )
     def test_only_expval_and_var_allow_observables(self, measurement):
         """Test that the validate_measurements transform catches measurements other
         than expval and var that include observables, and raises an error"""
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
         dev_capabilities = get_device_capabilities(dev, shots=None)
         qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
 
-        tape = qml.tape.QuantumScript([], measurements=[measurement])
+        tape = qp.tape.QuantumScript([], measurements=[measurement])
 
         if isinstance(measurement, (ExpectationMP, VarianceMP)):
             validate_measurements(tape, qjit_capabilities, dev.name, tape.shots)
@@ -650,18 +650,18 @@ class TestMeasurementTypeValidation:
     @pytest.mark.parametrize(
         "measurement, shots, msg",
         [
-            (qml.state(), 100, "Please specify shots=None."),
-            (qml.sample(), None, "Please specify a finite number of shots."),
-            (qml.expval(qml.X(0)), 100, "is not a supported measurement process"),
-            (qml.expval(qml.X(0)), None, "is not a supported measurement process"),
+            (qp.state(), 100, "Please specify shots=None."),
+            (qp.sample(), None, "Please specify a finite number of shots."),
+            (qp.expval(qp.X(0)), 100, "is not a supported measurement process"),
+            (qp.expval(qp.X(0)), None, "is not a supported measurement process"),
         ],
     )
     def test_validate_measurements_works_on_measurement_processes(self, measurement, shots, msg):
         """Test that the validate_measurements transform raises a CompileError as
         expected for an unsupported MeasurementProcess"""
 
-        dev = qml.device("lightning.qubit", wires=1)
-        tape = qml.tape.QuantumScript([], measurements=[measurement])
+        dev = qp.device("lightning.qubit", wires=1)
+        tape = qp.tape.QuantumScript([], measurements=[measurement])
 
         qjit_capabilities = get_device_capabilities(dev)
         qjit_capabilities.measurement_processes.pop("ExpectationMP")
@@ -674,29 +674,29 @@ class TestMeasurementTypeValidation:
         raises a CompileError informing the user that shots must be None for
         state based measurements"""
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
-        @qml.set_shots(100)
-        @qml.qnode(dev)
+        @qp.set_shots(100)
+        @qp.qnode(dev)
         def f():
-            qml.RX(1.23, 0)
-            return qml.state()
+            qp.RX(1.23, 0)
+            return qp.state()
 
         with pytest.raises(CompileError, match="Please specify shots=None."):
             qjit(f)()
 
-    @pytest.mark.parametrize("measurement", [qml.sample, qml.counts])
+    @pytest.mark.parametrize("measurement", [qp.sample, qp.counts])
     def test_sample_measurements_rejected_without_shots(self, measurement):
         """Test that trying to take a sample-based measurement on a device
         without shots raises a CompileError informing the user that a
         finite number of shots is needed for sampling"""
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
-        @qml.set_shots(None)
-        @qml.qnode(dev)
+        @qp.set_shots(None)
+        @qp.qnode(dev)
         def f():
-            qml.RX(1.23, 0)
+            qp.RX(1.23, 0)
             return measurement()
 
         with pytest.raises(CompileError, match="Please specify a finite number of shots."):
@@ -706,9 +706,9 @@ class TestMeasurementTypeValidation:
         """Test that trying to use a measurement type that is generally unsupported by
         the device raises a CompileError"""
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
-        class MyMeasurement(qml.measurements.SampleMeasurement):
+        class MyMeasurement(qp.measurements.SampleMeasurement):
             """A custom measurement (not supported on lightning.qubit)"""
 
             def __init__(self, obs=None, wires=None):
@@ -722,10 +722,10 @@ class TestMeasurementTypeValidation:
                 """overwrite ABC method"""
                 raise NotImplementedError
 
-        @qml.set_shots(100)
-        @qml.qnode(dev)
+        @qp.set_shots(100)
+        @qp.qnode(dev)
         def f():
-            qml.RX(1.23, 0)
+            qp.RX(1.23, 0)
             return MyMeasurement()
 
         with pytest.raises(CompileError, match="is not a supported measurement process"):
@@ -740,12 +740,12 @@ class TestAdjointMethodVerification:
     def test_non_differentiable_gate_simple(self):
         """Emulate a device with a non-differentiable gate."""
 
-        @qml.qnode(
+        @qp.qnode(
             get_custom_device(non_differentiable_gates={"RX"}, wires=[0]), diff_method="adjoint"
         )
         def f(x):
-            qml.RX(x, wires=0)
-            return qml.expval(qml.PauliX(0))
+            qp.RX(x, wires=0)
+            return qp.expval(qp.PauliX(0))
 
         with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
 
@@ -756,25 +756,25 @@ class TestAdjointMethodVerification:
     @pytest.mark.parametrize(
         "observable",
         [
-            qml.PauliX(0),  # single observable
-            qml.PauliX(0) @ qml.PauliZ(1),  # prod
-            qml.PauliX(0) + qml.PauliY(1),  # sum
-            qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]),  # linearcombination
-            2 * qml.PauliX(0),  # sprod
-            (2 * qml.X(0) @ qml.Y(2)) @ (2 * qml.X(3)) @ qml.Y(1),  # nested prod+sprod
+            qp.PauliX(0),  # single observable
+            qp.PauliX(0) @ qp.PauliZ(1),  # prod
+            qp.PauliX(0) + qp.PauliY(1),  # sum
+            qp.Hamiltonian([2, 3], [qp.X(0), qp.Y(1)]),  # linearcombination
+            2 * qp.PauliX(0),  # sprod
+            (2 * qp.X(0) @ qp.Y(2)) @ (2 * qp.X(3)) @ qp.Y(1),  # nested prod+sprod
         ],
     )
     def test_non_differentiable_observable(self, observable):
         """Test that taking the adjoint diff of a circuit with an observable that doesn't support
         adjoint differentiation raises an error."""
 
-        @qml.qnode(
+        @qp.qnode(
             get_custom_device(non_differentiable_obs={"PauliX"}, wires=[0, 1]),
             diff_method="adjoint",
         )
         def f(x):
-            qml.RX(x, wires=0)
-            return qml.expval(observable)
+            qp.RX(x, wires=0)
+            return qp.expval(observable)
 
         with pytest.raises(DifferentiableCompileError, match="PauliX.*non-differentiable"):
 
@@ -786,12 +786,12 @@ class TestAdjointMethodVerification:
         """Test that taking the adjoint diff of a circuit with an empyt observable with adjoint
         adjoint passes the validation."""
 
-        @qml.qnode(
+        @qp.qnode(
             get_custom_device(non_differentiable_obs={"PauliX"}, wires=[0]), diff_method="adjoint"
         )
         def f(x):
-            qml.RX(x, wires=0)
-            return qml.probs()
+            qp.RX(x, wires=0)
+            return qp.probs()
 
         qjit(f)(1.2)
 
@@ -799,21 +799,21 @@ class TestAdjointMethodVerification:
         """Test that taking the adjoint diff of a tape containing a parameterized operation
         that doesn't support adjoint differentiation raises an error."""
 
-        @qml.qnode(
+        @qp.qnode(
             get_custom_device(non_differentiable_gates={"RX"}, wires=1), diff_method="adjoint"
         )
         def f(x):
             @cond(True)
             def true_path():
-                qml.RX(x, wires=0)
+                qp.RX(x, wires=0)
 
             @true_path.otherwise
             def false_path():
-                qml.RX(x, wires=0)
+                qp.RX(x, wires=0)
 
             true_path()
 
-            return qml.expval(qml.PauliX(0))
+            return qp.expval(qp.PauliX(0))
 
         with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
 
@@ -826,12 +826,12 @@ class TestAdjointMethodVerification:
         parameterized operation that doesn't support adjoint differentiation raises
         an error."""
 
-        @qml.qnode(
+        @qp.qnode(
             get_custom_device(non_differentiable_gates={"RX"}, wires=1), diff_method="adjoint"
         )
         def f(x):
-            adjoint(qml.RX(x, wires=[0]))
-            return qml.expval(qml.PauliX(0))
+            adjoint(qp.RX(x, wires=[0]))
+            return qp.expval(qp.PauliX(0))
 
         with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
 
@@ -848,23 +848,23 @@ class TestParameterShiftMethodVerification:
     @pytest.mark.parametrize(
         "observable",
         [
-            qml.PauliX(0),
-            # qml.PauliX(0) @ qml.PauliZ(1),
-            # qml.PauliX(0)+qml.PauliY(1)
+            qp.PauliX(0),
+            # qp.PauliX(0) @ qp.PauliZ(1),
+            # qp.PauliX(0)+qp.PauliY(1)
         ],
     )
-    @patch.object(qml.PauliX, "grad_method", "F")
+    @patch.object(qp.PauliX, "grad_method", "F")
     def test_paramshift_obs_simple(self, observable):
         """Test that taking a parameter-shift gradient of an observable that doesn't support
         analytic differentiation raises an error."""
 
-        assert qml.PauliX.grad_method != "A"
+        assert qp.PauliX.grad_method != "A"
 
-        @qml.qnode(get_custom_device(wires=2), diff_method="parameter-shift")
+        @qp.qnode(get_custom_device(wires=2), diff_method="parameter-shift")
         def f(x):
-            qml.PauliY(wires=1)
-            qml.RX(x, wires=0)
-            return qml.expval(observable)
+            qp.PauliY(wires=1)
+            qp.RX(x, wires=0)
+            return qp.expval(observable)
 
         with pytest.raises(
             DifferentiableCompileError, match="PauliX does not support analytic differentiation"
@@ -878,10 +878,10 @@ class TestParameterShiftMethodVerification:
 def test_no_state_returns():
     """Test state returns are rejected in gradients."""
 
-    @qml.qnode(get_custom_device(wires=1))
+    @qp.qnode(get_custom_device(wires=1))
     def f(_):
-        qml.PauliX(wires=0)
-        return qml.state()
+        qp.PauliX(wires=0)
+        return qp.state()
 
     with pytest.raises(DifferentiableCompileError, match="State returns.*forbidden"):
 
@@ -893,10 +893,10 @@ def test_no_state_returns():
 def test_no_variance_returns():
     """Test variance returns are rejected in gradients."""
 
-    @qml.qnode(get_custom_device(wires=1))
+    @qp.qnode(get_custom_device(wires=1))
     def f(_):
-        qml.PauliX(wires=0)
-        return qml.var(qml.PauliX(0))
+        qp.PauliX(wires=0)
+        return qp.var(qp.PauliX(0))
 
     with pytest.raises(DifferentiableCompileError, match="Variance returns.*forbidden"):
 

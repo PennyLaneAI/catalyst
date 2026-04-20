@@ -14,27 +14,27 @@
 
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import qjit
 
 
 def circuit_jnp():
-    qml.QubitUnitary(1 / np.sqrt(2) * jnp.array([[1.0, 1.0], [1.0, -1.0]], dtype=complex), wires=0)
-    return qml.expval(qml.PauliZ(0))
+    qp.QubitUnitary(1 / np.sqrt(2) * jnp.array([[1.0, 1.0], [1.0, -1.0]], dtype=complex), wires=0)
+    return qp.expval(qp.PauliZ(0))
 
 
 def circuit_np():
-    qml.QubitUnitary(1 / np.sqrt(2) * np.array([[1.0, 1.0], [1.0, -1.0]], dtype=complex), wires=0)
-    return qml.expval(qml.PauliZ(0))
+    qp.QubitUnitary(1 / np.sqrt(2) * np.array([[1.0, 1.0], [1.0, -1.0]], dtype=complex), wires=0)
+    return qp.expval(qp.PauliZ(0))
 
 
 def test_variable_wires(backend):
     """Test variable wires."""
 
-    jitted_fn_jnp = qjit(qml.qnode(qml.device(backend, wires=1))(circuit_jnp))
-    jitted_fn_np = qjit(qml.qnode(qml.device(backend, wires=1))(circuit_np))
+    jitted_fn_jnp = qjit(qp.qnode(qp.device(backend, wires=1))(circuit_jnp))
+    jitted_fn_np = qjit(qp.qnode(qp.device(backend, wires=1))(circuit_np))
     assert np.isclose(jitted_fn_jnp(), jitted_fn_np())
 
 

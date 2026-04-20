@@ -16,24 +16,24 @@
 
 # pylint: disable=line-too-long
 
-"""Test for qml.set_shots functionality."""
+"""Test for qp.set_shots functionality."""
 
 from functools import partial
 
-import pennylane as qml
+import pennylane as qp
 
 from catalyst import qjit
 
 
 def test_simple_circuit_set_shots():
-    """Test that a circuit with qml.set_shots is compiling to MLIR."""
-    dev = qml.device("lightning.qubit", wires=2)
+    """Test that a circuit with qp.set_shots is compiling to MLIR."""
+    dev = qp.device("lightning.qubit", wires=2)
 
     @qjit(target="mlir")
-    @partial(qml.set_shots, shots=2048)
-    @qml.qnode(device=dev, mcm_method="single-branch-statistics")
+    @partial(qp.set_shots, shots=2048)
+    @qp.qnode(device=dev, mcm_method="single-branch-statistics")
     def circuit():
-        return qml.expval(qml.PauliZ(wires=0))
+        return qp.expval(qp.PauliZ(wires=0))
 
     # CHECK: [[shots:%.+]] = arith.constant 2048 : i64
     # CHECK: quantum.device shots([[shots]]) {{.*}}

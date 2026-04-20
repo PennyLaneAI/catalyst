@@ -20,7 +20,7 @@ This file contains tests for measurement primitives when the return shape is dyn
 from functools import partial
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 import catalyst
@@ -33,13 +33,13 @@ def test_dynamic_sample(capfd):
     @catalyst.qjit
     def workflow_dyn_sample(shots):
         print("compiling...")
-        device = qml.device("lightning.qubit", wires=1)
+        device = qp.device("lightning.qubit", wires=1)
 
-        @partial(qml.set_shots, shots=shots)
-        @qml.qnode(device)
+        @partial(qp.set_shots, shots=shots)
+        @qp.qnode(device)
         def circuit():
-            qml.RX(1.5, 0)
-            return qml.sample()
+            qp.RX(1.5, 0)
+            return qp.sample()
 
         return circuit()
 
@@ -63,13 +63,13 @@ def test_dynamic_counts(capfd):
     @catalyst.qjit
     def workflow_dyn_counts(shots):
         print("compiling...")
-        device = qml.device("lightning.qubit", wires=1)
+        device = qp.device("lightning.qubit", wires=1)
 
-        @partial(qml.set_shots, shots=shots)
-        @qml.qnode(device)
+        @partial(qp.set_shots, shots=shots)
+        @qp.qnode(device)
         def circuit():
-            qml.RX(1.5, 0)
-            return qml.counts(all_outcomes=True)
+            qp.RX(1.5, 0)
+            return qp.counts(all_outcomes=True)
 
         return circuit()
 
@@ -88,7 +88,7 @@ def test_dynamic_counts(capfd):
     assert out.count("compiling...") == 1
 
 
-@pytest.mark.parametrize("readout", [qml.expval, qml.var])
+@pytest.mark.parametrize("readout", [qp.expval, qp.var])
 def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
     """
     Test that a circuit with dynamic number of wires can be executed correctly.
@@ -99,17 +99,17 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
 
     def ref(num_qubits):
         print("compiling...")
-        dev = qml.device(backend, wires=num_qubits)
+        dev = qp.device(backend, wires=num_qubits)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circ():
             @catalyst.for_loop(0, num_qubits, 1)
             def loop_0(i):
-                qml.RY(2.2, wires=i)
+                qp.RY(2.2, wires=i)
 
             loop_0()
-            qml.RX(1.23, wires=num_qubits - 1)
-            return readout(qml.Z(wires=num_qubits - 1))
+            qp.RX(1.23, wires=num_qubits - 1)
+            return readout(qp.Z(wires=num_qubits - 1))
 
         return circ()
 
@@ -121,29 +121,29 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
     assert out.count("compiling...") == 3
 
 
-@pytest.mark.parametrize("readout", [qml.probs])
+@pytest.mark.parametrize("readout", [qp.probs])
 def test_dynamic_wires_statebased_with_wires(readout, backend, capfd):
     """
     Test that a circuit with dynamic number of wires can be executed correctly
     with state based measurements with wires specified.
 
-    Note that qml.state() cannot have wires.
+    Note that qp.state() cannot have wires.
     """
 
     def ref(num_qubits):
         print("compiling...")
-        dev = qml.device(backend, wires=num_qubits)
+        dev = qp.device(backend, wires=num_qubits)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circ():
             @catalyst.for_loop(0, num_qubits, 1)
             def loop_0(i):
-                qml.RY(2.2, wires=i)
+                qp.RY(2.2, wires=i)
 
             loop_0()
-            qml.RX(1.23, wires=num_qubits - 1)
-            qml.RZ(3.45, wires=0)
-            qml.CNOT(wires=[num_qubits - 2, 1])
+            qp.RX(1.23, wires=num_qubits - 1)
+            qp.RZ(3.45, wires=0)
+            qp.CNOT(wires=[num_qubits - 2, 1])
             return readout(wires=[0, num_qubits - 2])
 
         return circ()
@@ -156,7 +156,7 @@ def test_dynamic_wires_statebased_with_wires(readout, backend, capfd):
     assert out.count("compiling...") == 3
 
 
-@pytest.mark.parametrize("readout", [qml.probs, qml.state])
+@pytest.mark.parametrize("readout", [qp.probs, qp.state])
 def test_dynamic_wires_statebased_without_wires(readout, backend, capfd):
     """
     Test that a circuit with dynamic number of wires can be executed correctly
@@ -165,16 +165,16 @@ def test_dynamic_wires_statebased_without_wires(readout, backend, capfd):
 
     def ref(num_qubits):
         print("compiling...")
-        dev = qml.device(backend, wires=num_qubits)
+        dev = qp.device(backend, wires=num_qubits)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circ(x):
             @catalyst.for_loop(0, num_qubits, 1)
             def loop_0(i):
-                qml.RY(2.2, wires=i)
+                qp.RY(2.2, wires=i)
 
             loop_0()
-            qml.cond(x == 42, qml.RZ)(3.45, wires=0)
+            qp.cond(x == 42, qp.RZ)(3.45, wires=0)
             return readout()
 
         return circ(42)
@@ -196,18 +196,18 @@ def test_dynamic_wires_sample_with_wires(shots, backend, capfd):
 
     def ref(num_qubits):
         print("compiling...")
-        dev = qml.device(backend, wires=num_qubits)
+        dev = qp.device(backend, wires=num_qubits)
 
-        @qml.set_shots(shots)
-        @qml.qnode(dev)
+        @qp.set_shots(shots)
+        @qp.qnode(dev)
         def circ():
             @catalyst.for_loop(0, num_qubits, 1)
             def loop_0(i):
-                qml.RY(0.0, wires=i)
+                qp.RY(0.0, wires=i)
 
             loop_0()
-            qml.RX(0.0, wires=num_qubits - 1)
-            return qml.sample(wires=[0, num_qubits - 1])
+            qp.RX(0.0, wires=num_qubits - 1)
+            return qp.sample(wires=[0, num_qubits - 1])
 
         return circ()
 
@@ -231,18 +231,18 @@ def test_dynamic_wires_sample_without_wires(shots, backend, capfd):
 
     def ref(num_qubits):
         print("compiling...")
-        dev = qml.device(backend, wires=num_qubits)
+        dev = qp.device(backend, wires=num_qubits)
 
-        @qml.set_shots(shots)
-        @qml.qnode(dev)
+        @qp.set_shots(shots)
+        @qp.qnode(dev)
         def circ():
             @catalyst.for_loop(0, num_qubits, 1)
             def loop_0(i):
-                qml.RY(0.0, wires=i)
+                qp.RY(0.0, wires=i)
 
             loop_0()
-            qml.RX(0.0, wires=num_qubits - 1)
-            return qml.sample()
+            qp.RX(0.0, wires=num_qubits - 1)
+            return qp.sample()
 
         return circ()
 
@@ -268,13 +268,13 @@ def test_dynamic_wires_counts_with_wires(backend, capfd):
     @catalyst.qjit
     def func(num_qubits):
         print("compiling...")
-        dev = qml.device(backend, wires=num_qubits)
+        dev = qp.device(backend, wires=num_qubits)
 
-        @qml.set_shots(1000)
-        @qml.qnode(dev)
+        @qp.set_shots(1000)
+        @qp.qnode(dev)
         def circ():
-            qml.RX(0.0, wires=num_qubits - 1)
-            return qml.counts(wires=[0, num_qubits - 1])
+            qp.RX(0.0, wires=num_qubits - 1)
+            return qp.counts(wires=[0, num_qubits - 1])
 
         return circ()
 
@@ -298,13 +298,13 @@ def test_dynamic_wires_counts_without_wires(backend, capfd):
     @catalyst.qjit
     def func(num_qubits):
         print("compiling...")
-        dev = qml.device(backend, wires=num_qubits)
+        dev = qp.device(backend, wires=num_qubits)
 
-        @qml.set_shots(1000)
-        @qml.qnode(dev)
+        @qp.set_shots(1000)
+        @qp.qnode(dev)
         def circ():
-            qml.RX(0.0, wires=num_qubits - 1)
-            return qml.counts()
+            qp.RX(0.0, wires=num_qubits - 1)
+            return qp.counts()
 
         return circ()
 
@@ -329,11 +329,11 @@ def test_wrong_wires_argument(backend, wires):
 
     @catalyst.qjit
     def func(num_qubits):
-        dev = qml.device(backend, wires=num_qubits)
+        dev = qp.device(backend, wires=num_qubits)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circ():
-            return qml.expval(qml.Z(wires=num_qubits - 1))
+            return qp.expval(qp.Z(wires=num_qubits - 1))
 
         return circ()
 
@@ -344,20 +344,20 @@ def test_wrong_wires_argument(backend, wires):
 
 
 def test_dynamic_shots_and_wires(capfd):
-    """Test that a circuit with both dynamic shots and dynamic wires works correctly with qml.sample."""
+    """Test that a circuit with both dynamic shots and dynamic wires works correctly with qp.sample."""
 
     @catalyst.qjit
     def workflow_dynamic_shots_and_wires(num_shots, num_wires):
         print("compiling...")
-        device = qml.device("lightning.qubit", wires=num_wires)
+        device = qp.device("lightning.qubit", wires=num_wires)
 
-        @partial(qml.set_shots, shots=num_shots)
-        @qml.qnode(device)
+        @partial(qp.set_shots, shots=num_shots)
+        @qp.qnode(device)
         def circuit():
             # Apply Hadamard to all wires
             @catalyst.for_loop(0, num_wires, 1)
             def apply_hadamards(i):
-                qml.Hadamard(i)
+                qp.Hadamard(i)
 
             apply_hadamards()
 
@@ -366,13 +366,13 @@ def test_dynamic_shots_and_wires(capfd):
             def add_entanglement():
                 @catalyst.for_loop(0, num_wires - 1, 1)
                 def apply_cnots(i):
-                    qml.CNOT([i, i + 1])
+                    qp.CNOT([i, i + 1])
 
                 apply_cnots()
 
             add_entanglement()
 
-            return qml.sample()
+            return qp.sample()
 
         return circuit()
 

@@ -24,7 +24,7 @@ correctly.
 from typing import Callable, Sequence
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 from utils import print_jaxpr, print_mlir
 
 from catalyst import qjit
@@ -36,11 +36,11 @@ def test_multiple_tape_transforms():
     """
 
     def my_quantum_transform(
-        tape: qml.tape.QuantumTape,
-    ) -> (Sequence[qml.tape.QuantumTape], Callable):
+        tape: qp.tape.QuantumTape,
+    ) -> (Sequence[qp.tape.QuantumTape], Callable):
         tape1 = tape
-        tape2 = qml.tape.QuantumTape(
-            [qml.RY(tape1.operations[1].parameters[0] + 0.4, wires=0)], [qml.expval(qml.X(0))]
+        tape2 = qp.tape.QuantumTape(
+            [qp.RY(tape1.operations[1].parameters[0] + 0.4, wires=0)], [qp.expval(qp.X(0))]
         )
 
         def post_processing_fn(results):
@@ -48,19 +48,19 @@ def test_multiple_tape_transforms():
 
         return [tape1, tape2], post_processing_fn
 
-    dispatched_transform = qml.transform(my_quantum_transform)
+    dispatched_transform = qp.transform(my_quantum_transform)
 
     @qjit
     @dispatched_transform
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def circuit_twotapes(x):
-        qml.StatePrep(
+        qp.StatePrep(
             np.array([complex(1, 0), complex(0, 0), complex(0, 0), complex(0, 0)]),
             wires=[0, 1],
         )
-        qml.adjoint(qml.RY)(x[0], wires=0)
-        qml.RX(x[1] + 0.8, wires=1)
-        return qml.expval(qml.X(0))
+        qp.adjoint(qp.RY)(x[0], wires=0)
+        qp.RX(x[1] + 0.8, wires=1)
+        return qp.expval(qp.X(0))
 
     # CHECK: circuit_twotapes
     # CHECK: call_jaxpr={ lambda ;

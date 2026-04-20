@@ -14,7 +14,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import pennylane as qml
+import pennylane as qp
 
 from catalyst import measure, qjit
 from catalyst.passes import merge_rotations
@@ -23,9 +23,9 @@ from catalyst.passes import merge_rotations
 
 
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=1))
+@qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit(x: float):
-    qml.RX(x, wires=0)
+    qp.RX(x, wires=0)
     # CHECK: {{%.+}}, {{%.+}} = quantum.measure {{%.+}}
     m = measure(wires=0)
     return m
@@ -54,12 +54,12 @@ def test_one_shot_with_static_argnums(N):
     # CHECK: quantum.device shots([[one]])
     # CHECK: quantum.alloc( 10)
 
-    dev = qml.device("lightning.qubit", wires=N)
+    dev = qp.device("lightning.qubit", wires=N)
 
-    @qml.set_shots(N)
-    @qml.qnode(dev, mcm_method="one-shot")
+    @qp.set_shots(N)
+    @qp.qnode(dev, mcm_method="one-shot")
     def circ():
-        return qml.probs()
+        return qp.probs()
 
     return circ()
 
@@ -85,13 +85,13 @@ def test_one_shot_with_passes():
     # CHECK: transform.apply_registered_pass "merge-rotations"
     # CHECK: func.func public @circ() -> tensor<1x1xi64>
 
-    dev = qml.device("lightning.qubit", wires=1)
+    dev = qp.device("lightning.qubit", wires=1)
 
     @merge_rotations
-    @qml.set_shots(10)
-    @qml.qnode(dev, mcm_method="one-shot")
+    @qp.set_shots(10)
+    @qp.qnode(dev, mcm_method="one-shot")
     def circ():
-        return qml.sample()
+        return qp.sample()
 
     return circ()
 
@@ -144,18 +144,18 @@ def test_mcm_obs():
     # CHECK:  [[countsObs:%.+]] = quantum.mcmobs [[m0_i1]], [[m1_i1]] : !quantum.obs
     # CHECK:  [[counts:%.+]] = quantum.counts [[countsObs]] : tensor<4xf64>, tensor<4xi64>
 
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
-    @qml.qnode(dev, shots=1000)
+    @qp.qnode(dev, shots=1000)
     def circ():
-        m0 = qml.measure(0)
-        m1 = qml.measure(1)
+        m0 = qp.measure(0)
+        m1 = qp.measure(1)
         return (
-            qml.expval(m0),
-            qml.sample([m0, m1]),
-            qml.probs(op=[m0, m1]),
-            qml.var(m0),
-            qml.counts([m0, m1]),
+            qp.expval(m0),
+            qp.sample([m0, m1]),
+            qp.probs(op=[m0, m1]),
+            qp.var(m0),
+            qp.counts([m0, m1]),
         )
 
     return circ()

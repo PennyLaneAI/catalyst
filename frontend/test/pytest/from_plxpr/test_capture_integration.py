@@ -18,7 +18,7 @@
 from functools import partial
 
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 import pytest
 from jax.core import ShapedArray
 
@@ -31,19 +31,19 @@ pytestmark = pytest.mark.usefixtures("disable_capture")
 def circuit_aot_builder(dev):
     """Test AOT builder."""
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     @catalyst.qjit
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def catalyst_circuit_aot(x: float):
-        qml.Hadamard(wires=0)
-        qml.RZ(x, wires=0)
-        qml.RZ(x, wires=0)
-        qml.CNOT(wires=[1, 0])
-        qml.Hadamard(wires=1)
-        return qml.expval(qml.PauliY(wires=0))
+        qp.Hadamard(wires=0)
+        qp.RZ(x, wires=0)
+        qp.RZ(x, wires=0)
+        qp.CNOT(wires=[1, 0])
+        qp.Hadamard(wires=1)
+        return qp.expval(qp.PauliY(wires=0))
 
-    qml.capture.disable()
+    qp.capture.disable()
 
     return catalyst_circuit_aot
 
@@ -113,17 +113,17 @@ class TestCapture:
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_simple_circuit_aot(self, backend, theta):
         """Test the integration for a simple circuit."""
-        dev = qml.device(backend, wires=2)
+        dev = qp.device(backend, wires=2)
 
-        @qml.qnode(device=dev)
+        @qp.qnode(device=dev)
         def circuit(x):
-            qml.Hadamard(wires=0)
-            qml.RZ(x, wires=0)
-            qml.RZ(x, wires=0)
-            qml.CNOT(wires=[1, 0])
-            qml.Hadamard(wires=1)
-            qml.PCPhase(x, 2, wires=[0])
-            return qml.expval(qml.PauliY(wires=0))
+            qp.Hadamard(wires=0)
+            qp.RZ(x, wires=0)
+            qp.RZ(x, wires=0)
+            qp.CNOT(wires=[1, 0])
+            qp.Hadamard(wires=1)
+            qp.PCPhase(x, 2, wires=[0])
+            return qp.expval(qp.PauliY(wires=0))
 
         captured_result = circuit_aot_builder(dev)(theta)
         result = circuit(theta)
@@ -134,79 +134,79 @@ class TestCapture:
     def test_simple_circuit(self, backend, theta, capture):
         """Test the integration for a simple circuit."""
 
-        dev = qml.device(backend, wires=2)
+        dev = qp.device(backend, wires=2)
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @catalyst.qjit
-        @qml.qnode(device=dev)
+        @qp.qnode(device=dev)
         def captured_circuit(x):
-            qml.Hadamard(wires=0)
-            qml.RZ(x, wires=0)
-            qml.RZ(x, wires=0)
-            qml.CNOT(wires=[1, 0])
-            qml.Hadamard(wires=1)
-            return qml.expval(qml.PauliY(wires=0))
+            qp.Hadamard(wires=0)
+            qp.RZ(x, wires=0)
+            qp.RZ(x, wires=0)
+            qp.CNOT(wires=[1, 0])
+            qp.Hadamard(wires=1)
+            return qp.expval(qp.PauliY(wires=0))
 
         capture_result = captured_circuit(theta)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         if capture:
-            qml.capture.enable()
+            qp.capture.enable()
 
-        @qml.qnode(device=dev)
+        @qp.qnode(device=dev)
         def circuit(x):
-            qml.Hadamard(wires=0)
-            qml.RZ(x, wires=0)
-            qml.RZ(x, wires=0)
-            qml.CNOT(wires=[1, 0])
-            qml.Hadamard(wires=1)
-            return qml.expval(qml.PauliY(wires=0))
+            qp.Hadamard(wires=0)
+            qp.RZ(x, wires=0)
+            qp.RZ(x, wires=0)
+            qp.CNOT(wires=[1, 0])
+            qp.Hadamard(wires=1)
+            return qp.expval(qp.PauliY(wires=0))
 
         if capture:
-            assert qml.capture.enabled()
+            assert qp.capture.enabled()
         else:
-            assert not qml.capture.enabled()
+            assert not qp.capture.enabled()
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         assert jnp.allclose(capture_result, circuit(theta))
 
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_simple_workflow(self, backend, theta):
         """Test the integration for a simple workflow."""
-        dev = qml.device(backend, wires=2)
+        dev = qp.device(backend, wires=2)
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(device=dev)
+        @qp.qnode(device=dev)
         def captured_circuit(x):
-            qml.Hadamard(wires=0)
-            qml.RZ(x, wires=0)
-            qml.RZ(x, wires=0)
-            qml.CNOT(wires=[1, 0])
-            qml.Hadamard(wires=1)
-            return qml.expval(qml.PauliY(wires=0))
+            qp.Hadamard(wires=0)
+            qp.RZ(x, wires=0)
+            qp.RZ(x, wires=0)
+            qp.CNOT(wires=[1, 0])
+            qp.Hadamard(wires=1)
+            return qp.expval(qp.PauliY(wires=0))
 
         capture_result = captured_circuit(theta**2)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.qnode(device=dev)
+        @qp.qnode(device=dev)
         def circuit(x):
-            qml.Hadamard(wires=0)
-            qml.RZ(x, wires=0)
-            qml.RZ(x, wires=0)
-            qml.CNOT(wires=[1, 0])
-            qml.Hadamard(wires=1)
-            return qml.expval(qml.PauliY(wires=0))
+            qp.Hadamard(wires=0)
+            qp.RZ(x, wires=0)
+            qp.RZ(x, wires=0)
+            qp.CNOT(wires=[1, 0])
+            qp.Hadamard(wires=1)
+            return qp.expval(qp.PauliY(wires=0))
 
         assert jnp.allclose(capture_result, circuit(theta**2))
 
@@ -223,29 +223,29 @@ class TestCapture:
     )
     def test_basis_state(self, backend, n_wires, basis_state):
         """Test the integration for a circuit with BasisState."""
-        dev = qml.device(backend, wires=n_wires)
+        dev = qp.device(backend, wires=n_wires)
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def captured_circuit(_basis_state):
-            qml.BasisState(_basis_state, wires=list(range(n_wires)))
-            return qml.state()
+            qp.BasisState(_basis_state, wires=list(range(n_wires)))
+            return qp.state()
 
         capture_result = captured_circuit(basis_state)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(_basis_state):
-            qml.BasisState(_basis_state, wires=list(range(n_wires)))
-            return qml.state()
+            qp.BasisState(_basis_state, wires=list(range(n_wires)))
+            return qp.state()
 
         assert jnp.allclose(capture_result, circuit(basis_state))
 
@@ -263,59 +263,59 @@ class TestCapture:
     )
     def test_state_prep(self, backend, n_wires, init_state):
         """Test the integration for a circuit with StatePrep."""
-        dev = qml.device(backend, wires=n_wires)
+        dev = qp.device(backend, wires=n_wires)
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def captured_circuit(init_state):
-            qml.StatePrep(init_state, wires=list(range(n_wires)))
-            return qml.state()
+            qp.StatePrep(init_state, wires=list(range(n_wires)))
+            return qp.state()
 
         capture_result = captured_circuit(init_state)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(init_state):
-            qml.StatePrep(init_state, wires=list(range(n_wires)))
-            return qml.state()
+            qp.StatePrep(init_state, wires=list(range(n_wires)))
+            return qp.state()
 
         assert jnp.allclose(capture_result, circuit(init_state))
 
     @pytest.mark.parametrize("theta, val", [(jnp.pi, 0), (-100.0, 1)])
     def test_adjoint(self, backend, theta, val):
         """Test the integration for a circuit with adjoint."""
-        device = qml.device(backend, wires=2)
+        device = qp.device(backend, wires=2)
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(device)
+        @qp.qnode(device)
         def captured_circuit(theta, val):
-            qml.adjoint(qml.RY)(jnp.pi, val)
-            qml.adjoint(qml.RZ)(theta, wires=val)
-            return qml.state()
+            qp.adjoint(qp.RY)(jnp.pi, val)
+            qp.adjoint(qp.RZ)(theta, wires=val)
+            return qp.state()
 
         capture_result = captured_circuit(theta, val)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
-        @qml.qnode(device)
+        @qp.qnode(device)
         def circuit(theta, val):
-            qml.adjoint(qml.RY)(jnp.pi, val)
-            qml.adjoint(qml.RZ)(theta, wires=val)
-            return qml.state()
+            qp.adjoint(qp.RY)(jnp.pi, val)
+            qp.adjoint(qp.RZ)(theta, wires=val)
+            return qp.state()
 
         assert jnp.allclose(capture_result, circuit(theta, val))
 
@@ -323,30 +323,30 @@ class TestCapture:
     def test_ctrl(self, backend, theta):
         """Test the integration for a circuit with control."""
 
-        device = qml.device(backend, wires=3)
+        device = qp.device(backend, wires=3)
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(device)
+        @qp.qnode(device)
         def captured_circuit(theta):
-            qml.ctrl(qml.RX(theta, wires=0), control=[1], control_values=[False])
-            qml.ctrl(qml.RX, control=[1], control_values=[False])(theta, wires=[0])
-            return qml.state()
+            qp.ctrl(qp.RX(theta, wires=0), control=[1], control_values=[False])
+            qp.ctrl(qp.RX, control=[1], control_values=[False])(theta, wires=[0])
+            return qp.state()
 
         capture_result = captured_circuit(theta)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
-        @qml.qnode(device)
+        @qp.qnode(device)
         def circuit(theta):
-            qml.ctrl(qml.RX(theta, wires=0), control=[1], control_values=[False])
-            qml.ctrl(qml.RX, control=[1], control_values=[False])(theta, wires=[0])
-            return qml.state()
+            qp.ctrl(qp.RX(theta, wires=0), control=[1], control_values=[False])
+            qp.ctrl(qp.RX, control=[1], control_values=[False])(theta, wires=[0])
+            return qp.state()
 
         assert jnp.allclose(capture_result, circuit(theta))
 
@@ -356,28 +356,28 @@ class TestCapture:
         if backend == "lightning.kokkos":
             pytest.xfail(reason="Controlled PCPhase not yet implemented on Kokkos.")
 
-        device = qml.device(backend, wires=3)
+        device = qp.device(backend, wires=3)
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
-        @qml.qnode(device)
+        @qp.qnode(device)
         def circuit(theta):
-            qml.ctrl(qml.PCPhase, control=[1], control_values=[False])(theta, 2, wires=[0])
-            return qml.state()
+            qp.ctrl(qp.PCPhase, control=[1], control_values=[False])(theta, 2, wires=[0])
+            return qp.state()
 
         capture_result = qjit(circuit)(theta)
 
         # Capture disabled
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         assert jnp.allclose(capture_result, circuit(theta))
 
     @pytest.mark.parametrize(
         "reset, op, expected",
-        [(False, qml.I, 1), (False, qml.X, -1), (True, qml.I, 1), (True, qml.X, 1)],
+        [(False, qp.I, 1), (False, qp.X, -1), (True, qp.I, 1), (True, qp.X, 1)],
     )
     def test_measure(self, backend, reset, op, expected):
         """Test the integration for a circuit with a mid-circuit measurement.
@@ -387,20 +387,20 @@ class TestCapture:
         capture enabled. Hence, we only test that a simple example with a deterministic outcome
         returns correct results.
         """
-        device = qml.device(backend, wires=1)
+        device = qp.device(backend, wires=1)
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(device)
+        @qp.qnode(device)
         def captured_circuit():
             op(wires=0)
-            qml.measure(wires=0, reset=reset)
-            return qml.expval(qml.Z(0))
+            qp.measure(wires=0, reset=reset)
+            return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit()
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         assert jnp.allclose(capture_result, expected)
 
@@ -409,20 +409,20 @@ class TestCapture:
 
         See note in test_measure() above for discussion on testing strategy.
         """
-        device = qml.device(backend, wires=1)
+        device = qp.device(backend, wires=1)
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(device)
+        @qp.qnode(device)
         def captured_circuit():
-            qml.H(wires=0)
-            qml.measure(wires=0, postselect=1)
-            return qml.expval(qml.Z(0))
+            qp.H(wires=0)
+            qp.measure(wires=0, postselect=1)
+            return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit()
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         expected_result = -1
 
@@ -433,21 +433,21 @@ class TestCapture:
         """Test the integration for a circuit with a mid-circuit measurement used as a conditional
         predicate.
         """
-        device = qml.device(backend, wires=1)
+        device = qp.device(backend, wires=1)
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit(autograph=True)
-        @qml.qnode(device)
+        @qp.qnode(device)
         def captured_circuit():
-            m = qml.measure(wires=0)
+            m = qp.measure(wires=0)
             if m == pred:
-                qml.X(0)
-            return qml.expval(qml.Z(0))
+                qp.X(0)
+            return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit()
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         assert jnp.allclose(capture_result, -1)
 
@@ -457,35 +457,35 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=4))
+        @qp.qnode(qp.device(backend, wires=4))
         def captured_circuit(x):
 
-            @qml.for_loop(1, 4, 1)
+            @qp.for_loop(1, 4, 1)
             def loop(i):
-                qml.CNOT(wires=[0, i])
-                qml.RX(x, wires=i)
+                qp.CNOT(wires=[0, i])
+                qp.RX(x, wires=i)
 
             loop()  # pylint: disable=no-value-for-parameter
 
-            return qml.expval(qml.Z(2))
+            return qp.expval(qp.Z(2))
 
         capture_result = captured_circuit(theta)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
-        @qml.qnode(qml.device(backend, wires=4))
+        @qp.qnode(qp.device(backend, wires=4))
         def circuit(x):
 
             for i in range(1, 4):
-                qml.CNOT(wires=[0, i])
-                qml.RX(x, wires=i)
+                qp.CNOT(wires=[0, i])
+                qp.RX(x, wires=i)
 
-            return qml.expval(qml.Z(2))
+            return qp.expval(qp.Z(2))
 
         assert jnp.allclose(capture_result, circuit(theta))
 
@@ -494,41 +494,41 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(n, x):
 
-            @qml.for_loop(1, n, 1)
+            @qp.for_loop(1, n, 1)
             def loop_rx(_, x):
-                qml.RX(x, wires=0)
+                qp.RX(x, wires=0)
                 return jnp.sin(x)
 
             # apply the for loop
             loop_rx(x)  # pylint: disable=no-value-for-parameter
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(10, 0.3)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(n, x):
 
-            @qml.for_loop(1, n, 1)
+            @qp.for_loop(1, n, 1)
             def loop_rx(_, x):
-                qml.RX(x, wires=0)
+                qp.RX(x, wires=0)
                 return jnp.sin(x)
 
             # apply the for loop
             loop_rx(x)  # pylint: disable=no-value-for-parameter
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         assert jnp.allclose(circuit(10, 0.3), capture_result)
 
@@ -537,24 +537,24 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=4))
+        @qp.qnode(qp.device(backend, wires=4))
         def captured_circuit(n):
             # Input state: equal superposition
-            @qml.for_loop(0, n, 1)
+            @qp.for_loop(0, n, 1)
             def init(i):
-                qml.Hadamard(wires=i)
+                qp.Hadamard(wires=i)
 
             # QFT
-            @qml.for_loop(0, n, 1)
+            @qp.for_loop(0, n, 1)
             def qft(i):
-                qml.Hadamard(wires=i)
+                qp.Hadamard(wires=i)
 
-                @qml.for_loop(i + 1, n, 1)
+                @qp.for_loop(i + 1, n, 1)
                 def inner(j):
-                    qml.ControlledPhaseShift(jnp.pi / 2 ** (n - j + 1), [i, j])
+                    qp.ControlledPhaseShift(jnp.pi / 2 ** (n - j + 1), [i, j])
 
                 inner()  # pylint: disable=no-value-for-parameter
 
@@ -562,30 +562,30 @@ class TestCapture:
             qft()  # pylint: disable=no-value-for-parameter
 
             # Expected output: |100...>
-            return qml.state()
+            return qp.state()
 
         capture_result = captured_circuit(4)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=4))
+        @qp.qnode(qp.device(backend, wires=4))
         def circuit(n):
             # Input state: equal superposition
-            @qml.for_loop(0, n, 1)
+            @qp.for_loop(0, n, 1)
             def init(i):
-                qml.Hadamard(wires=i)
+                qp.Hadamard(wires=i)
 
             # QFT
-            @qml.for_loop(0, n, 1)
+            @qp.for_loop(0, n, 1)
             def qft(i):
-                qml.Hadamard(wires=i)
+                qp.Hadamard(wires=i)
 
-                @qml.for_loop(i + 1, n, 1)
+                @qp.for_loop(i + 1, n, 1)
                 def inner(j):
-                    qml.ControlledPhaseShift(jnp.pi / 2 ** (n - j + 1), [i, j])
+                    qp.ControlledPhaseShift(jnp.pi / 2 ** (n - j + 1), [i, j])
 
                 inner()  # pylint: disable=no-value-for-parameter
 
@@ -593,7 +593,7 @@ class TestCapture:
             qft()  # pylint: disable=no-value-for-parameter
 
             # Expected output: |100...>
-            return qml.state()
+            return qp.state()
 
         result = circuit(4)
 
@@ -605,51 +605,51 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def capturted_circuit(x: float):
 
             def while_cond(i):
                 return i < 10
 
-            @qml.while_loop(while_cond)
+            @qp.while_loop(while_cond)
             def loop_rx(a):
                 # perform some work and update (some of) the arguments
-                qml.RX(a, wires=0)
+                qp.RX(a, wires=0)
                 return a + 1
 
             # apply the while loop
             loop_rx(x)
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         capture_result_10_iterations = capturted_circuit(0)
         capture_result_1_iteration = capturted_circuit(9)
         capture_result_0_iterations = capturted_circuit(11)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
 
             def while_cond(i):
                 return i < 10
 
-            @qml.while_loop(while_cond)
+            @qp.while_loop(while_cond)
             def loop_rx(a):
                 # perform some work and update (some of) the arguments
-                qml.RX(a, wires=0)
+                qp.RX(a, wires=0)
                 return a + 1
 
             # apply the while loop
             loop_rx(x)
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         assert jnp.allclose(circuit(0), capture_result_10_iterations)
         assert jnp.allclose(circuit(9), capture_result_1_iteration)
@@ -661,49 +661,49 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float, step: float):
 
             def while_cond(i):
                 return i < 10
 
-            @qml.while_loop(while_cond)
+            @qp.while_loop(while_cond)
             def loop_rx(a):
                 # perform some work and update (some of) the arguments
-                qml.RX(a, wires=0)
+                qp.RX(a, wires=0)
                 return a + step
 
             # apply the while loop
             loop_rx(x)
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(0, 2)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float, step: float):
 
             def while_cond(i):
                 return i < 10
 
-            @qml.while_loop(while_cond)
+            @qp.while_loop(while_cond)
             def loop_rx(a):
                 # perform some work and update (some of) the arguments
-                qml.RX(a, wires=0)
+                qp.RX(a, wires=0)
                 return a + step
 
             # apply the while loop
             loop_rx(x)
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         assert jnp.allclose(circuit(0, 2), capture_result)
 
@@ -712,63 +712,63 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float, y: float):
 
             def while_cond(i):
                 return i < 10
 
-            @qml.while_loop(while_cond)
+            @qp.while_loop(while_cond)
             def outer_loop(a):
 
-                @qml.while_loop(while_cond)
+                @qp.while_loop(while_cond)
                 def inner_loop(b):
-                    qml.RX(b, wires=0)
+                    qp.RX(b, wires=0)
                     return b + 1
 
                 # apply the inner loop
                 inner_loop(y)
-                qml.RX(a, wires=0)
+                qp.RX(a, wires=0)
                 return a + 1
 
             # apply the outer loop
             outer_loop(x)
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(0, 0)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float, y: float):
 
             def while_cond(i):
                 return i < 10
 
-            @qml.while_loop(while_cond)
+            @qp.while_loop(while_cond)
             def outer_loop(a):
 
-                @qml.while_loop(while_cond)
+                @qp.while_loop(while_cond)
                 def inner_loop(b):
-                    qml.RX(b, wires=0)
+                    qp.RX(b, wires=0)
                     return b + 1
 
                 # apply the inner loop
                 inner_loop(y)
-                qml.RX(a, wires=0)
+                qp.RX(a, wires=0)
                 return a + 1
 
             # apply the outer loop
             outer_loop(x)
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         assert jnp.allclose(circuit(0, 0), capture_result)
 
@@ -777,43 +777,43 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
             def ansatz_true():
-                qml.RX(x, wires=0)
-                qml.Hadamard(wires=0)
+                qp.RX(x, wires=0)
+                qp.Hadamard(wires=0)
 
             def ansatz_false():
-                qml.RY(x, wires=0)
+                qp.RY(x, wires=0)
 
-            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+            qp.cond(x > 1.4, ansatz_true, ansatz_false)()
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(0.1)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
 
             def ansatz_true():
-                qml.RX(x, wires=0)
-                qml.Hadamard(wires=0)
+                qp.RX(x, wires=0)
+                qp.Hadamard(wires=0)
 
             def ansatz_false():
-                qml.RY(x, wires=0)
+                qp.RY(x, wires=0)
 
-            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+            qp.cond(x > 1.4, ansatz_true, ansatz_false)()
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         assert jnp.allclose(circuit(0.1), capture_result)
 
@@ -822,37 +822,37 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
             def ansatz_true():
-                qml.RX(x, wires=0)
-                qml.Hadamard(wires=0)
+                qp.RX(x, wires=0)
+                qp.Hadamard(wires=0)
 
-            qml.cond(x > 1.4, ansatz_true)()
+            qp.cond(x > 1.4, ansatz_true)()
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(1.5)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
 
             def ansatz_true():
-                qml.RX(x, wires=0)
-                qml.Hadamard(wires=0)
+                qp.RX(x, wires=0)
+                qp.Hadamard(wires=0)
 
-            qml.cond(x > 1.4, ansatz_true)()
+            qp.cond(x > 1.4, ansatz_true)()
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         assert jnp.allclose(circuit(1.5), capture_result)
 
@@ -862,47 +862,47 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
             def ansatz_true():
-                qml.RX(x, wires=0)
-                qml.Hadamard(wires=0)
-                qml.GlobalPhase(jnp.pi / 4)  # Custom primitive
+                qp.RX(x, wires=0)
+                qp.Hadamard(wires=0)
+                qp.GlobalPhase(jnp.pi / 4)  # Custom primitive
 
             def ansatz_false():
-                qml.RY(x, wires=0)
-                qml.GlobalPhase(jnp.pi / 2)  # Custom primitive
+                qp.RY(x, wires=0)
+                qp.GlobalPhase(jnp.pi / 2)  # Custom primitive
 
-            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+            qp.cond(x > 1.4, ansatz_true, ansatz_false)()
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(0.1)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
 
             def ansatz_true():
-                qml.RX(x, wires=0)
-                qml.Hadamard(wires=0)
-                qml.GlobalPhase(jnp.pi / 4)  # Custom primitive
+                qp.RX(x, wires=0)
+                qp.Hadamard(wires=0)
+                qp.GlobalPhase(jnp.pi / 4)  # Custom primitive
 
             def ansatz_false():
-                qml.RY(x, wires=0)
-                qml.GlobalPhase(jnp.pi / 2)  # Custom primitive
+                qp.RY(x, wires=0)
+                qp.GlobalPhase(jnp.pi / 2)  # Custom primitive
 
-            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+            qp.cond(x > 1.4, ansatz_true, ansatz_false)()
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         assert jnp.allclose(circuit(0.1), capture_result)
 
@@ -912,47 +912,47 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
             def ansatz_true():
-                qml.RX(x, wires=0)
-                qml.Hadamard(wires=0)
-                qml.state()  # Abstract measurement
+                qp.RX(x, wires=0)
+                qp.Hadamard(wires=0)
+                qp.state()  # Abstract measurement
 
             def ansatz_false():
-                qml.RY(x, wires=0)
-                qml.state()  # Abstract measurement
+                qp.RY(x, wires=0)
+                qp.state()  # Abstract measurement
 
-            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+            qp.cond(x > 1.4, ansatz_true, ansatz_false)()
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(0.1)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
 
             def ansatz_true():
-                qml.RX(x, wires=0)
-                qml.Hadamard(wires=0)
-                qml.state()  # Abstract measurement
+                qp.RX(x, wires=0)
+                qp.Hadamard(wires=0)
+                qp.state()  # Abstract measurement
 
             def ansatz_false():
-                qml.RY(x, wires=0)
-                qml.state()  # Abstract measurement
+                qp.RY(x, wires=0)
+                qp.state()  # Abstract measurement
 
-            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+            qp.cond(x > 1.4, ansatz_true, ansatz_false)()
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         assert jnp.allclose(circuit(0.1), capture_result)
 
@@ -962,47 +962,47 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
             def ansatz_true():
-                qml.RX(x, wires=0)
-                qml.Hadamard(wires=0)
+                qp.RX(x, wires=0)
+                qp.Hadamard(wires=0)
                 return x + 1  # simple primitive
 
             def ansatz_false():
-                qml.RY(x, wires=0)
+                qp.RY(x, wires=0)
                 return x + 1  # simple primitive
 
-            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+            qp.cond(x > 1.4, ansatz_true, ansatz_false)()
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(0.1)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
 
             def ansatz_true():
-                qml.RX(x, wires=0)
-                qml.Hadamard(wires=0)
+                qp.RX(x, wires=0)
+                qp.Hadamard(wires=0)
                 return x + 1  # simple primitive
 
             def ansatz_false():
-                qml.RY(x, wires=0)
+                qp.RY(x, wires=0)
                 return x + 1  # simple primitive
 
-            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+            qp.cond(x > 1.4, ansatz_true, ansatz_false)()
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         assert jnp.allclose(circuit(0.1), capture_result)
 
@@ -1011,57 +1011,57 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float, y: float):
 
             def ansatz_true():
-                qml.RX(x, wires=0)
-                qml.Hadamard(wires=0)
+                qp.RX(x, wires=0)
+                qp.Hadamard(wires=0)
 
             def ansatz_false():
 
                 def branch_true():
-                    qml.RY(y, wires=0)
+                    qp.RY(y, wires=0)
 
                 def branch_false():
-                    qml.RZ(y, wires=0)
+                    qp.RZ(y, wires=0)
 
-                qml.cond(y > 1.4, branch_true, branch_false)()
+                qp.cond(y > 1.4, branch_true, branch_false)()
 
-            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+            qp.cond(x > 1.4, ansatz_true, ansatz_false)()
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(0.1, 1.5)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float, y: float):
 
             def ansatz_true():
-                qml.RX(x, wires=0)
-                qml.Hadamard(wires=0)
+                qp.RX(x, wires=0)
+                qp.Hadamard(wires=0)
 
             def ansatz_false():
 
                 def branch_true():
-                    qml.RY(y, wires=0)
+                    qp.RY(y, wires=0)
 
                 def branch_false():
-                    qml.RZ(y, wires=0)
+                    qp.RZ(y, wires=0)
 
-                qml.cond(y > 1.4, branch_true, branch_false)()
+                qp.cond(y > 1.4, branch_true, branch_false)()
 
-            qml.cond(x > 1.4, ansatz_true, ansatz_false)()
+            qp.cond(x > 1.4, ansatz_true, ansatz_false)()
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         assert jnp.allclose(circuit(0.1, 1.5), capture_result)
 
@@ -1071,29 +1071,29 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
-            qml.cond(x > 1.4, qml.RX, qml.RY)(x, wires=0)
+            qp.cond(x > 1.4, qp.RX, qp.RY)(x, wires=0)
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(0.1)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
 
-            qml.cond(x > 1.4, qml.RX, qml.RY)(x, wires=0)
+            qp.cond(x > 1.4, qp.RX, qp.RY)(x, wires=0)
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         assert jnp.allclose(circuit(0.1), capture_result)
 
@@ -1104,13 +1104,13 @@ class TestCapture:
         def my_pass_setup_inputs(my_option=None, my_other_option=None):
             return (), {"my_option": my_option, "my_other_option": my_other_option}
 
-        my_pass = qml.transform(pass_name="my-pass", setup_inputs=my_pass_setup_inputs)
+        my_pass = qp.transform(pass_name="my-pass", setup_inputs=my_pass_setup_inputs)
 
         @qjit(target="mlir")
         @partial(my_pass, my_option="my_option_value", my_other_option=False)
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit():
-            return qml.expval(qml.PauliZ(0))
+            return qp.expval(qp.PauliZ(0))
 
         capture_mlir = captured_circuit.mlir
         assert 'transform.apply_registered_pass "my-pass"' in capture_mlir
@@ -1123,13 +1123,13 @@ class TestCapture:
     def test_pass_with_options(self, backend):
         """Test the integration for a circuit with a pass that takes in options."""
 
-        my_pass = qml.transform(pass_name="my-pass")
+        my_pass = qp.transform(pass_name="my-pass")
 
         @qjit(target="mlir")
         @partial(my_pass, my_option="my_option_value", my_other_option=False)
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit():
-            return qml.expval(qml.PauliZ(0))
+            return qp.expval(qp.PauliZ(0))
 
         capture_mlir = captured_circuit.mlir
         assert 'transform.apply_registered_pass "my-pass"' in capture_mlir
@@ -1143,32 +1143,32 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.transforms.cancel_inverses
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.transforms.cancel_inverses
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         capture_result = captured_circuit(0.1)
         assert 'transform.apply_registered_pass "cancel-inverses"' in captured_circuit.mlir
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.transforms.cancel_inverses
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.transforms.cancel_inverses
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         assert jnp.allclose(circuit(0.1), capture_result)
 
@@ -1177,32 +1177,32 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.transforms.merge_rotations
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.transforms.merge_rotations
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
-            qml.RX(x, wires=0)
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.RX(x, wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         capture_result = captured_circuit(0.1)
         assert 'transform.apply_registered_pass "merge-rotations"' in captured_circuit.mlir
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.transforms.merge_rotations
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.transforms.merge_rotations
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
-            qml.RX(x, wires=0)
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.RX(x, wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         assert jnp.allclose(circuit(0.1), capture_result)
 
@@ -1212,45 +1212,45 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
-            qml.RX(x, wires=0)
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.RX(x, wires=0)
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         captured_inverses_rotations = qjit(
-            qml.transforms.cancel_inverses(qml.transforms.merge_rotations(captured_circuit))
+            qp.transforms.cancel_inverses(qp.transforms.merge_rotations(captured_circuit))
         )
         captured_inverses_rotations_result = captured_inverses_rotations(0.1)
         assert has_catalyst_transforms(captured_inverses_rotations.mlir)
 
         captured_rotations_inverses = qjit(
-            qml.transforms.merge_rotations(qml.transforms.cancel_inverses(captured_circuit)),
+            qp.transforms.merge_rotations(qp.transforms.cancel_inverses(captured_circuit)),
         )
         captured_rotations_inverses_result = captured_rotations_inverses(0.1)
         assert has_catalyst_transforms(captured_rotations_inverses.mlir)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
-            qml.RX(x, wires=0)
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.RX(x, wires=0)
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         inverses_rotations_result = qjit(
-            qml.transforms.cancel_inverses(qml.transforms.merge_rotations(circuit))
+            qp.transforms.cancel_inverses(qp.transforms.merge_rotations(circuit))
         )(0.1)
         rotations_inverses_result = qjit(
-            qml.transforms.merge_rotations(qml.transforms.cancel_inverses(circuit))
+            qp.transforms.merge_rotations(qp.transforms.cancel_inverses(circuit))
         )(0.1)
 
         assert (
@@ -1263,32 +1263,32 @@ class TestCapture:
     def test_transform_unitary_to_rot_workflow(self, backend):
         """Test the integration for a circuit with a 'unitary_to_rot' transform."""
 
-        U = qml.Rot(1.0, 2.0, 3.0, wires=0)
+        U = qp.Rot(1.0, 2.0, 3.0, wires=0)
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.transforms.unitary_to_rot
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.transforms.unitary_to_rot
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(U: ShapedArray([2, 2], complex)):
-            qml.QubitUnitary(U, 0)
-            return qml.expval(qml.Z(0))
+            qp.QubitUnitary(U, 0)
+            return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(U.matrix())
         assert is_unitary_rotated(captured_circuit.mlir)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.transforms.unitary_to_rot
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.transforms.unitary_to_rot
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(U: ShapedArray([2, 2], complex)):
-            qml.QubitUnitary(U, 0)
-            return qml.expval(qml.Z(0))
+            qp.QubitUnitary(U, 0)
+            return qp.expval(qp.Z(0))
 
         assert jnp.allclose(circuit(U.matrix()), capture_result)
 
@@ -1296,24 +1296,24 @@ class TestCapture:
         """Test the integration for a circuit with a combination of 'unitary_to_rot'
         and 'cancel_inverses' transforms."""
 
-        U = qml.Rot(1.0, 2.0, 3.0, wires=0)
+        U = qp.Rot(1.0, 2.0, 3.0, wires=0)
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(U: ShapedArray([2, 2], complex)):
-            qml.QubitUnitary(U, 0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.QubitUnitary(U, 0)
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         # Case 1: During plxpr interpretation, first comes the PL transform
         # with Catalyst counterpart, second comes the PL transform without it
 
         captured_inverses_unitary = qjit(
-            qml.transforms.cancel_inverses(qml.transforms.unitary_to_rot(captured_circuit)),
+            qp.transforms.cancel_inverses(qp.transforms.unitary_to_rot(captured_circuit)),
         )
         captured_inverses_unitary_result = captured_inverses_unitary(U.matrix())
 
@@ -1327,7 +1327,7 @@ class TestCapture:
         # without Catalyst counterpart, second comes the PL transform with it
 
         captured_unitary_inverses = qjit(
-            qml.transforms.unitary_to_rot(qml.transforms.cancel_inverses(captured_circuit)),
+            qp.transforms.unitary_to_rot(qp.transforms.cancel_inverses(captured_circuit)),
         )
         captured_unitary_inverses_result = captured_unitary_inverses(U.matrix())
 
@@ -1338,22 +1338,22 @@ class TestCapture:
         assert 'quantum.custom "Hadamard"' not in capture_mlir
         assert is_unitary_rotated(capture_mlir)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(U: ShapedArray([2, 2], complex)):
-            qml.QubitUnitary(U, 0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.QubitUnitary(U, 0)
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         inverses_unitary_result = qjit(
-            qml.transforms.cancel_inverses(qml.transforms.unitary_to_rot(circuit))
+            qp.transforms.cancel_inverses(qp.transforms.unitary_to_rot(circuit))
         )(U.matrix())
         unitary_inverses_result = qjit(
-            qml.transforms.unitary_to_rot(qml.transforms.cancel_inverses(circuit))
+            qp.transforms.unitary_to_rot(qp.transforms.cancel_inverses(circuit))
         )(U.matrix())
 
         assert (
@@ -1368,28 +1368,28 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
-        @qml.qnode(qml.device(backend, wires=2))
+        @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
+        @qp.qnode(qp.device(backend, wires=2))
         def captured_circuit(x: float, y: float, z: float):
-            qml.Rot(x, y, z, 0)
-            return qml.expval(qml.PauliZ(0))
+            qp.Rot(x, y, z, 0)
+            return qp.expval(qp.PauliZ(0))
 
         capture_result = captured_circuit(1.5, 2.5, 3.5)
         assert is_rot_decomposed(captured_circuit.mlir)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
-        @qml.qnode(qml.device(backend, wires=2))
+        @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: float, y: float, z: float):
-            qml.Rot(x, y, z, 0)
-            return qml.expval(qml.PauliZ(0))
+            qp.Rot(x, y, z, 0)
+            return qp.expval(qp.PauliZ(0))
 
         assert jnp.allclose(circuit(1.5, 2.5, 3.5), capture_result)
 
@@ -1398,39 +1398,39 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
+        qp.capture.enable()
+        qp.decomposition.enable_graph()
 
         @qjit
-        @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
-        @qml.qnode(qml.device(backend, wires=2))
+        @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
+        @qp.qnode(qp.device(backend, wires=2))
         def captured_circuit(x: float, y: float, z: float):
-            m = qml.measure(0)
+            m = qp.measure(0)
 
-            @qml.cond(m)
+            @qp.cond(m)
             def cond_fn():
-                qml.Rot(x, y, z, 0)
+                qp.Rot(x, y, z, 0)
 
             cond_fn()
-            return qml.expval(qml.PauliZ(0))
+            return qp.expval(qp.PauliZ(0))
 
         capture_result = captured_circuit(1.5, 2.5, 3.5)
 
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
+        qp.decomposition.disable_graph()
+        qp.capture.disable()
 
         # Capture disabled
-        @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
-        @qml.qnode(qml.device(backend, wires=2))
+        @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: float, y: float, z: float):
             m = catalyst.measure(0)
 
             @catalyst.cond(m)
             def cond_fn():
-                qml.Rot(x, y, z, 0)
+                qp.Rot(x, y, z, 0)
 
             cond_fn()
-            return qml.expval(qml.PauliZ(0))
+            return qp.expval(qp.PauliZ(0))
 
         # non-capture pathway is not actively developed and raises unnecessary warnings (wontfix)
         with pytest.warns(UserWarning, match="MidCircuitMeasure does not define a decomposition"):
@@ -1444,37 +1444,37 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.transforms.single_qubit_fusion
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.transforms.single_qubit_fusion
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit():
-            qml.Hadamard(wires=0)
-            qml.Rot(0.1, 0.2, 0.3, wires=0)
-            qml.Rot(0.4, 0.5, 0.6, wires=0)
-            qml.RZ(0.1, wires=0)
-            qml.RZ(0.4, wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.Hadamard(wires=0)
+            qp.Rot(0.1, 0.2, 0.3, wires=0)
+            qp.Rot(0.4, 0.5, 0.6, wires=0)
+            qp.RZ(0.1, wires=0)
+            qp.RZ(0.4, wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         capture_result = captured_circuit()
 
         assert is_single_qubit_fusion_applied(captured_circuit.mlir)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.transforms.single_qubit_fusion
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.transforms.single_qubit_fusion
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit():
-            qml.Hadamard(wires=0)
-            qml.Rot(0.1, 0.2, 0.3, wires=0)
-            qml.Rot(0.4, 0.5, 0.6, wires=0)
-            qml.RZ(0.1, wires=0)
-            qml.RZ(0.4, wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.Hadamard(wires=0)
+            qp.Rot(0.1, 0.2, 0.3, wires=0)
+            qp.Rot(0.4, 0.5, 0.6, wires=0)
+            qp.RZ(0.1, wires=0)
+            qp.RZ(0.4, wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         assert jnp.allclose(circuit(), capture_result)
 
@@ -1483,19 +1483,19 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @partial(qml.transforms.commute_controlled, direction="left")
-        @qml.qnode(qml.device(backend, wires=3))
+        @partial(qp.transforms.commute_controlled, direction="left")
+        @qp.qnode(qp.device(backend, wires=3))
         def captured_circuit():
-            qml.CNOT(wires=[0, 2])
-            qml.PauliX(wires=2)
-            qml.RX(0.2, wires=2)
-            qml.Toffoli(wires=[0, 1, 2])
-            qml.CRX(0.1, wires=[0, 1])
-            qml.PauliX(wires=1)
-            return qml.expval(qml.PauliZ(0))
+            qp.CNOT(wires=[0, 2])
+            qp.PauliX(wires=2)
+            qp.RX(0.2, wires=2)
+            qp.Toffoli(wires=[0, 1, 2])
+            qp.CRX(0.1, wires=[0, 1])
+            qp.PauliX(wires=1)
+            return qp.expval(qp.PauliZ(0))
 
         capture_result = captured_circuit()
 
@@ -1507,21 +1507,21 @@ class TestCapture:
             capture_mlir, 'quantum.custom "PauliX"', 'quantum.custom "CRX"'
         )
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @partial(qml.transforms.commute_controlled, direction="left")
-        @qml.qnode(qml.device(backend, wires=3))
+        @partial(qp.transforms.commute_controlled, direction="left")
+        @qp.qnode(qp.device(backend, wires=3))
         def circuit():
-            qml.CNOT(wires=[0, 2])
-            qml.PauliX(wires=2)
-            qml.RX(0.2, wires=2)
-            qml.Toffoli(wires=[0, 1, 2])
-            qml.CRX(0.1, wires=[0, 1])
-            qml.PauliX(wires=1)
-            return qml.expval(qml.PauliZ(0))
+            qp.CNOT(wires=[0, 2])
+            qp.PauliX(wires=2)
+            qp.RX(0.2, wires=2)
+            qp.Toffoli(wires=[0, 1, 2])
+            qp.CRX(0.1, wires=[0, 1])
+            qp.PauliX(wires=1)
+            return qp.expval(qp.PauliZ(0))
 
         assert jnp.allclose(circuit(), capture_result)
 
@@ -1530,30 +1530,30 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.transforms.merge_amplitude_embedding
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.transforms.merge_amplitude_embedding
+        @qp.qnode(qp.device(backend, wires=2))
         def captured_circuit():
-            qml.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=0)
-            qml.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=1)
-            return qml.expval(qml.PauliZ(0))
+            qp.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=0)
+            qp.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=1)
+            return qp.expval(qp.PauliZ(0))
 
         capture_result = captured_circuit()
         assert is_amplitude_embedding_merged_and_decomposed(captured_circuit.mlir)
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         # Capture disabled
 
         @qjit
-        @qml.transforms.merge_amplitude_embedding
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.transforms.merge_amplitude_embedding
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit():
-            qml.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=0)
-            qml.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=1)
-            return qml.expval(qml.PauliZ(0))
+            qp.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=0)
+            qp.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=1)
+            return qp.expval(qp.PauliZ(0))
 
         assert jnp.allclose(circuit(), capture_result)
 
@@ -1562,53 +1562,53 @@ class TestCapture:
 
         # Capture enabled
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         @qjit
-        @qml.set_shots(10)
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.set_shots(10)
+        @qp.qnode(qp.device(backend, wires=2))
         def captured_circuit():
-            @qml.for_loop(0, 2, 1)
+            @qp.for_loop(0, 2, 1)
             def loop_0(i):
-                qml.RX(0, wires=i)
+                qp.RX(0, wires=i)
 
             loop_0()  # pylint: disable=no-value-for-parameter
 
-            qml.RX(0, wires=0)
-            return qml.sample()
+            qp.RX(0, wires=0)
+            return qp.sample()
 
         capture_result = captured_circuit()
         assert "shots(%" in captured_circuit.mlir
 
-        qml.capture.disable()
+        qp.capture.disable()
 
         @qjit
-        @qml.set_shots(10)
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.set_shots(10)
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit():
-            @qml.for_loop(0, 2, 1)
+            @qp.for_loop(0, 2, 1)
             def loop_0(i):
-                qml.RX(0, wires=i)
+                qp.RX(0, wires=i)
 
             loop_0()  # pylint: disable=no-value-for-parameter
 
-            qml.RX(0, wires=0)
-            return qml.sample()
+            qp.RX(0, wires=0)
+            return qp.sample()
 
         assert jnp.allclose(circuit(), capture_result)
 
     def test_static_variable_qnode(self, backend):
         """Test the integration for a circuit with a static variable."""
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         # Basic test
         @qjit(static_argnums=(0,))
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit_1(x, y):
-            qml.RX(x, wires=0)
-            qml.RY(y, wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.RY(y, wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         result_1 = captured_circuit_1(1.5, 2.0)
         captured_circuit_1_mlir = captured_circuit_1.mlir
@@ -1618,11 +1618,11 @@ class TestCapture:
 
         # Test that qjit static_argnums takes precedence over the one on the qnode
         @qjit(static_argnums=1)
-        @qml.qnode(qml.device(backend, wires=1), static_argnums=0)  # should be ignored
+        @qp.qnode(qp.device(backend, wires=1), static_argnums=0)  # should be ignored
         def captured_circuit_2(x, y):
-            qml.RX(x, wires=0)
-            qml.RY(y, wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.RY(y, wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         result_2 = captured_circuit_2(1.5, 2.0)
         captured_circuit_2_mlir = captured_circuit_2.mlir
@@ -1635,11 +1635,11 @@ class TestCapture:
         # Test under a non qnode workflow function
         @qjit(static_argnums=(0,))
         def workflow(x, y):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def c():
-                qml.RX(x, wires=0)
-                qml.RY(y, wires=0)
-                return qml.expval(qml.PauliZ(0))
+                qp.RX(x, wires=0)
+                qp.RY(y, wires=0)
+                return qp.expval(qp.PauliZ(0))
 
             return c()
 
@@ -1648,7 +1648,7 @@ class TestCapture:
         assert "%cst = arith.constant 1.5" in captured_circuit_3_mlir
         assert 'quantum.custom "RX"(%cst)' in captured_circuit_3_mlir
 
-        qml.capture.disable()
+        qp.capture.disable()
 
 
 class TestControlFlow:
@@ -1658,96 +1658,96 @@ class TestControlFlow:
     def test_for_loop_outside_qnode(self, reverse):
         """Test that a for loop outside qnode can be executed."""
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         if reverse:
             start, stop, step = 6, 0, -2  # 6, 4, 2
         else:
             start, stop, step = 2, 7, 2  # 2, 4, 6
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def c(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            return qp.expval(qp.Z(0))
 
-        @qml.qjit
+        @qp.qjit
         def f(i0):
-            @qml.for_loop(start, stop, step)
+            @qp.for_loop(start, stop, step)
             def g(i, x):
                 return c(i) + x
 
             return g(i0)  # pylint: disable=no-value-for-parameter
 
         out = f(3.0)
-        assert qml.math.allclose(out, 3 + jnp.cos(2) + jnp.cos(4) + jnp.cos(6))
+        assert qp.math.allclose(out, 3 + jnp.cos(2) + jnp.cos(4) + jnp.cos(6))
 
     def test_while_loop(self):
         """Test that a outside a qnode can be executed."""
-        qml.capture.enable()
+        qp.capture.enable()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            return qp.expval(qp.Z(0))
 
-        @qml.qjit
+        @qp.qjit
         def f(x):
 
             const = jnp.array([0, 1, 2])
 
-            @qml.while_loop(lambda i, y: i < jnp.sum(const))
+            @qp.while_loop(lambda i, y: i < jnp.sum(const))
             def g(i, y):
                 return i + 1, y + circuit(i)
 
             return g(0, x)
 
         ind, res = f(1.0)
-        assert qml.math.allclose(ind, 3)
+        assert qp.math.allclose(ind, 3)
         expected = 1.0 + jnp.cos(0) + jnp.cos(1) + jnp.cos(2)
-        assert qml.math.allclose(res, expected)
+        assert qp.math.allclose(res, expected)
 
     # pylint: disable=unused-argument
     def test_for_loop_consts(self):
         """This tests for kinda a weird edge case bug where the consts where getting
         reordered when translating the inner jaxpr."""
 
-        qml.capture.enable()
+        qp.capture.enable()
 
-        @qml.qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qp.qjit
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit(x, n):
-            @qml.for_loop(3)
+            @qp.for_loop(3)
             def outer(i):
 
-                @qml.for_loop(n)
+                @qp.for_loop(n)
                 def inner(j):
-                    qml.RY(x, wires=j)
+                    qp.RY(x, wires=j)
 
                 inner()  # pylint: disable=no-value-for-parameter
 
             outer()  # pylint: disable=no-value-for-parameter
 
             # Expected output: |100...>
-            return [qml.expval(qml.PauliZ(i)) for i in range(3)]
+            return [qp.expval(qp.PauliZ(i)) for i in range(3)]
 
         res1, res2, res3 = circuit(0.2, 2)
 
-        assert qml.math.allclose(res1, jnp.cos(0.2 * 3))
-        assert qml.math.allclose(res2, jnp.cos(0.2 * 3))
-        assert qml.math.allclose(res3, 1)
+        assert qp.math.allclose(res1, jnp.cos(0.2 * 3))
+        assert qp.math.allclose(res2, jnp.cos(0.2 * 3))
+        assert qp.math.allclose(res3, 1)
 
     # pylint: disable=unused-argument
     def test_for_loop_consts_outside_qnode(self):
         """Similar test as above for weird edge case, but not using a qnode."""
 
-        qml.capture.enable()
+        qp.capture.enable()
 
-        @qml.qjit
+        @qp.qjit
         def f(x, n):
-            @qml.for_loop(3)
+            @qp.for_loop(3)
             def outer(i, a):
 
-                @qml.for_loop(n)
+                @qp.for_loop(n)
                 def inner(j, b):
                     return b + x
 
@@ -1756,73 +1756,73 @@ class TestControlFlow:
             return outer(0.0)  # pylint: disable=no-value-for-parameter
 
         res = f(0.2, 2)
-        assert qml.math.allclose(res, 0.2 * 2 * 3)
+        assert qp.math.allclose(res, 0.2 * 2 * 3)
 
 
 def test_adjoint_transform_integration():
     """Test that adjoint transforms can be used with capture enabled."""
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     def f(x):
-        qml.IsingXX(2 * x, wires=(0, 1))
-        qml.H(0)
+        qp.IsingXX(2 * x, wires=(0, 1))
+        qp.H(0)
 
-    @qml.qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    @qp.qjit
+    @qp.qnode(qp.device("lightning.qubit", wires=3))
     def c(x):
-        qml.adjoint(f)(x)
-        return qml.expval(qml.Z(1))
+        qp.adjoint(f)(x)
+        return qp.expval(qp.Z(1))
 
     x = jnp.array(0.7)
     res = c(x)
     expected = jnp.cos(-2 * x)
-    assert qml.math.allclose(res, expected)
+    assert qp.math.allclose(res, expected)
 
 
 @pytest.mark.parametrize("separate_funcs", (True, False))
 def test_ctrl_transform_integration(separate_funcs):
     """Test that the ctrl transform can be applied."""
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     def f(x, y):
-        qml.RY(3 * y, wires=3)
-        qml.RX(2 * x, wires=3)
+        qp.RY(3 * y, wires=3)
+        qp.RX(2 * x, wires=3)
 
-    @qml.qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    @qp.qjit
+    @qp.qnode(qp.device("lightning.qubit", wires=4))
     def c(x, y):
-        qml.X(1)
+        qp.X(1)
         if separate_funcs:
-            qml.ctrl(qml.ctrl(f, 0, [False]), 1, [True])(x, y)
+            qp.ctrl(qp.ctrl(f, 0, [False]), 1, [True])(x, y)
         else:
-            qml.ctrl(f, (0, 1), [False, True])(x, y)
-        return qml.expval(qml.Z(3))
+            qp.ctrl(f, (0, 1), [False, True])(x, y)
+        return qp.expval(qp.Z(3))
 
     x = jnp.array(0.5)
     y = jnp.array(0.9)
     res = c(x, y)
     expected = jnp.cos(2 * x) * jnp.cos(3 * y)
-    assert qml.math.allclose(res, expected)
+    assert qp.math.allclose(res, expected)
 
 
 def test_different_static_argnums():
     """Test that the same qnode can be called different times with different static argnums."""
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qnode(qml.device("lightning.qubit", wires=1), static_argnums=1)
+    @qp.qnode(qp.device("lightning.qubit", wires=1), static_argnums=1)
     def c(x, pauli):
         if pauli == "X":
-            qml.RX(x, 0)
+            qp.RX(x, 0)
         elif pauli == "Y":
-            qml.RY(x, 0)
+            qp.RY(x, 0)
         else:
-            qml.RZ(x, 0)
-        return qml.state()
+            qp.RZ(x, 0)
+        return qp.state()
 
-    @qml.qjit
+    @qp.qjit
     def w(x):
         return c(x, "X"), c(x, "Y"), c(x, "Z")
 
@@ -1830,6 +1830,6 @@ def test_different_static_argnums():
 
     a = jnp.cos(0.5 / 2)
     b = jnp.sin(0.5 / 2)
-    assert qml.math.allclose(resx, jnp.array([a, -b * 1j]))
-    assert qml.math.allclose(resy, jnp.array([a, b]))
-    assert qml.math.allclose(resz, jnp.array([a - b * 1j, 0]))
+    assert qp.math.allclose(resx, jnp.array([a, -b * 1j]))
+    assert qp.math.allclose(resy, jnp.array([a, b]))
+    assert qp.math.allclose(resz, jnp.array([a - b * 1j, 0]))

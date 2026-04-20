@@ -16,7 +16,7 @@
 
 from dataclasses import dataclass
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import grad, qjit
@@ -150,15 +150,15 @@ class TestStaticArguments:
 
     def test_qnode_with_static_arguments(self, capsys):
         """Test if QJIT static arguments pass through QNode correctly."""
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit(static_argnums=(1,))
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x, c):
             print("Inside QNode:", c)
-            qml.RY(c, 0)
-            qml.RX(x, 0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RY(c, 0)
+            qp.RX(x, 0)
+            return qp.expval(qp.PauliZ(0))
 
         circuit(0.5, 0.5)
         captured = capsys.readouterr()
@@ -166,15 +166,15 @@ class TestStaticArguments:
 
     def test_qnode_nested_with_static_arguments(self, capsys):
         """Test if QJIT static arguments pass through QNode correctly."""
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit(static_argnums=(1,))
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x, c):
             print("Inside QNode:", c)
-            qml.RY(c, 0)
-            qml.RX(x, 0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RY(c, 0)
+            qp.RX(x, 0)
+            return qp.expval(qp.PauliZ(0))
 
         @qjit(static_argnums=(1,))
         def wrapper(x, c):
@@ -186,15 +186,15 @@ class TestStaticArguments:
 
     def test_qnode_switch_params(self, capsys):
         """Test if QJIT static arguments pass through QNode correctly when params are switched."""
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit(static_argnums=(0,))
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(c, x):
             print("Inside QNode:", c)
-            qml.RY(c, 0)
-            qml.RX(x, 0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RY(c, 0)
+            qp.RX(x, 0)
+            return qp.expval(qp.PauliZ(0))
 
         @qjit(static_argnums=(1,))
         def wrapper(x, c):
@@ -206,7 +206,7 @@ class TestStaticArguments:
 
     def test_qnode_nested_not_qnode(self, capsys):
         """Test if QJIT static arguments pass through nested Qjit calls with no QNodes."""
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit(static_argnums=(0,))
         def circuit(c, x):
@@ -278,14 +278,14 @@ class TestStaticArguments:
         """Test static arguments specified by names
         on functions with decorators"""
 
-        dev = qml.device("lightning.qubit", wires=3)
+        dev = qp.device("lightning.qubit", wires=3)
 
         @qjit(static_argnames="theta")
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def f(theta, phi):
-            qml.RX(theta, wires=0)
-            qml.RY(phi, wires=1)
-            return qml.probs()
+            qp.RX(theta, wires=0)
+            qp.RY(phi, wires=1)
+            return qp.probs()
 
         assert set(f.compile_options.static_argnums) == {0}
 

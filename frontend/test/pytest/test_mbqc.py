@@ -20,7 +20,7 @@ from functools import partial, reduce
 
 import networkx as nx
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pennylane.ftqc as plft
 import pytest
 
@@ -38,7 +38,7 @@ def fixture_mbqc_pipeline():
 
 
 def test_measure_x(mbqc_pipeline):
-    """Test the compilation of the qml.ftqc.measure_x function, which performs a mid-circuit
+    """Test the compilation of the qp.ftqc.measure_x function, which performs a mid-circuit
     measurement in the Pauli X basis.
 
     Executes on the null.qubit device. This test does not check the correctness of the result, only
@@ -47,24 +47,24 @@ def test_measure_x(mbqc_pipeline):
     only asserts that the result is mathematically valid given this final measurement process, i.e.
     that it is in the range [-1, +1].
     """
-    dev = qml.device("null.qubit", wires=1)
+    dev = qp.device("null.qubit", wires=1)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     @qjit(pipelines=mbqc_pipeline)
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def workload():
         _ = plft.measure_x(0)
-        return qml.expval(qml.Z(0))
+        return qp.expval(qp.Z(0))
 
     result = workload()
-    qml.capture.disable()
+    qp.capture.disable()
 
     assert -1.0 <= result <= 1.0
 
 
 def test_measure_y(mbqc_pipeline):
-    """Test the compilation of the qml.ftqc.measure_y function, which performs a mid-circuit
+    """Test the compilation of the qp.ftqc.measure_y function, which performs a mid-circuit
     measurement in the Pauli Y basis.
 
     Executes on the null.qubit device. This test does not check the correctness of the result, only
@@ -73,26 +73,26 @@ def test_measure_y(mbqc_pipeline):
     only asserts that the result is mathematically valid given this final measurement process, i.e.
     that it is in the range [-1, +1].
     """
-    dev = qml.device("null.qubit", wires=1)
+    dev = qp.device("null.qubit", wires=1)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     @qjit(pipelines=mbqc_pipeline)
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def workload():
         _ = plft.measure_y(0)
-        return qml.expval(qml.Z(0))
+        return qp.expval(qp.Z(0))
 
     result = workload()
-    qml.capture.disable()
+    qp.capture.disable()
 
     assert -1.0 <= result <= 1.0
 
 
 def test_measure_z(mbqc_pipeline):
-    """Test the compilation of the qml.ftqc.measure_z function, which performs a mid-circuit
+    """Test the compilation of the qp.ftqc.measure_z function, which performs a mid-circuit
     measurement in the Pauli Z basis. Including for completeness; measure_z() dispatches directly to
-    qml.measure().
+    qp.measure().
 
     Executes on the null.qubit device. This test does not check the correctness of the result, only
     that the workload can be compiled and executed end-to-end. We expect expval(Z) to always return
@@ -100,18 +100,18 @@ def test_measure_z(mbqc_pipeline):
     only asserts that the result is mathematically valid given this final measurement process, i.e.
     that it is in the range [-1, +1].
     """
-    dev = qml.device("null.qubit", wires=1)
+    dev = qp.device("null.qubit", wires=1)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     @qjit(pipelines=mbqc_pipeline)
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def workload():
         _ = plft.measure_z(0)
-        return qml.expval(qml.Z(0))
+        return qp.expval(qp.Z(0))
 
     result = workload()
-    qml.capture.disable()
+    qp.capture.disable()
 
     assert -1.0 <= result <= 1.0
 
@@ -119,7 +119,7 @@ def test_measure_z(mbqc_pipeline):
 @pytest.mark.parametrize("angle", [-np.pi / 2, 0.0, np.pi / 2])
 @pytest.mark.parametrize("plane", ["XY", "ZX", "YZ"])
 def test_measure_measure_arbitrary_basis(angle, plane, mbqc_pipeline):
-    """Test the compilation of the qml.ftqc.measure_arbitrary_basis function, which performs a
+    """Test the compilation of the qp.ftqc.measure_arbitrary_basis function, which performs a
     mid-circuit measurement in an arbitrary basis defined by a plane and rotation angle about that
     plane on the supplied qubit.
 
@@ -129,89 +129,89 @@ def test_measure_measure_arbitrary_basis(angle, plane, mbqc_pipeline):
     only asserts that the result is mathematically valid given this final measurement process, i.e.
     that it is in the range [-1, +1].
     """
-    dev = qml.device("null.qubit", wires=1)
+    dev = qp.device("null.qubit", wires=1)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     @qjit(pipelines=mbqc_pipeline)
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def workload():
         _ = plft.measure_arbitrary_basis(wires=0, angle=angle, plane=plane)
-        return qml.expval(qml.Z(0))
+        return qp.expval(qp.Z(0))
 
     result = workload()
-    qml.capture.disable()
+    qp.capture.disable()
 
     assert -1.0 <= result <= 1.0
 
 
 @pytest.mark.parametrize("postselect", [0, 1])
 def test_measure_measure_arbitrary_basis_postselect(postselect, mbqc_pipeline):
-    """Test the compilation of the qml.ftqc.measure_arbitrary_basis function with a postselect
+    """Test the compilation of the qp.ftqc.measure_arbitrary_basis function with a postselect
     argument.
 
     Executes on the null.qubit device. This test does not check the correctness of the result, only
     that the workload can be compiled and executed end-to-end.
     """
-    dev = qml.device("null.qubit", wires=1)
+    dev = qp.device("null.qubit", wires=1)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     @qjit(pipelines=mbqc_pipeline)
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def workload():
         _ = plft.measure_arbitrary_basis(wires=0, angle=0.1, plane="XY", postselect=postselect)
-        return qml.expval(qml.Z(0))
+        return qp.expval(qp.Z(0))
 
     result = workload()
-    qml.capture.disable()
+    qp.capture.disable()
 
     assert -1.0 <= result <= 1.0
 
 
 def test_measure_measure_arbitrary_basis_invalid_plane(mbqc_pipeline):
-    """Test that inputting an invalid ``plane`` parameter to qml.ftqc.measure_arbitrary_basis raises
+    """Test that inputting an invalid ``plane`` parameter to qp.ftqc.measure_arbitrary_basis raises
     a ValueError.
     """
-    dev = qml.device("null.qubit", wires=1)
+    dev = qp.device("null.qubit", wires=1)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     with pytest.raises(ValueError, match=r"Measurement plane must be one of \['XY', 'YZ', 'ZX'\]"):
 
         @qjit(pipelines=mbqc_pipeline)
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def workload():
             _ = plft.measure_arbitrary_basis(wires=0, angle=0.1, plane="YX")
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         _ = workload()
 
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 @pytest.mark.parametrize("postselect", [-1, 2])
 def test_measure_measure_arbitrary_basis_invalid_postselect(postselect, mbqc_pipeline):
-    """Test that inputting an invalid ``postselect`` parameter to qml.ftqc.measure_arbitrary_basis
+    """Test that inputting an invalid ``postselect`` parameter to qp.ftqc.measure_arbitrary_basis
     raises a CompileError.
     """
-    dev = qml.device("null.qubit", wires=1)
+    dev = qp.device("null.qubit", wires=1)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     with pytest.raises(
         CompileError, match="op attribute 'postselect' failed to satisfy constraint"
     ):
 
         @qjit(pipelines=mbqc_pipeline)
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def workload():
             _ = plft.measure_arbitrary_basis(wires=0, angle=0.1, plane="XY", postselect=postselect)
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         _ = workload()
 
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 # ---------------------------------------------------------------------------- #
@@ -232,48 +232,48 @@ def test_explicit_rz_in_mbqc(rz_angle, mbqc_pipeline):
     Executes on the null.qubit device. This test does not check the correctness of the result, only
     that the workload can be compiled and executed end-to-end.
     """
-    dev = qml.device("null.qubit", wires=5)
+    dev = qp.device("null.qubit", wires=5)
 
     # Define the graph structure for the RZ cluster state (omit node 0 for input):
     # 0 -- 1 -- 2 -- 3 -- 4
     lattice = plft.generate_lattice([4], "chain")
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     # RZ circuit in the MBQC representation
     @qjit(pipelines=mbqc_pipeline)
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit_mbqc(start_state, angle):
         # prep input node
-        qml.StatePrep(start_state, wires=[0])
+        qp.StatePrep(start_state, wires=[0])
 
         # prep graph state
-        qml.ftqc.make_graph_state(lattice.graph, wires=[1, 2, 3, 4])
+        qp.ftqc.make_graph_state(lattice.graph, wires=[1, 2, 3, 4])
 
         # entangle input and graph state
-        qml.CZ([0, 1])
+        qp.CZ([0, 1])
 
         # RZ measurement pattern
-        m0 = qml.ftqc.measure_x(0)
-        m1 = qml.ftqc.measure_x(1)
-        m2 = qml.ftqc.cond_measure(
+        m0 = qp.ftqc.measure_x(0)
+        m1 = qp.ftqc.measure_x(1)
+        m2 = qp.ftqc.cond_measure(
             m1,
-            partial(qml.ftqc.measure_arbitrary_basis, angle=angle, plane="XY"),
-            partial(qml.ftqc.measure_arbitrary_basis, angle=-angle, plane="XY"),
+            partial(qp.ftqc.measure_arbitrary_basis, angle=angle, plane="XY"),
+            partial(qp.ftqc.measure_arbitrary_basis, angle=-angle, plane="XY"),
         )(wires=2)
-        m3 = qml.ftqc.measure_x(3)
+        m3 = qp.ftqc.measure_x(3)
 
         # by-product corrections based on measurement outcomes
-        qml.cond(m0 ^ m2, qml.Z, qml.I)(4)
-        qml.cond(m1 ^ m3, qml.X, qml.I)(4)
+        qp.cond(m0 ^ m2, qp.Z, qp.I)(4)
+        qp.cond(m1 ^ m3, qp.X, qp.I)(4)
 
-        return qml.expval(qml.X(4)), qml.expval(qml.Y(4)), qml.expval(qml.Z(4))
+        return qp.expval(qp.X(4)), qp.expval(qp.Y(4)), qp.expval(qp.Z(4))
 
     initial_state = np.array([1, 0], dtype=np.complex128)
 
     expval_x, expval_y, expval_z = circuit_mbqc(initial_state, rz_angle)
 
-    qml.capture.disable()
+    qp.capture.disable()
 
     # We only assert that the expectation-value results are mathematically valid
     assert -1.0 <= expval_x <= 1.0
@@ -293,7 +293,7 @@ def test_cnot_in_mbqc_representation(mbqc_pipeline):
     Executes on the null.qubit device. This test does not check the correctness of the result, only
     that the workload can be compiled and executed end-to-end.
     """
-    dev = qml.device("null.qubit", wires=15)
+    dev = qp.device("null.qubit", wires=15)
 
     # Define the graph structure for the CNOT cluster state (omit nodes 0 and 8 for input)
     # 0 -- 1 -- 2 -- 3 -- 4 -- 5 -- 6
@@ -333,56 +333,56 @@ def test_cnot_in_mbqc_representation(mbqc_pipeline):
         """
         return reduce(lambda a, b: a ^ b, args)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     # Equivalent CNOT circuit in the MBQC representation
     @qjit(pipelines=mbqc_pipeline)
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit_mbqc(start_state):
         # prep input nodes
-        qml.StatePrep(start_state, wires=[1, 9])
+        qp.StatePrep(start_state, wires=[1, 9])
 
         # prep graph state
-        qml.ftqc.make_graph_state(g, wires=aux_wires)
+        qp.ftqc.make_graph_state(g, wires=aux_wires)
 
         # entangle
-        qml.CZ([0, 1])
-        qml.CZ([8, 9])
+        qp.CZ([0, 1])
+        qp.CZ([8, 9])
 
         # CNOT measurement pattern
-        m0 = qml.ftqc.measure_x(0)
-        m1 = qml.ftqc.measure_y(1)
-        m2 = qml.ftqc.measure_y(2)
-        m3 = qml.ftqc.measure_y(3)
-        m4 = qml.ftqc.measure_y(4)
-        m5 = qml.ftqc.measure_y(5)
-        m7 = qml.ftqc.measure_y(7)
-        m8 = qml.ftqc.measure_x(8)
-        m9 = qml.ftqc.measure_x(9)
-        m10 = qml.ftqc.measure_x(10)
-        m11 = qml.ftqc.measure_y(11)
-        m12 = qml.ftqc.measure_x(12)
-        m13 = qml.ftqc.measure_x(13)
+        m0 = qp.ftqc.measure_x(0)
+        m1 = qp.ftqc.measure_y(1)
+        m2 = qp.ftqc.measure_y(2)
+        m3 = qp.ftqc.measure_y(3)
+        m4 = qp.ftqc.measure_y(4)
+        m5 = qp.ftqc.measure_y(5)
+        m7 = qp.ftqc.measure_y(7)
+        m8 = qp.ftqc.measure_x(8)
+        m9 = qp.ftqc.measure_x(9)
+        m10 = qp.ftqc.measure_x(10)
+        m11 = qp.ftqc.measure_y(11)
+        m12 = qp.ftqc.measure_x(12)
+        m13 = qp.ftqc.measure_x(13)
 
         # corrections on controls
         x_cor = parity(m1, m2, m4, m5)
         z_cor = parity(m0, m2, m3, m4, m7, m8, m10, True)
-        qml.cond(z_cor, qml.Z, qml.I)(7)
-        qml.cond(x_cor, qml.X, qml.I)(7)
+        qp.cond(z_cor, qp.Z, qp.I)(7)
+        qp.cond(x_cor, qp.X, qp.I)(7)
 
         # corrections on target
         x_cor = parity(m1, m2, m7, m9, m11, m13)
         z_cor = parity(m8, m10, m12)
-        qml.cond(z_cor, qml.Z, qml.I)(14)
-        qml.cond(x_cor, qml.X, qml.I)(14)
+        qp.cond(z_cor, qp.Z, qp.I)(14)
+        qp.cond(x_cor, qp.X, qp.I)(14)
 
-        return qml.expval(qml.Z(6)), qml.expval(qml.Z(14))
+        return qp.expval(qp.Z(6)), qp.expval(qp.Z(14))
 
     initial_state = np.array([1, 0], dtype=np.complex128)
 
     expval_z_0, expval_z_1 = circuit_mbqc(initial_state)
 
-    qml.capture.disable()
+    qp.capture.disable()
 
     assert -1.0 <= expval_z_0 <= 1.0
     assert -1.0 <= expval_z_1 <= 1.0

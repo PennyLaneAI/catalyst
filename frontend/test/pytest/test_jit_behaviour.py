@@ -19,7 +19,7 @@ from timeit import default_timer as timer
 
 import jax
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 from jax import numpy as jnp
 from numpy import pi
@@ -41,10 +41,10 @@ def f_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder."""
 
     @qjit
-    @qml.set_shots(shots)
-    @qml.qnode(qml.device(backend, wires=wires))
+    @qp.set_shots(shots)
+    @qp.qnode(qp.device(backend, wires=wires))
     def f(x: float) -> bool:
-        qml.RY(x, wires=0)
+        qp.RY(x, wires=0)
         return measure(wires=0)
 
     return f
@@ -54,10 +54,10 @@ def f_jit_builder(backend, wires=1, shots=1000):
     """Test JIT builder."""
 
     @qjit
-    @qml.set_shots(shots)
-    @qml.qnode(qml.device(backend, wires=wires))
+    @qp.set_shots(shots)
+    @qp.qnode(qp.device(backend, wires=wires))
     def f(x):
-        qml.RY(x, wires=0)
+        qp.RY(x, wires=0)
         return measure(wires=0)
 
     return f
@@ -67,11 +67,11 @@ def fsample_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder with the sample measurement process."""
 
     @qjit
-    @qml.set_shots(shots)
-    @qml.qnode(qml.device(backend, wires=wires))
+    @qp.set_shots(shots)
+    @qp.qnode(qp.device(backend, wires=wires))
     def f(x: float):
-        qml.RY(x, wires=0)
-        return qml.sample()
+        qp.RY(x, wires=0)
+        return qp.sample()
 
     return f
 
@@ -82,10 +82,10 @@ class TestDifferentPrecisions:
 
         def builder(_in):
             @qjit
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def f(x):
-                qml.RX(x, wires=0)
-                return qml.state()
+                qp.RX(x, wires=0)
+                return qp.state()
 
             return f(_in)
 
@@ -116,12 +116,12 @@ class TestJittedWithOneTypeRunWithAnother:
         """Test recompile when unsupported argument."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f(x):
             if x.dtype == jnp.dtype(jnp.complex64):
                 x = jnp.real(x)
-            qml.RX(x.astype(float), wires=0)
-            return qml.state()
+            qp.RX(x.astype(float), wires=0)
+            return qp.state()
 
         res_from = f(from_type(1))
         id_from = id(f.compiled_function)
@@ -147,10 +147,10 @@ class TestJittedWithOneTypeRunWithAnother:
             warnings.simplefilter("error")
 
             @qjit
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def f(x):
-                qml.RX(jnp.real(x), wires=0)
-                return qml.state()
+                qp.RX(jnp.real(x), wires=0)
+                return qp.state()
 
             res_from = f(type(1))
 
@@ -173,12 +173,12 @@ class TestJittedWithOneTypeRunWithAnother:
         """Test recompile warning."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f(x: jax.core.ShapedArray([], jnp.int8)):
             if x.dtype == jnp.dtype(jnp.complex64):
                 x = jnp.real(x)
-            qml.RX(x.astype(float), wires=0)
-            return qml.state()
+            qp.RX(x.astype(float), wires=0)
+            return qp.state()
 
         res_from = f(jax.numpy.array(1, dtype=jnp.int8))
         id_from = id(f.compiled_function)
@@ -203,12 +203,12 @@ class TestJittedWithOneTypeRunWithAnother:
         """Test recompile python types."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f(x):
             if x.dtype == jnp.dtype(jnp.complex128):
                 x = jnp.real(x)
-            qml.RX(x.astype(float), wires=0)
-            return qml.state()
+            qp.RX(x.astype(float), wires=0)
+            return qp.state()
 
         res_from = f(from_type(1))
         id_from = id(f.compiled_function)
@@ -235,10 +235,10 @@ class TestJittedWithOneTypeRunWithAnother:
         """Test recompile no warning."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f(x):
-            qml.RX(x.astype(float), wires=0)
-            return qml.state()
+            qp.RX(x.astype(float), wires=0)
+            return qp.state()
 
         res_from = f(jax.numpy.array(1, dtype=jnp.int8))
         id_from = id(f.compiled_function)
@@ -271,10 +271,10 @@ class TestTypePromotion:
         """Test promote to double."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f(x):
-            qml.RX(x, wires=0)
-            return qml.state()
+            qp.RX(x, wires=0)
+            return qp.state()
 
         res_float64 = f(jnp.float64(1.0))
         id_64 = id(f.compiled_function)
@@ -298,12 +298,12 @@ class TestTypePromotion:
         """Test promotion python types."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f(x):
             if x.dtype == jnp.dtype(jnp.complex128):
                 x = jnp.real(x)
-            qml.RX(x.astype(float), wires=0)
-            return qml.state()
+            qp.RX(x.astype(float), wires=0)
+            return qp.state()
 
         res_from = f(from_type(1))
         id_from = id(f.compiled_function)
@@ -327,10 +327,10 @@ class TestTypePromotion:
         """Test promote to int."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f(x):
-            qml.RX(x.astype(float), wires=0)
-            return qml.state()
+            qp.RX(x.astype(float), wires=0)
+            return qp.state()
 
         res_int64 = f(jnp.int64(1))
         id_64 = id(f.compiled_function)
@@ -351,10 +351,10 @@ class TestTypePromotion:
         """Test promote to unsigned."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f(x):
-            qml.RX(x.astype(float), wires=0)
-            return qml.state()
+            qp.RX(x.astype(float), wires=0)
+            return qp.state()
 
         res_uint64 = f(jnp.uint64(1))
         id_64 = id(f.compiled_function)
@@ -383,10 +383,10 @@ class TestTypePromotion:
         """Test promote complex."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f(x):
-            qml.RX(x.real, wires=0)
-            return qml.state()
+            qp.RX(x.real, wires=0)
+            return qp.state()
 
         res_complex64 = f(jax.lax.complex(jnp.float64(1.0), jnp.float64(2.0)))
         id_64 = id(f.compiled_function)
@@ -411,15 +411,15 @@ class TestDecorator:
         """Test function is cached with decorator."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f_no_parenthesis(x):
-            qml.RY(x, wires=0)
+            qp.RY(x, wires=0)
             return measure(wires=0)
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f_parenthesis(x):
-            qml.RY(x, wires=0)
+            qp.RY(x, wires=0)
             return measure(wires=0)
 
         assert f_no_parenthesis(pi) == f_parenthesis(pi)
@@ -430,9 +430,9 @@ class TestCaching:
         """Test function is cached."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f_jit(x):
-            qml.RY(x, wires=0)
+            qp.RY(x, wires=0)
             return measure(wires=0)
 
         compile_and_run_start = timer()
@@ -451,10 +451,10 @@ class TestCaching:
         Test a function called multiple times within an outer jit function is generated only once
         """
 
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f(x):
-            qml.RX(x, wires=0)
-            return qml.expval(qml.PauliZ(wires=0))
+            qp.RX(x, wires=0)
+            return qp.expval(qp.PauliZ(wires=0))
 
         @qjit
         def g(x: float):
@@ -618,7 +618,7 @@ class TestClassicalCompilation:
 
 
 class TestArraysInHamiltonian:
-    """Test arrays in ``qml.Hamiltonian``."""
+    """Test arrays in ``qp.Hamiltonian``."""
 
     @pytest.mark.parametrize(
         "coeffs",
@@ -631,12 +631,12 @@ class TestArraysInHamiltonian:
         """Test array representation from context in Hamiltonian."""
 
         @qjit(target="mlir")
-        @qml.qnode(qml.device(backend, wires=6))
+        @qp.qnode(qp.device(backend, wires=6))
         def f():
-            qml.Hadamard(wires=0)
-            qml.CNOT(wires=[0, 1])
-            obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.Hadamard(0)]
-            return qml.expval(qml.Hamiltonian(coeffs, obs))
+            qp.Hadamard(wires=0)
+            qp.CNOT(wires=[0, 1])
+            obs = [qp.PauliX(0) @ qp.PauliZ(1), qp.Hadamard(0)]
+            return qp.expval(qp.Hamiltonian(coeffs, obs))
 
         f()
 
@@ -651,12 +651,12 @@ class TestArraysInHamiltonian:
         """Test array representation as parameter in Hamiltonian."""
 
         @qjit(target="mlir")
-        @qml.qnode(qml.device(backend, wires=6))
+        @qp.qnode(qp.device(backend, wires=6))
         def f(coeffs):
-            qml.Hadamard(wires=0)
-            qml.CNOT(wires=[0, 1])
-            obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.Hadamard(0)]
-            return qml.expval(qml.Hamiltonian(coeffs, obs))
+            qp.Hadamard(wires=0)
+            qp.CNOT(wires=[0, 1])
+            obs = [qp.PauliX(0) @ qp.PauliZ(1), qp.Hadamard(0)]
+            return qp.expval(qp.Hamiltonian(coeffs, obs))
 
         f(coeffs)
 
@@ -671,13 +671,13 @@ class TestArraysInHamiltonian:
         """Test array representation built-in in Hamiltonian."""
 
         @qjit(target="mlir")
-        @qml.qnode(qml.device(backend, wires=6))
+        @qp.qnode(qp.device(backend, wires=6))
         def f():
-            qml.Hadamard(wires=0)
-            qml.CNOT(wires=[0, 1])
-            obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.Hadamard(0)]
+            qp.Hadamard(wires=0)
+            qp.CNOT(wires=[0, 1])
+            obs = [qp.PauliX(0) @ qp.PauliZ(1), qp.Hadamard(0)]
             coeffs = array([0.4, 0.7])
-            return qml.expval(qml.Hamiltonian(coeffs, obs))
+            return qp.expval(qp.Hamiltonian(coeffs, obs))
 
         assert f.mlir
 
@@ -703,11 +703,11 @@ class TestArraysInHermitian:
         """Test array representation from context in Hermitian."""
 
         @qjit(target="mlir")
-        @qml.qnode(qml.device(backend, wires=6))
+        @qp.qnode(qp.device(backend, wires=6))
         def f(x: float):
-            qml.RX(x, wires=0)
-            hermitian = qml.Hermitian(array(matrix), wires=[0, 1])
-            return qml.expval(hermitian)
+            qp.RX(x, wires=0)
+            hermitian = qp.Hermitian(array(matrix), wires=[0, 1])
+            return qp.expval(hermitian)
 
         assert f.mlir
 
@@ -722,11 +722,11 @@ class TestArraysInHermitian:
         """Test array representation as parameter in Hermitian."""
 
         @qjit(target="mlir")
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def f(matrix):
-            qml.RX(jnp.pi, wires=0)
-            hermitian = qml.Hermitian(matrix, wires=[0, 1])
-            return qml.expval(hermitian)
+            qp.RX(jnp.pi, wires=0)
+            hermitian = qp.Hermitian(matrix, wires=[0, 1])
+            return qp.expval(hermitian)
 
         f(array(matrix))
 
@@ -741,9 +741,9 @@ class TestArraysInHermitian:
         """Test array representation built-in in Hermitian."""
 
         @qjit(target="mlir")
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def f(x: float):
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
             matrix = array(
                 [
                     [complex(2.0, 0.0), complex(1.0, 1.0), complex(9.0, 2.0), complex(0.0, 0.0)],
@@ -752,8 +752,8 @@ class TestArraysInHermitian:
                     [complex(0.0, 0.0), complex(3.0, 2.0), complex(1.0, -7.0), complex(4.0, 0.0)],
                 ]
             )
-            hermitian = qml.Hermitian(matrix, wires=[0, 1])
-            return qml.expval(hermitian)
+            hermitian = qp.Hermitian(matrix, wires=[0, 1])
+            return qp.expval(hermitian)
 
         assert f.mlir
 
@@ -778,10 +778,10 @@ class TestTracingQJITAnnotatedFunctions:
     def test_quantum_context(self, backend):
         """Test quantum context."""
 
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f(x: float):
-            qml.RX(x, wires=0)
-            return qml.state()
+            qp.RX(x, wires=0)
+            return qp.state()
 
         @qjit
         def g1(x: float):
@@ -801,10 +801,10 @@ class TestTracingQJITAnnotatedFunctions:
 
         # Issue 376
         @qjit
-        @qml.qnode(device=qml.device(backend, wires=1))
+        @qp.qnode(device=qp.device(backend, wires=1))
         def circuit(phi):
-            qml.RX(phi, wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(phi, wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         @qjit
         def workflow(phi):
@@ -819,10 +819,10 @@ class TestTracingQJITAnnotatedFunctions:
     def test_gradient_of_qjit_correctness(self, phi, backend):
         """Test gradient of qjit correctness."""
 
-        @qml.qnode(device=qml.device(backend, wires=1))
+        @qp.qnode(device=qp.device(backend, wires=1))
         def circuit(phi):
-            qml.RX(phi, wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(phi, wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         @qjit
         def workflow1(phi):
@@ -839,10 +839,10 @@ class TestTracingQJITAnnotatedFunctions:
     def test_gradient_of_qjit_names(self, backend):
         """Test gradient of qjit names."""
 
-        @qml.qnode(device=qml.device(backend, wires=1))
+        @qp.qnode(device=qp.device(backend, wires=1))
         def circuit(phi):
-            qml.RX(phi, wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(phi, wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         @qjit
         def workflow(phi: float):
@@ -874,10 +874,10 @@ class TestDefaultAvailableIR:
     def test_llvmir(self, backend):
         """Test llvmir."""
 
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f(x: float):
-            qml.RX(x, wires=0)
-            return qml.state()
+            qp.RX(x, wires=0)
+            return qp.state()
 
         @qjit  # Note that we are using the default qjit
         def g(x: float):
@@ -889,10 +889,10 @@ class TestDefaultAvailableIR:
     def test_mlir_opt(self, backend):
         """Test mlir opt."""
 
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f(x: float):
-            qml.RX(x, wires=0)
-            return qml.state()
+            qp.RX(x, wires=0)
+            return qp.state()
 
         @qjit  # Note that we are using the default qjit
         def g(x: float):
@@ -910,11 +910,11 @@ class TestDefaultAvailableIR:
 
         @qjit
         @iterative_cancel_inverses_pass
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f():
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.state()
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.state()
 
         mlir_opt = f.mlir_opt
         assert mlir_opt
@@ -924,10 +924,10 @@ class TestDefaultAvailableIR:
         """Test no mlir is generated for jaxpr target."""
 
         @qjit(target="jaxpr")
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f(x: float):
-            qml.RX(x, wires=0)
-            return qml.state()
+            qp.RX(x, wires=0)
+            return qp.state()
 
         assert f.mlir_opt is None
         assert f.mlir is None
@@ -937,9 +937,9 @@ class TestAvoidVerification:
     def test_no_verification(self, capfd, backend):
         """Test no verification."""
 
-        dev1 = qml.device(backend, wires=1)
+        dev1 = qp.device(backend, wires=1)
 
-        @qml.qnode(device=dev1)
+        @qp.qnode(device=dev1)
         def circuit(x):
             return x
 
@@ -1053,16 +1053,16 @@ class TestErrorNestedQNode:
     def test_nested_qnode(self):
         """Test autograph on a QNode raises error."""
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def inner():
-            return qml.state()
+            return qp.state()
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def outer():
             inner()
-            return qml.state()
+            return qp.state()
 
         with pytest.raises(CompileError):
 

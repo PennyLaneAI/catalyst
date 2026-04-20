@@ -24,7 +24,7 @@ running -apply-transform-sequence.
 
 # pylint: disable=line-too-long
 
-import pennylane as qml
+import pennylane as qp
 from utils import print_jaxpr, print_mlir
 
 from catalyst import pipeline, qjit
@@ -59,12 +59,12 @@ def test_pipeline_lowering():
 
     @qjit(keep_intermediate=True)
     @pipeline(my_pipeline)
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def test_pipeline_lowering_workflow(x):
-        qml.RX(x, wires=[0])
-        qml.Hadamard(wires=[1])
-        qml.Hadamard(wires=[1])
-        return qml.expval(qml.PauliY(wires=0))
+        qp.RX(x, wires=[0])
+        qp.Hadamard(wires=[1])
+        qp.Hadamard(wires=[1])
+        return qp.expval(qp.PauliY(wires=0))
 
     # CHECK: pipelines=(('main', (<cancel-inverses()>, <merge-rotations()>)),)
     print_jaxpr(test_pipeline_lowering_workflow, 1.2)
@@ -93,14 +93,14 @@ def test_transform_lowering():
     """
 
     @qjit(keep_intermediate=True)
-    @qml.transforms.merge_rotations
-    @qml.transforms.cancel_inverses
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qp.transforms.merge_rotations
+    @qp.transforms.cancel_inverses
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def test_pipeline_lowering_workflow(x):
-        qml.RX(x, wires=[0])
-        qml.Hadamard(wires=[1])
-        qml.Hadamard(wires=[1])
-        return qml.expval(qml.PauliY(wires=0))
+        qp.RX(x, wires=[0])
+        qp.Hadamard(wires=[1])
+        qp.Hadamard(wires=[1])
+        return qp.expval(qp.PauliY(wires=0))
 
     # CHECK: pipelines=(('main', (<cancel_inverses()>, <merge_rotations()>)),)
     print_jaxpr(test_pipeline_lowering_workflow, 1.2)
@@ -133,12 +133,12 @@ def test_pipeline_lowering_keep_original():
         "merge_rotations": {},
     }
 
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def f(x):
-        qml.RX(x, wires=[0])
-        qml.Hadamard(wires=[1])
-        qml.Hadamard(wires=[1])
-        return qml.expval(qml.PauliY(wires=0))
+        qp.RX(x, wires=[0])
+        qp.Hadamard(wires=[1])
+        qp.Hadamard(wires=[1])
+        return qp.expval(qp.PauliY(wires=0))
 
     f_pipeline = pipeline(my_pipeline)(f)
 
@@ -193,19 +193,19 @@ def test_pipeline_lowering_global():
 
     @qjit(keep_intermediate=True, circuit_transform_pipeline=my_pipeline)
     def global_wf():
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def g(x):
-            qml.RX(x, wires=[0])
-            qml.Hadamard(wires=[1])
-            qml.Hadamard(wires=[1])
-            return qml.expval(qml.PauliY(wires=0))
+            qp.RX(x, wires=[0])
+            qp.Hadamard(wires=[1])
+            qp.Hadamard(wires=[1])
+            return qp.expval(qp.PauliY(wires=0))
 
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def h(x):
-            qml.RX(x, wires=[0])
-            qml.Hadamard(wires=[1])
-            qml.Hadamard(wires=[1])
-            return qml.expval(qml.PauliY(wires=0))
+            qp.RX(x, wires=[0])
+            qp.Hadamard(wires=[1])
+            qp.Hadamard(wires=[1])
+            return qp.expval(qp.PauliY(wires=0))
 
         return g(1.2), h(1.2)
 
@@ -258,20 +258,20 @@ def test_pipeline_lowering_globloc_override():
 
     @qjit(keep_intermediate=True, circuit_transform_pipeline=global_pipeline)
     def global_wf():
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def g(x):
-            qml.RX(x, wires=[0])
-            qml.Hadamard(wires=[1])
-            qml.Hadamard(wires=[1])
-            return qml.expval(qml.PauliY(wires=0))
+            qp.RX(x, wires=[0])
+            qp.Hadamard(wires=[1])
+            qp.Hadamard(wires=[1])
+            return qp.expval(qp.PauliY(wires=0))
 
         @pipeline(local_pipeline)
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def h(x):
-            qml.RX(x, wires=[0])
-            qml.Hadamard(wires=[1])
-            qml.Hadamard(wires=[1])
-            return qml.expval(qml.PauliY(wires=0))
+            qp.RX(x, wires=[0])
+            qp.Hadamard(wires=[1])
+            qp.Hadamard(wires=[1])
+            return qp.expval(qp.PauliY(wires=0))
 
         return g(1.2), h(1.2)
 
@@ -323,13 +323,13 @@ def test_chained_pipeline_lowering():
     @qjit
     @pipeline(pipeline1)
     @pipeline(pipeline2)
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def test_chained_pipeline_lowering_workflow(x: float):
-        qml.Hadamard(wires=[1])
-        qml.RX(x, wires=[0])
-        qml.RX(-x, wires=[0])
-        qml.Hadamard(wires=[1])
-        return qml.expval(qml.PauliY(wires=0))
+        qp.Hadamard(wires=[1])
+        qp.RX(x, wires=[0])
+        qp.RX(-x, wires=[0])
+        qp.Hadamard(wires=[1])
+        return qp.expval(qp.PauliY(wires=0))
 
     print(test_chained_pipeline_lowering_workflow.mlir)
 
@@ -356,12 +356,12 @@ def test_chained_pipeline_lowering_keep_original():
         "cancel_inverses": {},
     }
 
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def f(x: float):
-        qml.RX(x, wires=[0])
-        qml.Hadamard(wires=[1])
-        qml.Hadamard(wires=[1])
-        return qml.expval(qml.PauliY(wires=0))
+        qp.RX(x, wires=[0])
+        qp.Hadamard(wires=[1])
+        qp.Hadamard(wires=[1])
+        return qp.expval(qp.PauliY(wires=0))
 
     f_pipeline1 = pipeline(pipeline1)(f)
     f_pipeline2 = pipeline(pipeline2)(f_pipeline1)
@@ -396,13 +396,13 @@ def test_chained_apply_passes():
     @qjit
     @apply_pass("merge-rotations")
     @apply_pass("cancel-inverses")
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def test_chained_apply_passes_workflow(x: float):
-        qml.Hadamard(wires=[1])
-        qml.RX(x, wires=[0])
-        qml.RX(-x, wires=[0])
-        qml.Hadamard(wires=[1])
-        return qml.expval(qml.PauliY(wires=0))
+        qp.Hadamard(wires=[1])
+        qp.RX(x, wires=[0])
+        qp.RX(-x, wires=[0])
+        qp.Hadamard(wires=[1])
+        return qp.expval(qp.PauliY(wires=0))
 
     print(test_chained_apply_passes_workflow.mlir)
 
@@ -421,12 +421,12 @@ def test_chained_apply_passes_keep_original():
     and the original is correctly kept and untransformed.
     """
 
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def f(x: float):
-        qml.RX(x, wires=[0])
-        qml.Hadamard(wires=[1])
-        qml.Hadamard(wires=[1])
-        return qml.expval(qml.PauliY(wires=0))
+        qp.RX(x, wires=[0])
+        qp.Hadamard(wires=[1])
+        qp.Hadamard(wires=[1])
+        return qp.expval(qp.PauliY(wires=0))
 
     f_pass1 = apply_pass("cancel-inverses")(f)
     f_pass2 = apply_pass("merge-rotations")(f_pass1)
@@ -459,13 +459,13 @@ def test_chained_peephole_passes():
     @qjit
     @merge_rotations
     @cancel_inverses
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def test_chained_peephole_passes_workflow(x: float):
-        qml.Hadamard(wires=[1])
-        qml.RX(x, wires=[0])
-        qml.RX(-x, wires=[0])
-        qml.Hadamard(wires=[1])
-        return qml.expval(qml.PauliY(wires=0))
+        qp.Hadamard(wires=[1])
+        qp.RX(x, wires=[0])
+        qp.RX(-x, wires=[0])
+        qp.Hadamard(wires=[1])
+        return qp.expval(qp.PauliY(wires=0))
 
     print(test_chained_peephole_passes_workflow.mlir)
 
@@ -484,12 +484,12 @@ def test_chained_peephole_passes_keep_original():
     and the original is correctly kept and untransformed.
     """
 
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def f(x: float):
-        qml.RX(x, wires=[0])
-        qml.Hadamard(wires=[1])
-        qml.Hadamard(wires=[1])
-        return qml.expval(qml.PauliY(wires=0))
+        qp.RX(x, wires=[0])
+        qp.Hadamard(wires=[1])
+        qp.Hadamard(wires=[1])
+        return qp.expval(qp.PauliY(wires=0))
 
     f_pass1 = cancel_inverses(f)
     f_pass2 = merge_rotations(f_pass1)
@@ -526,12 +526,12 @@ def test_single_pass_with_autograph():
 
     @qjit(autograph=True, target="mlir")
     @merge_rotations
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def f(x: float):
-        qml.RX(x, wires=0)
-        qml.RX(x, wires=0)
-        qml.Hadamard(wires=0)
-        return qml.expval(qml.PauliZ(0))
+        qp.RX(x, wires=0)
+        qp.RX(x, wires=0)
+        qp.Hadamard(wires=0)
+        return qp.expval(qp.PauliZ(0))
 
     # CHECK: transform.named_sequence @__transform_main(
     # CHECK-NEXT: transform.apply_registered_pass "merge-rotations" to {{%.+}}
@@ -554,12 +554,12 @@ def test_pipeline_with_autograph():
 
     @qjit(autograph=True, target="mlir")
     @pipeline(my_pipeline)
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def f(x: float):
-        qml.RX(x, wires=0)
-        qml.RX(x, wires=0)
-        qml.Hadamard(wires=0)
-        return qml.expval(qml.PauliZ(0))
+        qp.RX(x, wires=0)
+        qp.RX(x, wires=0)
+        qp.Hadamard(wires=0)
+        return qp.expval(qp.PauliZ(0))
 
     # CHECK: transform.named_sequence @__transform_main(
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
@@ -581,13 +581,13 @@ def test_single_pass_for_loop_autograph():
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
     # CHECK-NEXT: transform.yield
     @merge_rotations
-    @qml.qnode(qml.device("null.qubit", wires=1))
+    @qp.qnode(qp.device("null.qubit", wires=1))
     def circuit(n_iter: int):
         for _ in range(n_iter):
-            qml.RX(0.1, wires=0)
-            qml.T(0)
-            qml.RX(0.2, wires=0)
-        return qml.expval(qml.PauliZ(0))
+            qp.RX(0.1, wires=0)
+            qp.T(0)
+            qp.RX(0.2, wires=0)
+        return qp.expval(qp.PauliZ(0))
 
     print(circuit.mlir)
 
@@ -607,13 +607,13 @@ def test_stacked_pass_for_loop_autograph():
     # CHECK-NEXT: transform.yield
     @merge_rotations
     @cancel_inverses
-    @qml.qnode(qml.device("null.qubit", wires=1))
+    @qp.qnode(qp.device("null.qubit", wires=1))
     def circuit(n_iter: int):
         for _ in range(n_iter):
-            qml.RX(0.1, wires=0)
-            qml.T(0)
-            qml.RX(0.2, wires=0)
-        return qml.expval(qml.PauliZ(0))
+            qp.RX(0.1, wires=0)
+            qp.T(0)
+            qp.RX(0.2, wires=0)
+        return qp.expval(qp.PauliZ(0))
 
     print(circuit.mlir)
 
@@ -634,27 +634,27 @@ def test_cancel_inverses_tracing_and_lowering():
     def test_cancel_inverses_tracing_and_lowering_workflow(xx: float):
 
         @cancel_inverses
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def f(x: float):
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         @cancel_inverses
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def g(x: float):
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def h(x: float):
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         _f = f(xx)
         _g = g(xx)
@@ -687,12 +687,12 @@ def test_cancel_inverses_tracing_and_lowering_outside_qjit():
     """
 
     @cancel_inverses
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def f(x: float):
-        qml.RX(x, wires=0)
-        qml.Hadamard(wires=0)
-        qml.Hadamard(wires=0)
-        return qml.expval(qml.PauliZ(0))
+        qp.RX(x, wires=0)
+        qp.Hadamard(wires=0)
+        qp.Hadamard(wires=0)
+        return qp.expval(qp.PauliZ(0))
 
     @qjit
     def test_cancel_inverses_tracing_and_lowering_outside_qjit_workflow(xx: float):
@@ -724,30 +724,30 @@ def test_cancel_inverses_lowering_transform_applied():
     def test_cancel_inverses_lowering_transform_applied_workflow(xx: float):
 
         @cancel_inverses
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def f(x: float):
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def g(x: float):
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         @cancel_inverses
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def h(x: float):
             """
             Test that non-neighbouring self inverses are not canceled
             """
-            qml.Hadamard(wires=0)
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.Hadamard(wires=0)
+            qp.RX(x, wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
         # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
@@ -779,12 +779,12 @@ def test_cancel_inverses_keep_original():
     Test cancel_inverses does not unexpectedly mutate the original qnode.
     """
 
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def f(x: float):
-        qml.RX(x, wires=0)
-        qml.Hadamard(wires=0)
-        qml.Hadamard(wires=0)
-        return qml.expval(qml.PauliZ(0))
+        qp.RX(x, wires=0)
+        qp.Hadamard(wires=0)
+        qp.Hadamard(wires=0)
+        return qp.expval(qp.PauliZ(0))
 
     g = cancel_inverses(f)
 
@@ -854,27 +854,27 @@ def test_merge_rotations_tracing_and_lowering():
     def test_merge_rotations_tracing_and_lowering_workflow(xx: float):
 
         @merge_rotations
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def f(x: float):
-            qml.RX(x, wires=0)
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.RX(x, wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         @merge_rotations
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def g(x: float):
-            qml.RX(x, wires=0)
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.RX(x, wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def h(x: float):
-            qml.RX(x, wires=0)
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.RX(x, wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         _f = f(xx)
         _g = g(xx)

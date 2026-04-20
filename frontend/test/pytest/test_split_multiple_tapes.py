@@ -20,7 +20,7 @@ correct funcitonality after splitting each tape into a separate function in mlir
 from typing import Callable, Sequence
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import qjit
@@ -30,14 +30,14 @@ def test_split_multiple_tapes():
     """
     Test that multi-tape qnodes have the same functionality as core PL.
     """
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
     def my_quantum_transform(
-        tape: qml.tape.QuantumTape,
-    ) -> (Sequence[qml.tape.QuantumTape], Callable):
+        tape: qp.tape.QuantumTape,
+    ) -> (Sequence[qp.tape.QuantumTape], Callable):
         tape1 = tape
-        tape2 = qml.tape.QuantumTape(
-            [qml.RY(tape1.operations[1].parameters[0] + 0.4, wires=0)], [qml.expval(qml.X(0))]
+        tape2 = qp.tape.QuantumTape(
+            [qp.RY(tape1.operations[1].parameters[0] + 0.4, wires=0)], [qp.expval(qp.X(0))]
         )
 
         def post_processing_fn(results):
@@ -45,14 +45,14 @@ def test_split_multiple_tapes():
 
         return [tape1, tape2], post_processing_fn
 
-    dispatched_transform = qml.transform(my_quantum_transform)
+    dispatched_transform = qp.transform(my_quantum_transform)
 
     @dispatched_transform
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(x):
-        qml.adjoint(qml.RY)(x[0], wires=0)
-        qml.RX(x[1] + 0.8, wires=1)
-        return qml.expval(qml.X(0))
+        qp.adjoint(qp.RY)(x[0], wires=0)
+        qp.RX(x[1] + 0.8, wires=1)
+        return qp.expval(qp.X(0))
 
     expected = circuit([0.1, 0.2])
 

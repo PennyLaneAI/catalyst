@@ -19,7 +19,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import accelerate, debug, grad, jacobian, pure_callback, qjit
@@ -870,18 +870,18 @@ def test_active_grad_inside_qjit(backend, scale):
 
     @qjit
     @grad
-    @qml.qnode(qml.device(backend, wires=1))
+    @qp.qnode(qp.device(backend, wires=1))
     def wrapper(x):
         param = scale * identity(x)
-        qml.RX(param, wires=0)
-        return qml.expval(qml.PauliZ(0))
+        qp.RX(param, wires=0)
+        return qp.expval(qp.PauliZ(0))
 
-    @partial(qml.grad, argnums=0)
-    @qml.qnode(qml.device(backend, wires=1))
+    @partial(qp.grad, argnums=0)
+    @qp.qnode(qp.device(backend, wires=1))
     def wrapper_jit(x):
         param = scale * identity(x)
-        qml.RX(param, wires=0)
-        return qml.expval(qml.PauliZ(0))
+        qp.RX(param, wires=0)
+        return qp.expval(qp.PauliZ(0))
 
     assert np.allclose(wrapper_jit(42.0), wrapper(42.0))
 

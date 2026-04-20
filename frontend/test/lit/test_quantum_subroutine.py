@@ -19,7 +19,7 @@
 from functools import partial
 
 import jax
-import pennylane as qml
+import pennylane as qp
 from jax import numpy as jnp
 from pennylane.capture import subroutine
 
@@ -37,16 +37,16 @@ def test_subroutine_classical():
     def add_one(x):
         return x + 1
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qjit
+    @qp.qjit
     # CHECK: module @main
     def main():
         # CHECK: %{{.*}} = call @add_one(%{{.*}}) : (tensor<i64>) -> tensor<i64>
         return add_one(0)
 
     print(main.mlir)
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_subroutine_classical()
@@ -58,27 +58,27 @@ def test_quantum_subroutine_identity_restore_wires():
     @subroutine
     def identity(): ...
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qjit
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @main
     def main():
-        qml.Hadamard(wires=[0])
+        qp.Hadamard(wires=[0])
         # CHECK: [[QUBIT:%.+]] = quantum.custom "Hadamard"
         # CHECK: [[QREG:%.+]] = quantum.insert {{.*}}
         # CHECK: [[QREG_1:%.+]] = call @identity([[QREG]]) : (!quantum.reg) -> !quantum.reg
         # CHECK: [[QUBIT_1:%.+]] = quantum.extract [[QREG_1]][ 0]
         # CHECK: quantum.custom "Hadamard"() [[QUBIT_1]]
         identity()
-        qml.Hadamard(wires=[0])
-        return qml.probs()
+        qp.Hadamard(wires=[0])
+        return qp.probs()
 
     # CHECK: func.func private @identity([[REG:%.+]]: !quantum.reg) -> !quantum.reg
     # CHECK-NEXT: return [[REG]] : !quantum.reg
 
     print(main.mlir)
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_quantum_subroutine_identity_restore_wires()
@@ -90,23 +90,23 @@ def test_quantum_subroutine_identity():
     @subroutine
     def identity(): ...
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qjit
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @main
     def main():
         # CHECK: [[QREG:%.+]] = quantum.alloc
         # CHECK: [[QREG_1:%.+]] = call @identity([[QREG]]) : (!quantum.reg) -> !quantum.reg
         # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
         identity()
-        return qml.probs()
+        return qp.probs()
 
     # CHECK: func.func private @identity([[REG:%.+]]: !quantum.reg) -> !quantum.reg
     # CHECK-NEXT: return [[REG]] : !quantum.reg
 
     print(main.mlir)
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_quantum_subroutine_identity()
@@ -117,12 +117,12 @@ def test_quantum_subroutine_wire_param():
 
     @subroutine
     def Hadamard0(wire):
-        qml.Hadamard(wire)
+        qp.Hadamard(wire)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qjit
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @subroutine_test
     def subroutine_test(c: int):
         # CHECK: func.func public @subroutine_test([[ARG0:%.+]]
@@ -130,7 +130,7 @@ def test_quantum_subroutine_wire_param():
         # CHECK: [[QREG_1:%.+]] = call @Hadamard0([[QREG]], [[ARG0:%.+]]) : (!quantum.reg, tensor<i64>) -> !quantum.reg
         # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
         Hadamard0(c)
-        return qml.probs()
+        return qp.probs()
 
     # CHECK: func.func private @Hadamard0([[REG:%.+]]: !quantum.reg, [[WIRE_IDX_TENSOR:%.+]]: tensor<i64>) -> !quantum.reg
     # CHECK-NEXT: [[WIRE_IDX:%.+]] = tensor.extract [[WIRE_IDX_TENSOR]][] : tensor<i64>
@@ -142,7 +142,7 @@ def test_quantum_subroutine_wire_param():
 
     print(subroutine_test.mlir)
 
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_quantum_subroutine_wire_param()
@@ -153,12 +153,12 @@ def test_quantum_subroutine_gate_param_param():
 
     @subroutine
     def RX_on_wire_0(param):
-        qml.RX(param, wires=[0])
+        qp.RX(param, wires=[0])
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qjit
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @subroutine_test_2
     def subroutine_test_2():
         # CHECK-DAG: [[CST:%.+]] = stablehlo.constant dense<3.140000e+00>
@@ -166,7 +166,7 @@ def test_quantum_subroutine_gate_param_param():
         # CHECK: [[QREG_1:%.+]] = call @RX_on_wire_0([[QREG]], [[CST]]) : (!quantum.reg, tensor<f64>) -> !quantum.reg
         # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
         RX_on_wire_0(3.14)
-        return qml.probs()
+        return qp.probs()
 
     # CHECK: func.func private @RX_on_wire_0([[REG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>) -> !quantum.reg
     # CHECK-NEXT: [[QUBIT:%.+]] = quantum.extract [[REG]][ 0] : !quantum.reg -> !quantum.bit
@@ -176,7 +176,7 @@ def test_quantum_subroutine_gate_param_param():
     # CHECK-NEXT: return [[REG_1]] : !quantum.reg
     print(subroutine_test_2.mlir)
 
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_quantum_subroutine_gate_param_param()
@@ -185,20 +185,20 @@ test_quantum_subroutine_gate_param_param()
 def test_quantum_subroutine_with_control_flow():
     """Test control flow inside the subroutine"""
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     @subroutine
     def conditional_RX(param: float):
 
         def true_path():
-            qml.RX(param, wires=[0])
+            qp.RX(param, wires=[0])
 
         def false_path(): ...
 
-        qml.cond(param != 0.0, true_path, false_path)()
+        qp.cond(param != 0.0, true_path, false_path)()
 
-    @qml.qjit(autograph=False)
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qjit(autograph=False)
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @subroutine_test_3
     def subroutine_test_3():
         # CHECK-DAG: [[CST:%.+]] = stablehlo.constant dense<3.140000e+00>
@@ -206,7 +206,7 @@ def test_quantum_subroutine_with_control_flow():
         # CHECK: [[QREG_1:%.+]] = call @conditional_RX([[QREG]], [[CST]]) : (!quantum.reg, tensor<f64>) -> !quantum.reg
         # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
         conditional_RX(3.14)
-        return qml.probs()
+        return qp.probs()
 
     # CHECK: func.func private @conditional_RX([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>)
     # CHECK-NEXT: [[ZERO:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
@@ -222,7 +222,7 @@ def test_quantum_subroutine_with_control_flow():
     # CHECK:            scf.yield [[QREG]] : !quantum.reg
     # CHECK:      return [[RETVAL]]
     print(subroutine_test_3.mlir)
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_quantum_subroutine_with_control_flow()
@@ -231,25 +231,25 @@ test_quantum_subroutine_with_control_flow()
 def test_nested_subroutine_call():
     """Test nested subroutine call"""
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     @subroutine
     def Hadamard_subroutine():
-        qml.Hadamard(wires=[0])
+        qp.Hadamard(wires=[0])
 
     @subroutine
     def Hadamard_caller():
         Hadamard_subroutine()
 
-    @qml.qjit(autograph=False)
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qjit(autograph=False)
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @subroutine_test_4
     def subroutine_test_4():
         # CHECK: [[QREG:%.+]] = quantum.alloc
         # CHECK: [[QREG_1:%.+]] = call @Hadamard_caller([[QREG]]) : (!quantum.reg) -> !quantum.reg
         # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
         Hadamard_caller()
-        return qml.probs()
+        return qp.probs()
 
     # CHECK: func.func private @Hadamard_caller([[QREG:%.+]]: !quantum.reg) -> !quantum.reg
     # CHECK-NEXT: [[QREG_1:%.+]] = call @Hadamard_subroutine([[QREG]]) : (!quantum.reg) -> !quantum.reg
@@ -261,7 +261,7 @@ def test_nested_subroutine_call():
     # CHECK-NEXT: [[QREG_1:%.+]] = quantum.insert [[QREG]][ 0], [[QUBIT_1]] : !quantum.reg, !quantum.bit
     # CHECK-NEXT: return [[QREG_1]] : !quantum.reg
     print(subroutine_test_4.mlir)
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_nested_subroutine_call()
@@ -271,12 +271,12 @@ def test_two_callsites():
     """Test that two calls won't give multiple definitions
     in the classical setting"""
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     @subroutine
     def identity(): ...
 
-    @qml.qjit(autograph=False)
+    @qp.qjit(autograph=False)
     # CHECK: module @subroutine_test_5
     def subroutine_test_5():
         identity()
@@ -284,7 +284,7 @@ def test_two_callsites():
 
     # CHECK-NOT: func.func private @identity_0()
     print(subroutine_test_5.mlir)
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_two_callsites()
@@ -294,13 +294,13 @@ def test_two_callsites_quantum():
     """Test that two calls won't give multiple definitions
     int the quantum setting"""
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     @subroutine
     def identity(): ...
 
-    @qml.qjit(autograph=False)
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qjit(autograph=False)
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @subroutine_test_6
     def subroutine_test_6():
         # CHECK: [[QREG:%.+]] = quantum.alloc
@@ -309,11 +309,11 @@ def test_two_callsites_quantum():
         # CHECK: [[QREG_2:%.+]] = call @identity([[QREG_1]]) : (!quantum.reg) -> !quantum.reg
         identity()
         # CHECK: quantum.compbasis qreg [[QREG_2]] : !quantum.obs
-        return qml.probs()
+        return qp.probs()
 
     # CHECK-NOT: func.func private @identity_0
     print(subroutine_test_6.mlir)
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_two_callsites_quantum()
@@ -328,34 +328,34 @@ def test_two_qnodes_one_subroutine():
 
     # CHECK: module @main
 
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def subroutine_test_7():
         # CHECK: [[QREG:%.+]] = quantum.alloc
         # CHECK: [[QREG_1:%.+]] = call @identity([[QREG]]) : (!quantum.reg) -> !quantum.reg
         identity()
         # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
-        return qml.probs()
+        return qp.probs()
 
         # CHECK: func.func private @identity
 
-    @qml.qnode(qml.device("null.qubit", wires=1))
+    @qp.qnode(qp.device("null.qubit", wires=1))
     def subroutine_test_8():
         # CHECK: [[QREG:%.+]] = quantum.alloc
         # CHECK: [[QREG_1:%.+]] = call @identity_0([[QREG]]) : (!quantum.reg) -> !quantum.reg
         identity()
         # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
-        return qml.probs()
+        return qp.probs()
         # CHECK: func.func private @identity_0
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qjit(autograph=False)
+    @qp.qjit(autograph=False)
     def main():
         return subroutine_test_7() + subroutine_test_8()
 
     print(main.mlir)
 
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_two_qnodes_one_subroutine()
@@ -369,19 +369,19 @@ def test_with_constant():
         # CHECK: func.func private @Hadamard_plus_1
         # CHECK-NEXT: %c = stablehlo.constant dense<1> : tensor<i64>
         one = jax.numpy.array(1)
-        qml.Hadamard(c + one)
+        qp.Hadamard(c + one)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qjit(autograph=False)
-    @qml.qnode(qml.device("null.qubit", wires=2))
+    @qp.qjit(autograph=False)
+    @qp.qnode(qp.device("null.qubit", wires=2))
     def circ():
         Hadamard_plus_1(0)
-        return qml.probs()
+        return qp.probs()
 
     print(circ.mlir)
 
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_with_constant()
@@ -390,12 +390,12 @@ test_with_constant()
 def test_basic_subroutine():
     """Test the most simple subroutine."""
 
-    @qml.templates.Subroutine
+    @qp.templates.Subroutine
     def f(x, wires):
-        qml.RX(x, wires)
+        qp.RX(x, wires)
 
-    @qml.qjit(capture=True, target="mlir")
-    @qml.qnode(qml.device("null.qubit", wires=1))
+    @qp.qjit(capture=True, target="mlir")
+    @qp.qnode(qp.device("null.qubit", wires=1))
     # CHECK: module @circuit
     def circuit(x):
         # CHECK: [[QREG:%.+]] = quantum.alloc
@@ -403,7 +403,7 @@ def test_basic_subroutine():
 
         # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
         f(x, 0)
-        return qml.probs()
+        return qp.probs()
 
     # CHECK: func.func private @f(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
     # CHECK: [[QUBIT_1:%.+]] = quantum.custom "RX"
@@ -422,17 +422,17 @@ def test_multiple_metadata():
     Each metadata should get its own function.
     """
 
-    @partial(qml.templates.Subroutine, static_argnames="metadata")
+    @partial(qp.templates.Subroutine, static_argnames="metadata")
     def f(wires, metadata):
         if metadata == "X":
-            qml.X(wires)
+            qp.X(wires)
         elif metadata == "Y":
-            qml.Y(wires)
+            qp.Y(wires)
         else:
-            qml.Z(wires)
+            qp.Z(wires)
 
-    @qml.qjit(capture=True, target="mlir")
-    @qml.qnode(qml.device("null.qubit", wires=1))
+    @qp.qjit(capture=True, target="mlir")
+    @qp.qnode(qp.device("null.qubit", wires=1))
     # CHECK: module @circuit
     def circuit():
         # CHECK: [[QREG:%.+]] = quantum.alloc
@@ -446,7 +446,7 @@ def test_multiple_metadata():
         f(0, "Y")
         f(0, "Z")
         f(0, "X")  # check reusing the first call to the function
-        return qml.probs()
+        return qp.probs()
 
     # CHECK: func.func private @f(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg
     # CHECK: [[QUBIT_1:%.+]] = quantum.custom "PauliX"
@@ -471,16 +471,16 @@ test_multiple_metadata()
 def test_different_shapes():
     """Test a subroutine with different shape inputs get their own function."""
 
-    @qml.templates.Subroutine
+    @qp.templates.Subroutine
     def my_subroutine(data, wires):
-        @qml.for_loop(data.shape[0])
+        @qp.for_loop(data.shape[0])
         def loop(i):
-            qml.RX(data[i], wires[i])
+            qp.RX(data[i], wires[i])
 
         loop()  # pylint: disable=no-value-for-parameter
 
-    @qml.qjit(capture=True, target="mlir")
-    @qml.qnode(qml.device("null.qubit", wires=1))
+    @qp.qjit(capture=True, target="mlir")
+    @qp.qnode(qp.device("null.qubit", wires=1))
     # CHECK: module @circuit
     def circuit():
         # CHECK: [[QREG:%.+]] = quantum.alloc
@@ -492,7 +492,7 @@ def test_different_shapes():
         my_subroutine(jnp.array([0.0, 0.1, 0.2]), [0, 1, 2])
         my_subroutine(jnp.array([0.0, 0.1, 0.2]), [0, 1, 2])
         my_subroutine(jnp.array([0.5, 1.2]), [0, 1, 2])
-        return qml.probs()
+        return qp.probs()
 
     # CHECK: func.func private @my_subroutine(%arg0: !quantum.reg, %arg1: tensor<3xf64>, %arg2: tensor<3xi64>) -> !quantum.reg
     # CHECK:   [[ub:%.+]] = arith.constant 3 : index

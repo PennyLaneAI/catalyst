@@ -13,12 +13,12 @@
 # limitations under the License.
 
 """
-This file performs the frontend pytest checking for qml.Snapshot support in Catalyst.
+This file performs the frontend pytest checking for qp.Snapshot support in Catalyst.
 """
 
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 from pennylane import numpy as np
 
@@ -31,58 +31,58 @@ class TestSnapshot:
     @pytest.mark.parametrize(
         "operation_passed_to_snapshot",
         (
-            (qml.probs()),
-            (qml.expval(qml.X(0))),
-            (qml.counts()),
-            (qml.var(qml.X(0))),
-            (qml.sample()),
+            (qp.probs()),
+            (qp.expval(qp.X(0))),
+            (qp.counts()),
+            (qp.var(qp.X(0))),
+            (qp.sample()),
         ),
     )
     def test_not_implemented_snapshots(self, operation_passed_to_snapshot):
-        """Make sure only qml.state is allowed to be in qml.Snapshot"""
+        """Make sure only qp.state is allowed to be in qp.Snapshot"""
         with pytest.raises(
             NotImplementedError,
-            match=r"qml.Snapshot\(\) only supports qml.state\(\) when used from within Catalyst,"
+            match=r"qp.Snapshot\(\) only supports qp.state\(\) when used from within Catalyst,"
             + f" but encountered {type(operation_passed_to_snapshot)}",
         ):
-            dev = qml.device("lightning.qubit", wires=1)
+            dev = qp.device("lightning.qubit", wires=1)
 
             @qjit
-            @qml.set_shots(5)
-            @qml.qnode(dev)
+            @qp.set_shots(5)
+            @qp.qnode(dev)
             def circuit():
-                qml.Snapshot(measurement=operation_passed_to_snapshot)
-                return qml.probs()
+                qp.Snapshot(measurement=operation_passed_to_snapshot)
+                return qp.probs()
 
             circuit()
 
     def test_snapshot_on_single_wire(self, backend):
-        """Test all six single qubit basis states in qml.Snapshot without shots"""
+        """Test all six single qubit basis states in qp.Snapshot without shots"""
 
-        pl_dev = qml.device("default.qubit", wires=1)
-        cat_dev = qml.device(backend, wires=1)
+        pl_dev = qp.device("default.qubit", wires=1)
+        cat_dev = qp.device(backend, wires=1)
 
         def circuit():
-            qml.Snapshot()  # |0>
-            qml.X(wires=0)
-            qml.Snapshot()  # |1>
-            qml.Hadamard(wires=0)
-            qml.Snapshot()  # |->
-            qml.PhaseShift(np.pi / 2, wires=0)
-            qml.Snapshot()  # |-i>
-            qml.Z(wires=0)
-            qml.Snapshot()  # |+i>
-            qml.PhaseShift(-np.pi / 2, wires=0)
-            qml.Snapshot()  # |+>
-            return qml.state(), qml.probs(), qml.expval(qml.X(0)), qml.var(qml.Z(0))
+            qp.Snapshot()  # |0>
+            qp.X(wires=0)
+            qp.Snapshot()  # |1>
+            qp.Hadamard(wires=0)
+            qp.Snapshot()  # |->
+            qp.PhaseShift(np.pi / 2, wires=0)
+            qp.Snapshot()  # |-i>
+            qp.Z(wires=0)
+            qp.Snapshot()  # |+i>
+            qp.PhaseShift(-np.pi / 2, wires=0)
+            qp.Snapshot()  # |+>
+            return qp.state(), qp.probs(), qp.expval(qp.X(0)), qp.var(qp.Z(0))
 
-        pl_circuit = qml.qnode(pl_dev)(circuit)
+        pl_circuit = qp.qnode(pl_dev)(circuit)
         expected_measurement_results = pl_circuit()
 
-        expected_snapshot_results = list(qml.snapshots(pl_circuit)().values())
+        expected_snapshot_results = list(qp.snapshots(pl_circuit)().values())
         expected_snapshot_results = expected_snapshot_results[:-1]  # remove 'execution_results' key
 
-        cat_circuit = qjit(qml.qnode(cat_dev)(circuit))
+        cat_circuit = qjit(qp.qnode(cat_dev)(circuit))
         jitted_results = cat_circuit()
         jitted_snapshot_results = jitted_results[0]
         jitted_measurement_results = jitted_results[1]
@@ -94,29 +94,29 @@ class TestSnapshot:
         )
 
     def test_snapshot_on_two_wire(self, backend):
-        """Test qml.Snapshot on two qubits with shots"""
-        pl_dev = qml.device("default.qubit", wires=2)
-        cat_dev = qml.device(backend, wires=2)
+        """Test qp.Snapshot on two qubits with shots"""
+        pl_dev = qp.device("default.qubit", wires=2)
+        cat_dev = qp.device(backend, wires=2)
 
         def circuit():
-            qml.Snapshot()  # |00>
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=1)
-            qml.Snapshot()  # |++>
+            qp.Snapshot()  # |00>
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=1)
+            qp.Snapshot()  # |++>
 
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=1)  # |00>
-            qml.X(wires=0)
-            qml.X(wires=1)  # |11> to measure in comp-basis
-            return {0: qml.counts(), 1: qml.sample()}
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=1)  # |00>
+            qp.X(wires=0)
+            qp.X(wires=1)  # |11> to measure in comp-basis
+            return {0: qp.counts(), 1: qp.sample()}
 
-        pl_circuit = qml.qnode(pl_dev, shots=5)(circuit)
+        pl_circuit = qp.qnode(pl_dev, shots=5)(circuit)
         expected_measurement_results = pl_circuit()
 
-        expected_snapshot_results = list(qml.snapshots(pl_circuit)().values())
+        expected_snapshot_results = list(qp.snapshots(pl_circuit)().values())
         expected_snapshot_results = expected_snapshot_results[:-1]  # remove 'execution_results' key
 
-        cat_circuit = qjit(qml.qnode(cat_dev, shots=5)(circuit))
+        cat_circuit = qjit(qp.qnode(cat_dev, shots=5)(circuit))
         jitted_results = cat_circuit()
         jitted_snapshot_results = jitted_results[0]
         jitted_measurement_results = jitted_results[1]
@@ -128,15 +128,15 @@ class TestSnapshot:
         assert np.allclose(expected_measurement_results[1], jitted_measurement_results[1])
 
     def test_snapshots_with_dynamic_wires(self):
-        """Test if qml.Snapshot captures dynamic shaped states"""
+        """Test if qp.Snapshot captures dynamic shaped states"""
 
         @qjit
         def workflow(num_qubits):
-            @qml.qnode(qml.device("lightning.qubit", wires=num_qubits))
+            @qp.qnode(qp.device("lightning.qubit", wires=num_qubits))
             def circuit():
-                qml.X(wires=0)
-                qml.Snapshot()
-                return qml.probs()
+                qp.X(wires=0)
+                qp.Snapshot()
+                return qp.probs()
 
             return circuit()
 

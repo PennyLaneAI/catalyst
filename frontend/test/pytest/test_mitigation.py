@@ -17,7 +17,7 @@ from functools import partial
 
 import jax
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 from pennylane.noise import exponential_extrapolate, poly_extrapolate
 
@@ -44,16 +44,16 @@ def test_single_measurement(params, extrapolation, folding, scale_factors):
     """Test that without noise the same results are returned for single measurements."""
     skip_if_exponential_extrapolation_unstable(params, extrapolation, threshold=0.2)
 
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def circuit(x):
-        qml.Hadamard(wires=0)
-        qml.RZ(x, wires=0)
-        qml.RZ(x, wires=0)
-        qml.CNOT(wires=[1, 0])
-        qml.Hadamard(wires=1)
-        return qml.expval(qml.PauliY(wires=0))
+        qp.Hadamard(wires=0)
+        qp.RZ(x, wires=0)
+        qp.RZ(x, wires=0)
+        qp.CNOT(wires=[1, 0])
+        qp.Hadamard(wires=1)
+        return qp.expval(qp.PauliY(wires=0))
 
     @catalyst.qjit
     def mitigated_qnode(args):
@@ -74,16 +74,16 @@ def test_multiple_measurements(params, extrapolation, folding):
     """Test that without noise the same results are returned for multiple measurements"""
     skip_if_exponential_extrapolation_unstable(params, extrapolation, threshold=0.5)
 
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def circuit(x):
-        qml.Hadamard(wires=0)
-        qml.RZ(x, wires=0)
-        qml.RZ(x, wires=0)
-        qml.CNOT(wires=[1, 0])
-        qml.Hadamard(wires=1)
-        return qml.expval(qml.PauliY(wires=0)), qml.expval(qml.PauliY(wires=1))
+        qp.Hadamard(wires=0)
+        qp.RZ(x, wires=0)
+        qp.RZ(x, wires=0)
+        qp.CNOT(wires=[1, 0])
+        qp.Hadamard(wires=1)
+        return qp.expval(qp.PauliY(wires=0)), qp.expval(qp.PauliY(wires=1))
 
     @catalyst.qjit
     def mitigated_qnode(args):
@@ -102,28 +102,28 @@ def test_multiple_measurements(params, extrapolation, folding):
 def test_single_measurement_control_flow(params, folding):
     """Test that without noise the same results are returned for single measurement and with
     control flow."""
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def circuit(x, n):
         @catalyst.for_loop(0, n, 1)
         def loop_0(i):  # pylint: disable=unused-argument
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
 
         loop_0()
 
-        qml.Hadamard(wires=0)
-        qml.RZ(x, wires=0)
-        qml.RZ(x, wires=0)
-        qml.CNOT(wires=[1, 0])
-        qml.Hadamard(wires=1)
+        qp.Hadamard(wires=0)
+        qp.RZ(x, wires=0)
+        qp.RZ(x, wires=0)
+        qp.CNOT(wires=[1, 0])
+        qp.Hadamard(wires=1)
 
         @catalyst.for_loop(0, n, 1)
         def loop_1(i):  # pylint: disable=unused-argument
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
 
         loop_1()
-        return qml.expval(qml.PauliY(wires=0))
+        return qp.expval(qp.PauliY(wires=0))
 
     @catalyst.qjit
     def mitigated_qnode(args, n):
@@ -172,16 +172,16 @@ def test_scale_factors_type_error(scale_factors):
 @pytest.mark.parametrize("extrapolation", [quadratic_extrapolation, exponential_extrapolate])
 def test_dtype_error(extrapolation):
     """Test that an error is raised when multiple results do not have the same dtype."""
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def circuit(x):
-        qml.Hadamard(wires=0)
-        qml.RZ(x, wires=0)
-        qml.RZ(x, wires=0)
-        qml.CNOT(wires=[1, 0])
-        qml.Hadamard(wires=1)
-        return qml.expval(qml.PauliY(wires=0)), 1
+        qp.Hadamard(wires=0)
+        qp.RZ(x, wires=0)
+        qp.RZ(x, wires=0)
+        qp.CNOT(wires=[1, 0])
+        qp.Hadamard(wires=1)
+        return qp.expval(qp.PauliY(wires=0)), 1
 
     @catalyst.qjit
     def mitigated_qnode(args):
@@ -198,15 +198,15 @@ def test_dtype_error(extrapolation):
 @pytest.mark.parametrize("extrapolation", [quadratic_extrapolation, exponential_extrapolate])
 def test_dtype_not_float_error(extrapolation):
     """Test that an error is raised when results are not float."""
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def circuit(x):
-        qml.Hadamard(wires=0)
-        qml.RZ(x, wires=0)
-        qml.RZ(x, wires=0)
-        qml.CNOT(wires=[1, 0])
-        qml.Hadamard(wires=1)
+        qp.Hadamard(wires=0)
+        qp.RZ(x, wires=0)
+        qp.RZ(x, wires=0)
+        qp.CNOT(wires=[1, 0])
+        qp.Hadamard(wires=1)
         return 1
 
     @catalyst.qjit
@@ -224,16 +224,16 @@ def test_dtype_not_float_error(extrapolation):
 @pytest.mark.parametrize("extrapolation", [quadratic_extrapolation, exponential_extrapolate])
 def test_shape_error(extrapolation):
     """Test that an error is raised when results have shape."""
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def circuit(x):
-        qml.Hadamard(wires=0)
-        qml.RZ(x, wires=0)
-        qml.RZ(x, wires=0)
-        qml.CNOT(wires=[1, 0])
-        qml.Hadamard(wires=1)
-        return qml.probs(wires=0)
+        qp.Hadamard(wires=0)
+        qp.RZ(x, wires=0)
+        qp.RZ(x, wires=0)
+        qp.CNOT(wires=[1, 0])
+        qp.Hadamard(wires=1)
+        return qp.probs(wires=0)
 
     @catalyst.qjit
     def mitigated_qnode(args):
@@ -249,9 +249,9 @@ def test_shape_error(extrapolation):
 
 def test_folding_type_not_supported():
     """Test that value of folding argument is from allowed list"""
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def circuit():
         return 0.0
 
@@ -266,9 +266,9 @@ def test_folding_type_not_supported():
 
 def test_folding_type_not_implemented():
     """Test value of folding argument supported but not yet developed"""
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def circuit():
         return 0.0
 
@@ -286,16 +286,16 @@ def test_zne_usage_patterns(params, extrapolation, folding):
     """Test usage patterns of catalyst.zne."""
     skip_if_exponential_extrapolation_unstable(params, extrapolation, threshold=0.2)
 
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def fn(x):
-        qml.Hadamard(wires=0)
-        qml.RZ(x, wires=0)
-        qml.RZ(x, wires=0)
-        qml.CNOT(wires=[1, 0])
-        qml.Hadamard(wires=1)
-        return qml.expval(qml.PauliY(wires=0))
+        qp.Hadamard(wires=0)
+        qp.RZ(x, wires=0)
+        qp.RZ(x, wires=0)
+        qp.CNOT(wires=[1, 0])
+        qp.Hadamard(wires=1)
+        return qp.expval(qp.PauliY(wires=0))
 
     @catalyst.qjit
     def mitigated_qnode_fn_as_argument(args):
@@ -315,16 +315,16 @@ def test_zne_usage_patterns(params, extrapolation, folding):
 
 def test_zne_with_jax_polyfit():
     """test mitigate_with_zne works with jax polyfit"""
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def circuit():
-        qml.Hadamard(wires=0)
-        qml.RZ(0.4, wires=0)
-        qml.RZ(0.3, wires=0)
-        qml.CNOT(wires=[1, 0])
-        qml.Hadamard(wires=1)
-        return qml.expval(qml.PauliY(wires=0))
+        qp.Hadamard(wires=0)
+        qp.RZ(0.4, wires=0)
+        qp.RZ(0.3, wires=0)
+        qp.CNOT(wires=[1, 0])
+        qp.Hadamard(wires=1)
+        return qp.expval(qp.PauliY(wires=0))
 
     def jax_extrapolation(scale_factors, results):
         return jax.numpy.polyfit(scale_factors, results, 2)[-1]
@@ -340,16 +340,16 @@ def test_zne_with_jax_polyfit():
 
 def test_zne_with_extrap_kwargs():
     """test mitigate_with_zne with keyword arguments for extrapolation function"""
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def circuit():
-        qml.Hadamard(wires=0)
-        qml.RZ(0.1, wires=0)
-        qml.RZ(0.2, wires=0)
-        qml.CNOT(wires=[1, 0])
-        qml.Hadamard(wires=1)
-        return qml.expval(qml.PauliY(wires=0))
+        qp.Hadamard(wires=0)
+        qp.RZ(0.1, wires=0)
+        qp.RZ(0.2, wires=0)
+        qp.CNOT(wires=[1, 0])
+        qp.Hadamard(wires=1)
+        return qp.expval(qp.PauliY(wires=0))
 
     @catalyst.qjit
     def mitigated_qnode():
@@ -365,16 +365,16 @@ def test_zne_with_extrap_kwargs():
 
 def test_exponential_extrapolation_with_kwargs():
     """test mitigate_with_zne with keyword arguments for exponential extrapolation function"""
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def circuit():
-        qml.Hadamard(wires=0)
-        qml.RZ(0.1, wires=0)
-        qml.RZ(0.2, wires=0)
-        qml.CNOT(wires=[1, 0])
-        qml.Hadamard(wires=1)
-        return qml.expval(qml.PauliY(wires=0))
+        qp.Hadamard(wires=0)
+        qp.RZ(0.1, wires=0)
+        qp.RZ(0.2, wires=0)
+        qp.CNOT(wires=[1, 0])
+        qp.Hadamard(wires=1)
+        return qp.expval(qp.PauliY(wires=0))
 
     @catalyst.qjit
     def mitigated_qnode():
@@ -390,18 +390,18 @@ def test_exponential_extrapolation_with_kwargs():
 
 def test_jaxpr_with_const():
     """test mitigate_with_zne with a circuit that generates arguments in MLIR"""
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def circuit():
         a = jax.numpy.array([0.1, 0.2, 0.3, 0.4])
         b = jax.numpy.take(a, 2)
-        qml.Hadamard(wires=0)
-        qml.RZ(0.1, wires=0)
-        qml.RZ(b, wires=0)
-        qml.CNOT(wires=[1, 0])
-        qml.Hadamard(wires=1)
-        return qml.expval(qml.PauliY(wires=0))
+        qp.Hadamard(wires=0)
+        qp.RZ(0.1, wires=0)
+        qp.RZ(b, wires=0)
+        qp.CNOT(wires=[1, 0])
+        qp.Hadamard(wires=1)
+        return qp.expval(qp.PauliY(wires=0))
 
     @catalyst.qjit
     def mitigated_qnode():
@@ -416,22 +416,22 @@ def test_jaxpr_with_const():
 
 def test_mcm_method_with_zne(backend):
     """Test that the dynamic_one_shot works with ZNE."""
-    dev = qml.device(backend, wires=1)
+    dev = qp.device(backend, wires=1)
 
     def circuit():
-        return qml.expval(qml.PauliZ(0))
+        return qp.expval(qp.PauliZ(0))
 
     s = [1, 3]
 
     @catalyst.qjit
     def mitigated_circuit_1():
         s = [1, 3]
-        g = qml.set_shots(qml.QNode(circuit, dev, mcm_method="one-shot"), shots=5)
+        g = qp.set_shots(qp.QNode(circuit, dev, mcm_method="one-shot"), shots=5)
         return catalyst.mitigate_with_zne(g, scale_factors=s)()
 
     @catalyst.qjit
     def mitigated_circuit_2():
-        g = qml.set_shots(qml.QNode(circuit, dev), shots=5)
+        g = qp.set_shots(qp.QNode(circuit, dev), shots=5)
         return catalyst.mitigate_with_zne(g, scale_factors=s)()
 
     observed = mitigated_circuit_1()
@@ -448,25 +448,25 @@ def test_on_classical_function_with_qnodes(params, extrapolation, folding, scale
     """Test that without noise the same results are returned for qnode calls inside a classical
     function."""
 
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def circuit1(x):
-        qml.Hadamard(wires=0)
-        qml.RZ(x, wires=0)
-        qml.RZ(x, wires=0)
-        qml.CNOT(wires=[1, 0])
-        qml.Hadamard(wires=1)
-        return qml.expval(qml.PauliY(wires=0))
+        qp.Hadamard(wires=0)
+        qp.RZ(x, wires=0)
+        qp.RZ(x, wires=0)
+        qp.CNOT(wires=[1, 0])
+        qp.Hadamard(wires=1)
+        return qp.expval(qp.PauliY(wires=0))
 
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def circuit2(x):
-        qml.Hadamard(wires=0)
-        qml.RX(x, wires=0)
-        qml.RX(x, wires=0)
-        qml.CNOT(wires=[1, 0])
-        qml.Hadamard(wires=1)
-        return qml.expval(qml.PauliY(wires=0))
+        qp.Hadamard(wires=0)
+        qp.RX(x, wires=0)
+        qp.RX(x, wires=0)
+        qp.CNOT(wires=[1, 0])
+        qp.Hadamard(wires=1)
+        return qp.expval(qp.PauliY(wires=0))
 
     @catalyst.qjit
     @partial(
@@ -488,29 +488,29 @@ def test_on_classical_function_with_qnodes(params, extrapolation, folding, scale
 def test_multiple_qnodes_sinked(params, extrapolation, folding, scale_factors):
     """Test that without noise the same results are returned for sinked qnode calls."""
 
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def circuit1(x):
-        qml.Hadamard(wires=0)
-        qml.RZ(x, wires=0)
-        qml.RZ(x, wires=0)
-        qml.CNOT(wires=[1, 0])
-        qml.Hadamard(wires=1)
-        return qml.expval(qml.PauliY(wires=0))
+        qp.Hadamard(wires=0)
+        qp.RZ(x, wires=0)
+        qp.RZ(x, wires=0)
+        qp.CNOT(wires=[1, 0])
+        qp.Hadamard(wires=1)
+        return qp.expval(qp.PauliY(wires=0))
 
     def g(x):
         a = circuit1(x)
         return a**2
 
-    @qml.qnode(device=dev)
+    @qp.qnode(device=dev)
     def circuit2(x):
-        qml.Hadamard(wires=0)
-        qml.RX(x, wires=0)
-        qml.RX(x, wires=0)
-        qml.CNOT(wires=[1, 0])
-        qml.Hadamard(wires=1)
-        return qml.expval(qml.PauliY(wires=0))
+        qp.Hadamard(wires=0)
+        qp.RX(x, wires=0)
+        qp.RX(x, wires=0)
+        qp.CNOT(wires=[1, 0])
+        qp.Hadamard(wires=1)
+        return qp.expval(qp.PauliY(wires=0))
 
     @catalyst.qjit
     @partial(

@@ -22,7 +22,7 @@ import pathlib
 import tempfile
 from unittest.mock import Mock
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import qjit
@@ -173,14 +173,14 @@ class TestXDSLPassesIntegration:
         @qjit(keep_intermediate="changed", verbose=True)
         def workflow(x):
             @merge_rotations_pass
-            @qml.transforms.cancel_inverses
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            @qp.transforms.cancel_inverses
+            @qp.qnode(qp.device("lightning.qubit", wires=2))
             def f(_x):
-                qml.RX(_x, 0)
-                qml.RX(1.6, 0)
-                qml.Hadamard(1)
-                qml.Hadamard(1)
-                return qml.expval(qml.Z(0))
+                qp.RX(_x, 0)
+                qp.RX(1.6, 0)
+                qp.Hadamard(1)
+                qp.Hadamard(1)
+                return qp.expval(qp.Z(0))
 
             return f(x)
 

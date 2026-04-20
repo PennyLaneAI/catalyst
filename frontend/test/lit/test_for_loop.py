@@ -14,7 +14,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import pennylane as qml
+import pennylane as qp
 
 from catalyst import for_loop, qjit
 
@@ -22,7 +22,7 @@ from catalyst import for_loop, qjit
 # CHECK-NOT: Verification failed
 # CHECK-LABEL: @jit_loop_circuit
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=3))
+@qp.qnode(qp.device("lightning.qubit", wires=3))
 def loop_circuit(n: int, inc: float):
     # CHECK-DAG:   [[qreg:%.+]] = quantum.alloc
     # CHECK-DAG:   [[c0:%.+]] = arith.constant 0 : index
@@ -44,7 +44,7 @@ def loop_circuit(n: int, inc: float):
         # CHECK:       [[phi_e:%.+]] = tensor.extract [[phi0]]
         # CHECK:       [[q1:%.+]] = quantum.custom "RY"([[phi_e]]) [[q0]]
         # CHECK:       [[r1:%.+]] = quantum.insert [[r0]][[[i_cast]]], [[q1]]
-        qml.RY(phi, wires=i)
+        qp.RY(phi, wires=i)
 
         # CHECK:       scf.yield [[phi1]], [[r1]]
         return phi + inc
@@ -52,7 +52,7 @@ def loop_circuit(n: int, inc: float):
     loop_fn(0.0)
     # CHECK:       quantum.dealloc [[newqreg]]#1
     # CHECK:       return
-    return qml.state()
+    return qp.state()
 
 
 print(loop_circuit.mlir)

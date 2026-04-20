@@ -14,7 +14,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import pennylane as qml
+import pennylane as qp
 
 from catalyst import qjit, while_loop
 
@@ -22,7 +22,7 @@ from catalyst import qjit, while_loop
 # CHECK-NOT: Verification failed
 # CHECK-LABEL: @jit_circuit
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=1))
+@qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit(n: int):
     # CHECK:   scf.while ([[v0:%.+]] = {{%.+}}, [[array0:%.+]] = {{%.+}})
     # CHECK:       [[ct:%.+]] = stablehlo.compare LT, [[v0]], %arg0, SIGNED
@@ -37,7 +37,7 @@ def circuit(n: int):
     # CHECK:       scf.yield [[v0p]], [[array1]]
     @while_loop(lambda v: v[0] < v[1])
     def loop(v):
-        qml.PauliX(wires=0)
+        qp.PauliX(wires=0)
         return v[0] + 1, v[1]
 
     out = loop((0, n))
@@ -50,7 +50,7 @@ print(circuit.mlir)
 # CHECK-NOT: Verification failed
 # CHECK-LABEL: func.func public @jit_circuit_outer_scope_reference
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=1))
+@qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit_outer_scope_reference(n: int):
     # CHECK:   [[array0:%.+]] = quantum.alloc
 
@@ -67,7 +67,7 @@ def circuit_outer_scope_reference(n: int):
     # CHECK:       scf.yield [[v0p]], [[array_inner_2]]
     @while_loop(lambda i: i < n)
     def loop(i):
-        qml.PauliX(wires=0)
+        qp.PauliX(wires=0)
         return i + 1
 
     # CHECK:   quantum.dealloc [[newqreg]]#1
@@ -81,7 +81,7 @@ print(circuit_outer_scope_reference.mlir)
 # CHECK-NOT: Verification failed
 # CHECK-LABEL: public @jit_circuit_multiple_args
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=1))
+@qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit_multiple_args(n: int):
     # CHECK-DAG:   [[R0:%.+]] = quantum.alloc({{.+}})
     # CHECK-DAG:   [[C0:%.+]] = stablehlo.constant dense<0> : tensor<i64>
@@ -100,7 +100,7 @@ def circuit_multiple_args(n: int):
     # CHECK:       scf.yield [[V0p]], [[QREGp]]
     @while_loop(lambda v, _: v[0] < v[1])
     def loop(v, inc):
-        qml.PauliX(wires=0)
+        qp.PauliX(wires=0)
         return (v[0] + inc, v[1]), inc
 
     out = loop((0, n), 1)

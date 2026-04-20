@@ -17,7 +17,7 @@
 import functools
 
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import qjit
@@ -48,27 +48,27 @@ class TestKeywordArguments:
 
     def test_qnode_with_kwargs(self, backend):
         """Test that a qnode works with keyword argeument."""
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x, c):
-            qml.RY(c, 0)
-            qml.RX(x, 0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RY(c, 0)
+            qp.RX(x, 0)
+            return qp.expval(qp.PauliZ(0))
 
         assert jnp.allclose(circuit(0.5, c=0.5), circuit(0.5, 0.5))
 
     def test_qnode_with_kwargs_swich_order(self, backend):
         """Test that a qnode works with keyword argeument."""
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x, c):
-            qml.RX(x, wires=0)
-            qml.RY(c, wires=0)
-            return qml.probs()
+            qp.RX(x, wires=0)
+            qp.RY(c, wires=0)
+            return qp.probs()
 
         same_order = circuit(c=0.8, x=0.2)
         switched_order = circuit(x=0.2, c=0.8)

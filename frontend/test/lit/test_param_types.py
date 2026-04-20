@@ -15,7 +15,7 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 from jax import numpy as jnp
 from jax.core import ShapedArray
 
@@ -32,24 +32,24 @@ def test_tensor_accept(type):
         in_one = tensor(complex(1, 0), 1, type)
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def jax_untyped(x):
             extract = x[0]
             real = jnp.real(extract)
             multiply = real * np.pi
-            qml.RY(multiply, wires=0)
+            qp.RY(multiply, wires=0)
             return measure(wires=0)
 
         assert jax_untyped(in_zero) == False
         assert jax_untyped(in_one) == True
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def jax_typed(x: ShapedArray([1], type)):
             extract = x[0]
             real = jnp.real(extract)
             multiply = real * np.pi
-            qml.RY(multiply, wires=0)
+            qp.RY(multiply, wires=0)
             return measure(wires=0)
 
         assert jax_typed(in_zero) == False
@@ -65,18 +65,18 @@ def test_tensor_accept(type):
         in_one = tensor(1, 1, type)
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def jax_untyped(x):
-            qml.RY(x[0] * np.pi, wires=0)
+            qp.RY(x[0] * np.pi, wires=0)
             return measure(wires=0)
 
         assert jax_untyped(in_zero) == False
         assert jax_untyped(in_one) == True
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def jax_typed(x: ShapedArray([1], type)):
-            qml.RY(x[0] * np.pi, wires=0)
+            qp.RY(x[0] * np.pi, wires=0)
             return measure(wires=0)
 
         assert jax_typed(in_zero) == False
@@ -125,18 +125,18 @@ def test_python_accept(type):
         in_one = type(1)
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def jax_untyped(x):
-            qml.RY(x.real * np.pi, wires=0)
+            qp.RY(x.real * np.pi, wires=0)
             return measure(wires=0)
 
         assert jax_untyped(in_zero) == False
         assert jax_untyped(in_one) == True
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def jax_typed(x: type):
-            qml.RY(x.real * np.pi, wires=0)
+            qp.RY(x.real * np.pi, wires=0)
             return measure(wires=0)
 
         assert jax_typed(in_zero) == False
@@ -150,18 +150,18 @@ def test_python_accept(type):
         in_one = type(1)
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def jax_untyped(x):
-            qml.RY(x * np.pi, wires=0)
+            qp.RY(x * np.pi, wires=0)
             return measure(wires=0)
 
         assert jax_untyped(in_zero) == False
         assert jax_untyped(in_one) == True
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def jax_typed(x: type):
-            qml.RY(x * np.pi, wires=0)
+            qp.RY(x * np.pi, wires=0)
             return measure(wires=0)
 
         assert jax_typed(in_zero) == False

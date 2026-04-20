@@ -17,7 +17,7 @@
 import platform
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from utils import CONFIG_CUSTOM_DEVICE
@@ -32,36 +32,36 @@ class TestGateAliases:
     op definitions."""
 
     special_control_ops = (
-        qml.CNOT(wires=[0, 1]),
-        qml.Toffoli(wires=[0, 1, 2]),
-        qml.MultiControlledX(wires=[1, 2, 0], control_values=[True, False]),
-        qml.CZ(wires=[0, 1]),
-        qml.CCZ(wires=[0, 1, 2]),
-        qml.CY(wires=[0, 1]),
-        qml.CSWAP(wires=[0, 1, 2]),
-        qml.CH(wires=[0, 1]),
-        qml.CRX(0.1, wires=[0, 1]),
-        qml.CRY(0.1, wires=[0, 1]),
-        qml.CRZ(0.1, wires=[0, 1]),
-        qml.CRot(0.1, 0.2, 0.3, wires=[0, 1]),
-        qml.ControlledPhaseShift(0.1, wires=[0, 1]),
-        qml.ControlledQubitUnitary([[1, 0], [0, 1j]], wires=[1, 0]),
+        qp.CNOT(wires=[0, 1]),
+        qp.Toffoli(wires=[0, 1, 2]),
+        qp.MultiControlledX(wires=[1, 2, 0], control_values=[True, False]),
+        qp.CZ(wires=[0, 1]),
+        qp.CCZ(wires=[0, 1, 2]),
+        qp.CY(wires=[0, 1]),
+        qp.CSWAP(wires=[0, 1, 2]),
+        qp.CH(wires=[0, 1]),
+        qp.CRX(0.1, wires=[0, 1]),
+        qp.CRY(0.1, wires=[0, 1]),
+        qp.CRZ(0.1, wires=[0, 1]),
+        qp.CRot(0.1, 0.2, 0.3, wires=[0, 1]),
+        qp.ControlledPhaseShift(0.1, wires=[0, 1]),
+        qp.ControlledQubitUnitary([[1, 0], [0, 1j]], wires=[1, 0]),
     )
     control_base_ops = (
-        qml.PauliX,
-        qml.PauliX,
-        qml.PauliX,
-        qml.PauliZ,
-        qml.PauliZ,
-        qml.PauliY,
-        qml.SWAP,
-        qml.Hadamard,
-        qml.RX,
-        qml.RY,
-        qml.RZ,
-        qml.Rot,
-        qml.PhaseShift,
-        qml.QubitUnitary,
+        qp.PauliX,
+        qp.PauliX,
+        qp.PauliX,
+        qp.PauliZ,
+        qp.PauliZ,
+        qp.PauliY,
+        qp.SWAP,
+        qp.Hadamard,
+        qp.RX,
+        qp.RY,
+        qp.RZ,
+        qp.Rot,
+        qp.PhaseShift,
+        qp.QubitUnitary,
     )
     assert len(special_control_ops) == len(control_base_ops)
 
@@ -75,11 +75,11 @@ class TestGateAliases:
         decomp = catalyst_decomposer(gate, capabilities)
 
         assert len(decomp) == 1
-        assert type(decomp[0]) is qml.ops.ControlledOp
+        assert type(decomp[0]) is qp.ops.ControlledOp
         assert type(decomp[0].base) is base
 
 
-class NoUnitaryDevice(qml.devices.Device):
+class NoUnitaryDevice(qp.devices.Device):
     """Custom device used for testing purposes."""
 
     config_filepath = CONFIG_CUSTOM_DEVICE
@@ -117,15 +117,15 @@ class TestControlledDecomposition:
     def test_no_matrix(self, backend):
         """Test that controlling an operation without a matrix method raises an error."""
 
-        dev = qml.device(backend, wires=4)
+        dev = qp.device(backend, wires=4)
 
-        class OpWithNoMatrix(qml.operation.Operation):
+        class OpWithNoMatrix(qp.operation.Operation):
             """Op without a matrix or decomp"""
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def f():
             ctrl(OpWithNoMatrix(wires=[0, 1]), control=[2, 3])
-            return qml.probs()
+            return qp.probs()
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
             qjit(f, target="jaxpr")
@@ -133,7 +133,7 @@ class TestControlledDecomposition:
     def test_no_unitary_support(self):
         """Test that unknown controlled operations without QubitUnitary support raise an error."""
 
-        class UnknownOp(qml.operation.Operation):
+        class UnknownOp(qp.operation.Operation):
             """An unknown operation"""
 
             def matrix(self):
@@ -150,11 +150,11 @@ class TestControlledDecomposition:
 
         dev = NoUnitaryDevice(wires=4)
 
-        @qml.set_shots(4)
-        @qml.qnode(dev)
+        @qp.set_shots(4)
+        @qp.qnode(dev)
         def f():
             ctrl(UnknownOp(wires=[0, 1]), control=[2, 3])
-            return qml.probs()
+            return qp.probs()
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
             qjit(f, target="jaxpr")

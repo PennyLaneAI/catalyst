@@ -17,7 +17,7 @@ import platform
 from dataclasses import replace
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 from pennylane.devices import Device, NullQubit
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
@@ -41,7 +41,7 @@ from catalyst.jax_tracer import HybridOpRegion
 # pylint: disable=unused-argument
 
 
-class OtherHadamard(qml.Hadamard):
+class OtherHadamard(qp.Hadamard):
     """A version of the Hadamard operator that won't be recognized by the QJit device, and will
     need to be decomposed"""
 
@@ -51,7 +51,7 @@ class OtherHadamard(qml.Hadamard):
         return "OtherHadamard"
 
 
-class OtherIsingXX(qml.IsingXX):
+class OtherIsingXX(qp.IsingXX):
     """A version of the IsingXX operator that won't be recognized by the QJit device, and will
     need to be decomposed"""
 
@@ -61,7 +61,7 @@ class OtherIsingXX(qml.IsingXX):
         return "OtherIsingXX"
 
 
-class OtherRX(qml.RX):
+class OtherRX(qp.RX):
     """A version of the RX operator that won't be recognized by the QJit device, and will need to
     be decomposed"""
 
@@ -72,7 +72,7 @@ class OtherRX(qml.RX):
 
     def decomposition(self):
         """decomposes to normal RX"""
-        return [qml.RX(*self.parameters, self.wires)]
+        return [qp.RX(*self.parameters, self.wires)]
 
 
 class CustomDevice(Device):
@@ -115,10 +115,10 @@ class TestDecomposition:
         """Test the decompose transform as part of the Catalyst pipeline."""
         dev = NullQubit(wires=4, shots=None)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(theta: float):
-            qml.SingleExcitationPlus(theta, wires=[0, 1])
-            return qml.state()
+            qp.SingleExcitationPlus(theta, wires=[0, 1])
+            return qp.state()
 
         mlir = qjit(circuit, target="mlir").mlir
         assert "Hadamard" in mlir
@@ -128,23 +128,23 @@ class TestDecomposition:
 
     def test_decompose_ops_to_unitary(self):
         """Test the decompose ops to unitary transform."""
-        operations = [qml.CNOT(wires=[0, 1]), qml.RX(0.1, wires=0)]
-        tape = qml.tape.QuantumScript(ops=operations)
+        operations = [qp.CNOT(wires=[0, 1]), qp.RX(0.1, wires=0)]
+        tape = qp.tape.QuantumScript(ops=operations)
         ops_to_decompose = ["CNOT"]
 
         tapes, _ = decompose_ops_to_unitary(tape, ops_to_decompose)
         decomposed_ops = tapes[0].operations
-        assert isinstance(decomposed_ops[0], qml.QubitUnitary)
-        assert isinstance(decomposed_ops[1], qml.RX)
+        assert isinstance(decomposed_ops[0], qp.QubitUnitary)
+        assert isinstance(decomposed_ops[1], qp.RX)
 
     def test_decompose_ops_to_unitary_integration(self):
         """Test the decompose ops to unitary transform as part of the Catalyst pipeline."""
         dev = CustomDevice(wires=4, shots=None)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
-            qml.BlockEncode(np.array([[1, 1, 1], [0, 1, 0]]), wires=[0, 1, 2])
-            return qml.state()
+            qp.BlockEncode(np.array([[1, 1, 1], [0, 1, 0]]), wires=[0, 1, 2])
+            return qp.state()
 
         mlir = qjit(circuit, target="mlir").mlir
         assert "quantum.unitary" in mlir
@@ -152,8 +152,8 @@ class TestDecomposition:
 
 
 # tapes and regions for generating HybridOps
-tape1 = QuantumScript([qml.X(0), qml.Hadamard(1)])
-tape2 = QuantumScript([qml.RY(1.23, 1), qml.Y(0), qml.Hadamard(2)])
+tape1 = QuantumScript([qp.X(0), qp.Hadamard(1)])
+tape2 = QuantumScript([qp.RY(1.23, 1), qp.Y(0), qp.Hadamard(2)])
 region1 = HybridOpRegion([], tape1, [], [])
 region2 = HybridOpRegion([], tape2, [], [])
 
@@ -241,7 +241,7 @@ class TestPreprocessHybridOp:
             expected_ops = set(TARGET_GATES_FROM_CONFIG)
 
         # create and decompose the tape
-        tape = QuantumScript([op, qml.X(0), qml.Hadamard(3)])
+        tape = QuantumScript([op, qp.X(0), qp.Hadamard(3)])
         (new_tape,), _ = catalyst_decompose(tape, **kwargs)
 
         old_op = tape[0]
@@ -268,13 +268,13 @@ class TestPreprocessHybridOp:
         """Test that unsupported operators nested in Adjoint are decompsed
         and the resulting circuit has the expected result, obtained analytically"""
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x: float, y: float):
-            qml.RY(y, 0)
+            qp.RY(y, 0)
             adjoint(lambda: OtherRX(x, 0))()
-            return qml.expval(qml.PauliZ(0))
+            return qp.expval(qp.PauliZ(0))
 
         mlir = qjit(circuit, target="mlir").mlir
 
@@ -289,9 +289,9 @@ class TestPreprocessHybridOp:
         """Test that unsupported operators nested in Cond are decompsed, and the
         resulting circuit has the expected result, obtained analytically"""
 
-        dev = qml.device("lightning.qubit", wires=[0, 1])
+        dev = qp.device("lightning.qubit", wires=[0, 1])
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(phi: float):
             OtherHadamard(wires=0)
 
@@ -307,7 +307,7 @@ class TestPreprocessHybridOp:
             # apply the conditional ansatz
             ansatz()
 
-            return qml.state()
+            return qp.state()
 
         # mlir contains expected gate names, and not the unsupported gate names
         mlir = qjit(circuit, target="mlir").mlir
@@ -336,10 +336,10 @@ class TestPreprocessHybridOp:
         """Test that unsupported operators nested in ForLoop are decompsed, and
         the resulting circuit has the expected result, obtained analytically"""
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(n: int, x: float):
             OtherHadamard(wires=0)
 
@@ -351,7 +351,7 @@ class TestPreprocessHybridOp:
             # apply the for loop
             for_loop(0, n, 1)(loop_rx)(x)
 
-            return qml.state()
+            return qp.state()
 
         def expected_res(n, x):
             """Analytic result for a loop with n reps and initial angle x"""
@@ -369,10 +369,10 @@ class TestPreprocessHybridOp:
         """Test that unsupported operators nested in WhileLoop are decompsed, and
         the resulting circuit has the expected result, obtained analytically"""
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x: float):
             @while_loop(lambda x: x < 2.0)
             def loop_rx(x):
@@ -383,7 +383,7 @@ class TestPreprocessHybridOp:
             # apply the while loop
             final_x = loop_rx(x)
 
-            return qml.expval(qml.PauliY(0)), final_x
+            return qp.expval(qp.PauliY(0)), final_x
 
         res, final_phi = circuit(phi)
 
@@ -405,16 +405,16 @@ class TestPreprocessHybridOp:
 
         # make a weird nested op
         adjoint_op = HybridAdjoint([], [], [region1])
-        ops = [qml.RY(1.23, 1), adjoint_op, qml.Hadamard(2)]  # Hadamard will decompose
+        ops = [qp.RY(1.23, 1), adjoint_op, qp.Hadamard(2)]  # Hadamard will decompose
         adj_region = HybridOpRegion([], QuantumScript(ops), [], [])
 
         conditional_op = Cond([], [], regions=[adj_region, region2])
-        ops = [conditional_op, qml.Y(1)]  # PauliY will decompose
-        conditional_region = HybridOpRegion([], qml.tape.QuantumScript(ops), [], [])
+        ops = [conditional_op, qp.Y(1)]  # PauliY will decompose
+        conditional_region = HybridOpRegion([], qp.tape.QuantumScript(ops), [], [])
 
         for_loop_op = ForLoop([], [], [conditional_region])
-        ops = [for_loop_op, qml.X(0), qml.Hadamard(3)]  # Hadamard will decompose
-        tape = qml.tape.QuantumScript(ops)
+        ops = [for_loop_op, qp.X(0), qp.Hadamard(3)]  # Hadamard will decompose
+        tape = qp.tape.QuantumScript(ops)
 
         # hack to avoid needing a full trace in unit test
         adjoint_op.regions[0].trace = None
@@ -470,21 +470,21 @@ class TestPreprocessHybridOp:
     def test_controlled_decomposes_to_unitary_listed(self, request, gate_set_src):
         """Test that a PennyLane toml-listed operation is decomposed to a QubitUnitary"""
 
-        tape = qml.tape.QuantumScript([qml.PauliX(0), qml.S(0)])
+        tape = qp.tape.QuantumScript([qp.PauliX(0), qp.S(0)])
 
         if gate_set_src == "capabilities":
             capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
             setattr(capabilities, "to_matrix_ops", {"S": OperatorProperties()})
             kwargs = {"capabilities": capabilities}
-            expected_second_op = qml.QubitUnitary
+            expected_second_op = qp.QubitUnitary
         else:
             kwargs = {"target_gates": TARGET_GATES_FROM_CONFIG, "capabilities": None}
-            expected_second_op = qml.RZ
+            expected_second_op = qp.RZ
 
         (new_tape,), _ = catalyst_decompose(tape, **kwargs)
 
         assert len(new_tape.operations) == 2
-        assert isinstance(new_tape.operations[0], qml.PauliX)
+        assert isinstance(new_tape.operations[0], qp.PauliX)
         assert isinstance(new_tape.operations[1], expected_second_op)
 
     @pytest.mark.usefixtures("create_temporary_toml_file")
@@ -493,7 +493,7 @@ class TestPreprocessHybridOp:
     def test_controlled_decomposes_to_gate_sequence(self, request, gate_set_src):
         """Test that a PennyLane controlled operation is decomposed to a gate sequence."""
 
-        tape = qml.tape.QuantumScript([qml.ctrl(qml.RX(1.23, 0), 1)])
+        tape = qp.tape.QuantumScript([qp.ctrl(qp.RX(1.23, 0), 1)])
 
         if gate_set_src == "capabilities":
             capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
@@ -504,7 +504,7 @@ class TestPreprocessHybridOp:
         (new_tape,), _ = catalyst_decompose(tape, **kwargs)
 
         assert len(new_tape.operations) == 6
-        assert np.allclose(qml.matrix(new_tape, wire_order=[1, 0]), tape.operations[0].matrix())
+        assert np.allclose(qp.matrix(new_tape, wire_order=[1, 0]), tape.operations[0].matrix())
 
     @pytest.mark.usefixtures("create_temporary_toml_file")
     @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
@@ -512,12 +512,12 @@ class TestPreprocessHybridOp:
         """Test that an error is raised in decompose if a PennyLane mid-circuit measurement
         is encountered"""
 
-        with qml.queuing.AnnotatedQueue() as q:
-            qml.RX(1.23, wires=0)
-            qml.measure(0)
+        with qp.queuing.AnnotatedQueue() as q:
+            qp.RX(1.23, wires=0)
+            qp.measure(0)
 
-        ops, measurements = qml.queuing.process_queue(q)
-        tape = qml.tape.QuantumScript(ops, measurements)
+        ops, measurements = qp.queuing.process_queue(q)
+        tape = qp.tape.QuantumScript(ops, measurements)
 
         capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
         setattr(capabilities, "to_matrix_ops", {"S": OperatorProperties()})
@@ -533,18 +533,18 @@ class TestPreprocessHybridOp:
         """Test that an error is raised in decompose if a PennyLane mid-circuit measurement
         is encountered"""
 
-        with qml.queuing.AnnotatedQueue() as q:
-            qml.RX(1.23, wires=0)
-            qml.measure(0)
+        with qp.queuing.AnnotatedQueue() as q:
+            qp.RX(1.23, wires=0)
+            qp.measure(0)
 
-        ops, measurements = qml.queuing.process_queue(q)
-        subtape = qml.tape.QuantumScript(ops, measurements)
+        ops, measurements = qp.queuing.process_queue(q)
+        subtape = qp.tape.QuantumScript(ops, measurements)
 
         region = HybridOpRegion([], subtape, [], [])
         region.trace = None
         adjoint_op = HybridAdjoint([], [], [region])
 
-        tape = qml.tape.QuantumScript([adjoint_op, qml.Y(1)], [])
+        tape = qp.tape.QuantumScript([adjoint_op, qp.Y(1)], [])
 
         capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
         setattr(capabilities, "to_matrix_ops", {"S": OperatorProperties()})
@@ -561,7 +561,7 @@ class TestPreprocessHybridOp:
         """Test that an unsupported operator that doesn't provide a decomposition
         raises a CompileError"""
 
-        tape = qml.tape.QuantumScript([qml.Y(0)])
+        tape = qp.tape.QuantumScript([qp.Y(0)])
 
         if gate_set_src == "capabilities":
             capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
@@ -583,14 +583,14 @@ class TestPreprocessHybridOp:
     def test_decompose_to_matrix_raises_error(self, request, gate_set_src):
         """Test that _decompose_to_matrix raises a CompileError if the operator has no matrix"""
 
-        class NoMatrixMultiControlledX(qml.MultiControlledX):
+        class NoMatrixMultiControlledX(qp.MultiControlledX):
             """A version of MulitControlledX with no matrix defined"""
 
             def matrix(self):
                 """raise an error"""
-                raise qml.operation.MatrixUndefinedError
+                raise qp.operation.MatrixUndefinedError
 
-        tape = qml.tape.QuantumScript([NoMatrixMultiControlledX(wires=[0, 1, 2, 3])])
+        tape = qp.tape.QuantumScript([NoMatrixMultiControlledX(wires=[0, 1, 2, 3])])
 
         if gate_set_src == "capabilities":
             capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
@@ -614,7 +614,7 @@ class TestPreprocessHybridOp:
 
         capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
 
-        tape = qml.tape.QuantumScript()
+        tape = qp.tape.QuantumScript()
         with pytest.raises(
             ValueError,
             match="target_gates are not taken into account .* device capabilities are provided",
@@ -624,7 +624,7 @@ class TestPreprocessHybridOp:
     def test_grad_method_with_target_gates_provided_error(self):
         """Test that an error is raised if `grad_method` and a target gate set are provided."""
 
-        tape = qml.tape.QuantumScript()
+        tape = qp.tape.QuantumScript()
         with pytest.raises(
             NotImplementedError,
             match="grad_method is not taken into account .* if target_gates are provided",
@@ -635,44 +635,44 @@ class TestPreprocessHybridOp:
 class TestAdjointCallableLazyFalse:
     """Test adjoint(callable, lazy=False) in @qjit."""
 
-    def test_qml_adjoint_callable_lazy_false_with_for_loop(self):
-        """Test that qml.adjoint(callable, lazy=False) works."""
-        dev = qml.device("lightning.qubit", wires=6)
+    def test_qp_adjoint_callable_lazy_false_with_for_loop(self):
+        """Test that qp.adjoint(callable, lazy=False) works."""
+        dev = qp.device("lightning.qubit", wires=6)
 
         @qjit(capture=False)
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
             @for_loop(0, 3, 1)
             def loop(i):
-                qml.Toffoli(wires=[i, i + 1, i + 2])
+                qp.Toffoli(wires=[i, i + 1, i + 2])
 
-            qml.adjoint(lambda: loop(), lazy=False)()
-            return qml.state()
+            qp.adjoint(lambda: loop(), lazy=False)()
+            return qp.state()
 
         result = circuit()
         assert np.isclose(result[0], 1.0)
 
     def test_adjoint_callable_lazy_false_mixed_ops_identity(self):
         """Test adjoint(sub) == Identity for a callable with mixed gates and for_loop."""
-        dev = qml.device("lightning.qubit", wires=6)
+        dev = qp.device("lightning.qubit", wires=6)
 
         @qjit(capture=False)
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
             def sub():
-                qml.Hadamard(0)
+                qp.Hadamard(0)
 
                 @for_loop(0, 3, 1)
                 def loop(i):
-                    qml.RY(0.5, wires=i)
-                    qml.CNOT(wires=[i, i + 1])
+                    qp.RY(0.5, wires=i)
+                    qp.CNOT(wires=[i, i + 1])
 
                 loop()
-                qml.T(wires=2)
+                qp.T(wires=2)
 
-            qml.adjoint(sub, lazy=False)()
+            qp.adjoint(sub, lazy=False)()
             sub()
-            return qml.state()
+            return qp.state()
 
         result = circuit()
         assert np.isclose(result[0], 1.0)
@@ -684,19 +684,19 @@ class TestAdjointCallableLazyFalse:
         adjoint-lowering pass can handle the reversal.
         """
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         def g():
-            qml.H(0)
-            qml.adjoint(lambda: qml.RX(1.23, 0) and None)()
-            qml.X(0)
+            qp.H(0)
+            qp.adjoint(lambda: qp.RX(1.23, 0) and None)()
+            qp.X(0)
 
         @qjit(capture=False)
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
             g()
-            qml.adjoint(g, lazy=False)()
-            return qml.state()
+            qp.adjoint(g, lazy=False)()
+            return qp.state()
 
         result = circuit()
         assert np.isclose(result[0], 1.0)
