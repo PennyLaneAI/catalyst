@@ -28,6 +28,7 @@ class TestQecCode:
         "name, n, k, d", [("Steane", 7, 1, 3), ("Shor", 9, 1, 3), ("Surface_d3", 17, 1, 3)]
     )
     def test_constructor(self, name: str, n: int, k: int, d: int):
+        """Test the constructor of the `QecCode` class for various QEC codes."""
         qec_code = QecCode(name, n, k, d)
 
         assert qec_code.name == name
@@ -37,6 +38,7 @@ class TestQecCode:
 
     @pytest.mark.parametrize("name", SUPPORTED_CODES)
     def test_get(self, name: str):
+        """Test the `QecCode.get()` method for all supported QEC codes."""
         qec_code = QecCode.get(name)
 
         assert qec_code.name == name

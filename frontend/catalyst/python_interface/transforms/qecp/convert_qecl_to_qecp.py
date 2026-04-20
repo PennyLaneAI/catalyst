@@ -46,6 +46,7 @@ class CodeblockTypeConversion(TypeConversionPattern):
 
     @attr_type_rewrite_pattern
     def convert_type(self, typ: qecl.LogicalCodeblockType) -> qecp.PhysicalCodeblockType:
+        """Type conversion rewrite pattern for logical codeblock types."""
         return qecp.PhysicalCodeblockType(typ.k, self.qec_code.n)
 
 
@@ -57,6 +58,7 @@ class HyperRegisterTypeConversion(TypeConversionPattern):
 
     @attr_type_rewrite_pattern
     def convert_type(self, typ: qecl.LogicalHyperRegisterType) -> qecp.PhysicalHyperRegisterType:
+        """Type conversion rewrite pattern for physical codeblock types."""
         return qecp.PhysicalHyperRegisterType(typ.width, typ.k, self.qec_code.n)
 
 

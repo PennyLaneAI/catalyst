@@ -39,6 +39,14 @@ class QecCode:
 
     @staticmethod
     def get(name: str) -> "QecCode":
+        """A builder function that returns a `QecCode` instance for a supported QEC code.
+
+        Example
+        -------
+
+        >>> QecCode.get("Steane")
+        QecCode(name='Steane', n=7, k=1, d=3)
+        """
         qec_code = QecCode(name, *_CODE_REGISTRY[name])
         if qec_code is None:
             raise KeyError(f"QEC code {name} not found")
