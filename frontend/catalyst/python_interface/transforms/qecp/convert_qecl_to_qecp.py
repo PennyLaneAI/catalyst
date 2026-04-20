@@ -18,8 +18,7 @@ This module contains the implementation of the xDSL convert-qecl-to-qecp dialect
 To apply this pass, the QEC code must be know.
 """
 
-from dataclasses import dataclass
-from enum import StrEnum
+from dataclasses import dataclass, field
 
 from xdsl.context import Context
 from xdsl.dialects import builtin
@@ -27,17 +26,38 @@ from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
     PatternRewriteWalker,
+    TypeConversionPattern,
+    attr_type_rewrite_pattern,
 )
-from xdsl.transforms.reconcile_unrealized_casts import ReconcileUnrealizedCastsPass
 
+from catalyst.python_interface.dialects import qecl, qecp
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 
+from .qec_code_lib import QecCode
 
-class QecCodeKey(StrEnum):
-    """The set of supported QEC codes."""
+# MARK: Type Conversion Pattern
 
-    # List the supported QEC codes here, e.g.
-    # STEANE_7_1_3 = "steane[[7,1,3]]"
+
+@dataclass
+class CodeblockTypeConversion(TypeConversionPattern):
+    """Codeblock type conversion pattern from qecl.codeblock -> qecp.codeblock."""
+
+    qec_code: QecCode = field(kw_only=True)
+
+    @attr_type_rewrite_pattern
+    def convert_type(self, typ: qecl.LogicalCodeblockType) -> qecp.PhysicalCodeblockType:
+        return qecp.PhysicalCodeblockType(typ.k, self.qec_code.n)
+
+
+@dataclass
+class HyperRegisterTypeConversion(TypeConversionPattern):
+    """Hyper-register type conversion pattern from qecl.hyperreg -> qecp.hyperreg."""
+
+    qec_code: QecCode = field(kw_only=True)
+
+    @attr_type_rewrite_pattern
+    def convert_type(self, typ: qecl.LogicalHyperRegisterType) -> qecp.PhysicalHyperRegisterType:
+        return qecp.PhysicalHyperRegisterType(typ.width, typ.k, self.qec_code.n)
 
 
 # MARK: Conversion Pass
@@ -51,7 +71,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     name = "convert-qecl-to-qecp"
 
-    qec_code: QecCodeKey
+    qec_code: QecCode
 
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         """Apply the convert-qecl-to-qecp pass."""
@@ -59,14 +79,11 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [
-                    # Insert conversion patterns here
+                    CodeblockTypeConversion(qec_code=self.qec_code),
+                    HyperRegisterTypeConversion(qec_code=self.qec_code),
                 ]
             )
         ).rewrite_module(op)
-
-        # Certain patterns leave behind `builtin.unrealized_conversion_cast` ops;
-        # this pass removes them
-        ReconcileUnrealizedCastsPass().apply(ctx, op)
 
 
 convert_qecl_to_qecp_pass = compiler_transform(ConvertQecLogicalToQecPhysicalPass)

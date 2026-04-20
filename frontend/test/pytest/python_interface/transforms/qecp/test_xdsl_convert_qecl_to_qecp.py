@@ -16,9 +16,32 @@
 
 import pytest
 
-# from catalyst.python_interface.transforms.qecp import (
-#     ConvertQecLogicalToQecPhysicalPass,
-#     convert_qecl_to_qecp,
-# )
+from catalyst.python_interface.transforms.qecp import (
+    ConvertQecLogicalToQecPhysicalPass,
+)
+from catalyst.python_interface.transforms.qecp.qec_code_lib import QecCode
 
 pytestmark = pytest.mark.xdsl
+
+
+class TestTypeConversionPattern:
+    """Unit tests for the type conversion patterns of the convert-qecl-to-qecp pass."""
+
+    @pytest.mark.parametrize("n", [7, 42])
+    @pytest.mark.parametrize("k", [1, 2, 3])
+    def test_codeblock_conversion(self, run_filecheck, n, k):
+        program = f"""
+        builtin.module {{
+        // CHECK-LABEL: test_program
+        func.func @test_program() {{
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecp.codeblock<{k} x {n}>
+            %0 = "test.op"() : () -> !qecl.codeblock<{k}>
+
+            // CHECK: [[cb1:%.+]] = "test.op"([[cb0]]) : (!qecp.codeblock<{k} x {n}>) -> !qecp.codeblock<{k} x {n}>
+            %1 = "test.op"(%0) : (!qecl.codeblock<{k}>) -> !qecl.codeblock<{k}>
+            return
+        }}
+        }}
+        """
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3)),)
+        run_filecheck(program, pipeline)
