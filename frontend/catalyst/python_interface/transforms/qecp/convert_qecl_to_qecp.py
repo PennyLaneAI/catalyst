@@ -32,12 +32,14 @@ from xdsl.transforms.reconcile_unrealized_casts import ReconcileUnrealizedCastsP
 
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 
+from .convert_qecl_noise_to_qec_noise import ConvertQECLNoiseOpToQECPNoisePass
+
 
 class QecCodeKey(StrEnum):
     """The set of supported QEC codes."""
 
     # List the supported QEC codes here, e.g.
-    # STEANE_7_1_3 = "steane[[7,1,3]]"
+    STEANE_7_1_3 = "steane[[7,1,3]]"
 
 
 # MARK: Conversion Pass
@@ -53,8 +55,15 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     qec_code: QecCodeKey
 
+    # To specify the number of errors to be injected in the noise subroutine,
+    # which is needed for the convert-qecl-noise-to-qecp-noise pass.
+    number_errors: int = 1
+
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         """Apply the convert-qecl-to-qecp pass."""
+
+        # n is the number of physical data qubits from the QEC code.
+        ConvertQECLNoiseOpToQECPNoisePass(n=7, number_errors=self.number_errors).apply(ctx, op)
 
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
