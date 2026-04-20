@@ -405,12 +405,6 @@ jobs:
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-
 
-    - name: Download Catalyst-Runtime Artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: runtime-build-${{ matrix.compiler }}
-        path: runtime-build/lib
-
     - name: Build MLIR Dialects
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
