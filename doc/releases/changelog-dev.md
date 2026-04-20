@@ -530,7 +530,7 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Fixed the `work_wire_type` argument of `qml.ctrl` was silently dropped inside `@qjit` function. 
+* Fixed a bug where the `work_wire_type` argument of `qml.ctrl` was silently dropped inside `@qjit` functions. 
   The parameter is now threaded through `catalyst.ctrl`, `CtrlCallable`, `HybridCtrl`, and
   `ctrl_distribute`.
   [(#2710)](https://github.com/PennyLaneAI/catalyst/pull/2710)
