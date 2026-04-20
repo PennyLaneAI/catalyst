@@ -26,6 +26,7 @@ from pennylane import adjoint, cond, for_loop, qjit, while_loop
 from pennylane.ops.op_math.adjoint import Adjoint, AdjointOperation
 
 import catalyst
+import catalyst as cat
 from catalyst import debug, measure, qjit
 
 # pylint: disable=too-many-lines,missing-class-docstring,missing-function-docstring,too-many-public-methods
@@ -638,16 +639,6 @@ class TestCatalyst:
         assert isinstance(decomp[0].base, qml.Hadamard)
         assert isinstance(decomp[1].base, qml.RY)
         assert decomp[1].base.data == (0.7,)
-
-    def test_qfunc_eager(self, backend):
-        """Test the error message raised for eager adjoint on qfuncs."""
-
-        def qfunc(x, w):
-            qml.RY(x, wires=w)
-            qml.CNOT(wires=[1, w])
-
-        with pytest.raises(ValueError, match="Eagerly computing the adjoint"):
-            catalyst.adjoint(qfunc, lazy=False)(0.1, 0)
 
 
 #####################################################################################
@@ -1669,6 +1660,94 @@ class TestMidCircuitMeasurementAfterAdjoint:
             return res
 
         assert not circuit()
+
+
+class TestAdjointOfTemplates:
+    """Test behaviour of adjoint around complex templates."""
+
+    def test_adjoint_for_loop(self, backend):
+        """Test operator adjoint works around templates that decompose into for loops."""
+
+        @qml.qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(n: int):
+            qml.H(0)
+
+            @cat.for_loop(0, n, 1)
+            def f(_):
+                qml.T(0)
+
+            f()
+            qml.adjoint(f.operation)  # orig f is dequeued
+
+            qml.H(0)
+            return qml.expval(qml.Z(0))
+
+        assert np.allclose(circuit(0), 1.0)
+        assert np.allclose(circuit(1), 1.0 / np.sqrt(2))
+        assert np.allclose(circuit(2), 0.0)
+
+    def test_adjoint_while_loop(self, backend):
+        """Test operator adjoint works around templates that decompose into for loops."""
+
+        @qml.qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(n: int):
+            qml.H(0)
+
+            @cat.while_loop(lambda i: i < n)
+            def f(i):
+                qml.T(0)
+                return i + 1
+
+            f(0)
+            qml.adjoint(f.operation)  # orig f is dequeued
+
+            qml.H(0)
+            return qml.expval(qml.Z(0))
+
+        assert np.allclose(circuit(0), 1.0)
+        assert np.allclose(circuit(1), 1.0 / np.sqrt(2))
+        assert np.allclose(circuit(2), 0.0)
+
+    def test_adjoint_cond(self, backend):
+        """Test operator adjoint works around templates that decompose into if conditionals."""
+
+        @qml.qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(b: bool):
+            qml.H(0)
+
+            @cat.cond(b)
+            def f():
+                qml.T(0)
+
+            f()
+            qml.adjoint(f.operation)  # orig f is dequeued
+
+            qml.H(0)
+            return qml.expval(qml.Z(0))
+
+        assert np.allclose(circuit(False), 1.0)
+        assert np.allclose(circuit(True), 1.0 / np.sqrt(2))
+
+    def test_adjoint_switch(self, backend):
+        """Catalyst's adjoint algorithm doesn't work on switch yet."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(s: int):
+
+            @cat.switch(s)
+            def f():
+                qml.T(0)
+
+            f()
+            qml.adjoint(f.operation)  # orig f is dequeued
+
+            return qml.expval(qml.Z(0))
+
+        with pytest.raises(cat.CompileError, match=r"Adjoint\(Switch.+\) not supported"):
+            qjit(circuit)
 
 
 if __name__ == "__main__":

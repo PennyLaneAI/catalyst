@@ -53,7 +53,8 @@ const PipelineList pipelineList{
       "adjoint-lowering",
       // TODO: we can remove the following 2 passes once PBC has its own pipeline.
       "lower-pbc-init-ops",
-      "disable-assertion"}},
+      "disable-assertion",
+      "symbol-dce"}},  // to remove user decomposition rules after all graph-decomposition passes
     {"hlo-lowering-pipeline",
      {"canonicalize",
       "func.func(chlo-legalize-to-stablehlo)",
