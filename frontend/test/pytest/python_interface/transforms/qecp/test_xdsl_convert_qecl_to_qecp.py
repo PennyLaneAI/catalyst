@@ -29,7 +29,7 @@ from catalyst.python_interface.transforms.qecp import (
 pytestmark = pytest.mark.xdsl
 
 
-class TestQECLNoiseLoweringPassIntegration:
+class TestQECLNoiseLoweringPassIntegration:  # pylint: disable=line-too-long
     """Integration lit tests for the convert-qecl-noise-to-qecp-noise pass"""
 
     @pytest.mark.usefixtures("use_capture")
