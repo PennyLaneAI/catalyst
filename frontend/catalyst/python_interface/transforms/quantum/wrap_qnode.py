@@ -16,6 +16,8 @@
 calls the QNode, so that post-processing can be injected after the QNode call.
 """
 
+from dataclasses import dataclass
+
 from pennylane.exceptions import CompileError
 from xdsl import context, passes, pattern_rewriter
 from xdsl.dialects import builtin, func
@@ -41,6 +43,7 @@ def get_call_op(qnode: func.FuncOp):
     return qnode_call_op[0]
 
 
+@dataclass(frozen=True)
 class WrapQNodePass(passes.ModulePass):
     """This pass is a utility intended to be used with passes that update a quantum.node
     and add post-processing. The pass wraps each quantum.node in the program with a classical
@@ -80,11 +83,7 @@ class WrapQNodePass(passes.ModulePass):
 
     name = "wrap-qnode"
 
-    def __init__(self, pass_str: str):
-        """Initializes the class with a pass string that will be appended to
-        the QNode function names. This pass string would typically indicate
-        the pass that"""
-        self.pass_str = pass_str
+    pass_str: str
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """."""
