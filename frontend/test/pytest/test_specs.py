@@ -785,7 +785,11 @@ class TestPassByPassSpecs:
 
             return qml.expval(qml.PauliX(0))
 
-        actual = qml.specs(circuit, level=0)(3)
+        with pytest.warns(
+            UserWarning,
+            match="Specs was unable to determine the branch of a conditional or switch statement.",
+        ):
+            actual = qml.specs(circuit, level=0)(3)
         expected = CircuitSpecs(
             device_name="null.qubit",
             num_device_wires=1,
@@ -800,7 +804,6 @@ class TestPassByPassSpecs:
         )
 
         check_specs_same(actual, expected)
-
 
     @pytest.mark.usefixtures("use_both_frontend")
     def test_loops(self):
@@ -831,7 +834,6 @@ class TestPassByPassSpecs:
         )
 
         check_specs_same(actual, expected)
-
 
     def test_split_non_commuting_tape(self):
         """Test that qml.transforms.split_non_commuting works as expected"""
@@ -1033,6 +1035,22 @@ class TestPassByPassSpecs:
 
         actual = qml.specs(circ, level=2)()
         check_specs_same(actual, expected)
+
+    def test_loop_warning(self):
+        """Test that a warning is raised when dynamic loops are present in the circuit, as resource counting may be inaccurate."""
+
+        @qml.qjit(autograph=True)
+        @qml.qnode(qml.device("null.qubit", wires=1))
+        def circuit(x):
+            for _ in range(x):
+                qml.PauliX(0)
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.warns(
+            UserWarning,
+            match="Specs was unable to determine the number of loop iterations.",
+        ):
+            qml.specs(circuit, level=0)(5)
 
 
 class TestMarkerIntegration:
