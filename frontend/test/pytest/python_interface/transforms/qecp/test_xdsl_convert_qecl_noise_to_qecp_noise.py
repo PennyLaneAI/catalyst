@@ -18,15 +18,15 @@
 import pytest
 
 from catalyst.python_interface.transforms.qecp import (
-    ConvertNoiseOpToSubroutinePass,
+    ConvertQECLNoiseOpToQECPNoisePass,
 )
 
 pytestmark = pytest.mark.xdsl
 
 
 @pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
-class TestConvertNoiseOpToSubroutinePass:
-    """Unit tests for the convert-noiseop-to-subroutine pass."""
+class TestConvertQECLNoiseOpToQECPNoisePass:
+    """Unit tests for the convert-qecl-noise-to-qecp-noise pass."""
 
     def test_with_single_noise_op_lowering(self, run_filecheck):
         """Test that a qecl.noise operation can be lowered to a subroutine"""
@@ -65,7 +65,7 @@ class TestConvertNoiseOpToSubroutinePass:
             }
             """
 
-        pipeline = (ConvertNoiseOpToSubroutinePass(n=7, number_errors=1),)
+        pipeline = (ConvertQECLNoiseOpToQECPNoisePass(n=7, number_errors=1),)
         run_filecheck(program, pipeline)
 
     def test_with_several_errors_lowering(self, run_filecheck):
@@ -105,7 +105,7 @@ class TestConvertNoiseOpToSubroutinePass:
             }
             """
 
-        pipeline = (ConvertNoiseOpToSubroutinePass(n=7, number_errors=3),)
+        pipeline = (ConvertQECLNoiseOpToQECPNoisePass(n=7, number_errors=3),)
         run_filecheck(program, pipeline)
 
     def test_with_several_noise_op_lowering(self, run_filecheck):
@@ -153,7 +153,7 @@ class TestConvertNoiseOpToSubroutinePass:
             }
             """
 
-        pipeline = (ConvertNoiseOpToSubroutinePass(n=7, number_errors=1),)
+        pipeline = (ConvertQECLNoiseOpToQECPNoisePass(n=7, number_errors=1),)
         run_filecheck(program, pipeline)
 
     def test_with_single_noise_op_with_gateops(self, run_filecheck):
@@ -185,7 +185,7 @@ class TestConvertNoiseOpToSubroutinePass:
             }
             """
 
-        pipeline = (ConvertNoiseOpToSubroutinePass(n=7, number_errors=1),)
+        pipeline = (ConvertQECLNoiseOpToQECPNoisePass(n=7, number_errors=1),)
         run_filecheck(program, pipeline)
 
     def test_with_module_without_noise_ops(self, run_filecheck):
@@ -213,5 +213,5 @@ class TestConvertNoiseOpToSubroutinePass:
             }
             """
 
-        pipeline = (ConvertNoiseOpToSubroutinePass(n=7, number_errors=1),)
+        pipeline = (ConvertQECLNoiseOpToQECPNoisePass(n=7, number_errors=1),)
         run_filecheck(program, pipeline)

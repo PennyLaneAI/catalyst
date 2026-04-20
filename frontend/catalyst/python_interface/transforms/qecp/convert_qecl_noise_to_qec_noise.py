@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-This module contains the implementation of the xDSL convert-noiseop-to-subroutine pass.
+This module contains the implementation of the xDSL convert-qecl-noise-to-qecp-noise pass.
 """
 
 import math
@@ -46,7 +46,7 @@ def _get_noise_subroutine_name(k, n, number_errors):
     return f"noise_subroutine_code_{k}x{n}x{number_errors}"
 
 
-class ConvertNoiseOpToSubroutinePattern(
+class ConvertQECLNoiseOpToQECPNoisePattern(
     pattern_rewriter.RewritePattern
 ):  # pylint: disable=too-few-public-methods
     """RewritePattern for converting to qecl.noise operations to subroutines in the qecp layer."""
@@ -123,7 +123,7 @@ class ConvertNoiseOpToSubroutinePattern(
 
 
 @dataclass(frozen=True)
-class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
+class ConvertQECLNoiseOpToQECPNoisePass(passes.ModulePass):
     """Pass that converts qecl.noise operations to subroutines in the qecp layer."""
 
     name = "convert-qecl-noise-to-qecp-noise"
@@ -273,7 +273,7 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
         op.regions[0].blocks.first.add_op(noise_subroutine)
 
         pattern_rewriter.PatternRewriteWalker(
-            ConvertNoiseOpToSubroutinePattern(noise_subroutine, self.n, self.number_errors),
+            ConvertQECLNoiseOpToQECPNoisePattern(noise_subroutine, self.n, self.number_errors),
             apply_recursively=False,
         ).rewrite_module(op)
 
@@ -282,6 +282,6 @@ class ConvertNoiseOpToSubroutinePass(passes.ModulePass):
 
 
 # TODOs: Add integration tests for the following line once the quantum-to-qecl pass is in.
-convert_noiseop_to_subroutine_pass = compiler_transform(
-    ConvertNoiseOpToSubroutinePass
+convert_qecl_noise_to_qecp_noise_pass = compiler_transform(
+    ConvertQECLNoiseOpToQECPNoisePass
 )  # pragma: no cover
