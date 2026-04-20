@@ -18,10 +18,9 @@ This module contains the pipelines that are used to compile a quantum function t
 
 .. note::
 
-    For DEFAULT_PIPELINES pipeline and the pipelines in DEFAULT_ASYNC_PIPELINES,
-    any change should be reflected in the mlir/lib/Driver/Pipelines.cpp files as well.
-    This is to ensure that Catalyst's command line tool default pipelines are
-    in sync with the pipelines defined in the Python frontend.
+    Default pass lists are defined in the MLIR tree
+    (``mlir/include/Driver/DefaultPipelines/DefaultPipelines.h``) and exposed to Python via the
+    ``default_pipelines`` extension module.
 
 """
 
@@ -33,14 +32,27 @@ from io import TextIOWrapper
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Literal, Optional, Set, Tuple, Union
 
-from catalyst.default_pipelines import (
-    get_bufferization_stage,
-    get_convert_to_llvm_stage,
-    get_hlo_lowering_stage,
-    get_gradient_lowering_stage,
-    get_quantum_compilation_stage,
-)
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.runtime_environment import get_lib_path
+
+catalyst_lib_dir = get_lib_path("catalyst", "CATALYST_LIB_DIR")
+sys.path.append(catalyst_lib_dir)
+
+try:
+    from default_pipelines import (  # type: ignore[import-not-found]
+        get_bufferization_stage,
+        get_convert_to_llvm_stage,
+        get_gradient_lowering_stage,
+        get_hlo_lowering_stage,
+        get_quantum_compilation_stage,
+    )
+except ImportError as e:
+    raise ImportError(
+        "Could not find the default Catalyst compilation pipeline. This likely indicates a problem "
+        "with the Catalyst installation, please consult the installation guide "
+        "(https://docs.pennylane.ai/projects/catalyst/en/stable/dev/installation.html) or report "
+        "this issue on GitHub (https://github.com/PennyLaneAI/catalyst/issues)."
+    ) from e
 
 PipelineStage = Tuple[str, List[str]]
 PipelineStages = List[PipelineStage]

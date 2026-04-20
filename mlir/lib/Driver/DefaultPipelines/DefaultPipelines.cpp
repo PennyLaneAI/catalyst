@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "DefaultPipelines/DefaultPipelines.h"
+#include "Driver/DefaultPipelines/DefaultPipelines.h"
 
-#include <nanobind/nanobind.h>
-#include <nanobind/stl/string.h>
-#include <nanobind/stl/vector.h>
-
-namespace nb = nanobind;
+#include "nanobind/nanobind.h"
+#include "nanobind/stl/string.h"
+#include "nanobind/stl/vector.h"
 
 NB_MODULE(default_pipelines, m)
 {

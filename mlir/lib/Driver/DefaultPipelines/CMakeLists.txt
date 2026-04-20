@@ -1,11 +1,3 @@
-if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
-    cmake_minimum_required(VERSION 3.20)
-    project(DefaultPipelines LANGUAGES CXX C)
-
-    set(CMAKE_CXX_STANDARD 20 CACHE STRING "C++ standard to conform to")
-    set(CMAKE_CXX_STANDARD_REQUIRED ON)
-endif()
-
 #######################################
 ## default_pipelines nanobind module ##
 #######################################
@@ -19,12 +11,16 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
-# Locate nanobind
-find_package(Python COMPONENTS Interpreter Development REQUIRED)
+find_package(Python REQUIRED
+    COMPONENTS Interpreter Development.Module
+    OPTIONAL_COMPONENTS Development.SABIModule
+)
+
 execute_process(
     COMMAND "${Python_EXECUTABLE}" -c "import nanobind; print(nanobind.cmake_dir())"
     OUTPUT_VARIABLE nanobind_DIR OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+
 find_package(nanobind CONFIG REQUIRED)
 
 set(DEFAULT_PIPELINES_SRC_FILES
@@ -36,15 +32,12 @@ set(DEFAULT_PIPELINES_SRC_FILES
 # (`STABLE_ABI` does nothing on older Python versions).
 nanobind_add_module(default_pipelines STABLE_ABI
     ${DEFAULT_PIPELINES_SRC_FILES}
+    # -Wcast-qual: llvm configures more warnings than we get from -Wall in the runtime for example,
+    # so we need this additional flag here to suppress nanobind header warnings.
+    NB_SUPPRESS_WARNINGS
 )
 
-# This is necessary for compatibility with setuptools build extensions
+# Easier discovery later (similar to the runtime nanobind module for callback registration).
 set_target_properties(default_pipelines PROPERTIES
-    SUFFIX ".so"
-)
-
-set(MLIR_PROJECT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../..")
-
-target_include_directories(default_pipelines PRIVATE
-    ${MLIR_PROJECT_SOURCE_DIR}/include/Driver
+    LIBRARY_OUTPUT_DIRECTORY "${MLIR_BINARY_DIR}/lib"
 )

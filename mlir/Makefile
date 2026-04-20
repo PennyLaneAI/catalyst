@@ -176,6 +176,7 @@ dialects:
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+		-DPython_EXECUTABLE=$(PYTHON) \
 		-DPython3_EXECUTABLE=$(PYTHON) \
 		-DPython3_NumPy_INCLUDE_DIRS=$(shell $(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		-DEnzyme_DIR=$(ENZYME_BUILD_DIR) \

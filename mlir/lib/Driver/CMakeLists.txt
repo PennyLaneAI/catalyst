@@ -92,3 +92,10 @@ add_mlir_library(CatalystCompilerDriver
     ${LIBS}
     MLIRSupport
 )
+
+#########################################################
+## importable module with default pipeline definitions ##
+#########################################################
+
+add_subdirectory(DefaultPipelines)
+add_dependencies(CatalystCompilerDriver default_pipelines)
