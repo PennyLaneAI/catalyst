@@ -88,13 +88,6 @@ def mlir_specs(
             "The provided `qnode` argument does not appear to be a valid QJIT compiled QNode."
         )
 
-    if args or kwargs:
-        warnings.warn(
-            "The `specs` function does not yet support dynamic arguments, "
-            "so the results may not reflect information provided by the arguments.",
-            UserWarning,
-        )
-
     max_level: int | None = _get_max_level(level)
 
     def _specs_callback(
