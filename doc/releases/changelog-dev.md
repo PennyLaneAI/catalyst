@@ -617,6 +617,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Additional integration tests have been added for the pass-by-pass version of `qp.specs`.
+  [(#2690)](https://github.com/PennyLaneAI/catalyst/pull/2690/)
+
 * Removes unnessary registrations for the various gradient primitives in `from_plxpr` when we
   are able to just inherit the base behaviour from `PlxprInterpreter`.
   [(#2706)](https://github.com/PennyLaneAI/catalyst/pull/2706/)
