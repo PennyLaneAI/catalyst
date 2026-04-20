@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Quantum/Utils/RemoveQuantum.h"
+
 #include <deque>
 
 #include "llvm/ADT/SmallPtrSet.h"
-
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/RemoveQuantum.h"
 
 using namespace mlir;
 

@@ -14,13 +14,14 @@
 
 #pragma once
 
-#include "Exception.hpp"
-#include "RSUtils.hpp"
-#include "Rings.hpp"
 #include <array>
 #include <cmath>
 #include <string_view>
 #include <utility>
+
+#include "Exception.hpp"
+#include "RSUtils.hpp"
+#include "Rings.hpp"
 
 namespace RSDecomp::GridProblem {
 

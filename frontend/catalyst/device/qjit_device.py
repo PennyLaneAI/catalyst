@@ -16,6 +16,7 @@
 This module contains device stubs for the old and new PennyLane device API, which facilitate
 the application of decomposition and other device pre-processing routines.
 """
+
 import logging
 import os
 import pathlib
@@ -237,27 +238,18 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
         target_capabilities.measurement_processes, RUNTIME_MPS
     )
 
-    # Enable dynamic qubit allocation with qml.allocate and qml.deallocate
-    qjit_capabilities.operations.update(
-        {
-            "allocate": OperatorProperties(
-                invertible=False, controllable=False, differentiable=False
-            ),
-            "deallocate": OperatorProperties(
-                invertible=False, controllable=False, differentiable=False
-            ),
-        }
-    )
-
     # Control-flow gates to be lowered down to the LLVM control-flow instructions
     qjit_capabilities.operations.update(
         {
-            "Cond": OperatorProperties(invertible=True, controllable=True, differentiable=True),
+            # CF inversion is only support via hybrid adjoint in the compiler, never via PL Operator
+            # adjoint, so we have to set this flag to False. Supported ops will be "decomposed" to
+            # hybrid adjoints automatically.
+            "Cond": OperatorProperties(invertible=False, controllable=True, differentiable=True),
             "WhileLoop": OperatorProperties(
-                invertible=True, controllable=True, differentiable=True
+                invertible=False, controllable=True, differentiable=True
             ),
-            "ForLoop": OperatorProperties(invertible=True, controllable=True, differentiable=True),
-            "Switch": OperatorProperties(invertible=True, controllable=True, differentiable=True),
+            "ForLoop": OperatorProperties(invertible=False, controllable=True, differentiable=True),
+            "Switch": OperatorProperties(invertible=False, controllable=True, differentiable=True),
         }
     )
 
@@ -398,14 +390,10 @@ class QJITDevice(qml.devices.Device):
             isinstance(shots, qml.measurements.shots.Shots) and shots.total_shots is None
         )
         if shots_not_provided and _requires_shots(self.capabilities):
-            raise CompileError(
-                textwrap.dedent(
-                    f"""
+            raise CompileError(textwrap.dedent(f"""
                 {self.original_device.name} does not support analytical simulation.
                 Please supply the number of shots on the qnode.
-                """
-                )
-            )
+                """))
         capabilities = filter_device_capabilities_with_shots(
             capabilities=self.capabilities,
             shots_present=bool(shots),

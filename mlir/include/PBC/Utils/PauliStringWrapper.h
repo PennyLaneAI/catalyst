@@ -15,7 +15,6 @@
 #pragma once
 
 #include "llvm/ADT/SetVector.h"
-
 #include "mlir/IR/PatternMatch.h"
 
 #include "PBC/IR/PBCOpInterfaces.h"

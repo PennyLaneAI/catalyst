@@ -10,6 +10,7 @@ pennylane_catalyst.egg-info
 .lit
 .pytest_cache
 __pennylane_resources_data_*.json
+test_rules.mlirbc
 
 # Packaging directories
 dist

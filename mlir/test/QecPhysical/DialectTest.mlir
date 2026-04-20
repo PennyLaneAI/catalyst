@@ -173,6 +173,16 @@ func.func @test_gate_op_s(%arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<aux>) {
 
 // -----
 
+func.func @test_gate_op_rot(%phi : f64, %theta : f64,  %omega : f64, %arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<aux>) {
+    %0 = qecp.rot(%phi, %theta, %omega) %arg0 : !qecp.qubit<data>
+    %1 = qecp.rot(%phi, %theta, %omega) %0 : !qecp.qubit<data>
+    %2 = qecp.rot(%phi, %theta, %omega) %arg1 : !qecp.qubit<aux>
+    %3 = qecp.rot(%phi, %theta, %omega) %2 : !qecp.qubit<aux>
+    func.return
+}
+
+// -----
+
 func.func @test_gate_op_cnot(
     %arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<data>,
     %arg2 : !qecp.qubit<aux>, %arg3 : !qecp.qubit<aux>

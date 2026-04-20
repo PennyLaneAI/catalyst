@@ -759,3 +759,20 @@ def automatic_qubit_management():
 
 
 print(automatic_qubit_management.mlir)
+
+
+# CHECK-LABEL: @test_multiple_terminal_measurements
+@qjit(target="mlir")
+@qml.qnode(qml.device("null.qubit", wires=2), shots=1000)
+def test_multiple_terminal_measurements():
+    # CHECK: [[q0:%.+]] = quantum.extract {{%.+}}[ 0] : !quantum.reg -> !quantum.bit
+    # CHECK: [[compbasis:%.+]] = quantum.compbasis qubits [[q0]] : !quantum.obs
+    # CHECK: {{%.+}} = quantum.probs [[compbasis]] : tensor<2xf64>
+    # CHECK: [[compbasis:%.+]] = quantum.compbasis qubits [[q0]] : !quantum.obs
+    # CHECK: {{%.+}} = quantum.sample [[compbasis]] : tensor<1000x1xf64>
+    # CHECK: [[namedobs:%.+]] = quantum.namedobs [[q0]][ PauliX] : !quantum.obs
+    # CHECK: {{%.+}} = quantum.expval [[namedobs]] : f64
+    return qml.probs(wires=[0]), qml.sample(wires=[0]), qml.expval(qml.X(0))
+
+
+print(test_multiple_terminal_measurements.mlir)

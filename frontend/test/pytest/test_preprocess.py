@@ -632,5 +632,75 @@ class TestPreprocessHybridOp:
             _ = catalyst_decompose(tape, None, grad_method="fd", target_gates={"X"})
 
 
+class TestAdjointCallableLazyFalse:
+    """Test adjoint(callable, lazy=False) in @qjit."""
+
+    def test_qml_adjoint_callable_lazy_false_with_for_loop(self):
+        """Test that qml.adjoint(callable, lazy=False) works."""
+        dev = qml.device("lightning.qubit", wires=6)
+
+        @qjit(capture=False)
+        @qml.qnode(dev)
+        def circuit():
+            @for_loop(0, 3, 1)
+            def loop(i):
+                qml.Toffoli(wires=[i, i + 1, i + 2])
+
+            qml.adjoint(lambda: loop(), lazy=False)()
+            return qml.state()
+
+        result = circuit()
+        assert np.isclose(result[0], 1.0)
+
+    def test_adjoint_callable_lazy_false_mixed_ops_identity(self):
+        """Test adjoint(sub) == Identity for a callable with mixed gates and for_loop."""
+        dev = qml.device("lightning.qubit", wires=6)
+
+        @qjit(capture=False)
+        @qml.qnode(dev)
+        def circuit():
+            def sub():
+                qml.Hadamard(0)
+
+                @for_loop(0, 3, 1)
+                def loop(i):
+                    qml.RY(0.5, wires=i)
+                    qml.CNOT(wires=[i, i + 1])
+
+                loop()
+                qml.T(wires=2)
+
+            qml.adjoint(sub, lazy=False)()
+            sub()
+            return qml.state()
+
+        result = circuit()
+        assert np.isclose(result[0], 1.0)
+
+    def test_adjoint_callable_lazy_false_with_nested_hybrid_adjoint(self):
+        """Test adjoint(callable, lazy=False) when the callable contains a HybridAdjoint.
+
+        It's expected to produce a HybridAdjoint of HybridAdjoint(RX) so that the MLIR
+        adjoint-lowering pass can handle the reversal.
+        """
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        def g():
+            qml.H(0)
+            qml.adjoint(lambda: qml.RX(1.23, 0) and None)()
+            qml.X(0)
+
+        @qjit(capture=False)
+        @qml.qnode(dev)
+        def circuit():
+            g()
+            qml.adjoint(g, lazy=False)()
+            return qml.state()
+
+        result = circuit()
+        assert np.isclose(result[0], 1.0)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

@@ -14,6 +14,7 @@
 """
 Sets up the PLxPRToQuantumJaxprInterpreter for converting plxpr to catalyst jaxpr.
 """
+
 # pylint: disable=protected-access
 import textwrap
 from copy import copy
@@ -215,7 +216,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         wires = [self.init_qreg[w] for w in obs.wires]
         if obs.name == "Hermitian":
             return hermitian_p.bind(obs.data[0], *wires)
-        return namedobs_p.bind(*wires, *obs.data, kind=obs.name)
+        return namedobs_p.bind(wires[0], *obs.data, kind=obs.name)
 
     def _compbasis_obs(self, *wires):
         """Add a computational basis sampling observable."""
@@ -232,24 +233,16 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             if len(measurement.wires) == 0 and not isinstance(
                 measurement, qml.measurements.StateMP
             ):
-                raise CompileError(
-                    textwrap.dedent(
-                        """
+                raise CompileError(textwrap.dedent("""
                         Terminal measurements must take in an explicit list of wires when
                         dynamically allocated wires are present in the program.
-                        """
-                    )
-                )
+                        """))
 
             if any(is_dynamically_allocated_wire(w) for w in measurement.wires):
-                raise CompileError(
-                    textwrap.dedent(
-                        """
+                raise CompileError(textwrap.dedent("""
                         Terminal measurements cannot take in dynamically allocated wires
                         since they must be temporary.
-                        """
-                    )
-                )
+                        """))
 
     # pylint: disable=too-many-branches
     def interpret_measurement(self, measurement):
@@ -679,6 +672,20 @@ def handle_state_prep(self, *invals, n_wires, **kwargs):
     """Handle the conversion from plxpr to Catalyst jaxpr for the StatePrep primitive"""
     state_inval = invals[0]
     wires_inval = invals[1:]
+
+    normalize = kwargs.get("normalize", False)
+    pad_with = kwargs.get("pad_with")
+    if pad_with is not None:
+        normalize = True
+        n_states = state_inval.shape[-1]
+        dim = 2**n_wires
+        if n_states < dim:
+            pad_with = jnp.array(pad_with, dtype=state_inval.dtype)
+            state_inval = jax.lax.pad(state_inval, pad_with, [(0, dim - n_states, 0)])
+
+    if normalize:
+        norm = jnp.linalg.norm(state_inval)
+        state_inval /= norm
 
     # jnp.complex128 is the top element in the type promotion lattice so it is ok to do this:
     # https://jax.readthedocs.io/en/latest/type_promotion.html
