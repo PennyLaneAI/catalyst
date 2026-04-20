@@ -175,7 +175,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja jax
+        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja jax jaxlib
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
