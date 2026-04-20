@@ -1,8 +1,3 @@
-cmake_minimum_required(VERSION 3.26)
-
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 # CMake 3.30 removed the bundled FindBoost module (CMP0167).
 # Set to NEW so find_package uses Boost's own BoostConfig.cmake,
 # or falls through to FetchContent if not found on the system.
@@ -70,12 +65,6 @@ endif()
 
 
 add_library(decompsolver OBJECT DGBuilder.cpp DGSolver.cpp)
-
-install(TARGETS decompsolver
-        EXPORT CatalystTargets
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
-        RUNTIME DESTINATION bin)
 
 target_link_libraries(decompsolver
     PRIVATE Boost::graph

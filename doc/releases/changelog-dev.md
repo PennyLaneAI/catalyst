@@ -300,6 +300,7 @@
   [(#2552)](https://github.com/PennyLaneAI/catalyst/pull/2552)
   [(#2568)](https://github.com/PennyLaneAI/catalyst/pull/2568)
   [(#2578)](https://github.com/PennyLaneAI/catalyst/pull/2578)
+  [(#2711)](https://github.com/PennyLaneAI/catalyst/pull/2711)
 
   The framework is interfaced with a new `graph_decomposition` pass decorator
   with key capabilities:
@@ -613,9 +614,6 @@
   [(#2582)](https://github.com/PennyLaneAI/catalyst/pull/2582)
 
 <h3>Internal changes ⚙️</h3>
-
-* Moved `DecompGraphSolver` to the core compiler to improve code locality, as it is used exclusively by the `graph_decomposition` pass.
-  [(#2711)](https://github.com/PennyLaneAI/catalyst/pull/2711)
 
 * Removes unnessary registrations for the various gradient primitives in `from_plxpr` when we
   are able to just inherit the base behaviour from `PlxprInterpreter`.
