@@ -604,6 +604,12 @@ jobs:
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
 
+    - name: Download Catalyst-Runtime Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: runtime-build-${{ matrix.compiler }}
+        path: runtime-build/lib
+
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
         # Don't run xDSL tests
