@@ -458,9 +458,7 @@ class TestCatalystOnlyControlled:
 
         assert circuit(0.1) == qml.wires.Wires([1, 0, 3])
 
-    @pytest.mark.xfail(
-        strict=False, reason="ctrl.wires fails in control-flow branches is not supported"
-    )
+    @pytest.mark.xfail(reason="ctrl.wires fails in control-flow branches is not supported")
     def test_qctrl_wires_controlflow(self, backend):
         """Test the wires property of HybridCtrl with control flow branches"""
 
