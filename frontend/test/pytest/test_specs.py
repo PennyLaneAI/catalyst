@@ -269,7 +269,7 @@ class TestPassByPassSpecs:
         no_passes = qjit(simple_circuit)
         with pytest.raises(
             check=ValueError,
-            match="The 'level' argument to qp.specs for QJIT'd QNodes must be "
+            match="The 'level' argument to qml.specs for QJIT'd QNodes must be "
             "non-negative, got -1.",
         ):
             qp.specs(no_passes, level=-1)()
@@ -985,7 +985,7 @@ class TestMarkerIntegration:
 
         with pytest.warns(
             UserWarning,
-            match="The 'level' argument to qp.specs for QJIT'd QNodes has been sorted to be "
+            match="The 'level' argument to qml.specs for QJIT'd QNodes has been sorted to be "
             "in ascending order with no duplicate levels.",
         ):
             actual = qp.specs(simple_circuit, level=["m0", "m1", "m1-duplicate"])()
