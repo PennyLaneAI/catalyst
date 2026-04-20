@@ -543,7 +543,9 @@ class TestCatalystOnlyControlled:
         assert op.hyperparameters["work_wire_type"] == work_wire_type
         assert op.work_wire_type == work_wire_type
 
-    @pytest.mark.xfail(reason="Disable due to circular dependency between Catalyst and PennyLane")
+    @pytest.mark.xfail(
+        strict=False, reason="Disable due to circular dependency between Catalyst and PennyLane"
+    )
     @pytest.mark.parametrize("work_wire_type", ["zeroed", "borrowed"])
     def test_qctrl_work_wire_type_callable(self, work_wire_type):
         """Test that work_wire_type is preserved on a Controlled op when wrapping a callable"""
