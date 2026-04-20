@@ -593,9 +593,7 @@ def test_decompose_gateset_operator_with_graph():
     print(simple_circuit_10.mlir)
 
     @qp.qjit(target="mlir", capture=True)
-    @partial(
-        qp.transforms.decompose, gate_set={qp.RX, qp.RZ, "PauliZ", qp.PauliX, qp.Hadamard}
-    )
+    @partial(qp.transforms.decompose, gate_set={qp.RX, qp.RZ, "PauliZ", qp.PauliX, qp.Hadamard})
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK-LABEL: @circuit_10() -> tensor<f64> attributes {decompose_gatesets
     def circuit_10():
@@ -604,9 +602,7 @@ def test_decompose_gateset_operator_with_graph():
     print(circuit_10.mlir)
 
     @qp.qjit(target="mlir", capture=True)
-    @partial(
-        qp.transforms.decompose, gate_set={qp.RX, qp.RZ, qp.PauliZ, qp.PauliX, qp.Hadamard}
-    )
+    @partial(qp.transforms.decompose, gate_set={qp.RX, qp.RZ, qp.PauliZ, qp.PauliX, qp.Hadamard})
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK-DAG: %0 = transform.apply_registered_pass "decompose-lowering"
     # CHECK-LABEL: @circuit_11() -> tensor<f64> attributes {decompose_gatesets

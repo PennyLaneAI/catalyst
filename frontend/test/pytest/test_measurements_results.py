@@ -424,9 +424,7 @@ class TestExpval:
 
             obs = qp.Hermitian(obs_matrix, wires=[0, 1])
             return qp.expval(
-                qp.Hamiltonian(
-                    coeff, [obs, qp.Hamiltonian([1, 1], [qp.PauliX(0), qp.PauliZ(1)])]
-                )
+                qp.Hamiltonian(coeff, [obs, qp.Hamiltonian([1, 1], [qp.PauliX(0), qp.PauliZ(1)])])
             )
 
         expected = np.array(0.4359798)
@@ -841,9 +839,7 @@ class TestNewArithmeticOps:
             qp.RX(x + y, wires=2)
             qp.CNOT(wires=[0, 1])
             return meas(
-                qp.ops.op_math.Prod(
-                    qp.PauliX(wires=0), qp.PauliZ(wires=1), qp.Identity(wires=2)
-                )
+                qp.ops.op_math.Prod(qp.PauliX(wires=0), qp.PauliZ(wires=1), qp.Identity(wires=2))
             )
 
         result = circuit(np.pi / 4, np.pi / 2)
@@ -854,17 +850,13 @@ class TestNewArithmeticOps:
         [
             [
                 lambda: qp.expval(
-                    qp.ops.op_math.Sum(
-                        qp.PauliX(wires=0), qp.PauliY(wires=1), qp.PauliZ(wires=2)
-                    )
+                    qp.ops.op_math.Sum(qp.PauliX(wires=0), qp.PauliY(wires=1), qp.PauliZ(wires=2))
                 ),
                 np.array(-1.41421356),
             ],
             [
                 lambda: qp.var(
-                    qp.ops.op_math.Sum(
-                        qp.PauliX(wires=0), qp.PauliY(wires=1), qp.PauliZ(wires=2)
-                    )
+                    qp.ops.op_math.Sum(qp.PauliX(wires=0), qp.PauliY(wires=1), qp.PauliZ(wires=2))
                 ),
                 np.array(2.0),
             ],
@@ -925,9 +917,7 @@ class TestNewArithmeticOps:
             ],
             [
                 lambda: qp.var(
-                    0.2 * qp.PauliX(wires=0)
-                    + 0.4 * qp.PauliY(wires=1)
-                    + 0.5 * qp.PauliZ(wires=2)
+                    0.2 * qp.PauliX(wires=0) + 0.4 * qp.PauliY(wires=1) + 0.5 * qp.PauliZ(wires=2)
                 ),
                 np.array(0.245),
             ],
@@ -996,10 +986,7 @@ class TestNewArithmeticOps:
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
             )
             return qp.expval(
-                qp.PauliZ(2)
-                @ qp.Hermitian(A, wires=1)
-                @ qp.PauliZ(0)
-                @ qp.Hermitian(A, wires=3)
+                qp.PauliZ(2) @ qp.Hermitian(A, wires=1) @ qp.PauliZ(0) @ qp.Hermitian(A, wires=3)
             )
 
         result = circuit(np.pi / 4, np.pi / 2)
@@ -1088,8 +1075,7 @@ class TestNewArithmeticOps:
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
             )
             return qp.var(
-                (qp.Hermitian(A, wires=1) + qp.PauliZ(0))
-                @ (0.5 * (qp.PauliX(2) @ qp.PauliZ(3)))
+                (qp.Hermitian(A, wires=1) + qp.PauliZ(0)) @ (0.5 * (qp.PauliX(2) @ qp.PauliZ(3)))
             )
 
         result = circuit(np.pi, np.pi)

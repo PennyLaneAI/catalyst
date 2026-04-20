@@ -940,9 +940,7 @@ class TestSimplify:
     def test_simplify_adj_of_sums(self):
         """Test that the simplify methods converts an adjoint of sums to a sum of adjoints."""
         adj_op = adjoint(qp.sum(qp.RX(1, 0), qp.RY(1, 0), qp.RZ(1, 0)))
-        sum_op = qp.sum(
-            qp.RX(4 * np.pi - 1, 0), qp.RY(4 * np.pi - 1, 0), qp.RZ(4 * np.pi - 1, 0)
-        )
+        sum_op = qp.sum(qp.RX(4 * np.pi - 1, 0), qp.RY(4 * np.pi - 1, 0), qp.RZ(4 * np.pi - 1, 0))
         simplified_op = adj_op.simplify()
 
         # TODO: Use qp.equal when supported for nested operators
@@ -1364,9 +1362,7 @@ noncallable_objects = [
 class TestAdjointConstructorPreconstructedOp:
     """Test providing an already initalized operator to the transform."""
 
-    @pytest.mark.parametrize(
-        "base", (qp.IsingXX(1.23, wires=("c", "d")), qp.QFT(wires=(0, 1, 2)))
-    )
+    @pytest.mark.parametrize("base", (qp.IsingXX(1.23, wires=("c", "d")), qp.QFT(wires=(0, 1, 2))))
     def test_single_op(self, base):
         """Test passing a single preconstructed op in a queuing context."""
         with qp.queuing.AnnotatedQueue() as q:

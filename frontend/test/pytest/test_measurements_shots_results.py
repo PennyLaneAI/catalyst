@@ -252,9 +252,7 @@ class TestExpval:
             qp.RX(varphi, wires=[2])
             qp.CNOT(wires=[0, 1])
             qp.CNOT(wires=[1, 2])
-            return qp.expval(
-                0.2 * qp.PauliZ(wires=0) + 0.5 * qp.Hadamard(wires=1) @ qp.PauliX(2)
-            )
+            return qp.expval(0.2 * qp.PauliZ(wires=0) + 0.5 * qp.Hadamard(wires=1) @ qp.PauliX(2))
 
         result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
         qp.capture.disable()  # capture execution unmaintained

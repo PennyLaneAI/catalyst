@@ -73,12 +73,10 @@ class TestBasicCircuits:
             qp.RX(arg0, wires=w1)
             return qp.sample(wires=w2)
 
-        result = qjit(qp.set_shots(qp.qnode(qp.device(backend, wires=3))(circuit), shots=10))(
+        result = qjit(qp.set_shots(qp.qnode(qp.device(backend, wires=3))(circuit), shots=10))(*args)
+        expected = qp.set_shots(qp.qnode(qp.device("default.qubit", wires=3))(circuit), shots=10)(
             *args
         )
-        expected = qp.set_shots(
-            qp.qnode(qp.device("default.qubit", wires=3))(circuit), shots=10
-        )(*args)
         assert np.allclose(result, expected)
 
     @pytest.mark.parametrize("args", [[np.pi, 0, 0], [np.pi, 0, 1], [np.pi, 1, 0], [np.pi, 1, 1]])
@@ -89,12 +87,10 @@ class TestBasicCircuits:
             qp.RX(arg0, wires=w1)
             return qp.sample(wires=[w2 + 1])
 
-        result = qjit(qp.set_shots(qp.qnode(qp.device(backend, wires=3))(circuit), shots=10))(
+        result = qjit(qp.set_shots(qp.qnode(qp.device(backend, wires=3))(circuit), shots=10))(*args)
+        expected = qp.set_shots(qp.qnode(qp.device("default.qubit", wires=3))(circuit), shots=10)(
             *args
         )
-        expected = qp.set_shots(
-            qp.qnode(qp.device("default.qubit", wires=3))(circuit), shots=10
-        )(*args)
         assert np.allclose(result, expected)
 
     @pytest.mark.parametrize("args", [[jnp.pi, 0, 1], [jnp.pi, 1, 0]])

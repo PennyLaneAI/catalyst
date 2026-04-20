@@ -31,9 +31,7 @@ ops = [
     qp.CZ(wires=[0, 1]),
     qp.SWAP(wires=[0, 1]),
     qp.CSWAP(wires=[0, 1, 2]),
-    qp.QubitUnitary(
-        1 / jnp.sqrt(2) * jnp.array([[1.0, 1.0], [1.0, -1.0]], dtype=complex), wires=0
-    ),
+    qp.QubitUnitary(1 / jnp.sqrt(2) * jnp.array([[1.0, 1.0], [1.0, -1.0]], dtype=complex), wires=0),
     qp.QubitUnitary(
         jnp.array(
             [
