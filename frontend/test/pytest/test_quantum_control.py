@@ -560,7 +560,9 @@ class TestCatalystOnlyControlled:
         def _func():
             qml.SemiAdder(x_wires=x_wires, y_wires=output, work_wires=work_wires_add)
 
-        hybrid_ctrl = C_ctrl(_func, control=c_wire, work_wires=work_wires_ctrl, work_wire_type=work_wire_type)()
+        hybrid_ctrl = C_ctrl(
+            _func, control=c_wire, work_wires=work_wires_ctrl, work_wire_type=work_wire_type
+        )()
         assert hybrid_ctrl.work_wire_type == work_wire_type
 
         decomposed = hybrid_ctrl.decomposition()
