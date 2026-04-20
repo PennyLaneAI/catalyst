@@ -532,7 +532,7 @@
 
 * Fixed a bug where the `work_wire_type` argument of `qml.ctrl` was silently dropped inside `@qjit` functions. 
   The parameter is now threaded through `catalyst.ctrl`, `CtrlCallable`, `HybridCtrl`, and
-  `ctrl_distribute`.
+  `ctrl_distribute`, with the default value being `"borrowed"`.
   [(#2710)](https://github.com/PennyLaneAI/catalyst/pull/2710)
 
 * Fixed a bug where multiple `quantum.extract` operations from the same index were being created
