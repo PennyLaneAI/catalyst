@@ -26,6 +26,7 @@ This module contains the pipelines that are used to compile a quantum function t
 
 import enum
 import sys
+import warnings
 from copy import deepcopy
 from dataclasses import dataclass
 from io import TextIOWrapper
@@ -47,12 +48,13 @@ try:
         get_quantum_compilation_stage,
     )
 except ImportError as e:  # pragma: nocover
-    raise ImportError(
+    warnings.warn(
         "Could not find the default Catalyst compilation pipeline. This likely indicates a problem "
         "with the Catalyst installation, please consult the installation guide "
         "(https://docs.pennylane.ai/projects/catalyst/en/stable/dev/installation.html) or report "
-        "this issue on GitHub (https://github.com/PennyLaneAI/catalyst/issues)."
-    ) from e
+        "this issue on GitHub (https://github.com/PennyLaneAI/catalyst/issues).\n"
+        f" raised from <{type(e).__name__}: {e}>"
+    )
 
 PipelineStage = Tuple[str, List[str]]
 PipelineStages = List[PipelineStage]
