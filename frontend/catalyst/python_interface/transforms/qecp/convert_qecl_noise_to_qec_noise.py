@@ -22,7 +22,7 @@ from dataclasses import dataclass
 
 from xdsl import builder, context, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin, func, scf, tensor
-from xdsl.dialects.builtin import IndexType, IntegerType
+from xdsl.dialects.builtin import IndexType
 from xdsl.ir import Block, Region
 from xdsl.rewriter import InsertPoint
 from xdsl.transforms.reconcile_unrealized_casts import ReconcileUnrealizedCastsPass
@@ -62,7 +62,7 @@ class ConvertQECLNoiseOpToQECPNoisePattern(
         op: qecl.NoiseOp,
         rewriter: pattern_rewriter.PatternRewriter,
         /,
-    ):
+    ):  # pylint: disable=missing-function-docstring
         k = op.in_codeblock.type.k.value.data
 
         in_block_cast = builtin.UnrealizedConversionCastOp.get(
