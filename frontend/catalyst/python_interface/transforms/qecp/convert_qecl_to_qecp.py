@@ -75,6 +75,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     qec_code: QecCode
 
+    # pylint: disable=unused-argument
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         """Apply the convert-qecl-to-qecp pass."""
 
