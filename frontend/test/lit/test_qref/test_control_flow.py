@@ -21,8 +21,8 @@ PLxPR conversion.
 
 # pylint: disable=line-too-long
 
-from jax import numpy as jnp
 import pennylane as qp
+from jax import numpy as jnp
 
 
 # CHECK: func.func public @test_for_loop_basic(%arg0: tensor<i64>, %arg1: tensor<f64>) -> tensor<8xcomplex<f64>>
