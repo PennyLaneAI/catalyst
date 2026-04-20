@@ -22,16 +22,16 @@ from catalyst.python_interface.transforms.qecl import (
     inject_noise_to_qecl_pass,
 )
 from catalyst.python_interface.transforms.qecp import (
-    ConvertQecLogicalToQecPhysicalPass,
     convert_qecl_to_qecp_pass,
 )
 
 pytestmark = pytest.mark.xdsl
 
 
-class TestQECLNoiseLoweringPassIntegration:  # pylint: disable=line-too-long
+class TestQECLNoiseLoweringPassIntegration:
     """Integration lit tests for the convert-qecl-noise-to-qecp-noise pass"""
 
+    # pylint: disable=line-too-long
     @pytest.mark.usefixtures("use_capture")
     def test_convert_qecl_noise_to_qecp_noise_pass_integration(self, run_filecheck_qjit):
         """Test the convert-qecl-noise-to-qecp-noise pass on the simplest possible, non-trivial circuit."""
