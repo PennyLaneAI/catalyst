@@ -313,6 +313,8 @@ class UnifiedBuild(build):
             import catalyst  # pylint: disable=import-outside-toplevel
 
             print(dir(catalyst))
+            print(dir(catalyst.utils))
+            print(dir(catalyst.utils.precompile_decomposition_rules))
 
             BYTECODE_FILE_PATH = catalyst.utils.runtime_environment.BYTECODE_FILE_PATH
             if not BYTECODE_FILE_PATH.exists():
