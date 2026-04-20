@@ -733,7 +733,7 @@ def ctrl_distribute(
                 new_ops.extend(nested_ops)
             else:
                 for region in [region for region in op.regions if region.quantum_tape is not None]:
-                    # Re-enter a JAXPR frame but do not create a new one is none exists.
+                    # Re-enter a JAXPR frame but do not create a new one if none exists.
                     if cur_trace and region.trace:
                         trace_manager = EvaluationContext.frame_tracing_context(region.trace)
                     else:
