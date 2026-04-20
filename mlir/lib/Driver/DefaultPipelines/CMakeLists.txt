@@ -27,6 +27,9 @@ set(DEFAULT_PIPELINES_SRC_FILES
     DefaultPipelines.cpp
 )
 
+# Ignore all warnings from nanobind library sources (headers are not enough).
+add_compile_options("-w")
+
 # Target the stable ABI for Python 3.12+,
 # which reduces the number of binary wheels that must be built
 # (`STABLE_ABI` does nothing on older Python versions).
