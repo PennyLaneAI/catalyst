@@ -46,7 +46,7 @@ try:
         get_hlo_lowering_stage,
         get_quantum_compilation_stage,
     )
-except ImportError as e:
+except ImportError as e:  # pragma: nocover
     raise ImportError(
         "Could not find the default Catalyst compilation pipeline. This likely indicates a problem "
         "with the Catalyst installation, please consult the installation guide "
