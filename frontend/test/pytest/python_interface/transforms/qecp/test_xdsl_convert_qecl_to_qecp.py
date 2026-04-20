@@ -14,6 +14,8 @@
 
 """Test module for the convert-qecl-to-qecp dialect-conversion transform."""
 
+# pylint: disable=line-too-long
+
 import pytest
 
 from catalyst.python_interface.transforms.qecp import (
