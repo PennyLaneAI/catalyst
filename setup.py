@@ -310,20 +310,16 @@ class UnifiedBuild(build):
         sys.path.insert(0, os.path.abspath(self.build_lib))
 
         try:
-            import catalyst  # pylint: disable=import-outside-toplevel
+            from catalyst.utils.precompile_decomposition_rules import precompile_decomp_rules
+            from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
-            print(dir(catalyst))
-            print(dir(catalyst.utils))
-            print(dir(catalyst.utils.precompile_decomposition_rules))
-
-            BYTECODE_FILE_PATH = catalyst.utils.runtime_environment.BYTECODE_FILE_PATH
             if not BYTECODE_FILE_PATH.exists():
                 BYTECODE_FILE_PATH.parent.mkdir(exist_ok=True)
                 for file in BYTECODE_FILE_PATH.parent.iterdir():
                     if file.is_file() and file.name.startswith("decomposition_rules"):
                         file.unlink()
 
-                catalyst.utils.precompile_decomposition_rules.precompile_decomp_rules()
+                precompile_decomp_rules()
         except:
             print("failed to precompile decomp rules as bytecode when building wheels:")
             raise
