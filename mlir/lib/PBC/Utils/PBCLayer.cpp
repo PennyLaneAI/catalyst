@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "PBC/Utils/PBCLayer.h"
+
 #include "llvm/ADT/STLExtras.h"
 
 #include "PBC/IR/PBCOps.h"
-#include "PBC/Utils/PBCLayer.h"
 #include "PBC/Utils/PauliStringWrapper.h"
 #include "Quantum/IR/QuantumOps.h" // for quantum.extract op
 

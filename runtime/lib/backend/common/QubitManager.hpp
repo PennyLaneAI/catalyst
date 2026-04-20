@@ -19,7 +19,6 @@
 
 #include "Exception.hpp"
 #include "Types.h"
-#include "Utils.hpp"
 
 namespace Catalyst::Runtime {
 

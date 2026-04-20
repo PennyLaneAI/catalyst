@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "RSDecomp.hpp"
+
 #include <cassert>
 #include <cmath>
 #include <cstring>
@@ -22,7 +24,6 @@
 #include "GridProblems.hpp"
 #include "NormSolver.hpp"
 #include "NormalForms.hpp"
-#include "RSDecomp.hpp"
 #include "Rings.hpp"
 
 #define MAX_SEARCH_TRIALS 10000

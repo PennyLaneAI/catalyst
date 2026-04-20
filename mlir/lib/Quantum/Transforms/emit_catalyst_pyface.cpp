@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "llvm/Support/FormatVariadic.h"
-
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"

@@ -18,8 +18,9 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
+#include <vector>
 
-#include "Exception.hpp"
 #include "Types.h"
 
 #ifdef __cplusplus

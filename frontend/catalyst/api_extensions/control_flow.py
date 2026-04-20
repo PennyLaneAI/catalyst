@@ -753,12 +753,10 @@ class CondCallable:
         @property for CondCallable.operation
         """
         if self._operation is None:
-            raise AttributeError(
-                """
+            raise AttributeError("""
                 The cond() was not called (or has not been called) in a quantum context,
                 and thus has no associated quantum operation.
-                """
-            )
+                """)
         return self._operation
 
     def else_if(self, pred):
@@ -1002,12 +1000,10 @@ class ForLoopCallable:
         @property for ForLoopCallable.operation
         """
         if self._operation is None:
-            raise AttributeError(
-                """
+            raise AttributeError("""
                 The for_loop() was not called (or has not been called) in a quantum context,
                 and thus has no associated quantum operation.
-                """
-            )
+                """)
         return self._operation
 
     def _call_with_quantum_ctx(self, *init_state):
@@ -1412,12 +1408,10 @@ class WhileLoopCallable:
         @property for WhileLoopCallable.operation
         """
         if self._operation is None:
-            raise AttributeError(
-                """
+            raise AttributeError("""
                 The while_loop() was not called (or has not been called) in a quantum context,
                 and thus has no associated quantum operation.
-                """
-            )
+                """)
         return self._operation
 
     def _call_with_quantum_ctx(self, *init_state):
@@ -1575,6 +1569,13 @@ class Cond(HybridOp):
     """PennyLane's conditional operation."""
 
     binder = cond_p.bind
+    has_adjoint = True
+
+    def adjoint(self):
+        """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
+        version of the operation, which is generally supported by Catalyst."""
+
+        return qml.adjoint(lambda: qml.apply(self) and None)()
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         return trace_quantum_branches(self, ctx, device, trace, qrp)
@@ -1584,6 +1585,13 @@ class ForLoop(HybridOp):
     """PennyLane ForLoop Operation."""
 
     binder = for_p.bind
+    has_adjoint = True
+
+    def adjoint(self):
+        """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
+        version of the operation, which is generally supported by Catalyst."""
+
+        return qml.adjoint(lambda: qml.apply(self) and None)()
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         op = self
@@ -1665,6 +1673,13 @@ class WhileLoop(HybridOp):
     """PennyLane's while loop operation."""
 
     binder = while_p.bind
+    has_adjoint = True
+
+    def adjoint(self):
+        """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
+        version of the operation, which is generally supported by Catalyst."""
+
+        return qml.adjoint(lambda: qml.apply(self) and None)()
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         cond_trace = self.regions[0].trace

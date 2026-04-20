@@ -12,26 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <bitset>
+#include "RuntimeCAPI.h"
+
 #include <cstdarg>
 #include <cstdlib>
 #include <ctime>
 #include <memory>
 #include <ostream>
-#include <stdexcept>
 #include <string_view>
-#include <tuple>
 
-#include "mlir/ExecutionEngine/CRunnerUtils.h"
+#include "Driver/Timer.h"
 
 #include "Exception.hpp"
 #include "ExecutionContext.hpp"
 #include "MemRefUtils.hpp"
 #include "QuantumDevice.hpp"
-#include "Timer.hpp"
 #include "Types.h"
-
-#include "RuntimeCAPI.h"
 
 namespace Catalyst::Runtime {
 
@@ -122,7 +118,7 @@ static void autoQubitManagementAllocate(std::vector<QubitIdType> *qubit_vector_p
 extern "C" {
 
 using namespace Catalyst::Runtime;
-using timer = catalyst::utils::Timer;
+using timer = catalyst::utils::Timer<>; // default timing ratio of std::milli
 
 void __catalyst_inactive_callback(int64_t identifier, int64_t argc, int64_t retc, ...)
 {
