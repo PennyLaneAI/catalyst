@@ -27,6 +27,7 @@ from typing import Optional
 # build deps
 from setuptools import Extension, find_namespace_packages, setup
 from setuptools._distutils import sysconfig
+from setuptools.command.build import build
 from setuptools.command.build_ext import build_ext
 
 system_platform = platform.system()
@@ -300,8 +301,36 @@ class UnifiedBuildExt(build_ext):
         subprocess.check_call([cmake_path, "--build", "."] + build_args, cwd=build_temp)
 
 
+class UnifiedBuild(build):
+    """Custom build command for precompiled bytecode rules."""
+
+    def run(self):
+        """Generate precompiled decomposition rules as bytecode."""
+        super().run()
+        sys.path.insert(0, os.path.abspath(self.build_lib))
+
+        try:
+            import catalyst
+
+            print(dir(catalyst))
+
+            BYTECODE_FILE_PATH = catalyst.utils.runtime_environment.BYTECODE_FILE_PATH
+            if not BYTECODE_FILE_PATH.exists():
+                BYTECODE_FILE_PATH.parent.mkdir(exist_ok=True)
+                for file in BYTECODE_FILE_PATH.parent.iterdir():
+                    if file.is_file() and file.name.startswith("decomposition_rules"):
+                        file.unlink()
+
+                catalyst.utils.precompile_decomposition_rules.precompile_decomp_rules()
+        except:
+            print("failed to precompile decomp rules as bytecode when building wheels:")
+            raise
+        finally:
+            sys.path.pop(0)
+
+
 class CustomBuildExtLinux(UnifiedBuildExt):
-    """Custom build extension class for Linux platforms
+    """Custom build extension class for Linux platforms.
 
     Currently no extra work needs to be performed with respect to the base class
     UnifiedBuildExt.
@@ -309,7 +338,7 @@ class CustomBuildExtLinux(UnifiedBuildExt):
 
 
 class CustomBuildExtMacos(UnifiedBuildExt):
-    """Custom build extension class for macOS platforms
+    """Custom build extension class for macOS platforms.
 
     In addition to the work performed by the base class UnifiedBuildExt, this
     class also changes the LC_ID_DYLIB that is otherwise constant and equal to
@@ -353,7 +382,7 @@ if system_platform == "Linux":
         extra_compile_args=["-std=c++20"],
         define_macros=Py_LIMITED_API_macros,
     )
-    cmdclass = {"build_ext": CustomBuildExtLinux}
+    cmdclass = {"build": UnifiedBuild, "build_ext": CustomBuildExtLinux}
 
 elif system_platform == "Darwin":
     variables = sysconfig.get_config_vars()
