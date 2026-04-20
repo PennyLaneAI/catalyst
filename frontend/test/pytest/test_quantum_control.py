@@ -551,19 +551,16 @@ class TestCatalystOnlyControlled:
     @pytest.mark.parametrize("work_wire_type", ["zeroed", "borrowed"])
     def test_qctrl_work_wire_type_callable(self, work_wire_type):
         """Test that work_wire_type is preserved on a Controlled op when wrapping a callable"""
-        x_wires = [0, 1, 2, 3]
-        output = [4, 5, 6, 7]
-        work_wires = [-1, 8, 9, 10, 11]
+        c_wire = 0
+        x_wires = [1, 2, 3]
+        output = [4, 5, 6]
+        work_wires_add = [7, 8]
+        work_wires_ctrl = [9]
 
         def _func():
-            qml.SemiAdder(x_wires=x_wires, y_wires=output, work_wires=work_wires[1 : len(output)])
+            qml.SemiAdder(x_wires=x_wires, y_wires=output, work_wires=work_wires_add)
 
-        hybrid_ctrl = C_ctrl(
-            _func,
-            control=work_wires[:1],
-            work_wires=work_wires[len(output) :],
-            work_wire_type=work_wire_type,
-        )()
+        hybrid_ctrl = C_ctrl(_func, control=c_wire, work_wires=work_wires_ctrl, work_wire_type=work_wire_type)()
         assert hybrid_ctrl.work_wire_type == work_wire_type
 
         decomposed = hybrid_ctrl.decomposition()
