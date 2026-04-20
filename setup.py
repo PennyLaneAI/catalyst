@@ -310,7 +310,7 @@ class UnifiedBuild(build):
         sys.path.insert(0, os.path.abspath(self.build_lib))
 
         try:
-            import catalyst
+            import catalyst  # pylint: disable=import-outside-toplevel
 
             print(dir(catalyst))
 
