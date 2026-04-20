@@ -17,11 +17,15 @@
 import copy
 import functools
 import json
+from pathlib import Path
+from typing import Iterable
 
 import pennylane as qml
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
+from catalyst.passes.utils import prepare_decomposition_options
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 # pylint: disable=line-too-long, too-many-lines
 
@@ -49,7 +53,7 @@ def cancel_inverses(qnode):
     :class:`qml.SWAP <pennylane.SWAP>`
 
     Three-bit Gates:
-    - :class:`qml.Toffoli <pennylane.Toffoli>`
+    :class:`qml.Toffoli <pennylane.Toffoli>`
 
     .. note::
 
@@ -260,11 +264,11 @@ def diagonalize_measurements(
 
 
 def disentangle_cnot(qnode):
-    """A peephole optimization for replacing ``CNOT`` gates with single-qubit gates.
+    r"""A peephole optimization for replacing ``CNOT`` gates with single-qubit gates.
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`pennylane.qjit`.
+        This transform requires decorating the workflow with :func:`~.qjit`.
 
     Args:
         fn (QNode): the QNode to apply the pass to
@@ -319,10 +323,10 @@ def disentangle_swap(qnode):
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`pennylane.qjit`.
+        This transform requires decorating the workflow with :func:`~.qjit`.
 
     Args:
-        fn (QNode): the QNode to apply the pass to.
+        fn (QNode): the QNode to apply the pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -371,7 +375,7 @@ def disentangle_swap(qnode):
 
 
 def merge_rotations(qnode):
-    """Specify that the ``-merge-rotations`` MLIR compiler pass
+    r"""Specify that the ``-merge-rotations`` MLIR compiler pass
     for merging roations (peephole) will be applied.
 
     The full list of supported gates are as follows:
@@ -388,7 +392,6 @@ def merge_rotations(qnode):
     :class:`qml.CRot <pennylane.CRot>`,
     :class:`qml.MultiRZ <pennylane.MultiRZ>`.
 
-
     .. note::
 
         Unlike PennyLane :doc:`circuit transformations <introduction/compiling_circuits>`,
@@ -403,7 +406,7 @@ def merge_rotations(qnode):
         :func:`~.get_compilation_stage` function.
 
     Args:
-        fn (QNode): the QNode to apply the cancel inverses compiler pass to
+        fn (QNode): the QNode to apply the merge rotations compiler pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -442,7 +445,7 @@ def decompose_lowering(qnode):
     recursively.
 
     Args:
-        fn (QNode): the QNode to apply the cancel inverses compiler pass to
+        fn (QNode): the QNode to apply the decompose-lowering compiler pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -780,7 +783,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
     `Compilation Hub <https://pennylane.ai/compilation/pauli-product-rotations>`_.
 
     Args:
-        fn (QNode): QNode to apply the pass to.
+        fn (QNode): QNode to apply the pass to
         max_pauli_size (int):
             The maximum size of Pauli strings resulting from commutation. If a commutation results
             in a PPR that acts on more than ``max_pauli_size`` qubits, that commutation will not be
@@ -973,7 +976,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
     the `Compilation Hub <https://pennylane.ai/compilation/pauli-based-computation>`_.
 
     Args:
-        qnode (QNode): QNode to apply the pass to.
+        qnode (QNode): QNode to apply the pass to
         decompose_method (str): The method to use for decomposing non-Clifford PPRs.
             Options are ``"pauli-corrected"``, ``"auto-corrected"``, and ``"clifford-corrected"``.
             Defaults to ``"pauli-corrected"``.
@@ -1310,7 +1313,7 @@ def reduce_t_depth(qnode):
         ``reduce_t_depth``.
 
     Args:
-        qnode (QNode): QNode to apply the pass to.
+        qnode (QNode): the QNode to apply the pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -1413,7 +1416,7 @@ def ppr_to_mbqc(qnode):
         after :func:`~.passes.to_ppr`.
 
     Args:
-        fn (QNode): QNode to apply the pass to.
+        fn (QNode): the QNode to apply the pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -1490,7 +1493,7 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
         ``decompose_arbitrary_ppr``.
 
     Args:
-        qnode (QNode): QNode to apply the pass to.
+        qnode (QNode): the QNode to apply the pass to
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -1550,3 +1553,118 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
     :math:`\tfrac{\pi}{4}`, or :math:`\tfrac{\pi}{8}`.
     """
     return qml.transform(pass_name="decompose-arbitrary-ppr")(qnode)
+
+
+def graph_decomposition(
+    qnode=None,
+    *,
+    gate_set: Iterable[type | str] | dict[type | str, float],
+    fixed_decomps: dict | None = None,
+    alt_decomps: dict | None = None,
+    _builtin_rule_path: Path = BYTECODE_FILE_PATH,
+):
+    R"""
+    Specify that the ``-graph-decomposition`` MLIR compiler pass for applying the graph-based
+    decomposition should be applied to the decorated QNode during :func:`~.qjit` compilation.
+
+    The graph-based decomposition pass decomposes gates into a weighted target ``gate_set``
+    by applying user-provided and built-in decomposition rules. The graph-based framework
+    allows multiple decomposition rules to be defined for a quantum operation,
+    and the graph solver will determine the optimal decomposition rules to apply,
+    minimizing the overall gate count or the cost according to user-specified weights.
+
+    .. note::
+
+        The QNode itself will not be changed or transformed by applying these decorators.
+
+        As a result, circuit inspection tools such as :func:`~.draw` will continue
+        to display the circuit as written in Python.
+
+        To instead view the optimized circuit, the MLIR must be viewed
+        after the ``"QuantumCompilationStage"`` stage via the
+        :func:`~.get_compilation_stage` function.
+
+    Args:
+        fn (QNode): the QNode to apply the graph decomposition compiler pass to.
+        gate_set (Iterable[type | str] | dict[type | str, float]): the set of gates that are
+            permissable after decomposition.
+        fixed_decomps (dict | None): map ops to decomps that will be forcibly applied.
+        alt_decomps (dict | None): map ops to lists of decomps that the graph system will consider.
+
+    Returns:
+        ~.QNode:
+
+    **Example**
+
+    .. code-block:: python
+
+        import pennylane as qp
+        import pennylane.numpy as np
+
+        from catalyst import qjit
+        from catalyst.jax_primitives import decomposition_rule
+        from catalyst.passes import cancel_inverses, graph_decomposition, merge_rotations
+
+
+        @decomposition_rule(op_type=qp.PauliX)
+        def x_to_rx(wire: int):
+            qp.RX(np.pi, wire)
+
+
+        @decomposition_rule(op_type=qp.PauliY)
+        def y_to_ry(wire: int):
+            qp.RY(np.pi, wire)
+
+
+        @decomposition_rule(op_type=qp.Hadamard)
+        def h_to_rx_ry(wire: int):
+            qp.RX(np.pi / 2, wire)
+            qp.RY(np.pi / 2, wire)
+
+
+        @qjit(capture=True)
+        @graph_decomposition(gate_set={qp.Rot})
+        @merge_rotations
+        @graph_decomposition(
+            gate_set={qp.RX, qp.RY},
+            fixed_decomps={qp.PauliX: x_to_rx, qp.PauliY: y_to_ry},
+            alt_decomps={qp.H: [h_to_rx_ry]},
+        )
+        @cancel_inverses
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def circuit(x: float, y: float):
+            qp.H(0)
+            qp.H(0)
+            qp.RX(x, wires=0)
+            qp.PauliX(0)
+            qp.RY(y, wires=0)
+            qp.PauliY(0)
+            qp.RY(x + y, wires=0)
+
+            # register custom decomposition rules
+            x_to_rx(int)
+            y_to_ry(int)
+            h_to_rx_ry(int)
+
+            return qp.state()
+
+    >>> qp.specs(circuit, level="device")(1.23, 4.56).resources.gate_types
+    {'Rot': 2}
+    """
+    if qnode is None:
+        return functools.partial(
+            graph_decomposition,
+            gate_set=gate_set,
+            fixed_decomps=fixed_decomps,
+            alt_decomps=alt_decomps,
+            _builtin_rule_path=_builtin_rule_path,
+        )
+
+    options = prepare_decomposition_options(
+        gate_set=gate_set,
+        fixed_decomps=fixed_decomps,
+        alt_decomps=alt_decomps,
+        _builtin_rule_path=_builtin_rule_path,
+    )
+
+    return qml.transform(pass_name="graph-decomposition")(qnode, **options)

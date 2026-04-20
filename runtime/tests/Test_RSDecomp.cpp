@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/generators/catch_generators_all.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
-#include <catch2/matchers/catch_matchers_range_equals.hpp>
-#include <catch2/matchers/catch_matchers_string.hpp>
-#include <catch2/matchers/catch_matchers_vector.hpp>
 #include <complex>
 #include <cstdio>
 #include <map>
+
+#include "catch2/catch_test_macros.hpp"
+#include "catch2/generators/catch_generators.hpp"
+#include "catch2/generators/catch_generators_range.hpp"
+#include "catch2/matchers/catch_matchers_floating_point.hpp"
+#include "catch2/matchers/catch_matchers_string.hpp"
 
 #include "CliffordData.hpp"
 #include "RSDecomp.hpp"

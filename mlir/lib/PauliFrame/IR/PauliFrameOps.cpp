@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "PauliFrame/IR/PauliFrameOps.h"
+
 #include "mlir/IR/Builders.h"
 
 #include "PauliFrame/IR/PauliFrameDialect.h"
-#include "PauliFrame/IR/PauliFrameOps.h"
 
 using namespace mlir;
 using namespace catalyst::pauli_frame;

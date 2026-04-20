@@ -15,7 +15,6 @@
 #define DEBUG_TYPE "memrefcopytolinalgcopy"
 
 #include "llvm/Support/Debug.h"
-
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Pass/Pass.h"

@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Gradient/Utils/DestinationPassingStyle.h"
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-
-#include "Gradient/Utils/DestinationPassingStyle.h"
 
 using namespace mlir;
 

@@ -15,6 +15,7 @@
 """
 Conversion from control flow plxpr primitives.
 """
+
 from copy import copy
 from functools import partial
 
@@ -36,7 +37,7 @@ from catalyst.from_plxpr.qubit_handler import (
     _get_dynamically_allocated_qregs,
 )
 from catalyst.jax_extras import jaxpr_pad_consts
-from catalyst.jax_primitives import cond_p, for_p, while_p
+from catalyst.jax_primitives import cond_p, while_p
 
 
 def _calling_convention(
@@ -228,32 +229,32 @@ def workflow_for_loop(
     """
     assert jaxpr_body_fn is not None
     args = plxpr_invals[_tuple_to_slice(args_slice)]
-
+    abstract_shapes = plxpr_invals[slice(*abstract_shapes_slice)]
     consts = plxpr_invals[_tuple_to_slice(consts_slice)]
 
     converter = copy(self)
     evaluator = partial(converter.eval, jaxpr_body_fn, consts)
 
-    converted_jaxpr_branch = jax.make_jaxpr(evaluator)(start, *args)
-    converted_closed_jaxpr_branch = ClosedJaxpr(
-        convert_constvars_jaxpr(converted_jaxpr_branch.jaxpr), ()
-    )
+    converted_jaxpr_branch = jax.make_jaxpr(evaluator)(*abstract_shapes, start, *args)
 
-    # Config additional for loop settings
-    apply_reverse_transform = isinstance(step, int) and step < 0
+    new_consts = converted_jaxpr_branch.consts
+    abstract_shapes_end = len(new_consts) + len(abstract_shapes)
+    args_end = abstract_shapes_end + len(args)
+    consts_slice = (0, len(new_consts), 1)
+    abstract_shapes_slice = (len(new_consts), abstract_shapes_end, 1)
+    args_slice = (abstract_shapes_end, args_end, 1)
 
-    return for_p.bind(
-        *converted_jaxpr_branch.consts,
+    return plxpr_for_loop_prim.bind(
         start,
         stop,
         step,
-        start,
+        *new_consts,
+        *abstract_shapes,
         *args,
-        body_jaxpr=converted_closed_jaxpr_branch,
-        body_nconsts=len(consts),
-        apply_reverse_transform=apply_reverse_transform,
-        num_implicit_inputs=0,
-        preserve_dimensions=True,
+        jaxpr_body_fn=converted_jaxpr_branch.jaxpr,
+        consts_slice=consts_slice,
+        abstract_shapes_slice=abstract_shapes_slice,
+        args_slice=args_slice,
     )
 
 
@@ -278,7 +279,9 @@ def handle_for_loop(
         abstract_shapes_slice: Tuple (start, stop, step) to slice abstract shapes
     """
     assert jaxpr_body_fn is not None
-    args = plxpr_invals[_tuple_to_slice(args_slice)]
+    args = plxpr_invals[slice(*args_slice)]
+    abstract_shapes = plxpr_invals[slice(*abstract_shapes_slice)]
+    consts = plxpr_invals[slice(*consts_slice)]
 
     # Add the iteration start and the qreg to the args
     self.init_qreg.insert_all_dangling_qubits()
@@ -287,14 +290,13 @@ def handle_for_loop(
         plxpr_invals, self.qubit_index_recorder, self.init_qreg
     )
 
+    qregs = [*[dyn_qreg.get() for dyn_qreg in dynalloced_qregs], self.init_qreg.get()]
     start_plus_args_plus_qreg = [
+        *abstract_shapes,
         start,
         *args,
-        *[dyn_qreg.get() for dyn_qreg in dynalloced_qregs],
-        self.init_qreg.get(),
+        *qregs,
     ]
-
-    consts = plxpr_invals[_tuple_to_slice(consts_slice)]
 
     jaxpr = ClosedJaxpr(jaxpr_body_fn, consts)
 
@@ -304,31 +306,31 @@ def handle_for_loop(
         jaxpr,
         outer_dynqreg_handlers=dynalloced_qregs,
     )
-    converted_jaxpr_branch = jax.make_jaxpr(f)(*start_plus_args_plus_qreg)
 
-    converted_closed_jaxpr_branch = ClosedJaxpr(
-        convert_constvars_jaxpr(converted_jaxpr_branch.jaxpr), ()
-    )
+    converted_jaxpr_branch = jax.make_jaxpr(f)(*start_plus_args_plus_qreg)
 
     # Build Catalyst compatible input values
     # strip global wire indices of dynamic wires
     new_consts = converted_jaxpr_branch.consts
     new_consts = tuple(const for const in new_consts if const not in dynalloced_wire_global_indices)
-    for_loop_invals = [*new_consts, start, stop, step, *start_plus_args_plus_qreg]
 
-    # Config additional for loop settings
-    apply_reverse_transform = isinstance(step, int) and step < 0
+    abstract_shapes_end = len(new_consts) + len(abstract_shapes)
+    args_end = abstract_shapes_end + len(args) + len(qregs)
+    consts_slice = (0, len(new_consts), 1)
+    abstract_shapes_slice = (len(new_consts), abstract_shapes_end, 1)
+    args_slice = (abstract_shapes_end, args_end, 1)
+
+    invals = (start, stop, step, *new_consts, *abstract_shapes, *args, *qregs)
 
     # Perform the binding
-    outvals = for_p.bind(
-        *for_loop_invals,
-        body_jaxpr=converted_closed_jaxpr_branch,
-        body_nconsts=len(new_consts),
-        apply_reverse_transform=apply_reverse_transform,
-        num_implicit_inputs=0,
-        preserve_dimensions=True,
+    outvals = plxpr_for_loop_prim.bind(
+        *invals,
+        jaxpr_body_fn=converted_jaxpr_branch.jaxpr,
+        consts_slice=consts_slice,
+        abstract_shapes_slice=abstract_shapes_slice,
+        args_slice=args_slice,
     )
-
+    outvals = list(outvals)
     # Output structure:
     # First a list of dynamically allocated qregs, then the global qreg
     # Update the current qreg and remove it from the output values.
