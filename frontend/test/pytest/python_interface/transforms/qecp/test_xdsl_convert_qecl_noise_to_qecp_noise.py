@@ -46,16 +46,16 @@ class TestConvertQECLNoiseOpToQECPNoisePass:
                 }
                 // CHECK-LABEL: func.func private @noise_subroutine_code_1x7x1([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<1xi64>, [[rotation_params:%.*]]: tensor<1x3xf64>)
                 // CHECK-SAME: attributes {noise_subroutine_code_1x7x1}
-                // CHECK-NEXT: [[num_errors:%.*]] = arith.constant 1 : i64
-                // CHECK-NEXT: [[zero:%.*]] = arith.constant 0 : i64
-                // CHECK-NEXT: [[one:%.*]] = arith.constant 1 : i64
-                // CHECK-NEXT: [[two:%.*]] = arith.constant 2 : i64
+                // CHECK-NEXT: [[num_errors:%.*]] = arith.constant 1 : index
+                // CHECK-NEXT: [[zero:%.*]] = arith.constant 0 : index
+                // CHECK-NEXT: [[one:%.*]] = arith.constant 1 : index
+                // CHECK-NEXT: [[two:%.*]] = arith.constant 2 : index
                 // CHECK-NEXT: [[noisy_codeblock:%.*]] = scf.for [[index:%.*]] = [[zero:%.*]] to [[num_errors:%.*]] step [[one:%.*]] iter_args([[current_codeblock:%.*]] = [[codeblock:%.*]]) -> (!qecp.codeblock<1 x 7>)
-                // CHECK-NEXT: [[index_int:%.*]] = arith.index_cast [[index:%.*]] : index to i64
-                // CHECK-NEXT: [[qubit_index:%.*]] = tensor.extract [[qubit_indices:%.*]][[[index_int:%.*]]] : tensor<1xi64>
-                // CHECK-NEXT: [[phi:%.*]] = tensor.extract [[rotation_params:%.*]][[[index_int:%.*]], [[zero:%.*]]] : tensor<1x3xf64>
-                // CHECK-NEXT: [[theta:%.*]] = tensor.extract [[rotation_params:%.*]][[[index_int:%.*]], [[one:%.*]]] : tensor<1x3xf64>
-                // CHECK-NEXT: [[omega:%.*]] = tensor.extract [[rotation_params:%.*]][[[index_int:%.*]], [[two:%.*]]] : tensor<1x3xf64>
+                // CHECK-NEXT: [[qubit_i64:%.*]] = tensor.extract [[qubit_indices:%.*]][[[index:%.*]]] : tensor<1xi64>
+                // CHECK-NEXT: [[phi:%.*]] = tensor.extract [[rotation_params:%.*]][[[index:%.*]], [[zero:%.*]]] : tensor<1x3xf64>
+                // CHECK-NEXT: [[theta:%.*]] = tensor.extract [[rotation_params:%.*]][[[index:%.*]], [[one:%.*]]] : tensor<1x3xf64>
+                // CHECK-NEXT: [[omega:%.*]] = tensor.extract [[rotation_params:%.*]][[[index:%.*]], [[two:%.*]]] : tensor<1x3xf64>
+                // CHECK-NEXT: [[qubit_index:%.*]] = arith.index_cast [[qubit_i64:%.*]] : i64 to index
                 // CHECK-NEXT: [[qubit:%.*]] = qecp.extract [[current_codeblock:%.*]][[[qubit_index:%.*]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
                 // CHECK-NEXT: [[updated_qubit:%.*]] = qecp.rot([[phi:%.*]], [[theta:%.*]], [[omega:%.*]]) [[qubit:%.*]] : !qecp.qubit<data>
                 // CHECK-NEXT: [[updated_codeblock:%.*]] = qecp.insert [[current_codeblock:%.*]][[[qubit_index:%.*]]], [[updated_qubit:%.*]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
@@ -86,16 +86,16 @@ class TestConvertQECLNoiseOpToQECPNoisePass:
                 }
                 // CHECK-LABEL: func.func private @noise_subroutine_code_1x7x3([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<3xi64>, [[rotation_params:%.*]]: tensor<3x3xf64>)
                 // CHECK-SAME: attributes {noise_subroutine_code_1x7x3}
-                // CHECK-NEXT: [[num_errors:%.*]] = arith.constant 3 : i64
-                // CHECK-NEXT: [[zero:%.*]] = arith.constant 0 : i64
-                // CHECK-NEXT: [[one:%.*]] = arith.constant 1 : i64
-                // CHECK-NEXT: [[two:%.*]] = arith.constant 2 : i64
+                // CHECK-NEXT: [[num_errors:%.*]] = arith.constant 3 : index
+                // CHECK-NEXT: [[zero:%.*]] = arith.constant 0 : index
+                // CHECK-NEXT: [[one:%.*]] = arith.constant 1 : index
+                // CHECK-NEXT: [[two:%.*]] = arith.constant 2 : index
                 // CHECK-NEXT: [[noisy_codeblock:%.*]] = scf.for [[index:%.*]] = [[zero:%.*]] to [[num_errors:%.*]] step [[one:%.*]] iter_args([[current_codeblock:%.*]] = [[codeblock:%.*]]) -> (!qecp.codeblock<1 x 7>)
-                // CHECK-NEXT: [[index_int:%.*]] = arith.index_cast [[index:%.*]] : index to i64
-                // CHECK-NEXT: [[qubit_index:%.*]] = tensor.extract [[qubit_indices:%.*]][[[index_int:%.*]]] : tensor<3xi64>
-                // CHECK-NEXT: [[phi:%.*]] = tensor.extract [[rotation_params:%.*]][[[index_int:%.*]], [[zero:%.*]]] : tensor<3x3xf64>
-                // CHECK-NEXT: [[theta:%.*]] = tensor.extract [[rotation_params:%.*]][[[index_int:%.*]], [[one:%.*]]] : tensor<3x3xf64>
-                // CHECK-NEXT: [[omega:%.*]] = tensor.extract [[rotation_params:%.*]][[[index_int:%.*]], [[two:%.*]]] : tensor<3x3xf64>
+                // CHECK-NEXT: [[qubit_i64:%.*]] = tensor.extract [[qubit_indices:%.*]][[[index:%.*]]] : tensor<3xi64>
+                // CHECK-NEXT: [[phi:%.*]] = tensor.extract [[rotation_params:%.*]][[[index:%.*]], [[zero:%.*]]] : tensor<3x3xf64>
+                // CHECK-NEXT: [[theta:%.*]] = tensor.extract [[rotation_params:%.*]][[[index:%.*]], [[one:%.*]]] : tensor<3x3xf64>
+                // CHECK-NEXT: [[omega:%.*]] = tensor.extract [[rotation_params:%.*]][[[index:%.*]], [[two:%.*]]] : tensor<3x3xf64>
+                // CHECK-NEXT: [[qubit_index:%.*]] = arith.index_cast [[qubit_i64:%.*]] : i64 to index
                 // CHECK-NEXT: [[qubit:%.*]] = qecp.extract [[current_codeblock:%.*]][[[qubit_index:%.*]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
                 // CHECK-NEXT: [[updated_qubit:%.*]] = qecp.rot([[phi:%.*]], [[theta:%.*]], [[omega:%.*]]) [[qubit:%.*]] : !qecp.qubit<data>
                 // CHECK-NEXT: [[updated_codeblock:%.*]] = qecp.insert [[current_codeblock:%.*]][[[qubit_index:%.*]]], [[updated_qubit:%.*]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
@@ -134,16 +134,16 @@ class TestConvertQECLNoiseOpToQECPNoisePass:
                 }
                 // CHECK-COUNT-1: func.func private @noise_subroutine_code_1x7x1([[codeblock:%.*]]: !qecp.codeblock<1 x 7>, [[qubit_indices:%.*]]: tensor<1xi64>, [[rotation_params:%.*]]: tensor<1x3xf64>)
                 // CHECK-SAME: attributes {noise_subroutine_code_1x7x1}
-                // CHECK-NEXT: [[num_errors:%.*]] = arith.constant 1 : i64
-                // CHECK-NEXT: [[zero:%.*]] = arith.constant 0 : i64
-                // CHECK-NEXT: [[one:%.*]] = arith.constant 1 : i64
-                // CHECK-NEXT: [[two:%.*]] = arith.constant 2 : i64
+                // CHECK-NEXT: [[num_errors:%.*]] = arith.constant 1 : index
+                // CHECK-NEXT: [[zero:%.*]] = arith.constant 0 : index
+                // CHECK-NEXT: [[one:%.*]] = arith.constant 1 : index
+                // CHECK-NEXT: [[two:%.*]] = arith.constant 2 : index
                 // CHECK-NEXT: [[noisy_codeblock:%.*]] = scf.for [[index:%.*]] = [[zero:%.*]] to [[num_errors:%.*]] step [[one:%.*]] iter_args([[current_codeblock:%.*]] = [[codeblock:%.*]]) -> (!qecp.codeblock<1 x 7>)
-                // CHECK-NEXT: [[index_int:%.*]] = arith.index_cast [[index:%.*]] : index to i64
-                // CHECK-NEXT: [[qubit_index:%.*]] = tensor.extract [[qubit_indices:%.*]][[[index_int:%.*]]] : tensor<1xi64>
-                // CHECK-NEXT: [[phi:%.*]] = tensor.extract [[rotation_params:%.*]][[[index_int:%.*]], [[zero:%.*]]] : tensor<1x3xf64>
-                // CHECK-NEXT: [[theta:%.*]] = tensor.extract [[rotation_params:%.*]][[[index_int:%.*]], [[one:%.*]]] : tensor<1x3xf64>
-                // CHECK-NEXT: [[omega:%.*]] = tensor.extract [[rotation_params:%.*]][[[index_int:%.*]], [[two:%.*]]] : tensor<1x3xf64>
+                // CHECK-NEXT: [[qubit_i64:%.*]] = tensor.extract [[qubit_indices:%.*]][[[index:%.*]]] : tensor<1xi64>
+                // CHECK-NEXT: [[phi:%.*]] = tensor.extract [[rotation_params:%.*]][[[index:%.*]], [[zero:%.*]]] : tensor<1x3xf64>
+                // CHECK-NEXT: [[theta:%.*]] = tensor.extract [[rotation_params:%.*]][[[index:%.*]], [[one:%.*]]] : tensor<1x3xf64>
+                // CHECK-NEXT: [[omega:%.*]] = tensor.extract [[rotation_params:%.*]][[[index:%.*]], [[two:%.*]]] : tensor<1x3xf64>
+                // CHECK-NEXT: [[qubit_index:%.*]] = arith.index_cast [[qubit_i64:%.*]] : i64 to index
                 // CHECK-NEXT: [[qubit:%.*]] = qecp.extract [[current_codeblock:%.*]][[[qubit_index:%.*]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
                 // CHECK-NEXT: [[updated_qubit:%.*]] = qecp.rot([[phi:%.*]], [[theta:%.*]], [[omega:%.*]]) [[qubit:%.*]] : !qecp.qubit<data>
                 // CHECK-NEXT: [[updated_codeblock:%.*]] = qecp.insert [[current_codeblock:%.*]][[[qubit_index:%.*]]], [[updated_qubit:%.*]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
