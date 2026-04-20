@@ -366,8 +366,9 @@
 
 <h3>Improvements 🛠</h3>
 
-* `qml.for_loop` now supports dynamic shapes with program capture `qjit(capture=True)`.
+* `qml.for_loop` and `qml.while_loop` now support dynamic shapes with program capture `qjit(capture=True)`.
   [(#2603)](https://github.com/PennyLaneAI/catalyst/pull/2603/)
+  [(#2651)](https://github.com/PennyLaneAI/catalyst/pull/2651)
 
 * Added support for ``StatePrep`` kwargs ``pad_with`` and ``normalize`` with program capture enabled.
   [(#2620)](https://github.com/PennyLaneAI/catalyst/pull/2620)
@@ -479,7 +480,10 @@
 
 * A more informative error message is now raised when a `measurements-from-samples` xDSL pass encounters a
   program with dyanamic shots.
-  [#2616](https://github.com/PennyLaneAI/catalyst/pull/2616)
+  [(#2616)](https://github.com/PennyLaneAI/catalyst/pull/2616)
+
+* The `measurements-from-samples` xDSL pass is extended to support tensor product observables.
+  [(#2656)](https://github.com/PennyLaneAI/catalyst/pull/2656)
 
 <h3>Breaking changes 💔</h3>
 
@@ -529,6 +533,11 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fixed a bug where the `work_wire_type` argument of `qml.ctrl` was silently dropped inside `@qjit` functions. 
+  The parameter is now threaded through `catalyst.ctrl`, `CtrlCallable`, `HybridCtrl`, and
+  `ctrl_distribute`, with the default value being `"borrowed"`.
+  [(#2710)](https://github.com/PennyLaneAI/catalyst/pull/2710)
 
 * Fixed a bug where multiple `quantum.extract` operations from the same index were being created
   when there are multiple computational basis observables, named observables or Hermitian
@@ -975,6 +984,17 @@
   [(#2574)](https://github.com/PennyLaneAI/catalyst/pull/2574)
   [(#2576)](https://github.com/PennyLaneAI/catalyst/pull/2576)
   [(#2673)](https://github.com/PennyLaneAI/catalyst/pull/2673)
+
+* An experimental pass to convert `qecl.noise` operations in the *QEC Logical* layer to subroutine calls in the *QEC Phyiscal* layer.
+  [(#2678)](https://github.com/PennyLaneAI/catalyst/pull/2678)
+
+* A new, experimental compiler pass `convert-quantum-to-qecl` has been added to lower operations
+  from the `quantum` dialect into the QEC Logical (`qecl`) dialect.
+  [(#2589)](https://github.com/PennyLaneAI/catalyst/pull/2589)
+
+* An experimental compiler pass `inject-noise-to-qecl` has been added to inject noise operations  
+  into the QEC Logical (`qecl`) layer to validate QEC protocols under development.
+  [(#2705)](https://github.com/PennyLaneAI/catalyst/pull/2705)
 
 * A new, experimental compiler pass `convert-qecl-to-qecp` has been added to lower operations
   from the QEC Logical (`qecl`) dialect into the QEC Physical (`qecp`) dialect.
