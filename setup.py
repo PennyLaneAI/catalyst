@@ -310,8 +310,21 @@ class UnifiedBuild(build):
         sys.path.insert(0, os.path.abspath(self.build_lib))
 
         try:
-            from catalyst.utils.precompile_decomposition_rules import precompile_decomp_rules
-            from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
+            import catalyst.utils.runtime_environment as runtime_env  # pylint: disable=import-outside-toplevel
+            from catalyst.utils.precompile_decomposition_rules import (  # pylint: disable=import-outside-toplevel
+                precompile_decomp_rules,
+            )
+            from catalyst.utils.runtime_environment import (  # pylint: disable=import-outside-toplevel
+                BYTECODE_FILE_PATH,
+            )
+
+            # patch this so that precompile_decomp_rules has access to catalyst
+            if os.path.exists("frontend/bin/catalyst"):
+                runtime_env.get_cli_path = lambda: "frontend/bin/catalyst"
+            elif os.path.exists("mlir/build/bin/catalyst"):
+                runtime_env.get_cli_path = lambda: "mlir/build/bin/catalyst"
+            else:
+                raise FileNotFoundError("Catalyst CLI not found, cannot precompile rules")
 
             if not BYTECODE_FILE_PATH.exists():
                 BYTECODE_FILE_PATH.parent.mkdir(exist_ok=True)
