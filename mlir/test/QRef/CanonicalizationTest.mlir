@@ -115,6 +115,7 @@ func.func @test_get_constant_index(%r: !qref.reg<3>) -> (!qref.bit, !qref.bit) {
     %q0 = qref.get %r[%0] : !qref.reg<3>, i64 -> !qref.bit
 
     // CHECK-NOT: stablehlo.constant
+    // CHECK-NOT: tensor.extract
     // CHECK: [[q1:%.+]] = qref.get %arg0[ 1] : !qref.reg<3> -> !qref.bit
     %1 = stablehlo.constant dense<1> : tensor<i64>
     %extracted = tensor.extract %1[] : tensor<i64>
