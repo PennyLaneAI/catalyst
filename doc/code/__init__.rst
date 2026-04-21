@@ -28,6 +28,7 @@ Module: catalyst.passes
     :toctree: api
 
     ~to_ppr
+    ~commute_ppr
 
 Module: catalyst.third_party.cuda
 ---------------------------------
