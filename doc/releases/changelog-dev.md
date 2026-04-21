@@ -534,7 +534,7 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Fixed a bug where the `work_wire_type` argument of `qml.ctrl` was silently dropped inside `@qjit` functions. 
+* Fixed a bug where the `work_wire_type` argument of `qml.ctrl` was silently dropped inside `@qjit` functions.
   The parameter is now threaded through `catalyst.ctrl`, `CtrlCallable`, `HybridCtrl`, and
   `ctrl_distribute`, with the default value being `"borrowed"`.
   [(#2710)](https://github.com/PennyLaneAI/catalyst/pull/2710)
@@ -733,6 +733,7 @@
   [(#2663)](https://github.com/PennyLaneAI/catalyst/pull/2663)
   [(#2664)](https://github.com/PennyLaneAI/catalyst/pull/2664)
   [(#2672)](https://github.com/PennyLaneAI/catalyst/pull/2672)
+  [(#2720)](https://github.com/PennyLaneAI/catalyst/pull/2720)
 
 * Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
   Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
@@ -993,7 +994,7 @@
   from the `quantum` dialect into the QEC Logical (`qecl`) dialect.
   [(#2589)](https://github.com/PennyLaneAI/catalyst/pull/2589)
 
-* An experimental compiler pass `inject-noise-to-qecl` has been added to inject noise operations  
+* An experimental compiler pass `inject-noise-to-qecl` has been added to inject noise operations
   into the QEC Logical (`qecl`) layer to validate QEC protocols under development.
   [(#2705)](https://github.com/PennyLaneAI/catalyst/pull/2705)
 
