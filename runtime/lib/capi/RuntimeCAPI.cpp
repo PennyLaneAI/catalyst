@@ -1279,7 +1279,18 @@ RESULT *__catalyst__mbqc__measure_in_basis(QUBIT *wire, uint32_t plane, double a
 // NOTE: Syndrome results are currently represented as int8_t, following the design choice of SetBasisState.
 int64_t *__catalyst__qecp__decode_steane_lut(MemRefT_int64_1d *row_idx, MemRefT_int64_1d *col_ptr, MemRefT_int8_1d *syndrome_results)
 {
-    // Implementation for QECP decode function
+    // 1. Recover the parity check matrix from the given row_idx and col_ptr arrays. 
+    // m, n = dimensions of the parity check matrix
+    // std::vector<std::vector<int8_t>> parity_check_matrix(m,n);
+    // 2. Create a look up table 
+    // std::vector<std::vector<int8_t>> lut(1<<m, n);
+
+    // 3. Initalize the look up table
+
+    // 4. Process the given syndrome results to get the index of the look up table entry corresponding to the given syndrome results.
+
+    // 5. Return the look up table entry corresponding to the given syndrome results, which contains the error correction information (e.g., which qubits to apply X or Z gates to correct the error).
+
     return nullptr;
 }
 }
