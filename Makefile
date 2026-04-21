@@ -257,9 +257,8 @@ wheel:
 		    cp $(COPY_FLAGS) $$file $$dest_dir; \
 	    done' sh {} +
 
+	PYTHONPATH="$(MK_DIR)/frontend:$$PYTHONPATH" $(PYTHON) -m catalyst.utils.precompile_decomposition_rules
 	$(PYTHON) -m pip wheel --no-deps . -w dist
-	$(PYTHON) -m pip install dist/*.whl --extra-index-url https://test.pypi.org/simple/
-	$(PYTHON) -m frontend.catalyst.utils.precompile_decomposition_rules
 
 	rm -r $(MK_DIR)/build
 	rm -r frontend/pennylane_catalyst.egg-info
