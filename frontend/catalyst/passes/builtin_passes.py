@@ -870,7 +870,7 @@ def commute_ppr_setup_inputs(max_pauli_size=0):
 commute_ppr = qml.transform(pass_name="commute-ppr", setup_inputs=commute_ppr_setup_inputs)
 
 
-def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
+def merge_ppr_ppm_setup_inputs(max_pauli_size=0):
     r"""A quantum compilation pass that absorbs Clifford Pauli product rotation (PPR) operations,
     :math:`\exp{-iP\tfrac{\pi}{4}}`, into the final Pauli product measurements (PPMs).
 
@@ -952,13 +952,13 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     operation would be skipped. In the above output, ``PPM-w<int>`` denotes the PPM weight (the
     number of qubits it acts on, or the length of the Pauli word).
     """
-    if qnode is None:
-        return functools.partial(merge_ppr_ppm, max_pauli_size=max_pauli_size)
-
-    return qml.transform(pass_name="merge-ppr-ppm")(qnode, max_pauli_size=max_pauli_size)
+    return (), {"max_pauli_size": max_pauli_size}
 
 
-def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measure=False):
+merge_ppr_ppm = qml.transform(pass_name="merge-ppr-ppm")
+
+
+def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=False):
     r"""A quantum compilation pass that decomposes Pauli product rotations (PPRs),
     :math:`P(\theta) = \exp(-iP\theta)`, into Pauli product measurements (PPMs).
 
@@ -1066,14 +1066,12 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
     (:math:`P(\tfrac{\pi}{2}) = \exp(-iP\tfrac{\pi}{2}) = P`). Pauli operators can be commuted to
     the end of the circuit and absorbed into terminal measurements.
     """
-    if qnode is None:
-        return functools.partial(
-            ppr_to_ppm, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure
-        )
+    return (), {"decompose_method": decompose_method, "avoid_y_measure": avoid_y_measure}
 
-    return qml.transform(pass_name="ppr-to-ppm")(
-        qnode, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure
-    )
+
+ppr_to_ppm = qml.transform(pass_name="ppr-to-ppm")(
+    qnode, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure
+)
 
 
 def ppm_compilation(

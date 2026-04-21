@@ -29,6 +29,8 @@ Module: catalyst.passes
 
     ~to_ppr
     ~commute_ppr
+    ~merge_ppr_ppm
+    ~ppr_to_ppm
 
 Module: catalyst.third_party.cuda
 ---------------------------------
