@@ -1072,8 +1072,8 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
 ppr_to_ppm = qml.transform(pass_name="ppr-to-ppm", setup_inputs=ppr_to_ppm_setup_inputs)
 
 
-def ppm_compilation(
-    qnode=None, *, decompose_method="pauli-corrected", avoid_y_measure=False, max_pauli_size=0
+def ppm_compilation_setup_inputs(
+    decompose_method="pauli-corrected", avoid_y_measure=False, max_pauli_size=0
 ):
     r"""A quantum compilation pass that transforms Clifford+T gates into Pauli product measurements
     (PPMs).
@@ -1176,20 +1176,17 @@ def ppm_compilation(
     ``max_pauli_size`` qubits (here, ``max_pauli_size = 2``), that commutation or merge would be
     skipped.
     """
-    if qnode is None:
-        return functools.partial(
-            ppm_compilation,
-            decompose_method=decompose_method,
-            avoid_y_measure=avoid_y_measure,
-            max_pauli_size=max_pauli_size,
-        )
 
-    return qml.transform(pass_name="ppm-compilation")(
-        qnode,
-        decompose_method=decompose_method,
-        avoid_y_measure=avoid_y_measure,
-        max_pauli_size=max_pauli_size,
-    )
+    return (), {
+        "decompose_method": decompose_method,
+        "avoid_y_measure": avoid_y_measure,
+        "max_pauli_size": max_pauli_size,
+    }
+
+
+ppm_compilation = qml.transform(
+    pass_name="ppm-compilation", setup_inputs=ppm_compilation_setup_inputs
+)
 
 
 def ppm_specs(fn):
@@ -1295,7 +1292,7 @@ def ppm_specs(fn):
         raise NotImplementedError("PPM passes only support AOT (Ahead-Of-Time) compilation mode.")
 
 
-def reduce_t_depth(qnode):
+def reduce_t_depth_setup_inputs():
     r"""A quantum compilation pass that reduces the depth and count of non-Clifford Pauli product
     rotation (PPR, :math:`P(\theta) = \exp(-iP\theta)`) operators (e.g., ``T`` gates) by commuting
     PPRs in adjacent layers and merging compatible ones (a layer comprises PPRs that mutually
@@ -1384,11 +1381,13 @@ def reduce_t_depth(qnode):
         :alt: Graphical representation of circuit with ``reduce_t_depth``
         :align: left
     """
+    return (), {}
 
-    return qml.transform(pass_name="reduce-t-depth")(qnode)
+
+reduce_t_depth = qml.transform(pass_name="reduce-t-depth", setup_inputs=reduce_t_depth_setup_inputs)
 
 
-def ppr_to_mbqc(qnode):
+def ppr_to_mbqc_setup_inputs():
     r"""Specify that the MLIR compiler pass for lowering Pauli Product Rotations (PPR)
     and Pauli Product Measurements (PPM) to a measurement-based quantum computing
     (MBQC) style circuit will be applied.
@@ -1471,12 +1470,16 @@ def ppr_to_mbqc(qnode):
         ...
 
     """
-    return qml.transform(pass_name="ppr-to-mbqc")(qnode)
+
+    return (), {}
+
+
+ppr_to_mbqc = qml.transform(pass_name="ppr-to-mbqc", setup_inputs=ppr_to_mbqc_setup_inputs)
 
 
 # This pass is already covered via applying by pass
 # `qml.transform(pass_name="decompose-arbitrary-ppr")` in Pennylane.
-def decompose_arbitrary_ppr(qnode):  # pragma: nocover
+def decompose_arbitrary_ppr_setup_inputs():  # pragma: nocover
     r"""A quantum compilation pass that decomposes arbitrary-angle Pauli product rotations (PPRs) into a
     collection of PPRs (with angles of rotation of :math:`\tfrac{\pi}{2}`, :math:`\tfrac{\pi}{4}`,
     and :math:`\tfrac{\pi}{8}`), PPMs and a single-qubit arbitrary-angle PPR in the Z basis. For
@@ -1551,7 +1554,12 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
     ``PPR-Phi-w<int>`` corresponds to a PPR whose angle of rotation is not :math:`\tfrac{\pi}{2}`,
     :math:`\tfrac{\pi}{4}`, or :math:`\tfrac{\pi}{8}`.
     """
-    return qml.transform(pass_name="decompose-arbitrary-ppr")(qnode)
+    return (), {}
+
+
+decompose_arbitrary_ppr = qml.transform(
+    pass_name="decompose-arbitrary-ppr", setup_inputs=decompose_arbitrary_ppr_setup_inputs
+)
 
 
 def graph_decomposition(
