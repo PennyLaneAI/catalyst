@@ -34,9 +34,9 @@ def get_cpp_files_from_path(path, ignore_patterns=None, use_gitignore=True, head
     path = Path(path)
     files_rel = set()  # file paths relative to path
 
-    exts = HEADERFILE_EXT
+    exts = list(HEADERFILE_EXT)
     if not header_only:
-        exts += SRCFILE_EXT
+        exts.extend(SRCFILE_EXT)
     for ext in exts:
         for file_path in path.rglob(f"*.{ext}"):
             files_rel.add(file_path.relative_to(path))
