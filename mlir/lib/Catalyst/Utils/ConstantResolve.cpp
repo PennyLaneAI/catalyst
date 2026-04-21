@@ -48,7 +48,6 @@ static std::optional<double> attrToDouble(Attribute attr)
 
 inline std::optional<double> resolveConstantArithmetic(Value val, Operation *op)
 {
-
     // arith integer binary ops
     if (isa<arith::AddIOp, arith::SubIOp, arith::MulIOp>(op)) {
         auto lhs = resolveConstant(op->getOperand(0));
