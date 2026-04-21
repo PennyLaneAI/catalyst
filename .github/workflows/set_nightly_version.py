@@ -29,7 +29,7 @@ with open(version_file_path, "r+", encoding="UTF-8") as f:
     version_line = lines[-1]
     assert "__version__ = " in version_line
 
-    pattern = r"(\d+).(\d+).(\d+)-dev(\d+)"
+    pattern = r"^(\d+)\.(\d+)\.(\d+)-dev(\d+)$"
     match = re.search(pattern, version_line)
     assert match
 
