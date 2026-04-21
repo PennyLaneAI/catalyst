@@ -371,3 +371,49 @@ def test_set_basis_state():
 
 
 print(test_set_basis_state.mlir)
+
+
+# CHECK: func.func public @test_adjoint(%arg0: tensor<i64>) -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=4))
+def test_adjoint(i: int):
+    """
+    Test adjoint
+    """
+    # CHECK-DAG: [[angle_adj:%.+]] = arith.constant -1.000000e-01 : f64
+    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
+
+    # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
+
+    # CHECK: qref.adjoint {
+    # CHECK:   [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK:   [[i:%.+]] = tensor.extract %arg0[] : tensor<i64>
+    # CHECK:   [[qi:%.+]] = qref.get [[reg]][[[i]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK:   qref.custom "CNOT"() [[q0]], [[qi]] : !qref.bit, !qref.bit
+    # CHECK: }
+    qp.adjoint(qp.CNOT)(wires=[0, i])
+
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: qref.custom "RX"([[angle_adj]]) [[q0]] : !qref.bit
+    qp.adjoint(qp.RX(0.1, wires=0))
+
+    def f(wires):
+        qp.X(wires)
+
+    # CHECK: qref.adjoint {
+    # CHECK:   [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK:   qref.custom "PauliX"() [[q0]] : !qref.bit
+    # CHECK: }
+    qp.adjoint(f)(0)
+
+    # CHECK: qref.adjoint {
+    # CHECK:   [[i:%.+]] = tensor.extract %arg0[] : tensor<i64>
+    # CHECK:   [[qi:%.+]] = qref.get [[reg]][[[i]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK:   qref.custom "PauliX"() [[qi]] : !qref.bit
+    # CHECK: }
+    qp.adjoint(f)(i)
+
+    return qp.expval(qp.X(0))
+
+
+print(test_adjoint.mlir)
