@@ -955,7 +955,7 @@ def merge_ppr_ppm_setup_inputs(max_pauli_size=0):
     return (), {"max_pauli_size": max_pauli_size}
 
 
-merge_ppr_ppm = qml.transform(pass_name="merge-ppr-ppm")
+merge_ppr_ppm = qml.transform(pass_name="merge-ppr-ppm", setup_inputs=merge_ppr_ppm_setup_inputs)
 
 
 def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=False):
@@ -1069,7 +1069,7 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
     return (), {"decompose_method": decompose_method, "avoid_y_measure": avoid_y_measure}
 
 
-ppr_to_ppm = qml.transform(pass_name="ppr-to-ppm")
+ppr_to_ppm = qml.transform(pass_name="ppr-to-ppm", setup_inputs=ppr_to_ppm_setup_inputs)
 
 
 def ppm_compilation(
