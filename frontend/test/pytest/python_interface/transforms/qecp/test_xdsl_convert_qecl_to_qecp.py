@@ -16,9 +16,34 @@
 
 import pytest
 
-# from catalyst.python_interface.transforms.qecp import (
-#     ConvertQecLogicalToQecPhysicalPass,
-#     convert_qecl_to_qecp,
-# )
+from catalyst.python_interface.transforms.qecp import (
+    ConvertQecLogicalToQecPhysicalPass,
+    convert_qecl_to_qecp,
+)
 
 pytestmark = pytest.mark.xdsl
+
+
+@pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
+class TestLoweringEncode():
+    """Test lowering the qecl.EncodeOp to a subroutine of qecp gates"""
+
+    def test_1(self, run_filecheck):
+        """Test that a qecl.encode operation raises an error if we are not encoding to zero"""
+
+        # 
+
+        program = """
+            builtin.module @module_circuit {
+                func.func @test_func() attributes {quantum.node} {
+                    // CHECK: [[codeblock:%.*]] = "test.op"() : () -> !qecl.codeblock<1>
+                    // CHECK-NEXT: [[casted_codeblock:%.*]] = builtin.unrealized_conversion_cast [[codeblock:%.*]] : !qecl.codeblock<1> to !qecp.codeblock<1 x 7>
+                    %0 = "test.op"() : () -> !qecl.codeblock<1>
+                    %1 = qecl.encode ["zero"] %0 : !qecl.codeblock<1>
+                    return
+                }
+            }
+            """
+
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code="steane[[7,1,3]]"),)
+        run_filecheck(program, pipeline)
