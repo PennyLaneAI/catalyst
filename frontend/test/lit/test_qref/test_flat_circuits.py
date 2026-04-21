@@ -417,3 +417,41 @@ def test_adjoint(i: int):
 
 
 print(test_adjoint.mlir)
+
+
+# CHECK: func.func public @test_adjoint_with_allocation() -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=4))
+def test_adjoint_with_allocation():
+    """
+    Test adjoint with dynamic qubit allocation
+    """
+    # CHECK-DAG: [[angle:%.+]] = arith.constant 1.000000e-01 : f64
+    # CHECK-DAG: [[one:%.+]] = arith.constant 1 : i64
+    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
+
+    # CHECK-DAG: [[reg_device:%.+]] = qref.alloc( 4) : !qref.reg<4>
+
+    def f(wires):
+        qp.RX(0.1, wires)
+
+    # CHECK: [[reg_alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK: [[alloc_q0:%.+]] = qref.get [[reg_alloc]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK: [[alloc_q1:%.+]] = qref.get [[reg_alloc]][[[one]]] : !qref.reg<2>, i64 -> !qref.bit
+    with qp.allocate(2) as q:
+
+        # CHECK:  qref.adjoint {
+        # CHECK:    qref.custom "PauliX"() [[alloc_q0]] : !qref.bit
+        # CHECK:  }
+        qp.adjoint(qp.X)(q[0])
+
+        # CHECK:  qref.adjoint {
+        # CHECK:    qref.custom "RX"([[angle]]) [[alloc_q1]] : !qref.bit
+        # CHECK:  }
+        qp.adjoint(f)(q[1])
+    # CHECK: qref.dealloc [[reg_alloc]] : !qref.reg<2>
+
+    return qp.expval(qp.X(0))
+
+
+print(test_adjoint_with_allocation.mlir)
