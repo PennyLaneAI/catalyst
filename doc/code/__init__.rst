@@ -23,9 +23,7 @@ Module: catalyst.passes
 ---------------------------------
 
 .. autosummary:: catalyst.passes
-    :no-heading:
-    :no-inheritance-diagram:
-    :fullname:
+    :toctree: api
 
 Module: catalyst.third_party.cuda
 ---------------------------------
