@@ -28,9 +28,13 @@ Module: catalyst.passes
     :toctree: api
 
     ~to_ppr
-    ~commute_ppr
     ~merge_ppr_ppm
+    ~commute_ppr
+    ~ppm_compilation
     ~ppr_to_ppm
+    ~reduce_t_depth
+    ~decompose_arbitrary_ppr
+
 
 Module: catalyst.third_party.cuda
 ---------------------------------
