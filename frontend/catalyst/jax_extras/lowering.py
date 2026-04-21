@@ -237,8 +237,6 @@ def get_mlir_attribute_from_pyval(value):
             attr = get_mlir_attribute_from_pyval(dataclasses.asdict(value))
 
         case _:
-            raise CompileError(
-                f"Cannot convert Python type {type(value)} to an MLIR attribute."
-            )
+            raise CompileError(f"Cannot convert Python type {type(value)} to an MLIR attribute.")
 
     return attr
