@@ -56,6 +56,12 @@ class CodeblockTypeConversion(TypeConversionPattern):
     @attr_type_rewrite_pattern
     def convert_type(self, typ: qecl.LogicalCodeblockType) -> qecp.PhysicalCodeblockType:
         """Type conversion rewrite pattern for logical codeblock types."""
+        if typ.k.value.data != self.qec_code.k:
+            raise CompileError(
+                f"Failed to convert type {typ} with QEC code '{self.qec_code}'; codeblock has "
+                f"k = {typ.k.value.data} but QEC code has k = {self.qec_code.k}"
+            )
+
         return qecp.PhysicalCodeblockType(typ.k, self.qec_code.n)
 
 
@@ -68,6 +74,12 @@ class HyperRegisterTypeConversion(TypeConversionPattern):
     @attr_type_rewrite_pattern
     def convert_type(self, typ: qecl.LogicalHyperRegisterType) -> qecp.PhysicalHyperRegisterType:
         """Type conversion rewrite pattern for physical codeblock types."""
+        if typ.k.value.data != self.qec_code.k:
+            raise CompileError(
+                f"Failed to convert type {typ} with QEC code '{self.qec_code}'; hyper-register has "
+                f"k = {typ.k.value.data} but QEC code has k = {self.qec_code.k}"
+            )
+
         return qecp.PhysicalHyperRegisterType(typ.width, typ.k, self.qec_code.n)
 
 
@@ -116,9 +128,26 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     qec_code: QecCode
 
+    def __post_init__(self):
+        # This method handles the case where `qec_code` is given as a dictionary rather than a
+        # `QecCode` object. This is possible when the pass is registered in the IR and applied via
+        # the `transform.apply_registered_pass` op, in which case the QecCode pass option is
+        # represented as a dictionary attribute. Converting it from this dictionary attribute back
+        # to a QecCode object allows for regular usage of this variable.
+        if isinstance(self.qec_code, dict):
+            # Because the class is frozen, we cannot assign to self.qec_code directly.
+            # We use object.__setattr__ to bypass the frozen restriction.
+            new_code = QecCode.from_dict(self.qec_code)
+            object.__setattr__(self, "qec_code", new_code)
+
     # pylint: disable=unused-argument
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         """Apply the convert-qecl-to-qecp pass."""
+        if self.qec_code.k != 1:
+            raise NotImplementedError(
+                f"The {self.name} pass only supports QEC codes where the number of logical qubits "
+                f"per codeblock, k, is 1, but got k = {self.qec_code.k}"
+            )
 
         assert op.regions[0].blocks.first is not None
 

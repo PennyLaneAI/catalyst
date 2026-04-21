@@ -16,7 +16,8 @@
 
 import numpy as np
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
+from typing import Self
 
 _CODE_REGISTRY: dict[str, tuple[int, int, int]] = {
     "Steane": (
@@ -50,8 +51,33 @@ class QecCode:
     def __repr__(self):
         return f"QecCode(name='{self.name}', n={self.n}, k={self.k}, d={self.d})"
 
-    @staticmethod
-    def get(name: str) -> "QecCode":
+    def __str__(self):
+        if self.name == "" or str.isspace(self.name):
+            name = "<unknown>"
+        else:
+            name = self.name
+
+        return f"[[{self.n}, {self.k}, {self.d}]] {name}"
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Self:
+        """A builder function that returns a `QecCode` instance from a dictionary.
+
+        Keys in the dictionary that do not have a corresponding field in `QecCode` are dropped.
+
+        Example
+        -------
+
+        >>> QecCode.from_dict({'name': "Steane", 'n': 7, 'k': 1, 'd': 3})
+        QecCode(name='Steane', n=7, k=1, d=3)
+        """
+        # Filter dictionary to keep only keys that are fields of this dataclass
+        field_names = {f.name for f in fields(cls)}
+        filtered_data = {k: v for k, v in data.items() if k in field_names}
+        return cls(**filtered_data)
+
+    @classmethod
+    def get(cls, name: str) -> Self:
         """A builder function that returns a `QecCode` instance for a supported QEC code.
 
         Example
@@ -60,7 +86,7 @@ class QecCode:
         >>> QecCode.get("Steane")
         QecCode(name='Steane', n=7, k=1, d=3)
         """
-        qec_code = QecCode(name, *_CODE_REGISTRY[name])
+        qec_code = cls(name, *_CODE_REGISTRY[name])
         if qec_code is None:
             raise KeyError(f"QEC code {name} not found")
 

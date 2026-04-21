@@ -824,7 +824,7 @@ class TestQuantumToQecLogicalPassIntegration:
         """Test the convert-quantum-to-qecl pass on the simplest possible, non-trivial circuit."""
         dev = qml.device("null.qubit", wires=1)
 
-        @qml.qjit(target="mlir", keep_intermediate=True)
+        @qml.qjit(target="mlir")
         @convert_quantum_to_qecl_pass(k=1)
         @qml.qnode(dev, shots=1)
         def circuit():
