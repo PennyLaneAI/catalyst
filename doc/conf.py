@@ -163,6 +163,8 @@ html_baseurl = os.environ.get(
     "READTHEDOCS_CANONICAL_URL", "https://docs.pennylane.ai/projects/catalyst/"
 )
 
+os.environ["SPHINX_BUILD"] = "1"
+
 autosummary_generate = True
 autosummary_imported_members = False
 automodapi_toctreedirnm = "code/api"
