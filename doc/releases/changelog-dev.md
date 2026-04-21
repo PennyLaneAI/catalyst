@@ -1010,6 +1010,10 @@
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
 
+* Python `dataclass` objects can now be converted to MLIR dictionary attributes, allowing them to be
+  used as xDSL pass options, for example.
+  [(#2719)](https://github.com/PennyLaneAI/catalyst/pull/2719)
+
 <h3>Documentation 📝</h3>
 
 * The "Compatibility with PennyLane transforms" section of the
