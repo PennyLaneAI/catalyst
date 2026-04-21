@@ -19,8 +19,7 @@ To apply this pass, the QEC code must be know.
 """
 import numpy as np
 
-from dataclasses import dataclass
-from enum import StrEnum
+from dataclasses import dataclass, field
 
 from xdsl import builder
 from xdsl.context import Context
@@ -31,38 +30,51 @@ from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
     PatternRewriter,
     PatternRewriteWalker,
+    TypeConversionPattern,
+    attr_type_rewrite_pattern,
     RewritePattern,
     op_type_rewrite_pattern,
 )
 from xdsl.rewriter import InsertPoint
-from xdsl.transforms.reconcile_unrealized_casts import ReconcileUnrealizedCastsPass
 
 from catalyst.python_interface.dialects import qecl, qecp
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 from catalyst.utils.exceptions import CompileError
 
+from .qec_code_lib import QecCode
 
-class QecCodeKey(StrEnum):
-    """The set of supported QEC codes."""
-
-    # List the supported QEC codes here, e.g.
-    STEANE_7_1_3 = "steane[[7,1,3]]"
-
-@dataclass
-class QECCode:
-    n: int
-    k: int
-    x_tanner: np.array
-    z_tanner: np.array
-
-Steane713 = QECCode(
+Steane713 = (
     7, 
     1, 
     np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]), 
     np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]),
     )
 
-QEC_codes = {"steane[[7,1,3]]": Steane713}
+# MARK: Type Conversion Pattern
+
+
+@dataclass
+class CodeblockTypeConversion(TypeConversionPattern):
+    """Codeblock type conversion pattern from qecl.codeblock -> qecp.codeblock."""
+
+    qec_code: QecCode = field(kw_only=True)
+
+    @attr_type_rewrite_pattern
+    def convert_type(self, typ: qecl.LogicalCodeblockType) -> qecp.PhysicalCodeblockType:
+        """Type conversion rewrite pattern for logical codeblock types."""
+        return qecp.PhysicalCodeblockType(typ.k, self.qec_code.n)
+
+
+@dataclass
+class HyperRegisterTypeConversion(TypeConversionPattern):
+    """Hyper-register type conversion pattern from qecl.hyperreg -> qecp.hyperreg."""
+
+    qec_code: QecCode = field(kw_only=True)
+
+    @attr_type_rewrite_pattern
+    def convert_type(self, typ: qecl.LogicalHyperRegisterType) -> qecp.PhysicalHyperRegisterType:
+        """Type conversion rewrite pattern for physical codeblock types."""
+        return qecp.PhysicalHyperRegisterType(typ.width, typ.k, self.qec_code.n)
 
 
 # MARK: Conversion Pass
@@ -76,22 +88,21 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     name = "convert-qecl-to-qecp"
 
-    qec_code: QecCodeKey
+    qec_code: QecCode
 
+    # pylint: disable=unused-argument
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         """Apply the convert-qecl-to-qecp pass."""
 
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [
+                    CodeblockTypeConversion(qec_code=self.qec_code),
+                    HyperRegisterTypeConversion(qec_code=self.qec_code),
                     EncodeOpConversion(self.qec_code),
                 ]
             )
         ).rewrite_module(op)
-
-        # Certain patterns leave behind `builtin.unrealized_conversion_cast` ops;
-        # this pass removes them
-        ReconcileUnrealizedCastsPass().apply(ctx, op)
 
 
 # MARK: Encode Op Pattern

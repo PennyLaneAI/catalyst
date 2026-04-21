@@ -366,8 +366,9 @@
 
 <h3>Improvements 🛠</h3>
 
-* `qml.for_loop` now supports dynamic shapes with program capture `qjit(capture=True)`.
+* `qml.for_loop` and `qml.while_loop` now support dynamic shapes with program capture `qjit(capture=True)`.
   [(#2603)](https://github.com/PennyLaneAI/catalyst/pull/2603/)
+  [(#2651)](https://github.com/PennyLaneAI/catalyst/pull/2651)
 
 * Added support for ``StatePrep`` kwargs ``pad_with`` and ``normalize`` with program capture enabled.
   [(#2620)](https://github.com/PennyLaneAI/catalyst/pull/2620)
@@ -994,6 +995,7 @@
 * A new, experimental compiler pass `convert-qecl-to-qecp` has been added to lower operations
   from the QEC Logical (`qecl`) dialect into the QEC Physical (`qecp`) dialect.
   [(#2697)](https://github.com/PennyLaneAI/catalyst/pull/2697)
+  [(#2716)](https://github.com/PennyLaneAI/catalyst/pull/2716)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
