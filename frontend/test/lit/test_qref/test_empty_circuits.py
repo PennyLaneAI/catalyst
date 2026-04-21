@@ -432,7 +432,6 @@ def var1(i: int):
     """
     Test an empty circuit with variance terminal measurement on a dynamic wires.
     """
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: [[alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
     # CHECK: [[i:%.+]] = tensor.extract %arg0[] : tensor<i64>
     # CHECK: [[qi:%.+]] = qref.get [[alloc]][[[i]]] : !qref.reg<2>, i64 -> !qref.bit
