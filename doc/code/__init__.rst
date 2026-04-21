@@ -22,13 +22,17 @@ Module: catalyst.debug
 Module: catalyst.passes
 ---------------------------------
 
-.. autosummary:: catalyst.passes
+.. currentmodule:: catalyst.passes
+
+.. autosummary:: 
     :toctree: api
 
-    ~passes.to_ppr
+    ~to_ppr
 
 Module: catalyst.third_party.cuda
 ---------------------------------
+
+.. currentmodule:: catalyst
 
 .. automodapi:: catalyst.third_party.cuda
     :no-heading:
