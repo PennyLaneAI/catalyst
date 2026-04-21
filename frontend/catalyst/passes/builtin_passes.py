@@ -767,7 +767,7 @@ def to_ppr_setup_inputs():
 to_ppr = qml.transform(pass_name="to-ppr", setup_inputs=to_ppr_setup_inputs)
 
 
-def commute_ppr(qnode=None, *, max_pauli_size=0):
+def commute_ppr_setup_inputs(max_pauli_size=0):
     r"""A quantum compilation pass that commutes Clifford Pauli product rotation (PPR) gates,
     :math:`\exp(-{iP\tfrac{\pi}{4}})`, past non-Clifford PPRs gates,
     :math:`\exp(-{iP\tfrac{\pi}{8}})`, where :math:`P` is a Pauli word.
@@ -864,10 +864,9 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
     (here, ``max_pauli_size = 2``), that commutation would be skipped.
     """
 
-    if qnode is None:
-        return functools.partial(commute_ppr, max_pauli_size=max_pauli_size)
+    return (), {"max_pauli_size": max_pauli_size}
 
-    return qml.transform(pass_name="commute-ppr")(qnode, max_pauli_size=max_pauli_size)
+commute_ppr = qml.transform(pass_name="commute-ppr", setup_inputs = commute_ppr_setup_inputs)
 
 
 def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
