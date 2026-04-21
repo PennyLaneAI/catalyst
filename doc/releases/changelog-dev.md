@@ -617,6 +617,14 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The compiler pipeline definitions now have a single source of truth. Previously, pipeline and
+  pass sequences were duplicated between the frontend (`frontend/catalyst/pipelines.py`) and the
+  compiler (`mlir/lib/Driver/Pipelines.cpp`). Now, there is a unique definition that lives in
+  `mlir/include/Driver/DefaultPipelines.h` and is exposed to the frontend via a `default_pipelines`
+  nanobind extension module. This module is built during the MLIR compilation phase and discovered
+  at runtime.
+  [(#2259)](https://github.com/PennyLaneAI/catalyst/pull/2259)
+
 * Removes unnessary registrations for the various gradient primitives in `from_plxpr` when we
   are able to just inherit the base behaviour from `PlxprInterpreter`.
   [(#2706)](https://github.com/PennyLaneAI/catalyst/pull/2706/)
