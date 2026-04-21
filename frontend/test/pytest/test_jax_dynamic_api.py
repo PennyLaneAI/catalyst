@@ -25,7 +25,7 @@ from jax._src.source_info_util import current as current_source_info
 from numpy import array_equal
 from numpy.testing import assert_allclose
 
-from catalyst import cond, for_loop, qjit, while_loop
+from catalyst import cond, qjit
 from catalyst.jax_extras import DShapedArray, ShapedArray
 from catalyst.jax_extras.tracing import trace_to_jaxpr
 from catalyst.tracing.contexts import EvaluationContext
@@ -400,613 +400,667 @@ class TestBasicArrayCreation:
         assert_array_and_dtype_equal(result, expected)
 
 
-def test_quantum_tracing_1():
-    """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
+class TestForLoopDynamicShapes:
+    """Test using a for_loop with dynamic shapes."""
 
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f(shape):
-        i = 0
-        a = jnp.ones(shape, dtype=float)
+    def test_qjit_forloop_identity(self, capture_mode):
+        """Test simple for-loop primitive vs dynamic dimensions"""
 
-        @while_loop(lambda _, i: i < 3)
-        def loop(_, i):
-            qml.PauliX(wires=0)
-            b = jnp.ones(shape, dtype=float)
-            i += 1
-            return (b, i)
+        @qjit(capture=capture_mode)
+        def f(sz):
+            a = jnp.ones([sz], dtype=float)
 
-        a2, _ = loop(a, i)
-        return a2
+            @qml.for_loop(0, 10, 2)
+            def loop(_, a):
+                return a
 
-    result = f([2, 3])
-    expected = jnp.ones([2, 3])
-    assert_array_and_dtype_equal(result, expected)
+            a2 = loop(a)
+            return a2
 
+        result = f(3)
+        expected = jnp.ones(3)
+        assert_array_and_dtype_equal(result, expected)
 
-def test_quantum_tracing_2():
-    """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
+    def test_qjit_forloop_capture(self, capture_mode):
+        """Test simple for-loop primitive vs dynamic dimensions"""
 
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f(x, y):
-        i = 0
-        a = jnp.ones((x, y + 1), dtype=float)
+        @qjit(capture=capture_mode)
+        def f(sz):
+            x = jnp.ones([sz], dtype=float)
 
-        @while_loop(lambda _, i: i < 3, allow_array_resizing=True)
-        def loop(_, i):
-            qml.PauliX(wires=0)
-            b = jnp.ones((x, y + 1), dtype=float)
-            i += 1
-            return (b, i)
+            @qml.for_loop(0, 3, 1)
+            def loop(_, a):
+                return a + x
 
-        a2, _ = loop(a, i)
-        return a2
+            a2 = loop(x)
+            return a2
 
-    result = f(2, 3)
-    expected = jnp.ones((2, 4))
-    assert_array_and_dtype_equal(result, expected)
+        result = f(3)
+        expected = 4 * jnp.ones(3)
+        assert_array_and_dtype_equal(result, expected)
 
+    def test_qjit_forloop_shared_indbidx(self, capture_mode):
+        """Test for-loops with shared dynamic input dimensions in classical tracing mode"""
 
-def test_qjit_forloop_identity():
-    """Test simple for-loop primitive vs dynamic dimensions"""
+        @qjit(capture=capture_mode)
+        def f(sz):
+            a = jnp.ones([sz], dtype=float)
+            b = jnp.ones([sz], dtype=float)
 
-    @qjit
-    def f(sz):
-        a = jnp.ones([sz], dtype=float)
+            @qml.for_loop(0, 10, 2)
+            def loop(_, a, b):
+                return (a, b)
 
-        @for_loop(0, 10, 2)
-        def loop(_, a):
-            return a
+            a2, b2 = loop(a, b)
+            return a2 + b2
 
-        a2 = loop(a)
-        return a2
+        result = f(3)
+        expected = 2 * jnp.ones(3)
+        assert_array_and_dtype_equal(result, expected)
 
-    result = f(3)
-    expected = jnp.ones(3)
-    assert_array_and_dtype_equal(result, expected)
+    def test_qjit_forloop_indbidx_outdbidx(self, capture_mode):
+        """Test for-loops with shared dynamic output dimensions in classical tracing mode"""
 
+        @qjit(capture=capture_mode)
+        def f(sz):
+            a = jnp.ones([sz, 3], dtype=float)
+            b = jnp.ones([sz, 3], dtype=float)
 
-def test_qjit_forloop_capture():
-    """Test simple for-loop primitive vs dynamic dimensions"""
+            @qml.for_loop(0, 10, 2, allow_array_resizing=True)
+            def loop(_i, a, _b):
+                b = jnp.ones([sz + 1, 3], dtype=float)
+                return (a, b)
 
-    @qjit
-    def f(sz):
-        x = jnp.ones([sz], dtype=float)
+            a2, b2 = loop(a, b)
+            return a2, b2
 
-        @for_loop(0, 3, 1)
-        def loop(_, a):
-            return a + x
+        res_a, res_b = f(3)
+        assert_array_and_dtype_equal(res_a, jnp.ones([3, 3]))
+        assert_array_and_dtype_equal(res_b, jnp.ones([4, 3]))
 
-        a2 = loop(x)
-        return a2
+    def test_qjit_forloop_index_indbidx(self, capture_mode):
+        """Test for-loops referring loop return new dimension variable."""
 
-    result = f(3)
-    expected = 4 * jnp.ones(3)
-    assert_array_and_dtype_equal(result, expected)
+        @qjit(capture=capture_mode)
+        def f(sz):
+            a0 = jnp.ones([sz], dtype=float)
 
+            @qml.for_loop(0, 10, 1, allow_array_resizing=True)
+            def loop(i, _):
+                return jnp.ones([i], dtype=float)
 
-def test_qjit_forloop_shared_indbidx():
-    """Test for-loops with shared dynamic input dimensions in classical tracing mode"""
+            a2 = loop(a0)
+            assert a2.shape[0] is not sz
+            return a2
 
-    @qjit
-    def f(sz):
-        a = jnp.ones([sz], dtype=float)
-        b = jnp.ones([sz], dtype=float)
+        res_a = f(3)
+        assert_array_and_dtype_equal(res_a, jnp.ones(9))
 
-        @for_loop(0, 10, 2)
-        def loop(_, a, b):
-            return (a, b)
+    def test_qjit_forloop_indbidx_const(self, capture_mode):
+        """Test for-loops preserve type information in the presence of a constant."""
 
-        a2, b2 = loop(a, b)
-        return a2 + b2
-
-    result = f(3)
-    expected = 2 * jnp.ones(3)
-    assert_array_and_dtype_equal(result, expected)
-
-
-def test_qjit_forloop_indbidx_outdbidx():
-    """Test for-loops with shared dynamic output dimensions in classical tracing mode"""
-
-    @qjit
-    def f(sz):
-        a = jnp.ones([sz, 3], dtype=float)
-        b = jnp.ones([sz, 3], dtype=float)
-
-        @for_loop(0, 10, 2, allow_array_resizing=True)
-        def loop(_i, a, _b):
-            b = jnp.ones([sz + 1, 3], dtype=float)
-            return (a, b)
-
-        a2, b2 = loop(a, b)
-        # import pdb; pdb.set_trace()
-        return a2, b2
-
-    res_a, res_b = f(3)
-    assert_array_and_dtype_equal(res_a, jnp.ones([3, 3]))
-    assert_array_and_dtype_equal(res_b, jnp.ones([4, 3]))
-
-
-def test_qjit_forloop_index_indbidx():
-    """Test for-loops referring loop return new dimension variable."""
-
-    @qjit
-    def f(sz):
-        a0 = jnp.ones([sz], dtype=float)
-
-        @for_loop(0, 10, 1, allow_array_resizing=True)
-        def loop(i, _):
-            return jnp.ones([i], dtype=float)
-
-        a2 = loop(a0)
-        assert a2.shape[0] is not sz
-        return a2
-
-    res_a = f(3)
-    assert_array_and_dtype_equal(res_a, jnp.ones(9))
-
-
-def test_qjit_forloop_indbidx_const():
-    """Test for-loops preserve type information in the presence of a constant."""
-
-    @qjit
-    def f(sz):
-        a0 = jnp.ones([sz], dtype=float)
-
-        @for_loop(0, 3, 1)
-        def loop(_i, a):
-            return a * sz
-
-        a2 = loop(a0)
-        assert a2.shape[0] is sz
-        return a2
-
-    res_a = f(3)
-    assert_array_and_dtype_equal(res_a, jnp.ones(3) * (3**3))
-
-
-def test_qjit_forloop_shared_dimensions():
-    """Test catalyst for-loop primitive's experimental_preserve_dimensions option"""
-
-    @qjit
-    def f(sz: int):
-        input_a = jnp.ones([sz + 1], dtype=float)
-        input_b = jnp.ones([sz + 2], dtype=float)
-
-        @for_loop(0, 10, 1, allow_array_resizing=True)
-        def loop(_i, _a, _b):
-            return (input_a, input_a)
-
-        outputs = loop(input_b, input_b)
-        assert outputs[0].shape[0] is outputs[1].shape[0]
-        return outputs
-
-    result = f(3)
-    expected = (jnp.ones(4, dtype=float), jnp.ones(4, dtype=float))
-    assert_array_and_dtype_equal(result[0], expected[0])
-    assert_array_and_dtype_equal(result[1], expected[1])
-
-
-def test_qnode_forloop_identity():
-    """Test simple for-loops with dynamic dimensions while doing quantum tracing."""
-
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f(sz):
-        a = jnp.ones([sz], dtype=float)
-
-        @for_loop(0, 10, 2)
-        def loop(_, a):
-            return a
-
-        a2 = loop(a)
-        return a2
-
-    result = f(3)
-    expected = jnp.ones(3)
-    assert_array_and_dtype_equal(result, expected)
-
-
-def test_qnode_forloop_capture():
-    """Test simple for-loops with dynamic dimensions while doing quantum tracing."""
-
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f(sz):
-        x = jnp.ones([sz], dtype=float)
-
-        @for_loop(0, 3, 1)
-        def loop(_, a):
-            return a + x
-
-        a2 = loop(x)
-        return a2
-
-    result = f(3)
-    expected = 4 * jnp.ones(3)
-    assert_array_and_dtype_equal(result, expected)
-
-
-def test_qnode_forloop_shared_indbidx():
-    """Tests that for-loops preserve equality of output dynamic dimensions."""
-
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f(sz):
-        a = jnp.ones([sz], dtype=float)
-        b = jnp.ones([sz], dtype=float)
-
-        @for_loop(0, 10, 2)
-        def loop(_, a, b):
-            return (a, b)
-
-        a2, b2 = loop(a, b)
-        return a2 + b2
-
-    result = f(3)
-    expected = 2 * jnp.ones(3)
-    assert_array_and_dtype_equal(result, expected)
-
-
-def test_qnode_forloop_indbidx_outdbidx():
-    """Test for-loops with mixed input and output dimension variables during the quantum tracing."""
-
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f(sz):
-        a = jnp.ones([sz], dtype=float)
-        b = jnp.ones([sz], dtype=float)
-
-        @for_loop(0, 10, 2, allow_array_resizing=True)
-        def loop(_i, a, _b):
-            b = jnp.ones([sz + 1], dtype=float)
-            return (a, b)
-
-        a2, b2 = loop(a, b)
-        return a2, b2
-
-    res_a, res_b = f(3)
-    assert_array_and_dtype_equal(res_a, jnp.ones(3))
-    assert_array_and_dtype_equal(res_b, jnp.ones(4))
-
-
-def test_qnode_forloop_abstracted_axes():
-    """Test for-loops with mixed input and output dimension variables during the quantum tracing.
-    Use abstracted_axes as the source of dynamism."""
-
-    @qjit(abstracted_axes={0: "n"})
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f(a, b):
-        @for_loop(0, 10, 2, allow_array_resizing=True)
-        def loop(_i, a, _b):
-            b = jnp.ones([a.shape[0] + 1], dtype=float)
-            return (a, b)
-
-        a2, b2 = loop(a, b)
-        return a2, b2
-
-    a = jnp.ones([3], dtype=float)
-    b = jnp.ones([3], dtype=float)
-    res_a, res_b = f(a, b)
-    assert_array_and_dtype_equal(res_a, jnp.ones(3))
-    assert_array_and_dtype_equal(res_b, jnp.ones(4))
-
-
-def test_qnode_forloop_index_indbidx():
-    """Test for-loops referring loop index as a dimension during the quantum tracing."""
-
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f(sz):
-        a = jnp.ones([sz, 3], dtype=float)
-
-        @for_loop(0, 10, 1, allow_array_resizing=True)
-        def loop(i, _):
-            b = jnp.ones([i, 3], dtype=float)
-            return b
-
-        a2 = loop(a)
-        return a2
-
-    res_a = f(3)
-    assert_array_and_dtype_equal(res_a, jnp.ones([9, 3]))
-
-
-def test_qnode_whileloop_1():
-    """Test that catalyst tensor primitive is compatible with quantum while"""
-
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f(sz):
-        a0 = jnp.ones([sz + 1], dtype=float)
-
-        @while_loop(lambda _, i: i < 3)
-        def loop(a, i):
-            i += 1
-            return (a, i)
-
-        a2, _ = loop(a0, 0)
-        return a2
-
-    result = f(3)
-    expected = jnp.ones(4)
-    assert_array_and_dtype_equal(result, expected)
-
-
-def test_qnode_whileloop_2():
-    """Test that catalyst tensor primitive is compatible with quantum while"""
-
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f(sz):
-        a = jnp.ones([sz + 1], dtype=float)
-
-        @while_loop(lambda _, i: i < 3, allow_array_resizing=True)
-        def loop(_, i):
-            b = jnp.ones([sz + 1], dtype=float)
-            i += 1
-            return (b, i)
-
-        a2, _ = loop(a, 0)
-        return a2
-
-    result = f(3)
-    expected = jnp.ones(4)
-    assert_array_and_dtype_equal(result, expected)
-
-
-def test_qnode_whileloop_capture():
-    """Tests that while-loop primitive can capture variables from the outer scope"""
-
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f(sz):
-        x = jnp.ones([sz], dtype=float)
-
-        @while_loop(lambda i, _: i < 3)
-        def loop(i, a):
-            return i + 1, a + x
-
-        _, a2 = loop(1, x)
-        return a2
-
-    result = f(3)
-    expected = 3 * jnp.ones(3)
-    assert_array_and_dtype_equal(result, expected)
-
-
-def test_qnode_whileloop_abstracted_axes():
-    """Test that catalyst tensor primitive is compatible with quantum while. Use abstracted_axes as
-    the source of dynamism."""
-
-    @qjit(abstracted_axes={0: "n"})
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f(a, b):
-        @while_loop(lambda _a, _b, i: i < 3)
-        def loop(a, b, i):
-            i += 1
-            return (a, b, i)
-
-        a2, b2, _ = loop(a, b, 0)
-        return a2 + b2
-
-    a = jnp.ones([3], dtype=float)
-    b = jnp.ones([3], dtype=float)
-    result = f(a, b)
-    expected = 2 * jnp.ones(3)
-    assert_array_and_dtype_equal(result, expected)
-
-
-def test_qnode_whileloop_shared_indbidx():
-    """Test that catalyst tensor primitive is compatible with quantum while"""
-
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f(sz):
-        a = jnp.ones([sz], dtype=float)
-        b = jnp.ones([sz], dtype=float)
-
-        @while_loop(lambda _a, _b, i: i < 3)
-        def loop(a, b, i):
-            i += 1
-            return (a, b, i)
-
-        a2, b2, _ = loop(a, b, 0)
-        return a2 + b2
-
-    result = f(3)
-    expected = 2 * jnp.ones(3)
-    assert_array_and_dtype_equal(result, expected)
-
-
-def test_qnode_whileloop_indbidx_outdbidx():
-    """Test that catalyst tensor primitive is compatible with quantum while"""
-
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f(sz):
-        a = jnp.ones([sz], dtype=float)
-        b = jnp.ones([sz], dtype=float)
-
-        @while_loop(lambda _a, _b, i: i < 3, allow_array_resizing=True)
-        def loop(a, _, i):
-            b = jnp.ones([sz + 1], dtype=float)
-            i += 1
-            return (a, b, i)
-
-        a2, b2, _ = loop(a, b, 0)
-        return a + a2, b2
-
-    res_a, res_b = f(3)
-    assert_array_and_dtype_equal(res_a, 2 * jnp.ones(3))
-    assert_array_and_dtype_equal(res_b, jnp.ones(4))
-
-
-def test_qnode_whileloop_outer():
-    """Test that catalyst tensor primitive is compatible with quantum while"""
-
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f(sz):
-        a0 = jnp.ones([sz], dtype=float)
-
-        @while_loop(lambda _a, i: i < 3)
-        def loop(_a, i):
-            i += 1
-            return (a0, i)
-
-        a2, _ = loop(a0, 0)
-        return a0 + a2
-
-    res_a = f(3)
-    assert_array_and_dtype_equal(res_a, 2 * jnp.ones(3))
-
-
-def test_qjit_whileloop_1():
-    """Test that catalyst tensor primitive is compatible with quantum while"""
-
-    @qjit
-    def f(sz):
-        a = jnp.ones([sz + 1], dtype=float)
-
-        @while_loop(lambda _, i: i < 3, allow_array_resizing=True)
-        def loop(_, i):
-            b = jnp.ones([sz + 1], dtype=float)
-            i += 1
-            return (b, i)
-
-        a2, _ = loop(a, 0)
-        return a2
-
-    result = f(3)
-    expected = jnp.ones(4)
-    assert_array_and_dtype_equal(result, expected)
-
-
-def test_qjit_whileloop_2():
-    """Test that catalyst tensor primitive is compatible with quantum while"""
-
-    @qjit
-    def f(sz):
-        a = jnp.ones([sz + 1], dtype=float)
-
-        @while_loop(lambda _, i: i < 3, allow_array_resizing=True)
-        def loop(_, i):
-            b = jnp.ones([sz + 1], dtype=float)
-            i += 1
-            return (b, i)
-
-        a2, _ = loop(a, 0)
-        return a2
-
-    result = f(3)
-    expected = jnp.ones(4)
-    assert_array_and_dtype_equal(result, expected)
-
-
-def test_qjit_whileloop_shared_dimensions():
-    """Test catalyst while loop primitive's preserve dimensions option"""
-
-    @qjit
-    def f(sz: int):
-        input_a = jnp.ones([sz + 1], dtype=float)
-        input_b = jnp.ones([sz + 2], dtype=float)
-
-        @while_loop(lambda _a, _b, c: c, allow_array_resizing=False)
-        def loop(_a, _b, _c):
-            return (input_a, input_a, False)
-
-        outputs = loop(input_b, input_b, True)
-        assert outputs[0].shape[0] is outputs[1].shape[0]
-        return outputs
-
-    result = f(3)
-    expected = (jnp.ones(4, dtype=float), jnp.ones(4, dtype=float))
-    assert_array_and_dtype_equal(result[0], expected[0])
-    assert_array_and_dtype_equal(result[1], expected[1])
-
-
-def test_qjit_whileloop_shared_indbidx():
-    """Test that catalyst tensor primitive is compatible with quantum while"""
-
-    @qjit
-    def f(sz):
-        a = jnp.ones([sz], dtype=float)
-        b = jnp.ones([sz], dtype=float)
-
-        @while_loop(lambda _a, _b, i: i < 3)
-        def loop(a, b, i):
-            i += 1
-            return (a, b, i)
-
-        a2, b2, _ = loop(a, b, 0)
-        return a2 + b2
-
-    result = f(3)
-    expected = 2 * jnp.ones(3)
-    assert_array_and_dtype_equal(result, expected)
-
-
-def test_qjit_whileloop_indbidx_outdbidx():
-    """Test that catalyst tensor primitive is compatible with quantum while"""
-
-    @qjit
-    def f(sz):
-        a0 = jnp.ones([sz], dtype=float)
-        b0 = jnp.ones([sz], dtype=float)
-
-        @while_loop(lambda _a, _b, i: i < 3, allow_array_resizing=True)
-        def loop(a, _, i):
-            b = jnp.ones([sz + 1], dtype=float)
-            i += 1
-            return (a, b, i)
-
-        a2, b2, _ = loop(a0, b0, 0)
-        return a0 + a2, b2
-
-    res_a, res_b = f(3)
-    assert_array_and_dtype_equal(res_a, 2 * jnp.ones(3))
-    assert_array_and_dtype_equal(res_b, jnp.ones(4))
-
-
-def test_qjit_whileloop_outer():
-    """Test that catalyst tensor primitive is compatible with quantum while"""
-
-    @qjit
-    def f(sz):
-        a0 = jnp.ones([sz], dtype=float)
-
-        @while_loop(lambda _a, i: i < 3)
-        def loop(_a, i):
-            i += 1
-            return (a0, i)
-
-        a2, _ = loop(a0, 0)
-        assert a2.shape[0] is a0.shape[0]
-        return a2
-
-    res_a = f(3)
-    assert_array_and_dtype_equal(res_a, jnp.ones(3))
-
-
-def test_qjit_whileloop_capture():
-    """Tests that while-loop primitive can capture variables from the outer scope"""
-
-    @qjit
-    def f(sz):
-        x = jnp.ones([sz], dtype=float)
-
-        @while_loop(lambda i, _: i < 3)
-        def loop(i, a):
-            return i + 1, a + x
-
-        _, a2 = loop(1, x)
-        return a2
-
-    result = f(3)
-    expected = 3 * jnp.ones(3)
-    assert_array_and_dtype_equal(result, expected)
+        @qjit(capture=capture_mode)
+        def f(sz):
+            a0 = jnp.ones([sz], dtype=float)
+
+            @qml.for_loop(0, 3, 1)
+            def loop(_i, a):
+                return a * sz
+
+            a2 = loop(a0)
+            assert a2.shape[0] is sz
+            return a2
+
+        res_a = f(3)
+        assert_array_and_dtype_equal(res_a, jnp.ones(3) * (3**3))
+
+    def test_qjit_forloop_shared_dimensions(self, capture_mode):
+        """Test catalyst for-loop primitive's experimental_preserve_dimensions option"""
+
+        @qjit(capture=capture_mode)
+        def f(sz: int):
+            input_a = jnp.ones([sz + 1], dtype=float)
+            input_b = jnp.ones([sz + 2], dtype=float)
+
+            @qml.for_loop(0, 10, 1, allow_array_resizing=True)
+            def loop(_i, _a, _b):
+                return (input_a, input_a)
+
+            outputs = loop(input_b, input_b)
+            assert outputs[0].shape[0] is outputs[1].shape[0]
+            return outputs
+
+        result = f(3)
+        expected = (jnp.ones(4, dtype=float), jnp.ones(4, dtype=float))
+        assert_array_and_dtype_equal(result[0], expected[0])
+        assert_array_and_dtype_equal(result[1], expected[1])
+
+    def test_qnode_forloop_identity(self, capture_mode):
+        """Test simple for-loops with dynamic dimensions while doing quantum tracing."""
+
+        @qjit(capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(sz):
+            a = jnp.ones([sz], dtype=float)
+
+            @qml.for_loop(0, 10, 2)
+            def loop(_, a):
+                return a
+
+            a2 = loop(a)
+            x = jnp.sum(a2)
+            qml.RX(x, 0)
+            return qml.expval(qml.Z(0))
+
+        result = f(3)
+        expected = jnp.cos(3)
+        assert jnp.allclose(result, expected)
+
+    def test_qnode_forloop_capture(self, capture_mode):
+        """Test simple for-loops with dynamic dimensions while doing quantum tracing."""
+
+        @qjit(capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(sz):
+            x = jnp.ones([sz], dtype=float)
+
+            @qml.for_loop(0, 3, 1)
+            def loop(_, a):
+                return a + x
+
+            a2 = loop(x)
+            x = jnp.sum(a2)
+            qml.RX(x, 0)
+            return qml.expval(qml.Z(0))
+
+        result = f(3)
+        expected = jnp.cos(12)
+        assert jnp.allclose(result, expected)
+
+    def test_qnode_forloop_shared_indbidx(self, capture_mode):
+        """Tests that for-loops preserve equality of output dynamic dimensions."""
+
+        @qjit(capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(sz):
+            a = jnp.ones([sz], dtype=float)
+            b = jnp.ones([sz], dtype=float)
+
+            @qml.for_loop(0, 10, 2)
+            def loop(_, a, b):
+                return (a, b)
+
+            a2, b2 = loop(a, b)
+            c2 = a2 + b2
+            x = jnp.sum(c2)
+            qml.RX(x, 0)
+            return qml.expval(qml.Z(0))
+
+        result = f(3)
+        expected = jnp.cos(6)  # 2*np.ones(3)
+        assert qml.math.allclose(result, expected)
+
+    def test_qnode_forloop_indbidx_outdbidx(self, capture_mode):
+        """Test for-loops with mixed input and output dimension variables during the
+        quantum tracing."""
+
+        @qjit(capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(sz):
+            a = jnp.ones([sz], dtype=float)
+            b = jnp.ones([sz], dtype=float)
+
+            @qml.for_loop(0, 10, 2, allow_array_resizing=True)
+            def loop(_i, a, _b):
+                b = jnp.ones([sz + 1], dtype=float)
+                return (a, b)
+
+            a2, b2 = loop(a, b)
+            xa = jnp.sum(a2)
+            xb = jnp.sum(b2)
+            qml.RX(xa, 0)
+            qml.RX(xb, 1)
+            return qml.expval(qml.Z(0)), qml.expval(qml.Z(1))
+
+        res_a, res_b = f(3)
+        expected_a = jnp.cos(3)
+        expected_b = jnp.cos(4)
+        assert jnp.allclose(res_a, expected_a)
+        assert jnp.allclose(res_b, expected_b)
+
+    def test_qnode_forloop_abstracted_axes(self, capture_mode):
+        """Test for-loops with mixed input and output dimension variables during the quantum
+        tracing. Use abstracted_axes as the source of dynamism."""
+
+        @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(a, b):
+            @qml.for_loop(0, 10, 2, allow_array_resizing=True)
+            def loop(_i, a, _b):
+                b = jnp.ones([a.shape[0] + 1], dtype=float)
+                return (a, b)
+
+            a2, b2 = loop(a, b)
+            xa = jnp.sum(a2)
+            xb = jnp.sum(b2)
+            qml.RX(xa, 0)
+            qml.RX(xb, 1)
+            return qml.expval(qml.Z(0)), qml.expval(qml.Z(1))
+
+        a = jnp.ones([3], dtype=float)
+        b = jnp.ones([3], dtype=float)
+        res_a, res_b = f(a, b)
+        assert jnp.allclose(res_a, jnp.cos(3))
+        assert jnp.allclose(res_b, jnp.cos(4))
+
+    def test_qnode_forloop_index_indbidx(self, capture_mode):
+        """Test for-loops referring loop index as a dimension during the quantum tracing."""
+
+        @qjit(capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(sz):
+            a = jnp.ones([sz, 3], dtype=float)
+
+            @qml.for_loop(0, 10, 1, allow_array_resizing=True)
+            def loop(i, _):
+                b = jnp.ones([i, 3], dtype=float)
+                return b
+
+            a2 = loop(a)
+            x = jnp.sum(a2)
+            qml.RX(x, 0)
+            return qml.expval(qml.Z(0))
+
+        res_a = f(3)
+        # expected = (9, 3)
+        assert jnp.allclose(res_a, jnp.cos(27.0))
+
+    def test_abstracted_axis_no_recompilation(self, capture_mode):
+        """Test that a function that does not need recompilation can be executed a second time"""
+
+        @qjit(abstracted_axes=(("n",), ()), capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x1, x2):
+
+            @qml.for_loop(0, jnp.shape(x1)[0], 1)
+            def loop_block(i):
+                qml.RX(x1[i], 0)
+
+            loop_block()  # pylint: disable=no-value-for-parameter
+            qml.RY(x2, 1)
+            return qml.expval(qml.Z(1))
+
+        x1 = jnp.array([0.1, 0.2, 0.3])
+        x2 = 0.1967
+
+        res_0 = circuit(x1, x2)
+        _id0 = id(circuit.compiled_function)
+
+        res_1 = circuit(x1, x2)
+        _id1 = id(circuit.compiled_function)
+
+        assert _id0 == _id1
+        assert np.allclose(res_0, res_1)
+
+        x1 = jnp.array([0.1, 0.2, 0.3, 0.4])
+
+        res_2 = circuit(x1, x2)
+        _id2 = id(circuit.compiled_function)
+        assert _id0 == _id2
+
+        res_3 = circuit(x1, x2)
+        assert np.allclose(res_2, res_3)
+
+        _id3 = id(circuit.compiled_function)
+        assert _id0 == _id3
+
+        res_0 = circuit(x1, x2)
+        _id0 = id(circuit.compiled_function)
+
+
+class TestWhileLoopDynamicShapes:
+    """Test that while loop works with dynamic shapes."""
+
+    def test_quantum_tracing_1(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
+
+        @qjit(capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(shape):
+            i = 0
+            a = jnp.ones(shape, dtype=float)
+
+            @qml.while_loop(lambda _, i: i < 3)
+            def loop(_, i):
+                qml.PauliX(wires=0)
+                b = jnp.ones(shape, dtype=float)
+                i += 1
+                return (b, i)
+
+            a2, _ = loop(a, i)
+            x = jnp.sum(a2)
+            qml.RX(x, 1)
+            return qml.expval(qml.Z(0)), qml.expval(qml.Z(1))
+
+        result = f([2, 3])
+        expected0 = -1  # three flips
+        expected1 = jnp.cos(6)
+        assert qml.math.allclose(result[0], expected0)
+        assert qml.math.allclose(result[1], expected1)
+
+    def test_quantum_tracing_2(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
+
+        @qjit(capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(x, y):
+            i = 0
+            a = jnp.ones((x, y + 1), dtype=float)
+
+            @qml.while_loop(lambda _, i: i < 3, allow_array_resizing=True)
+            def loop(_, i):
+                qml.PauliX(wires=0)
+                b = jnp.ones((x, y + 1), dtype=float)
+                i += 1
+                return (b, i)
+
+            a2, _ = loop(a, i)
+            qml.RX(jnp.sum(a2), 1)
+
+            return qml.expval(qml.Z(0)), qml.expval(qml.Z(1))
+
+        result = f(2, 3)
+        assert qml.math.allclose(result[0], -1)
+        assert qml.math.allclose(result[1], jnp.cos(8))
+
+    def test_qnode_whileloop_1(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum while"""
+
+        @qjit(capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(sz):
+            a0 = jnp.ones([sz + 1], dtype=float)
+
+            @qml.while_loop(lambda _, i: i < 3)
+            def loop(a, i):
+                i += 1
+                return (a, i)
+
+            a2, _ = loop(a0, 0)
+            qml.RX(jnp.sum(a2), 0)
+            return qml.expval(qml.Z(0))
+
+        result = f(3)
+        assert qml.math.allclose(result, jnp.cos(4))
+
+    def test_qnode_whileloop_2(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum while"""
+
+        @qjit(capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(sz):
+            a = jnp.ones([sz + 1], dtype=float)
+
+            @qml.while_loop(lambda _, i: i < 3, allow_array_resizing=True)
+            def loop(_, i):
+                b = jnp.ones([sz + 1], dtype=float)
+                i += 1
+                return (b, i)
+
+            a2, _ = loop(a, 0)
+            qml.RX(jnp.sum(a2), 0)
+            return qml.expval(qml.Z(0))
+
+        result = f(3)
+        assert qml.math.allclose(result, jnp.cos(4))
+
+    def test_qnode_whileloop_capture(self, capture_mode):
+        """Tests that while-loop primitive can capture variables from the outer scope"""
+
+        @qjit(capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(sz):
+            x = jnp.ones([sz], dtype=float)
+
+            @qml.while_loop(lambda i, _: i < 3)
+            def loop(i, a):
+                return i + 1, a + x
+
+            _, a2 = loop(1, x)
+            qml.RX(jnp.sum(a2), 0)
+            return qml.expval(qml.Z(0))
+
+        result = f(3)
+        assert qml.math.allclose(result, jnp.cos(9))
+
+    def test_qnode_whileloop_abstracted_axes(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum while. Use abstracted_axes as
+        the source of dynamism."""
+
+        @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(a, b):
+            @qml.while_loop(lambda _a, _b, i: i < 3)
+            def loop(a, b, i):
+                i += 1
+                return (a, b, i)
+
+            a2, b2, _ = loop(a, b, 0)
+            c = a2 + b2
+            qml.RX(jnp.sum(c), 0)
+            return qml.expval(qml.Z(0))
+
+        a = jnp.ones([3], dtype=float)
+        b = jnp.ones([3], dtype=float)
+        result = f(a, b)
+        assert qml.math.allclose(result, jnp.cos(6))
+
+    def test_qnode_whileloop_shared_indbidx(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum while"""
+
+        @qjit(capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(sz):
+            a = jnp.ones([sz], dtype=float)
+            b = jnp.ones([sz], dtype=float)
+
+            @qml.while_loop(lambda _a, _b, i: i < 3)
+            def loop(a, b, i):
+                i += 1
+                return (a, b, i)
+
+            a2, b2, _ = loop(a, b, 0)
+            c = a2 + b2
+            qml.RX(jnp.sum(c), 0)
+            return qml.expval(qml.Z(0))
+
+        result = f(3)
+        assert qml.math.allclose(result, jnp.cos(6))
+
+    def test_qnode_whileloop_indbidx_outdbidx(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum while"""
+
+        @qjit(capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(sz):
+            a = jnp.ones([sz], dtype=float)
+            b = jnp.ones([sz], dtype=float)
+
+            @qml.while_loop(lambda _a, _b, i: i < 3, allow_array_resizing=True)
+            def loop(a, _, i):
+                b = jnp.ones([sz + 1], dtype=float)
+                i += 1
+                return (a, b, i)
+
+            a2, b2, _ = loop(a, b, 0)
+            c = a + a2
+            qml.RX(jnp.sum(c), 0)
+            qml.RX(jnp.sum(b2), 1)
+            return qml.expval(qml.Z(0)), qml.expval(qml.Z(1))
+
+        res_a, res_b = f(3)
+        assert qml.math.allclose(res_a, jnp.cos(6))
+        assert qml.math.allclose(res_b, jnp.cos(4))
+
+    def test_qnode_whileloop_outer(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum while"""
+
+        @qjit(capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(sz):
+            a0 = jnp.ones([sz], dtype=float)
+
+            @qml.while_loop(lambda _a, i: i < 3)
+            def loop(_a, i):
+                i += 1
+                return (a0, i)
+
+            a2, _ = loop(a0, 0)
+            c = a0 + a2
+            qml.RX(jnp.sum(c), 0)
+            return qml.expval(qml.Z(0))
+
+        res_a = f(3)
+        assert qml.math.allclose(res_a, jnp.cos(6))
+
+    def test_qjit_whileloop_1(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum while"""
+
+        @qjit(capture=capture_mode)
+        def f(sz):
+            a = jnp.ones([sz + 1], dtype=float)
+
+            @qml.while_loop(lambda _, i: i < 3, allow_array_resizing=True)
+            def loop(_, i):
+                b = jnp.ones([sz + 1], dtype=float)
+                i += 1
+                return (b, i)
+
+            a2, _ = loop(a, 0)
+            return a2
+
+        result = f(3)
+        expected = jnp.ones(4)
+        assert_array_and_dtype_equal(result, expected)
+
+    def test_qjit_whileloop_2(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum while"""
+
+        @qjit(capture=capture_mode)
+        def f(sz):
+            a = jnp.ones([sz + 1], dtype=float)
+
+            @qml.while_loop(lambda _, i: i < 3, allow_array_resizing=True)
+            def loop(_, i):
+                b = jnp.ones([sz + 1], dtype=float)
+                i += 1
+                return (b, i)
+
+            a2, _ = loop(a, 0)
+            return a2
+
+        result = f(3)
+        expected = jnp.ones(4)
+        assert_array_and_dtype_equal(result, expected)
+
+    def test_qjit_whileloop_shared_dimensions(self, capture_mode):
+        """Test catalyst while loop primitive's preserve dimensions option"""
+
+        @qjit(capture=capture_mode)
+        def f(sz: int):
+            input_a = jnp.ones([sz + 1], dtype=float)
+            input_b = jnp.ones([sz + 2], dtype=float)
+
+            @qml.while_loop(lambda _a, _b, c: c, allow_array_resizing=False)
+            def loop(_a, _b, _c):
+                return (input_a, input_a, False)
+
+            outputs = loop(input_b, input_b, True)
+            assert outputs[0].shape[0] is outputs[1].shape[0]
+            return outputs
+
+        result = f(3)
+        expected = (jnp.ones(4, dtype=float), jnp.ones(4, dtype=float))
+        assert_array_and_dtype_equal(result[0], expected[0])
+        assert_array_and_dtype_equal(result[1], expected[1])
+
+    def test_qjit_whileloop_shared_indbidx(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum while"""
+
+        @qjit(capture=capture_mode)
+        def f(sz):
+            a = jnp.ones([sz], dtype=float)
+            b = jnp.ones([sz], dtype=float)
+
+            @qml.while_loop(lambda _a, _b, i: i < 3)
+            def loop(a, b, i):
+                i += 1
+                return (a, b, i)
+
+            a2, b2, _ = loop(a, b, 0)
+            return a2 + b2
+
+        result = f(3)
+        expected = 2 * jnp.ones(3)
+        assert_array_and_dtype_equal(result, expected)
+
+    def test_qjit_whileloop_indbidx_outdbidx(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum while"""
+
+        @qjit(capture=capture_mode)
+        def f(sz):
+            a0 = jnp.ones([sz], dtype=float)
+            b0 = jnp.ones([sz], dtype=float)
+
+            @qml.while_loop(lambda _a, _b, i: i < 3, allow_array_resizing=True)
+            def loop(a, _, i):
+                b = jnp.ones([sz + 1], dtype=float)
+                i += 1
+                return (a, b, i)
+
+            a2, b2, _ = loop(a0, b0, 0)
+            return a0 + a2, b2
+
+        res_a, res_b = f(3)
+        assert_array_and_dtype_equal(res_a, 2 * jnp.ones(3))
+        assert_array_and_dtype_equal(res_b, jnp.ones(4))
+
+    def test_qjit_whileloop_outer(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum while"""
+
+        @qjit(capture=capture_mode)
+        def f(sz):
+            a0 = jnp.ones([sz], dtype=float)
+
+            @qml.while_loop(lambda _a, i: i < 3)
+            def loop(_a, i):
+                i += 1
+                return (a0, i)
+
+            a2, _ = loop(a0, 0)
+            assert a2.shape[0] is a0.shape[0]
+            return a2
+
+        res_a = f(3)
+        assert_array_and_dtype_equal(res_a, jnp.ones(3))
+
+    def test_qjit_whileloop_capture(self, capture_mode):
+        """Tests that while-loop primitive can capture variables from the outer scope"""
+
+        @qjit(capture=capture_mode)
+        def f(sz):
+            x = jnp.ones([sz], dtype=float)
+
+            @qml.while_loop(lambda i, _: i < 3)
+            def loop(i, a):
+                return i + 1, a + x
+
+            _, a2 = loop(1, x)
+            return a2
+
+        result = f(3)
+        expected = 3 * jnp.ones(3)
+        assert_array_and_dtype_equal(result, expected)
 
 
 def test_qnode_cond_identity():
@@ -1191,46 +1245,6 @@ def test_trace_to_jaxpr():
     with pytest.warns(DeprecationWarning, match="core.Jaxpr is missing a DebugInfo object"):
         r = circuit(3)
     assert r == 3
-
-
-def test_abstracted_axis_no_recompilation():
-    """Test that a function that does not need recompilation can be executed a second time"""
-
-    @qjit(abstracted_axes=(("n",), ()))
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
-    def circuit(x1, x2):
-
-        @qml.for_loop(0, jnp.shape(x1)[0], 1)
-        def loop_block(i):
-            qml.RX(x1[i], 0)
-
-        loop_block()  # pylint: disable=no-value-for-parameter
-        qml.RY(x2, 1)
-        return qml.expval(qml.Z(1))
-
-    x1 = jnp.array([0.1, 0.2, 0.3])
-    x2 = 0.1967
-
-    res_0 = circuit(x1, x2)
-    _id0 = id(circuit.compiled_function)
-
-    res_1 = circuit(x1, x2)
-    _id1 = id(circuit.compiled_function)
-
-    assert _id0 == _id1
-    assert np.allclose(res_0, res_1)
-
-    x1 = jnp.array([0.1, 0.2, 0.3, 0.4])
-
-    res_2 = circuit(x1, x2)
-    _id2 = id(circuit.compiled_function)
-    assert _id0 == _id2
-
-    res_3 = circuit(x1, x2)
-    assert np.allclose(res_2, res_3)
-
-    _id3 = id(circuit.compiled_function)
-    assert _id0 == _id3
 
 
 if __name__ == "__main__":

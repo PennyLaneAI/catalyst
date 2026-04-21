@@ -280,7 +280,7 @@
 * Added a cache of pre-compiled PennyLane built-in decomposition rules for use with the C++ graph
   decomposition system.
   [(#2531)](https://github.com/PennyLaneAI/catalyst/pull/2531)
-  [(#2619)](https://github.com/PennyLaneAI/catalyst/pull/2531)
+  [(#2619)](https://github.com/PennyLaneAI/catalyst/pull/2619)
 
 * Decomposition rules are lowered as private functions (instead of public).
   [(#2658)](https://github.com/PennyLaneAI/catalyst/pull/2658)
@@ -291,7 +291,87 @@
   program. The xDSL version written in Python has been removed.
   [(#2604)](https://github.com/PennyLaneAI/catalyst/pull/2604)
 
+* A new native-MLIR graph-based decomposition framework is now available. This system
+  migrates the graph-decomposition logic from Python into the Catalyst compiler as a
+  high-performance C++ library (`DecompGraphSolver`), enabling the compiler to
+  automatically find optimal decomposition paths from source gates to a target gate set.
+  PennyLane's built-in decompositon rules are pre-compiled to MLIR bytecode and
+  is utilized in this new framework to enable fast rule loading at compile time.
+  [(#2552)](https://github.com/PennyLaneAI/catalyst/pull/2552)
+  [(#2568)](https://github.com/PennyLaneAI/catalyst/pull/2568)
+  [(#2578)](https://github.com/PennyLaneAI/catalyst/pull/2578)
+  [(#2711)](https://github.com/PennyLaneAI/catalyst/pull/2711)
+
+  The framework is interfaced with a new `graph_decomposition` pass decorator
+  with key capabilities:
+  - Multiple graph-based decomposition transformation at MLIR
+  - Weighted target gate sets for the graph solver to minimize the total decomposition cost
+  - Optional `alt_decomps` to define additional rules for (user-defined) operators
+  - Optional `fixed_decomps` to pin a specific decomposition rule for an operator
+
+  ``` python
+  import pennylane as qp
+  import pennylane.numpy as np
+
+  from catalyst import qjit
+  from catalyst.jax_primitives import decomposition_rule
+  from catalyst.passes import cancel_inverses, graph_decomposition, merge_rotations
+
+
+  @decomposition_rule(op_type=qp.PauliX)
+  def x_to_rx(wire: int):
+      qp.RX(np.pi, wire)
+
+
+  @decomposition_rule(op_type=qp.PauliY)
+  def y_to_ry(wire: int):
+      qp.RY(np.pi, wire)
+
+
+  @decomposition_rule(op_type=qp.Hadamard)
+  def h_to_rx_ry(wire: int):
+      qp.RX(np.pi / 2, wire)
+      qp.RY(np.pi / 2, wire)
+
+
+  @qjit(capture=True)
+  @graph_decomposition(gate_set={qp.Rot})
+  @merge_rotations
+  @graph_decomposition(
+      gate_set={qp.RX: 1.0, qp.RY: 1.0, qp.Rot: 5.0},
+      fixed_decomps={qp.PauliX: x_to_rx, qp.PauliY: y_to_ry},
+      alt_decomps={qp.H: [h_to_rx_ry]},
+  )
+  @cancel_inverses
+  @qp.qnode(qp.device("lightning.qubit", wires=2))
+  def circuit(x: float, y: float):
+      qp.H(0)
+      qp.H(0)
+      qp.RX(x, wires=0)
+      qp.PauliX(0)
+      qp.RY(y, wires=0)
+      qp.PauliY(0)
+      qp.RY(x + y, wires=0)
+
+      # register custom decomposition rules, required
+      # when using the decomposition_rule decorator
+      x_to_rx(int)
+      y_to_ry(int)
+      h_to_rx_ry(int)
+
+      return qp.state()
+  ```
+
+  ``` pycon
+  >>> print(qp.specs(circuit, level="device")(1.23, 4.56).resources.gate_types)
+  {'Rot': 2}
+  ```
+
 <h3>Improvements 🛠</h3>
+
+* `qml.for_loop` and `qml.while_loop` now support dynamic shapes with program capture `qjit(capture=True)`.
+  [(#2603)](https://github.com/PennyLaneAI/catalyst/pull/2603/)
+  [(#2651)](https://github.com/PennyLaneAI/catalyst/pull/2651)
 
 * Added support for ``StatePrep`` kwargs ``pad_with`` and ``normalize`` with program capture enabled.
   [(#2620)](https://github.com/PennyLaneAI/catalyst/pull/2620)
@@ -403,7 +483,10 @@
 
 * A more informative error message is now raised when a `measurements-from-samples` xDSL pass encounters a
   program with dyanamic shots.
-  [#2616](https://github.com/PennyLaneAI/catalyst/pull/2616)
+  [(#2616)](https://github.com/PennyLaneAI/catalyst/pull/2616)
+
+* The `measurements-from-samples` xDSL pass is extended to support tensor product observables.
+  [(#2656)](https://github.com/PennyLaneAI/catalyst/pull/2656)
 
 <h3>Breaking changes 💔</h3>
 
@@ -453,6 +536,11 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fixed a bug where the `work_wire_type` argument of `qml.ctrl` was silently dropped inside `@qjit` functions. 
+  The parameter is now threaded through `catalyst.ctrl`, `CtrlCallable`, `HybridCtrl`, and
+  `ctrl_distribute`, with the default value being `"borrowed"`.
+  [(#2710)](https://github.com/PennyLaneAI/catalyst/pull/2710)
 
 * Fixed a bug where multiple `quantum.extract` operations from the same index were being created
   when there are multiple computational basis observables, named observables or Hermitian
@@ -540,6 +628,10 @@
   [(#2582)](https://github.com/PennyLaneAI/catalyst/pull/2582)
 
 <h3>Internal changes ⚙️</h3>
+
+* Removes unnessary registrations for the various gradient primitives in `from_plxpr` when we
+  are able to just inherit the base behaviour from `PlxprInterpreter`.
+  [(#2706)](https://github.com/PennyLaneAI/catalyst/pull/2706)
 
 * The legacy frontend no longer registers `qml.allocate()` and `qml.deallocate()` onto the qjit device
   capabilities, since dynamic qubit allocation is only implemented for the capture frontend.
@@ -896,6 +988,17 @@
   [(#2574)](https://github.com/PennyLaneAI/catalyst/pull/2574)
   [(#2576)](https://github.com/PennyLaneAI/catalyst/pull/2576)
   [(#2673)](https://github.com/PennyLaneAI/catalyst/pull/2673)
+
+* An experimental pass to convert `qecl.noise` operations in the *QEC Logical* layer to subroutine calls in the *QEC Phyiscal* layer.
+  [(#2678)](https://github.com/PennyLaneAI/catalyst/pull/2678)
+
+* A new, experimental compiler pass `convert-quantum-to-qecl` has been added to lower operations
+  from the `quantum` dialect into the QEC Logical (`qecl`) dialect.
+  [(#2589)](https://github.com/PennyLaneAI/catalyst/pull/2589)
+
+* An experimental compiler pass `inject-noise-to-qecl` has been added to inject noise operations  
+  into the QEC Logical (`qecl`) layer to validate QEC protocols under development.
+  [(#2705)](https://github.com/PennyLaneAI/catalyst/pull/2705)
 
 * A new, experimental compiler pass `convert-qecl-to-qecp` has been added to lower operations
   from the QEC Logical (`qecl`) dialect into the QEC Physical (`qecp`) dialect.
