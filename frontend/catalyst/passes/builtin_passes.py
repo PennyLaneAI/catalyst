@@ -866,7 +866,8 @@ def commute_ppr_setup_inputs(max_pauli_size=0):
 
     return (), {"max_pauli_size": max_pauli_size}
 
-commute_ppr = qml.transform(pass_name="commute-ppr", setup_inputs = commute_ppr_setup_inputs)
+
+commute_ppr = qml.transform(pass_name="commute-ppr", setup_inputs=commute_ppr_setup_inputs)
 
 
 def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
