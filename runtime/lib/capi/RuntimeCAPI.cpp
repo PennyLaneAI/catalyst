@@ -14,6 +14,7 @@
 
 #include "RuntimeCAPI.h"
 
+#include <algorithm>
 #include <cstdarg>
 #include <cstdlib>
 #include <ctime>
@@ -1279,9 +1280,23 @@ RESULT *__catalyst__mbqc__measure_in_basis(QUBIT *wire, uint32_t plane, double a
 // NOTE: Syndrome results are currently represented as int8_t, following the design choice of SetBasisState.
 int64_t *__catalyst__qecp__decode_steane_lut(MemRefT_int64_1d *row_idx, MemRefT_int64_1d *col_ptr, MemRefT_int8_1d *syndrome_results)
 {
-    // 1. Recover the parity check matrix from the given row_idx and col_ptr arrays. 
-    // m, n = dimensions of the parity check matrix
-    // std::vector<std::vector<int8_t>> parity_check_matrix(m,n);
+    // 1. Recover the parity check matrix from the CSC sparse representation. 
+    // Get shapes of the dense parity check matrix (H) from the input sparse representation.
+    const size_t nnz = row_idx->sizes[0]; // number of non-zero elements
+    std::vector<size_t> row_idx_vec(row_idx->data_aligned, row_idx->data_aligned + nnz);
+
+    const size_t n = col_ptr->sizes[0] - 1; // number of columns
+    std::vector<size_t> col_ptr_vec(col_ptr->data_aligned, col_ptr->data_aligned + n + 1);
+    const size_t m = *std::max_element(row_idx_vec.begin(), row_idx_vec.end()) + 1; // number of rows
+
+    // Construct the parity check matrix (H) from the sparse representation.
+    std::vector<std::vector<uint8_t>> H(m, std::vector<uint8_t>(n, 0));
+    for (size_t col = 0; col < n; col++) {
+        for (size_t idx = col_ptr_vec[col]; idx < col_ptr_vec[col + 1]; idx++) {
+            size_t row = row_idx_vec[idx];
+            H[row][col] = 1;
+        }
+    }
     // 2. Create a look up table 
     // std::vector<std::vector<int8_t>> lut(1<<m, n);
 
