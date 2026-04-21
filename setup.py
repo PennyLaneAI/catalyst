@@ -307,37 +307,52 @@ class UnifiedBuild(build):
     def run(self):
         """Generate precompiled decomposition rules as bytecode."""
         super().run()
-        sys.path.insert(0, os.path.abspath(self.build_lib))
+        build_lib_path = os.path.abspath(self.build_lib)
+
+        # Monkeypatch CLI path
+        local_cli_path = ""
+        if os.path.exists("frontend/bin/catalyst"):
+            local_cli_path = os.path.abspath("frontend/bin/catalyst")
+        elif os.path.exists("mlir/build/bin/catalyst"):
+            local_cli_path = os.path.abspath("mlir/build/bin/catalyst")
+
+        env = os.environ.copy()
+        env["PYTHONPATH"] = build_lib_path + os.pathsep + env.get("PYTHONPATH", "")
+
+        script = f"""
+import os
+import sys
+
+try:
+    import catalyst.compiler
+    from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
+    from catalyst.utils.precompile_decomposition_rules import precompile_decomp_rules
+
+    local_cli_path = r"{local_cli_path}"
+    if local_cli_path and os.path.exists(local_cli_path):
+        catalyst.compiler.get_cli_path = lambda: local_cli_path
+    else:
+        print("Catalyst CLI not found.")
+
+    if not BYTECODE_FILE_PATH.exists():
+        BYTECODE_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        for file in BYTECODE_FILE_PATH.parent.iterdir():
+            if file.is_file() and file.name.startswith("decomposition_rules"):
+                file.unlink()
+
+    precompile_decomp_rules()
+
+except Exception as e:
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+"""
 
         try:
-            import catalyst.compiler  # pylint: disable=import-outside-toplevel
-            from catalyst.utils.precompile_decomposition_rules import (  # pylint: disable=import-outside-toplevel
-                precompile_decomp_rules,
-            )
-            from catalyst.utils.runtime_environment import (  # pylint: disable=import-outside-toplevel
-                BYTECODE_FILE_PATH,
-            )
-
-            # monkey patch this (reference) so that precompile_decomp_rules has access to catalyst
-            if os.path.exists("frontend/bin/catalyst"):
-                catalyst.compiler.get_cli_path = lambda: "frontend/bin/catalyst"
-            elif os.path.exists("mlir/build/bin/catalyst"):
-                catalyst.compiler.get_cli_path = lambda: "mlir/build/bin/catalyst"
-            else:
-                raise FileNotFoundError("Catalyst CLI not found, cannot precompile rules")
-
-            if not BYTECODE_FILE_PATH.exists():
-                BYTECODE_FILE_PATH.parent.mkdir(exist_ok=True)
-                for file in BYTECODE_FILE_PATH.parent.iterdir():
-                    if file.is_file() and file.name.startswith("decomposition_rules"):
-                        file.unlink()
-
-                precompile_decomp_rules()
-        except:
-            print("failed to precompile decomp rules as bytecode when building wheels:")
+            subprocess.check_call([sys.executable, "-c", script], env=env)
+        except subprocess.CalledProcessError:
+            print("Failed to precompile decomp rules when building wheels.")
             raise
-        finally:
-            sys.path.pop(0)
 
 
 class CustomBuildExtLinux(UnifiedBuildExt):
