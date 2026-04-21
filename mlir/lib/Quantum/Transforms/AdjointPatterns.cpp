@@ -560,7 +560,7 @@ class AdjointGenerator {
         Value index = ListPopOp::create(builder, switchOp.getLoc(), tape);
         Value reversedResult = remappedValues.lookup(getQuantumReg(switchOp.getResults()).value());
 
-        auto findOldestQuregInRegion = [&](Region &region) {
+        auto findRootQuregInRegion = [&](Region &region) {
             for (Operation &innerOp : region.getOps()) {
                 for (Value operand : innerOp.getOperands()) {
                     if (isa<quantum::QuregType>(operand.getType())) {
@@ -585,7 +585,7 @@ class AdjointGenerator {
             remappedValues.map(yieldedQureg.value(), reversedResult);
             generateImpl(oldRegion, builder);
             scf::YieldOp::create(builder, switchOp.getLoc(),
-                                 remappedValues.lookup(findOldestQuregInRegion(oldRegion)));
+                                 remappedValues.lookup(findRootQuregInRegion(oldRegion)));
         };
 
         // Case regions:
@@ -597,7 +597,7 @@ class AdjointGenerator {
         // Default region:
         fillRegion(switchOp.getDefaultRegion(), newSwitchOp.getDefaultRegion());
 
-        Value startingQureg = findOldestQuregInRegion(switchOp.getDefaultRegion());
+        Value startingQureg = findRootQuregInRegion(switchOp.getDefaultRegion());
         remappedValues.map(startingQureg, newSwitchOp.getResult(0));
     }
 
