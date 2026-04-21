@@ -1272,4 +1272,14 @@ RESULT *__catalyst__mbqc__measure_in_basis(QUBIT *wire, uint32_t plane, double a
 
     return getQuantumDevicePtr()->Measure(reinterpret_cast<QubitIdType>(wire), postselectOpt);
 }
+
+// -------------------------------------------------------------------------- //
+// QECP Runtime CAPI
+// -------------------------------------------------------------------------- //
+// NOTE: Syndrome results are currently represented as int8_t, following the design choice of SetBasisState.
+int64_t *__catalyst__qecp__decode_steane_lut(MemRefT_int64_1d *row_idx, MemRefT_int64_1d *col_ptr, MemRefT_int8_1d *syndrome_results)
+{
+    // Implementation for QECP decode function
+    return nullptr;
+}
 }
