@@ -451,6 +451,22 @@ def test_adjoint_with_allocation():
         qp.adjoint(f)(q[1])
     # CHECK: qref.dealloc [[reg_alloc]] : !qref.reg<2>
 
+    # CHECK: qref.adjoint {
+    # CHECK:   [[reg_alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK:   [[alloc_q0:%.+]] = qref.get [[reg_alloc]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK:   [[alloc_q1:%.+]] = qref.get [[reg_alloc]][[[one]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK:   qref.custom "PauliX"() [[alloc_q0]] : !qref.bit
+    # CHECK:   [[q0:%.+]] = qref.get [[reg_device]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK:   qref.custom "CNOT"() [[q0]], [[alloc_q1]] : !qref.bit, !qref.bit
+    # CHECK:   qref.dealloc [[reg_alloc]] : !qref.reg<2>
+    # CHECK: }
+    def g():
+        with qp.allocate(2) as q:
+            qp.X(q[0])
+            qp.CNOT(wires=[0, q[1]])
+
+    qp.adjoint(g)()
+
     return qp.expval(qp.X(0))
 
 
