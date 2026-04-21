@@ -22,7 +22,7 @@ Module: catalyst.debug
 Module: catalyst.passes
 ---------------------------------
 
-.. automodapi:: catalyst.passes
+.. autosummary:: catalyst.passes
     :no-heading:
     :no-inheritance-diagram:
     :fullname:
