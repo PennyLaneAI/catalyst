@@ -537,7 +537,7 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Fixed a bug where the `work_wire_type` argument of `qml.ctrl` was silently dropped inside `@qjit` functions. 
+* Fixed a bug where the `work_wire_type` argument of `qml.ctrl` was silently dropped inside `@qjit` functions.
   The parameter is now threaded through `catalyst.ctrl`, `CtrlCallable`, `HybridCtrl`, and
   `ctrl_distribute`, with the default value being `"borrowed"`.
   [(#2710)](https://github.com/PennyLaneAI/catalyst/pull/2710)
@@ -699,6 +699,7 @@
   [(#2674)](https://github.com/PennyLaneAI/catalyst/pull/2674)
   [(#2642)](https://github.com/PennyLaneAI/catalyst/pull/2642)
   [(#2692)](https://github.com/PennyLaneAI/catalyst/pull/2692)
+  [(#2721)](https://github.com/PennyLaneAI/catalyst/pull/2721)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
@@ -991,7 +992,7 @@
   from the `quantum` dialect into the QEC Logical (`qecl`) dialect.
   [(#2589)](https://github.com/PennyLaneAI/catalyst/pull/2589)
 
-* An experimental compiler pass `inject-noise-to-qecl` has been added to inject noise operations  
+* An experimental compiler pass `inject-noise-to-qecl` has been added to inject noise operations
   into the QEC Logical (`qecl`) layer to validate QEC protocols under development.
   [(#2705)](https://github.com/PennyLaneAI/catalyst/pull/2705)
 
