@@ -38,6 +38,7 @@ from pennylane.measurements import CountsMP
 
 from catalyst.from_plxpr.qref_jax_primitives import (
     QrefQubit,
+    qref_adjoint_p,
     qref_alloc_p,
     qref_compbasis_p,
     qref_dealloc_p,
@@ -56,7 +57,6 @@ from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import (
     AbstractQbit,
     MeasurementPlane,
-    adjoint_p,
     cond_p,
     counts_p,
     decomprule_p,
@@ -64,7 +64,6 @@ from catalyst.jax_primitives import (
     hamiltonian_p,
     mcmobs_p,
     measure_in_basis_p,
-    measure_p,
     pauli_measure_p,
     probs_p,
     qinst_p,
@@ -773,49 +772,28 @@ def handle_adjoint_transform(
     consts = plxpr_invals[:n_consts]
     args = plxpr_invals[n_consts:]
 
-    # Add the iteration start and the qreg to the args
-    self.init_qreg.insert_all_dangling_qubits()
-    qreg = self.init_qreg.get()
-
     jaxpr = ClosedJaxpr(jaxpr, consts)
 
-    def calling_convention(*args_plus_qreg):
-        # The last arg is the scope argument for the body jaxpr
-        *args, qreg = args_plus_qreg
-
-        # Launch a new interpreter for the body region
-        # A new interpreter's root qreg value needs a new recorder
+    def calling_convention(*args):
         converter = copy(self)
-        converter.qubit_index_recorder = QubitIndexRecorder()
-        init_qreg = QubitHandler(qreg, converter.qubit_index_recorder)
-        converter.init_qreg = init_qreg
-
         retvals = converter(jaxpr, *args)
-        init_qreg.insert_all_dangling_qubits()
-        return *retvals, converter.init_qreg.get()
+        return retvals
 
-    converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*args, qreg)
-
+    converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*args)
     converted_closed_jaxpr_branch = ClosedJaxpr(
         convert_constvars_jaxpr(converted_jaxpr_branch.jaxpr), ()
     )
     new_consts = converted_jaxpr_branch.consts
-    _, args_tree = tree_flatten((new_consts, args, [qreg]))
-    # Perform the binding
-    outvals = adjoint_p.bind(
+    _, args_tree = tree_flatten((new_consts, args))
+
+    qref_adjoint_p.bind(
         *new_consts,
         *args,
-        qreg,
         jaxpr=converted_closed_jaxpr_branch,
         args_tree=args_tree,
     )
 
-    # We assume the last output value is the returned qreg.
-    # Update the current qreg and remove it from the output values.
-    self.init_qreg.set(outvals.pop())
-
-    # Return only the output values that match the plxpr output values
-    return outvals
+    return ()
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(transform_prim)
