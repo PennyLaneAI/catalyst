@@ -188,9 +188,11 @@
   cacheable MLIR analysis class (`ResourceAnalysis`) that other transformation passes can query
   via `getAnalysis<ResourceAnalysis>()`, avoiding redundant recomputation.
   [(#2479)](https://github.com/PennyLaneAI/catalyst/pull/2479)
+  [(#2675)](https://github.com/PennyLaneAI/catalyst/pull/2675)
+  [(#2695)](https://github.com/PennyLaneAI/catalyst/pull/2695)
 
   ```bash
-  quantum-opt --resource-tracker='output-json=true' input.mlir
+  quantum-opt --resource-tracker='print-json=true' input.mlir
   quantum-opt --resource-tracker -mlir-pass-statistics input.mlir
   ```
 
@@ -536,10 +538,6 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
-
-* Fixed incorrect measurement names and missing loop/subroutine resource counts in the
-  `resource-tracker` MLIR pass.
-  [(#2695)](https://github.com/PennyLaneAI/catalyst/pull/2695)
 
 * Fixed a bug where the `work_wire_type` argument of `qml.ctrl` was silently dropped inside `@qjit` functions. 
   The parameter is now threaded through `catalyst.ctrl`, `CtrlCallable`, `HybridCtrl`, and
