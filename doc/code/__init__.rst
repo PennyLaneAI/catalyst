@@ -25,6 +25,8 @@ Module: catalyst.passes
 .. autosummary:: catalyst.passes
     :toctree: api
 
+    ~.to_ppr
+
 Module: catalyst.third_party.cuda
 ---------------------------------
 
