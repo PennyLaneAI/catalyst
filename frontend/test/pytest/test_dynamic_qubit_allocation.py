@@ -633,5 +633,71 @@ def test_unsupported_adjoint(backend):
             return qml.probs(wires=[0, 1])
 
 
+# ---- Phase-gradient allocation ----
+
+
+def test_phase_grad_alloc_produces_init_state_attr(backend, capture_mode):
+    """
+    Test that state="phase-grad" produces an AllocOp carrying the typed
+    initialization_state attribute and is NOT collapsed to a zero-state alloc.
+    """
+    if not capture_mode:
+        pytest.skip("Dynamic allocation with state='phase-grad' requires capture=True.")
+
+    @qjit(target="mlir", capture=capture_mode)
+    @qml.qnode(qml.device(backend, wires=3))
+    def circuit():
+        pg = qml.allocate(2, state="phase-grad", precision=1e-6)
+        qml.H(pg[0])
+        qml.CNOT(wires=[pg[0], pg[1]])
+        qml.deallocate(pg)
+        return qml.expval(qml.Z(0))
+
+    mlir_text = circuit.mlir
+    # The phase-grad alloc must carry the typed init-state attribute.
+    assert "initialization_state = #quantum<init_state phase_grad>" in mlir_text
+    # A bare alloc(2) without the attribute must not appear (would mean silent collapse).
+    assert not re.search(r"quantum\.alloc\( 2\) : !quantum\.reg\b", mlir_text)
+
+
+def test_zero_state_alloc_unaffected_by_phase_grad_changes(backend, capture_mode):
+    """
+    Regression test: ordinary zero-state alloc must not gain an initialization_state attr.
+    """
+    if not capture_mode:
+        pytest.skip("Dynamic allocation requires capture=True.")
+
+    @qjit(target="mlir", capture=capture_mode)
+    @qml.qnode(qml.device(backend, wires=3))
+    def circuit():
+        w = qml.allocate(1, state="zero")
+        qml.H(w[0])
+        qml.deallocate(w)
+        return qml.expval(qml.Z(0))
+
+    mlir_text = circuit.mlir
+    assert "initialization_state" not in mlir_text
+
+
+def test_phase_grad_outside_qjit_raises_allocation_error():
+    """
+    Test that resolve_dynamic_wires raises AllocationError for phase-grad allocations,
+    preserving the explicit error boundary.
+
+    Uses integer pseudo-wires (as plxpr_conversion produces) rather than DynamicWire objects
+    so the error is triggered inside _retrieval_method rather than during wire conversion.
+    """
+    import numpy as np
+    from pennylane.allocation import AllocateState
+    from pennylane.exceptions import AllocationError
+
+    int_wires = [np.iinfo(np.int32).max - i for i in range(2)]
+    alloc = qml.allocation.Allocate(int_wires, state=AllocateState.PHASE_GRAD, precision=1e-6)
+    tape = qml.tape.QuantumScript([alloc])
+
+    with pytest.raises(AllocationError, match="Phase-gradient allocation resolution is not yet"):
+        qml.transforms.resolve_dynamic_wires(tape, min_int=0)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

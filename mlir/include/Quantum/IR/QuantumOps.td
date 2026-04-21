@@ -114,11 +114,18 @@ class Memory_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic,
 def AllocOp : Memory_Op<"alloc"> {
     let summary = "Allocate n qubits into a quantum register.";
     let description = [{
+        When ``initialization_state`` is absent the register is treated as an
+        ordinary zero-state allocation.  When present, it carries a typed
+        marker that downstream passes must respect instead of collapsing the
+        allocation back to the zero-state default.  Currently the only defined
+        value is ``phase_grad``, which marks the register as a catalytic
+        phase-gradient resource request.
     }];
 
     let arguments = (ins
         Optional<I64>:$nqubits,
-        OptionalAttr<ConfinedAttr<I64Attr, [IntNonNegative]>>:$nqubits_attr
+        OptionalAttr<ConfinedAttr<I64Attr, [IntNonNegative]>>:$nqubits_attr,
+        OptionalAttr<QuantumInitStateAttr>:$initialization_state
     );
 
     let results = (outs

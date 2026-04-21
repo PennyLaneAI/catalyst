@@ -1165,16 +1165,25 @@ def _qalloc_def_impl(ctx, size_value):  # pragma: no cover
 
 
 @qalloc_p.def_abstract_eval
-def _qalloc_abstract_eval(size):
+def _qalloc_abstract_eval(size, *, state=None, precision=None):
     """This function is called with abstract arguments for tracing."""
     return AbstractQreg()
 
 
-def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
+def _qalloc_lowering(
+    jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value, *, state=None, precision=None
+):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     qreg_type = ir.OpaqueType.get("quantum", "reg", ctx)
+
+    # Build initialization_state attribute for phase-gradient requests using the
+    # registered QuantumInitStateAttr type (#quantum<init_state ...> format).
+    init_state_attr = None
+    if state == "phase-grad":
+        init_state_attr = ir.Attribute.parse("#quantum<init_state phase_grad>", context=ctx)
+
     if isinstance(size_value.owner, ir.Operation) and size_value.owner.name == "stablehlo.constant":
         size_value_attr = size_value.owner.attributes["value"]
         assert ir.DenseIntElementsAttr.isinstance(size_value_attr)
@@ -1182,10 +1191,12 @@ def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
         assert size >= 0
 
         size_attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64, ctx), size)
-        return AllocOp(qreg_type, nqubits_attr=size_attr).results
+        return AllocOp(
+            qreg_type, nqubits_attr=size_attr, initialization_state=init_state_attr
+        ).results
     else:
         size_value = extract_scalar(size_value, "qalloc")
-        return AllocOp(qreg_type, nqubits=size_value).results
+        return AllocOp(qreg_type, nqubits=size_value, initialization_state=init_state_attr).results
 
 
 #

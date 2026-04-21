@@ -393,15 +393,19 @@ _special_op_bind_call = {
 }
 
 
-# pylint: disable=unused-argument
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.allocate_prim)
-def handle_qml_alloc(self, *, num_wires, state=None, restored=False):
+def handle_qml_alloc(self, *, num_wires, state=None, restored=False, precision=None):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
 
     self.has_dynamic_allocation = True
 
+    # Normalize AllocateState enum to its string value so qalloc_p receives a plain string.
+    state_str = state.value if hasattr(state, "value") else state
+
     new_qreg = QubitHandler(
-        qalloc_p.bind(num_wires), self.qubit_index_recorder, dynamically_alloced=True
+        qalloc_p.bind(num_wires, state=state_str, precision=precision),
+        self.qubit_index_recorder,
+        dynamically_alloced=True,
     )
 
     # The plxpr alloc primitive returns the list of all indices available in the new qreg

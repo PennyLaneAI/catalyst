@@ -23,6 +23,17 @@ include "Quantum/IR/QuantumDialect.td"
 // Quantum dialect enums and attributes.
 //===----------------------------------------------------------------------===//
 
+def QuantumInitState : I32EnumAttr<"QuantumInitState",
+    "Initialization state for a quantum register allocation",
+    [
+        I32EnumAttrCase<"PhaseGrad", 0, "phase_grad">,
+    ]> {
+    let cppNamespace = "catalyst::quantum";
+    let genSpecializedAttr = 0;
+}
+
+def QuantumInitStateAttr : EnumAttr<QuantumDialect, QuantumInitState, "init_state">;
+
 def NamedObservable : I32EnumAttr<"NamedObservable",
     "Known named observables",
     [

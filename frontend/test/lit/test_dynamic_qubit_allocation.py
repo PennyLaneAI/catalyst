@@ -305,4 +305,29 @@ def test_quantum_subroutine():
 test_quantum_subroutine()
 
 
+# ---- Phase-gradient allocation ----
+
+
+@qjit(target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=3))
+def test_phase_grad_alloc():
+    """
+    Test that state="phase-grad" produces an AllocOp with the typed
+    initialization_state attribute, and does NOT collapse to an ordinary
+    zero-state alloc.
+    """
+
+    # CHECK: [[pg_reg:%.+]] = quantum.alloc( 2) {initialization_state = #quantum<init_state phase_grad>}
+    # CHECK-NOT: quantum.alloc( 2) : !quantum.reg{{$}}
+
+    pg = qml.allocate(2, state="phase-grad", precision=1e-6)
+    qml.H(pg[0])
+    qml.CNOT(wires=[pg[0], pg[1]])
+    qml.deallocate(pg)
+    return qml.expval(qml.Z(0))
+
+
+print(test_phase_grad_alloc.mlir)
+
+
 qml.capture.disable()
