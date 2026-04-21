@@ -46,26 +46,8 @@ static std::optional<double> attrToDouble(Attribute attr)
     return std::nullopt;
 }
 
-std::optional<double> resolveConstant(Value val)
+inline std::optional<double> resolveConstantArithmetic(Value val, Operation *op)
 {
-    if (!val) {
-        return std::nullopt;
-    }
-
-    Operation *op = val.getDefiningOp();
-    if (!op) {
-        return std::nullopt;
-    }
-
-    // arith.constant
-    if (auto constOp = dyn_cast<arith::ConstantOp>(op)) {
-        return attrToDouble(constOp.getValue());
-    }
-
-    // arith.index_cast / arith.index_castui — pass through
-    if (isa<arith::IndexCastOp, arith::IndexCastUIOp>(op)) {
-        return resolveConstant(op->getOperand(0));
-    }
 
     // arith integer binary ops
     if (isa<arith::AddIOp, arith::SubIOp, arith::MulIOp>(op)) {
@@ -91,6 +73,36 @@ std::optional<double> resolveConstant(Value val)
             return *lhs + *rhs;
         }
         return std::nullopt;
+    }
+
+    return std::nullopt;
+}
+
+std::optional<double> resolveConstant(Value val)
+{
+    if (!val) {
+        return std::nullopt;
+    }
+
+    Operation *op = val.getDefiningOp();
+    if (!op) {
+        return std::nullopt;
+    }
+
+    // arith.constant
+    if (auto constOp = dyn_cast<arith::ConstantOp>(op)) {
+        return attrToDouble(constOp.getValue());
+    }
+
+    // arith.index_cast / arith.index_castui — pass through
+    if (isa<arith::IndexCastOp, arith::IndexCastUIOp>(op)) {
+        return resolveConstant(op->getOperand(0));
+    }
+
+    // Arithmetic operations
+    auto res = resolveConstantArithmetic(val, op);
+    if (res != std::nullopt) {
+        return res;
     }
 
     // tensor.extract
