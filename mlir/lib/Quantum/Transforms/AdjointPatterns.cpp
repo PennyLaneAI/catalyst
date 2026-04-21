@@ -100,6 +100,9 @@ class AdjointGenerator {
             else if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
                 visitOperation(whileOp, builder);
             }
+            else if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(op)) {
+                visitOperation(switchOp, builder);
+            }
             else if (auto insertOp = dyn_cast<quantum::InsertOp>(op)) {
                 Value dynamicWire = getDynamicWire(insertOp, builder);
                 auto extractOp = quantum::ExtractOp::create(
@@ -544,6 +547,58 @@ class AdjointGenerator {
                         getQuantumReg(whileOp.getAfter().front().getArguments()).value()));
             });
         remappedValues.map(getQuantumReg(whileOp.getInits()).value(), replacedWhile.getResult(0));
+    }
+
+    void visitOperation(scf::IndexSwitchOp switchOp, OpBuilder &builder)
+    {
+        std::optional<Value> qureg = getQuantumReg(switchOp.getResults());
+        if (!qureg.has_value()) {
+            return;
+        }
+
+        Value tape = cache.controlFlowTapes.at(switchOp.getOperation());
+        Value index = ListPopOp::create(builder, switchOp.getLoc(), tape);
+        Value reversedResult = remappedValues.lookup(getQuantumReg(switchOp.getResults()).value());
+
+        auto findRootQuregInRegion = [&](Region &region) {
+            for (Operation &innerOp : region.getOps()) {
+                for (Value operand : innerOp.getOperands()) {
+                    if (isa<quantum::QuregType>(operand.getType())) {
+                        return operand;
+                    }
+                }
+            }
+            llvm_unreachable("failed to find qureg in scf.index_switch region");
+        };
+
+        auto newSwitchOp = scf::IndexSwitchOp::create(builder, switchOp.getLoc(),
+                                                      TypeRange{reversedResult.getType()}, index,
+                                                      switchOp.getCases(), switchOp.getNumCases());
+
+        auto fillRegion = [&](Region &oldRegion, Region &newRegion) {
+            OpBuilder::InsertionGuard guard(builder);
+            newRegion.push_back(new Block());
+            builder.setInsertionPointToStart(&newRegion.front());
+
+            std::optional<Value> yieldedQureg =
+                getQuantumReg(oldRegion.front().getTerminator()->getOperands());
+            remappedValues.map(yieldedQureg.value(), reversedResult);
+            generateImpl(oldRegion, builder);
+            scf::YieldOp::create(builder, switchOp.getLoc(),
+                                 remappedValues.lookup(findRootQuregInRegion(oldRegion)));
+        };
+
+        // Case regions:
+        for (auto [oldCaseRegion, newCaseRegion] :
+             llvm::zip_equal(switchOp.getCaseRegions(), newSwitchOp.getCaseRegions())) {
+            fillRegion(oldCaseRegion, newCaseRegion);
+        }
+
+        // Default region:
+        fillRegion(switchOp.getDefaultRegion(), newSwitchOp.getDefaultRegion());
+
+        Value startingQureg = findRootQuregInRegion(switchOp.getDefaultRegion());
+        remappedValues.map(startingQureg, newSwitchOp.getResult(0));
     }
 
   private:

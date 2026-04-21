@@ -298,6 +298,9 @@
   PennyLane's built-in decompositon rules are pre-compiled to MLIR bytecode and
   is utilized in this new framework to enable fast rule loading at compile time.
   [(#2552)](https://github.com/PennyLaneAI/catalyst/pull/2552)
+  [(#2568)](https://github.com/PennyLaneAI/catalyst/pull/2568)
+  [(#2578)](https://github.com/PennyLaneAI/catalyst/pull/2578)
+  [(#2711)](https://github.com/PennyLaneAI/catalyst/pull/2711)
 
   The framework is interfaced with a new `graph_decomposition` pass decorator
   with key capabilities:
@@ -580,6 +583,11 @@
   which would previously raise an error. Adjoint on functions is unaffected.
   [(#2667)](https://github.com/PennyLaneAI/catalyst/pull/2667)
 
+* The adjoint lowering pass now supports `switch` operation as well. Previously, using
+  `qp.adjoint` on a circuit containing a `switch` would raise a `CompileError`. The MLIR
+  `--adjoint-lowering` pass has been updated to support this usage.
+  [(#2691)](https://github.com/PennyLaneAI/catalyst/pull/2691)
+
 * Fix a bug with the xDSL `ParitySynth` pass that caused failure when the QNode being transformed
   contained operations with regions.
   [(#2408)](https://github.com/PennyLaneAI/catalyst/pull/2408)
@@ -621,9 +629,12 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Additional integration tests have been added for the pass-by-pass version of `qp.specs`.
+  [(#2690)](https://github.com/PennyLaneAI/catalyst/pull/2690/)
+
 * Removes unnessary registrations for the various gradient primitives in `from_plxpr` when we
   are able to just inherit the base behaviour from `PlxprInterpreter`.
-  [(#2706)](https://github.com/PennyLaneAI/catalyst/pull/2706/)
+  [(#2706)](https://github.com/PennyLaneAI/catalyst/pull/2706)
 
 * The legacy frontend no longer registers `qml.allocate()` and `qml.deallocate()` onto the qjit device
   capabilities, since dynamic qubit allocation is only implemented for the capture frontend.
@@ -696,6 +707,7 @@
   [(#2674)](https://github.com/PennyLaneAI/catalyst/pull/2674)
   [(#2642)](https://github.com/PennyLaneAI/catalyst/pull/2642)
   [(#2692)](https://github.com/PennyLaneAI/catalyst/pull/2692)
+  [(#2721)](https://github.com/PennyLaneAI/catalyst/pull/2721)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
@@ -1004,6 +1016,10 @@
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
+
+* Python `dataclass` objects can now be converted to MLIR dictionary attributes, allowing them to be
+  used as xDSL pass options, for example.
+  [(#2719)](https://github.com/PennyLaneAI/catalyst/pull/2719)
 
 <h3>Documentation 📝</h3>
 
