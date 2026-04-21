@@ -22,16 +22,14 @@ from catalyst.python_interface.transforms.qecl import (
     inject_noise_to_qecl_pass,
 )
 from catalyst.python_interface.transforms.qecp import (
+    ConvertQecLogicalToQecPhysicalPass,
     convert_qecl_to_qecp_pass,
 )
+from catalyst.python_interface.transforms.qecp.qec_code_lib import QecCode
+
 # pylint: disable=line-too-long
 
-import pytest
 
-from catalyst.python_interface.transforms.qecp import (
-    ConvertQecLogicalToQecPhysicalPass,
-)
-from catalyst.python_interface.transforms.qecp.qec_code_lib import QecCode
 
 pytestmark = pytest.mark.xdsl
 
@@ -69,6 +67,8 @@ class TestQECLNoiseLoweringPassIntegration:
             return qp.sample([m0])
 
         run_filecheck_qjit(circuit)
+
+
 class TestTypeConversionPattern:
     """Unit tests for the type conversion patterns of the convert-qecl-to-qecp pass."""
 

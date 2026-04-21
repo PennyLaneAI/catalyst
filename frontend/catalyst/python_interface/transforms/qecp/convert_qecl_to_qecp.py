@@ -34,7 +34,6 @@ from catalyst.python_interface.dialects import qecl, qecp
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 
 from .convert_qecl_noise_to_qec_noise import ConvertQECLNoiseOpToQECPNoisePass
-
 from .qec_code_lib import QecCode
 
 # MARK: Type Conversion Pattern
@@ -86,7 +85,9 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         """Apply the convert-qecl-to-qecp pass."""
 
         # n is the number of physical data qubits from the QEC code.
-        ConvertQECLNoiseOpToQECPNoisePass(n=self.qec_code.n, number_errors=self.number_errors).apply(ctx, op)
+        ConvertQECLNoiseOpToQECPNoisePass(
+            n=self.qec_code.n, number_errors=self.number_errors
+        ).apply(ctx, op)
 
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
