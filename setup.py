@@ -27,7 +27,6 @@ from typing import Optional
 # build deps
 from setuptools import Extension, find_namespace_packages, setup
 from setuptools._distutils import sysconfig
-from setuptools.command.build import build
 from setuptools.command.build_ext import build_ext
 
 system_platform = platform.system()
@@ -301,62 +300,8 @@ class UnifiedBuildExt(build_ext):
         subprocess.check_call([cmake_path, "--build", "."] + build_args, cwd=build_temp)
 
 
-class UnifiedBuild(build):
-    """Custom build command for precompiled bytecode rules."""
-
-    def run(self):
-        """Generate precompiled decomposition rules as bytecode."""
-        super().run()
-        build_lib_path = os.path.abspath(self.build_lib)
-
-        # Monkeypatch CLI path
-        local_cli_path = ""
-        if os.path.exists("frontend/bin/catalyst"):
-            local_cli_path = os.path.abspath("frontend/bin/catalyst")
-        elif os.path.exists("mlir/build/bin/catalyst"):
-            local_cli_path = os.path.abspath("mlir/build/bin/catalyst")
-
-        env = os.environ.copy()
-        env["PYTHONPATH"] = build_lib_path + os.pathsep + env.get("PYTHONPATH", "")
-
-        script = f"""
-import os
-import sys
-
-try:
-    import catalyst.compiler
-    from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
-    from catalyst.utils.precompile_decomposition_rules import precompile_decomp_rules
-
-    local_cli_path = r"{local_cli_path}"
-    if local_cli_path and os.path.exists(local_cli_path):
-        catalyst.compiler.get_cli_path = lambda: local_cli_path
-    else:
-        print("Catalyst CLI not found.")
-
-    if not BYTECODE_FILE_PATH.exists():
-        BYTECODE_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        for file in BYTECODE_FILE_PATH.parent.iterdir():
-            if file.is_file() and file.name.startswith("decomposition_rules"):
-                file.unlink()
-
-    precompile_decomp_rules()
-
-except Exception as e:
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
-"""
-
-        try:
-            subprocess.check_call([sys.executable, "-c", script], env=env)
-        except subprocess.CalledProcessError:
-            print("Failed to precompile decomp rules when building wheels.")
-            raise
-
-
 class CustomBuildExtLinux(UnifiedBuildExt):
-    """Custom build extension class for Linux platforms.
+    """Custom build extension class for Linux platforms
 
     Currently no extra work needs to be performed with respect to the base class
     UnifiedBuildExt.
@@ -364,7 +309,7 @@ class CustomBuildExtLinux(UnifiedBuildExt):
 
 
 class CustomBuildExtMacos(UnifiedBuildExt):
-    """Custom build extension class for macOS platforms.
+    """Custom build extension class for macOS platforms
 
     In addition to the work performed by the base class UnifiedBuildExt, this
     class also changes the LC_ID_DYLIB that is otherwise constant and equal to
@@ -408,7 +353,7 @@ if system_platform == "Linux":
         extra_compile_args=["-std=c++20"],
         define_macros=Py_LIMITED_API_macros,
     )
-    cmdclass = {"build": UnifiedBuild, "build_ext": CustomBuildExtLinux}
+    cmdclass = {"build_ext": CustomBuildExtLinux}
 
 elif system_platform == "Darwin":
     variables = sysconfig.get_config_vars()

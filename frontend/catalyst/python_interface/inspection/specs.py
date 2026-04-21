@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Literal
 
 from pennylane.workflow.qnode import QNode
@@ -85,6 +86,13 @@ def mlir_specs(
     if not isinstance(qnode, QJIT) or (not isinstance(qnode.original_function, QNode)):
         raise ValueError(
             "The provided `qnode` argument does not appear to be a valid QJIT compiled QNode."
+        )
+
+    if args or kwargs:
+        warnings.warn(
+            "The `specs` function does not yet support dynamic arguments, "
+            "so the results may not reflect information provided by the arguments.",
+            UserWarning,
         )
 
     max_level: int | None = _get_max_level(level)

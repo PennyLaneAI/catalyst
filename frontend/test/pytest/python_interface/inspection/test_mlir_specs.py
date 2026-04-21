@@ -376,7 +376,9 @@ class TestMLIRSpecs:
             qml.X(0)
             qml.X(wire)
 
-        res = mlir_specs(circ, 0, 1)
+        # TODO: this warning is excessive, remove in the feature (sc-108251)
+        with pytest.warns(UserWarning, match="does not yet support dynamic arguments"):
+            res = mlir_specs(circ, 0, 1)
         expected = make_static_resources(
             operations={"PauliX": {1: 2}},
             measurements={},
@@ -475,7 +477,9 @@ class TestMLIRSpecs:
             "The results will assume the loop runs only once. "
             "This may be fixed in some cases by inlining dynamic arguments.",
         ):
-            res = mlir_specs(circ, 0, iters)
+            # TODO: this warning is excessive, remove in the feature (sc-108251)
+            with pytest.warns(UserWarning, match="does not yet support dynamic arguments"):
+                res = mlir_specs(circ, 0, iters)
             assert resources_equal(res, expected)
 
     @pytest.mark.parametrize(
@@ -530,7 +534,9 @@ class TestMLIRSpecs:
             "The results will assume the loop runs only once. "
             "This may be fixed in some cases by inlining dynamic arguments.",
         ):
-            res = mlir_specs(circ, 0, iters)
+            # TODO: this warning is excessive, remove in the feature (sc-108251)
+            with pytest.warns(UserWarning, match="does not yet support dynamic arguments"):
+                res = mlir_specs(circ, 0, iters)
             assert resources_equal(res, expected)
 
     @pytest.mark.parametrize(
@@ -577,7 +583,9 @@ class TestMLIRSpecs:
             "The results will take the maximum resources across all possible branches.",
         ):
             n = 3  # Arbitrary value for n
-            res = mlir_specs(circ, 0, n)
+            # TODO: this warning is excessive, remove in the feature (sc-108251)
+            with pytest.warns(UserWarning, match="does not yet support dynamic arguments"):
+                res = mlir_specs(circ, 0, n)
             assert resources_equal(res, expected)
 
     def test_tape_transforms(self, skip_preprocess):
@@ -684,7 +692,9 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        res = mlir_specs(circ, level=0, args=(0,))
+        # TODO: this warning is excessive, remove in the feature (sc-108251)
+        with pytest.warns(UserWarning, match="does not yet support dynamic arguments"):
+            res = mlir_specs(circ, level=0, args=(0,))
         assert resources_equal(res, expected)
 
     def test_ppr(self, skip_preprocess):
