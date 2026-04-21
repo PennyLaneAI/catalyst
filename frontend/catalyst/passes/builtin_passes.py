@@ -670,8 +670,7 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
 
     return qml.transform(pass_name="gridsynth")(qnode, epsilon=epsilon, ppr_basis=ppr_basis)
 
-
-def to_ppr(qnode):
+def to_ppr_setup_inputs():
     r"""A quantum compilation pass that converts Clifford+T gates into Pauli Product Rotation (PPR)
     gates.
 
@@ -761,7 +760,10 @@ def to_ppr(qnode):
     Note that the mid-circuit measurement (:func:`pennylane.measure`) in the circuit has been
     converted to a Pauli product measurement (PPM), as well.
     """
-    return qml.transform(pass_name="to-ppr")(qnode)
+    return (), {}
+
+
+to_ppr = qml.transform(pass_name="to-ppr", setup_inputs=to_ppr_setup_inputs)
 
 
 def commute_ppr(qnode=None, *, max_pauli_size=0):
