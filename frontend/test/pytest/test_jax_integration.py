@@ -616,29 +616,29 @@ class TestJAXMLIRAttributeGetter:
 
         # pylint: disable=missing-class-docstring
         @dataclass
-        class Foo:
+        class MyOptions:
             a: bool = True
             b: int = 42
             c: float = 1 / 137
             d: str = "yellow submarine"
 
         with ctx, loc:
-            foo = Foo()
-            attr = get_mlir_attribute_from_pyval(foo)
+            options = MyOptions()
+            attr = get_mlir_attribute_from_pyval(options)
 
             assert isinstance(attr, ir.DictAttr)
 
             assert isinstance(attr["a"], ir.BoolAttr)
-            assert attr["a"].value == foo.a
+            assert attr["a"].value == options.a
 
             assert isinstance(attr["b"], ir.IntegerAttr)
-            assert attr["b"].value == foo.b
+            assert attr["b"].value == options.b
 
             assert isinstance(attr["c"], ir.FloatAttr)
-            assert attr["c"].value == foo.c
+            assert attr["c"].value == options.c
 
             assert isinstance(attr["d"], ir.StringAttr)
-            assert attr["d"].value == foo.d
+            assert attr["d"].value == options.d
 
 
 if __name__ == "__main__":
