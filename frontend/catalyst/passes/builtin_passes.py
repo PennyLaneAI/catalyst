@@ -1069,9 +1069,7 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
     return (), {"decompose_method": decompose_method, "avoid_y_measure": avoid_y_measure}
 
 
-ppr_to_ppm = qml.transform(pass_name="ppr-to-ppm")(
-    qnode, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure
-)
+ppr_to_ppm = qml.transform(pass_name="ppr-to-ppm")
 
 
 def ppm_compilation(
