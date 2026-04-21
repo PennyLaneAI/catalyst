@@ -77,7 +77,7 @@ try:
     llvm_config.with_environment("PATH", config.quantum_bin_dir, append_path=True)
 
     # Define the location of runtime libraries when running frontend tests
-    llvm_config.with_environment("RUNTIME_LIB_DIR", config.lrt_lib_dir, append_path=True)
+    llvm_config.with_environment("RUNTIME_LIB_DIR", config.rt_lib_dir, append_path=True)
     llvm_config.with_environment("MLIR_LIB_DIR", config.mlir_lib_dir, append_path=True)
     llvm_config.with_environment("ENZYME_LIB_DIR", config.enzyme_lib_dir, append_path=True)
     llvm_config.with_environment(
