@@ -233,12 +233,12 @@ def get_mlir_attribute_from_pyval(value):
                 named_attrs[k] = get_mlir_attribute_from_pyval(v)
             attr = ir.DictAttr.get(named_attrs)
 
+        case _ if dataclasses.is_dataclass(value):
+            attr = get_mlir_attribute_from_pyval(dataclasses.asdict(value))
+
         case _:
-            if dataclasses.is_dataclass(value):
-                attr = get_mlir_attribute_from_pyval(dataclasses.asdict(value))
-            else:
-                raise CompileError(
-                    f"Cannot convert Python type {type(value)} to an MLIR attribute."
-                )
+            raise CompileError(
+                f"Cannot convert Python type {type(value)} to an MLIR attribute."
+            )
 
     return attr
