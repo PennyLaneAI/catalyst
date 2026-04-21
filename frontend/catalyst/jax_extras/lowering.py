@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import textwrap
 
@@ -233,6 +234,11 @@ def get_mlir_attribute_from_pyval(value):
             attr = ir.DictAttr.get(named_attrs)
 
         case _:
-            raise CompileError(f"Cannot convert Python type {type(value)} to an MLIR attribute.")
+            if dataclasses.is_dataclass(value):
+                attr = get_mlir_attribute_from_pyval(dataclasses.asdict(value))
+            else:
+                raise CompileError(
+                    f"Cannot convert Python type {type(value)} to an MLIR attribute."
+                )
 
     return attr
