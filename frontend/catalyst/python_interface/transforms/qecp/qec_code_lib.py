@@ -37,6 +37,14 @@ class QecCode:
     k: int
     d: int
 
+    def __str__(self):
+        if self.name == "" or str.isspace(self.name):
+            name = "<unknown>"
+        else:
+            name = self.name
+
+        return f"[[{self.n}, {self.k}, {self.d}]] {name}"
+
     @staticmethod
     def get(name: str) -> "QecCode":
         """A builder function that returns a `QecCode` instance for a supported QEC code.

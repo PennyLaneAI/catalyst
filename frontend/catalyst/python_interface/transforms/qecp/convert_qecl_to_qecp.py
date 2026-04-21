@@ -32,6 +32,7 @@ from xdsl.pattern_rewriter import (
 
 from catalyst.python_interface.dialects import qecl, qecp
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
+from catalyst.utils.exceptions import CompileError
 
 from .qec_code_lib import QecCode
 
@@ -47,6 +48,12 @@ class CodeblockTypeConversion(TypeConversionPattern):
     @attr_type_rewrite_pattern
     def convert_type(self, typ: qecl.LogicalCodeblockType) -> qecp.PhysicalCodeblockType:
         """Type conversion rewrite pattern for logical codeblock types."""
+        if typ.k.value.data != self.qec_code.k:
+            raise CompileError(
+                f"Failed to convert type {typ} with QEC code '{self.qec_code}'; codeblock has "
+                f"k = {typ.k.value.data} but QEC code has k = {self.qec_code.k}"
+            )
+
         return qecp.PhysicalCodeblockType(typ.k, self.qec_code.n)
 
 
@@ -59,6 +66,12 @@ class HyperRegisterTypeConversion(TypeConversionPattern):
     @attr_type_rewrite_pattern
     def convert_type(self, typ: qecl.LogicalHyperRegisterType) -> qecp.PhysicalHyperRegisterType:
         """Type conversion rewrite pattern for physical codeblock types."""
+        if typ.k.value.data != self.qec_code.k:
+            raise CompileError(
+                f"Failed to convert type {typ} with QEC code '{self.qec_code}'; hyper-register has "
+                f"k = {typ.k.value.data} but QEC code has k = {self.qec_code.k}"
+            )
+
         return qecp.PhysicalHyperRegisterType(typ.width, typ.k, self.qec_code.n)
 
 
@@ -78,6 +91,11 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
     # pylint: disable=unused-argument
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         """Apply the convert-qecl-to-qecp pass."""
+        if self.qec_code.k != 1:
+            raise NotImplementedError(
+                f"The {self.name} pass only supports QEC codes where the number of logical qubits "
+                f"per codeblock, k, is 1, but got k = {self.qec_code.k}"
+            )
 
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
