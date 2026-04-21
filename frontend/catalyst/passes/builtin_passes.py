@@ -670,6 +670,7 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
 
     return qml.transform(pass_name="gridsynth")(qnode, epsilon=epsilon, ppr_basis=ppr_basis)
 
+
 def to_ppr_setup_inputs():
     r"""A quantum compilation pass that converts Clifford+T gates into Pauli Product Rotation (PPR)
     gates.
