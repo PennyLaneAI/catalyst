@@ -30,7 +30,6 @@ from catalyst.python_interface.transforms.qecp.qec_code_lib import QecCode
 # pylint: disable=line-too-long
 
 
-
 pytestmark = pytest.mark.xdsl
 
 

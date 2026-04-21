@@ -86,14 +86,13 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         # n is the number of physical data qubits from the QEC code.
         ConvertQECLNoiseOpToQECPNoisePass(
-            n=self.qec_code.n, number_errors=self.number_errors
+            n=self.qec_code["n"], number_errors=self.number_errors
         ).apply(ctx, op)
 
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [
-                    CodeblockTypeConversion(qec_code=self.qec_code),
-                    HyperRegisterTypeConversion(qec_code=self.qec_code),
+                    # Type conversion patterns
                 ]
             )
         ).rewrite_module(op)
