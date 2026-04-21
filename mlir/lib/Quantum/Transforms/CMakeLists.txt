@@ -1,5 +1,7 @@
 set(LIBRARY_NAME quantum-transforms)
 
+add_subdirectory(DecompGraphSolver)
+
 file(GLOB SRC
     BufferizableOpInterfaceImpl.cpp
     ConversionPatterns.cpp
@@ -18,6 +20,7 @@ file(GLOB SRC
     decompose_lowering.cpp
     DecomposeLoweringPatterns.cpp
     dynamic_one_shot.cpp
+    graph_decomposition.cpp
     merge_global_phase.cpp
     gridsynth.cpp
     GridsynthPatterns.cpp
@@ -42,9 +45,18 @@ set(DEPENDS
     MLIRQuantumPassIncGen
 )
 
-add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
+add_mlir_library(${LIBRARY_NAME} STATIC
+    ${SRC}
+    LINK_LIBS
+    PRIVATE
+    ${LIBS}
+    $<TARGET_OBJECTS:decompsolver>
+    DEPENDS
+    ${DEPENDS}
+)
 target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 target_include_directories(${LIBRARY_NAME} PUBLIC
                            .
                            ${PROJECT_SOURCE_DIR}/include
-                           ${CMAKE_BINARY_DIR}/include)
+                           ${CMAKE_BINARY_DIR}/include
+                           DecompGraphSolver/)

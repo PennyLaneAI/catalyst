@@ -14,15 +14,15 @@
 
 #define DEBUG_TYPE "resource-analysis"
 
+#include "Catalyst/Analysis/ResourceAnalysis.h"
+
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
 
-#include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "Catalyst/Utils/ConstantResolve.h"
 
@@ -103,7 +103,7 @@ static std::string getPBCOpName(Operation *op)
 {
     return llvm::TypeSwitch<Operation *, std::string>(op)
         .Case<pbc::PPRotationOp>([](auto pprOp) -> std::string {
-            int16_t rk = pprOp.getRotationKindAttr().getValue().getSExtValue();
+            int8_t rk = pprOp.getRotationKind();
             if (rk == 0) {
                 return "PPR-identity";
             }

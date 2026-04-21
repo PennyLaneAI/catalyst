@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Driver/Pipelines.h"
+
 #include <memory>
 
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
@@ -39,7 +41,6 @@
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
-#include "Driver/Pipelines.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Mitigation/Transforms/Passes.h"
@@ -60,9 +61,8 @@ void createQuantumCompilationStage(OpPassManager &pm)
     pm.addPass(catalyst::createInlineNestedModulePass());
     pm.addPass(catalyst::mitigation::createMitigationLoweringPass());
     pm.addPass(catalyst::quantum::createAdjointLoweringPass());
-    // TODO: We can remove 2 passes below once PBC has its own pipeline.
+    // TODO: We can remove this pass below once PBC has its own pipeline.
     pm.addPass(catalyst::pbc::createLowerPBCInitOpsPass());
-    pm.addPass(catalyst::pbc::createUnrollConditionalPPRPPMPass());
     pm.addPass(catalyst::createDisableAssertionPass());
 }
 void createHloLoweringStage(OpPassManager &pm)
@@ -233,3 +233,19 @@ std::vector<Pipeline> getDefaultPipeline()
 
 } // namespace driver
 } // namespace catalyst
+
+namespace llvm {
+
+raw_ostream &operator<<(raw_ostream &oss, const catalyst::driver::Pipeline &p)
+{
+    oss << "Pipeline('" << p.getName() << "', [";
+    bool first = true;
+    for (const auto &i : p.getPasses()) {
+        oss << (first ? "" : ", ") << i;
+        first = false;
+    }
+    oss << "])";
+    return oss;
+}
+
+}; // namespace llvm

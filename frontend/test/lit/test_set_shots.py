@@ -17,6 +17,7 @@
 # pylint: disable=line-too-long
 
 """Test for qml.set_shots functionality."""
+
 from functools import partial
 
 import pennylane as qml

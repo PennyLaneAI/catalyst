@@ -169,6 +169,32 @@ class TestDeviceLevelSpecs:
 
         check_specs_same(cat_specs, pl_specs)
 
+    @pytest.mark.usefixtures("use_capture")
+    def test_paulirot_and_measure(self):
+        """Test that PauliRot and PauliMeasure are tracked at the device level."""
+
+        dev = qml.device("null.qubit", wires=2)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit():
+            qml.PauliRot(0.42, pauli_word="Y", wires=0)  # arbitrary angle
+            qml.PauliRot(jnp.pi / 2, pauli_word="YZ", wires=[0, 1])  # pi/2 angle
+            qml.PauliRot(2 * jnp.pi, pauli_word="X", wires=0)  # identity
+            qml.pauli_measure("X", wires=0)
+            return qml.probs()
+
+        cat_specs = qml.specs(circuit, level="device")()
+
+        assert cat_specs.resources.num_gates == 4
+        assert cat_specs.resources.gate_types == {
+            "PauliRot-pi/2-w2": 1,
+            "PauliRot-identity-w1": 1,
+            "PauliRot-Phi-w1": 1,
+            "PauliMeasure-w1": 1,
+        }
+        assert cat_specs.resources.gate_sizes == {1: 3, 2: 1}
+
     def test_measurements(self):
         """Test that measurements are tracked correctly at device level."""
 

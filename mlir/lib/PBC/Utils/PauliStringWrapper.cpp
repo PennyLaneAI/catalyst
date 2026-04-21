@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <stim/mem/simd_word.h>
-#include <stim/stabilizers/flex_pauli_string.h>
-#include <stim/stabilizers/pauli_string.h>
-
-#include "PBC/IR/PBCDialect.h"
-#include "PBC/IR/PBCOps.h"
 #include "PBC/Utils/PauliStringWrapper.h"
+
+#include "stim/mem/simd_word.h"
+#include "stim/stabilizers/flex_pauli_string.h"
+#include "stim/stabilizers/pauli_string.h"
+
+#include "PBC/IR/PBCOps.h"
 
 namespace catalyst {
 namespace pbc {
@@ -155,12 +155,12 @@ PauliWordPair normalizePPROps(PBCOpInterface lhs, PBCOpInterface rhs, ValueRange
         Operation *operation = pbcOp.getOperation();
 
         if (auto pprOp = dyn_cast<PPRotationOp>(operation)) {
-            wrapper.updateSign(static_cast<int16_t>(pprOp.getRotationKind()) < 0);
+            wrapper.updateSign(pprOp.getRotationKind() < 0);
             return;
         }
 
         if (auto ppmOp = dyn_cast<PPMeasurementOp>(operation)) {
-            wrapper.updateSign(static_cast<int16_t>(ppmOp.getRotationSign()) < 0);
+            wrapper.updateSign(ppmOp.getNegated());
         }
     };
 
@@ -227,15 +227,14 @@ void updatePauliWord(PBCOpInterface op, const PauliWord &newPauliWord, PatternRe
 void updatePauliWordSign(PBCOpInterface op, bool isNegated, PatternRewriter &rewriter)
 {
     if (auto pprOp = dyn_cast<PPRotationOp>(op.getOperation())) {
-        int16_t rotationKind = static_cast<int16_t>(pprOp.getRotationKind());
-        int16_t sign = isNegated ? -1 : 1;
-        rotationKind = (rotationKind < 0 ? -rotationKind : rotationKind) * sign;
+        int8_t rotationKind = std::abs(pprOp.getRotationKind());
+        if (isNegated) {
+            rotationKind = -rotationKind;
+        }
         pprOp.setRotationKind(rotationKind);
     }
     else if (auto ppmOp = dyn_cast<PPMeasurementOp>(op.getOperation())) {
-        int16_t rotationSign = static_cast<int16_t>(ppmOp.getRotationSign());
-        rotationSign = (rotationSign < 0 ? -rotationSign : rotationSign) * (isNegated ? -1 : 1);
-        ppmOp.setRotationSign(rotationSign);
+        ppmOp.setNegated(isNegated);
     }
 }
 

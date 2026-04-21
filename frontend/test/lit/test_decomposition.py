@@ -16,6 +16,7 @@ from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
 from catalyst.jax_primitives import decomposition_rule
+from catalyst.passes import graph_decomposition
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -108,7 +109,7 @@ def test_decompose_multicontrolledx():
 
     @qjit(target="mlir")
     @qml.qnode(dev)
-    # CHECK-LABEL: public @jit_decompose_multicontrolled_x1
+    # CHECK-LABEL: @jit_decompose_multicontrolled_x1
     def decompose_multicontrolled_x1(theta: float):
         qml.RX(theta, wires=[0])
         # CHECK-NOT: name = "MultiControlledX"
@@ -129,7 +130,7 @@ def test_decompose_rot():
 
     @qjit(target="mlir")
     @qml.qnode(dev)
-    # CHECK-LABEL: public @jit_decompose_rot
+    # CHECK-LABEL: @jit_decompose_rot
     def decompose_rot(phi: float, theta: float, omega: float):
         # CHECK-NOT: name = "Rot"
         # CHECK: [[phi:%.+]] = tensor.extract %arg0
@@ -159,7 +160,7 @@ def test_decompose_s():
 
     @qjit(target="mlir")
     @qml.qnode(dev)
-    # CHECK-LABEL: public @jit_decompose_s
+    # CHECK-LABEL: @jit_decompose_s
     def decompose_s():
         # CHECK-NOT: name="S"
         # CHECK: [[pi_div_2:%.+]] = arith.constant 1.57079{{.+}} : f64
@@ -181,7 +182,7 @@ def test_decompose_qubitunitary():
 
     @qjit(target="mlir")
     @qml.qnode(dev)
-    # CHECK-LABEL: public @jit_decompose_qubit_unitary
+    # CHECK-LABEL: @jit_decompose_qubit_unitary
     def decompose_qubit_unitary(U: jax.core.ShapedArray([2, 2], float)):
         # CHECK-NOT: name = "QubitUnitary"
         # CHECK: quantum.custom "RZ"
@@ -205,7 +206,7 @@ def test_decompose_singleexcitation():
 
     @qjit(target="mlir")
     @qml.qnode(dev)
-    # CHECK-LABEL: public @jit_decompose_singleexcitation
+    # CHECK-LABEL: @jit_decompose_singleexcitation
     def decompose_singleexcitation(theta: float):
         # CHECK: quantum.custom "SingleExcitation"
 
@@ -226,7 +227,7 @@ def test_decompose_doubleexcitation():
 
     @qjit(target="mlir")
     @qml.qnode(dev)
-    # CHECK-LABEL: public @jit_decompose_doubleexcitation
+    # CHECK-LABEL: @jit_decompose_doubleexcitation
     def decompose_doubleexcitation(theta: float):
         # CHECK: quantum.custom "DoubleExcitation"
 
@@ -243,14 +244,14 @@ def test_decompose_singleexcitationplus():
     """
     Test decomposition of single excitation plus.
     See
-    https://github.com/PennyLaneAI/pennylane/blob/master/pennylane/ops/qubit/qchem_ops.py
+    https://github.com/PennyLaneAI/pennylane/blob/main/pennylane/ops/qubit/qchem_ops.py
     for the decomposition of qml.SingleExcitationPlus
     """
     dev = get_custom_device_without(2, discards={"SingleExcitationPlus", "C(SingleExcitationPlus)"})
 
     @qjit(target="mlir")
     @qml.qnode(dev)
-    # CHECK-LABEL: public @jit_decompose_singleexcitationplus
+    # CHECK-LABEL: @jit_decompose_singleexcitationplus
     def decompose_singleexcitationplus(theta: float):
         # CHECK-NOT: "SingleExcitationPlus"
         # CHECK: quantum.custom "Hadamard"
@@ -279,7 +280,7 @@ def test_decompose_to_matrix():
 
     @qjit(target="mlir")
     @qml.qnode(dev)
-    # CHECK-LABEL: public @jit_decompose_to_matrix
+    # CHECK-LABEL: @jit_decompose_to_matrix
     def decompose_to_matrix():
         # CHECK: quantum.custom "PauliX"
         qml.PauliX(wires=0)
@@ -295,6 +296,26 @@ def test_decompose_to_matrix():
 test_decompose_to_matrix()
 
 
+def test_decomposition_rule_lowering():
+    """Test that decomposition rules are lowered to private functions."""
+
+    @decomposition_rule(is_qreg=True)
+    def my_decomp():
+        return
+
+    @qml.qjit(capture=True)
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circuit():
+        # CHECK-LABEL: func.func private @my_decomp
+        my_decomp()
+        return
+
+    print(circuit.mlir)
+
+
+test_decomposition_rule_lowering()
+
+
 def test_decomposition_rule_wire_param():
     """Test decomposition rule with passing a parameter that is a wire/integer"""
 
@@ -302,24 +323,20 @@ def test_decomposition_rule_wire_param():
     def Hadamard0(wire: WiresLike):
         qml.Hadamard(wire)
 
-    qml.capture.enable()
-
-    @qml.qjit
+    @qml.qjit(capture=True)
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK: module @circuit
+    # CHECK-LABEL: @circuit
     def circuit(_: float):
-        # CHECK: func.func public @circuit([[ARG0:%.+]]
+        # CHECK: @circuit([[ARG0:%.+]]
         # CHECK: [[QREG:%.+]] = quantum.alloc
         Hadamard0(int)
         return qml.probs()
 
-    # CHECK: func.func public @Hadamard0([[QBIT:%.+]]: !quantum.bit) -> !quantum.bit
+    # CHECK: @Hadamard0([[QBIT:%.+]]: !quantum.bit) -> !quantum.bit
     # CHECK-NEXT: [[QUBIT_OUT:%.+]] = quantum.custom "Hadamard"() [[QBIT]] : !quantum.bit
     # CHECK-NEXT: return [[QUBIT_OUT]] : !quantum.bit
 
     print(circuit.mlir)
-
-    qml.capture.disable()
 
 
 test_decomposition_rule_wire_param()
@@ -332,22 +349,18 @@ def test_decomposition_rule_gate_param_param():
     def RX_on_wire_0(param: TensorLike, w0: WiresLike):
         qml.RX(param, wires=w0)
 
-    qml.capture.enable()
-
-    @qml.qjit
+    @qml.qjit(capture=True)
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     # CHECK: module @circuit_2
     def circuit_2(_: float):
         RX_on_wire_0(float, int)
         return qml.probs()
 
-    # CHECK: func.func public @RX_on_wire_0([[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBIT:%.+]]: !quantum.bit) -> !quantum.bit
+    # CHECK: @RX_on_wire_0([[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBIT:%.+]]: !quantum.bit) -> !quantum.bit
     # CHECK-NEXT: [[PARAM:%.+]] = tensor.extract [[PARAM_TENSOR]][] : tensor<f64>
     # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.custom "RX"([[PARAM]]) [[QUBIT]] : !quantum.bit
     # CHECK-NEXT: return [[QUBIT_1]] : !quantum.bit
     print(circuit_2.mlir)
-
-    qml.capture.disable()
 
 
 test_decomposition_rule_gate_param_param()
@@ -355,8 +368,6 @@ test_decomposition_rule_gate_param_param()
 
 def test_multiple_decomposition_rules():
     """Test with multiple decomposition rules"""
-
-    qml.capture.enable()
 
     @decomposition_rule
     def identity(): ...
@@ -367,7 +378,7 @@ def test_multiple_decomposition_rules():
         qml.RX(param, wires=w1)
         qml.RX(param, wires=w2)
 
-    @qml.qjit
+    @qml.qjit(capture=True)
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def circuit_3(_: float):
         # CHECK: [[QREG:%.+]] = quantum.alloc
@@ -380,11 +391,10 @@ def test_multiple_decomposition_rules():
         qml.Hadamard(0)
         return qml.probs()
 
-    # CHECK: func.func public @identity
-    # CHECK: func.func public @all_wires_rx
+    # CHECK-LABEL: @identity
+    # CHECK-LABEL: @all_wires_rx
 
     print(circuit_3.mlir)
-    qml.capture.disable()
 
 
 test_multiple_decomposition_rules()
@@ -393,15 +403,13 @@ test_multiple_decomposition_rules()
 def test_decomposition_rule_shaped_wires():
     """Test decomposition rule with passing a shaped array of wires"""
 
-    qml.capture.enable()
-
     @decomposition_rule(is_qreg=True)
     def shaped_wires_rule(param: TensorLike, wires: WiresLike):
         qml.RX(param, wires=wires[0])
         qml.RX(param, wires=wires[1])
         qml.RX(param, wires=wires[2])
 
-    @qml.qjit
+    @qml.qjit(capture=True)
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def circuit_4(_: float):
         # CHECK: module @circuit_4
@@ -409,7 +417,7 @@ def test_decomposition_rule_shaped_wires():
         qml.Hadamard(0)
         return qml.probs()
 
-    # CHECK: func.func public @shaped_wires_rule([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBITS:%.+]]: tensor<3xi64>) -> !quantum.reg
+    # CHECK: @shaped_wires_rule([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBITS:%.+]]: tensor<3xi64>) -> !quantum.reg
     # CHECK-NEXT: [[IDX_0:%.+]] = stablehlo.slice [[QUBITS]] [0:1] : (tensor<3xi64>) -> tensor<1xi64>
     # CHECK-NEXT: [[RIDX_0:%.+]] = stablehlo.reshape [[IDX_0]] : (tensor<1xi64>) -> tensor<i64>
     # CHECK-NEXT: [[EXTRACTED:%.+]] = tensor.extract [[RIDX_0]][] : tensor<i64>
@@ -418,7 +426,6 @@ def test_decomposition_rule_shaped_wires():
     # CHECK-NEXT: [[OUT_QUBITS:%.+]] = quantum.custom "RX"([[EXTRACTED_0]]) [[QUBIT]] : !quantum.bit
 
     print(circuit_4.mlir)
-    qml.capture.disable()
 
 
 test_decomposition_rule_shaped_wires()
@@ -426,8 +433,6 @@ test_decomposition_rule_shaped_wires()
 
 def test_decomposition_rule_expanded_wires():
     """Test decomposition rule with passing expanding wires as a Python list"""
-
-    qml.capture.enable()
 
     def shaped_wires_rule(param: TensorLike, wires: WiresLike):
         qml.RX(param, wires=wires[0])
@@ -438,7 +443,7 @@ def test_decomposition_rule_expanded_wires():
     def expanded_wires_rule(param: TensorLike, w1, w2, w3):
         shaped_wires_rule(param, [w1, w2, w3])
 
-    @qml.qjit
+    @qml.qjit(capture=True)
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def circuit_5(_: float):
         # CHECK: module @circuit_5
@@ -446,10 +451,9 @@ def test_decomposition_rule_expanded_wires():
         qml.Hadamard(0)
         return qml.probs()
 
-    # CHECK: func.func public @expanded_wires_rule(%arg0: tensor<f64>, %arg1: !quantum.bit, %arg2: !quantum.bit, %arg3: !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit)
+    # CHECK-LABEL: @expanded_wires_rule(%arg0: tensor<f64>, %arg1: !quantum.bit, %arg2: !quantum.bit, %arg3: !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit)
 
     print(circuit_5.mlir)
-    qml.capture.disable()
 
 
 test_decomposition_rule_expanded_wires()
@@ -457,8 +461,6 @@ test_decomposition_rule_expanded_wires()
 
 def test_decomposition_rule_with_cond():
     """Test decomposition rule with a conditional path"""
-
-    qml.capture.enable()
 
     @decomposition_rule(is_qreg=True)
     def cond_RX(param: TensorLike, w0: WiresLike):
@@ -470,14 +472,14 @@ def test_decomposition_rule_with_cond():
 
         qml.cond(param != 0.0, true_path, false_path)()
 
-    @qml.qjit(autograph=False)
+    @qml.qjit(autograph=False, capture=True)
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def circuit_6():
         # CHECK: module @circuit_6
         cond_RX(float, jax.core.ShapedArray((1,), int))
         return qml.probs()
 
-    # CHECK: func.func public @cond_RX([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBITS:%.+]]: tensor<1xi64>) -> !quantum.reg
+    # CHECK: @cond_RX([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>, [[QUBITS:%.+]]: tensor<1xi64>) -> !quantum.reg
     # CHECK-NEXT: [[ZERO:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
     # CHECK-NEXT: [[COND_TENSOR:%.+]] = stablehlo.compare  NE, [[PARAM_TENSOR]], [[ZERO]],  FLOAT : (tensor<f64>, tensor<f64>) -> tensor<i1>
     # CHECK-NEXT: [[COND:%.+]] = tensor.extract [[COND_TENSOR]][] : tensor<i1>
@@ -492,7 +494,6 @@ def test_decomposition_rule_with_cond():
     # CHECK:      return [[RETVAL]]
 
     print(circuit_6.mlir)
-    qml.capture.disable()
 
 
 test_decomposition_rule_with_cond()
@@ -500,8 +501,6 @@ test_decomposition_rule_with_cond()
 
 def test_decomposition_rule_caller():
     """Test decomposition rules with a caller"""
-
-    qml.capture.enable()
 
     @decomposition_rule(is_qreg=True)
     def rule_op1_decomp(_: TensorLike, wires: WiresLike):
@@ -516,7 +515,7 @@ def test_decomposition_rule_caller():
         rule_op1_decomp(param, wires)
         rule_op2_decomp(param, wires)
 
-    @qml.qjit(autograph=False)
+    @qml.qjit(autograph=False, capture=True)
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     # CHECK: module @circuit_7
     def circuit_7():
@@ -525,10 +524,9 @@ def test_decomposition_rule_caller():
         decomps_caller(float, jax.core.ShapedArray((2,), int))
         return qml.probs()
 
-    # CHECK: func.func public @rule_op1_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
-    # CHECK: func.func public @rule_op2_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
+    # CHECK-LABEL: @rule_op1_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
+    # CHECK-LABEL: @rule_op2_decomp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<2xi64>) -> !quantum.reg
     print(circuit_7.mlir)
-    qml.capture.disable()
 
 
 test_decomposition_rule_caller()
@@ -537,30 +535,28 @@ test_decomposition_rule_caller()
 def test_decompose_gateset_with_graph():
     """Test the decompose transform to a target gate set with the graph decomposition."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(qml.transforms.decompose, gate_set={"RX"})
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK: public @simple_circuit_9() -> tensor<f64> attributes {decompose_gatesets
+    # CHECK-LABEL: @simple_circuit_9() -> tensor<f64> attributes {decompose_gatesets
     def simple_circuit_9():
         return qml.expval(qml.Z(0))
 
     print(simple_circuit_9.mlir)
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     # CHECK-DAG: %0 = transform.apply_registered_pass "decompose-lowering"
-    # CHECK: public @circuit_9() -> tensor<f64> attributes {decompose_gatesets
+    # CHECK-LABEL: @circuit_9() -> tensor<f64> attributes {decompose_gatesets
     def circuit_9():
         return qml.expval(qml.Z(0))
 
     print(circuit_9.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 test_decompose_gateset_with_graph()
@@ -569,17 +565,14 @@ test_decompose_gateset_with_graph()
 def test_decompose_gateset_without_graph():
     """Test the decompose transform to a target gate set without the graph decomposition."""
 
-    qml.capture.enable()
-
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK: func.func public @circuit_8() -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, quantum.node}
+    # CHECK-LABEL: @circuit_8() -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, quantum.node}
     def circuit_8():
         return qml.expval(qml.Z(0))
 
     print(circuit_8.mlir)
-    qml.capture.disable()
 
 
 test_decompose_gateset_without_graph()
@@ -588,43 +581,41 @@ test_decompose_gateset_without_graph()
 def test_decompose_gateset_operator_with_graph():
     """Test the decompose transform to a target gate set with the graph decomposition."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(qml.transforms.decompose, gate_set={qml.RX})
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK: public @simple_circuit_10() -> tensor<f64> attributes {decompose_gatesets
+    # CHECK-LABEL: @simple_circuit_10() -> tensor<f64> attributes {decompose_gatesets
     def simple_circuit_10():
         return qml.expval(qml.Z(0))
 
     print(simple_circuit_10.mlir)
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(
         qml.transforms.decompose, gate_set={qml.RX, qml.RZ, "PauliZ", qml.PauliX, qml.Hadamard}
     )
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK: public @circuit_10() -> tensor<f64> attributes {decompose_gatesets
+    # CHECK-LABEL: @circuit_10() -> tensor<f64> attributes {decompose_gatesets
     def circuit_10():
         return qml.expval(qml.Z(0))
 
     print(circuit_10.mlir)
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(
         qml.transforms.decompose, gate_set={qml.RX, qml.RZ, qml.PauliZ, qml.PauliX, qml.Hadamard}
     )
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     # CHECK-DAG: %0 = transform.apply_registered_pass "decompose-lowering"
-    # CHECK: public @circuit_11() -> tensor<f64> attributes {decompose_gatesets
+    # CHECK-LABEL: @circuit_11() -> tensor<f64> attributes {decompose_gatesets
     def circuit_11():
         return qml.expval(qml.Z(0))
 
     print(circuit_11.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 test_decompose_gateset_operator_with_graph()
@@ -633,30 +624,28 @@ test_decompose_gateset_operator_with_graph()
 def test_decompose_gateset_with_rotxzx():
     """Test the decompose transform with a custom operator with the graph decomposition."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(qml.transforms.decompose, gate_set={"RotXZX"})
     @qml.qnode(qml.device("lightning.qubit", wires=1))
-    # CHECK: public @simple_circuit_12() -> tensor<f64> attributes {decompose_gatesets
+    # CHECK-LABEL: @simple_circuit_12() -> tensor<f64> attributes {decompose_gatesets
     def simple_circuit_12():
         return qml.expval(qml.Z(0))
 
     print(simple_circuit_12.mlir)
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(qml.transforms.decompose, gate_set={qml.ftqc.RotXZX})
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     # CHECK-DAG: %0 = transform.apply_registered_pass "decompose-lowering"
-    # CHECK: public @circuit_12() -> tensor<f64> attributes {decompose_gatesets
+    # CHECK-LABEL: @circuit_12() -> tensor<f64> attributes {decompose_gatesets
     def circuit_12():
         return qml.expval(qml.Z(0))
 
     print(circuit_12.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 test_decompose_gateset_with_rotxzx()
@@ -665,7 +654,6 @@ test_decompose_gateset_with_rotxzx()
 def test_decomposition_rule_name():
     """Test the name of the decomposition rule is not updated with circuit instantiation."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
     @decomposition_rule
@@ -697,11 +685,11 @@ def test_decomposition_rule_name():
         qml.RZ(theta, wires=wires)
         qml.RX(omega, wires=wires)
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(qml.transforms.decompose, gate_set={"RX", "RZ", "PhaseShift"})
     @qml.qnode(qml.device("lightning.qubit", wires=3))
     # CHECK-DAG: %0 = transform.apply_registered_pass "decompose-lowering"
-    # CHECK: public @circuit_13() -> tensor<f64> attributes {decompose_gatesets
+    # CHECK-LABEL: @circuit_13() -> tensor<f64> attributes {decompose_gatesets
     def circuit_13():
         _ry_to_rz_rx(float, int)
         _rot_to_rz_ry_rz(float, float, float, int)
@@ -709,14 +697,13 @@ def test_decomposition_rule_name():
         _xzx_decompose(float, float, float, int)
         return qml.expval(qml.Z(0))
 
-    # CHECK: func.func public @_ry_to_rz_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<i64>) -> !quantum.reg
-    # CHECK: func.func public @_rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<i64>) -> !quantum.reg
-    # CHECK: func.func public @_u2_phaseshift_rot_decomposition(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<i64>) -> !quantum.reg
-    # CHECK: func.func public @_xzx_decompose(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<i64>) -> !quantum.reg
+    # CHECK-LABEL: @_ry_to_rz_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<i64>) -> !quantum.reg
+    # CHECK-LABEL: @_rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<i64>) -> !quantum.reg
+    # CHECK-LABEL: @_u2_phaseshift_rot_decomposition(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<i64>) -> !quantum.reg
+    # CHECK-LABEL: @_xzx_decompose(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<i64>) -> !quantum.reg
     print(circuit_13.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 test_decomposition_rule_name()
@@ -725,7 +712,6 @@ test_decomposition_rule_name()
 def test_decomposition_rule_name_update():
     """Test the name of the decomposition rule is updated in the MLIR output."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
     @qml.register_resources({qml.RZ: 2, qml.RX: 1})
@@ -748,7 +734,7 @@ def test_decomposition_rule_name_update():
         qml.RY(np.pi, wires=wires)
         qml.GlobalPhase(-np.pi / 2, wires=wires)
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(
         qml.transforms.decompose,
         gate_set={"RX", "RZ", "GlobalPhase"},
@@ -760,20 +746,19 @@ def test_decomposition_rule_name_update():
     )
     @qml.qnode(qml.device("lightning.qubit", wires=3))
     # CHECK-DAG: %0 = transform.apply_registered_pass "decompose-lowering"
-    # CHECK: public @circuit_14() -> tensor<f64> attributes {decompose_gatesets
+    # CHECK-LABEL: @circuit_14() -> tensor<f64> attributes {decompose_gatesets
     def circuit_14():
         qml.RY(0.5, wires=0)
         qml.Rot(0.1, 0.2, 0.3, wires=1)
         qml.PauliY(wires=2)
         return qml.expval(qml.Z(0))
 
-    # CHECK-DAG: func.func public @rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg
-    # CHECK-DAG: func.func public @rz_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
-    # CHECK-DAG: func.func public @ry_gp(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg
+    # CHECK-DAG: @rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg
+    # CHECK-DAG: @rz_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
+    # CHECK-DAG: @ry_gp(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg
     print(circuit_14.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 test_decomposition_rule_name_update()
@@ -804,7 +789,7 @@ def test_decomposition_inside_subroutine():
         f(1.2, (2, 3))
         return qml.probs(wires=0)
 
-    # CHECK-DAG: func.func public @_isingxx_to_cnot_rx_cnot(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>)
+    # CHECK-DAG: @_isingxx_to_cnot_rx_cnot(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>)
     print(subroutine_circuit.mlir)
     qml.decomposition.disable_graph()
 
@@ -815,17 +800,16 @@ test_decomposition_inside_subroutine()
 def test_decomposition_rule_name_update_multi_qubits():
     """Test the name of the decomposition rule with multi-qubit gates."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(
         qml.transforms.decompose,
         gate_set={"RY", "RX", "CNOT", "Hadamard", "GlobalPhase"},
     )
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     # CHECK-DAG: %0 = transform.apply_registered_pass "decompose-lowering"
-    # CHECK: public @circuit_15() -> tensor<f64> attributes {decompose_gatesets
+    # CHECK-LABEL: @circuit_15() -> tensor<f64> attributes {decompose_gatesets
     def circuit_15():
         qml.SingleExcitation(0.5, wires=[0, 1])
         qml.SingleExcitationPlus(0.5, wires=[0, 1])
@@ -833,17 +817,16 @@ def test_decomposition_rule_name_update_multi_qubits():
         qml.DoubleExcitation(0.5, wires=[0, 1, 2, 3])
         return qml.expval(qml.Z(0))
 
-    # CHECK-DAG: func.func public @_cry(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "CRY"}
-    # CHECK-DAG: func.func public @_s_phaseshift(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "S"}
-    # CHECK-DAG: func.func public @_phaseshift_to_rz_gp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "PhaseShift"}
-    # CHECK-DAG: func.func public @_rz_to_ry_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
-    # CHECK-DAG: func.func public @_rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
-    # CHECK-DAG: func.func public @_doublexcit(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<4xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 4 : i64, target_gate = "DoubleExcitation"}
-    # CHECK-DAG: func.func public @_single_excitation_decomp(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "SingleExcitation"}
+    # CHECK-DAG: @_cry(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "CRY"}
+    # CHECK-DAG: @_s_phaseshift(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "S"}
+    # CHECK-DAG: @_phaseshift_to_rz_gp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "PhaseShift"}
+    # CHECK-DAG: @_rz_to_ry_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
+    # CHECK-DAG: @_rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
+    # CHECK-DAG: @_doublexcit(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<4xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 4 : i64, target_gate = "DoubleExcitation"}
+    # CHECK-DAG: @_single_excitation_decomp(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "SingleExcitation"}
     print(circuit_15.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 skip_if_pauli_rot_issue(test_decomposition_rule_name_update_multi_qubits)()
@@ -852,10 +835,9 @@ skip_if_pauli_rot_issue(test_decomposition_rule_name_update_multi_qubits)()
 def test_decomposition_rule_name_adjoint():
     """Test decomposition rule with qml.adjoint."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(
         qml.transforms.decompose,
         gate_set={"RY", "RX", "CZ", "GlobalPhase", "Adjoint(SingleExcitation)"},
@@ -874,35 +856,33 @@ def test_decomposition_rule_name_adjoint():
         qml.adjoint(qml.SingleExcitation(x, wires=[0, 1]))
         return qml.expval(qml.Z(0))
 
-    # CHECK-DAG: func.func public @_single_excitation_decomp(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "SingleExcitation"}
-    # CHECK-DAG: func.func public @_hadamard_to_rz_ry(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Hadamard"}
-    # CHECK-DAG: func.func public @_rz_to_ry_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
-    # CHECK-DAG: func.func public @_rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
-    # CHECK-DAG: func.func public @_cnot_to_cz_h(%arg0: !quantum.reg, %arg1: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "CNOT"}
+    # CHECK-DAG: @_single_excitation_decomp(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "SingleExcitation"}
+    # CHECK-DAG: @_hadamard_to_rz_ry(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Hadamard"}
+    # CHECK-DAG: @_rz_to_ry_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
+    # CHECK-DAG: @_rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
+    # CHECK-DAG: @_cnot_to_cz_h(%arg0: !quantum.reg, %arg1: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "CNOT"}
     print(circuit_16.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 skip_if_pauli_rot_issue(test_decomposition_rule_name_adjoint)()
 
 
-# TODO: Reenable this once the underlying non-determinism issue is resolved'
+# TODO: Reenable this once the underlying non-determinism issue is resolved
 def test_decomposition_rule_name_ctrl():
     """Test decomposition rule with qml.ctrl."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(
         qml.transforms.decompose,
         gate_set={"RX", "RZ", "H", "CZ"},
     )
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     # SKIP-CHECK-DAG: %0 = transform.apply_registered_pass "decompose-lowering"
-    # SKIP-CHECK{LITERAL}: func.func public @circuit_17() -> tensor<f64> attributes {decompose_gatesets
+    # SKIP-CHECK{LITERAL}: @circuit_17() -> tensor<f64> attributes {decompose_gatesets
     def circuit_17():
         # SKIP-CHECK: %out_qubits:2 = quantum.custom "CRY"(%cst) %1, %2 : !quantum.bit, !quantum.bit
         # SKIP-CHECK-NEXT: %out_qubits_0:2 = quantum.custom "CNOT"() %out_qubits#0, %out_qubits#1 : !quantum.bit, !quantum.bit
@@ -910,14 +890,13 @@ def test_decomposition_rule_name_ctrl():
         qml.ctrl(qml.PauliX, control=0)(1)
         return qml.expval(qml.Z(0))
 
-    # SKIP-CHECK-DAG: func.func public @_cnot_to_cz_h(%arg0: !quantum.reg, %arg1: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "CNOT"}
-    # SKIP-CHECK-DAG: func.func public @_cry(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "CRY"}
-    # SKIP-CHECK-DAG: func.func public @_ry_to_rz_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RY"}
-    # SKIP-CHECK-DAG: func.func public @_rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
+    # SKIP-CHECK-DAG: @_cnot_to_cz_h(%arg0: !quantum.reg, %arg1: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "CNOT"}
+    # SKIP-CHECK-DAG: @_cry(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "CRY"}
+    # SKIP-CHECK-DAG: @_ry_to_rz_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RY"}
+    # SKIP-CHECK-DAG: @_rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
     # print(circuit_17.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 skip_if_pauli_rot_issue(test_decomposition_rule_name_ctrl)()
@@ -927,17 +906,16 @@ skip_if_pauli_rot_issue(test_decomposition_rule_name_ctrl)()
 def test_qft_decomposition():
     """Test the decomposition of the QFT"""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
-    @qml.qjit(autograph=True, target="mlir")
+    @qml.qjit(autograph=True, target="mlir", capture=True)
     @partial(
         qml.transforms.decompose,
         gate_set={"RX", "RY", "CNOT", "GlobalPhase"},
     )
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     # SKIP-CHECK: %0 = transform.apply_registered_pass "decompose-lowering"
-    # SKIP-CHECK: func.func public @circuit_18(%arg0: tensor<3xf64>) -> tensor<f64> attributes {decompose_gatesets
+    # SKIP-CHECK: @circuit_18(%arg0: tensor<3xf64>) -> tensor<f64> attributes {decompose_gatesets
     def circuit_18():
         # %6 = scf.for %arg1 = %c0 to %c4 step %c1 iter_args(%arg2 = %0) -> (!quantum.reg) {
         # %23 = scf.for %arg3 = %c0 to %22 step %c1 iter_args(%arg4 = %21) -> (!quantum.reg) {
@@ -945,15 +923,14 @@ def test_qft_decomposition():
         qml.QFT(wires=[0, 1, 2, 3])
         return qml.expval(qml.Z(0))
 
-    # SKIP-CHECK-DAG: func.func public @ag___cphase_to_rz_cnot(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "ControlledPhaseShift"}
-    # SKIP-CHECK-DAG: func.func public @ag___rz_to_ry_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
-    # SKIP-CHECK-DAG: func.func public @ag___rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
-    # SKIP-CHECK-DAG: func.func public @ag___swap_to_cnot(%arg0: !quantum.reg, %arg1: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "SWAP"}
-    # SKIP-CHECK-DAG: func.func public @ag___hadamard_to_rz_ry(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Hadamard"}
+    # SKIP-CHECK-DAG: @ag___cphase_to_rz_cnot(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "ControlledPhaseShift"}
+    # SKIP-CHECK-DAG: @ag___rz_to_ry_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
+    # SKIP-CHECK-DAG: @ag___rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
+    # SKIP-CHECK-DAG: @ag___swap_to_cnot(%arg0: !quantum.reg, %arg1: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "SWAP"}
+    # SKIP-CHECK-DAG: @ag___hadamard_to_rz_ry(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Hadamard"}
     # print(circuit_18.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 skip_if_pauli_rot_issue(test_qft_decomposition)()
@@ -962,10 +939,9 @@ skip_if_pauli_rot_issue(test_qft_decomposition)()
 def test_decompose_lowering_with_other_passes():
     """Test the decompose lowering pass with other passes in a pass pipeline."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @qml.transforms.merge_rotations
     @qml.transforms.cancel_inverses
     @partial(
@@ -992,12 +968,11 @@ def test_decompose_lowering_with_other_passes():
         qml.RX(-0.1, wires=0)
         return qml.expval(qml.PauliX(0))
 
-    # CHECK-DAG: func.func public @_paulix_to_rx(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "PauliX"}
-    # CHECK-DAG: func.func public @_rx_to_rz_ry(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RX"}
+    # CHECK-DAG: @_paulix_to_rx(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "PauliX"}
+    # CHECK-DAG: @_rx_to_rz_ry(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RX"}
     print(circuit_19.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 skip_if_pauli_rot_issue(test_decompose_lowering_with_other_passes)()
@@ -1006,10 +981,9 @@ skip_if_pauli_rot_issue(test_decompose_lowering_with_other_passes)()
 def test_decompose_lowering_multirz():
     """Test the decompose lowering pass with MultiRZ in the gate set."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(
         qml.transforms.decompose,
         gate_set={"CNOT", "RZ"},
@@ -1030,15 +1004,14 @@ def test_decompose_lowering_multirz():
         qml.MultiRZ(x, wires=[1, 0, 2])
         return qml.expval(qml.PauliX(0))
 
-    # CHECK-DAG: func.func public @_multi_rz_decomposition_wires_1(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "MultiRZ"}
-    # CHECK-DAG: func.func public @_multi_rz_decomposition_wires_2(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "MultiRZ"}
-    # CHECK-DAG: func.func public @_multi_rz_decomposition_wires_3(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<3xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 3 : i64, target_gate = "MultiRZ"}
+    # CHECK-DAG: @_multi_rz_decomposition_wires_1(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "MultiRZ"}
+    # CHECK-DAG: @_multi_rz_decomposition_wires_2(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "MultiRZ"}
+    # CHECK-DAG: @_multi_rz_decomposition_wires_3(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<3xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 3 : i64, target_gate = "MultiRZ"}
     # CHECK-DAG: %0 = scf.for %arg3 = %c0 to %c2 step %c1 iter_args(%arg4 = %arg0) -> (!quantum.reg)
     # CHECK-DAG:   %5 = scf.for %arg3 = %c1 to %c3 step %c1 iter_args(%arg4 = %4) -> (!quantum.reg)
     print(circuit_20.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 test_decompose_lowering_multirz()
@@ -1047,10 +1020,9 @@ test_decompose_lowering_multirz()
 def test_decompose_lowering_with_ordered_passes():
     """Test the decompose lowering pass with other passes in a specific order in a pass pipeline."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(
         qml.transforms.decompose,
         gate_set={"RZ", "RY", "CNOT", "GlobalPhase"},
@@ -1079,13 +1051,12 @@ def test_decompose_lowering_with_ordered_passes():
         qml.RX(-x, wires=0)
         return qml.expval(qml.PauliX(0))
 
-    # CHECK-DAG: func.func public @_paulix_to_rx(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "PauliX"}
-    # CHECK-DAG: func.func public @_rx_to_rz_ry(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RX"}
-    # CHECK-DAG: func.func public @_rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
+    # CHECK-DAG: @_paulix_to_rx(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "PauliX"}
+    # CHECK-DAG: @_rx_to_rz_ry(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RX"}
+    # CHECK-DAG: @_rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
     print(circuit_21.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 skip_if_pauli_rot_issue(test_decompose_lowering_with_ordered_passes)()
@@ -1094,10 +1065,9 @@ skip_if_pauli_rot_issue(test_decompose_lowering_with_ordered_passes)()
 def test_decompose_lowering_with_gphase():
     """Test the decompose lowering pass with GlobalPhase."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(
         qml.transforms.decompose,
         gate_set={"RX", "RY", "GlobalPhase"},
@@ -1114,12 +1084,11 @@ def test_decompose_lowering_with_gphase():
         qml.ctrl(qml.GlobalPhase, control=0)(phi=0.3, wires=[1, 2])
         return qml.expval(qml.PauliX(0))
 
-    # CHECK-DAG: func.func public @_phaseshift_to_rz_gp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "PhaseShift"}
-    # CHECK-DAG: func.func public @_rz_to_ry_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
+    # CHECK-DAG: @_phaseshift_to_rz_gp(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "PhaseShift"}
+    # CHECK-DAG: @_rz_to_ry_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
     print(circuit_22.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 skip_if_pauli_rot_issue(test_decompose_lowering_with_gphase)()
@@ -1128,14 +1097,13 @@ skip_if_pauli_rot_issue(test_decompose_lowering_with_gphase)()
 def test_decompose_lowering_alt_decomps():
     """Test the decompose lowering pass with alternative decompositions."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
     @qml.register_resources({qml.RY: 1})
     def custom_rot_cheap(params, wires: WiresLike):
         qml.RY(params[1], wires=wires)
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(
         qml.transforms.decompose,
         gate_set={"RY", "RZ"},
@@ -1146,11 +1114,10 @@ def test_decompose_lowering_alt_decomps():
         qml.Rot(x, y, x + y, wires=1)
         return qml.expval(qml.PauliZ(0))
 
-    # CHECK-DAG: func.func public @custom_rot_cheap(%arg0: !quantum.reg, %arg1: tensor<3xf64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
+    # CHECK-DAG: @custom_rot_cheap(%arg0: !quantum.reg, %arg1: tensor<3xf64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
     print(circuit_23.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 test_decompose_lowering_alt_decomps()
@@ -1160,7 +1127,6 @@ def test_decompose_lowering_with_tensorlike():
     """Test the decompose lowering pass with fixed decompositions
     using TensorLike parameters."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
     @qml.register_resources({qml.RZ: 2, qml.RY: 1})
@@ -1177,7 +1143,7 @@ def test_decompose_lowering_with_tensorlike():
         qml.CNOT(wires=(wires[1], wires[0]))
         qml.CNOT(wires=(wires[2], wires[1]))
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(
         qml.transforms.decompose,
         gate_set={"RY", "RX", qml.CNOT},
@@ -1189,13 +1155,12 @@ def test_decompose_lowering_with_tensorlike():
         qml.MultiRZ(x + y, wires=[0, 1, 2])
         return qml.expval(qml.PauliZ(0))
 
-    # CHECK-DAG: func.func public @custom_multirz_wires_3(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<3xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 3 : i64, target_gate = "MultiRZ"}
-    # CHECK-DAG: func.func public @_rz_to_ry_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
-    # CHECK-DAG: func.func public @custom_rot(%arg0: !quantum.reg, %arg1: tensor<3xf64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
+    # CHECK-DAG: @custom_multirz_wires_3(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<3xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 3 : i64, target_gate = "MultiRZ"}
+    # CHECK-DAG: @_rz_to_ry_rx(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
+    # CHECK-DAG: @custom_rot(%arg0: !quantum.reg, %arg1: tensor<3xf64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
     print(circuit_24.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 skip_if_pauli_rot_issue(test_decompose_lowering_with_tensorlike)()
@@ -1204,13 +1169,12 @@ skip_if_pauli_rot_issue(test_decompose_lowering_with_tensorlike)()
 def test_decompose_lowering_fallback():
     """Test the decompose lowering pass when the graph is failed."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(qml.transforms.decompose, gate_set={qml.RX, qml.RZ})
     @qml.qnode(qml.device("lightning.qubit", wires=2))
-    # CHECK-LABEL: func.func public @circuit_25()
+    # CHECK-LABEL: @circuit_25()
     def circuit_25():
         # CHECK: [[OUT_QUBIT:%.+]] = quantum.custom "RZ"(%cst) {{%.+}} : !quantum.bit
         # CHECK-NEXT: [[OUT_QUBIT_0:%.+]] = quantum.custom "RX"(%cst) [[OUT_QUBIT]] : !quantum.bit
@@ -1221,7 +1185,6 @@ def test_decompose_lowering_fallback():
     print(circuit_25.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 test_decompose_lowering_fallback()
@@ -1230,18 +1193,17 @@ test_decompose_lowering_fallback()
 def test_decompose_lowering_params_ordering():
     """Test the order of params and wires in the captured decomposition rule."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=True)
     @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
     @qml.qnode(qml.device("lightning.qubit", wires=2))
-    # CHECK: func.func public @circuit_26(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>)
+    # CHECK-LABEL: @circuit_26(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>)
     def circuit_26(x: float, y: float, z: float):
         qml.Rot(x, y, z, wires=0)
         return qml.expval(qml.PauliZ(0))
 
-    # CHECK: func.func public @_rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
+    # CHECK-LABEL: @_rot_to_rz_ry_rz(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
     # CHECK:  [[EXTRACTED_0:%.+]] = tensor.extract %arg1[] : tensor<f64>
     # CHECK-NEXT:  [[OUT_QUBITS:%.+]] = quantum.custom "RZ"([[EXTRACTED_0]]) {{%.+}} : !quantum.bit
     # CHECK:  [[EXTRACTED_3:%.+]] = tensor.extract %arg2[] : tensor<f64>
@@ -1252,7 +1214,6 @@ def test_decompose_lowering_params_ordering():
     print(circuit_26.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 test_decompose_lowering_params_ordering()
@@ -1261,22 +1222,20 @@ test_decompose_lowering_params_ordering()
 def test_decomposition_rule_with_allocation():
     """Test decomposition rule with dynamic qubit allocation"""
 
-    qml.capture.enable()
-
     @decomposition_rule(is_qreg=True)
     def Hadamard0_with_alloc(wire: WiresLike):
         with qml.allocate(1) as q:
             qml.X(q[0])
             qml.CNOT(wires=[q[0], wire])
 
-    @qml.qjit
+    @qml.qjit(capture=True)
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     # CHECK: module @circuit_27
     def circuit_27():
         Hadamard0_with_alloc(int)
         return qml.probs()
 
-    # CHECK: func.func public @Hadamard0_with_alloc(%arg0: !quantum.reg, %arg1: tensor<i64>) -> !quantum.reg
+    # CHECK-LABEL: @Hadamard0_with_alloc(%arg0: !quantum.reg, %arg1: tensor<i64>) -> !quantum.reg
     # CHECK:  [[dynalloc_qreg:%.+]] = quantum.alloc( 1)
     # CHECK:  [[dynalloc_bit0:%.+]] = quantum.extract [[dynalloc_qreg]][ 0]
     # CHECK:  [[xout:%.+]] = quantum.custom "PauliX"() [[dynalloc_bit0]]
@@ -1291,8 +1250,6 @@ def test_decomposition_rule_with_allocation():
 
     print(circuit_27.mlir)
 
-    qml.capture.disable()
-
 
 test_decomposition_rule_with_allocation()
 
@@ -1300,7 +1257,6 @@ test_decomposition_rule_with_allocation()
 def test_decompose_autograph_multi_blocks():
     """Test the decompose lowering pass with autograph in the program and rule."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
     def _multi_rz_decomposition_resources(num_wires):
@@ -1317,7 +1273,7 @@ def test_decompose_autograph_multi_blocks():
         for i in range(len(wires) - 1, 0, -1):
             qml.CNOT(wires=(wires[i], wires[i - 1]))
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(
         qml.transforms.decompose,
         gate_set={"RZ", "CNOT"},
@@ -1335,13 +1291,12 @@ def test_decompose_autograph_multi_blocks():
 
         return qml.expval(qml.Z(0))
 
-    # CHECK: func.func public @ag___multi_rz_decomposition_wires_5(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<5xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 5 : i64, target_gate = "MultiRZ"}
+    # CHECK-LABEL: @ag___multi_rz_decomposition_wires_5(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<5xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 5 : i64, target_gate = "MultiRZ"}
     # CHECK: {{%.+}} = scf.for %arg3 = %c0 to %c4 step %c1 iter_args(%arg4 = %arg0) -> (!quantum.reg)
     # CHECK: {{%.+}} = scf.for %arg3 = %c0 to %c4 step %c1 iter_args(%arg4 = %4) -> (!quantum.reg)
     print(circuit_29.mlir)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 test_decompose_autograph_multi_blocks()
@@ -1353,8 +1308,6 @@ def test_decompose_work_wires_context_manager():
     manager.
     """
 
-    qml.capture.enable()
-
     @decomposition_rule(is_qreg=True, op_type="PauliZ")
     def my_decomp(wires):
         with qml.allocate(2, restored=False) as work_wires:
@@ -1363,7 +1316,7 @@ def test_decompose_work_wires_context_manager():
             qml.H(work_wires[0])
             qml.H(work_wires[1])
 
-    @qml.qjit
+    @qml.qjit(capture=True)
     @qml.transform(pass_name="decompose-lowering")
     @qml.qnode(qml.device("lightning.qubit", wires=3))
     def my_circuit():
@@ -1372,7 +1325,7 @@ def test_decompose_work_wires_context_manager():
         return qml.probs()
 
     # check that decomp arrives properly
-    # CHECK: func.func public @my_decomp({{.*}}) -> !quantum.reg attributes {{{.*}} target_gate = "PauliZ"}
+    # CHECK-LABEL: @my_decomp({{.*}}) -> !quantum.reg attributes {{{.*}} target_gate = "PauliZ"}
     print(my_circuit.mlir)
 
     # check that decomp is applied properly
@@ -1390,8 +1343,6 @@ def test_decompose_work_wires_context_manager():
     # CHECK: release
     print(my_circuit.mlir_opt)
 
-    qml.capture.disable()
-
 
 test_decompose_work_wires_context_manager()
 
@@ -1401,8 +1352,6 @@ def test_decompose_work_wires_alloc_dealloc():
     Test that decomposition with work wires is correctly applied when allocating/deallocating
     explicitly.
     """
-
-    qml.capture.enable()
 
     @decomposition_rule(is_qreg=True, op_type="RY")
     def my_decomp(angle, wires):
@@ -1414,7 +1363,7 @@ def test_decompose_work_wires_alloc_dealloc():
         qml.CNOT((work_wires[1], wires[1]))
         qml.deallocate(work_wires)
 
-    @qml.qjit
+    @qml.qjit(capture=True)
     @qml.transform(pass_name="decompose-lowering")
     @qml.qnode(qml.device("lightning.qubit", wires=3))
     def my_circuit(angle: float):
@@ -1423,7 +1372,7 @@ def test_decompose_work_wires_alloc_dealloc():
         return qml.probs()
 
     # check that decomp arrives properly
-    # CHECK: func.func public @my_decomp({{.*}}) -> !quantum.reg attributes {{{.*}} target_gate = "RY"}
+    # CHECK-LABEL: @my_decomp({{.*}}) -> !quantum.reg attributes {{{.*}} target_gate = "RY"}
     print(my_circuit.mlir)
 
     # check that the decomposition applies properly
@@ -1442,16 +1391,12 @@ def test_decompose_work_wires_alloc_dealloc():
     # CHECK: release
     print(my_circuit.mlir_opt)
 
-    qml.capture.disable()
-
 
 test_decompose_work_wires_alloc_dealloc()
 
 
 def test_decompose_work_wires_control_flow():
     """Test that decomposition with work wires + control flow is correctly applied."""
-
-    qml.capture.enable()
 
     @decomposition_rule(is_qreg=True, op_type="CRX")
     def my_decomp(angle, wires, **_):
@@ -1473,7 +1418,7 @@ def test_decompose_work_wires_control_flow():
 
         qml.cond(angle > 1.2, true_func, false_func)()
 
-    @qml.qjit
+    @qml.qjit(capture=True)
     @qml.transform(pass_name="decompose-lowering")
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def circuit():
@@ -1515,8 +1460,6 @@ def test_decompose_work_wires_control_flow():
 
     print(circuit.mlir_opt)
 
-    qml.capture.disable()
-
 
 test_decompose_work_wires_control_flow()
 
@@ -1524,7 +1467,6 @@ test_decompose_work_wires_control_flow()
 def test_decompose_work_wires_with_decompose_transform():
     """Test that work wires are correctly lowered and decomposed by the decompose transform."""
 
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
     @qml.register_resources({qml.X: 1, qml.Z: 1})
@@ -1534,7 +1476,7 @@ def test_decompose_work_wires_with_decompose_transform():
             qml.Z(wire)
             qml.X(work_wire)
 
-    @qjit
+    @qjit(capture=True)
     @partial(
         qml.transforms.decompose,
         gate_set={
@@ -1564,7 +1506,6 @@ def test_decompose_work_wires_with_decompose_transform():
     print(my_circuit.mlir_opt)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 test_decompose_work_wires_with_decompose_transform()
@@ -1574,7 +1515,6 @@ def test_num_work_wires():
     """Test that num_work_wires can be passed and is correctly used in solving the graph."""
 
     qml.decomposition.enable_graph()
-    qml.capture.enable()
 
     @qml.register_resources(
         {qml.CNOT: 3, qml.H: 1, qml.X: 1, qml.ops.op_math.Conditional: 2},
@@ -1604,7 +1544,7 @@ def test_num_work_wires():
 
         qml.cond(angle > 1.2, true_func, false_func)()
 
-    @qml.qjit
+    @qml.qjit(capture=True)
     @partial(
         qml.transforms.decompose,
         gate_set={qml.CNOT, qml.H, qml.X, "Conditional", "MidMeasure"},
@@ -1635,7 +1575,6 @@ def test_num_work_wires():
     print(circuit.mlir_opt)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 test_num_work_wires()
@@ -1643,11 +1582,10 @@ test_num_work_wires()
 
 def test_default_decomps():
     """Test that default decompositions are correctly applied with qjit."""
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
     # Toffoli's decomposition to this gateset includes a wire allocation
-    @qml.qjit(target="mlir")
+    @qml.qjit(target="mlir", capture=True)
     @partial(
         qml.transforms.decompose,
         gate_set={qml.ops.ChangeOpBasis},
@@ -1664,13 +1602,226 @@ def test_default_decomps():
     # two allocates/releases, for default register + work wires
     # CHECK: allocate
     # CHECK: allocate
-    # CHECK: ChangeOpBasis
+    # CHECK: TemporaryAND
     # CHECK: release
     # CHECK: release
     print(circuit.mlir_opt)
 
     qml.decomposition.disable_graph()
-    qml.capture.disable()
 
 
 test_default_decomps()
+
+
+def test_graph_decomp_registered():
+    """Test that the `graph_decomposition` pass is registered correctly."""
+
+    @qjit(target="mlir", capture=True)
+    # CHECK: transform.apply_registered_pass "graph-decomposition"
+    @graph_decomposition(gate_set={qml.RX})
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def catalyst_circuit():
+        return
+
+    print(catalyst_circuit.mlir)
+
+    my_transform = qml.transform(pass_name="graph-decomposition")
+
+    @qjit(target="mlir", capture=True)
+    # CHECK: transform.apply_registered_pass "graph-decomposition"
+    @my_transform(gate_set=["RX"])
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def pennylane_circuit():
+        return
+
+    print(pennylane_circuit.mlir)
+
+
+test_graph_decomp_registered()
+
+
+def test_cpp_decomp_args():
+    """Test that the `graph_decomposition` pass lowers arguments to mlir correctly."""
+
+    def x_to_rx(wire):
+        qml.RX(np.pi, wire)
+
+    def y_to_ry(wire):
+        qml.RY(np.pi, wire)
+
+    def h_to_rx_ry(wire):
+        qml.RX(np.pi / 2, wire)
+        qml.RY(np.pi / 2, wire)
+
+    @qjit(target="mlir")
+    # CHECK: "graph-decomposition" with options = {
+    # CHECK-DAG: "gate-set" = {Hadamard = 1.000000e+00 : f64, RX = 1.000000e+00 : f64, RY = 1.000000e+00 : f64}
+    # CHECK-DAG: "fixed-decomps" = {PauliX = "x_to_rx", PauliY = "y_to_ry"}
+    # CHECK-DAG: "alt-decomps" = {Hadamard = ["h_to_rx_ry"]}
+    # CHECK-DAG: "bytecode-rules" = "/decomp_rules.mlirbc"
+    # CHECK: } to {{%.+}} : (!transform.op<"builtin.module">)
+    @graph_decomposition(
+        gate_set={qml.RX, qml.H, qml.RY},
+        fixed_decomps={qml.X: x_to_rx, qml.Y: y_to_ry},
+        alt_decomps={qml.H: [h_to_rx_ry]},
+        _builtin_rule_path="/decomp_rules.mlirbc",
+    )
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def circuit():
+        return
+
+    print(circuit.mlir)
+
+
+test_cpp_decomp_args()
+
+
+def test_cpp_decomp_empty_args():
+    """
+    Test that the `graph_decomposition` pass correctly handled arg lowering when no values are
+    supplied.
+    """
+
+    @qjit(target="mlir", capture=True)
+    # CHECK: transform.apply_registered_pass "graph-decomposition"
+    # CHECK-NOT: fixed-decomps
+    # CHECK-NOT: alt-decomps
+    # CHECK: "bytecode-rules" = "{{.*}}/decomposition_rules{{.*}}.mlirbc"
+    @graph_decomposition(gate_set={qml.RX})
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
+        return
+
+    print(circuit.mlir)
+
+    @qjit(target="mlir", capture=True)
+    # CHECK: transform.apply_registered_pass "graph-decomposition"
+    # CHECK-NOT: fixed-decomps
+    # CHECK-NOT: alt-decomps
+    # CHECK: "bytecode-rules" = "{{.*}}/decomposition_rules{{.*}}.mlirbc"
+    @graph_decomposition(gate_set={qml.RX}, fixed_decomps={}, alt_decomps={})
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit2():
+        return
+
+    print(circuit2.mlir)
+
+
+test_cpp_decomp_empty_args()
+
+
+def test_cpp_decomp_string_op_names():
+    """Test that cpp decomp args work with string op names."""
+
+    def y_to_xz(wires):
+        qml.RX(np.pi, wires)
+        qml.RZ(np.pi, wires)
+
+    @qjit(target="mlir", capture=True)
+    # CHECK: transform.apply_registered_pass "graph-decomposition" with options = {
+    # CHECK-DAG: "fixed-decomps" = {PauliX = "{{.*}}", PauliZ = "{{.*}}"}
+    # CHECK-DAG: "alt-decomps" = {PauliY = ["{{.*}}", "y_to_xz"]}
+    # CHECK: } to {{%.+}} : (!transform.op<"builtin.module">)
+    @graph_decomposition(
+        gate_set={"RX", "RY", "RZ"},
+        fixed_decomps={
+            "X": lambda wires: qml.RX(np.pi, wires),
+            "PauliZ": lambda wires: qml.RZ(np.pi, wires),
+        },
+        alt_decomps={
+            "PauliY": [
+                lambda wires: qml.RY(np.pi, wires),
+                y_to_xz,
+            ]
+        },
+    )
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def circuit():
+        return
+
+    print(circuit.mlir)
+
+
+test_cpp_decomp_string_op_names()
+
+
+def test_cpp_decomp_builtin_rules():
+    """Test that cpp decomp applies builtin rules."""
+
+    @qjit(target="mlir", capture=True)
+    @graph_decomposition(
+        gate_set={qml.RX, qml.RY, qml.RZ, qml.GlobalPhase},
+    )
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def circuit():
+        # CHECK-NOT: PauliX
+        # CHECK-NOT: PauliY
+        # CHECK-NOT: PauliZ
+        # CHECK-DAG: RX
+        # CHECK-DAG: RY
+        # CHECK-DAG: RZ
+        qml.X(0)
+        qml.Y(1)
+        qml.Z(0)
+        return qml.probs()
+
+    print(circuit.mlir_opt)
+
+
+test_cpp_decomp_builtin_rules()
+
+
+def test_cpp_decomp_user_rules():
+    """Test that cpp decomp applies user rules."""
+
+    @decomposition_rule(is_qreg=True, op_type="PauliY")
+    def y_to_rx(wire):
+        qml.RX(np.pi, wire)
+
+    @decomposition_rule(is_qreg=True, op_type="PauliZ")
+    def z_to_rx(wire):
+        qml.RX(np.pi, wire)
+
+    @qml.qjit(target="mlir", capture=True)
+    @graph_decomposition(
+        gate_set={qml.RX}, fixed_decomps={qml.Y: y_to_rx}, alt_decomps={qml.Z: [z_to_rx]}
+    )
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circuit():
+        y_to_rx(jax.core.ShapedArray((1,), int))
+        z_to_rx(jax.core.ShapedArray((1,), int))
+        # CHECK-NOT: PauliY
+        # CHECK-NOT: PauliZ
+        # CHECK: RX
+        # CHECK: RX
+        # CHECK: return
+        qml.Y(0)
+        qml.Z(0)
+        return qml.probs()
+
+    print(circuit.mlir_opt)
+
+
+test_cpp_decomp_user_rules()
+
+
+def test_cpp_decomp_user_rule_cleanup():
+    """Test that user rules do not pollute the IR after the quantum compilation stage."""
+
+    @decomposition_rule(is_qreg=True, op_type="PauliX")
+    def x_to_h(wire):
+        return qml.H(wire)
+
+    @qjit(capture=True)
+    @graph_decomposition(gate_set={qml.H}, fixed_decomps={qml.X: x_to_h})
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def circuit():
+        # CHECK-NOT: PauliX
+        # CHECK-NOT: x_to_h
+        x_to_h(jax.core.ShapedArray((1,), int))
+        qml.X(0)
+
+    print(circuit.mlir_opt)
+
+
+test_cpp_decomp_user_rule_cleanup()

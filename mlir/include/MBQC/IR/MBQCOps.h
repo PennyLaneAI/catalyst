@@ -14,9 +14,8 @@
 
 #pragma once
 
-#include "Quantum/IR/QuantumDialect.h"
-
 #include "MBQC/IR/MBQCDialect.h"
+#include "Quantum/IR/QuantumDialect.h"
 
 //===----------------------------------------------------------------------===//
 // MBQC ops declarations.

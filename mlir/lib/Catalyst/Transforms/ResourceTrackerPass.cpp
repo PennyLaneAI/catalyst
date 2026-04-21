@@ -19,7 +19,6 @@
 #include <string>
 
 #include "llvm/Support/JSON.h"
-
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"

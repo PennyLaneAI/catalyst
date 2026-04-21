@@ -14,10 +14,10 @@
 
 #define DEBUG_TYPE "decompose-clifford-ppr"
 
-#include <mlir/Dialect/Arith/IR/Arith.h> // for arith::XOrIOp and arith::ConstantOp
-#include <mlir/Dialect/SCF/IR/SCF.h>
-#include <mlir/IR/Builders.h>
-#include <mlir/IR/Value.h>
+#include "mlir/Dialect/Arith/IR/Arith.h" // for arith::XOrIOp and arith::ConstantOp
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/Value.h"
 
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Transforms/PPRDecomposeUtils.h"
@@ -57,8 +57,7 @@ SmallVector<Value> emitPiOverFourDecomposition(bool avoidPauliYMeasure, PPRotati
     // Initialize |0⟩ (zero) or Fabricate |Y⟩ (plus_i)
     auto axillaryQubit = initializeZeroOrPlusI(avoidPauliYMeasure, loc, rewriter);
 
-    auto [pauliForAxillaryQubit, rotationSign] =
-        determinePauliAndRotationSignOfMeasurement(avoidPauliYMeasure);
+    auto [pauliForAxillaryQubit, negated] = determinePauliAndSignOfMeasurement(avoidPauliYMeasure);
 
     // Extract qubits and insert axillary qubit
     SmallVector<Value> m1InQubits = op.getInQubits();
@@ -68,13 +67,12 @@ SmallVector<Value> emitPiOverFourDecomposition(bool avoidPauliYMeasure, PPRotati
     SmallVector<StringRef> pauliP = extractPauliString(op);
     pauliP.emplace_back(pauliForAxillaryQubit);
 
-    int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
-    if (rotationKind < 0) {
-        // flip rotation sign
-        rotationSign = -rotationSign;
+    if (op.getRotationKind() < 0) {
+        // flip the measurement sign
+        negated = !negated;
     }
 
-    auto ppmPZ = PPMeasurementOp::create(rewriter, loc, pauliP, rotationSign, m1InQubits);
+    auto ppmPZ = PPMeasurementOp::create(rewriter, loc, pauliP, m1InQubits, negated);
 
     SmallVector<StringRef> pauliX = {"X"};
     auto ppmX = PPMeasurementOp::create(rewriter, loc, pauliX, ppmPZ.getOutQubits().back());
@@ -87,7 +85,7 @@ SmallVector<Value> emitPiOverFourDecomposition(bool avoidPauliYMeasure, PPRotati
     outPZQubits.pop_back();
     pauliP.pop_back();
 
-    const uint16_t PI_DENOMINATOR = 2; // For rotation of P(PI/2)
+    const int8_t PI_DENOMINATOR = 2; // For rotation of P(PI/2)
     auto pprPI2 =
         PPRotationOp::create(rewriter, loc, pauliP, PI_DENOMINATOR, outPZQubits, cond.getResult());
 

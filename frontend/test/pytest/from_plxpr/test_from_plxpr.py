@@ -19,19 +19,18 @@ import jax
 import numpy as np
 import pennylane as qml
 import pytest
+from pennylane.capture.primitives import for_loop_prim, while_loop_prim
 
 import catalyst
 from catalyst import qjit
 from catalyst.from_plxpr import from_plxpr
 from catalyst.jax_primitives import (
     adjoint_p,
-    for_p,
     get_call_jaxpr,
     qalloc_p,
     qextract_p,
     qinsert_p,
     qinst_p,
-    while_p,
 )
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
@@ -61,9 +60,7 @@ def compare_call_jaxprs(jaxpr1, jaxpr2, skip_eqns=(), ignore_order=False):
         assert inv1.aval == inv2.aval, f"{inv1.aval}, {inv2.aval}"
     for ov1, ov2 in zip(jaxpr1.outvars, jaxpr2.outvars):
         assert ov1.aval == ov2.aval
-    assert len(jaxpr1.eqns) == len(
-        jaxpr2.eqns
-    ), f"""
+    assert len(jaxpr1.eqns) == len(jaxpr2.eqns), f"""
     Number of equations differ: {len(jaxpr1.eqns)} vs {len(jaxpr2.eqns)},
     {jaxpr1.eqns} vs {jaxpr2.eqns}
     """
@@ -807,7 +804,7 @@ class TestAdjointCtrl:
         catalyst_xpr = from_plxpr(plxpr)()
 
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
-        for_loop_xpr = qfunc_xpr.eqns[2].params["body_jaxpr"]
+        for_loop_xpr = qfunc_xpr.eqns[2].params["jaxpr_body_fn"]
 
         for i in [0, 1, 2]:
             assert for_loop_xpr.eqns[i].primitive == qextract_p
@@ -848,16 +845,21 @@ class TestControlFlow:
 
         print(catalyst_jaxpr)
 
-        assert eqn.primitive == for_p
-        assert eqn.params["apply_reverse_transform"] == reverse
-        assert eqn.params["body_nconsts"] == 0
-        assert eqn.params["num_implicit_inputs"] == 0
-        assert eqn.params["preserve_dimensions"] is True
+        assert eqn.primitive == for_loop_prim
+        assert eqn.params["abstract_shapes_slice"] == (0, 0, 1)
+        assert eqn.params["args_slice"] == (0, 1, 1)
+        assert eqn.params["consts_slice"] == (0, 0, 1)
 
-        assert eqn.invars[0].val == start
-        assert eqn.invars[1].val == stop
-        assert eqn.invars[2].val == step
-        assert eqn.invars[3].val == start
+        assert len(eqn.params["jaxpr_body_fn"].eqns) == 3 if reverse else 1
+
+        if reverse:
+            assert eqn.invars[0].val == 0
+            assert eqn.invars[1].val == 3
+            assert eqn.invars[2].val == 1
+        else:
+            assert eqn.invars[0].val == start
+            assert eqn.invars[1].val == stop
+            assert eqn.invars[2].val == step
 
     def test_while_loop_outside_qnode(self):
         """Test that a while loop outside a qnode can be translated."""
@@ -878,18 +880,15 @@ class TestControlFlow:
         plxpr = jax.make_jaxpr(f)(x)
         catalyst_xpr = from_plxpr(plxpr)(x)
 
-        assert catalyst_xpr.eqns[0].primitive == while_p
-        assert catalyst_xpr.eqns[0].params["body_nconsts"] == 1
-        assert catalyst_xpr.eqns[0].params["cond_nconsts"] == 1
-        assert catalyst_xpr.eqns[0].params["num_implicit_inputs"] == 0
-        assert catalyst_xpr.eqns[0].params["preserve_dimensions"] == True
+        eqn = catalyst_xpr.eqns[0]
 
-        for kind in ["body_jaxpr", "cond_jaxpr"]:
-            xpr = catalyst_xpr.eqns[0].params[kind]
-            assert isinstance(xpr, jax.extend.core.ClosedJaxpr)
-            assert len(xpr.consts) == 0
-            assert len(xpr.jaxpr.invars) == 2
-            assert len(xpr.jaxpr.outvars) == 1
+        assert eqn.primitive == while_loop_prim
+        assert eqn.params["args_slice"] == (2, None, None)
+        assert eqn.params["body_slice"] == (0, 1, None)
+        assert eqn.params["cond_slice"] == (1, 2, None)
+
+        assert eqn.params["jaxpr_body_fn"].eqns[0].primitive.name == "add"
+        assert eqn.params["jaxpr_cond_fn"].eqns[-1].primitive.name == "lt"
 
 
 class TestHybridPrograms:
