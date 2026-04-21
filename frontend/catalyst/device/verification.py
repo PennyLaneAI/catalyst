@@ -43,7 +43,7 @@ from pennylane.ops import (
 )
 from pennylane.tape import QuantumTape
 
-from catalyst.api_extensions import Cond, ForLoop, HybridAdjoint, HybridCtrl, WhileLoop
+from catalyst.api_extensions import Cond, ForLoop, HybridAdjoint, HybridCtrl, Switch, WhileLoop
 from catalyst.device.op_support import (
     EMPTY_PROPERTIES,
     is_active,
@@ -180,7 +180,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
             _inv_op_checker(op.base, in_inverse)
             return in_inverse
         # Exclude control flow ops we always know how to invert
-        if type(op) in (Cond, ForLoop, WhileLoop):
+        if type(op) in (Cond, ForLoop, WhileLoop, Switch):
             return in_inverse
         # Early exit when not in inverse, only determine the inverse status for recursing later.
         elif not in_inverse:

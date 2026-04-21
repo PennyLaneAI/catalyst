@@ -99,11 +99,7 @@ if (
 ):  # pragma: no cover
     BYTECODE_FILE_PATH.parent.mkdir(exist_ok=True)
     for file in BYTECODE_FILE_PATH.parent.iterdir():
-        if (
-            file.is_file()
-            and file.name.startswith("decomposition_rules")
-            and not file.name == BYTECODE_FILE_PATH.name
-        ):
+        if file.is_file() and file.name.startswith("decomposition_rules"):
             file.unlink()
 
     precompile_decomp_rules()  # pragma: no cover
