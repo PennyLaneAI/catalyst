@@ -587,6 +587,11 @@
   which would previously raise an error. Adjoint on functions is unaffected.
   [(#2667)](https://github.com/PennyLaneAI/catalyst/pull/2667)
 
+* The adjoint lowering pass now supports `switch` operation as well. Previously, using
+  `qp.adjoint` on a circuit containing a `switch` would raise a `CompileError`. The MLIR
+  `--adjoint-lowering` pass has been updated to support this usage.
+  [(#2691)](https://github.com/PennyLaneAI/catalyst/pull/2691)
+
 * Fix a bug with the xDSL `ParitySynth` pass that caused failure when the QNode being transformed
   contained operations with regions.
   [(#2408)](https://github.com/PennyLaneAI/catalyst/pull/2408)
@@ -1008,6 +1013,10 @@
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
+
+* Python `dataclass` objects can now be converted to MLIR dictionary attributes, allowing them to be
+  used as xDSL pass options, for example.
+  [(#2719)](https://github.com/PennyLaneAI/catalyst/pull/2719)
 
 <h3>Documentation 📝</h3>
 
