@@ -298,6 +298,9 @@
   PennyLane's built-in decompositon rules are pre-compiled to MLIR bytecode and
   is utilized in this new framework to enable fast rule loading at compile time.
   [(#2552)](https://github.com/PennyLaneAI/catalyst/pull/2552)
+  [(#2568)](https://github.com/PennyLaneAI/catalyst/pull/2568)
+  [(#2578)](https://github.com/PennyLaneAI/catalyst/pull/2578)
+  [(#2711)](https://github.com/PennyLaneAI/catalyst/pull/2711)
 
   The framework is interfaced with a new `graph_decomposition` pass decorator
   with key capabilities:
@@ -366,8 +369,9 @@
 
 <h3>Improvements 🛠</h3>
 
-* `qml.for_loop` now supports dynamic shapes with program capture `qjit(capture=True)`.
+* `qml.for_loop` and `qml.while_loop` now support dynamic shapes with program capture `qjit(capture=True)`.
   [(#2603)](https://github.com/PennyLaneAI/catalyst/pull/2603/)
+  [(#2651)](https://github.com/PennyLaneAI/catalyst/pull/2651)
 
 * Added support for ``StatePrep`` kwargs ``pad_with`` and ``normalize`` with program capture enabled.
   [(#2620)](https://github.com/PennyLaneAI/catalyst/pull/2620)
@@ -479,7 +483,10 @@
 
 * A more informative error message is now raised when a `measurements-from-samples` xDSL pass encounters a
   program with dyanamic shots.
-  [#2616](https://github.com/PennyLaneAI/catalyst/pull/2616)
+  [(#2616)](https://github.com/PennyLaneAI/catalyst/pull/2616)
+
+* The `measurements-from-samples` xDSL pass is extended to support tensor product observables.
+  [(#2656)](https://github.com/PennyLaneAI/catalyst/pull/2656)
 
 <h3>Breaking changes 💔</h3>
 
@@ -576,6 +583,11 @@
   which would previously raise an error. Adjoint on functions is unaffected.
   [(#2667)](https://github.com/PennyLaneAI/catalyst/pull/2667)
 
+* The adjoint lowering pass now supports `switch` operation as well. Previously, using
+  `qp.adjoint` on a circuit containing a `switch` would raise a `CompileError`. The MLIR
+  `--adjoint-lowering` pass has been updated to support this usage.
+  [(#2691)](https://github.com/PennyLaneAI/catalyst/pull/2691)
+
 * Fix a bug with the xDSL `ParitySynth` pass that caused failure when the QNode being transformed
   contained operations with regions.
   [(#2408)](https://github.com/PennyLaneAI/catalyst/pull/2408)
@@ -625,9 +637,12 @@
   at runtime.
   [(#2259)](https://github.com/PennyLaneAI/catalyst/pull/2259)
 
+* Additional integration tests have been added for the pass-by-pass version of `qp.specs`.
+  [(#2690)](https://github.com/PennyLaneAI/catalyst/pull/2690/)
+
 * Removes unnessary registrations for the various gradient primitives in `from_plxpr` when we
   are able to just inherit the base behaviour from `PlxprInterpreter`.
-  [(#2706)](https://github.com/PennyLaneAI/catalyst/pull/2706/)
+  [(#2706)](https://github.com/PennyLaneAI/catalyst/pull/2706)
 
 * The legacy frontend no longer registers `qml.allocate()` and `qml.deallocate()` onto the qjit device
   capabilities, since dynamic qubit allocation is only implemented for the capture frontend.
