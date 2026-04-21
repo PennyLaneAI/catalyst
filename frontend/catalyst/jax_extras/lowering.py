@@ -209,7 +209,7 @@ def get_mlir_attribute_from_pyval(value):
                 attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64), value)
             else:
                 raise CompileError(textwrap.dedent("""
-                    Large interger attributes currently not supported in MLIR,
+                    Large integer attributes currently not supported in MLIR,
                     see https://github.com/llvm/llvm-project/issues/128072
                     """))
 
