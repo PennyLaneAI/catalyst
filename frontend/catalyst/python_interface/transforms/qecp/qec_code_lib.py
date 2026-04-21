@@ -14,10 +14,30 @@
 
 """This module contains a library of QEC codes."""
 
+import numpy as np
+
 from dataclasses import dataclass
 
 _CODE_REGISTRY: dict[str, tuple[int, int, int]] = {
-    "Steane": (7, 1, 3),
+    "Steane": (
+        7, 
+        1, 
+        3, 
+        np.array(
+            [
+                [1, 1, 1, 1, 0, 0, 0], 
+                [0, 1, 1, 0, 1, 1, 0], 
+                [0, 0, 1, 1, 0, 1, 1]
+            ]
+        ), 
+        np.array(
+            [
+                [1, 1, 1, 1, 0, 0, 0], 
+                [0, 1, 1, 0, 1, 1, 0], 
+                [0, 0, 1, 1, 0, 1, 1]
+            ]
+        ),
+    ),
 }
 
 
@@ -36,6 +56,11 @@ class QecCode:
     n: int
     k: int
     d: int
+    x_tanner: np.ndarray
+    z_tanner: np.ndarray
+
+    def __repr__(self):
+        return f"QecCode(name='{self.name}', n={self.n}, k={self.k}, d={self.d})"
 
     @staticmethod
     def get(name: str) -> "QecCode":
