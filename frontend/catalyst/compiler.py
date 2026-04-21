@@ -90,7 +90,8 @@ class LinkerDriver:
         # Adds RUNTIME_LIB_DIR to the Python system path to allow the catalyst_callback_registry
         # to be importable.
         sys.path.append(rt_lib_path)
-        import catalyst_callback_registry as registry  # pylint: disable=import-outside-toplevel
+        # pylint: disable=import-outside-toplevel
+        import catalyst_callback_registry as registry  # type: ignore[import-not-found]
 
         # We use MLIR's C runner utils library in the registry.
         # In order to be able to dlopen that library we need to know the path
