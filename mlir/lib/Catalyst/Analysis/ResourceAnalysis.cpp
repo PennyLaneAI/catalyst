@@ -25,7 +25,6 @@
 
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "Catalyst/Utils/ConstantResolve.h"
-
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
