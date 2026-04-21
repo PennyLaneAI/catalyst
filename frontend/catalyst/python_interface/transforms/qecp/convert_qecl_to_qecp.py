@@ -88,6 +88,18 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     qec_code: QecCode
 
+    def __post_init__(self):
+        # This method handles the case where `qec_code` is given as a dictionary rather than a
+        # `QecCode` object. This is possible when the pass is registered in the IR and applied via
+        # the `transform.apply_registered_pass` op, in which case the QecCode pass option is
+        # represented as a dictionary attribute. Converting it from this dictionary attribute back
+        # to a QecCode object allows for regular usage of this variable.
+        if isinstance(self.qec_code, dict):
+            # Because the class is frozen, we cannot assign to self.qec_code directly.
+            # We use object.__setattr__ to bypass the frozen restriction.
+            new_code = QecCode.from_dict(self.qec_code)
+            object.__setattr__(self, "qec_code", new_code)
+
     # pylint: disable=unused-argument
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         """Apply the convert-qecl-to-qecp pass."""

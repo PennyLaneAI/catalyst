@@ -36,6 +36,22 @@ class TestQecCode:
         assert qec_code.k == k
         assert qec_code.d == d
 
+    @pytest.mark.parametrize(
+        "data",
+        [
+            {"name": "Steane", "n": 7, "k": 1, "d": 3},
+            {"name": "Shor", "n": 9, "k": 1, "d": 3},
+            {"name": "Unknown", "n": 7, "k": 1, "d": 3, "extra-field": 42},
+        ],
+    )
+    def test_from_dict(self, data: dict):
+        qec_code = QecCode.from_dict(data)
+
+        assert qec_code.name == data["name"]
+        assert qec_code.n == data["n"]
+        assert qec_code.k == data["k"]
+        assert qec_code.d == data["d"]
+
     @pytest.mark.parametrize("name", SUPPORTED_CODES)
     def test_get(self, name: str):
         """Test the `QecCode.get()` method for all supported QEC codes."""
