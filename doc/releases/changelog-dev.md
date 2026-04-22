@@ -636,6 +636,7 @@
   nanobind extension module. This module is built during the MLIR compilation phase and discovered
   at runtime.
   [(#2259)](https://github.com/PennyLaneAI/catalyst/pull/2259)
+  [(#2733)](https://github.com/PennyLaneAI/catalyst/pull/2733)
 
 * Additional integration tests have been added for the pass-by-pass version of `qp.specs`.
   [(#2690)](https://github.com/PennyLaneAI/catalyst/pull/2690/)
@@ -1016,6 +1017,7 @@
 * A new, experimental compiler pass `convert-qecl-to-qecp` has been added to lower operations
   from the QEC Logical (`qecl`) dialect into the QEC Physical (`qecp`) dialect.
   [(#2697)](https://github.com/PennyLaneAI/catalyst/pull/2697)
+  [(#2714)](https://github.com/PennyLaneAI/catalyst/pull/2714)
   [(#2716)](https://github.com/PennyLaneAI/catalyst/pull/2716)
   [(#2731)](https://github.com/PennyLaneAI/catalyst/pull/2731)
 
