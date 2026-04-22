@@ -280,9 +280,7 @@ def _qref_qinst_abstract_eval(
     qubits = qubits_or_params[:qubits_len]
     ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
     all_qubits = qubits + ctrl_qubits
-    for idx in range(qubits_len + ctrl_len):
-        qubit = all_qubits[idx]
-        assert isinstance(qubit, QrefQubit)
+    assert all(isinstance(qubit, QrefQubit) for qubit in all_qubits[: qubits_len + ctrl_len])
     return ()
 
 
@@ -377,9 +375,7 @@ def _qref_gphase_abstract_eval(*qubits_or_params, ctrl_len=0, adjoint=False):
     param = qubits_or_params[0]
     assert not isinstance(param, QrefQubit)
     ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
-    for idx in range(ctrl_len):
-        qubit = ctrl_qubits[idx]
-        assert isinstance(qubit, QrefQubit)
+    assert all(isinstance(qubit, QrefQubit) for qubit in ctrl_qubits[:ctrl_len])
     return ()
 
 
@@ -400,10 +396,9 @@ def _qref_gphase_lowering(
         param.type
     ), "Only scalar double parameters are allowed for quantum gates!"
 
-    ctrl_values_i1 = []
-    for v in ctrl_values:
-        p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
-        ctrl_values_i1.append(p)
+    ctrl_values_i1 = [
+        TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result for v in ctrl_values
+    ]
 
     GlobalPhaseOp(
         angle=param,
@@ -471,10 +466,9 @@ def _qref_pauli_rot_lowering(
 
     pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
 
-    ctrl_values_i1 = []
-    for v in ctrl_values:
-        p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
-        ctrl_values_i1.append(p)
+    ctrl_values_i1 = [
+        TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result for v in ctrl_values
+    ]
 
     PauliRotOp(
         angle=angle,
@@ -493,9 +487,7 @@ def _qref_pauli_rot_lowering(
 #
 @qref_unitary_p.def_abstract_eval
 def _qref_unitary_abstract_eval(matrix, *qubits, qubits_len=0, ctrl_len=0, adjoint=False):
-    for idx in range(qubits_len + ctrl_len):
-        qubit = qubits[idx]
-        assert isinstance(qubit, QrefQubit)
+    assert all(isinstance(qubit, QrefQubit) for qubit in qubits[: qubits_len + ctrl_len])
     return ()
 
 
@@ -542,10 +534,9 @@ def _qref_unitary_lowering(
         tensor_complex_f64_type = ir.RankedTensorType.get(shape, complex_f64_type)
         matrix = StableHLOConvertOp(tensor_complex_f64_type, matrix).result
 
-    ctrl_values_i1 = []
-    for v in ctrl_values:
-        p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
-        ctrl_values_i1.append(p)
+    ctrl_values_i1 = [
+        TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result for v in ctrl_values
+    ]
 
     QubitUnitaryOp(
         matrix=matrix,

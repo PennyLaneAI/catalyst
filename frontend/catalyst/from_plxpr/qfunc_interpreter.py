@@ -64,7 +64,6 @@ from catalyst.jax_primitives import (
     hamiltonian_p,
     mcmobs_p,
     measure_in_basis_p,
-    measure_p,
     pauli_measure_p,
     probs_p,
     qinst_p,
