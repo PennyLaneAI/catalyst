@@ -47,6 +47,8 @@ from .qec_code_lib import QecCode
 
 
 class CheckType(StrEnum):
+    """Check types for QEC codes. Currently limited to CSS codes (X and Z checks)."""
+
     X = "X"
     Z = "Z"
 
@@ -106,12 +108,14 @@ class EncodeOpConversion(RewritePattern):
 
         if not op.init_state.data == "zero":
             raise NotImplementedError(
-                "Lowering qecl.EncodeOp to the qecp dialect is only implemented for init_state 'zero'"
+                "Lowering qecl.EncodeOp to the qecp dialect is only implemented "
+                "for init_state 'zero'"
             )
 
         if (k := op.in_codeblock.type.k.value.data) != self.qec_code.k:
             raise CompileError(
-                f"Circuit expressed in the qecl dialect with k={k} is not compatible with lowering to a code with k={self.qec_code.k}"
+                f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
+                f"lowering to a code with k={self.qec_code.k}"
             )
 
         callee = builtin.SymbolRefAttr(self.encode_subroutine.sym_name)
@@ -208,7 +212,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             # ToDo: should we also be applying the Z corrections?
 
             # deallocate the auxiliary qubits
-            dealloc_ops = [qecp.DeallocAuxQubitOp(meas_op.results[1]) for meas_op in measure_ops]
+            for meas_op in measure_ops:
+                qecp.DeallocAuxQubitOp(meas_op.results[1])
 
             # return the encoded codeblock
             func.ReturnOp(encoded_codeblock)
