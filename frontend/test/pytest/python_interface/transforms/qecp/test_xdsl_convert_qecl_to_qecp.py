@@ -34,6 +34,17 @@ from catalyst.utils.exceptions import CompileError
 pytestmark = pytest.mark.xdsl
 
 
+@pytest.fixture(name="qecl_to_qecp_steane_pipeline", scope="module")
+def fixture_qecl_to_qecp_steane_pipeline():
+    """Fixture that returns the compilation pipeline containing the convert-qecl-to-qecp pass that
+    uses the Steane code for lowering.
+    """
+    return (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
+
+
+# MARK: TestTypeConversionPattern
+
+
 class TestTypeConversionPattern:
     """Unit tests for the type conversion patterns of the convert-qecl-to-qecp pass."""
 
@@ -121,6 +132,54 @@ class TestTypeConversionPattern:
 
         with pytest.raises(CompileError, match="Failed to convert type"):
             run_filecheck(program, pipeline)
+
+
+# MARK: TestMeasurePattern
+
+
+class TestMeasurePattern:
+    """Unit tests for the `measure` pattern of the convert-qecl-to-qecp pass."""
+
+    def test_measure(self, run_filecheck, qecl_to_qecp_steane_pipeline):
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_program
+        func.func @test_program() {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+
+            // CHECK: [[mresp:%.+]], [[cb1:%.+]] = func.call @measure_transversal_Steane([[cb0]]) : ({{.*}}) -> (tensor<7xi1>, !qecp.codeblock<1 x 7>)
+            // CHECK: [[mresl:%.+]] = qecp.decode_physical_meas [[mresp]] : tensor<7xi1> -> tensor<1xi1>
+            // CHECK: [[zero:%.+]] = arith.constant 0 : index
+            // CHECK: [[mres0:%.+]] = tensor.extract [[mresl]][[[zero]]] : tensor<1xi1>
+            %mres0, %1 = qecl.measure %0[0] : i1, !qecl.codeblock<1>
+
+            // CHECK: [[mres1:%.+]] = "test.op"([[mres0]]) : (i1) -> i1
+            %mres1 = "test.op"(%mres0) : (i1) -> i1  // To prevent DCE
+            %2 = "test.op"(%1) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>  // To prevent DCE
+            return
+        }
+        // CHECK-LABEL: func.func private @measure_transversal_Steane
+        // CHECK-SAME: ([[cb_in:%.+]]: !qecp.codeblock<1 x 7>) -> (tensor<7xi1>, !qecp.codeblock<1 x 7>)
+        // CHECK: [[buffer:%.+]] = memref.alloc() : memref<7xi1>
+        // CHECK: [[c0:%.+]] = arith.constant 0 : index
+        // CHECK: [[c7:%.+]] = arith.constant 7 : index
+        // CHECK: [[c1:%.+]] = arith.constant 1 : index
+        // CHECK: [[cb_out:%.+]] = scf.for [[idx:%.+]] = [[c0]] to [[c7]] step [[c1]] iter_args([[cb0:%.+]] = [[cb_in]]) -> (!qecp.codeblock<1 x 7>) {
+        // CHECK:   [[q0:%.+]] = qecp.extract [[cb0]][[[idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+        // CHECK:   [[mres:%.+]], [[q1:%.+]] = qecp.measure [[q0]] : i1, !qecp.qubit<data>
+        // CHECK:   [[cb1:%.+]] = qecp.insert [[cb0]][[[idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK:   memref.store [[mres]], [[buffer]][[[idx]]] : memref<7xi1>
+        // CHECK:   scf.yield [[cb1]] : !qecp.codeblock<1 x 7>
+        // CHECK: }
+        // CHECK: [[mresp:%.+]] = bufferization.to_tensor [[buffer]] : memref<7xi1> to tensor<7xi1>
+        // CHECK: func.return [[mresp]], [[cb_out]] : tensor<7xi1>, !qecp.codeblock<1 x 7>
+        }
+        """
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
+
+
+# MARK: TestQECLNoiseLoweringPassIntegration
 
 
 # We can remove this xfail and warning filter once `convert_qecl_to_qecp_pass` is complete

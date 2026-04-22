@@ -16,19 +16,34 @@
 
 This module contains the implementation of the xDSL convert-qecl-to-qecp dialect-conversion pass.
 To apply this pass, the QEC code must be know.
+
+Known Limitations
+-----------------
+
+The convert-qecl-to-qecp pass does not support the following cases:
+
+  * QEC codes where the number of logical qubits per codeblock, k, is greater than 1.
 """
 
 from dataclasses import dataclass, field
+from typing import cast
 
+from xdsl.builder import ImplicitBuilder
 from xdsl.context import Context
-from xdsl.dialects import builtin
+from xdsl.dialects import arith, bufferization, builtin, func, memref, scf, tensor
+from xdsl.dialects.builtin import IndexType, SymbolRefAttr, i1
+from xdsl.ir import Block, BlockArgument, OpResult, Region
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
+    PatternRewriter,
     PatternRewriteWalker,
+    RewritePattern,
     TypeConversionPattern,
     attr_type_rewrite_pattern,
+    op_type_rewrite_pattern,
 )
+from xdsl.traits import SymbolTable
 
 from catalyst.python_interface.dialects import qecl, qecp
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
@@ -76,6 +91,68 @@ class HyperRegisterTypeConversion(TypeConversionPattern):
         return qecp.PhysicalHyperRegisterType(typ.width, typ.k, self.qec_code.n)
 
 
+# MARK: Measure Op Pattern
+
+
+@dataclass(frozen=True)
+class MeasureOpConversion(RewritePattern):
+    """Converts `qecl.measure` ops to a call to a subroutine that performs a transversal measurement
+    on the physical codeblock.
+
+    In order to make the corresponding logical measurement outcome(s) of the `qecl.measure` op
+    available for subsequent use, this pattern also inserted a `qecp.decode_physical_meas` op that
+    acts on the results of the transversal measurements and returns the corresponding k logical
+    measurements outcomes.
+
+    While this rewrite pattern may appear as though it supports arbitrary values of k, it is
+    important to note that as implemented, it does not consider the `idx` attribute/operand of the
+    `qecl.measure` op, which indicates the position of the logical qubit within the codeblock to
+    measure. Therefore, for codes with k > 1, it is not possible to perform a measurement that
+    corresponds to a single logical qubit within the codeblock since the measurement is transversal
+    and collapses the entire state of the codeblock.
+    """
+
+    qec_code: QecCode
+
+    measure_subroutine_name: str
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecl.MeasureOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `qecl.measure` ops."""
+
+        k = op.out_codeblock.type.k.value.data
+        n = self.qec_code.n
+
+        # The type-converter should already raise a CompileError if the values of k don't agree;
+        # assert just in case.
+        assert k == self.qec_code.k, (
+            f"Value mismatch: codeblock {op.out_codeblock} has k = {k} but QEC code has "
+            f"k = {self.qec_code.k}"
+        )
+
+        ops_to_insert = (
+            subroutine_call_op := func.CallOp(
+                callee=SymbolRefAttr(self.measure_subroutine_name),
+                arguments=(op.in_codeblock,),
+                return_types=(builtin.TensorType(i1, shape=(n,)), op.in_codeblock.type),
+            ),
+            decode_op := qecp.DecodePhysicalMeasurementOp(
+                physical_measurements=cast(
+                    OpResult[builtin.TensorType], subroutine_call_op.results[0]
+                ),
+                logical_measurements_type=builtin.TensorType(i1, shape=(k,)),
+            ),
+            extract_idx_op := arith.ConstantOp.from_int_and_width(0, IndexType()),
+            tensor_extract_op := tensor.ExtractOp(
+                decode_op.logical_measurements, indices=extract_idx_op.result, result_type=i1
+            ),
+        )
+
+        new_results = (tensor_extract_op.result, subroutine_call_op.results[1])
+
+        rewriter.replace_op(op, ops_to_insert, new_results=new_results)
+
+
 # MARK: Conversion Pass
 
 
@@ -119,14 +196,111 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             n=self.qec_code.n, number_errors=self.number_errors
         ).apply(ctx, op)
 
+        self._insert_required_subroutines_into_module(op)
+
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [
+                    MeasureOpConversion(
+                        qec_code=self.qec_code,
+                        measure_subroutine_name=self._get_measure_subroutine_name(),
+                    ),
                     CodeblockTypeConversion(qec_code=self.qec_code),
                     HyperRegisterTypeConversion(qec_code=self.qec_code),
                 ]
             )
         ).rewrite_module(op)
+
+    def _insert_required_subroutines_into_module(self, module_op: builtin.ModuleOp):
+        """Helper function to insert the subroutines required by the rewrite patterns in this pass."""
+        module_block = module_op.regions[0].blocks.first
+        assert module_block is not None, "Module has no block"
+
+        if SymbolTable.lookup_symbol(module_op, self._get_measure_subroutine_name()) is None:
+            measure_subroutine = self._create_measure_subroutine(
+                qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
+            )
+            module_block.add_op(measure_subroutine)
+
+    def _get_measure_subroutine_name(self):
+        """Return the name (symbol) of the the subroutine that performs the transversal measurement
+        of a physical codeblock.
+        """
+        return f"measure_transversal_{self.qec_code.name}"
+
+    def _create_measure_subroutine(self, codeblock_type: qecp.PhysicalCodeblockType) -> func.FuncOp:
+        """Create the subroutine that performs the transversal measurement of a physical codeblock.
+
+        Note that this method does not insert the subroutine into the module op. Instead it returns
+        the built func.FuncOp object that can then be subsequently inserted where desired.
+        """
+        block = Block(arg_types=(codeblock_type,))
+
+        with ImplicitBuilder(block):
+            # Loop over all physical qubits in the codeblock and measure them.
+            in_codeblock = cast(BlockArgument[qecp.PhysicalCodeblockType], block.args[0])
+            n = in_codeblock.type.n.value.data
+
+            # Allocate a memref buffer to store the individual measurement results
+            memref_alloc_op = memref.AllocOp.get(return_type=i1, shape=(n,))
+            buffer = memref_alloc_op.memref
+
+            # Ops for lower bound, upper bound, and step size.
+            lb_op = arith.ConstantOp.from_int_and_width(0, IndexType())
+            ub_op = arith.ConstantOp.from_int_and_width(n, IndexType())
+            step_op = arith.ConstantOp.from_int_and_width(1, IndexType())
+
+            for_body = Block(
+                [],
+                arg_types=(builtin.IndexType(), in_codeblock.type),
+            )
+
+            for_each_qubit_op = scf.ForOp(
+                lb=lb_op,
+                ub=ub_op,
+                step=step_op,
+                iter_args=(in_codeblock,),
+                body=for_body,
+            )
+
+            # Build the body of the for loop. On each iteration, extract the physical qubit at the
+            # iteration index, measure it, and re-insert into the codeblock. Finally, yield the
+            # updated codeblock.
+            with ImplicitBuilder(for_each_qubit_op.body):
+                indvar = cast(BlockArgument[IndexType], for_each_qubit_op.body.block.args[0])
+                codeblock = cast(
+                    BlockArgument[qecp.PhysicalCodeblockType],
+                    for_each_qubit_op.body.block.args[1],
+                )
+
+                extract_op = qecp.ExtractQubitOp(codeblock=codeblock, idx=indvar)
+                measure_op = qecp.MeasureOp(extract_op.qubit)
+                insert_op = qecp.InsertQubitOp(
+                    in_codeblock=codeblock, idx=indvar, qubit=measure_op.out_qubit
+                )
+
+                memref.StoreOp.get(value=measure_op.mres, ref=buffer, indices=(indvar,))
+                scf.YieldOp(insert_op.out_codeblock)
+
+            mres_to_tensor_op = bufferization.ToTensorOp(buffer)
+
+            out_codeblock = for_each_qubit_op.results[0]
+            func.ReturnOp(mres_to_tensor_op, out_codeblock)
+
+        measure_subroutine = func.FuncOp(
+            name=self._get_measure_subroutine_name(),
+            function_type=(
+                (codeblock_type,),
+                (
+                    builtin.TensorType(i1, shape=(n,)),
+                    codeblock_type,
+                ),
+            ),
+            region=Region(block),
+            visibility="private",  # so that the `-symbol-dce` pass can remove if unused
+        )
+
+        return measure_subroutine
 
 
 convert_qecl_to_qecp_pass = compiler_transform(ConvertQecLogicalToQecPhysicalPass)
