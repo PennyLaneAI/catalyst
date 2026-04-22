@@ -76,8 +76,12 @@ class QiskitToCatalystImporter:
         for instruction in instructions:
             op = instruction.operation
             qubits = instruction.qubits
-            
-            if op.name == "h":
+
+            # Check for legacy QASM2 classical condition FIRST so that named
+            # gates like "h" or "cx" with op.condition don't bypass it.
+            if getattr(op, 'condition', None) is not None:
+                self._emit_conditional_gate(op, qubits, loc)
+            elif op.name == "h":
                 self._emit_gate("h", qubits, [], loc)
             elif op.name == "cx":
                 self._emit_gate("cnot", qubits, [], loc)
@@ -97,7 +101,7 @@ class QiskitToCatalystImporter:
                      clbits = instruction.clbits
                 else:
                      clbits = []
-                # In Qiskit, if_else touches all qubits in its body potentially, 
+                # In Qiskit, if_else touches all qubits in its body potentially,
                 # but instruction.qubits will contain them.
                 self._emit_if_else(op, qubits, clbits, loc)
             else:
@@ -204,6 +208,55 @@ class QiskitToCatalystImporter:
         results = for_op.results
         for i, q in enumerate(qubits):
             self.qubit_map[q] = results[i]
+
+    def _emit_conditional_gate(self, op, qubits, loc):
+        """Wrap a gate with op.condition=(ClassicalRegister, value) in nested scf.if blocks."""
+        cond_reg, cond_val = op.condition
+        i1_type = IntegerType.get_signless(1, self.ctx)
+        bit_type = Type.parse("!quantum.bit", context=self.ctx)
+        result_types = [bit_type] * len(qubits)
+
+        # Build one condition per measured bit in the register.
+        # XOrIOp encodes expected==0 so the C++ translator can emit "name == false".
+        conditions = []
+        for bit_idx, clbit in enumerate(cond_reg):
+            if clbit not in self.clbit_map:
+                continue
+            expected = (cond_val >> bit_idx) & 1
+            measured = self.clbit_map[clbit]
+            if expected == 0:
+                one = arith.ConstantOp(i1_type, IntegerAttr.get(i1_type, 1), loc=loc).result
+                measured = arith.XOrIOp(measured, one, loc=loc).result
+            conditions.append(measured)
+
+        if not conditions:
+            self._emit_gate(op.name, qubits, op.params, loc)
+            return
+
+        # Generate nested scf.if blocks — one level per bit condition.
+        # The innermost level emits the actual gate; each outer level passes
+        # qubits through its else branch unchanged.
+        def emit_nested(depth):
+            if depth == len(conditions):
+                self._emit_gate(op.name, qubits, op.params, loc)
+                return
+
+            passthrough = [self.qubit_map[q] for q in qubits]
+            if_op = scf.IfOp(conditions[depth], result_types, hasElse=True, loc=loc)
+
+            with InsertionPoint(if_op.then_block):
+                old_map = self.qubit_map.copy()
+                emit_nested(depth + 1)
+                scf.YieldOp([self.qubit_map[q] for q in qubits], loc=loc)
+                self.qubit_map = old_map
+
+            with InsertionPoint(if_op.else_block):
+                scf.YieldOp(passthrough, loc=loc)
+
+            for i, q in enumerate(qubits):
+                self.qubit_map[q] = if_op.results[i]
+
+        emit_nested(0)
 
     def _emit_if_else(self, op, qubits, clbits, loc):
         # op.params = [true_body, false_body]

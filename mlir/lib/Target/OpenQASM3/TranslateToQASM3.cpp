@@ -3,6 +3,7 @@
 #include "mlir/IR/Block.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
@@ -53,6 +54,23 @@ public:
         os << "  cx a, b;\n";
         os << "  rx(-pi/2) a;\n";
         os << "  rx(-pi/2) b;\n";
+        os << "}\n\n";
+
+        os << "gate rccx a, b, c {\n";
+        os << "  h c;\n";
+        os << "  t c;\n";
+        os << "  cx b, c;\n";
+        os << "  tdg c;\n";
+        os << "  cx a, c;\n";
+        os << "  t c;\n";
+        os << "  cx b, c;\n";
+        os << "  tdg c;\n";
+        os << "  h c;\n";
+        os << "  t c;\n";
+        os << "  cx a, b;\n";
+        os << "  t a;\n";
+        os << "  tdg b;\n";
+        os << "  cx a, b;\n";
         os << "}\n\n";
 
         // Walk the module
@@ -211,12 +229,29 @@ private:
 
     LogicalResult emitIf(scf::IfOp op) {
         Value cond = op.getCondition();
-        std::string condName = "unknown_cond";
+        std::string condExpr = "unknown_cond";
+
         if (bitMap.count(cond)) {
-            condName = bitMap[cond];
+            // Direct measurement bit: emit  if (m_i)
+            condExpr = bitMap[cond];
+        } else if (auto xorOp = cond.getDefiningOp<arith::XOrIOp>()) {
+            // Negated bit: arith.xori(m_i, 1) — emit  if (m_i == false)
+            Value lhs = xorOp.getLhs();
+            Value rhs = xorOp.getRhs();
+            Value bitVal, constVal;
+            if (bitMap.count(lhs)) { bitVal = lhs; constVal = rhs; }
+            else if (bitMap.count(rhs)) { bitVal = rhs; constVal = lhs; }
+            if (bitVal) {
+                if (auto cOp = constVal.getDefiningOp<arith::ConstantOp>()) {
+                    if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
+                        if (intAttr.getInt() == 1)
+                            condExpr = bitMap[bitVal] + " == false";
+                    }
+                }
+            }
         }
 
-        os << "if (" << condName << " == 1) {\n";
+        os << "if (" << condExpr << ") {\n";
 
         for (Operation &innerOp : op.getThenRegion().front()) {
             if (failed(emitOperation(&innerOp))) return failure();

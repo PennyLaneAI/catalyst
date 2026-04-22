@@ -506,6 +506,13 @@ def run_stage6_simulate(qasm3: str, original_qc) -> StageResult:
         return StageResult(False, None,
                            "qiskit-aer or qiskit.qasm3 not available (install with: pip install qiskit-aer)")
 
+    if re.search(r'^\s*if\s*\(', qasm3, re.MULTILINE) or re.search(r'^\s*for\s+', qasm3, re.MULTILINE):
+        return StageResult(
+            True, "COND_SKIP",
+            "Skipped — circuit contains classical control flow "
+            "(QASM3 simulation not supported for if/for blocks)"
+        )
+
     if original_qc.num_clbits == 0:
         return StageResult(True, None,
                            "Skipped — no classical bits (circuit has no measurements)")
@@ -703,7 +710,11 @@ class PipelineRunner:
         sr = run_stage6_simulate(qasm3, qc)
         elapsed = time.perf_counter() - t0
 
-        if sr.passed:
+        if sr.data == "COND_SKIP":
+            R.info("Result", sr.message)
+            R.stage_skip(6, total_stages, STAGES[5][2])
+            stages[5] = None
+        elif sr.passed:
             R.info("Result", sr.message)
             R.stage_pass(6, total_stages, STAGES[5][2], elapsed)
             stages[5] = True
