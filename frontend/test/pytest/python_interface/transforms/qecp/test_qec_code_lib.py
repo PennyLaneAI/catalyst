@@ -14,6 +14,8 @@
 
 """Test suite for the catalyst.python_interface.transforms.qecp.qec_code_lib module."""
 
+import re
+
 import pytest
 
 from catalyst.python_interface.transforms.qecp.qec_code_lib import QecCode
@@ -36,9 +38,67 @@ class TestQecCode:
         assert qec_code.k == k
         assert qec_code.d == d
 
+    @pytest.mark.parametrize(
+        "inputs, expected_str",
+        [
+            (("Steane", 7, 1, 3), "[[7, 1, 3]] Steane"),
+            (("", 7, 1, 3), "[[7, 1, 3]] <unknown>"),
+            (("  ", 7, 1, 3), "[[7, 1, 3]] <unknown>"),
+        ],
+    )
+    def test_str_representation(self, inputs, expected_str):
+        """Test the string representation of the `QecCode` class for various inputs."""
+        qec_code = QecCode(*inputs)
+        assert str(qec_code) == expected_str
+
+    @pytest.mark.parametrize(
+        "data",
+        [
+            {"name": "Steane", "n": 7, "k": 1, "d": 3},
+            {"name": "Shor", "n": 9, "k": 1, "d": 3},
+            {"name": "Unknown", "n": 7, "k": 1, "d": 3, "extra-field": 42},
+        ],
+    )
+    def test_from_dict(self, data: dict):
+        """Test constructing a `QecCode` object from a dictionary using the `from_dict()` method."""
+        qec_code = QecCode.from_dict(data)
+
+        assert qec_code.name == data["name"]
+        assert qec_code.n == data["n"]
+        assert qec_code.k == data["k"]
+        assert qec_code.d == data["d"]
+
+    @pytest.mark.parametrize(
+        "data",
+        [
+            {"name": "Steane", "n": 7, "k": 1, "d": 3},
+            {"name": "Shor", "n": 9, "k": 1, "d": 3},
+        ],
+    )
+    def test_constructor_with_dict_input(self, data: dict):
+        """Test constructing a `QecCode` object from a dictionary using the default constructor.
+
+        Note that constructing a `QecCode` object in this way is generally discouraged, but is
+        necessary in order to parse MLIR dictionary attributes from a
+        `transform.apply_registered_pass` op and construct an xDSL pass object that uses a `QecCode`
+        object as a pass option.
+        """
+        qec_code = QecCode(**data)
+
+        assert qec_code.name == data["name"]
+        assert qec_code.n == data["n"]
+        assert qec_code.k == data["k"]
+        assert qec_code.d == data["d"]
+
     @pytest.mark.parametrize("name", SUPPORTED_CODES)
     def test_get(self, name: str):
         """Test the `QecCode.get()` method for all supported QEC codes."""
         qec_code = QecCode.get(name)
 
         assert qec_code.name == name
+
+    @pytest.mark.parametrize("name", ["Sgt. Pepper's Lonely Hearts Club Code", None, 1])
+    def test_get_unsupported_code(self, name):
+        """Test that the `QecCode.get()` method raises an error for supported QEC codes."""
+        with pytest.raises(KeyError, match=re.compile(r"QEC code .* not found")):
+            QecCode.get(name)
