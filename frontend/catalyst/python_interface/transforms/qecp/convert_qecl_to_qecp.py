@@ -20,7 +20,9 @@ To apply this pass, the QEC code must be know.
 
 import numpy as np
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
+from enum import StrEnum
 
 from xdsl import builder
 from xdsl.context import Context
@@ -43,6 +45,12 @@ from catalyst.python_interface.pass_api.compiler_transform import compiler_trans
 from catalyst.utils.exceptions import CompileError
 
 from .qec_code_lib import QecCode
+
+
+class CheckType(StrEnum):
+    X = "X"
+    Z = "Z"
+
 
 # MARK: Type Conversion Pattern
 
@@ -149,9 +157,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 f"per codeblock, k, is 1, but got k = {self.qec_code.k}"
             )
 
+        encode_funcop = self.create_encode_subroutine()
         assert op.regions[0].blocks.first is not None
-
-        encode_funcop = self.create_encode_cycle()
         op.regions[0].blocks.first.add_op(encode_funcop)
 
         PatternRewriteWalker(
@@ -164,8 +171,13 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             )
         ).rewrite_module(op)
 
-    def create_encode_cycle(self):
-        # ToDo: docstring
+    def create_encode_subroutine(self) -> func.FuncOp:
+        """Create a subroutine that takes in a codeblock, encodes it in the zero state for 
+        the QEC code (based on the tanner graph), and returns the encoded codeblock.
+
+        The subroutine allocates auxiliary qubits for use in encoding based on the number of 
+        rows in the X tanner graph , and deallocates them once encoding is complete.    
+        """
 
         codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
         input_types = (codeblock_type,)
@@ -174,93 +186,117 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         block = Block(arg_types=input_types)
 
         with builder.ImplicitBuilder(block):
-
             (codeblock,) = block.args
 
-            aux_allocate_ops = (qecp.AllocAuxQubitOp() for row in self.qec_code.z_tanner)
+            # allocate auxiliary qubits
+            aux_allocate_ops = (qecp.AllocAuxQubitOp() for row in self.qec_code.x_tanner)
             aux_qubits = [op.results[0] for op in aux_allocate_ops]
 
-            measure_ops, codeblock = self._z_check_pattern(aux_qubits, codeblock)
+            # apply X-check gate+measurement pattern
+            measure_ops, encoded_codeblock = self.check_pattern(aux_qubits, codeblock, check_type=CheckType.X)
 
+            # ToDo: should we also be applying the Z corrections?
+
+            # deallocate the auxiliary qubits
             dealloc_ops = [qecp.DeallocAuxQubitOp(meas_op.results[1]) for meas_op in measure_ops]
 
-            func.ReturnOp(codeblock)
-
-        region = Region([block])
-
-        symbol_name = f"encode_zero_{self.qec_code.name}"
+            # return the encoded codeblock
+            func.ReturnOp(encoded_codeblock)
+        
         funcOp = func.FuncOp(
-            symbol_name,
-            (input_types, output_types),
-            visibility="private",
-            region=region,
+            name=f"encode_zero_{self.qec_code.name}", 
+            function_type=(input_types, output_types), 
+            visibility="private", 
+            region=Region([block]),
         )
 
         return funcOp
 
-    def _z_check_pattern(self, aux_qbs, codeblock):
-        # ToDo: add docstring
+    def check_pattern(self, aux_qubits: Iterable[qecp.QecPhysicalQubitSSAValue], codeblock: qecp.PhysicalCodeBlockSSAValue, check_type: CheckType) -> (Iterable[qecp.MeasureOp], qecp.PhysicalCodeblockType):
+        """Contains the ops to perform a QEC check on the provided auxiliary qubits and codeblock.
+        Intended to be called inside `builder.ImplicitBuilder` to add these operations to a block. 
 
-        tanner_graph = self.qec_code.z_tanner
+        This pattern includes measurement of the auxiliary qubits, and returns the MeasureOps, as 
+        well as the codeblock after the check pattern has been applied. 
+        
+        This function is not responsible for aux qubit allocation, aux qubit deallocation, or 
+        handling of measurement outputs (for example sending them to a decoder.)
+        
+        Args:
+            aux_qubits (Iterable[qecp.QecPhysicalQubitSSAValue]): The auxiliary qubits to be used 
+                in the check
+            codeblock (qecp.PhysicalCodeBlockSSAValue): The codeblock of data-qubits to be used 
+                in the check
+            check_type (CheckType): Which check pattern will be performed.
 
-        hadamard_ops = [qecp.HadamardOp(qb) for qb in aux_qbs]  # skip for X check
-        aux_qbs = [h_op.results[0] for h_op in hadamard_ops]
+        Returns:
+            Iterable[qecp.MeasureOp]: a list of the ops measuring the auxiliary qubits
+            qecp.PhysicalCodeblockType: the codeblock after the check pattern has been applied
+        """
 
+        tanner_graph, cnot_fn = self._get_cnot_and_tanner_graph(check_type)
+
+        if check_type == "X":
+            # auxiliary qubits are prepared in the |+> state
+            hadamard_ops = [qecp.HadamardOp(qb) for qb in aux_qubits]
+            aux_qubits = [h_op.results[0] for h_op in hadamard_ops]
+
+        # extract data qubits
         extract_ops = [qecp.ExtractQubitOp(codeblock, i) for i in range(self.qec_code.n)]
-        data_qbs = [ext_op.results[0] for ext_op in extract_ops]
+        data_qubits = [ext_op.results[0] for ext_op in extract_ops]
 
-        aux_qbs, data_qbs = self._cnot_pattern(aux_qbs, data_qbs, check_type="Z")
-
-        for i in range(self.qec_code.n):
-            insert_op = qecp.InsertQubitOp(codeblock, i, data_qbs[i])
-            codeblock = insert_op.results[0]
-
-        hadamard_ops2 = [qecp.HadamardOp(aux) for aux in aux_qbs]  # skip for X check
-        measure_ops = [qecp.MeasureOp(h_op.results[0]) for h_op in hadamard_ops2]
-
-        return measure_ops, codeblock
-
-    def _x_check_pattern(self, aux_qbs, codeblock):
-        # ToDo: add docstring
-
-        tanner_graph = self.qec_code.z_tanner
-
-        extract_ops = [qecp.ExtractQubitOp(codeblock, i) for i in range(self.qec_code.n)]
-        data_qbs = [ext_op.results[0] for ext_op in extract_ops]
-
-        aux_qbs, data_qbs = self._cnot_pattern(aux_qbs, data_qbs, check_type="Z")
-
-        measure_ops = [qecp.MeasureOp(qb) for qb in aux_qbs]
-
-        for i in range(self.qec_code.n):
-            insert_op = qecp.InsertQubitOp(codeblock, i, data_qbs[i])
-            codeblock = insert_op.results[0]
-
-        return measure_ops, codeblock
-
-    def _cnot_pattern(self, aux_qubits, data_qubits, check_type):
-        # ToDo: docstring
-
+        # apply CNOTs between data and auxiliary qubits based on tanner graph
         aux_qbs_out = []
-        if check_type == "Z":
-            tanner_graph = self.qec_code.z_tanner
-        elif check_type == "X":
-            tanner_graph = (
-                self.qec_code.x_tanner
-            )  # ToDo: reconsider all of this once the QecCode PR is merged
-
         for aux_qb, row in zip(aux_qubits, tanner_graph):
-            indices = [idx for idx, val in enumerate(row) if val]
-            for idx in indices:
-                if check_type == "Z":
-                    cnot_op = qecp.CnotOp(aux_qb, data_qubits[idx])
-                elif check_type == "X":
-                    cnot_op = qecp.CnotOp(data_qubits[idx], aux_qb)
-                aux_qb, data_qb = cnot_op.results
-                data_qubits[idx] = data_qb
+            data_qbs_out = []
+            for data_qb, val in zip(data_qubits, row, strict=True):
+                if val:
+                    aux_qb, data_qb = cnot_fn(aux_qb, data_qb)
+                data_qbs_out.append(data_qb)
+            data_qubits = data_qbs_out
             aux_qbs_out.append(aux_qb)
 
-        return aux_qbs_out, data_qubits
+        # insert data qubits back into the codeblock
+        for i in range(self.qec_code.n):
+            insert_op = qecp.InsertQubitOp(codeblock, i, data_qbs_out[i])
+            codeblock = insert_op.results[0]
+
+        if check_type == "X":
+            # re-set auxiliary qubits
+            hadamard_ops = [qecp.HadamardOp(aux) for aux in aux_qbs_out]
+            aux_qbs_out = [h_op.results[0] for h_op in hadamard_ops]
+
+        # measure auxilary qubits
+        measure_ops = [qecp.MeasureOp(qb) for qb in aux_qbs_out]
+
+        return measure_ops, codeblock
+
+    def _get_cnot_and_tanner_graph(self, check_type: CheckType) -> (np.ndarray, Callable):
+        """Get the appropriate tanner graph and the function for applying CNOTs in an 
+        QEC check based on the check type."""
+
+        if check_type == "X":
+            # we use CNOT(aux, data) and X-tanner graph
+            tanner_graph = self.qec_code.x_tanner
+
+            def cnot_fn(aux_qb, data_qb):
+                cnot_op = qecp.CnotOp(aux_qb, data_qb)
+                aux_qb, data_qb = cnot_op.results
+                return aux_qb, data_qb
+            
+        elif check_type == "Z":
+            # we use CNOT(data, aux) and Z-tanner graph
+            tanner_graph = self.qec_code.z_tanner
+
+            def cnot_fn(aux_qb, data_qb):
+                cnot_op = qecp.CnotOp(data_qb, aux_qb)
+                data_qb, aux_qb = cnot_op.results
+                return aux_qb, data_qb 
+            
+        else:
+            raise CompileError(f"Only CSS codes are supported, check_type must be X or Z but recieved {check_type}")
+        
+        return tanner_graph, cnot_fn        
 
 
 convert_qecl_to_qecp_pass = compiler_transform(ConvertQecLogicalToQecPhysicalPass)
