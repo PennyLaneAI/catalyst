@@ -636,6 +636,7 @@
   nanobind extension module. This module is built during the MLIR compilation phase and discovered
   at runtime.
   [(#2259)](https://github.com/PennyLaneAI/catalyst/pull/2259)
+  [(#2733)](https://github.com/PennyLaneAI/catalyst/pull/2733)
 
 * Additional integration tests have been added for the pass-by-pass version of `qp.specs`.
   [(#2690)](https://github.com/PennyLaneAI/catalyst/pull/2690/)
