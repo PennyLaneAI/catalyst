@@ -37,13 +37,12 @@ def test_for_loop_basic(size: int, angle: float):
     # CHECK-DAG: [[zero_index:%.+]] = arith.constant 0 : index
     # CHECK-DAG: [[size:%.+]] = tensor.extract %arg0[] : tensor<i64>
     # CHECK-DAG: [[size_index:%.+]] = arith.index_cast [[size]] : i64 to index
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
 
     # CHECK-DAG: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
 
     # CHECK: scf.for %arg2 = [[zero_index]] to [[size_index]] step [[one_index]] {
     # CHECK:   [[i:%.+]] = arith.index_cast %arg2 : index to i64
-    # CHECK:   [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK:   [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK:   [[angle:%.+]] = tensor.extract %arg1[] : tensor<f64>
     # CHECK:   qref.custom "RX"([[angle]]) [[q0]] : !qref.bit
     # CHECK:   [[qi:%.+]] = qref.get [[reg]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
@@ -109,7 +108,6 @@ def test_for_loop_with_result(size: int):
     # CHECK-DAG: [[zero_index:%.+]] = arith.constant 0 : index
     # CHECK-DAG: [[size:%.+]] = tensor.extract %arg0[] : tensor<i64>
     # CHECK-DAG: [[size_index:%.+]] = arith.index_cast [[size]] : i64 to index
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
 
     # CHECK-DAG: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
     # CHECK-DAG: [[sum:%.+]] = stablehlo.constant dense<0> : tensor<i64>
@@ -131,7 +129,7 @@ def test_for_loop_with_result(size: int):
         m = qp.measure(i)
         sum += m
 
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: [[loopOut_tensorf64:%.+]] = stablehlo.convert [[loopOut]] : (tensor<i64>) -> tensor<f64>
     # CHECK: [[angle:%.+]] = tensor.extract [[loopOut_tensorf64]][] : tensor<f64>
     # CHECK: qref.custom "RX"([[angle]]) [[q0]] : !qref.bit
@@ -155,7 +153,6 @@ def test_for_loop_with_dynamic_shapes(size: int):
     # CHECK-DAG: [[zero_index:%.+]] = arith.constant 0 : index
     # CHECK-DAG: [[size:%.+]] = tensor.extract %arg0[] : tensor<i64>
     # CHECK-DAG: [[size_index:%.+]] = arith.index_cast [[size]] : i64 to index
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
 
     # CHECK-DAG: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
     # CHECK-DAG: [[sum:%.+]] = stablehlo.dynamic_broadcast_in_dim {{.+}} -> tensor<?xf64>
@@ -171,7 +168,7 @@ def test_for_loop_with_dynamic_shapes(size: int):
 
     # CHECK: [[reduce:%.+]] = stablehlo.reduce([[loopOut]]
     # CHECK-SAME:   applies stablehlo.add
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: [[reduce_f64:%.+]] = tensor.extract [[reduce]][] : tensor<f64>
     # CHECK: qref.custom "RX"([[reduce_f64]]) [[q0]] : !qref.bit
     qp.RX(jnp.sum(x), wires=0)
@@ -193,14 +190,13 @@ def test_for_loop_with_dynamic_allocation():
     # CHECK-DAG: [[zero_index:%.+]] = arith.constant 0 : index
     # CHECK-DAG: [[one_index:%.+]] = arith.constant 1 : index
     # CHECK-DAG: [[three_index:%.+]] = arith.constant 3 : index
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
 
     # CHECK-DAG: [[reg_device:%.+]] = qref.alloc( 3) : !qref.reg<3>
 
     # CHECK: scf.for %arg0 = [[zero_index]] to [[three_index]] step [[one_index]] {
     # CHECK:   [[i:%.+]] = arith.index_cast %arg0 : index to i64
     # CHECK:   [[reg_loop:%.+]] = qref.alloc( 2) : !qref.reg<2>
-    # CHECK:   [[q0_loop:%.+]] = qref.get [[reg_loop]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK:   [[q0_loop:%.+]] = qref.get [[reg_loop]][ 0] : !qref.reg<2> -> !qref.bit
     # CHECK:   [[qi:%.+]] = qref.get [[reg_device]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
     # CHECK:   qref.custom "CNOT"() [[q0_loop]], [[qi]] : !qref.bit, !qref.bit
     # CHECK:   qref.dealloc [[reg_loop]] : !qref.reg<2>
@@ -211,7 +207,7 @@ def test_for_loop_with_dynamic_allocation():
             qp.CNOT(wires=[q[0], i])
 
     # CHECK: [[reg_loop:%.+]] = qref.alloc( 1) : !qref.reg<1>
-    # CHECK: [[q0_loop:%.+]] = qref.get [[reg_loop]][[[zero]]] : !qref.reg<1>, i64 -> !qref.bit
+    # CHECK: [[q0_loop:%.+]] = qref.get [[reg_loop]][ 0] : !qref.reg<1> -> !qref.bit
     # CHECK: scf.for %arg0 = [[zero_index]] to [[three_index]] step [[one_index]] {
     # CHECK:   [[i:%.+]] = arith.index_cast %arg0 : index to i64
     # CHECK:   [[qi:%.+]] = qref.get [[reg_device]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
