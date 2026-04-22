@@ -122,6 +122,7 @@ frontend:
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
+	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
 	rm -r frontend/pennylane_catalyst.egg-info
 
 .PHONY: mlir llvm stablehlo enzyme dialects runtime oqc builtin-decomp-rules
@@ -289,6 +290,7 @@ clean:
 	git restore frontend/catalyst/_configuration.py
 	rm -rf $(MK_DIR)/frontend/catalyst/_revision.py
 	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/lib $(MK_DIR)/frontend/catalyst/bin
+	rm -rf $(MK_DIR)/frontend/catalyst/resources
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 	rm -rf .benchmarks
