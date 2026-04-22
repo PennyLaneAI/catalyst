@@ -73,8 +73,8 @@ class QecCode:
         >>> QecCode.get("Steane")
         QecCode(name='Steane', n=7, k=1, d=3)
         """
-        qec_code = cls(name, *_CODE_REGISTRY[name])
-        if qec_code is None:
+        qec_code_params = _CODE_REGISTRY.get(name)
+        if qec_code_params is None:
             raise KeyError(f"QEC code {name} not found")
 
-        return qec_code
+        return cls(name, *qec_code_params)
