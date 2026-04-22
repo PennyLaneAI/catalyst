@@ -59,8 +59,8 @@ class TestTypeConversionPattern:
                     n,
                     k,
                     3,
-                    np.array([[]]),
-                    np.array([[]]),
+                    np.eye(n),
+                    np.eye(n),
                 )
             ),
         )
@@ -90,42 +90,56 @@ class TestTypeConversionPattern:
         """
         pipeline = (
             ConvertQecLogicalToQecPhysicalPass(
-                qec_code=QecCode("", n, k, 3, np.array([[]]), np.array([[]]))
+                qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))
             ),
         )
         run_filecheck(program, pipeline)
 
 
+    def test_codeblock_conversion_with_k_mismatch(self, run_filecheck):
+        """Test that attempting to convert a codeblock type with a value of k different than the
+        value of k given in the QEC code raise a CompileError.
+        """
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_program
+        func.func @test_program() {
+            %0 = "test.op"() : () -> !qecl.codeblock<2>
+            return
+        }
+        }
+        """
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", 7, 1, 3, np.eye(7), np.eye(7))),)
+
+        with pytest.raises(CompileError, match="Failed to convert type"):
+            run_filecheck(program, pipeline)
+
+    def test_hyperreg_conversion_with_k_mismatch(self, run_filecheck):
+        """Test that attempting to convert a hyper-register type with a value of k different than
+        the value of k given in the QEC code raise a CompileError.
+        """
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_program
+        func.func @test_program() {
+            %0 = "test.op"() : () -> !qecl.hyperreg<3 x 2>
+            return
+        }
+        }
+        """
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", 7, 1, 3, np.eye(7), np.eye(7))),)
+
+        with pytest.raises(CompileError, match="Failed to convert type"):
+            run_filecheck(program, pipeline)
+
+
 class TestLoweringEncode:
     """Test lowering the qecl.EncodeOp to a subroutine of qecp gates"""
 
-    def test_error_for_wrong_k(self, run_filecheck):
-        """Test that an error is raised if k in the logical operation doesn't match the k used in
-        the QEC code"""
-
-        qec_code = QecCode(
-            "test_code", n=10, k=3, d=1, x_tanner=np.array([[]]), z_tanner=np.array([[]])
-        )
-
-        program = f"""
-        builtin.module @module_circuit {{
-                func.func @test_func() attributes {{quantum.node}} {{
-                    %0 = "test.op"() : () -> !qecl.codeblock<5>
-                    %1 = qecl.encode ["zero"] %0 : !qecl.codeblock<5>
-                    return
-                }}
-            }}
-            """
-
-        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
-
-        with pytest.raises(
-            CompileError, match="k=5 is not compatible with lowering to a code with k=3"
-        ):
-            run_filecheck(program, pipeline)
-
     @pytest.mark.parametrize("code_name", ["test_name", "abcd"])
-    @pytest.mark.parametrize("k", [1, 2, 3])
+    @pytest.mark.parametrize(
+        "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
+    )
     def test_with_fake_code(self, code_name, k, run_filecheck):
         """Test that a single qecl.encode operation is lowered to a call to the encoding
         subroutine using a generic 'code' that relies on two data qubits (set by n) and
@@ -251,39 +265,3 @@ class TestLoweringEncode:
 
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
         run_filecheck(program, pipeline)
-
-    def test_codeblock_conversion_with_k_mismatch(self, run_filecheck):
-        """Test that attempting to convert a codeblock type with a value of k different than the
-        value of k given in the QEC code raise a CompileError.
-        """
-        program = """
-        builtin.module {
-        // CHECK-LABEL: test_program
-        func.func @test_program() {
-            %0 = "test.op"() : () -> !qecl.codeblock<2>
-            return
-        }
-        }
-        """
-        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", 7, 1, 3)),)
-
-        with pytest.raises(CompileError, match="Failed to convert type"):
-            run_filecheck(program, pipeline)
-
-    def test_hyperreg_conversion_with_k_mismatch(self, run_filecheck):
-        """Test that attempting to convert a hyper-register type with a value of k different than
-        the value of k given in the QEC code raise a CompileError.
-        """
-        program = """
-        builtin.module {
-        // CHECK-LABEL: test_program
-        func.func @test_program() {
-            %0 = "test.op"() : () -> !qecl.hyperreg<3 x 2>
-            return
-        }
-        }
-        """
-        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", 7, 1, 3)),)
-
-        with pytest.raises(CompileError, match="Failed to convert type"):
-            run_filecheck(program, pipeline)
