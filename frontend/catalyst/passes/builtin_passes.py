@@ -31,7 +31,7 @@ from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 
 ## API ##
-def cancel_inverses(qnode):
+def cancel_inverses_setup_inputs():
     """
     Specify that the ``-cancel-inverses`` MLIR compiler pass
     for cancelling two neighbouring self-inverse
@@ -141,7 +141,12 @@ def cancel_inverses(qnode):
         %2 = quantum.namedobs %out_qubits[ PauliZ] : !quantum.obs
         %3 = quantum.expval %2 : f64
     """
-    return qml.transform(pass_name="cancel-inverses")(qnode)
+    return (), {}
+
+
+cancel_inverses = qml.transform(
+    pass_name="cancel-inverses", setup_inputs=cancel_inverses_setup_inputs
+)
 
 
 def diagonalize_measurements(
@@ -384,7 +389,7 @@ disentangle_swap = qml.transform(
 )
 
 
-def merge_rotations(qnode):
+def merge_rotations_setup_inputs():
     r"""Specify that the ``-merge-rotations`` MLIR compiler pass
     for merging roations (peephole) will be applied.
 
@@ -445,10 +450,15 @@ def merge_rotations(qnode):
     >>> circuit(0.54)
     Array(0.5965506257017892, dtype=float64)
     """
-    return qml.transform(pass_name="merge-rotations")(qnode)
+    return (), {}
 
 
-def decompose_lowering(qnode):
+merge_rotations = qml.transform(
+    pass_name="merge-rotations", setup_inputs=merge_rotations_setup_inputs
+)
+
+
+def decompose_lowering_setup_inputs():
     """
     Specify that the ``-decompose-lowering`` MLIR compiler pass
     for applying the compiled decomposition rules to the QNode
@@ -464,7 +474,12 @@ def decompose_lowering(qnode):
         // TODO: add example here
 
     """
-    return qml.transform(pass_name="decompose-lowering")(qnode)  # pragma: no cover
+    return (), {}
+
+
+decompose_lowering = qml.transform(
+    pass_name="decompose-lowering", setup_inputs=decompose_lowering_setup_inputs
+)  # pragma: no cover
 
 
 def ions_decomposition_setup_inputs():  # pragma: nocover
@@ -1671,12 +1686,13 @@ def graph_decomposition_setup_inputs(
     >>> qp.specs(circuit, level="device")(1.23, 4.56).resources.gate_types
     {'Rot': 2}
     """
-    return (), {
-        "gate_set": gate_set,
-        "fixed_decomps": fixed_decomps,
-        "alt_decomps": alt_decomps,
-        "_builtin_rule_path": _builtin_rule_path,
-    }
+    options = prepare_decomposition_options(
+        gate_set=gate_set,
+        fixed_decomps=fixed_decomps,
+        alt_decomps=alt_decomps,
+        _builtin_rule_path=_builtin_rule_path,
+    )
+    return (), options
 
 
 graph_decomposition = qml.transform(

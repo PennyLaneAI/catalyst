@@ -39,6 +39,9 @@ Module: catalyst.passes
     ~disentangle_swap
     ~graph_decomposition
     ~ions_decomposition
+    ~cancel_inverses
+    ~merge_rotations
+    ~decompose_lowering
 
 
 Module: catalyst.third_party.cuda
