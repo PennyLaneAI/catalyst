@@ -33,35 +33,32 @@ def test_custom_op(i: int):
     """
     # CHECK-DAG: [[false:%.+]] = arith.constant false
     # CHECK-DAG: [[true:%.+]] = arith.constant true
-    # CHECK-DAG: [[two:%.+]] = arith.constant 2 : i64
-    # CHECK-DAG: [[one:%.+]] = arith.constant 1 : i64
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK-DAG: [[angle:%.+]] = arith.constant 1.000000e-01 : f64
 
     # CHECK: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
 
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: qref.custom "PauliX"() [[q0]] : !qref.bit
     qp.X(0)
 
-    # CHECK: [[q1:%.+]] = qref.get [[reg]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<3> -> !qref.bit
     # CHECK: qref.custom "RZ"([[angle]]) [[q1]] : !qref.bit
     qp.RZ(0.1, wires=1)
 
-    # CHECK: [[q1:%.+]] = qref.get [[reg]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
-    # CHECK: [[q2:%.+]] = qref.get [[reg]][[[two]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<3> -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<3> -> !qref.bit
     # CHECK: qref.custom "SWAP"() [[q1]], [[q2]] : !qref.bit, !qref.bit
     qp.SWAP([1, 2])
 
     # CHECK: [[i:%.+]] = tensor.extract %arg0[] : tensor<i64>
     # CHECK: [[qi:%.+]] = qref.get [[reg]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: qref.custom "RX"([[angle]]) [[qi]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit ctrls !qref.bit
     qp.ctrl(qp.RX, control=0)(0.1, wires=[i])
 
-    # CHECK: [[q1:%.+]] = qref.get [[reg]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
-    # CHECK: [[q2:%.+]] = qref.get [[reg]][[[two]]] : !qref.reg<3>, i64 -> !qref.bit
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<3> -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<3> -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: qref.custom "CNOT"() [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[false]]) : !qref.bit, !qref.bit ctrls !qref.bit
     qp.ctrl(qp.CNOT, control=0, control_values=False)(wires=[1, 2])
 
@@ -78,10 +75,9 @@ def test_measure():
     """
     Test measure.
     """
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
 
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: [[mres:%.+]] = qref.measure [[q0]] : i1
     # CHECK: [[mres_tensori1:%.+]] = tensor.from_elements [[mres]] : tensor<i1>
     m = qp.measure(0)
@@ -105,22 +101,19 @@ def test_dynamic_qubit_allocation(i: int):
     Test dynamic qubit allocation.
     """
     # CHECK-DAG: [[false:%.+]] = arith.constant false
-    # CHECK-DAG: [[two:%.+]] = arith.constant 2 : i64
-    # CHECK-DAG: [[one:%.+]] = arith.constant 1 : i64
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
 
     # CHECK: [[reg_device:%.+]] = qref.alloc( 3) : !qref.reg<3>
 
     # CHECK: [[reg_alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
-    # CHECK: [[alloc_q0:%.+]] = qref.get [[reg_alloc]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
-    # CHECK: [[alloc_q1:%.+]] = qref.get [[reg_alloc]][[[one]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK: [[alloc_q0:%.+]] = qref.get [[reg_alloc]][ 0] : !qref.reg<2> -> !qref.bit
+    # CHECK: [[alloc_q1:%.+]] = qref.get [[reg_alloc]][ 1] : !qref.reg<2> -> !qref.bit
     with qp.allocate(2) as q:
         # CHECK: qref.custom "PauliX"() [[alloc_q0]] : !qref.bit
         qp.X(q[0])
 
         # CHECK: [[i:%.+]] = tensor.extract %arg1[] : tensor<i64>
         # CHECK: [[qi:%.+]] = qref.get [[reg_device]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
-        # CHECK: [[q2:%.+]] = qref.get [[reg_device]][[[two]]] : !qref.reg<3>, i64 -> !qref.bit
+        # CHECK: [[q2:%.+]] = qref.get [[reg_device]][ 2] : !qref.reg<3> -> !qref.bit
         # CHECK: qref.custom "CNOT"() [[qi]], [[q2]] ctrls([[alloc_q1]]) ctrlvals([[false]]) : !qref.bit, !qref.bit ctrls !qref.bit
         qp.ctrl(qp.CNOT, control=q[1], control_values=False)(wires=[i, 2])
 
@@ -144,7 +137,7 @@ def test_dynamic_qubit_allocation(i: int):
 
     # CHECK: qref.dealloc [[reg_alloc]] : !qref.reg<2>
 
-    # CHECK: [[q0:%.+]] = qref.get [[reg_device]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg_device]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: qref.custom "PauliX"() [[q0]] : !qref.bit
     qp.X(0)
 
@@ -162,20 +155,17 @@ def test_multirz():
     Test multirz.
     """
     # CHECK-DAG: [[true:%.+]] = arith.constant true
-    # CHECK-DAG: [[two:%.+]] = arith.constant 2 : i64
-    # CHECK-DAG: [[one:%.+]] = arith.constant 1 : i64
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK-DAG: [[angle:%.+]] = arith.constant 1.000000e-01 : f64
 
     # CHECK: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
 
-    # CHECK: [[q1:%.+]] = qref.get [[reg]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<3> -> !qref.bit
     # CHECK: qref.multirz([[angle]]) [[q1]] : !qref.bit
     qp.MultiRZ(0.1, wires=1)
 
-    # CHECK: [[q1:%.+]] = qref.get [[reg]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
-    # CHECK: [[q2:%.+]] = qref.get [[reg]][[[two]]] : !qref.reg<3>, i64 -> !qref.bit
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<3> -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<3> -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: qref.multirz([[angle]]) [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit, !qref.bit ctrls !qref.bit
     qp.ctrl(qp.MultiRZ, control=0, control_values=True)(0.1, wires=[1, 2])
 
@@ -193,26 +183,23 @@ def test_pcphase():
     Test pcphase.
     """
     # CHECK-DAG: [[true:%.+]] = arith.constant true
-    # CHECK-DAG: [[two:%.+]] = arith.constant 2 : i64
-    # CHECK-DAG: [[one:%.+]] = arith.constant 1 : i64
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK-DAG: [[stablehlo_two:%.+]] = stablehlo.constant dense<2> : tensor<i64>
     # CHECK-DAG: [[stablehlo_one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
     # CHECK-DAG: [[angle:%.+]] = arith.constant 1.000000e-01 : f64
 
     # CHECK: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
 
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
-    # CHECK: [[q1:%.+]] = qref.get [[reg]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
-    # CHECK: [[q2:%.+]] = qref.get [[reg]][[[two]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<3> -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<3> -> !qref.bit
     # CHECK: [[_two:%.+]] = stablehlo.convert [[stablehlo_two]] : (tensor<i64>) -> tensor<f64>
     # CHECK: [[dim_2:%.+]] = tensor.extract [[_two]][] : tensor<f64>
     # CHECK: qref.pcphase([[angle]], [[dim_2]]) [[q0]], [[q1]], [[q2]] : !qref.bit, !qref.bit, !qref.bit
     qp.PCPhase(0.1, dim=2, wires=[0, 1, 2])
 
-    # CHECK: [[q1:%.+]] = qref.get [[reg]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
-    # CHECK: [[q2:%.+]] = qref.get [[reg]][[[two]]] : !qref.reg<3>, i64 -> !qref.bit
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<3> -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<3> -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: [[_one:%.+]] = stablehlo.convert [[stablehlo_one]] : (tensor<i64>) -> tensor<f64>
     # CHECK: [[dim_1:%.+]] = tensor.extract [[_one]][] : tensor<f64>
     # CHECK: qref.pcphase([[angle]], [[dim_1]]) [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit, !qref.bit ctrls !qref.bit
@@ -233,27 +220,23 @@ def test_pauli_rot():
     """
     # CHECK-DAG: [[true:%.+]] = arith.constant true
     # CHECK-DAG: [[false:%.+]] = arith.constant false
-    # CHECK-DAG: [[three:%.+]] = arith.constant 3 : i64
-    # CHECK-DAG: [[two:%.+]] = arith.constant 2 : i64
-    # CHECK-DAG: [[one:%.+]] = arith.constant 1 : i64
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK-DAG: [[angle:%.+]] = arith.constant 1.000000e-01 : f64
 
     # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
 
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
     # CHECK: qref.paulirot ["X"]([[angle]]) [[q0]] : !qref.bit
     qp.PauliRot(0.1, ["X"], wires=[0])
 
-    # CHECK: [[q1:%.+]] = qref.get [[reg]][[[one]]] : !qref.reg<4>, i64 -> !qref.bit
-    # CHECK: [[q2:%.+]] = qref.get [[reg]][[[two]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
     # CHECK: qref.paulirot ["Y", "I"]([[angle]]) [[q1]], [[q2]] : !qref.bit, !qref.bit
     qp.PauliRot(0.1, ["Y", "I"], wires=[1, 2])
 
-    # CHECK: [[q2:%.+]] = qref.get [[reg]][[[two]]] : !qref.reg<4>, i64 -> !qref.bit
-    # CHECK: [[q3:%.+]] = qref.get [[reg]][[[three]]] : !qref.reg<4>, i64 -> !qref.bit
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
-    # CHECK: [[q1:%.+]] = qref.get [[reg]][[[one]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
+    # CHECK: [[q3:%.+]] = qref.get [[reg]][ 3] : !qref.reg<4> -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
     # CHECK: qref.paulirot ["Z", "X"]([[angle]]) [[q2]], [[q3]] ctrls([[q0]], [[q1]]) ctrlvals([[true]], [[false]]) : !qref.bit, !qref.bit ctrls !qref.bit, !qref.bit
     qp.ctrl(
         qp.PauliRot(0.1, ["Z", "X"], wires=[2, 3]), control=[0, 1], control_values=[True, False]
@@ -273,7 +256,6 @@ def test_global_phase():
     Test global phase.
     """
     # CHECK-DAG: [[true:%.+]] = arith.constant true
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK-DAG: [[angle:%.+]] = arith.constant 0.78539816339744828 : f64
 
     # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
@@ -281,7 +263,7 @@ def test_global_phase():
     # CHECK: qref.gphase([[angle]])
     qp.GlobalPhase(np.pi / 4)
 
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
     # CHECK: qref.gphase([[angle]]) ctrls([[q0]]) ctrlvals([[true]]) : ctrls !qref.bit
     qp.ctrl(qp.GlobalPhase(np.pi / 4), control=[0])
 
@@ -299,20 +281,17 @@ def test_unitary():
     Test unitary.
     """
     # CHECK-DAG: [[true:%.+]] = arith.constant true
-    # CHECK-DAG: [[two:%.+]] = arith.constant 2 : i64
-    # CHECK-DAG: [[one:%.+]] = arith.constant 1 : i64
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
 
     # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
 
-    # CHECK: [[q1:%.+]] = qref.get [[reg]][[[one]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
     # CHECK: [[mat2:%.+]] = stablehlo.convert %arg0 : (tensor<2x2xf64>) -> tensor<2x2xcomplex<f64>>
     # CHECK: qref.unitary([[mat2]] : tensor<2x2xcomplex<f64>>) [[q1]] : !qref.bit
     qp.QubitUnitary(np.identity(2), wires=[1])
 
-    # CHECK: [[q1:%.+]] = qref.get [[reg]][[[one]]] : !qref.reg<4>, i64 -> !qref.bit
-    # CHECK: [[q2:%.+]] = qref.get [[reg]][[[two]]] : !qref.reg<4>, i64 -> !qref.bit
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
     # CHECK: [[mat4:%.+]] = stablehlo.convert %arg1 : (tensor<4x4xf64>) -> tensor<4x4xcomplex<f64>>
     # CHECK: qref.unitary([[mat4]] : tensor<4x4xcomplex<f64>>) [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit, !qref.bit ctrls !qref.bit
     qp.ctrl(qp.QubitUnitary(np.identity(4), wires=[1, 2]), control=[0])
@@ -330,13 +309,10 @@ def test_set_state():
     """
     Test set_state.
     """
-    # CHECK-DAG: [[two:%.+]] = arith.constant 2 : i64
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
-
     # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
 
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
-    # CHECK: [[q2:%.+]] = qref.get [[reg]][[[two]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
     # CHECK: [[state:%.+]] = stablehlo.convert %arg0 : (tensor<4xi64>) -> tensor<4xcomplex<f64>>
     # CHECK: qref.set_state([[state]]) [[q0]], [[q2]] : tensor<4xcomplex<f64>>, !qref.bit, !qref.bit
     qp.StatePrep(np.array([0, 0, 1, 0]), wires=[0, 2])
@@ -354,15 +330,11 @@ def test_set_basis_state():
     """
     Test set_basis_state.
     """
-    # CHECK-DAG: [[three:%.+]] = arith.constant 3 : i64
-    # CHECK-DAG: [[two:%.+]] = arith.constant 2 : i64
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
-
     # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
 
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
-    # CHECK: [[q2:%.+]] = qref.get [[reg]][[[two]]] : !qref.reg<4>, i64 -> !qref.bit
-    # CHECK: [[q3:%.+]] = qref.get [[reg]][[[three]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
+    # CHECK: [[q3:%.+]] = qref.get [[reg]][ 3] : !qref.reg<4> -> !qref.bit
     # CHECK: [[state:%.+]] = stablehlo.convert {{%.+}} : tensor<4xi1>
     # CHECK: qref.set_basis_state([[state]]) [[q0]], [[q2]], [[q3]] : tensor<4xi1>, !qref.bit, !qref.bit, !qref.bit
     qp.BasisState(np.array([0, 0, 1, 0]), wires=[0, 2, 3])
