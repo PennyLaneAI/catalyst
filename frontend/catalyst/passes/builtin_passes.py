@@ -263,7 +263,7 @@ def diagonalize_measurements(
     )
 
 
-def disentangle_cnot(qnode):
+def disentangle_cnot_setup_inputs():
     r"""A peephole optimization for replacing ``CNOT`` gates with single-qubit gates.
 
     .. note::
@@ -314,10 +314,15 @@ def disentangle_cnot(qnode):
     - state(all wires): 1
     Depth: Not computed
     """
-    return qml.transform(pass_name="disentangle-cnot")(qnode)
+    return (), {}
 
 
-def disentangle_swap(qnode):
+disentangle_cnot = qml.transform(
+    pass_name="disentangle-cnot", setup_inputs=disentangle_cnot_setup_inputs
+)
+
+
+def disentangle_swap_setup_inputs():
     r"""A peephole optimization for replacing ``SWAP`` gates with simpler gates (``PauliX`` and
     ``CNOT``).
 
@@ -371,7 +376,12 @@ def disentangle_swap(qnode):
     - state(all wires): 1
     Depth: Not computed
     """
-    return qml.transform(pass_name="disentangle-swap")(qnode)
+    return (), {}
+
+
+disentangle_swap = qml.transform(
+    pass_name="disentangle-swap", setup_inputs=disentangle_swap_setup_inputs
+)
 
 
 def merge_rotations(qnode):
@@ -457,7 +467,7 @@ def decompose_lowering(qnode):
     return qml.transform(pass_name="decompose-lowering")(qnode)  # pragma: no cover
 
 
-def ions_decomposition(qnode):  # pragma: nocover
+def ions_decomposition_setup_inputs():  # pragma: nocover
     """
     Specify that the ``--ions-decomposition`` MLIR compiler pass should be
     applied to the decorated QNode during :func:`~.qjit` compilation.
@@ -576,7 +586,12 @@ def ions_decomposition(qnode):  # pragma: nocover
         %out_qubits_8 = quantum.custom "RY"(%cst_2) %out_qubits_6#1 : !quantum.bit
         %out_qubits_9 = quantum.custom "RY"(%cst_2) %out_qubits_7 : !quantum.bit
     """
-    return qml.transform(pass_name="ions-decomposition")(qnode)
+    return (), {}
+
+
+ions_decomposition = qml.transform(
+    pass_name="ions-decomposition", setup_inputs=ions_decomposition_setup_inputs
+)
 
 
 def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
@@ -1562,9 +1577,7 @@ decompose_arbitrary_ppr = qml.transform(
 )
 
 
-def graph_decomposition(
-    qnode=None,
-    *,
+def graph_decomposition_setup_inputs(
     gate_set: Iterable[type | str] | dict[type | str, float],
     fixed_decomps: dict | None = None,
     alt_decomps: dict | None = None,
@@ -1658,20 +1671,14 @@ def graph_decomposition(
     >>> qp.specs(circuit, level="device")(1.23, 4.56).resources.gate_types
     {'Rot': 2}
     """
-    if qnode is None:
-        return functools.partial(
-            graph_decomposition,
-            gate_set=gate_set,
-            fixed_decomps=fixed_decomps,
-            alt_decomps=alt_decomps,
-            _builtin_rule_path=_builtin_rule_path,
-        )
+    return (), {
+        "gate_set": gate_set,
+        "fixed_decomps": fixed_decomps,
+        "alt_decomps": alt_decomps,
+        "_builtin_rule_path": _builtin_rule_path,
+    }
 
-    options = prepare_decomposition_options(
-        gate_set=gate_set,
-        fixed_decomps=fixed_decomps,
-        alt_decomps=alt_decomps,
-        _builtin_rule_path=_builtin_rule_path,
-    )
 
-    return qml.transform(pass_name="graph-decomposition")(qnode, **options)
+graph_decomposition = qml.transform(
+    pass_name="graph-decomposition", setup_inputs=graph_decomposition_setup_inputs
+)

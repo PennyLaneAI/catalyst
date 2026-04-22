@@ -34,6 +34,8 @@ Module: catalyst.passes
     ~ppr_to_ppm
     ~reduce_t_depth
     ~decompose_arbitrary_ppr
+    ~disentangle_cnot
+    ~disentangle_swap
 
 
 Module: catalyst.third_party.cuda
