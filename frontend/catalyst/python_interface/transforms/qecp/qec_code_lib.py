@@ -48,9 +48,6 @@ class QecCode:
     x_tanner: np.ndarray
     z_tanner: np.ndarray
 
-    def __repr__(self):
-        return f"QecCode(name='{self.name}', n={self.n}, k={self.k}, d={self.d})"
-
     def __str__(self):
         if self.name == "" or str.isspace(self.name):
             name = "<unknown>"
