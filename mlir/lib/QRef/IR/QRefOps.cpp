@@ -154,6 +154,31 @@ LogicalResult DeallocQubitOp::canonicalize(DeallocQubitOp deallocQb,
     return failure();
 }
 
+template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx)
+{
+    // Prefer using an attribute when the index is constant.
+    bool hasNoIdxAttr = !op.getIdxAttr().has_value();
+    bool isConstantIdx = isa_and_nonnull<IntegerAttr>(idx);
+    if (hasNoIdxAttr && isConstantIdx) {
+        auto constantIdx = cast<IntegerAttr>(idx);
+        op.setIdxAttr(constantIdx.getValue().getSExtValue());
+
+        // Remove the dynamic Value
+        op.getIdxMutable().clear();
+        return success();
+    }
+    return failure();
+}
+
+OpFoldResult GetOp::fold(FoldAdaptor adaptor)
+{
+    if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
+        return getResult();
+    }
+    // Returning nullptr tells the caller the op was unchanged.
+    return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 // QRef op verifiers.
 //===----------------------------------------------------------------------===//
