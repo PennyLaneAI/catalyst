@@ -176,7 +176,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja jax==0.7.1 jaxlib==0.7.1 pennylane==0.45.0-dev84 setuptools xdsl
+        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja jax==0.7.1 jaxlib==0.7.1 pennylane==0.45.0-dev84 setuptools scipy-openblas32>=0.3.26 xdsl==0.59.0 xdsl-jax==0.5.0
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
