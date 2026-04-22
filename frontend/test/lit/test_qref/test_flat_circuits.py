@@ -353,19 +353,18 @@ def test_adjoint(i: int):
     Test adjoint
     """
     # CHECK-DAG: [[angle_adj:%.+]] = arith.constant -1.000000e-01 : f64
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
 
     # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
 
     # CHECK: qref.adjoint {
-    # CHECK:   [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK:   [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
     # CHECK:   [[i:%.+]] = tensor.extract %arg0[] : tensor<i64>
     # CHECK:   [[qi:%.+]] = qref.get [[reg]][[[i]]] : !qref.reg<4>, i64 -> !qref.bit
     # CHECK:   qref.custom "CNOT"() [[q0]], [[qi]] : !qref.bit, !qref.bit
     # CHECK: }
     qp.adjoint(qp.CNOT)(wires=[0, i])
 
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
     # CHECK: qref.custom "RX"([[angle_adj]]) [[q0]] : !qref.bit
     qp.adjoint(qp.RX(0.1, wires=0))
 
@@ -373,7 +372,7 @@ def test_adjoint(i: int):
         qp.X(wires)
 
     # CHECK: qref.adjoint {
-    # CHECK:   [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK:   [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
     # CHECK:   qref.custom "PauliX"() [[q0]] : !qref.bit
     # CHECK: }
     qp.adjoint(f)(0)
@@ -399,8 +398,6 @@ def test_adjoint_with_allocation():
     Test adjoint with dynamic qubit allocation
     """
     # CHECK-DAG: [[angle:%.+]] = arith.constant 1.000000e-01 : f64
-    # CHECK-DAG: [[one:%.+]] = arith.constant 1 : i64
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
 
     # CHECK-DAG: [[reg_device:%.+]] = qref.alloc( 4) : !qref.reg<4>
 
@@ -408,8 +405,8 @@ def test_adjoint_with_allocation():
         qp.RX(0.1, wires)
 
     # CHECK: [[reg_alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
-    # CHECK: [[alloc_q0:%.+]] = qref.get [[reg_alloc]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
-    # CHECK: [[alloc_q1:%.+]] = qref.get [[reg_alloc]][[[one]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK: [[alloc_q0:%.+]] = qref.get [[reg_alloc]][ 0] : !qref.reg<2> -> !qref.bit
+    # CHECK: [[alloc_q1:%.+]] = qref.get [[reg_alloc]][ 1] : !qref.reg<2> -> !qref.bit
     with qp.allocate(2) as q:
 
         # CHECK:  qref.adjoint {
@@ -425,10 +422,10 @@ def test_adjoint_with_allocation():
 
     # CHECK: qref.adjoint {
     # CHECK:   [[reg_alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
-    # CHECK:   [[alloc_q0:%.+]] = qref.get [[reg_alloc]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
-    # CHECK:   [[alloc_q1:%.+]] = qref.get [[reg_alloc]][[[one]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK:   [[alloc_q0:%.+]] = qref.get [[reg_alloc]][ 0] : !qref.reg<2> -> !qref.bit
+    # CHECK:   [[alloc_q1:%.+]] = qref.get [[reg_alloc]][ 1] : !qref.reg<2> -> !qref.bit
     # CHECK:   qref.custom "PauliX"() [[alloc_q0]] : !qref.bit
-    # CHECK:   [[q0:%.+]] = qref.get [[reg_device]][[[zero]]] : !qref.reg<4>, i64 -> !qref.bit
+    # CHECK:   [[q0:%.+]] = qref.get [[reg_device]][ 0] : !qref.reg<4> -> !qref.bit
     # CHECK:   qref.custom "CNOT"() [[q0]], [[alloc_q1]] : !qref.bit, !qref.bit
     # CHECK:   qref.dealloc [[reg_alloc]] : !qref.reg<2>
     # CHECK: }
