@@ -55,13 +55,18 @@ def prepare_decomposition_options(
 
     if fixed_decomps:
         options |= {
-            "fixed_decomps": {to_name(op): rule.__name__ for op, rule in fixed_decomps.items()}
+            "fixed_decomps": {
+                to_name(op): (rule if isinstance(rule, str) else rule.__name__)
+                for op, rule in fixed_decomps.items()
+            }
         }
 
     if alt_decomps:
         options |= {
             "alt_decomps": {
-                to_name(op): tuple(rule.__name__ for rule in rules)
+                to_name(op): tuple(
+                    (rule if isinstance(rule, str) else rule.__name__) for rule in rules
+                )
                 for op, rules in alt_decomps.items()
             }
         }
