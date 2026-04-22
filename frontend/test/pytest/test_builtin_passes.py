@@ -12,13 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests the passes found in 'builtin_passes.py'"""
-import pytest
-import pennylane as qp
+
 import inspect
+
+import pennylane as qp
+import pytest
 
 from catalyst.passes import builtin_passes
 
-AVAILABLE_PASSES = {obj for _, obj in inspect.getmembers(builtin_passes) if isinstance(obj, qp.transforms.core.Transform)}
+AVAILABLE_PASSES = {
+    obj
+    for _, obj in inspect.getmembers(builtin_passes)
+    if isinstance(obj, qp.transforms.core.Transform)
+}
+
 
 @pytest.mark.parametrize("pass_", AVAILABLE_PASSES)
 def test_integration_with_compile_pipeline(pass_):
