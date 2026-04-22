@@ -43,7 +43,7 @@ known_third_party = ["diastatic-malt", "jax", "jaxlib", "numpy", "pennylane"]
 skips = ["B607"]
 
 [build-system]
-requires = ["setuptools>=62", "wheel", "pybind11>=2.12.0", "numpy>2.0.0", "nanobind", "cmake", "ninja", "jax==0.7.1", "jaxlib==0.7.1", "pennylane==0.45.0-dev84", "xdsl"]
+requires = ["setuptools>=62", "wheel", "pybind11>=2.12.0", "numpy>2.0.0", "nanobind", "cmake", "ninja"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
