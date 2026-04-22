@@ -648,7 +648,12 @@ def handle_basis_state(self, *invals, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the BasisState primitive"""
     state_inval = invals[0]
     wires_inval = invals[1:]
-    in_qubits = [qref_get_p.bind(self.init_qreg, w) for w in wires_inval]
+    in_qubits = []
+    for w in wires_inval:
+        if isinstance(w, DynamicJaxprTracer) and isinstance(w.val.aval, QrefQubit):
+            in_qubits.append(w)
+        else:
+            in_qubits.append(qref_get_p.bind(self.init_qreg, w))
 
     state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.bool))
 
@@ -661,7 +666,12 @@ def handle_state_prep(self, *invals, n_wires, **kwargs):
     """Handle the conversion from plxpr to Catalyst jaxpr for the StatePrep primitive"""
     state_inval = invals[0]
     wires_inval = invals[1:]
-    in_qubits = [qref_get_p.bind(self.init_qreg, w) for w in wires_inval]
+    in_qubits = []
+    for w in wires_inval:
+        if isinstance(w, DynamicJaxprTracer) and isinstance(w.val.aval, QrefQubit):
+            in_qubits.append(w)
+        else:
+            in_qubits.append(qref_get_p.bind(self.init_qreg, w))
 
     normalize = kwargs.get("normalize", False)
     pad_with = kwargs.get("pad_with")
