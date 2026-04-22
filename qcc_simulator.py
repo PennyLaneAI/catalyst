@@ -209,7 +209,9 @@ class Renderer:
         self._emit("─" * _WIDTH + "\n")
 
         col_name = 30
-        header = f"  {'Circuit':<{col_name}} {'1':>2} {'2':>2} {'3':>2} {'4':>2} {'5':>2} {'6':>2}    Result     Time\n"
+        n_stages = len(results[0]["stages"]) if results else 6
+        stage_cols = " ".join(f"{i+1:>2}" for i in range(n_stages))
+        header = f"  {'Circuit':<{col_name}} {stage_cols}    Result     Time\n"
         self._emit(header)
         self._emit("  " + "─" * (_WIDTH - 2) + "\n")
 
@@ -576,13 +578,14 @@ class PipelineRunner:
         R = self.R
         R.circuit_header(path.name)
 
-        stages: List[Optional[bool]] = [None] * 6
+        total_stages = 5 if self.no_simulation else 6
+        stages: List[Optional[bool]] = [None] * total_stages
         t_total    = time.perf_counter()
         tmp_path   = None
 
         # ── Stage 1 ────────────────────────────────────────────────────────────
         t0 = time.perf_counter()
-        R.stage_running(1, 6, STAGES[0][2])
+        R.stage_running(1, total_stages, STAGES[0][2])
         sr = run_stage1_frontend(path, lang)
         elapsed = time.perf_counter() - t0
 
@@ -590,64 +593,64 @@ class PipelineRunner:
             qc = sr.data
             R.info("Source",  str(path))
             R.info("Circuit", sr.message)
-            R.stage_pass(1, 6, STAGES[0][2], elapsed)
+            R.stage_pass(1, total_stages, STAGES[0][2], elapsed)
             stages[0] = True
         else:
             R.error_detail(sr.message)
-            R.stage_fail(1, 6, STAGES[0][2], elapsed)
+            R.stage_fail(1, total_stages, STAGES[0][2], elapsed)
             stages[0] = False
-            for i in range(1, 6):
-                R.stage_skip(i + 1, 6, STAGES[i][2])
+            for i in range(1, total_stages):
+                R.stage_skip(i + 1, total_stages, STAGES[i][2])
             R.circuit_result(False, time.perf_counter() - t_total)
             return _make_result(path.name, stages, False, time.perf_counter() - t_total)
 
         # ── Stage 2 ────────────────────────────────────────────────────────────
         t0 = time.perf_counter()
-        R.stage_running(2, 6, STAGES[1][2])
+        R.stage_running(2, total_stages, STAGES[1][2])
         sr = run_stage2_mlir(qc)
         elapsed = time.perf_counter() - t0
 
         if sr.passed:
             mlir_str = sr.data
             R.info("MLIR", sr.message)
-            R.stage_pass(2, 6, STAGES[1][2], elapsed)
+            R.stage_pass(2, total_stages, STAGES[1][2], elapsed)
             stages[1] = True
             if self.verbose:
                 R.verbose_block("MLIR OUTPUT", mlir_str)
         else:
             R.error_detail(sr.message)
-            R.stage_fail(2, 6, STAGES[1][2], elapsed)
+            R.stage_fail(2, total_stages, STAGES[1][2], elapsed)
             stages[1] = False
-            for i in range(2, 6):
-                R.stage_skip(i + 1, 6, STAGES[i][2])
+            for i in range(2, total_stages):
+                R.stage_skip(i + 1, total_stages, STAGES[i][2])
             R.circuit_result(False, time.perf_counter() - t_total)
             return _make_result(path.name, stages, False, time.perf_counter() - t_total)
 
         # ── Stage 3 ────────────────────────────────────────────────────────────
         t0 = time.perf_counter()
-        R.stage_running(3, 6, STAGES[2][2])
+        R.stage_running(3, total_stages, STAGES[2][2])
         sr = run_stage3_optimize(mlir_str)
         elapsed = time.perf_counter() - t0
 
         if sr.passed:
             tmp_path, opt_mlir = sr.data
             R.info("Opt MLIR", sr.message)
-            R.stage_pass(3, 6, STAGES[2][2], elapsed)
+            R.stage_pass(3, total_stages, STAGES[2][2], elapsed)
             stages[2] = True
         else:
             tmp_path = sr.data[0] if sr.data else None
             R.error_detail(sr.message)
-            R.stage_fail(3, 6, STAGES[2][2], elapsed)
+            R.stage_fail(3, total_stages, STAGES[2][2], elapsed)
             stages[2] = False
-            for i in range(3, 6):
-                R.stage_skip(i + 1, 6, STAGES[i][2])
+            for i in range(3, total_stages):
+                R.stage_skip(i + 1, total_stages, STAGES[i][2])
             _cleanup_tmp(tmp_path)
             R.circuit_result(False, time.perf_counter() - t_total)
             return _make_result(path.name, stages, False, time.perf_counter() - t_total)
 
         # ── Stage 4 ────────────────────────────────────────────────────────────
         t0 = time.perf_counter()
-        R.stage_running(4, 6, STAGES[3][2])
+        R.stage_running(4, total_stages, STAGES[3][2])
         sr = run_stage4_translate(tmp_path)
         elapsed = time.perf_counter() - t0
         _cleanup_tmp(tmp_path)
@@ -656,57 +659,57 @@ class PipelineRunner:
         if sr.passed:
             qasm3 = sr.data
             R.info("QASM3", sr.message)
-            R.stage_pass(4, 6, STAGES[3][2], elapsed)
+            R.stage_pass(4, total_stages, STAGES[3][2], elapsed)
             stages[3] = True
             if self.verbose:
                 R.verbose_block("QASM3 OUTPUT", qasm3)
         else:
             R.error_detail(sr.message)
-            R.stage_fail(4, 6, STAGES[3][2], elapsed)
+            R.stage_fail(4, total_stages, STAGES[3][2], elapsed)
             stages[3] = False
-            for i in range(4, 6):
-                R.stage_skip(i + 1, 6, STAGES[i][2])
+            for i in range(4, total_stages):
+                R.stage_skip(i + 1, total_stages, STAGES[i][2])
             R.circuit_result(False, time.perf_counter() - t_total)
             return _make_result(path.name, stages, False, time.perf_counter() - t_total)
 
         # ── Stage 5 ────────────────────────────────────────────────────────────
         t0 = time.perf_counter()
-        R.stage_running(5, 6, STAGES[4][2])
+        R.stage_running(5, total_stages, STAGES[4][2])
         sr = run_stage5_validate(qasm3, qc)
         elapsed = time.perf_counter() - t0
 
         if sr.passed:
             R.info("Checks", sr.message)
-            R.stage_pass(5, 6, STAGES[4][2], elapsed)
+            R.stage_pass(5, total_stages, STAGES[4][2], elapsed)
             stages[4] = True
         else:
             R.error_detail(sr.message)
-            R.stage_fail(5, 6, STAGES[4][2], elapsed)
+            R.stage_fail(5, total_stages, STAGES[4][2], elapsed)
             stages[4] = False
             if not self.no_simulation:
-                R.stage_skip(6, 6, STAGES[5][2])
+                R.stage_skip(6, total_stages, STAGES[5][2])
             R.circuit_result(False, time.perf_counter() - t_total)
             return _make_result(path.name, stages, False, time.perf_counter() - t_total)
 
         # ── Stage 6 (optional) ────────────────────────────────────────────────
         if self.no_simulation:
             total_elapsed = time.perf_counter() - t_total
-            overall = all(s is True for s in stages[:5])
+            overall = all(s is True for s in stages)
             R.circuit_result(overall, total_elapsed)
             return _make_result(path.name, stages, overall, total_elapsed)
 
         t0 = time.perf_counter()
-        R.stage_running(6, 6, STAGES[5][2])
+        R.stage_running(6, total_stages, STAGES[5][2])
         sr = run_stage6_simulate(qasm3, qc)
         elapsed = time.perf_counter() - t0
 
         if sr.passed:
             R.info("Result", sr.message)
-            R.stage_pass(6, 6, STAGES[5][2], elapsed)
+            R.stage_pass(6, total_stages, STAGES[5][2], elapsed)
             stages[5] = True
         else:
             R.error_detail(sr.message)
-            R.stage_fail(6, 6, STAGES[5][2], elapsed)
+            R.stage_fail(6, total_stages, STAGES[5][2], elapsed)
             stages[5] = False
 
         total_elapsed = time.perf_counter() - t_total
