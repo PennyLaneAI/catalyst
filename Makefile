@@ -199,8 +199,8 @@ endif
 endif
 
 test-demos:
-	# Some demos fail with optax dependency pulling in latest jax
-	# We skip them for now. These demos should be properly moved to the qml repo.
+    # Some demos fail with optax dependency pulling in latest jax
+    # We skip them for now. These demos should be properly moved to the qml repo.
 ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
 	@echo "Cannot run Jupyter Notebooks with ASAN on macOS, likely due to subprocess invocation."
 	@exit 1
@@ -210,6 +210,8 @@ endif
 	$(ASAN_COMMAND) $(PYTHON) -m pytest demos -k "tutorial_qft_arithmetics.ipynb" --nbmake $(PYTEST_FLAGS)
 
 wheel:
+	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
+
 	# Copy libs to frontend/catalyst/lib
 	mkdir -p $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(RT_BUILD_DIR)/lib/librtd* $(MK_DIR)/frontend/catalyst/lib
@@ -255,15 +257,15 @@ wheel:
 		    cp $(COPY_FLAGS) $$file $$dest_dir; \
 	    done' sh {} +
 
-	echo "__revision__ = \"$$(git rev-parse HEAD || echo 'None')\"" > $(MK_DIR)/frontend/catalyst/_revision.py
-	$(PYTHON) setup.py build_ext --inplace
+	$(PYTHON) -m pip wheel --no-deps . -w bootstrap_dist
+	$(PYTHON) -m pip install bootstrap_dist/*.whl
 
-	CATALYST_BIN_DIR="$(MK_DIR)/frontend/bin" PYTHONPATH="$(MK_DIR)/frontend:$$PYTHONPATH" $(PYTHON) -m catalyst.utils.precompile_decomposition_rules
+	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
+
 	$(PYTHON) -m pip wheel --no-deps . -w dist
 
-	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
-
 	rm -r $(MK_DIR)/build
+	rm -r $(MK_DIR)/bootstrap_dist
 	rm -r frontend/pennylane_catalyst.egg-info
 
 plugin-wheel: plugin
