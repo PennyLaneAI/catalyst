@@ -228,6 +228,7 @@ wheel:
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_apfloat_wrappers.* $(MK_DIR)/frontend/catalyst/lib || true # optional
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_async_runtime.* $(MK_DIR)/frontend/catalyst/lib
+	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/lib/default_pipelines.* $(MK_DIR)/frontend/catalyst/lib
 
 	# Copy mlir bindings & compiler driver to frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
