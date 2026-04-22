@@ -1692,7 +1692,7 @@ def graph_decomposition_setup_inputs(
         alt_decomps=alt_decomps,
         _builtin_rule_path=_builtin_rule_path,
     )
-    return (), options_snake_case
+    return (), options
 
 
 graph_decomposition = qml.transform(
