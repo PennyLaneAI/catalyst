@@ -176,7 +176,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja jax jaxlib pennylane
+        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja jax==0.7.1 jaxlib==0.7.1 pennylane==0.45.0-dev84
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -257,7 +257,7 @@ jobs:
     # LAPACKE reference implementation. TODO: Look into how to upgrade beyond this limit.
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML ninja delocate
+        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML ninja delocate jax==0.7.1 jaxlib==0.7.1 pennylane==0.45.0-dev84
         python${{ matrix.python_version }} -m pip install cmake'<4'
 
     - name: Get Cached LLVM Source
