@@ -263,6 +263,28 @@ class TestPreprocessHybridOp:
                     [op.name in expected_ops for op in new_region.quantum_tape.operations]
                 )
 
+    def test_adjoint_of_loop_in_mlir(self):
+        """Test that adjoint of a ForLoop can be compiled to MLIR."""
+        from catalyst.debug import get_compilation_stage
+
+        dev = qml.device("lightning.qubit", wires=3)
+
+        @qjit(keep_intermediate=True)
+        @qml.qnode(dev)
+        def circuit():
+            @for_loop(0, 3, 1)
+            def loop(i):
+                qml.RX(0.5, wires=i)
+                qml.RY(0.5, wires=i)
+
+            adjoint(loop)()
+            return qml.state()
+
+        mlir_after = get_compilation_stage(circuit, "QuantumCompilationStage")
+
+        assert "quantum.adjoint" not in mlir_after
+        assert mlir_after.count("scf.for") > 0
+
     @pytest.mark.parametrize("x, y", [(1.23, -0.4), (0.7, 0.25), (-1.51, 0.6)])
     def test_decomposition_of_adjoint_circuit(self, x, y):
         """Test that unsupported operators nested in Adjoint are decompsed
