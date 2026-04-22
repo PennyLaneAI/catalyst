@@ -168,7 +168,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         encode_funcop = self.create_encode_subroutine()
         assert op.regions[0].blocks.first is not None
         op.regions[0].blocks.first.add_op(encode_funcop)
-        
+
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [

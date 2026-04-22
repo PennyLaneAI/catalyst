@@ -16,8 +16,8 @@
 
 import re
 
-import pytest
 import numpy as np
+import pytest
 
 from catalyst.python_interface.transforms.qecp.qec_code_lib import QecCode
 
