@@ -262,6 +262,8 @@ wheel:
 
 	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
 
+	cp $$($(PYTHON) -c 'from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH; print(BYTECODE_FILE_PATH)') $(MK_DIR)/frontend/catalyst/resources/
+
 	$(PYTHON) -m pip wheel --no-deps . -w dist
 
 	rm -r $(MK_DIR)/build
