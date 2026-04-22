@@ -4,8 +4,9 @@ config.llvm_tools_dir = lit_config.substitute("@LLVM_TOOLS_DIR@")
 config.python_executable = "@Python3_EXECUTABLE@"
 config.frontend_test_dir = "@CMAKE_BINARY_DIR@" + "/test/frontend"
 config.quantum_bin_dir = "@CMAKE_BINARY_DIR@" + "/bin"
+config.quantum_lib_dir = "@CMAKE_BINARY_DIR@" + "/lib"
 config.mlir_bindings_dir = "@CMAKE_BINARY_DIR@" + "/python_packages/quantum"
-config.lrt_lib_dir = "@RUNTIME_LIB_DIR@"
+config.rt_lib_dir = "@RUNTIME_LIB_DIR@"
 config.mlir_lib_dir = "@MLIR_LIB_DIR@"
 
 config.host_os = "@HOST_OS@"
