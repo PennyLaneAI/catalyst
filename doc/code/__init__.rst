@@ -32,10 +32,13 @@ Module: catalyst.passes
     ~commute_ppr
     ~ppm_compilation
     ~ppr_to_ppm
+    ~ppr_to_mbqc
     ~reduce_t_depth
     ~decompose_arbitrary_ppr
     ~disentangle_cnot
     ~disentangle_swap
+    ~graph_decomposition
+    ~ions_decomposition
 
 
 Module: catalyst.third_party.cuda
