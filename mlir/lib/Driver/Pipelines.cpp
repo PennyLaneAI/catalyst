@@ -17,7 +17,6 @@
 #include "mlir/Pass/PassManager.h"
 
 #include "Driver/DefaultPipelines/DefaultPipelines.h"
-#include "Driver/Pipelines.h"
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
