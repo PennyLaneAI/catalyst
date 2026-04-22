@@ -18,12 +18,11 @@ This module contains the implementation of the xDSL convert-qecl-to-qecp dialect
 To apply this pass, the QEC code must be know.
 """
 
-import numpy as np
-
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+import numpy as np
 from xdsl import builder
 from xdsl.context import Context
 from xdsl.dialects import builtin, func
@@ -33,9 +32,9 @@ from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
     PatternRewriter,
     PatternRewriteWalker,
+    RewritePattern,
     TypeConversionPattern,
     attr_type_rewrite_pattern,
-    RewritePattern,
     op_type_rewrite_pattern,
 )
 from xdsl.rewriter import InsertPoint

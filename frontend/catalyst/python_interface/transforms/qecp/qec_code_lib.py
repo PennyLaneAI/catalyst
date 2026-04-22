@@ -14,10 +14,10 @@
 
 """This module contains a library of QEC codes."""
 
-import numpy as np
-
 from dataclasses import dataclass, fields
 from typing import Self
+
+import numpy as np
 
 _CODE_REGISTRY: dict[str, tuple[int, int, int]] = {
     "Steane": (

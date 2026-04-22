@@ -16,8 +16,8 @@
 
 # pylint: disable=line-too-long
 
-import pytest
 import numpy as np
+import pytest
 
 from catalyst.python_interface.transforms.qecp import (
     ConvertQecLogicalToQecPhysicalPass,
