@@ -49,18 +49,18 @@ def prepare_decomposition_options(
         gate_set = {to_name(op): cost for op, cost in gate_set.items()}
 
     options: dict[str, dict | tuple | str] = {
-        "gate-set": gate_set,
-        "bytecode-rules": str(_builtin_rule_path),
+        "gate_set": gate_set,
+        "bytecode_rules": str(_builtin_rule_path),
     }
 
     if fixed_decomps:
         options |= {
-            "fixed-decomps": {to_name(op): rule.__name__ for op, rule in fixed_decomps.items()}
+            "fixed_decomps": {to_name(op): rule.__name__ for op, rule in fixed_decomps.items()}
         }
 
     if alt_decomps:
         options |= {
-            "alt-decomps": {
+            "alt_decomps": {
                 to_name(op): tuple(rule.__name__ for rule in rules)
                 for op, rules in alt_decomps.items()
             }

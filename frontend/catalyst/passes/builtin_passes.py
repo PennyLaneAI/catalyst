@@ -1686,13 +1686,12 @@ def graph_decomposition_setup_inputs(
     >>> qp.specs(circuit, level="device")(1.23, 4.56).resources.gate_types
     {'Rot': 2}
     """
-    options = prepare_decomposition_options(
+    options: dict = prepare_decomposition_options(
         gate_set=gate_set,
         fixed_decomps=fixed_decomps,
         alt_decomps=alt_decomps,
         _builtin_rule_path=_builtin_rule_path,
     )
-    options_snake_case = {k.replace("-", "_"): v for k, v in options.items()}
     return (), options_snake_case
 
 
