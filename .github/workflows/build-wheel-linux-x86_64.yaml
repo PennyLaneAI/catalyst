@@ -381,6 +381,7 @@ jobs:
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE \
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+              -DPython_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
               -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \

@@ -629,6 +629,15 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The compiler pipeline definitions now have a single source of truth. Previously, pipeline and
+  pass sequences were duplicated between the frontend (`frontend/catalyst/pipelines.py`) and the
+  compiler (`mlir/lib/Driver/Pipelines.cpp`). Now, there is a unique definition that lives in
+  `mlir/include/Driver/DefaultPipelines.h` and is exposed to the frontend via a `default_pipelines`
+  nanobind extension module. This module is built during the MLIR compilation phase and discovered
+  at runtime.
+  [(#2259)](https://github.com/PennyLaneAI/catalyst/pull/2259)
+  [(#2733)](https://github.com/PennyLaneAI/catalyst/pull/2733)
+
 * Additional integration tests have been added for the pass-by-pass version of `qp.specs`.
   [(#2690)](https://github.com/PennyLaneAI/catalyst/pull/2690/)
 
@@ -708,6 +717,7 @@
   [(#2642)](https://github.com/PennyLaneAI/catalyst/pull/2642)
   [(#2692)](https://github.com/PennyLaneAI/catalyst/pull/2692)
   [(#2721)](https://github.com/PennyLaneAI/catalyst/pull/2721)
+  [(#2723)](https://github.com/PennyLaneAI/catalyst/pull/2723)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
