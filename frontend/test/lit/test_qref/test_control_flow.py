@@ -234,7 +234,6 @@ def test_while_loop_basic(i: int, angle: float):
     """
 
     # CHECK-DAG: [[ten:%.+]] = stablehlo.constant dense<10> : tensor<i64>
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
 
     # CHECK-DAG: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
 
@@ -243,7 +242,7 @@ def test_while_loop_basic(i: int, angle: float):
     # CHECK:   [[cmp_i1:%.+]] = tensor.extract [[cmp]][] : tensor<i1>
     # CHECK:   scf.condition([[cmp_i1]])
     # CHECK: } do {
-    # CHECK:   [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK:   [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK:   [[angle:%.+]] = tensor.extract %arg1[] : tensor<f64>
     # CHECK:   qref.custom "RX"([[angle]]) [[q0]] : !qref.bit
     # CHECK:   scf.yield
@@ -268,7 +267,6 @@ def test_while_loop_nested(i: int, angle: float):
 
     # CHECK-DAG: [[ten:%.+]] = stablehlo.constant dense<10> : tensor<i64>
     # CHECK-DAG: [[twenty:%.+]] = stablehlo.constant dense<20> : tensor<i64>
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
 
     # CHECK-DAG: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
 
@@ -282,7 +280,7 @@ def test_while_loop_nested(i: int, angle: float):
     # CHECK:       [[cmp_i1:%.+]] = tensor.extract [[cmp]][] : tensor<i1>
     # CHECK:       scf.condition([[cmp_i1]])
     # CHECK:     } do {
-    # CHECK:        [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK:        [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK:        [[angle:%.+]] = tensor.extract %arg1[] : tensor<f64>
     # CHECK:        qref.custom "RX"([[angle]]) [[q0]] : !qref.bit
     # CHECK:        scf.yield
@@ -309,7 +307,6 @@ def test_while_loop_with_dynamic_shapes(i: int):
     """
 
     # CHECK-DAG: [[ten:%.+]] = stablehlo.constant dense<10> : tensor<i64>
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK-DAG: [[sum:%.+]] = stablehlo.dynamic_broadcast_in_dim {{.+}} -> tensor<?xf64>
 
     # CHECK-DAG: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
@@ -321,7 +318,7 @@ def test_while_loop_with_dynamic_shapes(i: int):
     # CHECK: } do {
     # CHECK: ^bb0(%arg1: tensor<?xf64>):
     # CHECK:   [[add:%.+]] = stablehlo.add %arg1, %arg1 : tensor<?xf64>
-    # CHECK:   [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK:   [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK:   qref.custom "PauliX"() [[q0]] : !qref.bit
     # CHECK:   scf.yield [[add]] : tensor<?xf64>
     # CHECK: }
@@ -332,7 +329,7 @@ def test_while_loop_with_dynamic_shapes(i: int):
 
     # CHECK: [[reduce:%.+]] = stablehlo.reduce([[loopOut]]
     # CHECK-SAME:   applies stablehlo.add
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: [[reduce_f64:%.+]] = tensor.extract [[reduce]][] : tensor<f64>
     # CHECK: qref.custom "RX"([[reduce_f64]]) [[q0]] : !qref.bit
     qp.RX(jnp.sum(x), wires=0)
@@ -350,9 +347,6 @@ def test_while_loop_with_dynamic_allocation(i: int):
     """
     Test while loop with dynamic qubit allocation
     """
-
-    # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : i64
-
     # CHECK-DAG: [[reg_device:%.+]] = qref.alloc( 3) : !qref.reg<3>
 
     # CHECK: scf.while : () -> () {
@@ -360,7 +354,7 @@ def test_while_loop_with_dynamic_allocation(i: int):
     # CHECK:   scf.condition
     # CHECK: } do {
     # CHECK:   [[reg_loop:%.+]] = qref.alloc( 2) : !qref.reg<2>
-    # CHECK:   [[q0_loop:%.+]] = qref.get [[reg_loop]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK:   [[q0_loop:%.+]] = qref.get [[reg_loop]][ 0] : !qref.reg<2> -> !qref.bit
     # CHECK:   [[i:%.+]] = tensor.extract %arg0[] : tensor<i64>
     # CHECK:   [[qi:%.+]] = qref.get [[reg_device]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
     # CHECK:   qref.custom "CNOT"() [[q0_loop]], [[qi]] : !qref.bit, !qref.bit
@@ -373,7 +367,7 @@ def test_while_loop_with_dynamic_allocation(i: int):
             qp.CNOT(wires=[q[0], i])
 
     # CHECK: [[reg_loop:%.+]] = qref.alloc( 1) : !qref.reg<1>
-    # CHECK: [[q0_loop:%.+]] = qref.get [[reg_loop]][[[zero]]] : !qref.reg<1>, i64 -> !qref.bit
+    # CHECK: [[q0_loop:%.+]] = qref.get [[reg_loop]][ 0] : !qref.reg<1> -> !qref.bit
     # CHECK: scf.while : () -> () {
     # CHECK:   stablehlo.compare  LT
     # CHECK:   scf.condition
