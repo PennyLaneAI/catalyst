@@ -1,7 +1,7 @@
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library(rt_decoder SHARED lut_decoder.cpp)
+add_library(rt_decoder SHARED LUTDecoder.cpp)
 
 # Boost targets are already defined by the parent runtime/lib/CMakeLists.txt.
 # rt_decoder is a SHARED library, so PUBLIC linking ensures Boost symbols

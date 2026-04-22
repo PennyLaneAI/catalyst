@@ -116,11 +116,6 @@ void __catalyst__qis__Gradient_params(MemRefT_int64_1d *, int64_t, /*results*/..
 // MBQC operations
 RESULT *__catalyst__mbqc__measure_in_basis(QUBIT *, uint32_t, double, int32_t);
 
-// qecp operations
-int64_t *__catalyst__qecp__decode_steane_lut(/*row_idx*/ MemRefT_int64_1d *,
-                                             /*col_ptr*/ MemRefT_int64_1d *,
-                                             /*syndrome*/ MemRefT_int8_1d *);
-
 // Async runtime error
 void __catalyst__host__rt__unrecoverable_error();
 

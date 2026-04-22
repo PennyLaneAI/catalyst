@@ -13,10 +13,22 @@
 // limitations under the License.
 
 #pragma once
+#ifndef DECODERRUNTIMECAPI_H
+#define DECODERRUNTIMECAPI_H
 
-namespace Decoder::LUTDecoder {
+#include "Types.h"
 
-    extern "C" {
-        size_t* lut_decoder(size_t* row_idx, size_t* col_ptr, int8_t* syndrome_results, size_t distance, bool check_type);
-    }
-} // namespace Decoder::LUTDecoder
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// qecp operations
+size_t *__catalyst__qecp__lut_decoder(/*row_idx*/ MemRefT_int64_1d *,
+                                             /*col_ptr*/ MemRefT_int64_1d *,
+                                             /*syndrome*/ MemRefT_int8_1d *);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
+
+#endif
