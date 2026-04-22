@@ -60,7 +60,8 @@ class TestQecCode:
         ],
     )
     def test_from_dict(self, data: dict):
-        """Test constructing a `QecCode` object from a dictionary using the `from_dict()` method."""
+        """Test constructing a `QecCode` object from a dictionary using the `from_dict()` method.
+        """
         qec_code = QecCode.from_dict(data)
 
         assert qec_code.name == data["name"]
@@ -79,7 +80,9 @@ class TestQecCode:
         """Test constructing a `QecCode` object from a dictionary using the default constructor.
 
         Note that constructing a `QecCode` object in this way is generally discouraged, but is
-        necessary to parse
+        necessary in order to parse MLIR dictionary attributes from a
+        `transform.apply_registered_pass` op and construct an xDSL pass object that uses a `QecCode`
+        object as a pass option.
         """
         qec_code = QecCode(**data)
 
