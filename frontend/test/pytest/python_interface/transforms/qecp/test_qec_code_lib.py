@@ -60,8 +60,7 @@ class TestQecCode:
         ],
     )
     def test_from_dict(self, data: dict):
-        """Test constructing a `QecCode` object from a dictionary using the `from_dict()` method.
-        """
+        """Test constructing a `QecCode` object from a dictionary using the `from_dict()` method."""
         qec_code = QecCode.from_dict(data)
 
         assert qec_code.name == data["name"]
