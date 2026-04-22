@@ -210,7 +210,9 @@ endif
 	$(ASAN_COMMAND) $(PYTHON) -m pytest demos -k "tutorial_qft_arithmetics.ipynb" --nbmake $(PYTEST_FLAGS)
 
 wheel:
+	# TODO: there are redundancies in INSTALLED vs revision etc.
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
+	echo "__revision__ = \"$$(git rev-parse HEAD || echo 'None')\"" > $(MK_DIR)/frontend/catalyst/_revision.py
 
 	# Copy libs to frontend/catalyst/lib
 	mkdir -p $(MK_DIR)/frontend/catalyst/lib/backend
