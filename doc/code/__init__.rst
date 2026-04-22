@@ -47,8 +47,6 @@ Module: catalyst.passes
 Module: catalyst.third_party.cuda
 ---------------------------------
 
-.. currentmodule:: catalyst
-
 .. automodapi:: catalyst.third_party.cuda
     :no-heading:
     :no-inheritance-diagram:
