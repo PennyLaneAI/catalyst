@@ -77,12 +77,13 @@ try:
     llvm_config.with_environment("PATH", config.quantum_bin_dir, append_path=True)
 
     # Define the location of runtime libraries when running frontend tests
-    llvm_config.with_environment("RUNTIME_LIB_DIR", config.lrt_lib_dir, append_path=True)
+    llvm_config.with_environment("RUNTIME_LIB_DIR", config.rt_lib_dir, append_path=True)
     llvm_config.with_environment("MLIR_LIB_DIR", config.mlir_lib_dir, append_path=True)
     llvm_config.with_environment("ENZYME_LIB_DIR", config.enzyme_lib_dir, append_path=True)
     llvm_config.with_environment(
         "CATALYST_BIN_DIR", config.mlir_lib_dir + "/../..", append_path=True
     )
+    llvm_config.with_environment("CATALYST_LIB_DIR", config.quantum_lib_dir, append_path=True)
 
     # Define PYTHONPATH to include the dialect python bindings.
     # From within a build target we have access to cmake variables configured in lit.site.cfg.py.in.
@@ -113,4 +114,5 @@ except AttributeError:
     llvm_config.with_system_environment("RUNTIME_LIB_DIR")
     llvm_config.with_system_environment("MLIR_LIB_DIR")
     llvm_config.with_system_environment("CATALYST_BIN_DIR")
+    llvm_config.with_system_environment("CATALYST_LIB_DIR")
     llvm_config.with_system_environment("ENZYME_LIB_DIR")

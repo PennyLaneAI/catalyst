@@ -486,7 +486,8 @@ def _python_callback_lowering(
     """Callback lowering"""
 
     sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-    import catalyst_callback_registry as registry  # pylint: disable=import-outside-toplevel
+    # pylint: disable=import-outside-toplevel
+    import catalyst_callback_registry as registry  # type: ignore[import-not-found]
 
     callback_id = registry.register(callback)
 

@@ -75,12 +75,10 @@ def test_probs1():
     """
     Test an empty circuit with probs terminal measurement on static wires.
     """
-    # CHECK: [[one:%.+]] = arith.constant 1 : i64
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: quantum.device
     # CHECK: [[alloc:%.+]] = qref.alloc( 3) : !qref.reg<3>
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
-    # CHECK: [[q1:%.+]] = qref.get [[alloc]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<3> -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[alloc]][ 1] : !qref.reg<3> -> !qref.bit
     # CHECK: [[compbasis:%.+]] = qref.compbasis qubits [[q0]], [[q1]] : !quantum.obs
     # CHECK: [[probs:%.+]] = quantum.probs [[compbasis]] : tensor<4xf64>
     # CHECK: qref.dealloc [[alloc]] : !qref.reg<3>
@@ -99,10 +97,9 @@ def test_probs2(i: int):
     """
     Test an empty circuit with probs terminal measurement on dynamic wires.
     """
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: quantum.device
     # CHECK: [[alloc:%.+]] = qref.alloc( 3) : !qref.reg<3>
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: [[i:%.+]] = tensor.extract %arg0[] : tensor<i64>
     # CHECK: [[qi:%.+]] = qref.get [[alloc]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
     # CHECK: [[compbasis:%.+]] = qref.compbasis qubits [[q0]], [[qi]] : !quantum.obs
@@ -142,12 +139,10 @@ def test_sample1():
     """
     Test an empty circuit with sample terminal measurement on static wires.
     """
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
-    # CHECK: [[one:%.+]] = arith.constant 1 : i64
     # CHECK: quantum.device
     # CHECK: [[alloc:%.+]] = qref.alloc( 3) : !qref.reg<3>
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
-    # CHECK: [[q1:%.+]] = qref.get [[alloc]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<3> -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[alloc]][ 1] : !qref.reg<3> -> !qref.bit
     # CHECK: [[compbasis:%.+]] = qref.compbasis qubits [[q0]], [[q1]] : !quantum.obs
     # CHECK: [[sample:%.+]] = quantum.sample [[compbasis]] : tensor<1x2xf64>
     # CHECK: qref.dealloc [[alloc]] : !qref.reg<3>
@@ -165,10 +160,9 @@ def test_sample2(i: int):
     """
     Test an empty circuit with sample terminal measurement on dynamic wires.
     """
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: quantum.device
     # CHECK: [[alloc:%.+]] = qref.alloc( 3) : !qref.reg<3>
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: [[i:%.+]] = tensor.extract %arg0[] : tensor<i64>
     # CHECK: [[qi:%.+]] = qref.get [[alloc]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
     # CHECK: [[compbasis:%.+]] = qref.compbasis qubits [[q0]], [[qi]] : !quantum.obs
@@ -207,12 +201,10 @@ def test_counts1():
     """
     Test an empty circuit with counts terminal measurement on static wires.
     """
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
-    # CHECK: [[one:%.+]] = arith.constant 1 : i64
     # CHECK: quantum.device
     # CHECK: [[alloc:%.+]] = qref.alloc( 3) : !qref.reg<3>
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
-    # CHECK: [[q1:%.+]] = qref.get [[alloc]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<3> -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[alloc]][ 1] : !qref.reg<3> -> !qref.bit
     # CHECK: [[compbasis:%.+]] = qref.compbasis qubits [[q0]], [[q1]] : !quantum.obs
     # CHECK: [[eigens:%.+]], [[counts:%.+]] = quantum.counts [[compbasis]] : tensor<4xf64>, tensor<4xi64>
     # CHECK: qref.dealloc [[alloc]] : !qref.reg<3>
@@ -230,10 +222,9 @@ def test_counts2(i: int):
     """
     Test an empty circuit with counts terminal measurement on dynamic wires.
     """
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: quantum.device
     # CHECK: [[alloc:%.+]] = qref.alloc( 3) : !qref.reg<3>
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: [[i:%.+]] = tensor.extract %arg0[] : tensor<i64>
     # CHECK: [[qi:%.+]] = qref.get [[alloc]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
     # CHECK: [[compbasis:%.+]] = qref.compbasis qubits [[q0]], [[qi]] : !quantum.obs
@@ -253,9 +244,8 @@ def expval1():
     """
     Test an empty circuit with expval terminal measurement on a simple named observable.
     """
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: [[alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<2> -> !qref.bit
     # CHECK: [[obs:%.+]] = qref.namedobs [[q0]][ PauliX] : !quantum.obs
     # CHECK: [[expval:%.+]] = quantum.expval [[obs]] : f64
     # CHECK: qref.dealloc [[alloc]] : !qref.reg<2>
@@ -272,15 +262,12 @@ def expval2():
     """
     Test an empty circuit with expval terminal measurement on a tensor product observable.
     """
-    # CHECK: [[two:%.+]] = arith.constant 2 : i64
-    # CHECK: [[one:%.+]] = arith.constant 1 : i64
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: [[alloc:%.+]] = qref.alloc( 3) : !qref.reg<3>
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: [[obs0:%.+]] = qref.namedobs [[q0]][ PauliX] : !quantum.obs
-    # CHECK: [[q1:%.+]] = qref.get [[alloc]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[alloc]][ 1] : !qref.reg<3> -> !qref.bit
     # CHECK: [[obs1:%.+]] = qref.namedobs [[q1]][ PauliZ] : !quantum.obs
-    # CHECK: [[q2:%.+]] = qref.get [[alloc]][[[two]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[alloc]][ 2] : !qref.reg<3> -> !qref.bit
     # CHECK: [[obs2:%.+]] = qref.namedobs [[q2]][ Hadamard] : !quantum.obs
     # CHECK: [[obs_tensor:%.+]] = quantum.tensor [[obs0]], [[obs1]], [[obs2]] : !quantum.obs
     # CHECK: [[expval:%.+]] = quantum.expval [[obs_tensor]] : f64
@@ -300,9 +287,8 @@ def expval3():
     """
     A = np.array([[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]])
 
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: [[alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<2> -> !qref.bit
     # CHECK: [[obs:%.+]] = qref.hermitian(%arg0 : tensor<2x2xcomplex<f64>>) [[q0]] : !quantum.obs
     # CHECK: [[expval:%.+]] = quantum.expval [[obs]] : f64
     # CHECK: qref.dealloc [[alloc]] : !qref.reg<2>
@@ -329,11 +315,9 @@ def expval4():
         ]
     )
 
-    # CHECK: [[one:%.+]] = arith.constant 1 : i64
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: [[alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
-    # CHECK: [[q1:%.+]] = qref.get [[alloc]][[[one]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<2> -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[alloc]][ 1] : !qref.reg<2> -> !qref.bit
     # CHECK: [[obs:%.+]] = qref.hermitian(%arg0 : tensor<4x4xcomplex<f64>>) [[q0]], [[q1]] : !quantum.obs
     # CHECK: [[expval:%.+]] = quantum.expval [[obs]] : f64
     # CHECK: qref.dealloc [[alloc]] : !qref.reg<2>
@@ -360,14 +344,11 @@ def expval5():
         ]
     )
 
-    # CHECK: [[two:%.+]] = arith.constant 2 : i64
-    # CHECK: [[one:%.+]] = arith.constant 1 : i64
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: [[alloc:%.+]] = qref.alloc( 3) : !qref.reg<3>
-    # CHECK: [[q1:%.+]] = qref.get [[alloc]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[alloc]][ 1] : !qref.reg<3> -> !qref.bit
     # CHECK: [[obs1:%.+]] = qref.namedobs [[q1]][ PauliX] : !quantum.obs
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
-    # CHECK: [[q2:%.+]] = qref.get [[alloc]][[[two]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<3> -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[alloc]][ 2] : !qref.reg<3> -> !qref.bit
     # CHECK: [[obs2:%.+]] = qref.hermitian(%arg0 : tensor<4x4xcomplex<f64>>) [[q0]], [[q2]] : !quantum.obs
     # CHECK: [[obs_tensor:%.+]] = quantum.tensor [[obs1]], [[obs2]] : !quantum.obs
     # CHECK: [[expval:%.+]] = quantum.expval [[obs_tensor]] : f64
@@ -386,18 +367,15 @@ def expval6():
     Test an empty circuit with expval terminal measurement on a Hamiltonian observable, with the
     terms being tensor products.
     """
-    # CHECK: [[two:%.+]] = arith.constant 2 : i64
-    # CHECK: [[one:%.+]] = arith.constant 1 : i64
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: [[alloc:%.+]] = qref.alloc( 3) : !qref.reg<3>
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: [[obs0x:%.+]] = qref.namedobs [[q0]][ PauliX] : !quantum.obs
-    # CHECK: [[q1:%.+]] = qref.get [[alloc]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[alloc]][ 1] : !qref.reg<3> -> !qref.bit
     # CHECK: [[obs1z:%.+]] = qref.namedobs [[q1]][ PauliZ] : !quantum.obs
     # CHECK: [[t0:%.+]] = quantum.tensor [[obs0x]], [[obs1z]] : !quantum.obs
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: [[obs0z:%.+]] = qref.namedobs [[q0]][ PauliZ] : !quantum.obs
-    # CHECK: [[q2:%.+]] = qref.get [[alloc]][[[two]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[alloc]][ 2] : !qref.reg<3> -> !qref.bit
     # CHECK: [[obs2h:%.+]] = qref.namedobs [[q2]][ Hadamard] : !quantum.obs
     # CHECK: [[t1:%.+]] = quantum.tensor [[obs0z]], [[obs2h]] : !quantum.obs
     # CHECK: [[obs:%.+]] = quantum.hamiltonian({{%.+}} : tensor<2xf64>) [[t0]], [[t1]]
@@ -430,13 +408,11 @@ def expval7():
         ]
     )
 
-    # CHECK: [[one:%.+]] = arith.constant 1 : i64
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: [[alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
-    # CHECK: [[q1:%.+]] = qref.get [[alloc]][[[one]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<2> -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[alloc]][ 1] : !qref.reg<2> -> !qref.bit
     # CHECK: [[hermitian:%.+]] = qref.hermitian(%arg0 : tensor<4x4xcomplex<f64>>) [[q0]], [[q1]] : !quantum.obs
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<2> -> !qref.bit
     # CHECK: [[obs0x:%.+]] = qref.namedobs [[q0]][ PauliX] : !quantum.obs
     # CHECK: [[hamiltonian:%.+]] = quantum.hamiltonian({{%.+}} : tensor<2xf64>) [[hermitian]], [[obs0x]] : !quantum.obs
     # CHECK: [[expval:%.+]] = quantum.expval [[hamiltonian]] : f64
@@ -456,7 +432,6 @@ def var1(i: int):
     """
     Test an empty circuit with variance terminal measurement on a dynamic wires.
     """
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: [[alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
     # CHECK: [[i:%.+]] = tensor.extract %arg0[] : tensor<i64>
     # CHECK: [[qi:%.+]] = qref.get [[alloc]][[[i]]] : !qref.reg<2>, i64 -> !qref.bit
@@ -486,10 +461,8 @@ def var2(i: int, j: int):
         ]
     )
 
-    # CHECK: [[one:%.+]] = arith.constant 1 : i64
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: [[alloc:%.+]] = qref.alloc( 3) : !qref.reg<3>
-    # CHECK: [[q1:%.+]] = qref.get [[alloc]][[[one]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[alloc]][ 1] : !qref.reg<3> -> !qref.bit
     # CHECK: [[obs1x:%.+]] = qref.namedobs [[q1]][ PauliX] : !quantum.obs
     # CHECK: [[i:%.+]] = tensor.extract %arg1[] : tensor<i64>
     # CHECK: [[qi:%.+]] = qref.get [[alloc]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
@@ -512,22 +485,21 @@ def test_multiple_terminal_measurements():
     """
     Test an empty circuit with multiple terminal measurements.
     """
-    # CHECK: [[zero:%.+]] = arith.constant 0 : i64
     # CHECK: quantum.device
     # CHECK: [[alloc:%.+]] = qref.alloc( 3) : !qref.reg<3>
 
     # CHECK: [[compbasis:%.+]] = qref.compbasis(qreg [[alloc]] : !qref.reg<3>) : !quantum.obs
     # CHECK: [[probs:%.+]] = quantum.probs [[compbasis]] : tensor<8xf64>
 
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: [[compbasis:%.+]] = qref.compbasis qubits [[q0]] : !quantum.obs
     # CHECK: [[sample:%.+]] = quantum.sample [[compbasis]] : tensor<1000x1xf64>
 
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: [[Xobs:%.+]] = qref.namedobs [[q0]][ PauliX] : !quantum.obs
     # CHECK: [[expval:%.+]] = quantum.expval [[Xobs]] : f64
 
-    # CHECK: [[q0:%.+]] = qref.get [[alloc]][[[zero]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK: [[q0:%.+]] = qref.get [[alloc]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: [[Yobs:%.+]] = qref.namedobs [[q0]][ PauliY] : !quantum.obs
     # CHECK: [[var:%.+]] = quantum.var [[Yobs]] : f64
 
