@@ -14,42 +14,9 @@
 
 #include "Driver/Pipelines.h"
 
-#include <memory>
-
-#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
-#include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
-#include "mlir/Conversion/BufferizationToMemRef/BufferizationToMemRef.h"
-#include "mlir/Conversion/ComplexToLLVM/ComplexToLLVM.h"
-#include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
-#include "mlir/Conversion/IndexToLLVM/IndexToLLVM.h"
-#include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
-#include "mlir/Conversion/MathToLibm/MathToLibm.h"
-#include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
-#include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
-#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
-#include "mlir/Conversion/TensorToLinalg/TensorToLinalgPass.h"
-#include "mlir/Dialect/Arith/Transforms/Passes.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Bufferization/Transforms/Passes.h"
-#include "mlir/Dialect/Linalg/Passes.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Transforms/Passes.h"
-#include "stablehlo/conversions/linalg/transforms/Passes.h"
-#include "stablehlo/transforms/Passes.h"
-#include "stablehlo/transforms/optimization/Passes.h"
 
-#include "Catalyst/IR/CatalystDialect.h"
-#include "Catalyst/Transforms/Passes.h"
 #include "Driver/DefaultPipelines/DefaultPipelines.h"
-#include "Driver/Pipelines.h"
-#include "Gradient/IR/GradientDialect.h"
-#include "Gradient/Transforms/Passes.h"
-#include "Mitigation/Transforms/Passes.h"
-#include "PBC/Transforms/Passes.h"
-#include "Quantum/IR/QuantumDialect.h"
-#include "Quantum/Transforms/Passes.h"
-#include "hlo-extensions/Transforms/Passes.h"
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
