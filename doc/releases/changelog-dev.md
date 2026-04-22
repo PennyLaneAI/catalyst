@@ -1017,6 +1017,7 @@
   from the QEC Logical (`qecl`) dialect into the QEC Physical (`qecp`) dialect.
   [(#2697)](https://github.com/PennyLaneAI/catalyst/pull/2697)
   [(#2716)](https://github.com/PennyLaneAI/catalyst/pull/2716)
+  [(#2731)](https://github.com/PennyLaneAI/catalyst/pull/2731)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
