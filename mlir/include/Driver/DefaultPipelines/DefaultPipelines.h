@@ -35,6 +35,7 @@ using PipelineList = std::vector<PipelineInfo>;
 const PipelineList pipelineList{
     {"quantum-compilation-pipeline",
      {"canonicalize",
+      "verify-no-quantum-use-after-free",
       "convert-to-value-semantics",
       "canonicalize",
       // We want the invariant that transforms that generate multiple
