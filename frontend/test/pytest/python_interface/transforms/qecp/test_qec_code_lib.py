@@ -17,6 +17,7 @@
 import re
 
 import pytest
+import numpy as np
 
 from catalyst.python_interface.transforms.qecp.qec_code_lib import QecCode
 
@@ -31,19 +32,21 @@ class TestQecCode:
     )
     def test_constructor(self, name: str, n: int, k: int, d: int):
         """Test the constructor of the `QecCode` class for various QEC codes."""
-        qec_code = QecCode(name, n, k, d)
+        qec_code = QecCode(name, n, k, d, np.eye(n), np.array([1] * n))
 
         assert qec_code.name == name
         assert qec_code.n == n
         assert qec_code.k == k
         assert qec_code.d == d
+        assert np.all(qec_code.x_tanner == np.eye(n))
+        assert np.all(qec_code.z_tanner == np.array([1] * n))
 
     @pytest.mark.parametrize(
         "inputs, expected_str",
         [
-            (("Steane", 7, 1, 3), "[[7, 1, 3]] Steane"),
-            (("", 7, 1, 3), "[[7, 1, 3]] <unknown>"),
-            (("  ", 7, 1, 3), "[[7, 1, 3]] <unknown>"),
+            (("Steane", 7, 1, 3, np.eye(7), np.eye(7)), "[[7, 1, 3]] Steane"),
+            (("", 7, 1, 3, np.eye(7), np.eye(7)), "[[7, 1, 3]] <unknown>"),
+            (("  ", 7, 1, 3, np.eye(7), np.eye(7)), "[[7, 1, 3]] <unknown>"),
         ],
     )
     def test_str_representation(self, inputs, expected_str):
@@ -54,9 +57,31 @@ class TestQecCode:
     @pytest.mark.parametrize(
         "data",
         [
-            {"name": "Steane", "n": 7, "k": 1, "d": 3},
-            {"name": "Shor", "n": 9, "k": 1, "d": 3},
-            {"name": "Unknown", "n": 7, "k": 1, "d": 3, "extra-field": 42},
+            {
+                "name": "Steane",
+                "n": 7,
+                "k": 1,
+                "d": 3,
+                "x_tanner": np.eye(7),
+                "z_tanner": np.array([[0, 0, 1, 1, 0, 1, 1]]),
+            },
+            {
+                "name": "Shor",
+                "n": 9,
+                "k": 1,
+                "d": 3,
+                "x_tanner": np.eye(9),
+                "z_tanner": np.array([[0, 0, 1, 1, 0, 1, 1, 0, 1]]),
+            },
+            {
+                "name": "Unknown",
+                "n": 7,
+                "k": 1,
+                "d": 3,
+                "x_tanner": np.eye(7),
+                "z_tanner": np.array([[0, 0, 1, 1, 0, 1, 1]]),
+                "extra-field": 42,
+            },
         ],
     )
     def test_from_dict(self, data: dict):
@@ -67,12 +92,28 @@ class TestQecCode:
         assert qec_code.n == data["n"]
         assert qec_code.k == data["k"]
         assert qec_code.d == data["d"]
+        assert np.all(qec_code.x_tanner == data["x_tanner"])
+        assert np.all(qec_code.z_tanner == data["z_tanner"])
 
     @pytest.mark.parametrize(
         "data",
         [
-            {"name": "Steane", "n": 7, "k": 1, "d": 3},
-            {"name": "Shor", "n": 9, "k": 1, "d": 3},
+            {
+                "name": "Steane",
+                "n": 7,
+                "k": 1,
+                "d": 3,
+                "x_tanner": np.eye(7),
+                "z_tanner": np.array([[0, 0, 1, 1, 0, 1, 1]]),
+            },
+            {
+                "name": "Shor",
+                "n": 9,
+                "k": 1,
+                "d": 3,
+                "x_tanner": np.eye(9),
+                "z_tanner": np.array([[0, 0, 1, 1, 0, 1, 1, 0, 1]]),
+            },
         ],
     )
     def test_constructor_with_dict_input(self, data: dict):
@@ -89,6 +130,8 @@ class TestQecCode:
         assert qec_code.n == data["n"]
         assert qec_code.k == data["k"]
         assert qec_code.d == data["d"]
+        assert np.all(qec_code.x_tanner == data["x_tanner"])
+        assert np.all(qec_code.z_tanner == data["z_tanner"])
 
     @pytest.mark.parametrize("name", SUPPORTED_CODES)
     def test_get(self, name: str):
