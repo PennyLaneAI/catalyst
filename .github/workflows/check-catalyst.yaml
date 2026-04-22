@@ -532,12 +532,13 @@ jobs:
         echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
 
-    - name: Run qref frontend lit tests
+    - name: Run temporary qref frontend tests
       run: |
         for file in ./frontend/test/lit/test_qref/*; do\
           echo "Testing $file"\;
           python3 "$file" | ./llvm-build/bin/FileCheck "$file";\
         done
+        pytest ./frontend/test/pytest/test_dynamic_qubit_allocation.py -k test_use_after_free
 
     - name: Run Python Pytest/Lit Tests
       run: |
