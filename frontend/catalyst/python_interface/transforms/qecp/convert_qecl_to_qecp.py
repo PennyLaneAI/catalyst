@@ -92,7 +92,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
     # To specify the number of errors to be injected in the noise subroutine,
     # which is needed for the convert-qecl-noise-to-qecp-noise pass.
     number_errors: int = 1
-    
+
     def __post_init__(self):
         # This method handles the case where `qec_code` is given as a dictionary rather than a
         # `QecCode` object. This is possible when the pass is registered in the IR and applied via
