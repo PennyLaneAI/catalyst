@@ -1016,6 +1016,7 @@
 * A new, experimental compiler pass `convert-qecl-to-qecp` has been added to lower operations
   from the QEC Logical (`qecl`) dialect into the QEC Physical (`qecp`) dialect.
   [(#2697)](https://github.com/PennyLaneAI/catalyst/pull/2697)
+  [(#2714)](https://github.com/PennyLaneAI/catalyst/pull/2714)
   [(#2716)](https://github.com/PennyLaneAI/catalyst/pull/2716)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.

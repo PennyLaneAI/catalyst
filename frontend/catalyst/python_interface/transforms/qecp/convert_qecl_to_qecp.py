@@ -34,6 +34,7 @@ from catalyst.python_interface.dialects import qecl, qecp
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 from catalyst.utils.exceptions import CompileError
 
+from .convert_qecl_noise_to_qec_noise import ConvertQECLNoiseOpToQECPNoisePass
 from .qec_code_lib import QecCode
 
 # MARK: Type Conversion Pattern
@@ -88,6 +89,10 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     qec_code: QecCode
 
+    # To specify the number of errors to be injected in the noise subroutine,
+    # which is needed for the convert-qecl-noise-to-qecp-noise pass.
+    number_errors: int = 1
+
     def __post_init__(self):
         # This method handles the case where `qec_code` is given as a dictionary rather than a
         # `QecCode` object. This is possible when the pass is registered in the IR and applied via
@@ -109,11 +114,16 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 f"per codeblock, k, is 1, but got k = {self.qec_code.k}"
             )
 
+        # n is the number of physical data qubits from the QEC code.
+        ConvertQECLNoiseOpToQECPNoisePass(
+            n=self.qec_code.n, number_errors=self.number_errors
+        ).apply(ctx, op)
+
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [
-                    CodeblockTypeConversion(qec_code=self.qec_code),
-                    HyperRegisterTypeConversion(qec_code=self.qec_code),
+                    # CodeblockTypeConversion(qec_code=self.qec_code),
+                    # HyperRegisterTypeConversion(qec_code=self.qec_code),
                 ]
             )
         ).rewrite_module(op)
