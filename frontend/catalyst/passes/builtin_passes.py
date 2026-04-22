@@ -1596,6 +1596,7 @@ def graph_decomposition_setup_inputs(
     gate_set: Iterable[type | str] | dict[type | str, float],
     fixed_decomps: dict | None = None,
     alt_decomps: dict | None = None,
+    bytecode_rules=None,
     _builtin_rule_path: Path = BYTECODE_FILE_PATH,
 ):
     R"""
