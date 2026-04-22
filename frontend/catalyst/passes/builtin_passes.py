@@ -1598,7 +1598,7 @@ def graph_decomposition_setup_inputs(
     alt_decomps: dict | None = None,
     bytecode_rules=None,
     _builtin_rule_path: Path = BYTECODE_FILE_PATH,
-):
+): #pylint: disable=unused-argument
     R"""
     Specify that the ``-graph-decomposition`` MLIR compiler pass for applying the graph-based
     decomposition should be applied to the decorated QNode during :func:`~.qjit` compilation.
