@@ -89,12 +89,9 @@ class TestTypeConversionPattern:
         }}
         """
         pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(
-                qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))
-            ),
+            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))),
         )
         run_filecheck(program, pipeline)
-
 
     def test_codeblock_conversion_with_k_mismatch(self, run_filecheck):
         """Test that attempting to convert a codeblock type with a value of k different than the
@@ -109,7 +106,9 @@ class TestTypeConversionPattern:
         }
         }
         """
-        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", 7, 1, 3, np.eye(7), np.eye(7))),)
+        pipeline = (
+            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", 7, 1, 3, np.eye(7), np.eye(7))),
+        )
 
         with pytest.raises(CompileError, match="Failed to convert type"):
             run_filecheck(program, pipeline)
@@ -127,7 +126,9 @@ class TestTypeConversionPattern:
         }
         }
         """
-        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", 7, 1, 3, np.eye(7), np.eye(7))),)
+        pipeline = (
+            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", 7, 1, 3, np.eye(7), np.eye(7))),
+        )
 
         with pytest.raises(CompileError, match="Failed to convert type"):
             run_filecheck(program, pipeline)

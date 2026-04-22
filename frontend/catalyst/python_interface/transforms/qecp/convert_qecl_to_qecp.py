@@ -172,11 +172,11 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         ).rewrite_module(op)
 
     def create_encode_subroutine(self) -> func.FuncOp:
-        """Create a subroutine that takes in a codeblock, encodes it in the zero state for 
+        """Create a subroutine that takes in a codeblock, encodes it in the zero state for
         the QEC code (based on the tanner graph), and returns the encoded codeblock.
 
-        The subroutine allocates auxiliary qubits for use in encoding based on the number of 
-        rows in the X tanner graph , and deallocates them once encoding is complete.    
+        The subroutine allocates auxiliary qubits for use in encoding based on the number of
+        rows in the X tanner graph , and deallocates them once encoding is complete.
         """
 
         codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
@@ -193,7 +193,9 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             aux_qubits = [op.results[0] for op in aux_allocate_ops]
 
             # apply X-check gate+measurement pattern
-            measure_ops, encoded_codeblock = self.check_pattern(aux_qubits, codeblock, check_type=CheckType.X)
+            measure_ops, encoded_codeblock = self.check_pattern(
+                aux_qubits, codeblock, check_type=CheckType.X
+            )
 
             # ToDo: should we also be applying the Z corrections?
 
@@ -202,30 +204,35 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
             # return the encoded codeblock
             func.ReturnOp(encoded_codeblock)
-        
+
         funcOp = func.FuncOp(
-            name=f"encode_zero_{self.qec_code.name}", 
-            function_type=(input_types, output_types), 
-            visibility="private", 
+            name=f"encode_zero_{self.qec_code.name}",
+            function_type=(input_types, output_types),
+            visibility="private",
             region=Region([block]),
         )
 
         return funcOp
 
-    def check_pattern(self, aux_qubits: Iterable[qecp.QecPhysicalQubitSSAValue], codeblock: qecp.PhysicalCodeBlockSSAValue, check_type: CheckType) -> (Iterable[qecp.MeasureOp], qecp.PhysicalCodeblockType):
+    def check_pattern(
+        self,
+        aux_qubits: Iterable[qecp.QecPhysicalQubitSSAValue],
+        codeblock: qecp.PhysicalCodeBlockSSAValue,
+        check_type: CheckType,
+    ) -> (Iterable[qecp.MeasureOp], qecp.PhysicalCodeblockType):
         """Contains the ops to perform a QEC check on the provided auxiliary qubits and codeblock.
-        Intended to be called inside `builder.ImplicitBuilder` to add these operations to a block. 
+        Intended to be called inside `builder.ImplicitBuilder` to add these operations to a block.
 
-        This pattern includes measurement of the auxiliary qubits, and returns the MeasureOps, as 
-        well as the codeblock after the check pattern has been applied. 
-        
-        This function is not responsible for aux qubit allocation, aux qubit deallocation, or 
+        This pattern includes measurement of the auxiliary qubits, and returns the MeasureOps, as
+        well as the codeblock after the check pattern has been applied.
+
+        This function is not responsible for aux qubit allocation, aux qubit deallocation, or
         handling of measurement outputs (for example sending them to a decoder.)
-        
+
         Args:
-            aux_qubits (Iterable[qecp.QecPhysicalQubitSSAValue]): The auxiliary qubits to be used 
+            aux_qubits (Iterable[qecp.QecPhysicalQubitSSAValue]): The auxiliary qubits to be used
                 in the check
-            codeblock (qecp.PhysicalCodeBlockSSAValue): The codeblock of data-qubits to be used 
+            codeblock (qecp.PhysicalCodeBlockSSAValue): The codeblock of data-qubits to be used
                 in the check
             check_type (CheckType): Which check pattern will be performed.
 
@@ -272,7 +279,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         return measure_ops, codeblock
 
     def _get_cnot_and_tanner_graph(self, check_type: CheckType) -> (np.ndarray, Callable):
-        """Get the appropriate tanner graph and the function for applying CNOTs in an 
+        """Get the appropriate tanner graph and the function for applying CNOTs in an
         QEC check based on the check type."""
 
         if check_type == "X":
@@ -283,7 +290,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 cnot_op = qecp.CnotOp(aux_qb, data_qb)
                 aux_qb, data_qb = cnot_op.results
                 return aux_qb, data_qb
-            
+
         elif check_type == "Z":
             # we use CNOT(data, aux) and Z-tanner graph
             tanner_graph = self.qec_code.z_tanner
@@ -291,12 +298,14 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             def cnot_fn(aux_qb, data_qb):
                 cnot_op = qecp.CnotOp(data_qb, aux_qb)
                 data_qb, aux_qb = cnot_op.results
-                return aux_qb, data_qb 
-            
+                return aux_qb, data_qb
+
         else:
-            raise CompileError(f"Only CSS codes are supported, check_type must be X or Z but recieved {check_type}")
-        
-        return tanner_graph, cnot_fn        
+            raise CompileError(
+                f"Only CSS codes are supported, check_type must be X or Z but recieved {check_type}"
+            )
+
+        return tanner_graph, cnot_fn
 
 
 convert_qecl_to_qecp_pass = compiler_transform(ConvertQecLogicalToQecPhysicalPass)
