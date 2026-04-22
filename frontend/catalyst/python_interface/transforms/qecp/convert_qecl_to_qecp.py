@@ -122,8 +122,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [
-                    # CodeblockTypeConversion(qec_code=self.qec_code),
-                    # HyperRegisterTypeConversion(qec_code=self.qec_code),
+                    CodeblockTypeConversion(qec_code=self.qec_code),
+                    HyperRegisterTypeConversion(qec_code=self.qec_code),
                 ]
             )
         ).rewrite_module(op)
