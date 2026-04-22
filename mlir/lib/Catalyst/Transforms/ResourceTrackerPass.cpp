@@ -202,7 +202,10 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
     static void writeJsonToFile(const std::string &jsonStr, const std::string &fileName)
     {
         std::ofstream ofile(fileName);
-        assert(ofile.is_open() && "Invalid file to store resource results");
+        if (!ofile.is_open()) {
+            llvm::errs() << "Error: could not open resource output file: " << fileName << "\n";
+            return;
+        }
         ofile << jsonStr;
         ofile.close();
     }
@@ -222,8 +225,9 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
         file_name += jit_fn_name;
 
         auto now = std::chrono::system_clock::now();
-        std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
-        std::tm *now_tm = std::localtime(&now_time_t);
+        auto zt = std::chrono::zoned_time{std::chrono::current_zone(), now};
+        auto now_tm = zt.get_local_time();
+
 
         char buffer[32]; // Large enough for "_YYYYMMDD_HHMMSS\0"
         std::strftime(buffer, sizeof(buffer), "_%Y%m%d_%H%M%S", now_tm);

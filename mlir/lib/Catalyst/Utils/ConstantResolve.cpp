@@ -46,7 +46,7 @@ static std::optional<double> attrToDouble(Attribute attr)
     return std::nullopt;
 }
 
-inline std::optional<double> resolveConstantArithmetic(Value val, Operation *op)
+std::optional<double> resolveConstantArithmetic(Value val, Operation *op)
 {
     // arith integer binary ops
     if (isa<arith::AddIOp, arith::SubIOp, arith::MulIOp>(op)) {
