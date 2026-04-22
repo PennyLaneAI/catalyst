@@ -458,7 +458,7 @@ merge_rotations = qml.transform(
 )
 
 
-def decompose_lowering_setup_inputs():
+def decompose_lowering_setup_inputs(): # pragma: no cover
     """
     Specify that the ``-decompose-lowering`` MLIR compiler pass
     for applying the compiled decomposition rules to the QNode
