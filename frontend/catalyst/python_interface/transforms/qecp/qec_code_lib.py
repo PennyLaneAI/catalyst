@@ -70,11 +70,7 @@ class QecCode:
         """
         # Filter dictionary to keep only keys that are fields of this dataclass
         field_names = {f.name for f in fields(cls)}
-        print(field_names)
-        print(data.items())
-        print([k for k in data.keys() if k in field_names])
         filtered_data = {k: v for k, v in data.items() if k in field_names}
-        print(filtered_data)
         return cls(**filtered_data)
 
     @classmethod

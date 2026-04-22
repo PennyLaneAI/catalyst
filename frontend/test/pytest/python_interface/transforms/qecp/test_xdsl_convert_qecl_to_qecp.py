@@ -311,4 +311,3 @@ class TestQECLNoiseLoweringPassIntegration:
             return qp.sample([m0])
 
         run_filecheck_qjit(circuit)
-
