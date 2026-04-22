@@ -226,12 +226,8 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
 
         auto now = std::chrono::system_clock::now();
         auto zt = std::chrono::zoned_time{std::chrono::current_zone(), now};
-        auto now_tm = zt.get_local_time();
 
-
-        char buffer[32]; // Large enough for "_YYYYMMDD_HHMMSS\0"
-        std::strftime(buffer, sizeof(buffer), "_%Y%m%d_%H%M%S", now_tm);
-        file_name += std::string(buffer);
+        file_name += std::format("_{:%Y%m%d_%H%M%S}", zt);
 
         return file_name;
     }

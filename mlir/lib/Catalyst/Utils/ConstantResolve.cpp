@@ -55,23 +55,45 @@ std::optional<double> resolveConstantArithmetic(Value val, Operation *op)
         if (!lhs || !rhs) {
             return std::nullopt;
         }
-        if (isa<arith::AddIOp>(op)) {
+        if (isa<arith::AddIOp>(op) || isa<arith::AddFOp>(op)) {
             return *lhs + *rhs;
         }
-        if (isa<arith::SubIOp>(op)) {
+        if (isa<arith::SubIOp>(op) || isa<arith::SubFOp>(op)) {
             return *lhs - *rhs;
         }
         return *lhs * *rhs;
     }
 
-    // arith.addf
-    if (isa<arith::AddFOp>(op)) {
-        auto lhs = resolveConstant(op->getOperand(0));
-        auto rhs = resolveConstant(op->getOperand(1));
-        if (lhs && rhs) {
-            return *lhs + *rhs;
+    return std::nullopt;
+}
+
+std::optional<double> resolveConstantStableHLO(Value val, Operation *op)
+{
+    // stablehlo ops (matched by name to avoid header dependency)
+    // OpName is used to avoid header dependency
+    StringRef opName = op->getName().getStringRef();
+
+    if (opName == "stablehlo.constant") {
+        if (auto attr = op->getAttr("value")) {
+            return attrToDouble(attr);
         }
         return std::nullopt;
+    }
+
+    if (opName == "stablehlo.convert" || opName == "stablehlo.broadcast_in_dim") {
+        if (op->getNumOperands() > 0) {
+            return resolveConstant(op->getOperand(0));
+        }
+        return std::nullopt;
+    }
+
+    if (opName == "stablehlo.add" || opName == "stablehlo.subtract") {
+        auto lhs = resolveConstant(op->getOperand(0));
+        auto rhs = resolveConstant(op->getOperand(1));
+        if (!lhs || !rhs) {
+            return std::nullopt;
+        }
+        return (opName == "stablehlo.add") ? *lhs + *rhs : *lhs - *rhs;
     }
 
     return std::nullopt;
@@ -99,8 +121,7 @@ std::optional<double> resolveConstant(Value val)
     }
 
     // Arithmetic operations
-    auto res = resolveConstantArithmetic(val, op);
-    if (res != std::nullopt) {
+    if (auto res = resolveConstantArithmetic(val, op); res != std::nullopt) {
         return res;
     }
 
@@ -117,31 +138,9 @@ std::optional<double> resolveConstant(Value val)
         return std::nullopt;
     }
 
-    // stablehlo ops (matched by name to avoid header dependency)
-    // OpName is used to avoid header dependency
-    StringRef opName = op->getName().getStringRef();
-
-    if (opName == "stablehlo.constant") {
-        if (auto attr = op->getAttr("value")) {
-            return attrToDouble(attr);
-        }
-        return std::nullopt;
-    }
-
-    if (opName == "stablehlo.convert" || opName == "stablehlo.broadcast_in_dim") {
-        if (op->getNumOperands() > 0) {
-            return resolveConstant(op->getOperand(0));
-        }
-        return std::nullopt;
-    }
-
-    if (opName == "stablehlo.add" || opName == "stablehlo.subtract") {
-        auto lhs = resolveConstant(op->getOperand(0));
-        auto rhs = resolveConstant(op->getOperand(1));
-        if (!lhs || !rhs) {
-            return std::nullopt;
-        }
-        return (opName == "stablehlo.add") ? *lhs + *rhs : *lhs - *rhs;
+    // StableHLO operations
+    if (auto res = resolveConstantStableHLO(val, op); res != std::nullopt) {
+        return res;
     }
 
     // Generic dense splat constant (catch-all via matchPattern)
