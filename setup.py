@@ -214,14 +214,14 @@ class UnifiedBuildExt(build_ext):
         1. `get_ext_filename`, in order to remove the architecture/python
            version suffix of the library name.
         2. `build_extension`, in order to handle the compilation of extensions
-           with CMake configurations, namely the catalyst.utils.wrapper module,
-           and of generic C/C++ extensions without a CMake configuration, namely
-           the catalyst.utils.libcustom_calls module, which is currently built
-           as a plain setuptools Extension.
+           with CMake configurations, namely the catalyst.utils.wrapper module, and
+           of generic C/C++ extensions without a CMake configuration, namely the
+           catalyst.utils.libcustom_calls module, which is currently built as a
+           plain setuptools Extension.
 
     TODO: Eventually it would be better to build the utils.libcustom_calls
-    module using a CMake configuration as well, rather than as a setuptools
-    Extension.
+      module using a CMake configuration as well, rather than as a setuptools
+      Extension.
     """
 
     def initialize_options(self):
@@ -288,7 +288,7 @@ class UnifiedBuildExt(build_ext):
         if "CMAKE_ARGS" in os.environ:
             configure_args += os.environ["CMAKE_ARGS"].split(" ")
 
-        build_temp = os.path.abspath(self.build_temp)
+        build_temp = os.path.join(os.path.abspath(self.build_temp), ext.name)
         os.makedirs(build_temp, exist_ok=True)
 
         build_args = ["--config", "Debug"] if debug else ["--config", "RelWithDebInfo"]

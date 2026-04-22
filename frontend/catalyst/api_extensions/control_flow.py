@@ -1664,6 +1664,13 @@ class Switch(HybridOp):
     """PennyLane's switch operation"""
 
     binder = switch_p.bind
+    has_adjoint = True
+
+    def adjoint(self):
+        """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
+        version of the operation, which is generally supported by Catalyst."""
+
+        return qml.adjoint(lambda: qml.apply(self) and None)()
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         return trace_quantum_branches(self, ctx, device, trace, qrp)

@@ -349,3 +349,66 @@ func.func private @param_ordering(%0: !quantum.reg) -> !quantum.reg {
 
   return %1 : !quantum.reg
 }
+
+// -----
+
+// Test adjoint of scf.index_switch
+
+// CHECK: func.func private @switch_branch_callee.adjoint(%arg0: !quantum.reg) -> !quantum.reg
+// CHECK:     quantum.custom "PauliX"() {{%.+}} adj : !quantum.bit
+
+func.func private @switch_branch_callee(%arg0: !quantum.reg) -> !quantum.reg {
+    %q = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
+    %r = quantum.custom "PauliX"() %q : !quantum.bit
+    %out = quantum.insert %arg0[ 0], %r : !quantum.reg, !quantum.bit
+    func.return %out : !quantum.reg
+}
+
+// CHECK-LABEL: @adjoint_index_switch
+func.func private @adjoint_index_switch(%idx: index) -> !quantum.reg {
+  %0 = quantum.alloc( 1) : !quantum.reg
+
+  // CHECK:       catalyst.list_push
+  // CHECK:       [[popped:%.+]] = catalyst.list_pop
+  // CHECK:       scf.index_switch [[popped]]
+  // CHECK:       case 0 {
+  // CHECK:         "Hadamard"() {{%.+}} adj
+  // CHECK:         "PauliX"() {{%.+}} adj
+  // CHECK:       case 1 {
+  // CHECK:         "T"() {{%.+}} adj
+  // CHECK:         "PauliY"() {{%.+}} adj
+  // CHECK:       default {
+  // CHECK:         call @switch_branch_callee.adjoint({{%.+}}) : (!quantum.reg) -> !quantum.reg
+  // CHECK:         "S"() {{%.+}} adj
+  // CHECK:         "PauliZ"() {{%.+}} adj
+
+  %1 = quantum.adjoint(%0) : !quantum.reg {
+  ^bb0(%arg0: !quantum.reg):
+    %sw = scf.index_switch %idx -> !quantum.reg
+    case 0 {
+      %q = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
+      %r0 = quantum.custom "PauliX"() %q : !quantum.bit
+      %r1 = quantum.custom "Hadamard"() %r0 : !quantum.bit
+      %out = quantum.insert %arg0[ 0], %r1 : !quantum.reg, !quantum.bit
+      scf.yield %out : !quantum.reg
+    }
+    case 1 {
+      %q = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
+      %r0 = quantum.custom "PauliY"() %q : !quantum.bit
+      %r1 = quantum.custom "T"() %r0 : !quantum.bit
+      %out = quantum.insert %arg0[ 0], %r1 : !quantum.reg, !quantum.bit
+      scf.yield %out : !quantum.reg
+    }
+    default {
+      %q = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
+      %r0 = quantum.custom "PauliZ"() %q : !quantum.bit
+      %r1 = quantum.custom "S"() %r0 : !quantum.bit
+      %reg0 = quantum.insert %arg0[ 0], %r1 : !quantum.reg, !quantum.bit
+      %out = func.call @switch_branch_callee(%reg0) : (!quantum.reg) -> !quantum.reg
+      scf.yield %out : !quantum.reg
+    }
+    quantum.yield %sw : !quantum.reg
+  }
+
+  return %1 : !quantum.reg
+}
