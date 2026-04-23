@@ -15,9 +15,9 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/TypeRange.h"
 
+#include "Catalyst/Utils/ConstantResolve.h"
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Transforms/Patterns.h"
-#include "PBC/Utils/PBCOpUtils.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
@@ -266,7 +266,7 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
     auto inQubits = op.getInQubits();
     auto outQubitTypes = op.getOutQubits().getType();
 
-    auto angleOpt = resolveConstantValue(angleValue);
+    auto angleOpt = resolveConstant(angleValue);
 
     if (angleOpt.has_value()) {
         constexpr double PI = llvm::numbers::pi;
