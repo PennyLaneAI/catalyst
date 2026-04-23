@@ -515,6 +515,9 @@ print(test_multiple_terminal_measurements.mlir)
 # CHECK: func.func public @jit_test_pre_post_processing(%arg0: tensor<i64>)
 @qp.qjit(capture=True, target="mlir")
 def test_pre_post_processing(i: int):
+    """
+    Test converting a workflow with pre and post processing.
+    """
     # CHECK: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
     # CHECK: [[arg0_plus_one:%.+]] = stablehlo.add %arg0, [[one]] : tensor<i64>
     # CHECK: [[circuit_out:%.+]]:2 = catalyst.launch_kernel @module_circuit::@circuit(%arg0, [[arg0_plus_one]])
@@ -534,7 +537,7 @@ def test_pre_post_processing(i: int):
     # CHECK:   [[qk:%.+]] = qref.get [[reg]][[[k]]] : !qref.reg<2>, i64 -> !qref.bit
     # CHECK:   [[Yobs:%.+]] = qref.namedobs [[qk]][ PauliY] : !quantum.obs
     # CHECK:   [[Yexpval:%.+]] = quantum.expval [[Yobs]] : f64
-    # CHECK:   [[Yexpval_tensor:%.+]] = tensor.from_elements %6 : tensor<f64>
+    # CHECK:   [[Yexpval_tensor:%.+]] = tensor.from_elements [[Yexpval]] : tensor<f64>
 
     # CHECK:   qref.dealloc [[reg]] : !qref.reg<2>
     # CHECK:   return [[Xexpval_tensor]], [[Yexpval_tensor]] : tensor<f64>, tensor<f64>

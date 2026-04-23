@@ -22,7 +22,6 @@ import pytest
 from pennylane.capture.primitives import for_loop_prim, while_loop_prim
 
 import catalyst
-from catalyst import qjit
 from catalyst.from_plxpr import from_plxpr
 from catalyst.from_plxpr.qref_jax_primitives import (
     qref_alloc_p,
@@ -31,10 +30,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
 )
 from catalyst.jax_primitives import (
     adjoint_p,
-    get_call_jaxpr,
-    qextract_p,
     qinsert_p,
-    qinst_p,
 )
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
