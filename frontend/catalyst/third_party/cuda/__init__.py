@@ -60,7 +60,8 @@ def cudaqjit(fn=None, **kwargs):
     when the quantum function is executed:
 
     .. code-block:: python
-
+        import pennylane as qp
+        from catalyst.third_party.cuda import cudaqjit
         dev = qp.device("softwareq.qpp", wires=2)
 
         @cudaqjit
