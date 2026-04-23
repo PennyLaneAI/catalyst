@@ -87,7 +87,7 @@ class AllocationConversion(RewritePattern):
     """Op conversion pattern from qecl.alloc -> qecp.alloc."""
 
     @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: qecl.AllocOp, rewriter: PatternRewriter) -> qecp.AllocOp:
+    def match_and_rewrite(self, op: qecl.AllocOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
         assert isinstance(
             op.result_types[0], qecp.PhysicalHyperRegisterType
@@ -100,7 +100,7 @@ class DeallocationConversion(RewritePattern):
     """Op conversion pattern from qecl.dealloc -> qecp.dealloc."""
 
     @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: qecl.DeallocOp, rewriter: PatternRewriter) -> qecp.DeallocOp:
+    def match_and_rewrite(self, op: qecl.DeallocOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
         assert isinstance(
             op.hyper_reg.type, qecp.PhysicalHyperRegisterType
@@ -118,7 +118,7 @@ class ExtractBlockConversion(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(
         self, op: qecl.ExtractCodeblockOp, rewriter: PatternRewriter
-    ) -> qecp.ExtractCodeblockOp:
+    ):
         """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
         assert isinstance(
             op.hyper_reg.type, qecp.PhysicalHyperRegisterType
@@ -133,7 +133,7 @@ class InsertBlockConversion(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(
         self, op: qecl.InsertCodeblockOp, rewriter: PatternRewriter
-    ) -> qecp.InsertCodeblockOp:
+    ):
         """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
         assert isinstance(
             op.in_hyper_reg.type, qecp.PhysicalHyperRegisterType
