@@ -115,3 +115,22 @@ TEST_CASE("Test get_syndrome_from_errors", "[LUTDecoderUtils::get_syndrome_from_
         REQUIRE(syndrome_bitstr == expected_str);
     }
 }
+
+TEST_CASE("Test generate_lookup_table", "[LUTDecoderUtils::generate_lookup_table]")
+{
+    auto lut = generate_lookup_table(tanner_graph.row_idx_parity_matrix_transpose,
+                                     tanner_graph.col_ptr_parity_matrix_transpose,
+                                     tanner_graph.code_size, tanner_graph.code_distance);
+
+    std::unordered_map<std::string, std::vector<size_t>> expected_lut = {
+        {"000", std::vector<size_t>({})},  {"001", std::vector<size_t>({6})},
+        {"010", std::vector<size_t>({4})}, {"011", std::vector<size_t>({5})},
+        {"100", std::vector<size_t>({0})}, {"101", std::vector<size_t>({3})},
+        {"110", std::vector<size_t>({1})}, {"111", std::vector<size_t>({2})},
+    };
+
+    for (auto it = expected_lut.begin(); it != expected_lut.end(); ++it) {
+        auto key = it->first;
+        REQUIRE(lut[key] == it->second);
+    }
+}

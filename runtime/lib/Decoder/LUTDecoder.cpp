@@ -76,6 +76,7 @@ size_t __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
 
     // NOTE: The thoughts above might or might not work.
 
+    // TODOS: Note that error_indices could be empty.
     return error_indices.front();
 }
 } // namespace Catalyst::Runtime::QEC

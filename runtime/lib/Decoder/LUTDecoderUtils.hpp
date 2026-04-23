@@ -186,7 +186,7 @@ generate_lookup_table(const std::vector<size_t> &parity_mat_row_idx,
     for (int i = 0; i <= num_errors; i++) {
         // create a base error vector
         std::vector<uint8_t> err_vector(num_data_qubits, 0);
-        std::fill_n(err_vector.begin(), i, 1);
+        std::fill(err_vector.end() - i, err_vector.end(), 1);
 
         do {
             std::string syndrome_str =
