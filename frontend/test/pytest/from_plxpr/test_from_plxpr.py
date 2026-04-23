@@ -24,10 +24,14 @@ from pennylane.capture.primitives import for_loop_prim, while_loop_prim
 import catalyst
 from catalyst import qjit
 from catalyst.from_plxpr import from_plxpr
+from catalyst.from_plxpr.qref_jax_primitives import (
+    qref_alloc_p,
+    qref_get_p,
+    qref_qinst_p,
+)
 from catalyst.jax_primitives import (
     adjoint_p,
     get_call_jaxpr,
-    qalloc_p,
     qextract_p,
     qinsert_p,
     qinst_p,
@@ -621,7 +625,7 @@ class TestAdjointCtrl:
         catalyst_xpr = from_plxpr(plxpr)()
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
 
-        assert qfunc_xpr.eqns[-6].primitive == qinst_p
+        assert qfunc_xpr.eqns[-6].primitive == qref_qinst_p
         assert qfunc_xpr.eqns[-6].params == {
             "adjoint": num_adjoints % 2 == 1,
             "ctrl_len": 0,
@@ -652,7 +656,7 @@ class TestAdjointCtrl:
 
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
         eqn = qfunc_xpr.eqns[6]  # dev, qreg, four allocations
-        assert eqn.primitive == qinst_p
+        assert eqn.primitive == qref_qinst_p
         assert eqn.params == {
             "adjoint": (inner_adjoint + outer_adjoint) % 2 == 1,
             "ctrl_len": 3,
@@ -687,7 +691,7 @@ class TestAdjointCtrl:
 
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
         eqn = qfunc_xpr.eqns[5]
-        assert eqn.primitive == qinst_p
+        assert eqn.primitive == qref_qinst_p
         assert eqn.params == {
             "adjoint": False,
             "ctrl_len": 2,
@@ -723,9 +727,9 @@ class TestAdjointCtrl:
         catalyst_xpr = from_plxpr(plxpr)(0.5)
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
 
-        assert qfunc_xpr.eqns[1].primitive == qalloc_p
-        assert qfunc_xpr.eqns[2].primitive == qextract_p
-        assert qfunc_xpr.eqns[3].primitive == qinst_p
+        assert qfunc_xpr.eqns[1].primitive == qref_alloc_p
+        assert qfunc_xpr.eqns[2].primitive == qref_get_p
+        assert qfunc_xpr.eqns[3].primitive == qref_qinst_p
         assert qfunc_xpr.eqns[4].primitive == qinsert_p
 
         eqn = qfunc_xpr.eqns[5]
@@ -736,9 +740,9 @@ class TestAdjointCtrl:
         assert len(eqn.outvars) == 1
 
         target_xpr = eqn.params["jaxpr"]
-        assert target_xpr.eqns[1].primitive == qextract_p
-        assert target_xpr.eqns[2].primitive == qextract_p
-        assert target_xpr.eqns[3].primitive == qinst_p
+        assert target_xpr.eqns[1].primitive == qref_get_p
+        assert target_xpr.eqns[2].primitive == qref_get_p
+        assert target_xpr.eqns[3].primitive == qref_qinst_p
         assert target_xpr.eqns[3].params == {
             "adjoint": False,
             "ctrl_len": 0,
@@ -769,16 +773,14 @@ class TestAdjointCtrl:
 
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
 
-        assert qfunc_xpr.eqns[2].primitive == qextract_p
-        assert qfunc_xpr.eqns[3].primitive == qextract_p
-        assert qfunc_xpr.eqns[4].primitive == qinst_p  # the cnot
-        assert qfunc_xpr.eqns[5].primitive == qinsert_p  # sticking back into reg
-        assert qfunc_xpr.eqns[6].primitive == qinsert_p
-        assert qfunc_xpr.eqns[7].primitive == qextract_p
-        assert qfunc_xpr.eqns[8].primitive == qextract_p
+        assert qfunc_xpr.eqns[2].primitive == qref_get_p
+        assert qfunc_xpr.eqns[3].primitive == qref_get_p
+        assert qfunc_xpr.eqns[4].primitive == qref_qinst_p
+        assert qfunc_xpr.eqns[5].primitive == qref_get_p
+        assert qfunc_xpr.eqns[6].primitive == qref_get_p
 
-        assert qfunc_xpr.eqns[9].primitive == qinst_p
-        assert qfunc_xpr.eqns[9].params == {
+        assert qfunc_xpr.eqns[7].primitive == qref_qinst_p
+        assert qfunc_xpr.eqns[7].params == {
             "adjoint": False,
             "ctrl_len": 1,
             "op": "T",

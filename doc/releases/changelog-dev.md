@@ -636,6 +636,7 @@
   nanobind extension module. This module is built during the MLIR compilation phase and discovered
   at runtime.
   [(#2259)](https://github.com/PennyLaneAI/catalyst/pull/2259)
+  [(#2733)](https://github.com/PennyLaneAI/catalyst/pull/2733)
 
 * Additional integration tests have been added for the pass-by-pass version of `qp.specs`.
   [(#2690)](https://github.com/PennyLaneAI/catalyst/pull/2690/)
@@ -754,6 +755,8 @@
   [(#2663)](https://github.com/PennyLaneAI/catalyst/pull/2663)
   [(#2664)](https://github.com/PennyLaneAI/catalyst/pull/2664)
   [(#2672)](https://github.com/PennyLaneAI/catalyst/pull/2672)
+  [(#2694)](https://github.com/PennyLaneAI/catalyst/pull/2694)
+  [(#2717)](https://github.com/PennyLaneAI/catalyst/pull/2717)
   [(#2720)](https://github.com/PennyLaneAI/catalyst/pull/2720)
 
 * Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
@@ -1022,6 +1025,8 @@
 * A new, experimental compiler pass `convert-qecl-to-qecp` has been added to lower operations
   from the QEC Logical (`qecl`) dialect into the QEC Physical (`qecp`) dialect.
   [(#2697)](https://github.com/PennyLaneAI/catalyst/pull/2697)
+  [(#2714)](https://github.com/PennyLaneAI/catalyst/pull/2714)
+  [(#2716)](https://github.com/PennyLaneAI/catalyst/pull/2716)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
