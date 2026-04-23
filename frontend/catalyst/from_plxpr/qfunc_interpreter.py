@@ -393,7 +393,7 @@ _special_op_bind_call = {
 
 # pylint: disable=unused-argument
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qp.allocation.allocate_prim)
-def handle_qp_alloc(self, *, num_wires, state=None, restored=False):
+def handle_allocate(self, *, num_wires, state=None, restored=False):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qp.allocate primitive"""
 
     self.has_dynamic_allocation = True
@@ -411,7 +411,7 @@ def handle_qp_alloc(self, *, num_wires, state=None, restored=False):
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qp.allocation.deallocate_prim)
-def handle_qp_dealloc(self, *wires):
+def handle_deallocate(self, *wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qp.deallocate primitive"""
     qreg = self.qubit_index_recorder[wires[0]]
     assert all(self.qubit_index_recorder[w] is qreg for w in wires)
