@@ -283,6 +283,7 @@
   decomposition system.
   [(#2531)](https://github.com/PennyLaneAI/catalyst/pull/2531)
   [(#2619)](https://github.com/PennyLaneAI/catalyst/pull/2619)
+  [(#2713)](https://github.com/PennyLaneAI/catalyst/pull/2713)
 
 * Decomposition rules are lowered as private functions (instead of public).
   [(#2658)](https://github.com/PennyLaneAI/catalyst/pull/2658)
@@ -1033,6 +1034,7 @@
 
 * The `qml` alias as in `import pennylane as qml` has been updated to `qp` in our source code and documentation.
   [(#2745)](https://github.com/PennyLaneAI/catalyst/pull/2745)
+  [(#2738)](https://github.com/PennyLaneAI/catalyst/pull/2738)
 
 * The "Compatibility with PennyLane transforms" section of the
   :doc:`Sharp bits and debugging tips <../dev/sharp_bits>` document has been updated to describe
