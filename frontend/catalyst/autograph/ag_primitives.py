@@ -27,7 +27,7 @@ from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 
 import jax
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 from malt.core import config as ag_config
 from malt.impl import api as ag_api
 from malt.impl.api import converted_call as ag_converted_call
@@ -478,7 +478,7 @@ def get_source_code_info(tb_frame):
                 break
             if "self" in frame.frame.f_locals:
                 obj = frame.frame.f_locals["self"]
-                if isinstance(obj, qml.QNode):
+                if isinstance(obj, qp.QNode):
                     ag_source_map = obj.ag_source_map
                     break
                 if isinstance(obj, catalyst.QJIT):
@@ -529,21 +529,21 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         # List of known wrapper functions that should be handled specially
         _known_wrapper_functions = (
             catalyst.adjoint,
-            qml.adjoint,
-            qml.prod,
+            qp.adjoint,
+            qp.prod,
             catalyst.ctrl,
-            qml.ctrl,
-            qml.grad,
-            qml.jacobian,
-            qml.vjp,
-            qml.jvp,
+            qp.ctrl,
+            qp.grad,
+            qp.jacobian,
+            qp.vjp,
+            qp.jvp,
             catalyst.grad,
             catalyst.value_and_grad,
             catalyst.jacobian,
             catalyst.vjp,
-            qml.vjp,
+            qp.vjp,
             catalyst.jvp,
-            qml.jvp,
+            qp.jvp,
             catalyst.vmap,
             catalyst.mitigate_with_zne,
         )
@@ -554,7 +554,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
                 raise ValueError(f"{fn.__name__} requires at least one argument")
 
             # If first argument is already an operator, pass it through directly
-            if isinstance(args[0], qml.operation.Operator):
+            if isinstance(args[0], qp.operation.Operator):
                 return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
 
             # Otherwise, handle the callable case
@@ -589,7 +589,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
 
         # For QNode calls, since the class is not part of the Catalyst package, we manually add a
         # wrapper to correctly forward the quantum function call to autograph.
-        if isinstance(fn, qml.QNode):
+        if isinstance(fn, qp.QNode):
             pass_pipeline = kwargs.pop("pass_pipeline", []) if kwargs is not None else []
             new_kwargs = {"pass_pipeline": pass_pipeline} if pass_pipeline else {}
 
@@ -602,12 +602,12 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             new_qnode.func = qnode_call_wrapper
             return new_qnode(**new_kwargs)
 
-        # HOTFIX: Handle calls to functions that were decorated with "qml.prod"
+        # HOTFIX: Handle calls to functions that were decorated with "qp.prod"
         # These decorators return wrapper functions that call the original function without
         # autograph conversion. We detect these wrappers and unwrap them to convert the
         # original function with autograph.
         # TODO: remove once PL has dedicated way to propagate autograph through decorators
-        if hasattr(fn, "__wrapped__") and qml.prod.__module__ == fn.__module__:
+        if hasattr(fn, "__wrapped__") and qp.prod.__module__ == fn.__module__:
             original_fn = fn.__wrapped__
 
             # Extract decorator arguments from the closure
@@ -626,7 +626,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
                 )
 
             # Apply the decorator to the converted function and call it with the original kwargs
-            return qml.prod(converted_inner, **decorator_kwargs)(
+            return qp.prod(converted_inner, **decorator_kwargs)(
                 *args, **(kwargs if kwargs is not None else {})
             )
 
