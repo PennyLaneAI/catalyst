@@ -223,32 +223,3 @@ def test_for_loop_with_dynamic_allocation():
 
 
 print(test_for_loop_with_dynamic_allocation.mlir)
-
-
-# CHECK: func.func public @jit_test_for_loop_classical(%arg0: tensor<i64>) -> tensor<i64> attributes {llvm.emit_c_interface} {
-# CHECK:   %c1 = arith.constant 1 : index
-# CHECK:   %c = stablehlo.constant dense<0> : tensor<i64>
-# CHECK:   %c0 = arith.constant 0 : index
-# CHECK:   %extracted = tensor.extract %arg0[] : tensor<i64>
-# CHECK:   %0 = arith.index_cast %extracted : i64 to index
-# CHECK:   %1 = scf.for %arg1 = %c0 to %0 step %c1 iter_args(%arg2 = %c) -> (tensor<i64>) {
-# CHECK:     %2 = arith.index_cast %arg1 : index to i64
-# CHECK:     %from_elements = tensor.from_elements %2 : tensor<i64>
-# CHECK:     %3 = stablehlo.add %arg2, %from_elements : tensor<i64>
-# CHECK:     scf.yield %3 : tensor<i64>
-# CHECK:   }
-# CHECK:   return %1 : tensor<i64>
-# CHECK: }
-# !!!! this is just a temporary test to check nothing broke on the `WorkflowInterpreter`
-# for classical for loops
-# remove before merging to main
-# No docstring, so codefactor will pick it up on the main PR
-@qp.qjit(capture=True, target="mlir", autograph=True)
-def test_for_loop_classical(i: int):
-    sum = 0
-    for j in range(i):
-        sum += j
-    return sum
-
-
-print(test_for_loop_classical.mlir)
