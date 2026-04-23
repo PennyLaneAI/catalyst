@@ -14,10 +14,10 @@
 
 """Test module for the convert-qecl-to-qecp dialect-conversion transform."""
 
+from dataclasses import dataclass
+
 import pennylane as qp
 import pytest
-
-from dataclasses import dataclass
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import GreedyRewritePatternApplier, PatternRewriteWalker
 
@@ -269,7 +269,7 @@ class TestInsertExtractConversionPatterns:
                 )
             ).rewrite_module(op)
 
-    # pylint: too-many-arguments, too-many-positional-arguments
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
     @pytest.mark.parametrize("width", [1, 2, 3])
     @pytest.mark.parametrize("n", [7, 42])
     @pytest.mark.parametrize(
