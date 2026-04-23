@@ -25,9 +25,12 @@ from xdsl.dialects import builtin
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
+    PatternRewriter,
     PatternRewriteWalker,
+    RewritePattern,
     TypeConversionPattern,
     attr_type_rewrite_pattern,
+    op_type_rewrite_pattern,
 )
 
 from catalyst.python_interface.dialects import qecl, qecp
@@ -74,6 +77,70 @@ class HyperRegisterTypeConversion(TypeConversionPattern):
             )
 
         return qecp.PhysicalHyperRegisterType(typ.width, typ.k, self.qec_code.n)
+
+
+# MARK: Alloc/Dealloc Patterns
+
+
+@dataclass
+class AllocationConversion(RewritePattern):
+    """Op conversion pattern from qecl.alloc -> qecp.alloc."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecl.AllocOp, rewriter: PatternRewriter) -> qecp.AllocOp:
+        """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
+        # assert isinstance(op.hyper_reg, qecp.PhysicalHyperRegisterType)
+        assert isinstance(
+            op.result_types[0], qecp.PhysicalHyperRegisterType
+        ), "lowering of hyper-register types is expected before lowering allocate ops"
+        # ToDo: can this assert use hyper_reg instead like the others?
+        rewriter.replace_op(op, qecp.AllocOp(op.result_types[0]))
+
+
+@dataclass
+class DeallocationConversion(RewritePattern):
+    """Op conversion pattern from qecl.dealloc -> qecp.dealloc."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecl.DeallocOp, rewriter: PatternRewriter) -> qecp.DeallocOp:
+        """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
+        assert isinstance(
+            op.hyper_reg.type, qecp.PhysicalHyperRegisterType
+        ), "lowering of hyper-register types is expected before lowering deallocate ops"
+        rewriter.replace_op(op, qecp.DeallocOp(op.hyper_reg))
+
+
+# MARK: Extract/Insert Patterns
+
+
+@dataclass
+class ExtractBlockConversion(RewritePattern):
+    """Op conversion pattern from qecl.extract_block -> qecp.extract_block."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(
+        self, op: qecl.ExtractCodeblockOp, rewriter: PatternRewriter
+    ) -> qecp.ExtractCodeblockOp:
+        """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
+        assert isinstance(
+            op.hyper_reg.type, qecp.PhysicalHyperRegisterType
+        ), "lowering of hyper-register types is expected before lowering extract_block ops"
+        rewriter.replace_op(op, qecp.ExtractCodeblockOp(op.hyper_reg, op.idx_attr))
+
+
+@dataclass
+class InsertBlockConversion(RewritePattern):
+    """Op conversion pattern from qecl.insert_block -> qecp.insert_block."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(
+        self, op: qecl.InsertCodeblockOp, rewriter: PatternRewriter
+    ) -> qecp.InsertCodeblockOp:
+        """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
+        assert isinstance(
+            op.in_hyper_reg.type, qecp.PhysicalHyperRegisterType
+        ), "lowering of hyper-register types is expected before lowering insert_block ops"
+        rewriter.replace_op(op, qecp.InsertCodeblockOp(op.in_hyper_reg, op.idx_attr, op.codeblock))
 
 
 # MARK: Conversion Pass
@@ -124,6 +191,10 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 [
                     CodeblockTypeConversion(qec_code=self.qec_code),
                     HyperRegisterTypeConversion(qec_code=self.qec_code),
+                    AllocationConversion(),
+                    DeallocationConversion(),
+                    InsertBlockConversion(),
+                    ExtractBlockConversion(),
                 ]
             )
         ).rewrite_module(op)
