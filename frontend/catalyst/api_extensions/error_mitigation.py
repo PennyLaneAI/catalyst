@@ -24,7 +24,7 @@ from typing import Callable, Sequence
 
 import jax
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 from jax._src.tree_util import tree_flatten
 
 from catalyst.jax_primitives import Folding, func_p, quantum_kernel_p, zne_p
@@ -64,7 +64,7 @@ def mitigate_with_zne(
     `Li et al. <https://journals.aps.org/prx/abstract/10.1103/PhysRevX.7.021050>`__.
 
     Args:
-        fn (qml.QNode): the circuit to be mitigated.
+        fn (qp.QNode): the circuit to be mitigated.
         scale_factors (list[int]): the range of noise scale factors used.
         extrapolate (Callable): A qjit-compatible function taking two sequences as arguments (scale
             factors, and results), and returning a float by performing a fitting procedure.
@@ -87,23 +87,23 @@ def mitigate_with_zne(
     .. code-block:: python
 
         # replace "noisy.device" with your noisy device
-        dev = qml.device("noisy.device", wires=2)
+        dev = qp.device("noisy.device", wires=2)
 
-        @qml.qnode(device=dev)
+        @qp.qnode(device=dev)
         def circuit(x, n):
             @for_loop(0, n, 1)
             def loop_rx(i):
-                qml.RX(x, wires=0)
+                qp.RX(x, wires=0)
 
             loop_rx()
 
-            qml.Hadamard(wires=0)
-            qml.RZ(x, wires=0)
+            qp.Hadamard(wires=0)
+            qp.RZ(x, wires=0)
             loop_rx()
-            qml.RZ(x, wires=0)
-            qml.CNOT(wires=[1, 0])
-            qml.Hadamard(wires=1)
-            return qml.expval(qml.PauliY(wires=0))
+            qp.RZ(x, wires=0)
+            qp.CNOT(wires=[1, 0])
+            qp.Hadamard(wires=1)
+            return qp.expval(qp.PauliY(wires=0))
 
         @qjit
         def mitigated_circuit(args, n):
@@ -121,12 +121,12 @@ def mitigate_with_zne(
 
         from pennylane.noise import exponential_extrapolate
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev, shots=100000)
+        @qp.qnode(dev, shots=100000)
         def circuit(weights):
-            qml.StronglyEntanglingLayers(weights, wires=[0, 1])
-            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
+            qp.StronglyEntanglingLayers(weights, wires=[0, 1])
+            return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1))
 
         @qjit
         def workflow(weights, s):
@@ -234,12 +234,12 @@ class ZNECallable(CatalystCallable):
 
 def polynomial_extrapolation(degree):
     """utility to generate polynomial fitting functions of arbitrary degree"""
-    return functools.partial(qml.noise.poly_extrapolate, order=degree)
+    return functools.partial(qp.noise.poly_extrapolate, order=degree)
 
 
 ## PRIVATE ##
 def _wrap_callable(fn):
-    if isinstance(fn, (Function, qml.QNode)):
+    if isinstance(fn, (Function, qp.QNode)):
         return fn
     elif isinstance(fn, Callable):  # Keep at the bottom
         return Function(fn)
