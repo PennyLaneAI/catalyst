@@ -80,7 +80,7 @@ Supported backend devices include:
       simulator with many novel optimizations including hybrid stabilizer simulation. To use this
       device with Catalyst, make sure to install the
       `PennyLane-Qrack plugin <https://pennylane-qrack.readthedocs.io/en/latest/>`__, and check out
-      the `QJIT compilation with Qrack and Catalyst tutorial <https://pennylane.ai/qml/demos/qrack/>`__.
+      the `QJIT compilation with Qrack and Catalyst tutorial <https://pennylane.ai/qp/demos/qrack/>`__.
 
       See the `Catalyst configuration file <https://github.com/unitaryfund/pennylane-qrack/blob/master/pennylane_qrack/QrackDeviceConfig.toml>`__
       for natively supported instructions.
@@ -99,7 +99,7 @@ Supported backend devices include:
           os.environ["OQC_PASSWORD"] = "your_password"
           os.environ["OQC_URL"] = "oqc_url"
 
-          dev = qml.device("oqc.cloud", backend="lucy", shots=2012, wires=2)
+          dev = qp.device("oqc.cloud", backend="lucy", shots=2012, wires=2)
 
       See the `Catalyst configuration file <https://github.com/PennyLaneAI/catalyst/blob/main/frontend/catalyst/third_party/oqc/src/oqc.toml>`__
       for natively supported instructions.

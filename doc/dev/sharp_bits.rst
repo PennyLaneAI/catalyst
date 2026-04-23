@@ -268,18 +268,18 @@ size of the input argument determines the number of qubits and gates used:
 
 .. code-block:: python
 
-    dev = qml.device("lightning.qubit", wires=4)
+    dev = qp.device("lightning.qubit", wires=4)
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(x):
         print("Tracing occurring")
 
         def loop_fn(i):
-            qml.RX(x[i], wires=i)
+            qp.RX(x[i], wires=i)
 
         for_loop(0, x.shape[0], 1)(loop_fn)()
-        return qml.expval(qml.PauliZ(0))
+        return qp.expval(qp.PauliZ(0))
 
 This will run correctly, but tracing and recompilation will occur with every
 function execution:
@@ -296,13 +296,13 @@ To be explicitly warned about recompilation, you can use ahead-of-time
 directly:
 
 >>> @qjit
-... @qml.qnode(dev)
+... @qp.qnode(dev)
 ... def circuit(x: jax.core.ShapedArray((3,), dtype=np.float64)):
 ...     print("Tracing occurring")
 ...     def loop_fn(i):
-...         qml.RX(x[i], wires=i)
+...         qp.RX(x[i], wires=i)
 ...     for_loop(0, x.shape[0], 1)(loop_fn)()
-...     return qml.expval(qml.PauliZ(0))
+...     return qp.expval(qp.PauliZ(0))
 Tracing occurring
 
 Note that compilation now happens on **function definition**. We can execute
@@ -397,25 +397,25 @@ circuit, are measuring an expectation value, and are optimizing the result:
     import numpy as np
     import jax
 
-    dev = qml.device("default.qubit", wires=4)
+    dev = qp.device("default.qubit", wires=4)
 
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def cost(weights, data):
-        qml.AngleEmbedding(data, wires=range(4))
+        qp.AngleEmbedding(data, wires=range(4))
 
         for x in weights:
             # each trainable layer
             for i in range(4):
                 # for each wire
                 if x[i] > 0:
-                    qml.RX(x[i], wires=i)
+                    qp.RX(x[i], wires=i)
                 elif x[i] < 0:
-                    qml.RY(x[i], wires=i)
+                    qp.RY(x[i], wires=i)
 
             for i in range(4):
-                qml.CNOT(wires=[i, (i + 1) % 4])
+                qp.CNOT(wires=[i, (i + 1) % 4])
 
-        return qml.expval(qml.PauliZ(0) + qml.PauliZ(3))
+        return qp.expval(qp.PauliZ(0) + qp.PauliZ(3))
 
     weights = jnp.array(2 * np.random.random([5, 4]) - 1)
     data = jnp.array(np.random.random([4]))
@@ -445,12 +445,12 @@ it using Catalyst:
 
 .. code-block:: python
 
-    dev = qml.device("lightning.qubit", wires=4)
+    dev = qp.device("lightning.qubit", wires=4)
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def cost(weights, data):
-        qml.AngleEmbedding(data, wires=range(4))
+        qp.AngleEmbedding(data, wires=range(4))
 
         def layer_loop(i):
             x = weights[i]
@@ -458,23 +458,23 @@ it using Catalyst:
 
                 @cond(x[j] > 0)
                 def trainable_gate():
-                    qml.RX(x[j], wires=j)
+                    qp.RX(x[j], wires=j)
 
                 @trainable_gate.else_if(x[j] < 0)
                 def negative_gate():
-                    qml.RY(x[j], wires=j)
+                    qp.RY(x[j], wires=j)
 
                 trainable_gate.otherwise(lambda: None)
                 trainable_gate()
 
             def cnot_loop(j):
-                qml.CNOT(wires=[j, jnp.mod((j + 1), 4)])
+                qp.CNOT(wires=[j, jnp.mod((j + 1), 4)])
 
             for_loop(0, 4, 1)(wire_loop)()
             for_loop(0, 4, 1)(cnot_loop)()
 
         for_loop(0, jnp.shape(weights)[0], 1)(layer_loop)()
-        return qml.expval(qml.PauliZ(0) + qml.PauliZ(3))
+        return qp.expval(qp.PauliZ(0) + qp.PauliZ(3))
 
     opt = optax.sgd(learning_rate=0.4)
 
@@ -547,10 +547,10 @@ If they are applied to quantum processing, an error will occur:
 
 >>> @qjit
 ... def f(x):
-...     @qml.qnode(dev)
+...     @qp.qnode(dev)
 ...     def g(y):
-...         qml.RX(y, wires=0)
-...         return qml.expval(qml.PauliX(0))
+...         qp.RX(y, wires=0)
+...         return qp.expval(qp.PauliX(0))
 ...     return jax.grad(lambda y: g(y) ** 2)(x)
 >>> f(0.4)
 NotImplementedError: must override
@@ -560,10 +560,10 @@ quantum-classical processing:
 
 >>> @qjit
 ... def f(x):
-...     @qml.qnode(dev)
+...     @qp.qnode(dev)
 ...     def g(y):
-...         qml.RX(y, wires=0)
-...         return qml.expval(qml.PauliZ(0))
+...         qp.RX(y, wires=0)
+...         return qp.expval(qp.PauliZ(0))
 ...     return grad(lambda y: g(y) ** 2)(x)
 >>> f(0.4)
 Array(-0.71735609, dtype=float64)
@@ -577,9 +577,9 @@ Inspecting and drawing circuits
 
 A useful tool for debugging quantum algorithms is the ability to draw them. Currently,
 :func:`@qjit <~.qjit>` compiled QNodes can be used as input to
-:func:`qml.draw <pennylane.draw>`, with the following caveats:
+:func:`qp.draw <pennylane.draw>`, with the following caveats:
 
-- The ``qml.draw()`` function will only accept plain QNodes as input, *or* QNodes that have been qjit-compiled. It will not accept arbitrary hybrid functions (that may contain QNodes).
+- The ``qp.draw()`` function will only accept plain QNodes as input, *or* QNodes that have been qjit-compiled. It will not accept arbitrary hybrid functions (that may contain QNodes).
 
 - The :func:`catalyst.measure` function is not supported in drawn QNodes
 
@@ -593,25 +593,25 @@ For example,
 .. code-block:: python
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(x):
         def measurement_loop(i, y):
-            qml.RX(y, wires=0)
-            qml.RY(y ** 2, wires=1)
-            qml.CNOT(wires=[0, 1])
+            qp.RX(y, wires=0)
+            qp.RY(y ** 2, wires=1)
+            qp.CNOT(wires=[0, 1])
 
             @cond(y < 0.5)
             def cond_gate():
-                qml.CRX(y * jnp.exp(- y ** 2), wires=[0, 1])
+                qp.CRX(y * jnp.exp(- y ** 2), wires=[0, 1])
 
             cond_gate()
 
             return y * 2
 
         for_loop(0, 3, step=1)(measurement_loop)(x)
-        return qml.expval(qml.PauliZ(0))
+        return qp.expval(qp.PauliZ(0))
 
->>> print(qml.draw(circuit)(0.3))
+>>> print(qp.draw(circuit)(0.3))
 0: ──RX(0.30)─╭●─╭●─────────RX(0.60)─╭●──RX(1.20)─╭●─┤  <Z>
 1: ──RY(0.09)─╰X─╰RX(0.27)──RY(0.36)─╰X──RY(1.44)─╰X─┤
 
@@ -681,7 +681,7 @@ when working with classical control in Catalyst.
 Compatibility with PennyLane transforms
 ---------------------------------------
 
-PennyLane provides a wide variety of :doc:`transforms <code/qml_transforms>`
+PennyLane provides a wide variety of :doc:`transforms <code/qp_transforms>`
 that convert a circuit to one or more circuits.
 
 Currently, most PennyLane transforms will work with Catalyst as long as
@@ -690,16 +690,16 @@ variables. This includes transforms that generate many circuits,
 
 .. code-block:: python
 
-    import pennylane as qml
+    import pennylane as qp
 
-    dev = qml.device("lightning.qubit", wires=1)
+    dev = qp.device("lightning.qubit", wires=1)
 
-    @qml.qjit
-    @qml.transforms.split_non_commuting
-    @qml.qnode(dev)
+    @qp.qjit
+    @qp.transforms.split_non_commuting
+    @qp.qnode(dev)
     def circuit(x):
-        qml.RX(x,wires=0)
-        return [qml.expval(qml.PauliY(0)), qml.expval(qml.PauliZ(0))]
+        qp.RX(x,wires=0)
+        return [qp.expval(qp.PauliY(0)), qp.expval(qp.PauliZ(0))]
 
 >>> circuit(0.4)
 (Array(-0.38941834, dtype=float64), Array(0.92106099, dtype=float64))
@@ -708,13 +708,13 @@ as well as transforms that simply map the circuit to another:
 
 .. code-block:: python
 
-    @qml.qjit
-    @qml.transforms.merge_rotations
-    @qml.qnode(dev)
+    @qp.qjit
+    @qp.transforms.merge_rotations
+    @qp.qnode(dev)
     def circuit(x):
-        qml.RX(x, wires=0)
-        qml.RX(x ** 2, wires=0)
-        return qml.expval(qml.PauliZ(0))
+        qp.RX(x, wires=0)
+        qp.RX(x ** 2, wires=0)
+        return qp.expval(qp.PauliZ(0))
 
 >>> circuit(0.5)
 Array(0.73168887, dtype=float64)
@@ -763,31 +763,31 @@ Consider the following example that includes ``cancel_inverses``,
 
 .. code-block:: python
 
-    @qml.transform
+    @qp.transform
     def tape_transform(tape):
         return [tape,], lambda x: x[0]
 
-    dev = qml.device("lightning.qubit", wires=3)
+    dev = qp.device("lightning.qubit", wires=3)
 
-    @qml.qjit
+    @qp.qjit
     @tape_transform # applied as a tape transform
-    @qml.transforms.cancel_inverses(recursive=True) # applied as a tape transform
-    @qml.transforms.merge_rotations # applied as a tape transform
-    @qml.qnode(device=dev)
+    @qp.transforms.cancel_inverses(recursive=True) # applied as a tape transform
+    @qp.transforms.merge_rotations # applied as a tape transform
+    @qp.qnode(device=dev)
     def circuit(theta):
-        qml.CZ(wires=[0, 2])
-        qml.X(2)
-        qml.S(wires=0)
+        qp.CZ(wires=[0, 2])
+        qp.X(2)
+        qp.S(wires=0)
 
-        qml.CNOT(wires=[0, 1])
+        qp.CNOT(wires=[0, 1])
 
-        qml.H(0)
-        qml.H(0)
+        qp.H(0)
+        qp.H(0)
 
-        qml.RX(theta, wires=1)
-        qml.RX(theta, wires=1)
+        qp.RX(theta, wires=1)
+        qp.RX(theta, wires=1)
 
-        return qml.expval(qml.Z(0))
+        return qp.expval(qp.Z(0))
 
 >>> circuit(0.1)
 Array(1., dtype=float64)
@@ -803,27 +803,27 @@ However, if we were to swap ``cancel_inverses`` and ``tape_transform``,
 
 .. code-block:: python
 
-    dev = qml.device("lightning.qubit", wires=3)
+    dev = qp.device("lightning.qubit", wires=3)
 
-    @qml.qjit
-    @qml.transforms.cancel_inverses(recursive=True) # applied as an MLIR pass
+    @qp.qjit
+    @qp.transforms.cancel_inverses(recursive=True) # applied as an MLIR pass
     @tape_transform # applied as a tape transform
-    @qml.transforms.merge_rotations # applied as a tape transform
-    @qml.qnode(device=dev)
+    @qp.transforms.merge_rotations # applied as a tape transform
+    @qp.qnode(device=dev)
     def circuit(theta):
-        qml.CZ(wires=[0, 2])
-        qml.X(2)
-        qml.S(wires=0)
+        qp.CZ(wires=[0, 2])
+        qp.X(2)
+        qp.S(wires=0)
 
-        qml.CNOT(wires=[0, 1])
+        qp.CNOT(wires=[0, 1])
 
-        qml.H(0)
-        qml.H(0)
+        qp.H(0)
+        qp.H(0)
 
-        qml.RX(theta, wires=1)
-        qml.RX(theta, wires=1)
+        qp.RX(theta, wires=1)
+        qp.RX(theta, wires=1)
 
-        return qml.expval(qml.Z(0))
+        return qp.expval(qp.Z(0))
 
 In addition to this internal discrepancy, an error will now be raised since the
 MLIR implementation of ``cancel_inverses`` does not support the ``recursive``
@@ -845,7 +845,7 @@ variables will fail, since decompositions are applied at compile time:
 
 .. code-block:: python
 
-    class RXX(qml.operation.Operation):
+    class RXX(qp.operation.Operation):
         num_params = 1
         num_wires = 2
 
@@ -854,20 +854,20 @@ variables will fail, since decompositions are applied at compile time:
             ops = []
 
             if theta == 0.3:
-                ops.append(qml.PauliRot(theta / 2 * 2, 'XX', wires=wires))
+                ops.append(qp.PauliRot(theta / 2 * 2, 'XX', wires=wires))
             else:
-                ops.append(qml.PauliRot(theta / 2 * 2, 'XX', wires=wires))
+                ops.append(qp.PauliRot(theta / 2 * 2, 'XX', wires=wires))
 
             return ops
 
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(theta):
         RXX(theta, wires=[0, 1])
-        qml.Hadamard(1)
-        return qml.expval(qml.PauliZ(0))
+        qp.Hadamard(1)
+        return qp.expval(qp.PauliZ(0))
 
 >>> circuit(0.3)
 TracerBoolConversionError: Attempted boolean conversion of traced array with shape bool[]..
@@ -877,33 +877,33 @@ Instead, Catalyst control flow (such as :func:`~.cond` and :func:`.for_loop`) mu
 
 .. code-block:: python
 
-    class RXX(qml.operation.Operation):
+    class RXX(qp.operation.Operation):
         num_params = 1
         num_wires = 2
 
         def compute_decomposition(self, *params, wires=None):
             theta = params[0]
 
-            with qml.tape.QuantumTape() as tape:
+            with qp.tape.QuantumTape() as tape:
 
                 @cond(params[0] == 0.3)
                 def branch_fn():
-                    qml.PauliRot(theta, 'XX', wires=wires)
+                    qp.PauliRot(theta, 'XX', wires=wires)
 
                 @branch_fn.otherwise
                 def branch_fn():
-                    qml.PauliRot(theta / 2 * 2, 'XX', wires=wires)
+                    qp.PauliRot(theta / 2 * 2, 'XX', wires=wires)
 
                 branch_fn()
 
             return tape.operations
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(theta):
         RXX(theta, wires=[0, 1])
-        qml.Hadamard(1)
-        return qml.expval(qml.PauliZ(0))
+        qp.Hadamard(1)
+        return qp.expval(qp.PauliZ(0))
 
 >>> circuit(0.3)
 Array(0.95533649, dtype=float64)
@@ -920,7 +920,7 @@ the decomposition as follows:
 
     from catalyst import run_autograph
 
-    class RXX(qml.operation.Operation):
+    class RXX(qp.operation.Operation):
         num_params = 1
         num_wires = 2
 
@@ -930,11 +930,11 @@ the decomposition as follows:
             @run_autograph
             def f(params):
                 if params[0] == 0.3:
-                    qml.PauliRot(theta, 'XX', wires=wires)
+                    qp.PauliRot(theta, 'XX', wires=wires)
                 else:
-                    qml.PauliRot(theta / 2 * 2, 'XX', wires=wires)
+                    qp.PauliRot(theta / 2 * 2, 'XX', wires=wires)
 
-            with qml.tape.QuantumTape() as tape:
+            with qp.tape.QuantumTape() as tape:
                 f(params)
 
             return tape.operations
@@ -952,18 +952,18 @@ function, and can be used as follows:
 
 .. code-block:: python
 
-    dev = qml.device("lightning.qubit", wires=1)
+    dev = qp.device("lightning.qubit", wires=1)
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def f():
-        qml.PauliX(0)
-        qml.PauliX(0)
-        qml.Hadamard(0)
-        return qml.state()
+        qp.PauliX(0)
+        qp.PauliX(0)
+        qp.Hadamard(0)
+        return qp.state()
 
     # Explicitly accessing the QNode for PenneLane transforms, which takes in a QNode and returns a QNode
-    g = qml.transforms.cancel_inverses(f.original_function)
+    g = qp.transforms.cancel_inverses(f.original_function)
 
 
 >>> f
@@ -972,22 +972,22 @@ function, and can be used as follows:
 <QNode: device='<lightning.qubit device (wires=1) at ...>', ...>
 >>> g
 <QNode: device='<lightning.qubit device (wires=1) at ...>', ...>
->>> qml.matrix(f.original_function)()
+>>> qp.matrix(f.original_function)()
 [[ 0.70710678  0.70710678]
  [ 0.70710678 -0.70710678]]
 
 
-Note that some PennyLane functions may be able to extract the QNode automatically, like ``qml.draw`` and ``qml.matrix``:
+Note that some PennyLane functions may be able to extract the QNode automatically, like ``qp.draw`` and ``qp.matrix``:
 
->>> qml.matrix(f)()
+>>> qp.matrix(f)()
 [[ 0.70710678  0.70710678]
  [ 0.70710678 -0.70710678]]
->>> qml.draw(f)()
+>>> qp.draw(f)()
 0: ──X──X──H─┤  State
 >>> g = qjit(g)   # Compile the transformed QNode again with qjit
 >>> g
 <catalyst.jit.QJIT object at ...>
->>> qml.draw(g)()
+>>> qp.draw(g)()
 0: ──H─┤  State
 
 But in general, you will need to pass in the QNode explicitly.
@@ -1012,7 +1012,7 @@ For example, consider the following, where we pass arbitrarily nested lists or
 dictionaries as input to the compiled function:
 
 >>> f = qjit(lambda *args: args)
->>> x = qml.RX(0.4, wires=0)
+>>> x = qp.RX(0.4, wires=0)
 >>> y = {"apple": (True, jnp.array([0.1, 0.2, 0.3]))}
 >>> f(x, y)
 (RX(Array(0.4, dtype=float64), wires=[0]),
@@ -1206,35 +1206,35 @@ a single QNode, allowing the measurement type to alter based on some condition:
 
 .. code-block:: python
 
-    dev = qml.device("default.qubit", wires=2, shots=10)
+    dev = qp.device("default.qubit", wires=2, shots=10)
 
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(x, sample=False):
-        qml.RX(x, wires=0)
+        qp.RX(x, wires=0)
 
         if sample:
-            return qml.sample(wires=0)
+            return qp.sample(wires=0)
 
-        return qml.expval(qml.PauliZ(0))
+        return qp.expval(qp.PauliZ(0))
 
 This pattern is currently not supported in Catalyst, and will lead to an error:
 
 .. code-block:: python
 
-    dev = qml.device("lightning.qubit", wires=2, shots=10)
+    dev = qp.device("lightning.qubit", wires=2, shots=10)
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(x, sample=False):
-        qml.RX(x, wires=0)
+        qp.RX(x, wires=0)
 
         @cond(sample)
         def measure_fn():
-            return qml.sample(wires=0)
+            return qp.sample(wires=0)
 
         @measure_fn.otherwise
         def expval():
-            return qml.expval(qml.PauliZ(0))
+            return qp.expval(qp.PauliZ(0))
 
         return measure_fn()
 
@@ -1245,10 +1245,10 @@ It is recommended for now to create separate QNodes if different measurement sta
 returned, or alternatively using a single return statement with multiple measurements:
 
 >>> @qjit
-... @qml.qnode(dev)
+... @qp.qnode(dev)
 ... def circuit(x):
-...     qml.RX(x, wires=0)
-...     return {"samples": qml.sample(), "expval": qml.expval(qml.PauliZ(0))}
+...     qp.RX(x, wires=0)
+...     return {"samples": qp.sample(), "expval": qp.expval(qp.PauliZ(0))}
 >>> circuit(0.3)
 {'expval': Array(1., dtype=float64),
  'samples': Array([[0, 0],
@@ -1311,11 +1311,11 @@ Compatibility with broadcasting
 Catalyst does not currently support passing multi-dimensional arrays
 as quantum operator parameters ('parameter broadcasting'):
 
->>> @qml.qnode(dev)
+>>> @qp.qnode(dev)
 ... def circuit(x):
-...     qml.RX(x, wires=0)
-...     qml.RY(0.1, wires=0)
-...     return qml.expval(qml.PauliZ(0))
+...     qp.RX(x, wires=0)
+...     qp.RY(0.1, wires=0)
+...     return qp.expval(qp.PauliZ(0))
 >>> circuit(jnp.array([0.1, 0.2]))
 Array([0.99003329, 0.97517033], dtype=float64)
 >>> qjit(circuit)(jnp.array([0.1, 0.2]))
@@ -1334,9 +1334,9 @@ Note that ``jax.vmap`` cannot be used within a qjit-compiled function:
 NotImplementedError: Batching rule for 'qinst' not implemented
 
 In addition, shot-vectors are currently only supported in a limited manner;
-shot-vectors work with :func:`qml.sample <pennylane.sample>`, but not other
-measurement processes such as :func:`qml.expval <pennylane.expval>` and
-:func:`qml.probs <pennylane.probs>`.
+shot-vectors work with :func:`qp.sample <pennylane.sample>`, but not other
+measurement processes such as :func:`qp.expval <pennylane.expval>` and
+:func:`qp.probs <pennylane.probs>`.
 
 Functionality differences from PennyLane
 ----------------------------------------
@@ -1354,12 +1354,12 @@ Currently, however, this is not the case for the following functionalities.
   intermediate decompositions that have the same overall cost. This phenomenon
   is not an issue, except for in cases where intermediate gates are not
   executable with ``qjit`` present. An example of such a gate is
-  ``qml.PauliRot``; if an intermediate decomposition is chosen that includes
-  a ``qml.PauliRot`` instance, Catalyst cannot execute the program. If this
+  ``qp.PauliRot``; if an intermediate decomposition is chosen that includes
+  a ``qp.PauliRot`` instance, Catalyst cannot execute the program. If this
   behaviour is encountered, this can be counteracted by adding a prohibitively
-  large penalty to the graph solution should it encounter a ``qml.PauliRot``
+  large penalty to the graph solution should it encounter a ``qp.PauliRot``
   instance (e.g.,
-  ``qml.transforms.decomopose(..., gate_set={..., qml.PauliRot: 100_000})``).
+  ``qp.transforms.decomopose(..., gate_set={..., qp.PauliRot: 100_000})``).
 
 - **Measurement behaviour**: :func:`catalyst.measure` currently behaves
   differently from its PennyLane counterpart :func:`pennylane.measure`.
@@ -1373,76 +1373,76 @@ Currently, however, this is not the case for the following functionalities.
     be post-selected on the outcome that was measured. The post-selected
     measurement will change with every execution.
 
-- **Dynamic wire allocation behaviour**: The ``qml.allocate()`` function currently
+- **Dynamic wire allocation behaviour**: The ``qp.allocate()`` function currently
   behaves differently when Catalyst is present or not. In particular:
 
-  - The ``state`` and ``restored`` keyword arguments of ``qml.allocate()`` are
+  - The ``state`` and ``restored`` keyword arguments of ``qp.allocate()`` are
     ignored in Catalyst. The reason is that the only supported mode is to always allocate in the
     zero state.
 
   - Related to the above point, in PennyLane, dynamic wire allocations do not
     increase the total number of wires used in the circuit. This is because
     PennyLane treats the number of wires during device initialization (the
-    ``qml.device("...", wires=N)``) as the device capacity. Briefly, when
-    ``qml.allocate()`` is encountered, PennyLane looks into the pool of existing
+    ``qp.device("...", wires=N)``) as the device capacity. Briefly, when
+    ``qp.allocate()`` is encountered, PennyLane looks into the pool of existing
     wires and chooses a suitable set of wires that is currently unused as the
     result of the allocation, instead of requesting additional wires from the
     device. However, Catalyst treats device wires as completely separate from
-    wires that are requested via ``qml.allocate``; they are two separate pools
-    of memory, where wires requested with ``qml.allocate`` are in addition to
-    initial ones from ``qml.device``. If the pool of wires from ``device`` is
-    called "device" and the pool of wires from ``qml.allocate`` is called
-    "dynamic", future calls to ``qml.allocate`` can reuse wires from the
+    wires that are requested via ``qp.allocate``; they are two separate pools
+    of memory, where wires requested with ``qp.allocate`` are in addition to
+    initial ones from ``qp.device``. If the pool of wires from ``device`` is
+    called "device" and the pool of wires from ``qp.allocate`` is called
+    "dynamic", future calls to ``qp.allocate`` can reuse wires from the
     dynamic pool, but not from the device pool.
 
   - Dynamically allocated wires cannot be used in quantum adjoints yet.
 
   .. code-block:: python
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qjit
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit():
-        with qml.allocate(1) as q:
-            qml.adjoint(qml.X)(wires=q[0])
-        return qml.probs(wires=[0])
+        with qp.allocate(1) as q:
+            qp.adjoint(qp.X)(wires=q[0])
+        return qp.probs(wires=[0])
 
   >>> print(circuit())
   NotImplementedError: Dynamically allocated wires cannot be used in quantum adjoints yet.
 
-  - Usage of ``qml.allocate()`` with Catalyst prohibits returning any terminal measurement
-    *except for* ``qml.probs``. This is due to a bug in Lightning.
-    Other measurement types (``qml.sample``, ``qml.expval``, ``qml.var``, etc.)
+  - Usage of ``qp.allocate()`` with Catalyst prohibits returning any terminal measurement
+    *except for* ``qp.probs``. This is due to a bug in Lightning.
+    Other measurement types (``qp.sample``, ``qp.expval``, ``qp.var``, etc.)
     will be supported in the future after the underlying bug is fixed.
 
   .. code-block:: python
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=3, shots=10))
+    @qp.qnode(qp.device("lightning.qubit", wires=3, shots=10))
     def circuit():
-        with qml.allocate(2) as qs:
-            qml.X(qs[1])
-        return qml.sample(wires=[0, 1])
+        with qp.allocate(2) as qs:
+            qp.X(qs[1])
+        return qp.sample(wires=[0, 1])
 
   >>> circuit()
-  CompileError: Only probability measurements (qml.probs) are currently supported
+  CompileError: Only probability measurements (qp.probs) are currently supported
   when dynamic allocations are present in the program. Other measurement
-  types (qml.sample, qml.expval, qml.var, ...etc) will be supported
+  types (qp.sample, qp.expval, qp.var, ...etc) will be supported
   in a future release after the underlying bug is fixed.
 
   .. code-block:: python
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qjit
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit():
-        with qml.allocate(1) as q:
-            qml.X(q[0])
-        return qml.probs(wires=[0])
+        with qp.allocate(1) as q:
+            qp.X(q[0])
+        return qp.probs(wires=[0])
 
   >>> circuit()
   Array([1., 0.], dtype=float64)
