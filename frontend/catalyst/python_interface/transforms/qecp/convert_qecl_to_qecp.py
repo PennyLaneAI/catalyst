@@ -89,7 +89,6 @@ class AllocationConversion(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecl.AllocOp, rewriter: PatternRewriter) -> qecp.AllocOp:
         """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
-        # assert isinstance(op.hyper_reg, qecp.PhysicalHyperRegisterType)
         assert isinstance(
             op.result_types[0], qecp.PhysicalHyperRegisterType
         ), "lowering of hyper-register types is expected before lowering allocate ops"
