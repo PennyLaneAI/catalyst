@@ -74,21 +74,15 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
         }
         std::string jsonStr = "";
 
-        if (outputJson || printJson) {
-            jsonStr = buildJsonString(results);
-        }
-
         if (outputJson) {
+            jsonStr = buildJsonString(results);
+
             if (outputFname.empty()) {
-                writeJsonToFile(jsonStr, generateFileName(results));
+                printJsonOutput(jsonStr);
             }
             else {
                 writeJsonToFile(jsonStr, outputFname);
             }
-        }
-
-        if (printJson) {
-            printJsonOutput(jsonStr);
         }
 
         markAllAnalysesPreserved();
@@ -208,28 +202,6 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
         }
         ofile << jsonStr;
         ofile.close();
-    }
-
-    /// Generate a timestamped filename for the JSON output.
-    static std::string generateFileName(const llvm::StringMap<ResourceResult> &results)
-    {
-        StringRef jit_fn_name("");
-        for (const auto &funcEntry : results) {
-            if (funcEntry.getKey().starts_with("jit_")) {
-                jit_fn_name = funcEntry.getKey().drop_front(4);
-                break;
-            }
-        }
-
-        std::string file_name = "__mlir_resources_";
-        file_name += jit_fn_name;
-
-        auto now = std::chrono::system_clock::now();
-        auto zt = std::chrono::zoned_time{std::chrono::current_zone(), now};
-
-        file_name += std::format("_{:%Y%m%d_%H%M%S}", zt);
-
-        return file_name;
     }
 };
 

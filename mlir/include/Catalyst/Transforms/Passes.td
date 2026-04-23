@@ -270,21 +270,14 @@ def ResourceTrackerPass : Pass<"resource-tracker"> {
             /*CLI arg name=*/"output-json",
             /*type=*/"bool",
             /*default=*/"false",
-            /*description=*/"Save resource counts as a JSON file"
+            /*description=*/"Output resource counts as JSON. Prints to stdout unless output-fname is set"
         >,
         Option<
             /*C++ var name=*/"outputFname",
             /*CLI arg name=*/"output-fname",
             /*type=*/"std::string",
             /*default=*/"",
-            /*description=*/"The output JSON's filename (only relevant when output-json is true)"
-        >,
-        Option<
-            /*C++ var name=*/"printJson",
-            /*CLI arg name=*/"print-json",
-            /*type=*/"bool",
-            /*default=*/"false",
-            /*description=*/"Print resource counts as JSON to stdout"
+            /*description=*/"The filename to save the output JSON to (only when output-json is true)"
         >
     ];
 }
