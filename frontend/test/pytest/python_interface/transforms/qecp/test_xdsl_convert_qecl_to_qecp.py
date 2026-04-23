@@ -160,20 +160,22 @@ class TestMeasurePattern:
             return
         }
         // CHECK-LABEL: func.func private @measure_transversal_Steane
-        // CHECK-SAME: ([[cb_in:%.+]]: !qecp.codeblock<1 x 7>) -> (tensor<7xi1>, !qecp.codeblock<1 x 7>)
-        // CHECK: [[buffer:%.+]] = memref.alloc() : memref<7xi1>
+        // CHECK-SAME: ([[cb_in:%.+]]: !qecp.codeblock<1 x 7>) -> (tensor<7xi1>, !qecp.codeblock<1 x 7>) {
+        // CHECK: [[mres_t:%.+]] = tensor.empty() : tensor<7xi1>
         // CHECK: [[c0:%.+]] = arith.constant 0 : index
         // CHECK: [[c7:%.+]] = arith.constant 7 : index
         // CHECK: [[c1:%.+]] = arith.constant 1 : index
-        // CHECK: [[cb_out:%.+]] = scf.for [[idx:%.+]] = [[c0]] to [[c7]] step [[c1]] iter_args([[cb0:%.+]] = [[cb_in]]) -> (!qecp.codeblock<1 x 7>) {
-        // CHECK:   [[q0:%.+]] = qecp.extract [[cb0]][[[idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-        // CHECK:   [[mres:%.+]], [[q1:%.+]] = qecp.measure [[q0]] : i1, !qecp.qubit<data>
-        // CHECK:   [[cb1:%.+]] = qecp.insert [[cb0]][[[idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
-        // CHECK:   memref.store [[mres]], [[buffer]][[[idx]]] : memref<7xi1>
-        // CHECK:   scf.yield [[cb1]] : !qecp.codeblock<1 x 7>
+        // CHECK: [[mres_t_out:%.+]], [[cb_out:%.+]] = scf.for [[idx:%.+]] = [[c0]] to [[c7]] step [[c1]]
+        // CHECK-SAME: iter_args([[mres_t_arg:%.+]] = [[mres_t]], [[cb_arg:%.+]] = [[cb_in]])
+        // CHECK-SAME: -> (tensor<7xi1>, !qecp.codeblock<1 x 7>) {
+        // CHECK:   [[q0:%.+]] = qecp.extract [[cb_arg]][[[idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+        // CHECK:   [[mres0:%.+]], [[q1:%.+]] = qecp.measure [[q0]] : i1, !qecp.qubit<data>
+        // CHECK:   [[cb2:%.+]] = qecp.insert [[cb_arg]][[[idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK:   [[mres_t_1:%.+]] = tensor.insert [[mres0]] into [[mres_t_arg]][[[idx]]] : tensor<7xi1>
+        // CHECK:   scf.yield [[mres_t_1]], [[cb2]] : tensor<7xi1>, !qecp.codeblock<1 x 7>
         // CHECK: }
-        // CHECK: [[mresp:%.+]] = bufferization.to_tensor [[buffer]] : memref<7xi1> to tensor<7xi1>
-        // CHECK: func.return [[mresp]], [[cb_out]] : tensor<7xi1>, !qecp.codeblock<1 x 7>
+        // CHECK: func.return [[mres_t_out]], [[cb_out]] : tensor<7xi1>, !qecp.codeblock<1 x 7>
+        // CHECK: }
         }
         """
         run_filecheck(program, qecl_to_qecp_steane_pipeline)

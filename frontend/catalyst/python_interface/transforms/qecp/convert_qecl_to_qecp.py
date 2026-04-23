@@ -30,8 +30,8 @@ from typing import cast
 
 from xdsl.builder import ImplicitBuilder
 from xdsl.context import Context
-from xdsl.dialects import arith, bufferization, builtin, func, memref, scf, tensor
-from xdsl.dialects.builtin import IndexType, SymbolRefAttr, i1
+from xdsl.dialects import arith, builtin, func, scf, tensor
+from xdsl.dialects.builtin import I1, IndexType, SymbolRefAttr, TensorType, i1
 from xdsl.ir import Block, BlockArgument, OpResult, Region
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
@@ -241,9 +241,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             in_codeblock = cast(BlockArgument[qecp.PhysicalCodeblockType], block.args[0])
             n = in_codeblock.type.n.value.data
 
-            # Allocate a memref buffer to store the individual measurement results
-            memref_alloc_op = memref.AllocOp.get(return_type=i1, shape=(n,))
-            buffer = memref_alloc_op.memref
+            # Initialize an empty tensor to store the physical measurement results
+            empty_tensor_op = tensor.EmptyOp([], TensorType(i1, shape=(n,)))
 
             # Ops for lower bound, upper bound, and step size.
             lb_op = arith.ConstantOp.from_int_and_width(0, IndexType())
@@ -252,25 +251,29 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
             for_body = Block(
                 [],
-                arg_types=(builtin.IndexType(), in_codeblock.type),
+                arg_types=(builtin.IndexType(), empty_tensor_op.tensor.type, in_codeblock.type),
             )
 
             for_each_qubit_op = scf.ForOp(
                 lb=lb_op,
                 ub=ub_op,
                 step=step_op,
-                iter_args=(in_codeblock,),
+                iter_args=(empty_tensor_op.tensor, in_codeblock),
                 body=for_body,
             )
 
             # Build the body of the for loop. On each iteration, extract the physical qubit at the
-            # iteration index, measure it, and re-insert into the codeblock. Finally, yield the
-            # updated codeblock.
+            # iteration index, measure it, and re-insert into the codeblock. Also insert the
+            # measurement result into the tensor. Finally, yield updated tensor of measurement
+            # results and the updated codeblock.
             with ImplicitBuilder(for_each_qubit_op.body):
                 indvar = cast(BlockArgument[IndexType], for_each_qubit_op.body.block.args[0])
+                mres_tensor = cast(
+                    BlockArgument[TensorType[I1]], for_each_qubit_op.body.block.args[1]
+                )
                 codeblock = cast(
                     BlockArgument[qecp.PhysicalCodeblockType],
-                    for_each_qubit_op.body.block.args[1],
+                    for_each_qubit_op.body.block.args[2],
                 )
 
                 extract_op = qecp.ExtractQubitOp(codeblock=codeblock, idx=indvar)
@@ -279,13 +282,14 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                     in_codeblock=codeblock, idx=indvar, qubit=measure_op.out_qubit
                 )
 
-                memref.StoreOp.get(value=measure_op.mres, ref=buffer, indices=(indvar,))
-                scf.YieldOp(insert_op.out_codeblock)
+                tensor_insert_op = tensor.InsertOp(
+                    measure_op.mres, dest=mres_tensor, indices=indvar
+                )
+                scf.YieldOp(tensor_insert_op.result, insert_op.out_codeblock)
 
-            mres_to_tensor_op = bufferization.ToTensorOp(buffer)
-
-            out_codeblock = for_each_qubit_op.results[0]
-            func.ReturnOp(mres_to_tensor_op, out_codeblock)
+            out_mres = for_each_qubit_op.results[0]
+            out_codeblock = for_each_qubit_op.results[1]
+            func.ReturnOp(out_mres, out_codeblock)
 
         measure_subroutine = func.FuncOp(
             name=self._get_measure_subroutine_name(),
