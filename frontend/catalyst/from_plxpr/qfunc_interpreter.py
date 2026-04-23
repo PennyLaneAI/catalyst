@@ -230,9 +230,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     def _check_measurement_with_dynamic_allocation(self, measurement):
         """Check some constraints regarding dynamic allocation."""
         if self.has_dynamic_allocation:
-            if len(measurement.wires) == 0 and not isinstance(
-                measurement, qp.measurements.StateMP
-            ):
+            if len(measurement.wires) == 0 and not isinstance(measurement, qp.measurements.StateMP):
                 raise CompileError(textwrap.dedent("""
                         Terminal measurements must take in an explicit list of wires when
                         dynamically allocated wires are present in the program.
