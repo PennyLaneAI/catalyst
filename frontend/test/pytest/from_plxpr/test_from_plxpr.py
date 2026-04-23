@@ -662,9 +662,9 @@ class TestControlFlow:
         eqn = catalyst_jaxpr.eqns[0]
 
         assert eqn.primitive == for_loop_prim
-        assert eqn.params["abstract_shapes_slice"] == (0, 0, 1)
-        assert eqn.params["args_slice"] == (0, 1, 1)
-        assert eqn.params["consts_slice"] == (0, 0, 1)
+        assert eqn.params["abstract_shapes_slice"] == (0, 0, None)
+        assert eqn.params["args_slice"] == (0, None, None)
+        assert eqn.params["consts_slice"] == (0, 0, None)
 
         assert len(eqn.params["jaxpr_body_fn"].eqns) == 3 if reverse else 1
 
