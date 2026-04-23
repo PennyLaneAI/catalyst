@@ -195,6 +195,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             adjoint=is_adjoint,
         )
 
+        return ()
+
     def _obs(self, obs):
         """Interpret the observable equation corresponding to a measurement equation's input."""
         if isinstance(obs, qml.ops.Prod):

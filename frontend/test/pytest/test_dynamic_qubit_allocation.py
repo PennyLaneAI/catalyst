@@ -559,7 +559,7 @@ def test_use_after_free(backend):
 
     with pytest.raises(
         CompileError,
-        match="Deallocated qubits cannot be used, but used in Hadamard.",
+        match="Detected use of a qubit after deallocation",
     ):
 
         @qjit
@@ -630,27 +630,6 @@ def test_unsupported_adjoint(backend):
         def circuit():
             with qp.allocate(1) as q:
                 qp.adjoint(qp.X)(q[0])
-            return qp.probs(wires=[0, 1])
-
-
-@pytest.mark.usefixtures("use_capture")
-def test_use_after_free(backend):
-    """
-    Test that an error is raised when a dynamically allocated wire is used after being freed.
-    """
-
-    with pytest.raises(
-        CompileError,
-        match="Detected use of a qubit after deallocation",
-    ):
-
-        @qjit
-        @qp.qnode(qp.device(backend, wires=2))
-        def circuit():
-            with qp.allocate(1) as q:
-                qp.X(q[0])
-
-            qp.Z(q[0])
             return qp.probs(wires=[0, 1])
 
 
