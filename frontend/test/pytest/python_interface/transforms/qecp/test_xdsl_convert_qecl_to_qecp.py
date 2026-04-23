@@ -193,7 +193,9 @@ class TestAllocAndDeallocConversionPatterns:
         }}
         """
 
-        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3)),)
+        pipeline = (
+            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))),
+        )
         run_filecheck(program, pipeline)
 
     @pytest.mark.parametrize("width", [1, 2, 3])
@@ -217,7 +219,9 @@ class TestAllocAndDeallocConversionPatterns:
         }}
         """
 
-        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3)),)
+        pipeline = (
+            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))),
+        )
         run_filecheck(program, pipeline)
 
     def test_assertion_error_allocate(self, run_filecheck):
@@ -310,7 +314,9 @@ class TestInsertExtractConversionPatterns:
         }}
         """
 
-        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3)),)
+        pipeline = (
+            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))),
+        )
         run_filecheck(program, pipeline)
 
     @pytest.mark.parametrize("width", [1, 2, 3])
@@ -337,7 +343,9 @@ class TestInsertExtractConversionPatterns:
         }}
         """
 
-        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3)),)
+        pipeline = (
+            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))),
+        )
         run_filecheck(program, pipeline)
 
     def test_assertion_error_extract(self, run_filecheck):
@@ -384,6 +392,8 @@ class TestInsertExtractConversionPatterns:
             match="lowering of hyper-register types is expected before lowering insert",
         ):
             run_filecheck(program, pipeline)
+
+
 class TestLoweringEncode:
     """Test lowering the qecl.EncodeOp to a subroutine of qecp gates"""
 
