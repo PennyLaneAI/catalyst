@@ -22,7 +22,6 @@ from functools import partial
 import jax
 from jax.extend.core import ClosedJaxpr
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
-from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
 
 from catalyst.from_plxpr.from_plxpr import (
     PLxPRToQuantumJaxprInterpreter,
@@ -198,88 +197,6 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     # First a list of dynamically allocated qregs, then the global qreg
     # Update the current qreg and remove it from the output values.
     self.init_qreg.set(outvals.pop())
-    for dyn_qreg in reversed(dynalloced_qregs):
-        dyn_qreg.set(outvals.pop())
-
-    # Return only the output values that match the plxpr output values
-    return outvals
-
-
-# pylint: disable=too-many-arguments
-@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_while_loop_prim)
-def handle_while_loop(
-    self,
-    *plxpr_invals,
-    jaxpr_body_fn,
-    jaxpr_cond_fn,
-    body_slice,
-    cond_slice,
-    args_slice,
-):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the while loop primitive
-
-    Args:
-        body_slice: Tuple (start, stop, step) to slice body consts from plxpr_invals
-        cond_slice: Tuple (start, stop, step) to slice cond consts from plxpr_invals
-        args_slice: Tuple (start, stop, step) to slice args from plxpr_invals
-    """
-    self.init_qreg.insert_all_dangling_qubits()
-    dynalloced_qregs, dynalloced_wire_global_indices = _get_dynamically_allocated_qregs(
-        plxpr_invals, self.qubit_index_recorder, self.init_qreg
-    )
-    consts_body = plxpr_invals[_tuple_to_slice(body_slice)]
-    consts_cond = plxpr_invals[_tuple_to_slice(cond_slice)]
-    args = plxpr_invals[_tuple_to_slice(args_slice)]
-    args_plus_qreg = [
-        *args,
-        *[dyn_qreg.get() for dyn_qreg in dynalloced_qregs],
-        self.init_qreg.get(),
-    ]  # Add the qreg to the args
-
-    jaxpr = ClosedJaxpr(jaxpr_body_fn, consts_body)
-
-    f = partial(_calling_convention, self, jaxpr, outer_dynqreg_handlers=dynalloced_qregs)
-    converted_body_jaxpr = jax.make_jaxpr(f)(*args_plus_qreg)
-    new_consts_body = converted_body_jaxpr.consts
-
-    # Convert for condition from plxpr to Catalyst jaxpr
-    # We need to be able to handle arbitrary plxpr here.
-    # But we want to be able to create a state where:
-    # * We do not pass the quantum register as an argument.
-    # So let's just remove the quantum register here at the end
-    jaxpr = ClosedJaxpr(jaxpr_cond_fn, consts_cond)
-
-    f_remove_qreg = partial(
-        _calling_convention, self, jaxpr, outer_dynqreg_handlers=dynalloced_qregs, return_qreg=False
-    )
-
-    converted_cond_jaxpr = jax.make_jaxpr(f_remove_qreg)(*args_plus_qreg)
-
-    # Build Catalyst compatible input values
-    new_consts_cond = converted_cond_jaxpr.consts
-    new_consts_body = tuple(
-        const for const in new_consts_body if const not in dynalloced_wire_global_indices
-    )
-    while_loop_invals = [*new_consts_cond, *new_consts_body, *args_plus_qreg]
-    cond_slice = (0, len(new_consts_cond), 1)
-    body_slice = (cond_slice[1], len(new_consts_body) + cond_slice[1], 1)
-    args_slice = (body_slice[1], None, 1)
-
-    # Perform the binding
-    outvals = plxpr_while_loop_prim.bind(
-        *while_loop_invals,
-        jaxpr_body_fn=converted_body_jaxpr.jaxpr,
-        jaxpr_cond_fn=converted_cond_jaxpr.jaxpr,
-        body_slice=body_slice,
-        cond_slice=cond_slice,
-        args_slice=args_slice,
-    )
-    outvals = list(outvals)
-
-    # We assume the last output value is the returned qreg.
-    # Update the current qreg and remove it from the output values.
-    self.init_qreg.set(outvals.pop())
-
     for dyn_qreg in reversed(dynalloced_qregs):
         dyn_qreg.set(outvals.pop())
 
