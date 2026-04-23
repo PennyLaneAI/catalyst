@@ -19,7 +19,7 @@ import jax
 import numpy as np
 import pennylane as qp
 import pytest
-from pennylane.capture.primitives import for_loop_prim
+from pennylane.capture.primitives import for_loop_prim, while_loop_prim
 
 import catalyst
 from catalyst import qjit
@@ -31,7 +31,6 @@ from catalyst.jax_primitives import (
     qextract_p,
     qinsert_p,
     qinst_p,
-    while_p,
 )
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
@@ -881,18 +880,15 @@ class TestControlFlow:
         plxpr = jax.make_jaxpr(f)(x)
         catalyst_xpr = from_plxpr(plxpr)(x)
 
-        assert catalyst_xpr.eqns[0].primitive == while_p
-        assert catalyst_xpr.eqns[0].params["body_nconsts"] == 1
-        assert catalyst_xpr.eqns[0].params["cond_nconsts"] == 1
-        assert catalyst_xpr.eqns[0].params["num_implicit_inputs"] == 0
-        assert catalyst_xpr.eqns[0].params["preserve_dimensions"] == True
+        eqn = catalyst_xpr.eqns[0]
 
-        for kind in ["body_jaxpr", "cond_jaxpr"]:
-            xpr = catalyst_xpr.eqns[0].params[kind]
-            assert isinstance(xpr, jax.extend.core.ClosedJaxpr)
-            assert len(xpr.consts) == 0
-            assert len(xpr.jaxpr.invars) == 2
-            assert len(xpr.jaxpr.outvars) == 1
+        assert eqn.primitive == while_loop_prim
+        assert eqn.params["args_slice"] == (2, None, None)
+        assert eqn.params["body_slice"] == (0, 1, None)
+        assert eqn.params["cond_slice"] == (1, 2, None)
+
+        assert eqn.params["jaxpr_body_fn"].eqns[0].primitive.name == "add"
+        assert eqn.params["jaxpr_cond_fn"].eqns[-1].primitive.name == "lt"
 
 
 class TestHybridPrograms:

@@ -497,9 +497,6 @@ class TestCatalystOnlyControlled:
         assert new_qctrl._control_wires == [1]  # pylint: disable=protected-access
         assert new_qctrl.regions[0].quantum_tape.operations[0].wires == Wires([0])
 
-    @pytest.mark.xfail(
-        strict=False, reason="Disable due to circular dependency between Catalyst and PennyLane"
-    )
     @pytest.mark.parametrize("work_wire_type", ["zeroed", "borrowed"])
     def test_qctrl_work_wire_type_operator(self, work_wire_type):
         """Test that work_wire_type is preserved on a Controlled op inside qjit"""
@@ -545,9 +542,6 @@ class TestCatalystOnlyControlled:
         assert op.hyperparameters["work_wire_type"] == work_wire_type
         assert op.work_wire_type == work_wire_type
 
-    @pytest.mark.xfail(
-        strict=False, reason="Disable due to circular dependency between Catalyst and PennyLane"
-    )
     @pytest.mark.parametrize("work_wire_type", ["zeroed", "borrowed"])
     def test_qctrl_work_wire_type_callable(self, work_wire_type):
         """Test that work_wire_type is preserved on a Controlled op when wrapping a callable"""

@@ -92,13 +92,12 @@ def check_specs_same(actual: CircuitSpecs, expected: CircuitSpecs):
 class TestDeviceLevelSpecs:
     """Test qp.specs() at device level"""
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_with_passes(self):
+    def test_with_passes(self, capture_mode):
         """Test that device-level specs count resources *after* all passes are applied"""
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qp.transforms.merge_rotations
         @qp.transforms.cancel_inverses
         @qp.qnode(dev)
@@ -262,32 +261,38 @@ class TestPassByPassSpecs:
 
         return circ
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_invalid_levels(self, simple_circuit):
+    def test_invalid_levels(self, simple_circuit, capture_mode):
         """Test invalid inputs."""
 
-        no_passes = qjit(simple_circuit)
+        no_passes = qjit(simple_circuit, capture=capture_mode)
         with pytest.raises(
             check=ValueError,
-            match="The 'level' argument to qml.specs for QJIT'd QNodes must be "
-            "non-negative, got -1.",
+            match="The 'level' argument to qml.specs for QJIT'd QNodes is out of "
+            "bounds, got -5.",
         ):
-            qp.specs(no_passes, level=-1)()
+            qp.specs(no_passes, level=-5)()
 
-        with pytest.raises(check=ValueError, match="Requested specs levels 10"):
+        with pytest.raises(
+            check=ValueError,
+            match="The 'level' argument to qml.specs for QJIT'd "
+            "QNodes is out of bounds, got 10.",
+        ):
             qp.specs(no_passes, level=10)()
 
-        with pytest.raises(check=ValueError, match="Requested specs levels 10, 11"):
+        with pytest.raises(
+            check=ValueError,
+            match="The 'level' argument to qml.specs for QJIT'd "
+            "QNodes is out of bounds, got 10.",
+        ):
             qp.specs(no_passes, level=[10, 11])()
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_basic_passes_multi_level(self, simple_circuit):
+    def test_basic_passes_multi_level(self, simple_circuit, capture_mode):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
 
         simple_circuit = qp.transforms.cancel_inverses(simple_circuit)
         simple_circuit = qp.transforms.merge_rotations(simple_circuit)
 
-        simple_circuit = qjit(simple_circuit)
+        simple_circuit = qjit(simple_circuit, capture=capture_mode)
 
         expected = CircuitSpecs(
             device_name="lightning.qubit",
@@ -333,6 +338,39 @@ class TestPassByPassSpecs:
             single_level_specs = qp.specs(simple_circuit, level=i)()
             check_specs_header_same(actual, single_level_specs, skip_level=True)
             check_specs_resources_same(res, single_level_specs["resources"])
+
+    def test_user_level(self, simple_circuit, capture_mode):
+        """Test that 'user' level is handled correctly."""
+
+        simple_circuit = qp.transform(pass_name="cancel-inverses")(simple_circuit)
+        simple_circuit = qp.transform(pass_name="merge-rotations")(simple_circuit)
+        simple_circuit = qp.qjit(simple_circuit, capture=capture_mode)
+
+        specs = qp.specs(simple_circuit, level="user")()
+        assert specs.level == "merge-rotations"
+        assert specs.resources == SpecsResources(
+            gate_types={"RX": 1, "RZ": 1},
+            gate_sizes={1: 2},
+            measurements={"probs(all wires)": 1},
+            num_allocs=2,
+        )
+
+    def test_user_level_with_tapes(self, simple_circuit):
+        """Test that 'user' level is handled correctly with tape transforms."""
+
+        simple_circuit = qp.transforms.cancel_inverses(simple_circuit)
+        simple_circuit = dummy_transform(simple_circuit)  # Force tape transform
+        simple_circuit = qp.transform(pass_name="merge-rotations")(simple_circuit)
+        simple_circuit = qp.qjit(simple_circuit)
+
+        specs = qp.specs(simple_circuit, level="user")()
+        assert specs.level == "merge-rotations"
+        assert specs.resources == SpecsResources(
+            gate_types={"RX": 1, "RZ": 1},
+            gate_sizes={1: 2},
+            measurements={"probs(all wires)": 1},
+            num_allocs=2,
+        )
 
     def test_duplicate_level_names(self, simple_circuit):
         """Test that duplicate pass names are handled gracefully."""
@@ -536,7 +574,126 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
+    def test_circuit_with_args(self):
+        """Test using a mix of compiler passes and plain tape transforms"""
+
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def circ(x):
+            qp.RX(x * 1.0, 0)
+            qp.RX(x * 2.0, 0)
+            qp.RZ(x * 3.0, 1)
+            qp.RZ(x * 4.0, 1)
+            qp.Hadamard(0)
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([0, 1])
+            return qp.probs()
+
+        circ = qp.transforms.cancel_inverses(
+            circ
+        )  # Has to be applied as a tape transform because of the next transform
+        circ = dummy_transform(circ)  # Forces normal tape transform
+        circ = qp.transforms.merge_rotations(circ)  # Can be applied as an MLIR pass
+
+        circ = qjit(circ)
+
+        actual = qp.specs(circ, level="all")(3)
+        expected = CircuitSpecs(
+            device_name="lightning.qubit",
+            num_device_wires=2,
+            shots=Shots(None),
+            level=dict(
+                enumerate(
+                    (
+                        "Before Tape Transforms",
+                        "cancel_inverses",
+                        "dummy_transform",
+                        "Before MLIR Passes",
+                        "merge-rotations",
+                    )
+                )
+            ),
+            resources={
+                "Before Tape Transforms": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    gate_sizes={1: 6, 2: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "cancel_inverses": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "dummy_transform": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "Before MLIR Passes": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "merge-rotations": SpecsResources(
+                    gate_types={"RX": 1, "RZ": 1},
+                    gate_sizes={1: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+            },
+        )
+
+        check_specs_same(actual, expected)
+
     def test_all_mlir(self, simple_circuit):
+        """Test using "all-mlir" level"""
+
+        simple_circuit = qp.transforms.cancel_inverses(simple_circuit)
+        simple_circuit = qp.transforms.merge_rotations(
+            simple_circuit
+        )  # Can be applied as an MLIR pass
+
+        simple_circuit = qjit(simple_circuit)
+
+        actual = qp.specs(simple_circuit, level="all-mlir")()
+        expected = CircuitSpecs(
+            device_name="lightning.qubit",
+            num_device_wires=2,
+            shots=Shots(None),
+            level={
+                0: "Before MLIR Passes",
+                1: "cancel-inverses",
+                2: "merge-rotations",
+            },
+            resources={
+                "Before MLIR Passes": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    gate_sizes={1: 6, 2: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "cancel-inverses": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "merge-rotations": SpecsResources(
+                    gate_types={"RX": 1, "RZ": 1},
+                    gate_sizes={1: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+            },
+        )
+
+        check_specs_same(actual, expected)
+
+    def test_all_mlir_with_tape_transforms(self, simple_circuit):
         """Test using "all-mlir" level"""
 
         simple_circuit = qp.transforms.cancel_inverses(
@@ -555,8 +712,8 @@ class TestPassByPassSpecs:
             num_device_wires=2,
             shots=Shots(None),
             level={
-                2: "Before MLIR Passes",
-                3: "merge-rotations",
+                3: "Before MLIR Passes",
+                4: "merge-rotations",
             },
             resources={
                 "Before MLIR Passes": SpecsResources(
@@ -576,12 +733,12 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_advanced_measurements(self):
+    def test_advanced_measurements(self, capture_mode):
         """Test that advanced measurements such as LinearCombination are handled correctly."""
 
         dev = qp.device("lightning.qubit", wires=7)
 
+        @qjit(capture=capture_mode)
         @qp.qnode(dev, shots=10)
         def circ():
             coeffs = [0.2, -0.543]
@@ -596,7 +753,7 @@ class TestPassByPassSpecs:
             )
 
         # Representations are slightly different from plain PL -- wire counts are missing
-        info = qp.specs(qjit(circ), level=0, compute_depth=False)()
+        info = qp.specs(circ, level=0, compute_depth=False)()
 
         assert info.resources.measurements == {
             "expval(Hamiltonian(num_terms=2))": 1,
@@ -604,6 +761,73 @@ class TestPassByPassSpecs:
             "sample(1 wires)": 1,
             "sample(all wires)": 1,
         }
+
+    def test_conditionals(self, capture_mode):
+        """Test that conditionals are handled correctly."""
+
+        @qp.qjit(autograph=True, capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit(x):
+            if x > 0.5:
+                qp.Hadamard(0)
+                qp.PauliX(0)
+            else:
+                qp.PauliX(0)
+                if x < 2:
+                    qp.PauliX(0)
+                else:
+                    qp.PauliZ(0)
+
+            return qp.expval(qp.PauliX(0))
+
+        with pytest.warns(
+            UserWarning,
+            match="Specs was unable to determine the branch of a conditional or switch statement.",
+        ):
+            actual = qp.specs(circuit, level=0)(3)
+        expected = CircuitSpecs(
+            device_name="null.qubit",
+            num_device_wires=1,
+            shots=Shots(None),
+            level="Before MLIR Passes",
+            resources=SpecsResources(
+                gate_types={"Hadamard": 1, "PauliX": 2, "PauliZ": 1},
+                gate_sizes={1: 4},
+                measurements={"expval(PauliX)": 1},
+                num_allocs=1,
+            ),
+        )
+
+        check_specs_same(actual, expected)
+
+    def test_loops(self, capture_mode):
+        """Test that static loops are handled correctly and that resources are counted
+        according to the number of iterations (including nested loops)."""
+
+        @qp.qjit(capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            for _ in range(5):
+                qp.PauliX(0)
+                for _ in range(3):
+                    qp.Hadamard(0)
+            return qp.expval(qp.PauliX(0))
+
+        actual = qp.specs(circuit, level=0)()
+        expected = CircuitSpecs(
+            device_name="null.qubit",
+            num_device_wires=1,
+            shots=Shots(None),
+            level="Before MLIR Passes",
+            resources=SpecsResources(
+                gate_types={"Hadamard": 15, "PauliX": 5},
+                gate_sizes={1: 20},
+                measurements={"expval(PauliX)": 1},
+                num_allocs=1,
+            ),
+        )
+
+        check_specs_same(actual, expected)
 
     def test_split_non_commuting_tape(self):
         """Test that qp.transforms.split_non_commuting works as expected"""
@@ -723,6 +947,8 @@ class TestPassByPassSpecs:
         @qp.qjit(autograph=True)
         @qp.qnode(dev)
         def circuit():
+            qp.PauliX(wires=1)
+
             for _ in range(3):
                 subroutine()
 
@@ -735,8 +961,8 @@ class TestPassByPassSpecs:
             shots=Shots(None),
             level="Before MLIR Passes",
             resources=SpecsResources(
-                gate_types={"Hadamard": 3},
-                gate_sizes={1: 3},
+                gate_types={"Hadamard": 3, "PauliX": 1},
+                gate_sizes={1: 4},
                 measurements={"probs(all wires)": 1},
                 num_allocs=3,
             ),
@@ -747,9 +973,7 @@ class TestPassByPassSpecs:
     def test_ppr(self):
         """Test that PPRs are handled correctly."""
 
-        pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
-
-        @qp.qjit(pipelines=pipeline, target="mlir")
+        @qp.qjit(target="mlir")
         @catalyst.passes.to_ppr
         @qp.qnode(qp.device("null.qubit", wires=2))
         def circ():
@@ -805,6 +1029,23 @@ class TestPassByPassSpecs:
 
         actual = qp.specs(circ, level=2)()
         check_specs_same(actual, expected)
+
+    def test_loop_warning(self):
+        """Test that a warning is raised when dynamic loops are present in the circuit,
+        as resource counting may be inaccurate."""
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit(x):
+            for _ in range(x):
+                qp.PauliX(0)
+            return qp.expval(qp.PauliX(0))
+
+        with pytest.warns(
+            UserWarning,
+            match="Specs was unable to determine the number of loop iterations.",
+        ):
+            qp.specs(circuit, level=0)(5)
 
 
 class TestMarkerIntegration:
@@ -951,8 +1192,7 @@ class TestMarkerIntegration:
 
         check_specs_same(actual, expected)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_redundant_marker(self, simple_circuit):
+    def test_redundant_marker(self, simple_circuit, capture_mode):
         """Test that two markers on the same level generate the same specs."""
 
         simple_circuit = partial(qp.marker, label="m0")(simple_circuit)
@@ -960,7 +1200,7 @@ class TestMarkerIntegration:
         simple_circuit = partial(qp.marker, label="m1")(simple_circuit)
         simple_circuit = partial(qp.marker, label="m1-duplicate")(simple_circuit)
 
-        simple_circuit = qjit(simple_circuit)
+        simple_circuit = qjit(simple_circuit, capture=capture_mode)
 
         expected = CircuitSpecs(
             device_name="lightning.qubit",
@@ -992,8 +1232,7 @@ class TestMarkerIntegration:
 
         check_specs_same(actual, expected)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_marker(self, simple_circuit):
+    def test_marker(self, simple_circuit, capture_mode):
         """Test that qp.marker can be used appropriately."""
 
         simple_circuit = partial(qp.marker, label="m0")(simple_circuit)
@@ -1002,7 +1241,7 @@ class TestMarkerIntegration:
         simple_circuit = qp.transforms.merge_rotations(simple_circuit)
         simple_circuit = partial(qp.marker, label="m2")(simple_circuit)
 
-        simple_circuit = qjit(simple_circuit)
+        simple_circuit = qjit(simple_circuit, capture=capture_mode)
 
         expected = CircuitSpecs(
             device_name="lightning.qubit",

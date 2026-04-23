@@ -15,6 +15,7 @@
 """Test QJIT compatibility with JAX transformations such as jax.jit and jax.grad."""
 
 import textwrap
+from dataclasses import dataclass, field
 from functools import partial
 
 import jax
@@ -601,12 +602,56 @@ class TestJAXMLIRAttributeGetter:
         with pytest.raises(
             CompileError,
             match=textwrap.dedent("""
-            Large interger attributes currently not supported in MLIR,
+            Large integer attributes currently not supported in MLIR,
             see https://github.com/llvm/llvm-project/issues/128072
             """),
         ):
             with ctx, loc:
                 _ = get_mlir_attribute_from_pyval(2**100)
+
+    def test_dataclass_attr(self):
+        """
+        Test that a dataclass is convertible to an MLIR dictionary attribute.
+        """
+
+        # pylint: disable=missing-class-docstring
+        @dataclass
+        class MyOptions:
+            a: bool = True
+            b: int = 42
+            c: float = 1 / 137
+            d: str = "Yellow Submarine"
+            e: list = field(default_factory=lambda: ["John", "Paul", "George", "Ringo"])
+            f: dict = field(default_factory=lambda: {"one": 1, "two": 2})
+
+        with ctx, loc:
+            options = MyOptions()
+            attr = get_mlir_attribute_from_pyval(options)
+
+            assert isinstance(attr, ir.DictAttr)
+
+            assert isinstance(attr["a"], ir.BoolAttr)
+            assert attr["a"].value == options.a
+
+            assert isinstance(attr["b"], ir.IntegerAttr)
+            assert attr["b"].value == options.b
+
+            assert isinstance(attr["c"], ir.FloatAttr)
+            assert attr["c"].value == options.c
+
+            assert isinstance(attr["d"], ir.StringAttr)
+            assert attr["d"].value == options.d
+
+            assert isinstance(attr["e"], ir.ArrayAttr)
+            assert len(attr["e"]) == len(options.e)
+            for attr_val, options_val in zip(attr["e"], options.e):
+                assert attr_val.value == options_val
+
+            assert isinstance(attr["f"], ir.DictAttr)
+            assert len(attr["f"]) == len(options.f)
+            for attr_val, (options_key, options_val) in zip(attr["f"], options.f.items()):
+                assert attr_val.name == options_key
+                assert attr_val.attr.value == options_val
 
 
 if __name__ == "__main__":

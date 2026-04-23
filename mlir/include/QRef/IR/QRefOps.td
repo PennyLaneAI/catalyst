@@ -153,6 +153,8 @@ def GetOp : Memory_Op<"get", [NoMemoryEffect]> {
     let assemblyFormat = [{
         $qreg `[` ($idx^):($idx_attr)? `]` attr-dict `:` type(operands) `->` type(results)
     }];
+
+    let hasFolder = 1;
 }
 
 // -----
