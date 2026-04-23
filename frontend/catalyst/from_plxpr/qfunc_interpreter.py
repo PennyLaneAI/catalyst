@@ -22,7 +22,7 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 from jax._src.sharding_impls import UNSPECIFIED
 from jax._src.tree_util import tree_flatten
 from jax.extend.core import ClosedJaxpr
@@ -83,17 +83,17 @@ from .qubit_handler import (
 )
 
 measurement_map = {
-    qml.measurements.SampleMP: sample_p,
-    qml.measurements.ExpectationMP: expval_p,
-    qml.measurements.VarianceMP: var_p,
-    qml.measurements.ProbabilityMP: probs_p,
-    qml.measurements.StateMP: state_p,
+    qp.measurements.SampleMP: sample_p,
+    qp.measurements.ExpectationMP: expval_p,
+    qp.measurements.VarianceMP: var_p,
+    qp.measurements.ProbabilityMP: probs_p,
+    qp.measurements.StateMP: state_p,
 }
 
 
-def _flat_prod_gen(op: qml.ops.Prod):
+def _flat_prod_gen(op: qp.ops.Prod):
     for o in op:
-        if isinstance(o, qml.ops.Prod):
+        if isinstance(o, qp.ops.Prod):
             yield from _flat_prod_gen(o)
         else:
             yield o
@@ -142,7 +142,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         binding, we refer to the `_special_op_bind_call` mapping.
 
         Args:
-            op (qml.operation.Operator): The operation to interpret.
+            op (qp.operation.Operator): The operation to interpret.
             is_adjoint (bool): Whether the operation is in adjoint mode.
             control_values (tuple): Control values for controlled operations.
             control_wires (tuple): Control wires for controlled operations.
@@ -150,14 +150,14 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         Returns:
             List[AbstractQbit]: The resulting qubits after applying the operation.
         """
-        if isinstance(op, qml.ops.Adjoint):
+        if isinstance(op, qp.ops.Adjoint):
             return self.interpret_operation(
                 op.base,
                 is_adjoint=not is_adjoint,
                 control_values=control_values,
                 control_wires=control_wires,
             )
-        if type(op) in {qml.ops.Controlled, qml.ops.ControlledOp}:
+        if type(op) in {qp.ops.Controlled, qp.ops.ControlledOp}:
             return self.interpret_operation(
                 op.base,
                 is_adjoint=is_adjoint,
@@ -199,7 +199,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
     def _obs(self, obs):
         """Interpret the observable equation corresponding to a measurement equation's input."""
-        if isinstance(obs, qml.ops.Prod):
+        if isinstance(obs, qp.ops.Prod):
             # catalyst cant handle product of products
             return tensorobs_p.bind(*(self._obs(t) for t in _flat_prod_gen(obs)))
         if obs.arithmetic_depth > 0:
@@ -223,9 +223,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
     def _check_measurement_with_dynamic_allocation(self, measurement):
         """Check some constraints regarding dynamic allocation."""
         if self.has_dynamic_allocation:
-            if len(measurement.wires) == 0 and not isinstance(
-                measurement, qml.measurements.StateMP
-            ):
+            if len(measurement.wires) == 0 and not isinstance(measurement, qp.measurements.StateMP):
                 raise CompileError(textwrap.dedent("""
                         Terminal measurements must take in an explicit list of wires when
                         dynamically allocated wires are present in the program.
@@ -242,7 +240,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         """Rebind a measurement as a catalyst instruction.
 
         Args:
-            measurement (qml.measurements.MeasurementProcess): The measurement to interpret.
+            measurement (qp.measurements.MeasurementProcess): The measurement to interpret.
 
         Returns:
             AbstractQbit: The resulting measurement value.
@@ -263,7 +261,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         mcm_mv = measurement.mv
         mcm_obs = measurement.obs
         mp_is_on_mcm = (mcm_mv is not None) or (
-            mcm_obs is not None and not isinstance(mcm_obs, qml.operation.Operator)
+            mcm_obs is not None and not isinstance(mcm_obs, qp.operation.Operator)
         )
 
         if mp_is_on_mcm:
@@ -379,17 +377,17 @@ def _pauli_rot_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint,
 # These operations require special handling of their parameters
 # during the binding process.
 _special_op_bind_call = {
-    qml.QubitUnitary: _qubit_unitary_bind_call,
-    qml.GlobalPhase: _gphase_bind_call,
-    qml.PCPhase: _pcphase_bind_call,
-    qml.PauliRot: _pauli_rot_bind_call,
+    qp.QubitUnitary: _qubit_unitary_bind_call,
+    qp.GlobalPhase: _gphase_bind_call,
+    qp.PCPhase: _pcphase_bind_call,
+    qp.PauliRot: _pauli_rot_bind_call,
 }
 
 
 # pylint: disable=unused-argument
-@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.allocate_prim)
-def handle_qml_alloc(self, *, num_wires, state=None, restored=False):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the qml.allocate primitive"""
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qp.allocation.allocate_prim)
+def handle_allocate(self, *, num_wires, state=None, restored=False):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the qp.allocate primitive"""
 
     assert isinstance(
         num_wires, int
@@ -400,9 +398,9 @@ def handle_qml_alloc(self, *, num_wires, state=None, restored=False):
     return [qref_get_p.bind(new_qreg, i) for i in range(num_wires)]
 
 
-@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.deallocate_prim)
-def handle_qml_dealloc(self, *wires):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the qml.deallocate primitive"""
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qp.allocation.deallocate_prim)
+def handle_deallocate(self, *wires):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the qp.deallocate primitive"""
     qregs = set()
     for w in wires:
         get_op = w.parent
@@ -645,7 +643,7 @@ def handle_pauli_measure(self, *invals, pauli_word, **params):
     return result
 
 
-@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.BasisState._primitive)
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qp.BasisState._primitive)
 def handle_basis_state(self, *invals, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the BasisState primitive"""
     state_inval = invals[0]
@@ -663,7 +661,7 @@ def handle_basis_state(self, *invals, n_wires):
 
 
 # pylint: disable=unused-argument
-@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.StatePrep._primitive)
+@PLxPRToQuantumJaxprInterpreter.register_primitive(qp.StatePrep._primitive)
 def handle_state_prep(self, *invals, n_wires, **kwargs):
     """Handle the conversion from plxpr to Catalyst jaxpr for the StatePrep primitive"""
     state_inval = invals[0]
@@ -835,8 +833,8 @@ def _error_on_transform(*args, **kwargs):
 
 
 _special_op_bind_call = {
-    qml.QubitUnitary: _qubit_unitary_bind_call,
-    qml.GlobalPhase: _gphase_bind_call,
-    qml.PCPhase: _pcphase_bind_call,
-    qml.PauliRot: _pauli_rot_bind_call,
+    qp.QubitUnitary: _qubit_unitary_bind_call,
+    qp.GlobalPhase: _gphase_bind_call,
+    qp.PCPhase: _pcphase_bind_call,
+    qp.PauliRot: _pauli_rot_bind_call,
 }
