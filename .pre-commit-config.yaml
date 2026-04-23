@@ -1,0 +1,47 @@
+repos:
+-   repo: https://github.com/psf/black
+    rev: 24.4.2
+    hooks:
+    - id: black
+      args: [
+              "--line-length=100",
+              "-t", "py39",
+              "-t", "py310",
+              "-t", "py311",
+            ]
+      files: frontend
+-   repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+    - id: isort
+      args:
+        [
+          "--py",
+          "311",
+          "--profile",
+          "black",
+          "-l",
+          "100",
+          "-o",
+          "autoray",
+          "-p",
+          "./frontend",
+          "--skip",
+          "__init__.py",
+          "--filter-files",
+        ]
+      files: frontend
+- repo: local
+  hooks:
+    - id: pylint
+      name: pylint
+      entry: pylint
+      language: system
+      types: [python]
+      args:
+        [
+          "-rn", # Only display messages
+          "-sn", # Don't display the score
+          "--rcfile=.pylintrc", # Link to your config file
+        ]
+      files: frontend
