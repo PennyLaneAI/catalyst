@@ -97,7 +97,7 @@ def measure(
 
         import pennylane as qp
         from catalyst import qjit, measure
-        
+
         dev = qp.device("lightning.qubit", wires=2)
 
         @qjit
@@ -223,7 +223,7 @@ def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator
         import pennylane as qp
         import catalyst
         from catalyst import qjit
-        
+
         @qjit
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def workflow(theta, wires):
@@ -299,7 +299,7 @@ def ctrl(
         import pennylane as qp
         import catalyst
         from catalyst import qjit
-        
+
         @qjit
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def workflow(theta, w, cw):

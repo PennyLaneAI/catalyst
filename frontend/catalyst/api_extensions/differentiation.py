@@ -105,7 +105,7 @@ def grad(fn=None, *, method=None, h=None, argnums=None):
 
         import pennylane as qp
         from catalyst import qjit, grad
-        
+
         dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
@@ -247,7 +247,7 @@ def value_and_grad(fn=None, *, method=None, h=None, argnums=None):
 
         import pennylane as qp
         from catalyst import qjit, value_and_grad
-        
+
         dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
@@ -354,7 +354,7 @@ def jacobian(fn=None, *, method=None, h=None, argnums=None):
 
         import pennylane as qp
         from catalyst import qjit, jacobian
-        
+
         dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
