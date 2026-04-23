@@ -283,6 +283,7 @@
   decomposition system.
   [(#2531)](https://github.com/PennyLaneAI/catalyst/pull/2531)
   [(#2619)](https://github.com/PennyLaneAI/catalyst/pull/2619)
+  [(#2713)](https://github.com/PennyLaneAI/catalyst/pull/2713)
 
 * Decomposition rules are lowered as private functions (instead of public).
   [(#2658)](https://github.com/PennyLaneAI/catalyst/pull/2658)
