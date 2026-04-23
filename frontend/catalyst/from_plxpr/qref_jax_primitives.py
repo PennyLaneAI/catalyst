@@ -17,19 +17,18 @@ of quantum operations, measurements, and observables to reference semantics JAXP
 """
 
 from itertools import chain
-from typing import Iterable
 
 from jax._src import source_info_util
 from jax._src.lib.mlir import ir
 from jax.core import AbstractValue, ShapedArray
-from jax.extend.core import ClosedJaxpr, Primitive
+from jax.extend.core import Primitive
 from jax.interpreters import mlir
-from jax.tree_util import PyTreeDef, tree_unflatten
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.arith import (
     ExtUIOp,
 )
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
+from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
@@ -140,8 +139,6 @@ mlir.ir_type_handlers[QrefQreg] = _qref_qreg_lowering
 # Primitives #
 ##############
 
-qref_adjoint_p = Primitive("qref_adjoint")
-qref_adjoint_p.multiple_results = True
 qref_alloc_p = Primitive("qref_alloc")
 qref_dealloc_p = Primitive("qref_dealloc")
 qref_dealloc_p.multiple_results = True
@@ -556,22 +553,17 @@ def _qref_unitary_lowering(
 
     return ()
 
-
 #
-# adjoint
+# PL adjoint primitive
 #
-@qref_adjoint_p.def_abstract_eval
-def _qref_adjoint_abstract(*args, args_tree, jaxpr):
-    return ()
-
-
-def _qref_adjoint_lowering(
-    jax_ctx: mlir.LoweringRuleContext,
-    *args: Iterable[ir.Value],
-    args_tree: PyTreeDef,
-    jaxpr: ClosedJaxpr,
-) -> ir.Value:
-    consts, cargs = tree_unflatten(args_tree, args)
+def _pl_adjoint_lowering(
+    jax_ctx,
+    *plxpr_invals,
+    jaxpr,
+    lazy,
+    n_consts,
+):
+    new_jaxpr = jaxpr.replace(constvars=(), invars=jaxpr.constvars + jaxpr.invars)
 
     op = AdjointOp()
     adjoint_block = op.regions[0].blocks.append()
@@ -579,11 +571,11 @@ def _qref_adjoint_lowering(
         source_info_util.extend_name_stack("adjoint")
         _, _ = mlir.jaxpr_subcomp(
             jax_ctx.module_context,
-            jaxpr.jaxpr,
+            new_jaxpr,
             jax_ctx.name_stack.extend("adjoint"),
             mlir.TokenSet(),
-            [mlir.ir_constants(c) for c in jaxpr.consts],
-            *list(chain(consts, cargs, adjoint_block.arguments)),
+            [],
+            *list(chain(plxpr_invals, adjoint_block.arguments)),
             dim_var_values=jax_ctx.dim_var_values,
             const_lowering=jax_ctx.const_lowering,
         )
@@ -723,9 +715,9 @@ CUSTOM_LOWERING_RULES = (
     (qref_gphase_p, _qref_gphase_lowering),
     (qref_pauli_rot_p, _qref_pauli_rot_lowering),
     (qref_unitary_p, _qref_unitary_lowering),
-    (qref_adjoint_p, _qref_adjoint_lowering),
     (qref_measure_p, _qref_measure_lowering),
     (qref_compbasis_p, _qref_compbasis_lowering),
     (qref_namedobs_p, _qref_named_obs_lowering),
     (qref_hermitian_p, _qref_hermitian_lowering),
+    (plxpr_adjoint_transform_prim, _pl_adjoint_lowering),
 )

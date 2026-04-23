@@ -24,11 +24,8 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 from jax._src.sharding_impls import UNSPECIFIED
-from jax._src.tree_util import tree_flatten
-from jax.extend.core import ClosedJaxpr
-from jax.interpreters.partial_eval import DynamicJaxprTracer, convert_constvars_jaxpr
+from jax.interpreters.partial_eval import DynamicJaxprTracer
 from pennylane.capture import PlxprInterpreter, pause
-from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
@@ -38,7 +35,6 @@ from pennylane.measurements import CountsMP
 
 from catalyst.from_plxpr.qref_jax_primitives import (
     QrefQubit,
-    qref_adjoint_p,
     qref_alloc_p,
     qref_compbasis_p,
     qref_dealloc_p,
@@ -762,50 +758,6 @@ def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_
     unroller.control_values += tuple(control_values)
     unroller.eval(jaxpr, consts, *args)
     return []
-
-
-# pylint: disable=unused-argument
-@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_adjoint_transform_prim)
-def handle_adjoint_transform(
-    self,
-    *plxpr_invals,
-    jaxpr,
-    lazy,
-    n_consts,
-):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the adjoint primitive"""
-
-    if any(is_dynamically_allocated_wire(arg) for arg in plxpr_invals):
-        raise NotImplementedError(
-            "Dynamically allocated wires cannot be used in quantum adjoints yet."
-        )
-
-    assert jaxpr is not None
-    consts = plxpr_invals[:n_consts]
-    args = plxpr_invals[n_consts:]
-
-    jaxpr = ClosedJaxpr(jaxpr, consts)
-
-    def calling_convention(*args):
-        converter = copy(self)
-        retvals = converter(jaxpr, *args)
-        return retvals
-
-    converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*args)
-    converted_closed_jaxpr_branch = ClosedJaxpr(
-        convert_constvars_jaxpr(converted_jaxpr_branch.jaxpr), ()
-    )
-    new_consts = converted_jaxpr_branch.consts
-    _, args_tree = tree_flatten((new_consts, args))
-
-    qref_adjoint_p.bind(
-        *new_consts,
-        *args,
-        jaxpr=converted_closed_jaxpr_branch,
-        args_tree=args_tree,
-    )
-
-    return ()
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(transform_prim)
