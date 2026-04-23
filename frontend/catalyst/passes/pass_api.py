@@ -63,8 +63,8 @@ def pipeline(pass_pipeline: PipelineDict):
         @pipeline(my_pass_pipeline)
         @qnode(dev)
         def circuit(x):
-            qml.RX(x, wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         @qjit
         def fn(x):
@@ -140,11 +140,11 @@ def apply_pass(pass_name: str, *flags, **valued_options):
         .. code-block:: python
 
             @passes.apply_pass("merge-rotations")
-            @qml.qnode(qml.device("lightning.qubit", wires=1))
+            @qp.qnode(qp.device("lightning.qubit", wires=1))
             def qnode():
-                return qml.state()
+                return qp.state()
 
-            @qml.qjit(target="mlir")
+            @qp.qjit(target="mlir")
             def module():
                 return qnode()
     """
@@ -174,11 +174,11 @@ def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valu
             from standalone import getStandalonePluginAbsolutePath
 
             @passes.apply_pass_plugin(getStandalonePluginAbsolutePath(), "standalone-switch-bar-foo")
-            @qml.qnode(qml.device("lightning.qubit", wires=1))
+            @qp.qnode(qp.device("lightning.qubit", wires=1))
             def qnode():
-                return qml.state()
+                return qp.state()
 
-            @qml.qjit(target="mlir")
+            @qp.qjit(target="mlir")
             def module():
                 return qnode()
     """
