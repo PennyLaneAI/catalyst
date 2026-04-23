@@ -681,7 +681,7 @@ when working with classical control in Catalyst.
 Compatibility with PennyLane transforms
 ---------------------------------------
 
-PennyLane provides a wide variety of :doc:`transforms <code/qp_transforms>`
+PennyLane provides a wide variety of :doc:`transforms <code/qml_transforms>`
 that convert a circuit to one or more circuits.
 
 Currently, most PennyLane transforms will work with Catalyst as long as

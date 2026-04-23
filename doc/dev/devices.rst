@@ -80,7 +80,7 @@ Supported backend devices include:
       simulator with many novel optimizations including hybrid stabilizer simulation. To use this
       device with Catalyst, make sure to install the
       `PennyLane-Qrack plugin <https://pennylane-qrack.readthedocs.io/en/latest/>`__, and check out
-      the `QJIT compilation with Qrack and Catalyst tutorial <https://pennylane.ai/qp/demos/qrack/>`__.
+      the `QJIT compilation with Qrack and Catalyst tutorial <https://pennylane.ai/qml/demos/qrack/>`__.
 
       See the `Catalyst configuration file <https://github.com/unitaryfund/pennylane-qrack/blob/master/pennylane_qrack/QrackDeviceConfig.toml>`__
       for natively supported instructions.
