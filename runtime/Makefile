@@ -41,7 +41,7 @@ ASAN_COMMAND = $(ASAN_FLAGS)
 endif
 
 BUILD_TARGETS := rt_capi rtd_null_qubit rt_rsdecomp decompsolver rt_decoder
-TEST_TARGETS := runner_tests_qir_runtime runner_tests_mbqc_runtime runner_tests_rsdecomp_runtime runner_tests_decompsolver
+TEST_TARGETS := runner_tests_qir_runtime runner_tests_mbqc_runtime runner_tests_rsdecomp_runtime runner_tests_decompsolver runner_tests_decoder_runtime
 
 ifeq ($(ENABLE_OPENQASM), ON)
 	BUILD_TARGETS += rtd_openqasm
