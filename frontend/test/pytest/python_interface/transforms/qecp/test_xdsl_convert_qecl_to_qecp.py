@@ -18,7 +18,6 @@ import pennylane as qp
 import pytest
 
 from dataclasses import dataclass
-from xdsl.context import Context
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import GreedyRewritePatternApplier, PatternRewriteWalker
 
@@ -144,6 +143,7 @@ class TestAllocAndDeallocConversionPatterns:
 
         name = "bad-pass"
 
+        # pylint: disable=unused-argument
         def apply(self, ctx, op):
             """Apply test pass."""
 
@@ -206,14 +206,14 @@ class TestAllocAndDeallocConversionPatterns:
         """Test that an assertion error is raised if the TypeConversion to lower the HyperRegister
         and Codeblock types wasn't applied prior to these patterns"""
 
-        program = f"""
-        builtin.module {{
+        program = """
+        builtin.module {
         // CHECK-LABEL: test_program
-        func.func @test_program() {{
+        func.func @test_program() {
             %0 = qecl.alloc() : !qecl.hyperreg<3 x 1>
             return
-        }}
-        }}
+        }
+        }
         """
 
         pipeline = (self.BadPass(),)
@@ -227,15 +227,15 @@ class TestAllocAndDeallocConversionPatterns:
         """Test that an assertion error is raised if the TypeConversion to lower the HyperRegister
         and Codeblock types wasn't applied prior to these patterns"""
 
-        program = f"""
-        builtin.module {{
+        program = """
+        builtin.module {
         // CHECK-LABEL: test_program
-        func.func @test_program() {{
+        func.func @test_program() {
             %0 = "test.op"() : () -> !qecl.hyperreg<5 x 1>
             qecl.dealloc %0 : !qecl.hyperreg<5 x 1>
             return
-        }}
-        }}
+        }
+        }
         """
 
         pipeline = (self.BadPass(),)
@@ -256,6 +256,7 @@ class TestInsertExtractConversionPatterns:
 
         name = "bad-pass"
 
+        # pylint: disable=unused-argument
         def apply(self, ctx, op):
             """Apply test pass."""
 
@@ -268,6 +269,7 @@ class TestInsertExtractConversionPatterns:
                 )
             ).rewrite_module(op)
 
+    # pylint: too-many-arguments, too-many-positional-arguments
     @pytest.mark.parametrize("width", [1, 2, 3])
     @pytest.mark.parametrize("n", [7, 42])
     @pytest.mark.parametrize(
@@ -324,15 +326,15 @@ class TestInsertExtractConversionPatterns:
         """Test that an assertion error is raised if the TypeConversion to lower the HyperRegister
         and Codeblock types wasn't applied prior to these patterns"""
 
-        program = f"""
-        builtin.module {{
+        program = """
+        builtin.module {
         // CHECK-LABEL: test_program
-        func.func @test_program() {{
+        func.func @test_program() {
             %0 = "test.op"() : () -> !qecl.hyperreg<3 x 1>
             %1 = qecl.extract_block %0[0] : !qecl.hyperreg<3 x 1> -> !qecl.codeblock<1>
             return
-        }}
-        }}
+        }
+        }
         """
 
         pipeline = (self.BadPass(),)
@@ -346,16 +348,16 @@ class TestInsertExtractConversionPatterns:
         """Test that an assertion error is raised if the TypeConversion to lower the HyperRegister
         and Codeblock types wasn't applied prior to these patterns"""
 
-        program = f"""
-        builtin.module {{
+        program = """
+        builtin.module {
         // CHECK-LABEL: test_program
-        func.func @test_program() {{
+        func.func @test_program() {
             %0 = "test.op"() : () -> !qecl.codeblock<1>
             %1 = "test.op"() : () -> !qecl.hyperreg<3 x 1>
             %2 = qecl.insert_block %1[0], %0 : !qecl.hyperreg<3 x 1>, !qecl.codeblock<1>
             return
-        }}
-        }}
+        }
+        }
         """
 
         pipeline = (self.BadPass(),)
