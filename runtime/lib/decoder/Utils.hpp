@@ -23,6 +23,18 @@
 
 namespace Catalyst::Runtime::QEC {
 
+template <class IntegerType = std::size_t>
+std::string map_sydrome_res_to_bitstr(std::vector<IntegerType> &syndrome_res)
+{
+    std::string syndrom_str;
+    for (const auto &bit : syndrome_res) {
+        syndrom_str += (bit ? '1' : '0');
+    }
+
+    // Return results
+    return syndrom_str
+}
+
 /**
  * @brief Get a parity check matrix from the Tanner graph data.
  * The syndrome $s$ is calculated using the parity check matrix $H$ and the
@@ -91,14 +103,8 @@ std::string map_errors_to_syndrome(const std::vector<size_t> &row_idx,
         syndrome_res[col] = syndrome_res[col] % 2;
     }
 
-    // Convert the syndrome vector to a bitstr representation
-    std::string syndrom_str;
-    for (int bit : syndrome_res) {
-        syndrom_str += (bit ? '1' : '0');
-    }
-
     // Return results
-    return syndrom_str;
+    return map_sydrome_res_to_bitstr(syndrome_res);
 }
 
 std::vector<size_t> get_error_indices(std::vector<uint8_t> &err_vec)
