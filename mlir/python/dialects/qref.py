@@ -14,4 +14,5 @@
 
 """MLIR Dialect for Qref dialect."""
 
+# pylint: disable=relative-beyond-top-level
 from ._qref_ops_gen import *  # noqa: F401

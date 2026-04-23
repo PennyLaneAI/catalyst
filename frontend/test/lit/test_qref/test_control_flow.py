@@ -124,16 +124,16 @@ def test_for_loop_with_result(size: int):
     # CHECK:   scf.yield [[add]] : tensor<i64>
     # CHECK: }
 
-    sum = 0
+    x = 0
     for i in range(size):
         m = qp.measure(i)
-        sum += m
+        x += m
 
     # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: [[loopOut_tensorf64:%.+]] = stablehlo.convert [[loopOut]] : (tensor<i64>) -> tensor<f64>
     # CHECK: [[angle:%.+]] = tensor.extract [[loopOut_tensorf64]][] : tensor<f64>
     # CHECK: qref.custom "RX"([[angle]]) [[q0]] : !qref.bit
-    qp.RX(sum, wires=0)
+    qp.RX(x, wires=0)
 
     return qp.state()
 
@@ -163,7 +163,7 @@ def test_for_loop_with_dynamic_shapes(size: int):
     # CHECK:    scf.yield [[add]] : tensor<?xf64>
     # CHECK: }
     x = jnp.zeros(size)
-    for i in range(size):
+    for _ in range(size):
         x += x
 
     # CHECK: [[reduce:%.+]] = stablehlo.reduce([[loopOut]]
@@ -387,32 +387,3 @@ def test_while_loop_with_dynamic_allocation(i: int):
 
 
 print(test_while_loop_with_dynamic_allocation.mlir)
-
-
-# CHECK: func.func public @jit_test_for_loop_classical(%arg0: tensor<i64>) -> tensor<i64> attributes {llvm.emit_c_interface} {
-# CHECK:   %c1 = arith.constant 1 : index
-# CHECK:   %c = stablehlo.constant dense<0> : tensor<i64>
-# CHECK:   %c0 = arith.constant 0 : index
-# CHECK:   %extracted = tensor.extract %arg0[] : tensor<i64>
-# CHECK:   %0 = arith.index_cast %extracted : i64 to index
-# CHECK:   %1 = scf.for %arg1 = %c0 to %0 step %c1 iter_args(%arg2 = %c) -> (tensor<i64>) {
-# CHECK:     %2 = arith.index_cast %arg1 : index to i64
-# CHECK:     %from_elements = tensor.from_elements %2 : tensor<i64>
-# CHECK:     %3 = stablehlo.add %arg2, %from_elements : tensor<i64>
-# CHECK:     scf.yield %3 : tensor<i64>
-# CHECK:   }
-# CHECK:   return %1 : tensor<i64>
-# CHECK: }
-# !!!! this is just a temporary test to check nothing broke on the `WorkflowInterpreter`
-# for classical for loops
-# remove before merging to main
-# No docstring, so codefactor will pick it up on the main PR
-@qp.qjit(capture=True, target="mlir", autograph=True)
-def test_for_loop_classical(i: int):
-    sum = 0
-    for j in range(i):
-        sum += j
-    return sum
-
-
-print(test_for_loop_classical.mlir)

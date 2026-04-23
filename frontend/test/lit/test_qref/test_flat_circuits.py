@@ -302,7 +302,7 @@ def test_unitary():
 print(test_unitary.mlir)
 
 
-# CHECK: func.func public @test_set_state(%arg0: tensor<4xi64>) -> tensor<f64>
+# CHECK: func.func public @test_set_state(%arg0: tensor<4xi64>, %arg1: tensor<4xi64>) -> tensor<f64>
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=4))
 def test_set_state():
@@ -317,13 +317,22 @@ def test_set_state():
     # CHECK: qref.set_state([[state]]) [[q0]], [[q2]] : tensor<4xcomplex<f64>>, !qref.bit, !qref.bit
     qp.StatePrep(np.array([0, 0, 1, 0]), wires=[0, 2])
 
+    # CHECK: [[reg_alloc:%.+]] = qref.alloc( 1) : !qref.reg<1>
+    # CHECK: [[q0_alloc:%.+]] = qref.get [[reg_alloc]][ 0] : !qref.reg<1> -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
+    # CHECK: [[state:%.+]] = stablehlo.convert %arg1 : (tensor<4xi64>) -> tensor<4xcomplex<f64>>
+    # CHECK: qref.set_state([[state]]) [[q0_alloc]], [[q2]] : tensor<4xcomplex<f64>>, !qref.bit, !qref.bit
+    # CHECK: qref.dealloc [[reg_alloc]] : !qref.reg<1>
+    with qp.allocate(1) as q:
+        qp.StatePrep(np.array([0, 0, 1, 0]), wires=[q[0], 2])
+
     return qp.expval(qp.X(0))
 
 
 print(test_set_state.mlir)
 
 
-# CHECK: func.func public @test_set_basis_state(%arg0: tensor<4xi64>) -> tensor<f64>
+# CHECK: func.func public @test_set_basis_state(%arg0: tensor<3xi64>, %arg1: tensor<2xi64>) -> tensor<f64>
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=4))
 def test_set_basis_state():
@@ -335,9 +344,18 @@ def test_set_basis_state():
     # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
     # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
     # CHECK: [[q3:%.+]] = qref.get [[reg]][ 3] : !qref.reg<4> -> !qref.bit
-    # CHECK: [[state:%.+]] = stablehlo.convert {{%.+}} : tensor<4xi1>
-    # CHECK: qref.set_basis_state([[state]]) [[q0]], [[q2]], [[q3]] : tensor<4xi1>, !qref.bit, !qref.bit, !qref.bit
-    qp.BasisState(np.array([0, 0, 1, 0]), wires=[0, 2, 3])
+    # CHECK: [[state:%.+]] = stablehlo.convert {{%.+}} : tensor<3xi1>
+    # CHECK: qref.set_basis_state([[state]]) [[q0]], [[q2]], [[q3]] : tensor<3xi1>, !qref.bit, !qref.bit, !qref.bit
+    qp.BasisState(np.array([0, 0, 1]), wires=[0, 2, 3])
+
+    # CHECK: [[reg_alloc:%.+]] = qref.alloc( 1) : !qref.reg<1>
+    # CHECK: [[q0_alloc:%.+]] = qref.get [[reg_alloc]][ 0] : !qref.reg<1> -> !qref.bit
+    # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
+    # CHECK: [[state:%.+]] = stablehlo.convert {{%.+}} : tensor<2xi1>
+    # CHECK: qref.set_basis_state([[state]]) [[q0_alloc]], [[q2]] : tensor<2xi1>, !qref.bit, !qref.bit
+    # CHECK: qref.dealloc [[reg_alloc]] : !qref.reg<1>
+    with qp.allocate(1) as q:
+        qp.BasisState(np.array([0, 1]), wires=[q[0], 2])
 
     return qp.expval(qp.X(0))
 
