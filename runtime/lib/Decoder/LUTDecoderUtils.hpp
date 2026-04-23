@@ -24,8 +24,8 @@
 namespace Catalyst::Runtime::QEC {
 /**
  * @brief Convert a vector of syndrome results to a bit string representation.
- * 
- * @tparam IntegerType 
+ *
+ * @tparam IntegerType
  * @param syndrome_res A vector of syndrome results
  * @return std::string A bit string representation of the given syndrome results.
  */
@@ -95,9 +95,9 @@ get_parity_check_matrix(const std::vector<size_t> &tanner_row_idx,
  * @param num_cols
  * @return std::string
  */
-std::string map_errors_to_syndrome(const std::vector<size_t> &row_idx,
-                                   const std::vector<size_t> &col_ptr, const size_t num_rows,
-                                   const size_t num_cols, std::vector<uint8_t> &err_vec)
+std::string get_syndrome_from_errors(const std::vector<size_t> &row_idx,
+                                     const std::vector<size_t> &col_ptr, const size_t num_rows,
+                                     const size_t num_cols, std::vector<uint8_t> &err_vec)
 {
 
     std::vector<size_t> syndrome_res(num_cols, 0);
@@ -190,8 +190,8 @@ generate_lookup_table(const std::vector<size_t> &parity_mat_row_idx,
 
         do {
             std::string syndrome_str =
-                map_errors_to_syndrome(parity_mat_row_idx, parity_mat_col_ptr, num_data_qubits,
-                                       num_aux_qubits, err_vector);
+                get_syndrome_from_errors(parity_mat_row_idx, parity_mat_col_ptr, num_data_qubits,
+                                         num_aux_qubits, err_vector);
             std::vector<size_t> error_indices = get_error_indices(err_vector);
             // We assume that 1:1 mapping for the syndrome and err_vector
             lut[syndrome_str] = error_indices;
