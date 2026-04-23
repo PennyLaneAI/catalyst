@@ -232,7 +232,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         aux_qubits: Iterable[qecp.QecPhysicalQubitSSAValue],
         codeblock: qecp.PhysicalCodeBlockSSAValue,
         check_type: CheckType,
-    ) -> (Iterable[qecp.MeasureOp], qecp.PhysicalCodeblockType):
+    ) -> tuple[Iterable[qecp.MeasureOp], qecp.PhysicalCodeBlockSSAValue]:
         """Contains the ops to perform a QEC check on the provided auxiliary qubits and codeblock.
         Intended to be called inside `builder.ImplicitBuilder` to add these operations to a block.
 
@@ -256,7 +256,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         tanner_graph, cnot_fn = self._get_cnot_and_tanner_graph(check_type)
 
-        if check_type == "X":
+        if check_type == CheckType.X:
             # auxiliary qubits are prepared in the |+> state
             hadamard_ops = [qecp.HadamardOp(qb) for qb in aux_qubits]
             aux_qubits = [h_op.results[0] for h_op in hadamard_ops]
@@ -286,16 +286,16 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             hadamard_ops = [qecp.HadamardOp(aux) for aux in aux_qbs_out]
             aux_qbs_out = [h_op.results[0] for h_op in hadamard_ops]
 
-        # measure auxilary qubits
+        # measure auxiliary qubits
         measure_ops = [qecp.MeasureOp(qb) for qb in aux_qbs_out]
 
         return measure_ops, codeblock
 
-    def _get_cnot_and_tanner_graph(self, check_type: CheckType) -> (np.ndarray, Callable):
+    def _get_cnot_and_tanner_graph(self, check_type: CheckType) -> tuple[np.ndarray, Callable]:
         """Get the appropriate tanner graph and the function for applying CNOTs in an
         QEC check based on the check type."""
 
-        if check_type == "X":
+        if check_type == CheckType.X:
             # we use CNOT(aux, data) and X-tanner graph
             tanner_graph = self.qec_code.x_tanner
 
@@ -304,7 +304,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 aux_qb, data_qb = cnot_op.results
                 return aux_qb, data_qb
 
-        elif check_type == "Z":
+        elif check_type == CheckType.Z:
             # we use CNOT(data, aux) and Z-tanner graph
             tanner_graph = self.qec_code.z_tanner
 
@@ -315,7 +315,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         else:
             raise CompileError(
-                f"Only CSS codes are supported, check_type must be X or Z but recieved {check_type}"
+                f"Only CSS codes are supported, check_type must be X or Z but received {check_type}"
             )
 
         return tanner_graph, cnot_fn

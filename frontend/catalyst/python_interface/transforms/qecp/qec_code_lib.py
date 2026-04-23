@@ -19,7 +19,7 @@ from typing import Self
 
 import numpy as np
 
-_CODE_REGISTRY: dict[str, tuple[int, int, int]] = {
+_CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
     "Steane": (
         7,
         1,
