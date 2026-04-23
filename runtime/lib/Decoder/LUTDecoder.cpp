@@ -28,11 +28,11 @@ namespace Catalyst::Runtime::QEC {
  * @param row_idx_tanner
  * @param col_ptr_tanner
  * @param syndrome_results
- * @return int64_t*
+ * @return size_t
  */
-size_t *__catalyst__qecp__decode_steane_lut(MemRefT_int64_1d *row_idx_tanner,
-                                            MemRefT_int64_1d *col_ptr_tanner,
-                                            MemRefT_int8_1d *current_syndromes)
+size_t __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
+                                           MemRefT_int64_1d *col_ptr_tanner,
+                                           MemRefT_int8_1d *current_syndromes)
 {
     // 1. Recover the parity check matrix from a tanner graph
     const size_t nnz = row_idx_tanner->sizes[0];
@@ -42,8 +42,6 @@ size_t *__catalyst__qecp__decode_steane_lut(MemRefT_int64_1d *row_idx_tanner,
     const size_t n = col_ptr_tanner->sizes[0] - 1; // number of columns
     std::vector<size_t> col_ptr_tanner_vec(col_ptr_tanner->data_aligned,
                                            col_ptr_tanner->data_aligned + n + 1);
-    const size_t m = *std::max_element(row_idx_tanner_vec.begin(), row_idx_tanner_vec.end()) +
-                     1;                                 // number of rows
     const size_t num_aux = current_syndromes->sizes[0]; // number of columns
     std::vector<int8_t> current_syndromes_res(current_syndromes->data_aligned,
                                               current_syndromes->data_aligned + num_aux);
@@ -66,6 +64,18 @@ size_t *__catalyst__qecp__decode_steane_lut(MemRefT_int64_1d *row_idx_tanner,
 
     auto current_syndrome_str = map_sydrome_res_to_bitstr(current_syndromes_res);
 
-    return lut[current_syndrome_str].data();
+    std::vector<size_t> error_indices = lut[current_syndrome_str];
+
+    // TODOs: Current implementation return an index of the single inferred error.
+    // This works for the 2026-Q2 goal for Steane code prototyping. For a general
+    // lookup table decoder implementation, an pointer to the array of indices of
+    // errors should be returned. An example we can follow is the OQD CAPI and additional
+    // work such as garbage collection for the results, manual memory allocation for
+    // return indices are required. For more details, please see the lines here
+    // https://github.com/PennyLaneAI/catalyst/blob/7563bf8d91c05e6cfcee89cc49f498da6b45d616/runtime/lib/OQDcapi/OQDRuntimeCAPI.cpp#L113-L123
+
+    // NOTE: The thoughts above might or might not work.
+
+    return error_indices.front();
 }
 } // namespace Catalyst::Runtime::QEC

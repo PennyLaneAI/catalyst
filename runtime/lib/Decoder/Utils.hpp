@@ -32,7 +32,7 @@ std::string map_sydrome_res_to_bitstr(std::vector<IntegerType> &syndrome_res)
     }
 
     // Return results
-    return syndrom_str
+    return syndrom_str;
 }
 
 /**
