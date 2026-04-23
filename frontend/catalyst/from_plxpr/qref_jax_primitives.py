@@ -16,8 +16,6 @@
 of quantum operations, measurements, and observables to reference semantics JAXPR.
 """
 
-from itertools import chain
-
 from jax._src import source_info_util
 from jax._src.lib.mlir import ir
 from jax.core import AbstractValue, ShapedArray
@@ -553,9 +551,11 @@ def _qref_unitary_lowering(
 
     return ()
 
+
 #
 # PL adjoint primitive
 #
+# pylint: disable=unused-argument
 def _pl_adjoint_lowering(
     jax_ctx,
     *plxpr_invals,
@@ -575,7 +575,7 @@ def _pl_adjoint_lowering(
             jax_ctx.name_stack.extend("adjoint"),
             mlir.TokenSet(),
             [],
-            *list(chain(plxpr_invals, adjoint_block.arguments)),
+            *plxpr_invals,
             dim_var_values=jax_ctx.dim_var_values,
             const_lowering=jax_ctx.const_lowering,
         )
