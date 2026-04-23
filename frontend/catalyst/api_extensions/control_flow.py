@@ -231,8 +231,8 @@ def cond(pred: DynamicJaxprTracer):
 
     .. note::
 
-       ``catalyst.cond`` is not supported in program capture mode. If capture is enabled (``qjit(capture=True)``),
-        please use ``qp.cond`` instead.
+       ``catalyst.cond`` is not supported in program capture mode. If capture is enabled
+       (``qjit(capture=True)``), please use ``qp.cond`` instead.
 
         .. code-block:: python
 
