@@ -105,6 +105,9 @@ def cond(pred: DynamicJaxprTracer):
 
     .. code-block:: python
 
+        import pennylane as qp
+        from catalyst import qjit, cond
+
         dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
@@ -320,7 +323,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
 
         import pennylane as qp
         from catalyst import qjit, for_loop
-        
+
         dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
@@ -473,7 +476,7 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
 
         import pennylane as qp
         from catalyst import qjit, while_loop
-        
+
         dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
@@ -589,7 +592,7 @@ def switch(index_var: int):
 
         import pennylane as qp
         from catalyst import qjit, switch
-        
+
         dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
