@@ -192,7 +192,7 @@
   [(#2695)](https://github.com/PennyLaneAI/catalyst/pull/2695)
 
   ```bash
-  quantum-opt --resource-analysis='print-json=true' input.mlir
+  quantum-opt --resource-analysis='output-json=true' input.mlir
   quantum-opt --resource-analysis -mlir-pass-statistics input.mlir
   ```
 
