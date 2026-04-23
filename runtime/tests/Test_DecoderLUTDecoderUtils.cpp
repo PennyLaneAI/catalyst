@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "catch2/catch_test_macros.hpp"
@@ -45,6 +47,18 @@ struct tanner_graph_steane {
     const std::vector<size_t> row_idx_parity_matrix_transpose = {0, 1, 2, 3, 1, 2,
                                                                  4, 5, 2, 3, 5, 6};
     const std::vector<size_t> col_ptr_parity_matrix_transpose = {0, 4, 8, 12};
+
+    const std::unordered_map<std::string, std::vector<uint8_t>> lookup_table = {
+        {"000", std::vector<uint8_t>({0, 0, 0, 0, 0, 0, 0})},
+        {"001", std::vector<uint8_t>({0, 0, 0, 0, 0, 0, 1})},
+        {"010", std::vector<uint8_t>({0, 0, 0, 0, 1, 0, 0})},
+        {"011", std::vector<uint8_t>({0, 0, 0, 0, 0, 1, 0})},
+        {"100", std::vector<uint8_t>({1, 0, 0, 0, 0, 0, 0})},
+        {"101", std::vector<uint8_t>({0, 0, 0, 1, 0, 0, 0})},
+        {"110", std::vector<uint8_t>({0, 1, 0, 0, 0, 0, 0})},
+        {"111", std::vector<uint8_t>({0, 0, 1, 0, 0, 0, 0})},
+
+    };
 } tanner_graph;
 
 TEST_CASE("Test convert_sydrome_res_to_bitstr", "[LUTDecoderUtils::convert_syndrome_res_to_bitstr]")
@@ -93,9 +107,11 @@ TEST_CASE("Test get_syndrome_from_errors", "[LUTDecoderUtils::get_syndrome_from_
 
     const size_t num_data_qubits = tanner_graph.code_size;
     const size_t num_aux_qubits = 3;
-    std::vector<uint8_t> err_vec = {0, 0, 0, 0, 0, 0, 0};
-    std::string syndrome_bitstr = get_syndrome_from_errors(
-        parity_mat_csc.first, parity_mat_csc.second, num_data_qubits, num_aux_qubits, err_vec);
-
-    REQUIRE(syndrome_bitstr == "000");
+    for (auto it = tanner_graph.lookup_table.begin(); it != tanner_graph.lookup_table.end(); ++it) {
+        auto err_vec = it->second;
+        std::string expected_str = it->first;
+        std::string syndrome_bitstr = get_syndrome_from_errors(
+            parity_mat_csc.first, parity_mat_csc.second, num_data_qubits, num_aux_qubits, err_vec);
+        REQUIRE(syndrome_bitstr == expected_str);
+    }
 }
