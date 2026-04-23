@@ -19,7 +19,33 @@
 
 #include "LUTDecoderUtils.hpp"
 using namespace Catalyst::Runtime::QEC;
-TEST_CASE("Test convert_sydrome_res_to_bitstr", "[LUTDecoderUtils::syndrome_res_convert]")
+
+struct tanner_graph_steane{
+    /* Tanner graph representation for the [[7, 1, 3]] Steane code
+       The shape of dense matrix that the [[7, 1, 3]] Steane code is (10, 10).
+       The first 7 columns represent data qubits, while the last 3 columns 
+       represent auxillary qubits. The full dense matrix is:
+       | 0 0 0 0 0 0 0 1 0 0|
+       | 0 0 0 0 0 0 0 1 1 0|
+       | 0 0 0 0 0 0 0 1 1 1|
+       | 0 0 0 0 0 0 0 1 0 1|
+       | 0 0 0 0 0 0 0 0 1 0|
+       | 0 0 0 0 0 0 0 0 1 1|
+       | 0 0 0 0 0 0 0 0 0 1|
+       | 1 1 1 1 0 0 0 0 0 0|
+       | 0 1 1 0 1 1 0 0 0 0|
+       | 0 0 1 1 0 1 1 0 0 0|
+    */
+    const size_t code_size = 7;
+    const size_t code_distance = 3;
+    const std::vector<size_t> row_idx = {7, 7, 8, 7, 8, 9, 7, 9, 8, 8, 9, 9, 0, 1, 2, 3, 1, 2, 4, 5, 2, 3, 5, 6};
+    const std::vector<size_t> col_ptr = {0, 1, 3, 6, 8, 9, 11, 12, 16, 20, 24};
+
+    const std::vector<size_t> row_idx_parity_matrix_transpose = {0, 1, 2, 3, 1, 2, 4, 5, 2, 3, 5, 6};
+    const std::vector<size_t> col_ptr_parity_matrix_transpose = {0, 4, 8, 12};
+} tanner_graph;
+
+TEST_CASE("Test convert_sydrome_res_to_bitstr", "[LUTDecoderUtils::convert_syndrome_res_to_bitstr]")
 {
     std::vector<size_t> bad_syndrome_inputs = {1, 2, 3};
     REQUIRE_THROWS_WITH(convert_syndrome_res_to_bitstr(bad_syndrome_inputs),
@@ -33,4 +59,23 @@ TEST_CASE("Test convert_sydrome_res_to_bitstr", "[LUTDecoderUtils::syndrome_res_
 
     REQUIRE(syndrome_str_size_t == expected_syndrome_str);
     REQUIRE(syndrome_str_int8_t == expected_syndrome_str);
+}
+
+TEST_CASE("Test get_error_indices", "[LUTDecoderUtils::get_error_indices]")
+{
+    std::vector<u_int8_t> error_vector = {0,1,0,1,0,0,0};
+    std::vector<size_t> expected_indices = {1,3};
+
+    auto error_indices = get_error_indices(error_vector);
+
+    REQUIRE(error_indices == expected_indices);
+}
+
+TEST_CASE("Test get_parity_check_matrix", "[LUTDecoderUtils::get_parity_check_matrix]"){
+
+    std::vector<size_t> aux_cols = {7, 8, 9};
+    auto parity_mat_csc = get_parity_check_matrix(tanner_graph.row_idx, tanner_graph.col_ptr, aux_cols);
+
+    REQUIRE(parity_mat_csc.first == tanner_graph.row_idx_parity_matrix_transpose);
+    REQUIRE(parity_mat_csc.second == tanner_graph.col_ptr_parity_matrix_transpose);
 }
