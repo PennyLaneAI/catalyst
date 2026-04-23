@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline="builtin.module(resource-tracker{output-json=true})" --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --pass-pipeline="builtin.module(resource-analysis{output-json=true})" --split-input-file %s | FileCheck %s
 
 
 // Basic gate counting
@@ -406,9 +406,9 @@ func.func @mixed_alloc_and_arg_qubits(%q0: !quantum.bit) -> !quantum.bit {
 
 // Pass statistics output
 
-// RUN: quantum-opt --pass-pipeline="builtin.module(resource-tracker)" -mlir-pass-statistics -mlir-pass-statistics-display=list --split-input-file %s 2>&1 | FileCheck %s --check-prefix=STATS
+// RUN: quantum-opt --pass-pipeline="builtin.module(resource-analysis)" -mlir-pass-statistics -mlir-pass-statistics-display=list --split-input-file %s 2>&1 | FileCheck %s --check-prefix=STATS
 
-// STATS: ResourceTrackerPass
+// STATS: ResourceAnalysisPass
 // STATS: 2 total-alloc-qubits
 // STATS: 0 total-arg-qubits
 // STATS: 1 total-classical-ops
@@ -429,7 +429,7 @@ func.func @stats_test() {
 
 // Multiple qnode functions: the first qnode is the entry function.
 
-// STATS: ResourceTrackerPass
+// STATS: ResourceAnalysisPass
 // STATS: 0 total-alloc-qubits
 // STATS: 1 total-arg-qubits
 // STATS: 4 total-function-calls

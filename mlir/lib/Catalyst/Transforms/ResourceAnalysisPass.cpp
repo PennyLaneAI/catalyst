@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "resource-tracker"
+#define DEBUG_TYPE "resource-analysis"
 
 #include <chrono>
 #include <fstream>
@@ -29,18 +29,18 @@ using namespace llvm;
 
 namespace catalyst {
 
-#define GEN_PASS_DECL_RESOURCETRACKERPASS
-#define GEN_PASS_DEF_RESOURCETRACKERPASS
+#define GEN_PASS_DECL_RESOURCEANALYSISPASS
+#define GEN_PASS_DEF_RESOURCEANALYSISPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
-struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTrackerPass> {
-    using ResourceTrackerPassBase::ResourceTrackerPassBase;
+struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnalysisPass> {
+    using ResourceAnalysisPassBase::ResourceAnalysisPassBase;
 
     // Explicit default and copy constructors required because Statistic
     // wraps std::atomic which is non-copyable. MLIR's clonePass() needs
     // the pass to be copyable.
-    ResourceTrackerPass() = default;
-    ResourceTrackerPass(const ResourceTrackerPass & /*pass*/) : ResourceTrackerPassBase() {}
+    ResourceAnalysisPass() = default;
+    ResourceAnalysisPass(const ResourceAnalysisPass & /*pass*/) : ResourceAnalysisPassBase() {}
 
     Statistic totalGates{this, "total-gates", "Total number of gate operations"};
     Statistic totalMeasurements{this, "total-measurements", "Total number of measurements"};
