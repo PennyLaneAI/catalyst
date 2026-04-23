@@ -19,7 +19,7 @@
 #include <vector>
 
 #include "DataView.hpp"
-#include "Utils.hpp"
+#include "LUTDecoderUtils.hpp"
 
 namespace Catalyst::Runtime::QEC {
 /**
@@ -31,8 +31,8 @@ namespace Catalyst::Runtime::QEC {
  * @return size_t
  */
 size_t __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
-                                           MemRefT_int64_1d *col_ptr_tanner,
-                                           MemRefT_int8_1d *current_syndromes)
+                                     MemRefT_int64_1d *col_ptr_tanner,
+                                     MemRefT_int8_1d *current_syndromes)
 {
     // 1. Recover the parity check matrix from a tanner graph
     const size_t nnz = row_idx_tanner->sizes[0];
@@ -62,7 +62,7 @@ size_t __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
 
     auto lut = generate_lookup_table(row_idx_parity, col_ptr_parity, code_size, code_distance);
 
-    auto current_syndrome_str = map_sydrome_res_to_bitstr(current_syndromes_res);
+    auto current_syndrome_str = convert_syndrome_res_to_bitstr(current_syndromes_res);
 
     std::vector<size_t> error_indices = lut[current_syndrome_str];
 

@@ -24,10 +24,11 @@
 namespace Catalyst::Runtime::QEC {
 
 template <class IntegerType = std::size_t>
-std::string map_sydrome_res_to_bitstr(std::vector<IntegerType> &syndrome_res)
+std::string convert_syndrome_res_to_bitstr(std::vector<IntegerType> &syndrome_res)
 {
     std::string syndrom_str;
     for (const auto &bit : syndrome_res) {
+        RT_ASSERT(bit != 0 && bit != 1)
         syndrom_str += (bit ? '1' : '0');
     }
 
@@ -104,7 +105,7 @@ std::string map_errors_to_syndrome(const std::vector<size_t> &row_idx,
     }
 
     // Return results
-    return map_sydrome_res_to_bitstr(syndrome_res);
+    return convert_syndrome_res_to_bitstr(syndrome_res);
 }
 
 std::vector<size_t> get_error_indices(std::vector<uint8_t> &err_vec)
