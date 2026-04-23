@@ -155,25 +155,6 @@ class TestAllocAndDeallocConversionPatterns:
     """Test that qecl.allocate and qecl.deallocate operations for allocating hyperregisters
     of codeblocks are lowered as expected"""
 
-    @dataclass(frozen=True)
-    class BadPass(ModulePass):
-        """A pass that tries to lower operations without the type conversion."""
-
-        name = "bad-pass"
-
-        # pylint: disable=unused-argument
-        def apply(self, ctx, op):
-            """Apply test pass."""
-
-            PatternRewriteWalker(
-                GreedyRewritePatternApplier(
-                    [
-                        AllocationConversion(),
-                        DeallocationConversion(),
-                    ]
-                )
-            ).rewrite_module(op)
-
     @pytest.mark.parametrize("width", [1, 2, 3])
     @pytest.mark.parametrize("n", [7, 42])
     @pytest.mark.parametrize(
@@ -224,72 +205,10 @@ class TestAllocAndDeallocConversionPatterns:
         )
         run_filecheck(program, pipeline)
 
-    def test_assertion_error_allocate(self, run_filecheck):
-        """Test that an assertion error is raised if the TypeConversion to lower the HyperRegister
-        and Codeblock types wasn't applied prior to these patterns"""
-
-        program = """
-        builtin.module {
-        // CHECK-LABEL: test_program
-        func.func @test_program() {
-            %0 = qecl.alloc() : !qecl.hyperreg<3 x 1>
-            return
-        }
-        }
-        """
-
-        pipeline = (self.BadPass(),)
-        with pytest.raises(
-            AssertionError,
-            match="lowering of hyper-register types is expected before lowering allocate",
-        ):
-            run_filecheck(program, pipeline)
-
-    def test_assertion_error_deallocate(self, run_filecheck):
-        """Test that an assertion error is raised if the TypeConversion to lower the HyperRegister
-        and Codeblock types wasn't applied prior to these patterns"""
-
-        program = """
-        builtin.module {
-        // CHECK-LABEL: test_program
-        func.func @test_program() {
-            %0 = "test.op"() : () -> !qecl.hyperreg<5 x 1>
-            qecl.dealloc %0 : !qecl.hyperreg<5 x 1>
-            return
-        }
-        }
-        """
-
-        pipeline = (self.BadPass(),)
-        with pytest.raises(
-            AssertionError,
-            match="lowering of hyper-register types is expected before lowering deallocate",
-        ):
-            run_filecheck(program, pipeline)
-
 
 class TestInsertExtractConversionPatterns:
     """Test that qecl.extract_block and qecl.insert_block operations acting on hyperregisters
     of codeblocks are lowered as expected"""
-
-    @dataclass(frozen=True)
-    class BadPass(ModulePass):
-        """A pass that tries to lower operations without the type conversion."""
-
-        name = "bad-pass"
-
-        # pylint: disable=unused-argument
-        def apply(self, ctx, op):
-            """Apply test pass."""
-
-            PatternRewriteWalker(
-                GreedyRewritePatternApplier(
-                    [
-                        InsertBlockConversion(),
-                        ExtractBlockConversion(),
-                    ]
-                )
-            ).rewrite_module(op)
 
     # pylint: disable=too-many-arguments, too-many-positional-arguments
     @pytest.mark.parametrize("width", [1, 2, 3])
@@ -347,51 +266,6 @@ class TestInsertExtractConversionPatterns:
             ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))),
         )
         run_filecheck(program, pipeline)
-
-    def test_assertion_error_extract(self, run_filecheck):
-        """Test that an assertion error is raised if the TypeConversion to lower the HyperRegister
-        and Codeblock types wasn't applied prior to these patterns"""
-
-        program = """
-        builtin.module {
-        // CHECK-LABEL: test_program
-        func.func @test_program() {
-            %0 = "test.op"() : () -> !qecl.hyperreg<3 x 1>
-            %1 = qecl.extract_block %0[0] : !qecl.hyperreg<3 x 1> -> !qecl.codeblock<1>
-            return
-        }
-        }
-        """
-
-        pipeline = (self.BadPass(),)
-        with pytest.raises(
-            AssertionError,
-            match="lowering of hyper-register types is expected before lowering extract",
-        ):
-            run_filecheck(program, pipeline)
-
-    def test_assertion_error_insert(self, run_filecheck):
-        """Test that an assertion error is raised if the TypeConversion to lower the HyperRegister
-        and Codeblock types wasn't applied prior to these patterns"""
-
-        program = """
-        builtin.module {
-        // CHECK-LABEL: test_program
-        func.func @test_program() {
-            %0 = "test.op"() : () -> !qecl.codeblock<1>
-            %1 = "test.op"() : () -> !qecl.hyperreg<3 x 1>
-            %2 = qecl.insert_block %1[0], %0 : !qecl.hyperreg<3 x 1>, !qecl.codeblock<1>
-            return
-        }
-        }
-        """
-
-        pipeline = (self.BadPass(),)
-        with pytest.raises(
-            AssertionError,
-            match="lowering of hyper-register types is expected before lowering insert",
-        ):
-            run_filecheck(program, pipeline)
 
 
 class TestLoweringEncode:

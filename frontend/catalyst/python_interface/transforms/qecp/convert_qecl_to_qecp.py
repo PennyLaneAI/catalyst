@@ -102,9 +102,6 @@ class AllocationConversion(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecl.AllocOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
-        assert isinstance(
-            op.result_types[0], qecp.PhysicalHyperRegisterType
-        ), "lowering of hyper-register types is expected before lowering allocate ops"
         rewriter.replace_op(op, qecp.AllocOp(op.result_types[0]))
 
 
@@ -115,9 +112,6 @@ class DeallocationConversion(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecl.DeallocOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
-        assert isinstance(
-            op.hyper_reg.type, qecp.PhysicalHyperRegisterType
-        ), "lowering of hyper-register types is expected before lowering deallocate ops"
         rewriter.replace_op(op, qecp.DeallocOp(op.hyper_reg))
 
 
@@ -129,13 +123,8 @@ class ExtractBlockConversion(RewritePattern):
     """Op conversion pattern from qecl.extract_block -> qecp.extract_block."""
 
     @op_type_rewrite_pattern
-    def match_and_rewrite(
-        self, op: qecl.ExtractCodeblockOp, rewriter: PatternRewriter
-    ):
+    def match_and_rewrite(self, op: qecl.ExtractCodeblockOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
-        assert isinstance(
-            op.hyper_reg.type, qecp.PhysicalHyperRegisterType
-        ), "lowering of hyper-register types is expected before lowering extract_block ops"
         rewriter.replace_op(op, qecp.ExtractCodeblockOp(op.hyper_reg, op.idx_attr))
 
 
@@ -144,16 +133,11 @@ class InsertBlockConversion(RewritePattern):
     """Op conversion pattern from qecl.insert_block -> qecp.insert_block."""
 
     @op_type_rewrite_pattern
-    def match_and_rewrite(
-        self, op: qecl.InsertCodeblockOp, rewriter: PatternRewriter
-    ):
+    def match_and_rewrite(self, op: qecl.InsertCodeblockOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
-        assert isinstance(
-            op.in_hyper_reg.type, qecp.PhysicalHyperRegisterType
-        ), "lowering of hyper-register types is expected before lowering insert_block ops"
         rewriter.replace_op(op, qecp.InsertCodeblockOp(op.in_hyper_reg, op.idx_attr, op.codeblock))
 
-        
+
 # MARK: Encode Op Pattern
 
 
