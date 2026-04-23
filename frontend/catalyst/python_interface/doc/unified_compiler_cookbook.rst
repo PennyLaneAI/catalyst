@@ -498,19 +498,19 @@ the “PennyLane integration” section below.
 
   .. code-block:: python
 
-      import pennylane as qml
+      import pennylane as qp
       from catalyst.python_interface.conversion import xdsl_from_qjit
 
-      dev = qml.device("lightning.qubit", wires=3)
+      dev = qp.device("lightning.qubit", wires=3)
 
       @xdsl_from_qjit
-      @qml.qjit(target="mlir")
-      @qml.qnode(dev)
+      @qp.qjit(target="mlir")
+      @qp.qnode(dev)
       def circuit():
-          qml.Hadamard(0)
-          qml.Hadamard(1)
-          qml.Hadamard(2)
-          return qml.state()
+          qp.Hadamard(0)
+          qp.Hadamard(1)
+          qp.Hadamard(2)
+          return qp.state()
 
   >>> mod = circuit()
   >>> print(mod)
@@ -672,7 +672,7 @@ but is noted here for completeness:
 
     from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 
-    @qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+    @qp.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
     ...
 
 .. _ir-structure-1:
@@ -685,18 +685,18 @@ described below using the following example:
 
 .. code-block:: python
 
-    import pennylane as qml
+    import pennylane as qp
 
-    qml.capture.enable()
-    dev = qml.device("lightning.qubit", wires=1)
+    qp.capture.enable()
+    dev = qp.device("lightning.qubit", wires=1)
 
-    @qml.qjit
-    @qml.transforms.cancel_inverses
-    @qml.transforms.merge_rotations
-    @qml.qnode(dev)
+    @qp.qjit
+    @qp.transforms.cancel_inverses
+    @qp.transforms.merge_rotations
+    @qp.qnode(dev)
     def circuit():
-        qml.X(0)
-        return qml.state()
+        qp.X(0)
+        return qp.state()
 
 >>> print(circuit.mlir)
 module @circuit {
@@ -780,14 +780,14 @@ its MLIR representation:
 
   .. code-block:: python
 
-      dev = qml.device("lightning.qubit", wires=3)
+      dev = qp.device("lightning.qubit", wires=3)
 
-      @qml.qjit(target="mlir")
-      @qml.qnode(dev)
+      @qp.qjit(target="mlir")
+      @qp.qnode(dev)
       def circuit():
-          qml.X(0)
-          qml.H(0)
-          return qml.state()
+          qp.X(0)
+          qp.H(0)
+          return qp.state()
 
   >>> print(circuit.mlir)
   module @circuit {
@@ -864,22 +864,22 @@ register using ``ExtractOp``. Consider the following example:
 
   .. code-block:: python
 
-      import pennylane as qml
+      import pennylane as qp
 
-      qml.capture.enable()
+      qp.capture.enable()
 
-      dev = qml.device("lightning.qubit", wires=3)
+      dev = qp.device("lightning.qubit", wires=3)
 
-      @qml.qjit(target="mlir")
-      @qml.qnode(dev)
+      @qp.qjit(target="mlir")
+      @qp.qnode(dev)
       def circuit(w1: int, w2: int):
-          qml.X(0)
-          qml.Y(w1)
-          qml.Z(w1)
-          qml.S(w2)
-          qml.T(w1)
-          qml.H(0)
-          return qml.state()
+          qp.X(0)
+          qp.Y(w1)
+          qp.Z(w1)
+          qp.S(w2)
+          qp.T(w1)
+          qp.H(0)
+          return qp.state()
 
   >>> print(circuit.mlir)
   module @circuit {
@@ -999,15 +999,15 @@ currently accessible as
 
     # Program capture must be enabled to use the compiler transform
     # as a decorator
-    qml.capture.enable()
-    dev = qml.device("lightning.qubit", wires=1)
+    qp.capture.enable()
+    dev = qp.device("lightning.qubit", wires=1)
 
-    @qml.qjit
+    @qp.qjit
     @my_pass
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(x):
-        qml.RX(x, 0)
-        return qml.expval(qml.Z(0))
+        qp.RX(x, 0)
+        return qp.expval(qp.Z(0))
 
     circuit(1.5)
 
@@ -1231,7 +1231,7 @@ within the ``tests/python_interface`` folder:
 - ``run_filecheck``: This fixture is for unit testing. One can specify a
   program along with filecheck directives as a multi-line string.
 - ``run_filecheck_qjit``: This fixture is for integration testing. One
-  can create a normal ``qml.qjit``-ed workflow and include filecheck
+  can create a normal ``qp.qjit``-ed workflow and include filecheck
   directives as in-line comments.
 
 Let’s write tests for the ``HToXPass`` that was implemented in the
@@ -1299,15 +1299,15 @@ will explain what is going on.
         # with qjit, we can use the decorator created using
         # `compiler_transform`. To make sure that the xDSL API works
         # correctly, program capture must be enabled.
-        # qml.capture.enable()
-        @qml.qjit
+        # qp.capture.enable()
+        @qp.qjit
         @h_to_x_pass
         def circuit():
             # CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
             # CHECK: quantum.custom "PauliX"() [[q0]] : !quantum.bit
             # CHECK-NOT: quantum.custom "Hadamard"
-            qml.Hadamard(0)
-            return qml.state()
+            qp.Hadamard(0)
+            return qp.state()
 
         # Finally, we use the run_filecheck_qjit fixture. We pass it our
         # original qjitted workflow. It extracts the filecheck directives

@@ -34,9 +34,9 @@ from xdsl.ir import Block, Operation, Region
 from catalyst.python_interface.dialects import mbqc, pbc, quantum
 from catalyst.python_interface.inspection.dag_builder import DAGBuilder
 from catalyst.python_interface.inspection.xdsl_conversion import (
-    ssa_to_qml_wires,
-    xdsl_to_qml_measurement,
-    xdsl_to_qml_op,
+    ssa_to_qp_wires,
+    xdsl_to_qp_measurement,
+    xdsl_to_qp_op,
 )
 
 # Defines a set of operations from the quantum dialect
@@ -199,11 +199,11 @@ class ConstructCircuitDAG:
     def _gate_op(self, op: quantum.GateOp) -> None:
         """Generic handler for unitary gates."""
         # Create PennyLane instance
-        qml_op: Operator = xdsl_to_qml_op(op)
+        qp_op: Operator = xdsl_to_qp_op(op)
 
         # Add node to current cluster
         node_uid = self.dag_builder.add_node(
-            label=get_label(qml_op),
+            label=get_label(qp_op),
             cluster_uid=self._cluster_stack[-1].uid,
             # NOTE: "record" allows us to use ports
             # (https://graphviz.org/doc/info/shapes.html#record)
@@ -215,15 +215,15 @@ class ConstructCircuitDAG:
         # a disjoint or 'floating' node within the current cluster to reflect
         # that it has no strict ordering requirements relative to other
         # quantum operations.
-        if len(qml_op.wires) != 0:
-            self._connect(qml_op.wires, node_uid)
+        if len(qp_op.wires) != 0:
+            self._connect(qp_op.wires, node_uid)
 
     @_visualize_operation.register
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
         """Handler for the single-qubit projective measurement operation."""
 
         # Create PennyLane instance
-        meas: Operator = xdsl_to_qml_measurement(op)
+        meas: Operator = xdsl_to_qp_measurement(op)
 
         # Add node to current cluster
         node_uid = self.dag_builder.add_node(
@@ -241,7 +241,7 @@ class ConstructCircuitDAG:
         """Handler for the PPR operation."""
 
         # Create label
-        wires = ssa_to_qml_wires(op)
+        wires = ssa_to_qp_wires(op)
         wires_str = f"[{', '.join(map(str, wires))}]"
         pw = []
         for str_attr in op.pauli_product.data:
@@ -281,7 +281,7 @@ class ConstructCircuitDAG:
     def _ppm(self, op: pbc.PPMeasurementOp) -> None:
         """Handler for the PPM operation."""
 
-        wires = ssa_to_qml_wires(op)
+        wires = ssa_to_qp_wires(op)
         if wires == []:
             wires_str = "all"
         else:
@@ -315,20 +315,20 @@ class ConstructCircuitDAG:
 
         match op:
             case quantum.StateOp():
-                meas = xdsl_to_qml_measurement(op)
+                meas = xdsl_to_qp_measurement(op)
                 # NOTE: state can only handle all wires
 
             case quantum.ExpvalOp() | quantum.VarianceOp():
                 obs_op = op.obs.owner
-                meas = xdsl_to_qml_measurement(op, xdsl_to_qml_measurement(obs_op))
+                meas = xdsl_to_qp_measurement(op, xdsl_to_qp_measurement(obs_op))
 
             case quantum.SampleOp() | quantum.ProbsOp():
                 obs_op = op.obs.owner
 
                 # TODO: This doesn't logically make sense, but quantum.compbasis
                 # is obs_op and function below just pulls out the static wires
-                wires = xdsl_to_qml_measurement(obs_op)
-                meas = xdsl_to_qml_measurement(op, wires=None if wires == [] else wires)
+                wires = xdsl_to_qp_measurement(obs_op)
+                meas = xdsl_to_qp_measurement(op, wires=None if wires == [] else wires)
 
             case _:
                 return
@@ -469,11 +469,11 @@ class ConstructCircuitDAG:
                 #
                 # For example,
                 #
-                #    qml.H(x)
+                #    qp.H(x)
                 #    if x == 2:
-                #        qml.Y(x)
-                #        qml.X(0)
-                #    qml.Z(x)
+                #        qp.Y(x)
+                #        qp.X(0)
+                #    qp.Z(x)
                 #
                 before_dyn_node_uid: set[str] = wire_map_before.get(_WireKind.DYNAMIC, set())
                 current_dyn_node_uid: set[str] = self._wire_to_node_uids[_WireKind.DYNAMIC]
@@ -669,22 +669,22 @@ class ConstructCircuitDAG:
             # For example,
             #
             # if x:
-            #   qml.X(0)
+            #   qp.X(0)
             # else:
-            #   qml.Y(dyn)
-            # qml.Z(0)
+            #   qp.Y(dyn)
+            # qp.Z(0)
             #
             # We should have both X and Y connecting to the Z.
 
             # Also required for situations like,
             #
-            #    qml.H(x)
-            #    qml.S(0)
+            #    qp.H(x)
+            #    qp.S(0)
             #    if x == 3:
             #        if x == 2:
-            #            qml.H(0)
+            #            qp.H(0)
             #    else:
-            #        qml.RX(0,0)
+            #        qp.RX(0,0)
             #
             # We don't want the RX in the final else condition to connect to the H(x)
 
