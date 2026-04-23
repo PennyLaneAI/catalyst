@@ -12,17 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-#include "lut_decoder.hpp"
-#include "DataView.hpp"
-
-
 #include <algorithm>
 #include <vector>
 
+#include "DataView.hpp"
+#include "lut_decoder.hpp"
+
 namespace Catalyst::Runtime::QEC {
 int64_t *__catalyst__qecp__decode_steane_lut(MemRefT_int64_1d *row_idx, MemRefT_int64_1d *col_ptr,
-                                             MemRefT_int8_1d *syndrome_results){
+                                             MemRefT_int8_1d *syndrome_results)
+{
     // 1. Recover the parity check matrix from the CSC sparse representation.
     // Get shapes of the dense parity check matrix (H) from the input sparse representation.
     const size_t nnz = row_idx->sizes[0]; // number of non-zero elements

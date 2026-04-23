@@ -24,8 +24,8 @@ extern "C" {
 
 // qecp operations
 size_t *__catalyst__qecp__lut_decoder(/*row_idx*/ MemRefT_int64_1d *,
-                                             /*col_ptr*/ MemRefT_int64_1d *,
-                                             /*syndrome*/ MemRefT_int8_1d *);
+                                      /*col_ptr*/ MemRefT_int64_1d *,
+                                      /*syndrome*/ MemRefT_int8_1d *);
 
 #ifdef __cplusplus
 } // extern "C"
