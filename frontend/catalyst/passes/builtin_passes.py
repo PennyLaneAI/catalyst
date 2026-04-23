@@ -78,6 +78,8 @@ def cancel_inverses(qnode):
 
     .. code-block:: python
 
+        import pennylane as qp
+        from catalyst import qjit
         from catalyst.debug import get_compilation_stage
         from catalyst.passes import cancel_inverses
 
