@@ -22,13 +22,19 @@
 #include "Exception.hpp"
 
 namespace Catalyst::Runtime::QEC {
-
+/**
+ * @brief Convert a vector of syndrome results to a bit string representation.
+ * 
+ * @tparam IntegerType 
+ * @param syndrome_res A vector of syndrome results
+ * @return std::string A bit string representation of the given syndrome results.
+ */
 template <class IntegerType = std::size_t>
 std::string convert_syndrome_res_to_bitstr(std::vector<IntegerType> &syndrome_res)
 {
     std::string syndrom_str;
     for (const auto &bit : syndrome_res) {
-        RT_ASSERT(bit != 0 && bit != 1)
+        RT_ASSERT(bit == 0 || bit == 1)
         syndrom_str += (bit ? '1' : '0');
     }
 
@@ -94,7 +100,7 @@ std::string map_errors_to_syndrome(const std::vector<size_t> &row_idx,
                                    const size_t num_cols, std::vector<uint8_t> &err_vec)
 {
 
-    std::vector<int64_t> syndrome_res(num_cols, 0);
+    std::vector<size_t> syndrome_res(num_cols, 0);
 
     for (size_t col = 0; col < num_cols; col++) {
         for (size_t idx = col_ptr[col]; idx < col_ptr[col + 1]; idx++) {

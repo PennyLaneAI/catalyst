@@ -21,7 +21,16 @@
 using namespace Catalyst::Runtime::QEC;
 TEST_CASE("Test convert_sydrome_res_to_bitstr", "[LUTDecoderUtils::syndrome_res_convert]")
 {
-    std::vector<size_t> syndrome_res = {1, 2, 3};
-    REQUIRE_THROWS_WITH(convert_syndrome_res_to_bitstr(syndrome_res),
-                        Catch::Matchers::ContainsSubstring("Assertion:"));
+    std::vector<size_t> bad_syndrome_inputs = {1, 2, 3};
+    REQUIRE_THROWS_WITH(convert_syndrome_res_to_bitstr(bad_syndrome_inputs),
+                        Catch::Matchers::ContainsSubstring("Assertion: bit == 0 || bit == 1"));
+
+    std::vector<size_t> syndromes_size_t = {0, 1, 0};
+    std::vector<int8_t> syndromes_int8_t = {0, 1, 0};
+    std::string expected_syndrome_str = "010";
+    std::string syndrome_str_size_t = convert_syndrome_res_to_bitstr(syndromes_size_t);
+    std::string syndrome_str_int8_t = convert_syndrome_res_to_bitstr(syndromes_int8_t);
+
+    REQUIRE(syndrome_str_size_t == expected_syndrome_str);
+    REQUIRE(syndrome_str_int8_t == expected_syndrome_str);
 }
