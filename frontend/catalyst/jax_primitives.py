@@ -141,6 +141,7 @@ from pennylane.capture.primitives import quantum_subroutine_prim
 from pennylane.capture.primitives import value_and_grad_prim as pl_value_and_grad_prim
 from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
 from pennylane.capture.primitives import while_loop_prim as pl_while_loop_prim
+from pennylane.capture.primitives import cond_prim as pl_cond_prim
 
 import catalyst
 from catalyst.compiler import get_lib_path
@@ -2372,6 +2373,91 @@ def _cond_lowering(
     head_if_op = emit_branches(preds, branch_jaxprs, jax_ctx.module_context.ip.current)
     return head_if_op.results
 
+def _pl_cond_lowering(jax_ctx: mlir.LoweringRuleContext,
+    *invals,
+    jaxpr_branches,
+    consts_slices,
+    args_slice,      
+):
+    result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
+    num_preds = len(jaxpr_branches)
+    preds = invals[:num_preds]
+    args = invals[slice(*args_slice)]
+
+
+    # recursively lower if-else chains to nested IfOps
+    def emit_branches(preds, sub_branches, sub_consts_slices, insertion_point):
+        # closure vars are invals, args, jax_ctx
+
+        # ip is an MLIR InsertionPoint. This allows recursive calls to emit their Operations inside
+        # the 'else' blocks of preceding IfOps.
+        with insertion_point:
+            pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), preds[0], []).result
+            if_op_scf = IfOp(pred_extracted, result_types, hasElse=True)
+            true_jaxpr = sub_branches[0]
+            if_block = if_op_scf.then_block
+
+            # if block
+            source_info_util.extend_name_stack("if")
+            if_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend("if"))
+            with ir.InsertionPoint(if_block):
+                consts = invals[slice(*sub_consts_slices[0])]
+
+                new_jaxpr = true_jaxpr.replace(
+                    constvars=(), invars=true_jaxpr.constvars + true_jaxpr.invars
+                )
+
+                # recursively generate the mlir for the if block
+                out, _ = mlir.jaxpr_subcomp(
+                    if_ctx.module_context,
+                    new_jaxpr,
+                    if_ctx.name_stack,
+                    mlir.TokenSet(),
+                    [], 
+                    *consts,
+                    *args,
+                    dim_var_values=jax_ctx.dim_var_values,
+                    const_lowering=jax_ctx.const_lowering,
+                )
+
+                YieldOp(out)
+
+            # else block
+            source_info_util.extend_name_stack("else")
+            else_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend("else"))
+            else_block = if_op_scf.else_block
+            if len(preds) == 1:
+                # Base case: reached the otherwise block
+                else_jaxpr = sub_branches[-1]
+                consts = invals[slice(*sub_consts_slices[-1])]
+
+                new_jaxpr = else_jaxpr.replace(
+                    constvars=(), invars=else_jaxpr.constvars + else_jaxpr.invars
+                )
+
+                with ir.InsertionPoint(else_block):
+                    out, _ = mlir.jaxpr_subcomp(
+                        else_ctx.module_context,
+                        new_jaxpr,
+                        else_ctx.name_stack,
+                        mlir.TokenSet(),
+                        [],
+                        *consts,
+                        *args,
+                        dim_var_values=jax_ctx.dim_var_values,
+                        const_lowering=jax_ctx.const_lowering,
+                    )
+
+                    YieldOp(out)
+            else:
+                with ir.InsertionPoint(else_block) as else_ip:
+                    child_if_op = emit_branches(preds[1:], sub_branches[1:], sub_consts_slices[1:], else_ip)
+                    YieldOp(child_if_op.results)
+            return if_op_scf
+
+    head_if_op = emit_branches(preds, jaxpr_branches, consts_slices, jax_ctx.module_context.ip.current)
+    return head_if_op.results
+
 
 #
 # Index Switch
@@ -3100,6 +3186,7 @@ CUSTOM_LOWERING_RULES = (
     (pl_jvp_prim, _capture_jvp_lowering),
     (pl_value_and_grad_prim, _capture_value_and_grad_lowering),
     (pl_while_loop_prim, _pl_while_loop_lowering),
+    (pl_cond_prim, _pl_cond_lowering),
     (func_p, _func_lowering),
     (jvp_p, _jvp_lowering),
     (vjp_p, _vjp_lowering),
