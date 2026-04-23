@@ -25,7 +25,7 @@ from jax._src.source_info_util import current as current_source_info
 from numpy import array_equal
 from numpy.testing import assert_allclose
 
-from catalyst import cond, qjit
+from catalyst import qjit
 from catalyst.jax_extras import DShapedArray, ShapedArray
 from catalyst.jax_extras.tracing import trace_to_jaxpr
 from catalyst.tracing.contexts import EvaluationContext
@@ -1062,42 +1062,107 @@ class TestWhileLoopDynamicShapes:
         expected = 3 * jnp.ones(3)
         assert_array_and_dtype_equal(result, expected)
 
+class TestCondDynamicShapes:
+    """Tests for cond with dynamic shapes."""
 
-def test_qnode_cond_identity():
-    """Test that catalyst tensor primitive is compatible with quantum conditional"""
+    def test_qnode_cond_identity(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f(flag, sz):
-        a = jnp.ones([sz], dtype=float)
-        b = jnp.zeros([sz], dtype=float)
-
-        @cond(flag)
-        def case():
-            return a
-
-        @case.otherwise
-        def case():
-            return b
-
-        c = case()
-        assert c.shape[0] is a.shape[0]
-        assert c.shape[0] is b.shape[0]
-        return c
-
-    assert_array_and_dtype_equal(f(True, 3), jnp.ones(3))
-    assert_array_and_dtype_equal(f(False, 3), jnp.zeros(3))
-
-
-def test_qnode_cond_abstracted_axes():
-    """Test that catalyst tensor primitive is compatible with quantum conditional. Use
-    abstracted_axes as the source of dynamism."""
-
-    def f(flag, a, b):
-        @qjit(abstracted_axes={0: "n"})
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device("lightning.qubit", wires=4))
-        def _f(a, b):
-            @cond(flag)
+        def f(flag, sz):
+            a = jnp.ones([sz], dtype=float)
+            b = jnp.zeros([sz], dtype=float)
+
+            @qml.cond(flag)
+            def case():
+                return a
+
+            @case.otherwise
+            def case():
+                return b
+
+            c = case()
+            assert c.shape[0] is a.shape[0]
+            assert c.shape[0] is b.shape[0]
+            x = jnp.sum(c)
+            qml.RX(x, 0)
+            return qml.expval(qml.Z(0))
+
+        res_True = f(True, 3)
+        res_False = f(False, 3)
+        assert qml.math.allclose(res_True, jnp.cos(3))
+        assert qml.math.allclose(res_False, 1.0)
+
+
+    def test_qnode_cond_abstracted_axes(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum conditional. Use
+        abstracted_axes as the source of dynamism."""
+
+        def f(flag, a, b):
+            @qml.qjit(abstracted_axes={0: "n"}, capture=capture_mode)
+            @qml.qnode(qml.device("lightning.qubit", wires=4))
+            def _f(a, b):
+                @qml.cond(flag)
+                def case():
+                    return a
+
+                @case.otherwise
+                def case():
+                    return b
+
+                c = case()
+                assert c.shape[0] is a.shape[0]
+                assert c.shape[0] is b.shape[0]
+
+                x = jnp.sum(c)
+                qml.RX(x, 0)
+                return qml.expval(qml.Z(0))
+
+            return _f(a, b)
+
+        a = jnp.ones([3], dtype=float)
+        b = jnp.zeros([3], dtype=float)
+        res_True = f(True, a, b)
+        assert qml.math.allclose(res_True, jnp.cos(3))
+        res_False = f(False, a, b)
+        assert qml.math.allclose(res_False, 1) # jnp.cos(0)
+
+
+    def test_qnode_cond_capture(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum conditional"""
+
+        @qjit(capture=capture_mode)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(flag, sz):
+            a = jnp.ones([sz, 3], dtype=float)
+
+            @qml.cond(flag)
+            def case():
+                b = jnp.ones([sz, 3], dtype=float)
+                return a + b
+
+            @case.otherwise
+            def case():
+                b = jnp.zeros([sz, 3], dtype=float)
+                return a + b
+
+            c = case()
+            return c + a
+
+        assert_array_and_dtype_equal(f(True, 3), 3 * jnp.ones([3, 3]))
+        assert_array_and_dtype_equal(f(False, 3), 2 * jnp.ones([3, 3]))
+
+
+    def test_qjit_cond_identity(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum conditional"""
+
+        @qjit(capture=capture_mode)
+        def f(flag, sz):
+            a = jnp.ones([sz, 3], dtype=float)
+            b = jnp.zeros([sz, 3], dtype=float)
+
+            @qml.cond(flag)
             def case():
                 return a
 
@@ -1110,105 +1175,51 @@ def test_qnode_cond_abstracted_axes():
             assert c.shape[0] is b.shape[0]
             return c
 
-        return _f(a, b)
-
-    a = jnp.ones([3], dtype=float)
-    b = jnp.zeros([3], dtype=float)
-    assert_array_and_dtype_equal(f(True, a, b), jnp.ones(3))
-    assert_array_and_dtype_equal(f(False, a, b), jnp.zeros(3))
+        assert_array_and_dtype_equal(f(True, 3), jnp.ones([3, 3]))
+        assert_array_and_dtype_equal(f(False, 3), jnp.zeros([3, 3]))
 
 
-def test_qnode_cond_capture():
-    """Test that catalyst tensor primitive is compatible with quantum conditional"""
+    def test_qjit_cond_outdbidx(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def f(flag, sz):
-        a = jnp.ones([sz, 3], dtype=float)
+        @qjit(capture=capture_mode)
+        def f(flag, sz):
+            @qml.cond(flag)
+            def case():
+                return jnp.ones([sz + 1, 3], dtype=float)
 
-        @cond(flag)
-        def case():
-            b = jnp.ones([sz, 3], dtype=float)
-            return a + b
+            @case.otherwise
+            def case():
+                return jnp.zeros([sz + 1, 3], dtype=float)
 
-        @case.otherwise
-        def case():
-            b = jnp.zeros([sz, 3], dtype=float)
-            return a + b
+            return case()
 
-        c = case()
-        return c + a
-
-    assert_array_and_dtype_equal(f(True, 3), 3 * jnp.ones([3, 3]))
-    assert_array_and_dtype_equal(f(False, 3), 2 * jnp.ones([3, 3]))
+        assert_array_and_dtype_equal(f(True, 3), jnp.ones([4, 3]))
+        assert_array_and_dtype_equal(f(False, 3), jnp.zeros([4, 3]))
 
 
-def test_qjit_cond_identity():
-    """Test that catalyst tensor primitive is compatible with quantum conditional"""
+    def test_qjit_cond_capture(self, capture_mode):
+        """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
-    @qjit
-    def f(flag, sz):
-        a = jnp.ones([sz, 3], dtype=float)
-        b = jnp.zeros([sz, 3], dtype=float)
+        @qjit(capture=capture_mode)
+        def f(flag, sz):
+            a = jnp.ones([sz, 3], dtype=float)
 
-        @cond(flag)
-        def case():
-            return a
+            @qml.cond(flag)
+            def case():
+                b = jnp.ones([sz, 3], dtype=float)
+                return a + b
 
-        @case.otherwise
-        def case():
-            return b
+            @case.otherwise
+            def case():
+                b = jnp.zeros([sz, 3], dtype=float)
+                return a + b
 
-        c = case()
-        assert c.shape[0] is a.shape[0]
-        assert c.shape[0] is b.shape[0]
-        return c
+            c = case()
+            return c + a
 
-    assert_array_and_dtype_equal(f(True, 3), jnp.ones([3, 3]))
-    assert_array_and_dtype_equal(f(False, 3), jnp.zeros([3, 3]))
-
-
-def test_qjit_cond_outdbidx():
-    """Test that catalyst tensor primitive is compatible with quantum conditional"""
-
-    @qjit
-    def f(flag, sz):
-        @cond(flag)
-        def case():
-            return jnp.ones([sz + 1, 3], dtype=float)
-
-        @case.otherwise
-        def case():
-            return jnp.zeros([sz + 1, 3], dtype=float)
-
-        return case()
-
-    assert_array_and_dtype_equal(f(True, 3), jnp.ones([4, 3]))
-    assert_array_and_dtype_equal(f(False, 3), jnp.zeros([4, 3]))
-
-
-def test_qjit_cond_capture():
-    """Test that catalyst tensor primitive is compatible with quantum conditional"""
-
-    @qjit
-    def f(flag, sz):
-        a = jnp.ones([sz, 3], dtype=float)
-
-        @cond(flag)
-        def case():
-            b = jnp.ones([sz, 3], dtype=float)
-            return a + b
-
-        @case.otherwise
-        def case():
-            b = jnp.zeros([sz, 3], dtype=float)
-            return a + b
-
-        c = case()
-        return c + a
-
-    assert_array_and_dtype_equal(f(True, 3), 3 * jnp.ones([3, 3]))
-    assert_array_and_dtype_equal(f(False, 3), 2 * jnp.ones([3, 3]))
+        assert_array_and_dtype_equal(f(True, 3), 3 * jnp.ones([3, 3]))
+        assert_array_and_dtype_equal(f(False, 3), 2 * jnp.ones([3, 3]))
 
 
 def test_trace_to_jaxpr():

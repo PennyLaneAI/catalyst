@@ -103,42 +103,6 @@ def _to_bool_if_not(arg):
     return jax.numpy.bool(arg)
 
 
-@WorkflowInterpreter.register_primitive(plxpr_cond_prim)
-def workflow_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive
-
-    Args:
-        consts_slices: List of tuples (start, stop, step) to slice consts for each branch
-        args_slice: Tuple (start, stop, step) to slice args from plxpr_invals
-    """
-    args = plxpr_invals[_tuple_to_slice(args_slice)]
-    converted_jaxpr_branches = []
-    all_consts = []
-
-    # Convert each branch from plxpr to jaxpr
-    for const_slice, plxpr_branch in zip(consts_slices, jaxpr_branches):
-
-        # Store all branches consts in a flat list
-        branch_consts = plxpr_invals[_tuple_to_slice(const_slice)]
-
-        evaluator = partial(copy(self).eval, plxpr_branch, branch_consts)
-        new_jaxpr = jax.make_jaxpr(evaluator)(*args)
-        all_consts = all_consts + new_jaxpr.consts
-
-        converted_jaxpr_branches.append(new_jaxpr.jaxpr)
-
-    predicate = [_to_bool_if_not(p) for p in plxpr_invals[: len(jaxpr_branches) - 1]]
-
-    # Build Catalyst compatible input values
-    cond_invals = [*predicate, *all_consts, *args]
-
-    return cond_p.bind(
-        *cond_invals,
-        branch_jaxprs=jaxpr_pad_consts(converted_jaxpr_branches),
-        num_implicit_outputs=0,
-    )
-
-
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_cond_prim)
 def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive
@@ -147,8 +111,9 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
         consts_slices: List of tuples (start, stop, step) to slice consts for each branch
         args_slice: Tuple (start, stop, step) to slice args from plxpr_invals
     """
-    args = plxpr_invals[_tuple_to_slice(args_slice)]
+    args = plxpr_invals[slice(*args_slice)]
     self.init_qreg.insert_all_dangling_qubits()
+    predicates = plxpr_invals[:len(jaxpr_branches)]
 
     dynalloced_qregs, dynalloced_wire_global_indices = _get_dynamically_allocated_qregs(
         plxpr_invals, self.qubit_index_recorder, self.init_qreg
@@ -163,38 +128,41 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
 
     converted_jaxpr_branches = []
     all_consts = []
+    end_consts_ind = len(jaxpr_branches)
+    new_consts_slices = []
 
     # Convert each branch from plxpr to jaxpr
     for const_slice, plxpr_branch in zip(consts_slices, jaxpr_branches):
 
         # Store all branches consts in a flat list
-        branch_consts = plxpr_invals[_tuple_to_slice(const_slice)]
+        branch_consts = plxpr_invals[slice(*const_slice)]
 
-        converted_jaxpr_branch = None
         closed_jaxpr = ClosedJaxpr(plxpr_branch, branch_consts)
 
         f = partial(
             _calling_convention, self, closed_jaxpr, outer_dynqreg_handlers=dynalloced_qregs
         )
-        converted_jaxpr_branch = jax.make_jaxpr(f)(*args_plus_qreg)
+        converted_jaxpr = jax.make_jaxpr(f)(*args_plus_qreg)
 
-        all_consts += converted_jaxpr_branch.consts
-        converted_jaxpr_branches.append(converted_jaxpr_branch.jaxpr)
+        # strip global wire indices of dynamic wires
+        consts = [const for const in converted_jaxpr.consts if const not in dynalloced_wire_global_indices]
+        new_consts_slices.append((end_consts_ind, end_consts_ind + len(consts), 1))
+        end_consts_ind += len(consts)
+        all_consts += consts
 
-    predicate = [_to_bool_if_not(p) for p in plxpr_invals[: len(jaxpr_branches) - 1]]
+        converted_jaxpr_branches.append(converted_jaxpr.jaxpr)
 
     # Build Catalyst compatible input values
-    # strip global wire indices of dynamic wires
-    all_consts = tuple(const for const in all_consts if const not in dynalloced_wire_global_indices)
-    cond_invals = [*predicate, *all_consts, *args_plus_qreg]
+    cond_invals = [*predicates, *all_consts, *args_plus_qreg]
 
     # Perform the binding
-    outvals = cond_p.bind(
+    outvals = plxpr_cond_prim.bind(
         *cond_invals,
-        branch_jaxprs=jaxpr_pad_consts(converted_jaxpr_branches),
-        num_implicit_outputs=None,
+        jaxpr_branches=converted_jaxpr_branches,
+        consts_slices=new_consts_slices,
+        args_slice=args_slice,
     )
-
+    outvals = list(outvals)
     # Output structure:
     # First a list of dynamically allocated qregs, then the global qreg
     # Update the current qreg and remove it from the output values.
