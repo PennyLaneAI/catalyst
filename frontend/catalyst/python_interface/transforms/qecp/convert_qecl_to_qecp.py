@@ -94,6 +94,7 @@ class HyperRegisterTypeConversion(TypeConversionPattern):
 
 # MARK: Encode Op Pattern
 
+
 @dataclass
 class EncodeOpConversion(RewritePattern):
     """Converts qecl.encode [zero] to the equivalent subroutine of qecp gates"""
@@ -184,9 +185,9 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     def create_encode_subroutine(self) -> func.FuncOp:
         """Create a subroutine that takes in a codeblock, encodes it in the zero state for
-        the QEC code (based on the tanner graph), and returns the encoded codeblock. This 
+        the QEC code (based on the tanner graph), and returns the encoded codeblock. This
         encoding procedure follows the example shown in arXiv: 0905.2794, Section VIII.A.
-        It does not include Z-corrections; this is because the encode op is followed directly 
+        It does not include Z-corrections; this is because the encode op is followed directly
         by a full cycle of error correction when lowering to the qecl dialect.
 
         The subroutine allocates auxiliary qubits for use in encoding based on the number of
@@ -239,12 +240,12 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         """Contains the ops to perform a QEC check on the provided auxiliary qubits and codeblock.
         Intended to be called inside `builder.ImplicitBuilder` to add these operations to a block.
 
-        This implementation uses the convention where all two-qubit gates are CNOTs - see for example 
+        This implementation uses the convention where all two-qubit gates are CNOTs - see for example
         Figure 5a. and Figure 5d. in arXiv: 2304.08678
 
         This pattern includes measurement of the auxiliary qubits, and returns the MeasureOps, as
-        well as the codeblock after the check pattern has been applied. It is not responsible for 
-        aux qubit allocation, aux qubit deallocation, or handling of measurement outputs (for 
+        well as the codeblock after the check pattern has been applied. It is not responsible for
+        aux qubit allocation, aux qubit deallocation, or handling of measurement outputs (for
         example sending them to a decoder).
 
         Args:
@@ -283,7 +284,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             aux_qbs_out.append(aux_qb)
 
         # insert data qubits back into the codeblock
-        codeblock=in_codeblock
+        codeblock = in_codeblock
         for i in range(self.qec_code.n):
             insert_op = qecp.InsertQubitOp(codeblock, i, data_qbs_out[i])
             codeblock = insert_op.results[0]
