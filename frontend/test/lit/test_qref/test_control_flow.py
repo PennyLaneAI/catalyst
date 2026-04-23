@@ -124,16 +124,16 @@ def test_for_loop_with_result(size: int):
     # CHECK:   scf.yield [[add]] : tensor<i64>
     # CHECK: }
 
-    sum = 0
+    x = 0
     for i in range(size):
         m = qp.measure(i)
-        sum += m
+        x += m
 
     # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: [[loopOut_tensorf64:%.+]] = stablehlo.convert [[loopOut]] : (tensor<i64>) -> tensor<f64>
     # CHECK: [[angle:%.+]] = tensor.extract [[loopOut_tensorf64]][] : tensor<f64>
     # CHECK: qref.custom "RX"([[angle]]) [[q0]] : !qref.bit
-    qp.RX(sum, wires=0)
+    qp.RX(x, wires=0)
 
     return qp.state()
 
@@ -163,7 +163,7 @@ def test_for_loop_with_dynamic_shapes(size: int):
     # CHECK:    scf.yield [[add]] : tensor<?xf64>
     # CHECK: }
     x = jnp.zeros(size)
-    for i in range(size):
+    for _ in range(size):
         x += x
 
     # CHECK: [[reduce:%.+]] = stablehlo.reduce([[loopOut]]
