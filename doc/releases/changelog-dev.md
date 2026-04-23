@@ -183,15 +183,17 @@
   # [ARTIQ] Generated ELF: /path/to/circuit.elf
   ```
 
-* Added a scalable MLIR resource tracker analysis pass (`resource-tracker`) that counts quantum
+* Added a scalable MLIR resource analysis pass (`resource-analysis`) that counts quantum
   operations across the `quantum`, `qec`, and `mbqc` dialects. The analysis is implemented as a
   cacheable MLIR analysis class (`ResourceAnalysis`) that other transformation passes can query
   via `getAnalysis<ResourceAnalysis>()`, avoiding redundant recomputation.
   [(#2479)](https://github.com/PennyLaneAI/catalyst/pull/2479)
+  [(#2675)](https://github.com/PennyLaneAI/catalyst/pull/2675)
+  [(#2695)](https://github.com/PennyLaneAI/catalyst/pull/2695)
 
   ```bash
-  quantum-opt --resource-tracker='output-json=true' input.mlir
-  quantum-opt --resource-tracker -mlir-pass-statistics input.mlir
+  quantum-opt --resource-analysis='output-json=true' input.mlir
+  quantum-opt --resource-analysis -mlir-pass-statistics input.mlir
   ```
 
 * The `diagonalize-final-measurements` xDSL pass now accepts the optional keyword argument ``supported_base_obs``. The kwarg``to_eigvals`` is now also included in the call signature for compatibility with the tape transform, but this kwarg is unused and can only take its default value, `False`.
