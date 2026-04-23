@@ -48,6 +48,7 @@ add_subdirectory(backend)
 add_subdirectory(registry)
 add_subdirectory(DecompGraphSolver)
 add_subdirectory(RSDecompRuntime)
+add_subdirectory(Decoder)
 
 if(ENABLE_OQD)
 add_subdirectory(OQDcapi)
