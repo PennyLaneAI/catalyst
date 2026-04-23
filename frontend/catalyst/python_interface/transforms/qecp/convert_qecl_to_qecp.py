@@ -93,7 +93,6 @@ class AllocationConversion(RewritePattern):
         assert isinstance(
             op.result_types[0], qecp.PhysicalHyperRegisterType
         ), "lowering of hyper-register types is expected before lowering allocate ops"
-        # ToDo: can this assert use hyper_reg instead like the others?
         rewriter.replace_op(op, qecp.AllocOp(op.result_types[0]))
 
 
