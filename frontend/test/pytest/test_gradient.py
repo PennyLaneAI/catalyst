@@ -190,7 +190,7 @@ def test_jacobian_outside_qjit_argnums(argnums):
     assert np.allclose(expected[1], result[1])
 
 
-def test_non_differentiable_qnode():
+def test_non_differentiable_qnode(capture_mode):
     """Check for an error message when the QNode is explicitly marked non-differentiable."""
 
     @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method=None)
@@ -199,9 +199,9 @@ def test_non_differentiable_qnode():
         return qml.expval(qml.PauliZ(wires=0))
 
     # Ensure None allows forward-pass to succeed
-    assert np.allclose(qjit(f)(1.0), np.cos(1.0))
+    assert np.allclose(qjit(f, capture=capture_mode)(1.0), np.cos(1.0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def grad_f(x):
         return qml.grad(f, method="auto")(x)
 
@@ -212,7 +212,7 @@ def test_non_differentiable_qnode():
         grad_f(1.0)
 
 
-def test_param_shift_on_non_expval(backend):
+def test_param_shift_on_non_expval(capture_mode, backend):
     """Check for an error message when parameter-shift is used on QNodes that return anything but
     qml.expval or qml.probs.
     """
@@ -229,10 +229,10 @@ def test_param_shift_on_non_expval(backend):
     with pytest.raises(
         DifferentiableCompileError, match="The parameter-shift method can only be used"
     ):
-        qjit(workflow)
+        qjit(workflow, capture=capture_mode)
 
 
-def test_adjoint_on_non_expval(backend):
+def test_adjoint_on_non_expval(capture_mode, backend):
     """Check for an error message when adjoint is used on QNodes that return anything but
     qml.expval or qml.probs.
     """
@@ -247,24 +247,23 @@ def test_adjoint_on_non_expval(backend):
         return qml.jacobian(func, method="auto")(p)
 
     with pytest.raises(DifferentiableCompileError, match="The adjoint method can only be used"):
-        qjit(workflow)
+        qjit(workflow, capture=capture_mode)
 
 
-def test_grad_on_qjit():
+def test_grad_on_qjit(capture_mode):
     """Check that grad works when called on an existing qjit object that does not wrap a QNode."""
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(x: float):
         return x * x
 
-    result = qjit(qml.grad(f))(3.0)
+    result = qjit(qml.grad(f), capture=capture_mode)(3.0)
     expected = 6.0
 
     assert np.allclose(result, expected)
 
 
-@pytest.mark.parametrize("capture", (True, False))
-def test_value_and_grad_on_qjit_classical(capture):
+def test_value_and_grad_on_qjit_classical(capture_mode):
     """Check that value_and_grad works when called on an qjit object that does not wrap a QNode.
     We ignore nested qjit's with program capture till [sc-114222] fixing nested qjit's is resolved.
     """
@@ -272,8 +271,8 @@ def test_value_and_grad_on_qjit_classical(capture):
     def f1(x: float):
         return x * x
 
-    if not capture:
-        f1 = qjit(f1, capture=capture)
+    if not capture_mode:
+        f1 = qjit(f1, capture=capture_mode)
 
     result = qjit(qml.value_and_grad(f1))(3.0)
     expected = (9.0, 6.0)
@@ -282,20 +281,20 @@ def test_value_and_grad_on_qjit_classical(capture):
     def f2(x: float):
         return [x * x]
 
-    if not capture:
-        f2 = qjit(f2, capture=capture)
+    if not capture_mode:
+        f2 = qjit(f2, capture=capture_mode)
 
-    result = qjit(qml.value_and_grad(f2), capture=capture)(3.0)
+    result = qjit(qml.value_and_grad(f2), capture=capture_mode)(3.0)
     expected = ([9.0], [6.0])
     assert np.allclose(result, expected)
 
     def f3(x: float):
         return {"helloworld": x * x}
 
-    if not capture:
-        f2 = qjit(f2, capture=capture)
+    if not capture_mode:
+        f2 = qjit(f2, capture=capture_mode)
 
-    result = qjit(qml.value_and_grad(f3), capture=capture)(3.0)
+    result = qjit(qml.value_and_grad(f3), capture=capture_mode)(3.0)
     expected = ({"helloworld": 9.0}, {"helloworld": 6.0})
     assert np.allclose(result[0]["helloworld"], expected[0]["helloworld"])
     assert np.allclose(result[1]["helloworld"], expected[1]["helloworld"])
@@ -303,27 +302,26 @@ def test_value_and_grad_on_qjit_classical(capture):
     def f4(x: float, y: float, z: float):
         return 100 * x + 200 * y + 300 * z
 
-    if not capture:
-        f2 = qjit(f4, capture=capture)
+    if not capture_mode:
+        f2 = qjit(f4, capture=capture_mode)
 
-    result = qjit(qml.value_and_grad(f4), capture=capture)(0.1, 0.2, 0.3)
+    result = qjit(qml.value_and_grad(f4), capture=capture_mode)(0.1, 0.2, 0.3)
     expected = (140, 100)
     assert np.allclose(result, expected)
 
     def f5(x: float, y: float, z: float):
         return 100 * x + 200 * y + 300 * z
 
-    if not capture:
-        f5 = qjit(f5, capture=capture)
+    if not capture_mode:
+        f5 = qjit(f5, capture=capture_mode)
 
-    result = qjit(qml.value_and_grad(f5, argnums=(0, 1, 2)), capture=capture)(0.1, 0.2, 0.3)
+    result = qjit(qml.value_and_grad(f5, argnums=(0, 1, 2)), capture=capture_mode)(0.1, 0.2, 0.3)
     expected = (140, (100, 200, 300))
     assert np.allclose(result[0], expected[0])
     assert np.allclose(result[1], expected[1])
 
 
-@pytest.mark.parametrize("capture", (True, False))
-def test_value_and_grad_on_qjit_classical_vector(capture):
+def test_value_and_grad_on_qjit_classical_vector(capture_mode):
     """Check that value_and_grad works when called on an qjit object that does not wrap a QNode
     and takes in a vector.
     We ignore nested qjit's with program capture till [sc-114222] fixing nested qjit's is resolved.
@@ -334,19 +332,18 @@ def test_value_and_grad_on_qjit_classical_vector(capture):
         prod = jnp.array([30, 40]) * vec
         return prod[0] + prod[1]
 
-    if not capture:
-        f = qjit(f, capture=capture)
+    if not capture_mode:
+        f = qjit(f, capture=capture_mode)
 
     x = jnp.array([1.0, 1.0])
-    result = qjit(qml.value_and_grad(f), capture=capture)(x)
+    result = qjit(qml.value_and_grad(f), capture=capture_mode)(x)
     expected = (70.0, [30.0, 40.0])
 
     assert np.allclose(result[0], expected[0])
     assert np.allclose(result[1], expected[1])
 
 
-@pytest.mark.parametrize("capture", (True, False))
-def test_value_and_grad_on_qjit_classical_dict(capture):
+def test_value_and_grad_on_qjit_classical_dict(capture_mode):
     """Check that value_and_grad works when called on an qjit object that does not wrap a QNode
     and takes in a dictionary.
 
@@ -359,11 +356,11 @@ def test_value_and_grad_on_qjit_classical_dict(capture):
         world = tree["world"]  # (y1, y2)
         return (hello * world).sum()
 
-    if not capture:
-        f = qjit(f, capture=capture)
+    if not capture_mode:
+        f = qjit(f, capture=capture_mode)
 
     x = {"hello": jnp.array([1.0, 2.0]), "world": jnp.array([3.0, 4.0])}
-    result = qjit(qml.value_and_grad(f), capture=capture)(x)
+    result = qjit(qml.value_and_grad(f), capture=capture_mode)(x)
     expected = (11.0, {"hello": jnp.array([3.0, 4.0]), "world": jnp.array([1.0, 2.0])})
 
     assert np.allclose(result[0], expected[0])
@@ -371,15 +368,14 @@ def test_value_and_grad_on_qjit_classical_dict(capture):
     assert np.allclose(result[1]["world"], expected[1]["world"])
 
 
-@pytest.mark.parametrize("capture", (True, False))
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_value_and_grad_on_qjit_quantum(diff_method, capture):
+def test_value_and_grad_on_qjit_quantum(diff_method, capture_mode):
     """Check that value_and_grad works when called on an qjit object that does wrap a QNode.
 
     We ignore nested qjit's with program capture till [sc-114222] fixing nested qjit's is resolved.
     """
 
-    if capture and diff_method == "adjoint":
+    if capture_mode and diff_method == "adjoint":
         pytest.xfail("No validation yet.")
 
     def workflow(x: float):
@@ -391,7 +387,7 @@ def test_value_and_grad_on_qjit_quantum(diff_method, capture):
 
         return x * (circuit()[0])
 
-    if not capture:
+    if not capture_mode:
         workflow = qjit(workflow)
 
     if diff_method == "adjoint":
@@ -399,21 +395,20 @@ def test_value_and_grad_on_qjit_quantum(diff_method, capture):
             CompileError,
             match="The adjoint method can only be used for QNodes which return qml.expval",
         ):
-            qjit(qml.value_and_grad(workflow), capture=capture)(3.0)
+            qjit(qml.value_and_grad(workflow), capture=capture_mode)(3.0)
     else:
-        result = qjit(qml.value_and_grad(workflow), capture=capture)(3.0)
+        result = qjit(qml.value_and_grad(workflow), capture=capture_mode)(3.0)
         expected = (3.0, 1.0)
         assert np.allclose(result, expected)
 
 
-@pytest.mark.parametrize("capture", (True, False))
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_value_and_grad_on_qjit_quantum_variant(diff_method, capture):
+def test_value_and_grad_on_qjit_quantum_variant(diff_method, capture_mode):
     """
     Check that value_and_grad works when called on a QNode with trainable parameters.
     """
 
-    if capture and diff_method == "adjoint":
+    if capture_mode and diff_method == "adjoint":
         pytest.xfail("No validation yet.")
 
     def workflow_variant(x: float):
@@ -430,23 +425,22 @@ def test_value_and_grad_on_qjit_quantum_variant(diff_method, capture):
             CompileError,
             match="The adjoint method can only be used for QNodes which return qml.expval",
         ):
-            qjit(qml.value_and_grad(workflow_variant), capture=capture)(1.1)
+            qjit(qml.value_and_grad(workflow_variant), capture=capture_mode)(1.1)
     else:
-        result = qjit(qml.value_and_grad(workflow_variant), capture=capture)(1.1)
-        expected = (workflow_variant(1.1), qjit(qml.grad(workflow_variant), capture=capture)(1.1))
+        result = qjit(qml.value_and_grad(workflow_variant), capture=capture_mode)(1.1)
+        expected = (workflow_variant(1.1), qjit(qml.grad(workflow_variant), capture=capture_mode)(1.1))
         assert np.allclose(result, expected)
 
 
-@pytest.mark.parametrize("capture", (True, False))
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
 @pytest.mark.parametrize(
     "argnum", [(0, 1, 2), (0), (1), (2), (0, 1), (0, 2), (1, 2), (1, 0, 2), (2, 0, 1)]
 )
-def test_value_and_grad_on_qjit_quantum_variant_argnum(argnum, diff_method, capture):
+def test_value_and_grad_on_qjit_quantum_variant_argnum(argnum, diff_method, capture_mode):
     """
     Check that value_and_grad works when called on a QNode with multiple trainable parameters.
     """
-    if capture and diff_method == "adjoint":
+    if capture_mode and diff_method == "adjoint":
         pytest.xfail("No validation yet.")
 
     def workflow_variant(x: float, y: float, z: float):
@@ -465,31 +459,30 @@ def test_value_and_grad_on_qjit_quantum_variant_argnum(argnum, diff_method, capt
             CompileError,
             match="The adjoint method can only be used for QNodes which return qml.expval",
         ):
-            qjit(qml.value_and_grad(workflow_variant, argnums=argnum), capture=capture)(
+            qjit(qml.value_and_grad(workflow_variant, argnums=argnum), capture=capture_mode)(
                 1.1, 2.2, 3.3
             )
     else:
-        result = qjit(qml.value_and_grad(workflow_variant, argnums=argnum), capture=capture)(
+        result = qjit(qml.value_and_grad(workflow_variant, argnums=argnum), capture=capture_mode)(
             1.1, 2.2, 3.3
         )
         expected = (
             workflow_variant(1.1, 2.2, 3.3),
-            qjit(qml.grad(workflow_variant, argnums=argnum), capture=capture)(1.1, 2.2, 3.3),
+            qjit(qml.grad(workflow_variant, argnums=argnum), capture=capture_mode)(1.1, 2.2, 3.3),
         )
         assert np.allclose(result[0], expected[0])
         assert np.allclose(result[1], expected[1])
 
 
-@pytest.mark.parametrize("capture", (True, False))
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_value_and_grad_on_qjit_quantum_variant_tree(diff_method, capture):
+def test_value_and_grad_on_qjit_quantum_variant_tree(diff_method, capture_mode):
     """
     Check that value_and_grad works when called on an qjit object that does wrap a QNode
     with trainable parameters and a general pytree input.
 
     We ignore nested qjit's with program capture till [sc-114222] fixing nested qjit's is resolved.
     """
-    if capture and diff_method == "adjoint":
+    if capture_mode and diff_method == "adjoint":
         pytest.xfail("No validation yet.")
 
     def workflow_variant_tree(params):
@@ -503,7 +496,7 @@ def test_value_and_grad_on_qjit_quantum_variant_tree(diff_method, capture):
 
     params = {"x": 0.12, "y": 0.34}
 
-    if not capture:
+    if not capture_mode:
         workflow_variant_tree = qjit(workflow_variant_tree)
 
     if diff_method == "adjoint":
@@ -512,9 +505,9 @@ def test_value_and_grad_on_qjit_quantum_variant_tree(diff_method, capture):
             match="The adjoint method can only be used for QNodes which return qml.expval",
         ):
 
-            qjit(qml.value_and_grad(workflow_variant_tree), capture=capture)(params)
+            qjit(qml.value_and_grad(workflow_variant_tree), capture=capture_mode)(params)
     else:
-        result = qjit(qml.value_and_grad(workflow_variant_tree), capture=capture)(params)
+        result = qjit(qml.value_and_grad(workflow_variant_tree), capture=capture_mode)(params)
         expected = (workflow_variant_tree(params), qjit(grad(workflow_variant_tree))(params))
         assert np.allclose(result[0], expected[0])
         assert np.allclose(result[1]["x"], expected[1]["x"])
@@ -939,7 +932,7 @@ def test_ps_probs(backend):
 
 
 @pytest.mark.parametrize("gate_n_inputs", [(qml.CRX, [1]), (qml.CRot, [1, 2, 3])])
-def test_ps_four_term_rule(backend, gate_n_inputs):
+def test_ps_four_term_rule(capture_mode, backend, gate_n_inputs):
     """Operations with the 4-term shift rule need to be decomposed to be differentiated."""
     gate, inputs = gate_n_inputs
 
@@ -949,7 +942,7 @@ def test_ps_four_term_rule(backend, gate_n_inputs):
         gate(*(x * i for i in inputs), wires=[0, 1])
         return qml.expval(0.5 * qml.Z(1) @ qml.X(0) - 0.4 * qml.Y(1) @ qml.H(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def main(x: float):
         return qml.grad(f)(x)
 
@@ -1133,7 +1126,7 @@ def test_adjoint_grad_range_change(inp, backend):
 
 
 @pytest.mark.parametrize("method", [("parameter-shift"), ("adjoint")])
-def test_assert_no_higher_order_without_fd(method, backend):
+def test_assert_no_higher_order_without_fd(capture_mode, method, backend):
     """Test input validation for gradients"""
 
     def f(x):
@@ -1143,7 +1136,7 @@ def test_assert_no_higher_order_without_fd(method, backend):
     with pytest.raises(DifferentiableCompileError, match="higher order derivatives"):
 
         # not sure how to get this working with qml.grad TODO
-        @qjit
+        @qjit(capture=capture_mode)
         def workflow(x: float):
             g = qml.qnode(qml.device(backend, wires=1), diff_method=method)(f)
             h = catalyst.grad(g, method="auto")
@@ -1151,7 +1144,7 @@ def test_assert_no_higher_order_without_fd(method, backend):
             return i(x)
 
 
-def test_assert_invalid_diff_method():
+def test_assert_invalid_diff_method(capture_mode):
     """Test invalid diff method detection"""
 
     def f(x):
@@ -1160,14 +1153,14 @@ def test_assert_invalid_diff_method():
 
     with pytest.raises(ValueError, match="Invalid differentiation method"):
 
-        @qjit
+        @qjit(capture=capture_mode)
         def workflow(x: float):
             g = qml.qnode(qml.device("lightning.qubit", wires=1))(f)
             h = grad(g, method="non-existent method")
             return h(x)
 
 
-def test_assert_invalid_h_type():
+def test_assert_invalid_h_type(capture_mode):
     """Test invalid h type detection"""
 
     def f(x):
@@ -1176,14 +1169,14 @@ def test_assert_invalid_h_type():
 
     with pytest.raises(ValueError, match="Invalid h value"):
 
-        @qjit
+        @qjit(capture=capture_mode)
         def workflow(x: float):
             g = qml.qnode(qml.device("lightning.qubit", wires=1))(f)
             h = grad(g, method="fd", h="non-integer")
             return h(x)
 
 
-def test_assert_non_differentiable():
+def test_assert_non_differentiable(capture_mode):
     """Test non-differentiable parameter detection"""
 
     def workflow(x: float):
@@ -1191,7 +1184,7 @@ def test_assert_non_differentiable():
         return h(x)
 
     with pytest.raises(TypeError, match="'string!' is not a callable object"):
-        qjit(workflow)
+        qjit(workflow, capture=capture_mode)
 
 
 @pytest.mark.usefixtures("use_both_frontend")
@@ -1279,7 +1272,7 @@ def test_jax_consts(h_coeffs, g_method, backend):
     assert np.allclose(compile_grad(jnp.array(inp)), expected)
 
 
-def test_non_float_arg(backend):
+def test_non_float_arg(capture_mode, backend):
     """Test a function which attempts to differentiate non-floating point arguments."""
 
     @qml.qnode(qml.device(backend, wires=2))
@@ -1288,7 +1281,7 @@ def test_non_float_arg(backend):
         qml.RY(y, wires=0)
         return qml.expval(qml.PauliZ(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def cost_fn(x, y):
         return grad(circuit)(x, y)
 
@@ -1299,7 +1292,7 @@ def test_non_float_arg(backend):
         cost_fn(1j, 2.0)
 
 
-def test_non_float_res(backend):
+def test_non_float_res(capture_mode, backend):
     """Test a function which attempts to differentiate non-floating point results."""
 
     @qml.qnode(qml.device(backend, wires=2))
@@ -1308,7 +1301,7 @@ def test_non_float_res(backend):
         qml.RY(y, wires=0)
         return qml.expval(qml.PauliZ(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     @grad
     def cost_fn(x, y):
         return 1j * circuit(x, y)
@@ -1356,7 +1349,7 @@ def test_finite_diff_multiple_devices(inp, diff_method, backend):
     assert np.allclose(result[0], result[1])
 
 
-def test_grad_on_non_scalar_output(backend):
+def test_grad_on_non_scalar_output(capture_mode, backend):
     """Test a function which attempts to use `grad` on a function that returns a non-scalar."""
 
     @qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")
@@ -1364,7 +1357,7 @@ def test_grad_on_non_scalar_output(backend):
         qml.RX(3 * x, wires=0)
         return qml.probs()
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled(x):
         return grad(f)(x)
 
@@ -1372,7 +1365,7 @@ def test_grad_on_non_scalar_output(backend):
         compiled(1.0)
 
 
-def test_grad_on_multi_result_function(backend):
+def test_grad_on_multi_result_function(capture_mode, backend):
     """Test a function which attempts to use `grad` on a function that returns multiple values."""
 
     @qml.qnode(qml.device(backend, wires=2), diff_method="parameter-shift")
@@ -1380,7 +1373,7 @@ def test_grad_on_multi_result_function(backend):
         qml.RX(3 * x, wires=0)
         return qml.expval(qml.PauliZ(0)), qml.expval(qml.PauliX(1))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled(x):
         return grad(f)(x)
 
@@ -1447,18 +1440,18 @@ def test_loop_with_dyn_wires(backend, diff_method):
     assert np.allclose(result, expected)
 
 
-def test_classical_kwargs():
+def test_classical_kwargs(capture_mode):
     """Test the gradient on a classical function with keyword arguments"""
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f1(x, y, z):
         return x * (y - z)
 
     def g(*args, **kwargs):
         return qml.grad(f1, argnums=0)(*args, **kwargs)
 
-    result = qjit(g)(3.0, y=1.0, z=2.0)
-    expected = qjit(g)(3.0, 1.0, 2.0)
+    result = qjit(g, capture=capture_mode)(3.0, y=1.0, z=2.0)
+    expected = qjit(g, capture=capture_mode)(3.0, 1.0, 2.0)
     assert np.allclose(expected, result)
 
 
@@ -1478,9 +1471,8 @@ def test_classical_kwargs_switched_arg_order():
     assert np.allclose(expected, result)
 
 
-@pytest.mark.parametrize("capture", (True, False))
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_qnode_kwargs(backend, diff_method, capture):
+def test_qnode_kwargs(backend, diff_method, capture_mode):
     """Test the gradient on a qnode with keyword arguments"""
     num_wires = 1
     dev = qml.device(backend, wires=num_wires)
@@ -1492,26 +1484,25 @@ def test_qnode_kwargs(backend, diff_method, capture):
         qml.RX(z, wires=0)
         return qml.expval(qml.PauliZ(0))
 
-    result = qjit(qml.jacobian(circuit, argnums=[0]), capture=capture)(0.1, y=0.2, z=0.3)
-    expected = qjit(qml.jacobian(circuit, argnums=[0]), capture=capture)(0.1, 0.2, 0.3)
+    result = qjit(qml.jacobian(circuit, argnums=[0]), capture=capture_mode)(0.1, y=0.2, z=0.3)
+    expected = qjit(qml.jacobian(circuit, argnums=[0]), capture=capture_mode)(0.1, 0.2, 0.3)
     assert np.allclose(expected, result)
-    result = qjit(qml.grad(circuit, argnums=[0]), capture=capture)(0.1, y=0.2, z=0.3)
-    expected = qjit(qml.grad(circuit, argnums=[0]), capture=capture)(0.1, 0.2, 0.3)
+    result = qjit(qml.grad(circuit, argnums=[0]), capture=capture_mode)(0.1, y=0.2, z=0.3)
+    expected = qjit(qml.grad(circuit, argnums=[0]), capture=capture_mode)(0.1, 0.2, 0.3)
     assert np.allclose(expected, result)
 
-    result_val, result_grad = qjit(qml.value_and_grad(circuit, argnums=[0]), capture=capture)(
+    result_val, result_grad = qjit(qml.value_and_grad(circuit, argnums=[0]), capture=capture_mode)(
         0.1, y=0.2, z=0.3
     )
     expected_val = qjit(circuit)(0.1, 0.2, 0.3)
-    expected_grad = qjit(qml.grad(circuit, argnums=[0]), capture=capture)(0.1, 0.2, 0.3)
+    expected_grad = qjit(qml.grad(circuit, argnums=[0]), capture=capture_mode)(0.1, 0.2, 0.3)
 
     assert np.allclose(expected_val, result_val)
     assert np.allclose(expected_grad, result_grad)
 
 
-@pytest.mark.parametrize("capture", (True, False))
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_qnode_kwargs_switched_arg_order(backend, diff_method, capture):
+def test_qnode_kwargs_switched_arg_order(backend, diff_method, capture_mode):
     """Test the gradient on a qnode with keyword arguments and switched argument order"""
     num_wires = 1
     dev = qml.device(backend, wires=num_wires)
@@ -1523,18 +1514,18 @@ def test_qnode_kwargs_switched_arg_order(backend, diff_method, capture):
         qml.RX(z, wires=0)
         return qml.expval(qml.PauliZ(0))
 
-    switched_order = qjit(qml.jacobian(circuit, argnums=[0]), capture=capture)(0.1, z=0.3, y=0.2)
-    expected = qjit(qml.jacobian(circuit, argnums=[0]), capture=capture)(0.1, 0.2, 0.3)
+    switched_order = qjit(qml.jacobian(circuit, argnums=[0]), capture=capture_mode)(0.1, z=0.3, y=0.2)
+    expected = qjit(qml.jacobian(circuit, argnums=[0]), capture=capture_mode)(0.1, 0.2, 0.3)
     assert np.allclose(expected[0], switched_order[0])
-    switched_order = qjit(qml.grad(circuit, argnums=[0]), capture=capture)(0.1, z=0.3, y=0.2)
-    expected = qjit(qml.grad(circuit, argnums=[0]), capture=capture)(0.1, 0.2, 0.3)
+    switched_order = qjit(qml.grad(circuit, argnums=[0]), capture=capture_mode)(0.1, z=0.3, y=0.2)
+    expected = qjit(qml.grad(circuit, argnums=[0]), capture=capture_mode)(0.1, 0.2, 0.3)
     assert np.allclose(expected[0], switched_order[0])
 
     switched_order_val, switched_order_grad = qjit(
-        qml.value_and_grad(circuit, argnums=[0]), capture=capture
+        qml.value_and_grad(circuit, argnums=[0]), capture=capture_mode
     )(0.1, z=0.3, y=0.2)
-    expected_val = qjit(circuit, capture=capture)(0.1, 0.2, 0.3)
-    expected_grad = qjit(grad(circuit, argnums=[0]), capture=capture)(0.1, 0.2, 0.3)
+    expected_val = qjit(circuit, capture=capture_mode)(0.1, 0.2, 0.3)
+    expected_grad = qjit(grad(circuit, argnums=[0]), capture=capture_mode)(0.1, 0.2, 0.3)
     assert np.allclose(expected_val, switched_order_val)
     assert np.allclose(expected_grad, switched_order_grad)
 
@@ -1673,7 +1664,7 @@ def test_non_parametrized_circuit(backend, diff_method):
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_adj_qubitunitary(inp, backend):
+def test_adj_qubitunitary(capture_mode, inp, backend):
     """Test the adjoint method."""
 
     def f(x):
@@ -1682,7 +1673,7 @@ def test_adj_qubitunitary(inp, backend):
         qml.QubitUnitary(U1, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="adjoint")(f)
         h = grad(g, method="auto")
@@ -1699,7 +1690,7 @@ def test_adj_qubitunitary(inp, backend):
 
 @pytest.mark.xfail(reason="Need PR 332.")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_preprocessing_outside_qnode(inp, backend):
+def test_preprocessing_outside_qnode(capture_mode, inp, backend):
     """Test the preprocessing outside qnode."""
 
     @qml.qnode(qml.device(backend, wires=1))
@@ -1707,7 +1698,7 @@ def test_preprocessing_outside_qnode(inp, backend):
         qml.RX(y, wires=0)
         return qml.expval(qml.PauliZ(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def g(x):
         return grad(lambda y: f(jnp.cos(y)) ** 2)(x)
 
@@ -1717,7 +1708,7 @@ def test_preprocessing_outside_qnode(inp, backend):
     assert np.allclose(g(inp), h(inp))
 
 
-def test_gradient_slice(backend):
+def test_gradient_slice(capture_mode, backend):
     """Test the differentation when the qnode generates memref with non identity layout."""
     n_wires = 5
     data = jnp.sin(jnp.mgrid[-2:2:0.2].reshape(n_wires, -1)) ** 3
@@ -1751,7 +1742,8 @@ def test_gradient_slice(backend):
         jacobian(
             my_model,
             argnums=1,
-        )
+        ),
+        capture=capture_mode,
     )(data, params["weights"], params["bias"])
     jax_res = jax.jacobian(my_model, argnums=1)(data, params["weights"], params["bias"])
     assert np.allclose(cat_res, jax_res)
@@ -1778,7 +1770,7 @@ def test_ellipsis_differentiation(backend, diff_method):
 
 
 @pytest.mark.xfail(reason="First need #332, then Vmap yields wrong results when differentiated")
-def test_vmap_worflow_derivation(backend):
+def test_vmap_worflow_derivation(capture_mode, backend):
     """Check the gradient of a vmap workflow"""
     n_wires = 5
     data = jnp.sin(jnp.mgrid[-2:2:0.2].reshape(n_wires, -1)) ** 3
@@ -1822,7 +1814,7 @@ def test_vmap_worflow_derivation(backend):
     bias = jnp.array(0.0, dtype=jax.numpy.float64)
     params = {"weights": weights, "bias": bias}
 
-    results_cat = qjit(grad(loss_fn))(params, data, targets)
+    results_cat = qjit(grad(loss_fn, capture=capture_mode))(params, data, targets)
     results_jax = jax.grad(loss_fn)(params, data, targets)
 
     data_cat, pytree_enzyme = tree_flatten(results_cat)
@@ -1834,7 +1826,7 @@ def test_vmap_worflow_derivation(backend):
 
 
 @pytest.mark.xfail(reason="First need #332, then Vmap yields wrong results when differentiated")
-def test_forloop_vmap_worflow_derivation(backend):
+def test_forloop_vmap_worflow_derivation(capture_mode, backend):
     """Test a forloop vmap."""
     n_wires = 5
     data = jnp.sin(jnp.mgrid[-2:2:0.2].reshape(n_wires, -1)) ** 3
@@ -1878,7 +1870,8 @@ def test_forloop_vmap_worflow_derivation(backend):
         jacobian(
             my_model,
             argnums=1,
-        )
+        ),
+        capture=capture_mode,
     )(data, params["weights"])
     jax_res = jax.jacobian(my_model, argnums=1)(data, params["weights"])
 
@@ -1918,7 +1911,7 @@ class TestGradientErrors:
     """Test errors when an operation which does not have a valid gradient is reachable
     from the grad op"""
 
-    def test_measure_error(self):
+    def test_measure_error(self, capture_mode):
         """Test with measure"""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -1930,11 +1923,11 @@ class TestGradientErrors:
 
         with pytest.raises(DifferentiableCompileError, match="MidCircuitMeasure is not allowed"):
 
-            @qjit
+            @qjit(capture=capture_mode)
             def cir(x: float):
                 return grad(f)(x)
 
-    def test_callback_error(self):
+    def test_callback_error(self, capture_mode):
         """Test with callback"""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -1945,11 +1938,11 @@ class TestGradientErrors:
 
         with pytest.raises(CompileError, match=".*Compilation failed.*"):
 
-            @qjit
+            @qjit(capture=capture_mode)
             def cir(x: float):
                 return grad(f)(x)
 
-    def test_with_zne(self):
+    def test_with_zne(self, capture_mode):
         """Test with ZNE"""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -1962,7 +1955,7 @@ class TestGradientErrors:
 
         with pytest.raises(CompileError, match=".*Compilation failed.*"):
 
-            @qjit
+            @qjit(capture=capture_mode)
             def cir(x: float):
                 return grad(g)(x)
 
@@ -2019,10 +2012,10 @@ class TestGradientUsagePatterns:
 
 
 @pytest.mark.parametrize("argnums", [0, 1, (0, 1)])
-def test_grad_argnums(argnums):
+def test_grad_argnums(capture_mode, argnums):
     """Tests https://github.com/PennyLaneAI/catalyst/issues/1477"""
 
-    @qjit
+    @qjit(capture=capture_mode)
     @qml.qnode(device=qml.device("lightning.qubit", wires=4), interface="jax")
     def circuit(inputs, weights):
         qml.AngleEmbedding(features=inputs, wires=range(4), rotation="X")
@@ -2089,7 +2082,7 @@ class TestGradientMethodErrors:
 
         return CustomDevice(**kwargs)
 
-    def test_device_grad_method_error(self):
+    def test_device_grad_method_error(self, capture_mode):
         """Test that using 'device' grad method raises appropriate error."""
 
         @qml.qnode(self.get_custom_device(grad_method="device", wires=1))
@@ -2100,9 +2093,9 @@ class TestGradientMethodErrors:
         with pytest.raises(
             ValueError, match="The device does not provide a catalyst compatible gradient method"
         ):
-            qjit(grad(f))(0.5)
+            qjit(grad(f), capture=capture_mode)(0.5)
 
-    def test_finite_diff_grad_method_error(self):
+    def test_finite_diff_grad_method_error(self, capture_mode):
         """Test that using 'finite-diff' grad method raises appropriate error."""
 
         @qml.qnode(self.get_custom_device(grad_method="finite-diff", wires=1))
@@ -2113,9 +2106,9 @@ class TestGradientMethodErrors:
         with pytest.raises(
             ValueError, match="Finite differences at the QNode level is not supported"
         ):
-            qjit(grad(f))(0.5)
+            qjit(grad(f), capture=capture_mode)(0.5)
 
-    def test_invalid_grad_method_error(self):
+    def test_invalid_grad_method_error(self, capture_mode):
         """Test that using an invalid grad method raises appropriate error."""
 
         @qml.qnode(self.get_custom_device(grad_method="invalid_method", wires=1))
@@ -2124,7 +2117,7 @@ class TestGradientMethodErrors:
             return qml.expval(qml.PauliY(0))
 
         with pytest.raises(ValueError, match="Invalid gradient method: invalid_method"):
-            qjit(grad(f))(0.5)
+            qjit(grad(f), capture=capture_mode)(0.5)
 
 
 class TestParameterShiftVerificationUnitTests:
@@ -2301,14 +2294,14 @@ class TestParameterShiftVerificationIntegrationTests:
     Source of truth obtained from shortcut story: 84819
     """
 
-    def test_is_mcm(self, backend):
+    def test_is_mcm(self, capture_mode, backend):
         """No mcm"""
 
         device = qml.device(backend, wires=1)
 
         with pytest.raises(DifferentiableCompileError, match="MidCircuitMeasure is not allowed"):
 
-            @qjit
+            @qjit(capture=capture_mode)
             @grad
             @qml.qnode(device, diff_method="parameter-shift")
             def circuit(_: float):
@@ -2317,21 +2310,21 @@ class TestParameterShiftVerificationIntegrationTests:
 
             circuit(0.5)
 
-    def test_all_arguments_are_constant(self, backend):
+    def test_all_arguments_are_constant(self, capture_mode, backend):
         """When all arguments are constant they do not contribute to the gradient"""
         device = qml.device(backend, wires=1)
 
         # Yes, this test does not have an assertion.
         # The test is that this does not produce an assertion.
 
-        @qjit
+        @qjit(capture=capture_mode)
         @grad
         @qml.qnode(device, diff_method="parameter-shift")
         def circuit(_: float):
             qml.RX(0.0, wires=[0])
             return qml.expval(qml.PauliZ(wires=0))
 
-    def test_grad_recipe_dynamic(self, backend):
+    def test_grad_recipe_dynamic(self, capture_mode, backend):
         """Raise exception when there is an op with a grad_recipe that's dynamic"""
         device = qml.device(backend, wires=1)
 
@@ -2344,14 +2337,14 @@ class TestParameterShiftVerificationIntegrationTests:
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
 
-            @qjit
+            @qjit(capture=capture_mode)
             @grad
             @qml.qnode(device, diff_method="parameter-shift")
             def circuit(x: float):
                 RX(x, wires=[0])
                 return qml.expval(qml.PauliZ(wires=0))
 
-    def test_grad_recipe_static(self, backend):
+    def test_grad_recipe_static(self, capture_mode, backend):
         """Raise exception when there is an op with a mismatching grad_recipe"""
         device = qml.device(backend, wires=1)
 
@@ -2362,14 +2355,14 @@ class TestParameterShiftVerificationIntegrationTests:
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
 
-            @qjit
+            @qjit(capture=capture_mode)
             @grad
             @qml.qnode(device, diff_method="parameter-shift")
             def circuit(x: float):
                 RX(x, wires=[0])
                 return qml.expval(qml.PauliZ(wires=0))
 
-    def test_parameter_frequencies(self, backend):
+    def test_parameter_frequencies(self, capture_mode, backend):
         """Raise exception when when there is an lengths are mismatched."""
         device = qml.device(backend, wires=1)
 
@@ -2381,7 +2374,7 @@ class TestParameterShiftVerificationIntegrationTests:
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
 
-            @qjit
+            @qjit(capture=capture_mode)
             @grad
             @qml.qnode(device, diff_method="parameter-shift")
             def circuit(x: float):
@@ -2390,7 +2383,7 @@ class TestParameterShiftVerificationIntegrationTests:
 
             circuit(0.5)
 
-    def test_parameter_frequencies_not_one(self, backend):
+    def test_parameter_frequencies_not_one(self, capture_mode, backend):
         """When there is an op without parameter_frequencies, ps gradient should fail"""
         device = qml.device(backend, wires=1)
 
@@ -2402,7 +2395,7 @@ class TestParameterShiftVerificationIntegrationTests:
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
 
-            @qjit
+            @qjit(capture=capture_mode)
             @grad
             @qml.qnode(device, diff_method="parameter-shift")
             def circuit(x: float):
@@ -2448,12 +2441,11 @@ def test_closure_variable_grad(diff_method):
     assert np.allclose(expected, observed)
 
 
-@pytest.mark.parametrize("capture", (True, False))
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_closure_variable_value_and_grad(diff_method, capture):
+def test_closure_variable_value_and_grad(diff_method, capture_mode):
     """Test that value and grad can take closure variables"""
 
-    @qml.qjit(capture=capture)
+    @qml.qjit(capture=capture_mode)
     def workflow_closure(x, y):
 
         dev = qml.device("lightning.qubit", wires=1)
@@ -2467,7 +2459,7 @@ def test_closure_variable_value_and_grad(diff_method, capture):
         g = qml.value_and_grad(circuit)
         return g(x)
 
-    @qml.qjit(capture=capture)
+    @qml.qjit(capture=capture_mode)
     def workflow_no_closure(x, y):
 
         dev = qml.device("lightning.qubit", wires=1)
@@ -2487,7 +2479,7 @@ def test_closure_variable_value_and_grad(diff_method, capture):
     assert np.allclose(expected, observed)
 
 
-def test_bufferization_inside_tensor_generate(backend):
+def test_bufferization_inside_tensor_generate(capture_mode, backend):
     """This tests specifically for an bug already
     filed in LLVM: https://github.com/llvm/llvm-project/issues/141667
     The issue is that linalg structured operations cannot be nested
@@ -2521,7 +2513,7 @@ def test_bufferization_inside_tensor_generate(backend):
 
     inp = np.array([2.0, 1.0])
 
-    @qjit
+    @qjit(capture=capture_mode)
     def workflow(x):
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
