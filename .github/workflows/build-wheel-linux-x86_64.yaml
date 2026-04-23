@@ -45,7 +45,6 @@ env:
   # If the input is empty (meaning this workflow was not triggered by a workflow_call/workflow_dispatch), then check if event_name is schedule.
   # If event_name is NOT schedule, default to false
   BUILD_STANDALONE_PLUGIN: ${{ format('{0}', inputs.build_standalone_plugin) || github.event_name == 'schedule' }}
-  PIP_EXTRA_INDEX_URL: "https://test.pypi.org/simple/"
 
 jobs:
   determine_runner:
@@ -195,7 +194,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja jax==0.7.1 jaxlib==0.7.1 pennylane==0.45.0-dev84 setuptools scipy-openblas32>=0.3.26 xdsl==0.59.0 xdsl-jax==0.5.0
+        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
         # Add cmake and ninja to the PATH env var
         PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
         echo $PYTHON_BINS >> $GITHUB_PATH
@@ -293,7 +292,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja jax==0.7.1 jaxlib==0.7.1 pennylane==0.45.0-dev84 setuptools scipy-openblas32>=0.3.26 xdsl==0.59.0 xdsl-jax==0.5.0
+        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
         # Add cmake and ninja to the PATH env var
         PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
         echo $PYTHON_BINS >> $GITHUB_PATH
