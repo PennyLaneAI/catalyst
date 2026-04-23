@@ -148,7 +148,7 @@ def measure(
     """
     EvaluationContext.check_is_tracing("catalyst.measure can only be used from within @qjit.")
     EvaluationContext.check_is_quantum_tracing(
-        "catalyst.measure can only be used from within a qp.qnode."
+        "catalyst.measure can only be used from within a qml.qnode."
     )
     cur_trace = EvaluationContext.get_current_trace()
     wires = list(wires) if isinstance(wires, (list, tuple)) else [wires]
@@ -398,7 +398,7 @@ class AdjointCallable:
             self.single_op = False
             self.instantiated = False
         else:
-            raise ValueError(f"Expected a callable or a qp.Operator, not {target}")
+            raise ValueError(f"Expected a callable or a qml.Operator, not {target}")
 
     def __call__(self, *args, **kwargs):
         if self.single_op:
@@ -553,7 +553,7 @@ class CtrlCallable:
             self.single_op = False
             self.instantiated = False
         else:
-            raise ValueError(f"Expected a callable or a qp.Operator, not {target}")
+            raise ValueError(f"Expected a callable or a qml.Operator, not {target}")
 
     def __call__(self, *args, **kwargs):
         if self.single_op:
