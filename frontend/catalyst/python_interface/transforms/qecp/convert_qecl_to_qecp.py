@@ -94,13 +94,12 @@ class HyperRegisterTypeConversion(TypeConversionPattern):
 
 # MARK: Encode Op Pattern
 
-
+@dataclass
 class EncodeOpConversion(RewritePattern):
     """Converts qecl.encode [zero] to the equivalent subroutine of qecp gates"""
 
-    def __init__(self, qec_code: QecCode, encode_subroutine: func.FuncOp):
-        self.qec_code = qec_code
-        self.encode_subroutine = encode_subroutine
+    qec_code: QecCode
+    encode_subroutine: func.FuncOp
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecl.EncodeOp, rewriter: PatternRewriter):
@@ -185,10 +184,16 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     def create_encode_subroutine(self) -> func.FuncOp:
         """Create a subroutine that takes in a codeblock, encodes it in the zero state for
-        the QEC code (based on the tanner graph), and returns the encoded codeblock.
+        the QEC code (based on the tanner graph), and returns the encoded codeblock. This 
+        encoding procedure follows the example shown in arXiv: 0905.2794, Section VIII.A.
+        It does not include Z-corrections; this is because the encode op is followed directly 
+        by a full cycle of error correction when lowering to the qecl dialect.
 
         The subroutine allocates auxiliary qubits for use in encoding based on the number of
-        rows in the X tanner graph , and deallocates them once encoding is complete.
+        rows in the X tanner graph, and deallocates them once encoding is complete.
+
+        Note that this method does not insert the subroutine into the module op. Instead it returns
+        the built func.FuncOp object that can then be subsequently inserted where desired.
         """
 
         codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
@@ -209,8 +214,6 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 aux_qubits, codeblock, check_type=CheckType.X
             )
 
-            # ToDo: should we also be applying the Z corrections?
-
             # deallocate the auxiliary qubits
             for meas_op in measure_ops:
                 qecp.DeallocAuxQubitOp(meas_op.results[1])
@@ -229,21 +232,23 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     def check_pattern(
         self,
-        aux_qubits: Iterable[qecp.QecPhysicalQubitSSAValue],
-        codeblock: qecp.PhysicalCodeBlockSSAValue,
+        in_aux_qbs: Iterable[qecp.QecPhysicalQubitSSAValue],
+        in_codeblock: qecp.PhysicalCodeBlockSSAValue,
         check_type: CheckType,
     ) -> tuple[Iterable[qecp.MeasureOp], qecp.PhysicalCodeBlockSSAValue]:
         """Contains the ops to perform a QEC check on the provided auxiliary qubits and codeblock.
         Intended to be called inside `builder.ImplicitBuilder` to add these operations to a block.
 
-        This pattern includes measurement of the auxiliary qubits, and returns the MeasureOps, as
-        well as the codeblock after the check pattern has been applied.
+        This implementation uses the convention where all two-qubit gates are CNOTs - see for example 
+        Figure 5a. and Figure 5d. in arXiv: 2304.08678
 
-        This function is not responsible for aux qubit allocation, aux qubit deallocation, or
-        handling of measurement outputs (for example sending them to a decoder.)
+        This pattern includes measurement of the auxiliary qubits, and returns the MeasureOps, as
+        well as the codeblock after the check pattern has been applied. It is not responsible for 
+        aux qubit allocation, aux qubit deallocation, or handling of measurement outputs (for 
+        example sending them to a decoder).
 
         Args:
-            aux_qubits (Iterable[qecp.QecPhysicalQubitSSAValue]): The auxiliary qubits to be used
+            aux_qbs_in (Iterable[qecp.QecPhysicalQubitSSAValue]): The auxiliary qubits to be used
                 in the check
             codeblock (qecp.PhysicalCodeBlockSSAValue): The codeblock of data-qubits to be used
                 in the check
@@ -254,6 +259,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             qecp.PhysicalCodeblockType: the codeblock after the check pattern has been applied
         """
 
+        aux_qubits = in_aux_qbs
         tanner_graph, cnot_fn = self._get_cnot_and_tanner_graph(check_type)
 
         if check_type == CheckType.X:
@@ -262,7 +268,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             aux_qubits = [h_op.results[0] for h_op in hadamard_ops]
 
         # extract data qubits
-        extract_ops = [qecp.ExtractQubitOp(codeblock, i) for i in range(self.qec_code.n)]
+        extract_ops = [qecp.ExtractQubitOp(in_codeblock, i) for i in range(self.qec_code.n)]
         data_qubits = [ext_op.results[0] for ext_op in extract_ops]
 
         # apply CNOTs between data and auxiliary qubits based on tanner graph
@@ -277,6 +283,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             aux_qbs_out.append(aux_qb)
 
         # insert data qubits back into the codeblock
+        codeblock=in_codeblock
         for i in range(self.qec_code.n):
             insert_op = qecp.InsertQubitOp(codeblock, i, data_qbs_out[i])
             codeblock = insert_op.results[0]

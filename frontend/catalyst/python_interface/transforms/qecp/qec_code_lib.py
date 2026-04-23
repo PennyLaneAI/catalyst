@@ -15,7 +15,7 @@
 """This module contains a library of QEC codes."""
 
 from dataclasses import dataclass, fields
-from typing import Self
+from typing import Any, Self
 
 import numpy as np
 
