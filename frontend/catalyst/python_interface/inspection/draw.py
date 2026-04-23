@@ -153,7 +153,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         Please consult the links provided for installation instructions.
 
         Additionally, it is recommended to use ``draw_graph`` with PennyLane's program capture
-        enabled (see :func:`qml.capture.enable <pennylane.capture.enable>`).
+        enabled (see :func:`qp.capture.enable <pennylane.capture.enable>`).
 
     .. warning::
 
@@ -205,22 +205,22 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
 
     .. code-block::
 
-        import pennylane as qml
+        import pennylane as qp
         import catalyst
 
-        qml.capture.enable()
+        qp.capture.enable()
 
-        @qml.qjit
-        @qml.transforms.merge_rotations
-        @qml.transforms.cancel_inverses
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit
+        @qp.transforms.merge_rotations
+        @qp.transforms.cancel_inverses
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def circuit():
-            qml.H(0)
-            qml.T(1)
-            qml.H(0)
-            qml.RX(0.1, wires=0)
-            qml.RX(0.2, wires=0)
-            return qml.expval(qml.X(0))
+            qp.H(0)
+            qp.T(1)
+            qp.H(0)
+            qp.RX(0.1, wires=0)
+            qp.RX(0.2, wires=0)
+            return qp.expval(qp.X(0))
 
     With ``level=0``, the graphical visualization will display the program as if no transforms are
     applied:
@@ -260,18 +260,18 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
 
         .. code-block::
 
-            @qml.qjit(autograph=True)
-            @qml.qnode(qml.device("null.qubit", wires=3))
+            @qp.qjit(autograph=True)
+            @qp.qnode(qp.device("null.qubit", wires=3))
             def circuit():
-                qml.H(0)
+                qp.H(0)
                 for i in range(3):
                     if i == 1:
-                        qml.X(0)
+                        qp.X(0)
                     elif i == 2:
-                        qml.Y(0)
+                        qp.Y(0)
                     else:
-                        qml.Z(0)
-                return qml.probs()
+                        qp.Z(0)
+                return qp.probs()
 
         >>> fig, ax = catalyst.draw_graph(circuit)()
         >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
@@ -290,19 +290,19 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
 
         .. code-block::
 
-            @qml.qjit
-            @qml.qnode(qml.device("null.qubit", wires=3))
+            @qp.qjit
+            @qp.qnode(qp.device("null.qubit", wires=3))
             def circuit(x, y):
-                qml.X(0)
-                qml.Y(1)
-                qml.Z(2)
-                qml.H(x) # 'x' is a dynamic wire index
-                qml.S(0)
-                qml.T(2)
-                qml.H(x)
-                return qml.expval(qml.Z(y))
+                qp.X(0)
+                qp.Y(1)
+                qp.Z(2)
+                qp.H(x) # 'x' is a dynamic wire index
+                qp.S(0)
+                qp.T(2)
+                qp.H(x)
+                return qp.expval(qp.Z(y))
 
-        The two ``qml.H`` gates act on wires that are dynamic. In order to preserve qubit data
+        The two ``qp.H`` gates act on wires that are dynamic. In order to preserve qubit data
         flow, each dynamic operator acts as a "choke point" to all currently active wires.
         To visualize this clearly, we use dashed lines to represent a dynamic dependency
         and solid lines for static/known values:
