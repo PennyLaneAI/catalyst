@@ -1034,8 +1034,13 @@
 
 * The `qml` alias as in `import pennylane as qml` has been updated to `qp` in our source code and documentation.
   [(#2745)](https://github.com/PennyLaneAI/catalyst/pull/2745)
+  [(#2744)](https://github.com/PennyLaneAI/catalyst/pull/2744)
+  [(#2743)](https://github.com/PennyLaneAI/catalyst/pull/2743)
+  [(#2742)](https://github.com/PennyLaneAI/catalyst/pull/2742)
+  [(#2741)](https://github.com/PennyLaneAI/catalyst/pull/2741)
   [(#2739)](https://github.com/PennyLaneAI/catalyst/pull/2739)
   [(#2738)](https://github.com/PennyLaneAI/catalyst/pull/2738)
+  [(#2736)](https://github.com/PennyLaneAI/catalyst/pull/2736)
 
 * The "Compatibility with PennyLane transforms" section of the
   :doc:`Sharp bits and debugging tips <../dev/sharp_bits>` document has been updated to describe
