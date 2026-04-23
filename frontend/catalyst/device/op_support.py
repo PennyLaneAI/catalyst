@@ -18,7 +18,7 @@ from typing import Union
 
 import jax
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.operation import Operation, Operator
 
@@ -31,7 +31,7 @@ EMPTY_PROPERTIES = OperatorProperties()
 
 def get_base_operation_name(op: Operator) -> str:
     """Get the base operation name, handling controlled and adjoint operations."""
-    if type(op) in (qml.ops.Controlled, qml.ops.ControlledOp) or isinstance(op, qml.ops.Adjoint):
+    if type(op) in (qp.ops.Controlled, qp.ops.ControlledOp) or isinstance(op, qp.ops.Adjoint):
         return op.base.name
     return op.name
 
@@ -93,7 +93,7 @@ def _has_parameter_frequencies(op):
     try:
         if not hasattr(op, "parameter_frequencies"):
             return False
-    except qml.operation.ParameterFrequenciesUndefinedError:
+    except qp.operation.ParameterFrequenciesUndefinedError:
         return False
     return True
 
@@ -115,11 +115,11 @@ def _are_param_frequencies_same_as_catalyst(op):
 
 def _paramshift_op_checker(op):
 
-    if isinstance(op, qml.QubitUnitary):
+    if isinstance(op, qp.QubitUnitary):
         # Cannot take param shift of qubit unitary.
         return False
 
-    if type(op) in (qml.ops.Controlled, qml.ops.ControlledOp):
+    if type(op) in (qp.ops.Controlled, qp.ops.ControlledOp):
         # Cannot take param shift of controlled ops.
         # It will always be at least a four term shift rule.
         return False
@@ -167,7 +167,7 @@ def is_differentiable(
 
     if grad_method == "adjoint":
         # lightning will accept constant unitaries
-        if isinstance(op, qml.QubitUnitary) and not is_active(op):
+        if isinstance(op, qp.QubitUnitary) and not is_active(op):
             return True
         return _adjoint_diff_op_checker(op, capabilities)
     elif grad_method == "parameter-shift":
