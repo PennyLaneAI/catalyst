@@ -14,13 +14,9 @@
 
 """Test module for the convert-qecl-to-qecp dialect-conversion transform."""
 
-from dataclasses import dataclass
-
 import numpy as np
 import pennylane as qp
 import pytest
-from xdsl.passes import ModulePass
-from xdsl.pattern_rewriter import GreedyRewritePatternApplier, PatternRewriteWalker
 
 from catalyst.python_interface.transforms.qecl import (
     convert_quantum_to_qecl_pass,
@@ -29,12 +25,6 @@ from catalyst.python_interface.transforms.qecl import (
 from catalyst.python_interface.transforms.qecp import (
     ConvertQecLogicalToQecPhysicalPass,
     convert_qecl_to_qecp_pass,
-)
-from catalyst.python_interface.transforms.qecp.convert_qecl_to_qecp import (
-    AllocationConversion,
-    DeallocationConversion,
-    ExtractBlockConversion,
-    InsertBlockConversion,
 )
 from catalyst.python_interface.transforms.qecp.qec_code_lib import QecCode
 from catalyst.utils.exceptions import CompileError

@@ -290,8 +290,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         """Contains the ops to perform a QEC check on the provided auxiliary qubits and codeblock.
         Intended to be called inside `builder.ImplicitBuilder` to add these operations to a block.
 
-        This implementation uses the convention where all two-qubit gates are CNOTs - see for example
-        Figure 5a. and Figure 5d. in arXiv: 2304.08678
+        This implementation uses the convention where all two-qubit gates are CNOTs - for example,
+        see Figure 5a. and Figure 5d. in arXiv: 2304.08678
 
         This pattern includes measurement of the auxiliary qubits, and returns the MeasureOps, as
         well as the codeblock after the check pattern has been applied. It is not responsible for
