@@ -86,6 +86,9 @@ def mitigate_with_zne(
 
     .. code-block:: python
 
+        import pennylane as qp
+        from catalyst import qjit, for_loop, mitigate_with_zne
+        
         # replace "noisy.device" with your noisy device
         dev = qp.device("noisy.device", wires=2)
 

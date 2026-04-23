@@ -228,7 +228,7 @@ def cond(pred: DynamicJaxprTracer):
 
     .. note::
 
-       ``catalyst.cond`` is not supported in program capture mode. If ``qp.capture`` is enabled,
+       ``catalyst.cond`` is not supported in program capture mode. If capture is enabled (``qjit(capture=True)``),
         please use ``qp.cond`` instead.
 
         .. code-block:: python
@@ -318,6 +318,9 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
 
     .. code-block:: python
 
+        import pennylane as qp
+        from catalyst import qjit, for_loop
+        
         dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
@@ -391,13 +394,12 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     .. note::
 
        ``catalyst.for_loop`` is not supported in program capture mode.
-       If ``qp.capture`` is enabled, please use ``qp.for_loop`` instead.
+       If capture is enabled (``qjit(capture=True)``, please use ``qp.for_loop`` instead.
 
         .. code-block:: python
 
-            qp.capture.enable()
-            # This will raise an error with capture mode
-            @qjit
+           # This will raise an error with capture mode
+           @qjit(capture=True)
             def func():
                 @catalyst.for_loop(0, 10, 1)
                 def loop_fn(v):
@@ -469,6 +471,9 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
 
     .. code-block:: python
 
+        import pennylane as qp
+        from catalyst import qjit, while_loop
+        
         dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
@@ -531,7 +536,7 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
     .. note::
 
        ``catalyst.while_loop`` is not supported in program capture mode.
-       If ``qp.capture`` is enabled, please use ``qp.while_loop`` instead.
+       If capture is enabled (``qjit(capture=True)``), please use ``qp.while_loop`` instead.
 
         .. code-block:: python
 
@@ -582,6 +587,9 @@ def switch(index_var: int):
 
     .. code-block:: python
 
+        import pennylane as qp
+        from catalyst import qjit, switch
+        
         dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
