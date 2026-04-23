@@ -629,8 +629,8 @@ class TestAdjointCtrl:
         for_loop_xpr = qfunc_xpr.eqns[2].params["jaxpr_body_fn"]
 
         for i in [0, 1, 2]:
-            assert for_loop_xpr.eqns[i].primitive == qextract_p
-        assert for_loop_xpr.eqns[3].primitive == qinst_p
+            assert for_loop_xpr.eqns[i].primitive == qref_get_p
+        assert for_loop_xpr.eqns[3].primitive == qref_qinst_p
         assert for_loop_xpr.eqns[3].params == {
             "adjoint": False,
             "ctrl_len": 2,
@@ -664,8 +664,6 @@ class TestControlFlow:
         catalyst_jaxpr = from_plxpr(jaxpr)(2)
 
         eqn = catalyst_jaxpr.eqns[0]
-
-        print(catalyst_jaxpr)
 
         assert eqn.primitive == for_loop_prim
         assert eqn.params["abstract_shapes_slice"] == (0, 0, 1)
