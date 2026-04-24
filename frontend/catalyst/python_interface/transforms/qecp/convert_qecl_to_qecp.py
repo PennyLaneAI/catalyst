@@ -126,7 +126,7 @@ class MeasureOpConversion(RewritePattern):
 
     qec_code: QecCode
 
-    measure_subroutine_name: str
+    measure_subroutine: func.FuncOp
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecl.MeasureOp, rewriter: PatternRewriter):
@@ -144,7 +144,7 @@ class MeasureOpConversion(RewritePattern):
 
         ops_to_insert = (
             subroutine_call_op := func.CallOp(
-                callee=SymbolRefAttr(self.measure_subroutine_name),
+                callee=SymbolRefAttr(self.measure_subroutine.sym_name),
                 arguments=(op.in_codeblock,),
                 return_types=(builtin.TensorType(i1, shape=(n,)), op.in_codeblock.type),
             ),
@@ -242,44 +242,37 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             n=self.qec_code.n, number_errors=self.number_errors
         ).apply(ctx, op)
 
-        self._insert_required_subroutines_into_module(op)
+        # Insert subroutines into the module
+        module_block = op.regions[0].blocks.first
+        assert module_block is not None, "Module has no block"
+
         encode_funcop = self.create_encode_subroutine()
-        assert op.regions[0].blocks.first is not None
-        op.regions[0].blocks.first.add_op(encode_funcop)
+        module_block.add_op(encode_funcop)
+
+        measure_subroutine = self.create_measure_subroutine()
+        module_block.add_op(measure_subroutine)
 
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [
-                    MeasureOpConversion(
-                        qec_code=self.qec_code,
-                        measure_subroutine_name=self._get_measure_subroutine_name(),
-                    ),
                     CodeblockTypeConversion(qec_code=self.qec_code),
                     HyperRegisterTypeConversion(qec_code=self.qec_code),
                     EncodeOpConversion(qec_code=self.qec_code, encode_subroutine=encode_funcop),
+                    MeasureOpConversion(
+                        qec_code=self.qec_code,
+                        measure_subroutine=measure_subroutine,
+                    ),
                 ]
             )
         ).rewrite_module(op)
 
-    def _insert_required_subroutines_into_module(self, module_op: builtin.ModuleOp):
-        """Helper function to insert the subroutines required by the rewrite patterns in this pass."""
-        module_block = module_op.regions[0].blocks.first
-        assert module_block is not None, "Module has no block"
+    def create_measure_subroutine(self) -> func.FuncOp:
+        """Create the subroutine that performs the transversal measurement of a physical codeblock.
 
-        if SymbolTable.lookup_symbol(module_op, self._get_measure_subroutine_name()) is None:
-            measure_subroutine = self._create_measure_subroutine(
-                qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
-            )
-            module_block.add_op(measure_subroutine)
-
-    def _get_measure_subroutine_name(self):
-        """Return the name (symbol) of the the subroutine that performs the transversal measurement
-        of a physical codeblock.
+        Note that this method does not insert the subroutine into the module op. Instead it returns
+        the built func.FuncOp object that can then be subsequently inserted where desired.
         """
-        return f"measure_transversal_{self.qec_code.name}"
-
-    def _create_measure_subroutine(self, codeblock_type: qecp.PhysicalCodeblockType) -> func.FuncOp:
-        """Create the subroutine that performs the transversal measurement of a physical codeblock."""
+        codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
         block = Block(arg_types=(codeblock_type,))
 
         with ImplicitBuilder(block):
@@ -333,12 +326,12 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 )
                 scf.YieldOp(tensor_insert_op.result, insert_op.out_codeblock)
 
-            out_mres = for_each_qubit_op.results[0]
+            out_mres_tensor = for_each_qubit_op.results[0]
             out_codeblock = for_each_qubit_op.results[1]
-            func.ReturnOp(out_mres, out_codeblock)
+            func.ReturnOp(out_mres_tensor, out_codeblock)
 
         measure_subroutine = func.FuncOp(
-            name=self._get_measure_subroutine_name(),
+            name=f"measure_transversal_{self.qec_code.name}",
             function_type=(
                 (codeblock_type,),
                 (
