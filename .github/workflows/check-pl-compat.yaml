@@ -140,11 +140,7 @@ jobs:
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         ENABLE_OPENQASM=ON \
-        make runtime dialects plugin
-        
-        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
-        
-        make frontend oqc
+        make catalyst
 
     - name: Install Catalyst (release-candidate)
       if: ${{ inputs.catalyst == 'release-candidate' }}
