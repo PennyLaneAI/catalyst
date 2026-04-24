@@ -30,9 +30,9 @@ namespace Catalyst::Runtime::QEC {
  * @param syndrome_results
  * @return size_t
  */
-int64_t __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
-                                      MemRefT_int64_1d *col_ptr_tanner,
-                                      MemRefT_int8_1d *current_syndromes)
+void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
+                                   MemRefT_int64_1d *col_ptr_tanner,
+                                   MemRefT_int8_1d *current_syndromes, MemRefT_int64_1d *err_idx)
 {
     // 1. Recover the parity check matrix from a tanner graph
     const size_t nnz = row_idx_tanner->sizes[0];
@@ -66,20 +66,15 @@ int64_t __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
 
     std::vector<size_t> error_indices = lut[current_syndrome_str];
 
-    // TODOs: Current implementation return an index of the single inferred error.
-    // This works for the 2026-Q2 goal for Steane code prototyping. For a general
-    // lookup table decoder implementation, an pointer to the array of indices of
-    // errors should be returned. An example we can follow is the OQD CAPI and additional
-    // work such as garbage collection for the results, manual memory allocation for
-    // return indices are required. For more details, please see the lines here
-    // https://github.com/PennyLaneAI/catalyst/blob/7563bf8d91c05e6cfcee89cc49f498da6b45d616/runtime/lib/OQDcapi/OQDRuntimeCAPI.cpp#L113-L123
-
-    // NOTE: The thoughts above might or might not work.
-
-    // TODOS: Note that error_indices could be empty.
-    if (error_indices.empty()) {
-        return -1;
+    // We use `-1` to full fill the err_idx array if the number of
+    // errors is less than (code_distance - 1)/2
+    for (int i = 0; i < (code_distance - 1) / 2; i++) {
+        if (i < error_indices.size()) {
+            err_idx->data_allocated[i] = error_indices[i];
+        }
+        else {
+            err_idx->data_allocated[i] = -1;
+        }
     }
-    return error_indices.front();
 }
 } // namespace Catalyst::Runtime::QEC

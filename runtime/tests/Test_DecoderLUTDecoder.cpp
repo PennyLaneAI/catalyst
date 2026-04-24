@@ -31,9 +31,11 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
 
     std::vector<int64_t> row_idx_tanner = tanner_graph.row_idx;
     std::vector<int64_t> col_ptr_tanner = tanner_graph.col_ptr;
+    std::vector<int64_t> err_idx = std::vector<int64_t>((tanner_graph.code_distance - 1) / 2, -1);
 
     int64_t *buffer_row_idx_tanner_memref = row_idx_tanner.data();
     int64_t *buffer_col_ptr_tanner_memref = col_ptr_tanner.data();
+    int64_t *buffer_err_idx_memref = err_idx.data();
 
     MemRefT_int64_1d row_idx_tanner_memref = {buffer_row_idx_tanner_memref,
                                               buffer_row_idx_tanner_memref,
@@ -45,10 +47,14 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
                                               0,
                                               {col_ptr_tanner.size()},
                                               {1}};
+    MemRefT_int64_1d err_idx_memref = {
+        buffer_err_idx_memref, buffer_err_idx_memref, 0, {err_idx.size()}, {1}
+
+    };
 
     for (auto it = tanner_graph.lookup_table_error_idx_to_syndrome.begin();
          it != tanner_graph.lookup_table_error_idx_to_syndrome.end(); ++it) {
-        size_t expected_res = it->first;
+        int64_t expected_res = it->first;
 
         auto syndrome_res = it->second;
 
@@ -56,9 +62,9 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
         MemRefT_int8_1d syndrome_res_memref = {
             buffer_syndrome_res_memref, buffer_syndrome_res_memref, 0, {syndrome_res.size()}, {1}};
 
-        size_t decoded_res = __catalyst__qecp__lut_decoder(
-            &row_idx_tanner_memref, &col_ptr_tanner_memref, &syndrome_res_memref);
+        __catalyst__qecp__lut_decoder(&row_idx_tanner_memref, &col_ptr_tanner_memref,
+                                      &syndrome_res_memref, &err_idx_memref);
 
-        REQUIRE(decoded_res == expected_res);
+        REQUIRE(err_idx_memref.data_allocated[0] == expected_res);
     }
 }
