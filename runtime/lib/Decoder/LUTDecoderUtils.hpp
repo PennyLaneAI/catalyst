@@ -14,12 +14,14 @@
 
 #pragma once
 #include <algorithm>
+#include <numeric>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "Exception.hpp"
+#include "Types.h"
 
 namespace Catalyst::Runtime::QEC {
 /**
@@ -199,5 +201,48 @@ generate_lookup_table(const std::vector<size_t> &parity_mat_row_idx,
 
     return lut;
 }
+
+class LUTs {
+  private:
+    LUTs() = default;
+    static std::unordered_map<size_t, std::unordered_map<std::string, std::vector<size_t>>> luts;
+
+  public:
+    static const std::unordered_map<std::string, std::vector<size_t>>
+    get_lut(size_t aux_col_offset, size_t code_size, size_t code_distance,
+            MemRefT_int64_1d *row_idx_tanner, MemRefT_int64_1d *col_ptr_tanner)
+    {
+        auto it = luts.find(aux_col_offset);
+
+        if (it == luts.end()) {
+            std::vector<size_t> aux_cols((code_size - 1) / 2);
+            std::iota(aux_cols.begin(), aux_cols.end(), aux_col_offset);
+
+            // 1. Recover the parity check matrix from a tanner graph
+            const size_t nnz = row_idx_tanner->sizes[0];
+            std::vector<size_t> row_idx_tanner_vec(row_idx_tanner->data_aligned,
+                                                   row_idx_tanner->data_aligned + nnz);
+
+            const size_t n = col_ptr_tanner->sizes[0] - 1; // number of columns
+            std::vector<size_t> col_ptr_tanner_vec(col_ptr_tanner->data_aligned,
+                                                   col_ptr_tanner->data_aligned + n + 1);
+
+            auto csc_parity_matrix =
+                get_parity_check_matrix(row_idx_tanner_vec, col_ptr_tanner_vec, aux_cols);
+            auto row_idx_parity = csc_parity_matrix.first;
+            auto col_ptr_parity = csc_parity_matrix.second;
+
+            auto lut =
+                generate_lookup_table(row_idx_parity, col_ptr_parity, code_size, code_distance);
+            luts[aux_col_offset] = lut;
+            return lut;
+        }
+        else {
+            return luts[aux_col_offset];
+        }
+    }
+};
+
+std::unordered_map<size_t, std::unordered_map<std::string, std::vector<size_t>>> LUTs::luts;
 
 } // namespace Catalyst::Runtime::QEC

@@ -24,12 +24,16 @@
 
 namespace Catalyst::Runtime::QEC {
 /**
- * @brief
- *
- * @param row_idx_tanner
- * @param col_ptr_tanner
- * @param syndrome_results
- * @return size_t
+ * @brief A runtime lookup table based decoder. This function uses tanner graph data in CSC format
+ * information to generate the lookup table and find out the corresponding error qubit indices with
+ * the syndrome data.
+ * NOTE: As CAPI does not support setting default values for args, as discussed, we hardcode the
+ * required args in the beginning of the function body. Those values are specifically for the [[7,
+ * 1, 3]] Steane code. We expect those values are from args inputs later.
+ * @param row_idx_tanner Pointer to the row_idx data of the Tanner graph of the QEC code.
+ * @param col_ptr_tanner Pointer to the col_ptr data of the Tanner graph of the QEC code.
+ * @param syndrome_results Pointer to the syndrome measurement data.
+ * @param err_idx Pointer to the error qubit indices data.
  */
 void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
                                    MemRefT_int64_1d *col_ptr_tanner,
@@ -41,31 +45,17 @@ void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
     const size_t code_distance = 3;
     const size_t aux_col_offset = 7;
 
-    std::vector<size_t> aux_cols((code_size - 1) / 2);
-    std::iota(aux_cols.begin(), aux_cols.end(), aux_col_offset);
 
-    // 1. Recover the parity check matrix from a tanner graph
-    const size_t nnz = row_idx_tanner->sizes[0];
-    std::vector<size_t> row_idx_tanner_vec(row_idx_tanner->data_aligned,
-                                           row_idx_tanner->data_aligned + nnz);
 
-    const size_t n = col_ptr_tanner->sizes[0] - 1; // number of columns
-    std::vector<size_t> col_ptr_tanner_vec(col_ptr_tanner->data_aligned,
-                                           col_ptr_tanner->data_aligned + n + 1);
     const size_t num_aux = current_syndromes->sizes[0]; // number of columns
     std::vector<int8_t> current_syndromes_res(current_syndromes->data_aligned,
                                               current_syndromes->data_aligned + num_aux);
 
-    auto csc_parity_matrix =
-        get_parity_check_matrix(row_idx_tanner_vec, col_ptr_tanner_vec, aux_cols);
-    auto row_idx_parity = csc_parity_matrix.first;
-    auto col_ptr_parity = csc_parity_matrix.second;
-
-    auto lut = generate_lookup_table(row_idx_parity, col_ptr_parity, code_size, code_distance);
-
     auto current_syndrome_str = convert_syndrome_res_to_bitstr(current_syndromes_res);
 
-    std::vector<size_t> error_indices = lut[current_syndrome_str];
+    auto current_lut = LUTs::get_lut(aux_col_offset, code_size, code_distance, row_idx_tanner, col_ptr_tanner);
+
+    std::vector<size_t> error_indices = current_lut[current_syndrome_str];
 
     // We use `-1` to full fill the err_idx array if the number of
     // errors is less than (code_distance - 1)/2
