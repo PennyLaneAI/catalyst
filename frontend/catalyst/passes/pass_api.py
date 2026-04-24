@@ -19,7 +19,7 @@ from typing import TypeAlias
 
 from pennylane.transforms.core import BoundTransform, CompilePipeline, transform
 
-from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
+# from catalyst.jax_primitives_utils import get_mlir_attribute_from_pyval
 from catalyst.tracing.contexts import EvaluationContext
 
 PipelineDict: TypeAlias = dict[str, dict[str, str]]
@@ -230,24 +230,6 @@ class Pass:
             EvaluationContext.add_plugin(path)
 
         self.name = name
-
-    def get_options(self):
-        """
-        Build a dictionary mapping option names to MLIR attributes.
-        ApplyRegisteredPassOp expects options to be a dictionary from strings to attributes.
-        See https://github.com/llvm/llvm-project/pull/143159
-        """
-        options_dict = {}
-        for option in self.options:
-            options_dict[str(option)] = get_mlir_attribute_from_pyval(True)
-
-        for option, value in self.valued_options.items():
-            # MLIR options are either CamelCase
-            # or spinal-case (kebab-case) which is not allowed in python
-            mlir_option = str(option).replace("_", "-")
-            options_dict[mlir_option] = get_mlir_attribute_from_pyval(value)
-
-        return options_dict
 
     def __repr__(self):
         return (

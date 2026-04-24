@@ -20,8 +20,7 @@ import numpy as np
 from jax import numpy as jnp
 from jax._src.core import shaped_abstractify
 from jax._src.lib.mlir import ir
-
-from catalyst.jax_extras import ShapedArray
+from jax.core import ShapedArray
 
 
 def convert_shaped_arrays_to_tensors(sarrays: Sequence[ShapedArray]):

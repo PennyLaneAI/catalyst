@@ -28,7 +28,7 @@ from jax._src.pjit import _flat_axes_specs
 from jax.core import AbstractValue
 from jax.tree_util import tree_flatten, tree_unflatten
 
-from catalyst.jax_extras import get_aval2
+from catalyst.jax_extras.patches import get_aval2
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 

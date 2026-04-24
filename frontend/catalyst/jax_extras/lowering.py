@@ -15,9 +15,7 @@
 
 from __future__ import annotations
 
-import dataclasses
 import logging
-import textwrap
 
 import jax
 from jax._src import core
@@ -39,6 +37,7 @@ from jaxlib.mlir.dialects.func import FuncOp
 
 import catalyst
 from catalyst.logging import debug_logger
+from catalyst.primitive_lowering_rules import get_custom_lowering_rules
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 
@@ -129,7 +128,7 @@ def custom_lower_jaxpr_to_module(
     # Create a keepalives list that will be mutated during the lowering.
     keepalives = []
     host_callbacks = []
-    custom_lowering_rules = catalyst.jax_primitives.CUSTOM_LOWERING_RULES
+    custom_lowering_rules = get_custom_lowering_rules()
     lowering_params = LoweringParameters(override_lowering_rules=custom_lowering_rules)
     ctx = ModuleContext(
         backend=None,
@@ -187,56 +186,3 @@ def custom_lower_jaxpr_to_module(
                 worklist += [*op.body.operations]
 
     return ctx.module, ctx.context
-
-
-def get_mlir_attribute_from_pyval(value):
-    """
-    Given a value of any type, construct an mlir attribute of corresponding type.
-
-    We set up the context and location outside because recursive calls to this function
-    will segfault if multiple `Context()`s are instantiated.
-    """
-
-    attr = None
-    match value:
-        case bool():
-            attr = ir.BoolAttr.get(value)
-
-        case int():
-            if -9223372036854775808 <= value < 0:  # 2**63
-                attr = ir.IntegerAttr.get(ir.IntegerType.get_signed(64), value)
-            elif 0 <= value < 18446744073709551616:  # = 2**64
-                attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64), value)
-            else:
-                raise CompileError(textwrap.dedent("""
-                    Large integer attributes currently not supported in MLIR,
-                    see https://github.com/llvm/llvm-project/issues/128072
-                    """))
-
-        case float():
-            attr = ir.FloatAttr.get(ir.F64Type.get(), value)
-
-        case str():
-            attr = ir.StringAttr.get(value)
-
-        case list() | tuple():
-            element_attrs = [get_mlir_attribute_from_pyval(elem) for elem in value]
-            attr = ir.ArrayAttr.get(element_attrs)
-
-        case dict():
-            named_attrs = {}
-            for k, v in value.items():
-                if not isinstance(k, str):
-                    raise CompileError(
-                        f"Dictionary keys for MLIR DictionaryAttr must be strings, got: {type(k)}"
-                    )
-                named_attrs[k] = get_mlir_attribute_from_pyval(v)
-            attr = ir.DictAttr.get(named_attrs)
-
-        case _ if dataclasses.is_dataclass(value):
-            attr = get_mlir_attribute_from_pyval(dataclasses.asdict(value))
-
-        case _:
-            raise CompileError(f"Cannot convert Python type {type(value)} to an MLIR attribute.")
-
-    return attr
