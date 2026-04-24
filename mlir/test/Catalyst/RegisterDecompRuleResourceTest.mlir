@@ -16,7 +16,7 @@
 
 // Basic decomposition rule
 
-// CHECK: resources = {measurements = {}, num_alloc_qubits = 2 : i64, num_arg_qubits = 0 : i64, num_qubits = 2 : i64, operations = {"CNOT(2)" = 1 : i64, "Hadamard(1)" = 1 : i64, "S(1)" = 1 : i64, "T(1)" = 1 : i64}}, target_gate = "basic"
+// CHECK: resources = {measurements = {}, num_alloc_qubits = 2 : i64, num_arg_qubits = 0 : i64, num_qubits = 2 : i64, operations = {"CNOT(2,0)" = 1 : i64, "Hadamard(1,0)" = 1 : i64, "S(1,0)" = 1 : i64, "T(1,0)" = 1 : i64}}, target_gate = "basic"
 func.func @basic_gates() attributes {target_gate="basic"}  {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -35,7 +35,7 @@ func.func @basic_gates() attributes {target_gate="basic"}  {
 
 // Rule with PBC ops
 
-// CHECK: resources = {measurements = {}, num_alloc_qubits = 2 : i64, num_arg_qubits = 0 : i64, num_qubits = 2 : i64, operations = {"PPM(1)" = 2 : i64, "PPR-pi/4(1)" = 3 : i64, "PPR-pi/8(1)" = 1 : i64}}, target_gate = "pbc"
+// CHECK: resources = {measurements = {}, num_alloc_qubits = 2 : i64, num_arg_qubits = 0 : i64, num_qubits = 2 : i64, operations = {"PPM(1,0)" = 2 : i64, "PPR-pi/4(1,0)" = 3 : i64, "PPR-pi/8(1,0)" = 1 : i64}}, target_gate = "pbc"
 func.func @pbc_operations() attributes {target_gate="pbc"} {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -88,7 +88,7 @@ func.func @rule(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode, target_g
 
 // Rules with for loop (static)
 
-// CHECK: resources = {measurements = {}, num_alloc_qubits = 0 : i64, num_arg_qubits = 1 : i64, num_qubits = 1 : i64, operations = {"Hadamard(1)" = 5 : i64}}
+// CHECK: resources = {measurements = {}, num_alloc_qubits = 0 : i64, num_arg_qubits = 1 : i64, num_qubits = 1 : i64, operations = {"Hadamard(1,0)" = 5 : i64}}
 func.func @rule_with_loop(%arg0: !quantum.bit) -> !quantum.bit attributes {target_gate="gate"} {
     %c5 = arith.constant 5 : index
     %c0 = arith.constant 0 : index
@@ -106,7 +106,7 @@ func.func @rule_with_loop(%arg0: !quantum.bit) -> !quantum.bit attributes {targe
 
 // Rules with branching (take max per op)
 
-// CHECK: resources = {measurements = {}, num_alloc_qubits = 0 : i64, num_arg_qubits = 1 : i64, num_qubits = 1 : i64, operations = {"Hadamard(1)" = 3 : i64, "PauliX(1)" = 2 : i64}}
+// CHECK: resources = {measurements = {}, num_alloc_qubits = 0 : i64, num_arg_qubits = 1 : i64, num_qubits = 1 : i64, operations = {"Hadamard(1,0)" = 3 : i64, "PauliX(1,0)" = 2 : i64}}
 func.func @rule_with_branching(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit attributes {target_gate="gate"} {
     %q = scf.if %cond -> !quantum.bit {
         // True branch: 2 Hadamard, 1 PauliX
@@ -131,7 +131,7 @@ func.func @rule_with_branching(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit a
 
 // Rules with static for loops
 
-// CHECK:  operations = {"PauliX(1)" = 15 : i64}}
+// CHECK:  operations = {"PauliX(1,0)" = 15 : i64}}
 func.func @rule_with_nested_loop(%arg0: !quantum.bit) -> !quantum.bit attributes {target_gate="gate"} {
     %c3 = arith.constant 3 : index
     %c5 = arith.constant 5 : index

@@ -27,6 +27,7 @@
 #include "Catalyst/Utils/ConstantResolve.h"
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
+#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
@@ -97,21 +98,18 @@ static int getGateQubitCount(Operation *op)
     return 0;
 }
 
-/// Get the number of parameters for a gate operation.
 static int getGateParamCount(Operation *op)
 {
-    return llvm::TypeSwitch<Operation *, int>(op)
-        .Case<quantum::CustomOp>(
-            [](auto customOp) { return static_cast<int>(customOp.getParams().size()); })
-        .Case<quantum::PauliRotOp>([](auto op) {
-            return static_cast<int>(op.getParams().size());
-        })
-        .Case<quantum::MultiRZOp>([](auto op) {
-            return static_cast<int>(op.getParams().size());
-        })
-        .Case<quantum::GlobalPhaseOp>([](auto) { return 1; })   // phase angle
-        .Case<quantum::QubitUnitaryOp>([](auto) { return 1; })  // matrix operand
-        .Default([](Operation *) { return 0; });
+    // if (auto rotOp = dyn_cast<quantum::PauliRotOp>(op)) {
+    //     return 1;
+    // }
+    // if (auto customOp = dyn_cast<quantum::CustomOp>(op)) {
+    //     return static_cast<int>(customOp.getParams().size());
+    // }
+    if (auto gate = dyn_cast<quantum::ParametrizedGate>(op)) {
+        return static_cast<int>(gate.getAllParams().size());
+    }
+    return 0;
 }
 
 /// Get the name for a PBC operation.
@@ -397,8 +395,8 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
             quantum::PCPhaseOp, quantum::QubitUnitaryOp, quantum::SetStateOp,
             quantum::SetBasisStateOp>(op)) {
         std::string name = getGateOpName(op, isAdjoint);
-        int nParams = getGateParamCount(op);
         int nQubits = getGateQubitCount(op);
+        int nParams = getGateParamCount(op);
         result.operations[name][{nQubits, nParams}] += 1;
         return;
     }
@@ -415,7 +413,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
             pbc::SelectPPMeasurementOp, pbc::PrepareStateOp, pbc::FabricateOp>(op)) {
         std::string name = getPBCOpName(op);
         int nQubits = getPBCQubitCount(op);
-        result.operations[name][{nQubits, 1}] += 1;
+        result.operations[name][{nQubits, 0}] += 1;
         return;
     }
 

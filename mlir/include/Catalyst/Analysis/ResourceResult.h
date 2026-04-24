@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <utility>
+
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 
