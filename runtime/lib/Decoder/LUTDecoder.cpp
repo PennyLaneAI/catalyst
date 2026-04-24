@@ -43,7 +43,7 @@ void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
     // The default values here only work for the [[7, 1, 3]] Steane code.
     const size_t code_size = 7;
     const size_t code_distance = 3;
-    // The following parameter depends on the design choice of tanner graph would 
+    // The following parameter depends on the design choice of tanner graph would
     // change.
     const size_t aux_col_offset = 7;
 
@@ -54,9 +54,8 @@ void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
 
     auto current_lut = LUTs::get_lut(aux_col_offset, code_size, code_distance, row_idx, col_ptr);
 
-    DataView<int8_t, 1> syndromes_res(current_syndromes->data_aligned,
-                                                current_syndromes->offset, current_syndromes->sizes,
-                                                current_syndromes->strides);
+    DataView<int8_t, 1> syndromes_res(current_syndromes->data_aligned, current_syndromes->offset,
+                                      current_syndromes->sizes, current_syndromes->strides);
 
     auto syndrome_str = convert_syndrome_res_to_bitstr<int8_t>(syndromes_res);
 
