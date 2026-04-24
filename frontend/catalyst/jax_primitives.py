@@ -566,7 +566,7 @@ def _unitary_abstract_eval(matrix, *qubits, qubits_len=0, ctrl_len=0, adjoint=Fa
 #
 # pauli rot operation
 #
-# pylint: disable=unused-variable
+# pylint: disable=unused-variable,too-many-arguments
 @pauli_rot_p.def_abstract_eval
 def _pauli_rot_abstract_eval(
     *qubits_and_ctrl_qubits,

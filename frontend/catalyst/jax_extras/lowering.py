@@ -35,10 +35,8 @@ from jax.interpreters.mlir import (
 from jaxlib.mlir.dialects.builtin import ModuleOp
 from jaxlib.mlir.dialects.func import FuncOp
 
-import catalyst
 from catalyst.logging import debug_logger
 from catalyst.primitive_lowering_rules import get_custom_lowering_rules
-from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 
 # pylint: disable=protected-access

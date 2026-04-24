@@ -201,6 +201,9 @@ CUSTOM_LOWERING_RULES = ()
 
 
 def get_custom_lowering_rules():
+    """
+    Get the custom lowering rules registry.
+    """
     return CUSTOM_LOWERING_RULES
 
 
