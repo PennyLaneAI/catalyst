@@ -21,12 +21,14 @@ To apply this pass, the QEC code must be know.
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import cast
 
 import numpy as np
 from xdsl import builder
 from xdsl.context import Context
-from xdsl.dialects import builtin, func
-from xdsl.ir import Block, Region
+from xdsl.dialects import arith, builtin, func
+from xdsl.dialects.builtin import IndexType, TensorType, i32
+from xdsl.ir import Block, BlockArgument, OpResult, Region
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
@@ -40,6 +42,7 @@ from xdsl.pattern_rewriter import (
 
 from catalyst.python_interface.dialects import qecl, qecp
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
+from catalyst.python_interface.transforms.qecp.tanner_graph_lib import dense_tanner_graph_to_csc
 from catalyst.utils.exceptions import CompileError
 
 from .convert_qecl_noise_to_qec_noise import ConvertQECLNoiseOpToQECPNoisePass
@@ -112,15 +115,51 @@ class EncodeOpConversion(RewritePattern):
                 "for init_state 'zero'"
             )
 
-        if (k := op.in_codeblock.type.k.value.data) != self.qec_code.k:
+        in_codeblock = cast(
+            qecl.LogicalCodeBlockSSAValue | qecp.PhysicalCodeBlockSSAValue, op.in_codeblock
+        )
+
+        if (k := in_codeblock.type.k.value.data) != self.qec_code.k:
             raise CompileError(
                 f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
                 f"lowering to a code with k={self.qec_code.k}"
             )
 
         callee = builtin.SymbolRefAttr(self.encode_subroutine.sym_name)
-        arguments = (op.in_codeblock,)
+        arguments = (in_codeblock,)
         return_types = self.encode_subroutine.function_type.outputs.data
+        callOp = func.CallOp(callee, arguments, return_types)
+
+        rewriter.replace_op(op, callOp)
+
+
+# MARK: QEC Cycle Op Pattern
+
+
+@dataclass
+class QecCycleOpConversion(RewritePattern):
+    """Converts qecl.encode [zero] to the equivalent subroutine of qecp gates"""
+
+    qec_code: QecCode
+    qec_cycle_subroutine: func.FuncOp
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecl.QecCycleOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `qecl.encode [zero]` op"""
+
+        in_codeblock = cast(
+            qecl.LogicalCodeBlockSSAValue | qecp.PhysicalCodeBlockSSAValue, op.in_codeblock
+        )
+
+        if (k := in_codeblock.type.k.value.data) != self.qec_code.k:
+            raise CompileError(
+                f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
+                f"lowering to a code with k={self.qec_code.k}"
+            )
+
+        callee = builtin.SymbolRefAttr(self.qec_cycle_subroutine.sym_name)
+        arguments = (in_codeblock,)
+        return_types = self.qec_cycle_subroutine.function_type.outputs.data
         callOp = func.CallOp(callee, arguments, return_types)
 
         rewriter.replace_op(op, callOp)
@@ -169,9 +208,86 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             n=self.qec_code.n, number_errors=self.number_errors
         ).apply(ctx, op)
 
+        module_block = op.regions[0].blocks.first
+        assert module_block is not None, "Module has no block"
+
+        # Insert Tanner graph ops
+        x_tanner_row_idx_array, x_tanner_col_ptr_array = dense_tanner_graph_to_csc(
+            self.qec_code.x_tanner
+        )
+        x_tanner_row_idx_const_op = arith.ConstantOp(
+            builtin.DenseIntOrFPElementsAttr.from_list(
+                type=builtin.TensorType(i32, shape=x_tanner_row_idx_array.shape),
+                data=x_tanner_row_idx_array.tolist(),
+            )
+        )
+        x_tanner_col_ptr_const_op = arith.ConstantOp(
+            builtin.DenseIntOrFPElementsAttr.from_list(
+                type=builtin.TensorType(i32, shape=x_tanner_col_ptr_array.shape),
+                data=x_tanner_col_ptr_array.tolist(),
+            )
+        )
+        assemble_x_tanner_op = qecp.AssembleTannerGraphOp(
+            row_idx=x_tanner_row_idx_const_op,
+            col_ptr=x_tanner_col_ptr_const_op,
+            tanner_graph_type=qecp.TannerGraphType(
+                x_tanner_row_idx_array.shape[0], x_tanner_col_ptr_array.shape[0], i32
+            ),
+        )
+
+        z_tanner_row_idx_array, z_tanner_col_ptr_array = dense_tanner_graph_to_csc(
+            self.qec_code.z_tanner
+        )
+        z_tanner_row_idx_const_op = arith.ConstantOp(
+            builtin.DenseIntOrFPElementsAttr.from_list(
+                type=builtin.TensorType(i32, shape=z_tanner_row_idx_array.shape),
+                data=z_tanner_row_idx_array.tolist(),
+            )
+        )
+        z_tanner_col_ptr_const_op = arith.ConstantOp(
+            builtin.DenseIntOrFPElementsAttr.from_list(
+                type=builtin.TensorType(i32, shape=z_tanner_col_ptr_array.shape),
+                data=z_tanner_col_ptr_array.tolist(),
+            )
+        )
+        assemble_z_tanner_op = qecp.AssembleTannerGraphOp(
+            row_idx=z_tanner_row_idx_const_op,
+            col_ptr=z_tanner_col_ptr_const_op,
+            tanner_graph_type=qecp.TannerGraphType(
+                z_tanner_row_idx_array.shape[0], z_tanner_col_ptr_array.shape[0], i32
+            ),
+        )
+
+        ops_to_insert = (
+            x_tanner_row_idx_const_op,
+            x_tanner_col_ptr_const_op,
+            assemble_x_tanner_op,
+            z_tanner_row_idx_const_op,
+            z_tanner_col_ptr_const_op,
+            assemble_z_tanner_op,
+        )
+
+        if module_block.first_op is None:
+            module_block.add_ops(ops_to_insert)
+        else:
+            module_block.insert_ops_before(
+                (
+                    x_tanner_row_idx_const_op,
+                    x_tanner_col_ptr_const_op,
+                    assemble_x_tanner_op,
+                    z_tanner_row_idx_const_op,
+                    z_tanner_col_ptr_const_op,
+                    assemble_z_tanner_op,
+                ),
+                module_block.first_op,
+            )
+
+        # Insert subroutines that implement the QEC protocols
         encode_funcop = self.create_encode_subroutine()
-        assert op.regions[0].blocks.first is not None
-        op.regions[0].blocks.first.add_op(encode_funcop)
+        module_block.add_op(encode_funcop)
+
+        qec_cycle_funcop = self.create_qec_cycle_subroutine()
+        module_block.add_op(qec_cycle_funcop)
 
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
@@ -179,6 +295,9 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                     CodeblockTypeConversion(qec_code=self.qec_code),
                     HyperRegisterTypeConversion(qec_code=self.qec_code),
                     EncodeOpConversion(qec_code=self.qec_code, encode_subroutine=encode_funcop),
+                    QecCycleOpConversion(
+                        qec_code=self.qec_code, qec_cycle_subroutine=qec_cycle_funcop
+                    ),
                 ]
             )
         ).rewrite_module(op)
@@ -221,6 +340,67 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
             # return the encoded codeblock
             func.ReturnOp(encoded_codeblock)
+
+        funcOp = func.FuncOp(
+            name=f"encode_zero_{self.qec_code.name}",
+            function_type=(input_types, output_types),
+            visibility="private",
+            region=Region([block]),
+        )
+
+        return funcOp
+
+    def create_qec_cycle_subroutine(self) -> func.FuncOp:
+        """FIXME
+
+        Create a subroutine that takes in a codeblock, encodes it in the zero state for
+        the QEC code (based on the tanner graph), and returns the encoded codeblock. This
+        encoding procedure follows the example shown in arXiv: 0905.2794, Section VIII.A.
+        It does not include Z-corrections; this is because the encode op is followed directly
+        by a full cycle of error correction when lowering to the qecl dialect.
+
+        The subroutine allocates auxiliary qubits for use in encoding based on the number of
+        rows in the X tanner graph, and deallocates them once encoding is complete.
+
+        Note that this method does not insert the subroutine into the module op. Instead it returns
+        the built func.FuncOp object that can then be subsequently inserted where desired.
+        """
+
+        codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
+        input_types = (codeblock_type,)
+        output_types = (codeblock_type,)
+
+        block = Block(arg_types=input_types)
+
+        with builder.ImplicitBuilder(block):
+            in_codeblock = cast(BlockArgument[qecp.PhysicalCodeblockType], block.args[0])
+
+            # allocate X-check auxiliary qubits
+            x_aux_allocate_ops = (qecp.AllocAuxQubitOp() for row in self.qec_code.x_tanner)
+            x_aux_qubits = [
+                cast(OpResult[qecp.QecPhysicalQubitType], op.results[0])
+                for op in x_aux_allocate_ops
+            ]
+
+            # apply X-check gate+measurement pattern
+            x_measure_ops, x_out_codeblock = self.check_pattern(
+                x_aux_qubits, in_codeblock, check_type=CheckType.X
+            )
+
+            # deallocate the X-check auxiliary qubits
+            for x_meas_op in x_measure_ops:
+                qecp.DeallocAuxQubitOp(x_meas_op.out_qubit)
+
+            # Decode X-check ESM
+            # TODO!
+            qecp.DecodeEsmCssOp(
+                tanner_graph=self.qec_code.x_tanner,
+                esm=...,
+                err_idx_type=TensorType(IndexType(), shape=(1,)),
+            )
+
+            # return the corrected codeblock
+            func.ReturnOp(x_out_codeblock)
 
         funcOp = func.FuncOp(
             name=f"encode_zero_{self.qec_code.name}",

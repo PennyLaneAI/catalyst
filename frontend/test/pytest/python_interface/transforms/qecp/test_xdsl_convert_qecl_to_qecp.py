@@ -141,6 +141,19 @@ class TestTypeConversionPattern:
             run_filecheck(program, pipeline)
 
 
+class TestTannerGraphInsertion:
+    def test_tanner_graph_insertion_steane(self, run_filecheck):
+        program = """
+        builtin.module @test_module {
+        func.func @test_program()  {
+            return
+        }
+        }
+        """
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
+        run_filecheck(program, pipeline)
+
+
 class TestLoweringEncode:
     """Test lowering the qecl.EncodeOp to a subroutine of qecp gates"""
 
