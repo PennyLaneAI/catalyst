@@ -284,6 +284,7 @@
   [(#2531)](https://github.com/PennyLaneAI/catalyst/pull/2531)
   [(#2619)](https://github.com/PennyLaneAI/catalyst/pull/2619)
   [(#2713)](https://github.com/PennyLaneAI/catalyst/pull/2713)
+  [(#2749)](https://github.com/PennyLaneAI/catalyst/pull/2749)
 
 * Decomposition rules are lowered as private functions (instead of public).
   [(#2658)](https://github.com/PennyLaneAI/catalyst/pull/2658)
@@ -1022,6 +1023,7 @@
   [(#2697)](https://github.com/PennyLaneAI/catalyst/pull/2697)
   [(#2714)](https://github.com/PennyLaneAI/catalyst/pull/2714)
   [(#2716)](https://github.com/PennyLaneAI/catalyst/pull/2716)
+  [(#2737)](https://github.com/PennyLaneAI/catalyst/pull/2737)
   [(#2731)](https://github.com/PennyLaneAI/catalyst/pull/2731)
   [(#2735)](https://github.com/PennyLaneAI/catalyst/pull/2735)
 
@@ -1035,6 +1037,7 @@
 <h3>Documentation 📝</h3>
 
 * The `qml` alias as in `import pennylane as qml` has been updated to `qp` in our source code and documentation.
+  [(#2746)](https://github.com/PennyLaneAI/catalyst/pull/2746)
   [(#2745)](https://github.com/PennyLaneAI/catalyst/pull/2745)
   [(#2744)](https://github.com/PennyLaneAI/catalyst/pull/2744)
   [(#2743)](https://github.com/PennyLaneAI/catalyst/pull/2743)
@@ -1043,7 +1046,8 @@
   [(#2739)](https://github.com/PennyLaneAI/catalyst/pull/2739)
   [(#2738)](https://github.com/PennyLaneAI/catalyst/pull/2738)
   [(#2736)](https://github.com/PennyLaneAI/catalyst/pull/2736)
-
+  [(#2715)](https://github.com/PennyLaneAI/catalyst/pull/2715)
+  
 * The "Compatibility with PennyLane transforms" section of the
   :doc:`Sharp bits and debugging tips <../dev/sharp_bits>` document has been updated to describe
   potential oddities that can be encountered when composing PennyLane transforms together.

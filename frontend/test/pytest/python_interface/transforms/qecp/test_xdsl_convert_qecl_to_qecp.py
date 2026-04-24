@@ -152,7 +152,127 @@ class TestTypeConversionPattern:
             run_filecheck(program, pipeline)
 
 
+# MARK: TestAllocAndDealloc
+
+
+class TestAllocAndDeallocConversionPatterns:
+    """Test that qecl.allocate and qecl.deallocate operations for allocating hyperregisters
+    of codeblocks are lowered as expected"""
+
+    @pytest.mark.parametrize("width", [1, 2, 3])
+    @pytest.mark.parametrize("n", [7, 42])
+    @pytest.mark.parametrize(
+        "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
+    )
+    def test_allocate_is_lowered(self, width, n, k, run_filecheck):
+        """Test that a qecl.allocate operation is lowered as expected"""
+
+        program = f"""
+        builtin.module {{
+        // CHECK-LABEL: test_program
+        func.func @test_program() {{
+            // CHECK: [[hreg0:%.+]] = qecp.alloc() : !qecp.hyperreg<{width} x {k} x {n}>
+            %0 = qecl.alloc() : !qecl.hyperreg<{width} x {k}>
+            return
+        }}
+        }}
+        """
+
+        pipeline = (
+            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))),
+        )
+        run_filecheck(program, pipeline)
+
+    @pytest.mark.parametrize("width", [1, 2, 3])
+    @pytest.mark.parametrize("n", [7, 42])
+    @pytest.mark.parametrize(
+        "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
+    )
+    def test_deallocate_is_lowered(self, width, n, k, run_filecheck):
+        """Test that a qecl.deallocate operation is lowered as expected"""
+
+        program = f"""
+        builtin.module {{
+        // CHECK-LABEL: test_program
+        func.func @test_program() {{
+            // CHECK: [[hreg:%.+]] = "test.op"() : () -> !qecp.hyperreg<{width} x {k} x {n}>
+            // CHECK-NEXT: qecp.dealloc [[hreg]] : !qecp.hyperreg<{width} x {k} x {n}>
+            %0 = "test.op"() : () -> !qecl.hyperreg<{width} x {k}>
+            qecl.dealloc %0 : !qecl.hyperreg<{width} x {k}>
+            return
+        }}
+        }}
+        """
+
+        pipeline = (
+            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))),
+        )
+        run_filecheck(program, pipeline)
+
+
 # MARK: TestLoweringEncode
+
+
+class TestInsertExtractConversionPatterns:
+    """Test that qecl.extract_block and qecl.insert_block operations acting on hyperregisters
+    of codeblocks are lowered as expected"""
+
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
+    @pytest.mark.parametrize("width", [1, 2, 3])
+    @pytest.mark.parametrize("n", [7, 42])
+    @pytest.mark.parametrize(
+        "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
+    )
+    @pytest.mark.parametrize("idx", [0, 3, 6])
+    def test_extract_block_is_lowered(self, width, k, n, idx, run_filecheck):
+        """Test that a qecl.extract_block operation is lowered as expected"""
+
+        program = f"""
+        builtin.module {{
+        // CHECK-LABEL: test_program
+        func.func @test_program() {{
+            // CHECK: [[hreg0:%.+]] = "test.op"() : () -> !qecp.hyperreg<{width} x {k} x {n}>
+            // CHECK: qecp.extract_block [[hreg0]][{idx}] : !qecp.hyperreg<{width} x {k} x {n}> -> !qecp.codeblock<{k} x {n}>
+            %0 = "test.op"() : () -> !qecl.hyperreg<{width} x {k}>
+            %1 = qecl.extract_block %0[{idx}] : !qecl.hyperreg<{width} x {k}> -> !qecl.codeblock<{k}>
+            return
+        }}
+        }}
+        """
+
+        pipeline = (
+            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))),
+        )
+        run_filecheck(program, pipeline)
+
+    @pytest.mark.parametrize("width", [1, 2, 3])
+    @pytest.mark.parametrize("n", [7, 42])
+    @pytest.mark.parametrize(
+        "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
+    )
+    @pytest.mark.parametrize("idx", [0, 3, 6])
+    def test_insert_block_is_lowered(self, width, k, n, idx, run_filecheck):
+        """Test that a qecl.insert_block operation is lowered as expected"""
+
+        program = f"""
+        builtin.module {{
+        // CHECK-LABEL: test_program
+        func.func @test_program() {{
+            // CHECK: [[cb:%.+]] = "test.op"() : () -> !qecp.codeblock<{k} x {n}>
+            // CHECK: [[hreg:%.+]] = "test.op"() : () -> !qecp.hyperreg<{width} x {k} x {n}>
+            // CHECK: qecp.insert_block [[hreg]][{idx}], [[cb]] : !qecp.hyperreg<{width} x {k} x {n}>, !qecp.codeblock<{k} x {n}>
+            %0 = "test.op"() : () -> !qecl.codeblock<{k}>
+            %1 = "test.op"() : () -> !qecl.hyperreg<{width} x {k}>
+            %2 = qecl.insert_block %1[{idx}], %0 : !qecl.hyperreg<{width} x {k}>, !qecl.codeblock<{k}>
+            return
+        }}
+        }}
+        """
+
+        pipeline = (
+            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))),
+        )
+        run_filecheck(program, pipeline)
 
 
 class TestLoweringEncode:
