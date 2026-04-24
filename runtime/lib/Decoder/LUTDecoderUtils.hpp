@@ -20,6 +20,7 @@
 #include <utility>
 #include <vector>
 
+#include "DataView.hpp"
 #include "Exception.hpp"
 #include "Types.h"
 
@@ -65,20 +66,20 @@ std::string convert_syndrome_res_to_bitstr(std::vector<IntegerType> &syndrome_re
  * in the CSS format. Each column represents an auxillary qubit.
  */
 
-std::pair<std::vector<size_t>, std::vector<size_t>>
-get_parity_check_matrix(const std::vector<size_t> &tanner_row_idx,
-                        const std::vector<size_t> &tanner_col_ptr,
+std::pair<std::vector<int64_t>, std::vector<int64_t>>
+get_parity_check_matrix(DataView<int64_t, 1> &tanner_row_idx, DataView<int64_t, 1> &tanner_col_ptr,
                         const std::vector<size_t> &aux_cols)
 {
-    std::vector<size_t> row_idx_parity;
-    std::vector<size_t> col_ptr_parity{0};
+    std::vector<int64_t> row_idx_parity;
+    std::vector<int64_t> col_ptr_parity{0};
 
     for (const auto &col : aux_cols) {
-        size_t offset_start = tanner_col_ptr[col];
-        size_t offset_end = tanner_col_ptr[col + 1];
+        auto offset_start = tanner_col_ptr(col);
+        auto offset_end = tanner_col_ptr(col + 1);
 
-        row_idx_parity.insert(row_idx_parity.end(), tanner_row_idx.begin() + offset_start,
-                              tanner_row_idx.begin() + offset_end);
+        for (int i = offset_start; i < offset_end; i++) {
+            row_idx_parity.push_back(tanner_row_idx(i));
+        }
         size_t new_offset = col_ptr_parity.back() + offset_end - offset_start;
         col_ptr_parity.push_back(new_offset);
     }
@@ -96,8 +97,8 @@ get_parity_check_matrix(const std::vector<size_t> &tanner_row_idx,
  * @param num_cols
  * @return std::string
  */
-std::string get_syndrome_from_errors(const std::vector<size_t> &row_idx,
-                                     const std::vector<size_t> &col_ptr, const size_t num_rows,
+std::string get_syndrome_from_errors(const std::vector<int64_t> &row_idx,
+                                     const std::vector<int64_t> &col_ptr, const size_t num_rows,
                                      const size_t num_cols, std::vector<uint8_t> &err_vec)
 {
 
@@ -115,10 +116,10 @@ std::string get_syndrome_from_errors(const std::vector<size_t> &row_idx,
     return convert_syndrome_res_to_bitstr(syndrome_res);
 }
 
-std::vector<size_t> get_error_indices(std::vector<uint8_t> &err_vec)
+std::vector<int64_t> get_error_indices(std::vector<uint8_t> &err_vec)
 {
     // Get indices of errors
-    std::vector<size_t> error_indices;
+    std::vector<int64_t> error_indices;
 
     error_indices.reserve(err_vec.size());
 
@@ -160,14 +161,14 @@ std::vector<size_t> get_error_indices(std::vector<uint8_t> &err_vec)
  * corrected.
  * @return std::unordered_map<std::string, std::vector<size_t>>&
  */
-std::unordered_map<std::string, std::vector<size_t>>
-generate_lookup_table(const std::vector<size_t> &parity_mat_row_idx,
-                      const std::vector<size_t> &parity_mat_col_ptr, const size_t code_size,
+std::unordered_map<std::string, std::vector<int64_t>>
+generate_lookup_table(const std::vector<int64_t> &parity_mat_row_idx,
+                      const std::vector<int64_t> &parity_mat_col_ptr, const size_t code_size,
                       const size_t code_distance)
 {
     // The key here is the bitstr representation of the syndrome results, e.g., "0101"
     // The value is the corresponding indices of qubits to correct, e.g., {0, 2}.
-    std::unordered_map<std::string, std::vector<size_t>> lut;
+    std::unordered_map<std::string, std::vector<int64_t>> lut;
 
     const size_t nnz = parity_mat_row_idx.size();
     const size_t num_aux_qubits =
@@ -193,7 +194,7 @@ generate_lookup_table(const std::vector<size_t> &parity_mat_row_idx,
             std::string syndrome_str =
                 get_syndrome_from_errors(parity_mat_row_idx, parity_mat_col_ptr, num_data_qubits,
                                          num_aux_qubits, err_vector);
-            std::vector<size_t> error_indices = get_error_indices(err_vector);
+            std::vector<int64_t> error_indices = get_error_indices(err_vector);
             // We assume that 1:1 mapping for the syndrome and err_vector
             lut[syndrome_str] = error_indices;
         } while (std::next_permutation(err_vector.begin(), err_vector.end()));
@@ -205,10 +206,10 @@ generate_lookup_table(const std::vector<size_t> &parity_mat_row_idx,
 class LUTs {
   private:
     LUTs() = default;
-    static std::unordered_map<size_t, std::unordered_map<std::string, std::vector<size_t>>> luts;
+    static std::unordered_map<size_t, std::unordered_map<std::string, std::vector<int64_t>>> luts;
 
   public:
-    static const std::unordered_map<std::string, std::vector<size_t>>
+    static const std::unordered_map<std::string, std::vector<int64_t>>
     get_lut(size_t aux_col_offset, size_t code_size, size_t code_distance,
             MemRefT_int64_1d *row_idx_tanner, MemRefT_int64_1d *col_ptr_tanner)
     {
@@ -219,16 +220,16 @@ class LUTs {
             std::iota(aux_cols.begin(), aux_cols.end(), aux_col_offset);
 
             // 1. Recover the parity check matrix from a tanner graph
-            const size_t nnz = row_idx_tanner->sizes[0];
-            std::vector<size_t> row_idx_tanner_vec(row_idx_tanner->data_aligned,
-                                                   row_idx_tanner->data_aligned + nnz);
+            DataView<int64_t, 1> row_idx_tanner_data_view(
+                row_idx_tanner->data_aligned, row_idx_tanner->offset, row_idx_tanner->sizes,
+                row_idx_tanner->strides);
 
-            const size_t n = col_ptr_tanner->sizes[0] - 1; // number of columns
-            std::vector<size_t> col_ptr_tanner_vec(col_ptr_tanner->data_aligned,
-                                                   col_ptr_tanner->data_aligned + n + 1);
+            DataView<int64_t, 1> col_ptr_tanner_data_view(
+                col_ptr_tanner->data_aligned, col_ptr_tanner->offset, col_ptr_tanner->sizes,
+                col_ptr_tanner->strides);
 
-            auto csc_parity_matrix =
-                get_parity_check_matrix(row_idx_tanner_vec, col_ptr_tanner_vec, aux_cols);
+            auto csc_parity_matrix = get_parity_check_matrix(row_idx_tanner_data_view,
+                                                             col_ptr_tanner_data_view, aux_cols);
             auto row_idx_parity = csc_parity_matrix.first;
             auto col_ptr_parity = csc_parity_matrix.second;
 
@@ -243,6 +244,6 @@ class LUTs {
     }
 };
 
-std::unordered_map<size_t, std::unordered_map<std::string, std::vector<size_t>>> LUTs::luts;
+std::unordered_map<size_t, std::unordered_map<std::string, std::vector<int64_t>>> LUTs::luts;
 
 } // namespace Catalyst::Runtime::QEC

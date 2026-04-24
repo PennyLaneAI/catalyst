@@ -45,17 +45,16 @@ void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
     const size_t code_distance = 3;
     const size_t aux_col_offset = 7;
 
-
-
     const size_t num_aux = current_syndromes->sizes[0]; // number of columns
     std::vector<int8_t> current_syndromes_res(current_syndromes->data_aligned,
                                               current_syndromes->data_aligned + num_aux);
 
     auto current_syndrome_str = convert_syndrome_res_to_bitstr(current_syndromes_res);
 
-    auto current_lut = LUTs::get_lut(aux_col_offset, code_size, code_distance, row_idx_tanner, col_ptr_tanner);
+    auto current_lut =
+        LUTs::get_lut(aux_col_offset, code_size, code_distance, row_idx_tanner, col_ptr_tanner);
 
-    std::vector<size_t> error_indices = current_lut[current_syndrome_str];
+    std::vector<int64_t> error_indices = current_lut[current_syndrome_str];
 
     // We use `-1` to full fill the err_idx array if the number of
     // errors is less than (code_distance - 1)/2
