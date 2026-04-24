@@ -213,7 +213,7 @@ def register_lowering(primitive: Primitive):
     """
 
     def decorator(f: Callable) -> Callable:
-        global CUSTOM_LOWERING_RULES
+        global CUSTOM_LOWERING_RULES  # pylint: disable=global-statement
         CUSTOM_LOWERING_RULES += ((primitive, f),)
         return f
 
