@@ -146,7 +146,6 @@ jobs:
         
         make frontend oqc
 
-
     - name: Install Catalyst (release-candidate)
       if: ${{ inputs.catalyst == 'release-candidate' }}
       run: |
