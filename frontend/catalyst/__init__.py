@@ -84,26 +84,6 @@ from catalyst.utils.exceptions import (
     DifferentiableCompileError,
     PlxprCaptureCFCompatibilityError,
 )
-from catalyst.utils.precompile_decomposition_rules import (
-    BYTECODE_FILE_PATH,
-    precompile_decomp_rules,
-)
-
-# # we ONLY want to compile on init for dev installs, where the caching should work correctly
-# if (
-#     not (
-#         getenv("DOCUTILSCONFIG")  # do not run for docs
-#         or getenv("READTHEDOCS_CANONICAL_URL")  # do not run for RTD
-#     )
-#     and not BYTECODE_FILE_PATH.exists()
-# ):  # pragma: no cover
-#     BYTECODE_FILE_PATH.parent.mkdir(exist_ok=True)
-#     for file in BYTECODE_FILE_PATH.parent.iterdir():
-#         if file.is_file() and file.name.startswith("decomposition_rules"):
-#             file.unlink()
-
-#     precompile_decomp_rules()  # pragma: no cover
-
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising
