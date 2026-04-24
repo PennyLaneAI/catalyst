@@ -140,7 +140,7 @@ jobs:
         MLIR_LIB_DIR=$(pwd)/llvm-build/lib \
         CATALYST_BIN_DIR=$(pwd)/quantum-build/bin \
         CATALYST_LIB_DIR=$(pwd)/quantum-build/lib \
-        make frontend oqc \
+        make frontend oqc
 
 
     - name: Install Catalyst (release-candidate)
