@@ -18,7 +18,7 @@
 
 import inspect
 
-import pennylane as qml
+import pennylane as qp
 from jax.core import ShapedArray
 
 from catalyst import jacobian, mitigate_with_zne, qjit, vmap
@@ -31,11 +31,11 @@ from catalyst import jacobian, mitigate_with_zne, qjit, vmap
 
 @qjit(autograph=True, target="mlir")
 @qjit(target="")
-@qml.qnode(qml.device("lightning.qubit", wires=1))
+@qp.qnode(qp.device("lightning.qubit", wires=1))
 def test_qjit(c: bool, data: float):
     if c:
-        qml.RY(data, wires=0)
-    return qml.probs()
+        qp.RY(data, wires=0)
+    return qp.probs()
 
 
 # CHECK-LABEL: @test_qjit
@@ -48,11 +48,11 @@ print(test_qjit.mlir)
 
 
 @vmap(in_axes=(None, 0))
-@qml.qnode(qml.device("lightning.qubit", wires=1))
+@qp.qnode(qp.device("lightning.qubit", wires=1))
 def test_vmap(c, data):
     if c:
-        qml.RY(data, wires=0)
-    return qml.probs()
+        qp.RY(data, wires=0)
+    return qp.probs()
 
 
 # hack in the annotations for vmap
@@ -76,11 +76,11 @@ print(test_vmap.mlir)
 
 @qjit(autograph=True, target="mlir")
 @jacobian(argnums=1)
-@qml.qnode(qml.device("lightning.qubit", wires=1))
+@qp.qnode(qp.device("lightning.qubit", wires=1))
 def test_grad(c: bool, data: float):
     if c:
-        qml.RY(data, wires=0)
-    return qml.probs()
+        qp.RY(data, wires=0)
+    return qp.probs()
 
 
 # CHECK-LABEL: @test_grad
@@ -94,11 +94,11 @@ print(test_grad.mlir)
 
 @qjit(autograph=True, target="mlir")
 @mitigate_with_zne(scale_factors=[1, 3, 5])
-@qml.qnode(qml.device("lightning.qubit", wires=1))
+@qp.qnode(qp.device("lightning.qubit", wires=1))
 def test_zne(c: bool, data: float):
     if c:
-        qml.RY(data, wires=0)
-    return qml.expval(qml.PauliZ(0))
+        qp.RY(data, wires=0)
+    return qp.expval(qp.PauliZ(0))
 
 
 # CHECK-LABEL: @test_zne

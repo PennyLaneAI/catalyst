@@ -18,7 +18,7 @@ import textwrap
 
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 from jax.tree_util import register_pytree_node_class
 from pennylane import for_loop
@@ -209,10 +209,10 @@ class TestDebugPrint:
     def test_multiple_prints(self, capfd):
         "Test printing strings in multiple prints"
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def func1():
             debug.print("hello")
-            return qml.state()
+            return qp.state()
 
         @qjit
         def func2():
@@ -276,14 +276,14 @@ class TestCProgramGeneration:
 
     def test_program_generation(self):
         """Test C Program generation"""
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def f(x: float):
             """Returns two states."""
-            qml.RX(x, wires=1)
-            return qml.state(), qml.state()
+            qp.RX(x, wires=1)
+            return qp.state(), qp.state()
 
         template = get_cmain(f, 4.0)
         assert "main" in template

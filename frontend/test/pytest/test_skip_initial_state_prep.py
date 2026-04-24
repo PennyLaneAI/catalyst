@@ -15,7 +15,7 @@
 """Test skipping initial state prep"""
 
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import DifferentiableCompileError as DiffErr
@@ -33,10 +33,10 @@ class TestExamplesFromWebsite:
         Modified to use jax.numpy and a non trivial StatePrep
         """
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def example_circuit():
-            qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
-            return qml.state()
+            qp.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
+            return qp.state()
 
         expected = example_circuit()
         observed = qjit(example_circuit)()
@@ -44,17 +44,17 @@ class TestExamplesFromWebsite:
 
     def test_state_prep_recycled_device(self, backend):
         """The same test as above but two qnodes using the same device"""
-        dev = qml.device(backend, wires=2)
+        dev = qp.device(backend, wires=2)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def example_circuit():
-            qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
-            return qml.state()
+            qp.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
+            return qp.state()
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def example_circuit_doppelganger():
-            qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
-            return qml.state()
+            qp.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
+            return qp.state()
 
         def main():
             return example_circuit(), example_circuit_doppelganger()
@@ -69,10 +69,10 @@ class TestExamplesFromWebsite:
         """
         state = jnp.array([0, 1, 0, 0], dtype=jnp.int32)
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def example_circuit():
-            qml.StatePrep(state, wires=range(2))
-            return qml.state()
+            qp.StatePrep(state, wires=range(2))
+            return qp.state()
 
         expected = example_circuit()
         observed = qjit(example_circuit)()
@@ -86,10 +86,10 @@ class TestExamplesFromWebsite:
         Modified to use jax.numpy
         """
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def example_circuit():
-            qml.BasisState(jnp.array([1, 1]), wires=range(2))
-            return qml.state()
+            qp.BasisState(jnp.array([1, 1]), wires=range(2))
+            return qp.state()
 
         expected = example_circuit()
         observed = qjit(example_circuit)()
@@ -97,17 +97,17 @@ class TestExamplesFromWebsite:
 
     def test_basis_state_recycled_device(self, backend):
         """The same test as above but two qnodes using the same device"""
-        dev = qml.device(backend, wires=2)
+        dev = qp.device(backend, wires=2)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def example_circuit():
-            qml.BasisState(jnp.array([1, 1]), wires=range(2))
-            return qml.state()
+            qp.BasisState(jnp.array([1, 1]), wires=range(2))
+            return qp.state()
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def example_circuit_doppelganger():
-            qml.BasisState(jnp.array([1, 1]), wires=range(2))
-            return qml.state()
+            qp.BasisState(jnp.array([1, 1]), wires=range(2))
+            return qp.state()
 
         def main():
             return example_circuit(), example_circuit_doppelganger()
@@ -122,10 +122,10 @@ class TestExamplesFromWebsite:
         """
         state = jnp.array([1, 1, 0, 0, 0, 0], dtype=jnp.int32)
 
-        @qml.qnode(qml.device(backend, wires=6))
+        @qp.qnode(qp.device(backend, wires=6))
         def example_circuit():
-            qml.BasisState(state, wires=range(6))
-            return qml.state()
+            qp.BasisState(state, wires=range(6))
+            return qp.state()
 
         expected = example_circuit()
         observed = qjit(example_circuit)()
@@ -137,10 +137,10 @@ class TestExamplesFromWebsite:
         This is the same error as reported by pennylane
         """
 
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def example_circuit():
-            qml.StatePrep(jnp.array([0, 1]), wires=wires)
-            return qml.state()
+            qp.StatePrep(jnp.array([0, 1]), wires=wires)
+            return qp.state()
 
         expected = example_circuit()
         observed = qjit(example_circuit)()
@@ -153,10 +153,10 @@ class TestExamplesFromWebsite:
         let's submit this and we can fix it later.
         """
 
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def example_circuit():
-            qml.BasisState(jnp.array([0, 1]), wires=range(2))
-            return qml.state()
+            qp.BasisState(jnp.array([0, 1]), wires=range(2))
+            return qp.state()
 
         expected = example_circuit()
         observed = qjit(example_circuit)()
@@ -180,10 +180,10 @@ class TestDynamicWires:
         """
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
         def example_circuit(a: int):
-            qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=[a, a + 1])
-            return qml.state()
+            qp.StatePrep(jnp.array([0, 1, 0, 0]), wires=[a, a + 1])
+            return qp.state()
 
         expected = example_circuit(inp)
         observed = qjit(example_circuit)(inp)
@@ -199,10 +199,10 @@ class TestDynamicWires:
         Modified to use dynamic wires.
         """
 
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def example_circuit(a: int):
-            qml.BasisState(jnp.array([1, 1]), wires=[a, a + 1])
-            return qml.state()
+            qp.BasisState(jnp.array([1, 1]), wires=[a, a + 1])
+            return qp.state()
 
         expected = example_circuit(inp)
         observed = qjit(example_circuit)(inp)
@@ -220,10 +220,10 @@ class TestPossibleErrors:
         with pytest.raises(ValueError, match="State must be of length 2; got length 1"):
 
             @qjit
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            @qp.qnode(qp.device("lightning.qubit", wires=2))
             def example_circuit():
-                qml.BasisState(jnp.array([1]), wires=range(2))
-                return qml.state()
+                qp.BasisState(jnp.array([1]), wires=range(2))
+                return qp.state()
 
             example_circuit()
 
@@ -232,10 +232,10 @@ class TestPossibleErrors:
         with pytest.raises(ValueError, match="State must be of length 2; got length 1"):
 
             @qjit
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            @qp.qnode(qp.device("lightning.qubit", wires=2))
             def example_circuit():
-                qml.StatePrep(jnp.array([0]), wires=[0])
-                return qml.state()
+                qp.StatePrep(jnp.array([0]), wires=[0])
+                return qp.state()
 
             example_circuit()
 
@@ -250,10 +250,10 @@ class TestPossibleErrors:
         with pytest.raises(RuntimeError, match=msg):
 
             @qjit
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            @qp.qnode(qp.device("lightning.qubit", wires=2))
             def example_circuit():
-                qml.BasisState(jnp.array([0, 2]), wires=range(2))
-                return qml.state()
+                qp.BasisState(jnp.array([0, 2]), wires=range(2))
+                return qp.state()
 
             example_circuit()
 
@@ -268,11 +268,11 @@ class TestGrad:
 
             @qjit
             @grad
-            @qml.qnode(qml.device(backend, wires=2))
+            @qp.qnode(qp.device(backend, wires=2))
             def example_circuit(a: float):
-                qml.StatePrep(jnp.array([0, 1]), wires=[0])
-                qml.RX(a, wires=[0])
-                return qml.state()
+                qp.StatePrep(jnp.array([0, 1]), wires=[0])
+                qp.RX(a, wires=[0])
+                return qp.state()
 
             example_circuit(0.0)
 
@@ -283,11 +283,11 @@ class TestGrad:
 
             @qjit
             @grad
-            @qml.qnode(qml.device(backend, wires=2))
+            @qp.qnode(qp.device(backend, wires=2))
             def example_circuit(a: float):
-                qml.BasisState(jnp.array([0, 1]), wires=range(2))
-                qml.RX(a, wires=[0])
-                return qml.state()
+                qp.BasisState(jnp.array([0, 1]), wires=range(2))
+                qp.RX(a, wires=[0])
+                return qp.state()
 
             example_circuit(0.0)
 
@@ -298,11 +298,11 @@ class TestControlled:
     def test_state_prep_ctrl(self):
         """Test state prep with ctrl"""
 
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def example_circuit():
             """Example provided by Tom in Slack"""
-            qml.ctrl(qml.StatePrep, 0)([0, 1], 1)
-            return qml.state()
+            qp.ctrl(qp.StatePrep, 0)([0, 1], 1)
+            return qp.state()
 
         expected = example_circuit()
         observed = qjit(example_circuit)()
@@ -311,11 +311,11 @@ class TestControlled:
     def test_basis_state_ctrl(self):
         """Test basis state with ctrl"""
 
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def example_circuit():
-            """Changed from above to use qml.BasisState"""
-            qml.ctrl(qml.BasisState, 0)([1], 1)
-            return qml.state()
+            """Changed from above to use qp.BasisState"""
+            qp.ctrl(qp.BasisState, 0)([1], 1)
+            return qp.state()
 
         expected = example_circuit()
         observed = qjit(example_circuit)()
@@ -328,11 +328,11 @@ class TestAdjoint:
     def test_state_prep_ctrl(self, backend):
         """Test state prep with adjoint"""
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def example_circuit():
             """Example provided by Tom in Slack"""
-            qml.adjoint(qml.StatePrep, 0)([0, 1], 1)
-            return qml.state()
+            qp.adjoint(qp.StatePrep, 0)([0, 1], 1)
+            return qp.state()
 
         expected = example_circuit()
         observed = qjit(example_circuit)()
@@ -341,11 +341,11 @@ class TestAdjoint:
     def test_basis_state_ctrl(self, backend):
         """Test basis state with adjoint"""
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def example_circuit():
-            """Changed from above to use qml.BasisState"""
-            qml.adjoint(qml.BasisState, 0)([1], 1)
-            return qml.state()
+            """Changed from above to use qp.BasisState"""
+            qp.adjoint(qp.BasisState, 0)([1], 1)
+            return qp.state()
 
         expected = example_circuit()
         observed = qjit(example_circuit)()
