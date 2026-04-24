@@ -112,16 +112,6 @@ jobs:
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-
 
-    - name: Add Frontend Dependencies to PATH
-      if: ${{ inputs.catalyst == 'latest' }}
-      run: |
-        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
-        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
-        echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
-        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
-
     - name: Install Catalyst (stable)
       if: ${{ inputs.catalyst == 'stable' }}
       run: |
@@ -141,7 +131,15 @@ jobs:
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         ENABLE_OPENQASM=ON \
-        make catalyst
+        make runtime dialects plugin
+        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+        echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
+        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
+        make frontend oqc
+
 
     - name: Install Catalyst (release-candidate)
       if: ${{ inputs.catalyst == 'release-candidate' }}
