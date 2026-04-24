@@ -16,7 +16,7 @@
 
 # pylint: disable=missing-function-docstring
 
-import pennylane as qml
+import pennylane as qp
 
 from catalyst import qjit, switch
 
@@ -92,7 +92,7 @@ print(classical_circuit.mlir)
 @qjit(target="mlir")
 
 # CHECK: quantum.device
-@qml.qnode(qml.device("lightning.qubit", wires=1))
+@qp.qnode(qp.device("lightning.qubit", wires=1))
 def quantum_circuit(i: int):
 
     # cast index and use as arg for switch
@@ -100,17 +100,17 @@ def quantum_circuit(i: int):
     # CHECK:    %{{[a-zA-Z0-9_]+}} = scf.index_switch [[i]] -> !quantum.reg
     @switch(i)
     def my_switch():
-        qml.X(0)
+        qp.X(0)
 
     # CHECK-DAG: case -3 {
     @my_switch.branch(-3)
     def my_branch():
-        qml.Y(0)
+        qp.Y(0)
 
     # CHECK-DAG: case 0 {
     @my_switch.branch(0)
     def my_branch():
-        qml.Z(0)
+        qp.Z(0)
 
     # default case is always last
     # CHECK: default {
@@ -118,7 +118,7 @@ def quantum_circuit(i: int):
     my_switch()
     # CHECK: return
 
-    return qml.probs()
+    return qp.probs()
 
 
 print(quantum_circuit.mlir)
