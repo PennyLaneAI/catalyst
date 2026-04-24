@@ -101,68 +101,6 @@ class HyperRegisterTypeConversion(TypeConversionPattern):
         return qecp.PhysicalHyperRegisterType(typ.width, typ.k, self.qec_code.n)
 
 
-# MARK: Measure Op Pattern
-
-
-@dataclass(frozen=True)
-class MeasureOpConversion(RewritePattern):
-    """Converts `qecl.measure` ops to a call to a subroutine that performs a transversal measurement
-    on the physical codeblock.
-
-    In order to make the corresponding logical measurement outcome(s) of the `qecl.measure` op
-    available for subsequent use, this pattern also inserted a `qecp.decode_physical_meas` op that
-    acts on the results of the transversal measurements and returns the corresponding k logical
-    measurements outcomes.
-
-    While this rewrite pattern may appear as though it supports arbitrary values of k, it is
-    important to note that as implemented, it does not consider the `idx` attribute/operand of the
-    `qecl.measure` op, which indicates the position of the logical qubit within the codeblock to
-    measure. Therefore, for codes with k > 1, it is not possible to perform a measurement that
-    corresponds to a single logical qubit within the codeblock since the measurement is transversal
-    and collapses the entire state of the codeblock.
-    """
-
-    qec_code: QecCode
-
-    measure_subroutine: func.FuncOp
-
-    @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: qecl.MeasureOp, rewriter: PatternRewriter):
-        """Rewrite pattern for `qecl.measure` ops."""
-
-        k = op.out_codeblock.type.k.value.data
-        n = self.qec_code.n
-
-        # The type-converter should already raise a CompileError if the values of k don't agree;
-        # assert just in case.
-        assert k == self.qec_code.k, (
-            f"Value mismatch: codeblock {op.out_codeblock} has k = {k} but QEC code has "
-            f"k = {self.qec_code.k}"
-        )
-
-        ops_to_insert = (
-            subroutine_call_op := func.CallOp(
-                callee=SymbolRefAttr(self.measure_subroutine.sym_name),
-                arguments=(op.in_codeblock,),
-                return_types=(builtin.TensorType(i1, shape=(n,)), op.in_codeblock.type),
-            ),
-            decode_op := qecp.DecodePhysicalMeasurementOp(
-                physical_measurements=cast(
-                    OpResult[builtin.TensorType], subroutine_call_op.results[0]
-                ),
-                logical_measurements_type=builtin.TensorType(i1, shape=(k,)),
-            ),
-            extract_idx_op := arith.ConstantOp.from_int_and_width(0, IndexType()),
-            tensor_extract_op := tensor.ExtractOp(
-                decode_op.logical_measurements, indices=extract_idx_op.result, result_type=i1
-            ),
-        )
-
-        new_results = (tensor_extract_op.result, subroutine_call_op.results[1])
-
-        rewriter.replace_op(op, ops_to_insert, new_results=new_results)
-
-
 # MARK: Alloc/Dealloc Patterns
 
 
@@ -243,6 +181,68 @@ class EncodeOpConversion(RewritePattern):
         rewriter.replace_op(op, callOp)
 
 
+# MARK: Measure Op Pattern
+
+
+@dataclass(frozen=True)
+class MeasureOpConversion(RewritePattern):
+    """Converts `qecl.measure` ops to a call to a subroutine that performs a transversal measurement
+    on the physical codeblock.
+
+    In order to make the corresponding logical measurement outcome(s) of the `qecl.measure` op
+    available for subsequent use, this pattern also inserted a `qecp.decode_physical_meas` op that
+    acts on the results of the transversal measurements and returns the corresponding k logical
+    measurements outcomes.
+
+    While this rewrite pattern may appear as though it supports arbitrary values of k, it is
+    important to note that as implemented, it does not consider the `idx` attribute/operand of the
+    `qecl.measure` op, which indicates the position of the logical qubit within the codeblock to
+    measure. Therefore, for codes with k > 1, it is not possible to perform a measurement that
+    corresponds to a single logical qubit within the codeblock since the measurement is transversal
+    and collapses the entire state of the codeblock.
+    """
+
+    qec_code: QecCode
+
+    measure_subroutine: func.FuncOp
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecl.MeasureOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `qecl.measure` ops."""
+
+        k = op.out_codeblock.type.k.value.data
+        n = self.qec_code.n
+
+        # The type-converter should already raise a CompileError if the values of k don't agree;
+        # assert just in case.
+        assert k == self.qec_code.k, (
+            f"Value mismatch: codeblock {op.out_codeblock} has k = {k} but QEC code has "
+            f"k = {self.qec_code.k}"
+        )
+
+        ops_to_insert = (
+            subroutine_call_op := func.CallOp(
+                callee=SymbolRefAttr(self.measure_subroutine.sym_name),
+                arguments=(op.in_codeblock,),
+                return_types=(builtin.TensorType(i1, shape=(n,)), op.in_codeblock.type),
+            ),
+            decode_op := qecp.DecodePhysicalMeasurementOp(
+                physical_measurements=cast(
+                    OpResult[builtin.TensorType], subroutine_call_op.results[0]
+                ),
+                logical_measurements_type=builtin.TensorType(i1, shape=(k,)),
+            ),
+            extract_idx_op := arith.ConstantOp.from_int_and_width(0, IndexType()),
+            tensor_extract_op := tensor.ExtractOp(
+                decode_op.logical_measurements, indices=extract_idx_op.result, result_type=i1
+            ),
+        )
+
+        new_results = (tensor_extract_op.result, subroutine_call_op.results[1])
+
+        rewriter.replace_op(op, ops_to_insert, new_results=new_results)
+
+
 # MARK: Conversion Pass
 
 
@@ -301,15 +301,15 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 [
                     CodeblockTypeConversion(qec_code=self.qec_code),
                     HyperRegisterTypeConversion(qec_code=self.qec_code),
+                    AllocationConversion(),
+                    DeallocationConversion(),
+                    InsertBlockConversion(),
+                    ExtractBlockConversion(),
                     EncodeOpConversion(qec_code=self.qec_code, encode_subroutine=encode_subroutine),
                     MeasureOpConversion(
                         qec_code=self.qec_code,
                         measure_subroutine=measure_subroutine,
                     ),
-                    AllocationConversion(),
-                    DeallocationConversion(),
-                    InsertBlockConversion(),
-                    ExtractBlockConversion(),
                 ]
             )
         ).rewrite_module(op)
