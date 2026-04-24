@@ -258,8 +258,6 @@ class TestIntegrationWithOtherPasses:
         In this test, the terminal measurements are performed on the combination of both wires.
         """
 
-        dev = qp.device("lightning.qubit", wires=2)
-
         def circuit():
             qp.RX(phi, 0)
             # CHECK-NOT: quantum.var
