@@ -14,7 +14,6 @@
 
 #include "Catalyst/IR/CatalystDialect.h"
 
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/IR/Builders.h"
