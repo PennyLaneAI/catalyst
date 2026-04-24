@@ -16,7 +16,7 @@
 
 # pylint: disable=line-too-long
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 from pennylane.exceptions import CompileError
 from xdsl.context import Context
@@ -163,10 +163,10 @@ class TestGetCallOp:
         WrapQNodePass has been applied to circuit."""
 
         @xdsl_from_qjit
-        @qml.qjit
-        @qml.qnode(qml.device("null.qubit", wires=1))
+        @qp.qjit
+        @qp.qnode(qp.device("null.qubit", wires=1))
         def circ():
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         xdsl_module = circ()
         WrapQNodePass("test").apply(None, xdsl_module)

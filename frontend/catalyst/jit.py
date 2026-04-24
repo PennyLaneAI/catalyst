@@ -28,7 +28,7 @@ from contextlib import contextmanager
 
 import jax
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 from jax.api_util import debug_info
 from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
@@ -158,9 +158,9 @@ def qjit(
             ``lightning.gpu``. The default value is None, which means no seeding is performed,
             and all processes are random. A seed is expected to be an unsigned 32-bit integer.
             Currently, the following measurement processes are seeded: :func:`~.measure`,
-            :func:`qml.sample() <pennylane.sample>`, :func:`qml.counts() <pennylane.counts>`,
-            :func:`qml.probs() <pennylane.probs>`, :func:`qml.expval() <pennylane.expval>`,
-            :func:`qml.var() <pennylane.var>`.
+            :func:`qp.sample() <pennylane.sample>`, :func:`qp.counts() <pennylane.counts>`,
+            :func:`qp.probs() <pennylane.probs>`, :func:`qp.expval() <pennylane.expval>`,
+            :func:`qp.var() <pennylane.var>`.
         circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
             A dictionary that specifies the quantum circuit transformation pass pipeline order,
             and optionally arguments for each pass in the pipeline. Keys of this dictionary
@@ -174,20 +174,20 @@ def qjit(
         dialect_plugins (Optional[List[Path]]): List of paths to dialect plugins.
         capture (str or bool): Controls whether to use PennyLane program capture for tracing.
             This allows enabling capture locally for this QJIT without affecting the global
-            ``qml.capture.enabled()`` state.
+            ``qp.capture.enabled()`` state.
 
-            - ``"global"`` (default): Defer to ``qml.capture.enabled()`` to decide whether
+            - ``"global"`` (default): Defer to ``qp.capture.enabled()`` to decide whether
               to use program capture.
             - ``True``: Force program capture on for this QJIT, regardless of the global setting.
               This allows using the new capture-based frontend without calling
-              ``qml.capture.enable()`` globally.
+              ``qp.capture.enable()`` globally.
             - ``False``: Force program capture off for this QJIT, using the old frontend,
               regardless of the global setting.
         skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
             If ``True``, transforms used to preprocess and validate the user program before
             executing on a quantum backend will not be used, and the user is expected to ensure
             the validity of the program themselves. If ``capture=False``, or ``capture="global"``
-            and ``qml.capture.enabled() == False``, this argument will be ignored. ``False``
+            and ``qp.capture.enabled() == False``, this argument will be ignored. ``False``
             by default.
 
     Returns:
@@ -209,12 +209,12 @@ def qjit(
     .. code-block:: python
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit(theta):
-            qml.Hadamard(wires=0)
-            qml.RX(theta, wires=1)
-            qml.CNOT(wires=[0,1])
-            return qml.expval(qml.PauliZ(wires=1))
+            qp.Hadamard(wires=0)
+            qp.RX(theta, wires=1)
+            qp.CNOT(wires=[0,1])
+            return qp.expval(qp.PauliZ(wires=1))
 
     >>> circuit(0.5)  # the first call, compilation occurs here
     Array(0., dtype=float64)
@@ -226,15 +226,15 @@ def qjit(
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x: complex, z: jax.ShapeDtypeStruct((3,), jnp.float64)):
             theta = jnp.abs(x)
-            qml.RY(theta, wires=0)
-            qml.Rot(z[0], z[1], z[2], wires=0)
-            return qml.state()
+            qp.RY(theta, wires=0)
+            qp.Rot(z[0], z[1], z[2], wires=0)
+            return qp.state()
 
     >>> circuit(0.2j, jnp.array([0.3, 0.6, 0.9]))  # calls precompiled function
     Array([0.75634905-0.52801002j, 0.        +0.j        ,
@@ -254,15 +254,15 @@ def qjit(
         .. code-block:: python
 
             @qjit(autograph=True)
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            @qp.qnode(qp.device("lightning.qubit", wires=2))
             def circuit(x: int):
 
                 if x < 5:
-                    qml.Hadamard(wires=0)
+                    qp.Hadamard(wires=0)
                 else:
-                    qml.T(wires=0)
+                    qp.T(wires=0)
 
-                return qml.expval(qml.PauliZ(0))
+                return qp.expval(qp.PauliZ(0))
 
         >>> circuit(3)
         Array(0., dtype=float64)
@@ -473,10 +473,10 @@ def qjit(
 
         Out of all the :ref:`Catalyst-supported terminal measurements <measurements>`, there are
         four that have a return shape that depend on the number of qubits. Namely, the return shape
-        of :func:`qml.probs() <pennylane.probs>` and :func:`qml.state() <pennylane.state>` is a 1D
-        array of size ``(2**num_qubits)``, the return shape of :func:`qml.sample() <pennylane.sample>`
+        of :func:`qp.probs() <pennylane.probs>` and :func:`qp.state() <pennylane.state>` is a 1D
+        array of size ``(2**num_qubits)``, the return shape of :func:`qp.sample() <pennylane.sample>`
         is a 2D array of size ``(shots, num_qubits)``, and the return shape of
-        :func:`qml.counts() <pennylane.counts>` is two 1D arrays of size ``(2**num_qubits)``.
+        :func:`qp.counts() <pennylane.counts>` is two 1D arrays of size ``(2**num_qubits)``.
         The general rule of recompilation mentioned above would imply that changing the number of qubits
         in a workflow that returns any of these four measurements triggers recompilation.
 
@@ -484,7 +484,7 @@ def qjit(
         the same compiled QNode can be invoked with a different number of qubits! This is especially
         helpful for workflows where you would like to, for example, iterate through the wires without
         knowing how many of them there are in advance. For instance, many workflows (such as `Grover's
-        algorithm <https://pennylane.ai/qml/demos/tutorial_grovers_algorithm>`_) have
+        algorithm <https://pennylane.ai/qp/demos/tutorial_grovers_algorithm>`_) have
         an entangling layer at the beginning, where a Hadamard gate is applied to every wire.
 
         To use this feature, the PennyLane device needs to be instantiated within the qjitted
@@ -496,16 +496,16 @@ def qjit(
             @qjit
             def workflow(num_qubits):
                 print("compiling...")
-                dev = qml.device("lightning.qubit", wires=num_qubits)
+                dev = qp.device("lightning.qubit", wires=num_qubits)
 
-                @qml.qnode(dev)
+                @qp.qnode(dev)
                 def circuit():
                     @catalyst.for_loop(0, num_qubits, 1)
                     def entangle_all_qubits(i):
-                        qml.Hadamard(wires=i)
+                        qp.Hadamard(wires=i)
                     entangle_all_qubits()
 
-                    return qml.probs()
+                    return qp.probs()
 
                 return circuit()
 
@@ -601,13 +601,13 @@ class QJIT(CatalystCallable):
 
         Returns:
             bool: The effective capture mode.
-                - If capture='global', use current qml.capture.enabled() state
+                - If capture='global', use current qp.capture.enabled() state
                 - If capture=True/False, use that explicit value
         """
         capture_option = self.compile_options.capture
         if capture_option == "global":
             # Defer to current global state
-            return qml.capture.enabled()
+            return qp.capture.enabled()
         # Explicit True/False override
         return capture_option
 
@@ -641,7 +641,7 @@ class QJIT(CatalystCallable):
     def __call__(self, *args, **kwargs):
         # Transparantly call Python function in case of nested QJIT calls.
         if EvaluationContext.is_tracing():
-            isQNode = isinstance(self.user_function, qml.QNode)
+            isQNode = isinstance(self.user_function, qp.QNode)
             if isQNode and self.compile_options.static_argnums:
                 kwargs = {"static_argnums": self.compile_options.static_argnums, **kwargs}
 
@@ -752,12 +752,12 @@ class QJIT(CatalystCallable):
     def pre_compilation(self):
         """Perform pre-processing tasks on the Python function, such as AST transformations."""
         if self.compile_options.autograph:
-            if qml.capture.enabled():
+            if qp.capture.enabled():
                 if self.compile_options.autograph_include:
                     raise NotImplementedError(
                         "capture autograph does not yet support autograph_include."
                     )
-                return qml.capture.run_autograph(self.original_function)
+                return qp.capture.run_autograph(self.original_function)
             return run_autograph(self.original_function, *self.compile_options.autograph_include)
 
         return self.original_function
@@ -812,7 +812,7 @@ class QJIT(CatalystCallable):
     ):  # pylint: disable=too-many-arguments, too-many-positional-arguments
         """Trace the function using the legacy (non-capture) pathway.
 
-        This method is used when qml.capture is disabled, using the old
+        This method is used when qp.capture is disabled, using the old
         QNode patching approach.
         """
 
@@ -834,7 +834,7 @@ class QJIT(CatalystCallable):
             )
 
         with Patcher(
-            (qml.QNode, "__call__", closure),
+            (qp.QNode, "__call__", closure),
         ):
             # TODO: improve PyTree handling
             jaxpr, out_type, treedef, plugins = trace_to_jaxpr(
@@ -1054,7 +1054,7 @@ class JAX_QJIT:
 def _ensure_capture_mode(enable_capture: bool):
     """Enforce the PennyLane capture state for the duration of the context.
 
-    This context manager safely transitions the global ``qml.capture`` state to
+    This context manager safely transitions the global ``qp.capture`` state to
     the requested state and guarantees restoration of the previous state upon
     exit, regardless of exceptions.
 
@@ -1073,13 +1073,13 @@ def _ensure_capture_mode(enable_capture: bool):
         toggles drifting out of sync.
     """
     # 1. Snapshot the pre-existing state
-    was_enabled = qml.capture.enabled()
+    was_enabled = qp.capture.enabled()
 
     # 2. Enforce the requested state (only toggle if necessary)
     if enable_capture and not was_enabled:
-        qml.capture.enable()
+        qp.capture.enable()
     elif not enable_capture and was_enabled:
-        qml.capture.disable()
+        qp.capture.disable()
 
     try:
         yield
@@ -1088,6 +1088,6 @@ def _ensure_capture_mode(enable_capture: bool):
         # We restore 'was_enabled' directly rather than just toggling back,
         # which protects against nested toggles drifting out of sync.
         if was_enabled:
-            qml.capture.enable()
+            qp.capture.enable()
         else:
-            qml.capture.disable()
+            qp.capture.disable()

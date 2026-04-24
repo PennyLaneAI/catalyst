@@ -113,7 +113,7 @@ class TestShotVector:
 
         if measurement[1] == "VarianceMP" and mcm_method == "one-shot":
             with pytest.raises(
-                NotImplementedError, match=r"qml.var\(\) cannot be used on observables"
+                NotImplementedError, match=r"qp.var\(\) cannot be used on observables"
             ):
                 qjit(circuit)()
         else:
