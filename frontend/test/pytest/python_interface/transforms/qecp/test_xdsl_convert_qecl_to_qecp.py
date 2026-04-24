@@ -43,7 +43,7 @@ def fixture_qecl_to_qecp_steane_pipeline():
     return (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
 
 
-# MARK: TestTypeConversionPattern
+# MARK: TestTypeConversion
 
 
 class TestTypeConversionPattern:
@@ -152,10 +152,10 @@ class TestTypeConversionPattern:
             run_filecheck(program, pipeline)
 
 
-# MARK: TestMeasurePattern
+# MARK: TestLoweringMeasure
 
 
-class TestMeasurePattern:
+class TestLoweringMeasure:
     """Unit tests for the `measure` pattern of the convert-qecl-to-qecp pass."""
 
     def test_measure(self, run_filecheck, qecl_to_qecp_steane_pipeline):
@@ -199,7 +199,7 @@ class TestMeasurePattern:
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
 
-# MARK: TestQECLNoiseLoweringPassIntegration
+# MARK: TestLoweringEncode
 
 
 class TestLoweringEncode:
@@ -320,8 +320,8 @@ class TestLoweringEncode:
                 func.func @test_func() attributes {quantum.node} {
                     // CHECK: [[codeblock1:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
                     // CHECK-NEXT: [[codeblock2:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
-                    // CHECK-NEXT: func.call @encode_zero_Steane 
-                    // CHECK-NEXT: func.call @encode_zero_Steane 
+                    // CHECK-NEXT: func.call @encode_zero_Steane
+                    // CHECK-NEXT: func.call @encode_zero_Steane
                     %0 = "test.op"() : () -> !qecl.codeblock<1>
                     %1 = "test.op"() : () -> !qecl.codeblock<1>
                     %2 = qecl.encode ["zero"] %0 : !qecl.codeblock<1>
@@ -334,6 +334,9 @@ class TestLoweringEncode:
 
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
         run_filecheck(program, pipeline)
+
+
+# MARK: TestQECLNoiseLoweringPassIntegration
 
 
 # We can remove this xfail and warning filter once `convert_qecl_to_qecp_pass` is complete
@@ -349,7 +352,7 @@ class TestQECLNoiseLoweringPassIntegration:
         dev = qp.device("null.qubit", wires=1)
 
         @qp.qjit(target="mlir", keep_intermediate=True)
-        @convert_qecl_to_qecp_pass(qec_code=QecCode("Steane", 7, 1, 3), number_errors=1)
+        @convert_qecl_to_qecp_pass(qec_code=QecCode.get("Steane"), number_errors=1)
         @inject_noise_to_qecl_pass
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)
