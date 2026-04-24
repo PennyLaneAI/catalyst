@@ -97,6 +97,23 @@ static int getGateQubitCount(Operation *op)
     return 0;
 }
 
+/// Get the number of parameters for a gate operation.
+static int getGateParamCount(Operation *op)
+{
+    return llvm::TypeSwitch<Operation *, int>(op)
+        .Case<quantum::CustomOp>(
+            [](auto customOp) { return static_cast<int>(customOp.getParams().size()); })
+        .Case<quantum::PauliRotOp>([](auto op) {
+            return static_cast<int>(op.getParams().size());
+        })
+        .Case<quantum::MultiRZOp>([](auto op) {
+            return static_cast<int>(op.getParams().size());
+        })
+        .Case<quantum::GlobalPhaseOp>([](auto) { return 1; })   // phase angle
+        .Case<quantum::QubitUnitaryOp>([](auto) { return 1; })  // matrix operand
+        .Default([](Operation *) { return 0; });
+}
+
 /// Get the name for a PBC operation.
 static std::string getPBCOpName(Operation *op)
 {
@@ -380,8 +397,9 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
             quantum::PCPhaseOp, quantum::QubitUnitaryOp, quantum::SetStateOp,
             quantum::SetBasisStateOp>(op)) {
         std::string name = getGateOpName(op, isAdjoint);
+        int nParams = getGateParamCount(op);
         int nQubits = getGateQubitCount(op);
-        result.operations[name][nQubits] += 1;
+        result.operations[name][{nQubits, nParams}] += 1;
         return;
     }
 
@@ -397,14 +415,14 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
             pbc::SelectPPMeasurementOp, pbc::PrepareStateOp, pbc::FabricateOp>(op)) {
         std::string name = getPBCOpName(op);
         int nQubits = getPBCQubitCount(op);
-        result.operations[name][nQubits] += 1;
+        result.operations[name][{nQubits, 1}] += 1;
         return;
     }
 
     // MBQC operations
     if (isa<mbqc::MeasureInBasisOp, mbqc::GraphStatePrepOp>(op)) {
         std::string name = op->getName().getStringRef().str();
-        result.operations[name][0] += 1;
+        result.operations[name][{0, 0}] += 1;
         return;
     }
 

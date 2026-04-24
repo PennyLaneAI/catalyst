@@ -90,9 +90,9 @@ struct RegisterDecompRuleResourcePass
         for (const auto &opEntry : result.operations) {
             llvm::StringRef opName = opEntry.getKey();
             for (const auto &sizeEntry : opEntry.getValue()) {
-                int nQubits = sizeEntry.first;
+                const auto &[nQubits, nParams] = sizeEntry.first;
                 int64_t count = sizeEntry.second;
-                std::string key = (opName + "(" + std::to_string(nQubits) + ")").str();
+                std::string key = (opName + "(" + std::to_string(nQubits) + ", " + std::to_string(nParams) + ")").str();
                 opsEntries.push_back(NamedAttribute(
                     StringAttr::get(ctx, key), IntegerAttr::get(IntegerType::get(ctx, 64), count)));
             }

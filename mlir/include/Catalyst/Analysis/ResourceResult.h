@@ -25,8 +25,10 @@ struct ResourceResult {
     // method for merging two ResourceResult values
     enum class MergeMethod { Sum, Max, Min };
 
-    // quantum, pbc, mbqc operations
-    llvm::StringMap<llvm::DenseMap<int, int64_t>> operations;
+    // quantum, pbc, mbqc operations are stored
+    // as a map from operation name to a map of
+    // name -> ((numWires, numParams) -> count)
+    llvm::StringMap<llvm::DenseMap<std::pair<int, int>, int64_t>> operations;
 
     llvm::StringMap<int64_t> measurements;
 
