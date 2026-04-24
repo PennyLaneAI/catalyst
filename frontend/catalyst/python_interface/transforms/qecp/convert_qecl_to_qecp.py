@@ -31,7 +31,6 @@ from enum import StrEnum
 from typing import cast
 
 import numpy as np
-from xdsl import builder
 from xdsl.builder import ImplicitBuilder
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, func, scf, tensor
@@ -245,8 +244,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         module_block = op.regions[0].blocks.first
         assert module_block is not None, "Module has no block"
 
-        encode_funcop = self.create_encode_subroutine()
-        module_block.add_op(encode_funcop)
+        encode_subroutine = self.create_encode_subroutine()
+        module_block.add_op(encode_subroutine)
 
         measure_subroutine = self.create_measure_subroutine()
         module_block.add_op(measure_subroutine)
@@ -256,7 +255,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 [
                     CodeblockTypeConversion(qec_code=self.qec_code),
                     HyperRegisterTypeConversion(qec_code=self.qec_code),
-                    EncodeOpConversion(qec_code=self.qec_code, encode_subroutine=encode_funcop),
+                    EncodeOpConversion(qec_code=self.qec_code, encode_subroutine=encode_subroutine),
                     MeasureOpConversion(
                         qec_code=self.qec_code,
                         measure_subroutine=measure_subroutine,
@@ -363,7 +362,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         block = Block(arg_types=input_types)
 
-        with builder.ImplicitBuilder(block):
+        with ImplicitBuilder(block):
             (codeblock,) = block.args
 
             # allocate auxiliary qubits
