@@ -132,12 +132,12 @@ jobs:
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         ENABLE_OPENQASM=ON \
         make runtime dialects plugin
-        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
-        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
-        echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
-        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
+        PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum \
+        RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib \
+        MLIR_LIB_DIR=$(pwd)/llvm-build/lib \
+        CATALYST_BIN_DIR=$(pwd)/quantum-build/bin \
+        CATALYST_LIB_DIR=$(pwd)/quantum-build/lib \
+        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions \
         make frontend oqc
 
 
