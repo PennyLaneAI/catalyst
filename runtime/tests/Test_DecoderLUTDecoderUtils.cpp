@@ -20,46 +20,9 @@
 #include "catch2/matchers/catch_matchers_string.hpp"
 
 #include "LUTDecoderUtils.hpp"
+#include "TestUtils.hpp"
+
 using namespace Catalyst::Runtime::QEC;
-
-struct tanner_graph_steane {
-    /* Tanner graph representation for the [[7, 1, 3]] Steane code
-       The shape of dense matrix that the [[7, 1, 3]] Steane code is (10, 10).
-       The first 7 columns represent data qubits, while the last 3 columns
-       represent auxillary qubits. The full dense matrix is:
-       | 0 0 0 0 0 0 0 1 0 0|
-       | 0 0 0 0 0 0 0 1 1 0|
-       | 0 0 0 0 0 0 0 1 1 1|
-       | 0 0 0 0 0 0 0 1 0 1|
-       | 0 0 0 0 0 0 0 0 1 0|
-       | 0 0 0 0 0 0 0 0 1 1|
-       | 0 0 0 0 0 0 0 0 0 1|
-       | 1 1 1 1 0 0 0 0 0 0|
-       | 0 1 1 0 1 1 0 0 0 0|
-       | 0 0 1 1 0 1 1 0 0 0|
-    */
-    const size_t code_size = 7;
-    const size_t code_distance = 3;
-    const std::vector<size_t> row_idx = {7, 7, 8, 7, 8, 9, 7, 9, 8, 8, 9, 9,
-                                         0, 1, 2, 3, 1, 2, 4, 5, 2, 3, 5, 6};
-    const std::vector<size_t> col_ptr = {0, 1, 3, 6, 8, 9, 11, 12, 16, 20, 24};
-
-    const std::vector<size_t> row_idx_parity_matrix_transpose = {0, 1, 2, 3, 1, 2,
-                                                                 4, 5, 2, 3, 5, 6};
-    const std::vector<size_t> col_ptr_parity_matrix_transpose = {0, 4, 8, 12};
-
-    const std::unordered_map<std::string, std::vector<uint8_t>> lookup_table = {
-        {"000", std::vector<uint8_t>({0, 0, 0, 0, 0, 0, 0})},
-        {"001", std::vector<uint8_t>({0, 0, 0, 0, 0, 0, 1})},
-        {"010", std::vector<uint8_t>({0, 0, 0, 0, 1, 0, 0})},
-        {"011", std::vector<uint8_t>({0, 0, 0, 0, 0, 1, 0})},
-        {"100", std::vector<uint8_t>({1, 0, 0, 0, 0, 0, 0})},
-        {"101", std::vector<uint8_t>({0, 0, 0, 1, 0, 0, 0})},
-        {"110", std::vector<uint8_t>({0, 1, 0, 0, 0, 0, 0})},
-        {"111", std::vector<uint8_t>({0, 0, 1, 0, 0, 0, 0})},
-
-    };
-} tanner_graph;
 
 TEST_CASE("Test convert_sydrome_res_to_bitstr", "[LUTDecoderUtils::convert_syndrome_res_to_bitstr]")
 {
@@ -89,6 +52,7 @@ TEST_CASE("Test get_error_indices", "[LUTDecoderUtils::get_error_indices]")
 
 TEST_CASE("Test get_parity_check_matrix", "[LUTDecoderUtils::get_parity_check_matrix]")
 {
+    tanner_graph_steane<size_t> tanner_graph;
 
     std::vector<size_t> aux_cols = {7, 8, 9};
     auto parity_mat_csc =
@@ -100,6 +64,7 @@ TEST_CASE("Test get_parity_check_matrix", "[LUTDecoderUtils::get_parity_check_ma
 
 TEST_CASE("Test get_syndrome_from_errors", "[LUTDecoderUtils::get_syndrome_from_errors]")
 {
+    tanner_graph_steane<size_t> tanner_graph;
 
     std::vector<size_t> aux_cols = {7, 8, 9};
     auto parity_mat_csc =
@@ -107,7 +72,8 @@ TEST_CASE("Test get_syndrome_from_errors", "[LUTDecoderUtils::get_syndrome_from_
 
     const size_t num_data_qubits = tanner_graph.code_size;
     const size_t num_aux_qubits = 3;
-    for (auto it = tanner_graph.lookup_table.begin(); it != tanner_graph.lookup_table.end(); ++it) {
+    for (auto it = tanner_graph.lookup_table_syndrome_to_error.begin();
+         it != tanner_graph.lookup_table_syndrome_to_error.end(); ++it) {
         auto err_vec = it->second;
         std::string expected_str = it->first;
         std::string syndrome_bitstr = get_syndrome_from_errors(
@@ -118,6 +84,7 @@ TEST_CASE("Test get_syndrome_from_errors", "[LUTDecoderUtils::get_syndrome_from_
 
 TEST_CASE("Test generate_lookup_table", "[LUTDecoderUtils::generate_lookup_table]")
 {
+    tanner_graph_steane<size_t> tanner_graph;
     auto lut = generate_lookup_table(tanner_graph.row_idx_parity_matrix_transpose,
                                      tanner_graph.col_ptr_parity_matrix_transpose,
                                      tanner_graph.code_size, tanner_graph.code_distance);
