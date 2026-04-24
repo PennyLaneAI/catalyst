@@ -22,34 +22,34 @@ measurements from PennyLane's ftqc module in Catalyst.
 
 from functools import partial
 
-import pennylane as qml
+import pennylane as qp
 import pennylane.ftqc as plft
 
 from catalyst import qjit
 
 
 def test_measure_x():
-    """Test the compilation of the qml.ftqc.measure_x function, which performs a mid-circuit
+    """Test the compilation of the qp.ftqc.measure_x function, which performs a mid-circuit
     measurement in the Pauli X basis.
 
     `measure_x` is implemented as a measurement in the XY plane with angle=0.
     """
-    dev = qml.device("null.qubit", wires=1)
+    dev = qp.device("null.qubit", wires=1)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     # CHECK-LABEL: @workload_measure_x
     @qjit(target="mlir")
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def workload_measure_x():
         # CHECK: [[angle:%.+]] = arith.constant 0.000000e+00 : f64
         # CHECK: [[qreg:%.+]] = quantum.alloc( 1) : !quantum.reg
         # CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
         # CHECK: [[mres:%.+]], [[out_qubit:%.+]] = mbqc.measure_in_basis[ XY, [[angle]]] [[q0]] : i1, !quantum.bit
         _ = plft.measure_x(0)
-        return qml.expval(qml.Z(0))
+        return qp.expval(qp.Z(0))
 
-    qml.capture.disable()
+    qp.capture.disable()
 
     print(workload_measure_x.mlir)
 
@@ -58,27 +58,27 @@ test_measure_x()
 
 
 def test_measure_y():
-    """Test the compilation of the qml.ftqc.measure_y function, which performs a mid-circuit
+    """Test the compilation of the qp.ftqc.measure_y function, which performs a mid-circuit
     measurement in the Pauli Y basis.
 
     `measure_y` is implemented as a measurement in the XY plane with angle=pi/2.
     """
-    dev = qml.device("null.qubit", wires=1)
+    dev = qp.device("null.qubit", wires=1)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     # CHECK-LABEL: @workload_measure_y
     @qjit(target="mlir")
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def workload_measure_y():
         # CHECK: [[angle:%.+]] = arith.constant 1.5707963267948966 : f64
         # CHECK: [[qreg:%.+]] = quantum.alloc( 1) : !quantum.reg
         # CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
         # CHECK: [[mres:%.+]], [[out_qubit:%.+]] = mbqc.measure_in_basis[ XY, [[angle]]] [[q0]] : i1, !quantum.bit
         _ = plft.measure_y(0)
-        return qml.expval(qml.Z(0))
+        return qp.expval(qp.Z(0))
 
-    qml.capture.disable()
+    qp.capture.disable()
 
     print(workload_measure_y.mlir)
 
@@ -87,30 +87,30 @@ test_measure_y()
 
 
 def test_measure_z():
-    """Test the compilation of the qml.ftqc.measure_z function, which performs a mid-circuit
+    """Test the compilation of the qp.ftqc.measure_z function, which performs a mid-circuit
     measurement in the Pauli Z (computational) basis.
 
-    `measure_z` is a wrapper around the standard computation-basis measurement op (qml.measure).
+    `measure_z` is a wrapper around the standard computation-basis measurement op (qp.measure).
 
-    NOTE: At the time of writing, Catalyst does not support qml.measure() with program capture
+    NOTE: At the time of writing, Catalyst does not support qp.measure() with program capture
     enabled. This test is expected to fail until support is added. The expected output has been
     commented out using FileCheck comment directives, `COM:`.
     """
-    dev = qml.device("null.qubit", wires=1)
+    dev = qp.device("null.qubit", wires=1)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     # COM: CHECK-LABEL: @workload_measure_z
     @qjit(target="mlir")
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def workload_measure_z():
         # COM: CHECK: [[qreg:%.+]] = quantum.alloc( 1) : !quantum.reg
         # COM: CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
         # COM: CHECK: [[mres:%.+]], [[out_qubit:%.+]] = quantum.measure [[q0]] : i1, !quantum.bit
         _ = plft.measure_z(0)
-        return qml.expval(qml.Z(0))
+        return qp.expval(qp.Z(0))
 
-    qml.capture.disable()
+    qp.capture.disable()
 
     print(workload_measure_z.mlir)
 
@@ -123,23 +123,23 @@ except NotImplementedError:
 
 
 def test_measure_arbitrary_basis(angle, plane):
-    """Test the compilation of the qml.ftqc.measure_arbitrary_basis function, which performs a
+    """Test the compilation of the qp.ftqc.measure_arbitrary_basis function, which performs a
     mid-circuit measurement in an arbitrary basis defined by a plane and rotation angle about that
     plane on the supplied qubit.
 
     In this case, the rotation angle is static (known at compile time).
     """
-    dev = qml.device("null.qubit", wires=1)
+    dev = qp.device("null.qubit", wires=1)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     @qjit(target="mlir")
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def workload_measure_arbitrary_basis():
         _ = plft.measure_arbitrary_basis(wires=0, angle=angle, plane=plane)
-        return qml.expval(qml.Z(0))
+        return qp.expval(qp.Z(0))
 
-    qml.capture.disable()
+    qp.capture.disable()
 
     print(workload_measure_arbitrary_basis.mlir)
 
@@ -177,23 +177,23 @@ except ValueError as e:
 
 
 def test_measure_arbitrary_basis_dyn_angle(plane):
-    """Test the compilation of the qml.ftqc.measure_arbitrary_basis function, which performs a
+    """Test the compilation of the qp.ftqc.measure_arbitrary_basis function, which performs a
     mid-circuit measurement in an arbitrary basis defined by a plane and rotation angle about that
     plane on the supplied qubit.
 
     In this case, the rotation angle is dynamic (not known until runtime).
     """
-    dev = qml.device("null.qubit", wires=1)
+    dev = qp.device("null.qubit", wires=1)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     @qjit(target="mlir")
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def workload_measure_arbitrary_basis_dyn_angle(_angle: float):
         _ = plft.measure_arbitrary_basis(wires=0, angle=_angle, plane=plane)
-        return qml.expval(qml.Z(0))
+        return qp.expval(qp.Z(0))
 
-    qml.capture.disable()
+    qp.capture.disable()
 
     print(workload_measure_arbitrary_basis_dyn_angle.mlir)
 
@@ -214,13 +214,13 @@ def test_pseudo_mbqc_workload():
     contains all of the elements of a typical gate represented in the MBQC formalism, but with
     reduced complexity for the sake of testing.
     """
-    dev = qml.device("null.qubit", wires=3)
+    dev = qp.device("null.qubit", wires=3)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     # CHECK-LABEL: public @workload_pseudo_mbqc(
     @qjit(target="mlir")
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def workload_pseudo_mbqc(rotation_angle: float):
         # CHECK: [[cst_zero:%.+]] = arith.constant 0.000000e+00 : f64
 
@@ -228,14 +228,14 @@ def test_pseudo_mbqc_workload():
         # CHECK: quantum.custom "Hadamard"() {{.+}} : !quantum.bit
         # CHECK: quantum.custom "Hadamard"() {{.+}} : !quantum.bit
         # CHECK: quantum.custom "Hadamard"() {{.+}} : !quantum.bit
-        qml.Hadamard(0)
-        qml.Hadamard(1)
-        qml.Hadamard(2)
+        qp.Hadamard(0)
+        qp.Hadamard(1)
+        qp.Hadamard(2)
 
         # CHECK: quantum.custom "CZ"() {{.+}}, {{.+}} : !quantum.bit, !quantum.bit
         # CHECK: quantum.custom "CZ"() {{.+}}, {{.+}} : !quantum.bit, !quantum.bit
-        qml.CZ([0, 1])
-        qml.CZ([1, 2])
+        qp.CZ([0, 1])
+        qp.CZ([1, 2])
 
         # Perform measurement pattern
         # CHECK: [[m0:%.+]], [[out0:%.+]] = mbqc.measure_in_basis[ XY, [[cst_zero]]] {{.+}} : i1, !quantum.bit
@@ -251,10 +251,10 @@ def test_pseudo_mbqc_workload():
         # CHECK:   [[neg_angle_ext:%.+]] = tensor.extract {{.+}} : tensor<f64>
         # CHECK:   mbqc.measure_in_basis[ XY, [[neg_angle_ext]]] {{.+}} : i1, !quantum.bit
         # CHECK: }
-        m1 = qml.ftqc.cond_measure(
+        m1 = qp.ftqc.cond_measure(
             m0,
-            partial(qml.ftqc.measure_arbitrary_basis, angle=rotation_angle, plane="XY"),
-            partial(qml.ftqc.measure_arbitrary_basis, angle=-rotation_angle, plane="XY"),
+            partial(qp.ftqc.measure_arbitrary_basis, angle=rotation_angle, plane="XY"),
+            partial(qp.ftqc.measure_arbitrary_basis, angle=-rotation_angle, plane="XY"),
         )(wires=1)
 
         # Apply by-product correction
@@ -265,13 +265,13 @@ def test_pseudo_mbqc_workload():
         # CHECK: } else {
         # CHECK:   quantum.custom "Identity"() {{.+}} : !quantum.bit
         # CHECK: }
-        qml.cond(m0 ^ m1, qml.X, qml.I)(2)
+        qp.cond(m0 ^ m1, qp.X, qp.I)(2)
 
         # CHECK: [[obs:%.+]] = quantum.namedobs {{.+}}[ PauliZ] : !quantum.obs
         # CHECK: quantum.expval [[obs]] : f64
-        return qml.expval(qml.Z(2))
+        return qp.expval(qp.Z(2))
 
-    qml.capture.disable()
+    qp.capture.disable()
 
     print(workload_pseudo_mbqc.mlir)
 

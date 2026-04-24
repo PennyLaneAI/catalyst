@@ -1044,7 +1044,8 @@
   [(#2739)](https://github.com/PennyLaneAI/catalyst/pull/2739)
   [(#2738)](https://github.com/PennyLaneAI/catalyst/pull/2738)
   [(#2736)](https://github.com/PennyLaneAI/catalyst/pull/2736)
-
+  [(#2715)](https://github.com/PennyLaneAI/catalyst/pull/2715)
+  
 * The "Compatibility with PennyLane transforms" section of the
   :doc:`Sharp bits and debugging tips <../dev/sharp_bits>` document has been updated to describe
   potential oddities that can be encountered when composing PennyLane transforms together.

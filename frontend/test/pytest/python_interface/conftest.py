@@ -254,18 +254,18 @@ def run_filecheck_qjit():
 
         def test_qjit(self, run_filecheck_qjit):
             # Test that the merge_rotations_pass works as expected when used with `qjit`
-            dev = qml.device("lightning.qubit", wires=2)
+            dev = qp.device("lightning.qubit", wires=2)
 
-            @qml.qjit(target="mlir")
+            @qp.qjit(target="mlir")
             @merge_rotations_pass
-            @qml.qnode(dev)
+            @qp.qnode(dev)
             def circuit(x: float, y: float):
                 # CHECK: [[phi:%.*]] = arith.addf
                 # CHECK: quantum.custom "RX"([[phi]])
                 # CHECK-NOT: quantum.custom
-                qml.RX(x, 0)
-                qml.RX(y, 0)
-                return qml.state()
+                qp.RX(x, 0)
+                qp.RX(y, 0)
+                return qp.state()
 
             run_filecheck_qjit(circuit)
 
