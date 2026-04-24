@@ -197,7 +197,7 @@ from catalyst.utils.types import convert_shaped_arrays_to_tensors
 # pylint: disable=unused-argument,too-many-lines,too-many-statements,protected-access
 
 
-CUSTOM_LOWERING_RULES = ()
+CUSTOM_LOWERING_RULES = {}
 
 
 def get_custom_lowering_rules():
@@ -213,8 +213,7 @@ def register_lowering(primitive: Primitive):
     """
 
     def decorator(f: Callable) -> Callable:
-        global CUSTOM_LOWERING_RULES  # pylint: disable=global-statement
-        CUSTOM_LOWERING_RULES += ((primitive, f),)
+        CUSTOM_LOWERING_RULES[primitive] = f
         return f
 
     return decorator

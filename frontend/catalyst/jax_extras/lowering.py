@@ -126,7 +126,7 @@ def custom_lower_jaxpr_to_module(
     # Create a keepalives list that will be mutated during the lowering.
     keepalives = []
     host_callbacks = []
-    custom_lowering_rules = get_custom_lowering_rules()
+    custom_lowering_rules = tuple(get_custom_lowering_rules().items())
     lowering_params = LoweringParameters(override_lowering_rules=custom_lowering_rules)
     ctx = ModuleContext(
         backend=None,
