@@ -30,6 +30,7 @@ from pennylane.operation import Operator
 from pennylane.ops import GlobalPhase
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region
+from xdsl.traits import SymbolTable
 
 from catalyst.python_interface.dialects import mbqc, pbc, quantum
 from catalyst.python_interface.inspection.dag_builder import DAGBuilder
@@ -89,9 +90,11 @@ class _ClusterKind(Enum):
     """Defines the structural role for a cluster of operations."""
 
     FUNC = auto()
+    CALL = auto()
     FOR_LOOP = auto()
     WHILE_LOOP = auto()
     CONDITIONAL = auto()
+    SWITCH = auto()
     BRANCH = auto()
     ADJOINT = auto()
 
@@ -376,7 +379,7 @@ class ConstructCircuitDAG:
         """Handle a PennyLane adjoint operation."""
 
         cluster_uid = self.dag_builder.add_cluster(
-            label="adjoint",
+            label=_ClusterKind.ADJOINT.name.lower(),
             labeljust="l",
             cluster_uid=self._cluster_stack[-1].uid,
         )
@@ -395,7 +398,7 @@ class ConstructCircuitDAG:
         """Handle an xDSL ForOp operation."""
 
         cluster_uid = self.dag_builder.add_cluster(
-            label="for loop",
+            label=_ClusterKind.FOR_LOOP.name.lower().replace("_", " "),
             labeljust="l",
             cluster_uid=self._cluster_stack[-1].uid,
         )
@@ -409,7 +412,7 @@ class ConstructCircuitDAG:
     def _while_op(self, operation: scf.WhileOp) -> None:
         """Handle an xDSL WhileOp operation."""
         cluster_uid = self.dag_builder.add_cluster(
-            label="while loop",
+            label=_ClusterKind.WHILE_LOOP.name.lower().replace("_", " "),
             labeljust="l",
             cluster_uid=self._cluster_stack[-1].uid,
         )
@@ -421,16 +424,43 @@ class ConstructCircuitDAG:
         self._cluster_stack.pop()
 
     @_visit_operation.register
-    def _if_op(self, operation: scf.IfOp):
-        """Handles the scf.IfOp operation."""
+    def _visit_if_op(self, operation: scf.IfOp) -> None:
+        """Handle an xDSL IfOp operation."""
+        regions = _flatten_if_op(operation)
+        labels = ["if"] + ["elif"] * (len(regions) - 2) + ["else"] if len(regions) > 1 else ["if"]
+        self._wire_to_node_uids = self._visit_branched_op(regions, _ClusterKind.CONDITIONAL, labels)
+
+    @_visit_operation.register
+    def _visit_switch_op(self, operation: scf.IndexSwitchOp) -> None:
+        """Handle an xDSL IndexSwitchOp operation."""
+        _MAX_SWITCH_BRANCHES = 5
+        if len(operation.regions) > _MAX_SWITCH_BRANCHES:
+            node_uid = self.dag_builder.add_node(
+                label=f"switch ({len(operation.regions)} cases)",
+                cluster_uid=self._cluster_stack[-1].uid,
+                fillcolor="#FFD580",
+            )
+            # NOTE: Treat this as a node with dynamic "wires"
+            self._connect([], node_uid)
+            return
+
+        labels = [f"case {i}" for i in range(len(operation.regions))]
+        self._wire_to_node_uids = self._visit_branched_op(
+            operation.regions, _ClusterKind.SWITCH, labels
+        )
+
+    def _visit_branched_op(
+        self, regions: tuple[Region, ...], cluster_kind: _ClusterKind, branch_labels: list[str]
+    ) -> dict[str | int, set[str]]:
+        """Handles a branched operation."""
 
         # Create cluster for IfOp
         cluster_uid = self.dag_builder.add_cluster(
-            label="conditional",
+            label=cluster_kind.name.lower(),
             labeljust="l",
             cluster_uid=self._cluster_stack[-1].uid,
         )
-        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.CONDITIONAL))
+        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=cluster_kind))
 
         # Save wires state before all of the branches
         wire_map_before = deepcopy(self._wire_to_node_uids)
@@ -438,17 +468,10 @@ class ConstructCircuitDAG:
         region_wire_maps: list[dict[_WireKind | int, set[str]]] = []
 
         # Loop through each branch and visualize as a cluster
-        flattened_if_op: list[Region] = _flatten_if_op(operation)
-        num_regions = len(flattened_if_op)
-        for i, region in enumerate(flattened_if_op):
-            cluster_label = "elif"
-            if i == 0:
-                cluster_label = "if"
-            elif i == num_regions - 1:
-                cluster_label = "else"
+        for i, region in enumerate(regions):
 
             cluster_uid = self.dag_builder.add_cluster(
-                label=cluster_label,
+                label=branch_labels[i],
                 labeljust="l",
                 style="dashed",
                 cluster_uid=self._cluster_stack[-1].uid,
@@ -517,7 +540,7 @@ class ConstructCircuitDAG:
         # Pop IfOp cluster before leaving this handler
         self._last_cluster_entry = self._cluster_stack.pop()
 
-        self._wire_to_node_uids = final_wire_map
+        return final_wire_map
 
     # ============
     # DEVICE NODE
@@ -540,15 +563,37 @@ class ConstructCircuitDAG:
     # =======================
 
     @_visit_operation.register
+    def _call_op(self, operation: func.CallOp) -> None:
+        """Visit a CallOp operation."""
+        callee_name = operation.callee.root_reference.data
+        # Look up the callee function in the symbol table to get its body and visualize it as a cluster
+        callee_func = SymbolTable.lookup_symbol(operation, operation.callee)
+
+        # Don't visualize calls to external functions without a body
+        is_external_function = callee_func is None or not callee_func.regions[0].blocks
+        if is_external_function:
+            return
+
+        cluster_uid = self.dag_builder.add_cluster(
+            label=callee_name,
+            labeljust="l",
+            cluster_uid=self._cluster_stack[-1].uid,
+        )
+        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.CALL))
+
+        self._visit_block(callee_func.regions[0].blocks[0])
+
+    @_visit_operation.register
     def _func_op(self, operation: func.FuncOp) -> None:
         """Visit a FuncOp Operation."""
 
-        if not operation.regions[0].blocks:
-            _ERROR_MSG = (
-                "Calls to functions without a definition are not yet compatible with 'draw_graph'. "
-                f"Found external function call to {operation.sym_name.data}."
-            )
-            raise VisualizationError(_ERROR_MSG)
+        is_external_function = len(operation.regions[0].blocks) == 0
+        qjit = operation.sym_name.data.startswith("jit_")
+        qnode = operation.attributes.get("quantum.node", None) is not None
+
+        # Don't visualize external functions without a body unless they are qjits or qnodes
+        if is_external_function or not (qjit or qnode):
+            return
 
         label: str = (
             "qjit" if operation.sym_name.data.startswith("jit_") else operation.sym_name.data
@@ -569,15 +614,13 @@ class ConstructCircuitDAG:
     def _func_return(self, operation: func.ReturnOp) -> None:
         """Handle func.return to exit FuncOp's cluster scope."""
 
-        # NOTE: Skip first cluster as it is the "base" of the graph diagram.
-        # In our case, it is the `qjit` bounding box.
-        if len(self._cluster_stack) > 1:
-            # If we hit a func.return operation we know we are leaving
-            # the FuncOp's scope and so we can pop the ID off the stack.
+        parent_op = operation.parent_op()
+
+        if not parent_op.sym_name.data.startswith("jit_"):
             self._cluster_stack.pop()
 
-        # Clear seen wires as we are exiting a FuncOp (qnode)
-        self._wire_to_node_uids = defaultdict(set)
+        if parent_op.attributes.get("quantum.node", None) is not None:
+            self._wire_to_node_uids = defaultdict(set)
 
     # =======================
     # NODE CONNECTIVITY
@@ -717,7 +760,7 @@ class ConstructCircuitDAG:
         """
         if cluster is None:
             return False
-        return cluster.kind == _ClusterKind.CONDITIONAL
+        return cluster.kind in (_ClusterKind.CONDITIONAL, _ClusterKind.SWITCH)
 
     @property
     def _exited_branching_cluster(self) -> bool:
