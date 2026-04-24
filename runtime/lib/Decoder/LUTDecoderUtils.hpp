@@ -211,7 +211,7 @@ class LUTs {
   public:
     static const std::unordered_map<std::string, std::vector<int64_t>>
     get_lut(size_t aux_col_offset, size_t code_size, size_t code_distance,
-            MemRefT_int64_1d *row_idx_tanner, MemRefT_int64_1d *col_ptr_tanner)
+            DataView<int64_t, 1> &row_idx, DataView<int64_t, 1> &col_ptr)
     {
         auto it = luts.find(aux_col_offset);
 
@@ -219,17 +219,7 @@ class LUTs {
             std::vector<size_t> aux_cols((code_size - 1) / 2);
             std::iota(aux_cols.begin(), aux_cols.end(), aux_col_offset);
 
-            // 1. Recover the parity check matrix from a tanner graph
-            DataView<int64_t, 1> row_idx_tanner_data_view(
-                row_idx_tanner->data_aligned, row_idx_tanner->offset, row_idx_tanner->sizes,
-                row_idx_tanner->strides);
-
-            DataView<int64_t, 1> col_ptr_tanner_data_view(
-                col_ptr_tanner->data_aligned, col_ptr_tanner->offset, col_ptr_tanner->sizes,
-                col_ptr_tanner->strides);
-
-            auto csc_parity_matrix = get_parity_check_matrix(row_idx_tanner_data_view,
-                                                             col_ptr_tanner_data_view, aux_cols);
+            auto csc_parity_matrix = get_parity_check_matrix(row_idx, col_ptr, aux_cols);
             auto row_idx_parity = csc_parity_matrix.first;
             auto col_ptr_parity = csc_parity_matrix.second;
 
