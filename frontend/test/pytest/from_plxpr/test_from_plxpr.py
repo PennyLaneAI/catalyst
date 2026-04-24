@@ -28,10 +28,6 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_get_p,
     qref_qinst_p,
 )
-from catalyst.jax_primitives import (
-    adjoint_p,
-    qinsert_p,
-)
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
