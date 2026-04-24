@@ -15,10 +15,18 @@
 """This module contains a library of QEC codes."""
 
 from dataclasses import dataclass, fields
-from typing import Self
+from typing import Any, Self
 
-_CODE_REGISTRY: dict[str, tuple[int, int, int]] = {
-    "Steane": (7, 1, 3),
+import numpy as np
+
+_CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
+    "Steane": (
+        7,
+        1,
+        3,
+        np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]),
+        np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]),
+    ),
 }
 
 
@@ -37,6 +45,8 @@ class QecCode:
     n: int
     k: int
     d: int
+    x_tanner: np.ndarray
+    z_tanner: np.ndarray
 
     def __str__(self):
         if self.name == "" or str.isspace(self.name):
