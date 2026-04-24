@@ -19,7 +19,6 @@ from typing import TypeAlias
 
 from pennylane.transforms.core import BoundTransform, CompilePipeline, transform
 
-# from catalyst.jax_primitives_utils import get_mlir_attribute_from_pyval
 from catalyst.tracing.contexts import EvaluationContext
 
 PipelineDict: TypeAlias = dict[str, dict[str, str]]
