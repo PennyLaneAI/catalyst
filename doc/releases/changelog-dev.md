@@ -629,6 +629,11 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Added a generic memory-space attribute in the Catalyst dialect that can be used in the
+  `memory_space` slot of `memref` types (or as a discardable attribute) to tag values with
+  a logical memory domain plus an optional LLVM-level address space within that domain.
+  [(#2750)](https://github.com/PennyLaneAI/catalyst/pull/2750)
+
 * The compiler pipeline definitions now have a single source of truth. Previously, pipeline and
   pass sequences were duplicated between the frontend (`frontend/catalyst/pipelines.py`) and the
   compiler (`mlir/lib/Driver/Pipelines.cpp`). Now, there is a unique definition that lives in
