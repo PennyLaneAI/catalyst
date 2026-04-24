@@ -25,12 +25,13 @@ from functools import partial
 from typing import Any, Callable, List, Optional, Union
 
 import jax
-import pennylane as qml
+import pennylane as qp
 from jax._src.source_info_util import current as current_source_info
 from jax._src.tree_util import tree_flatten
 from jax.api_util import debug_info
 from jax.core import get_aval
 from pennylane import QueuingManager
+from pennylane.decomposition.resources import resolve_work_wire_type
 from pennylane.operation import Operator
 from pennylane.ops.op_math.adjoint import create_adjoint_op
 from pennylane.ops.op_math.controlled import create_controlled_op
@@ -67,7 +68,7 @@ def measure(
 
     .. important::
 
-        The :func:`qml.measure() <pennylane.measure>` function is **not** QJIT
+        The :func:`qp.measure() <pennylane.measure>` function is **not** QJIT
         compatible and :func:`catalyst.measure` from Catalyst should be used instead.
 
     Args:
@@ -94,19 +95,22 @@ def measure(
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=2)
+        import pennylane as qp
+        from catalyst import qjit, measure
+
+        dev = qp.device("lightning.qubit", wires=2)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x: float):
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
             m1 = measure(wires=0)
 
-            qml.RX(m1 * jnp.pi, wires=1)
+            qp.RX(m1 * jnp.pi, wires=1)
             m2 = measure(wires=1)
 
-            qml.RZ(m2 * jnp.pi / 2, wires=0)
-            return qml.expval(qml.PauliZ(0)), m2
+            qp.RZ(m2 * jnp.pi / 2, wires=0)
+            return qp.expval(qp.PauliZ(0)), m2
 
     >>> circuit(0.43)
     [Array(1., dtype=float64), Array(False, dtype=bool)]
@@ -117,14 +121,14 @@ def measure(
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
-            qml.Hadamard(0)
+            qp.Hadamard(0)
             m = measure(0, postselect=1)
-            return qml.expval(qml.PauliZ(0))
+            return qp.expval(qp.PauliZ(0))
 
     >>> circuit()
     Array(-1., dtype=float64)
@@ -133,14 +137,14 @@ def measure(
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
-            qml.Hadamard(0)
+            qp.Hadamard(0)
             m = measure(0, reset=True)
-            return qml.expval(qml.PauliZ(0))
+            return qp.expval(qp.PauliZ(0))
 
     >>> circuit()
     Array(1., dtype=float64)
@@ -178,7 +182,7 @@ def measure(
 
         @cond(m)
         def reset_fn():
-            qml.PauliX(wires=wires)
+            qp.PauliX(wires=wires)
 
         reset_fn()
 
@@ -216,17 +220,20 @@ def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator
     **Example 1 (basic usage)**
 
     .. code-block:: python
+        import pennylane as qp
+        import catalyst
+        from catalyst import qjit
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def workflow(theta, wires):
-            catalyst.adjoint(qml.RZ)(theta, wires=wires)
-            catalyst.adjoint(qml.RZ(theta, wires=wires))
+            catalyst.adjoint(qp.RZ)(theta, wires=wires)
+            catalyst.adjoint(qp.RZ(theta, wires=wires))
             def func():
-                qml.RX(theta, wires=wires)
-                qml.RY(theta, wires=wires)
+                qp.RX(theta, wires=wires)
+                qp.RY(theta, wires=wires)
             catalyst.adjoint(func)()
-            return qml.probs()
+            return qp.probs()
 
     >>> workflow(jnp.pi/2, wires=0)
     Array([0.5, 0.5], dtype=float64)
@@ -236,16 +243,16 @@ def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator
     .. code-block:: python
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def workflow(theta, n, wires):
             def func():
                 @catalyst.for_loop(0, n, 1)
                 def loop_fn(i):
-                    qml.RX(theta, wires=wires)
+                    qp.RX(theta, wires=wires)
 
                 loop_fn()
             catalyst.adjoint(func)()
-            return qml.probs()
+            return qp.probs()
 
     >>> workflow(jnp.pi/2, 3, 0)
     [1.00000000e+00 7.39557099e-32]
@@ -262,9 +269,10 @@ def ctrl(
     control: List[Any],
     control_values: Optional[List[Any]] = None,
     work_wires: Optional[List[Any]] = None,
+    work_wire_type: str = "borrowed",
 ) -> Callable:
     """Create a method that applies a controlled version of the provided op. This function is the
-    Catalyst version of the ``qml.ctrl`` that supports Catalyst hybrid operations such as loops and
+    Catalyst version of the ``qp.ctrl`` that supports Catalyst hybrid operations such as loops and
     conditionals.
 
     Args:
@@ -274,6 +282,7 @@ def ctrl(
         control_values (List[bool], optional): The value(s) the control wire(s) should take.
             Integers other than 0 or 1 will be treated as ``int(bool(x))``.
         work_wires (Any): Any auxiliary wires that can be used in the decomposition
+        work_wire_type (str): The type of work wire(s), can be ``"zeroed"`` or ``"borrowed"``.
 
     Returns:
         (function or :class:`~.operation.Operator`): If an Operator is provided, returns a
@@ -287,24 +296,28 @@ def ctrl(
 
     .. code-block:: python
 
+        import pennylane as qp
+        import catalyst
+        from catalyst import qjit
+
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def workflow(theta, w, cw):
-            qml.Hadamard(wires=[0])
-            qml.Hadamard(wires=[1])
+            qp.Hadamard(wires=[0])
+            qp.Hadamard(wires=[1])
 
             def func(arg):
-              qml.RX(theta, wires=arg)
+              qp.RX(theta, wires=arg)
 
             @cond(theta > 0.0)
             def cond_fn():
-              qml.RY(theta, wires=w)
+              qp.RY(theta, wires=w)
 
             catalyst.ctrl(func, control=[cw])(w)
             catalyst.ctrl(cond_fn, control=[cw])()
-            catalyst.ctrl(qml.RZ, control=[cw])(theta, wires=w)
-            catalyst.ctrl(qml.RY(theta, wires=w), control=[cw])
-            return qml.probs()
+            catalyst.ctrl(qp.RZ, control=[cw])(theta, wires=w)
+            catalyst.ctrl(qp.RY(theta, wires=w), control=[cw])
+            return qp.probs()
 
     >>> workflow(jnp.pi/4, 1, 0)
     Array([0.25, 0.25, 0.03661165, 0.46338835], dtype=float64)
@@ -318,7 +331,13 @@ def ctrl(
             f"to the lenght of control ({len(control)})"
         )
 
-    res = CtrlCallable(f, control, control_values=control_values, work_wires=work_wires)
+    res = CtrlCallable(
+        f,
+        control,
+        control_values=control_values,
+        work_wires=work_wires,
+        work_wire_type=work_wire_type,
+    )
     return res() if isinstance(f, Operator) else res
 
 
@@ -338,7 +357,7 @@ class MidCircuitMeasure(HybridOp):
         postselect: int = None,
     ):
         HybridOp.__init__(self, in_classical_tracers, out_classical_tracers, regions)
-        self._wires = qml.wires.Wires(in_classical_tracers)
+        self._wires = qp.wires.Wires(in_classical_tracers)
         self.reset = reset
         self.postselect = postselect
 
@@ -374,11 +393,11 @@ class AdjointCallable:
         self.lazy = lazy
 
         if isinstance(target, Operator):
-            # Case 1: User passed an already instantiated operation, e.g. adjoint(qml.Hadamard(0))
+            # Case 1: User passed an already instantiated operation, e.g. adjoint(qp.Hadamard(0))
             self.single_op = True
             self.instantiated = True
         elif isinstance(target, type) and issubclass(target, Operator):
-            # Case 2: User passed the constructor of an operation, e.g. adjoint(qml.Hadamard)(0)
+            # Case 2: User passed the constructor of an operation, e.g. adjoint(qp.Hadamard)(0)
             self.single_op = True
             self.instantiated = False
         elif isinstance(target, Callable):
@@ -412,7 +431,7 @@ class AdjointCallable:
             # For Adjoint of HybridAdjoint, we still create the HybridAdjoint of HybridAdjoint, so
             # that the MLIR adjoint-lowering pass can handle the reversal.
             if isinstance(op, HybridOp):
-                AdjointCallable(lambda bound_op=op: qml.apply(bound_op) and None, lazy=True)()
+                AdjointCallable(lambda bound_op=op: qp.apply(bound_op) and None, lazy=True)()
             else:
                 create_adjoint_op(op, lazy=False)
 
@@ -523,11 +542,13 @@ class HybridAdjoint(HybridOp):
 class CtrlCallable:
     """Callable wrapper to produce a ctrl instance."""
 
-    def __init__(self, target, control, control_values, work_wires):
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
+    def __init__(self, target, control, control_values, work_wires, work_wire_type="borrowed"):
         self.target = target
         self.control_wires = control
         self.control_values = control_values
         self.work_wires = work_wires
+        self.work_wire_type = work_wire_type
 
         if isinstance(target, Operator):
             # Case 1. Support an initialized operation as the base target
@@ -548,7 +569,11 @@ class CtrlCallable:
         if self.single_op:
             base_op = self.target if self.instantiated else self.target(*args, **kwargs)
             return create_controlled_op(
-                base_op, self.control_wires, self.control_values, self.work_wires
+                base_op,
+                self.control_wires,
+                self.control_values,
+                self.work_wires,
+                work_wire_type=self.work_wire_type,
             )
 
         tracing_artifacts = self.trace_body(args, kwargs)
@@ -558,6 +583,7 @@ class CtrlCallable:
             control_wires=self.control_wires,
             control_values=self.control_values,
             work_wires=self.work_wires,
+            work_wire_type=self.work_wire_type,
         )
 
     def trace_body(self, args, kwargs):
@@ -589,9 +615,17 @@ class CtrlCallable:
 class HybridCtrl(HybridOp):
     """Catalyst quantum ctrl operation support for both operations and callables"""
 
-    def __init__(self, *tracing_artifacts, control_wires, control_values=None, work_wires=None):
-        self._control_wires = qml.wires.Wires(control_wires)
-        self._work_wires = qml.wires.Wires([] if work_wires is None else work_wires)
+    def __init__(
+        self,
+        *tracing_artifacts,
+        control_wires,
+        control_values=None,
+        work_wires=None,
+        work_wire_type="borrowed",
+    ):
+        self._control_wires = qp.wires.Wires(control_wires)
+        self._work_wires = qp.wires.Wires([] if work_wires is None else work_wires)
+        self._work_wire_type = work_wire_type
         if control_values is None:
             self._control_values = [True] * len(self._control_wires)
         elif isinstance(control_values, (int, bool)):
@@ -617,6 +651,7 @@ class HybridCtrl(HybridOp):
             self._control_wires,
             self._control_values,
             self._work_wires,
+            self._work_wire_type,
         )
 
     @property
@@ -645,6 +680,11 @@ class HybridCtrl(HybridOp):
         """Optional wires that can be used in the expansion of this op."""
         return self._work_wires
 
+    @property
+    def work_wire_type(self):
+        """The type of work wires provided"""
+        return self._work_wire_type
+
     def map_wires(self, wire_map):
         """Map wires to new wires according to wire_map"""
         new_ops = []
@@ -661,6 +701,7 @@ def ctrl_distribute(
     control_wires: List[Any],
     control_values: List[Any],
     work_wires: Optional[List[Any]] = None,
+    work_wire_type: str = "borrowed",
 ) -> QuantumTape:
     """Distribute the quantum control operation, described by ``control_wires`` and
     ``control_values``, over all the operations on the nested quantum tape.
@@ -683,16 +724,26 @@ def ctrl_distribute(
     for op in tape.operations:
         if has_nested_tapes(op):
             if isinstance(op, HybridCtrl):
+                # For nested HybridCtrl, resolve the combined work_wire_type first.
+                # This is the same as the logic in PennyLane:
+                # `pennylane/ops/op_math/controlled.py:create_controlled_op`
+                combined_work_wire_type = resolve_work_wire_type(
+                    qp.wires.Wires(work_wires) if work_wires is not None else qp.wires.Wires([]),
+                    work_wire_type,
+                    op.work_wires,
+                    op.work_wire_type,
+                )
                 nested_ops = ctrl_distribute(
                     op.regions[0].quantum_tape,
                     control_wires + op.control_wires,
                     control_values + op.control_values,
                     work_wires + op.work_wires,
+                    combined_work_wire_type,
                 )
                 new_ops.extend(nested_ops)
             else:
                 for region in [region for region in op.regions if region.quantum_tape is not None]:
-                    # Re-enter a JAXPR frame but do not create a new one is none exists.
+                    # Re-enter a JAXPR frame but do not create a new one if none exists.
                     if cur_trace and region.trace:
                         trace_manager = EvaluationContext.frame_tracing_context(region.trace)
                     else:
@@ -700,19 +751,24 @@ def ctrl_distribute(
 
                     with trace_manager:
                         nested_ops = ctrl_distribute(
-                            region.quantum_tape, control_wires, control_values, work_wires
+                            region.quantum_tape,
+                            control_wires,
+                            control_values,
+                            work_wires,
+                            work_wire_type,
                         )
                         region.quantum_tape = QuantumTape(
                             nested_ops, region.quantum_tape.measurements
                         )
                 new_ops.append(op)
-        elif isinstance(op, qml.ops.Adjoint):
+        elif isinstance(op, qp.ops.Adjoint):
             # ctrl resolves faster for nested hybrid controls than create_controlled_op
             ctrl_op = ctrl(
                 copy.copy(op.base),
                 control=control_wires,
                 control_values=control_values,
                 work_wires=work_wires,
+                work_wire_type=work_wire_type,
             )
             new_ops.append(create_adjoint_op(ctrl_op, lazy=True))
         else:
@@ -721,6 +777,7 @@ def ctrl_distribute(
                 control=control_wires,
                 control_values=control_values,
                 work_wires=work_wires,
+                work_wire_type=work_wire_type,
             )
             new_ops.append(ctrl_op)
     return new_ops

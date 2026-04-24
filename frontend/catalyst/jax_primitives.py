@@ -140,6 +140,7 @@ from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
 from pennylane.capture.primitives import quantum_subroutine_prim
 from pennylane.capture.primitives import value_and_grad_prim as pl_value_and_grad_prim
 from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
+from pennylane.capture.primitives import while_loop_prim as pl_while_loop_prim
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
@@ -482,7 +483,8 @@ def _python_callback_lowering(
     """Callback lowering"""
 
     sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-    import catalyst_callback_registry as registry  # pylint: disable=import-outside-toplevel
+    # pylint: disable=import-outside-toplevel
+    import catalyst_callback_registry as registry  # type: ignore[import-not-found]
 
     callback_id = registry.register(callback)
 
@@ -2560,6 +2562,77 @@ def _while_loop_lowering(
     return while_op_scf.results
 
 
+def _pl_while_loop_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *plxpr_invals,
+    jaxpr_body_fn,
+    jaxpr_cond_fn,
+    body_slice,
+    cond_slice,
+    args_slice,
+):
+    body_consts = plxpr_invals[slice(*body_slice)]
+    cond_consts = plxpr_invals[slice(*cond_slice)]
+    args = plxpr_invals[slice(*args_slice)]
+
+    all_args_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
+    args_types = all_args_types[slice(*args_slice)]
+
+    while_op_scf = WhileOp(args_types, args)
+
+    # cond block
+    cond_block = while_op_scf.regions[0].blocks.append(*args_types)
+    name_stack = jax_ctx.name_stack.extend("while")
+    cond_ctx = jax_ctx.replace(name_stack=name_stack.extend("cond"))
+    with ir.InsertionPoint(cond_block):
+        cond_args = tuple(cond_block.arguments[i] for i in range(len(args)))
+        params = cond_consts + cond_args
+        new_cond_jaxpr = jaxpr_cond_fn.replace(
+            constvars=(), invars=jaxpr_cond_fn.constvars + jaxpr_cond_fn.invars
+        )
+
+        # recursively generate the mlir for the while cond
+        (pred,), _ = mlir.jaxpr_subcomp(
+            cond_ctx.module_context,
+            new_cond_jaxpr,
+            cond_ctx.name_stack,
+            mlir.TokenSet(),
+            [],
+            *params,
+            dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
+        )
+
+        pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), pred, []).result
+        ConditionOp(pred_extracted, cond_args)
+
+    # body block
+    body_block = while_op_scf.regions[1].blocks.append(*args_types)
+    body_ctx = jax_ctx.replace(name_stack=name_stack.extend("body"))
+    with ir.InsertionPoint(body_block):
+        body_args = tuple(body_block.arguments[-len(args) :])
+        params = body_consts + body_args
+
+        new_body_jaxpr = jaxpr_body_fn.replace(
+            constvars=(), invars=jaxpr_body_fn.constvars + jaxpr_body_fn.invars
+        )
+
+        # recursively generate the mlir for the while body
+        out, _ = mlir.jaxpr_subcomp(
+            body_ctx.module_context,
+            new_body_jaxpr,
+            body_ctx.name_stack,
+            mlir.TokenSet(),
+            [],
+            *params,
+            dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
+        )
+        YieldOp(out)
+
+    return while_op_scf.results
+
+
 #
 # for loop
 #
@@ -3019,6 +3092,7 @@ CUSTOM_LOWERING_RULES = (
     (pl_vjp_prim, _capture_vjp_lowering),
     (pl_jvp_prim, _capture_jvp_lowering),
     (pl_value_and_grad_prim, _capture_value_and_grad_lowering),
+    (pl_while_loop_prim, _pl_while_loop_lowering),
     (func_p, _func_lowering),
     (jvp_p, _jvp_lowering),
     (vjp_p, _vjp_lowering),

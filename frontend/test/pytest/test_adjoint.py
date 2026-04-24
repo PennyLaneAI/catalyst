@@ -1732,7 +1732,7 @@ class TestAdjointOfTemplates:
         assert np.allclose(circuit(True), 1.0 / np.sqrt(2))
 
     def test_adjoint_switch(self, backend):
-        """Catalyst's adjoint algorithm doesn't work on switch yet."""
+        """Test operator adjoint works on the switch operation."""
 
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(s: int):
@@ -1746,8 +1746,8 @@ class TestAdjointOfTemplates:
 
             return qml.expval(qml.Z(0))
 
-        with pytest.raises(cat.CompileError, match=r"Adjoint\(Switch.+\) not supported"):
-            qjit(circuit)
+        result = qjit(circuit)(0)
+        assert np.isclose(result, 1.0)
 
 
 if __name__ == "__main__":

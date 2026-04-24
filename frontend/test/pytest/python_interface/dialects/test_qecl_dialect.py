@@ -302,6 +302,12 @@ def test_assembly_format(run_filecheck, pretty_print):
     // CHECK: [[block11:%.+]], [[block12:%.+]] = qecl.cnot [[block_ctrl]][{{\s*}}0], [[block10]][{{\s*}}0]
     %block_ctrl = "test.op"() : () -> !qecl.codeblock<1>
     %block11, %block12 = qecl.cnot %block_ctrl[0], %block10[0] : !qecl.codeblock<1>, !qecl.codeblock<1>
+    
+    // CHECK: [[block13:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+    // CHECK: [[block14:%.+]] = qecl.noise [[block13:%.+]] : !qecl.codeblock<1>
+    %block13 = "test.op"() : () -> !qecl.codeblock<1>
+    %block14 = qecl.noise %block13 : !qecl.codeblock<1>
+    
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)

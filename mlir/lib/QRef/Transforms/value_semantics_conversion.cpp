@@ -132,6 +132,11 @@ DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumGate r
  */
 bool isQrefSubroutine(func::FuncOp f)
 {
+    // quantum.node is not a subroutine
+    if (f->hasAttrOfType<UnitAttr>("quantum.node")) {
+        return false;
+    }
+
     // If has a qref argument, definitely is a qref subroutine
     if (llvm::any_of(f.getArgumentTypes(), llvm::IsaPred<qref::QubitType, qref::QuregType>)) {
         return true;
@@ -1166,10 +1171,6 @@ void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTr
     SetVector<Value> rValuesUsedByRegion;
     collectNecessaryRegionRValues(rAdjointOp.getRegion(), rValuesUsedByRegion);
 
-    if (rValuesUsedByRegion.size() == 0) {
-        return;
-    }
-
     quantum::AdjointOp vAdjointOp;
     {
         // 1. Send in the vValues from above as arguments
@@ -1610,6 +1611,11 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
                "qref.bit Values must have no uses after the semantic conversion");
         builder.eraseOp(getOp);
     });
+    f.walk([&](qref::AllocOp allocOp) {
+        assert(allocOp.use_empty() &&
+               "qref.reg Values must have no uses after the semantic conversion");
+        builder.eraseOp(allocOp);
+    });
 
     // Nuke all old qref arguments
     f.front().eraseArguments(
@@ -1789,6 +1795,12 @@ struct ValueSemanticsConversionPass
                 assert(getOp.use_empty() &&
                        "qref.bit Values must have no uses after the semantic conversion");
                 builder.eraseOp(getOp);
+            });
+
+            targetFunc.walk([&](qref::AllocOp allocOp) {
+                assert(allocOp.use_empty() &&
+                       "qref.reg Values must have no uses after the semantic conversion");
+                builder.eraseOp(allocOp);
             });
         }
     }

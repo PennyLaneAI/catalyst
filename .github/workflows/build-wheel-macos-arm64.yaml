@@ -329,7 +329,7 @@ jobs:
               -DENABLE_OQD=OFF \
               -DMLIR_INCLUDE_DIRS="$GITHUB_WORKSPACE/mlir/llvm-project/mlir/include"
 
-        cmake --build $GITHUB_WORKSPACE/runtime-build --target rt_capi rt_rsdecomp rtd_openqasm rtd_null_qubit decompsolver
+        cmake --build $GITHUB_WORKSPACE/runtime-build --target rt_capi rt_rsdecomp rtd_openqasm rtd_null_qubit
 
     - name: Error log on failure
       if: failure() && steps.runtime-build.outcome == 'failure'
@@ -359,6 +359,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+              -DPython_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
               -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir" \
@@ -366,7 +367,6 @@ jobs:
               -DSTABLEHLO_BUILD_DIR="$GITHUB_WORKSPACE/stablehlo-build" \
               -DEnzyme_DIR="$GITHUB_WORKSPACE/enzyme-build" \
               -DENZYME_SRC_DIR="$GITHUB_WORKSPACE/mlir/Enzyme" \
-              -DRUNTIME_LIB_DIR="$GITHUB_WORKSPACE/runtime-build/lib" \
               -DLLVM_ENABLE_ZLIB=FORCE_ON \
               -DLLVM_ENABLE_ZSTD=OFF \
               -DLLVM_ENABLE_LLD=OFF \
