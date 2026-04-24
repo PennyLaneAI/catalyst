@@ -1022,6 +1022,7 @@
   [(#2697)](https://github.com/PennyLaneAI/catalyst/pull/2697)
   [(#2714)](https://github.com/PennyLaneAI/catalyst/pull/2714)
   [(#2716)](https://github.com/PennyLaneAI/catalyst/pull/2716)
+  [(#2737)](https://github.com/PennyLaneAI/catalyst/pull/2737)
   [(#2731)](https://github.com/PennyLaneAI/catalyst/pull/2731)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
