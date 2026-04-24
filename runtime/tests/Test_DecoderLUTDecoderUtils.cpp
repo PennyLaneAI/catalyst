@@ -28,14 +28,17 @@ using namespace Catalyst::Runtime::QEC;
 TEST_CASE("Test convert_sydrome_res_to_bitstr", "[LUTDecoderUtils::convert_syndrome_res_to_bitstr]")
 {
     std::vector<size_t> bad_syndrome_inputs = {1, 2, 3};
-    REQUIRE_THROWS_WITH(convert_syndrome_res_to_bitstr(bad_syndrome_inputs),
+    DataView<size_t, 1> bad_syndrome_inputs_dv(bad_syndrome_inputs);
+    REQUIRE_THROWS_WITH(convert_syndrome_res_to_bitstr<size_t>(bad_syndrome_inputs_dv),
                         Catch::Matchers::ContainsSubstring("Assertion: bit == 0 || bit == 1"));
 
     std::vector<size_t> syndromes_size_t = {0, 1, 0};
     std::vector<int8_t> syndromes_int8_t = {0, 1, 0};
+    DataView<size_t, 1> syndromes_size_t_dv(syndromes_size_t);
+    DataView<int8_t, 1> syndromes_int8_t_dv(syndromes_int8_t);
     std::string expected_syndrome_str = "010";
-    std::string syndrome_str_size_t = convert_syndrome_res_to_bitstr(syndromes_size_t);
-    std::string syndrome_str_int8_t = convert_syndrome_res_to_bitstr(syndromes_int8_t);
+    std::string syndrome_str_size_t = convert_syndrome_res_to_bitstr<size_t>(syndromes_size_t_dv);
+    std::string syndrome_str_int8_t = convert_syndrome_res_to_bitstr<int8_t>(syndromes_int8_t_dv);
 
     REQUIRE(syndrome_str_size_t == expected_syndrome_str);
     REQUIRE(syndrome_str_int8_t == expected_syndrome_str);

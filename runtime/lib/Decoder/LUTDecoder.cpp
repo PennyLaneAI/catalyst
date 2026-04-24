@@ -45,11 +45,11 @@ void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
     const size_t code_distance = 3;
     const size_t aux_col_offset = 7;
 
-    const size_t num_aux = current_syndromes->sizes[0]; // number of columns
-    std::vector<int8_t> current_syndromes_res(current_syndromes->data_aligned,
-                                              current_syndromes->data_aligned + num_aux);
+    DataView<int8_t, 1> syndromes_res_data_view(current_syndromes->data_aligned,
+                                                current_syndromes->offset, current_syndromes->sizes,
+                                                current_syndromes->strides);
 
-    auto current_syndrome_str = convert_syndrome_res_to_bitstr(current_syndromes_res);
+    auto current_syndrome_str = convert_syndrome_res_to_bitstr<int8_t>(syndromes_res_data_view);
 
     auto current_lut =
         LUTs::get_lut(aux_col_offset, code_size, code_distance, row_idx_tanner, col_ptr_tanner);

@@ -32,8 +32,8 @@ namespace Catalyst::Runtime::QEC {
  * @param syndrome_res A vector of syndrome results
  * @return std::string A bit string representation of the given syndrome results.
  */
-template <class IntegerType = std::size_t>
-std::string convert_syndrome_res_to_bitstr(std::vector<IntegerType> &syndrome_res)
+template <typename T = int8_t>
+std::string convert_syndrome_res_to_bitstr(DataView<T, 1> &syndrome_res)
 {
     std::string syndrom_str;
     for (const auto &bit : syndrome_res) {
@@ -111,9 +111,9 @@ std::string get_syndrome_from_errors(const std::vector<int64_t> &row_idx,
         }
         syndrome_res[col] = syndrome_res[col] % 2;
     }
-
+    DataView<size_t, 1> syndrome_res_data_view(syndrome_res);
     // Return results
-    return convert_syndrome_res_to_bitstr(syndrome_res);
+    return convert_syndrome_res_to_bitstr<size_t>(syndrome_res_data_view);
 }
 
 std::vector<int64_t> get_error_indices(std::vector<uint8_t> &err_vec)
