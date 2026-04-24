@@ -18,7 +18,7 @@
 
 import jax
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 from jax import numpy as jnp
 from jax._src.source_info_util import current as current_source_info
@@ -62,8 +62,8 @@ class TestBasicAbstractedAxes:
         @qjit(abstracted_axes={0: "a", 1: "b"}, capture=capture_mode)
         def identity(a):
             assert a.shape[0] is not a.shape[1]
-            assert qml.math.is_abstract(a.shape[0])
-            assert qml.math.is_abstract(a.shape[1])
+            assert qp.math.is_abstract(a.shape[0])
+            assert qp.math.is_abstract(a.shape[1])
             return a
 
         param = jnp.eye(2)
@@ -79,9 +79,9 @@ class TestBasicAbstractedAxes:
             assert a.shape[0] is b.shape[0]
             assert a.shape[0] is not a.shape[1]
             assert b.shape[1] == 2
-            assert qml.math.is_abstract(a.shape[0])
-            assert qml.math.is_abstract(a.shape[1])
-            assert qml.math.is_abstract(b.shape[0])
+            assert qp.math.is_abstract(a.shape[0])
+            assert qp.math.is_abstract(a.shape[1])
+            assert qp.math.is_abstract(b.shape[0])
             return a, b
 
         param0 = jnp.ones((4, 3))
@@ -96,8 +96,8 @@ class TestBasicAbstractedAxes:
         @qjit(abstracted_axes={0: "n", 2: "m"}, capture=capture_mode)
         def aot(a: jax.core.ShapedArray([1, 3, 1], dtype=float)):
             assert a.shape[0] is not a.shape[2]
-            assert qml.math.is_abstract(a.shape[0])
-            assert qml.math.is_abstract(a.shape[2])
+            assert qp.math.is_abstract(a.shape[0])
+            assert qp.math.is_abstract(a.shape[2])
             assert a.shape[1] == 3
             return a
 
@@ -106,12 +106,12 @@ class TestBasicAbstractedAxes:
     def test_qnode_abstracted_axis(self, capture_mode):
         """Test that qnode accepts dynamical arguments."""
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit(a):
-            assert qml.math.is_abstract(a.shape[0])
+            assert qp.math.is_abstract(a.shape[0])
             s = jnp.sum(a)
-            qml.RX(s, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(s, 0)
+            return qp.expval(qp.Z(0))
 
         @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
         def workflow(a):
@@ -127,13 +127,13 @@ class TestBasicAbstractedAxes:
     def test_qnode_dynamic_structured_args(self, capture_mode):
         """Test that qnode accepts dynamically-shaped structured args"""
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit(a_b):
             x = a_b[0] + a_b[1]
-            assert qml.math.is_abstract(x.shape[0])
+            assert qp.math.is_abstract(x.shape[0])
             phi = jnp.sum(x)
-            qml.RX(phi, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(phi, 0)
+            return qp.expval(qp.Z(0))
 
         @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
         def func(a_b):
@@ -142,7 +142,7 @@ class TestBasicAbstractedAxes:
         param = jnp.array([1, 2, 3])
         c = func((param, param))
         expected = jnp.cos(2 * jnp.sum(param))
-        assert qml.math.allclose(c, expected)
+        assert qp.math.allclose(c, expected)
         assert c.dtype == expected.dtype
         assert "tensor<?xi64>" in func.mlir, func.mlir
 
@@ -168,7 +168,7 @@ class TestBasicArrayCreation:
     def test_qnode_dynamic_structured_results(self):
         """Test that qnode returns dynamically-shaped results"""
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit(a):
             return (
                 jnp.ones((a + 1,)),
@@ -410,7 +410,7 @@ class TestForLoopDynamicShapes:
         def f(sz):
             a = jnp.ones([sz], dtype=float)
 
-            @qml.for_loop(0, 10, 2)
+            @qp.for_loop(0, 10, 2)
             def loop(_, a):
                 return a
 
@@ -428,7 +428,7 @@ class TestForLoopDynamicShapes:
         def f(sz):
             x = jnp.ones([sz], dtype=float)
 
-            @qml.for_loop(0, 3, 1)
+            @qp.for_loop(0, 3, 1)
             def loop(_, a):
                 return a + x
 
@@ -447,7 +447,7 @@ class TestForLoopDynamicShapes:
             a = jnp.ones([sz], dtype=float)
             b = jnp.ones([sz], dtype=float)
 
-            @qml.for_loop(0, 10, 2)
+            @qp.for_loop(0, 10, 2)
             def loop(_, a, b):
                 return (a, b)
 
@@ -466,7 +466,7 @@ class TestForLoopDynamicShapes:
             a = jnp.ones([sz, 3], dtype=float)
             b = jnp.ones([sz, 3], dtype=float)
 
-            @qml.for_loop(0, 10, 2, allow_array_resizing=True)
+            @qp.for_loop(0, 10, 2, allow_array_resizing=True)
             def loop(_i, a, _b):
                 b = jnp.ones([sz + 1, 3], dtype=float)
                 return (a, b)
@@ -485,7 +485,7 @@ class TestForLoopDynamicShapes:
         def f(sz):
             a0 = jnp.ones([sz], dtype=float)
 
-            @qml.for_loop(0, 10, 1, allow_array_resizing=True)
+            @qp.for_loop(0, 10, 1, allow_array_resizing=True)
             def loop(i, _):
                 return jnp.ones([i], dtype=float)
 
@@ -503,7 +503,7 @@ class TestForLoopDynamicShapes:
         def f(sz):
             a0 = jnp.ones([sz], dtype=float)
 
-            @qml.for_loop(0, 3, 1)
+            @qp.for_loop(0, 3, 1)
             def loop(_i, a):
                 return a * sz
 
@@ -522,7 +522,7 @@ class TestForLoopDynamicShapes:
             input_a = jnp.ones([sz + 1], dtype=float)
             input_b = jnp.ones([sz + 2], dtype=float)
 
-            @qml.for_loop(0, 10, 1, allow_array_resizing=True)
+            @qp.for_loop(0, 10, 1, allow_array_resizing=True)
             def loop(_i, _a, _b):
                 return (input_a, input_a)
 
@@ -539,18 +539,18 @@ class TestForLoopDynamicShapes:
         """Test simple for-loops with dynamic dimensions while doing quantum tracing."""
 
         @qjit(capture=capture_mode)
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def f(sz):
             a = jnp.ones([sz], dtype=float)
 
-            @qml.for_loop(0, 10, 2)
+            @qp.for_loop(0, 10, 2)
             def loop(_, a):
                 return a
 
             a2 = loop(a)
             x = jnp.sum(a2)
-            qml.RX(x, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            return qp.expval(qp.Z(0))
 
         result = f(3)
         expected = jnp.cos(3)
@@ -560,18 +560,18 @@ class TestForLoopDynamicShapes:
         """Test simple for-loops with dynamic dimensions while doing quantum tracing."""
 
         @qjit(capture=capture_mode)
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def f(sz):
             x = jnp.ones([sz], dtype=float)
 
-            @qml.for_loop(0, 3, 1)
+            @qp.for_loop(0, 3, 1)
             def loop(_, a):
                 return a + x
 
             a2 = loop(x)
             x = jnp.sum(a2)
-            qml.RX(x, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            return qp.expval(qp.Z(0))
 
         result = f(3)
         expected = jnp.cos(12)
@@ -581,36 +581,36 @@ class TestForLoopDynamicShapes:
         """Tests that for-loops preserve equality of output dynamic dimensions."""
 
         @qjit(capture=capture_mode)
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def f(sz):
             a = jnp.ones([sz], dtype=float)
             b = jnp.ones([sz], dtype=float)
 
-            @qml.for_loop(0, 10, 2)
+            @qp.for_loop(0, 10, 2)
             def loop(_, a, b):
                 return (a, b)
 
             a2, b2 = loop(a, b)
             c2 = a2 + b2
             x = jnp.sum(c2)
-            qml.RX(x, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            return qp.expval(qp.Z(0))
 
         result = f(3)
         expected = jnp.cos(6)  # 2*np.ones(3)
-        assert qml.math.allclose(result, expected)
+        assert qp.math.allclose(result, expected)
 
     def test_qnode_forloop_indbidx_outdbidx(self, capture_mode):
         """Test for-loops with mixed input and output dimension variables during the
         quantum tracing."""
 
         @qjit(capture=capture_mode)
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def f(sz):
             a = jnp.ones([sz], dtype=float)
             b = jnp.ones([sz], dtype=float)
 
-            @qml.for_loop(0, 10, 2, allow_array_resizing=True)
+            @qp.for_loop(0, 10, 2, allow_array_resizing=True)
             def loop(_i, a, _b):
                 b = jnp.ones([sz + 1], dtype=float)
                 return (a, b)
@@ -618,9 +618,9 @@ class TestForLoopDynamicShapes:
             a2, b2 = loop(a, b)
             xa = jnp.sum(a2)
             xb = jnp.sum(b2)
-            qml.RX(xa, 0)
-            qml.RX(xb, 1)
-            return qml.expval(qml.Z(0)), qml.expval(qml.Z(1))
+            qp.RX(xa, 0)
+            qp.RX(xb, 1)
+            return qp.expval(qp.Z(0)), qp.expval(qp.Z(1))
 
         res_a, res_b = f(3)
         expected_a = jnp.cos(3)
@@ -633,9 +633,9 @@ class TestForLoopDynamicShapes:
         tracing. Use abstracted_axes as the source of dynamism."""
 
         @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def f(a, b):
-            @qml.for_loop(0, 10, 2, allow_array_resizing=True)
+            @qp.for_loop(0, 10, 2, allow_array_resizing=True)
             def loop(_i, a, _b):
                 b = jnp.ones([a.shape[0] + 1], dtype=float)
                 return (a, b)
@@ -643,9 +643,9 @@ class TestForLoopDynamicShapes:
             a2, b2 = loop(a, b)
             xa = jnp.sum(a2)
             xb = jnp.sum(b2)
-            qml.RX(xa, 0)
-            qml.RX(xb, 1)
-            return qml.expval(qml.Z(0)), qml.expval(qml.Z(1))
+            qp.RX(xa, 0)
+            qp.RX(xb, 1)
+            return qp.expval(qp.Z(0)), qp.expval(qp.Z(1))
 
         a = jnp.ones([3], dtype=float)
         b = jnp.ones([3], dtype=float)
@@ -657,19 +657,19 @@ class TestForLoopDynamicShapes:
         """Test for-loops referring loop index as a dimension during the quantum tracing."""
 
         @qjit(capture=capture_mode)
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def f(sz):
             a = jnp.ones([sz, 3], dtype=float)
 
-            @qml.for_loop(0, 10, 1, allow_array_resizing=True)
+            @qp.for_loop(0, 10, 1, allow_array_resizing=True)
             def loop(i, _):
                 b = jnp.ones([i, 3], dtype=float)
                 return b
 
             a2 = loop(a)
             x = jnp.sum(a2)
-            qml.RX(x, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            return qp.expval(qp.Z(0))
 
         res_a = f(3)
         # expected = (9, 3)
@@ -679,16 +679,16 @@ class TestForLoopDynamicShapes:
         """Test that a function that does not need recompilation can be executed a second time"""
 
         @qjit(abstracted_axes=(("n",), ()), capture=capture_mode)
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit(x1, x2):
 
-            @qml.for_loop(0, jnp.shape(x1)[0], 1)
+            @qp.for_loop(0, jnp.shape(x1)[0], 1)
             def loop_block(i):
-                qml.RX(x1[i], 0)
+                qp.RX(x1[i], 0)
 
             loop_block()  # pylint: disable=no-value-for-parameter
-            qml.RY(x2, 1)
-            return qml.expval(qml.Z(1))
+            qp.RY(x2, 1)
+            return qp.expval(qp.Z(1))
 
         x1 = jnp.array([0.1, 0.2, 0.3])
         x2 = 0.1967
@@ -725,168 +725,168 @@ class TestWhileLoopDynamicShapes:
         """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
 
         @qjit(capture=capture_mode)
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def f(shape):
             i = 0
             a = jnp.ones(shape, dtype=float)
 
-            @qml.while_loop(lambda _, i: i < 3)
+            @qp.while_loop(lambda _, i: i < 3)
             def loop(_, i):
-                qml.PauliX(wires=0)
+                qp.PauliX(wires=0)
                 b = jnp.ones(shape, dtype=float)
                 i += 1
                 return (b, i)
 
             a2, _ = loop(a, i)
             x = jnp.sum(a2)
-            qml.RX(x, 1)
-            return qml.expval(qml.Z(0)), qml.expval(qml.Z(1))
+            qp.RX(x, 1)
+            return qp.expval(qp.Z(0)), qp.expval(qp.Z(1))
 
         result = f([2, 3])
         expected0 = -1  # three flips
         expected1 = jnp.cos(6)
-        assert qml.math.allclose(result[0], expected0)
-        assert qml.math.allclose(result[1], expected1)
+        assert qp.math.allclose(result[0], expected0)
+        assert qp.math.allclose(result[1], expected1)
 
     def test_quantum_tracing_2(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
 
         @qjit(capture=capture_mode)
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def f(x, y):
             i = 0
             a = jnp.ones((x, y + 1), dtype=float)
 
-            @qml.while_loop(lambda _, i: i < 3, allow_array_resizing=True)
+            @qp.while_loop(lambda _, i: i < 3, allow_array_resizing=True)
             def loop(_, i):
-                qml.PauliX(wires=0)
+                qp.PauliX(wires=0)
                 b = jnp.ones((x, y + 1), dtype=float)
                 i += 1
                 return (b, i)
 
             a2, _ = loop(a, i)
-            qml.RX(jnp.sum(a2), 1)
+            qp.RX(jnp.sum(a2), 1)
 
-            return qml.expval(qml.Z(0)), qml.expval(qml.Z(1))
+            return qp.expval(qp.Z(0)), qp.expval(qp.Z(1))
 
         result = f(2, 3)
-        assert qml.math.allclose(result[0], -1)
-        assert qml.math.allclose(result[1], jnp.cos(8))
+        assert qp.math.allclose(result[0], -1)
+        assert qp.math.allclose(result[1], jnp.cos(8))
 
     def test_qnode_whileloop_1(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum while"""
 
         @qjit(capture=capture_mode)
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def f(sz):
             a0 = jnp.ones([sz + 1], dtype=float)
 
-            @qml.while_loop(lambda _, i: i < 3)
+            @qp.while_loop(lambda _, i: i < 3)
             def loop(a, i):
                 i += 1
                 return (a, i)
 
             a2, _ = loop(a0, 0)
-            qml.RX(jnp.sum(a2), 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(jnp.sum(a2), 0)
+            return qp.expval(qp.Z(0))
 
         result = f(3)
-        assert qml.math.allclose(result, jnp.cos(4))
+        assert qp.math.allclose(result, jnp.cos(4))
 
     def test_qnode_whileloop_2(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum while"""
 
         @qjit(capture=capture_mode)
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def f(sz):
             a = jnp.ones([sz + 1], dtype=float)
 
-            @qml.while_loop(lambda _, i: i < 3, allow_array_resizing=True)
+            @qp.while_loop(lambda _, i: i < 3, allow_array_resizing=True)
             def loop(_, i):
                 b = jnp.ones([sz + 1], dtype=float)
                 i += 1
                 return (b, i)
 
             a2, _ = loop(a, 0)
-            qml.RX(jnp.sum(a2), 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(jnp.sum(a2), 0)
+            return qp.expval(qp.Z(0))
 
         result = f(3)
-        assert qml.math.allclose(result, jnp.cos(4))
+        assert qp.math.allclose(result, jnp.cos(4))
 
     def test_qnode_whileloop_capture(self, capture_mode):
         """Tests that while-loop primitive can capture variables from the outer scope"""
 
         @qjit(capture=capture_mode)
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def f(sz):
             x = jnp.ones([sz], dtype=float)
 
-            @qml.while_loop(lambda i, _: i < 3)
+            @qp.while_loop(lambda i, _: i < 3)
             def loop(i, a):
                 return i + 1, a + x
 
             _, a2 = loop(1, x)
-            qml.RX(jnp.sum(a2), 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(jnp.sum(a2), 0)
+            return qp.expval(qp.Z(0))
 
         result = f(3)
-        assert qml.math.allclose(result, jnp.cos(9))
+        assert qp.math.allclose(result, jnp.cos(9))
 
     def test_qnode_whileloop_abstracted_axes(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum while. Use abstracted_axes as
         the source of dynamism."""
 
         @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def f(a, b):
-            @qml.while_loop(lambda _a, _b, i: i < 3)
+            @qp.while_loop(lambda _a, _b, i: i < 3)
             def loop(a, b, i):
                 i += 1
                 return (a, b, i)
 
             a2, b2, _ = loop(a, b, 0)
             c = a2 + b2
-            qml.RX(jnp.sum(c), 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(jnp.sum(c), 0)
+            return qp.expval(qp.Z(0))
 
         a = jnp.ones([3], dtype=float)
         b = jnp.ones([3], dtype=float)
         result = f(a, b)
-        assert qml.math.allclose(result, jnp.cos(6))
+        assert qp.math.allclose(result, jnp.cos(6))
 
     def test_qnode_whileloop_shared_indbidx(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum while"""
 
         @qjit(capture=capture_mode)
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def f(sz):
             a = jnp.ones([sz], dtype=float)
             b = jnp.ones([sz], dtype=float)
 
-            @qml.while_loop(lambda _a, _b, i: i < 3)
+            @qp.while_loop(lambda _a, _b, i: i < 3)
             def loop(a, b, i):
                 i += 1
                 return (a, b, i)
 
             a2, b2, _ = loop(a, b, 0)
             c = a2 + b2
-            qml.RX(jnp.sum(c), 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(jnp.sum(c), 0)
+            return qp.expval(qp.Z(0))
 
         result = f(3)
-        assert qml.math.allclose(result, jnp.cos(6))
+        assert qp.math.allclose(result, jnp.cos(6))
 
     def test_qnode_whileloop_indbidx_outdbidx(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum while"""
 
         @qjit(capture=capture_mode)
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def f(sz):
             a = jnp.ones([sz], dtype=float)
             b = jnp.ones([sz], dtype=float)
 
-            @qml.while_loop(lambda _a, _b, i: i < 3, allow_array_resizing=True)
+            @qp.while_loop(lambda _a, _b, i: i < 3, allow_array_resizing=True)
             def loop(a, _, i):
                 b = jnp.ones([sz + 1], dtype=float)
                 i += 1
@@ -894,34 +894,34 @@ class TestWhileLoopDynamicShapes:
 
             a2, b2, _ = loop(a, b, 0)
             c = a + a2
-            qml.RX(jnp.sum(c), 0)
-            qml.RX(jnp.sum(b2), 1)
-            return qml.expval(qml.Z(0)), qml.expval(qml.Z(1))
+            qp.RX(jnp.sum(c), 0)
+            qp.RX(jnp.sum(b2), 1)
+            return qp.expval(qp.Z(0)), qp.expval(qp.Z(1))
 
         res_a, res_b = f(3)
-        assert qml.math.allclose(res_a, jnp.cos(6))
-        assert qml.math.allclose(res_b, jnp.cos(4))
+        assert qp.math.allclose(res_a, jnp.cos(6))
+        assert qp.math.allclose(res_b, jnp.cos(4))
 
     def test_qnode_whileloop_outer(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum while"""
 
         @qjit(capture=capture_mode)
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def f(sz):
             a0 = jnp.ones([sz], dtype=float)
 
-            @qml.while_loop(lambda _a, i: i < 3)
+            @qp.while_loop(lambda _a, i: i < 3)
             def loop(_a, i):
                 i += 1
                 return (a0, i)
 
             a2, _ = loop(a0, 0)
             c = a0 + a2
-            qml.RX(jnp.sum(c), 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(jnp.sum(c), 0)
+            return qp.expval(qp.Z(0))
 
         res_a = f(3)
-        assert qml.math.allclose(res_a, jnp.cos(6))
+        assert qp.math.allclose(res_a, jnp.cos(6))
 
     def test_qjit_whileloop_1(self, capture_mode):
         """Test that catalyst tensor primitive is compatible with quantum while"""
@@ -930,7 +930,7 @@ class TestWhileLoopDynamicShapes:
         def f(sz):
             a = jnp.ones([sz + 1], dtype=float)
 
-            @qml.while_loop(lambda _, i: i < 3, allow_array_resizing=True)
+            @qp.while_loop(lambda _, i: i < 3, allow_array_resizing=True)
             def loop(_, i):
                 b = jnp.ones([sz + 1], dtype=float)
                 i += 1
@@ -950,7 +950,7 @@ class TestWhileLoopDynamicShapes:
         def f(sz):
             a = jnp.ones([sz + 1], dtype=float)
 
-            @qml.while_loop(lambda _, i: i < 3, allow_array_resizing=True)
+            @qp.while_loop(lambda _, i: i < 3, allow_array_resizing=True)
             def loop(_, i):
                 b = jnp.ones([sz + 1], dtype=float)
                 i += 1
@@ -971,7 +971,7 @@ class TestWhileLoopDynamicShapes:
             input_a = jnp.ones([sz + 1], dtype=float)
             input_b = jnp.ones([sz + 2], dtype=float)
 
-            @qml.while_loop(lambda _a, _b, c: c, allow_array_resizing=False)
+            @qp.while_loop(lambda _a, _b, c: c, allow_array_resizing=False)
             def loop(_a, _b, _c):
                 return (input_a, input_a, False)
 
@@ -992,7 +992,7 @@ class TestWhileLoopDynamicShapes:
             a = jnp.ones([sz], dtype=float)
             b = jnp.ones([sz], dtype=float)
 
-            @qml.while_loop(lambda _a, _b, i: i < 3)
+            @qp.while_loop(lambda _a, _b, i: i < 3)
             def loop(a, b, i):
                 i += 1
                 return (a, b, i)
@@ -1012,7 +1012,7 @@ class TestWhileLoopDynamicShapes:
             a0 = jnp.ones([sz], dtype=float)
             b0 = jnp.ones([sz], dtype=float)
 
-            @qml.while_loop(lambda _a, _b, i: i < 3, allow_array_resizing=True)
+            @qp.while_loop(lambda _a, _b, i: i < 3, allow_array_resizing=True)
             def loop(a, _, i):
                 b = jnp.ones([sz + 1], dtype=float)
                 i += 1
@@ -1032,7 +1032,7 @@ class TestWhileLoopDynamicShapes:
         def f(sz):
             a0 = jnp.ones([sz], dtype=float)
 
-            @qml.while_loop(lambda _a, i: i < 3)
+            @qp.while_loop(lambda _a, i: i < 3)
             def loop(_a, i):
                 i += 1
                 return (a0, i)
@@ -1051,7 +1051,7 @@ class TestWhileLoopDynamicShapes:
         def f(sz):
             x = jnp.ones([sz], dtype=float)
 
-            @qml.while_loop(lambda i, _: i < 3)
+            @qp.while_loop(lambda i, _: i < 3)
             def loop(i, a):
                 return i + 1, a + x
 
@@ -1067,7 +1067,7 @@ def test_qnode_cond_identity():
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    @qp.qnode(qp.device("lightning.qubit", wires=4))
     def f(flag, sz):
         a = jnp.ones([sz], dtype=float)
         b = jnp.zeros([sz], dtype=float)
@@ -1095,7 +1095,7 @@ def test_qnode_cond_abstracted_axes():
 
     def f(flag, a, b):
         @qjit(abstracted_axes={0: "n"})
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def _f(a, b):
             @cond(flag)
             def case():
@@ -1122,7 +1122,7 @@ def test_qnode_cond_capture():
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    @qp.qnode(qp.device("lightning.qubit", wires=4))
     def f(flag, sz):
         a = jnp.ones([sz, 3], dtype=float)
 

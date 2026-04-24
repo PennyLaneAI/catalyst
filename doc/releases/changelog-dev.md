@@ -1022,6 +1022,7 @@
   [(#2697)](https://github.com/PennyLaneAI/catalyst/pull/2697)
   [(#2714)](https://github.com/PennyLaneAI/catalyst/pull/2714)
   [(#2716)](https://github.com/PennyLaneAI/catalyst/pull/2716)
+  [(#2737)](https://github.com/PennyLaneAI/catalyst/pull/2737)
   [(#2731)](https://github.com/PennyLaneAI/catalyst/pull/2731)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
@@ -1035,11 +1036,17 @@
 
 * The `qp` alias as in `import pennylane as qp` has been updated to `qp` in our source code and documentation.
   [(#2748)](https://github.com/PennyLaneAI/catalyst/pull/2748)
+  [(#2746)](https://github.com/PennyLaneAI/catalyst/pull/2746)
+  [(#2745)](https://github.com/PennyLaneAI/catalyst/pull/2745)
+  [(#2744)](https://github.com/PennyLaneAI/catalyst/pull/2744)
+  [(#2743)](https://github.com/PennyLaneAI/catalyst/pull/2743)
+  [(#2742)](https://github.com/PennyLaneAI/catalyst/pull/2742)
   [(#2741)](https://github.com/PennyLaneAI/catalyst/pull/2741)
   [(#2739)](https://github.com/PennyLaneAI/catalyst/pull/2739)
   [(#2738)](https://github.com/PennyLaneAI/catalyst/pull/2738)
   [(#2736)](https://github.com/PennyLaneAI/catalyst/pull/2736)
-
+  [(#2715)](https://github.com/PennyLaneAI/catalyst/pull/2715)
+  
 * The "Compatibility with PennyLane transforms" section of the
   :doc:`Sharp bits and debugging tips <../dev/sharp_bits>` document has been updated to describe
   potential oddities that can be encountered when composing PennyLane transforms together.
