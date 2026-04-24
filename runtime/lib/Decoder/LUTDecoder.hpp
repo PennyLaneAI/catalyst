@@ -20,9 +20,9 @@ namespace Catalyst::Runtime::QEC {
 
 extern "C" {
 
-size_t __catalyst__qecp__lut_decoder(/*row_idx*/ MemRefT_int64_1d *row_idx_tanner,
-                                     /*col_ptr*/ MemRefT_int64_1d *col_ptr_tanner,
-                                     /*syndrome*/ MemRefT_int8_1d *syndrome_res);
+int64_t __catalyst__qecp__lut_decoder(/*row_idx*/ MemRefT_int64_1d *row_idx_tanner,
+                                      /*col_ptr*/ MemRefT_int64_1d *col_ptr_tanner,
+                                      /*syndrome*/ MemRefT_int8_1d *syndrome_res);
 
 } // extern "C"
 } // namespace Catalyst::Runtime::QEC

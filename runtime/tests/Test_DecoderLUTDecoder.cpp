@@ -51,28 +51,16 @@ struct tanner_graph_steane0 {
     const std::vector<int64_t> col_ptr_parity_matrix_transpose = {0, 4, 8, 12};
 
     const std::unordered_map<int64_t, std::vector<int8_t>> lookup_table = {
-        {7, std::vector<int8_t>({0, 0, 0})}, {0, std::vector<int8_t>({0, 0, 1})},
-        {1, std::vector<int8_t>({0, 1, 0})}, {2, std::vector<int8_t>({0, 1, 1})},
-        {3, std::vector<int8_t>({1, 0, 0})}, {4, std::vector<int8_t>({1, 0, 1})},
-        {5, std::vector<int8_t>({1, 1, 0})}, {6, std::vector<int8_t>({1, 1, 1})},
+        {-1, std::vector<int8_t>({0, 0, 0})}, {6, std::vector<int8_t>({0, 0, 1})},
+        {4, std::vector<int8_t>({0, 1, 0})},  {5, std::vector<int8_t>({0, 1, 1})},
+        {0, std::vector<int8_t>({1, 0, 0})},  {3, std::vector<int8_t>({1, 0, 1})},
+        {1, std::vector<int8_t>({1, 1, 0})},  {2, std::vector<int8_t>({1, 1, 1})},
 
     };
 } tanner_graph0;
 
 TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
 {
-
-    // const std::vector<double> param{0.3, 0.7, 0.4};
-
-    // std::vector<int64_t> trainParams{0, 1, 2};
-    // size_t J = trainParams.size();
-    // double *buffer = new double[J];
-    // MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
-    // double *buffer_tp = new double[J];
-    // MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
-    // int64_t *buffer_tp_memref = trainParams.data();
-    // MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()},
-    // {1}};
 
     std::vector<int64_t> row_idx_tanner = tanner_graph0.row_idx;
     std::vector<int64_t> col_ptr_tanner = tanner_graph0.col_ptr;
@@ -91,7 +79,8 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
                                               {col_ptr_tanner.size()},
                                               {1}};
 
-    for (auto it = tanner_graph0.lookup_table.begin(); it != tanner_graph0.lookup_table.end(); ++it) {
+    for (auto it = tanner_graph0.lookup_table.begin(); it != tanner_graph0.lookup_table.end();
+         ++it) {
         size_t expected_res = it->first;
 
         auto syndrome_res = it->second;

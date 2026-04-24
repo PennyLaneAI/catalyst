@@ -30,9 +30,9 @@ namespace Catalyst::Runtime::QEC {
  * @param syndrome_results
  * @return size_t
  */
-size_t __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
-                                     MemRefT_int64_1d *col_ptr_tanner,
-                                     MemRefT_int8_1d *current_syndromes)
+int64_t __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
+                                      MemRefT_int64_1d *col_ptr_tanner,
+                                      MemRefT_int8_1d *current_syndromes)
 {
     // 1. Recover the parity check matrix from a tanner graph
     const size_t nnz = row_idx_tanner->sizes[0];
@@ -77,6 +77,9 @@ size_t __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
     // NOTE: The thoughts above might or might not work.
 
     // TODOS: Note that error_indices could be empty.
+    if (error_indices.empty()) {
+        return -1;
+    }
     return error_indices.front();
 }
 } // namespace Catalyst::Runtime::QEC
