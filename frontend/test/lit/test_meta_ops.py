@@ -14,17 +14,17 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import pennylane as qml
+import pennylane as qp
 
 from catalyst import qjit
 
 
 # CHECK-LABEL: @adjoint_adjoint
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=1))
+@qp.qnode(qp.device("lightning.qubit", wires=1))
 def adjoint_adjoint():
-    qml.adjoint(qml.adjoint(qml.S(0)))
-    return qml.probs()
+    qp.adjoint(qp.adjoint(qp.S(0)))
+    return qp.probs()
 
 
 # CHECK:   quantum.custom "S"() %{{[^\s]+}} : !quantum.bit
@@ -36,10 +36,10 @@ print(adjoint_adjoint.mlir)
 
 # CHECK-LABEL: @adjoint_ctrl_adjoint
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 def adjoint_ctrl_adjoint():
-    qml.adjoint(qml.ctrl(qml.adjoint(qml.S(0)), control=1))
-    return qml.probs()
+    qp.adjoint(qp.ctrl(qp.adjoint(qp.S(0)), control=1))
+    return qp.probs()
 
 
 # CHECK:   quantum.custom "S"() %{{[^\s]+}} ctrls(%{{[^\s]+}}) ctrlvals(%{{[^\s]+}}) : !quantum.bit
