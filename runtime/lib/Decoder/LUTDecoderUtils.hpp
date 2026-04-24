@@ -88,7 +88,6 @@ get_parity_check_matrix(const std::vector<size_t> &tanner_row_idx,
  * NOTE: The current implementation is experimental. Based on the design choice of the first Steane
  * code prototyping,
  *
- *
  * @param row_idx_vec
  * @param col_ptr_vec
  * @param num_rows
@@ -195,7 +194,6 @@ generate_lookup_table(const std::vector<size_t> &parity_mat_row_idx,
             std::vector<size_t> error_indices = get_error_indices(err_vector);
             // We assume that 1:1 mapping for the syndrome and err_vector
             lut[syndrome_str] = error_indices;
-
         } while (std::next_permutation(err_vector.begin(), err_vector.end()));
     }
 

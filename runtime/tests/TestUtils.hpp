@@ -84,7 +84,6 @@ template <class IntegerType> struct tanner_graph_steane {
         {"101", std::vector<uint8_t>({0, 0, 0, 1, 0, 0, 0})},
         {"110", std::vector<uint8_t>({0, 1, 0, 0, 0, 0, 0})},
         {"111", std::vector<uint8_t>({0, 0, 1, 0, 0, 0, 0})},
-
     };
 
     const std::unordered_map<int64_t, std::vector<int8_t>> lookup_table_error_idx_to_syndrome = {
@@ -92,6 +91,5 @@ template <class IntegerType> struct tanner_graph_steane {
         {4, std::vector<int8_t>({0, 1, 0})},  {5, std::vector<int8_t>({0, 1, 1})},
         {0, std::vector<int8_t>({1, 0, 0})},  {3, std::vector<int8_t>({1, 0, 1})},
         {1, std::vector<int8_t>({1, 1, 0})},  {2, std::vector<int8_t>({1, 1, 1})},
-
     };
 };
