@@ -13,22 +13,16 @@
 // limitations under the License.
 
 #pragma once
-#ifndef DECODERRUNTIMECAPI_H
-#define DECODERRUNTIMECAPI_H
 
 #include "Types.h"
 
-#ifdef __cplusplus
+namespace Catalyst::Runtime::QEC {
+
 extern "C" {
-#endif
 
-// qecp operations
-size_t __catalyst__qecp__lut_decoder(/*row_idx*/ MemRefT_int64_1d *,
-                                     /*col_ptr*/ MemRefT_int64_1d *,
-                                     /*syndrome*/ MemRefT_int8_1d *);
+size_t __catalyst__qecp__lut_decoder(/*row_idx*/ MemRefT_int64_1d *row_idx_tanner,
+                                     /*col_ptr*/ MemRefT_int64_1d *col_ptr_tanner,
+                                     /*syndrome*/ MemRefT_int8_1d *syndrome_res);
 
-#ifdef __cplusplus
 } // extern "C"
-#endif
-
-#endif
+} // namespace Catalyst::Runtime::QEC

@@ -138,7 +138,7 @@ catch_discover_tests(runner_tests_mbqc_runtime)
 add_executable(runner_tests_decoder_runtime)
 target_sources(runner_tests_decoder_runtime PRIVATE
     Test_DecoderLUTDecoderUtils.cpp
-    #Test_DecoderLUTDecoder.cpp
+    Test_DecoderLUTDecoder.cpp
 )
 target_link_libraries(runner_tests_decoder_runtime PRIVATE
     Catch2WithMain
