@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "MBQC/IR/MBQCOps.h"
 #define DEBUG_TYPE "value-semantics-conversion"
-
-#include "value_semantics_conversion.h"
 
 #include <cstdint>
 #include <optional>
@@ -40,6 +39,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/WalkResult.h"
 
+#include "MBQC/IR/MBQCOps.h"
 #include "QRef/IR/QRefDialect.h"
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
@@ -47,6 +47,8 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
+
+#include "value_semantics_conversion.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -1021,6 +1023,18 @@ void handleMeasure(IRRewriter &builder, qref::MeasureOp rMeasureOp, QubitValueTr
     builder.eraseOp(rMeasureOp);
 }
 
+void handleMeasureInBasis(IRRewriter &builder, qref::MeasureInBasisOp rMeasureInBasisOp,
+                          QubitValueTracker &tracker)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    MLIRContext *ctx = rMeasureInBasisOp.getContext();
+
+    auto vMeasureOp = migrateOpToValueSemantics<mbqc::MeasureInBasisOp>(
+        builder, rMeasureInBasisOp, tracker, {quantum::QubitType::get(ctx)});
+    builder.replaceAllUsesWith(rMeasureInBasisOp.getMres(), vMeasureOp.getMres());
+    builder.eraseOp(rMeasureInBasisOp);
+}
+
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker)
 {
     OpBuilder::InsertionGuard guard(builder);
@@ -1658,6 +1672,9 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
         else if (auto rMeasureOp = dyn_cast<qref::MeasureOp>(op)) {
             handleMeasure(builder, rMeasureOp, tracker);
         }
+        else if (auto rMeasureInBasisOp = dyn_cast<qref::MeasureInBasisOp>(op)) {
+            handleMeasureInBasis(builder, rMeasureInBasisOp, tracker);
+        }
         else if (auto adjointOp = dyn_cast<qref::AdjointOp>(op)) {
             handleAdjoint(builder, adjointOp, tracker);
         }
@@ -1727,7 +1744,7 @@ struct ValueSemanticsConversionPass
             if (!llvm::all_of(getOp->getUsers(),
                               llvm::IsaPred<qref::QuantumOperation, qref::MeasureOp,
                                             qref::ComputationalBasisOp, qref::NamedObsOp,
-                                            qref::HermitianOp>)) {
+                                            qref::HermitianOp, qref::MeasureInBasisOp>)) {
                 getOp.emitOpError(
                     "qref.get operations can only be used by qref dialect gate operations");
                 return WalkResult::interrupt();
