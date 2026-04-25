@@ -107,7 +107,7 @@ def test_generic_catalyst_program(as_mod):
             }) {transform.with_named_sequence} : () -> ()
             "func.func"() <{function_type = () -> tensor<2xcomplex<f64>>, sym_name = "circuit", sym_visibility = "public"}> ({
               %0 = "arith.constant"() <{value = 0 : i64}> : () -> i64
-              "quantum.device"(%0) <{kwargs = "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}", lib = "/usr/local/lib/python3.11/dist-packages/pennylane_lightning/liblightning_qubit_catalyst.so", name = "LightningSimulator"}> : (i64) -> ()
+              "quantum.device"(%0) <{kwargs = "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}", lib = "/usr/local/lib/python3.11/dist-packages/pennylane_lightning/liblightning_qubit_catalyst.so", device_name = "LightningSimulator"}> : (i64) -> ()
               %1 = "quantum.alloc"() <{nqubits_attr = 1 : i64}> : () -> !quantum.reg
               %2 = "quantum.extract"(%1) <{idx_attr = 0 : i64}> : (!quantum.reg) -> !quantum.bit
               %3 = "quantum.custom"(%2) <{gate_name = "Hadamard", operandSegmentSizes = array<i32: 0, 1, 0, 0>, resultSegmentSizes = array<i32: 1, 0>}> : (!quantum.bit) -> !quantum.bit
