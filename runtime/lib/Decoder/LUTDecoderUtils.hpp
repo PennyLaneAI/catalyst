@@ -139,11 +139,11 @@ std::vector<int64_t> get_error_indices(std::vector<uint8_t> &err_vec)
 
 /**
  * @brief Generates a look up table with a CSC parity check matrix $H$ and QEC code information.
- * 
- * NOTE: Note that this function has a combinatorial time complexity of $O(n^k)$, where $n$ represents
- * the number of data qubits and $k$ represents the maximum error weight. Consequently, it is 
- * computationally intractable for large-scale codes.
- * 
+ *
+ * NOTE: Note that this function has a combinatorial time complexity of $O(n^k)$, where $n$
+ * represents the number of data qubits and $k$ represents the maximum error weight. Consequently,
+ * it is computationally intractable for large-scale codes.
+ *
  * @param parity_mat_row_idx The row vector of length nnz that contains row indices of the
  * corresponding elements. Each column corresponds to an auxillary qubit.
  * @param parity_mat_col_ptr The column offsets vector of length number of num_col + 1 that

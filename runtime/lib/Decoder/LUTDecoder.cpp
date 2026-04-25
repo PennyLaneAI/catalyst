@@ -25,7 +25,7 @@
 namespace Catalyst::Runtime::QEC {
 /**
  * @brief A runtime lookup table based decoder.
- * 
+ *
  * NOTE: As CAPI does not support setting default values for args, as discussed, we hardcode the
  * required args in the beginning of the function body. Those values are specifically for the [[7,
  * 1, 3]] Steane code. We expect those values are from args inputs later.
@@ -50,7 +50,6 @@ void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
                                  row_idx_tanner->sizes, row_idx_tanner->strides);
     DataView<int64_t, 1> col_ptr(col_ptr_tanner->data_aligned, col_ptr_tanner->offset,
                                  col_ptr_tanner->sizes, col_ptr_tanner->strides);
-
 
     auto current_lut =
         LUTs::getInstance().get_lut(aux_col_offset, code_size, code_distance, row_idx, col_ptr);
