@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <mlir/IR/PatternMatch.h>
 #define DEBUG_TYPE "value-semantics-conversion"
+
+#include "value_semantics_conversion.h"
 
 #include <cstdint>
 #include <optional>
@@ -47,8 +48,6 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
-
-#include "value_semantics_conversion.h"
 
 using namespace mlir;
 using namespace catalyst;
