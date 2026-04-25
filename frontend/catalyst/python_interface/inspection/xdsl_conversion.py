@@ -200,15 +200,15 @@ def _extract_dense_constant_value(op) -> float | int:
     raise NotImplementedError(f"Unexpected attr type in constant: {type(attr)}")
 
 
-def _apply_adjoint_and_ctrls(qml_op: Operator, xdsl_op) -> Operator:
+def _apply_adjoint_and_ctrls(qp_op: Operator, xdsl_op) -> Operator:
     """Apply adjoint and control modifiers to a gate if needed."""
     if xdsl_op.properties.get("adjoint"):
-        qml_op = ops.op_math.adjoint(qml_op)
-    ctrls = ssa_to_qml_wires(xdsl_op, control=True)
+        qp_op = ops.op_math.adjoint(qp_op)
+    ctrls = ssa_to_qp_wires(xdsl_op, control=True)
     if ctrls:
-        cvals = ssa_to_qml_params(xdsl_op, control=True)
-        qml_op = ops.op_math.ctrl(qml_op, control=ctrls, control_values=cvals)
-    return qml_op
+        cvals = ssa_to_qp_params(xdsl_op, control=True)
+        qp_op = ops.op_math.ctrl(qp_op, control=ctrls, control_values=cvals)
+    return qp_op
 
 
 # pylint: disable=too-many-return-statements
@@ -389,19 +389,19 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
 ######################################################
 
 
-def ssa_to_qml_params(
+def ssa_to_qp_params(
     op, control: bool = False, single: bool = False
 ) -> list[float | int] | float | int | None:
     """Get the parameters from the operation."""
     return _extract(op, "in_ctrl_values" if control else "params", resolve_constant_params, single)
 
 
-def ssa_to_qml_wires(op: CustomOp, control: bool = False) -> list[int]:
+def ssa_to_qp_wires(op: CustomOp, control: bool = False) -> list[int]:
     """Get the wires from the operation."""
     return _extract(op, "in_ctrl_qubits" if control else "in_qubits", resolve_constant_wire)
 
 
-def ssa_to_qml_wires_named(op: NamedObsOp) -> int:
+def ssa_to_qp_wires_named(op: NamedObsOp) -> int:
     """Get the wire from the named observable operation."""
     if not op.qubit:
         raise ValueError("No qubit found for named observable operation.")
@@ -413,7 +413,7 @@ def ssa_to_qml_wires_named(op: NamedObsOp) -> int:
 ############################################################
 
 
-def xdsl_to_qml_op(op) -> Operator:
+def xdsl_to_qp_op(op) -> Operator:
     """Convert an xDSL operation into a PennyLane Operator.
 
     Args:
@@ -433,40 +433,38 @@ def xdsl_to_qml_op(op) -> Operator:
                 gate = ops.PauliRot(
                     theta=_extract(op, "angle", resolve_constant_params, single=True),
                     pauli_word=pw,
-                    wires=ssa_to_qml_wires(op),
+                    wires=ssa_to_qp_wires(op),
                 )
             case "quantum.gphase":
-                gate = ops.GlobalPhase(
-                    ssa_to_qml_params(op, single=True), wires=ssa_to_qml_wires(op)
-                )
+                gate = ops.GlobalPhase(ssa_to_qp_params(op, single=True), wires=ssa_to_qp_wires(op))
 
             case "quantum.unitary":
                 gate = ops.qubit.matrix_ops.QubitUnitary(
                     U=jax.numpy.zeros(_tensor_shape_from_ssa(op.matrix)),
-                    wires=ssa_to_qml_wires(op),
+                    wires=ssa_to_qp_wires(op),
                 )
 
             case "quantum.set_state":
                 gate = ops.qubit.state_preparation.StatePrep(
                     state=jax.numpy.zeros(_tensor_shape_from_ssa(op.in_state)),
-                    wires=ssa_to_qml_wires(op),
+                    wires=ssa_to_qp_wires(op),
                 )
 
             case "quantum.multirz":
                 gate = ops.qubit.parametric_ops_multi_qubit.MultiRZ(
                     theta=_extract(op, "theta", resolve_constant_params, single=True),
-                    wires=ssa_to_qml_wires(op),
+                    wires=ssa_to_qp_wires(op),
                 )
 
             case "quantum.set_basis_state":
                 gate = ops.qubit.state_preparation.BasisState(
                     state=jax.numpy.zeros(_tensor_shape_from_ssa(op.basis_state)),
-                    wires=ssa_to_qml_wires(op),
+                    wires=ssa_to_qp_wires(op),
                 )
 
             case "quantum.custom":
                 gate_cls = resolve_gate(op.properties.get("gate_name").data)
-                gate = gate_cls(*ssa_to_qml_params(op), wires=ssa_to_qml_wires(op))
+                gate = gate_cls(*ssa_to_qp_params(op), wires=ssa_to_qp_wires(op))
 
             case _:
                 raise NotImplementedError(f"Unsupported gate: {op.name}")
@@ -474,7 +472,7 @@ def xdsl_to_qml_op(op) -> Operator:
     return _apply_adjoint_and_ctrls(gate, op)
 
 
-def xdsl_to_qml_op_name(op, adjoint_mode: bool) -> str:
+def xdsl_to_qp_op_name(op, adjoint_mode: bool) -> str:
     """Convert an xDSL operation into a string representing a PennyLane Operator.
 
     Args:
@@ -518,7 +516,7 @@ def xdsl_to_qml_op_name(op, adjoint_mode: bool) -> str:
     return gate_name
 
 
-def xdsl_to_qml_measurement(op, *args, **kwargs) -> MeasurementProcess | Operator:
+def xdsl_to_qp_measurement(op, *args, **kwargs) -> MeasurementProcess | Operator:
     """Convert any xDSL measurement/observable operation to a PennyLane object.
 
     Args:
@@ -535,16 +533,16 @@ def xdsl_to_qml_measurement(op, *args, **kwargs) -> MeasurementProcess | Operato
                 return MidMeasure([resolve_constant_wire(op.in_qubit)], postselect=postselect)
 
             case "quantum.namedobs":
-                return resolve_gate(op.type.data.value)(wires=ssa_to_qml_wires_named(op))
+                return resolve_gate(op.type.data.value)(wires=ssa_to_qp_wires_named(op))
 
             case "quantum.tensor":
                 return ops.op_math.prod(
-                    *(xdsl_to_qml_measurement(operand.owner) for operand in op.operands)
+                    *(xdsl_to_qp_measurement(operand.owner) for operand in op.operands)
                 )
 
             case "quantum.hamiltonian":
                 coeffs = _extract(op, "coeffs", resolve_constant_params, single=True)
-                ops_list = [xdsl_to_qml_measurement(term.owner) for term in op.terms]
+                ops_list = [xdsl_to_qp_measurement(term.owner) for term in op.terms]
                 if len(ops_list) == 1:
                     return ops_list[0] * coeffs
                 return ops.LinearCombination(coeffs, ops_list)
@@ -564,7 +562,7 @@ def xdsl_to_qml_measurement(op, *args, **kwargs) -> MeasurementProcess | Operato
                 raise NotImplementedError(f"Unsupported measurement/observable: {op.name}")
 
 
-def xdsl_to_qml_measurement_name(op, obs_op=None) -> str:
+def xdsl_to_qp_measurement_name(op, obs_op=None) -> str:
     """Convert any xDSL measurement/observable operation into a string representing a PennyLane
     measurement.
 

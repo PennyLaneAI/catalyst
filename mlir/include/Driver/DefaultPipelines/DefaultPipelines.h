@@ -14,7 +14,6 @@
 
 #pragma once
 
-#include <format>
 #include <numeric>
 #include <ranges>
 #include <string>
@@ -194,10 +193,11 @@ PassNames getGradientLoweringStage() { return pipelineList[2].passNames; }
 
 PassNames getBufferizationStage(bool asyncQNodes = false)
 {
-    const std::string bufferizationOptions = std::format(
-        "{{{} {} {} {}{}}}", "bufferize-function-boundaries", "allow-return-allocs-from-loops",
-        "function-boundary-type-conversion=identity-layout-map",
-        "unknown-type-conversion=identity-layout-map", (asyncQNodes ? " copy-before-write" : ""));
+    const std::string bufferizationOptions =
+        std::string("{bufferize-function-boundaries ") + "allow-return-allocs-from-loops " +
+        "function-boundary-type-conversion=identity-layout-map " +
+        "unknown-type-conversion=identity-layout-map" + (asyncQNodes ? " copy-before-write" : "") +
+        "}";
     auto &&ret = pipelineList[3].passNames |
                  std::views::transform([&bufferizationOptions](const auto &passName) {
                      if (passName == "one-shot-bufferize") {

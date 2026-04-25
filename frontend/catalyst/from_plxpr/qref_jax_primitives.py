@@ -16,6 +16,7 @@
 of quantum operations, measurements, and observables to reference semantics JAXPR.
 """
 
+from jax._src import source_info_util
 from jax._src.lib.mlir import ir
 from jax.core import AbstractValue, ShapedArray
 from jax.extend.core import Primitive
@@ -25,6 +26,7 @@ from jaxlib.mlir.dialects.arith import (
     ExtUIOp,
 )
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
+from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
@@ -54,6 +56,7 @@ with Patcher(
     ),
 ):
     from mlir_quantum.dialects.qref import (
+        AdjointOp,
         AllocOp,
         ComputationalBasisOp,
         CustomOp,
@@ -550,6 +553,37 @@ def _qref_unitary_lowering(
 
 
 #
+# PL adjoint primitive
+#
+# pylint: disable=unused-argument
+def _pl_adjoint_lowering(
+    jax_ctx,
+    *plxpr_invals,
+    jaxpr,
+    lazy,
+    n_consts,
+):
+    new_jaxpr = jaxpr.replace(constvars=(), invars=jaxpr.constvars + jaxpr.invars)
+
+    op = AdjointOp()
+    adjoint_block = op.regions[0].blocks.append()
+    with ir.InsertionPoint(adjoint_block):
+        source_info_util.extend_name_stack("adjoint")
+        _, _ = mlir.jaxpr_subcomp(
+            jax_ctx.module_context,
+            new_jaxpr,
+            jax_ctx.name_stack.extend("adjoint"),
+            mlir.TokenSet(),
+            [],
+            *plxpr_invals,
+            dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
+        )
+
+    return ()
+
+
+#
 # measure
 #
 @qref_measure_p.def_abstract_eval
@@ -685,4 +719,5 @@ CUSTOM_LOWERING_RULES = (
     (qref_compbasis_p, _qref_compbasis_lowering),
     (qref_namedobs_p, _qref_named_obs_lowering),
     (qref_hermitian_p, _qref_hermitian_lowering),
+    (plxpr_adjoint_transform_prim, _pl_adjoint_lowering),
 )

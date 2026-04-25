@@ -118,6 +118,15 @@ jobs:
         sudo apt-get install -y graphviz
         pip install pennylane-catalyst
 
+    - name: Add Frontend Dependencies to PATH
+      if: ${{ inputs.catalyst == 'latest' }}
+      run: |
+        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+        echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
+
     - name: Install Catalyst (latest)
       if: ${{ inputs.catalyst == 'latest' }}
       run: |
@@ -182,16 +191,6 @@ jobs:
       run: |
         # Do not overwrite any dependencies, just fetch rc package from TestPyPI
         pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane'>=0.44.0rc0,<=0.44.0'
-
-    - name: Add Frontend Dependencies to PATH
-      if: ${{ inputs.catalyst == 'latest' }}
-      run: |
-        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
-        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
-        echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
-        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
 
     - name: Run Frontend Tests
       run: |

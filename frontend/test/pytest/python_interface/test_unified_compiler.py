@@ -18,7 +18,7 @@
 from dataclasses import dataclass
 
 import jax
-import pennylane as qml
+import pennylane as qp
 import pytest
 from jaxlib.mlir.ir import Module as jModule
 from pennylane.capture import enabled as capture_enabled
@@ -216,10 +216,10 @@ class TestCatalystIntegration:
         assert capture_enabled()
 
         @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            return qp.expval(qp.Z(0))
 
         out = f(1.5)
         assert jax.numpy.allclose(out, jax.numpy.cos(1.5))
@@ -231,10 +231,10 @@ class TestCatalystIntegration:
         assert not capture_enabled()
 
         @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            return qp.expval(qp.Z(0))
 
         out = f(1.5)
         assert jax.numpy.allclose(out, jax.numpy.cos(1.5))
@@ -248,10 +248,10 @@ class TestCatalystIntegration:
 
         @qjit
         @hello_world_pass
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            return qp.expval(qp.Z(0))
 
         out = f(1.5)
         assert jax.numpy.allclose(out, jax.numpy.cos(1.5))
@@ -266,10 +266,10 @@ class TestCatalystIntegration:
 
         @qjit
         @apply_pass("hello-world")
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            return qp.expval(qp.Z(0))
 
         out = f(1.5)
         assert jax.numpy.allclose(out, jax.numpy.cos(1.5))
@@ -285,13 +285,13 @@ class TestCatalystIntegration:
 
         @qjit
         @hello_world_pass
-        @qml.transforms.cancel_inverses
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.transforms.cancel_inverses
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
-            qml.RX(x, 0)
-            qml.X(0)
-            qml.X(0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            qp.X(0)
+            qp.X(0)
+            return qp.expval(qp.Z(0))
 
         out = f(1.5)
         assert jax.numpy.allclose(out, jax.numpy.cos(1.5))
@@ -307,12 +307,12 @@ class TestCatalystIntegration:
         @qjit
         @apply_pass("hello-world")
         @catalyst_cancel_inverses
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
-            qml.RX(x, 0)
-            qml.X(0)
-            qml.X(0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            qp.X(0)
+            qp.X(0)
+            return qp.expval(qp.Z(0))
 
         out = f(1.5)
         assert jax.numpy.allclose(out, jax.numpy.cos(1.5))
@@ -444,16 +444,16 @@ class TestCallbackIntegration:
             print("=== Between Pass ===")
             print(module)
 
-        @qml.qjit(skip_preprocess=skip_preprocess)
+        @qp.qjit(skip_preprocess=skip_preprocess)
         @iterative_cancel_inverses_pass
         @merge_rotations_pass
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit():
-            qml.RX(0.1, 0)
-            qml.RX(2.0, 0)
-            qml.Hadamard(1)
-            qml.Hadamard(1)
-            return qml.state()
+            qp.RX(0.1, 0)
+            qp.RX(2.0, 0)
+            qp.Hadamard(1)
+            qp.Hadamard(1)
+            return qp.state()
 
         Compiler.run(circuit.mlir_module, callback=print_between_passes)
         out = capsys.readouterr().out

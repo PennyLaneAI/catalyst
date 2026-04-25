@@ -387,3 +387,43 @@ def test_while_loop_with_dynamic_allocation(i: int):
 
 
 print(test_while_loop_with_dynamic_allocation.mlir)
+
+
+# CHECK: func.func public @test_loop_with_adjoint() -> tensor<f64>
+@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def test_loop_with_adjoint():
+    """
+    Test loops when adjoints are present.
+    """
+    # CHECK: [[one_index:%.+]] = arith.constant 1 : index
+    # CHECK: [[ten_index:%.+]] = arith.constant 10 : index
+    # CHECK: [[zero_index:%.+]] = arith.constant 0 : index
+
+    # CHECK: [[reg_device:%.+]] = qref.alloc( 3) : !qref.reg<3>
+
+    def f(q1: int, q2: int, n: int):
+        for _ in range(n):
+            qp.SWAP(wires=[q1, q2])
+
+    # CHECK: [[reg_alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK: [[q1_alloc:%.+]] = qref.get [[reg_alloc]][ 1] : !qref.reg<2> -> !qref.bit
+    with qp.allocate(2) as q:
+
+        # CHECK: scf.for %arg0 = [[zero_index]] to [[ten_index]] step [[one_index]] {
+        # CHECK:   qref.adjoint {
+        # CHECK:     scf.for %arg1 = [[zero_index]] to %arg0 step [[one_index]] {
+        # CHECK:       [[q0:%.+]] = qref.get [[reg_device]][ 0] : !qref.reg<3> -> !qref.bit
+        # CHECK:       qref.custom "SWAP"() [[q1_alloc]], [[q0]] : !qref.bit, !qref.bit
+        # CHECK:     }
+        # CHECK:   }
+        # CHECK: }
+        for n in range(10):
+            qp.adjoint(f)(q[1], 0, n)
+
+    # qref.dealloc [[reg_alloc]] : !qref.reg<2>
+
+    return qp.expval(qp.X(0))
+
+
+print(test_loop_with_adjoint.mlir)

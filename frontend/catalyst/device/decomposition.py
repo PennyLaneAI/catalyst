@@ -23,7 +23,7 @@ from functools import partial
 from typing import Union
 
 import jax
-import pennylane as qml
+import pennylane as qp
 from pennylane import transform
 from pennylane.devices.capabilities import DeviceCapabilities
 from pennylane.devices.preprocess import decompose
@@ -57,11 +57,11 @@ logger.addHandler(logging.NullHandler())
 def check_alternative_support(op, capabilities: DeviceCapabilities):
     """Verify that aliased operations aren't supported via alternative definitions."""
 
-    if isinstance(op, qml.ops.Controlled) and type(op) is not qml.ops.ControlledOp:
+    if isinstance(op, qp.ops.Controlled) and type(op) is not qp.ops.ControlledOp:
         # "Cast" away the specialized class for gates like Toffoli, ControlledQubitUnitary, etc.
         supported = capabilities.operations.get(op.base.name)
         if supported and supported.controllable:
-            return [qml.ops.Controlled(op.base, op.control_wires, op.control_values, op.work_wires)]
+            return [qp.ops.Controlled(op.base, op.control_wires, op.control_values, op.work_wires)]
 
     return None
 
@@ -81,7 +81,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     if op.name in getattr(capabilities, "to_matrix_ops", {}):
         return _decompose_to_matrix(op)
 
-    if isinstance(op, qml.ops.Controlled) and not op.has_decomposition:
+    if isinstance(op, qp.ops.Controlled) and not op.has_decomposition:
         if op.has_matrix and "QubitUnitary" in capabilities.operations:
             return _decompose_to_matrix(op)
 
@@ -91,7 +91,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
 @transform
 @debug_logger
 def catalyst_decompose(
-    tape: qml.tape.QuantumTape,
+    tape: qp.tape.QuantumTape,
     capabilities: DeviceCapabilities,
     grad_method: str = None,
     target_gates=None,
@@ -113,12 +113,12 @@ def catalyst_decompose(
     the HybridOps have been passed to the decompose function.
     """
 
-    # This if statement is needed because not all classes that inherit from qml.StatePrepBase
+    # This if statement is needed because not all classes that inherit from qp.StatePrepBase
     # are compatible with Catalyst's handling of initial state preparation. Currently, Catalyst
-    # only supports qml.StatePrep and qml.BasisState. A default strategy for handling any PennyLane
-    # operator of type qml.StatePrepBase will be needed before this conditional can be removed.
+    # only supports qp.StatePrep and qp.BasisState. A default strategy for handling any PennyLane
+    # operator of type qp.StatePrepBase will be needed before this conditional can be removed.
     skip_initial_state_prep = False
-    if len(tape) > 0 and type(tape[0]) in (qml.StatePrep, qml.BasisState):
+    if len(tape) > 0 and type(tape[0]) in (qp.StatePrep, qp.BasisState):
         if grad_method is None or not is_active(tape[0]):
             skip_initial_state_prep = capabilities.initial_state_prep
 
@@ -164,7 +164,7 @@ def catalyst_decompose(
         if has_nested_tapes(op):
             op = _decompose_nested_tapes(op, capabilities, **decompose_kwargs)
         new_ops.append(op)
-    tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
+    tape = qp.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
 
     return (tape,), lambda x: x[0]
 
@@ -176,7 +176,7 @@ def _decompose_to_matrix(op):
         raise CompileError(
             f"Operation {op} could not be decomposed, it might be unsupported."
         ) from e
-    op = qml.QubitUnitary(mat, wires=op.wires)
+    op = qp.QubitUnitary(mat, wires=op.wires)
     return [op]
 
 
@@ -217,7 +217,7 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 
     Returns:
         qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
-        transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
+        transformed circuit as described in :func:`qp.transform <pennylane.transform>`.
     """
     new_operations = []
 
@@ -229,7 +229,7 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
                 raise CompileError(
                     f"Operation {op} could not be decomposed, it might be unsupported."
                 ) from e
-            op = qml.QubitUnitary(mat, wires=op.wires)
+            op = qp.QubitUnitary(mat, wires=op.wires)
         new_operations.append(op)
 
     new_tape = type(tape)(new_operations, tape.measurements, shots=tape.shots)
@@ -244,14 +244,14 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 
 
 def catalyst_acceptance(
-    op: qml.operation.Operator, capabilities: DeviceCapabilities, grad_method: Union[str, None]
+    op: qp.operation.Operator, capabilities: DeviceCapabilities, grad_method: Union[str, None]
 ) -> Union[str, None]:
     """Check whether an Operator is supported and returns the name of the operation or None."""
 
     if not is_differentiable(op, capabilities, grad_method):
         return None
 
-    if isinstance(op, qml.ops.Adjoint):
+    if isinstance(op, qp.ops.Adjoint):
         match = catalyst_acceptance(op.base, capabilities, grad_method)
         if match and is_invertible(op.base, capabilities):
             return match
@@ -259,7 +259,7 @@ def catalyst_acceptance(
     # There are cases where a custom controlled gate, e.g., CH, is supported, but its
     # base, i.e., H, is not labeled controllable. In this case, we don't want to use
     # this branch to check the support for this operation.
-    elif type(op) is qml.ops.ControlledOp:
+    elif type(op) is qp.ops.ControlledOp:
         match = catalyst_acceptance(op.base, capabilities, grad_method)
         if match and is_controllable(op.base, capabilities):
             return match
@@ -283,7 +283,7 @@ def measurements_from_counts(tape, device_wires):
 
     Returns:
         qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
-        transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
+        transformed circuit as described in :func:`qp.transform <pennylane.transform>`.
 
     .. note::
 
@@ -305,7 +305,7 @@ def measurements_from_counts(tape, device_wires):
 
     new_operations, measured_wires = _diagonalize_measurements(tape, device_wires=device_wires)
 
-    new_tape = type(tape)(new_operations, [qml.counts(wires=measured_wires)], shots=tape.shots)
+    new_tape = type(tape)(new_operations, [qp.counts(wires=measured_wires)], shots=tape.shots)
 
     def postprocessing_counts(results):
         """A processing function to get expectation values from counts."""
@@ -315,7 +315,7 @@ def measurements_from_counts(tape, device_wires):
         for m in tape.measurements:
             wires = m.wires if m.wires else device_wires
             mapped_counts_outcome = _map_counts(
-                counts_outcomes, wires, qml.wires.Wires(list(measured_wires))
+                counts_outcomes, wires, qp.wires.Wires(list(measured_wires))
             )
             if isinstance(m, ExpectationMP):
                 probs = _probs_from_counts(mapped_counts_outcome)
@@ -354,7 +354,7 @@ def measurements_from_samples(tape, device_wires):
 
     Returns:
         qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
-        transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
+        transformed circuit as described in :func:`qp.transform <pennylane.transform>`.
 
     .. note::
 
@@ -376,7 +376,7 @@ def measurements_from_samples(tape, device_wires):
 
     new_operations, measured_wires = _diagonalize_measurements(tape, device_wires=device_wires)
 
-    new_tape = type(tape)(new_operations, [qml.sample(wires=measured_wires)], shots=tape.shots)
+    new_tape = type(tape)(new_operations, [qp.sample(wires=measured_wires)], shots=tape.shots)
 
     def postprocessing_samples(results):
         """A processing function to get expectation values from samples."""
@@ -415,7 +415,7 @@ def _diagonalize_measurements(tape, device_wires):
 
     """
 
-    (diagonalized_tape,), _ = qml.transforms.diagonalize_measurements(tape)
+    (diagonalized_tape,), _ = qp.transforms.diagonalize_measurements(tape)
 
     measured_wires = set()
     for m in diagonalized_tape.measurements:
