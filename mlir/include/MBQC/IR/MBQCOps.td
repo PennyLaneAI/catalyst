@@ -21,35 +21,12 @@ include "mlir/IR/EnumAttr.td"
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumTypes.td"
 
+include "MBQC/IR/MBQCAttrDefs.td"
 include "MBQC/IR/MBQCDialect.td"
-
-//===----------------------------------------------------------------------===//
-// MBQC dialect enums.
-//===----------------------------------------------------------------------===//
-
-def MeasurementPlane : I32EnumAttr<"MeasurementPlane",
-    "Planes in the Bloch sphere representation with support for arbitrary-basis measurements",
-    [
-        I32EnumAttrCase<"XY", 0>,
-        I32EnumAttrCase<"YZ", 1>,
-        I32EnumAttrCase<"ZX", 2>,
-    ]> {
-    let cppNamespace = "catalyst::mbqc";
-    let genSpecializedAttr = 0;
-}
-
 
 //===----------------------------------------------------------------------===//
 // MBQC dialect traits.
 //===----------------------------------------------------------------------===//
-
-
-//===----------------------------------------------------------------------===//
-// MBQC dialect attributes.
-//===----------------------------------------------------------------------===//
-
-def MeasurementPlaneAttr : EnumAttr<MBQC_Dialect, MeasurementPlane, "measurement_plane">;
-
 
 //===----------------------------------------------------------------------===//
 // MBQC dialect operations.
