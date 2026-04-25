@@ -713,6 +713,8 @@ def GraphStatePrepOp : Memory_Op<"mbqc.graph_state_prep"> {
     let assemblyFormat = [{
         `(` $adj_matrix `:` type($adj_matrix) `)` `[` `init` $init_op `,` `entangle` $entangle_op `]` attr-dict `:` type(results)
     }];
+
+    let hasVerifier = 1;
 }
 
 #endif // QREF_OPS

@@ -15,6 +15,7 @@
 #include "QRef/IR/QRefOps.h"
 
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
@@ -282,10 +283,32 @@ LogicalResult ComputationalBasisOp::verify()
 LogicalResult HermitianOp::verify()
 {
     size_t dim = std::pow(2, getQubits().size());
-    if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim)))
+    if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim))) {
         return emitOpError("The Hermitian matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
+    }
 
     return success();
 }
 
+LogicalResult GraphStatePrepOp::verify()
+{
+    ShapedType adjMatrixType = cast<ShapedType>(getAdjMatrix().getType());
+    size_t adjMatrixSize = adjMatrixType.getShape()[0];
+
+    QuregType qregType = getQreg().getType();
+    if (qregType.isDynamic()) {
+        return emitOpError() << "expected static allocation size";
+    }
+
+    size_t qregSize = qregType.getSize().getInt();
+    size_t expectedAdjMatrixSize = qregSize * (qregSize - 1) / 2;
+    if (adjMatrixSize != expectedAdjMatrixSize) {
+        return emitOpError() << "mismatch between allocation size and size of dense adjacency "
+                                "matrix. For an allocation size of "
+                             << qregSize << ", dense adjacency matrix size is expected to be "
+                             << expectedAdjMatrixSize;
+    }
+
+    return success();
+}
 } // namespace catalyst::qref
