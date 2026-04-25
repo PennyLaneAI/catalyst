@@ -52,7 +52,12 @@ void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
     DataView<int64_t, 1> col_ptr(col_ptr_tanner->data_aligned, col_ptr_tanner->offset,
                                  col_ptr_tanner->sizes, col_ptr_tanner->strides);
 
-    auto current_lut = LUTs::get_lut(aux_col_offset, code_size, code_distance, row_idx, col_ptr);
+    // auto &&luts = LUTs::getInstance();
+
+    // auto current_lut = luts.get_lut(aux_col_offset, code_size, code_distance, row_idx, col_ptr);
+
+    auto current_lut =
+        LUTs::getInstance().get_lut(aux_col_offset, code_size, code_distance, row_idx, col_ptr);
 
     DataView<int8_t, 1> syndromes_res(current_syndromes->data_aligned, current_syndromes->offset,
                                       current_syndromes->sizes, current_syndromes->strides);
