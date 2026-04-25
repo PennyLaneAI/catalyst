@@ -18,7 +18,7 @@ Unit tests for the dynamic qubit allocation.
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import pennylane as qml
+import pennylane as qp
 
 from catalyst import qjit
 from catalyst.jax_primitives import qalloc_p, qdealloc_qb_p, qextract_p
@@ -45,14 +45,14 @@ print(test_single_qubit_dealloc.jaxpr)
 print(test_single_qubit_dealloc.mlir)
 
 
-qml.capture.enable()
+qp.capture.enable()
 
 
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=3))
+@qp.qnode(qp.device("lightning.qubit", wires=3))
 def test_basic_dynalloc():
     """
-    Test basic qml.allocate and qml.deallocate.
+    Test basic qp.allocate and qp.deallocate.
 
     Test both the explicit call API and the context manager API.
     """
@@ -69,10 +69,10 @@ def test_basic_dynalloc():
     # CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[CNOTout]]#0
     # CHECK: quantum.dealloc [[insert1]]
 
-    qs = qml.allocate(2)
-    qml.X(qs[0])
-    qml.CNOT(wires=[qs[1], 2])
-    qml.deallocate(qs[:])
+    qs = qp.allocate(2)
+    qp.X(qs[0])
+    qp.CNOT(wires=[qs[1], 2])
+    qp.deallocate(qs[:])
 
     # CHECK: [[dyn_qreg:%.+]] = quantum.alloc( 4)
     # CHECK: [[dyn_bit1:%.+]] = quantum.extract [[dyn_qreg]][ 1]
@@ -85,21 +85,21 @@ def test_basic_dynalloc():
     # CHECK: [[insert2:%.+]] = quantum.insert [[insert1]][ 3]
     # CHECK: quantum.dealloc [[insert2]]
 
-    with qml.allocate(4) as qs1:
-        qml.X(qs1[1])
-        qml.CNOT(wires=[qs1[2], 1])
+    with qp.allocate(4) as qs1:
+        qp.X(qs1[1])
+        qp.CNOT(wires=[qs1[2], 1])
 
-    return qml.probs(wires=[0])
+    return qp.probs(wires=[0])
 
 
 print(test_basic_dynalloc.mlir)
 
 
 @qjit(autograph=True, target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=3))
+@qp.qnode(qp.device("lightning.qubit", wires=3))
 def test_measure_with_reset():
     """
-    Test qml.allocate with qml.measure with a reset.
+    Test qp.allocate with qp.measure with a reset.
     """
 
     # CHECK: [[device_init_qreg:%.+]] = quantum.alloc( 3)
@@ -116,17 +116,17 @@ def test_measure_with_reset():
     # CHECK:  [[dealloc_qreg:%.+]] = quantum.insert [[dyn_qreg]][ 0], [[reset_qubit]]
     # CHECK:  quantum.dealloc [[dealloc_qreg]]
 
-    with qml.allocate(1) as q:
-        qml.measure(wires=q[0], reset=True, postselect=1)
+    with qp.allocate(1) as q:
+        qp.measure(wires=q[0], reset=True, postselect=1)
 
-    return qml.probs(wires=[0, 1, 2])
+    return qp.probs(wires=[0, 1, 2])
 
 
 print(test_measure_with_reset.mlir)
 
 
 @qjit(autograph=True, target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_pass_reg_into_forloop():
     """
     Test using a dynamically allocated resgister from inside a subscope.
@@ -145,23 +145,23 @@ def test_pass_reg_into_forloop():
     # CHECK:    scf.yield [[dyn_reg_yield]], [[global_reg_yield]] : !quantum.reg, !quantum.reg
     # CHECK: quantum.dealloc [[for_out]]#0 : !quantum.reg
 
-    with qml.allocate(1) as q:
+    with qp.allocate(1) as q:
         for _ in range(3):
-            qml.X(wires=q[0])
-            qml.CNOT(wires=[q[0], 0])
+            qp.X(wires=q[0])
+            qp.CNOT(wires=[q[0], 0])
 
     # CHECK: [[global_bit0:%.+]] = quantum.extract [[for_out]]#1[ 0]
     # CHECK: [[global_bit1:%.+]] = quantum.extract [[for_out]]#1[ 1]
     # CHECK: [[obs:%.+]] = quantum.compbasis qubits [[global_bit0]], [[global_bit1]] : !quantum.obs
     # CHECK: {{.+}} = quantum.probs [[obs]] : tensor<4xf64>
-    return qml.probs(wires=[0, 1])
+    return qp.probs(wires=[0, 1])
 
 
 print(test_pass_reg_into_forloop.mlir)
 
 
 @qjit(autograph=True, target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=3))
+@qp.qnode(qp.device("lightning.qubit", wires=3))
 def test_pass_multiple_regs_into_forloop():
     """
     Test using multiple dynamically allocated resgisters from inside a subscope.
@@ -188,20 +188,20 @@ def test_pass_multiple_regs_into_forloop():
     # CHECK:  quantum.dealloc [[for_out]]#1 : !quantum.reg
     # CHECK:  quantum.dealloc [[for_out]]#0 : !quantum.reg
 
-    with qml.allocate(1) as q1:
-        with qml.allocate(2) as q2:
+    with qp.allocate(1) as q1:
+        with qp.allocate(2) as q2:
             for _ in range(3):
-                qml.CNOT(wires=[q1[0], 0])
-                qml.CNOT(wires=[q2[1], 1])
+                qp.CNOT(wires=[q1[0], 0])
+                qp.CNOT(wires=[q2[1], 1])
 
-    return qml.probs(wires=[0, 1])
+    return qp.probs(wires=[0, 1])
 
 
 print(test_pass_multiple_regs_into_forloop.mlir)
 
 
 @qjit(autograph=True, target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_pass_multiple_regs_into_whileloop(N: int):
     """
     Test using multiple dynamically allocated resgisters from inside a while loop.
@@ -232,14 +232,14 @@ def test_pass_multiple_regs_into_whileloop(N: int):
     # CHECK:  quantum.dealloc [[while_out]]#1
 
     i = 0
-    with qml.allocate(1) as q1:
-        with qml.allocate(4) as q2:
+    with qp.allocate(1) as q1:
+        with qp.allocate(4) as q2:
             while i < N:
-                qml.CNOT(wires=[q1[0], 1])
-                qml.CNOT(wires=[q2[0], 1])
+                qp.CNOT(wires=[q1[0], 1])
+                qp.CNOT(wires=[q2[0], 1])
                 i += 1
 
-    return qml.probs(wires=[0, 1])
+    return qp.probs(wires=[0, 1])
 
 
 print(test_pass_multiple_regs_into_whileloop.mlir)
@@ -251,12 +251,12 @@ def test_quantum_subroutine():
     Test passing dynamically allocated wires into a quantum subroutine.
     """
 
-    @qml.capture.subroutine
+    @qp.capture.subroutine
     def flip(w1, w2, w3, theta):
-        qml.X(w1)
-        qml.Y(w2)
-        qml.Z(w3)
-        qml.ctrl(qml.RX, (w1, w2))(theta, wires=0)
+        qp.X(w1)
+        qp.Y(w2)
+        qp.Z(w3)
+        qp.ctrl(qp.RX, (w1, w2))(theta, wires=0)
 
     # CHECK:  [[angle:%.+]] = stablehlo.constant dense<1.230000e+00>
     # CHECK:  [[two:%.+]] = stablehlo.constant dense<2>
@@ -270,12 +270,12 @@ def test_quantum_subroutine():
     # CHECK-SAME: -> (!quantum.reg, !quantum.reg, !quantum.reg)
 
     @qjit(target="mlir")
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit():
-        with qml.allocate(2) as q1:
-            with qml.allocate(3) as q2:
+        with qp.allocate(2) as q1:
+            with qp.allocate(3) as q2:
                 flip(q1[0], q1[1], q2[2], 1.23)
-        return qml.probs(wires=[0])
+        return qp.probs(wires=[0])
 
     # CHECK: func.func private @flip(
     # CHECK:   [[zero:%.+]] = tensor.extract %arg3[]
@@ -305,4 +305,4 @@ def test_quantum_subroutine():
 test_quantum_subroutine()
 
 
-qml.capture.disable()
+qp.capture.disable()

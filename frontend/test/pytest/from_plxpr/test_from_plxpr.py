@@ -17,7 +17,7 @@ This module tests the from_plxpr conversion function.
 
 import jax
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 from pennylane.capture.primitives import adjoint_transform_prim, for_loop_prim, while_loop_prim
 
@@ -57,13 +57,13 @@ class TestErrors:
     def test_measuring_eigvals_not_supported(self):
         """Test that a NotImplementedError is raised for converting a measurement
         specified via eigvals and wires."""
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.set_shots(50)
-        @qml.qnode(dev)
+        @qp.set_shots(50)
+        @qp.qnode(dev)
         def circuit():
-            return qml.measurements.SampleMP(
-                wires=qml.wires.Wires((0, 1)), eigvals=np.array([-1.0, -1.0, 1.0, 1.0])
+            return qp.measurements.SampleMP(
+                wires=qp.wires.Wires((0, 1)), eigvals=np.array([-1.0, -1.0, 1.0, 1.0])
             )
 
         jaxpr = jax.make_jaxpr(circuit)()
@@ -74,11 +74,11 @@ class TestErrors:
         """Test that a NotImplementedError is raised if a measurement
         is not yet supported for conversion."""
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
-            return qml.vn_entropy(wires=0)
+            return qp.vn_entropy(wires=0)
 
         jaxpr = jax.make_jaxpr(circuit)()
 
@@ -88,12 +88,12 @@ class TestErrors:
     def test_no_shot_vectors(self):
         """Test that a NotImplementedError is raised with shot vectors."""
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
-        @qml.set_shots((10, 10, 20))
-        @qml.qnode(dev)
+        @qp.set_shots((10, 10, 20))
+        @qp.qnode(dev)
         def c():
-            return qml.sample(wires=0)
+            return qp.sample(wires=0)
 
         jaxpr = jax.make_jaxpr(c)()
 
@@ -103,10 +103,10 @@ class TestErrors:
     def test_errors_transform_inside_qnode(self):
         """Test that an error is raised if a transform is applied inside a transform."""
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        @qml.transforms.cancel_inverses
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        @qp.transforms.cancel_inverses
         def c():
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         jaxpr = jax.make_jaxpr(c)()
 
@@ -122,77 +122,77 @@ class TestCatalystCompareJaxpr:
     def test_qubit_unitary(self):
         """Test that qubit unitary can be converted."""
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(U):
-            qml.QubitUnitary(U, wires=0)
-            return qml.expval(qml.Z(0))
+            qp.QubitUnitary(U, wires=0)
+            return qp.expval(qp.Z(0))
 
-        x = qml.X.compute_matrix()
-        qml.capture.enable()
+        x = qp.X.compute_matrix()
+        qp.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(x)
         converted = from_plxpr(plxpr)(x)
-        qml.capture.disable()
+        qp.capture.disable()
 
         catalyst_res = catalyst_execute_jaxpr(converted)(x)
         assert len(catalyst_res) == 1
-        assert qml.math.allclose(catalyst_res[0], -1)
+        assert qp.math.allclose(catalyst_res[0], -1)
 
     def test_globalphase(self):
         """Test conversion of a global phase."""
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(phi):
-            qml.GlobalPhase(phi)
-            return qml.state()
+            qp.GlobalPhase(phi)
+            return qp.state()
 
         phi = 0.5
-        qml.capture.enable()
+        qp.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(phi)
         converted = from_plxpr(plxpr)(phi)
-        qml.capture.disable()
+        qp.capture.disable()
         catalyst_res = catalyst_execute_jaxpr(converted)(phi)
-        assert qml.math.allclose(catalyst_res, np.exp(-0.5j) * np.array([1.0, 0.0]))
+        assert qp.math.allclose(catalyst_res, np.exp(-0.5j) * np.array([1.0, 0.0]))
 
     def test_expval(self):
         """Test comparison and execution of the jaxpr for a simple qnode."""
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x):
-            qml.RX(x, wires=0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, wires=0)
+            return qp.expval(qp.Z(0))
 
-        qml.capture.enable()
+        qp.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(0.5)
         converted = from_plxpr(plxpr)(0.5)
-        qml.capture.disable()
+        qp.capture.disable()
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
 
         catalyst_res = catalyst_execute_jaxpr(converted)(0.5)
         assert len(catalyst_res) == 1
-        assert qml.math.allclose(catalyst_res[0], jax.numpy.cos(0.5))
+        assert qp.math.allclose(catalyst_res[0], jax.numpy.cos(0.5))
 
     def test_probs(self):
         """Test comparison and execution of a jaxpr containing a probability measurement."""
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x):
-            qml.RX(x, wires=0)
-            return qml.probs(wires=0)
+            qp.RX(x, wires=0)
+            return qp.probs(wires=0)
 
-        qml.capture.enable()
+        qp.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(0.5)
 
         converted = from_plxpr(plxpr)(0.5)
-        qml.capture.disable()
+        qp.capture.disable()
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -200,26 +200,26 @@ class TestCatalystCompareJaxpr:
         catalyst_res = catalyst_execute_jaxpr(converted)(0.5)
         assert len(catalyst_res) == 1
         expected = np.array([np.cos(0.5 / 2) ** 2, np.sin(0.5 / 2) ** 2])
-        assert qml.math.allclose(catalyst_res[0], expected)
+        assert qp.math.allclose(catalyst_res[0], expected)
 
     def test_state(self):
         """Test that the state can be converted to catalxpr."""
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(phi):
-            qml.Hadamard(0)
-            qml.IsingXX(phi, wires=(0, 1))
-            return qml.state()
+            qp.Hadamard(0)
+            qp.IsingXX(phi, wires=(0, 1))
+            return qp.state()
 
         phi = np.array(-0.6234)
 
-        qml.capture.enable()
+        qp.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(phi)
 
         converted = from_plxpr(plxpr)(phi)
-        qml.capture.disable()
+        qp.capture.disable()
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -231,25 +231,25 @@ class TestCatalystCompareJaxpr:
         x2 = -1j * np.sin(phi / 2) / np.sqrt(2)
         expected = np.array([x1, x2, x1, x2])
 
-        assert qml.math.allclose(catalyst_res[0], expected)
+        assert qp.math.allclose(catalyst_res[0], expected)
 
     def test_variance(self):
         """Test comparison and execution of a jaxpr containing a variance measurement."""
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x):
-            qml.RX(x, wires=0)
-            return qml.var(qml.Y(0))
+            qp.RX(x, wires=0)
+            return qp.var(qp.Y(0))
 
         x = np.array(0.724)
 
-        qml.capture.enable()
+        qp.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(x)
 
         converted = from_plxpr(plxpr)(np.array(0.724))
-        qml.capture.disable()
+        qp.capture.disable()
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -257,24 +257,24 @@ class TestCatalystCompareJaxpr:
         catalyst_res = catalyst_execute_jaxpr(converted)(x)
         assert len(catalyst_res) == 1
         expected = 1 - np.sin(x) ** 2
-        assert qml.math.allclose(catalyst_res[0], expected)
+        assert qp.math.allclose(catalyst_res[0], expected)
 
     def test_sample(self):
         """Test comparison and execution of a jaxpr returning samples."""
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.set_shots(50)
-        @qml.qnode(dev, mcm_method="single-branch-statistics")
+        @qp.set_shots(50)
+        @qp.qnode(dev, mcm_method="single-branch-statistics")
         def circuit():
-            qml.X(0)
-            return qml.sample()
+            qp.X(0)
+            return qp.sample()
 
-        qml.capture.enable()
+        qp.capture.enable()
         plxpr = jax.make_jaxpr(circuit)()
 
         converted = from_plxpr(plxpr)()
-        qml.capture.disable()
+        qp.capture.disable()
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -282,23 +282,23 @@ class TestCatalystCompareJaxpr:
         catalyst_res = catalyst_execute_jaxpr(converted)()
         assert len(catalyst_res) == 1
         expected = np.transpose(np.vstack([np.ones(50), np.zeros(50)]))
-        assert qml.math.allclose(catalyst_res[0], expected)
+        assert qp.math.allclose(catalyst_res[0], expected)
 
     def test_counts(self):
         """Test comparison and execution of a jaxpr returning counts."""
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.set_shots(50)
-        @qml.qnode(dev)
+        @qp.set_shots(50)
+        @qp.qnode(dev)
         def circuit():
-            qml.X(0)
-            return qml.counts(all_outcomes=True)
+            qp.X(0)
+            return qp.counts(all_outcomes=True)
 
-        qml.capture.enable()
+        qp.capture.enable()
         plxpr = jax.make_jaxpr(circuit)()
         converted = from_plxpr(plxpr)()
-        qml.capture.disable()
+        qp.capture.disable()
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -307,75 +307,75 @@ class TestCatalystCompareJaxpr:
         assert len(catalyst_res) == 2
         expected_keys = np.array([0, 1, 2, 3])
         expected_values = np.array([0, 0, 50, 0])
-        assert qml.math.allclose(catalyst_res[0], expected_keys)
-        assert qml.math.allclose(catalyst_res[1], expected_values)
+        assert qp.math.allclose(catalyst_res[0], expected_keys)
+        assert qp.math.allclose(catalyst_res[1], expected_values)
 
     def test_basis_state(self):
         """Test comparison and execution of a jaxpr containing BasisState."""
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(_basis_state):
-            qml.BasisState(_basis_state, wires=[0, 1])
-            return qml.state()
+            qp.BasisState(_basis_state, wires=[0, 1])
+            return qp.state()
 
         basis_state = np.array([1, 1])
         expected_state_vector = np.array([0, 0, 0, 1], dtype=np.complex128)
 
-        qml.capture.enable()
+        qp.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(basis_state)
         converted = from_plxpr(plxpr)(basis_state)
-        qml.capture.disable()
+        qp.capture.disable()
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
 
         catalyst_res = catalyst_execute_jaxpr(converted)(basis_state)
         assert len(catalyst_res) == 1
-        assert qml.math.allclose(catalyst_res[0], expected_state_vector)
+        assert qp.math.allclose(catalyst_res[0], expected_state_vector)
 
     def test_state_prep(self):
         """Test comparison and execution of a jaxpr containing StatePrep."""
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(_init_state):
             # NOTE: Require validate_norm=False here otherwise Catalyst jaxpr contains
             # unused function that computes norm
-            qml.StatePrep(_init_state, wires=0, validate_norm=False)
-            return qml.state()
+            qp.StatePrep(_init_state, wires=0, validate_norm=False)
+            return qp.state()
 
         init_state = np.array([1, 1], dtype=np.complex128) / np.sqrt(2)
 
-        qml.capture.enable()
+        qp.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(init_state)
         converted = from_plxpr(plxpr)(init_state)
-        qml.capture.disable()
+        qp.capture.disable()
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
 
         catalyst_res = catalyst_execute_jaxpr(converted)(init_state)
         assert len(catalyst_res) == 1
-        assert qml.math.allclose(catalyst_res[0], init_state)
+        assert qp.math.allclose(catalyst_res[0], init_state)
 
     def test_multiple_measurements(self):
         """Test that we can convert a circuit with multiple measurement returns."""
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x, y, z):
-            qml.Rot(x, y, z, 0)
-            return qml.expval(qml.X(0)), qml.expval(qml.Y(0)), qml.probs(wires=0)
+            qp.Rot(x, y, z, 0)
+            return qp.expval(qp.X(0)), qp.expval(qp.Y(0)), qp.probs(wires=0)
 
         x, y, z = 0.9, 0.2, 0.5
 
-        qml.capture.enable()
+        qp.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(x, y, z)
 
         converted = from_plxpr(plxpr)(x, y, z)
-        qml.capture.disable()
+        qp.capture.disable()
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -387,34 +387,34 @@ class TestCatalystCompareJaxpr:
         b = np.sin(y / 2) * np.exp(-0.5j * (x - z))
         state = np.array([a, b])
         expected_probs = np.abs(state) ** 2
-        expected_expval_x = np.conj(state) @ qml.X.compute_matrix() @ state
-        expected_expval_y = np.conj(state) @ qml.Y.compute_matrix() @ state
-        assert qml.math.allclose(catalyst_res[0], expected_expval_x)
-        assert qml.math.allclose(catalyst_res[1], expected_expval_y)
-        assert qml.math.allclose(catalyst_res[2], expected_probs)
+        expected_expval_x = np.conj(state) @ qp.X.compute_matrix() @ state
+        expected_expval_y = np.conj(state) @ qp.Y.compute_matrix() @ state
+        assert qp.math.allclose(catalyst_res[0], expected_expval_x)
+        assert qp.math.allclose(catalyst_res[1], expected_expval_y)
+        assert qp.math.allclose(catalyst_res[2], expected_probs)
 
     def test_dynamic_shots(self):
         """Test that shots can be specified on qnode call."""
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.set_shots(50)
-        @qml.qnode(dev)
+        @qp.set_shots(50)
+        @qp.qnode(dev)
         def circuit():
-            return qml.sample(wires=0)
+            return qp.sample(wires=0)
 
         def f():
-            return qml.set_shots(circuit, shots=100)()
+            return qp.set_shots(circuit, shots=100)()
 
-        qml.capture.enable()
+        qp.capture.enable()
         jaxpr = jax.make_jaxpr(f)()
 
         converted = from_plxpr(jaxpr)()
-        qml.capture.disable()
+        qp.capture.disable()
 
         assert converted.out_avals[0].shape == (100, 1)
         [samples] = catalyst_execute_jaxpr(converted)()
-        assert qml.math.allclose(samples, np.zeros((100, 1)))
+        assert qp.math.allclose(samples, np.zeros((100, 1)))
 
 
 class TestAdjointCtrl:
@@ -423,15 +423,15 @@ class TestAdjointCtrl:
     @pytest.mark.parametrize("num_adjoints", (1, 2, 3))
     def test_adjoint_op(self, num_adjoints):
         """Test the conversion of a simple adjoint op."""
-        qml.capture.enable()
+        qp.capture.enable()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def c():
-            op = qml.S(0)
+            op = qp.S(0)
             for _ in range(num_adjoints):
-                op = qml.adjoint(op)
+                op = qp.adjoint(op)
 
-            return qml.state()
+            return qp.state()
 
         plxpr = jax.make_jaxpr(c)()
         catalyst_xpr = from_plxpr(plxpr)()
@@ -451,17 +451,17 @@ class TestAdjointCtrl:
     def test_ctrl_op(self, inner_adjoint, outer_adjoint):
         """Test the conversion of a simple adjoint op."""
 
-        qml.capture.enable()
+        qp.capture.enable()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def c(x, wire3):
-            op = qml.RX(x, 0)
+            op = qp.RX(x, 0)
             if inner_adjoint:
-                op = qml.adjoint(op)
-            op = qml.ctrl(op, (1, 2, wire3), [0, 1, 0])
+                op = qp.adjoint(op)
+            op = qp.ctrl(op, (1, 2, wire3), [0, 1, 0])
             if outer_adjoint:
-                op = qml.adjoint(op)
-            return qml.state()
+                op = qp.adjoint(op)
+            return qp.state()
 
         plxpr = jax.make_jaxpr(c)(0.5, 3)
         catalyst_xpr = from_plxpr(plxpr)(0.5, 3)
@@ -488,15 +488,15 @@ class TestAdjointCtrl:
     def test_doubly_ctrl(self, as_qfunc):
         """Test doubly controlled op."""
 
-        qml.capture.enable()
+        qp.capture.enable()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
         def c():
             if as_qfunc:
-                qml.ctrl(qml.ctrl(qml.S, 1), 2, control_values=[False])(0)
+                qp.ctrl(qp.ctrl(qp.S, 1), 2, control_values=[False])(0)
             else:
-                qml.ctrl(qml.ctrl(qml.S(0), 1), 2, control_values=[False])
-            return qml.state()
+                qp.ctrl(qp.ctrl(qp.S(0), 1), 2, control_values=[False])
+            return qp.state()
 
         plxpr = jax.make_jaxpr(c)()
         catalyst_xpr = from_plxpr(plxpr)()
@@ -521,19 +521,19 @@ class TestAdjointCtrl:
     def test_adjoint_transform(self, with_return):
         """Test the adjoint transform."""
 
-        qml.capture.enable()
+        qp.capture.enable()
 
         # pylint: disable=inconsistent-return-statements
         def f(x):
-            op = qml.IsingXX(2 * x, wires=(0, 1))
+            op = qp.IsingXX(2 * x, wires=(0, 1))
             if with_return:
                 return op
 
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def c(x):
-            qml.X(0)
-            qml.adjoint(f)(x)
-            return qml.state()
+            qp.X(0)
+            qp.adjoint(f)(x)
+            return qp.state()
 
         plxpr = jax.make_jaxpr(c)(0.5)
         catalyst_xpr = from_plxpr(plxpr)(0.5)
@@ -565,16 +565,16 @@ class TestAdjointCtrl:
     def test_dynamic_control_wires(self, as_qfunc):
         """Test that dynamic wires are re-inserted if a dynamic wire is present."""
 
-        qml.capture.enable()
+        qp.capture.enable()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def c(wire):
-            qml.CNOT((0, wire))
+            qp.CNOT((0, wire))
             if as_qfunc:
-                qml.ctrl(qml.T, wire)(0)
+                qp.ctrl(qp.T, wire)(0)
             else:
-                qml.ctrl(qml.T(0), wire)
-            return qml.state()
+                qp.ctrl(qp.T(0), wire)
+            return qp.state()
 
         plxpr = jax.make_jaxpr(c)(3)
         catalyst_xpr = from_plxpr(plxpr)(3)
@@ -599,16 +599,16 @@ class TestAdjointCtrl:
     def test_ctrl_around_for_loop(self):
         """Test that ctrl applied to a for loop."""
 
-        qml.capture.enable()
+        qp.capture.enable()
 
-        @qml.for_loop(3)
+        @qp.for_loop(3)
         def g(i):
-            qml.X(i)
+            qp.X(i)
 
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
         def c():
-            qml.ctrl(g, [4, 5])()
-            return qml.state()
+            qp.ctrl(g, [4, 5])()
+            return qp.state()
 
         plxpr = jax.make_jaxpr(c)()
         catalyst_xpr = from_plxpr(plxpr)()
@@ -635,14 +635,14 @@ class TestControlFlow:
     def test_for_loop_outside_qnode(self, reverse):
         """Test the conversion of a for loop outside the qnode."""
 
-        qml.capture.enable()
+        qp.capture.enable()
         if reverse:
             start, stop, step = 6, 0, -2  # 6, 4, 2
         else:
             start, stop, step = 2, 7, 2  # 2, 4, 6
 
         def f(i0):
-            @qml.for_loop(start, stop, step)
+            @qp.for_loop(start, stop, step)
             def g(i, x):
                 return i + x
 
@@ -671,13 +671,13 @@ class TestControlFlow:
 
     def test_while_loop_outside_qnode(self):
         """Test that a while loop outside a qnode can be translated."""
-        qml.capture.enable()
+        qp.capture.enable()
 
         def f(x):
 
             y = jax.numpy.array([0, 1, 2])
 
-            @qml.while_loop(lambda i: jax.numpy.sum(i) < 5 * jax.numpy.sum(y))
+            @qp.while_loop(lambda i: jax.numpy.sum(i) < 5 * jax.numpy.sum(y))
             def g(i):
                 return i + y
 
@@ -705,24 +705,24 @@ class TestHybridPrograms:
     def test_pre_post_processing(self):
         """Test converting a workflow with pre and post processing."""
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x, y):
-            qml.RX(x, 0)
-            qml.RY(3 * y + 1, 1)
-            qml.CNOT((0, 1))
-            return qml.expval(qml.X(1)), qml.expval(qml.Y(0))
+            qp.RX(x, 0)
+            qp.RY(3 * y + 1, 1)
+            qp.CNOT((0, 1))
+            return qp.expval(qp.X(1)), qp.expval(qp.Y(0))
 
         def workflow(z):
             a, b = circuit(z, 2 * z)
             return a + b
 
-        qml.capture.enable()
+        qp.capture.enable()
         plxpr = jax.make_jaxpr(workflow)(0.5)
 
         converted = from_plxpr(plxpr)(0.5)
-        qml.capture.disable()
+        qp.capture.disable()
 
         res = catalyst_execute_jaxpr(converted)(0.5)
 
@@ -733,34 +733,34 @@ class TestHybridPrograms:
         expval_y0 = -np.sin(x) * np.sin(y)
         expected = expval_x1 + expval_y0
 
-        assert qml.math.allclose(expected, res[0])
+        assert qp.math.allclose(expected, res[0])
 
     def test_multiple_qnodes(self):
         """Test that a workflow with multiple qnodes can be converted."""
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def f(x):
-            qml.RX(x, wires=0)
-            return qml.expval(qml.Y(0))
+            qp.RX(x, wires=0)
+            return qp.expval(qp.Y(0))
 
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def g(y):
-            qml.Hadamard(0)
-            qml.IsingXX(y, wires=(0, 1))
-            return qml.expval(qml.PauliZ(1))
+            qp.Hadamard(0)
+            qp.IsingXX(y, wires=(0, 1))
+            return qp.expval(qp.PauliZ(1))
 
         def workflow(x, y):
             return f(x) + g(y)
 
-        qml.capture.enable()
+        qp.capture.enable()
         jaxpr = jax.make_jaxpr(workflow)(0.5, 1.2)
         catalxpr = from_plxpr(jaxpr)(0.5, 1.2)
-        qml.capture.disable()
+        qp.capture.disable()
         results = catalyst_execute_jaxpr(catalxpr)(0.5, 1.2)
 
         expected = -np.sin(0.5) + np.cos(1.2)
 
-        assert qml.math.allclose(results, expected)
+        assert qp.math.allclose(results, expected)
 
 
 if __name__ == "__main__":

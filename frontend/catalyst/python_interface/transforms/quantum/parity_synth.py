@@ -433,30 +433,30 @@ a self-inverse gate (``CNOT``) with itself. Concretely, the circuit is:
 
 .. code-block:: python
 
-    import pennylane as qml
+    import pennylane as qp
     from catalyst.python_interface import Compiler
     from catalyst.python_interface.transforms import parity_synth_pass
 
-    qml.capture.enable()
-    dev = qml.device("lightning.qubit", wires=2)
+    qp.capture.enable()
+    dev = qp.device("lightning.qubit", wires=2)
 
-    @qml.qjit(target="mlir")
+    @qp.qjit(target="mlir")
     @parity_synth_pass
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(x: float, y: float, z: float):
-        qml.CNOT((0, 1))
-        qml.RZ(x, 1)
-        qml.CNOT((0, 1))
-        qml.RX(y, 1)
-        qml.CNOT((1, 0))
-        qml.RZ(z, 1)
-        qml.CNOT((1, 0))
-        return qml.state()
+        qp.CNOT((0, 1))
+        qp.RZ(x, 1)
+        qp.CNOT((0, 1))
+        qp.RX(y, 1)
+        qp.CNOT((1, 0))
+        qp.RZ(z, 1)
+        qp.CNOT((1, 0))
+        return qp.state()
 
 We can draw the circuit and observe the last ``RZ`` gate to be wrapped in a pair of ``CNOT``
 gates that commute with it:
 
->>> print(qml.draw(circuit)(0.52, 0.12, 0.2))
+>>> print(qp.draw(circuit)(0.52, 0.12, 0.2))
 0: ─╭●───────────╭●───────────╭X───────────╭X─┤  State
 1: ─╰X──RZ(0.52)─╰X──RX(0.12)─╰●──RZ(0.20)─╰●─┤  State
 
@@ -465,7 +465,7 @@ the circuit into a reduced MLIR module:
 
 .. code-block:: python
 
-    circuit_qjit = qml.qjit(parity_synth_pass(circuit), autograph=True, target="mlir")
+    circuit_qjit = qp.qjit(parity_synth_pass(circuit), autograph=True, target="mlir")
     compiler = Compiler()
     mlir_module = compiler.run(circuit_qjit.mlir_module)
 

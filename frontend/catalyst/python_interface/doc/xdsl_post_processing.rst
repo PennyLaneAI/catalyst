@@ -6,7 +6,7 @@ Simple tutorial for injecting functions into xDSL modules
     from dataclasses import dataclass
     import jax
 
-    import pennylane as qml
+    import pennylane as qp
     from catalyst.python_interface.conversion import inline_module, xdsl_from_qjit, xdsl_module
     from catalyst.python_interface.dialects.catalyst import LaunchKernelOp
 
@@ -21,14 +21,14 @@ Create workflow and convert to xDSL module
 .. code-block:: python
 
     @xdsl_from_qjit
-    @qml.qjit(target="mlir")
+    @qp.qjit(target="mlir")
     def workflow(x, y):
-        dev = qml.device("lightning.qubit", wires=5)
+        dev = qp.device("lightning.qubit", wires=5)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            return qp.expval(qp.Z(0))
 
         res = circuit(x)
         return res - y
