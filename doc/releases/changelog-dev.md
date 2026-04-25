@@ -762,6 +762,8 @@
   [(#2694)](https://github.com/PennyLaneAI/catalyst/pull/2694)
   [(#2717)](https://github.com/PennyLaneAI/catalyst/pull/2717)
   [(#2720)](https://github.com/PennyLaneAI/catalyst/pull/2720)
+  [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
+  [(#2757)](https://github.com/PennyLaneAI/catalyst/pull/2757)
 
 * Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
   Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
@@ -1054,7 +1056,7 @@
   [(#2738)](https://github.com/PennyLaneAI/catalyst/pull/2738)
   [(#2736)](https://github.com/PennyLaneAI/catalyst/pull/2736)
   [(#2715)](https://github.com/PennyLaneAI/catalyst/pull/2715)
-  
+
 * The "Compatibility with PennyLane transforms" section of the
   :doc:`Sharp bits and debugging tips <../dev/sharp_bits>` document has been updated to describe
   potential oddities that can be encountered when composing PennyLane transforms together.
