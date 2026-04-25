@@ -134,6 +134,7 @@ with Patcher(
         lower_jaxpr,
     )
 
+from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import for_loop_prim as pl_for_loop_prim
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
@@ -141,7 +142,6 @@ from pennylane.capture.primitives import quantum_subroutine_prim
 from pennylane.capture.primitives import value_and_grad_prim as pl_value_and_grad_prim
 from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
 from pennylane.capture.primitives import while_loop_prim as pl_while_loop_prim
-from pennylane.capture.primitives import cond_prim as pl_cond_prim
 
 import catalyst
 from catalyst.compiler import get_lib_path
@@ -2373,17 +2373,18 @@ def _cond_lowering(
     head_if_op = emit_branches(preds, branch_jaxprs, jax_ctx.module_context.ip.current)
     return head_if_op.results
 
-def _pl_cond_lowering(jax_ctx: mlir.LoweringRuleContext,
+
+def _pl_cond_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
     *invals,
     jaxpr_branches,
     consts_slices,
-    args_slice,      
+    args_slice,
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
     num_preds = len(jaxpr_branches)
     preds = invals[:num_preds]
     args = invals[slice(*args_slice)]
-
 
     # recursively lower if-else chains to nested IfOps
     def emit_branches(preds, sub_branches, sub_consts_slices, insertion_point):
@@ -2413,7 +2414,7 @@ def _pl_cond_lowering(jax_ctx: mlir.LoweringRuleContext,
                     new_jaxpr,
                     if_ctx.name_stack,
                     mlir.TokenSet(),
-                    [], 
+                    [],
                     *consts,
                     *args,
                     dim_var_values=jax_ctx.dim_var_values,
@@ -2451,11 +2452,15 @@ def _pl_cond_lowering(jax_ctx: mlir.LoweringRuleContext,
                     YieldOp(out)
             else:
                 with ir.InsertionPoint(else_block) as else_ip:
-                    child_if_op = emit_branches(preds[1:], sub_branches[1:], sub_consts_slices[1:], else_ip)
+                    child_if_op = emit_branches(
+                        preds[1:], sub_branches[1:], sub_consts_slices[1:], else_ip
+                    )
                     YieldOp(child_if_op.results)
             return if_op_scf
 
-    head_if_op = emit_branches(preds, jaxpr_branches, consts_slices, jax_ctx.module_context.ip.current)
+    head_if_op = emit_branches(
+        preds, jaxpr_branches, consts_slices, jax_ctx.module_context.ip.current
+    )
     return head_if_op.results
 
 

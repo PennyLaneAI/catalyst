@@ -223,3 +223,167 @@ def test_for_loop_with_dynamic_allocation():
 
 
 print(test_for_loop_with_dynamic_allocation.mlir)
+
+
+# CHECK: func.func public @test_while_loop_basic(%arg0: tensor<i64>, %arg1: tensor<f64>) -> tensor<8xcomplex<f64>>
+@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def test_while_loop_basic(i: int, angle: float):
+    """
+    Test basic while loop
+    """
+
+    # CHECK-DAG: [[ten:%.+]] = stablehlo.constant dense<10> : tensor<i64>
+
+    # CHECK-DAG: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
+
+    # CHECK: scf.while : () -> () {
+    # CHECK:   [[cmp:%.+]] = stablehlo.compare  LT, %arg0, [[ten]]
+    # CHECK:   [[cmp_i1:%.+]] = tensor.extract [[cmp]][] : tensor<i1>
+    # CHECK:   scf.condition([[cmp_i1]])
+    # CHECK: } do {
+    # CHECK:   [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
+    # CHECK:   [[angle:%.+]] = tensor.extract %arg1[] : tensor<f64>
+    # CHECK:   qref.custom "RX"([[angle]]) [[q0]] : !qref.bit
+    # CHECK:   scf.yield
+    # CHECK: }
+
+    while i < 10:
+        qp.RX(angle, wires=0)
+
+    return qp.state()
+
+
+print(test_while_loop_basic.mlir)
+
+
+# CHECK: func.func public @test_while_loop_nested(%arg0: tensor<i64>, %arg1: tensor<f64>) -> tensor<8xcomplex<f64>>
+@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def test_while_loop_nested(i: int, angle: float):
+    """
+    Test nested while loop
+    """
+
+    # CHECK-DAG: [[ten:%.+]] = stablehlo.constant dense<10> : tensor<i64>
+    # CHECK-DAG: [[twenty:%.+]] = stablehlo.constant dense<20> : tensor<i64>
+
+    # CHECK-DAG: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
+
+    # CHECK: scf.while : () -> () {
+    # CHECK:   [[cmp:%.+]] = stablehlo.compare  LT, %arg0, [[ten]]
+    # CHECK:   [[cmp_i1:%.+]] = tensor.extract [[cmp]][] : tensor<i1>
+    # CHECK:   scf.condition([[cmp_i1]])
+    # CHECK: } do {
+    # CHECK:     scf.while : () -> () {
+    # CHECK:       [[cmp:%.+]] = stablehlo.compare  LT, %arg0, [[twenty]]
+    # CHECK:       [[cmp_i1:%.+]] = tensor.extract [[cmp]][] : tensor<i1>
+    # CHECK:       scf.condition([[cmp_i1]])
+    # CHECK:     } do {
+    # CHECK:        [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
+    # CHECK:        [[angle:%.+]] = tensor.extract %arg1[] : tensor<f64>
+    # CHECK:        qref.custom "RX"([[angle]]) [[q0]] : !qref.bit
+    # CHECK:        scf.yield
+    # CHECK:     }
+    # CHECK:     scf.yield
+    # CHECK: }
+
+    while i < 10:
+        while i < 20:
+            qp.RX(angle, wires=0)
+
+    return qp.state()
+
+
+print(test_while_loop_nested.mlir)
+
+
+# CHECK: func.func public @test_while_loop_with_dynamic_shapes(%arg0: tensor<i64>) -> tensor<8xcomplex<f64>>
+@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def test_while_loop_with_dynamic_shapes(i: int):
+    """
+    Test while loop with dynamically shaped results
+    """
+
+    # CHECK-DAG: [[ten:%.+]] = stablehlo.constant dense<10> : tensor<i64>
+    # CHECK-DAG: [[sum:%.+]] = stablehlo.dynamic_broadcast_in_dim {{.+}} -> tensor<?xf64>
+
+    # CHECK-DAG: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
+
+    # CHECK: [[loopOut:%.+]] = scf.while (%arg1 = [[sum]]) : (tensor<?xf64>) -> tensor<?xf64> {
+    # CHECK:   [[cmp:%.+]] = stablehlo.compare  LT, %arg0, [[ten]]
+    # CHECK:   [[cmp_i1:%.+]] = tensor.extract [[cmp]][] : tensor<i1>
+    # CHECK:   scf.condition([[cmp_i1]]) %arg1 : tensor<?xf64>
+    # CHECK: } do {
+    # CHECK: ^bb0(%arg1: tensor<?xf64>):
+    # CHECK:   [[add:%.+]] = stablehlo.add %arg1, %arg1 : tensor<?xf64>
+    # CHECK:   [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
+    # CHECK:   qref.custom "PauliX"() [[q0]] : !qref.bit
+    # CHECK:   scf.yield [[add]] : tensor<?xf64>
+    # CHECK: }
+    x = jnp.zeros(i)
+    while i < 10:
+        x += x
+        qp.X(wires=0)
+
+    # CHECK: [[reduce:%.+]] = stablehlo.reduce([[loopOut]]
+    # CHECK-SAME:   applies stablehlo.add
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
+    # CHECK: [[reduce_f64:%.+]] = tensor.extract [[reduce]][] : tensor<f64>
+    # CHECK: qref.custom "RX"([[reduce_f64]]) [[q0]] : !qref.bit
+    qp.RX(jnp.sum(x), wires=0)
+
+    return qp.state()
+
+
+print(test_while_loop_with_dynamic_shapes.mlir)
+
+
+# CHECK: func.func public @test_while_loop_with_dynamic_allocation(%arg0: tensor<i64>) -> tensor<f64>
+@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def test_while_loop_with_dynamic_allocation(i: int):
+    """
+    Test while loop with dynamic qubit allocation
+    """
+    # CHECK-DAG: [[reg_device:%.+]] = qref.alloc( 3) : !qref.reg<3>
+
+    # CHECK: scf.while : () -> () {
+    # CHECK:   stablehlo.compare  LT
+    # CHECK:   scf.condition
+    # CHECK: } do {
+    # CHECK:   [[reg_loop:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK:   [[q0_loop:%.+]] = qref.get [[reg_loop]][ 0] : !qref.reg<2> -> !qref.bit
+    # CHECK:   [[i:%.+]] = tensor.extract %arg0[] : tensor<i64>
+    # CHECK:   [[qi:%.+]] = qref.get [[reg_device]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK:   qref.custom "CNOT"() [[q0_loop]], [[qi]] : !qref.bit, !qref.bit
+    # CHECK:   qref.dealloc [[reg_loop]] : !qref.reg<2>
+    # CHECK:   scf.yield
+    # CHECK: }
+
+    while i < 10:
+        with qp.allocate(2) as q:
+            qp.CNOT(wires=[q[0], i])
+
+    # CHECK: [[reg_loop:%.+]] = qref.alloc( 1) : !qref.reg<1>
+    # CHECK: [[q0_loop:%.+]] = qref.get [[reg_loop]][ 0] : !qref.reg<1> -> !qref.bit
+    # CHECK: scf.while : () -> () {
+    # CHECK:   stablehlo.compare  LT
+    # CHECK:   scf.condition
+    # CHECK: } do {
+    # CHECK:   [[i:%.+]] = tensor.extract %arg0[] : tensor<i64>
+    # CHECK:   [[qi:%.+]] = qref.get [[reg_device]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
+    # CHECK:   qref.custom "CNOT"() [[q0_loop]], [[qi]] : !qref.bit, !qref.bit
+    # CHECK:   scf.yield
+    # CHECK: }
+    # CHECK: qref.dealloc [[reg_loop]] : !qref.reg<1>
+
+    with qp.allocate(1) as q:
+        while i < 10:
+            qp.CNOT(wires=[q[0], i])
+
+    return qp.expval(qp.X(0))
+
+
+print(test_while_loop_with_dynamic_allocation.mlir)

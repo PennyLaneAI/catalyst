@@ -33,8 +33,5 @@ std::vector<mlir::Value> getInQubitReachingValuesAt(PBCOpInterface srcOp, PBCOpI
 // This checks commutativity of the normalized ops with the same block.
 bool commutes(PBCOpInterface rhsOp, PBCOpInterface lhsOp);
 
-// Recursively resolve the constant parameter of a value and returns std::nullopt if not a constant.
-std::optional<double> resolveConstantValue(mlir::Value value);
-
 } // namespace pbc
 } // namespace catalyst

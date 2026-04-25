@@ -510,3 +510,44 @@ def test_multiple_terminal_measurements():
 
 
 print(test_multiple_terminal_measurements.mlir)
+
+
+# CHECK: func.func public @jit_test_pre_post_processing(%arg0: tensor<i64>)
+@qp.qjit(capture=True, target="mlir")
+def test_pre_post_processing(i: int):
+    """
+    Test converting a workflow with pre and post processing.
+    """
+    # CHECK: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+    # CHECK: [[arg0_plus_one:%.+]] = stablehlo.add %arg0, [[one]] : tensor<i64>
+    # CHECK: [[circuit_out:%.+]]:2 = catalyst.launch_kernel @module_circuit::@circuit(%arg0, [[arg0_plus_one]])
+    # CHECK-SAME:   (tensor<i64>, tensor<i64>) -> (tensor<f64>, tensor<f64>)
+    # CHECK: [[add:%.+]] = stablehlo.add [[circuit_out]]#0, [[circuit_out]]#1 : tensor<f64>
+    # CHECK: return [[add]] : tensor<f64>
+
+    # CHECK: func.func public @circuit(%arg0: tensor<i64>, %arg1: tensor<i64>) -> (tensor<f64>, tensor<f64>)
+    # CHECK:   [[reg:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK:   [[j:%.+]] = tensor.extract %arg0[] : tensor<i64>
+    # CHECK:   [[qj:%.+]] = qref.get [[reg]][[[j]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK:   [[Xobs:%.+]] = qref.namedobs [[qj]][ PauliX] : !quantum.obs
+    # CHECK:   [[Xexpval:%.+]] = quantum.expval [[Xobs]] : f64
+    # CHECK:   [[Xexpval_tensor:%.+]] = tensor.from_elements [[Xexpval]] : tensor<f64>
+
+    # CHECK:   [[k:%.+]] = tensor.extract %arg1[] : tensor<i64>
+    # CHECK:   [[qk:%.+]] = qref.get [[reg]][[[k]]] : !qref.reg<2>, i64 -> !qref.bit
+    # CHECK:   [[Yobs:%.+]] = qref.namedobs [[qk]][ PauliY] : !quantum.obs
+    # CHECK:   [[Yexpval:%.+]] = quantum.expval [[Yobs]] : f64
+    # CHECK:   [[Yexpval_tensor:%.+]] = tensor.from_elements [[Yexpval]] : tensor<f64>
+
+    # CHECK:   qref.dealloc [[reg]] : !qref.reg<2>
+    # CHECK:   return [[Xexpval_tensor]], [[Yexpval_tensor]] : tensor<f64>, tensor<f64>
+
+    @qp.qnode(qp.device("null.qubit", wires=2))
+    def circuit(j: int, k: int):
+        return qp.expval(qp.X(j)), qp.expval(qp.Y(k))
+
+    a, b = circuit(i, i + 1)
+    return a + b
+
+
+print(test_pre_post_processing.mlir)

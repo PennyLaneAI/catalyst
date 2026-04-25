@@ -14,5 +14,4 @@
 
 """Conversion from plxpr to catalyst jaxpr"""
 
-from catalyst.from_plxpr.control_flow import handle_while_loop
 from catalyst.from_plxpr.from_plxpr import from_plxpr, trace_from_pennylane

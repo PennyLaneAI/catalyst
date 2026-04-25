@@ -474,26 +474,6 @@ jobs:
       with:
         python-version: ${{ needs.constants.outputs.primary_python_version }}
 
-    - name: Install Deps
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libasan6 make
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install -r requirements.txt
-        # cuda-quantum is added manually here.
-        # It can't be in requirements.txt as that will break
-        # macOS requirements.txt
-        python3 -m pip install cuda-quantum==0.6.0
-        python3 -m pip install oqc-qcaas-client
-        # Install graphviz for testing the mlir-op-graph integration
-        sudo apt-get install -y graphviz
-        make frontend
-
-    - name: Verify Graphviz installation
-      run: |
-        dot -V
-        dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
-
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v4
@@ -531,6 +511,26 @@ jobs:
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
+
+    - name: Install Deps
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasan6 make
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install -r requirements.txt
+        # cuda-quantum is added manually here.
+        # It can't be in requirements.txt as that will break
+        # macOS requirements.txt
+        python3 -m pip install cuda-quantum==0.6.0
+        python3 -m pip install oqc-qcaas-client
+        # Install graphviz for testing the mlir-op-graph integration
+        sudo apt-get install -y graphviz
+        make frontend
+
+    - name: Verify Graphviz installation
+      run: |
+        dot -V
+        dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
 
     - name: Run temporary qref frontend tests
       run: |
@@ -578,14 +578,6 @@ jobs:
       with:
         python-version: ${{ needs.constants.outputs.primary_python_version }}
 
-    - name: Install Deps
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libasan6 make
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install -r requirements.txt
-        make frontend
-
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v4
@@ -614,6 +606,14 @@ jobs:
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
+
+    - name: Install Deps
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasan6 make
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install -r requirements.txt
+        make frontend
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
@@ -642,14 +642,6 @@ jobs:
         pip install amazon-braket-pennylane-plugin
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
-    - name: Install Deps
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libasan6 make
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install -r requirements.txt
-        make frontend
-
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v4
@@ -678,6 +670,14 @@ jobs:
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
+
+    - name: Install Deps
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasan6 make
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install -r requirements.txt
+        make frontend
 
   runtime-device-tests:
     name: Third-Party Device Tests (C++)

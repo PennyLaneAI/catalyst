@@ -122,6 +122,7 @@ frontend:
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
+	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
 	rm -r frontend/pennylane_catalyst.egg-info
 
 .PHONY: mlir llvm stablehlo enzyme dialects runtime oqc builtin-decomp-rules
@@ -258,9 +259,18 @@ wheel:
 		    cp $(COPY_FLAGS) $$file $$dest_dir; \
 	    done' sh {} +
 
+	$(PYTHON) -m pip wheel . -w bootstrap_dist --extra-index-url https://test.pypi.org/simple
+	$(PYTHON) -m pip install bootstrap_dist/*.whl
+
+	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
+
+	mkdir -p $(MK_DIR)/frontend/catalyst/resources
+	cp $$($(PYTHON) -c 'from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH; print(BYTECODE_FILE_PATH)') $(MK_DIR)/frontend/catalyst/resources/
+
 	$(PYTHON) -m pip wheel --no-deps . -w dist
 
 	rm -r $(MK_DIR)/build
+	rm -r $(MK_DIR)/bootstrap_dist
 	rm -r frontend/pennylane_catalyst.egg-info
 
 plugin-wheel: plugin
@@ -281,6 +291,7 @@ clean:
 	git restore frontend/catalyst/_configuration.py
 	rm -rf $(MK_DIR)/frontend/catalyst/_revision.py
 	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/lib $(MK_DIR)/frontend/catalyst/bin
+	rm -rf $(MK_DIR)/frontend/catalyst/resources
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 	rm -rf .benchmarks
