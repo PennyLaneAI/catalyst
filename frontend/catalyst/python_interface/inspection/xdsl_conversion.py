@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import contextlib
 import inspect
+import subprocess
 from collections.abc import Callable
 from itertools import compress
 from typing import TYPE_CHECKING
@@ -33,6 +34,7 @@ from xdsl.dialects.scf import ForOp
 from xdsl.dialects.tensor import ExtractOp as TensorExtractOp
 from xdsl.ir import Block, SSAValue
 
+from catalyst.compiler import CompileError, _get_catalyst_cli_cmd
 from catalyst.jit import QJIT
 from catalyst.python_interface.dialects.pbc import (
     PPMeasurementOp,
@@ -77,13 +79,36 @@ def conditional_pause(pause):
     return dont_do_anything()
 
 
+# TODO: This interface can be removed once the _quantum_opt interface
+# implemented in catalyst.compiler returns the `stderr` output
+def _quantum_opt_stderr(*args, stdin=None, stderr_return=False):
+    """Raw interface to quantum-opt"""
+    return _catalyst(("--tool", "opt"), *args, stdin=stdin, stderr_return=stderr_return)
+
+
+def _catalyst(*args, stdin=None, stderr_return=False):
+    """Raw interface to catalyst"""
+    cmd = _get_catalyst_cli_cmd(*args, stdin=stdin)
+    try:
+        result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=True)
+        if stderr_return:
+            return result.stdout, result.stderr
+        return result.stdout  # pragma: no cover
+    except subprocess.CalledProcessError as e:  # pragma: no cover
+        raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
+
+
 def get_mlir_module(workflow: QJIT, args, kwargs) -> Module:
     """Ensure the workflow is compiled and return its MLIR module."""
     if not isinstance(workflow, QJIT):
         raise TypeError(f"Cannot generate MLIR module for non-QJIT objects. Got {workflow}.")
 
     if (mlir_module := getattr(workflow, "mlir_module", None)) is not None:
-        return mlir_module
+        value_semantics_mlir = _quantum_opt_stderr(
+            '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;canonicalize)"',
+            stdin=str(mlir_module),
+        )
+        return value_semantics_mlir
 
     if (jaxpr := getattr(workflow, "jaxpr", None)) is None:
         jaxpr, *_ = workflow.capture(args, **kwargs)
@@ -91,7 +116,12 @@ def get_mlir_module(workflow: QJIT, args, kwargs) -> Module:
     with Patcher((workflow, "jaxpr", jaxpr)):
         mlir_module = workflow.generate_ir()
 
-    return mlir_module
+    value_semantics_mlir = _quantum_opt_stderr(
+        '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;canonicalize)"',
+        stdin=str(mlir_module),
+    )
+
+    return value_semantics_mlir
 
 
 from_str_to_PL_gate = {
