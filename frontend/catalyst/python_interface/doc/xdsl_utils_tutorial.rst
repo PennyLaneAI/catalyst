@@ -6,7 +6,7 @@ All utilities we care about are in the
 
 .. code-block:: python
 
-    import pennylane as qml
+    import pennylane as qp
 
     from catalyst.python_interface.conversion import (
         inline_jit_to_module,
@@ -97,14 +97,14 @@ Catalyst program. Let’s check it out:
 .. code-block:: python
 
     @xdsl_from_qjit
-    @qml.qjit
+    @qp.qjit
     def workflow(x, y):
-        dev = qml.device("lightning.qubit", wires=5)
+        dev = qp.device("lightning.qubit", wires=5)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def qnode(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            return qp.expval(qp.Z(0))
 
         return qnode(x) ** 2 - y
 
@@ -250,14 +250,14 @@ Let’s try revisiting the above modules and inlining them using
 .. code-block:: python
 
     @xdsl_from_qjit
-    @qml.qjit
+    @qp.qjit
     def workflow2(x, y):
-        dev = qml.device("lightning.qubit", wires=5)
+        dev = qp.device("lightning.qubit", wires=5)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def qnode(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            return qp.expval(qp.Z(0))
 
         return qnode(x) ** 2 - y
 

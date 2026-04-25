@@ -21,7 +21,7 @@ Known Limitations
   * The compilation pass assumes a static number of shots.
   * HamiltonianOps (and therefore Sums and SProds) are not supported directly. Applying
     `split-non-commuting` before this pass enables circuits with Sum/SProd observables.
-  * qml.counts() is not supported since the return type/shape is different in PennyLane and
+  * qp.counts() is not supported since the return type/shape is different in PennyLane and
     Catalyst. See
     https://docs.pennylane.ai/projects/catalyst/en/stable/dev/quick_start.html#measurements
     for more information.
@@ -139,7 +139,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
                 case "quantum.sample":
                     pass
                 case "quantum.counts":
-                    # Currently ``qml.counts()`` is unsupported due to differences in return
+                    # Currently ``qp.counts()`` is unsupported due to differences in return
                     # type/shape in PennyLane and Catalyst. It may be supported at a later time.
                     # It is included for completeness and to notify users that it is unsupported.
                     raise NotImplementedError("qml.counts() operations are not supported.")
