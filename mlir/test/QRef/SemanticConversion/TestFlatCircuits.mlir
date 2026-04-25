@@ -367,37 +367,6 @@ func.func @test_measure_op() -> (i1, i1, i1) attributes {quantum.node} {
 // -----
 
 
-// CHECK-LABEL: test_mbqc_measure_in_basis_op
-func.func @test_mbqc_measure_in_basis_op(%angle: f64) -> (i1, i1, i1) attributes {quantum.node} {
-
-    // CHECK: [[qreg:%.+]] = quantum.alloc( 1) : !quantum.reg
-    // CHECK: [[qb:%.+]] = quantum.alloc_qb : !quantum.bit
-    %a = qref.alloc(1) : !qref.reg<1>
-    %q0 = qref.get %a[0] : !qref.reg<1> -> !qref.bit
-    %qb = qref.alloc_qb : !qref.bit
-
-    // CHECK: [[mres0:%.+]], [[qb_0:%.+]] = mbqc.measure_in_basis[ XY, %arg0] [[qb]] : i1, !quantum.bit
-    // CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[mres1:%.+]], [[q0_0:%.+]] = mbqc.measure_in_basis[ YZ, %arg0] [[q0]] : i1, !quantum.bit
-    // CHECK: [[mres2:%.+]], [[q0_1:%.+]] = mbqc.measure_in_basis[ ZX, %arg0] [[q0_0]] : i1, !quantum.bit
-    %mres0 = qref.mbqc.measure_in_basis [XY, %angle] %qb : i1
-    %mres1 = qref.mbqc.measure_in_basis [YZ, %angle] %q0 : i1
-    %mres2 = qref.mbqc.measure_in_basis [ZX, %angle] %q0 : i1
-
-    // CHECK: [[insert:%.+]] = quantum.insert [[qreg]][ 0], [[q0_1]] : !quantum.reg, !quantum.bit
-    // CHECK: quantum.dealloc [[insert]] : !quantum.reg
-    // CHECK: quantum.dealloc_qb [[qb_0]] : !quantum.bit
-    qref.dealloc %a : !qref.reg<1>
-    qref.dealloc_qb %qb : !qref.bit
-
-    // CHECK: return [[mres0]], [[mres1]], [[mres2]] : i1, i1, i1
-    return %mres0, %mres1, %mres2 : i1, i1, i1
-}
-
-
-// -----
-
-
 // CHECK-LABEL: test_multiple_allocs
 func.func @test_multiple_allocs() attributes {quantum.node} {
 

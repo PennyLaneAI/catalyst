@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "MBQC/IR/MBQCOps.h"
+#include <mlir/IR/PatternMatch.h>
 #define DEBUG_TYPE "value-semantics-conversion"
 
 #include <cstdint>
@@ -164,6 +164,33 @@ bool isQrefSubroutine(func::FuncOp f)
         return WalkResult::advance();
     });
     return walkResult.wasInterrupted();
+}
+
+/**
+ * @brief Erase all remaining qref.alloc, qref.get, qref.mbqc.graph_state_prep operations in a
+ * function
+ *
+ * During the conversion, these operations cannot be deleted immediately because they might be used
+ * by other qref operations after their own conversion is done.
+ * This utility erases all of them, and must only be called at the end of a function's conversion.
+ */
+void eraseAllRemainingAnchorRValues(func::FuncOp f)
+{
+    f.walk([&](qref::GetOp getOp) {
+        assert(getOp.use_empty() &&
+               "qref.bit Values must have no uses after the semantic conversion");
+        getOp->erase();
+    });
+    f.walk([&](qref::AllocOp allocOp) {
+        assert(allocOp.use_empty() &&
+               "qref.reg Values must have no uses after the semantic conversion");
+        allocOp->erase();
+    });
+    f.walk([&](qref::GraphStatePrepOp graphStatePrepOp) {
+        assert(graphStatePrepOp.use_empty() &&
+               "qref.reg Values must have no uses after the semantic conversion");
+        graphStatePrepOp->erase();
+    });
 }
 
 /**
@@ -1087,6 +1114,23 @@ void handleHermitian(IRRewriter &builder, qref::HermitianOp rHermitianOp,
     builder.replaceOp(rHermitianOp, vHermitianOp);
 }
 
+void handleGraphStatePrep(IRRewriter &builder, qref::GraphStatePrepOp rGraphStatePrepOp,
+                          QubitValueTracker &tracker)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(rGraphStatePrepOp);
+
+    Location loc = rGraphStatePrepOp.getLoc();
+    MLIRContext *ctx = rGraphStatePrepOp.getContext();
+    Type qregType = quantum::QuregType::get(ctx);
+
+    auto vGraphStatePrepOp = mbqc::GraphStatePrepOp::create(
+        builder, loc, qregType, rGraphStatePrepOp.getAdjMatrix(), rGraphStatePrepOp.getInitOp(),
+        rGraphStatePrepOp.getEntangleOp());
+
+    tracker.setCurrentVQreg(rGraphStatePrepOp.getQreg(), vGraphStatePrepOp.getQreg());
+}
+
 /**
  * @brief Append the current root vQreg and vQubit values to the terminator operation of a region,
  * with the root rQreg and rQubit values being the ones passed in in `rValuesToReturn`.
@@ -1620,16 +1664,7 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
     addRootVValuesToRetOp(f.front().getTerminator(), rValuesUsedBySubroutine.getArrayRef(),
                           regionTracker);
 
-    f.walk([&](qref::GetOp getOp) {
-        assert(getOp.use_empty() &&
-               "qref.bit Values must have no uses after the semantic conversion");
-        builder.eraseOp(getOp);
-    });
-    f.walk([&](qref::AllocOp allocOp) {
-        assert(allocOp.use_empty() &&
-               "qref.reg Values must have no uses after the semantic conversion");
-        builder.eraseOp(allocOp);
-    });
+    eraseAllRemainingAnchorRValues(f);
 
     // Nuke all old qref arguments
     f.front().eraseArguments(
@@ -1689,6 +1724,9 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
         }
         else if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
             handleWhile(builder, whileOp, tracker);
+        }
+        else if (auto rGraphStatePrepOp = dyn_cast<qref::GraphStatePrepOp>(op)) {
+            handleGraphStatePrep(builder, rGraphStatePrepOp, tracker);
         }
     });
 }
@@ -1807,18 +1845,7 @@ struct ValueSemanticsConversionPass
         for (auto targetFunc : targetFuncs) {
             QubitValueTracker tracker;
             handleRegion(builder, targetFunc.getBody(), tracker);
-
-            targetFunc.walk([&](qref::GetOp getOp) {
-                assert(getOp.use_empty() &&
-                       "qref.bit Values must have no uses after the semantic conversion");
-                builder.eraseOp(getOp);
-            });
-
-            targetFunc.walk([&](qref::AllocOp allocOp) {
-                assert(allocOp.use_empty() &&
-                       "qref.reg Values must have no uses after the semantic conversion");
-                builder.eraseOp(allocOp);
-            });
+            eraseAllRemainingAnchorRValues(targetFunc);
         }
     }
 };
