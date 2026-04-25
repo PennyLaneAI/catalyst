@@ -30,7 +30,7 @@ namespace Catalyst::Runtime::QEC {
  * @brief Convert a vector of syndrome results to a bit string representation.
  *
  * @tparam IntegerType
- * @param syndrome_res A vector of syndrome results
+ * @param syndrome_res A dataview of syndrome results.
  * @return std::string A bit string representation of the given syndrome results.
  */
 template <typename T = int8_t>
@@ -47,24 +47,20 @@ std::string convert_syndrome_res_to_bitstr(DataView<T, 1> &syndrome_res)
 }
 
 /**
- * @brief Get a parity check matrix from the Tanner graph data.
- * The syndrome $s$ is calculated using the parity check matrix $H$ and the
- * error vector $e$ according to the linear relation:
- *
- * $$s = He \pmod 2$$
+ * @brief Get a parity check matrix from Tanner graph data.
  *
  * NOTE: With the current design of Tanner graph operation in MLIR, the first $n$ or $code_size$
  * columns represent the physical data qubits, while the last $n-1$ columns represent auxillary
  * qubits (more details here
  * https://github.com/PennyLaneAI/catalyst/blob/ab97f982539b31ab802a63020292595476f22d15/mlir/include/QecPhysical/IR/QecPhysicalTypes.td).
  *
- * @param tanner_row_idx The vector of row indices of non-zero elements with a length of $nnz$.
- * @param tanner_col_ptr The column offsets vector of a length number of $num_col + 1$ that
+ * @param tanner_row_idx The dataview of row indices of non-zero elements with a length of $nnz$.
+ * @param tanner_col_ptr The column offsets dataview of a length number of $num_col + 1$ that
  * represents the starting position of each column.
  * @param aux_cols A vector of column indices for the corresponding type of auxillary qubits.
  *
- * @return std::pair<std::vector<size_t>, std::vector<size_t>> The corresponding parity check matrix
- * in the CSS format. Each column represents an auxillary qubit.
+ * @return std::pair<std::vector<int64_t>, std::vector<int64_t>> The corresponding parity check
+ * matrix in the CSS format. Each column represents an auxillary qubit.
  */
 
 std::pair<std::vector<int64_t>, std::vector<int64_t>>
@@ -89,14 +85,17 @@ get_parity_check_matrix(DataView<int64_t, 1> &tanner_row_idx, DataView<int64_t, 
 
 /**
  * @brief Get the bit representation of a syndrome from errors object
- * NOTE: The current implementation is experimental. Based on the design choice of the first Steane
- * code prototyping,
+ * The syndrome $s$ is calculated using a CSC parity check matrix $H$ and the
+ * error vector $e$ according to the linear relation:
  *
- * @param row_idx_vec
- * @param col_ptr_vec
- * @param num_rows
- * @param num_cols
- * @return std::string
+ * $$s = He \pmod 2$$
+ *
+ * @param row_idx The row_idx vector of $H$.
+ * @param col_ptr The col_ptr vector of $H$.
+ * @param num_rows Number of rows of $H$.
+ * @param num_cols Number of columns of $H$.
+ * @param err_vec A vector of qubit errors.
+ * @return std::string The syndrome string corresponds to the err_vec.
  */
 std::string get_syndrome_from_errors(const std::vector<int64_t> &row_idx,
                                      const std::vector<int64_t> &col_ptr, const size_t num_rows,
@@ -113,13 +112,18 @@ std::string get_syndrome_from_errors(const std::vector<int64_t> &row_idx,
         syndrome_res[col] = syndrome_res[col] % 2;
     }
     DataView<size_t, 1> syndrome_res_data_view(syndrome_res);
-    // Return results
+
     return convert_syndrome_res_to_bitstr<size_t>(syndrome_res_data_view);
 }
 
+/**
+ * @brief Get the error indices of a vector of qubit errors.
+ *
+ * @param err_vec  A vector of qubit errors.
+ * @return std::vector<int64_t> Indices of qubit errors.
+ */
 std::vector<int64_t> get_error_indices(std::vector<uint8_t> &err_vec)
 {
-    // Get indices of errors
     std::vector<int64_t> error_indices;
 
     error_indices.reserve(err_vec.size());
@@ -134,25 +138,13 @@ std::vector<int64_t> get_error_indices(std::vector<uint8_t> &err_vec)
 }
 
 /**
- * @brief Generates a look up table with the given parity check matrix represented in CSC format and
- * QEC code distance.
- *
- * NOTE: The current implementation of LUT generation is not limited to the $[[7,1,3]]$ Steane code.
- * The runtime cost would be expensive if the code distance/size are large.
- *
- *
- * NOTE: However, for the Steane code prototyping, the shape of dense matrix representation of the
- * Tanner graph is $(10, 10)$, instead of $(13, 13)$. It makes sense as the Steane code is a
- * self-dual CSS code, which means the connectivities of $Z-check$ auxillary qubits are identical to
- * the $X-check$ auxillary qubits.
- *
- * NOTE: This subroutine only requires the columns of either check type of auxillary qubits
- * connectivity information. Therefore, we add a function to sanitize the tanner graph to get the
- * corresponding connectivities.
- *
- * TODOs: We need to come back to update the error to syndrome mapping code when we need to support
- * non self-dual codes.
- * @param parity_mat_row_idx .The the row vector of length nnz that contains row indices of the
+ * @brief Generates a look up table with a CSC parity check matrix $H$ and QEC code information.
+ * 
+ * NOTE: Note that this function has a combinatorial time complexity of $O(n^k)$, where $n$ represents
+ * the number of data qubits and $k$ represents the maximum error weight. Consequently, it is 
+ * computationally intractable for large-scale codes.
+ * 
+ * @param parity_mat_row_idx The row vector of length nnz that contains row indices of the
  * corresponding elements. Each column corresponds to an auxillary qubit.
  * @param parity_mat_col_ptr The column offsets vector of length number of num_col + 1 that
  * represents the starting position of each row.
@@ -160,7 +152,7 @@ std::vector<int64_t> get_error_indices(std::vector<uint8_t> &err_vec)
  * purpose.
  * @param code_distance The code distance, which represents the number of quantum errors can be
  * corrected.
- * @return std::unordered_map<std::string, std::vector<size_t>>&
+ * @return std::unordered_map<std::string, std::vector<size_t>>& The result lookup table.
  */
 std::unordered_map<std::string, std::vector<int64_t>>
 generate_lookup_table(const std::vector<int64_t> &parity_mat_row_idx,
@@ -224,11 +216,21 @@ class LUTs final {
         return instance;
     }
 
+    /**
+     * @brief Get a lookup table.
+     *
+     * @param aux_col_offset The offset of the first X-check or Z-check column in a Tanner graph.
+     * @param code_size Number of data qubits in a QEC code.
+     * @param code_distance Code distance of a QEC code.
+     * @param row_idx Dataview of the row_idx of a Tanner graph.
+     * @param col_ptr Dataview of the col_ptr of a Tanner graph.
+     * @return const std::unordered_map<std::string, std::vector<int64_t>>& The corresponding lookup
+     * table.
+     */
     auto get_lut(size_t aux_col_offset, size_t code_size, size_t code_distance,
                  DataView<int64_t, 1> &row_idx, DataView<int64_t, 1> &col_ptr)
         -> const std::unordered_map<std::string, std::vector<int64_t>> &
     {
-        // Thread-safe lock for the duration of checking/generating the LUT
         std::lock_guard<std::mutex> lock(mutex_);
 
         auto it = luts_.find(aux_col_offset);

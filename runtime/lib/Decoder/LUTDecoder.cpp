@@ -24,14 +24,13 @@
 
 namespace Catalyst::Runtime::QEC {
 /**
- * @brief A runtime lookup table based decoder. This function uses tanner graph data in CSC format
- * information to generate the lookup table and find out the corresponding error qubit indices with
- * the syndrome data.
+ * @brief A runtime lookup table based decoder.
+ * 
  * NOTE: As CAPI does not support setting default values for args, as discussed, we hardcode the
  * required args in the beginning of the function body. Those values are specifically for the [[7,
  * 1, 3]] Steane code. We expect those values are from args inputs later.
- * @param row_idx_tanner Pointer to the row_idx data of the Tanner graph of the QEC code.
- * @param col_ptr_tanner Pointer to the col_ptr data of the Tanner graph of the QEC code.
+ * @param row_idx_tanner Pointer to the row_idx data of a Tanner graph.
+ * @param col_ptr_tanner Pointer to the col_ptr data of a Tanner graph.
  * @param syndrome_results Pointer to the syndrome measurement data.
  * @param err_idx Pointer to the error qubit indices data.
  */
@@ -52,9 +51,6 @@ void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
     DataView<int64_t, 1> col_ptr(col_ptr_tanner->data_aligned, col_ptr_tanner->offset,
                                  col_ptr_tanner->sizes, col_ptr_tanner->strides);
 
-    // auto &&luts = LUTs::getInstance();
-
-    // auto current_lut = luts.get_lut(aux_col_offset, code_size, code_distance, row_idx, col_ptr);
 
     auto current_lut =
         LUTs::getInstance().get_lut(aux_col_offset, code_size, code_distance, row_idx, col_ptr);
