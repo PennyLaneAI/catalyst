@@ -16,7 +16,7 @@
 
 import jax
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import qjit, vmap
@@ -55,12 +55,12 @@ class TestVectorizeMap:
         """Test a basic use case of jax.vmap and catalyst.vmap on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: jax.core.ShapedArray((3,), dtype=float)):
-            qml.RX(jnp.pi * x[0], wires=0)
-            qml.RY(x[1] ** 2, wires=0)
-            qml.RX(x[1] * x[2], wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(jnp.pi * x[0], wires=0)
+            qp.RY(x[1] ** 2, wires=0)
+            qp.RX(x[1] * x[2], wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         def cost_fn(x):
             result = circuit(x)
@@ -78,12 +78,12 @@ class TestVectorizeMap:
 
         @qjit
         def workflow(x):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x):
-                qml.RX(jnp.pi * x[0], wires=0)
-                qml.RY(x[1] ** 2, wires=0)
-                qml.RX(x[1] * x[2], wires=0)
-                return qml.expval(qml.PauliZ(0))
+                qp.RX(jnp.pi * x[0], wires=0)
+                qp.RY(x[1] ** 2, wires=0)
+                qp.RX(x[1] * x[2], wires=0)
+                return qp.expval(qp.PauliZ(0))
 
             res = jax.vmap(circuit)(x)
             return res
@@ -104,12 +104,12 @@ class TestVectorizeMap:
 
         @qjit
         def workflow(x):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x):
-                qml.RX(jnp.pi * x[0], wires=0)
-                qml.RY(x[1] ** 2, wires=0)
-                qml.RX(x[1] * x[2], wires=0)
-                return qml.expval(qml.PauliZ(0))
+                qp.RX(jnp.pi * x[0], wires=0)
+                qp.RY(x[1] ** 2, wires=0)
+                qp.RX(x[1] * x[2], wires=0)
+                return qp.expval(qp.PauliZ(0))
 
             res1 = vmap(circuit)(x)
             res2 = vmap(circuit, in_axes=0)(x)
@@ -133,12 +133,12 @@ class TestVectorizeMap:
     def test_vmap_circuit_inside_without_jax_dispatch(self, backend):
         """Test catalyst.vmap of a hybrid workflow inside QJIT."""
 
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x):
-            qml.RX(jnp.pi * x[0], wires=0)
-            qml.RY(x[1] ** 2, wires=0)
-            qml.RX(x[1] * x[2], wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(jnp.pi * x[0], wires=0)
+            qp.RY(x[1] ** 2, wires=0)
+            qp.RX(x[1] * x[2], wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         x = jnp.array(
             [
@@ -159,12 +159,12 @@ class TestVectorizeMap:
 
         @qjit
         def workflow(x, y, z):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x, y, z):
-                qml.RX(jnp.pi * x[0] * y[1] * z[2], wires=0)
-                qml.RY(x[1] ** 2, wires=0)
-                qml.RX(x[1] * x[2] * y[0], wires=0)
-                return qml.expval(qml.PauliZ(0))
+                qp.RX(jnp.pi * x[0] * y[1] * z[2], wires=0)
+                qp.RY(x[1] ** 2, wires=0)
+                qp.RX(x[1] * x[2] * y[0], wires=0)
+                return qp.expval(qp.PauliZ(0))
 
             res1 = vmap(circuit, in_axes=0)(x, y, z)
             res2 = vmap(circuit)(x, x / 2, x / 3)
@@ -188,12 +188,12 @@ class TestVectorizeMap:
 
         @qjit
         def workflow(x):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x):
-                qml.RX(jnp.pi * x[0], wires=0)
-                qml.RY(x[1] ** 2, wires=0)
-                qml.RX(x[1] * x[2], wires=0)
-                return qml.expval(qml.PauliZ(0))
+                qp.RX(jnp.pi * x[0], wires=0)
+                qp.RY(x[1] ** 2, wires=0)
+                qp.RX(x[1] * x[2], wires=0)
+                return qp.expval(qp.PauliZ(0))
 
             res1 = vmap(circuit, in_axes=1)(x)
             res2 = vmap(circuit, in_axes=(1,))(x)
@@ -217,12 +217,12 @@ class TestVectorizeMap:
 
         @qjit
         def workflow(y, x):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(y, x):
-                qml.RX(jnp.pi * x[0] * y, wires=0)
-                qml.RY(x[1] ** 2, wires=0)
-                qml.RX(x[1] * x[2] * y, wires=0)
-                return qml.expval(qml.PauliZ(0))
+                qp.RX(jnp.pi * x[0] * y, wires=0)
+                qp.RY(x[1] ** 2, wires=0)
+                qp.RX(x[1] * x[2] * y, wires=0)
+                return qp.expval(qp.PauliZ(0))
 
             res1 = vmap(circuit, in_axes=(None, 1))(y[0], x)
             res2 = vmap(circuit, in_axes=(0, 1))(y, x)
@@ -248,10 +248,10 @@ class TestVectorizeMap:
         """Test catalyst.vmap with invalid type of in_axes."""
 
         def workflow(x):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x):
-                qml.RX(jnp.pi * x, wires=0)
-                return qml.expval(qml.PauliZ(0))
+                qp.RX(jnp.pi * x, wires=0)
+                return qp.expval(qp.PauliZ(0))
 
             res = vmap(circuit, in_axes=(0.1, None))(x)
             return res
@@ -267,10 +267,10 @@ class TestVectorizeMap:
         """Test catalyst.vmap with invalid length of in_axes and args."""
 
         def workflow(x):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x):
-                qml.RX(jnp.pi * x, wires=0)
-                return qml.expval(qml.PauliZ(0))
+                qp.RX(jnp.pi * x, wires=0)
+                return qp.expval(qp.PauliZ(0))
 
             res = vmap(circuit, in_axes=(0, None))(x)
             return res
@@ -285,10 +285,10 @@ class TestVectorizeMap:
         """Test catalyst.vmap with invalid out_axes type."""
 
         def workflow(x):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x):
-                qml.RX(jnp.pi * x, wires=0)
-                return qml.expval(qml.PauliZ(0))
+                qp.RX(jnp.pi * x, wires=0)
+                return qp.expval(qp.PauliZ(0))
 
             res = vmap(circuit, out_axes=(0.1, None))(x)
             return res
@@ -304,12 +304,12 @@ class TestVectorizeMap:
         """Test catalyst.vmap with invalid out_axes."""
 
         def workflow(x):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x):
-                qml.RX(jnp.pi * x[0], wires=0)
-                qml.RY(x[1] ** 2, wires=0)
-                qml.RX(x[1] * x[2], wires=0)
-                return qml.expval(qml.PauliZ(0))
+                qp.RX(jnp.pi * x[0], wires=0)
+                qp.RY(x[1] ** 2, wires=0)
+                qp.RX(x[1] * x[2], wires=0)
+                return qp.expval(qp.PauliZ(0))
 
             return vmap(circuit, out_axes=(0, 1))(x)
 
@@ -332,12 +332,12 @@ class TestVectorizeMap:
 
         @qjit
         def workflow(x, y, z):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x, y):
-                qml.RX(jnp.pi * x[0] + y - y, wires=0)
-                qml.RY(x[1] ** 2, wires=0)
-                qml.RX(x[1] * x[2], wires=0)
-                return qml.expval(qml.PauliZ(0))
+                qp.RX(jnp.pi * x[0] + y - y, wires=0)
+                qp.RY(x[1] ** 2, wires=0)
+                qp.RX(x[1] * x[2], wires=0)
+                return qp.expval(qp.PauliZ(0))
 
             def workflow2(x, y):
                 return circuit(x, y) * y
@@ -375,9 +375,9 @@ class TestVectorizeMap:
 
         @qjit
         def workflow(x, y):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x, y):
-                qml.Identity(wires=0)
+                qp.Identity(wires=0)
                 return x + y
 
             return vmap(circuit, in_axes=(0, 0))(x, y)
@@ -403,12 +403,12 @@ class TestVectorizeMap:
 
         @qjit
         def workflow(x, x2, y, z):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x, y):
-                qml.RX(jnp.pi * x[0] + y, wires=0)
-                qml.RY(x[1] ** 2, wires=0)
-                qml.RX(x[1] * x[2], wires=0)
-                return qml.expval(qml.PauliZ(0))
+                qp.RX(jnp.pi * x[0] + y, wires=0)
+                qp.RY(x[1] ** 2, wires=0)
+                qp.RX(x[1] * x[2], wires=0)
+                return qp.expval(qp.PauliZ(0))
 
             def workflow2(x, y):
                 return circuit(x, y)
@@ -484,12 +484,12 @@ class TestVectorizeMap:
 
         @qjit
         def workflow(x, y, z):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x, y):
-                qml.RX(jnp.pi * x["arr"][0] + y - y, wires=0)
-                qml.RY(x["arr"][1] ** 2, wires=0)
-                qml.RX(x["arr"][1] * x["arr"][2], wires=0)
-                return qml.expval(qml.PauliZ(0))
+                qp.RX(jnp.pi * x["arr"][0] + y - y, wires=0)
+                qp.RY(x["arr"][1] ** 2, wires=0)
+                qp.RX(x["arr"][1] * x["arr"][2], wires=0)
+                return qp.expval(qp.PauliZ(0))
 
             def workflow2(x, y):
                 return circuit(x, y) * y
@@ -530,12 +530,12 @@ class TestVectorizeMap:
 
         @qjit
         def workflow(x):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x):
-                qml.RX(jnp.pi * x[0], wires=0)
-                qml.RY(x[1] ** 2, wires=0)
-                qml.RX(x[1] * x[2], wires=0)
-                return qml.state()
+                qp.RX(jnp.pi * x[0], wires=0)
+                qp.RY(x[1] ** 2, wires=0)
+                qp.RX(x[1] * x[2], wires=0)
+                return qp.state()
 
             res1 = vmap(circuit)(x)
             res2 = vmap(circuit, out_axes=0)(x)
@@ -558,12 +558,12 @@ class TestVectorizeMap:
 
         @qjit
         def workflow(x):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x):
-                qml.RX(jnp.pi * x[0], wires=0)
-                qml.RY(x[1] ** 2, wires=0)
-                qml.RX(x[1] * x[2], wires=0)
-                return qml.state()
+                qp.RX(jnp.pi * x[0], wires=0)
+                qp.RY(x[1] ** 2, wires=0)
+                qp.RX(x[1] * x[2], wires=0)
+                return qp.state()
 
             res1 = vmap(circuit)(x)
             res2 = vmap(circuit, out_axes=1)(x)
@@ -586,12 +586,12 @@ class TestVectorizeMap:
 
         @qjit
         def workflow(x):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x):
-                qml.RX(jnp.pi * x[0], wires=0)
-                qml.RY(x[1] ** 2, wires=0)
-                qml.RX(x[1] * x[2], wires=0)
-                return qml.state(), qml.state()
+                qp.RX(jnp.pi * x[0], wires=0)
+                qp.RY(x[1] ** 2, wires=0)
+                qp.RX(x[1] * x[2], wires=0)
+                return qp.state(), qp.state()
 
             res1 = vmap(circuit, out_axes=1)(x)
             res2 = vmap(circuit, out_axes=(0, 1))(x)
@@ -616,12 +616,12 @@ class TestVectorizeMap:
 
         @qjit
         def workflow(x):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x):
-                qml.RX(jnp.pi * x[0], wires=0)
-                qml.RY(x[1] ** 2, wires=0)
-                qml.RX(x[1] * x[2], wires=0)
-                return qml.state(), qml.probs(0)
+                qp.RX(jnp.pi * x[0], wires=0)
+                qp.RY(x[1] ** 2, wires=0)
+                qp.RX(x[1] * x[2], wires=0)
+                return qp.state(), qp.probs(0)
 
             res1 = vmap(circuit)(x)
             return res1
@@ -644,14 +644,14 @@ class TestVectorizeMap:
 
         @qjit
         def workflow(x):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x):
-                qml.RX(jnp.pi * x[0], wires=0)
-                qml.RY(x[1] ** 2, wires=0)
-                qml.RX(x[1] * x[2], wires=0)
+                qp.RX(jnp.pi * x[0], wires=0)
+                qp.RY(x[1] ** 2, wires=0)
+                qp.RX(x[1] * x[2], wires=0)
                 return {
-                    "a": qml.state(),
-                    "b": {"c": qml.probs(0), "d": qml.expval(qml.PauliZ(0)), "e": x},
+                    "a": qp.state(),
+                    "b": {"c": qp.probs(0), "d": qp.expval(qp.PauliZ(0)), "e": x},
                 }
 
             res1 = vmap(circuit)(x)
@@ -705,12 +705,12 @@ class TestVectorizeMap:
         """Test catalyst.vmap of a hybrid workflow inside QJIT with an invalid axis_size."""
 
         def workflow(x, y, z):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x, y):
-                qml.RX(jnp.pi * x[0] + y - y, wires=0)
-                qml.RY(x[1] ** 2, wires=0)
-                qml.RX(x[1] * x[2], wires=0)
-                return qml.expval(qml.PauliZ(0))
+                qp.RX(jnp.pi * x[0] + y - y, wires=0)
+                qp.RY(x[1] ** 2, wires=0)
+                qp.RX(x[1] * x[2], wires=0)
+                return qp.expval(qp.PauliZ(0))
 
             def workflow4(y, x, z):
                 return circuit(x, y) * y * z
@@ -738,12 +738,12 @@ class TestVectorizeMap:
         """Test catalyst.vmap of a hybrid workflow inside QJIT with an invalid zero axis_size."""
 
         def workflow(x):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(x):
-                qml.RX(jnp.pi * x[0], wires=0)
-                qml.RY(x[1] ** 2, wires=0)
-                qml.RX(x[1] * x[2], wires=0)
-                return qml.state()
+                qp.RX(jnp.pi * x[0], wires=0)
+                qp.RY(x[1] ** 2, wires=0)
+                qp.RX(x[1] * x[2], wires=0)
+                return qp.state()
 
             return vmap(circuit, axis_size=0)(x)
 
@@ -760,12 +760,12 @@ class TestVectorizeMap:
 
         @qjit
         def workflow(x):
-            @qml.qnode(qml.device(backend, wires=1))
+            @qp.qnode(qp.device(backend, wires=1))
             def fn(x):
-                qml.RX(jnp.pi * x[0], wires=0)
-                qml.RY(x[1] ** 2, wires=0)
-                qml.RX(x[1] * x[2], wires=0)
-                return qml.expval(qml.PauliZ(0))
+                qp.RX(jnp.pi * x[0], wires=0)
+                qp.RY(x[1] ** 2, wires=0)
+                qp.RX(x[1] * x[2], wires=0)
+                return qp.expval(qp.PauliZ(0))
 
             res_pattern_fn_as_argument = vmap(fn, in_axes=0)(x)
             res_pattern_partial = vmap(in_axes=0)(fn)(x)

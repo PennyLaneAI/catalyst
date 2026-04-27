@@ -18,7 +18,7 @@ import json
 import os
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import qjit
@@ -99,11 +99,11 @@ class TestTargetGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit(x):
-            qml.RX(x, wires=0)
-            return qml.counts(wires=0)
+            qp.RX(x, wires=0)
+            return qp.counts(wires=0)
 
         circuit(np.pi / 2)
 
@@ -115,11 +115,11 @@ class TestTargetGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit(x):
-            qml.RY(x, wires=0)
-            return qml.counts(wires=0)
+            qp.RY(x, wires=0)
+            return qp.counts(wires=0)
 
         circuit(np.pi / 2)
 
@@ -145,12 +145,12 @@ class TestChainedGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
-            qml.RX(np.pi / 2, wires=0)
-            qml.RY(np.pi / 2, wires=0)
-            return qml.counts(wires=0)
+            qp.RX(np.pi / 2, wires=0)
+            qp.RY(np.pi / 2, wires=0)
+            return qp.counts(wires=0)
 
         circuit()
 
@@ -170,11 +170,11 @@ class TestDecomposableGates:
         oqd_dev = OQDDevice(backend="default", wires=2, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
-            qml.CNOT(wires=[0, 1])
-            return qml.counts(wires=0)
+            qp.CNOT(wires=[0, 1])
+            return qp.counts(wires=0)
 
         circuit()
 
@@ -186,11 +186,11 @@ class TestDecomposableGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
-            qml.Hadamard(wires=0)
-            return qml.counts(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.counts(wires=0)
 
         circuit()
 
@@ -206,11 +206,11 @@ class TestDecomposableGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
-            qml.PauliZ(wires=0)
-            return qml.counts(wires=0)
+            qp.PauliZ(wires=0)
+            return qp.counts(wires=0)
 
         circuit()
 
@@ -226,11 +226,11 @@ class TestDecomposableGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
-            qml.PhaseShift(np.pi / 4, wires=0)
-            return qml.counts(wires=0)
+            qp.PhaseShift(np.pi / 4, wires=0)
+            return qp.counts(wires=0)
 
         circuit()
 
@@ -246,11 +246,11 @@ class TestDecomposableGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
-            qml.RZ(np.pi / 4, wires=0)
-            return qml.counts(wires=0)
+            qp.RZ(np.pi / 4, wires=0)
+            return qp.counts(wires=0)
 
         circuit()
 
@@ -266,11 +266,11 @@ class TestDecomposableGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
-            qml.T(wires=0)
-            return qml.counts(wires=0)
+            qp.T(wires=0)
+            return qp.counts(wires=0)
 
         circuit()
 
@@ -286,11 +286,11 @@ class TestDecomposableGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
-            qml.S(wires=0)
-            return qml.counts(wires=0)
+            qp.S(wires=0)
+            return qp.counts(wires=0)
 
         circuit()
 
@@ -311,12 +311,12 @@ class TestComplexCircuits:
         oqd_dev = OQDDevice(backend="default", wires=wires, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit(basis_state):
-            qml.BasisState(basis_state, wires=range(wires))
-            qml.QFT(wires=range(wires))
-            return qml.counts(wires=0)
+            qp.BasisState(basis_state, wires=range(wires))
+            qp.QFT(wires=range(wires))
+            return qp.counts(wires=0)
 
         circuit(np.array([0, 1]))
 
@@ -337,12 +337,12 @@ class TestMeasurement:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
-            qml.RX(np.pi / 2, wires=0)
-            qml.measure(wires=0)
-            return qml.counts(wires=0)
+            qp.RX(np.pi / 2, wires=0)
+            qp.measure(wires=0)
+            return qp.counts(wires=0)
 
         circuit()
 

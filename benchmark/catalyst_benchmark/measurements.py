@@ -109,13 +109,13 @@ def measure_compile_catalyst(a: ParsedArguments) -> BenchmarkResult:
     """Catalyst compilation time measurement procedure"""
     import jax
     import jax.numpy as jnp
-    import pennylane as qml
+    import pennylane as qp
     from jax.core import ShapedArray
 
     from catalyst import qjit
 
     versions = {
-        "pennylane": qml.__version__,
+        "pennylane": qp.__version__,
         "jax": jax.__version__,
         "catalyst": catalyst_version(),
     }
@@ -126,7 +126,7 @@ def measure_compile_catalyst(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.grover_catalyst import qcompile, workflow
 
         p = Problem(
-            qml.device("lightning.qubit", wires=a.nqubits),
+            qp.device("lightning.qubit", wires=a.nqubits),
             a.nlayers,
             expansion_strategy="device",
         )
@@ -135,7 +135,7 @@ def measure_compile_catalyst(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.chemvqe_catalyst import qcompile, workflow
 
         p = Problem(
-            qml.device("lightning.qubit", wires=a.nqubits),
+            qp.device("lightning.qubit", wires=a.nqubits),
             diff_method=a.vqe_diff_method,
             expansion_strategy="device",
         )
@@ -145,7 +145,7 @@ def measure_compile_catalyst(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.chemvqe_catalyst import workflow_hybrid as workflow
 
         p = Problem(
-            qml.device("lightning.qubit", wires=a.nqubits),
+            qp.device("lightning.qubit", wires=a.nqubits),
             diff_method=a.vqe_diff_method,
             expansion_strategy="device",
         )
@@ -154,7 +154,7 @@ def measure_compile_catalyst(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.qft_catalyst import qcompile, workflow
 
         p = Problem(
-            qml.device("lightning.qubit", wires=a.nqubits), a.nlayers, expansion_strategy="device"
+            qp.device("lightning.qubit", wires=a.nqubits), a.nlayers, expansion_strategy="device"
         )
     else:
         raise NotImplementedError(f"Unsupported problem {a.problem}")
@@ -185,13 +185,13 @@ def measure_runtime_catalyst(a: ParsedArguments) -> BenchmarkResult:
     """Catalyst running time measurement procedure"""
     import jax
     import jax.numpy as jnp
-    import pennylane as qml
+    import pennylane as qp
     from jax.core import ShapedArray
 
     from catalyst import qjit
 
     versions = {
-        "pennylane": qml.__version__,
+        "pennylane": qp.__version__,
         "jax": jax.__version__,
         "catalyst": catalyst_version(),
     }
@@ -201,25 +201,25 @@ def measure_runtime_catalyst(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.grover_catalyst import ProblemC as Problem
         from catalyst_benchmark.test_cases.grover_catalyst import qcompile, workflow
 
-        p = Problem(qml.device("lightning.qubit", wires=a.nqubits), a.nlayers)
+        p = Problem(qp.device("lightning.qubit", wires=a.nqubits), a.nlayers)
 
     elif a.problem == "chemvqe":
         from catalyst_benchmark.test_cases.chemvqe_catalyst import ProblemCVQE as Problem
         from catalyst_benchmark.test_cases.chemvqe_catalyst import qcompile, workflow
 
-        p = Problem(qml.device("lightning.qubit", wires=a.nqubits), diff_method=a.vqe_diff_method)
+        p = Problem(qp.device("lightning.qubit", wires=a.nqubits), diff_method=a.vqe_diff_method)
     elif a.problem == "chemvqe-hybrid":
         from catalyst_benchmark.test_cases.chemvqe_catalyst import ProblemCVQE as Problem
         from catalyst_benchmark.test_cases.chemvqe_catalyst import qcompile_hybrid as qcompile
         from catalyst_benchmark.test_cases.chemvqe_catalyst import workflow_hybrid as workflow
 
-        p = Problem(qml.device("lightning.qubit", wires=a.nqubits), diff_method=a.vqe_diff_method)
+        p = Problem(qp.device("lightning.qubit", wires=a.nqubits), diff_method=a.vqe_diff_method)
     elif a.problem == "qft":
         from catalyst_benchmark.test_cases.qft_catalyst import ProblemC as Problem
         from catalyst_benchmark.test_cases.qft_catalyst import qcompile, workflow
 
         p = Problem(
-            qml.device("lightning.qubit", wires=a.nqubits),
+            qp.device("lightning.qubit", wires=a.nqubits),
             a.nlayers,
         )
     else:
@@ -253,9 +253,9 @@ def measure_runtime_catalyst(a: ParsedArguments) -> BenchmarkResult:
 def measure_compile_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
     """PennyLane/Jax compilation time measurement procedure"""
     import jax
-    import pennylane as qml
+    import pennylane as qp
 
-    versions = {"pennylane": qml.__version__, "jax": jax.__version__}
+    versions = {"pennylane": qp.__version__, "jax": jax.__version__}
 
     jax.config.update("jax_enable_x64", True)
     jax.config.update("jax_platform_name", "cpu")
@@ -269,7 +269,7 @@ def measure_compile_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.grover_pennylane import qcompile, size, workflow
 
         p = Problem(
-            qml.device(device, wires=a.nqubits),
+            qp.device(device, wires=a.nqubits),
             a.nlayers,
             interface=interface,
             expansion_strategy="device",
@@ -280,7 +280,7 @@ def measure_compile_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.chemvqe_pennylane import qcompile, size, workflow
 
         p = Problem(
-            qml.device(device, wires=a.nqubits),
+            qp.device(device, wires=a.nqubits),
             grad=jax.grad,
             interface=interface,
             diff_method=a.vqe_diff_method,
@@ -293,7 +293,7 @@ def measure_compile_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.chemvqe_pennylane import workflow_hybrid as workflow
 
         p = Problem(
-            qml.device(device, wires=a.nqubits),
+            qp.device(device, wires=a.nqubits),
             grad=jax.grad,
             interface=interface,
             diff_method=a.vqe_diff_method,
@@ -304,7 +304,7 @@ def measure_compile_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.qft_pennylane import qcompile, size, workflow
 
         p = Problem(
-            qml.device(device, wires=a.nqubits),
+            qp.device(device, wires=a.nqubits),
             interface=interface,
             nlayers=a.nlayers,
             expansion_strategy="device",
@@ -338,9 +338,9 @@ def measure_compile_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
 def measure_runtime_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
     """Pennylane/Jax running time measurement procedure"""
     import jax
-    import pennylane as qml
+    import pennylane as qp
 
-    versions = {"pennylane": qml.__version__, "jax": jax.__version__}
+    versions = {"pennylane": qp.__version__, "jax": jax.__version__}
 
     jax.config.update("jax_enable_x64", True)
     jax.config.update("jax_platform_name", "cpu")
@@ -353,14 +353,14 @@ def measure_runtime_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.grover_pennylane import ProblemPL as Problem
         from catalyst_benchmark.test_cases.grover_pennylane import qcompile, size, workflow
 
-        p = Problem(qml.device(device, wires=a.nqubits), a.nlayers, interface=interface)
+        p = Problem(qp.device(device, wires=a.nqubits), a.nlayers, interface=interface)
 
     elif a.problem == "chemvqe":
         from catalyst_benchmark.test_cases.chemvqe_pennylane import ProblemCVQE as Problem
         from catalyst_benchmark.test_cases.chemvqe_pennylane import qcompile, size, workflow
 
         p = Problem(
-            qml.device(device, wires=a.nqubits),
+            qp.device(device, wires=a.nqubits),
             grad=jax.grad,
             interface=interface,
             diff_method=a.vqe_diff_method,
@@ -372,7 +372,7 @@ def measure_runtime_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.chemvqe_pennylane import workflow_hybrid as workflow
 
         p = Problem(
-            qml.device(device, wires=a.nqubits),
+            qp.device(device, wires=a.nqubits),
             grad=jax.grad,
             interface=interface,
             diff_method=a.vqe_diff_method,
@@ -381,7 +381,7 @@ def measure_runtime_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.qft_pennylane import ProblemPL as Problem
         from catalyst_benchmark.test_cases.qft_pennylane import qcompile, size, workflow
 
-        p = Problem(qml.device(device, wires=a.nqubits), interface=interface, nlayers=a.nlayers)
+        p = Problem(qp.device(device, wires=a.nqubits), interface=interface, nlayers=a.nlayers)
 
     else:
         raise NotImplementedError(f"Unsupported problme {a.problem}")
@@ -412,9 +412,9 @@ def measure_runtime_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
 
 def measure_compile_pennylane(a: ParsedArguments) -> BenchmarkResult:
     """PennyLane compilation time measurement procedure"""
-    import pennylane as qml
+    import pennylane as qp
 
-    versions = {"pennylane": qml.__version__}
+    versions = {"pennylane": qp.__version__}
 
     _, device, interface = parse_implementation(a.implementation)
 
@@ -424,7 +424,7 @@ def measure_compile_pennylane(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.grover_pennylane import qcompile, size, workflow
 
         p = Problem(
-            qml.device(device, wires=a.nqubits),
+            qp.device(device, wires=a.nqubits),
             a.nlayers,
             interface=interface,
             expansion_strategy="device",
@@ -434,8 +434,8 @@ def measure_compile_pennylane(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.chemvqe_pennylane import qcompile, size, workflow
 
         p = Problem(
-            qml.device(device, wires=a.nqubits),
-            grad=partial(qml.grad, argnum=0),
+            qp.device(device, wires=a.nqubits),
+            grad=partial(qp.grad, argnum=0),
             diff_method=a.vqe_diff_method,
             expansion_strategy="device",
         )
@@ -446,8 +446,8 @@ def measure_compile_pennylane(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.chemvqe_pennylane import workflow_hybrid as workflow
 
         p = Problem(
-            qml.device(device, wires=a.nqubits),
-            grad=partial(qml.grad, argnum=0),
+            qp.device(device, wires=a.nqubits),
+            grad=partial(qp.grad, argnum=0),
             diff_method=a.vqe_diff_method,
             expansion_strategy="device",
         )
@@ -456,7 +456,7 @@ def measure_compile_pennylane(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.qft_pennylane import qcompile, size, workflow
 
         p = Problem(
-            qml.device(device, wires=a.nqubits),
+            qp.device(device, wires=a.nqubits),
             interface=interface,
             nlayers=a.nlayers,
             expansion_strategy="device",
@@ -482,9 +482,9 @@ def measure_compile_pennylane(a: ParsedArguments) -> BenchmarkResult:
 
 def measure_runtime_pennylane(a: ParsedArguments) -> BenchmarkResult:
     """PennyLanem running time measurement procedure"""
-    import pennylane as qml
+    import pennylane as qp
 
-    versions = {"pennylane": qml.__version__}
+    versions = {"pennylane": qp.__version__}
 
     _, device, interface = parse_implementation(a.implementation)
 
@@ -493,14 +493,14 @@ def measure_runtime_pennylane(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.grover_pennylane import ProblemPL as Problem
         from catalyst_benchmark.test_cases.grover_pennylane import qcompile, size, workflow
 
-        p = Problem(qml.device(device, wires=a.nqubits), a.nlayers)
+        p = Problem(qp.device(device, wires=a.nqubits), a.nlayers)
     elif a.problem == "chemvqe":
         from catalyst_benchmark.test_cases.chemvqe_pennylane import ProblemCVQE as Problem
         from catalyst_benchmark.test_cases.chemvqe_pennylane import qcompile, size, workflow
 
         p = Problem(
-            qml.device(device, wires=a.nqubits),
-            grad=partial(qml.grad, argnum=0),
+            qp.device(device, wires=a.nqubits),
+            grad=partial(qp.grad, argnum=0),
             diff_method=a.vqe_diff_method,
         )
     elif a.problem == "chemvqe-hybrid":
@@ -510,8 +510,8 @@ def measure_runtime_pennylane(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.chemvqe_pennylane import workflow_hybrid as workflow
 
         p = Problem(
-            qml.device(device, wires=a.nqubits),
-            grad=partial(qml.grad, argnum=0),
+            qp.device(device, wires=a.nqubits),
+            grad=partial(qp.grad, argnum=0),
             diff_method=a.vqe_diff_method,
         )
     elif a.problem == "qft":
@@ -519,7 +519,7 @@ def measure_runtime_pennylane(a: ParsedArguments) -> BenchmarkResult:
         from catalyst_benchmark.test_cases.qft_pennylane import qcompile, size, workflow
 
         p = Problem(
-            qml.device(device, wires=a.nqubits),
+            qp.device(device, wires=a.nqubits),
             interface=interface,
             nlayers=a.nlayers,
         )
