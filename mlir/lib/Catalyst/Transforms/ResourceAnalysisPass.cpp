@@ -130,7 +130,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         for (const auto &opEntry : result.operations) {
             StringRef opName = opEntry.getKey();
             for (const auto &sizeEntry : opEntry.getValue()) {
-                int nQubits = sizeEntry.first;
+                const auto &[nQubits, nParams] = sizeEntry.first;
                 int64_t count = sizeEntry.second;
                 std::string key = opName.str() + "(" + std::to_string(nQubits) + ")";
                 opsObj[key] = count;
