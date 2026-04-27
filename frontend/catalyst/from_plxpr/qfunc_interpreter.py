@@ -225,7 +225,10 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                         dynamically allocated wires are present in the program.
                         """))
 
-            if any(is_dynamically_allocated_wire(w) for w in measurement.wires):
+            if any(
+                isinstance(w, DynamicJaxprTracer) and isinstance(w.val.aval, QrefQubit)
+                for w in measurement.wires
+            ):
                 raise CompileError(textwrap.dedent("""
                         Terminal measurements cannot take in dynamically allocated wires
                         since they must be temporary.
