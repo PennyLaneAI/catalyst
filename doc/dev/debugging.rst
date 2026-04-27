@@ -152,7 +152,7 @@ passing them to the ``@qjit`` decorator. E.g. if you want to disable inlining
         ]
 
      @qjit(pipelines=my_pipelines, keep_intermediate=True)
-     @qml.qnode(dev)
+     @qp.qnode(dev)
      def circuit():
         ...
 
@@ -209,7 +209,7 @@ Compilation Steps
 
 The compilation process of a QJITed quantum function moves through various stages of the compilation pipeline including:
 
-- **Quantum Tape**: the quantum record of hybrid quantum programs in a single ``qml.QNode``
+- **Quantum Tape**: the quantum record of hybrid quantum programs in a single ``qp.QNode``
 - **JAXPR**: the graph data structure maintained by `JAX <https://github.com/google/jax>`_ for the classical & quantum parts of the compiled program
 - **MLIR**: a novel compiler framework and intermediate representation
 - **StableHLO + Quantum Dialect**: Lowering to `StableHLO <https://github.com/openxla/stablehlo>`_ is the first stage inside MLIR after leaving JAXPR.
@@ -224,12 +224,12 @@ In the following example, we also compile ahead-of-time so that there is no requ
 .. code-block:: python
 
     @qjit(keep_intermediate=True)
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def circuit(x: float, y: float):
         theta = jnp.sin(x) + y
-        qml.RY(theta, wires=0)
-        qml.CNOT(wires=[0,1])
-        return qml.state()
+        qp.RY(theta, wires=0)
+        qp.CNOT(wires=[0,1])
+        return qp.state()
 
     print(circuit.jaxpr)
 
