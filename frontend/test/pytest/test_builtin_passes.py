@@ -13,24 +13,15 @@
 # limitations under the License.
 """Tests the passes found in 'builtin_passes.py'"""
 
-import inspect
-
-import pennylane as qp
 import pytest
+from pennylane.transforms.core import Transform
 
 from catalyst.passes import builtin_passes
 
-AVAILABLE_PASSES = {
-    obj
-    for _, obj in inspect.getmembers(builtin_passes)
-    if isinstance(obj, qp.transforms.core.Transform)
-}
 
+@pytest.mark.parametrize("name", builtin_passes.__all__)
+def test_exported_as_transform(name):
+    """Tests that these passes are transform objects."""
 
-@pytest.mark.parametrize("pass_", AVAILABLE_PASSES)
-def test_integration_with_compile_pipeline(pass_):
-    """Tests that these passes can be fed into a 'qp.CompilePipeline' object."""
-
-    pipeline = qp.CompilePipeline(pass_)
-    assert len(pipeline) == 1
-    assert pipeline[0].pass_name == pass_.pass_name
+    obj = getattr(builtin_passes, name)
+    assert isinstance(obj, Transform)

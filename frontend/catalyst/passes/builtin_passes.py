@@ -1701,3 +1701,21 @@ def graph_decomposition_setup_inputs(
 graph_decomposition = qp.transform(
     pass_name="graph-decomposition", setup_inputs=graph_decomposition_setup_inputs
 )
+
+__all__ = [
+    "cancel_inverses",
+    "disentangle_cnot",
+    "disentangle_swap",
+    "merge_rotations",
+    "decompose_lowering",
+    "ions_decomposition",
+    "to_ppr",
+    "commute_ppr",
+    "merge_ppr_ppm",
+    "ppr_to_ppm",
+    "ppm_compilation",
+    "reduce_t_depth",
+    "ppr_to_mbqc",
+    "decompose_arbitrary_ppr",
+    "graph_decomposition",
+]
