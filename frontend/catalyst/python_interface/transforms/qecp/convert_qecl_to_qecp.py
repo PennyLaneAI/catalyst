@@ -594,15 +594,15 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         )
 
         # Decode ESM syndrome
+        num_correctable_errors = self.qec_code.correctable_errors
         decode_esm_op = qecp.DecodeEsmCssOp(
             tanner_graph=tanner_graph,
             esm=pack_mres_tensor_op.result,
-            err_idx_type=TensorType(IndexType(), shape=(1,)),
+            err_idx_type=TensorType(IndexType(), shape=(num_correctable_errors,)),
         )
 
         # Apply correction(s)
         err_indices = cast(OpResult[TensorType[IndexType]], decode_esm_op.err_idx)
-        num_correctable_errors = self.qec_code.correctable_errors
 
         assert err_indices.type == (
             expected_type := TensorType(IndexType(), shape=(num_correctable_errors,))
