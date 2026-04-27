@@ -1,4 +1,4 @@
-// Copyright 2025 Xanadu Quantum Technologies Inc.
+// Copyright 2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,12 +14,8 @@
 
 #pragma once
 
-#include "MBQC/IR/MBQCDialect.h"
-#include "Quantum/IR/QuantumDialect.h"
+#include "mlir/IR/Attributes.h"
 
-//===----------------------------------------------------------------------===//
-// MBQC ops declarations.
-//===----------------------------------------------------------------------===//
-
-#define GET_OP_CLASSES
-#include "MBQC/IR/MBQCOps.h.inc"
+#include "MBQC/IR/MBQCEnums.h.inc"
+#define GET_ATTRDEF_CLASSES
+#include "MBQC/IR/MBQCAttributes.h.inc"
