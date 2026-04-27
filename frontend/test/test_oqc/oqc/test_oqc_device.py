@@ -17,7 +17,7 @@
 
 import os
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst.utils.exceptions import CompileError
@@ -29,10 +29,10 @@ class TestOQCDevice:
     def test_entrypoint(self, set_dummy_oqc_env):
         """Test the initialization."""
 
-        device = qml.device("oqc.cloud", backend="lucy", wires=8)
+        device = qp.device("oqc.cloud", backend="lucy", wires=8)
 
         assert device.backend == "lucy"
-        assert device.wires == qml.wires.Wires(range(0, 8))
+        assert device.wires == qp.wires.Wires(range(0, 8))
 
     def test_initialization(self, set_dummy_oqc_env):
         """Test the initialization."""
@@ -41,12 +41,12 @@ class TestOQCDevice:
         device = OQCDevice(backend="lucy", wires=8)
 
         assert device.backend == "lucy"
-        assert device.wires == qml.wires.Wires(range(0, 8))
+        assert device.wires == qp.wires.Wires(range(0, 8))
 
         device = OQCDevice(backend="toshiko", wires=32)
 
         assert device.backend == "toshiko"
-        assert device.wires == qml.wires.Wires(range(0, 32))
+        assert device.wires == qp.wires.Wires(range(0, 32))
 
     def test_wrong_backend(self, set_dummy_oqc_env):
         """Test the backend check."""
@@ -69,16 +69,16 @@ class TestOQCDevice:
 
         dev = OQCDevice(backend="lucy", wires=8)
         tranform_program, _ = dev.preprocess()
-        assert tranform_program == qml.CompilePipeline()
+        assert tranform_program == qp.CompilePipeline()
 
     def test_preprocess_with_config(self, set_dummy_oqc_env):
         """Test the device preprocessing by explicitly passing an execution config"""
         from catalyst.third_party.oqc import OQCDevice
 
         dev = OQCDevice(backend="lucy", wires=8)
-        execution_config = qml.devices.ExecutionConfig()
+        execution_config = qp.devices.ExecutionConfig()
         tranform_program, config = dev.preprocess(execution_config)
-        assert tranform_program == qml.CompilePipeline()
+        assert tranform_program == qp.CompilePipeline()
         assert config == execution_config
 
     def test_get_c_interface(self, set_dummy_oqc_env):
@@ -109,10 +109,10 @@ class TestOQCCircuit:
 
         with pytest.raises(CompileError, match="Please supply the number of shots on the qnode."):
 
-            @qml.qjit
-            @qml.qnode(qml.device("oqc.cloud", backend="lucy", wires=8))
+            @qp.qjit
+            @qp.qnode(qp.device("oqc.cloud", backend="lucy", wires=8))
             def circuit():
-                return qml.probs()
+                return qp.probs()
 
         del os.environ["OQC_PASSWORD"]
         del os.environ["OQC_EMAIL"]

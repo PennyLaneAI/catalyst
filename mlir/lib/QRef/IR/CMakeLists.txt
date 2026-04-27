@@ -7,6 +7,5 @@ add_mlir_library(MLIRQRef
     ${PROJECT_SOURCE_DIR}/include/QRef
 
     DEPENDS
-    MLIRQuantumInterfacesIncGen
     MLIRQRefOpsIncGen
 )
