@@ -440,47 +440,14 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         with builder.ImplicitBuilder(block):
             in_codeblock = cast(BlockArgument[qecp.PhysicalCodeblockType], block.args[0])
 
-            # allocate X-check auxiliary qubits
-            x_aux_allocate_ops = (qecp.AllocAuxQubitOp() for row in self.qec_code.x_tanner)
-            x_aux_qubits = [
-                cast(OpResult[qecp.QecPhysicalQubitType], op.results[0])
-                for op in x_aux_allocate_ops
-            ]
+            # Apply X checks pattern for Z corrections
+            x_out_codeblock = self._qec_cycle_css_pattern(in_codeblock, CheckType.X, tanner_x)
 
-            # apply X-check gate+measurement pattern
-            x_measure_ops, x_out_codeblock = self.check_pattern(
-                x_aux_qubits, in_codeblock, check_type=CheckType.X
-            )
+            # Apply Z checks pattern for X corrections
+            z_out_codeblock = self._qec_cycle_css_pattern(x_out_codeblock, CheckType.Z, tanner_z)
 
-            # deallocate the X-check auxiliary qubits
-            for x_meas_op in x_measure_ops:
-                qecp.DeallocAuxQubitOp(x_meas_op.out_qubit)
-
-            pack_mres_tensor_op = tensor.FromElementsOp.build(
-                operands=([meas_op.mres for meas_op in x_measure_ops],),
-                result_types=(TensorType(i1, shape=(len(x_measure_ops),)),),
-            )
-
-            # Decode X-check ESM
-            decode_esm_op = qecp.DecodeEsmCssOp(
-                tanner_graph=tanner_x,
-                esm=pack_mres_tensor_op.result,
-                err_idx_type=TensorType(IndexType(), shape=(1,)),
-            )
-
-            # Apply correction
-            err_idx = cast(OpResult[IndexType], decode_esm_op.err_idx)
-            extract_err_qubit_op = qecp.ExtractQubitOp(codeblock=x_out_codeblock, idx=err_idx)
-            err_qubit = extract_err_qubit_op.qubit
-            qecp.PauliZOp(in_qubit=err_qubit)
-            insert_err_qubit_op = qecp.InsertQubitOp(
-                in_codeblock=x_out_codeblock, idx=err_idx, qubit=err_qubit
-            )
-
-            out_codeblock = insert_err_qubit_op.out_codeblock
-
-            # return the corrected codeblock
-            func.ReturnOp(out_codeblock)
+            # Return the corrected codeblock
+            func.ReturnOp(z_out_codeblock)
 
         funcOp = func.FuncOp(
             name=f"qec_cycle_{self.qec_code.name}",
@@ -587,6 +554,61 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             )
 
         return tanner_graph, cnot_fn
+
+    def _qec_cycle_css_pattern(
+        self,
+        in_codeblock: qecp.PhysicalCodeBlockSSAValue,
+        check_type: CheckType,
+        tanner_graph: qecp.TannerGraphSSAValue,
+    ) -> OpResult[qecp.PhysicalCodeblockType]:
+        """TODO"""
+        # Allocate auxiliary qubits for ESM checks
+        aux_allocate_ops = (qecp.AllocAuxQubitOp() for row in self.qec_code.x_tanner)
+        aux_qubits = [
+            cast(OpResult[qecp.QecPhysicalQubitType], op.results[0]) for op in aux_allocate_ops
+        ]
+
+        # Apply gate+measurement pattern for the check
+        measure_ops, out_codeblock = self.check_pattern(
+            aux_qubits, in_codeblock, check_type=check_type
+        )
+
+        # Checks are done; deallocate the auxiliary qubits
+        for x_meas_op in measure_ops:
+            qecp.DeallocAuxQubitOp(x_meas_op.out_qubit)
+
+        # Pack measurement results into a tensor for decoding
+        pack_mres_tensor_op = tensor.FromElementsOp.build(
+            operands=([meas_op.mres for meas_op in measure_ops],),
+            result_types=(TensorType(i1, shape=(len(measure_ops),)),),
+        )
+
+        # Decode ESM syndrome
+        decode_esm_op = qecp.DecodeEsmCssOp(
+            tanner_graph=tanner_graph,
+            esm=pack_mres_tensor_op.result,
+            err_idx_type=TensorType(IndexType(), shape=(1,)),
+        )
+
+        # Apply correction
+        err_idx = cast(OpResult[IndexType], decode_esm_op.err_idx)
+        extract_err_qubit_op = qecp.ExtractQubitOp(codeblock=out_codeblock, idx=err_idx)
+        err_qubit = extract_err_qubit_op.qubit
+
+        match check_type:
+            case CheckType.X:
+                qecp.PauliZOp(in_qubit=err_qubit)
+            case CheckType.Z:
+                qecp.PauliZOp(in_qubit=err_qubit)
+            case _:
+                assert False, f"Unknown CheckType: '{check_type}'"
+
+        insert_err_qubit_op = qecp.InsertQubitOp(
+            in_codeblock=out_codeblock, idx=err_idx, qubit=err_qubit
+        )
+
+        # Return updated codeblock SSA value
+        return insert_err_qubit_op.out_codeblock
 
 
 convert_qecl_to_qecp_pass = compiler_transform(ConvertQecLogicalToQecPhysicalPass)
