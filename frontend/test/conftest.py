@@ -35,6 +35,7 @@ def skip_flaky_tests(config, items):
         if "skip_flaky" in item.keywords:
             item.add_marker(pytest.mark.skip(reason="don't test flakiness"))
 
+
 def is_cuda_available():
     """Checks if cuda is available by trying an import.
 
