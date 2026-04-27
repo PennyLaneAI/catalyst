@@ -98,14 +98,9 @@ static int getGateQubitCount(Operation *op)
     return 0;
 }
 
+/// Get the number of parameters for a gate operation.
 static int getGateParamCount(Operation *op)
 {
-    // if (auto rotOp = dyn_cast<quantum::PauliRotOp>(op)) {
-    //     return 1;
-    // }
-    // if (auto customOp = dyn_cast<quantum::CustomOp>(op)) {
-    //     return static_cast<int>(customOp.getParams().size());
-    // }
     if (auto gate = dyn_cast<quantum::ParametrizedGate>(op)) {
         return static_cast<int>(gate.getAllParams().size());
     }

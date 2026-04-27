@@ -288,21 +288,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * @brief Helper to parse a gate name into an OperatorNode.
      * Handles patterns like "Adjoint(GateName)" and "GateName(metadata)".
      */
-    // OperatorNode parseOperator(llvm::StringRef name)
-    // {
-    //     OperatorNode node;
-
-    //     // Check for adjoint pattern
-    //     if (name.consume_front("Adjoint(")) {
-    //         node.adjoint = true;
-    //         name = name.split(')').first;
-    //     }
-
-    //     // Extract base name before any parameters
-    //     // (e.g., "GateName" from "Adjoint(GateName)(metadata)")
-    //     node.name = name.split('(').first.trim().str();
-    //     return node;
-    // }
     OperatorNode parseOperator(llvm::StringRef raw)
     {
         OperatorNode node;
