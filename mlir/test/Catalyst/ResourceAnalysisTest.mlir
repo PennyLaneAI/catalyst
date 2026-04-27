@@ -22,10 +22,10 @@
 // CHECK:   "num_arg_qubits": 0
 // CHECK:   "num_qubits": 2
 // CHECK:   "operations"
-// CHECK-DAG: "Hadamard(1,0)": 1
-// CHECK-DAG: "CNOT(2,0)": 1
-// CHECK-DAG: "T(1,0)": 1
-// CHECK-DAG: "S(1,0)": 1
+// CHECK-DAG: "Hadamard(1)": 1
+// CHECK-DAG: "CNOT(2)": 1
+// CHECK-DAG: "T(1)": 1
+// CHECK-DAG: "S(1)": 1
 func.func @basic_gates() {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -49,9 +49,9 @@ func.func @basic_gates() {
 // CHECK:   "num_arg_qubits": 0
 // CHECK:   "num_qubits": 2
 // CHECK:   "operations"
-// CHECK-DAG: "PPR-pi/4(1,0)": 3
-// CHECK-DAG: "PPR-pi/8(1,0)": 1
-// CHECK-DAG: "PPM(1,0)": 2
+// CHECK-DAG: "PPR-pi/4(1)": 3
+// CHECK-DAG: "PPR-pi/8(1)": 1
+// CHECK-DAG: "PPM(1)": 2
 func.func @pbc_operations() {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -74,7 +74,7 @@ func.func @pbc_operations() {
 
 // CHECK-LABEL: "static_for_loop"
 // CHECK: "operations"
-// CHECK-DAG: "Hadamard(1,0)": 5
+// CHECK-DAG: "Hadamard(1)": 5
 func.func @static_for_loop(%arg0: !quantum.bit) -> !quantum.bit {
     %c5 = arith.constant 5 : index
     %c0 = arith.constant 0 : index
@@ -94,7 +94,7 @@ func.func @static_for_loop(%arg0: !quantum.bit) -> !quantum.bit {
 
 // CHECK-LABEL: "dynamic_for_loop"
 // CHECK: "operations"
-// CHECK-DAG: "PauliX(1,0)": 1
+// CHECK-DAG: "PauliX(1)": 1
 func.func @dynamic_for_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
@@ -113,7 +113,7 @@ func.func @dynamic_for_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
 
 // CHECK-LABEL: "estimated_iterations_loop"
 // CHECK: "operations"
-// CHECK-DAG: "PauliZ(1,0)": 10
+// CHECK-DAG: "PauliZ(1)": 10
 func.func @estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
@@ -132,7 +132,7 @@ func.func @estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !quantum
 
 // CHECK-LABEL: "resolve_constant_index_loop"
 // CHECK: "operations"
-// CHECK-DAG: "Hadamard(1,0)": 7
+// CHECK-DAG: "Hadamard(1)": 7
 func.func @resolve_constant_index_loop(%arg0: !quantum.bit) -> !quantum.bit {
     %c0_i64 = arith.constant 0 : i64
     %c3_i64 = arith.constant 3 : i64
@@ -157,8 +157,8 @@ func.func @resolve_constant_index_loop(%arg0: !quantum.bit) -> !quantum.bit {
 
 // CHECK-LABEL: "if_else_branching"
 // CHECK: "operations"
-// CHECK-DAG: "Hadamard(1,0)": 3
-// CHECK-DAG: "PauliX(1,0)": 2
+// CHECK-DAG: "Hadamard(1)": 3
+// CHECK-DAG: "PauliX(1)": 2
 func.func @if_else_branching(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit {
     %q = scf.if %cond -> !quantum.bit {
         // True branch: 2 Hadamard, 1 PauliX
@@ -185,7 +185,7 @@ func.func @if_else_branching(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit {
 
 // CHECK-LABEL: "nested_static_for"
 // CHECK: "operations"
-// CHECK-DAG: "PauliX(1,0)": 15
+// CHECK-DAG: "PauliX(1)": 15
 func.func @nested_static_for(%arg0: !quantum.bit) -> !quantum.bit {
     %c3 = arith.constant 3 : index
     %c5 = arith.constant 5 : index
@@ -285,7 +285,7 @@ func.func @observable_measurements() {
 
 // CHECK-LABEL: "caller_func"
 // CHECK: "operations"
-// CHECK-DAG: "Hadamard(1,0)": 2
+// CHECK-DAG: "Hadamard(1)": 2
 func.func @caller_func(%arg0: !quantum.bit) -> !quantum.bit {
     %r1 = func.call @helper_func(%arg0) : (!quantum.bit) -> !quantum.bit
     %r2 = func.call @helper_func(%r1) : (!quantum.bit) -> !quantum.bit
@@ -304,7 +304,7 @@ func.func private @helper_func(%arg0: !quantum.bit) -> !quantum.bit {
 
 // CHECK-LABEL: "nested_caller_func"
 // CHECK: "operations"
-// CHECK-DAG: "PauliX(1,0)": 60
+// CHECK-DAG: "PauliX(1)": 60
 
 func.func @nested_caller_func(%arg0: !quantum.bit) -> !quantum.bit {
     %r1 = func.call @nested_helper_func(%arg0) : (!quantum.bit) -> !quantum.bit
@@ -347,9 +347,9 @@ func.func private @nested_helper_func(%arg0: !quantum.bit) -> !quantum.bit {
 // CHECK: "num_arg_qubits": 0
 // CHECK: "num_qubits": 2
 // CHECK: "operations"
-// CHECK-DAG: "Hadamard(1,0)": 1
-// CHECK-DAG: "PPR-pi/4(1,0)": 1
-// CHECK-DAG: "PPM(1,0)": 1
+// CHECK-DAG: "Hadamard(1)": 1
+// CHECK-DAG: "PPR-pi/4(1)": 1
+// CHECK-DAG: "PPM(1)": 1
 func.func @mixed_ops() {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -373,7 +373,7 @@ func.func @mixed_ops() {
 // CHECK: "num_arg_qubits": 2
 // CHECK: "num_qubits": 2
 // CHECK: "operations"
-// CHECK-DAG: "CNOT(2,0)": 1
+// CHECK-DAG: "CNOT(2)": 1
 func.func @multi_qubit_args(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
     %0:2 = quantum.custom "CNOT"() %q0, %q1 : !quantum.bit, !quantum.bit
     return %0#0, %0#1 : !quantum.bit, !quantum.bit
@@ -388,8 +388,8 @@ func.func @multi_qubit_args(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.b
 // CHECK: "num_arg_qubits": 1
 // CHECK: "num_qubits": 3
 // CHECK: "operations"
-// CHECK-DAG: "Hadamard(1,0)": 1
-// CHECK-DAG: "CNOT(2,0)": 1
+// CHECK-DAG: "Hadamard(1)": 1
+// CHECK-DAG: "CNOT(2)": 1
 func.func @mixed_alloc_and_arg_qubits(%q0: !quantum.bit) -> !quantum.bit {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
