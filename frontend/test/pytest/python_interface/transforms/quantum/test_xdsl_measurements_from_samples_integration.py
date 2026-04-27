@@ -175,7 +175,7 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        with pytest.raises(CompileError, match="Apply `qp.transforms.split_non_commuting`"):
+        with pytest.raises(CompileError, match=r"Apply `.*.transforms.split_non_commuting`"):
 
             @qp.qjit(capture=capture)
             @measurements_from_samples_pass
