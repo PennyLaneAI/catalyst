@@ -23,6 +23,7 @@ from jax.interpreters.mlir import ir
 
 import catalyst
 from catalyst import qjit
+from catalyst.jax_primitives_utils import _lowered_options
 
 
 def test_path_does_not_exists():
@@ -70,27 +71,27 @@ def test_pass_plugin_can_aot_compile():
         assert example.mlir
 
 
-def test_get_options():
+def test_lower_options():
     """
-    Test get_options from Pass
+    Test lower_options util function
 
     ApplyRegisteredPassOp expects options to be a dictionary from strings to attributes.
     See https://github.com/llvm/llvm-project/pull/143159
     """
     with ir.Context(), ir.Location.unknown():
-        options = catalyst.passes.Pass("example-pass", "single-option").get_options()
-        assert isinstance(options, dict)
+        options = _lowered_options(catalyst.passes.Pass("example-pass", "single-option"))
+        assert isinstance(options, ir.DictAttr)
         assert isinstance(options["single-option"], ir.BoolAttr)
         assert options["single-option"].value == True
 
-        options = catalyst.passes.Pass("example-pass", "an-option", "bn-option").get_options()
-        assert isinstance(options, dict)
+        options = _lowered_options(catalyst.passes.Pass("example-pass", "an-option", "bn-option"))
+        assert isinstance(options, ir.DictAttr)
         assert isinstance(options["an-option"], ir.BoolAttr)
         assert options["an-option"].value == True
         assert isinstance(options["bn-option"], ir.BoolAttr)
         assert options["bn-option"].value == True
 
-        options = catalyst.passes.Pass("example-pass", option=True).get_options()
-        assert isinstance(options, dict)
+        options = _lowered_options(catalyst.passes.Pass("example-pass", option=True))
+        assert isinstance(options, ir.DictAttr)
         assert isinstance(options["option"], ir.BoolAttr)
         assert options["option"].value == True

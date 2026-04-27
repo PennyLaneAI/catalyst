@@ -14,7 +14,9 @@
 """This module contains some helper functions for translating JAX primitives to MLIR."""
 
 import copy
+import dataclasses
 import functools
+import textwrap
 
 import pennylane as qml
 from jax._src import core, util
@@ -26,8 +28,61 @@ from mlir_quantum.dialects._transform_ops_gen import ApplyRegisteredPassOp, Name
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
 from pennylane.transforms.core import BoundTransform
 
-from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.passes import PassPlugin
+from catalyst.utils.exceptions import CompileError
+
+
+def get_mlir_attribute_from_pyval(value):
+    """
+    Given a value of any type, construct an mlir attribute of corresponding type.
+
+    We set up the context and location outside because recursive calls to this function
+    will segfault if multiple `Context()`s are instantiated.
+    """
+
+    attr = None
+    match value:
+        case bool():
+            attr = ir.BoolAttr.get(value)
+
+        case int():
+            if -9223372036854775808 <= value < 0:  # 2**63
+                attr = ir.IntegerAttr.get(ir.IntegerType.get_signed(64), value)
+            elif 0 <= value < 18446744073709551616:  # = 2**64
+                attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64), value)
+            else:
+                raise CompileError(textwrap.dedent("""
+                    Large integer attributes currently not supported in MLIR,
+                    see https://github.com/llvm/llvm-project/issues/128072
+                    """))
+
+        case float():
+            attr = ir.FloatAttr.get(ir.F64Type.get(), value)
+
+        case str():
+            attr = ir.StringAttr.get(value)
+
+        case list() | tuple():
+            element_attrs = [get_mlir_attribute_from_pyval(elem) for elem in value]
+            attr = ir.ArrayAttr.get(element_attrs)
+
+        case dict():
+            named_attrs = {}
+            for k, v in value.items():
+                if not isinstance(k, str):
+                    raise CompileError(
+                        f"Dictionary keys for MLIR DictionaryAttr must be strings, got: {type(k)}"
+                    )
+                named_attrs[k] = get_mlir_attribute_from_pyval(v)
+            attr = ir.DictAttr.get(named_attrs)
+
+        case _ if dataclasses.is_dataclass(value):
+            attr = get_mlir_attribute_from_pyval(dataclasses.asdict(value))
+
+        case _:
+            raise CompileError(f"Cannot convert Python type {type(value)} to an MLIR attribute.")
+
+    return attr
 
 
 def _all_expval(call_jaxpr: core.ClosedJaxpr) -> bool:

@@ -25,7 +25,7 @@ import pytest
 from jax.interpreters.mlir import ir
 
 from catalyst import for_loop, measure, qjit
-from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
+from catalyst.jax_primitives_utils import get_mlir_attribute_from_pyval
 from catalyst.jit import JAX_QJIT
 from catalyst.utils.exceptions import CompileError
 

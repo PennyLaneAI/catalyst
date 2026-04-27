@@ -25,7 +25,7 @@ from jax import make_jaxpr
 from jax._src.lib.mlir import ir
 from jax.interpreters.mlir import ir_constant, make_ir_context
 
-from catalyst.jax_primitives import (
+from catalyst.primitive_lowering_rules import (
     _qextract_lowering,
     _qinsert_lowering,
     extract_scalar,
