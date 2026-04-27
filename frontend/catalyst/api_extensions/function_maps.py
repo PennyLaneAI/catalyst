@@ -75,14 +75,14 @@ def vmap(
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x, y):
-          qml.RX(jnp.pi * x[0] + y, wires=0)
-          qml.RY(x[1] ** 2, wires=0)
-          qml.RX(x[1] * x[2], wires=0)
-          return qml.expval(qml.PauliZ(0))
+          qp.RX(jnp.pi * x[0] + y, wires=0)
+          qp.RY(x[1] ** 2, wires=0)
+          qp.RX(x[1] * x[2], wires=0)
+          return qp.expval(qp.PauliZ(0))
 
     >>> circuit(jnp.array([0.1, 0.2, 0.3]), jnp.pi)
     Array(-0.93005586, dtype=float64)

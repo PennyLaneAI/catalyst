@@ -23,7 +23,7 @@ from functools import partial
 from typing import Callable
 
 import jax
-import pennylane as qml
+import pennylane as qp
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
@@ -169,12 +169,12 @@ def from_plxpr(
 
         from catalyst.from_plxpr import from_plxpr
 
-        qml.capture.enable()
+        qp.capture.enable()
 
-        @qml.qnode(qml.device('lightning.qubit', wires=2))
+        @qp.qnode(qp.device('lightning.qubit', wires=2))
         def circuit(x):
-            qml.RX(x, 0)
-            return qml.probs(wires=(0, 1))
+            qp.RX(x, 0)
+            return qp.probs(wires=(0, 1))
 
         def f(x):
             return circuit(2 * x) ** 2
@@ -292,7 +292,7 @@ def handle_qnode(
             tkwargs={"gate_set": self.decompose_tkwargs.get("gate_set", [])},
             stopping_condition=stopping_condition,
         )
-    elif not qml.decomposition.enabled_graph() and self.requires_decompose_lowering:
+    elif not qp.decomposition.enabled_graph() and self.requires_decompose_lowering:
         # Use the plxpr decompose transform when graph is disabled
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
@@ -300,7 +300,7 @@ def handle_qnode(
             ncargs=non_const_args,
             tkwargs={"gate_set": self.decompose_tkwargs.get("gate_set", [])},
         )
-    elif qml.decomposition.enabled_graph() and self.requires_decompose_lowering:
+    elif qp.decomposition.enabled_graph() and self.requires_decompose_lowering:
         closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
             inner_jaxpr=closed_jaxpr.jaxpr,
             consts=closed_jaxpr.consts,
@@ -411,8 +411,8 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
 
     # Add the decompose-lowering pass to the start of the pipeline
     if use_graph:
-        t = qml.transform(pass_name="decompose-lowering")
-        pass_container = qml.transforms.core.BoundTransform(t)
+        t = qp.transform(pass_name="decompose-lowering")
+        pass_container = qp.transforms.core.BoundTransform(t)
         next_eval._pass_pipeline.insert(0, pass_container)
 
     # We still need to construct and solve the graph based on
@@ -452,7 +452,7 @@ def handle_transform(
     # and the graph-based decomposition is enabled
     transform_name = getattr(transform._plxpr_transform, "__name__", None)
     if transform_name == "decompose_plxpr_to_plxpr":
-        use_graph = qml.decomposition.enabled_graph()
+        use_graph = qp.decomposition.enabled_graph()
         return _handle_decompose_transform(
             self, inner_jaxpr, consts, non_const_args, pl_tkwargs, use_graph
         )
@@ -481,8 +481,8 @@ def handle_transform(
 
     # Apply the corresponding Catalyst pass counterpart
     next_eval = copy(self)
-    t = qml.transform(pass_name=catalyst_pass_name)
-    bound_pass = qml.transforms.core.BoundTransform(t, args=targs, kwargs=pl_tkwargs)
+    t = qp.transform(pass_name=catalyst_pass_name)
+    bound_pass = qp.transforms.core.BoundTransform(t, args=targs, kwargs=pl_tkwargs)
     next_eval._pass_pipeline.insert(0, bound_pass)
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
@@ -537,7 +537,7 @@ def trace_from_pennylane(
         # ShapedArrays incompatible with abstracted_axes, so need to create dummy arrays
         args = [jax.numpy.empty(arg.shape, dtype=arg.dtype) for arg in args]
 
-    if isinstance(fn, qml.QNode) and static_argnums:
+    if isinstance(fn, qp.QNode) and static_argnums:
         # `make_jaxpr2` sees the qnode
         # The static_argnum on the wrapped function takes precedence over the
         # one in `make_jaxpr`
@@ -566,7 +566,7 @@ def trace_from_pennylane(
             )(*inner_args, **inner_kwargs)
 
             flat_inputs = jax.tree.flatten((inner_args, inner_kwargs))[0]
-            flat_inputs = [a for a in flat_inputs if qml.math.is_abstract(a)]
+            flat_inputs = [a for a in flat_inputs if qp.math.is_abstract(a)]
             abstract_shapes = _extract_abstract_shapes(flat_inputs)
             jaxpr = from_plxpr(plxpr, skip_preprocess=skip_preprocess)(
                 *abstract_shapes, *flat_inputs
@@ -618,10 +618,10 @@ def _apply_compiler_decompose_to_plxpr(
     # Besides, the graph-based decomposition is not supported
     # yet in from_plxpr for most gates and templates.
     # TODO: Enable the graph-based decomposition
-    graph_enabled = qml.decomposition.enabled_graph()
+    graph_enabled = qp.decomposition.enabled_graph()
 
     if graph_enabled:
-        qml.decomposition.disable_graph()
+        qp.decomposition.disable_graph()
 
     kwargs = (
         {"gate_set": set(COMPILER_OPS_FOR_DECOMPOSITION.keys()).union(tgateset)}
@@ -632,10 +632,10 @@ def _apply_compiler_decompose_to_plxpr(
     if stopping_condition:
         kwargs["stopping_condition"] = stopping_condition
 
-    final_jaxpr = qml.transforms.decompose.plxpr_transform(inner_jaxpr, consts, (), kwargs, *ncargs)
+    final_jaxpr = qp.transforms.decompose.plxpr_transform(inner_jaxpr, consts, (), kwargs, *ncargs)
 
     if graph_enabled:
-        qml.decomposition.enable_graph()
+        qp.decomposition.enable_graph()
 
     return final_jaxpr
 

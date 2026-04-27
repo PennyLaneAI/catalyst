@@ -20,7 +20,7 @@ import json
 from pathlib import Path
 from typing import Iterable
 
-import pennylane as qml
+import pennylane as qp
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.passes.utils import prepare_decomposition_options
@@ -41,19 +41,19 @@ def cancel_inverses_setup_inputs():
     The full list of supported gates are as follows:
 
     One-bit Gates:
-    :class:`qml.Hadamard <pennylane.Hadamard>`,
-    :class:`qml.PauliX <pennylane.PauliX>`,
-    :class:`qml.PauliY <pennylane.PauliY>`,
-    :class:`qml.PauliZ <pennylane.PauliZ>`
+    :class:`qp.Hadamard <pennylane.Hadamard>`,
+    :class:`qp.PauliX <pennylane.PauliX>`,
+    :class:`qp.PauliY <pennylane.PauliY>`,
+    :class:`qp.PauliZ <pennylane.PauliZ>`
 
     Two-bit Gates:
-    :class:`qml.CNOT <pennylane.CNOT>`,
-    :class:`qml.CY <pennylane.CY>`,
-    :class:`qml.CZ <pennylane.CZ>`,
-    :class:`qml.SWAP <pennylane.SWAP>`
+    :class:`qp.CNOT <pennylane.CNOT>`,
+    :class:`qp.CY <pennylane.CY>`,
+    :class:`qp.CZ <pennylane.CZ>`,
+    :class:`qp.SWAP <pennylane.SWAP>`
 
     Three-bit Gates:
-    :class:`qml.Toffoli <pennylane.Toffoli>`
+    :class:`qp.Toffoli <pennylane.Toffoli>`
 
     .. note::
 
@@ -78,19 +78,21 @@ def cancel_inverses_setup_inputs():
 
     .. code-block:: python
 
+        import pennylane as qp
+        from catalyst import qjit
         from catalyst.debug import get_compilation_stage
         from catalyst.passes import cancel_inverses
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit(keep_intermediate=True)
         @cancel_inverses
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x: float):
-            qml.RX(x, wires=0)
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliZ(0))
 
     >>> circuit(0.54)
     Array(0.85770868, dtype=float64)
@@ -189,18 +191,18 @@ def diagonalize_measurements(
 
     .. code-block:: python
 
-        import pennylane as qml
+        import pennylane as qp
         from catalyst import qjit
         from catalyst.passes import diagonalize_measurements
 
         @qjit
         @diagonalize_measurements(supported_base_obs=("PauliX",))
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit():
-            qml.Hadamard(0)
-            qml.RZ(1.1, 0)
-            qml.PhaseShift(0.22, 0)
-            return qml.expval(qml.Y(0))
+            qp.Hadamard(0)
+            qp.RZ(1.1, 0)
+            qp.PhaseShift(0.22, 0)
+            return qp.expval(qp.Y(0))
 
         expected_substr = 'transform.apply_registered_pass "diagonalize-final-measurements" with options = {"supported-base-obs" = ["PauliX"], "to-eigvals" = false}'
 
@@ -213,16 +215,16 @@ def diagonalize_measurements(
 
     .. code-block:: python
 
-        import pennylane as qml
+        import pennylane as qp
         from catalyst import qjit
         from catalyst.passes import diagonalize_measurements
 
         @diagonalize_measurements(to_eigvals=True)
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit():
-            qml.Hadamard(0)
-            qml.PhaseShift(0.22, 0)
-            return qml.expval(qml.Y(0))
+            qp.Hadamard(0)
+            qp.PhaseShift(0.22, 0)
+            return qp.expval(qp.Y(0))
 
         error_msg = None
 
@@ -238,16 +240,16 @@ def diagonalize_measurements(
 
     .. code-block:: python
 
-        import pennylane as qml
+        import pennylane as qp
         from pennylane.exceptions import CompileError
         from catalyst import qjit
         from catalyst.passes import diagonalize_measurements
 
         @diagonalize_measurements
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit():
-            qml.Hadamard(0)
-            return qml.expval(qml.Y(0) + qml.X(0))
+            qp.Hadamard(0)
+            return qp.expval(qp.Y(0) + qp.X(0))
 
         error_msg = None
 
@@ -263,7 +265,7 @@ def diagonalize_measurements(
         return functools.partial(
             diagonalize_measurements, supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
         )
-    return qml.transform(pass_name="diagonalize-final-measurements")(
+    return qp.transform(pass_name="diagonalize-final-measurements")(
         qnode, supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
     )
 
@@ -288,24 +290,24 @@ def disentangle_cnot_setup_inputs():
 
     .. code-block:: python
 
-        import pennylane as qml
+        import pennylane as qp
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qjit(capture=True)
-        @qml.transforms.disentangle_cnot
-        @qml.qnode(dev)
+        @qp.qjit(capture=True)
+        @qp.transforms.disentangle_cnot
+        @qp.qnode(dev)
         def circuit():
             # first qubit in |1>
-            qml.X(0)
+            qp.X(0)
             # second qubit in |0>
             # current state : |10>
-            qml.CNOT([0, 1]) # state after CNOT : |11>
-            return qml.state()
+            qp.CNOT([0, 1]) # state after CNOT : |11>
+            return qp.state()
 
     When inspecting the circuit resources, only ``PauliX`` gates are present.
 
-    >>> print(qml.specs(circuit, level=1)())
+    >>> print(qp.specs(circuit, level=1)())
     Device: lightning.qubit
     Device wires: 2
     Shots: Shots(total=None)
@@ -348,24 +350,24 @@ def disentangle_swap_setup_inputs():
 
     .. code-block:: python
 
-        import pennylane as qml
+        import pennylane as qp
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qjit(keep_intermediate=True)
-        @qml.transforms.disentangle_swap
-        @qml.qnode(dev)
+        @qp.qjit(keep_intermediate=True)
+        @qp.transforms.disentangle_swap
+        @qp.qnode(dev)
         def circuit():
             # first qubit in |1>
-            qml.X(0)
+            qp.X(0)
             # second qubit in non-basis
-            qml.RX(0.2, 1)
-            qml.SWAP([0, 1])
-            return qml.state()
+            qp.RX(0.2, 1)
+            qp.SWAP([0, 1])
+            return qp.state()
 
     When inspecting the circuit resources, the ``SWAP`` gate is no longer present.
 
-    >>> print(qml.specs(circuit, level=1)())
+    >>> print(qp.specs(circuit, level=1)())
     Device: lightning.qubit
     Device wires: 2
     Shots: Shots(total=None)
@@ -395,17 +397,17 @@ def merge_rotations_setup_inputs():
 
     The full list of supported gates are as follows:
 
-    :class:`qml.RX <pennylane.RX>`,
-    :class:`qml.CRX <pennylane.CRX>`,
-    :class:`qml.RY <pennylane.RY>`,
-    :class:`qml.CRY <pennylane.CRY>`,
-    :class:`qml.RZ <pennylane.RZ>`,
-    :class:`qml.CRZ <pennylane.CRZ>`,
-    :class:`qml.PhaseShift <pennylane.PhaseShift>`,
-    :class:`qml.ControlledPhaseShift <pennylane.ControlledPhaseShift>`,
-    :class:`qml.Rot <pennylane.Rot>`,
-    :class:`qml.CRot <pennylane.CRot>`,
-    :class:`qml.MultiRZ <pennylane.MultiRZ>`.
+    :class:`qp.RX <pennylane.RX>`,
+    :class:`qp.CRX <pennylane.CRX>`,
+    :class:`qp.RY <pennylane.RY>`,
+    :class:`qp.CRY <pennylane.CRY>`,
+    :class:`qp.RZ <pennylane.RZ>`,
+    :class:`qp.CRZ <pennylane.CRZ>`,
+    :class:`qp.PhaseShift <pennylane.PhaseShift>`,
+    :class:`qp.ControlledPhaseShift <pennylane.ControlledPhaseShift>`,
+    :class:`qp.Rot <pennylane.Rot>`,
+    :class:`qp.CRot <pennylane.CRot>`,
+    :class:`qp.MultiRZ <pennylane.MultiRZ>`.
 
     .. note::
 
@@ -428,7 +430,7 @@ def merge_rotations_setup_inputs():
 
     **Example**
 
-    In this example the three :class:`qml.RX <pennylane.RX>` will be merged in a single
+    In this example the three :class:`qp.RX <pennylane.RX>` will be merged in a single
     one with the sum of angles as parameter.
 
     .. code-block:: python
@@ -436,16 +438,16 @@ def merge_rotations_setup_inputs():
         from catalyst.debug import get_compilation_stage
         from catalyst.passes import merge_rotations
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit(keep_intermediate=True)
         @merge_rotations
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x: float):
-            qml.RX(x, wires=0)
-            qml.RX(0.1, wires=0)
-            qml.RX(x**2, wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.RX(0.1, wires=0)
+            qp.RX(x**2, wires=0)
+            return qp.expval(qp.PauliZ(0))
 
     >>> circuit(0.54)
     Array(0.5965506257017892, dtype=float64)
@@ -515,7 +517,7 @@ def ions_decomposition_setup_inputs():  # pragma: nocover
 
     .. code-block:: python
 
-        import pennylane as qml
+        import pennylane as qp
         from pennylane.devices import NullQubit
 
         import catalyst
@@ -525,11 +527,11 @@ def ions_decomposition_setup_inputs():  # pragma: nocover
 
         @qjit(keep_intermediate=True)
         @catalyst.passes.ions_decomposition
-        @qml.qnode(NullQubit(2))
+        @qp.qnode(NullQubit(2))
         def circuit():
-            qml.Hadamard(wires=[0])
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(qml.PauliY(wires=0))
+            qp.Hadamard(wires=[0])
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.PauliY(wires=0))
 
 
     >>> print(get_compilation_stage(circuit, stage="QuantumCompilationStage"))
@@ -639,7 +641,7 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
 
     .. code-block:: python
 
-        import pennylane as qml
+        import pennylane as qp
         from catalyst import qjit
         from catalyst.passes import gridsynth
 
@@ -647,10 +649,10 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
 
         @qjit(pipelines=pipe, target="mlir")
         @gridsynth
-        @qml.qnode(qml.device("null.qubit", wires=1))
+        @qp.qnode(qp.device("null.qubit", wires=1))
         def circuit():
-            qml.RZ(x, wires=0)
-            return qml.probs()
+            qp.RZ(x, wires=0)
+            return qp.probs()
 
         >>> print(circuit.mlir_opt)
 
@@ -698,7 +700,7 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
     if qnode is None:
         return functools.partial(gridsynth, epsilon=epsilon, ppr_basis=ppr_basis)
 
-    return qml.transform(pass_name="gridsynth")(qnode, epsilon=epsilon, ppr_basis=ppr_basis)
+    return qp.transform(pass_name="gridsynth")(qnode, epsilon=epsilon, ppr_basis=ppr_basis)
 
 
 def to_ppr_setup_inputs():
@@ -718,18 +720,18 @@ def to_ppr_setup_inputs():
     `compilation hub <https://pennylane.ai/compilation/pauli-based-computation>`__.
 
     The full list of supported gates and operations are
-    ``qml.H``,
-    ``qml.S``,
-    ``qml.T``,
-    ``qml.X``,
-    ``qml.Y``,
-    ``qml.Z``,
-    ``qml.PauliRot``,
-    ``qml.adjoint(qml.PauliRot)``,
-    ``qml.adjoint(qml.S)``,
-    ``qml.adjoint(qml.T)``,
-    ``qml.CNOT``, and
-    ``qml.measure``.
+    ``qp.H``,
+    ``qp.S``,
+    ``qp.T``,
+    ``qp.X``,
+    ``qp.Y``,
+    ``qp.Z``,
+    ``qp.PauliRot``,
+    ``qp.adjoint(qp.PauliRot)``,
+    ``qp.adjoint(qp.S)``,
+    ``qp.adjoint(qp.T)``,
+    ``qp.CNOT``, and
+    ``qp.measure``.
 
     Args:
         fn (QNode): the QNode to apply the pass to
@@ -753,21 +755,21 @@ def to_ppr_setup_inputs():
 
     .. code-block:: python
 
-        import pennylane as qml
+        import pennylane as qp
 
-        @qml.qjit(capture=True)
-        @qml.transforms.to_ppr
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qjit(capture=True)
+        @qp.transforms.to_ppr
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
-            qml.H(0)
-            qml.CNOT([0, 1])
-            m = qml.measure(0)
-            qml.T(0)
-            return qml.expval(qml.Z(0))
+            qp.H(0)
+            qp.CNOT([0, 1])
+            m = qp.measure(0)
+            qp.T(0)
+            return qp.expval(qp.Z(0))
 
     >>> circuit()
     Array(-1., dtype=float64)
-    >>> print(qml.specs(circuit, level=1)())
+    >>> print(qp.specs(circuit, level=1)())
     Device: lightning.qubit
     Device wires: 2
     Shots: Shots(total=None)
@@ -804,7 +806,7 @@ def commute_ppr_setup_inputs(max_pauli_size=0):
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`@qml.qjit <pennylane.qjit>`. In
+        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane.qjit>`. In
         addition, the circuits generated by this pass are currently not executable on any
         backend. This pass is only for Pauli-based-computation analysis with the ``null.qubit``
         device and potential future execution when a suitable backend is available.
@@ -841,33 +843,33 @@ def commute_ppr_setup_inputs(max_pauli_size=0):
 
     .. code-block:: python
 
-        import pennylane as qml
+        import pennylane as qp
         import jax.numpy as jnp
 
-        @qml.qjit(capture=True)
-        @qml.transforms.commute_ppr(max_pauli_size=2)
-        @qml.transforms.to_ppr
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qjit(capture=True)
+        @qp.transforms.commute_ppr(max_pauli_size=2)
+        @qp.transforms.to_ppr
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
 
             # equivalent to a Hadamard gate
-            qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
-            qml.PauliRot(jnp.pi / 2, pauli_word="X", wires=0)
-            qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
+            qp.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
+            qp.PauliRot(jnp.pi / 2, pauli_word="X", wires=0)
+            qp.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
 
             # equivalent to a CNOT gate
-            qml.PauliRot(jnp.pi / 2, pauli_word="ZX", wires=[0, 1])
-            qml.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=0)
-            qml.PauliRot(-jnp.pi / 2, pauli_word="X", wires=1)
+            qp.PauliRot(jnp.pi / 2, pauli_word="ZX", wires=[0, 1])
+            qp.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=0)
+            qp.PauliRot(-jnp.pi / 2, pauli_word="X", wires=1)
 
             # equivalent to a T gate
-            qml.PauliRot(jnp.pi / 4, pauli_word="Z", wires=0)
+            qp.PauliRot(jnp.pi / 4, pauli_word="Z", wires=0)
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
     >>> circuit()
     Array(-1.11022302e-16, dtype=float64)
-    >>> print(qml.specs(circuit, level=2)())
+    >>> print(qp.specs(circuit, level=2)())
     Device: lightning.qubit
     Device wires: 2
     Shots: Shots(total=None)
@@ -906,7 +908,7 @@ def merge_ppr_ppm_setup_inputs(max_pauli_size=0):
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`@qml.qjit <pennylane.qjit>`. In
+        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane.qjit>`. In
         addition, the circuits generated by this pass are currently executable on
         ``lightning.qubit`` or ``null.qubit`` (for mock-execution).
 
@@ -946,24 +948,24 @@ def merge_ppr_ppm_setup_inputs(max_pauli_size=0):
 
     .. code-block:: python
 
-        import pennylane as qml
+        import pennylane as qp
         import jax.numpy as jnp
 
-        @qml.qjit(capture=True)
-        @qml.transforms.merge_ppr_ppm(max_pauli_size=2)
-        @qml.transforms.to_ppr
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qjit(capture=True)
+        @qp.transforms.merge_ppr_ppm(max_pauli_size=2)
+        @qp.transforms.to_ppr
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
-            qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
-            qml.PauliRot(jnp.pi / 2, pauli_word="X", wires=1)
+            qp.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
+            qp.PauliRot(jnp.pi / 2, pauli_word="X", wires=1)
 
-            ppm = qml.pauli_measure(pauli_word="ZX", wires=[0, 1])
+            ppm = qp.pauli_measure(pauli_word="ZX", wires=[0, 1])
 
-            return qml.probs()
+            return qp.probs()
 
     >>> circuit()
     Array([0.5, 0.5, 0. , 0. ], dtype=float64)
-    >>> print(qml.specs(circuit, level=2)())
+    >>> print(qp.specs(circuit, level=2)())
     Device: lightning.qubit
     Device wires: 2
     Shots: Shots(total=None)
@@ -994,7 +996,7 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`@qml.qjit <pennylane.qjit>`. In
+        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane.qjit>`. In
         addition, the circuits generated by this pass are currently executable on
         ``lightning.qubit`` or ``null.qubit`` (for mock-execution).
 
@@ -1045,31 +1047,31 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
 
     .. code-block:: python
 
-        import pennylane as qml
+        import pennylane as qp
         from functools import partial
         import jax.numpy as jnp
 
-        @qml.qjit(capture=True)
-        @qml.transforms.ppr_to_ppm
-        @qml.transforms.to_ppr
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qp.qjit(capture=True)
+        @qp.transforms.ppr_to_ppm
+        @qp.transforms.to_ppr
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit():
             # equivalent to a Hadamard gate
-            qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
-            qml.PauliRot(jnp.pi / 2, pauli_word="X", wires=0)
-            qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
+            qp.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
+            qp.PauliRot(jnp.pi / 2, pauli_word="X", wires=0)
+            qp.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
 
             # equivalent to a CNOT gate
-            qml.PauliRot(jnp.pi / 2, pauli_word="ZX", wires=[0, 1])
-            qml.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=[0])
-            qml.PauliRot(-jnp.pi / 2, pauli_word="X", wires=[1])
+            qp.PauliRot(jnp.pi / 2, pauli_word="ZX", wires=[0, 1])
+            qp.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=[0])
+            qp.PauliRot(-jnp.pi / 2, pauli_word="X", wires=[1])
 
             # equivalent to a T gate
-            qml.PauliRot(jnp.pi / 4, pauli_word="Z", wires=0)
+            qp.PauliRot(jnp.pi / 4, pauli_word="Z", wires=0)
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
-    >>> print(qml.specs(circuit, level=2)())
+    >>> print(qp.specs(circuit, level=2)())
     Device: null.qubit
     Device wires: 2
     Shots: Shots(total=None)
@@ -1110,7 +1112,7 @@ def ppm_compilation_setup_inputs(
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`@qml.qjit <pennylane.qjit>`. In
+        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane.qjit>`. In
         addition, the circuits generated by this pass are currently executable on
         ``lightning.qubit`` or ``null.qubit`` (for mock-execution).
 
@@ -1163,18 +1165,18 @@ def ppm_compilation_setup_inputs(
 
     .. code-block:: python
 
-        import pennylane as qml
+        import pennylane as qp
 
-        @qml.qjit(capture=True)
-        @qml.transforms.ppm_compilation(decompose_method="clifford-corrected", max_pauli_size=2)
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qp.qjit(capture=True)
+        @qp.transforms.ppm_compilation(decompose_method="clifford-corrected", max_pauli_size=2)
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit():
-            qml.H(0)
-            qml.CNOT([0, 1])
-            qml.T(0)
-            return qml.expval(qml.Z(0))
+            qp.H(0)
+            qp.CNOT([0, 1])
+            qp.T(0)
+            return qp.expval(qp.Z(0))
 
-    >>> print(qml.specs(circuit, level=1)())
+    >>> print(qp.specs(circuit, level=1)())
     Device: null.qubit
     Device wires: 2
     Shots: Shots(total=None)
@@ -1251,22 +1253,22 @@ def ppm_specs(fn):
 
     .. code-block:: python
 
-        import pennylane as qml
+        import pennylane as qp
         import catalyst
 
         p = [("my_pipe", ["quantum-compilation-stage"])]
-        device = qml.device("lightning.qubit", wires=2)
+        device = qp.device("lightning.qubit", wires=2)
 
-        @qml.qjit(pipelines=p, target="mlir")
+        @qp.qjit(pipelines=p, target="mlir")
         @catalyst.passes.ppm_compilation
-        @qml.qnode(device)
+        @qp.qnode(device)
         def circuit():
-            qml.H(0)
-            qml.CNOT([0,1])
+            qp.H(0)
+            qp.CNOT([0,1])
 
             @catalyst.for_loop(0,10,1)
             def loop(i):
-                qml.T(1)
+                qp.T(1)
 
             loop()
             return catalyst.measure(0), catalyst.measure(1)
@@ -1331,7 +1333,7 @@ def reduce_t_depth_setup_inputs():
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`@qml.qjit <pennylane.qjit>`. In
+        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane.qjit>`. In
         addition, the circuits generated by this pass are currently executable on
         ``lightning.qubit`` or ``null.qubit`` (for mock-execution).
 
@@ -1368,21 +1370,21 @@ def reduce_t_depth_setup_inputs():
 
     .. code-block:: python
 
-        import pennylane as qml
+        import pennylane as qp
         import jax.numpy as jnp
 
-        @qml.qjit(capture=True)
-        @qml.transforms.reduce_t_depth
-        @qml.transforms.to_ppr
-        @qml.qnode(qml.device("null.qubit", wires=4))
+        @qp.qjit(capture=True)
+        @qp.transforms.reduce_t_depth
+        @qp.transforms.to_ppr
+        @qp.qnode(qp.device("null.qubit", wires=4))
         def circuit():
-            qml.PauliRot(jnp.pi / 4, pauli_word="Z", wires=1)
-            qml.PauliRot(-jnp.pi / 4, pauli_word="XYZ", wires=[0, 2, 3])
-            qml.PauliRot(-jnp.pi / 2, pauli_word="XYZY", wires=[0, 1, 2, 3])
-            qml.PauliRot(jnp.pi / 4, pauli_word="XZX", wires=[0, 1, 3])
-            qml.PauliRot(-jnp.pi / 4, pauli_word="XZY", wires=[0, 1, 2])
+            qp.PauliRot(jnp.pi / 4, pauli_word="Z", wires=1)
+            qp.PauliRot(-jnp.pi / 4, pauli_word="XYZ", wires=[0, 2, 3])
+            qp.PauliRot(-jnp.pi / 2, pauli_word="XYZY", wires=[0, 1, 2, 3])
+            qp.PauliRot(jnp.pi / 4, pauli_word="XZX", wires=[0, 1, 3])
+            qp.PauliRot(-jnp.pi / 4, pauli_word="XZY", wires=[0, 1, 2])
 
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
     The ``reduce_t_depth`` compilation pass will rearrange the last three PPRs in the above circuit
     to reduce the non-Clifford PPR depth. This is best seen with the :func:`catalyst.draw_graph`
@@ -1457,18 +1459,18 @@ def ppr_to_mbqc_setup_inputs():
 
     .. code-block:: python
 
-        import pennylane as qml
+        import pennylane as qp
         import catalyst
 
         p = [("my_pipe", ["quantum-compilation-stage"])]
 
-        @qml.qjit(pipelines=p, target="mlir", keep_intermediate=True)
+        @qp.qjit(pipelines=p, target="mlir", keep_intermediate=True)
         @catalyst.passes.ppr_to_mbqc
         @catalyst.passes.to_ppr
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit():
-            qml.H(0)
-            qml.CNOT([0, 1])
+            qp.H(0)
+            qp.CNOT([0, 1])
             return
 
         print(circuit.mlir_opt)
@@ -1517,7 +1519,7 @@ def decompose_arbitrary_ppr_setup_inputs():  # pragma: nocover
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`@qml.qjit <pennylane.qjit>`. In
+        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane.qjit>`. In
         addition, the circuits generated by this pass are currently executable on
         ``lightning.qubit`` or ``null.qubit`` (for mock-execution).
 
@@ -1543,23 +1545,23 @@ def decompose_arbitrary_ppr_setup_inputs():  # pragma: nocover
     **Example**
 
     In the example below, the arbitrary-angle PPR
-    (``qml.PauliRot(0.1, pauli_word="XY", wires=[0, 1])``), will be decomposed into various other
+    (``qp.PauliRot(0.1, pauli_word="XY", wires=[0, 1])``), will be decomposed into various other
     PPRs and PPMs in accordance with
     `Figure 13(d) of arXiv:2211.15465 <https://arxiv.org/abs/2211.15465>`__.
 
     .. code-block:: python
 
-        import pennylane as qml
+        import pennylane as qp
 
-        @qml.qjit(capture=True)
-        @qml.transforms.decompose_arbitrary_ppr
-        @qml.transforms.to_ppr
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit(capture=True)
+        @qp.transforms.decompose_arbitrary_ppr
+        @qp.transforms.to_ppr
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def circuit():
-            qml.PauliRot(0.1, pauli_word="XY", wires=[0, 1])
-            return qml.expval(qml.Z(0))
+            qp.PauliRot(0.1, pauli_word="XY", wires=[0, 1])
+            return qp.expval(qp.Z(0))
 
-    >>> print(qml.specs(circuit, level=2)())
+    >>> print(qp.specs(circuit, level=2)())
     Device: null.qubit
     Device wires: 3
     Shots: Shots(total=None)

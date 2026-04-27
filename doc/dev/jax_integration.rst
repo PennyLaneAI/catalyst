@@ -77,18 +77,18 @@ and only apply outside of QNodes:
 
 .. code-block:: python
 
-    dev = qml.device("lightning.qubit", wires=4, shots=10)
+    dev = qp.device("lightning.qubit", wires=4, shots=10)
 
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(x):
         N = x.shape[0]
 
         @catalyst.for_loop(0, N, 1)
         def loop_fn(i):
-            qml.RX(x[i], wires=i)
+            qp.RX(x[i], wires=i)
 
         loop_fn()
-        return [qml.expval(qml.PauliZ(i)) for i in range(N)]
+        return [qp.expval(qp.PauliZ(i)) for i in range(N)]
 
     @qjit
     def fn(x):
@@ -168,12 +168,12 @@ Compiled functions remain JAX compatible, and you can call JAX transformations
 on them, such as ``jax.grad`` and ``jax.vmap``. You can even call ``jax.jit``
 on functions that call qjit-compiled functions:
 
->>> dev = qml.device("lightning.qubit", wires=2)
+>>> dev = qp.device("lightning.qubit", wires=2)
 >>> @qjit
-... @qml.qnode(dev)
+... @qp.qnode(dev)
 ... def circuit(x):
-...     qml.RX(x, wires=0)
-...     return qml.expval(qml.PauliZ(0))
+...     qp.RX(x, wires=0)
+...     return qp.expval(qp.PauliZ(0))
 >>> @jax.jit
 ... def workflow(y):
 ...     return jax.grad(circuit)(jnp.sin(y))
@@ -213,10 +213,10 @@ If they are applied to quantum processing, an error will occur:
 
 >>> @qjit
 ... def f(x):
-...     @qml.qnode(dev)
+...     @qp.qnode(dev)
 ...     def g(y):
-...         qml.RX(y, wires=0)
-...         return qml.expval(qml.PauliX(0))
+...         qp.RX(y, wires=0)
+...         return qp.expval(qp.PauliX(0))
 ...     return jax.grad(lambda y: g(y) ** 2)(x)
 >>> f(0.4)
 NotImplementedError: must override
@@ -226,10 +226,10 @@ quantum-classical processing:
 
 >>> @qjit
 ... def f(x):
-...     @qml.qnode(dev)
+...     @qp.qnode(dev)
 ...     def g(y):
-...         qml.RX(y, wires=0)
-...         return qml.expval(qml.PauliZ(0))
+...         qp.RX(y, wires=0)
+...         return qp.expval(qp.PauliZ(0))
 ...     return grad(lambda y: g(y) ** 2)(x)
 >>> f(0.4)
 Array(-0.71735609, dtype=float64)
