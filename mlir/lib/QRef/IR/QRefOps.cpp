@@ -303,10 +303,11 @@ LogicalResult GraphStatePrepOp::verify()
     size_t qregSize = qregType.getSize().getInt();
     size_t expectedAdjMatrixSize = qregSize * (qregSize - 1) / 2;
     if (adjMatrixSize != expectedAdjMatrixSize) {
-        return emitOpError() << "mismatch between allocation size and size of dense adjacency "
-                                "matrix. For an allocation size of "
-                             << qregSize << ", dense adjacency matrix size is expected to be "
-                             << expectedAdjMatrixSize;
+        return emitOpError()
+               << "mismatch between allocation size and size of densely packed adjacency "
+                  "matrix. For an allocation size of "
+               << qregSize << ", the densely packed adjacency matrix size is expected to be "
+               << expectedAdjMatrixSize;
     }
 
     return success();

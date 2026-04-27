@@ -237,7 +237,7 @@ func.func @test_mbqc_measure_in_basis_invalid_plane(%q : !qref.bit) {
 
 func.func @test_mbqc_graph_state_prep_invalid_size() {
     %adj_matrix = arith.constant dense<[1]> : tensor<1xi1>
-    // expected-error@below {{mismatch between allocation size and size of dense adjacency matrix. For an allocation size of 4, dense adjacency matrix size is expected to be 6}}
+    // expected-error@below {{mismatch between allocation size and size of densely packed adjacency matrix. For an allocation size of 4, the densely packed adjacency matrix size is expected to be 6}}
     %graph_reg = qref.mbqc.graph_state_prep (%adj_matrix : tensor<1xi1>) [init "Hadamard", entangle "CZ"] : !qref.reg<4>
     func.return
 }
