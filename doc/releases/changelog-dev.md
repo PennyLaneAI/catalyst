@@ -633,6 +633,11 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Refactored all passes in `catalyst.passes.builtin_passes.py` to be `pennylane.transforms.core.Transform` objects
+  rather than decorators. This allows them to be used as standard transforms, enabling full compatibility with
+  `pennylane.CompilePipeline`.
+  [(#2722)](https://github.com/PennyLaneAI/catalyst/pull/2722)
+
 * The compiler pipeline definitions now have a single source of truth. Previously, pipeline and
   pass sequences were duplicated between the frontend (`frontend/catalyst/pipelines.py`) and the
   compiler (`mlir/lib/Driver/Pipelines.cpp`). Now, there is a unique definition that lives in
