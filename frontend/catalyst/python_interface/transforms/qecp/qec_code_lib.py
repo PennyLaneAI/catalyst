@@ -14,8 +14,12 @@
 
 """This module contains a library of QEC codes."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass, fields
+from functools import partial
 from typing import Any, Self
+
+from catalyst.python_interface.dialects import qecp
 
 import numpy as np
 
@@ -26,9 +30,16 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
         3,
         np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]),
         np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]),
+        {
+            "X": (qecp.PauliXOp, [4, 5, 6]), 
+            "Y": (qecp.PauliYOp, [4, 5, 6]),  # ToDo: does it matter that the Y gate seems to introduce a global phase?
+            "Z": (qecp.PauliZOp, [4, 5, 6]), 
+            "CNOT": (qecp.CnotOp, [0, 1, 2, 3, 4, 5, 6]), 
+            "Hadamard": (qecp.HadamardOp, [0, 1, 2, 3, 4, 5, 6]), 
+            "S" : (partial(qecp.SOp, adjoint=True), [0, 1, 2, 3, 4, 5, 6]), 
+        },
     ),
 }
-
 
 @dataclass(frozen=True)
 class QecCode:
@@ -39,6 +50,11 @@ class QecCode:
         n (int): The code's number of QEC physical qubits.
         k (int): The code's number of QEC logical qubits.
         d (int): The code's distance.
+        x_tanner (np.ndarray): The code's X Tanner graph
+        z_tanner (np.ndarray): The code's Z Tanner graph
+        transversal_gates (dict): A dictionary of transversal gates. The key is the gate 
+            name, and the value is a tuple containing the qecp op to be applied, and the 
+            non-Identity indices. Current format assumes k=1.
     """
 
     name: str
@@ -47,6 +63,7 @@ class QecCode:
     d: int
     x_tanner: np.ndarray
     z_tanner: np.ndarray
+    transversal_gates: dict
 
     def __str__(self):
         if self.name == "" or str.isspace(self.name):
@@ -65,7 +82,7 @@ class QecCode:
         Example
         -------
 
-        >>> QecCode.from_dict({'name': "Steane", 'n': 7, 'k': 1, 'd': 3})
+        >>> QecCode.from_dict({'name': "Steane", 'n': 7, 'k': 1, 'd': 3})  # ToDo: upate these doctrings
         QecCode(name='Steane', n=7, k=1, d=3)
         """
         # Filter dictionary to keep only keys that are fields of this dataclass
