@@ -281,6 +281,49 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         return funcOp
 
+    def create_transversal_gate_subroutines(self) -> func.FuncOp:
+        """ToDo: Docstring goes here"""
+
+        subroutines = {}
+
+        for gate in self.qec_code.transversal_gates:
+            gate_op, gate_indices = self.qec_code.transversal_gates[gate]
+
+            codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
+            input_types = (codeblock_type,)
+            output_types = (codeblock_type,)
+
+            block = Block(arg_types=input_types)
+
+            with builder.ImplicitBuilder(block):
+                (in_codeblock,) = block.args
+
+                # extract qubits
+                extract_ops = [qecp.ExtractQubitOp(in_codeblock, i) for i in range(self.qec_code.n)]
+                qubits = [ext_op.results[0] for ext_op in extract_ops]
+
+                transversal_gate = [gate_op(qb) if idx in gate_indices else qecp.IdentityOp(qb) for idx, qb in enumerate(qubits)]
+
+                qubits_out = [op.results[0] for op in transversal_gate]
+
+                codeblock = in_codeblock
+                for i in range(self.qec_code.n):
+                    insert_op = qecp.InsertQubitOp(codeblock, i, qubits_out[i])
+                    codeblock = insert_op.results[0]
+
+                # return the encoded codeblock
+                func.ReturnOp(codeblock)
+
+            funcOp = func.FuncOp(
+                name=f"{gate.lower()}_{self.qec_code.name}",
+                function_type=(input_types, output_types),
+                visibility="private",
+                region=Region([block]),
+            )
+
+            subroutines[gate] = funcOp
+
+
     def check_pattern(
         self,
         in_aux_qbs: Iterable[qecp.QecPhysicalQubitSSAValue],
