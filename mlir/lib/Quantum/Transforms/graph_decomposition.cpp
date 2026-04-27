@@ -295,7 +295,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // Unwrap "Adjoint(GateName)"
         if (raw.consume_front("Adjoint(")) {
             node.adjoint = true;
-            auto closeIdx = raw.find(')');
+            auto closeIdx = raw.rfind(')');
             if (closeIdx == llvm::StringRef::npos) {
                 node.name = raw.trim().str();
                 return node;
@@ -318,10 +318,12 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             llvm::StringRef wStr, pStr;
             std::tie(wStr, pStr) = raw.split(',');
             int w = -1, p = -1;
-            if (!wStr.getAsInteger(10, w))
+            if (!wStr.getAsInteger(10, w)) {
                 node.numWires = w;
-            if (!pStr.empty() && !pStr.getAsInteger(10, p))
+            }
+            if (!pStr.empty() && !pStr.getAsInteger(10, p)) {
                 node.numParams = p;
+            }
             // If pStr is empty we were given the legacy "(w)" format; leave
             // numParams at the wildcard default so old bytecode keeps working.
         }
