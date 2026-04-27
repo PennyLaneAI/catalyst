@@ -148,3 +148,33 @@ func.func @rule_with_nested_loop(%arg0: !quantum.bit) -> !quantum.bit attributes
 
     return %q : !quantum.bit
 }
+
+
+// -----
+
+// Rules with parametric ops
+// CHECK:  operations = {"Adjoint(Rot)(4,3)" = 1 : i64, "Rot(4,3)" = 1 : i64}}
+func.func @rule_with_parametric_ops(%arg0: !quantum.bit) -> !quantum.bit attributes {target_gate="gate"} {
+    %cst_0 = arith.constant 0.1 : f64
+    %cst_1 = arith.constant 0.2 : f64
+    %cst_2 = arith.constant 0.3 : f64
+
+    %true = arith.constant true
+    %false = arith.constant false
+
+    %reg = quantum.alloc(4) : !quantum.reg
+    %q0 = quantum.extract %reg[0] : !quantum.reg -> !quantum.bit
+    %q1 = quantum.extract %reg[1] : !quantum.reg -> !quantum.bit
+    %q2 = quantum.extract %reg[2] : !quantum.reg -> !quantum.bit
+    %q3 = quantum.extract %reg[3] : !quantum.reg -> !quantum.bit
+
+    %res:4 = quantum.custom "Rot"(%cst_0, %cst_1, %cst_2) %q0, %q1
+             ctrls(%q2, %q3)
+             ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
+
+    %res_adj:4 = quantum.custom "Rot"(%cst_0, %cst_1, %cst_2) %res#0, %res#1 adj
+                 ctrls(%res#2, %res#3)
+                 ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
+
+    return %res_adj#0 : !quantum.bit
+}
