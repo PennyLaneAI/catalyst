@@ -303,13 +303,13 @@ TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample call
     QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
     QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
-    // qml.Hadamard(wires=0)
+    // qp.Hadamard(wires=0)
     __catalyst__qis__Hadamard(*target, NO_MODIFIERS);
-    // qml.ControlledPhaseShift(0.6, wires=[0,1])
+    // qp.ControlledPhaseShift(0.6, wires=[0,1])
     __catalyst__qis__ControlledPhaseShift(0.6, *target, *ctrls, NO_MODIFIERS);
-    // qml.IsingYY(0.2, wires=[0, 1])
+    // qp.IsingYY(0.2, wires=[0, 1])
     __catalyst__qis__IsingYY(0.2, *target, *ctrls, NO_MODIFIERS);
-    // qml.CRX(0.4, wires=[1,0])
+    // qp.CRX(0.4, wires=[1,0])
     __catalyst__qis__CRX(0.4, *target, *ctrls, NO_MODIFIERS);
 
     constexpr size_t n = 1;

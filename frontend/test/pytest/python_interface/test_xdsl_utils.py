@@ -15,7 +15,7 @@
 
 # pylint: disable=line-too-long
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 from jax import jit
 from jaxlib.mlir.ir import Module as jaxModule
@@ -365,10 +365,10 @@ class TestConversionUtils:
     def test_xdsl_from_qjit(self):
         """Test that the xdsl_from_qjit function works correctly."""
 
-        @qml.qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qjit
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
-            return qml.state()
+            return qp.state()
 
         mod = xdsl_from_qjit(circuit)()
         assert isinstance(mod, builtin.ModuleOp)

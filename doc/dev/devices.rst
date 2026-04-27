@@ -99,7 +99,7 @@ Supported backend devices include:
           os.environ["OQC_PASSWORD"] = "your_password"
           os.environ["OQC_URL"] = "oqc_url"
 
-          dev = qml.device("oqc.cloud", backend="lucy", shots=2012, wires=2)
+          dev = qp.device("oqc.cloud", backend="lucy", shots=2012, wires=2)
 
       See the `Catalyst configuration file <https://github.com/PennyLaneAI/catalyst/blob/main/frontend/catalyst/third_party/oqc/src/oqc.toml>`__
       for natively supported instructions.

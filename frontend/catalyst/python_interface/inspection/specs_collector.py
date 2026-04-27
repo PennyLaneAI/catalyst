@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-This file contains the implementation of the a collector method for qml.specs,
+This file contains the implementation of the a collector method for qp.specs,
 which collects and maps PennyLane operations and measurements from xDSL.
 """
 
@@ -60,8 +60,8 @@ from catalyst.python_interface.dialects.quantum import (
 )
 from catalyst.python_interface.inspection.xdsl_conversion import (
     count_static_loop_iterations,
-    xdsl_to_qml_measurement_name,
-    xdsl_to_qml_op_name,
+    xdsl_to_qp_measurement_name,
+    xdsl_to_qp_op_name,
 )
 
 # A list of all custom dialect names used by Catalyst for MLIR ops
@@ -212,7 +212,7 @@ def handle_resource(
 
 @handle_resource.register
 def _(xdsl_op: MeasureOp) -> tuple[ResourceType, str]:
-    return ResourceType.MEASUREMENT, xdsl_to_qml_measurement_name(xdsl_op)
+    return ResourceType.MEASUREMENT, xdsl_to_qp_measurement_name(xdsl_op)
 
 
 @handle_resource.register
@@ -220,8 +220,8 @@ def _(
     xdsl_op: CountsOp | ExpvalOp | ProbsOp | SampleOp | StateOp | VarianceOp,
 ) -> tuple[ResourceType, str]:
     obs_op = xdsl_op.obs.owner
-    return ResourceType.MEASUREMENT, xdsl_to_qml_measurement_name(
-        xdsl_op, xdsl_to_qml_measurement_name(obs_op)
+    return ResourceType.MEASUREMENT, xdsl_to_qp_measurement_name(
+        xdsl_op, xdsl_to_qp_measurement_name(obs_op)
     )
 
 
@@ -375,7 +375,7 @@ def _collect_operation(
             if hasattr(op, "in_ctrl_qubits"):
                 n_qubits += len(op.in_ctrl_qubits)
 
-            resource = xdsl_to_qml_op_name(op, adjoint_mode=adjoint_mode)
+            resource = xdsl_to_qp_op_name(op, adjoint_mode=adjoint_mode)
 
             resources.operations[resource][n_qubits] += 1
 

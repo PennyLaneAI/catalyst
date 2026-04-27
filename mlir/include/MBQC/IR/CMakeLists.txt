@@ -4,7 +4,7 @@ add_mlir_doc(MBQCDialect MBQCDialect MBQC/ -gen-dialect-doc)
 add_mlir_doc(MBQCOps MBQCOps MBQC/ -gen-op-doc)
 add_mlir_doc(MBQCInterfaces MBQCInterfaces MBQC/ -gen-op-interface-docs)
 
-set(LLVM_TARGET_DEFINITIONS MBQCOps.td)
+set(LLVM_TARGET_DEFINITIONS MBQCAttrDefs.td)
 mlir_tablegen(MBQCEnums.h.inc -gen-enum-decls)
 mlir_tablegen(MBQCEnums.cpp.inc -gen-enum-defs)
 mlir_tablegen(MBQCAttributes.h.inc -gen-attrdef-decls -attrdefs-dialect=mbqc)

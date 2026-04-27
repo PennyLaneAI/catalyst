@@ -19,7 +19,7 @@ import os
 import pathlib
 import platform
 
-import pennylane as qml
+import pennylane as qp
 
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
@@ -40,10 +40,10 @@ def get_custom_qjit_device(num_wires, discards, additions, to_matrix_ops):
             to add to the device capabilities as gates that can be decomposed to matrices.
 
     Returns:
-        qml.Device: A custom QJITDevice with the specified capabilities.
+        qp.Device: A custom QJITDevice with the specified capabilities.
     """
 
-    class CustomDevice(qml.devices.Device):
+    class CustomDevice(qp.devices.Device):
         """Custom Gate Set Device"""
 
         name = "lightning.qubit"

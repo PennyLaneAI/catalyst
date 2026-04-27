@@ -52,12 +52,16 @@ void handleDeallocQubit(IRRewriter &builder, qref::DeallocQubitOp rDeallocQbOp,
                         QubitValueTracker &tracker);
 void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, QubitValueTracker &tracker);
 void handleMeasure(IRRewriter &builder, qref::MeasureOp rMeasureOp, QubitValueTracker &tracker);
+void handleMeasureInBasis(IRRewriter &builder, qref::MeasureInBasisOp rMeasureInBasisOp,
+                          QubitValueTracker &tracker);
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker);
 void handleCompbasis(IRRewriter &builder, qref::ComputationalBasisOp rCompbasisOp,
                      QubitValueTracker &tracker);
 void handleNamedObs(IRRewriter &builder, qref::NamedObsOp rNamedObsOp, QubitValueTracker &tracker);
 void handleHermitian(IRRewriter &builder, qref::HermitianOp rHermitianOp,
                      QubitValueTracker &tracker);
+void handleGraphStatePrep(IRRewriter &builder, qref::GraphStatePrepOp rGraphStatePrepOp,
+                          QubitValueTracker &tracker);
 void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTracker &tracker);
 void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker);
 void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker);

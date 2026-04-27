@@ -109,7 +109,7 @@ with abstract arguments called *tracers*. Calling operations from the tracing li
 data structure. Note that JAX's tracing contexts can be nested to allow scoped region capture,
 which is relevant when tracing control flow operations.
 
-During the tracing of quantum functions (``qml.qnode``), PennyLane's queuing context is activated to
+During the tracing of quantum functions (``qp.qnode``), PennyLane's queuing context is activated to
 build a ``QuantumTape`` data structure that records all quantum operations. Nested queuing contexts
 are leveraged to allow for scoped operation capture, including control flow operations which are
 themselves captured as pseudo-quantum operations on the tape.

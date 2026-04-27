@@ -25,7 +25,7 @@ from collections.abc import Callable
 from typing import get_type_hints
 
 import jax
-import pennylane as qml
+import pennylane as qp
 from pennylane.decomposition import DecompositionGraph
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
@@ -97,7 +97,7 @@ COMPILER_OPS_FOR_DECOMPOSITION: dict[str, tuple[int, int]] = {
 
 
 # pylint: disable=too-many-instance-attributes
-class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
+class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
     """Interpreter for getting the decomposition graph solution
     from a jaxpr when program capture is enabled.
 
@@ -105,7 +105,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
     and builds a decomposition graph to find efficient decomposition pathways
     to a target gate set.
 
-    This interpreter should be used with `qml.decomposition.enable_graph()`
+    This interpreter should be used with `qp.decomposition.enable_graph()`
     to enable graph-based decomposition.
 
     Note that this doesn't actually decompose the operations during interpretation.
@@ -134,7 +134,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
         num_work_wires=0,
     ):
 
-        if not qml.decomposition.enabled_graph():  # pragma: no cover
+        if not qp.decomposition.enabled_graph():  # pragma: no cover
             raise TypeError(
                 "The DecompRuleInterpreter can only be used when"
                 "graph-based decomposition is enabled."
@@ -151,7 +151,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
         self.subroutine_cache = {}
         # This will be consumed by _quantum_subroutine inherited from PlxprInterpreter
 
-    def interpret_operation(self, op: "qml.operation.Operator"):
+    def interpret_operation(self, op: "qp.operation.Operator"):
         """Interpret a PennyLane operation instance.
 
         Args:
@@ -310,7 +310,7 @@ def _create_decomposition_rule(
         possible_names_for_wires = {"wires", "wire", "control_wires", "target_wires"}
 
         if typ is TensorLike or name in possible_names_for_multi_params:
-            args.append(qml.math.array([0.0] * num_params, like="jax", dtype=float))
+            args.append(qp.math.array([0.0] * num_params, like="jax", dtype=float))
         elif typ is float or name in possible_names_for_single_param:
             # TensorLike is a Union of float, int, array-like, so we use float here
             # to cover the most common case as the JAX tracer doesn't like Union types
