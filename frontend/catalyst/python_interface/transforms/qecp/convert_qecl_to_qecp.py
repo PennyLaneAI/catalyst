@@ -26,8 +26,8 @@ from typing import cast
 import numpy as np
 from xdsl import builder
 from xdsl.context import Context
-from xdsl.dialects import arith, builtin, func, tensor
-from xdsl.dialects.builtin import IndexType, TensorType, i1, i32
+from xdsl.dialects import arith, builtin, func, scf, tensor
+from xdsl.dialects.builtin import IndexType, TensorType, i1, i32, i64
 from xdsl.ir import Block, BlockArgument, OpResult, Region
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
@@ -413,51 +413,6 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         return funcOp
 
-    def create_qec_cycle_subroutine(
-        self, tanner_x: qecp.TannerGraphSSAValue, tanner_z: qecp.TannerGraphSSAValue
-    ) -> func.FuncOp:
-        """FIXME
-
-        Create a subroutine that takes in a codeblock, encodes it in the zero state for
-        the QEC code (based on the tanner graph), and returns the encoded codeblock. This
-        encoding procedure follows the example shown in arXiv: 0905.2794, Section VIII.A.
-        It does not include Z-corrections; this is because the encode op is followed directly
-        by a full cycle of error correction when lowering to the qecl dialect.
-
-        The subroutine allocates auxiliary qubits for use in encoding based on the number of
-        rows in the X tanner graph, and deallocates them once encoding is complete.
-
-        Note that this method does not insert the subroutine into the module op. Instead it returns
-        the built func.FuncOp object that can then be subsequently inserted where desired.
-        """
-
-        codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
-        input_types = (codeblock_type,)
-        output_types = (codeblock_type,)
-
-        block = Block(arg_types=input_types)
-
-        with builder.ImplicitBuilder(block):
-            in_codeblock = cast(BlockArgument[qecp.PhysicalCodeblockType], block.args[0])
-
-            # Apply X checks pattern for Z corrections
-            x_out_codeblock = self._qec_cycle_css_pattern(in_codeblock, CheckType.X, tanner_x)
-
-            # Apply Z checks pattern for X corrections
-            z_out_codeblock = self._qec_cycle_css_pattern(x_out_codeblock, CheckType.Z, tanner_z)
-
-            # Return the corrected codeblock
-            func.ReturnOp(z_out_codeblock)
-
-        funcOp = func.FuncOp(
-            name=f"qec_cycle_{self.qec_code.name}",
-            function_type=(input_types, output_types),
-            visibility="private",
-            region=Region([block]),
-        )
-
-        return funcOp
-
     def check_pattern(
         self,
         in_aux_qbs: Iterable[qecp.QecPhysicalQubitSSAValue],
@@ -555,13 +510,68 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         return tanner_graph, cnot_fn
 
+    def create_qec_cycle_subroutine(
+        self, tanner_x: qecp.TannerGraphSSAValue, tanner_z: qecp.TannerGraphSSAValue
+    ) -> func.FuncOp:
+        """Create a subroutine that performs a cycle of QEC on an input physical codeblock.
+
+        The generated subroutine assumes a CSS QEC code and performs separate X and Z corrections,
+        as defined by the input X and Z Tanner graphs, `tanner_x` and `tanner_z`. Recall that
+        X-Tanner graphs define the X stabilizer components of the code, which are used to perform Z
+        corrections, and conversely Z-Tanner graphs define the Z stabilizer components of the code,
+        which are used to perform X corrections.
+
+        For each of the X and Z components of the QEC protocol, the subroutine allocates auxiliary
+        qubits for error-syndrome measurement (ESM) based on the number of rows in the respective
+        Tanner graph. After obtaining the ESM, it deallocates the auxiliary qubits and feeds the ESM
+        into a call to the ESM decoder, which returns the indices in the physical codeblock where
+        the detected error(s) occurred. It then iterates over these codeblock indices, applies the
+        respective correction, and finally returns the updated physical codeblock SSA value.
+
+        Note that this method does not insert the subroutine into the module op. Instead it returns
+        the built func.FuncOp object that can then be subsequently inserted where desired.
+        """
+
+        codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
+        input_types = (codeblock_type,)
+        output_types = (codeblock_type,)
+
+        block = Block(arg_types=input_types)
+
+        with builder.ImplicitBuilder(block):
+            in_codeblock = cast(BlockArgument[qecp.PhysicalCodeblockType], block.args[0])
+
+            # Apply X checks pattern for Z corrections
+            x_out_codeblock = self._qec_cycle_css_pattern(in_codeblock, CheckType.X, tanner_x)
+
+            # Apply Z checks pattern for X corrections
+            z_out_codeblock = self._qec_cycle_css_pattern(x_out_codeblock, CheckType.Z, tanner_z)
+
+            # Return the corrected codeblock
+            func.ReturnOp(z_out_codeblock)
+
+        funcOp = func.FuncOp(
+            name=f"qec_cycle_{self.qec_code.name}",
+            function_type=(input_types, output_types),
+            visibility="private",
+            region=Region([block]),
+        )
+
+        return funcOp
+
     def _qec_cycle_css_pattern(
         self,
         in_codeblock: qecp.PhysicalCodeBlockSSAValue,
         check_type: CheckType,
         tanner_graph: qecp.TannerGraphSSAValue,
     ) -> OpResult[qecp.PhysicalCodeblockType]:
-        """TODO"""
+        """Build the operations that perform a single X or Z component of a CSS QEC cycle on the
+        given `in_codeblock`.
+
+        This method is intended to be a helper function to `create_qec_cycle_subroutine()` and to be
+        called inside `builder.ImplicitBuilder` context to automatically add these operations to a
+        block.
+        """
         # Allocate auxiliary qubits for ESM checks
         aux_allocate_ops = (qecp.AllocAuxQubitOp() for row in self.qec_code.x_tanner)
         aux_qubits = [
@@ -569,7 +579,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         ]
 
         # Apply gate+measurement pattern for the check
-        measure_ops, out_codeblock = self.check_pattern(
+        measure_ops, post_check_codeblock = self.check_pattern(
             aux_qubits, in_codeblock, check_type=check_type
         )
 
@@ -590,25 +600,90 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             err_idx_type=TensorType(IndexType(), shape=(1,)),
         )
 
-        # Apply correction
-        err_idx = cast(OpResult[IndexType], decode_esm_op.err_idx)
-        extract_err_qubit_op = qecp.ExtractQubitOp(codeblock=out_codeblock, idx=err_idx)
-        err_qubit = extract_err_qubit_op.qubit
+        # Apply correction(s)
+        err_indices = cast(OpResult[TensorType[IndexType]], decode_esm_op.err_idx)
+        num_correctable_errors = self.qec_code.correctable_errors
 
-        match check_type:
-            case CheckType.X:
-                qecp.PauliZOp(in_qubit=err_qubit)
-            case CheckType.Z:
-                qecp.PauliZOp(in_qubit=err_qubit)
-            case _:
-                assert False, f"Unknown CheckType: '{check_type}'"
-
-        insert_err_qubit_op = qecp.InsertQubitOp(
-            in_codeblock=out_codeblock, idx=err_idx, qubit=err_qubit
+        assert err_indices.type == (
+            expected_type := TensorType(IndexType(), shape=(num_correctable_errors,))
+        ), (
+            f"Expected result of op '{decode_esm_op}' to have type '{expected_type}', "
+            f"but got '{err_indices.type}'"
         )
 
+        # Build a for loop that iterates over each error index
+        lb_op = arith.ConstantOp.from_int_and_width(0, IndexType())
+        ub_op = arith.ConstantOp.from_int_and_width(num_correctable_errors, IndexType())
+        step_op = arith.ConstantOp.from_int_and_width(1, IndexType())
+
+        for_body = Block(
+            [],
+            arg_types=(builtin.IndexType(), post_check_codeblock.type),
+        )
+
+        for_each_err_idx_op = scf.ForOp(
+            lb=lb_op,
+            ub=ub_op,
+            step=step_op,
+            iter_args=(post_check_codeblock,),
+            body=for_body,
+        )
+
+        with builder.ImplicitBuilder(for_each_err_idx_op.body):
+            indvar = cast(BlockArgument[IndexType], for_each_err_idx_op.body.block.args[0])
+            codeblock = cast(
+                BlockArgument[qecp.PhysicalCodeblockType],
+                for_each_err_idx_op.body.block.args[1],
+            )
+
+            extract_err_idx_op = tensor.ExtractOp(
+                err_indices, indices=indvar, result_type=IndexType()
+            )
+            err_idx = cast(OpResult[IndexType], extract_err_idx_op.result)
+
+            # Now we have the error index for this iteration in the for loop. Next we check if its
+            # value indicates that an error was detected (idx != -1), or if no error was detected
+            # (idx == -1).
+            cast_index_op = arith.IndexCastOp(err_idx, target_type=i64)
+            minus_1_const_op = arith.ConstantOp.from_int_and_width(-1, 64)
+            apply_corr_cond_op = arith.CmpiOp(cast_index_op.result, minus_1_const_op.result, "ne")
+
+            if_apply_corr_op = scf.IfOp(
+                apply_corr_cond_op.result,
+                return_types=(codeblock.type,),
+                true_region=Region(Block()),
+                false_region=Region(Block()),
+            )
+
+            with builder.ImplicitBuilder(if_apply_corr_op.true_region):
+                # This branch is for the case where a correctable error was detected
+                extract_err_qubit_op = qecp.ExtractQubitOp(codeblock=codeblock, idx=err_idx)
+                err_qubit = extract_err_qubit_op.qubit
+
+                match check_type:
+                    case CheckType.X:
+                        corr_qubit_op = qecp.PauliZOp(in_qubit=err_qubit)
+                    case CheckType.Z:
+                        corr_qubit_op = qecp.PauliXOp(in_qubit=err_qubit)
+                    case _:
+                        assert False, f"Unknown CheckType: '{check_type}'"
+
+                insert_err_qubit_op = qecp.InsertQubitOp(
+                    in_codeblock=post_check_codeblock, idx=err_idx, qubit=corr_qubit_op.out_qubit
+                )
+
+                scf.YieldOp(insert_err_qubit_op.out_codeblock)
+
+            with builder.ImplicitBuilder(if_apply_corr_op.false_region):
+                # This branch is for the case where no correctable error was detected
+                scf.YieldOp(codeblock)
+
+            out_codeblock = cast(OpResult[qecp.PhysicalCodeblockType], if_apply_corr_op.results[0])
+
+            scf.YieldOp(out_codeblock)
+
         # Return updated codeblock SSA value
-        return insert_err_qubit_op.out_codeblock
+        return out_codeblock
 
 
 convert_qecl_to_qecp_pass = compiler_transform(ConvertQecLogicalToQecPhysicalPass)

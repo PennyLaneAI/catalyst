@@ -133,6 +133,15 @@ class TestQecCode:
         assert np.all(qec_code.x_tanner == data["x_tanner"])
         assert np.all(qec_code.z_tanner == data["z_tanner"])
 
+    @pytest.mark.parametrize("d, expected_t", [(1, 0), (2, 0), (3, 1), (4, 1), (5, 2), (6, 2)])
+    def test_correctable_errors_property(self, d: int, expected_t: int):
+        """Test the `correctable_errors` property of `QecCode`, which returns the number of
+        correctable errors of the code, equal to floor((d - 1) / 2).
+        """
+        qec_code = QecCode("", 1, 1, d, np.array([]), np.array([]))
+
+        assert qec_code.correctable_errors == expected_t
+
     @pytest.mark.parametrize("name", SUPPORTED_CODES)
     def test_get(self, name: str):
         """Test the `QecCode.get()` method for all supported QEC codes."""

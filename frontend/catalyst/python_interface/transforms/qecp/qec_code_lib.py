@@ -15,6 +15,7 @@
 """This module contains a library of QEC codes."""
 
 from dataclasses import dataclass, fields
+from math import floor
 from typing import Any, Self
 
 import numpy as np
@@ -88,3 +89,21 @@ class QecCode:
             raise KeyError(f"QEC code {name} not found")
 
         return cls(name, *qec_code_params)
+
+    @property
+    def correctable_errors(self) -> int:
+        """Return the number of correctable errors of the QEC code.
+
+        For a code with distance *d*, the number of correctable errors *t* is given by
+
+        .. math::
+
+            t = \\lfloor (d - 1) / 2 \\rfloor
+
+        Example
+        -------
+
+        >>> code = QecCode.get("Steane")
+        >>> code.correctable_errors
+        """
+        return floor((self.d - 1) / 2)

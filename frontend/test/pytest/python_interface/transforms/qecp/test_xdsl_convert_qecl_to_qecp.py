@@ -388,8 +388,8 @@ class TestLoweringEncode:
                 func.func @test_func() attributes {quantum.node} {
                     // CHECK: [[codeblock1:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
                     // CHECK-NEXT: [[codeblock2:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
-                    // CHECK-NEXT: func.call @encode_zero_Steane 
-                    // CHECK-NEXT: func.call @encode_zero_Steane 
+                    // CHECK-NEXT: func.call @encode_zero_Steane
+                    // CHECK-NEXT: func.call @encode_zero_Steane
                     %0 = "test.op"() : () -> !qecl.codeblock<1>
                     %1 = "test.op"() : () -> !qecl.codeblock<1>
                     %2 = qecl.encode ["zero"] %0 : !qecl.codeblock<1>
@@ -441,7 +441,9 @@ class TestQecCycleLowering:
     """Unit tests for the `qecl.qec` conversion pattern of the convert-qecl-to-qecp pass."""
 
     def test_single_qec_cycle_Steane(self, run_filecheck):
-        """TODO"""
+        """Test that a `qecl.qec` op is lowered to a call to the QEC-cycle subroutine for the Steane
+        code.
+        """
         program = """
         // CHECK-LABEL: test_module
         builtin.module @test_module {
@@ -456,6 +458,85 @@ class TestQecCycleLowering:
             %1 = qecl.qec %0 : !qecl.codeblock<1>
             return
         }
+        // CHECK-LABEL: qec_cycle_Steane([[cb0:%.+]]: !qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+
+        // COM: The block below takes results of X checks and performs Z corrections
+        // CHECK: qecp.alloc_aux : !qecp.qubit<aux>
+        // CHECK: qecp.alloc_aux : !qecp.qubit<aux>
+        // CHECK: qecp.alloc_aux : !qecp.qubit<aux>
+        // CHECK: qecp.hadamard {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.hadamard {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.hadamard {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.extract {{.*}} : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+        // CHECK: qecp.cnot {{.*}} : !qecp.qubit<aux>, !qecp.qubit<data>
+        // CHECK: qecp.insert {{.*}} : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK: [[cb0:%.+]] = qecp.insert {{.*}}[6], {{.*}} : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK: qecp.hadamard {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.hadamard {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.hadamard {{.*}} : !qecp.qubit<aux>
+        // CHECK: [[m0:%.+]], {{.*}} = qecp.measure {{.*}} : i1, !qecp.qubit<aux>
+        // CHECK: [[m1:%.+]], {{.*}} = qecp.measure {{.*}} : i1, !qecp.qubit<aux>
+        // CHECK: [[m2:%.+]], {{.*}} = qecp.measure {{.*}} : i1, !qecp.qubit<aux>
+        // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
+        // CHECK: [[esm:%.+]] = tensor.from_elements [[m0]], [[m1]], [[m2]] : tensor<3xi1>
+        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[esm]] : tensor<3xi1>) [[tanner_x]] : !qecp.tanner_graph<12, 8, i32> -> tensor<1xindex>
+        // CHECK: [[lb:%.+]] = arith.constant 0 : index
+        // CHECK: [[ub:%.+]] = arith.constant 1 : index
+        // CHECK: [[st:%.+]] = arith.constant 1 : index
+        // CHECK: [[cb_x_out:%.+]] = scf.for [[i:%.+]] = [[lb]] to [[ub]] step [[st]] iter_args([[cb_arg:%.+]] = {{%.+}})
+        // CHECK:   [[err_idx:%.+]] = tensor.extract [[idx_t]][[[i]]] : tensor<1xindex>
+        // CHECK:   [[err_i64:%.+]] = arith.index_cast [[err_idx]] : index to i64
+        // CHECK:   [[minus1:%.+]] = arith.constant -1 : i64
+        // CHECK:   [[cond:%.+]] = arith.cmpi ne, [[err_i64]], [[minus1]] : i64
+        // CHECK:   [[cond_out_cb:%.+]] = scf.if [[cond]]
+        // CHECK:     [[q0:%.+]] = qecp.extract [[cb_arg]][[[err_idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+        // CHECK:     [[q1:%.+]] = qecp.z [[q0]] : !qecp.qubit<data>
+        // CHECK:     [[cb_arg_1:%.+]] = qecp.insert [[cb0]][[[err_idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK:     scf.yield [[cb_arg_1]] : !qecp.codeblock<1 x 7>
+        // CHECK:   } else {
+        // CHECK:     scf.yield [[cb_arg]] : !qecp.codeblock<1 x 7>
+        // CHECK:   }
+        // CHECK: scf.yield [[cond_out_cb]] : !qecp.codeblock<1 x 7>
+        // CHECK: }
+
+        // COM: The block below takes results of X checks and performs Z corrections
+        // CHECK: qecp.alloc_aux : !qecp.qubit<aux>
+        // CHECK: qecp.alloc_aux : !qecp.qubit<aux>
+        // CHECK: qecp.alloc_aux : !qecp.qubit<aux>
+        // CHECK-NOT: qecp.hadamard
+        // CHECK: qecp.extract {{.*}} : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+        // CHECK: qecp.cnot {{.*}} : !qecp.qubit<data>, !qecp.qubit<aux>
+        // CHECK: qecp.insert {{.*}} : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK: [[cb0:%.+]] = qecp.insert {{.*}}[6], {{.*}} : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK-NOT: qecp.hadamard
+        // CHECK: [[m0:%.+]], {{.*}} = qecp.measure {{.*}} : i1, !qecp.qubit<aux>
+        // CHECK: [[m1:%.+]], {{.*}} = qecp.measure {{.*}} : i1, !qecp.qubit<aux>
+        // CHECK: [[m2:%.+]], {{.*}} = qecp.measure {{.*}} : i1, !qecp.qubit<aux>
+        // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
+        // CHECK: [[esm:%.+]] = tensor.from_elements [[m0]], [[m1]], [[m2]] : tensor<3xi1>
+        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[esm]] : tensor<3xi1>) [[tanner_z]] : !qecp.tanner_graph<12, 8, i32> -> tensor<1xindex>
+        // CHECK: [[lb:%.+]] = arith.constant 0 : index
+        // CHECK: [[ub:%.+]] = arith.constant 1 : index
+        // CHECK: [[st:%.+]] = arith.constant 1 : index
+        // CHECK: [[cb_x_out:%.+]] = scf.for [[i:%.+]] = [[lb]] to [[ub]] step [[st]] iter_args([[cb_arg:%.+]] = {{%.+}})
+        // CHECK:   [[err_idx:%.+]] = tensor.extract [[idx_t]][[[i]]] : tensor<1xindex>
+        // CHECK:   [[err_i64:%.+]] = arith.index_cast [[err_idx]] : index to i64
+        // CHECK:   [[minus1:%.+]] = arith.constant -1 : i64
+        // CHECK:   [[cond:%.+]] = arith.cmpi ne, [[err_i64]], [[minus1]] : i64
+        // CHECK:   [[cond_out_cb:%.+]] = scf.if [[cond]]
+        // CHECK:     [[q0:%.+]] = qecp.extract [[cb_arg]][[[err_idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+        // CHECK:     [[q1:%.+]] = qecp.x [[q0]] : !qecp.qubit<data>
+        // CHECK:     [[cb_arg_1:%.+]] = qecp.insert [[cb0]][[[err_idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK:     scf.yield [[cb_arg_1]] : !qecp.codeblock<1 x 7>
+        // CHECK:   } else {
+        // CHECK:     scf.yield [[cb_arg]] : !qecp.codeblock<1 x 7>
+        // CHECK:   }
+        // CHECK: scf.yield [[cond_out_cb]] : !qecp.codeblock<1 x 7>
+        // CHECK: }
         }
         """
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
