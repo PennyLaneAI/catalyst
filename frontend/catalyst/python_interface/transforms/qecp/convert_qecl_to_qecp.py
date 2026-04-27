@@ -26,8 +26,8 @@ from typing import cast
 import numpy as np
 from xdsl import builder
 from xdsl.context import Context
-from xdsl.dialects import arith, builtin, func
-from xdsl.dialects.builtin import IndexType, TensorType, i32
+from xdsl.dialects import arith, builtin, func, tensor
+from xdsl.dialects.builtin import IndexType, TensorType, i1, i32
 from xdsl.ir import Block, BlockArgument, OpResult, Region
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
@@ -211,7 +211,38 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         module_block = op.regions[0].blocks.first
         assert module_block is not None, "Module has no block"
 
-        # Insert Tanner graph ops
+        tanner_x, tanner_z = self.insert_tanner_graph_ops_into_block(module_block)
+
+        # Insert subroutines that implement the QEC protocols
+        encode_funcop = self.create_encode_subroutine()
+        module_block.add_op(encode_funcop)
+
+        qec_cycle_funcop = self.create_qec_cycle_subroutine(tanner_x=tanner_x, tanner_z=tanner_z)
+        module_block.add_op(qec_cycle_funcop)
+
+        PatternRewriteWalker(
+            GreedyRewritePatternApplier(
+                [
+                    CodeblockTypeConversion(qec_code=self.qec_code),
+                    HyperRegisterTypeConversion(qec_code=self.qec_code),
+                    EncodeOpConversion(qec_code=self.qec_code, encode_subroutine=encode_funcop),
+                    QecCycleOpConversion(
+                        qec_code=self.qec_code, qec_cycle_subroutine=qec_cycle_funcop
+                    ),
+                ]
+            )
+        ).rewrite_module(op)
+
+    def insert_tanner_graph_ops_into_block(
+        self, block: Block
+    ) -> tuple[OpResult[qecp.TannerGraphType], OpResult[qecp.TannerGraphType]]:
+        """Insert Tanner graph operations into the given block.
+
+        The operations are inserted at the beginning of the block.
+
+        Returns the X and Z Tanner graph SSA values from the `qecp.assemble_tanner` ops (we assume
+        a CSS code here and therefore have separate X and Z Tanner graphs).
+        """
         x_tanner_row_idx_array, x_tanner_col_ptr_array = dense_tanner_graph_to_csc(
             self.qec_code.x_tanner
         )
@@ -267,10 +298,10 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             assemble_z_tanner_op,
         )
 
-        if module_block.first_op is None:
-            module_block.add_ops(ops_to_insert)
+        if block.first_op is None:
+            block.add_ops(ops_to_insert)
         else:
-            module_block.insert_ops_before(
+            block.insert_ops_before(
                 (
                     x_tanner_row_idx_const_op,
                     x_tanner_col_ptr_const_op,
@@ -279,28 +310,10 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                     z_tanner_col_ptr_const_op,
                     assemble_z_tanner_op,
                 ),
-                module_block.first_op,
+                block.first_op,
             )
 
-        # Insert subroutines that implement the QEC protocols
-        encode_funcop = self.create_encode_subroutine()
-        module_block.add_op(encode_funcop)
-
-        qec_cycle_funcop = self.create_qec_cycle_subroutine()
-        module_block.add_op(qec_cycle_funcop)
-
-        PatternRewriteWalker(
-            GreedyRewritePatternApplier(
-                [
-                    CodeblockTypeConversion(qec_code=self.qec_code),
-                    HyperRegisterTypeConversion(qec_code=self.qec_code),
-                    EncodeOpConversion(qec_code=self.qec_code, encode_subroutine=encode_funcop),
-                    QecCycleOpConversion(
-                        qec_code=self.qec_code, qec_cycle_subroutine=qec_cycle_funcop
-                    ),
-                ]
-            )
-        ).rewrite_module(op)
+        return assemble_x_tanner_op.tanner_graph, assemble_z_tanner_op.tanner_graph
 
     def create_encode_subroutine(self) -> func.FuncOp:
         """Create a subroutine that takes in a codeblock, encodes it in the zero state for
@@ -350,7 +363,9 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         return funcOp
 
-    def create_qec_cycle_subroutine(self) -> func.FuncOp:
+    def create_qec_cycle_subroutine(
+        self, tanner_x: qecp.TannerGraphSSAValue, tanner_z: qecp.TannerGraphSSAValue
+    ) -> func.FuncOp:
         """FIXME
 
         Create a subroutine that takes in a codeblock, encodes it in the zero state for
@@ -391,11 +406,15 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             for x_meas_op in x_measure_ops:
                 qecp.DeallocAuxQubitOp(x_meas_op.out_qubit)
 
+            pack_mres_tensor_op = tensor.FromElementsOp.build(
+                operands=([meas_op.mres for meas_op in x_measure_ops],),
+                result_types=(TensorType(i1, shape=(len(x_measure_ops),)),),
+            )
+
             # Decode X-check ESM
-            # TODO!
             qecp.DecodeEsmCssOp(
-                tanner_graph=self.qec_code.x_tanner,
-                esm=...,
+                tanner_graph=tanner_x,
+                esm=pack_mres_tensor_op.result,
                 err_idx_type=TensorType(IndexType(), shape=(1,)),
             )
 
@@ -403,7 +422,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             func.ReturnOp(x_out_codeblock)
 
         funcOp = func.FuncOp(
-            name=f"encode_zero_{self.qec_code.name}",
+            name=f"qec_cycle_{self.qec_code.name}",
             function_type=(input_types, output_types),
             visibility="private",
             region=Region([block]),
@@ -416,7 +435,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         in_aux_qbs: Iterable[qecp.QecPhysicalQubitSSAValue],
         in_codeblock: qecp.PhysicalCodeBlockSSAValue,
         check_type: CheckType,
-    ) -> tuple[Iterable[qecp.MeasureOp], qecp.PhysicalCodeBlockSSAValue]:
+    ) -> tuple[list[qecp.MeasureOp], qecp.PhysicalCodeBlockSSAValue]:
         """Contains the ops to perform a QEC check on the provided auxiliary qubits and codeblock.
         Intended to be called inside `builder.ImplicitBuilder` to add these operations to a block.
 

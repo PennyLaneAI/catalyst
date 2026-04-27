@@ -141,17 +141,7 @@ class TestTypeConversionPattern:
             run_filecheck(program, pipeline)
 
 
-class TestTannerGraphInsertion:
-    def test_tanner_graph_insertion_steane(self, run_filecheck):
-        program = """
-        builtin.module @test_module {
-        func.func @test_program()  {
-            return
-        }
-        }
-        """
-        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
-        run_filecheck(program, pipeline)
+# MARK: TestLoweringEncode
 
 
 class TestLoweringEncode:
@@ -284,6 +274,64 @@ class TestLoweringEncode:
             }
             """
 
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
+        run_filecheck(program, pipeline)
+
+
+# MARK: TestTannerGraphInsertion
+
+
+class TestTannerGraphInsertion:
+    """Unit tests for the insertion of Tanner graph ops."""
+
+    def test_tanner_graph_insertion_steane(self, run_filecheck):
+        """Test that Tanner graph ops for the Steane code are correctly inserted at the beginning of
+        the module.
+        """
+
+        program = """
+        // CHECK-LABEL: test_module
+        builtin.module @test_module {
+        // CHECK: [[row_idx_x:%.+]] = arith.constant dense<[0, 0, 1, 0, 1, 2, 0, 2, 1, 1, 2, 2]> : tensor<12xi32>
+        // CHECK: [[col_ptr_x:%.+]] = arith.constant dense<[0, 1, 3, 6, 8, 9, 11, 12]> : tensor<8xi32>
+        // CHECK: [[tanner_x:%.+]] = qecp.assemble_tanner [[row_idx_x]], [[col_ptr_x]] : tensor<12xi32>, tensor<8xi32> -> !qecp.tanner_graph<12, 8, i32>
+        // CHECK: [[row_idx_z:%.+]] = arith.constant dense<[0, 0, 1, 0, 1, 2, 0, 2, 1, 1, 2, 2]> : tensor<12xi32>
+        // CHECK: [[col_ptr_z:%.+]] = arith.constant dense<[0, 1, 3, 6, 8, 9, 11, 12]> : tensor<8xi32>
+        // CHECK: [[tanner_z:%.+]] = qecp.assemble_tanner [[row_idx_z]], [[col_ptr_z]] : tensor<12xi32>, tensor<8xi32> -> !qecp.tanner_graph<12, 8, i32>
+        // CHECK-LABEL: test_program
+        func.func @test_program()  {
+            return
+        }
+        }
+        """
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
+        run_filecheck(program, pipeline)
+
+
+# MARK: TestQecCycleLowering
+
+
+class TestQecCycleLowering:
+    """Unit tests for the `qecl.qec` conversion pattern of the convert-qecl-to-qecp pass."""
+
+    def test_single_qec_cycle_Steane(self, run_filecheck):
+        """TODO"""
+        program = """
+        // CHECK-LABEL: test_module
+        builtin.module @test_module {
+        // CHECK: [[tanner_x:%.+]] = qecp.assemble_tanner {{.+}} -> !qecp.tanner_graph
+        // CHECK: [[tanner_z:%.+]] = qecp.assemble_tanner {{.+}} -> !qecp.tanner_graph
+        // CHECK-LABEL: test_program
+        func.func @test_program()  {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+
+            // CHECK: [[cb1:%.+]] = func.call @qec_cycle_Steane([[cb0]]) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+            %1 = qecl.qec %0 : !qecl.codeblock<1>
+            return
+        }
+        }
+        """
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
         run_filecheck(program, pipeline)
 
