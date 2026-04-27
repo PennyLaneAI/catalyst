@@ -26,7 +26,7 @@ the basis vector is aligned for a rotation angle of 0, and the second character 
 the other axis that forms the plane. For instance, the measurement basis defined by the XY
 plane with a rotation angle of 0 is the Pauli-X basis, with orthonormal basis vector |+> and
 |->, which point along the +x and -x axes of the Bloch sphere, respectively. For more
-details, see the documentation for the [`qml.ftqc.measure_arbitrary_basis()`
+details, see the documentation for the [`qp.ftqc.measure_arbitrary_basis()`
 ](https://docs.pennylane.ai/en/stable/code/api/pennylane.ftqc.measure_arbitrary_basis.html)
 function.
 
