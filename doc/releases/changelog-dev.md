@@ -629,6 +629,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `-memspace-to-address-space` pass has been added which converts the `catalyst.memspace`
+  attribute on `memref` types to the explicit integer address space.
+  [(#2756)](https://github.com/PennyLaneAI/catalyst/pull/2756)
+
 * The compiler pipeline definitions now have a single source of truth. Previously, pipeline and
   pass sequences were duplicated between the frontend (`frontend/catalyst/pipelines.py`) and the
   compiler (`mlir/lib/Driver/Pipelines.cpp`). Now, there is a unique definition that lives in
