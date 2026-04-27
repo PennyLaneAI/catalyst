@@ -486,7 +486,7 @@ def qjit(
         This is especially helpful for workflows where you would like to, for example, iterate
         through the wires without knowing how many of them there are in advance. For instance, many
         workflows (such as `Grover's algorithm
-        <https://pennylane.ai/qp/demos/tutorial_grovers_algorithm>`_) have an entangling layer at
+        <https://pennylane.ai/qml/demos/tutorial_grovers_algorithm>`_) have an entangling layer at
         the beginning, where a Hadamard gate is applied to every wire.
 
         To use this feature, the PennyLane device needs to be instantiated within the qjitted
