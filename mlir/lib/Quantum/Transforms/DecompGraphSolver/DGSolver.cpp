@@ -79,7 +79,8 @@ ChosenDecompRule DecompositionSolver::bestRule(const OperatorNode &op)
     }
 
     // if there is an empty rule (with no inputs)
-    // pick this as the best rule with zero cost
+    // for the given operator, pick this as the
+    // best rule with zero cost
     for (const auto &rule : all_rules) {
         if (rule.isEmpty()) {
             return evalRule(rule);

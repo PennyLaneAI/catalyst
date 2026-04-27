@@ -15,6 +15,8 @@
 This module tests the decompose transformation.
 """
 
+# pylint: disable=too-many-lines
+
 from contextlib import nullcontext as does_not_raise
 from functools import partial
 
