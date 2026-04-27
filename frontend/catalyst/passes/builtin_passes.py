@@ -146,7 +146,7 @@ def cancel_inverses_setup_inputs():
     return (), {}
 
 
-cancel_inverses = qml.transform(
+cancel_inverses = qp.transform(
     pass_name="cancel-inverses", setup_inputs=cancel_inverses_setup_inputs
 )
 
@@ -324,7 +324,7 @@ def disentangle_cnot_setup_inputs():
     return (), {}
 
 
-disentangle_cnot = qml.transform(
+disentangle_cnot = qp.transform(
     pass_name="disentangle-cnot", setup_inputs=disentangle_cnot_setup_inputs
 )
 
@@ -386,7 +386,7 @@ def disentangle_swap_setup_inputs():
     return (), {}
 
 
-disentangle_swap = qml.transform(
+disentangle_swap = qp.transform(
     pass_name="disentangle-swap", setup_inputs=disentangle_swap_setup_inputs
 )
 
@@ -455,7 +455,7 @@ def merge_rotations_setup_inputs():
     return (), {}
 
 
-merge_rotations = qml.transform(
+merge_rotations = qp.transform(
     pass_name="merge-rotations", setup_inputs=merge_rotations_setup_inputs
 )
 
@@ -479,7 +479,7 @@ def decompose_lowering_setup_inputs():  # pragma: no cover
     return (), {}
 
 
-decompose_lowering = qml.transform(
+decompose_lowering = qp.transform(
     pass_name="decompose-lowering", setup_inputs=decompose_lowering_setup_inputs
 )  # pragma: no cover
 
@@ -606,7 +606,7 @@ def ions_decomposition_setup_inputs():  # pragma: nocover
     return (), {}
 
 
-ions_decomposition = qml.transform(
+ions_decomposition = qp.transform(
     pass_name="ions-decomposition", setup_inputs=ions_decomposition_setup_inputs
 )
 
@@ -796,7 +796,7 @@ def to_ppr_setup_inputs():
     return (), {}
 
 
-to_ppr = qml.transform(pass_name="to-ppr", setup_inputs=to_ppr_setup_inputs)
+to_ppr = qp.transform(pass_name="to-ppr", setup_inputs=to_ppr_setup_inputs)
 
 
 def commute_ppr_setup_inputs(max_pauli_size=0):
@@ -899,7 +899,7 @@ def commute_ppr_setup_inputs(max_pauli_size=0):
     return (), {"max_pauli_size": max_pauli_size}
 
 
-commute_ppr = qml.transform(pass_name="commute-ppr", setup_inputs=commute_ppr_setup_inputs)
+commute_ppr = qp.transform(pass_name="commute-ppr", setup_inputs=commute_ppr_setup_inputs)
 
 
 def merge_ppr_ppm_setup_inputs(max_pauli_size=0):
@@ -987,7 +987,7 @@ def merge_ppr_ppm_setup_inputs(max_pauli_size=0):
     return (), {"max_pauli_size": max_pauli_size}
 
 
-merge_ppr_ppm = qml.transform(pass_name="merge-ppr-ppm", setup_inputs=merge_ppr_ppm_setup_inputs)
+merge_ppr_ppm = qp.transform(pass_name="merge-ppr-ppm", setup_inputs=merge_ppr_ppm_setup_inputs)
 
 
 def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=False):
@@ -1101,7 +1101,7 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
     return (), {"decompose_method": decompose_method, "avoid_y_measure": avoid_y_measure}
 
 
-ppr_to_ppm = qml.transform(pass_name="ppr-to-ppm", setup_inputs=ppr_to_ppm_setup_inputs)
+ppr_to_ppm = qp.transform(pass_name="ppr-to-ppm", setup_inputs=ppr_to_ppm_setup_inputs)
 
 
 def ppm_compilation_setup_inputs(
@@ -1216,7 +1216,7 @@ def ppm_compilation_setup_inputs(
     }
 
 
-ppm_compilation = qml.transform(
+ppm_compilation = qp.transform(
     pass_name="ppm-compilation", setup_inputs=ppm_compilation_setup_inputs
 )
 
@@ -1416,7 +1416,7 @@ def reduce_t_depth_setup_inputs():
     return (), {}
 
 
-reduce_t_depth = qml.transform(pass_name="reduce-t-depth", setup_inputs=reduce_t_depth_setup_inputs)
+reduce_t_depth = qp.transform(pass_name="reduce-t-depth", setup_inputs=reduce_t_depth_setup_inputs)
 
 
 def ppr_to_mbqc_setup_inputs():
@@ -1506,11 +1506,11 @@ def ppr_to_mbqc_setup_inputs():
     return (), {}
 
 
-ppr_to_mbqc = qml.transform(pass_name="ppr-to-mbqc", setup_inputs=ppr_to_mbqc_setup_inputs)
+ppr_to_mbqc = qp.transform(pass_name="ppr-to-mbqc", setup_inputs=ppr_to_mbqc_setup_inputs)
 
 
 # This pass is already covered via applying by pass
-# `qml.transform(pass_name="decompose-arbitrary-ppr")` in Pennylane.
+# `qp.transform(pass_name="decompose-arbitrary-ppr")` in Pennylane.
 def decompose_arbitrary_ppr_setup_inputs():  # pragma: nocover
     r"""A quantum compilation pass that decomposes arbitrary-angle Pauli product rotations (PPRs) into a
     collection of PPRs (with angles of rotation of :math:`\tfrac{\pi}{2}`, :math:`\tfrac{\pi}{4}`,
@@ -1589,7 +1589,7 @@ def decompose_arbitrary_ppr_setup_inputs():  # pragma: nocover
     return (), {}
 
 
-decompose_arbitrary_ppr = qml.transform(
+decompose_arbitrary_ppr = qp.transform(
     pass_name="decompose-arbitrary-ppr", setup_inputs=decompose_arbitrary_ppr_setup_inputs
 )
 
@@ -1698,6 +1698,6 @@ def graph_decomposition_setup_inputs(
     return (), options
 
 
-graph_decomposition = qml.transform(
+graph_decomposition = qp.transform(
     pass_name="graph-decomposition", setup_inputs=graph_decomposition_setup_inputs
 )
