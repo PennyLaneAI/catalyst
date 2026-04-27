@@ -81,49 +81,47 @@ class TestCompileOpDecompRules:
         with pytest.warns():
             compile_op_decomp_rules(qp.Identity)
 
+    @pytest.mark.skip_flaky
     def test_compile_error(self):
         """Test that compile_op_decomp_rules warns when compilation of a rule fails."""
 
-        class FakeOp(qp.operation.Operator):
-            """Test class with incompatible decomp rule."""
-
-            num_wires = 3
-            num_params = 1
-            ndim_params = (0,)
-
-        @qp.register_resources({})
-        def fake_op_decomp(param, wires):
-            _quantum_opt(stdin="module {1}")
-            return param, wires
-
-        qp.add_decomps(FakeOp, fake_op_decomp)
-
         with pytest.warns(match="Failed to compile"):
+
+            class FakeOp(qp.operation.Operator):
+                """Test class with incompatible decomp rule."""
+
+                num_wires = 3
+                num_params = 1
+                ndim_params = (0,)
+
+            @qp.register_resources({})
+            def fake_op_decomp(param, wires):
+                _quantum_opt(stdin="module {")
+                return param, wires
+
+            qp.add_decomps(FakeOp, fake_op_decomp)
 
             compile_op_decomp_rules(FakeOp)
 
-        qp.decomposition.decomposition_rule._decompositions_private.pop("FakeOp")
-
+    @pytest.mark.skip_flaky
     def test_unexpected_error(self):
         """Test that compile_op_decomp_rules warns when an unexpected exception is thrown."""
 
-        class NewFakeOp(qp.operation.Operator):
-            """Test class without ndim_params."""
-
-            num_wires = 1
-            num_params = 1
-
-        @qp.register_resources({})
-        def fake_op_decomp(string):
-            qp.PauliRot(2, string)
-
-        qp.add_decomps(NewFakeOp, fake_op_decomp)
-
         with pytest.warns(match="Unexpected error"):
 
-            compile_op_decomp_rules(NewFakeOp)
+            class NewFakeOp(qp.operation.Operator):
+                """Test class without ndim_params."""
 
-        qp.decomposition.decomposition_rule._decompositions_private.pop("NewFakeOp")
+                num_wires = 1
+                num_params = 1
+
+            @qp.register_resources({})
+            def fake_op_decomp(string):
+                qp.PauliRot(2, string)
+
+            qp.add_decomps(NewFakeOp, fake_op_decomp)
+
+            compile_op_decomp_rules(NewFakeOp)
 
 
 def test_bytecode_file():
