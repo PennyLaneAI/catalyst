@@ -305,6 +305,7 @@
   [(#2568)](https://github.com/PennyLaneAI/catalyst/pull/2568)
   [(#2578)](https://github.com/PennyLaneAI/catalyst/pull/2578)
   [(#2711)](https://github.com/PennyLaneAI/catalyst/pull/2711)
+  [(#2765)](https://github.com/PennyLaneAI/catalyst/pull/2765)
 
   The framework is interfaced with a new `graph_decomposition` pass decorator
   with key capabilities:
@@ -722,6 +723,7 @@
   [(#2692)](https://github.com/PennyLaneAI/catalyst/pull/2692)
   [(#2721)](https://github.com/PennyLaneAI/catalyst/pull/2721)
   [(#2723)](https://github.com/PennyLaneAI/catalyst/pull/2723)
+  [(#2758)](https://github.com/PennyLaneAI/catalyst/pull/2758)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
@@ -750,6 +752,9 @@
   An MLIR program in the `QRef` dialect can be converted to the `Quantum` dialect with the new pass
   `--convert-to-value-semantics`, optionally followed by `--canonicalize` for removing pairs of
   neighboring inverse `quantum.extract` and `quantum.insert` operations.
+
+  Apart from those in the `Quantum` dialect, reference semantics operations for their value
+  semantics counterparts in the `MBQC` dialect were also added.
 
 * A new pass `--verify-no-quantum-use-after-free` was added to the new `QRef` dialect, to verify
   that there are no uses of quantum values after they have been deallocated.
@@ -1036,6 +1041,7 @@
 <h3>Documentation 📝</h3>
 
 * The `qp` alias as in `import pennylane as qp` has been updated to `qp` in our source code and documentation.
+  [(#2763)](https://github.com/PennyLaneAI/catalyst/pull/2763)
   [(#2748)](https://github.com/PennyLaneAI/catalyst/pull/2748)
   [(#2746)](https://github.com/PennyLaneAI/catalyst/pull/2746)
   [(#2745)](https://github.com/PennyLaneAI/catalyst/pull/2745)
@@ -1047,7 +1053,7 @@
   [(#2738)](https://github.com/PennyLaneAI/catalyst/pull/2738)
   [(#2736)](https://github.com/PennyLaneAI/catalyst/pull/2736)
   [(#2715)](https://github.com/PennyLaneAI/catalyst/pull/2715)
-  
+
 * The "Compatibility with PennyLane transforms" section of the
   :doc:`Sharp bits and debugging tips <../dev/sharp_bits>` document has been updated to describe
   potential oddities that can be encountered when composing PennyLane transforms together.

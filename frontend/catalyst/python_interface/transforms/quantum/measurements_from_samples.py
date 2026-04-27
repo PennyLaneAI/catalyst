@@ -142,12 +142,12 @@ class MeasurementsFromSamplesPattern(RewritePattern):
                     # Currently ``qp.counts()`` is unsupported due to differences in return
                     # type/shape in PennyLane and Catalyst. It may be supported at a later time.
                     # It is included for completeness and to notify users that it is unsupported.
-                    raise NotImplementedError("qml.counts() operations are not supported.")
+                    raise NotImplementedError("qp.counts() operations are not supported.")
                 case "quantum.state":
                     # It is not possible to recover a quantum state from samples; this is included
                     # for completeness and to notify users that ``state`` mps are not supported
                     raise CompileError(
-                        "qml.state() operations are not compatible with conversion to samples."
+                        "qp.state() operations are not compatible with conversion to samples."
                     )
 
     @classmethod
@@ -184,7 +184,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         if isinstance(op, quantum.HamiltonianOp):
             raise CompileError(
                 "Encountered a quantum.HamiltonianOp while applying `measurements_from_samples`. "
-                "This is not supported with Catalyst. Apply `qml.transforms.split_non_commuting` "
+                "This is not supported with Catalyst. Apply `qp.transforms.split_non_commuting` "
                 "to split the HamiltonianOp into separate terms."
             )
 

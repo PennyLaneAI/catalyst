@@ -908,10 +908,10 @@ def _check_qnode_against_grad_method(f: QNode, method: str, jaxpr: Jaxpr):
     ):
         raise DifferentiableCompileError(
             "The parameter-shift method can only be used for QNodes "
-            "which return either qml.expval or qml.probs."
+            "which return either qp.expval or qp.probs."
         )
 
     if f.diff_method == "adjoint" and any(prim not in [expval_p] for prim in return_ops):
         raise DifferentiableCompileError(
-            "The adjoint method can only be used for QNodes which return qml.expval."
+            "The adjoint method can only be used for QNodes which return qp.expval."
         )

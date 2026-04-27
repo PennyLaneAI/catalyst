@@ -42,7 +42,7 @@ class TestSnapshot:
         """Make sure only qp.state is allowed to be in qp.Snapshot"""
         with pytest.raises(
             NotImplementedError,
-            match=r"qml.Snapshot\(\) only supports qml.state\(\) when used from within Catalyst,"
+            match=r"qp.Snapshot\(\) only supports qp.state\(\) when used from within Catalyst,"
             + f" but encountered {type(operation_passed_to_snapshot)}",
         ):
             dev = qp.device("lightning.qubit", wires=1)
