@@ -318,6 +318,32 @@ class TestGraphDecomposition:
         resources = qp.specs(circuit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
+    def test_empty_rule(self):
+        """Test that a decomposition rule with no ops is handled correctly."""
+
+        @decomposition_rule(op_type="PauliX")
+        def empty_decomp(_wire):
+            pass
+
+        @qp.qjit(capture=True)
+        @graph_decomposition(
+            gate_set={"PauliY"},
+            fixed_decomps={"PauliX": empty_decomp},
+        )
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit():
+            qp.X(0)
+            qp.Y(0)
+
+            # register the empty decomposition rule
+            empty_decomp(int)
+
+            return qp.expval(qp.Z(0))
+
+        expected_resources = {"PauliY": 1}
+        resources = qp.specs(circuit, level="device")()["resources"].gate_types
+        assert resources == expected_resources
+
     @pytest.mark.xfail(
         reason="graph-decomposition supports pre-compiled rules, alt_decomps and fix_decomps"
     )

@@ -67,9 +67,6 @@ ChosenDecompRule DecompositionSolver::evalRule(const RuleNode &rule)
         }
     }
 
-    if (rule.inputs.empty() && total_cost == 0.0) {
-        return invalidRule(solution.op); // invalid rule
-    }
     solution.totalCost = total_cost;
     return solution;
 }
@@ -79,6 +76,14 @@ ChosenDecompRule DecompositionSolver::bestRule(const OperatorNode &op)
     const auto &all_rules = graph.getAllRulesFor(op);
     if (all_rules.empty()) {
         return invalidRule(op); // no valid rules
+    }
+
+    // if there is an empty rule (with no inputs)
+    // pick this as the best rule with zero cost
+    for (const auto &rule : all_rules) {
+        if (rule.isEmpty()) {
+            return evalRule(rule);
+        }
     }
 
     std::optional<ChosenDecompRule> best_rule;

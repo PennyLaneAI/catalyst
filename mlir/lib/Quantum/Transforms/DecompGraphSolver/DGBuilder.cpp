@@ -182,6 +182,12 @@ struct DecompositionGraph::Impl {
             // Connect rule vertex to output operator vertex
             boost::add_edge(rule_vertex, output_vertex, GraphWeightedEdge{}, graph);
 
+            // Empty rules (with no inputs) are effectively just target gates
+            // and don't need to be connected to input operator vertices
+            if (rule.isEmpty()) {
+                continue;
+            }
+
             // Connect rule vertex to input operator vertices
             for (const auto &input : rule.inputs) {
                 const auto input_id = registerOp(input.op);
