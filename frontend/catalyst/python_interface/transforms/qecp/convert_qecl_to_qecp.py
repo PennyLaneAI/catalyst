@@ -462,14 +462,25 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             )
 
             # Decode X-check ESM
-            qecp.DecodeEsmCssOp(
+            decode_esm_op = qecp.DecodeEsmCssOp(
                 tanner_graph=tanner_x,
                 esm=pack_mres_tensor_op.result,
                 err_idx_type=TensorType(IndexType(), shape=(1,)),
             )
 
+            # Apply correction
+            err_idx = cast(OpResult[IndexType], decode_esm_op.err_idx)
+            extract_err_qubit_op = qecp.ExtractQubitOp(codeblock=x_out_codeblock, idx=err_idx)
+            err_qubit = extract_err_qubit_op.qubit
+            qecp.PauliZOp(in_qubit=err_qubit)
+            insert_err_qubit_op = qecp.InsertQubitOp(
+                in_codeblock=x_out_codeblock, idx=err_idx, qubit=err_qubit
+            )
+
+            out_codeblock = insert_err_qubit_op.out_codeblock
+
             # return the corrected codeblock
-            func.ReturnOp(x_out_codeblock)
+            func.ReturnOp(out_codeblock)
 
         funcOp = func.FuncOp(
             name=f"qec_cycle_{self.qec_code.name}",
