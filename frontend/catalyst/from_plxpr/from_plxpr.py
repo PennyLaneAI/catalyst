@@ -787,6 +787,7 @@ def _union_decompose_gatesets(tkwargs_list):
                 gate_set.append(op)
     return gate_set
 
+
 class CustomRuleInterpreter(PlxprInterpreter):
     """Interpreter that collects quantum operations from a qfunc jaxpr."""
 
@@ -799,8 +800,12 @@ class CustomRuleInterpreter(PlxprInterpreter):
         op_name = _get_operator_name(op)
         num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op_name]
         requires_copy = num_wires == -1
-        actual_num_wires = len(op.wires) if issubclass(op, qml.operation.Operation) and requires_copy else num_wires
-        
+        actual_num_wires = (
+            len(op.wires)
+            if issubclass(op, qml.operation.Operation) and requires_copy
+            else num_wires
+        )
+
         _create_decomposition_rule(
             rule_impl,
             op_name=op_name,
@@ -823,15 +828,17 @@ class CustomRuleInterpreter(PlxprInterpreter):
                 for rule in rules:
                     self._create_rule(op, rule)
 
+
 def _compile_explicit_graph_decomposition_rules(inner_jaxpr, consts, tkwargs_list, ncargs):
     """Compile user-provided fixed/alternative rules for the C++ graph pass."""
 
-    capture_custom_rules_interpreter = CustomRuleInterpreter(tkwargs_list = tkwargs_list)
+    capture_custom_rules_interpreter = CustomRuleInterpreter(tkwargs_list=tkwargs_list)
 
     def custom_rule_wrapper(*args):
         return capture_custom_rules_interpreter.eval(inner_jaxpr, consts, *args)
-    
+
     return jax.make_jaxpr(custom_rule_wrapper)(*ncargs)
+
 
 def _is_cxx_graph_decompose_supported(tkwargs) -> bool:
     """Whether a qml.decompose invocation can be routed to the C++ graph pass."""
@@ -857,6 +864,7 @@ def _is_cxx_graph_decompose_supported(tkwargs) -> bool:
                 return False
 
     return True
+
 
 def _rule_uses_work_wires(rule) -> bool:
     """Whether a PennyLane decomposition rule declares work wires."""
