@@ -26,16 +26,6 @@ import platform
 import pytest
 
 
-def skip_flaky_tests(config, items):
-    """Skip marked tests when running with `--force-flaky`."""
-    if not config.getoption("--force-flaky"):
-        return
-
-    for item in items:
-        if "skip_flaky" in item.keywords:
-            item.add_marker(pytest.mark.skip(reason="don't test flakiness"))
-
-
 def is_cuda_available():
     """Checks if cuda is available by trying an import.
 
@@ -152,7 +142,6 @@ def pytest_collection_modifyitems(config, items):
     """A pytest items modifier method"""
 
     skip_cuda_tests(config, items)
-    skip_flaky_tests(config, items)
 
     # skip braket tests
     skipper = pytest.mark.skip()
