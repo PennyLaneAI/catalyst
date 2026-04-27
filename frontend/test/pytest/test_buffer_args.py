@@ -15,7 +15,7 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import grad, qjit
@@ -24,13 +24,13 @@ from catalyst import grad, qjit
 
 
 def f(arg0: int, _arg1: int):
-    qml.RX(arg0 * jnp.pi, wires=[0])
-    return qml.state()
+    qp.RX(arg0 * jnp.pi, wires=[0])
+    return qp.state()
 
 
 def g(arg0: int, _arg1: int, _arg2: int):
-    qml.RX(arg0 * jnp.pi, wires=[0])
-    return qml.state()
+    qp.RX(arg0 * jnp.pi, wires=[0])
+    return qp.state()
 
 
 @pytest.mark.parametrize(
@@ -53,8 +53,8 @@ def g(arg0: int, _arg1: int, _arg2: int):
 def test_buffer_args(fn, params):
     """Test multiple arguments passed to compiled function."""
 
-    device = qml.device("lightning.qubit", wires=1)
-    interpreted_fn = qml.QNode(fn, device)
+    device = qp.device("lightning.qubit", wires=1)
+    interpreted_fn = qp.QNode(fn, device)
     jitted_fn = qjit(interpreted_fn)
     assert jnp.allclose(interpreted_fn(*params), jitted_fn(*params))
 
@@ -64,7 +64,7 @@ def test_qjit_does_not_mutate_numpy_input_buffers():
 
     @qjit
     def update_with_copy(x):
-        y = qml.math.copy(x)
+        y = qp.math.copy(x)
         return y.at[0, 0].set(7.0)
 
     matrix = np.arange(9.0).reshape(3, 3)
@@ -84,11 +84,11 @@ class TestReturnValues:
     def test_return_values(self):
         """Test return values are correctly stored in return buffers."""
 
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit(params):
-            qml.SingleExcitation(params[0], wires=[0, 1])
-            qml.SingleExcitation(params[1], wires=[0, 2])
-            return qml.expval(qml.PauliZ(2))
+            qp.SingleExcitation(params[0], wires=[0, 1])
+            qp.SingleExcitation(params[1], wires=[0, 2])
+            return qp.expval(qp.PauliZ(2))
 
         @qjit
         def order1(params):

@@ -95,6 +95,52 @@ class HyperRegisterTypeConversion(TypeConversionPattern):
         return qecp.PhysicalHyperRegisterType(typ.width, typ.k, self.qec_code.n)
 
 
+# MARK: Alloc/Dealloc Patterns
+
+
+@dataclass
+class AllocationConversion(RewritePattern):
+    """Op conversion pattern from qecl.alloc -> qecp.alloc."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecl.AllocOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
+        rewriter.replace_op(op, qecp.AllocOp(op.result_types[0]))
+
+
+@dataclass
+class DeallocationConversion(RewritePattern):
+    """Op conversion pattern from qecl.dealloc -> qecp.dealloc."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecl.DeallocOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
+        rewriter.replace_op(op, qecp.DeallocOp(op.hyper_reg))
+
+
+# MARK: Extract/Insert Patterns
+
+
+@dataclass
+class ExtractBlockConversion(RewritePattern):
+    """Op conversion pattern from qecl.extract_block -> qecp.extract_block."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecl.ExtractCodeblockOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
+        rewriter.replace_op(op, qecp.ExtractCodeblockOp(op.hyper_reg, op.idx_attr))
+
+
+@dataclass
+class InsertBlockConversion(RewritePattern):
+    """Op conversion pattern from qecl.insert_block -> qecp.insert_block."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecl.InsertCodeblockOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
+        rewriter.replace_op(op, qecp.InsertCodeblockOp(op.in_hyper_reg, op.idx_attr, op.codeblock))
+
+
 # MARK: Encode Op Pattern
 
 
@@ -225,6 +271,10 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 [
                     CodeblockTypeConversion(qec_code=self.qec_code),
                     HyperRegisterTypeConversion(qec_code=self.qec_code),
+                    AllocationConversion(),
+                    DeallocationConversion(),
+                    InsertBlockConversion(),
+                    ExtractBlockConversion(),
                     EncodeOpConversion(qec_code=self.qec_code, encode_subroutine=encode_funcop),
                     QecCycleOpConversion(
                         qec_code=self.qec_code, qec_cycle_subroutine=qec_cycle_funcop
@@ -439,8 +489,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         """Contains the ops to perform a QEC check on the provided auxiliary qubits and codeblock.
         Intended to be called inside `builder.ImplicitBuilder` to add these operations to a block.
 
-        This implementation uses the convention where all two-qubit gates are CNOTs - see for example
-        Figure 5a. and Figure 5d. in arXiv: 2304.08678
+        This implementation uses the convention where all two-qubit gates are CNOTs - for example,
+        see Figure 5a. and Figure 5d. in arXiv: 2304.08678
 
         This pattern includes measurement of the auxiliary qubits, and returns the MeasureOps, as
         well as the codeblock after the check pattern has been applied. It is not responsible for

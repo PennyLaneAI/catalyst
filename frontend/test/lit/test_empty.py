@@ -19,19 +19,19 @@ Unit tests for the MLIR 'empty' pass.
 
 from functools import partial
 
-import pennylane as qml
+import pennylane as qp
 
 
 def test_empty():
     """Test a simple example to verify that the empty pass can be used
     with Catalyst."""
 
-    @qml.qjit(target="mlir")
-    @qml.transform(pass_name="empty")
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qjit(target="mlir")
+    @qp.transform(pass_name="empty")
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit():
         # CHECK: transform.apply_registered_pass "empty" to {{%.+}}
-        return qml.state()
+        return qp.state()
 
     print(circuit.mlir)
 
@@ -43,12 +43,12 @@ def test_empty_with_options():
     """Test a simple example to verify that the empty pass can be used
     with Catalyst."""
 
-    @qml.qjit(target="mlir")
-    @partial(qml.transform(pass_name="empty"), key="foo")
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qjit(target="mlir")
+    @partial(qp.transform(pass_name="empty"), key="foo")
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit():
         # CHECK: transform.apply_registered_pass "empty" with options = {"key" = "foo"} to {{%.+}}
-        return qml.state()
+        return qp.state()
 
     print(circuit.mlir)
 
