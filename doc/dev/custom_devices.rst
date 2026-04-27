@@ -87,7 +87,7 @@ as a string of device specifications and options, represented in Python dictiona
 An example could be some noise parameter or other configurable behaviour: ``"{'noise': 0.5}"``.
 
 Note that these parameters are automatically initialized in the frontend if the library is
-provided as a PennyLane plugin device (see :func:`qml.device() <pennylane.device>`).
+provided as a PennyLane plugin device (see :func:`qp.device() <pennylane.device>`).
 
 The destructor of ``CustomDevice`` will be automatically called by the runtime.
 
@@ -121,7 +121,7 @@ Integration with Python devices
 
 There are two things that are needed in order to integrate with PennyLane devices:
 
-* Adding a ``get_c_interface`` method to your ``qml.devices.Device`` class.
+* Adding a ``get_c_interface`` method to your ``qp.devices.Device`` class.
 * Adding a ``config_filepath`` class variable pointing to your configuration file. This file should
   be a `toml file <https://toml.io/en/>`_ with fields that describe what gates and features are
   supported by your device.
@@ -143,7 +143,7 @@ The Pennylane device API allows you to build a QJIT compatible device in a simpl
 
 .. code-block:: python
 
-    class CustomDevice(qml.devices.Device):
+    class CustomDevice(qp.devices.Device):
         """Custom Device"""
 
         config_filepath = pathlib.Path("absolute/path/to/configuration/file.toml")
@@ -163,7 +163,7 @@ The Pennylane device API allows you to build a QJIT compatible device in a simpl
             """Your normal definitions"""
 
     @qjit
-    @qml.qnode(CustomDevice(wires=1))
+    @qp.qnode(CustomDevice(wires=1))
     def f():
         return measure(0)
 
@@ -295,7 +295,7 @@ of the ``QuantumDevice`` constructor to variables. For example:
 
 .. code-block:: python
 
-    class CustomDevice(qml.devices.Device):
+    class CustomDevice(qp.devices.Device):
         """Custom Device"""
 
         config_filepath = pathlib.Path("absolute/path/to/configuration/file.toml")
