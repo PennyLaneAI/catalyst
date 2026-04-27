@@ -397,7 +397,7 @@ def test_value_and_grad_on_qjit_quantum(diff_method, capture):
     if diff_method == "adjoint":
         with pytest.raises(
             CompileError,
-            match="The adjoint method can only be used for QNodes which return qml.expval",
+            match=r"The adjoint method can only be used for QNodes which return .*\.expval",
         ):
             qjit(qp.value_and_grad(workflow), capture=capture)(3.0)
     else:
@@ -428,7 +428,7 @@ def test_value_and_grad_on_qjit_quantum_variant(diff_method, capture):
     if diff_method == "adjoint":
         with pytest.raises(
             CompileError,
-            match="The adjoint method can only be used for QNodes which return qml.expval",
+            match=r"The adjoint method can only be used for QNodes which return .*\.expval",
         ):
             qjit(qp.value_and_grad(workflow_variant), capture=capture)(1.1)
     else:
@@ -463,7 +463,7 @@ def test_value_and_grad_on_qjit_quantum_variant_argnum(argnum, diff_method, capt
     if diff_method == "adjoint":
         with pytest.raises(
             CompileError,
-            match="The adjoint method can only be used for QNodes which return qml.expval",
+            match=r"The adjoint method can only be used for QNodes which return .*\.expval",
         ):
             qjit(qp.value_and_grad(workflow_variant, argnums=argnum), capture=capture)(
                 1.1, 2.2, 3.3
@@ -509,7 +509,7 @@ def test_value_and_grad_on_qjit_quantum_variant_tree(diff_method, capture):
     if diff_method == "adjoint":
         with pytest.raises(
             CompileError,
-            match="The adjoint method can only be used for QNodes which return qml.expval",
+            match=r"The adjoint method can only be used for QNodes which return .*\.expval",
         ):
 
             qjit(qp.value_and_grad(workflow_variant_tree), capture=capture)(params)
