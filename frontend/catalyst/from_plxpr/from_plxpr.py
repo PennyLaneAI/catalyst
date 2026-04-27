@@ -344,7 +344,7 @@ def handle_qnode(
                 tkwargs={"gate_set": self.decompose_tkwargs.get("gate_set", [])},
                 stopping_condition=stopping_condition,
             )
-        elif not qml.decomposition.enabled_graph() and self.requires_decompose_lowering:
+        elif not qp.decomposition.enabled_graph() and self.requires_decompose_lowering:
             # Use the plxpr decompose transform when graph is disabled
             closed_jaxpr = _apply_compiler_decompose_to_plxpr(
                 inner_jaxpr=qfunc_jaxpr,
@@ -352,7 +352,7 @@ def handle_qnode(
                 ncargs=non_const_args,
                 tkwargs={"gate_set": self.decompose_tkwargs.get("gate_set", [])},
             )
-        elif qml.decomposition.enabled_graph() and self.requires_decompose_lowering:
+        elif qp.decomposition.enabled_graph() and self.requires_decompose_lowering:
             closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
                 inner_jaxpr=closed_jaxpr.jaxpr,
                 consts=closed_jaxpr.consts,
@@ -501,7 +501,7 @@ def handle_transform(
     # and the graph-based decomposition is enabled
     transform_name = getattr(transform._plxpr_transform, "__name__", None)
     if transform_name == "decompose_plxpr_to_plxpr":
-        use_graph = qml.decomposition.enabled_graph()
+        use_graph = qp.decomposition.enabled_graph()
         if use_graph and _is_cxx_graph_decompose_supported(pl_tkwargs):
             if self.requires_decompose_lowering:
                 raise NotImplementedError(
@@ -510,8 +510,8 @@ def handle_transform(
 
             next_eval = copy(self)
             next_eval.graph_decompose_tkwargs.append(pl_tkwargs)
-            t = qml.transform(pass_name="graph-decomposition")
-            bound_pass = qml.transforms.core.BoundTransform(
+            t = qp.transform(pass_name="graph-decomposition")
+            bound_pass = qp.transforms.core.BoundTransform(
                 t,
                 kwargs=prepare_decomposition_options(
                     gate_set=pl_tkwargs.get("gate_set", []),
@@ -775,7 +775,7 @@ def _get_operator_name(op):
 
 
 def _union_decompose_gatesets(tkwargs_list):
-    """Union the gate sets from a list of qml.decompose transform kwargs."""
+    """Union the gate sets from a list of qp.decompose transform kwargs."""
 
     gate_set = []
     seen = set()
@@ -802,7 +802,7 @@ class CustomRuleInterpreter(PlxprInterpreter):
         requires_copy = num_wires == -1
         actual_num_wires = (
             len(op.wires)
-            if issubclass(op, qml.operation.Operation) and requires_copy
+            if issubclass(op, qp.operation.Operation) and requires_copy
             else num_wires
         )
 
@@ -841,7 +841,7 @@ def _compile_explicit_graph_decomposition_rules(inner_jaxpr, consts, tkwargs_lis
 
 
 def _is_cxx_graph_decompose_supported(tkwargs) -> bool:
-    """Whether a qml.decompose invocation can be routed to the C++ graph pass."""
+    """Whether a qp.decompose invocation can be routed to the C++ graph pass."""
 
     if tkwargs.get("stopping_condition") is not None:
         return False

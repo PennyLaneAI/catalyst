@@ -324,7 +324,7 @@ def _create_decomposition_rule(
                 # avoid passing an array reduce the traced LOC!
                 args.append(int)
             else:
-                args.append(qml.math.array([0] * num_wires, like="jax"))
+                args.append(qp.math.array([0] * num_wires, like="jax"))
         elif typ is int:  # pragma: no cover
             # This is only for cases where the rule has an int parameter
             # e.g., dimension in some gates. Not that common though!
