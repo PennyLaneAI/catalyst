@@ -38,8 +38,9 @@ using namespace catalyst::qecp;
 namespace {
 
 // Bufferization of qecp.decode_esm_css.
-// Result tensor of qecp.decode_esm_css is bufferized with a corresponding memref.alloc.
-// Users of the result tensor are updated to use the new memref.
+//   - Convert tensor of ESMs to memref.
+//   - Bufferize result tensor of error indicies with a corresponding memref.alloc; users of the
+//     result tensor are updated to use the new memref.
 struct DecodeEsmCssOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<DecodeEsmCssOpInterface,
                                                                    DecodeEsmCssOp> {
@@ -84,7 +85,7 @@ struct DecodeEsmCssOpInterface
 
         DecodeEsmCssOp::create(
             rewriter, loc, TypeRange{},
-            ValueRange{esmToBufferOp.getResult(), decodeEsmCssOp.getTannerGraph(), errIdxBuffer});
+            esmToBufferOp.getResult(), decodeEsmCssOp.getTannerGraph(), errIdxBuffer);
 
         bufferization::replaceOpWithBufferizedValues(rewriter, op, errIdxBuffer);
         return success();
