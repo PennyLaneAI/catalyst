@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Iterable
 
 import pennylane as qp
+from pennylane.decomposition.utils import to_name
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.passes.utils import prepare_decomposition_options
@@ -1689,12 +1690,35 @@ def graph_decomposition_setup_inputs(
     >>> qp.specs(circuit, level="device")(1.23, 4.56).resources.gate_types
     {'Rot': 2}
     """
-    options: dict = prepare_decomposition_options(
-        gate_set=gate_set,
-        fixed_decomps=fixed_decomps,
-        alt_decomps=alt_decomps,
-        _builtin_rule_path=_builtin_rule_path,
-    )
+
+    if not isinstance(gate_set, dict):
+        gate_set = {to_name(op): 1.0 for op in gate_set}
+    else:
+        gate_set = {to_name(op): cost for op, cost in gate_set.items()}
+
+    options: dict[str, dict | tuple | str] = {
+        "gate_set": gate_set,
+        "bytecode_rules": str(_builtin_rule_path),
+    }
+
+    if fixed_decomps:
+        options |= {
+            "fixed_decomps": {
+                to_name(op): (rule if isinstance(rule, str) else rule.__name__)
+                for op, rule in fixed_decomps.items()
+            }
+        }
+
+    if alt_decomps:
+        options |= {
+            "alt_decomps": {
+                to_name(op): tuple(
+                    (rule if isinstance(rule, str) else rule.__name__) for rule in rules
+                )
+                for op, rules in alt_decomps.items()
+            }
+        }
+
     return (), options
 
 
