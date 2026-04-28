@@ -20,9 +20,7 @@ import numpy as np
 import scipy.sparse
 
 
-def dense_tanner_graph_to_csc(
-    matrix: np.ndarray[tuple[int, int]],
-) -> tuple[np.ndarray[tuple[int]], np.ndarray[tuple[int]]]:
+def dense_tanner_graph_to_csc(matrix: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Converts a dense parity-check matrix to CSC index arrays.
 
     Takes a dense 2D numpy array representing a Tanner graph, expressed as a parity-check matrix,
