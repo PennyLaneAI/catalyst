@@ -12,9 +12,7 @@ set(LIBS
     MLIRQecPhysical
 )
 
-set(DEPENDS
-    # MLIRQecPhysicalPassIncGen
-)
+set(DEPENDS )
 
 add_mlir_library(${LIBRARY_NAME} STATIC
     ${SRC}

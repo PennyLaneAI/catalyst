@@ -144,10 +144,10 @@ struct DecodeEsmCssOpInterface
     }
 };
 
-// Bufferization of qecp.decode_esm_css.
-//   - Convert tensor of ESMs to memref.
-//   - Bufferize result tensor of error indicies with a corresponding memref.alloc; users of the
-//     result tensor are updated to use the new memref.
+// Bufferization of qecp.decode_physical_meas.
+//   - Convert tensor of physical measurements to memref.
+//   - Bufferize result tensor of logical measurements with a corresponding memref.alloc; users of
+//     the result tensor are updated to use the new memref.
 struct DecodePhysicalMeasurementOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<
           DecodePhysicalMeasurementOpInterface, DecodePhysicalMeasurementOp> {
