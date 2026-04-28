@@ -134,7 +134,7 @@ Extending
    import framework
    from .test_cases.my_problem import Problem, qcompile, workflow
 
-   p = Problem(qml.device(...), ...)
+   p = Problem(qp.device(...), ...)
 
    def _main(params):
        qcompile(p, params)

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-This module contains a patch for the upstream qml.QNode behaviour, in particular around
+This module contains a patch for the upstream qp.QNode behaviour, in particular around
 what happens when a QNode object is called during tracing. Mostly this involves bypassing
 the default behaviour and replacing it with a function-like "QNode" primitive.
 """
@@ -25,7 +25,7 @@ from numbers import Integral
 from typing import Callable, Sequence
 
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
 from pennylane import exceptions
@@ -105,7 +105,7 @@ def _resolve_mcm_config(qnode):
         else:
             mcm_method = "single-branch-statistics"
 
-    return qml.devices.MCMConfig(postselect_mode=postselect_mode, mcm_method=mcm_method)
+    return qp.devices.MCMConfig(postselect_mode=postselect_mode, mcm_method=mcm_method)
 
 
 def _is_one_shot_compatible_device(qnode):
@@ -250,7 +250,7 @@ class QFunc:
         if EvaluationContext.is_quantum_tracing():
             raise CompileError("Can't nest qnodes under qjit")
 
-        assert isinstance(self, qml.QNode)
+        assert isinstance(self, qp.QNode)
         new_compile_pipeline, new_pass_pipeline = _extract_passes(self.compile_pipeline)
 
         # Update the qnode with peephole pipeline
@@ -342,7 +342,7 @@ def _get_snapshot_results(mcm_method, tape, out):
     # if no snapshot are present, return None, out
     assert mcm_method == "one-shot"
 
-    if not any(isinstance(op, qml.Snapshot) for op in tape.operations):
+    if not any(isinstance(op, qp.Snapshot) for op in tape.operations):
         return None, out
 
     # Snapshots present: out[0] = snapshots, out[1] = measurements
@@ -434,7 +434,7 @@ def _process_terminal_measurements(mcm_method, cpy_tape, out, snapshots, shot_ve
 
 
 def _validate_one_shot_measurements(
-    mcm_config, tape: qml.tape.QuantumTape, user_specified_mcm_method, shot_vector, wires
+    mcm_config, tape: qp.tape.QuantumTape, user_specified_mcm_method, shot_vector, wires
 ) -> None:
     """Validate measurements for one-shot mode.
 
@@ -473,7 +473,7 @@ def _validate_one_shot_measurements(
 
         if isinstance(m, VarianceMP) and m.obs:
             raise NotImplementedError(
-                "qml.var() cannot be used on observables (MCMs are allowed) with the chosen or "
+                "qp.var() cannot be used on observables (MCMs are allowed) with the chosen or "
                 "default mcm_method 'one-shot'. Please consider using 'single-branch-statistics' "
                 "or using it on MCMs instead."
             )
@@ -482,7 +482,7 @@ def _validate_one_shot_measurements(
             raise NotImplementedError(
                 f"The {type(m).__name__} measurement process does not support shot-vectors "
                 "with the chosen or default mcm_method 'one-shot'. Please consider using "
-                "'single-branch-statistics' or qml.sample() instead."
+                "'single-branch-statistics' or qp.sample() instead."
             )
 
         if (
@@ -491,7 +491,7 @@ def _validate_one_shot_measurements(
             and not device_has_static_wires
         ):
             raise NotImplementedError(
-                "qml.sample() and qml.counts() cannot be used without wires and a dynamic number "
+                "qp.sample() and qp.counts() cannot be used without wires and a dynamic number "
                 "of device wires in the chosen or default mcm_method 'one-shot'. Please consider "
                 "using 'single-branch-statistics', providing explicit wires in the measurement "
                 "process, or setting a constant number of wires in the device."
@@ -517,19 +517,19 @@ def dynamic_one_shot(qnode, **kwargs):
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit")
+        dev = qp.device("lightning.qubit")
         params = np.pi / 4 * np.ones(2)
 
         @qjit
         @dynamic_one_shot
-        @qml.qnode(dev, diff_method=None, shots=100)
+        @qp.qnode(dev, diff_method=None, shots=100)
         def circuit(x, y):
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
             m0 = measure(0, reset=reset, postselect=postselect)
 
             @cond(m0 == 1)
             def ansatz():
-                qml.RY(y, wires=1)
+                qp.RY(y, wires=1)
 
             ansatz()
             return measure_f(wires=[0, 1])
@@ -553,10 +553,10 @@ def dynamic_one_shot(qnode, **kwargs):
         shot_vector = qnode._shots.shot_vector if qnode._shots else []
         wires = qnode.device.wires
 
-        @qml.transform
+        @qp.transform
         def dynamic_one_shot_partial(
-            tape: qml.tape.QuantumTape,
-        ) -> tuple[Sequence[qml.tape.QuantumTape], Callable]:
+            tape: qp.tape.QuantumTape,
+        ) -> tuple[Sequence[qp.tape.QuantumTape], Callable]:
             nonlocal cpy_tape
             cpy_tape = tape
 
@@ -577,7 +577,7 @@ def dynamic_one_shot(qnode, **kwargs):
         return dynamic_one_shot_partial(qnode)
 
     single_shot_qnode = transform_to_single_shot(qnode)
-    single_shot_qnode = qml.set_shots(single_shot_qnode, shots=1)
+    single_shot_qnode = qp.set_shots(single_shot_qnode, shots=1)
     if mcm_config is not None:
         single_shot_qnode.execute_kwargs["postselect_mode"] = mcm_config.postselect_mode
         single_shot_qnode.execute_kwargs["mcm_method"] = mcm_config.mcm_method
@@ -654,4 +654,4 @@ def _extract_passes(transform_program):
             raise ValueError(
                 f"{t} without a tape definition occurs before tape transform {tape_transforms[-1]}."
             )
-    return qml.CompilePipeline(tape_transforms), tuple(pass_pipeline)
+    return qp.CompilePipeline(tape_transforms), tuple(pass_pipeline)
