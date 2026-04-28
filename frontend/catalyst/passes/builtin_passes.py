@@ -24,7 +24,6 @@ import pennylane as qp
 from pennylane.decomposition.utils import to_name
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
-from catalyst.passes.utils import prepare_decomposition_options
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 

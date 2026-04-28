@@ -40,7 +40,7 @@ def assert_valid_transform(obj: Any) -> None:
     try:
         pipeline = CompilePipeline(obj)
     except Exception as e:
-        raise AssertionError(f"Cannot be inserted into a CompilePipeline: {e}")
+        raise AssertionError(f"Cannot be inserted into a CompilePipeline: {e}") from e
     assert len(pipeline) == 1
     assert pipeline[0].pass_name == pass_name
 
