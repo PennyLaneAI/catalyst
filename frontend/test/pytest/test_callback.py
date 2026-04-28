@@ -31,7 +31,7 @@ from catalyst.utils.patching import Patcher
 
 
 @pytest.mark.parametrize("arg", [1, 2, 3])
-def test_callback_no_tracing(arg, capture_mode):
+def test_callback_no_tracing(arg):
     """Test that when there's no tracing the behaviour of identity
     stays the same."""
 
@@ -43,7 +43,7 @@ def test_callback_no_tracing(arg, capture_mode):
 
 
 @pytest.mark.parametrize("arg", [1, 2, 3])
-def test_purecallback_no_tracing(arg, capture_mode):
+def test_purecallback_no_tracing(arg):
     """Test that when there's no tracing the behaviour of identity
     stays the same."""
 

@@ -45,17 +45,17 @@ from catalyst.jax_tracer import HybridOpRegion
 
 
 def verify_catalyst_ctrl_against_pennylane(
-    quantum_func: Callable, device, *args, with_adjoint_arg=False
+    quantum_func: Callable, device, *args, with_adjoint_arg=False, capture_mode="global"
 ):
     """
     A helper function for verifying Catalyst's native quantum control against the behaviour of
     PennyLane's quantum control function.
     """
 
-    @qjit
+    @qjit(capture=capture_mode)
     @qp.qnode(device)
     def catalyst_workflow(*args):
-        if qp.capture.enabled():
+        if capture_mode is True:
             if with_adjoint_arg:
                 return quantum_func(*args, ctrl_fn=PL_ctrl, adjoint_fn=PL_adjoint)
             else:
@@ -95,7 +95,9 @@ class TestControlled:
             ctrl_fn(qp.RX, control=[cw], control_values=[False])(theta, wires=[w])
             return qp.state()
 
-        verify_catalyst_ctrl_against_pennylane(circuit, qp.device(backend, wires=3), 0.1, 0, 1)
+        verify_catalyst_ctrl_against_pennylane(
+            circuit, qp.device(backend, wires=3), 0.1, 0, 1, capture_mode=capture_mode
+        )
 
     def test_qctrl_op_class(self, backend, capture_mode):
         """Test the quantum control application to a single operation class"""
@@ -104,7 +106,9 @@ class TestControlled:
             ctrl_fn(qp.RX, control=[w], control_values=[True])(theta, wires=[cw])
             return qp.state()
 
-        verify_catalyst_ctrl_against_pennylane(circuit, qp.device(backend, wires=3), 0.1, 0, 1)
+        verify_catalyst_ctrl_against_pennylane(
+            circuit, qp.device(backend, wires=3), 0.1, 0, 1, capture_mode=capture_mode
+        )
 
     def test_qctrl_adjoint_func_simple(self, backend, capture_mode):
         """Test the quantum control distribution over the group of operations"""
@@ -118,7 +122,11 @@ class TestControlled:
             return qp.state()
 
         verify_catalyst_ctrl_against_pennylane(
-            circuit, qp.device(backend, wires=3), 0.1, with_adjoint_arg=True
+            circuit,
+            qp.device(backend, wires=3),
+            0.1,
+            with_adjoint_arg=True,
+            capture_mode=capture_mode,
         )
 
     def test_adjoint_qctrl_func_simple(self, backend, capture_mode):
@@ -133,7 +141,11 @@ class TestControlled:
             return qp.state()
 
         verify_catalyst_ctrl_against_pennylane(
-            circuit, qp.device(backend, wires=3), 0.1, with_adjoint_arg=True
+            circuit,
+            qp.device(backend, wires=3),
+            0.1,
+            with_adjoint_arg=True,
+            capture_mode=capture_mode,
         )
 
     def test_qctrl_adjoint_hybrid(self, backend, capture_mode):
@@ -152,7 +164,13 @@ class TestControlled:
             return qp.state()
 
         verify_catalyst_ctrl_against_pennylane(
-            circuit, qp.device(backend, wires=3), 0.1, 2, 2, with_adjoint_arg=True
+            circuit,
+            qp.device(backend, wires=3),
+            0.1,
+            2,
+            2,
+            with_adjoint_arg=True,
+            capture_mode=capture_mode,
         )
 
     def test_qctrl_func_simple(self, backend, capture_mode):
@@ -166,7 +184,9 @@ class TestControlled:
             ctrl_fn(_func, control=[1], control_values=[True])(arg)
             return qp.state()
 
-        verify_catalyst_ctrl_against_pennylane(circuit, qp.device(backend, wires=3), 0.1)
+        verify_catalyst_ctrl_against_pennylane(
+            circuit, qp.device(backend, wires=3), 0.1, capture_mode=capture_mode
+        )
 
     def test_qctrl_func_hybrid(self, backend, capture_mode):
         """Test the quantum control distribution over the Catalyst hybrid operation"""
@@ -208,7 +228,9 @@ class TestControlled:
             ctrl_fn(_func, control=[cw], control_values=[True])()
             return qp.state()
 
-        verify_catalyst_ctrl_against_pennylane(circuit, qp.device(backend, wires=3), 0.1, 0, 2, 2)
+        verify_catalyst_ctrl_against_pennylane(
+            circuit, qp.device(backend, wires=3), 0.1, 0, 2, 2, capture_mode=capture_mode
+        )
 
     def test_qctrl_func_nested(self, backend, capture_mode):
         """Test the quantum control distribution over the nested control operations"""
@@ -228,7 +250,14 @@ class TestControlled:
             return qp.state()
 
         verify_catalyst_ctrl_against_pennylane(
-            circuit, qp.device(backend, wires=4), 0.1, 0, 1, 2, 3
+            circuit,
+            qp.device(backend, wires=4),
+            0.1,
+            0,
+            1,
+            2,
+            3,
+            capture_mode=capture_mode,
         )
 
     def test_qctrl_func_work_wires(self, backend, capture_mode):
@@ -248,7 +277,9 @@ class TestControlled:
             ctrl_fn(_func1, control=[1], work_wires=[2])()
             return qp.state()
 
-        verify_catalyst_ctrl_against_pennylane(circuit, qp.device(backend, wires=5), 0.1)
+        verify_catalyst_ctrl_against_pennylane(
+            circuit, qp.device(backend, wires=5), 0.1, capture_mode=capture_mode
+        )
 
     def test_qctrl_valid_input_types(self, backend, capture_mode):
         """Test the quantum control input types"""
@@ -263,7 +294,9 @@ class TestControlled:
             # ctrl_fn(qp.RX(theta, wires=[0]), control=[1], work_wires=[2])
             return qp.state()
 
-        verify_catalyst_ctrl_against_pennylane(circuit, qp.device(backend, wires=3), 0.1, 0, 1)
+        verify_catalyst_ctrl_against_pennylane(
+            circuit, qp.device(backend, wires=3), 0.1, 0, 1, capture_mode=capture_mode
+        )
 
     def test_native_controlled_custom(self, capture_mode):
         """Test native control of a custom operation."""

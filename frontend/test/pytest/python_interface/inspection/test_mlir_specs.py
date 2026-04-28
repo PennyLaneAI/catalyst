@@ -156,6 +156,7 @@ class TestMLIRSpecs:
             ),
         ],
     )
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
     def test_no_passes(self, skip_preprocess, simple_circuit, level, expected, capture_mode):
         """Test that if no passes are applied, the circuit resources are the original amount."""
         if not capture_mode and skip_preprocess:
@@ -196,6 +197,7 @@ class TestMLIRSpecs:
             ),
         ],
     )
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
     def test_basic_passes(self, skip_preprocess, simple_circuit, level, expected, capture_mode):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
         if not capture_mode and skip_preprocess:
@@ -363,7 +365,7 @@ class TestMLIRSpecs:
             for r, er in zip(res[lvl], expected_res):
                 assert resources_equal(r, er)
 
-    def test_not_qnode(self, skip_preprocess, capture_mode):
+    def test_not_qnode(self, skip_preprocess):  # pylint: disable=unused-argument
         """Test that a malformed QNode raises an error."""
 
         def not_a_qnode():
@@ -407,6 +409,7 @@ class TestMLIRSpecs:
             (False, 10, True),
         ],
     )
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
     def test_fixed_loop(self, skip_preprocess, pl_ctrl_flow, iters, autograph, capture_mode):
         """Test that loop resources are counted correctly."""
         if not capture_mode and skip_preprocess:

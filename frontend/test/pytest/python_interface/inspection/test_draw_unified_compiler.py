@@ -624,7 +624,7 @@ class TestDrawGraph:
         ):
             _ = draw_graph(circuit, level=100)()
 
-    def test_unsupported_qnode(self, capture_mode):
+    def test_unsupported_qnode(self):
         """Tests that only qjit'd qnodes are allowed to be visualized."""
 
         @qp.qnode(qp.device("null.qubit", wires=2))

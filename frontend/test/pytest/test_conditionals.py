@@ -736,6 +736,7 @@ class TestClassicalCompilation:
     @pytest.mark.parametrize(
         "x,y,op1,op2", [(2, 2, 0, 0), (2, 2, 1, 0), (2, 2, 0, 1), (2, 2, 1, 1)]
     )
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
     def test_nested_conditional(self, x, y, op1, op2, capture_mode):
         """Test nested conditional in classical context."""
 

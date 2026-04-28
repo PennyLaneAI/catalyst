@@ -35,14 +35,16 @@ from catalyst import debug, measure, qjit
 class TestCatalyst:
     """Integration tests for Catalyst adjoint functionality."""
 
-    def verify_catalyst_adjoint_against_pennylane(self, quantum_func, device, *args):
+    def verify_catalyst_adjoint_against_pennylane(
+        self, quantum_func, device, *args, capture_mode="global"
+    ):
         """
         A helper function for verifying Catalyst's native adjoint against the behaviour of
         PennyLane's adjoint function. This is specialized to verifying the behaviour of a single
         function that has its adjoint computed.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qp.qnode(device)
         def catalyst_workflow(*args):
             adjoint(quantum_func)(*args)
@@ -213,7 +215,9 @@ class TestCatalyst:
                 wires=[0, 1],
             )
 
-        self.verify_catalyst_adjoint_against_pennylane(func, qp.device(backend, wires=2))
+        self.verify_catalyst_adjoint_against_pennylane(
+            func, qp.device(backend, wires=2), capture_mode=capture_mode
+        )
 
     def test_adjoint_qubitunitary_dynamic_variable_loop(self, backend, capture_mode):
         """Ensures that catalyst.adjoint supports QubitUnitary oprtations."""
@@ -237,7 +241,9 @@ class TestCatalyst:
             ]
         )
 
-        self.verify_catalyst_adjoint_against_pennylane(func, qp.device(backend, wires=2), _input)
+        self.verify_catalyst_adjoint_against_pennylane(
+            func, qp.device(backend, wires=2), _input, capture_mode=capture_mode
+        )
 
     def test_adjoint_multirz(self, backend, capture_mode):
         """Ensures that catalyst.adjoint supports MultiRZ operations."""
@@ -246,7 +252,9 @@ class TestCatalyst:
             qp.PauliX(0)
             qp.MultiRZ(theta=np.pi / 2, wires=[0, 1])
 
-        self.verify_catalyst_adjoint_against_pennylane(func, qp.device(backend, wires=2))
+        self.verify_catalyst_adjoint_against_pennylane(
+            func, qp.device(backend, wires=2), capture_mode=capture_mode
+        )
 
     def test_adjoint_pcphase(self, backend):
         """Ensures that catalyst.adjoint supports PCPhase operations."""
@@ -297,7 +305,9 @@ class TestCatalyst:
             qp.PauliX(wires=loop(w))  # pylint: disable=no-value-for-parameter
             qp.RX(np.pi / 2, wires=w)
 
-        self.verify_catalyst_adjoint_against_pennylane(func, qp.device(backend, wires=3), 0)
+        self.verify_catalyst_adjoint_against_pennylane(
+            func, qp.device(backend, wires=3), 0, capture_mode=capture_mode
+        )
 
     @pytest.mark.parametrize("pred", [True, False])
     def test_adjoint_cond(self, backend, pred, capture_mode):
@@ -311,7 +321,9 @@ class TestCatalyst:
             cond_fn()
 
         dev = qp.device(backend, wires=1)
-        self.verify_catalyst_adjoint_against_pennylane(func, dev, pred, jnp.pi)
+        self.verify_catalyst_adjoint_against_pennylane(
+            func, dev, pred, jnp.pi, capture_mode=capture_mode
+        )
 
     def test_adjoint_while_loop(self, backend, capture_mode):
         """
@@ -331,7 +343,7 @@ class TestCatalyst:
             qp.RZ(final, wires=0)
 
         dev = qp.device(backend, wires=1)
-        self.verify_catalyst_adjoint_against_pennylane(func, dev, 10)
+        self.verify_catalyst_adjoint_against_pennylane(func, dev, 10, capture_mode=capture_mode)
 
     def test_adjoint_for_loop(self, backend, capture_mode):
         """Tests the correct application of gates (with dynamic wires)"""
@@ -344,7 +356,7 @@ class TestCatalyst:
             loop_body()  # pylint: disable=no-value-for-parameter
 
         dev = qp.device(backend, wires=5)
-        self.verify_catalyst_adjoint_against_pennylane(func, dev, 4)
+        self.verify_catalyst_adjoint_against_pennylane(func, dev, 4, capture_mode=capture_mode)
 
     def test_adjoint_while_nested(self, backend, capture_mode):
         """Tests the correct handling of nested while loops."""
@@ -375,7 +387,11 @@ class TestCatalyst:
 
         dev = qp.device(backend, wires=2)
         self.verify_catalyst_adjoint_against_pennylane(
-            func, dev, 10, jnp.array([2, 4, 3, 5, 1, 7, 4, 6, 9, 10])
+            func,
+            dev,
+            10,
+            jnp.array([2, 4, 3, 5, 1, 7, 4, 6, 9, 10]),
+            capture_mode=capture_mode,
         )
 
     def test_adjoint_nested_with_control_flow(self, backend, capture_mode):
@@ -463,7 +479,7 @@ class TestCatalyst:
             loop_outer()  # pylint: disable=no-value-for-parameter
 
         dev = qp.device(backend, wires=1)
-        self.verify_catalyst_adjoint_against_pennylane(func, dev, jnp.pi)
+        self.verify_catalyst_adjoint_against_pennylane(func, dev, jnp.pi, capture_mode=capture_mode)
 
     def test_adjoint_wires(self, backend):
         """Test the wires property of Adjoint"""

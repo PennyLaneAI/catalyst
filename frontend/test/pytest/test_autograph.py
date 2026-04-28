@@ -925,7 +925,7 @@ class TestForLoops:
         result = f()
         assert np.allclose(result, [1 / 8] * 8)
 
-    def test_for_in_static_range_indexing_array(self, capture_mode):
+    def test_for_in_static_range_indexing_array(self):
         """Test for loop over a Python range with static bounds that is used to index an array."""
 
         @qp.qnode(qp.device("lightning.qubit", wires=1))
@@ -1386,6 +1386,7 @@ class TestWhileLoops:
     @pytest.mark.parametrize(
         "init,inc,expected", [(0, 1, 3), (0.0, 1.0, 3.0), (0.0 + 0j, 1.0 + 0j, 3.0 + 0j)]
     )
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
     def test_whileloop_basic(self, monkeypatch, init, inc, expected, capture_mode):
         """Test basic while-loop functionality"""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)

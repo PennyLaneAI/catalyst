@@ -29,7 +29,7 @@ import catalyst
 def test_dynamic_sample(capfd, capture_mode):
     """Test that a `sample` program with dynamic shots can be executed correctly and doesn't recompile."""
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=capture_mode)
     def workflow_dyn_sample(shots):
         print("compiling...")
         device = qp.device("lightning.qubit", wires=1)
@@ -58,7 +58,7 @@ def test_dynamic_sample(capfd, capture_mode):
 def test_dynamic_counts(capfd, capture_mode):
     """Test that a `counts` program with dynamic shots can be executed correctly and doesn't recompile."""
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=capture_mode)
     def workflow_dyn_counts(shots):
         print("compiling...")
         device = qp.device("lightning.qubit", wires=1)

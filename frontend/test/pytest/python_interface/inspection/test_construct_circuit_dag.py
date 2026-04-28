@@ -196,7 +196,7 @@ def assert_dag_structure(nodes, edges, expected_edges):
 class TestFuncOpVisualization:
     """Tests the visualization of FuncOps with bounding boxes"""
 
-    def test_external_empty_function_visualization_error(self, capture_mode):
+    def test_external_empty_function_visualization_error(self):
         """Regression test for #2541 issue."""
 
         external_func = func.FuncOp.external("test_func", [], [])
@@ -804,7 +804,7 @@ class TestCreateStaticOperatorNodes:
     """Tests that operators with static parameters can be created and visualized as nodes."""
 
     @pytest.mark.parametrize("dialect", ["quantum", "pbc", "mbqc"])
-    def test_unsupported_non_skipped_op_raises_visualization_error(self, dialect, capture_mode):
+    def test_unsupported_non_skipped_op_raises_visualization_error(self, dialect):
         """Tests that an unknown non-skipped operator raises an error."""
 
         unknown_op = MagicMock(spec=Operation)
@@ -1059,7 +1059,7 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node1"]["label"] == "<name> PauliRot|<wire> [0]"
         assert nodes["node2"]["label"] == "<name> PauliRot|<wire> [0, 1, 2]"
 
-    def test_complex_measurements(self, capture_mode):
+    def test_complex_measurements(self):
         """Tests that complex measurements can be created."""
 
         dev = qp.device("null.qubit", wires=1)

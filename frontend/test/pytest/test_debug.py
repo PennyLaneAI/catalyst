@@ -67,7 +67,7 @@ class TestDebugPrint:
         expected = str(arg)
         assert expected == out.strip()
 
-    def test_memref_outside_qjit(self, capfd, capture_mode):
+    def test_memref_outside_qjit(self, capfd):
         """Test that memref can be used outside qjit."""
 
         def test(x):
@@ -196,7 +196,7 @@ class TestDebugPrint:
             (MyObject("hello"), "MyObject(hello)\n"),
         ],
     )
-    def test_no_qjit(self, capfd, arg, expected, capture_mode):
+    def test_no_qjit(self, capfd, arg, expected):
         """Test printing in interpreted mode."""
 
         debug.print(arg)
@@ -259,7 +259,7 @@ class TestPrintStage:
 
         func.workspace.cleanup()
 
-    def test_invalid_object(self, capture_mode):
+    def test_invalid_object(self):
         """Test the function on a non-QJIT object."""
 
         def func():

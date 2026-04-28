@@ -529,6 +529,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
         ), "Sanity check failed, is expected_res correct?"
         circuit_compiled = qp.qjit(
             diagonalize_final_measurements_pass(circuit_ref),
+            capture=capture_mode,
         )
 
         assert np.allclose(expected_res(angle), circuit_compiled(angle))
@@ -560,6 +561,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
         ), "Sanity check failed, is expected_res correct?"
         circuit_compiled = qp.qjit(
             diagonalize_final_measurements_pass(circuit_ref),
+            capture=capture_mode,
         )
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
@@ -668,6 +670,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         circuit_compiled = qp.qjit(
             diagonalize_final_measurements_pass(circuit_ref),
+            capture=capture_mode,
         )
 
         np.allclose(expected_res(angle), circuit_compiled(angle))
@@ -700,6 +703,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         circuit_compiled = qp.qjit(
             diagonalize_final_measurements_pass(circuit_ref),
+            capture=capture_mode,
         )
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))

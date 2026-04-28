@@ -172,7 +172,7 @@ def test_jacobian_outside_qjit():
 
 
 @pytest.mark.parametrize("argnums", (None, 0, [1], (0, 1)))
-def test_jacobian_outside_qjit_argnums(argnums, capture_mode):
+def test_jacobian_outside_qjit_argnums(argnums):
     """Test that argnums work correctly outside of a jitting context."""
 
     def f(x, y):

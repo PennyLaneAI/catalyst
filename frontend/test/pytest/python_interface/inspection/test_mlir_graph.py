@@ -48,7 +48,7 @@ def collect_files(tmp_path: Path) -> list[str]:
 class TestMLIRGraph:
     """Test the MLIR graph generation"""
 
-    def test_no_qjit_error(self, capture_mode):
+    def test_no_qjit_error(self):
         """Test that an error is raised if trying to use anything other than QJIT as
         an input."""
 
