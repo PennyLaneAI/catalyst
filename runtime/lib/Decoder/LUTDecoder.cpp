@@ -66,8 +66,8 @@ void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
     DataView<int64_t, 1> col_ptr(col_ptr_tanner->data_aligned, col_ptr_tanner->offset,
                                  col_ptr_tanner->sizes, col_ptr_tanner->strides);
 
-    auto current_lut =
-        LUTs::getInstance().get_lut(aux_col_offset, code_size, code_distance, row_idx, col_ptr);
+    auto current_lut = LUTs<int64_t>::getInstance().get_lut(aux_col_offset, code_size,
+                                                            code_distance, row_idx, col_ptr);
 
     DataView<int8_t, 1> syndromes_res(current_syndromes->data_aligned, current_syndromes->offset,
                                       current_syndromes->sizes, current_syndromes->strides);
@@ -75,16 +75,7 @@ void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
     auto syndrome_str = convert_syndrome_res_to_bitstr<int8_t>(syndromes_res);
 
     std::vector<int64_t> error_indices = current_lut[syndrome_str];
-
-    // We use `-1` to full fill the err_idx array if the number of
-    // errors is less than (code_distance - 1)/2
-    for (size_t i = 0; i < (code_distance - 1) / 2; i++) {
-        if (i < error_indices.size()) {
-            err_idx->data_allocated[i] = error_indices[i];
-        }
-        else {
-            err_idx->data_allocated[i] = -1;
-        }
-    }
+    // Copy the inquired error indices back to the err_idx
+    std::copy(error_indices.begin(), error_indices.end(), err_idx->data_allocated);
 }
 } // namespace Catalyst::Runtime::QEC

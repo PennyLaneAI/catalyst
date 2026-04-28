@@ -54,18 +54,20 @@ std::string convert_syndrome_res_to_bitstr(DataView<T, 1> &syndrome_res)
  * qubits (more details here
  * https://github.com/PennyLaneAI/catalyst/blob/ab97f982539b31ab802a63020292595476f22d15/mlir/include/QecPhysical/IR/QecPhysicalTypes.td).
  *
+* @tparam MLIR_I64 MLIR int64_t
  * @param tanner_row_idx The dataview of row indices of the Tanner graph struct.
  * @param tanner_col_ptr The column offsets dataview of the Tanner graph struct.
  * @param aux_cols A vector of column indices for the corresponding type of auxiliary qubits.
  * @return std::pair<std::vector<int64_t>, std::vector<int64_t>> The corresponding parity check
  * matrix in the CSS format. Each column represents an auxiliary qubit.
  */
-std::pair<std::vector<int64_t>, std::vector<int64_t>>
-get_parity_check_matrix(DataView<int64_t, 1> &tanner_row_idx, DataView<int64_t, 1> &tanner_col_ptr,
-                        const std::vector<size_t> &aux_cols)
+template <typename MLIR_I64 = int64_t>
+std::pair<std::vector<MLIR_I64>, std::vector<MLIR_I64>>
+get_parity_check_matrix(DataView<MLIR_I64, 1> &tanner_row_idx,
+                        DataView<MLIR_I64, 1> &tanner_col_ptr, const std::vector<size_t> &aux_cols)
 {
-    std::vector<int64_t> row_idx_parity;
-    std::vector<int64_t> col_ptr_parity{0};
+    std::vector<MLIR_I64> row_idx_parity;
+    std::vector<MLIR_I64> col_ptr_parity{0};
 
     for (const auto &col : aux_cols) {
         auto offset_start = tanner_col_ptr(col);
@@ -87,6 +89,7 @@ get_parity_check_matrix(DataView<int64_t, 1> &tanner_row_idx, DataView<int64_t, 
  *
  * $$s = He \pmod 2$$
  *
+ * @tparam MLIR_I64 MLIR int64_t
  * @param row_idx The row_idx vector of $H$.
  * @param col_ptr The col_ptr vector of $H$.
  * @param num_rows Number of rows of $H$.
@@ -94,8 +97,9 @@ get_parity_check_matrix(DataView<int64_t, 1> &tanner_row_idx, DataView<int64_t, 
  * @param err_vec A vector of qubit errors.
  * @return std::string The syndrome string corresponds to the err_vec.
  */
-std::string get_syndrome_from_errors(const std::vector<int64_t> &row_idx,
-                                     const std::vector<int64_t> &col_ptr, const size_t num_rows,
+template <typename MLIR_I64 = int64_t>
+std::string get_syndrome_from_errors(const std::vector<MLIR_I64> &row_idx,
+                                     const std::vector<MLIR_I64> &col_ptr, const size_t num_rows,
                                      const size_t num_cols, std::vector<int8_t> &err_vec)
 {
 
@@ -116,12 +120,15 @@ std::string get_syndrome_from_errors(const std::vector<int64_t> &row_idx,
 /**
  * @brief Get the error indices of a vector of qubit errors.
  *
+ * @tparam MLIR_I64 MLIR int64_t
  * @param err_vec  A vector of qubit errors.
+ * @param num_errors Number of errors that the QEC code can detect
  * @return std::vector<int64_t> Indices of qubit errors.
  */
-std::vector<int64_t> get_error_indices(std::vector<int8_t> &err_vec)
+template <typename MLIR_I64 = int64_t>
+std::vector<MLIR_I64> get_error_indices(std::vector<int8_t> &err_vec, const size_t num_errors)
 {
-    std::vector<int64_t> error_indices;
+    std::vector<MLIR_I64> error_indices;
 
     error_indices.reserve(err_vec.size());
 
@@ -129,6 +136,13 @@ std::vector<int64_t> get_error_indices(std::vector<int8_t> &err_vec)
         if (err_vec[i] != 0) {
             error_indices.push_back(i);
         }
+    }
+
+    // Case for number of errors less than those can be detected.
+    // We insert -1 instead.
+    size_t num_detected_errors = error_indices.size();
+    if (num_detected_errors < num_errors) {
+        error_indices.insert(error_indices.end(), num_errors - num_detected_errors, -1);
     }
 
     return error_indices;
@@ -141,6 +155,7 @@ std::vector<int64_t> get_error_indices(std::vector<int8_t> &err_vec)
  * represents the number of data qubits and $k$ represents the maximum error weight. Consequently,
  * it is computationally intractable for large-scale codes.
  *
+ * @tparam MLIR_I64 MLIR int64_t
  * @param parity_mat_row_idx The row vector of length nnz that contains row indices of the
  * corresponding elements. Each column corresponds to an X- or Z- check type auxiliary qubit.
  * @param parity_mat_col_ptr The column offsets vector of length number of num_col + 1 that
@@ -151,14 +166,15 @@ std::vector<int64_t> get_error_indices(std::vector<int8_t> &err_vec)
  * corrected.
  * @return std::unordered_map<std::string, std::vector<size_t>>& The result lookup table.
  */
-std::unordered_map<std::string, std::vector<int64_t>>
-generate_lookup_table(const std::vector<int64_t> &parity_mat_row_idx,
-                      const std::vector<int64_t> &parity_mat_col_ptr, const size_t code_size,
+template <typename MLIR_I64 = int64_t>
+std::unordered_map<std::string, std::vector<MLIR_I64>>
+generate_lookup_table(const std::vector<MLIR_I64> &parity_mat_row_idx,
+                      const std::vector<MLIR_I64> &parity_mat_col_ptr, const size_t code_size,
                       const size_t code_distance)
 {
     // The key here is the bitstr representation of the syndrome results, e.g., "0101"
     // The value is the corresponding indices of qubits to correct, e.g., {0, 2}.
-    std::unordered_map<std::string, std::vector<int64_t>> lut;
+    std::unordered_map<std::string, std::vector<MLIR_I64>> lut;
 
     const size_t nnz = parity_mat_row_idx.size();
     const size_t num_aux_qubits = parity_mat_col_ptr.size() - 1; // number of auxiliary qubits
@@ -183,7 +199,7 @@ generate_lookup_table(const std::vector<int64_t> &parity_mat_row_idx,
             std::string syndrome_str =
                 get_syndrome_from_errors(parity_mat_row_idx, parity_mat_col_ptr, num_data_qubits,
                                          num_aux_qubits, err_vector);
-            std::vector<int64_t> error_indices = get_error_indices(err_vector);
+            std::vector<MLIR_I64> error_indices = get_error_indices(err_vector, num_errors);
             // We assume that 1:1 mapping for the syndrome and err_vector
             lut[syndrome_str] = error_indices;
         } while (std::next_permutation(err_vector.begin(), err_vector.end()));
@@ -192,9 +208,14 @@ generate_lookup_table(const std::vector<int64_t> &parity_mat_row_idx,
     return lut;
 }
 
-class LUTs final {
+/**
+ * @brief Singleton design of the LUT decoder.
+ * 
+ * @tparam MLIR_I64 MLIR int64_t
+ */
+template <typename MLIR_I64 = int64_t> class LUTs final {
   private:
-    std::unordered_map<size_t, std::unordered_map<std::string, std::vector<int64_t>>> luts_;
+    std::unordered_map<size_t, std::unordered_map<std::string, std::vector<MLIR_I64>>> luts_;
 
     mutable std::mutex mutex_;
 
@@ -220,12 +241,12 @@ class LUTs final {
      * @param code_distance Code distance of a QEC code.
      * @param row_idx Dataview of the row_idx of a Tanner graph.
      * @param col_ptr Dataview of the col_ptr of a Tanner graph.
-     * @return const std::unordered_map<std::string, std::vector<int64_t>>& The corresponding lookup
-     * table.
+     * @return const std::unordered_map<std::string, std::vector<MLIR_I64>>& The corresponding
+     * lookup table.
      */
     auto get_lut(size_t aux_col_offset, size_t code_size, size_t code_distance,
-                 DataView<int64_t, 1> &row_idx, DataView<int64_t, 1> &col_ptr)
-        -> const std::unordered_map<std::string, std::vector<int64_t>> &
+                 DataView<MLIR_I64, 1> &row_idx, DataView<MLIR_I64, 1> &col_ptr)
+        -> const std::unordered_map<std::string, std::vector<MLIR_I64>> &
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
