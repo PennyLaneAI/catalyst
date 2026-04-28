@@ -13,6 +13,7 @@
 # limitations under the License.
 """Pytest configuration for tests for the catalyst.python_interface submodule."""
 
+from contextlib import contextmanager
 from inspect import getsource
 from io import StringIO
 
@@ -38,10 +39,32 @@ except (ImportError, ModuleNotFoundError):
     deps_available = False
 
 
+@pytest.fixture(scope="session", name="debug_pipeline")
+def debug_pipeline_fixture(request: pytest.FixtureRequest):
+    """Returns whether the --debug-pipeline command line option has been given."""
+    return request.config.getoption("--debug-pipeline")
+
+
+@contextmanager
+def debug_step(message, enabled=True):
+    """A convenience context manager that prints a debug message before running a block of code.
+
+    If the block of code executes without error, "OK" is appended to the debug message.
+    """
+    if enabled:
+        print(f"[DEBUG] {message}... ", end="", flush=True)
+
+    yield  # The code inside the 'with' block runs here
+
+    if enabled:
+        print("OK")
+
+
 # pylint: disable=too-many-positional-arguments,too-many-arguments
 def _run_filecheck_impl(
+    debug_pipeline,
     program_str: str,
-    pipeline: tuple[ModulePass, ...] = (),
+    passes: tuple[ModulePass, ...] = (),
     verify: bool = False,
     roundtrip: bool = False,
     to_mlir: bool = True,
@@ -54,6 +77,11 @@ def _run_filecheck_impl(
 
     ctx = Context(allow_unregistered=False)
     xdsl_module = QuantumParser(ctx, program_str, extra_dialects=(test.Test,)).parse_module()
+
+    if debug_pipeline:
+        print("\n[DEBUG] ========== RUNNING FILECHECK ==========")
+        print("[DEBUG] Initial xDSL module:")
+        print(xdsl_module)
 
     if roundtrip:
         # Print -> parse to xDSL
@@ -77,8 +105,14 @@ def _run_filecheck_impl(
     if verify:
         xdsl_module.verify()
 
-    pipeline = PassPipeline(pipeline)
-    pipeline.apply(ctx, xdsl_module)
+    pipeline = PassPipeline(passes)
+
+    with debug_step(f"Applying pass pipeline '{pipeline}'", debug_pipeline):
+        pipeline.apply(ctx, xdsl_module)
+
+    if debug_pipeline:
+        print("[DEBUG] After:")
+        print(xdsl_module)
 
     if verify:
         xdsl_module.verify()
@@ -105,7 +139,7 @@ def _run_filecheck_impl(
 
 
 @pytest.fixture(scope="function")
-def run_filecheck():
+def run_filecheck(debug_pipeline):
     """Fixture to run filecheck on an xDSL module.
 
     This fixture uses FileCheck to verify the correctness of a parsed MLIR string. Testers
@@ -132,7 +166,10 @@ def run_filecheck():
     if not deps_available:
         pytest.skip("Cannot run xDSL lit tests without the Python 'filecheck' package.")
 
-    yield _run_filecheck_impl
+    def wrapper(*args, **kwargs):
+        return _run_filecheck_impl(debug_pipeline, *args, **kwargs)
+
+    yield wrapper
 
 
 def _get_filecheck_directives(qjit_fn):
@@ -217,18 +254,18 @@ def run_filecheck_qjit():
 
         def test_qjit(self, run_filecheck_qjit):
             # Test that the merge_rotations_pass works as expected when used with `qjit`
-            dev = qml.device("lightning.qubit", wires=2)
+            dev = qp.device("lightning.qubit", wires=2)
 
-            @qml.qjit(target="mlir")
+            @qp.qjit(target="mlir")
             @merge_rotations_pass
-            @qml.qnode(dev)
+            @qp.qnode(dev)
             def circuit(x: float, y: float):
                 # CHECK: [[phi:%.*]] = arith.addf
                 # CHECK: quantum.custom "RX"([[phi]])
                 # CHECK-NOT: quantum.custom
-                qml.RX(x, 0)
-                qml.RX(y, 0)
-                return qml.state()
+                qp.RX(x, 0)
+                qp.RX(y, 0)
+                return qp.state()
 
             run_filecheck_qjit(circuit)
 

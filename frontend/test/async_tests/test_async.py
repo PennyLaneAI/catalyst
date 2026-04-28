@@ -15,7 +15,7 @@
 """Integration tests for the async execution of QNodes features."""
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 from jax import numpy as jnp
 
@@ -29,29 +29,29 @@ from catalyst import adjoint, cond, for_loop, grad, measure, qjit, while_loop
 
 def test_qnode_execution(backend):
     """The two first QNodes are executed in parrallel."""
-    dev = qml.device(backend, wires=2)
+    dev = qp.device(backend, wires=2)
 
     def multiple_qnodes(params):
-        @qml.qnode(device=dev)
+        @qp.qnode(device=dev)
         def circuit1(params):
-            qml.RX(params[0], wires=0)
-            qml.RY(params[1], wires=1)
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(qml.PauliZ(wires=0))
+            qp.RX(params[0], wires=0)
+            qp.RY(params[1], wires=1)
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.PauliZ(wires=0))
 
-        @qml.qnode(device=dev)
+        @qp.qnode(device=dev)
         def circuit2(params):
-            qml.RY(params[0], wires=0)
-            qml.RZ(params[1], wires=1)
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(qml.PauliX(wires=0))
+            qp.RY(params[0], wires=0)
+            qp.RZ(params[1], wires=1)
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.PauliX(wires=0))
 
-        @qml.qnode(device=dev)
+        @qp.qnode(device=dev)
         def circuit3(params):
-            qml.RZ(params[0], wires=0)
-            qml.RX(params[1], wires=1)
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(qml.PauliY(wires=0))
+            qp.RZ(params[0], wires=0)
+            qp.RX(params[1], wires=1)
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.PauliY(wires=0))
 
         new_params = jnp.array([circuit1(params), circuit2(params)])
         return circuit3(new_params)
@@ -72,19 +72,19 @@ def test_gradient(inp, diff_methods, backend):
     """Parameter shift and finite diff generate multiple QNode that are run async."""
 
     def f(x):
-        qml.RX(x * 2, wires=0)
-        return qml.expval(qml.PauliY(0))
+        qp.RX(x * 2, wires=0)
+        return qp.expval(qp.PauliY(0))
 
     @qjit(async_qnodes=True)
     def compiled(x: float):
-        g = qml.qnode(qml.device(backend, wires=1), diff_method=diff_methods[0])(f)
+        g = qp.qnode(qp.device(backend, wires=1), diff_method=diff_methods[0])(f)
         h = grad(g, method=diff_methods[1])
         return h(x)
 
     def interpreted(x):
-        device = qml.device("default.qubit", wires=1)
-        g = qml.QNode(f, device, diff_method="backprop")
-        h = qml.grad(g, argnums=0)
+        device = qp.device("default.qubit", wires=1)
+        g = qp.QNode(f, device, diff_method="backprop")
+        h = qp.grad(g, argnums=0)
         return h(x)
 
     assert "async_execute_fn" in compiled.llvmir
@@ -94,10 +94,10 @@ def test_gradient(inp, diff_methods, backend):
 def test_exception(backend):
     "Test exception."
 
-    @qml.qnode(qml.device(backend, wires=2))
+    @qp.qnode(qp.device(backend, wires=2))
     def circuit(x: int):
-        qml.CNOT(wires=[x, 0])
-        return qml.probs()
+        qp.CNOT(wires=[x, 0])
+        return qp.probs()
 
     @qjit(async_qnodes=True)
     def wrapper():
@@ -112,10 +112,10 @@ def test_exception(backend):
 def test_exception2(backend):
     "Test exception in multiple async executions."
 
-    @qml.qnode(qml.device(backend, wires=2))
+    @qp.qnode(qp.device(backend, wires=2))
     def circuit(x: int):
-        qml.CNOT(wires=[x, 0])
-        return qml.probs()
+        qp.CNOT(wires=[x, 0])
+        return qp.probs()
 
     @qjit(async_qnodes=True)
     def wrapper():
@@ -130,10 +130,10 @@ def test_exception2(backend):
 def test_exception3(backend):
     "Test exception when not used in python."
 
-    @qml.qnode(qml.device(backend, wires=2))
+    @qp.qnode(qp.device(backend, wires=2))
     def circuit(x: int):
-        qml.CNOT(wires=[x, 0])
-        return qml.probs()
+        qp.CNOT(wires=[x, 0])
+        return qp.probs()
 
     @qjit(async_qnodes=True)
     def wrapper():
@@ -149,16 +149,16 @@ def test_exception3(backend):
 def test_exception4(backend):
     "Test exception happening on two different circuits."
 
-    @qml.qnode(qml.device(backend, wires=2))
+    @qp.qnode(qp.device(backend, wires=2))
     def circuit(x: int):
-        qml.CNOT(wires=[x, 0])
-        return qml.probs()
+        qp.CNOT(wires=[x, 0])
+        return qp.probs()
 
-    @qml.qnode(qml.device(backend, wires=2))
+    @qp.qnode(qp.device(backend, wires=2))
     def circuit2(x: int):
-        qml.Hadamard(wires=[0])
-        qml.CNOT(wires=[x, 0])
-        return qml.probs()
+        qp.Hadamard(wires=[0])
+        qp.CNOT(wires=[x, 0])
+        return qp.probs()
 
     @qjit(async_qnodes=True)
     def wrapper():
@@ -175,18 +175,18 @@ def test_exception_adjoint(backend):
     "Test exception happening on two different circuits both adjointed."
 
     def bad_cnot(x):
-        qml.CNOT(wires=[x, 0])
+        qp.CNOT(wires=[x, 0])
 
-    @qml.qnode(qml.device(backend, wires=2))
+    @qp.qnode(qp.device(backend, wires=2))
     def circuit(x: int):
         adjoint(bad_cnot)(x)
-        return qml.probs()
+        return qp.probs()
 
-    @qml.qnode(qml.device(backend, wires=2))
+    @qp.qnode(qp.device(backend, wires=2))
     def circuit2(x: int):
-        qml.Hadamard(wires=[0])
+        qp.Hadamard(wires=[0])
         adjoint(bad_cnot)(x)
-        return qml.probs()
+        return qp.probs()
 
     @qjit(async_qnodes=True)
     def wrapper():
@@ -200,10 +200,10 @@ def test_exception_adjoint(backend):
 
 
 def test_exception_conditional(backend):
-    @qml.qnode(qml.device(backend, wires=2))
+    @qp.qnode(qp.device(backend, wires=2))
     def circuit(x: int):
-        qml.CNOT(wires=[x, 0])
-        return qml.probs()
+        qp.CNOT(wires=[x, 0])
+        return qp.probs()
 
     @qjit(async_qnodes=True)
     def wrapper(x: int):
@@ -226,10 +226,10 @@ def test_exception_conditional(backend):
 def test_exception_conditional_1(backend):
     "Test exception happening in else and outside else."
 
-    @qml.qnode(qml.device(backend, wires=2))
+    @qp.qnode(qp.device(backend, wires=2))
     def circuit(x: int):
-        qml.CNOT(wires=[x, 0])
-        return qml.probs()
+        qp.CNOT(wires=[x, 0])
+        return qp.probs()
 
     @qjit(async_qnodes=True)
     def wrapper(x: int):
@@ -254,10 +254,10 @@ def test_exception_conditional_1(backend):
 def test_exception_conditional_2(backend):
     "Test exception happening in the presence of an if statement but in another."
 
-    @qml.qnode(qml.device(backend, wires=2))
+    @qp.qnode(qp.device(backend, wires=2))
     def circuit(x: int):
-        qml.CNOT(wires=[x, 0])
-        return qml.probs()
+        qp.CNOT(wires=[x, 0])
+        return qp.probs()
 
     @qjit(async_qnodes=True)
     def wrapper(x: int):
@@ -284,32 +284,32 @@ def test_exception_conditional_2(backend):
 )
 def test_qnode_exception_dependency(order, backend):
     """The two first QNodes are executed in parrallel."""
-    dev = qml.device(backend, wires=2)
+    dev = qp.device(backend, wires=2)
     x = order[0]
     y = order[1]
     z = order[2]
 
     def multiple_qnodes(params):
-        @qml.qnode(device=dev)
+        @qp.qnode(device=dev)
         def circuit1(params, x):
-            qml.RX(params[0], wires=0)
-            qml.RY(params[1], wires=1)
-            qml.CNOT(wires=[x, 1])
-            return qml.expval(qml.PauliZ(wires=0))
+            qp.RX(params[0], wires=0)
+            qp.RY(params[1], wires=1)
+            qp.CNOT(wires=[x, 1])
+            return qp.expval(qp.PauliZ(wires=0))
 
-        @qml.qnode(device=dev)
+        @qp.qnode(device=dev)
         def circuit2(params, x):
-            qml.RY(params[0], wires=0)
-            qml.RZ(params[1], wires=1)
-            qml.CNOT(wires=[x, 1])
-            return qml.expval(qml.PauliX(wires=0))
+            qp.RY(params[0], wires=0)
+            qp.RZ(params[1], wires=1)
+            qp.CNOT(wires=[x, 1])
+            return qp.expval(qp.PauliX(wires=0))
 
-        @qml.qnode(device=dev)
+        @qp.qnode(device=dev)
         def circuit3(params, x):
-            qml.RZ(params[0], wires=0)
-            qml.RX(params[1], wires=1)
-            qml.CNOT(wires=[x, 1])
-            return qml.expval(qml.PauliY(wires=0))
+            qp.RZ(params[0], wires=0)
+            qp.RX(params[1], wires=1)
+            qp.CNOT(wires=[x, 1])
+            return qp.expval(qp.PauliY(wires=0))
 
         new_params = jnp.array([circuit1(params, x), circuit2(params, y)])
         return circuit3(new_params, z)
@@ -328,13 +328,13 @@ def test_gradient_exception(inp, diff_methods, backend):
     """Parameter shift and finite diff generate multiple QNode that are run async."""
 
     def f(x, y):
-        qml.RX(x * 2, wires=0)
-        qml.CNOT(wires=[0, y])
-        return qml.expval(qml.PauliY(0))
+        qp.RX(x * 2, wires=0)
+        qp.CNOT(wires=[0, y])
+        return qp.expval(qp.PauliY(0))
 
     @qjit(async_qnodes=True)
     def compiled(x: float):
-        g = qml.qnode(qml.device(backend, wires=1), diff_method=diff_methods[0])(f)
+        g = qp.qnode(qp.device(backend, wires=1), diff_method=diff_methods[0])(f)
         h = grad(g, method=diff_methods[1], argnums=[0])
         return h(x, 0)
 
@@ -347,11 +347,11 @@ def test_exception_in_loop(backend):
     "Test exception happening in a loop."
 
     @qjit(async_qnodes=True)
-    @qml.qnode(qml.device(backend, wires=3))
+    @qp.qnode(qp.device(backend, wires=3))
     def circuit(n):
         @while_loop(lambda v: v[0] < v[1])
         def loop(v):
-            qml.CNOT(wires=[n, v[0]])
+            qp.CNOT(wires=[n, v[0]])
             return v[0] + 1, v[1]
 
         loop((0, 3))
@@ -373,11 +373,11 @@ def test_exception_in_for_loop(backend):
     "Test exception happening in a loop."
 
     @qjit(async_qnodes=True)
-    @qml.qnode(qml.device(backend, wires=1))
+    @qp.qnode(qp.device(backend, wires=1))
     def circuit(n):
         @for_loop(0, 1, n)
         def loop(i):
-            qml.CNOT(wires=[0, i])
+            qp.CNOT(wires=[0, i])
 
         return loop()
 
@@ -390,19 +390,19 @@ def test_exception_in_for_loop(backend):
 def test_exception_in_loop2(backend):
     "Test exception happening in a loop while one qnode succeeds."
 
-    @qml.qnode(qml.device(backend, wires=3))
+    @qp.qnode(qp.device(backend, wires=3))
     def bad(n):
         @while_loop(lambda v: v[0] < v[1])
         def loop(v):
-            qml.CNOT(wires=[n, v[0]])
+            qp.CNOT(wires=[n, v[0]])
             return v[0] + 1, v[1]
 
         loop((0, 3))
         return measure(wires=0)
 
-    @qml.qnode(qml.device(backend, wires=3))
+    @qp.qnode(qp.device(backend, wires=3))
     def good():
-        return qml.state()
+        return qp.state()
 
     @qjit(async_qnodes=True)
     def wrapper(n):

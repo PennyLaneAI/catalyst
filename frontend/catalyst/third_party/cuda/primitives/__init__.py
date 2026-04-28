@@ -399,11 +399,11 @@ def cudaq_sample_impl(kernel, *args, shots_count=1000):
     """Concrete implementation of cudaq.sample.
 
     `cudaq.sample` returns an object which is a compressed version of what
-    `qml.sample` returns as samples. Instead of returning an array with the observed
+    `qp.sample` returns as samples. Instead of returning an array with the observed
     population, `cudaq.sample` returns a dictionary where the keys are bitstrings and
     values are the frequency those bitstrings were observed.
 
-    In a way `qml.count` is more similar to `cudaq.sample` than `qml.sample`.
+    In a way `qp.count` is more similar to `cudaq.sample` than `qp.sample`.
     So, let's perform a little conversion here.
     """
     a_dict = cudaq.sample(kernel, *args, shots_count=shots_count)
@@ -431,14 +431,14 @@ def cudaq_counts(kernel, *args, shape, shots_count=1000):
 def cudaq_counts_impl(kernel, *args, shape=None, shots_count=1000):
     """Concrete implementation of counts.
     `cudaq.sample` returns an object which is a compressed version of what
-    `qml.sample` returns as samples. Instead of returning an array with the observed
+    `qp.sample` returns as samples. Instead of returning an array with the observed
     population, `cudaq.sample` returns a dictionary where the keys are bitstrings and
     values are the frequency those bitstrings were observed.
 
-    CUDA-quantum does not implement another function similar to `qml.counts`.
+    CUDA-quantum does not implement another function similar to `qp.counts`.
     The closest function is `cudaq.sample`.
 
-    In Catalyst, `qml.counts` returns two arrays.
+    In Catalyst, `qp.counts` returns two arrays.
     The first array corresponds to a count from 0..shape
     denoting the integers that can be computed from the bitstrings.
     """

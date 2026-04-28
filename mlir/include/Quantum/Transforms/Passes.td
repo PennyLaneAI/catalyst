@@ -106,8 +106,8 @@ def GridsynthPass : Pass<"gridsynth"> {
         /*C++ var name=*/"epsilon",
         /*CLI name=*/"epsilon",
         /*Type=*/"double",
-       /*Default=*/"1e-4",
-       /*Description=*/"Maximum error tolerance for per-gate discretization.">,
+        /*Default=*/"1e-4",
+        /*Description=*/"Maximum error tolerance for per-gate discretization.">,
         Option<
         /*C++ var name=*/"pprBasis",
         /*CLI name=*/"ppr-basis",
@@ -126,6 +126,45 @@ def MergeRotationsPass : Pass<"merge-rotations"> {
     let summary = "Perform merging of chained rotation gates about the same axis.";
 
     let dependentDialects = ["math::MathDialect"];
+}
+
+def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
+    let summary = "Decompose gates using an MLIR-native graph-based framework.";
+
+    let options = [
+        ListOption<
+            /*C++ name*/"targetGateSetOption",
+            /*CLI name*/"gate-set",
+            /*Type*/"std::string",
+            /*Description*/"The accepted gates to decompose to.">,
+        ListOption<
+            /*C++ name*/"fixedDecompsOption",
+            /*CLI name*/"fixed-decomps",
+            /*Type*/"std::string",
+            /*Description*/"Maps an operator to a decomposition rule that will be applied.">,
+        ListOption<
+            /*C++ name*/"altDecompsOption",
+            /*CLI name*/"alt-decomps",
+            /*Type*/"std::string",
+            /*Description*/
+            "Maps an operator to a `|` separated list of alternative decomposition "
+            "rules that will be considered alongside any built-in rules for the operator.">,
+        Option<
+            /*C++ name*/"bytecodeRulesFile",
+            /*CLI name*/"bytecode-rules",
+            /*Type*/"std::string",
+            /*Default*/[{ "./frontend/catalyst/resources/decomposition_rules.mlirbc" }],
+            /*Description*/"A path to a bytecode file of compiled decomposition rules.">
+    ];
+
+    let dependentDialects = [
+        "memref::MemRefDialect",
+        "func::FuncDialect",
+        "scf::SCFDialect",
+        "LLVM::LLVMDialect",
+        "stablehlo::StablehloDialect",
+        "tensor::TensorDialect",
+    ];
 }
 
 def DecomposeLoweringPass : Pass<"decompose-lowering"> {

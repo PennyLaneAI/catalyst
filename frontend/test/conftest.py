@@ -72,6 +72,17 @@ def pytest_addoption(parser):
         " runtime must be compiled with `ENABLE_OPENQASM=ON`",
     )
 
+    parser.addoption(
+        "--debug-pipeline",
+        action="store_true",
+        help=(
+            "For tests that use the run_filecheck fixture, display the full xDSL module IR before "
+            "and after applying a compilation pipeline. This option should generally be used with "
+            "either the '--capture=no' or '-s' option (or similar) in order to display the output "
+            "to the terminal."
+        ),
+    )
+
 
 def pytest_generate_tests(metafunc):
     """A pytest fixture to define custom parametrization"""

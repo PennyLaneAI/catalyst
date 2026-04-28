@@ -2,7 +2,7 @@
 
     from dataclasses import dataclass
 
-    import pennylane as qml
+    import pennylane as qp
     from catalyst.python_interface.conversion import xdsl_from_qjit
     from catalyst.python_interface.dialects.quantum import CustomOp, QubitType
 
@@ -17,14 +17,14 @@ Convert into xDSL module
 
 .. code-block:: python
 
-    dev = qml.device("lightning.qubit", wires=5)
+    dev = qp.device("lightning.qubit", wires=5)
 
     @xdsl_from_qjit
-    @qml.qjit(target="mlir")
-    @qml.qnode(dev)
+    @qp.qjit(target="mlir")
+    @qp.qnode(dev)
     def circuit(x):
-        qml.H(0)
-        return qml.expval(qml.Z(0))
+        qp.H(0)
+        return qp.expval(qp.Z(0))
 
 
 >>> qjit_mod = circuit(1.5)

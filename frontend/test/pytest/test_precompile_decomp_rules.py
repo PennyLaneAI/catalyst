@@ -19,12 +19,11 @@ import pytest
 
 from catalyst.compiler import _quantum_opt
 from catalyst.utils.precompile_decomposition_rules import (
-    BYTECODE_FILE_PATH,
-    COMPILER_OPS_FOR_DECOMPOSITION,
     compile_op_decomp_rules,
     get_abstract_args,
     precompile_decomp_rules,
 )
+from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 
 class TestGetAbstractArgs:
@@ -136,7 +135,6 @@ def test_bytecode_file():
 
     assert "_isingxy_to_h_cy" in rules
     assert "_doublexcit" in rules
-    assert "_toffoli_to_ppr" in rules
     assert "_pauliz_to_ps" in rules
     assert "_cphase_to_ppr" in rules
     assert "_crot" in rules

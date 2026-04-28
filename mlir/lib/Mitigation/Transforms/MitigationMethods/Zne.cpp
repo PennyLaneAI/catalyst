@@ -245,7 +245,7 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
     Value numberQubitsValue = arith::ConstantOp::create(rewriter, loc, numberQubitsAttr);
 
     // TODO: in the frontend, calculation of shots will happen outside of the qnode,
-    // before qml.device(..., shots = <some value computed earlier>) is called,
+    // before qp.device(..., shots = <some value computed earlier>) is called,
     // so the SSA def-use computation chain of the shots will actually not be inside the qnode
     // For now, we simply create a single arith.constant SSA shots value for the ZNE tests.
     // Revisit when discussing the frontend design of dynamic shots/device/qnode interaction.

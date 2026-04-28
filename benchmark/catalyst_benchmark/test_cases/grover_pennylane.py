@@ -20,7 +20,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
-import pennylane as qml
+import pennylane as qp
 import pennylane.numpy as pnp
 from catalyst_benchmark.types import Problem
 
@@ -79,38 +79,38 @@ def oracle(t):
 
     # Compute clauses
     for i, clause in enumerate(clause_list):
-        qml.CNOT(wires=[t.iqr[clause[0]], t.cqr[i]])
-        qml.CNOT(wires=[t.iqr[clause[1]], t.cqr[i]])
+        qp.CNOT(wires=[t.iqr[clause[0]], t.cqr[i]])
+        qp.CNOT(wires=[t.iqr[clause[1]], t.cqr[i]])
 
     # Flip 'output' bit if all clauses are satisfied
-    qml.MultiControlledX(wires=t.cqr_oqr, work_wires=t.anc1)
+    qp.MultiControlledX(wires=t.cqr_oqr, work_wires=t.anc1)
 
     # Uncompute clauses to reset clause-checking bits to 0
     for i, clause in reversed(list(enumerate(clause_list))):
-        qml.CNOT(wires=[t.iqr[clause[1]], t.cqr[i]])
-        qml.CNOT(wires=[t.iqr[clause[0]], t.cqr[i]])
+        qp.CNOT(wires=[t.iqr[clause[1]], t.cqr[i]])
+        qp.CNOT(wires=[t.iqr[clause[0]], t.cqr[i]])
 
 
 def diffuser(t):
     """Diffuser part of the Grover algorithm"""
     # Apply transformation |s> -> |00..0> (H-gates)
     for qubit in t.iqr:
-        qml.Hadamard(wires=[qubit])
+        qp.Hadamard(wires=[qubit])
     # Apply transformation |00..0> -> |11..1> (X-gates)
     for qubit in t.iqr:
-        qml.PauliX(wires=[qubit])
+        qp.PauliX(wires=[qubit])
     # Do multi-controlled-Z gate
     for qubit in t.iqr[:-1]:
-        qml.Hadamard(wires=[qubit])
-    qml.MultiControlledX(wires=t.iqr, work_wires=t.anc2)
+        qp.Hadamard(wires=[qubit])
+    qp.MultiControlledX(wires=t.iqr, work_wires=t.anc2)
     for qubit in t.iqr[:-1]:
-        qml.Hadamard(wires=[qubit])
+        qp.Hadamard(wires=[qubit])
     # Apply transformation |11..1> -> |00..0>
     for qubit in t.iqr:
-        qml.PauliX(wires=[qubit])
+        qp.PauliX(wires=[qubit])
     # Apply transformation |00..0> -> |s>
     for qubit in t.iqr:
-        qml.Hadamard(wires=[qubit])
+        qp.Hadamard(wires=[qubit])
 
 
 def qcompile(p: ProblemPL, weights):
@@ -119,7 +119,7 @@ def qcompile(p: ProblemPL, weights):
     def _main(weights):
         # Initialize the state
         for qubit in p.iqr:
-            qml.Hadamard(wires=[qubit])
+            qp.Hadamard(wires=[qubit])
 
         for _ in range(int(p.nlayers)):
             # Apply the oracle
@@ -127,10 +127,10 @@ def qcompile(p: ProblemPL, weights):
             # Apply the diffuser
             diffuser(p)
 
-            qml.BasicEntanglerLayers(weights=weights, wires=p.iqr)
-        return qml.state()
+            qp.BasicEntanglerLayers(weights=weights, wires=p.iqr)
+        return qp.state()
 
-    qcircuit = qml.QNode(_main, p.dev, **p.qnode_kwargs)
+    qcircuit = qp.QNode(_main, p.dev, **p.qnode_kwargs)
     qcircuit.construct([weights], {})
     p.qcircuit = qcircuit
 
@@ -154,7 +154,7 @@ def run_jax_default_qubit(N=7, L=10):
 
     jax.config.update("jax_enable_x64", True)
 
-    p = ProblemPL(qml.device("default.qubit", wires=N, shots=None), L, interface="jax")
+    p = ProblemPL(qp.device("default.qubit", wires=N, shots=None), L, interface="jax")
     print(f"Size: {size(p)}")
 
     @jax.jit
@@ -171,7 +171,7 @@ def profile_jax_default_qubit(N=7, L=10):
 
     jax.config.update("jax_enable_x64", True)
 
-    p = ProblemPL(qml.device("default.qubit", wires=N, shots=None), L, interface="jax")
+    p = ProblemPL(qp.device("default.qubit", wires=N, shots=None), L, interface="jax")
     print(f"Size: {size(p)}")
 
     @jax.jit
@@ -189,7 +189,7 @@ def run_jax_lightning_qubit(N=7):
 
     jax.config.update("jax_enable_x64", True)
 
-    p = ProblemPL(qml.device("lightning.qubit", wires=N, shots=None), 4, interface="jax")
+    p = ProblemPL(qp.device("lightning.qubit", wires=N, shots=None), 4, interface="jax")
     print(f"Size: {size(p)}")
 
     @jax.jit
@@ -202,7 +202,7 @@ def run_jax_lightning_qubit(N=7):
 
 def run_lightning_qubit(N=7):
     """Test entry point"""
-    p = ProblemPL(qml.device("lightning.qubit", wires=N, shots=None), 4, interface=None)
+    p = ProblemPL(qp.device("lightning.qubit", wires=N, shots=None), 4, interface=None)
     print(f"Size: {size(p)}")
 
     def _main(params):
@@ -214,7 +214,7 @@ def run_lightning_qubit(N=7):
 
 def run_default_qubit(N=7):
     """Test entry point"""
-    p = ProblemPL(qml.device("default.qubit", wires=N, shots=None), 4, interface=None)
+    p = ProblemPL(qp.device("default.qubit", wires=N, shots=None), 4, interface=None)
     print(f"Size: {size(p)}")
 
     def _main(params):

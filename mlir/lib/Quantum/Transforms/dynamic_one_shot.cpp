@@ -367,7 +367,7 @@ void editKernelMCMExpval(IRRewriter &builder, func::FuncOp oneShotKernel, quantu
     builder.setInsertionPoint(retOp);
 
     assert(mcmobs.getMcms().size() == 1 &&
-           "qml.expval does not support measuring sequences of measurements or observables");
+           "qp.expval does not support measuring sequences of measurements or observables");
     Value mcm = mcmobs.getMcms()[0];
     auto extuiOp = arith::ExtUIOp::create(builder, loc, builder.getI64Type(), mcm);
     auto int2floatCastOp =
