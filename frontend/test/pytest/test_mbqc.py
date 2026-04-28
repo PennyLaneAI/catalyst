@@ -49,16 +49,13 @@ def test_measure_x(mbqc_pipeline):
     """
     dev = qp.device("null.qubit", wires=1)
 
-    qp.capture.enable()
-
-    @qjit(pipelines=mbqc_pipeline)
+    @qjit(capture=True, pipelines=mbqc_pipeline)
     @qp.qnode(dev)
     def workload():
         _ = plft.measure_x(0)
         return qp.expval(qp.Z(0))
 
     result = workload()
-    qp.capture.disable()
 
     assert -1.0 <= result <= 1.0
 
@@ -75,16 +72,13 @@ def test_measure_y(mbqc_pipeline):
     """
     dev = qp.device("null.qubit", wires=1)
 
-    qp.capture.enable()
-
-    @qjit(pipelines=mbqc_pipeline)
+    @qjit(capture=True, pipelines=mbqc_pipeline)
     @qp.qnode(dev)
     def workload():
         _ = plft.measure_y(0)
         return qp.expval(qp.Z(0))
 
     result = workload()
-    qp.capture.disable()
 
     assert -1.0 <= result <= 1.0
 
@@ -102,16 +96,13 @@ def test_measure_z(mbqc_pipeline):
     """
     dev = qp.device("null.qubit", wires=1)
 
-    qp.capture.enable()
-
-    @qjit(pipelines=mbqc_pipeline)
+    @qjit(capture=True, pipelines=mbqc_pipeline)
     @qp.qnode(dev)
     def workload():
         _ = plft.measure_z(0)
         return qp.expval(qp.Z(0))
 
     result = workload()
-    qp.capture.disable()
 
     assert -1.0 <= result <= 1.0
 
@@ -131,16 +122,13 @@ def test_measure_measure_arbitrary_basis(angle, plane, mbqc_pipeline):
     """
     dev = qp.device("null.qubit", wires=1)
 
-    qp.capture.enable()
-
-    @qjit(pipelines=mbqc_pipeline)
+    @qjit(capture=True, pipelines=mbqc_pipeline)
     @qp.qnode(dev)
     def workload():
         _ = plft.measure_arbitrary_basis(wires=0, angle=angle, plane=plane)
         return qp.expval(qp.Z(0))
 
     result = workload()
-    qp.capture.disable()
 
     assert -1.0 <= result <= 1.0
 
@@ -155,16 +143,13 @@ def test_measure_measure_arbitrary_basis_postselect(postselect, mbqc_pipeline):
     """
     dev = qp.device("null.qubit", wires=1)
 
-    qp.capture.enable()
-
-    @qjit(pipelines=mbqc_pipeline)
+    @qjit(capture=True, pipelines=mbqc_pipeline)
     @qp.qnode(dev)
     def workload():
         _ = plft.measure_arbitrary_basis(wires=0, angle=0.1, plane="XY", postselect=postselect)
         return qp.expval(qp.Z(0))
 
     result = workload()
-    qp.capture.disable()
 
     assert -1.0 <= result <= 1.0
 
@@ -175,19 +160,15 @@ def test_measure_measure_arbitrary_basis_invalid_plane(mbqc_pipeline):
     """
     dev = qp.device("null.qubit", wires=1)
 
-    qp.capture.enable()
-
     with pytest.raises(ValueError, match=r"Measurement plane must be one of \['XY', 'YZ', 'ZX'\]"):
 
-        @qjit(pipelines=mbqc_pipeline)
+        @qjit(capture=True, pipelines=mbqc_pipeline)
         @qp.qnode(dev)
         def workload():
             _ = plft.measure_arbitrary_basis(wires=0, angle=0.1, plane="YX")
             return qp.expval(qp.Z(0))
 
         _ = workload()
-
-    qp.capture.disable()
 
 
 @pytest.mark.parametrize("postselect", [-1, 2])
@@ -197,21 +178,17 @@ def test_measure_measure_arbitrary_basis_invalid_postselect(postselect, mbqc_pip
     """
     dev = qp.device("null.qubit", wires=1)
 
-    qp.capture.enable()
-
     with pytest.raises(
         CompileError, match="op attribute 'postselect' failed to satisfy constraint"
     ):
 
-        @qjit(pipelines=mbqc_pipeline)
+        @qjit(capture=True, pipelines=mbqc_pipeline)
         @qp.qnode(dev)
         def workload():
             _ = plft.measure_arbitrary_basis(wires=0, angle=0.1, plane="XY", postselect=postselect)
             return qp.expval(qp.Z(0))
 
         _ = workload()
-
-    qp.capture.disable()
 
 
 # ---------------------------------------------------------------------------- #
@@ -238,10 +215,8 @@ def test_explicit_rz_in_mbqc(rz_angle, mbqc_pipeline):
     # 0 -- 1 -- 2 -- 3 -- 4
     lattice = plft.generate_lattice([4], "chain")
 
-    qp.capture.enable()
-
     # RZ circuit in the MBQC representation
-    @qjit(pipelines=mbqc_pipeline)
+    @qjit(capture=True, pipelines=mbqc_pipeline)
     @qp.qnode(dev)
     def circuit_mbqc(start_state, angle):
         # prep input node
@@ -272,8 +247,6 @@ def test_explicit_rz_in_mbqc(rz_angle, mbqc_pipeline):
     initial_state = np.array([1, 0], dtype=np.complex128)
 
     expval_x, expval_y, expval_z = circuit_mbqc(initial_state, rz_angle)
-
-    qp.capture.disable()
 
     # We only assert that the expectation-value results are mathematically valid
     assert -1.0 <= expval_x <= 1.0
@@ -333,10 +306,8 @@ def test_cnot_in_mbqc_representation(mbqc_pipeline):
         """
         return reduce(lambda a, b: a ^ b, args)
 
-    qp.capture.enable()
-
     # Equivalent CNOT circuit in the MBQC representation
-    @qjit(pipelines=mbqc_pipeline)
+    @qjit(capture=True, pipelines=mbqc_pipeline)
     @qp.qnode(dev)
     def circuit_mbqc(start_state):
         # prep input nodes
@@ -381,8 +352,6 @@ def test_cnot_in_mbqc_representation(mbqc_pipeline):
     initial_state = np.array([1, 0], dtype=np.complex128)
 
     expval_z_0, expval_z_1 = circuit_mbqc(initial_state)
-
-    qp.capture.disable()
 
     assert -1.0 <= expval_z_0 <= 1.0
     assert -1.0 <= expval_z_1 <= 1.0
