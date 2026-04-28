@@ -1,4 +1,4 @@
-// Copyright 2025 Xanadu Quantum Technologies Inc.
+// Copyright 2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,21 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef PBC_ATTR_DEFS
+#define PBC_ATTR_DEFS
 
-#include "mlir/IR/Dialect.h"
+include "mlir/IR/EnumAttr.td"
 
-#include "PBC/IR/PBCAttrDefs.h"
-
-//===----------------------------------------------------------------------===//
-// PBC dialect declarations.
-//===----------------------------------------------------------------------===//
-
-#include "PBC/IR/PBCOpsDialect.h.inc"
+include "PBC/IR/PBCDialect.td"
 
 //===----------------------------------------------------------------------===//
-// PBC type declarations.
+// PBC dialect enums and attributes.
 //===----------------------------------------------------------------------===//
 
-#define GET_TYPEDEF_CLASSES
-#include "PBC/IR/PBCOpsTypes.h.inc"
+// Constraint for rotation_kind: must be one of ±1, ±2, ±4, ±8
+// The power-of-2 check works because powers of 2 have exactly one bit set.
+def RotationKindConstraint : AttrConstraint<
+    CPred<"[&]() {"
+          "  auto val = ::llvm::cast<::mlir::IntegerAttr>($_self).getSInt();"
+          "  auto absVal = val < 0 ? -val : val;"
+          "  return absVal >= 1 && absVal <= 8 && (absVal & (absVal - 1)) == 0;"
+          "}()">,
+    "whose value is ±1, ±2, ±4, or ±8">;
+
+#endif // PBC_ATTR_DEFS

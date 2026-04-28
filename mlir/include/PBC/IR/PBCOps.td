@@ -21,6 +21,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td" // for Pure
 
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumTypes.td"
+include "PBC/IR/PBCAttrDefs.td"
 include "PBC/IR/PBCDialect.td"
 include "PBC/IR/PBCOpInterfaces.td"
 
@@ -33,16 +34,6 @@ class PBC_Op<string mnemonic, list<Trait> traits = []> : Op<PBCDialect, mnemonic
 //===----------------------------------------------------------------------===//
 // Attribute constraints
 //===----------------------------------------------------------------------===//
-
-// Constraint for rotation_kind: must be one of ±1, ±2, ±4, ±8
-// The power-of-2 check works because powers of 2 have exactly one bit set.
-def RotationKindConstraint : AttrConstraint<
-    CPred<"[&]() {"
-          "  auto val = ::llvm::cast<::mlir::IntegerAttr>($_self).getSInt();"
-          "  auto absVal = val < 0 ? -val : val;"
-          "  return absVal >= 1 && absVal <= 8 && (absVal & (absVal - 1)) == 0;"
-          "}()">,
-    "whose value is ±1, ±2, ±4, or ±8">;
 
 def PrepareStateOp : PBC_Op<"prepare"> {
     let summary = "Prepare auxiliary qubits in a given state.";
