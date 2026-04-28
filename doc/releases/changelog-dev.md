@@ -548,6 +548,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Refactored all passes in `catalyst.passes.builtin_passes.py` to be `pennylane.transforms.core.Transform` objects
+  rather than decorators. This allows them to be used as standard transforms, enabling full compatibility with
+  `pennylane.CompilePipeline`.
+  [(#2722)](https://github.com/PennyLaneAI/catalyst/pull/2722)
+
 * Fixed a bug where the `work_wire_type` argument of `qp.ctrl` was silently dropped inside `@qjit` functions.
   The parameter is now threaded through `catalyst.ctrl`, `CtrlCallable`, `HybridCtrl`, and
   `ctrl_distribute`, with the default value being `"borrowed"`.
@@ -639,11 +644,6 @@
   [(#2582)](https://github.com/PennyLaneAI/catalyst/pull/2582)
 
 <h3>Internal changes ⚙️</h3>
-
-* Refactored all passes in `catalyst.passes.builtin_passes.py` to be `pennylane.transforms.core.Transform` objects
-  rather than decorators. This allows them to be used as standard transforms, enabling full compatibility with
-  `pennylane.CompilePipeline`.
-  [(#2722)](https://github.com/PennyLaneAI/catalyst/pull/2722)
 
 * The compiler pipeline definitions now have a single source of truth. Previously, pipeline and
   pass sequences were duplicated between the frontend (`frontend/catalyst/pipelines.py`) and the
