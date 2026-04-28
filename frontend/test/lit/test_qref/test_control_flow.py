@@ -638,3 +638,26 @@ def test_measurement_result_as_cond():
 
 
 print(test_measurement_result_as_cond.mlir)
+
+
+# CHECK: func.func public @test_measurement_with_reset() -> tensor<8xcomplex<f64>>
+@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def test_measurement_with_reset():
+    """
+    Test using measurement with reset
+    """
+
+    # CHECK: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
+
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
+    # CHECK: [[mres:%.+]] = qref.measure [[q0]] : i1
+    # CHECK: scf.if [[mres]] {
+    # CHECK:     qref.custom "PauliX"() [[q0]] : !qref.bit
+    # CHECK: }
+    qp.measure(0, reset=True)
+
+    return qp.state()
+
+
+print(test_measurement_with_reset.mlir)
