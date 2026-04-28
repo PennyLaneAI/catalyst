@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "Catalyst/Utils/PrintVersion.h"
+
 #include "Catalyst/Utils/frontend_catalyst_version_py.h" // CATALYST_VERSION
 
 namespace catalyst {

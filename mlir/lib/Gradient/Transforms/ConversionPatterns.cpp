@@ -18,7 +18,6 @@
 #include <vector>
 
 #include "llvm/Support/raw_ostream.h"
-
 #include "mlir/Conversion/LLVMCommon/MemRefBuilder.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"

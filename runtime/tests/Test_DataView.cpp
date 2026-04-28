@@ -14,15 +14,12 @@
 
 #include <cstdio>
 
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
-#include <catch2/matchers/catch_matchers_string.hpp>
+#include "catch2/catch_test_macros.hpp"
+#include "catch2/matchers/catch_matchers_floating_point.hpp"
 
 #include "DataView.hpp"
 
 using namespace Catch::Matchers;
-
-using namespace Catalyst::Runtime;
 
 TEST_CASE("Test DataView Pre-Increment Iterator - double, 1", "[DataView]")
 {

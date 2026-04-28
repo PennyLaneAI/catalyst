@@ -26,7 +26,6 @@ from typing import ClassVar, TypeAlias
 
 from xdsl.dialects.builtin import (
     I64,
-    ContainerOf,
     IndexType,
     IntegerAttr,
     IntegerType,
@@ -50,6 +49,7 @@ from xdsl.irdl import (
     IRDLOperation,
     TypeAttributeInvT,
     VarConstraint,
+    base,
     irdl_attr_definition,
     irdl_op_definition,
     operand_def,
@@ -147,9 +147,6 @@ class LogicalHyperRegisterType(ParametrizedAttribute, TypeAttribute):
 
 LogicalCodeBlockSSAValue: TypeAlias = SSAValue[LogicalCodeblockType]
 LogicalHyperRegisterSSAValue: TypeAlias = SSAValue[LogicalHyperRegisterType]
-
-anyLogicalCodeblock = ContainerOf(LogicalCodeblockType)
-anyLogicalHyperRegister = ContainerOf(LogicalHyperRegisterType)
 
 
 def _get_type_from_ssa_value_or_operation(
@@ -273,7 +270,7 @@ class ExtractCodeblockOp(IRDLOperation):
 class InsertCodeblockOp(IRDLOperation):
     """Update the logical codeblock value of a hyper-register."""
 
-    T: ClassVar = VarConstraint("T", anyLogicalHyperRegister)
+    T: ClassVar = VarConstraint("T", base(LogicalHyperRegisterType))
 
     name = "qecl.insert_block"
 
@@ -318,7 +315,7 @@ class InsertCodeblockOp(IRDLOperation):
 class EncodeOp(IRDLOperation):
     """Encode a logical codeblock to the specified logical state."""
 
-    T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
+    T: ClassVar = VarConstraint("T", base(LogicalCodeblockType))
 
     name = "qecl.encode"
 
@@ -354,10 +351,37 @@ class EncodeOp(IRDLOperation):
 
 
 @irdl_op_definition
+class NoiseOp(IRDLOperation):
+    """Inject physical noise on elements of a logical codeblock."""
+
+    T: ClassVar = VarConstraint("T", base(LogicalCodeblockType))
+
+    name = "qecl.noise"
+
+    in_codeblock = operand_def(T)
+
+    out_codeblock = result_def(T)
+
+    assembly_format = """
+            $in_codeblock attr-dict `:` type($in_codeblock)
+        """
+
+    def __init__(
+        self,
+        in_codeblock: LogicalCodeBlockSSAValue | Operation,
+    ):
+        operands = (in_codeblock,)
+
+        in_codeblock_type = get_logical_codeblock_type(in_codeblock)
+
+        super().__init__(operands=operands, result_types=(in_codeblock_type,))
+
+
+@irdl_op_definition
 class QecCycleOp(IRDLOperation):
     """Perform a single cycle of a quantum error-correction protocol."""
 
-    T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
+    T: ClassVar = VarConstraint("T", base(LogicalCodeblockType))
 
     name = "qecl.qec"
 
@@ -401,7 +425,7 @@ class SingleQubitLogicalGateOp(IRDLOperation):
     ```
     """
 
-    T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
+    T: ClassVar = VarConstraint("T", base(LogicalCodeblockType))
 
     in_codeblock = operand_def(T)
 
@@ -426,7 +450,7 @@ class SingleQubitLogicalGateOp(IRDLOperation):
         properties: dict[str, Attribute | None] = {}
 
         if isinstance(idx, int):
-            idx = IntegerAttr(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (in_codeblock, None)
@@ -588,8 +612,8 @@ class CnotOp(IRDLOperation):
     k >= 2).
     """
 
-    T_CTRL: ClassVar = VarConstraint("T_CTRL", anyLogicalCodeblock)
-    T_TRGT: ClassVar = VarConstraint("T_TRGT", anyLogicalCodeblock)
+    T_CTRL: ClassVar = VarConstraint("T_CTRL", base(LogicalCodeblockType))
+    T_TRGT: ClassVar = VarConstraint("T_TRGT", base(LogicalCodeblockType))
 
     name = "qecl.cnot"
 
@@ -625,9 +649,9 @@ class CnotOp(IRDLOperation):
         idx_trgt: int | IntegerAttr | SSAValue[IndexType] | Operation,
     ):
         if isinstance(idx_ctrl, int):
-            idx_ctrl = IntegerAttr(idx_ctrl, 64)
+            idx_ctrl = IntegerAttr(idx_ctrl, IndexType())
         if isinstance(idx_trgt, int):
-            idx_trgt = IntegerAttr(idx_trgt, 64)
+            idx_trgt = IntegerAttr(idx_trgt, IndexType())
 
         if isinstance(idx_ctrl, IntegerAttr) and isinstance(idx_trgt, IntegerAttr):
             operands = (in_ctrl_codeblock, None, in_trgt_codeblock, None)
@@ -671,7 +695,7 @@ class MeasureOp(IRDLOperation):
     the `postselect` attribute to select the basis state of the qubit post-measurement.
     """
 
-    T: ClassVar = VarConstraint("T", anyLogicalCodeblock)
+    T: ClassVar = VarConstraint("T", base(LogicalCodeblockType))
 
     name = "qecl.measure"
 
@@ -697,7 +721,7 @@ class MeasureOp(IRDLOperation):
         properties: dict[str, Attribute | None] = {}
 
         if isinstance(idx, int):
-            idx = IntegerAttr(idx, 64)
+            idx = IntegerAttr(idx, IndexType())
 
         if isinstance(idx, IntegerAttr):
             operands = (in_codeblock, None)
@@ -722,6 +746,7 @@ QecLogical = Dialect(
         ExtractCodeblockOp,
         InsertCodeblockOp,
         EncodeOp,
+        NoiseOp,
         QecCycleOp,
         IdentityOp,
         PauliXOp,

@@ -21,16 +21,16 @@
 #include <vector>
 
 #include "llvm/ADT/SmallPtrSet.h"
-
-#include "Catalyst/Utils/CallGraph.h"
-#include "Mitigation/IR/MitigationOps.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/RemoveQuantum.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
+
+#include "Catalyst/Utils/CallGraph.h"
+#include "Mitigation/IR/MitigationOps.h"
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Utils/RemoveQuantum.h"
 
 namespace catalyst {
 namespace mitigation {
@@ -245,7 +245,7 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
     Value numberQubitsValue = arith::ConstantOp::create(rewriter, loc, numberQubitsAttr);
 
     // TODO: in the frontend, calculation of shots will happen outside of the qnode,
-    // before qml.device(..., shots = <some value computed earlier>) is called,
+    // before qp.device(..., shots = <some value computed earlier>) is called,
     // so the SSA def-use computation chain of the shots will actually not be inside the qnode
     // For now, we simply create a single arith.constant SSA shots value for the ZNE tests.
     // Revisit when discussing the frontend design of dynamic shots/device/qnode interaction.

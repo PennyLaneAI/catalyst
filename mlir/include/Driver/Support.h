@@ -18,7 +18,6 @@
 #include <string>
 
 #include "llvm/Support/raw_ostream.h"
-
 #include "mlir/Support/LogicalResult.h"
 
 #include "CompilerDriver.h"

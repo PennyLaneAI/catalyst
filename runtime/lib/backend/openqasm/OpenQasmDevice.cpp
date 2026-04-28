@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Exception.hpp"
-
 #include "OpenQasmDevice.hpp"
+
+#include <bitset>
+
+#include "Exception.hpp"
 
 namespace Catalyst::Runtime::Device {
 

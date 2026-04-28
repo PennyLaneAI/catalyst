@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "QRef/IR/QRefOps.h"
+
+#include "llvm/ADT/StringSet.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
-#include "llvm/ADT/StringSet.h"
 
 #include "QRef/IR/QRefDialect.h"
-#include "QRef/IR/QRefOps.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 
 using namespace mlir;
@@ -153,6 +155,31 @@ LogicalResult DeallocQubitOp::canonicalize(DeallocQubitOp deallocQb,
     return failure();
 }
 
+template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx)
+{
+    // Prefer using an attribute when the index is constant.
+    bool hasNoIdxAttr = !op.getIdxAttr().has_value();
+    bool isConstantIdx = isa_and_nonnull<IntegerAttr>(idx);
+    if (hasNoIdxAttr && isConstantIdx) {
+        auto constantIdx = cast<IntegerAttr>(idx);
+        op.setIdxAttr(constantIdx.getValue().getSExtValue());
+
+        // Remove the dynamic Value
+        op.getIdxMutable().clear();
+        return success();
+    }
+    return failure();
+}
+
+OpFoldResult GetOp::fold(FoldAdaptor adaptor)
+{
+    if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
+        return getResult();
+    }
+    // Returning nullptr tells the caller the op was unchanged.
+    return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 // QRef op verifiers.
 //===----------------------------------------------------------------------===//
@@ -188,6 +215,15 @@ LogicalResult AllocOp::verify()
     return success();
 }
 
+LogicalResult CustomOp::verify()
+{
+    if (getQubits().size() == 0) {
+        return emitOpError("expected op to have at least one qubit");
+    }
+
+    return success();
+}
+
 LogicalResult PauliRotOp::verify()
 {
     size_t pauliWordLength = getPauliProduct().size();
@@ -204,14 +240,6 @@ LogicalResult PauliRotOp::verify()
         return emitOpError() << "Only \"X\", \"Y\", \"Z\", and \"I\" are valid Pauli words.";
     }
 
-    return success();
-}
-
-LogicalResult CustomOp::verify()
-{
-    if (getQubits().size() == 0) {
-        return emitOpError("expected op to have at least one qubit");
-    }
     return success();
 }
 
@@ -255,10 +283,33 @@ LogicalResult ComputationalBasisOp::verify()
 LogicalResult HermitianOp::verify()
 {
     size_t dim = std::pow(2, getQubits().size());
-    if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim)))
+    if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim))) {
         return emitOpError("The Hermitian matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
+    }
 
     return success();
 }
 
+LogicalResult GraphStatePrepOp::verify()
+{
+    ShapedType adjMatrixType = cast<ShapedType>(getAdjMatrix().getType());
+    size_t adjMatrixSize = adjMatrixType.getShape()[0];
+
+    QuregType qregType = getQreg().getType();
+    if (qregType.isDynamic()) {
+        return emitOpError() << "expected static allocation size";
+    }
+
+    size_t qregSize = qregType.getSize().getInt();
+    size_t expectedAdjMatrixSize = qregSize * (qregSize - 1) / 2;
+    if (adjMatrixSize != expectedAdjMatrixSize) {
+        return emitOpError()
+               << "mismatch between allocation size and size of densely packed adjacency "
+                  "matrix. For an allocation size of "
+               << qregSize << ", the densely packed adjacency matrix size is expected to be "
+               << expectedAdjMatrixSize;
+    }
+
+    return success();
+}
 } // namespace catalyst::qref

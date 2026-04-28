@@ -15,7 +15,6 @@
 #pragma once
 
 #include <algorithm>
-#include <memory>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -24,6 +23,7 @@
 #include "OQDRuntimeCAPI.h"
 #include "QuantumDevice.hpp"
 #include "QubitManager.hpp"
+#include "Utils.hpp"
 
 namespace Catalyst::Runtime::Device {
 class OQDDevice final : public Catalyst::Runtime::QuantumDevice {

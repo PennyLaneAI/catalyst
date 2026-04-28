@@ -29,7 +29,7 @@ from functools import partial
 
 import jax
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 import scipy
 from jax import numpy as jnp
@@ -57,25 +57,25 @@ def test_add_noise(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        fcond1 = qml.noise.op_eq(qml.RX) & qml.noise.wires_in([0, 1])
-        noise1 = qml.noise.partial_wires(qml.RX, 0.4)
+        fcond1 = qp.noise.op_eq(qp.RX) & qp.noise.wires_in([0, 1])
+        noise1 = qp.noise.partial_wires(qp.RX, 0.4)
 
-        fcond2 = qml.noise.op_in([qml.RX, qml.RZ])
+        fcond2 = qp.noise.op_in([qp.RX, qp.RZ])
 
         def noise2(op, **_):
-            qml.CRX(op.data[0], wires=[op.wires[0], (op.wires[0] + 1) % 2])
+            qp.CRX(op.data[0], wires=[op.wires[0], (op.wires[0] + 1) % 2])
 
-        noise_model = qml.NoiseModel({fcond1: noise1, fcond2: noise2}, t1=2.0, t2=0.2)
+        noise_model = qp.NoiseModel({fcond1: noise1, fcond2: noise2}, t1=2.0, t2=0.2)
 
-        @partial(qml.noise.add_noise, noise_model=noise_model)
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        @partial(qp.noise.add_noise, noise_model=noise_model)
+        @qp.qnode(qp.device(device_name, wires=2), interface="jax")
         def qfunc(w, x, y, z):
-            qml.RX(w, wires=0)
-            qml.RY(x, wires=1)
-            qml.CNOT(wires=[0, 1])
-            qml.RY(y, wires=0)
-            qml.RX(z, wires=1)
-            return qml.expval(qml.Z(0) @ qml.Z(1))
+            qp.RX(w, wires=0)
+            qp.RY(x, wires=1)
+            qp.CNOT(wires=[0, 1])
+            qp.RY(y, wires=0)
+            qp.RX(z, wires=1)
+            return qp.expval(qp.Z(0) @ qp.Z(1))
 
         return qfunc
 
@@ -98,14 +98,14 @@ def test_batch_input(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @partial(qml.batch_input, argnums=1)
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax", diff_method="parameter-shift")
+        @partial(qp.batch_input, argnums=1)
+        @qp.qnode(qp.device(device_name, wires=2), interface="jax", diff_method="parameter-shift")
         def qfunc(inputs, weights):
             """Example taken from tests"""
-            qml.RY(weights[0], wires=0)
-            qml.AngleEmbedding(inputs, wires=range(2), rotation="Y")
-            qml.RY(weights[1], wires=1)
-            return qml.expval(qml.PauliZ(1))
+            qp.RY(weights[0], wires=0)
+            qp.AngleEmbedding(inputs, wires=range(2), rotation="Y")
+            qp.RY(weights[1], wires=1)
+            return qp.expval(qp.PauliZ(1))
 
         return qfunc
 
@@ -130,15 +130,15 @@ def test_batch_params(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qml.batch_params
-        @qml.qnode(qml.device(device_name, wires=3), interface="jax")
+        @qp.batch_params
+        @qp.qnode(qp.device(device_name, wires=3), interface="jax")
         def qfunc(data, x, weights):
             """Example taken from PL tests"""
-            qml.templates.AmplitudeEmbedding(data, wires=[0, 1, 2], normalize=True)
-            qml.RX(x, wires=0)
-            qml.RY(0.2, wires=1)
-            qml.templates.StronglyEntanglingLayers(weights, wires=[0, 1, 2])
-            return qml.probs(wires=[0, 2])
+            qp.templates.AmplitudeEmbedding(data, wires=[0, 1, 2], normalize=True)
+            qp.RX(x, wires=0)
+            qp.RY(0.2, wires=1)
+            qp.templates.StronglyEntanglingLayers(weights, wires=[0, 1, 2])
+            return qp.probs(wires=[0, 2])
 
         return qfunc
 
@@ -169,11 +169,11 @@ def test_batch_partial(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        @qp.qnode(qp.device(device_name, wires=2), interface="jax")
         def qfunc(x, y):
-            qml.RX(x, wires=0)
-            qml.RY(y, wires=1)
-            return qml.expval(qml.Z(0) @ qml.Z(1))
+            qp.RX(x, wires=0)
+            qp.RY(y, wires=1)
+            return qp.expval(qp.Z(0) @ qp.Z(1))
 
         return qfunc
 
@@ -181,8 +181,8 @@ def test_batch_partial(backend):
     x = np.linspace(0.1, 0.5, batch_size)
     y = np.array(0.2)
 
-    qnode_control = qml.batch_partial(qnode_builder("default.qubit"), all_operations=True, y=y)
-    qnode_backend = qml.batch_partial(qnode_builder(backend), all_operations=True, y=y)
+    qnode_control = qp.batch_partial(qnode_builder("default.qubit"), all_operations=True, y=y)
+    qnode_backend = qp.batch_partial(qnode_builder(backend), all_operations=True, y=y)
 
     jax_jit = jax.jit(qnode_control)
     compiled = qjit(qnode_backend)
@@ -201,20 +201,20 @@ def test_cancel_inverses(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qml.transforms.cancel_inverses
-        @qml.qnode(qml.device(device_name, wires=3), interface="jax")
+        @qp.transforms.cancel_inverses
+        @qp.qnode(qp.device(device_name, wires=3), interface="jax")
         def qfunc(x, y, z):
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=1)
-            qml.Hadamard(wires=0)
-            qml.RX(x, wires=2)
-            qml.RY(y, wires=1)
-            qml.X(1)
-            qml.RZ(z, wires=0)
-            qml.RX(y, wires=2)
-            qml.CNOT(wires=[0, 2])
-            qml.X(1)
-            return qml.expval(qml.Z(0))
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=1)
+            qp.Hadamard(wires=0)
+            qp.RX(x, wires=2)
+            qp.RY(y, wires=1)
+            qp.X(1)
+            qp.RZ(z, wires=0)
+            qp.RX(y, wires=2)
+            qp.CNOT(wires=[0, 2])
+            qp.X(1)
+            return qp.expval(qp.Z(0))
 
         return qfunc
 
@@ -240,20 +240,20 @@ def test_commute_controlled(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @partial(qml.transforms.commute_controlled, direction="right")
-        @qml.qnode(qml.device(device_name, wires=3), interface="jax")
+        @partial(qp.transforms.commute_controlled, direction="right")
+        @qp.qnode(qp.device(device_name, wires=3), interface="jax")
         def qfunc(theta):
-            qml.CZ(wires=[0, 2])
-            qml.X(2)
-            qml.S(wires=0)
-            qml.CNOT(wires=[0, 1])
-            qml.Y(1)
-            qml.CRY(theta, wires=[0, 1])
-            qml.PhaseShift(theta / 2, wires=0)
-            qml.Toffoli(wires=[0, 1, 2])
-            qml.T(wires=0)
-            qml.RZ(theta / 2, wires=1)
-            return qml.expval(qml.Z(0))
+            qp.CZ(wires=[0, 2])
+            qp.X(2)
+            qp.S(wires=0)
+            qp.CNOT(wires=[0, 1])
+            qp.Y(1)
+            qp.CRY(theta, wires=[0, 1])
+            qp.PhaseShift(theta / 2, wires=0)
+            qp.Toffoli(wires=[0, 1, 2])
+            qp.T(wires=0)
+            qp.RZ(theta / 2, wires=1)
+            return qp.expval(qp.Z(0))
 
         return qfunc
 
@@ -278,12 +278,12 @@ def test_convert_to_numpy_parameters(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qml.transforms.convert_to_numpy_parameters
-        @qml.qnode(qml.device(device_name, wires=1), interface="jax")
+        @qp.transforms.convert_to_numpy_parameters
+        @qp.qnode(qp.device(device_name, wires=1), interface="jax")
         def qfunc():
-            qml.S(0)
-            qml.RX(0.1234, 0)
-            return qml.expval(qml.X(0))
+            qp.S(0)
+            qp.RX(0.1234, 0)
+            return qp.expval(qp.X(0))
 
         return qfunc
 
@@ -308,12 +308,12 @@ def test_decompose(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qml.transforms.decompose
-        @qml.qnode(qml.device(device_name, wires=3), interface="jax")
+        @qp.transforms.decompose
+        @qp.qnode(qp.device(device_name, wires=3), interface="jax")
         def qfunc():
-            qml.Hadamard(wires=[0])
-            qml.Toffoli(wires=[0, 1, 2])
-            return qml.expval(qml.Z(0))
+            qp.Hadamard(wires=[0])
+            qp.Toffoli(wires=[0, 1, 2])
+            return qp.expval(qp.Z(0))
 
         return qfunc
 
@@ -338,12 +338,12 @@ def test_diagonalize_measurements(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qml.transforms.diagonalize_measurements
-        @qml.qnode(qml.device(device_name, wires=3), interface="jax")
+        @qp.transforms.diagonalize_measurements
+        @qp.qnode(qp.device(device_name, wires=3), interface="jax")
         def qfunc(x):
-            qml.RY(x[0], wires=0)
-            qml.RX(x[1], wires=1)
-            return qml.expval(qml.X(0) @ qml.Z(1)), qml.var(0.5 * qml.Y(2) + qml.X(0))
+            qp.RY(x[0], wires=0)
+            qp.RX(x[1], wires=1)
+            return qp.expval(qp.X(0) @ qp.Z(1)), qp.var(0.5 * qp.Y(2) + qp.X(0))
 
         return qfunc
 
@@ -369,15 +369,15 @@ def test_insert(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @partial(qml.noise.insert, op=qml.X, op_args=(), position="end")
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        @partial(qp.noise.insert, op=qp.X, op_args=(), position="end")
+        @qp.qnode(qp.device(device_name, wires=2), interface="jax")
         def qfunc(w, x, y, z):
-            qml.RX(w, wires=0)
-            qml.RY(x, wires=1)
-            qml.CNOT(wires=[0, 1])
-            qml.RY(y, wires=0)
-            qml.RX(z, wires=1)
-            return qml.expval(qml.Z(0) @ qml.Z(1))
+            qp.RX(w, wires=0)
+            qp.RY(x, wires=1)
+            qp.CNOT(wires=[0, 1])
+            qp.RY(y, wires=0)
+            qp.RX(z, wires=1)
+            return qp.expval(qp.Z(0) @ qp.Z(1))
 
         return qfunc
 
@@ -402,13 +402,13 @@ def test_merge_amplitude_embedding(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qml.transforms.merge_amplitude_embedding
-        @qml.qnode(qml.device(device_name, wires=4), interface="jax")
+        @qp.transforms.merge_amplitude_embedding
+        @qp.qnode(qp.device(device_name, wires=4), interface="jax")
         def qfunc():
-            qml.CNOT(wires=[0, 1])
-            qml.AmplitudeEmbedding([0, 1], wires=2)
-            qml.AmplitudeEmbedding([0, 1], wires=3)
-            return qml.state()
+            qp.CNOT(wires=[0, 1])
+            qp.AmplitudeEmbedding([0, 1], wires=2)
+            qp.AmplitudeEmbedding([0, 1], wires=3)
+            return qp.state()
 
         return qfunc
 
@@ -433,14 +433,14 @@ def test_remove_barrier(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qml.transforms.remove_barrier
-        @qml.qnode(qml.device(device_name, wires=2))
+        @qp.transforms.remove_barrier
+        @qp.qnode(qp.device(device_name, wires=2))
         def qfunc():
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=1)
-            qml.Barrier(wires=[0, 1])
-            qml.X(0)
-            return qml.expval(qml.Z(0))
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=1)
+            qp.Barrier(wires=[0, 1])
+            qp.X(0)
+            return qp.expval(qp.Z(0))
 
         return qfunc
 
@@ -465,15 +465,15 @@ def test_single_qubit_fusion(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qml.transforms.single_qubit_fusion
-        @qml.qnode(qml.device(device_name, wires=1), interface="jax")
+        @qp.transforms.single_qubit_fusion
+        @qp.qnode(qp.device(device_name, wires=1), interface="jax")
         def qfunc(r1, r2):
-            qml.Hadamard(wires=0)
-            qml.Rot(*r1, wires=0)
-            qml.Rot(*r2, wires=0)
-            qml.RZ(r1[0], wires=0)
-            qml.RZ(r2[0], wires=0)
-            return qml.expval(qml.X(0))
+            qp.Hadamard(wires=0)
+            qp.Rot(*r1, wires=0)
+            qp.Rot(*r2, wires=0)
+            qp.RZ(r1[0], wires=0)
+            qp.RZ(r2[0], wires=0)
+            return qp.expval(qp.X(0))
 
         return qfunc
 
@@ -501,23 +501,23 @@ def test_split_non_commuting(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qml.transforms.split_non_commuting
-        @qml.qnode(qml.device(device_name, wires=6), interface="jax")
+        @qp.transforms.split_non_commuting
+        @qp.qnode(qp.device(device_name, wires=6), interface="jax")
         def qfunc():
             """Example taken from PL tests"""
-            qml.Hadamard(1)
-            qml.Hadamard(0)
-            qml.PauliZ(0)
-            qml.Hadamard(3)
-            qml.Hadamard(5)
-            qml.T(5)
+            qp.Hadamard(1)
+            qp.Hadamard(0)
+            qp.PauliZ(0)
+            qp.Hadamard(3)
+            qp.Hadamard(5)
+            qp.T(5)
             return (
-                qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)),
-                qml.expval(qml.PauliX(0)),
-                qml.expval(qml.PauliZ(1)),
-                qml.expval(qml.PauliX(1) @ qml.PauliX(4)),
-                qml.expval(qml.PauliX(3)),
-                qml.expval(qml.PauliY(5)),
+                qp.expval(qp.PauliZ(0) @ qp.PauliZ(1)),
+                qp.expval(qp.PauliX(0)),
+                qp.expval(qp.PauliZ(1)),
+                qp.expval(qp.PauliX(1) @ qp.PauliX(4)),
+                qp.expval(qp.PauliX(3)),
+                qp.expval(qp.PauliY(5)),
             )
 
         return qfunc
@@ -539,16 +539,16 @@ def test_transpile(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @partial(qml.transforms.transpile, coupling_map=[(0, 1), (1, 3), (3, 2), (2, 0)])
-        @qml.qnode(qml.device(device_name, wires=4), interface="jax")
+        @partial(qp.transforms.transpile, coupling_map=[(0, 1), (1, 3), (3, 2), (2, 0)])
+        @qp.qnode(qp.device(device_name, wires=4), interface="jax")
         def qfunc():
-            qml.CNOT(wires=[0, 1])
-            qml.CNOT(wires=[2, 3])
-            qml.CNOT(wires=[1, 3])
-            qml.CNOT(wires=[1, 2])
-            qml.CNOT(wires=[2, 3])
-            qml.CNOT(wires=[0, 3])
-            return qml.probs(wires=[0, 1, 2, 3])
+            qp.CNOT(wires=[0, 1])
+            qp.CNOT(wires=[2, 3])
+            qp.CNOT(wires=[1, 3])
+            qp.CNOT(wires=[1, 2])
+            qp.CNOT(wires=[2, 3])
+            qp.CNOT(wires=[0, 3])
+            return qp.probs(wires=[0, 1, 2, 3])
 
         return qfunc
 
@@ -573,15 +573,15 @@ def test_undo_swaps(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qml.transforms.undo_swaps
-        @qml.qnode(qml.device(device_name, wires=3), interface="jax")
+        @qp.transforms.undo_swaps
+        @qp.qnode(qp.device(device_name, wires=3), interface="jax")
         def qfunc():
-            qml.Hadamard(wires=0)
-            qml.X(1)
-            qml.SWAP(wires=[0, 1])
-            qml.SWAP(wires=[0, 2])
-            qml.Y(0)
-            return qml.expval(qml.Z(0))
+            qp.Hadamard(wires=0)
+            qp.X(1)
+            qp.SWAP(wires=[0, 1])
+            qp.SWAP(wires=[0, 2])
+            qp.Y(0)
+            return qp.expval(qp.Z(0))
 
         return qfunc
 
@@ -609,18 +609,18 @@ class TestMitigate:
         def qnode_builder(device_name):
             """Builder"""
 
-            @partial(qml.noise.fold_global, scale_factor=2)
-            @qml.qnode(qml.device(device_name, wires=3), interface="jax")
+            @partial(qp.noise.fold_global, scale_factor=2)
+            @qp.qnode(qp.device(device_name, wires=3), interface="jax")
             def qfunc(x):
-                qml.RX(x[0], wires=0)
-                qml.RY(x[1], wires=1)
-                qml.RZ(x[2], wires=2)
-                qml.CNOT(wires=(0, 1))
-                qml.CNOT(wires=(1, 2))
-                qml.RX(x[3], wires=0)
-                qml.RY(x[4], wires=1)
-                qml.RZ(x[5], wires=2)
-                return qml.expval(qml.Z(0) @ qml.Z(1) @ qml.Z(2))
+                qp.RX(x[0], wires=0)
+                qp.RY(x[1], wires=1)
+                qp.RZ(x[2], wires=2)
+                qp.CNOT(wires=(0, 1))
+                qp.CNOT(wires=(1, 2))
+                qp.RX(x[3], wires=0)
+                qp.RY(x[4], wires=1)
+                qp.RZ(x[5], wires=2)
+                return qp.expval(qp.Z(0) @ qp.Z(1) @ qp.Z(2))
 
             return qfunc
 
@@ -648,22 +648,22 @@ class TestMitigate:
             """Builder"""
 
             @partial(
-                qml.noise.mitigate_with_zne,
+                qp.noise.mitigate_with_zne,
                 scale_factors=[1.0, 2.0, 3.0],
-                folding=qml.noise.fold_global,
-                extrapolate=qml.noise.poly_extrapolate,
+                folding=qp.noise.fold_global,
+                extrapolate=qp.noise.poly_extrapolate,
                 extrapolate_kwargs={"order": 2},
             )
-            @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+            @qp.qnode(qp.device(device_name, wires=2), interface="jax")
             def qfunc(w1, w2):
-                qml.SimplifiedTwoDesign(w1, w2, wires=range(2))
-                return qml.expval(qml.Z(0))
+                qp.SimplifiedTwoDesign(w1, w2, wires=range(2))
+                return qp.expval(qp.Z(0))
 
             return qfunc
 
         n_wires = 2
         n_layers = 2
-        shapes = qml.SimplifiedTwoDesign.shape(n_layers, n_wires)
+        shapes = qp.SimplifiedTwoDesign.shape(n_layers, n_wires)
         np.random.seed(0)
         w1, w2 = [np.random.random(s) for s in shapes]
 
@@ -699,17 +699,17 @@ class TestQuantumMonteCarlo:
             r_mat = scipy.stats.unitary_group.rvs(2**n_wires, random_state=1967)
 
             @partial(
-                qml.transforms.apply_controlled_Q,
+                qp.transforms.apply_controlled_Q,
                 wires=wires,
                 target_wire=target_wire,
                 control_wire=control_wire,
                 work_wires=None,
             )
-            @qml.qnode(qml.device(device_name, wires=n_wires + 1), interface="jax")
+            @qp.qnode(qp.device(device_name, wires=n_wires + 1), interface="jax")
             def qfunc():
-                qml.QubitUnitary(a_mat, wires=wires[:-1])
-                qml.QubitUnitary(r_mat, wires=wires)
-                return qml.expval(qml.Z(0))
+                qp.QubitUnitary(a_mat, wires=wires[:-1])
+                qp.QubitUnitary(r_mat, wires=wires)
+                return qp.expval(qp.Z(0))
 
             return qfunc
 
@@ -739,16 +739,16 @@ class TestQuantumMonteCarlo:
             r_mat = scipy.stats.unitary_group.rvs(2**n_wires, random_state=1967)
 
             @partial(
-                qml.transforms.quantum_monte_carlo,
+                qp.transforms.quantum_monte_carlo,
                 wires=wires,
                 target_wire=target_wire,
                 estimation_wires=estimation_wires,
             )
-            @qml.qnode(qml.device(device_name, wires=2 * n_wires), interface="jax")
+            @qp.qnode(qp.device(device_name, wires=2 * n_wires), interface="jax")
             def qfunc():
-                qml.QubitUnitary(a_mat, wires=wires[:-1])
-                qml.QubitUnitary(r_mat, wires=wires)
-                return qml.expval(qml.Z(0))
+                qp.QubitUnitary(a_mat, wires=wires[:-1])
+                qp.QubitUnitary(r_mat, wires=wires)
+                return qp.expval(qp.Z(0))
 
             return qfunc
 
@@ -767,18 +767,18 @@ class TestQuantumMonteCarlo:
         assert expected_shape == observed_shape
 
 
-class RX_broadcasted(qml.RX):
-    """A version of qml.RX that detects batching."""
+class RX_broadcasted(qp.RX):
+    """A version of qp.RX that detects batching."""
 
     ndim_params = (0,)
-    compute_decomposition = staticmethod(lambda theta, wires=None: [qml.RX(theta, wires=wires)])
+    compute_decomposition = staticmethod(lambda theta, wires=None: [qp.RX(theta, wires=wires)])
 
 
-class RZ_broadcasted(qml.RZ):
-    """A version of qml.RZ that detects batching."""
+class RZ_broadcasted(qp.RZ):
+    """A version of qp.RZ that detects batching."""
 
     ndim_params = (0,)
-    compute_decomposition = staticmethod(lambda theta, wires=None: [qml.RZ(theta, wires=wires)])
+    compute_decomposition = staticmethod(lambda theta, wires=None: [qp.RZ(theta, wires=wires)])
 
 
 parameters = [
@@ -792,12 +792,12 @@ parameters = [
 ]
 
 coeffs0 = [0.3, -5.1]
-H0 = qml.Hamiltonian(qml.math.array(coeffs0), [qml.PauliZ(0), qml.PauliY(1)])
+H0 = qp.Hamiltonian(qp.math.array(coeffs0), [qp.PauliZ(0), qp.PauliY(1)])
 
 observables = [
-    [qml.PauliZ(0)],
-    [qml.PauliZ(0) @ qml.PauliY(1)],
-    [qml.PauliZ(0), qml.PauliY(1)],
+    [qp.PauliZ(0)],
+    [qp.PauliZ(0) @ qp.PauliY(1)],
+    [qp.PauliZ(0), qp.PauliY(1)],
     [H0],
 ]
 
@@ -817,20 +817,20 @@ class TestBroadcastExpand:
         def qnode_builder(device_name):
             """Builder"""
 
-            @qml.transforms.broadcast_expand
-            @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+            @qp.transforms.broadcast_expand
+            @qp.qnode(qp.device(device_name, wires=2), interface="jax")
             def circuit(x, y, z, obs):
                 """Example taken from PL tests"""
-                qml.StatePrep(
+                qp.StatePrep(
                     np.array([complex(1, 0), complex(0, 0), complex(0, 0), complex(0, 0)]),
                     wires=[0, 1],
                 )
                 RX_broadcasted(x, wires=0)
-                qml.PauliY(0)
+                qp.PauliY(0)
                 RX_broadcasted(y, wires=1)
                 RZ_broadcasted(z, wires=1)
-                qml.Hadamard(1)
-                return [qml.expval(ob) for ob in obs]
+                qp.Hadamard(1)
+                return [qp.expval(ob) for ob in obs]
 
             return circuit
 
@@ -862,20 +862,20 @@ class TestBroadcastExpand:
         def qnode_builder(device_name):
             """Builder"""
 
-            @qml.transforms.broadcast_expand
-            @qml.qnode(qml.device(device_name, wires=2), interface="jax", cache=False)
+            @qp.transforms.broadcast_expand
+            @qp.qnode(qp.device(device_name, wires=2), interface="jax", cache=False)
             def circuit(x, y, z, obs):
                 """Example taken from PL tests"""
-                qml.StatePrep(
+                qp.StatePrep(
                     np.array([complex(1, 0), complex(0, 0), complex(0, 0), complex(0, 0)]),
                     wires=[0, 1],
                 )
                 RX_broadcasted(x, wires=0)
-                qml.PauliY(0)
+                qp.PauliY(0)
                 RX_broadcasted(y, wires=1)
                 RZ_broadcasted(z, wires=1)
-                qml.Hadamard(1)
-                return [qml.expval(ob) for ob in obs]
+                qp.Hadamard(1)
+                return [qp.expval(ob) for ob in obs]
 
             return circuit
 
@@ -905,16 +905,16 @@ class TestCutCircuitMCTransform:
         def qnode_builder(device_name):
             """Builder"""
 
-            @qml.qnode(qml.device(device_name, wires=2))
+            @qp.qnode(qp.device(device_name, wires=2))
             def qfunc(x):
                 """Example taken from PL tests."""
-                qml.RX(x, wires=0)
-                qml.RY(0.543, wires=1)
-                qml.WireCut(wires=0)
-                qml.CNOT(wires=[0, 1])
-                qml.RZ(0.240, wires=0)
-                qml.RZ(0.133, wires=1)
-                return qml.expval(qml.PauliZ(wires=[0]))
+                qp.RX(x, wires=0)
+                qp.RY(0.543, wires=1)
+                qp.WireCut(wires=0)
+                qp.CNOT(wires=[0, 1])
+                qp.RZ(0.240, wires=0)
+                qp.RZ(0.133, wires=1)
+                return qp.expval(qp.PauliZ(wires=[0]))
 
             return qfunc
 
@@ -942,26 +942,26 @@ class TestSplitNonCommuting:
         non-commuting terms."""
 
         H4 = (
-            qml.PauliX(0) @ qml.PauliZ(2)
-            + 3 * qml.PauliZ(2)
-            - 2 * qml.PauliX(0)
-            + qml.PauliZ(2)
-            + qml.PauliZ(2)
+            qp.PauliX(0) @ qp.PauliZ(2)
+            + 3 * qp.PauliZ(2)
+            - 2 * qp.PauliX(0)
+            + qp.PauliZ(2)
+            + qp.PauliZ(2)
         )
-        H4 += qml.PauliZ(0) @ qml.PauliX(1) @ qml.PauliY(2)
+        H4 += qp.PauliZ(0) @ qp.PauliX(1) @ qp.PauliY(2)
 
         def qnode_builder(device_name):
             """Builder"""
 
-            @qml.transforms.split_non_commuting
-            @qml.qnode(qml.device(device_name, wires=3))
+            @qp.transforms.split_non_commuting
+            @qp.qnode(qp.device(device_name, wires=3))
             def qfunc():
                 """Example taken from PL tests."""
-                qml.Hadamard(0)
-                qml.Hadamard(1)
-                qml.PauliZ(1)
-                qml.PauliX(2)
-                return qml.expval(H4)
+                qp.Hadamard(0)
+                qp.Hadamard(1)
+                qp.PauliZ(1)
+                qp.PauliX(2)
+                return qp.expval(H4)
 
             return qfunc
 
@@ -982,13 +982,13 @@ class TestSplitNonCommuting:
         def qnode_builder(device_name):
             """Builder"""
 
-            @qml.transforms.split_non_commuting
-            @qml.qnode(qml.device(device_name, wires=2))
+            @qp.transforms.split_non_commuting
+            @qp.qnode(qp.device(device_name, wires=2))
             def qfunc():
                 """Example taken from PL tests"""
-                obs1 = qml.prod(qml.PauliX(0), qml.PauliX(1))
-                obs2 = qml.prod(qml.PauliX(0), qml.PauliY(1))
-                return qml.expval(obs1), qml.expval(obs2)
+                obs1 = qp.prod(qp.PauliX(0), qp.PauliX(1))
+                obs2 = qp.prod(qp.PauliX(0), qp.PauliY(1))
+                return qp.expval(obs1), qp.expval(obs2)
 
             return qfunc
 
@@ -1014,12 +1014,12 @@ class TestQFuncTransforms:
         def qnode_builder(device_name):
             """Builder"""
 
-            @qml.qnode(qml.device(device_name, wires=3))
+            @qp.qnode(qp.device(device_name, wires=3))
             @merge_rotations
             def qfunc(theta_1, theta_2):
-                qml.RZ(theta_1, wires=0)
-                qml.RZ(theta_2, wires=0)
-                return qml.state()
+                qp.RZ(theta_1, wires=0)
+                qp.RZ(theta_2, wires=0)
+                return qp.state()
 
             return qfunc
 
@@ -1036,42 +1036,42 @@ class TestQFuncTransforms:
         # Here we are asserting that there is only one RZ operation
         assert 1 == compiled_function.mlir.count('quantum.custom "RZ"')
 
-    @pytest.mark.xfail(reason="qml.ctrl to HybridCtrl dispatch breaks the method of this transform")
+    @pytest.mark.xfail(reason="qp.ctrl to HybridCtrl dispatch breaks the method of this transform")
     def test_unroll_ccrz(self, backend):
         """Test unroll_ccrz transform."""
         # TODO: Test by inspecting the circuit actually produced, testing the
         #       results does not verify the transform was applied correctly.
 
-        @qml.transform
+        @qp.transform
         def unroll_ccrz(tape):
             """Needed for lightning.qubit, as it does not natively support expansion of
             multi-controlled RZ."""
 
             for op in tape:
                 if op.name == "C(RZ)":
-                    qml.CNOT(wires=[op.control_wires[0], op.target_wires[0]])
-                    qml.RZ(-op.data[0] / 4, wires=op.target_wires[0])
-                    qml.CNOT(wires=[op.control_wires[1], op.target_wires[0]])
-                    qml.RZ(op.data[0] / 4, wires=op.target_wires[0])
-                    qml.CNOT(wires=[op.control_wires[0], op.target_wires[0]])
-                    qml.RZ(-op.data[0] / 4, wires=op.target_wires[0])
-                    qml.CNOT(wires=[op.control_wires[1], op.target_wires[0]])
-                    qml.RZ(op.data[0] / 4, wires=op.target_wires[0])
+                    qp.CNOT(wires=[op.control_wires[0], op.target_wires[0]])
+                    qp.RZ(-op.data[0] / 4, wires=op.target_wires[0])
+                    qp.CNOT(wires=[op.control_wires[1], op.target_wires[0]])
+                    qp.RZ(op.data[0] / 4, wires=op.target_wires[0])
+                    qp.CNOT(wires=[op.control_wires[0], op.target_wires[0]])
+                    qp.RZ(-op.data[0] / 4, wires=op.target_wires[0])
+                    qp.CNOT(wires=[op.control_wires[1], op.target_wires[0]])
+                    qp.RZ(op.data[0] / 4, wires=op.target_wires[0])
                 else:
-                    qml.apply(op)
+                    qp.apply(op)
 
         def sub_circuit():
             """Just a controlled RZ operation."""
-            qml.ctrl(qml.RZ, [0, 1], control_values=[0, 0])(jnp.pi, wires=[2])
+            qp.ctrl(qp.RZ, [0, 1], control_values=[0, 0])(jnp.pi, wires=[2])
 
         def qnode_builder(device_name):
             """Builder"""
 
-            @qml.qnode(qml.device(device_name, wires=3))
+            @qp.qnode(qp.device(device_name, wires=3))
             def circuit():
                 """Example."""
                 unroll_ccrz(sub_circuit)()  # pylint: disable=not-callable
-                return qml.state()
+                return qp.state()
 
             return circuit
 
@@ -1106,15 +1106,15 @@ class TestTransformValidity:
         original_preprocess = QJITDevice.preprocess
         monkeypatch.setattr(QJITDevice, "preprocess", inject_device_transforms)
 
-        dev = qml.device(backend, wires=2)
+        dev = qp.device(backend, wires=2)
 
         @partial(transform, device_wires=dev.wires)
-        @qml.set_shots(5)
-        @qml.qnode(dev)
+        @qp.set_shots(5)
+        @qp.qnode(dev)
         def qfunc():
-            qml.X(0)
+            qp.X(0)
             measurements = [measure(i) for i in range(2)]
-            return measurements, qml.expval(qml.PauliZ(0))
+            return measurements, qp.expval(qp.PauliZ(0))
 
         with pytest.raises(
             CompileError,
@@ -1139,12 +1139,12 @@ class TestTransformValidity:
         original_preprocess = QJITDevice.preprocess
         monkeypatch.setattr(QJITDevice, "preprocess", inject_device_transforms)
 
-        dev = qml.device(backend, wires=2)
+        dev = qp.device(backend, wires=2)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def qfunc():
-            qml.X(0)
+            qp.X(0)
             measurements = [measure(i) for i in range(2)]
             return measurements
 
@@ -1156,23 +1156,23 @@ class TestTransformValidity:
         a classical value."""
 
         H4 = (
-            qml.PauliX(0) @ qml.PauliZ(2)
-            + 3 * qml.PauliZ(2)
-            - 2 * qml.PauliX(0)
-            + qml.PauliZ(2)
-            + qml.PauliZ(2)
+            qp.PauliX(0) @ qp.PauliZ(2)
+            + 3 * qp.PauliZ(2)
+            - 2 * qp.PauliX(0)
+            + qp.PauliZ(2)
+            + qp.PauliZ(2)
         )
-        H4 += qml.PauliZ(0) @ qml.PauliX(1) @ qml.PauliY(2)
+        H4 += qp.PauliZ(0) @ qp.PauliX(1) @ qp.PauliY(2)
 
-        @qml.transforms.split_non_commuting
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.transforms.split_non_commuting
+        @qp.qnode(qp.device(backend, wires=3))
         def qfunc():
             """Example taken from PL tests."""
-            qml.Hadamard(0)
-            qml.Hadamard(1)
-            qml.PauliZ(1)
-            qml.PauliX(2)
-            return [1, qml.expval(H4)]
+            qp.Hadamard(0)
+            qp.Hadamard(1)
+            qp.PauliZ(1)
+            qp.PauliX(2)
+            return [1, qp.expval(H4)]
 
         with pytest.raises(
             CompileError,
@@ -1186,25 +1186,25 @@ class TestTransformValidity:
         def qnode_builder(device_name):
             """Builder"""
 
-            @qml.transforms.split_non_commuting
-            @qml.qnode(qml.device(device_name, wires=6), interface="jax")
+            @qp.transforms.split_non_commuting
+            @qp.qnode(qp.device(device_name, wires=6), interface="jax")
             def qfunc():
                 """Example taken from PL tests"""
-                qml.Hadamard(1)
-                qml.Hadamard(0)
-                qml.PauliZ(0)
+                qp.Hadamard(1)
+                qp.Hadamard(0)
+                qp.PauliZ(0)
                 # There is a measure which is a source of uncertainty!
                 measure(0)
-                qml.Hadamard(3)
-                qml.Hadamard(5)
-                qml.T(5)
+                qp.Hadamard(3)
+                qp.Hadamard(5)
+                qp.T(5)
                 return (
-                    qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)),
-                    qml.expval(qml.PauliX(0)),
-                    qml.expval(qml.PauliZ(1)),
-                    qml.expval(qml.PauliX(1) @ qml.PauliX(4)),
-                    qml.expval(qml.PauliX(3)),
-                    qml.expval(qml.PauliY(5)),
+                    qp.expval(qp.PauliZ(0) @ qp.PauliZ(1)),
+                    qp.expval(qp.PauliX(0)),
+                    qp.expval(qp.PauliZ(1)),
+                    qp.expval(qp.PauliX(1) @ qp.PauliX(4)),
+                    qp.expval(qp.PauliX(3)),
+                    qp.expval(qp.PauliY(5)),
                 )
 
             return qfunc
@@ -1225,13 +1225,13 @@ class TestTransformValidity:
         def qnode_builder(device_name):
             """Builder"""
 
-            @qml.qnode(qml.device(device_name, wires=3))
+            @qp.qnode(qp.device(device_name, wires=3))
             @merge_rotations
             def qfunc(theta_1, theta_2):
                 measure(0)
-                qml.RZ(theta_1, wires=0)
-                qml.RZ(theta_2, wires=0)
-                return qml.state()
+                qp.RZ(theta_1, wires=0)
+                qp.RZ(theta_2, wires=0)
+                return qp.state()
 
             return qfunc
 
@@ -1246,14 +1246,14 @@ class TestTransformValidity:
         """Informative transforms are not supported!"""
 
         # Just fake that it is informative
-        @partial(qml.transforms.core.transform, is_informative=True)
+        @partial(qp.transforms.core.transform, is_informative=True)
         def id_transform(tape):
             return [tape], lambda res: res[0]
 
         @id_transform
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def f():
-            return qml.state()
+            return qp.state()
 
         with pytest.raises(CompileError, match="Catalyst does not support informative transforms."):
             qjit(f)
@@ -1266,13 +1266,13 @@ def test_clifford_t_decomposition(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qml.transforms.clifford_t_decomposition
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        @qp.transforms.clifford_t_decomposition
+        @qp.qnode(qp.device(device_name, wires=2), interface="jax")
         def qfunc(x, y):
-            qml.RX(x, 0)
-            qml.CNOT([0, 1])
-            qml.RY(y, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            qp.CNOT([0, 1])
+            qp.RY(y, 0)
+            return qp.expval(qp.Z(0))
 
         return qfunc
 
@@ -1300,17 +1300,17 @@ def test_commutation_dag(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qml.commutation_dag
-        @qml.qnode(qml.device(device_name, wires=3), interface="jax")
+        @qp.commutation_dag
+        @qp.qnode(qp.device(device_name, wires=3), interface="jax")
         def qfunc(x, y, z):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=0)
-            qml.CNOT(wires=[1, 2])
-            qml.RY(y, wires=1)
-            qml.Hadamard(wires=2)
-            qml.CRZ(z, wires=[2, 0])
-            qml.RY(-y, wires=1)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, wires=0)
+            qp.RX(y, wires=0)
+            qp.CNOT(wires=[1, 2])
+            qp.RY(y, wires=1)
+            qp.Hadamard(wires=2)
+            qp.CRZ(z, wires=[2, 0])
+            qp.RY(-y, wires=1)
+            return qp.expval(qp.Z(0))
 
         return qfunc
 
@@ -1337,14 +1337,14 @@ def test_defer_measurements(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qml.transforms.defer_measurements
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        @qp.transforms.defer_measurements
+        @qp.qnode(qp.device(device_name, wires=2), interface="jax")
         def qfunc():
-            qml.RY(0.123, wires=0)
-            qml.Hadamard(wires=1)
-            m_0 = qml.measure(1)
-            qml.cond(m_0, qml.RY)(np.pi / 4, wires=0)
-            return qml.expval(qml.Z(0))
+            qp.RY(0.123, wires=0)
+            qp.Hadamard(wires=1)
+            m_0 = qp.measure(1)
+            qp.cond(m_0, qp.RY)(np.pi / 4, wires=0)
+            return qp.expval(qp.Z(0))
 
         return qfunc
 
@@ -1372,13 +1372,13 @@ def test_dynamic_one_shot(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qml.transforms.dynamic_one_shot
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        @qp.transforms.dynamic_one_shot
+        @qp.qnode(qp.device(device_name, wires=2), interface="jax")
         def qfunc(x, y):
-            qml.RX(x, wires=0)
-            m0 = qml.measure(0)
-            qml.cond(m0, qml.RY)(y, wires=1)
-            return qml.expval(op=m0)
+            qp.RX(x, wires=0)
+            m0 = qp.measure(0)
+            qp.cond(m0, qp.RY)(y, wires=1)
+            return qp.expval(op=m0)
 
         return qfunc
 
@@ -1399,30 +1399,27 @@ def test_dynamic_one_shot(backend):
     assert expected_shape == observed_shape
 
 
-@pytest.mark.xfail(
-    reason="QJIT fails with ValueError: Eagerly computing the adjoint (lazy=False) is only supported on single operators."
-)
 def test_pattern_matching_optimization(backend):
     """Test pattern_matching_optimization"""
 
     def qnode_builder(device_name):
         """Builder"""
 
-        ops = [qml.S(0), qml.S(0), qml.Z(0)]
-        pattern = qml.tape.QuantumTape(ops)
+        ops = [qp.S(0), qp.S(0), qp.Z(0)]
+        pattern = qp.tape.QuantumTape(ops)
 
-        @partial(qml.transforms.pattern_matching_optimization, pattern_tapes=[pattern])
-        @qml.qnode(qml.device(device_name, wires=5))
+        @partial(qp.transforms.pattern_matching_optimization, pattern_tapes=[pattern])
+        @qp.qnode(qp.device(device_name, wires=5))
         def qfunc():
-            qml.S(wires=0)
-            qml.Z(0)
-            qml.S(wires=1)
-            qml.CZ(wires=[0, 1])
-            qml.S(wires=1)
-            qml.S(wires=2)
-            qml.CZ(wires=[1, 2])
-            qml.S(wires=2)
-            return qml.expval(qml.X(0))
+            qp.S(wires=0)
+            qp.Z(0)
+            qp.S(wires=1)
+            qp.CZ(wires=[0, 1])
+            qp.S(wires=1)
+            qp.S(wires=2)
+            qp.CZ(wires=[1, 2])
+            qp.S(wires=2)
+            return qp.expval(qp.X(0))
 
         return qfunc
 
@@ -1442,7 +1439,7 @@ def test_pattern_matching_optimization(backend):
 
 
 @pytest.mark.xfail(
-    reason="QJIT error ValueError: Passed tape must end in `qml.expval(H)` or qml.var(H)`, where H is of type `qml.Hamiltonian`"
+    reason="QJIT error ValueError: Passed tape must end in `qp.expval(H)` or qp.var(H)`, where H is of type `qp.Hamiltonian`"
 )
 def test_sign_expand(backend):
     """Test sign_expand"""
@@ -1450,15 +1447,15 @@ def test_sign_expand(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        H = qml.Z(0) + 0.5 * qml.Z(2) + qml.Z(1)
+        H = qp.Z(0) + 0.5 * qp.Z(2) + qp.Z(1)
 
-        @qml.transforms.sign_expand
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        @qp.transforms.sign_expand
+        @qp.qnode(qp.device(device_name, wires=2), interface="jax")
         def qfunc():
-            qml.Hadamard(wires=0)
-            qml.CNOT(wires=[0, 1])
-            qml.X(2)
-            return qml.expval(H)
+            qp.Hadamard(wires=0)
+            qp.CNOT(wires=[0, 1])
+            qp.X(2)
+            return qp.expval(H)
 
         return qfunc
 
@@ -1483,14 +1480,14 @@ def test_split_to_single_terms(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qml.transforms.split_to_single_terms
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        @qp.transforms.split_to_single_terms
+        @qp.qnode(qp.device(device_name, wires=2), interface="jax")
         def qfunc(x):
-            qml.RY(x[0], wires=0)
-            qml.RX(x[1], wires=1)
+            qp.RY(x[0], wires=0)
+            qp.RX(x[1], wires=1)
             return [
-                qml.expval(qml.X(0) @ qml.Z(1) + 0.5 * qml.Y(1) + qml.Z(0)),
-                qml.expval(qml.X(1) + qml.Y(1)),
+                qp.expval(qp.X(0) @ qp.Z(1) + 0.5 * qp.Y(1) + qp.Z(0)),
+                qp.expval(qp.X(1) + qp.Y(1)),
             ]
 
         return qfunc
@@ -1518,18 +1515,18 @@ def test_to_zx(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qml.transforms.to_zx
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        @qp.transforms.to_zx
+        @qp.qnode(qp.device(device_name, wires=2), interface="jax")
         def qfunc(p):
-            qml.RZ(p[0], wires=1)
-            qml.RZ(p[1], wires=1)
-            qml.RX(p[2], wires=0)
-            qml.Z(0)
-            qml.RZ(p[3], wires=1)
-            qml.X(1)
-            qml.CNOT(wires=[0, 1])
-            qml.CNOT(wires=[1, 0])
-            return qml.expval(qml.Z(0) @ qml.Z(1))
+            qp.RZ(p[0], wires=1)
+            qp.RZ(p[1], wires=1)
+            qp.RX(p[2], wires=0)
+            qp.Z(0)
+            qp.RZ(p[3], wires=1)
+            qp.X(1)
+            qp.CNOT(wires=[0, 1])
+            qp.CNOT(wires=[1, 0])
+            return qp.expval(qp.Z(0) @ qp.Z(1))
 
         return qfunc
 
@@ -1557,14 +1554,14 @@ def test_unitary_to_rot(backend):
         """Builder"""
         U = scipy.stats.unitary_group.rvs(4)
 
-        @qml.transforms.unitary_to_rot
-        @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+        @qp.transforms.unitary_to_rot
+        @qp.qnode(qp.device(device_name, wires=2), interface="jax")
         def qfunc(angles):
-            qml.QubitUnitary(U, wires=[0, 1])
-            qml.RX(angles[0], wires=0)
-            qml.RY(angles[1], wires=1)
-            qml.CNOT(wires=[1, 0])
-            return qml.expval(qml.Z(0))
+            qp.QubitUnitary(U, wires=[0, 1])
+            qp.RX(angles[0], wires=0)
+            qp.RY(angles[1], wires=1)
+            qp.CNOT(wires=[1, 0])
+            return qp.expval(qp.Z(0))
 
         return qfunc
 

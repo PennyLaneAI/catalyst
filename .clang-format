@@ -6,3 +6,29 @@ AccessModifierOffset: -2
 BreakBeforeBraces: Stroustrup
 FixNamespaceComments: true
 ColumnLimit: 100
+
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+
+# NOTE: Ensure that lists are always sorted alphabetically.
+
+IncludeCategories:
+  # System/STL
+  - Regex:    '^(<)(([^.]+)|((std.*|complex|sys.*|dlfcn)\.h))(>)$'
+    Priority: 1
+
+  # Dependencies
+  - Regex:    '^(")(llvm|Enzyme|absl|boost|catch2|gmock|gtest|jax_cpu_lapack_kernels|mlir|nanobind|nlohmann|numpy|pybind11|stablehlo|stim|toml\+\+|xla)(.*)\.([hcp]+)(")$'
+    Priority: 2
+
+  # Local headers
+  - Regex:    '^(")(CAPI|Catalyst|Driver|Gradient|GradMethods|hlo-extensions|Ion|MBQC|Mitigation|PBC|PauliFrame|QRef|QecLogical|QecPhysical|Quantum|RTIO|Standalone|Test)(.*\/.*)\.([hcp]+)(")$'
+    Priority: 3
+
+  # Private headers
+  - Regex: '^(")([^\.\/]+)\.([hcp]+)(")$'
+    Priority: 4
+
+  # Unsorted headers (catch-all)
+  - Regex: '^(.*)$'
+    Priority: 5

@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "llvm/ADT/TypeSwitch.h" // needed for enums
+#include "PBC/IR/PBCDialect.h"
 
+#include "llvm/ADT/TypeSwitch.h" // needed for enums
 #include "mlir/IR/DialectImplementation.h"
 
-#include "PBC/IR/PBCDialect.h"
 #include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumDialect.h"
 

@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
@@ -21,9 +22,8 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/CallInterfaces.h"
 
-#include "mlir/Bytecode/BytecodeOpInterface.h"
-
 #include "Mitigation/IR/MitigationDialect.h"
+
 #include "Mitigation/IR/MitigationEnums.h.inc"
 #define GET_ATTRDEF_CLASSES
 #include "Mitigation/IR/MitigationAttributes.h.inc"

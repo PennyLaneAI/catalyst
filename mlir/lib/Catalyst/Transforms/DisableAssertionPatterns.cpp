@@ -11,12 +11,12 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include "Catalyst/IR/CatalystDialect.h"
-#include "Catalyst/IR/CatalystOps.h"
-
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
+
+#include "Catalyst/IR/CatalystDialect.h"
+#include "Catalyst/IR/CatalystOps.h"
 
 using namespace mlir;
 using namespace catalyst;

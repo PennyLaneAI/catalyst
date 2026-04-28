@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "ParameterShift.hpp"
-
 #include <deque>
 #include <string>
 #include <vector>
@@ -30,6 +28,8 @@
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantum.h"
+
+#include "ParameterShift.hpp"
 
 namespace catalyst {
 namespace gradient {

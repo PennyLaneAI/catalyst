@@ -24,7 +24,7 @@ from typing import Iterable, List, Union
 
 import jax
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 from jax._src import core, source_info_util, util
 from jax._src.core import pytype_aval_mappings
 from jax._src.interpreters import partial_eval as pe
@@ -134,11 +134,13 @@ with Patcher(
         lower_jaxpr,
     )
 
+from pennylane.capture.primitives import for_loop_prim as pl_for_loop_prim
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
 from pennylane.capture.primitives import quantum_subroutine_prim
 from pennylane.capture.primitives import value_and_grad_prim as pl_value_and_grad_prim
 from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
+from pennylane.capture.primitives import while_loop_prim as pl_while_loop_prim
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
@@ -361,12 +363,14 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None
     Denotes the creation of a quantum definition in the intermediate representation.
 
     Args:
-        func (Callable): the subroutine to apply in place of the replaced gate.
-        is_qreg (bool): ???
-        num_params (int): ???
-        pauli_word (???): ???
-        op_type (str): the name attribute of the MLIR representation of the op type to be
-                       replaced.
+        func (Callable): The function defining the decomposition rule.
+        is_qreg (bool): Indicates if the qubits involved in the decomposition are represented
+            as a quantum register. Defaults to True.
+        num_params (int): The number of parameters for the decomposition rule. Defaults to 0.
+        pauli_word (str | None): The Pauli word associated with the decomposition rule.
+            Defaults to None.
+        op_type (str | None | Operation): The type of operation that the decomposition rule
+            applies to. Defaults to None.
 
     .. note::
 
@@ -381,7 +385,7 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None
         qp.capture.enable() # remember to enable capture
 
 
-        @decomposition_rule(is_qreg=True, op_type="RY") # specify the op type to decompose
+        @decomposition_rule(is_qreg=True, op_type=qp.RY) # specify the op type to decompose
         def my_decomp(angle, wires):
             qp.RX(-pi / 2, wires[0])
             qp.RZ(angle, wires[0])
@@ -420,6 +424,12 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None
     assert not is_qreg or (
         is_qreg and num_params == 0
     ), "Decomposition rules with `qreg` do not require `num_params`."
+
+    if op_type is not None and not isinstance(op_type, str):
+        if issubclass(op_type, qp.operation.Operation):
+            op_type = op_type.__name__
+        else:
+            raise ValueError("op_type must be a string or a pennylane operator.")
 
     if func is None:
         return functools.partial(
@@ -473,7 +483,8 @@ def _python_callback_lowering(
     """Callback lowering"""
 
     sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-    import catalyst_callback_registry as registry  # pylint: disable=import-outside-toplevel
+    # pylint: disable=import-outside-toplevel
+    import catalyst_callback_registry as registry  # type: ignore[import-not-found]
 
     callback_id = registry.register(callback)
 
@@ -575,12 +586,12 @@ def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode, pipelines=None):
     Args:
       ctx: LoweringRuleContext
       *args: List[mlir.Value] corresponding to argument values
-      qnode: qml.Qnode
+      qnode: qp.Qnode
       call_jaxpr: jaxpr representing fn
     Returns:
       List[mlir.Value] corresponding
     """
-    assert isinstance(qnode, qml.QNode), "This function expects qnodes"
+    assert isinstance(qnode, qp.QNode), "This function expects qnodes"
     pipelines = pipelines or ()
 
     func_op = lower_callable(ctx, qnode, call_jaxpr, pipelines)
@@ -623,9 +634,7 @@ def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr, **params):
     The step is the compilation of the definition of the function fn.
     """
 
-    # Set the visibility of the decomposition rule to public
-    # to avoid the elimination by the compiler
-    lower_callable(ctx, pyfun, func_jaxpr, public=True, **params)
+    lower_callable(ctx, pyfun, func_jaxpr, **params)
     return ()
 
 
@@ -1979,7 +1988,7 @@ def custom_measurement_staging_rule(
 
     shape = _merge_dyn_shape(static_shape, dynamic_shape)
     if not dynamic_shape:
-        # Some PL transforms, like @qml.batch_params, do not support dynamic shapes yet
+        # Some PL transforms, like @qp.batch_params, do not support dynamic shapes yet
         # Therefore we still keep static shapes when possible
         # This can be removed, and all avals turned into DShapedArrays, when
         # dynamic program capture in PL is complete
@@ -2553,6 +2562,77 @@ def _while_loop_lowering(
     return while_op_scf.results
 
 
+def _pl_while_loop_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *plxpr_invals,
+    jaxpr_body_fn,
+    jaxpr_cond_fn,
+    body_slice,
+    cond_slice,
+    args_slice,
+):
+    body_consts = plxpr_invals[slice(*body_slice)]
+    cond_consts = plxpr_invals[slice(*cond_slice)]
+    args = plxpr_invals[slice(*args_slice)]
+
+    all_args_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
+    args_types = all_args_types[slice(*args_slice)]
+
+    while_op_scf = WhileOp(args_types, args)
+
+    # cond block
+    cond_block = while_op_scf.regions[0].blocks.append(*args_types)
+    name_stack = jax_ctx.name_stack.extend("while")
+    cond_ctx = jax_ctx.replace(name_stack=name_stack.extend("cond"))
+    with ir.InsertionPoint(cond_block):
+        cond_args = tuple(cond_block.arguments[i] for i in range(len(args)))
+        params = cond_consts + cond_args
+        new_cond_jaxpr = jaxpr_cond_fn.replace(
+            constvars=(), invars=jaxpr_cond_fn.constvars + jaxpr_cond_fn.invars
+        )
+
+        # recursively generate the mlir for the while cond
+        (pred,), _ = mlir.jaxpr_subcomp(
+            cond_ctx.module_context,
+            new_cond_jaxpr,
+            cond_ctx.name_stack,
+            mlir.TokenSet(),
+            [],
+            *params,
+            dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
+        )
+
+        pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), pred, []).result
+        ConditionOp(pred_extracted, cond_args)
+
+    # body block
+    body_block = while_op_scf.regions[1].blocks.append(*args_types)
+    body_ctx = jax_ctx.replace(name_stack=name_stack.extend("body"))
+    with ir.InsertionPoint(body_block):
+        body_args = tuple(body_block.arguments[-len(args) :])
+        params = body_consts + body_args
+
+        new_body_jaxpr = jaxpr_body_fn.replace(
+            constvars=(), invars=jaxpr_body_fn.constvars + jaxpr_body_fn.invars
+        )
+
+        # recursively generate the mlir for the while body
+        out, _ = mlir.jaxpr_subcomp(
+            body_ctx.module_context,
+            new_body_jaxpr,
+            body_ctx.name_stack,
+            mlir.TokenSet(),
+            [],
+            *params,
+            dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
+        )
+        YieldOp(out)
+
+    return while_op_scf.results
+
+
 #
 # for loop
 #
@@ -2674,6 +2754,64 @@ def _for_loop_lowering(
             body_ctx.name_stack,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in body_jaxpr.consts],
+            *loop_params,
+            dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
+        )
+        YieldOp(out)
+
+    return for_op_scf.results
+
+
+# pylint: disable=too-many-arguments
+def _pl_for_loop_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    start,
+    stop,
+    step,
+    *plxpr_invals,
+    jaxpr_body_fn,
+    consts_slice,
+    args_slice,
+    abstract_shapes_slice,
+):
+    body_consts = plxpr_invals[slice(*consts_slice)]
+    abstract_shapes = plxpr_invals[slice(*abstract_shapes_slice)]
+    args = plxpr_invals[slice(*args_slice)]
+
+    # need later to cast index back to original type
+    start_type = ir.RankedTensorType(start.type).element_type
+
+    start, stop, step = map(_cast_to_index, (start, stop, step))
+    # slicing out index, as passed to block independently
+    loop_args = abstract_shapes + args
+    for_op_scf = ForOp(start, stop, step, iter_args=loop_args)
+
+    name_stack = jax_ctx.name_stack.extend("for")
+    body_block = for_op_scf.body
+    body_ctx = jax_ctx.replace(name_stack=name_stack.extend("body"))
+
+    with ir.InsertionPoint(body_block):
+        # index -> i32 -> tensor<i32>
+        index = body_block.arguments[0]
+        scalar_index = IndexCastOp(start_type, index).result
+        new_dtype = ir.RankedTensorType.get((), start_type)
+        tensor_index = FromElementsOp(new_dtype, scalar_index).result
+
+        inner_shapes = body_block.arguments[1 : len(abstract_shapes) + 1]
+        inner_args = body_block.arguments[len(abstract_shapes) + 1 :]
+        loop_params = (*body_consts, *inner_shapes, tensor_index, *inner_args)
+        new_jaxpr = jaxpr_body_fn.replace(
+            constvars=(), invars=jaxpr_body_fn.constvars + jaxpr_body_fn.invars
+        )
+
+        # Recursively generate the mlir for the loop body
+        out, _ = mlir.jaxpr_subcomp(
+            body_ctx.module_context,
+            new_jaxpr,
+            body_ctx.name_stack,
+            mlir.TokenSet(),
+            [],
             *loop_params,
             dim_var_values=jax_ctx.dim_var_values,
             const_lowering=jax_ctx.const_lowering,
@@ -2948,11 +3086,13 @@ CUSTOM_LOWERING_RULES = (
     (switch_p, _switch_lowering),
     (while_p, _while_loop_lowering),
     (for_p, _for_loop_lowering),
+    (pl_for_loop_prim, _pl_for_loop_lowering),
     (grad_p, _grad_lowering),
     (pl_jac_prim, _capture_grad_lowering),
     (pl_vjp_prim, _capture_vjp_lowering),
     (pl_jvp_prim, _capture_jvp_lowering),
     (pl_value_and_grad_prim, _capture_value_and_grad_lowering),
+    (pl_while_loop_prim, _pl_while_loop_lowering),
     (func_p, _func_lowering),
     (jvp_p, _jvp_lowering),
     (vjp_p, _vjp_lowering),

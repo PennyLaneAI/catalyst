@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
+#include "Catalyst/IR/CatalystDialect.h"
 
+#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Transforms/InliningUtils.h"
 
-#include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/IR/CatalystOps.h"
 
 using namespace mlir;

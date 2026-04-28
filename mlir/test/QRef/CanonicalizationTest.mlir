@@ -107,6 +107,26 @@ func.func @test_get_no_user_fold(%r: !qref.reg<3>) {
 
 // -----
 
+// CHECK-LABEL: test_get_constant_index
+func.func @test_get_constant_index(%r: !qref.reg<3>) -> (!qref.bit, !qref.bit) {
+    // CHECK-NOT: arith.constant
+    // CHECK: [[q0:%.+]] = qref.get %arg0[ 0] : !qref.reg<3> -> !qref.bit
+    %0 = arith.constant 0 : i64
+    %q0 = qref.get %r[%0] : !qref.reg<3>, i64 -> !qref.bit
+
+    // CHECK-NOT: stablehlo.constant
+    // CHECK-NOT: tensor.extract
+    // CHECK: [[q1:%.+]] = qref.get %arg0[ 1] : !qref.reg<3> -> !qref.bit
+    %1 = stablehlo.constant dense<1> : tensor<i64>
+    %extracted = tensor.extract %1[] : tensor<i64>
+    %q1 = qref.get %r[%extracted] : !qref.reg<3>, i64 -> !qref.bit
+
+    // CHECK: return [[q0]], [[q1]]
+    return %q0, %q1 : !qref.bit, !qref.bit
+}
+
+// -----
+
 // CHECK-LABEL: test_get_cse
 func.func @test_get_cse(%r: !qref.reg<3>, %i: i64) {
     // CHECK: [[q0:%.+]] = qref.get %arg0[ 0] : !qref.reg<3> -> !qref.bit

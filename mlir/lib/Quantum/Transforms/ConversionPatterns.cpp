@@ -12,14 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "Catalyst/Utils/StaticAllocas.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
+#include "Quantum/Utils/QIRPauliRot.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -41,6 +46,45 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
     return LLVM::GEPOp::create(rewriter, loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
                                type, LLVM::AddressOfOp::create(rewriter, loc, glb),
                                ArrayRef<LLVM::GEPArg>{0, 0}, LLVM::GEPNoWrapFlags::inbounds);
+}
+
+Value getPauliProductPtr(Location loc, OpBuilder &rewriter, ModuleOp mod, ArrayAttr pauliProduct)
+{
+    std::string pauliWord;
+    for (Attribute attr : pauliProduct) {
+        pauliWord += cast<StringAttr>(attr).getValue().str();
+    }
+    std::string pauliWordKey = "pauli_word_" + pauliWord;
+    return getGlobalString(loc, rewriter, pauliWordKey,
+                           StringRef(pauliWord.c_str(), pauliWord.length() + 1), mod);
+}
+
+void createPauliRotCall(Location loc, ConversionPatternRewriter &rewriter, Operation *op,
+                        Value pauliWordPtr, Value thetaValue, Value modifiersPtr, Value cond,
+                        ValueRange inQubits)
+{
+    MLIRContext *ctx = rewriter.getContext();
+    StringRef qirName = "__catalyst__qis__PauliRot";
+    Type ptrType = LLVM::LLVMPointerType::get(ctx);
+    Type qirSignature =
+        LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
+                                    {ptrType, Float64Type::get(ctx), ptrType,
+                                     IntegerType::get(ctx, 1), IntegerType::get(ctx, 64)},
+                                    /*isVarArg=*/true);
+
+    LLVM::LLVMFuncOp fnDecl =
+        catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(rewriter, op, qirName, qirSignature);
+
+    int64_t numQubits = inQubits.size();
+    SmallVector<Value> args;
+    args.push_back(pauliWordPtr);
+    args.push_back(thetaValue);
+    args.push_back(modifiersPtr);
+    args.push_back(cond);
+    args.push_back(LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
+    args.append(inQubits.begin(), inQubits.end());
+
+    LLVM::CallOp::create(rewriter, loc, fnDecl, args);
 }
 
 } // namespace quantum
@@ -590,6 +634,35 @@ struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
         values.insert(values.end(), adaptor.getInCtrlQubits().begin(),
                       adaptor.getInCtrlQubits().end());
         rewriter.replaceOp(op, values);
+
+        return success();
+    }
+};
+
+struct PauliRotOpPattern : public OpConversionPattern<PauliRotOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(PauliRotOp op, PauliRotOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        const TypeConverter *conv = getTypeConverter();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
+                                            adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
+
+        Value pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct());
+        Value thetaValue = adaptor.getAngle();
+        Value cond = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(true));
+
+        createPauliRotCall(loc, rewriter, op.getOperation(), pauliWordPtr, thetaValue, modifiersPtr,
+                           cond, adaptor.getInQubits());
+
+        SmallVector<Value> values;
+        values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        values.insert(values.end(), adaptor.getInCtrlQubits().begin(),
+                      adaptor.getInCtrlQubits().end());
+        rewriter.replaceOp(op.getOperation(), values);
 
         return success();
     }
@@ -1195,6 +1268,7 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     }
     patterns.add<CustomOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MultiRZOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<PauliRotOpPattern>(typeConverter, patterns.getContext());
     patterns.add<PCPhaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<GlobalPhaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<QubitUnitaryOpPattern>(typeConverter, patterns.getContext());

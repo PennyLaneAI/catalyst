@@ -19,6 +19,7 @@ from typing import cast
 import pytest
 from xdsl.dialects import test
 from xdsl.dialects.builtin import (
+    Float64Type,
     IndexType,
     IntegerAttr,
     IntegerType,
@@ -59,6 +60,7 @@ expected_ops_names = {
     "PauliZOp": "qecp.z",
     "HadamardOp": "qecp.hadamard",
     "SOp": "qecp.s",
+    "RotOp": "qecp.rot",
     "CnotOp": "qecp.cnot",
     "MeasureOp": "qecp.measure",
     "AssembleTannerGraphOp": "qecp.assemble_tanner",
@@ -280,6 +282,34 @@ class TestQecPhysicalOps:
             create_ssa_value(qecp.QecPhysicalQubitType("aux")),
         ],
     )
+    @pytest.mark.parametrize(
+        "phi, theta, omega",
+        [
+            (
+                create_ssa_value(Float64Type()),
+                create_ssa_value(Float64Type()),
+                create_ssa_value(Float64Type()),
+            ),
+        ],
+    )
+    def test_qecp_op_constructor_rot(self, phi, theta, omega, qubit):
+        """Test the constructor of the qecp.rot op."""
+        rot_op = qecp.RotOp(phi, theta, omega, qubit)
+        assert len(rot_op.operands) == 4
+        assert rot_op.operand_types[0] == phi.type
+        assert rot_op.operand_types[1] == theta.type
+        assert rot_op.operand_types[2] == omega.type
+        assert rot_op.operand_types[3] == qubit.type
+        assert len(rot_op.result_types) == 1
+        assert rot_op.result_types[0] == qubit.type
+
+    @pytest.mark.parametrize(
+        "qubit",
+        [
+            create_ssa_value(qecp.QecPhysicalQubitType("data")),
+            create_ssa_value(qecp.QecPhysicalQubitType("aux")),
+        ],
+    )
     @pytest.mark.parametrize("adj", [False, True, UnitAttr()])
     def test_qecp_op_constructor_s(self, qubit, adj):
         """Test the constructor of the qecp.s op."""
@@ -452,6 +482,17 @@ def test_assembly_format(run_filecheck, pretty_print):
     %qd7 = qecp.s %qd6 adj : !qecp.qubit<data>
     %qa7 = qecp.s %qa6 adj : !qecp.qubit<aux>
 
+    // CHECK: [[phi:%.+]] = "test.op"() : () -> f64
+    // CHECK: [[theta:%.+]] = "test.op"() : () -> f64
+    // CHECK: [[omega:%.+]] = "test.op"() : () -> f64
+    // CHECK: [[qd8:%.+]] = qecp.rot([[phi:%.+]], [[theta:%.+]], [[omega:%.+]]) [[qd7]] : !qecp.qubit<data>
+    // CHECK: [[qa8:%.+]] = qecp.rot([[phi:%.+]], [[theta:%.+]], [[omega:%.+]]) [[qa7]] : !qecp.qubit<aux>
+    %phi = "test.op"() : () -> f64
+    %theta = "test.op"() : () -> f64
+    %omega = "test.op"() : () -> f64
+    %qd8 = qecp.rot(%phi, %theta, %omega) %qd7 : !qecp.qubit<data>
+    %qa8 = qecp.rot(%phi, %theta, %omega) %qa7 : !qecp.qubit<aux>
+
     // CHECK: [[qd10:%.+]] = "test.op"() : () -> !qecp.qubit<data>
     // CHECK: [[qd20:%.+]] = "test.op"() : () -> !qecp.qubit<data>
     // CHECK: [[qa10:%.+]] = "test.op"() : () -> !qecp.qubit<aux>
@@ -478,10 +519,10 @@ def test_assembly_format(run_filecheck, pretty_print):
     %row_idx = "test.op"() : () -> tensor<8xi32>
     %col_ptr = "test.op"() : () -> tensor<6xi32>
 
-    // CHECK: [[mres0:%.+]], [[qd8:%.+]] = qecp.measure [[qd7]] : i1, !qecp.qubit<data>
-    // CHECK: [[mres1:%.+]], [[qa8:%.+]] = qecp.measure [[qa7]] : i1, !qecp.qubit<aux>
-    %mres0, %qd8 = qecp.measure %qd7 : i1, !qecp.qubit<data>
-    %mres1, %qa8 = qecp.measure %qa7 : i1, !qecp.qubit<aux>
+    // CHECK: [[mres0:%.+]], [[qd9:%.+]] = qecp.measure [[qd8]] : i1, !qecp.qubit<data>
+    // CHECK: [[mres1:%.+]], [[qa9:%.+]] = qecp.measure [[qa8]] : i1, !qecp.qubit<aux>
+    %mres0, %qd9 = qecp.measure %qd8 : i1, !qecp.qubit<data>
+    %mres1, %qa9 = qecp.measure %qa8 : i1, !qecp.qubit<aux>
 
     // CHECK: [[tgraph:%.+]] = qecp.assemble_tanner [[row_idx]], [[col_ptr]] : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
     %tgraph = qecp.assemble_tanner %row_idx, %col_ptr : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>

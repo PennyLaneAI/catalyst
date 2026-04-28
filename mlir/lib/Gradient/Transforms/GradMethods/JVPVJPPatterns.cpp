@@ -14,13 +14,14 @@
 
 #define DEBUG_TYPE "jvpvjp"
 
+#include "JVPVJPPatterns.hpp"
+
 #include <algorithm>
 #include <memory>
 #include <vector>
 
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -29,8 +30,6 @@
 #include "Gradient/Utils/EinsumLinalgGeneric.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
-
-#include "JVPVJPPatterns.hpp"
 
 using namespace mlir;
 using namespace catalyst::gradient;

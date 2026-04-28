@@ -66,7 +66,6 @@
 #include <deque>
 
 #include "llvm/ADT/SmallSet.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"

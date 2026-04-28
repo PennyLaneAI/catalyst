@@ -19,7 +19,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Ion/IR/IonInfo.h"
-#include "Ion/Transforms/oqd_database_managers.hpp"
+#include "Ion/Transforms/oqd_database_managers.h"
 
 namespace catalyst {
 namespace ion {

@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Gradient/IR/GradientDialect.h"
+
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Transforms/InliningUtils.h"
 
-#include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientOps.h"
 
 using namespace mlir;

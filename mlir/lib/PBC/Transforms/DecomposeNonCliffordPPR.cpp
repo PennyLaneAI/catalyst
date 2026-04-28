@@ -13,19 +13,18 @@
 // limitations under the License.
 
 #define DEBUG_TYPE "decompose-non-clifford-ppr"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "mlir/Dialect/Arith/IR/Arith.h" // for arith::XOrIOp and arith::ConstantOp
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringRef.h"
-
-#include "Quantum/IR/QuantumOps.h"
 
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Transforms/PPRDecomposeUtils.h"
 #include "PBC/Transforms/Patterns.h"
 #include "PBC/Utils/PauliStringWrapper.h"
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 using namespace catalyst::pbc;

@@ -13,13 +13,13 @@
 # limitations under the License.
 
 """
-Integration tests for qml.StatePrep.
+Integration tests for qp.StatePrep.
 
 This test suite was introduced following https://github.com/PennyLaneAI/catalyst/issues/1488.
 """
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import qjit
@@ -39,6 +39,51 @@ def generate_random_state(n=1, seed=None):
     rng = np.random.default_rng(seed=seed)
     input_state = rng.random(2**n) + 1j * rng.random(2**n)
     return input_state / np.linalg.norm(input_state)
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        np.array([1, 1]),
+        np.array([np.sqrt(1 / 2), np.sqrt(1 / 2)]),
+        np.array([np.sqrt(1 / 2), np.sqrt(1 / 2), 0, 0]),
+    ],
+    ids=["unnormalized_input", "normalized_input", "correct_input"],
+)
+def test_state_prep_pad_with_kwarg(state, capture_mode):
+    """Tests the 'pad_with' kwarg."""
+
+    num_qubits = 2
+
+    @qp.qjit(capture=capture_mode)
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
+    def circuit(state=None):
+        qp.StatePrep(state, wires=range(num_qubits), pad_with=0.0)
+        return qp.expval(qp.Z(0)), qp.state()
+
+    res, state = circuit(state)
+
+    assert np.allclose(res, 1.0)
+    assert len(state) == 2**num_qubits
+    assert np.allclose(state, np.sqrt(1 / 2) * np.array([1, 1, 0, 0]))
+
+
+def test_state_prep_normalize_kwarg(capture_mode):
+    """Tests the 'normalize' kwarg."""
+
+    num_qubits = 2
+
+    @qp.qjit(capture=capture_mode)
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
+    def circuit(state=None):
+        qp.StatePrep(state, wires=range(num_qubits), normalize=True)
+        return qp.expval(qp.Z(0)), qp.state()
+
+    res, state = circuit(np.array([15, 15, 15, 15]))
+
+    assert np.allclose(res, 0.0)
+    assert len(state) == 2**num_qubits
+    assert np.allclose(state, 1 / 2 * np.array([1, 1, 1, 1]))
 
 
 class Test2QubitStatePrep:
@@ -65,10 +110,10 @@ class Test2QubitStatePrep:
         generate_random_state(seed=42),
     ]
 
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     @staticmethod
     def circuit_01(input_state):
         """A circuit that applies StatePrep on wire 0 and the Hadamard on wire 1.
@@ -77,14 +122,14 @@ class Test2QubitStatePrep:
 
             |psi'> = (a|00> + a|01> + b|10> - b|11>) / sqrt(2)
         """
-        qml.StatePrep(input_state, wires=[0])
-        qml.Hadamard(1)
-        qml.CZ([1, 0])
+        qp.StatePrep(input_state, wires=[0])
+        qp.Hadamard(1)
+        qp.CZ([1, 0])
 
-        return qml.state()
+        return qp.state()
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     @staticmethod
     def circuit_10(input_state):
         """A circuit that applies StatePrep on wire 1 and the Hadamard on wire 0.
@@ -93,11 +138,11 @@ class Test2QubitStatePrep:
 
             |psi'> = (a|00> + b|01> + a|10> - b|11>) / sqrt(2)
         """
-        qml.StatePrep(input_state, wires=[1])
-        qml.Hadamard(0)
-        qml.CZ([1, 0])
+        qp.StatePrep(input_state, wires=[1])
+        qp.Hadamard(0)
+        qp.CZ([1, 0])
 
-        return qml.state()
+        return qp.state()
 
     @pytest.mark.parametrize("input_state", input_states)
     def test_2qubit_state_prep_H_CZ_01(self, input_state):
@@ -131,16 +176,16 @@ class TestTrotterProduct:
         Test state prep.
         """
 
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def circ():
-            H = qml.Hamiltonian([1, 1], [qml.PauliZ(0), qml.PauliZ(1)])
-            qml.StatePrep([0, 0, 0, 1], wires=[0, 1])
-            qml.Hadamard(wires=2)
-            qml.ctrl(
-                qml.TrotterProduct(H, 1, n=3, order=2),
+            H = qp.Hamiltonian([1, 1], [qp.PauliZ(0), qp.PauliZ(1)])
+            qp.StatePrep([0, 0, 0, 1], wires=[0, 1])
+            qp.Hadamard(wires=2)
+            qp.ctrl(
+                qp.TrotterProduct(H, 1, n=3, order=2),
                 control=2,
             )
-            return qml.probs(wires=[2])
+            return qp.probs(wires=[2])
 
         assert np.allclose(circ(), qjit(circ)())
 
@@ -149,16 +194,16 @@ class TestTrotterProduct:
         Test basis state.
         """
 
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def circ():
-            H = qml.Hamiltonian([1, 1], [qml.PauliZ(0), qml.PauliZ(1)])
-            qml.BasisState(np.array([1, 1]), wires=[0, 1])
-            qml.Hadamard(wires=2)
-            qml.ctrl(
-                qml.TrotterProduct(H, 1, n=3, order=2),
+            H = qp.Hamiltonian([1, 1], [qp.PauliZ(0), qp.PauliZ(1)])
+            qp.BasisState(np.array([1, 1]), wires=[0, 1])
+            qp.Hadamard(wires=2)
+            qp.ctrl(
+                qp.TrotterProduct(H, 1, n=3, order=2),
                 control=2,
             )
-            return qml.probs(wires=[2])
+            return qp.probs(wires=[2])
 
         assert np.allclose(circ(), qjit(circ)())
 

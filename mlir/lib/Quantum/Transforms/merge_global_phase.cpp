@@ -16,10 +16,10 @@
 
 #include <iterator>
 
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
-#include "llvm/ADT/SmallVector.h"
 
 #include "Quantum/IR/QuantumOps.h"
 

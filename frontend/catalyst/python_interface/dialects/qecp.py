@@ -27,8 +27,8 @@ from typing import ClassVar, TypeAlias
 
 from xdsl.dialects.builtin import (
     I64,
-    ContainerOf,
     ContainerType,
+    Float64Type,
     IndexType,
     IntegerAttr,
     IntegerType,
@@ -54,6 +54,7 @@ from xdsl.irdl import (
     IRDLOperation,
     TypeAttributeInvT,
     VarConstraint,
+    base,
     irdl_attr_definition,
     irdl_op_definition,
     operand_def,
@@ -241,10 +242,6 @@ PhysicalCodeBlockSSAValue: TypeAlias = SSAValue[PhysicalCodeblockType]
 PhysicalHyperRegisterSSAValue: TypeAlias = SSAValue[PhysicalHyperRegisterType]
 TannerGraphSSAValue: TypeAlias = SSAValue[TannerGraphType]
 
-anyPhysicalQubit = ContainerOf(QecPhysicalQubitType)
-anyPhysicalCodeblock = ContainerOf(PhysicalCodeblockType)
-anyPhysicalHyperRegister = ContainerOf(PhysicalHyperRegisterType)
-
 
 def _get_type_from_ssa_value_or_operation(
     arg: SSAValue | Operation, expected_type: TypeAttributeInvT
@@ -413,7 +410,7 @@ class ExtractCodeblockOp(IRDLOperation):
 class InsertCodeblockOp(IRDLOperation):
     """Update the physical codeblock value of a hyper-register."""
 
-    T: ClassVar = VarConstraint("T", anyPhysicalHyperRegister)
+    T: ClassVar = VarConstraint("T", base(PhysicalHyperRegisterType))
 
     name = "qecp.insert_block"
 
@@ -510,7 +507,7 @@ class InsertQubitOp(IRDLOperation):
     inserted into a physical codeblock.
     """
 
-    T: ClassVar = VarConstraint("T", anyPhysicalCodeblock)
+    T: ClassVar = VarConstraint("T", base(PhysicalCodeblockType))
 
     name = "qecp.insert"
 
@@ -571,7 +568,7 @@ class SingleQubitPhysicalGateOp(IRDLOperation):
     %1 = qecp.s %0 adj : !qecp.qubit<data>
     """
 
-    T: ClassVar = VarConstraint("T", anyPhysicalQubit)
+    T: ClassVar = VarConstraint("T", base(QecPhysicalQubitType))
 
     assembly_format = """
             $in_qubit (`adj` $adjoint^)? attr-dict `:` type($out_qubit)
@@ -656,8 +653,8 @@ class SOp(SingleQubitPhysicalGateOp):
 class CnotOp(IRDLOperation):
     """A physical CNOT gate operation."""
 
-    T_CTRL: ClassVar = VarConstraint("T_CTRL", anyPhysicalQubit)
-    T_TRGT: ClassVar = VarConstraint("T_TRGT", anyPhysicalQubit)
+    T_CTRL: ClassVar = VarConstraint("T_CTRL", base(QecPhysicalQubitType))
+    T_TRGT: ClassVar = VarConstraint("T_TRGT", base(QecPhysicalQubitType))
 
     name = "qecp.cnot"
 
@@ -688,10 +685,58 @@ class CnotOp(IRDLOperation):
 
 
 @irdl_op_definition
+class RotOp(IRDLOperation):
+    """A physical Rot gate operation.
+
+    ```mlir
+    %1 = qecp.rot (%phi, %theta, %omega) %0 : !qecp.qubit<data>
+    ```
+    NOTE: This operation is for physical noise injection only.
+    """
+
+    T: ClassVar = VarConstraint("T", base(QecPhysicalQubitType))
+
+    name = "qecp.rot"
+
+    assembly_format = """
+           `(` $phi `,` $theta `,` $omega `)` $in_qubit attr-dict `:` type($in_qubit)
+        """
+
+    phi = operand_def(Float64Type())
+
+    theta = operand_def(Float64Type())
+
+    omega = operand_def(Float64Type())
+
+    in_qubit = operand_def(T)
+
+    out_qubit = result_def(T)
+
+    def __init__(
+        self,
+        phi: SSAValue[Float64Type],
+        theta: SSAValue[Float64Type],
+        omega: SSAValue[Float64Type],
+        in_qubit: QecPhysicalQubitSSAValue | Operation,
+    ):
+        in_qubit_type = get_physical_qubit_type(in_qubit)
+
+        super().__init__(
+            operands=(
+                phi,
+                theta,
+                omega,
+                in_qubit,
+            ),
+            result_types=(in_qubit_type,),
+        )
+
+
+@irdl_op_definition
 class MeasureOp(IRDLOperation):
     """A physical single-qubit projective measurement in the computational basis."""
 
-    T: ClassVar = VarConstraint("T", anyPhysicalQubit)
+    T: ClassVar = VarConstraint("T", base(QecPhysicalQubitType))
 
     name = "qecp.measure"
 
@@ -825,6 +870,7 @@ QecPhysical = Dialect(
         PauliYOp,
         PauliZOp,
         HadamardOp,
+        RotOp,
         SOp,
         CnotOp,
         MeasureOp,

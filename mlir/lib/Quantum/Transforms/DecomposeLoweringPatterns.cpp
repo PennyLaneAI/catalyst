@@ -16,14 +16,14 @@
 
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 
-#include "DecomposeLoweringImpl.hpp"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
+
+#include "DecomposeLoweringImpl.hpp"
 
 using namespace mlir;
 using namespace catalyst::quantum;

@@ -15,7 +15,6 @@
 #define DEBUG_TYPE "merge-rotation"
 
 #include "llvm/Support/Debug.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"

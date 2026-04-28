@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Mitigation/IR/MitigationDialect.h"
+
+#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 #include "mlir/Transforms/InliningUtils.h"
-#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 
-#include "Mitigation/IR/MitigationDialect.h"
 #include "Mitigation/IR/MitigationOps.h"
 
 using namespace mlir;

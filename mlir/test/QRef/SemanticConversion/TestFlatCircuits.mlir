@@ -469,7 +469,7 @@ func.func @test_alloc_qb() attributes {quantum.node} {
 
 
 // CHECK-LABEL: test_adjoint_op
-func.func @test_adjoint_op()
+func.func @test_adjoint_op() attributes {quantum.node}
 {
     // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
     %r = qref.alloc(2) : !qref.reg<2>
@@ -502,7 +502,7 @@ func.func @test_adjoint_op()
 
 
 // CHECK-LABEL: test_adjoint_op_nested
-func.func @test_adjoint_op_nested()
+func.func @test_adjoint_op_nested() attributes {quantum.node}
 {
     // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
     %r = qref.alloc(2) : !qref.reg<2>

@@ -15,7 +15,6 @@
 #define DEBUG_TYPE "loop-boundary"
 
 #include "llvm/Support/Debug.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"

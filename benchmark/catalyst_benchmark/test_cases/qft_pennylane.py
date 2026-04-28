@@ -16,7 +16,7 @@
 from copy import deepcopy
 from dataclasses import dataclass
 
-import pennylane as qml
+import pennylane as qp
 import pennylane.numpy as pnp
 from catalyst_benchmark.types import Problem
 
@@ -41,15 +41,15 @@ def qcompile(p: ProblemPL, params):
         N = p.nqubits
         L = p.nlayers
         for wG in range(N):
-            qml.Hadamard(wires=[wG])
+            qp.Hadamard(wires=[wG])
         for _ in range(L):
             for wG in range(N):
                 for wC in range(wG + 1, N):
                     phi = (2 ** (wC - wG)) / params[0]
-                    qml.ctrl(qml.PhaseShift, control=wC)(phi=phi, wires=[wG])
-        return qml.state()
+                    qp.ctrl(qp.PhaseShift, control=wC)(phi=phi, wires=[wG])
+        return qp.state()
 
-    qcircuit = qml.QNode(_circuit, p.dev, **p.qnode_kwargs)
+    qcircuit = qp.QNode(_circuit, p.dev, **p.qnode_kwargs)
     qcircuit.construct([params], {})
     p.qcircuit = qcircuit
     return p
@@ -78,7 +78,7 @@ def run_jax_lightning_qubit(N=6):
 
     jax.config.update("jax_enable_x64", True)
 
-    p = ProblemPL(dev=qml.device("lightning.qubit", wires=N, shots=SHOTS), interface="jax")
+    p = ProblemPL(dev=qp.device("lightning.qubit", wires=N, shots=SHOTS), interface="jax")
 
     @jax.jit
     def _main(params):
@@ -93,7 +93,7 @@ def run_jax_lightning_qubit(N=6):
 def run_lightning_qubit(N=6):
     """Test problem entry point"""
 
-    p = ProblemPL(dev=qml.device("lightning.qubit", wires=N, shots=SHOTS))
+    p = ProblemPL(dev=qp.device("lightning.qubit", wires=N, shots=SHOTS))
 
     def _main(params):
         qcompile(p, params)
@@ -107,7 +107,7 @@ def run_lightning_qubit(N=6):
 def run_default_qubit(N=6):
     """Test problem entry point"""
 
-    p = ProblemPL(dev=qml.device("default.qubit", wires=N, shots=SHOTS))
+    p = ProblemPL(dev=qp.device("default.qubit", wires=N, shots=SHOTS))
 
     def _main(params):
         qcompile(p, params)

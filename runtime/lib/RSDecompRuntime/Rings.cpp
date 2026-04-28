@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Rings.hpp"
+
 #include <numeric>
 
 #include "RSUtils.hpp"
-#include "Rings.hpp"
 
 namespace RSDecomp::Rings {
 using namespace RSDecomp::Utils;

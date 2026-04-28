@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <stim/mem/simd_word.h>
-#include <stim/stabilizers/flex_pauli_string.h>
-#include <stim/stabilizers/pauli_string.h>
-
-#include "PBC/IR/PBCDialect.h"
-#include "PBC/IR/PBCOps.h"
 #include "PBC/Utils/PauliStringWrapper.h"
+
+#include "stim/mem/simd_word.h"
+#include "stim/stabilizers/flex_pauli_string.h"
+#include "stim/stabilizers/pauli_string.h"
+
+#include "PBC/IR/PBCOps.h"
 
 namespace catalyst {
 namespace pbc {

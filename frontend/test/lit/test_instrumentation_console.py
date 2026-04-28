@@ -17,7 +17,7 @@
 
 import jax
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 
 from catalyst import qjit
 from catalyst.debug import instrumentation
@@ -28,16 +28,16 @@ jax.config.update("jax_platforms", "cpu")
 
 num_layers = 1
 num_wires = 1
-dev = qml.device("lightning.qubit", wires=num_wires)
+dev = qp.device("lightning.qubit", wires=num_wires)
 
 
-@qml.qnode(dev)
+@qp.qnode(dev)
 def circuit(weights):
-    qml.StronglyEntanglingLayers(weights=weights, wires=range(num_wires))
-    return qml.expval(qml.PauliZ(0))
+    qp.StronglyEntanglingLayers(weights=weights, wires=range(num_wires))
+    return qp.expval(qp.PauliZ(0))
 
 
-shape = qml.StronglyEntanglingLayers.shape(num_layers, num_wires)
+shape = qp.StronglyEntanglingLayers.shape(num_layers, num_wires)
 weights = np.random.random(size=shape)
 
 # -----

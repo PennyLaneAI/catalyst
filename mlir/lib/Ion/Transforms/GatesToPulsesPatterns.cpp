@@ -25,7 +25,7 @@
 
 #include "Ion/IR/IonOps.h"
 #include "Ion/Transforms/Patterns.h"
-#include "Ion/Transforms/oqd_database_managers.hpp"
+#include "Ion/Transforms/oqd_database_managers.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;

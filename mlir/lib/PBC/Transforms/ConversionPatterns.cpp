@@ -15,18 +15,17 @@
 #include <cstdint>
 
 #include "llvm/Support/MathExtras.h" // for llvm::numbers::pi
-
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Transforms/Patterns.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Patterns.h"
+#include "Quantum/IR/QuantumTypes.h"
+#include "Quantum/Utils/QIRPauliRot.h"
 
 using namespace mlir;
 
@@ -39,26 +38,6 @@ using namespace catalyst::quantum;
 // Pauli-based Computational Operations //
 //////////////////////////////////////////
 
-/// Helper function to convert a Pauli product ArrayAttr to a string
-// (e.g., ["X", "I", "Z"] -> "XIZ")
-std::string pauliProductToString(ArrayAttr pauliProduct)
-{
-    std::string result;
-    for (auto attr : pauliProduct) {
-        result += cast<StringAttr>(attr).getValue().str();
-    }
-    return result;
-}
-
-Value getPauliProductPtr(Location loc, ConversionPatternRewriter &rewriter, ModuleOp mod,
-                         ArrayAttr pauliProduct)
-{
-    std::string pauliWord = pauliProductToString(pauliProduct);
-    std::string pauliWordKey = "pauli_word_" + pauliWord;
-    return catalyst::quantum::getGlobalString(
-        loc, rewriter, pauliWordKey, StringRef(pauliWord.c_str(), pauliWord.length() + 1), mod);
-}
-
 template <typename T> struct PPRotationBasedPattern : public OpConversionPattern<T> {
     using OpConversionPattern<T>::OpConversionPattern;
 
@@ -66,27 +45,12 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
                                   ConversionPatternRewriter &rewriter) const override
     {
         Location loc = op.getLoc();
-        MLIRContext *ctx = this->getContext();
         ModuleOp mod = op->template getParentOfType<ModuleOp>();
 
-        // Create a global string for the Pauli word
-        Value pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct());
-
-        // void __catalyst__qis__PauliRot(const char* pauliStr, double theta, const Modifiers*,
-        //                                bool cond, int64_t numQubits, ...qubits)
-        StringRef qirName = "__catalyst__qis__PauliRot";
         Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-        Type qirSignature =
-            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
-                                        {ptrType, Float64Type::get(ctx), ptrType,
-                                         IntegerType::get(ctx, 1), IntegerType::get(ctx, 64)},
-                                        /*isVarArg=*/true);
-
-        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
-            rewriter, op, qirName, qirSignature);
 
         // Get the rotation angle based on the op type
-        // Since the qml.PauliRot(phi) == PPR(phi/2), this rotation_kind is multiplied by 2.
+        // Since the qp.PauliRot(phi) == PPR(phi/2), this rotation_kind is multiplied by 2.
         Value thetaValue;
         Value cond;
         if constexpr (std::is_same_v<T, PPRotationOp>) {
@@ -113,27 +77,14 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
                 rewriter, loc, adaptor.getArbitraryAngle(),
                 LLVM::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0)));
         }
-        else if constexpr (std::is_same_v<T, PauliRotOp>) {
-            cond = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(1));
-            // Use the arbitrary angle directly
-            thetaValue = adaptor.getAngle();
-        }
         else {
             static_assert(!std::is_same_v<T, T>(), "unexpected type in templated rewrite");
         }
 
-        // Build the arguments: pauliStr, theta, modifiers, numQubits, qubits...
-        int64_t numQubits = adaptor.getInQubits().size();
-        SmallVector<Value> args;
-        args.push_back(pauliWordPtr);
-        args.push_back(thetaValue);
-        args.push_back(LLVM::ZeroOp::create(rewriter, loc, ptrType));
-        args.push_back(cond);
-        args.push_back(
-            LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
-        args.append(adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-
-        LLVM::CallOp::create(rewriter, loc, fnDecl, args);
+        Value pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct());
+        Value modifiersPtr = LLVM::ZeroOp::create(rewriter, loc, ptrType);
+        createPauliRotCall(loc, rewriter, op.getOperation(), pauliWordPtr, thetaValue, modifiersPtr,
+                           cond, adaptor.getInQubits());
 
         // Replace the op with the input qubits
         rewriter.replaceOp(op, adaptor.getInQubits());
@@ -225,8 +176,6 @@ namespace pbc {
 void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns)
 {
     // Pauli-based Computational Operations
-    patterns.add<PPRotationBasedPattern<PauliRotOp>>(typeConverter, patterns.getContext());
-
     patterns.add<PPRotationBasedPattern<PPRotationOp>>(typeConverter, patterns.getContext());
     patterns.add<PPRotationBasedPattern<PPRotationArbitraryOp>>(typeConverter,
                                                                 patterns.getContext());

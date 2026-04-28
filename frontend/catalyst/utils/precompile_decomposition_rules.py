@@ -25,8 +25,7 @@ from pennylane.operation import Operator
 from catalyst.compiler import _quantum_opt
 from catalyst.jax_primitives import decomposition_rule
 from catalyst.utils.exceptions import CompileError
-
-BYTECODE_FILE_PATH = Path(__file__).parent.parent / Path("resources/decomposition_rules.mlirbc")
+from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 # TODO: Uncomment dynamic size wires ops once they are supported
 # FIXME: Use the Gate class instead of this list of compiler ops
@@ -48,7 +47,11 @@ COMPILER_OPS_FOR_DECOMPOSITION = {
     qp.IsingYY,
     qp.IsingZZ,
     qp.SingleExcitation,
+    qp.SingleExcitationPlus,
+    qp.SingleExcitationMinus,
     qp.DoubleExcitation,
+    qp.DoubleExcitationPlus,
+    qp.DoubleExcitationMinus,
     qp.ISWAP,
     qp.PauliX,
     qp.PauliY,
@@ -64,7 +67,7 @@ COMPILER_OPS_FOR_DECOMPOSITION = {
     qp.S,
     qp.SWAP,
     qp.T,
-    qp.Toffoli,
+    # qp.Toffoli, // adjoint not supported
     qp.U1,
     qp.U2,
     qp.U3,

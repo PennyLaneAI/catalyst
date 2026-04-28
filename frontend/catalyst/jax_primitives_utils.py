@@ -16,7 +16,7 @@
 import copy
 import functools
 
-import pennylane as qml
+import pennylane as qp
 from jax._src import core, util
 from jax._src.lib.mlir import ir
 from jax.interpreters import mlir
@@ -37,7 +37,7 @@ def _all_expval(call_jaxpr: core.ClosedJaxpr) -> bool:
     return True
 
 
-def _calculate_diff_method(qn: qml.QNode, call_jaxpr: core.ClosedJaxpr):
+def _calculate_diff_method(qn: qp.QNode, call_jaxpr: core.ClosedJaxpr):
     diff_method = str(qn.diff_method)
     if diff_method != "best":
         return diff_method
@@ -78,7 +78,7 @@ def lower_jaxpr(ctx, jaxpr, metadata=None, fn=None):
         FuncOp
     """
 
-    if fn is None or isinstance(fn, qml.QNode):
+    if fn is None or isinstance(fn, qp.QNode):
         equation = get_call_equation(jaxpr)
         call_jaxpr = equation.params["call_jaxpr"]
         pipelines = equation.params.get("pipelines")
@@ -94,7 +94,7 @@ def lower_jaxpr(ctx, jaxpr, metadata=None, fn=None):
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
-def lower_callable(ctx, callable_, call_jaxpr, pipelines=(), metadata=None, public=False):
+def lower_callable(ctx, callable_, call_jaxpr, pipelines=(), metadata=None):
     """Lowers _callable to MLIR.
 
     If callable_ is a qnode, then we will first create a module, then
@@ -106,18 +106,15 @@ def lower_callable(ctx, callable_, call_jaxpr, pipelines=(), metadata=None, publ
       ctx: LoweringRuleContext
       callable_: python function
       call_jaxpr: jaxpr representing callable_
-      public: whether the visibility should be marked public
 
     Returns:
       FuncOp
     """
     if pipelines is None:
         pipelines = tuple()
-    if isinstance(callable_, qml.QNode):
+    if isinstance(callable_, qp.QNode):
         return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipelines, metadata=metadata)
-    return get_or_create_funcop(
-        ctx, callable_, call_jaxpr, pipelines, metadata=metadata, public=public
-    )
+    return get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines, metadata=metadata)
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
@@ -127,7 +124,6 @@ def get_or_create_funcop(
     call_jaxpr,
     pipelines: tuple[tuple[str, BoundTransform], ...],
     metadata=None,
-    public=False,
 ):
     """Get funcOp from cache, or create it from scratch
 
@@ -137,7 +133,6 @@ def get_or_create_funcop(
         call_jaxpr: jaxpr representing callable_
         pipelines (tuple[tuple[str, BoundTransform], ...]): pipelines to be applied to the funcop
         metadata: additional metadata to distinguish different FuncOps
-        public: whether the visibility should be marked public
 
     Returns:
         FuncOp
@@ -147,19 +142,18 @@ def get_or_create_funcop(
     key = (callable_, *metadata, *_lowered_pipelines(pipelines))
     if func_op := get_cached(ctx, key):
         return func_op
-    func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=public)
+    func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr)
     cache(ctx, key, func_op)
     return func_op
 
 
-def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
+def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
     """Lower callable to either a FuncOp
 
     Args:
         ctx: LoweringRuleContext
         callable_: python function
         call_jaxpr: jaxpr representing callable_
-        public: whether the visibility should be marked public
 
     Returns:
         FuncOp
@@ -187,10 +181,8 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
     kwargs["num_const_args"] = num_const_args
 
     func_op = mlir.lower_jaxpr_to_fun(**kwargs)
-    if public:
-        func_op.attributes["sym_visibility"] = ir.StringAttr.get("public")
 
-    if isinstance(callable_, qml.QNode):
+    if isinstance(callable_, qp.QNode):
         func_op.attributes["quantum.node"] = ir.UnitAttr.get()
 
         diff_method = _calculate_diff_method(callable_, call_jaxpr)
@@ -218,7 +210,7 @@ def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipelines, metadata):
 
     Args:
       ctx: LoweringRuleContext
-      callable_: qml.Qnode
+      callable_: qp.Qnode
       call_jaxpr: jaxpr representing callable_
     Returns:
       FuncOp
@@ -244,12 +236,12 @@ def lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines):
 
     Args:
       ctx: LoweringRuleContext
-      callable_: qml.Qnode
+      callable_: qp.Qnode
       call_jaxpr: jaxpr representing callable_
     Returns:
       FuncOp
     """
-    assert isinstance(callable_, qml.QNode), "This function expects qnodes"
+    assert isinstance(callable_, qp.QNode), "This function expects qnodes"
 
     name = "module_" + callable_.__name__
     # pylint: disable-next=no-member

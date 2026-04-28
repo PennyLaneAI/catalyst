@@ -15,15 +15,12 @@
 #pragma once
 
 #include <array>
-#include <stdexcept>
-#include <tuple>
 #include <utility>
 
 #include "Exception.hpp"
 #include "OpenQasmBuilder.hpp"
-#include "Utils.hpp"
-
 #include "Types.h"
+#include "Utils.hpp"
 
 namespace Catalyst::Runtime::Device::OpenQasm {
 

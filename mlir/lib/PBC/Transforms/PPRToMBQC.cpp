@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <mlir/Dialect/Arith/IR/Arith.h>
+#include "mlir/Dialect/Arith/IR/Arith.h"
 
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Transforms/Patterns.h"

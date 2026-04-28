@@ -16,8 +16,8 @@
 
 #define DEBUG_TYPE "empty"
 
-#include "mlir/Pass/Pass.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Pass/Pass.h"
 
 using namespace llvm;
 using namespace mlir;

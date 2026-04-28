@@ -17,7 +17,6 @@
 #include <optional>
 
 #include "llvm/ADT/StringRef.h"
-
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
@@ -25,6 +24,7 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 
+#include "MBQC/IR/MBQCDialect.h"
 #include "QRef/IR/QRefDialect.h"
 #include "QRef/IR/QRefInterfaces.h"
 #include "Quantum/IR/QuantumDialect.h"

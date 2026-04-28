@@ -14,7 +14,6 @@
 
 #pragma once
 
-#include "Ellipse.hpp"
 #include <algorithm>
 #include <cmath>
 #include <complex>
@@ -22,6 +21,8 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
+
+#include "Ellipse.hpp"
 
 // Note:
 // The construction of the grid problem solver here are described in https://arxiv.org/pdf/1403.2975

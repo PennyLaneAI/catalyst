@@ -14,13 +14,13 @@
 
 #define DEBUG_TYPE "to-pauli-frame"
 
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/WalkPatternRewriteDriver.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/LogicalResult.h"
 
 #include "PauliFrame/IR/PauliFrameOps.h"
 #include "PauliFrame/Transforms/Patterns.h"

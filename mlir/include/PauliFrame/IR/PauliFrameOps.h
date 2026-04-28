@@ -14,9 +14,8 @@
 
 #pragma once
 
-#include "Quantum/IR/QuantumDialect.h"
-
 #include "PauliFrame/IR/PauliFrameDialect.h"
+#include "Quantum/IR/QuantumDialect.h"
 
 //===----------------------------------------------------------------------===//
 // PauliFrame ops declarations.
