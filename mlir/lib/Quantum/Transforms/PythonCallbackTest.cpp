@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/ADT/StringSet.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"
 
@@ -30,44 +31,41 @@ struct InstantiatePythonDecompRulePass
 
     void runOnOperation() override
     {
+        llvm::StringSet<> addedWords;
 
+        llvm::errs() << "starting pass\n";
         mlir::ModuleOp module = cast<mlir::ModuleOp>(getOperation());
 
-        // walk module to find paulirot
-        quantum::PauliRotOp myPauliRot;
-        module.walk([&](quantum::PauliRotOp op) { myPauliRot = op; });
-        if (!myPauliRot) {
-            llvm::errs() << "failed to find paulirot\n";
-            return signalPassFailure();
-        }
-        // llvm::errs() << "got paulirot\n";
+        module.walk([&](quantum::PauliRotOp op) {
+            llvm::errs() << "getting pauli word\n";
+            std::string pauliWord;
+            for (auto pauliChar : op.getPauliProduct()) {
+                pauliWord += cast<mlir::StringAttr>(pauliChar).getValue().str();
+            }
+            llvm::errs() << "got pauli word\n";
 
-        std::string pauliWord;
-        for (auto pauliChar : myPauliRot.getPauliProduct()) {
-            pauliWord += cast<mlir::StringAttr>(pauliChar).getValue().str();
-        }
-        // llvm::errs() << "got pauli word\n";
+            if (addedWords.contains(pauliWord)) {
+                return mlir::WalkResult::advance();
+            }
 
-        std::vector<PyArg> args;
-        args.push_back(0.2);       // dynamic parameter, any value will work
-        args.push_back(pauliWord); // static parameter, must be the correct value
-        llvm::errs() << "pauli word arg: " << pauliWord << "\n";
-        std::vector<int> wires;
-        llvm::errs() << "wires arg: {";
-        for (size_t i = 0; i < pauliWord.size(); i++) {
-            llvm::errs() << i << ", ";
-            wires.push_back(i); // dynamic parameters, any value
-        }
-        llvm::errs() << "}\n";
+            std::vector<PyArg> args;
+            args.push_back(0.2);       // dynamic parameter, any value will work
+            args.push_back(pauliWord); // static parameter, must be the correct value
+            llvm::errs() << "pauli word arg: " << pauliWord << "\n";
+            std::vector<int> wires;
+            llvm::errs() << "wires arg: {";
+            for (size_t i = 0; i < pauliWord.size(); i++) {
+                llvm::errs() << i << ", ";
+                wires.push_back(i); // dynamic parameters, any value
+            }
+            llvm::errs() << "}\n";
 
-        auto outOp = get_op_from_python(module, "catalyst.utils.python_callbacks",
-                                        "test_rot_to_ppr", args, wires);
-
-        if (!outOp) {
-            llvm::errs() << "failed to parse python\n";
-            return signalPassFailure();
-        }
-        module.push_back(outOp.release());
+            auto outOp = get_op_from_python(module, "catalyst.utils.python_callbacks",
+                                            "test_rot_to_ppr", args, wires);
+            outOp->setName((outOp->getName() + "_" + llvm::StringRef(pauliWord)).str());
+            module.push_back(outOp.release());
+            return mlir::WalkResult::advance();
+        });
     }
 };
 

@@ -17,10 +17,11 @@
 #include <string>
 #include <vector>
 
-#include <llvm/ADT/StringRef.h>
-#include <mlir/IR/BuiltinOps.h>
-#include <mlir/IR/Operation.h>
-#include <mlir/IR/OwningOpRef.h>
+#include "llvm/ADT/StringRef.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/OwningOpRef.h"
 
 namespace catalyst {
 namespace quantum {
@@ -31,9 +32,9 @@ using PyWires = std::vector<int>;
 std::string python_circuit_execution(llvm::StringRef module_name, llvm::StringRef function_name,
                                      std::vector<PyArg> args, PyWires wires);
 
-mlir::OwningOpRef<mlir::Operation *> get_op_from_python(mlir::ModuleOp module,
-                                                        llvm::StringRef module_name,
-                                                        llvm::StringRef function_name,
-                                                        std::vector<PyArg> args, PyWires wires);
+mlir::OwningOpRef<mlir::func::FuncOp> get_op_from_python(mlir::ModuleOp module,
+                                                         llvm::StringRef module_name,
+                                                         llvm::StringRef function_name,
+                                                         std::vector<PyArg> args, PyWires wires);
 } // namespace quantum
 } // namespace catalyst

@@ -68,11 +68,12 @@ std::string python_circuit_execution(llvm::StringRef module_name, llvm::StringRe
     }
 }
 
-mlir::OwningOpRef<mlir::Operation *> get_op_from_python(mlir::ModuleOp module,
-                                                        llvm::StringRef module_name,
-                                                        llvm::StringRef function_name,
-                                                        std::vector<PyArg> args, PyWires wires)
+mlir::OwningOpRef<mlir::func::FuncOp> get_op_from_python(mlir::ModuleOp module,
+                                                         llvm::StringRef module_name,
+                                                         llvm::StringRef function_name,
+                                                         std::vector<PyArg> args, PyWires wires)
 {
+    llvm::errs() << "calling python...\n";
     std::string result = python_circuit_execution(module_name, function_name, args, wires);
     llvm::errs() << "got python result: " << result << "\n";
 
@@ -80,28 +81,29 @@ mlir::OwningOpRef<mlir::Operation *> get_op_from_python(mlir::ModuleOp module,
 
     // parse and insert the returned IR
     mlir::ParserConfig config = mlir::ParserConfig(module.getContext());
-    auto outOp = mlir::parseSourceString(resultRef, config);
+    auto moduleOp = mlir::parseSourceString(resultRef, config);
 
     // if parsing failed, return the null op from the parser
-    if (!outOp) {
+    if (!moduleOp) {
         llvm::errs() << "failed to parse python output, returning null\n";
-        return outOp;
+        return nullptr;
     }
 
     llvm::errs() << "successfully parsed python result\n";
 
     // get the lowered function from the python result
-    outOp->walk([&](mlir::func::FuncOp func) {
+    mlir::OwningOpRef<mlir::func::FuncOp> funcOp;
+    moduleOp->walk([&](mlir::func::FuncOp func) {
         if (func.getName() == function_name) {
             llvm::errs() << "found matching function!\n";
             func->remove();
-            outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
+            funcOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
             return mlir::WalkResult::interrupt();
         }
         return mlir::WalkResult::advance();
     });
 
-    return outOp;
+    return funcOp;
 }
 
 } // namespace quantum
