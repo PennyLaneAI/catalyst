@@ -50,6 +50,23 @@ quantum.dealloc %r1 : !quantum.reg
 
 // -----
 
+func.func @test_swap_no_index(%r : !quantum.reg, %q : !quantum.bit) -> (!quantum.reg, !quantum.bit) {
+    // expected-error@+1 {{expected op to have a non-null index}}
+    %r1, %q_displaced = "quantum.swap"(%r, %q) : (!quantum.reg, !quantum.bit) -> (!quantum.reg, !quantum.bit)
+    return %r1, %q_displaced : !quantum.reg, !quantum.bit
+}
+
+// -----
+
+func.func @test_swap_negative_index(%q : !quantum.bit) {
+    %r = quantum.alloc(4) : !quantum.reg
+    // expected-error @+1 {{failed to satisfy constraint: 64-bit signless integer attribute whose value is non-negative}}
+    %r1, %q_displaced = quantum.swap %r[-1], %q : !quantum.reg, !quantum.bit
+    return
+}
+
+// -----
+
 ///////////
 // Gates //
 ///////////

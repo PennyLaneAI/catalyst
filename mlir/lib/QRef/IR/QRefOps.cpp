@@ -215,6 +215,17 @@ LogicalResult AllocOp::verify()
     return success();
 }
 
+LogicalResult SwapOp::verify()
+{
+    if (!(getIdx() || getIdxAttr().has_value())) {
+        return emitOpError() << "expected op to have a non-null index";
+    }
+    if (getIdx() && getIdxAttr().has_value()) {
+        return emitOpError() << "must have a single index";
+    }
+    return success();
+}
+
 LogicalResult CustomOp::verify()
 {
     if (getQubits().size() == 0) {

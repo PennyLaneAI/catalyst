@@ -297,6 +297,7 @@
 
 * Register manupulation API has been added to the quantum dialect.
   [(#2654)](https://github.com/PennyLaneAI/catalyst/pull/2654)
+  [(#2770)](https://github.com/PennyLaneAI/catalyst/pull/2770)
 
 * A new native-MLIR graph-based decomposition framework is now available. This system
   migrates the graph-decomposition logic from Python into the Catalyst compiler as a
