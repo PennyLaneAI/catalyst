@@ -1334,9 +1334,9 @@ class TestCreateDynamicOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 4  # Device node + ops
 
-        assert nodes["node1"]["label"] == "<name> RX|<wire> [(arg5 % 3)]"
-        assert nodes["node2"]["label"] == "<name> RY|<wire> [(arg5 - 3)]"
-        assert nodes["node3"]["label"] == "<name> RZ|<wire> [(arg5 + 3)]"
+        assert nodes["node1"]["label"] == "<name> RX|<wire> [(arg0 % 3)]"
+        assert nodes["node2"]["label"] == "<name> RY|<wire> [(arg0 - 3)]"
+        assert nodes["node3"]["label"] == "<name> RZ|<wire> [(arg0 + 3)]"
 
     @pytest.mark.usefixtures("use_capture")
     def test_ppm_dynamic(self):
@@ -1554,9 +1554,9 @@ class TestCreateDynamicMeasurementNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + meas
 
-        assert nodes["node1"]["label"] == "<name> probs|<wire> [(arg5 % 3), (arg5 - 3), (arg5 + 3)]"
+        assert nodes["node1"]["label"] == "<name> probs|<wire> [(arg0 % 3), (arg0 - 3), (arg0 + 3)]"
         assert (
-            nodes["node2"]["label"] == "<name> sample|<wire> [(arg5 % 3), (arg5 - 3), (arg5 + 3)]"
+            nodes["node2"]["label"] == "<name> sample|<wire> [(arg0 % 3), (arg0 - 3), (arg0 + 3)]"
         )
 
 
