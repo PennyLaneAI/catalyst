@@ -18,7 +18,7 @@
 // a few QEC code parameters are hard coded as discussed. We can expect a few changes required in
 // the decoder operation defined in the MLIR layer to pass the required information from the
 // compilation pass if needed.
-// 2. The current implementation is tied in to the current design of the Tanner graph operation in
+// 2. The current implementation is tied in to the current design of the Tanner graph type in
 // the MLIR. Modifications / changes might be required if there is any change in the Tanner graph
 // operation definition in the MLIR layer.
 // 3. The LUT decoder is not scalable in both spatial and temporal complexity.

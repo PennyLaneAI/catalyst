@@ -49,14 +49,14 @@ std::string convert_syndrome_res_to_bitstr(DataView<T, 1> &syndrome_res)
 /**
  * @brief Get a parity check matrix from Tanner graph data.
  *
- * NOTE: With the current design of Tanner graph operation in MLIR, the first $n$ or $code_size$
+ * NOTE: With the current design of Tanner graph type in MLIR, the first $n$ or $code_size$
  * columns represent the physical data qubits, while the last $n-1$ columns represent auxiliary
  * qubits (more details here
  * https://github.com/PennyLaneAI/catalyst/blob/ab97f982539b31ab802a63020292595476f22d15/mlir/include/QecPhysical/IR/QecPhysicalTypes.td).
  *
  * @tparam MLIR_I64 MLIR int64_t
- * @param tanner_row_idx The dataview of row indices of the Tanner graph struct.
- * @param tanner_col_ptr The column offsets dataview of the Tanner graph struct.
+ * @param tanner_row_idx The dataview of row indices of the Tanner graph data.
+ * @param tanner_col_ptr The column offsets dataview of the Tanner graph data.
  * @param aux_cols A vector of column indices for the corresponding type of auxiliary qubits.
  * @return std::pair<std::vector<int64_t>, std::vector<int64_t>> The corresponding parity check
  * matrix in the CSS format. Each column represents an auxiliary qubit.
