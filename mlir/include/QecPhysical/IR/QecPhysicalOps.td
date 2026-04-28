@@ -408,6 +408,10 @@ def DecodePhysicalMeasurementOp : QecPhysical_Op<"decode_physical_meas"> {
         computational basis. The logical measurement results are returned as a one-dimensional
         tensor with shape=(k,), where k is the number of QEC logical qubits encoded by the physical
         codeblock.
+
+        .. note::
+
+            The ``logical_measurements_in`` field is needed only after bufferization.
     }];
 
     let arguments = (ins

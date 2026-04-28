@@ -144,6 +144,62 @@ struct DecodeEsmCssOpInterface
     }
 };
 
+// Bufferization of qecp.decode_esm_css.
+//   - Convert tensor of ESMs to memref.
+//   - Bufferize result tensor of error indicies with a corresponding memref.alloc; users of the
+//     result tensor are updated to use the new memref.
+struct DecodePhysicalMeasurementOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<
+          DecodePhysicalMeasurementOpInterface, DecodePhysicalMeasurementOp> {
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const
+    {
+        return true;
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const
+    {
+        return false;
+    }
+
+    bool bufferizesToAllocation(Operation *op, Value value) const { return true; }
+
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const
+    {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
+    {
+        auto decodePhysMeasOp = cast<DecodePhysicalMeasurementOp>(op);
+        Location loc = op->getLoc();
+
+        auto physMeasTensorType =
+            cast<RankedTensorType>(decodePhysMeasOp.getPhysicalMeasurements().getType());
+        MemRefType physMeasMemRefType =
+            MemRefType::get(physMeasTensorType.getShape(), physMeasTensorType.getElementType());
+        auto physMeasToBufferOp = bufferization::ToBufferOp::create(
+            rewriter, loc, physMeasMemRefType, decodePhysMeasOp.getPhysicalMeasurements());
+
+        auto logiMeasTensorType =
+            cast<RankedTensorType>(decodePhysMeasOp.getLogicalMeasurements().getType());
+        MemRefType logiMeasMemRefType =
+            MemRefType::get(logiMeasTensorType.getShape(), logiMeasTensorType.getElementType());
+        Value logiMeasBuffer = memref::AllocOp::create(rewriter, loc, logiMeasMemRefType);
+
+        DecodePhysicalMeasurementOp::create(rewriter, loc, TypeRange{},
+                                            physMeasToBufferOp.getResult(), logiMeasBuffer);
+
+        bufferization::replaceOpWithBufferizedValues(rewriter, op, logiMeasBuffer);
+        return success();
+    }
+};
+
 } // namespace
 
 void catalyst::qecp::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry)
@@ -151,5 +207,6 @@ void catalyst::qecp::registerBufferizableOpInterfaceExternalModels(DialectRegist
     registry.addExtension(+[](MLIRContext *ctx, catalyst::qecp::QecPhysicalDialect *dialect) {
         AssembleTannerGraphOp::attachInterface<AssembleTannerGraphOpInterface>(*ctx);
         DecodeEsmCssOp::attachInterface<DecodeEsmCssOpInterface>(*ctx);
+        DecodePhysicalMeasurementOp::attachInterface<DecodePhysicalMeasurementOpInterface>(*ctx);
     });
 }

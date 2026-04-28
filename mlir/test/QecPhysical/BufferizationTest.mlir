@@ -40,3 +40,15 @@ func.func @decode_esm_css(%esm : tensor<3xi1>) {
     %0 = qecp.decode_esm_css(%tanner : !qecp.tanner_graph<12, 8, i32>) %esm : tensor<3xi1> -> tensor<1xindex>
     func.return
 }
+
+// -----
+
+// CHECK-LABEL: decode_physical_meas
+// CHECK-SAME: [[pmeas:%.+]]: tensor<7xi1>
+func.func @decode_physical_meas(%phys_meas : tensor<7xi1>) {
+    // CHECK-DAG: [[pmeas_buf:%.+]] = bufferization.to_buffer [[pmeas]] : tensor<7xi1> to memref<7xi1>
+    // CHECK-DAG: [[lmeas_buf:%.+]] = memref.alloc() : memref<1xi1>
+    // CHECK: qecp.decode_physical_meas [[pmeas_buf]] in([[lmeas_buf]] : memref<1xi1>) : memref<7xi1>
+    %0 = qecp.decode_physical_meas %phys_meas : tensor<7xi1> -> tensor<1xi1>
+    func.return
+}
