@@ -374,6 +374,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* ``ResourceAnalysis`` and ``RegisterDecompRuleResource`` passes now record the number of classical
+  parameters for each gate alongside the wire count. The operation key format changes from
+  `"GateName(nWires)"` to `"GateName(nWires,nParams)"`.
+  [(#2755)](https://github.com/PennyLaneAI/catalyst/pull/2755)
+
 * `qp.for_loop` and `qp.while_loop` now support dynamic shapes with program capture `qjit(capture=True)`.
   [(#2603)](https://github.com/PennyLaneAI/catalyst/pull/2603/)
   [(#2651)](https://github.com/PennyLaneAI/catalyst/pull/2651)

@@ -288,19 +288,46 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * @brief Helper to parse a gate name into an OperatorNode.
      * Handles patterns like "Adjoint(GateName)" and "GateName(metadata)".
      */
-    OperatorNode parseOperator(llvm::StringRef name)
+    OperatorNode parseOperator(llvm::StringRef raw)
     {
         OperatorNode node;
 
-        // Check for adjoint pattern
-        if (name.consume_front("Adjoint(")) {
+        // Unwrap "Adjoint(GateName)"
+        if (raw.consume_front("Adjoint(")) {
             node.adjoint = true;
-            name = name.split(')').first;
+            auto closeIdx = raw.rfind(')');
+            if (closeIdx == llvm::StringRef::npos) {
+                node.name = raw.trim().str();
+                return node;
+            }
+            node.name = raw.take_front(closeIdx).trim().str();
+            raw = raw.drop_front(closeIdx + 1); // leftover: "(w,p)" or ""
+        }
+        else {
+            auto openIdx = raw.find('(');
+            if (openIdx == llvm::StringRef::npos) {
+                node.name = raw.trim().str();
+                return node;
+            }
+            node.name = raw.take_front(openIdx).trim().str();
+            raw = raw.drop_front(openIdx); // leftover: "(w,p)" or "(w)"
         }
 
-        // Extract base name before any parameters
-        // (e.g., "GateName" from "Adjoint(GateName)(metadata)")
-        node.name = name.split('(').first.trim().str();
+        // Parse "(w,p)" (new) or "(w)" (legacy) suffix.
+        if (raw.consume_front("(") && raw.consume_back(")")) {
+            llvm::StringRef wStr, pStr;
+            std::tie(wStr, pStr) = raw.split(',');
+            int w = -1, p = -1;
+            if (!wStr.getAsInteger(10, w)) {
+                node.numWires = w;
+            }
+            if (!pStr.empty() && !pStr.getAsInteger(10, p)) {
+                node.numParams = p;
+            }
+            // If pStr is empty we were given the legacy "(w)" format; leave
+            // numParams at the wildcard default so old bytecode keeps working.
+        }
+
         return node;
     }
 
