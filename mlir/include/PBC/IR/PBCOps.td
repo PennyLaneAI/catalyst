@@ -32,10 +32,6 @@ include "PBC/IR/PBCOpInterfaces.td"
 
 class PBC_Op<string mnemonic, list<Trait> traits = []> : Op<PBCDialect, mnemonic, traits>;
 
-//===----------------------------------------------------------------------===//
-// Attribute constraints
-//===----------------------------------------------------------------------===//
-
 def PrepareStateOp : PBC_Op<"prepare"> {
     let summary = "Prepare auxiliary qubits in a given state.";
     let description = [{

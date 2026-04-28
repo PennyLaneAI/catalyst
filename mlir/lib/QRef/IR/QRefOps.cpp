@@ -312,4 +312,12 @@ LogicalResult GraphStatePrepOp::verify()
 
     return success();
 }
+
+LogicalResult PPMeasurementOp::verify()
+{
+    if (getQubits().size() != getPauliProduct().size()) {
+        return emitOpError("Number of qubits must match number of pauli operators");
+    }
+    return success();
+}
 } // namespace catalyst::qref

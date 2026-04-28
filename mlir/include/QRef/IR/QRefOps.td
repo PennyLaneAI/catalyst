@@ -718,4 +718,31 @@ def GraphStatePrepOp : Memory_Op<"mbqc.graph_state_prep"> {
     let hasVerifier = 1;
 }
 
+// -----
+// PBC Ops
+
+def PPMeasurementOp : QRef_Op<"pbc.ppm"> {
+    let summary = "Pauli Product Measurement on qubits.";
+
+    let description = [{
+        Identical to the pbc.ppm operation, except in reference semantics.
+    }];
+
+    let arguments = (ins
+        PauliWord:$pauli_product,
+        UnitAttr:$negated,  // Pauli words can carry a negative sign, which flips the result
+        Variadic<QubitRefType>:$qubits
+    );
+
+    let results = (outs
+        I1:$mres
+    );
+
+    let assemblyFormat = [{
+        $pauli_product (`(``-``)` $negated^)? $qubits attr-dict `:` type(results)
+    }];
+
+    let hasVerifier = 1;
+}
+
 #endif // QREF_OPS
