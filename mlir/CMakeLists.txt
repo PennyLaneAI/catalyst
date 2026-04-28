@@ -269,3 +269,13 @@ endif()
 if(NOT CATALYST_DOCS_ONLY)
   add_subdirectory(test)
 endif()
+
+execute_process(
+    COMMAND python3 -c "import pybind11; print(pybind11.get_cmake_dir())"
+    OUTPUT_VARIABLE pybind11_DIR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+find_package(pybind11 REQUIRED)
+
+target_link_libraries(CatalystCompilerDriver PRIVATE pybind11::embed)

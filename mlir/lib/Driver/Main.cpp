@@ -42,6 +42,7 @@
 #include "Driver/CompilerDriver.h"
 #include "Driver/HighResolutionOutputStrategy.h"
 #include "Driver/LineUtils.h"
+#include "Driver/PythonDriverUtils.h"
 #include "Driver/Support.h"
 #include "Driver/Timer.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
@@ -56,6 +57,9 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
                                       mlir::DialectRegistry &registry)
 {
     using timer = catalyst::utils::Timer<>;
+
+    // TODO: only initialize when a python callback pass is used
+    initialize_python_runtime();
 
     mlir::OpPrintingFlags opPrintingFlags{};
     if (options.useNameLocAsPrefix) {
@@ -115,6 +119,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         if (!llvmModule) {
             err.print(options.moduleName.data(), options.diagnosticStream);
             CO_MSG(options, Verbosity::Urgent, "Failed to parse module as LLVM or MLIR source\n");
+            finalize_python_runtime();
             return llvm::failure();
         }
         inType = InputType::LLVMIR;
@@ -125,6 +130,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         }
     }
     if (failed(verifyInputType(options, inType))) {
+        finalize_python_runtime();
         return llvm::failure();
     }
     parserTiming.stop();
@@ -138,6 +144,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         mlir::TimingScope optTiming = timing.nest("Optimization");
         if (failed(runLowering(options, &ctx, *mlirModule, output, optTiming))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
+            finalize_python_runtime();
             return llvm::failure();
         }
         output.outIR.clear();
@@ -158,6 +165,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
                          /* disableVerification */ true);
         if (!llvmModule) {
             CO_MSG(options, Verbosity::Urgent, "Failed to translate LLVM module\n");
+            finalize_python_runtime();
             return llvm::failure();
         }
 
@@ -209,6 +217,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
             mlir::TimingScope coroLLVMPassesTiming = llcTiming.nest("LLVM coroutine passes");
             if (failed(timer::timer(runCoroLLVMPasses, "runCoroLLVMPasses", /* add_endl */ false,
                                     options, llvmModule, output))) {
+                finalize_python_runtime();
                 return llvm::failure();
             }
             coroLLVMPassesTiming.stop();
@@ -220,6 +229,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
             mlir::TimingScope o2PassesTiming = llcTiming.nest("LLVM O2 passes");
             if (failed(timer::timer(runO2LLVMPasses, "runO2LLVMPasses", /* add_endl */ false,
                                     options, llvmModule, output))) {
+                finalize_python_runtime();
                 return llvm::failure();
             }
             o2PassesTiming.stop();
@@ -228,6 +238,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
             mlir::TimingScope enzymePassesTiming = llcTiming.nest("Enzyme passes");
             if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", /* add_endl */ false,
                                     options, llvmModule, output))) {
+                finalize_python_runtime();
                 return llvm::failure();
             }
             enzymePassesTiming.stop();
@@ -241,6 +252,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
             outfile->os() << *llvmModule;
             outfile->keep();
             // early exit
+            finalize_python_runtime();
             return llvm::success();
         }
 
@@ -253,6 +265,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         if (failed(timer::timer(catalyst::driver::compileObjectFile, "compileObjFile",
                                 /* add_endl */ true, options, llvmModule, targetMachine,
                                 options.getObjectFile()))) {
+            finalize_python_runtime();
             return llvm::failure();
         }
         outputTiming.stop();
@@ -267,6 +280,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
     auto outfile = mlir::openOutputFile(output.outputFilename, &errorMessage);
     if (!outfile) {
         llvm::errs() << errorMessage << "\n";
+        finalize_python_runtime();
         return llvm::failure();
     }
     else if (output.outputFilename == "-" && llvmModule) {
@@ -274,6 +288,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
     }
     else if (output.outputFilename == "-" && mlirModule) {
         if (options.shouldEmitBytecode) {
+            finalize_python_runtime();
             return mlir::writeBytecodeToFile(mlirModule.get(), outfile->os());
         }
         else {
@@ -287,6 +302,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         outfile->keep();
     }
 
+    finalize_python_runtime();
     return llvm::success();
 }
 

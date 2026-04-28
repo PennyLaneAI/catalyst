@@ -16,6 +16,8 @@ set(LLVM_LINK_COMPONENTS
     AllTargetsCodeGens
 )
 
+find_package(Python3 COMPONENTS Development REQUIRED)
+
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 get_property(extension_libs GLOBAL PROPERTY MLIR_EXTENSION_LIBS)
@@ -53,6 +55,8 @@ set(LIBS
     ${ENZYME_LIB}
     CatalystCompilerDriver
     MLIRTestDialect
+    pybind11::embed
+    Python3::Python
 )
 
 add_mlir_tool(catalyst-cli catalyst-cli.cpp SUPPORT_PLUGINS)

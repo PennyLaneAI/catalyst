@@ -87,10 +87,12 @@ add_mlir_library(CatalystCompilerDriver
     Pipelines.cpp
     LineUtils.cpp
     HighResolutionOutputStrategy.cpp
+    PythonDriverUtils.cpp
 
     LINK_LIBS PRIVATE
     ${LIBS}
     MLIRSupport
+    pybind11::embed
 )
 
 #########################################################
@@ -99,3 +101,5 @@ add_mlir_library(CatalystCompilerDriver
 
 add_subdirectory(DefaultPipelines)
 add_dependencies(CatalystCompilerDriver default_pipelines)
+
+set_source_files_properties(PythonDriverUtils.cpp PROPERTIES COMPILE_FLAGS "-fexceptions -frtti -Wno-covered-switch-default")
