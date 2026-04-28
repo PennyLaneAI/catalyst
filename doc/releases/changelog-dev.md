@@ -295,6 +295,9 @@
   program. The xDSL version written in Python has been removed.
   [(#2604)](https://github.com/PennyLaneAI/catalyst/pull/2604)
 
+* Register manupulation API has been added to the quantum dialect.
+  [(#2654)](https://github.com/PennyLaneAI/catalyst/pull/2654)
+
 * A new native-MLIR graph-based decomposition framework is now available. This system
   migrates the graph-decomposition logic from Python into the Catalyst compiler as a
   high-performance C++ library (`DecompGraphSolver`), enabling the compiler to
@@ -1035,6 +1038,7 @@
   [(#2716)](https://github.com/PennyLaneAI/catalyst/pull/2716)
   [(#2737)](https://github.com/PennyLaneAI/catalyst/pull/2737)
   [(#2731)](https://github.com/PennyLaneAI/catalyst/pull/2731)
+  [(#2735)](https://github.com/PennyLaneAI/catalyst/pull/2735)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
