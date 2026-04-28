@@ -136,9 +136,9 @@ class TestQecCode:
     @pytest.mark.parametrize("d, expected_t", [(1, 0), (2, 0), (3, 1), (4, 1), (5, 2), (6, 2)])
     def test_correctable_errors_property(self, d: int, expected_t: int):
         """Test the `correctable_errors` property of `QecCode`, which returns the number of
-        correctable errors of the code, equal to floor((d - 1) / 2).
+        correctable errors of the code, t = floor((d - 1) / 2).
         """
-        qec_code = QecCode("", 1, 1, d, np.array([]), np.array([]))
+        qec_code = QecCode("", 1, 1, d, np.array([]), np.array([]))  # Values of n, k don't matter
 
         assert qec_code.correctable_errors == expected_t
 

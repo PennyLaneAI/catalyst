@@ -184,14 +184,14 @@ class EncodeOpConversion(RewritePattern):
 
 @dataclass
 class QecCycleOpConversion(RewritePattern):
-    """Converts qecl.encode [zero] to the equivalent subroutine of qecp gates"""
+    """Converts qecl.qec to the equivalent subroutine of qecp gates."""
 
     qec_code: QecCode
     qec_cycle_subroutine: func.FuncOp
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecl.QecCycleOp, rewriter: PatternRewriter):
-        """Rewrite pattern for `qecl.encode [zero]` op"""
+        """Rewrite pattern for `qecl.qec` ops."""
 
         in_codeblock = cast(
             qecl.LogicalCodeBlockSSAValue | qecp.PhysicalCodeBlockSSAValue, op.in_codeblock
@@ -351,17 +351,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         if block.first_op is None:
             block.add_ops(ops_to_insert)
         else:
-            block.insert_ops_before(
-                (
-                    x_tanner_row_idx_const_op,
-                    x_tanner_col_ptr_const_op,
-                    assemble_x_tanner_op,
-                    z_tanner_row_idx_const_op,
-                    z_tanner_col_ptr_const_op,
-                    assemble_z_tanner_op,
-                ),
-                block.first_op,
-            )
+            block.insert_ops_before(ops_to_insert, block.first_op)
 
         return assemble_x_tanner_op.tanner_graph, assemble_z_tanner_op.tanner_graph
 
@@ -569,7 +559,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         given `in_codeblock`.
 
         This method is intended to be a helper function to `create_qec_cycle_subroutine()` and to be
-        called inside `builder.ImplicitBuilder` context to automatically add these operations to a
+        called inside a `builder.ImplicitBuilder` context to automatically add these operations to a
         block.
         """
         # Allocate auxiliary qubits for ESM checks

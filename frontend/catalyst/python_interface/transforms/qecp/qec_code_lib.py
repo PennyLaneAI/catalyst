@@ -14,8 +14,8 @@
 
 """This module contains a library of QEC codes."""
 
+import math
 from dataclasses import dataclass, fields
-from math import floor
 from typing import Any, Self
 
 import numpy as np
@@ -106,4 +106,4 @@ class QecCode:
         >>> code = QecCode.get("Steane")
         >>> code.correctable_errors
         """
-        return floor((self.d - 1) / 2)
+        return math.floor((self.d - 1) / 2)
