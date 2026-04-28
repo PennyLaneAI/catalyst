@@ -374,19 +374,26 @@ def DecodeEsmCssOp : QecPhysical_Op<"decode_esm_css"> {
         // Decode ESM, return single index in codeblock where error occurred
         %err_idx = qecp.decode_esm_css(%tannerX : !qecp.tanner_graph<8, 6, i32>) %esm : tensor<2xi1> -> tensor<1xindex>
         ```
+
+        .. note::
+
+            The ``err_idx_in`` field is needed only after bufferization.
     }];
 
     let arguments = (ins
         AnyTypeOf<[1DTensorOf<[I1]>, MemRefRankOf<[I1], [1]>]>:$esm,
-        TannerGraphType:$tanner_graph
+        TannerGraphType:$tanner_graph,
+        Optional<MemRefRankOf<[Index], [1]>>:$err_idx_in
     );
 
     let results = (outs
-        1DTensorOf<[Index]>:$err_idx
+        Optional<1DTensorOf<[Index]>>:$err_idx
     );
 
     let assemblyFormat = [{
-        `(` $tanner_graph `:` qualified(type($tanner_graph)) `)` $esm attr-dict `:` type($esm) `->` type($err_idx)
+        `(` $tanner_graph `:` qualified(type($tanner_graph)) `)` $esm
+        ( `in` `(` $err_idx_in^ `:` type($err_idx_in) `)` )?
+        attr-dict `:` type($esm) ( `->` type($err_idx)^ )?
     }];
 }
 
