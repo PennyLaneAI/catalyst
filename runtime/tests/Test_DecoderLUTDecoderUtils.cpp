@@ -100,10 +100,10 @@ TEST_CASE("Test generate_lookup_table", "[LUTDecoderUtils::generate_lookup_table
                                      tanner_graph.code_size, tanner_graph.code_distance);
 
     std::unordered_map<std::string, std::vector<int64_t>> expected_lut = {
-        {"000", std::vector<int64_t>({-1})},  {"001", std::vector<int64_t>({6})},
-        {"010", std::vector<int64_t>({4})}, {"011", std::vector<int64_t>({5})},
-        {"100", std::vector<int64_t>({0})}, {"101", std::vector<int64_t>({3})},
-        {"110", std::vector<int64_t>({1})}, {"111", std::vector<int64_t>({2})},
+        {"000", std::vector<int64_t>({-1})}, {"001", std::vector<int64_t>({6})},
+        {"010", std::vector<int64_t>({4})},  {"011", std::vector<int64_t>({5})},
+        {"100", std::vector<int64_t>({0})},  {"101", std::vector<int64_t>({3})},
+        {"110", std::vector<int64_t>({1})},  {"111", std::vector<int64_t>({2})},
     };
 
     for (auto it = expected_lut.begin(); it != expected_lut.end(); ++it) {

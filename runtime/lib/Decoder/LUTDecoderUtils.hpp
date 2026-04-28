@@ -54,7 +54,7 @@ std::string convert_syndrome_res_to_bitstr(DataView<T, 1> &syndrome_res)
  * qubits (more details here
  * https://github.com/PennyLaneAI/catalyst/blob/ab97f982539b31ab802a63020292595476f22d15/mlir/include/QecPhysical/IR/QecPhysicalTypes.td).
  *
-* @tparam MLIR_I64 MLIR int64_t
+ * @tparam MLIR_I64 MLIR int64_t
  * @param tanner_row_idx The dataview of row indices of the Tanner graph struct.
  * @param tanner_col_ptr The column offsets dataview of the Tanner graph struct.
  * @param aux_cols A vector of column indices for the corresponding type of auxiliary qubits.
@@ -210,7 +210,7 @@ generate_lookup_table(const std::vector<MLIR_I64> &parity_mat_row_idx,
 
 /**
  * @brief Singleton design of the LUT decoder.
- * 
+ *
  * @tparam MLIR_I64 MLIR int64_t
  */
 template <typename MLIR_I64 = int64_t> class LUTs final {
