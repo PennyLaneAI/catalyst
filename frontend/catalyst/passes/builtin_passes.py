@@ -151,8 +151,7 @@ cancel_inverses = qp.transform(
 )
 
 
-def diagonalize_measurements(
-    qnode=None,
+def diagonalize_measurements_setup_inputs(
     supported_base_obs: tuple[str, ...] = ("PauliZ", "Identity"),
     to_eigvals: bool = False,
 ):
@@ -261,13 +260,12 @@ def diagonalize_measurements(
     >>> print(error_msg)
     Observables are not qubit-wise commuting. Please apply the `split-non-commuting` pass first.
     """
-    if qnode is None:
-        return functools.partial(
-            diagonalize_measurements, supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
-        )
-    return qp.transform(pass_name="diagonalize-final-measurements")(
-        qnode, supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
-    )
+    return (), {"supported_base_obs": supported_base_obs, "to_eigvals": to_eigvals}
+
+
+diagonalize_measurements = qp.transform(
+    pass_name="diagonalize-final-measurements", setup_inputs=diagonalize_measurements_setup_inputs
+)
 
 
 def disentangle_cnot_setup_inputs():
@@ -1742,4 +1740,5 @@ __all__ = [
     "ppr_to_mbqc",
     "decompose_arbitrary_ppr",
     "graph_decomposition",
+    "diagonalize_measurements",
 ]
