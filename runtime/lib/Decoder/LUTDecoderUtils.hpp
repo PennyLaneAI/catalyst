@@ -50,19 +50,16 @@ std::string convert_syndrome_res_to_bitstr(DataView<T, 1> &syndrome_res)
  * @brief Get a parity check matrix from Tanner graph data.
  *
  * NOTE: With the current design of Tanner graph operation in MLIR, the first $n$ or $code_size$
- * columns represent the physical data qubits, while the last $n-1$ columns represent auxillary
+ * columns represent the physical data qubits, while the last $n-1$ columns represent auxiliary
  * qubits (more details here
  * https://github.com/PennyLaneAI/catalyst/blob/ab97f982539b31ab802a63020292595476f22d15/mlir/include/QecPhysical/IR/QecPhysicalTypes.td).
  *
- * @param tanner_row_idx The dataview of row indices of non-zero elements with a length of $nnz$.
- * @param tanner_col_ptr The column offsets dataview of a length number of $num_col + 1$ that
- * represents the starting position of each column.
- * @param aux_cols A vector of column indices for the corresponding type of auxillary qubits.
- *
+ * @param tanner_row_idx The dataview of row indices of the Tanner graph struct.
+ * @param tanner_col_ptr The column offsets dataview of the Tanner graph struct.
+ * @param aux_cols A vector of column indices for the corresponding type of auxiliary qubits.
  * @return std::pair<std::vector<int64_t>, std::vector<int64_t>> The corresponding parity check
- * matrix in the CSS format. Each column represents an auxillary qubit.
+ * matrix in the CSS format. Each column represents an auxiliary qubit.
  */
-
 std::pair<std::vector<int64_t>, std::vector<int64_t>>
 get_parity_check_matrix(DataView<int64_t, 1> &tanner_row_idx, DataView<int64_t, 1> &tanner_col_ptr,
                         const std::vector<size_t> &aux_cols)
@@ -99,7 +96,7 @@ get_parity_check_matrix(DataView<int64_t, 1> &tanner_row_idx, DataView<int64_t, 
  */
 std::string get_syndrome_from_errors(const std::vector<int64_t> &row_idx,
                                      const std::vector<int64_t> &col_ptr, const size_t num_rows,
-                                     const size_t num_cols, std::vector<uint8_t> &err_vec)
+                                     const size_t num_cols, std::vector<int8_t> &err_vec)
 {
 
     std::vector<size_t> syndrome_res(num_cols, 0);
@@ -122,7 +119,7 @@ std::string get_syndrome_from_errors(const std::vector<int64_t> &row_idx,
  * @param err_vec  A vector of qubit errors.
  * @return std::vector<int64_t> Indices of qubit errors.
  */
-std::vector<int64_t> get_error_indices(std::vector<uint8_t> &err_vec)
+std::vector<int64_t> get_error_indices(std::vector<int8_t> &err_vec)
 {
     std::vector<int64_t> error_indices;
 
@@ -145,7 +142,7 @@ std::vector<int64_t> get_error_indices(std::vector<uint8_t> &err_vec)
  * it is computationally intractable for large-scale codes.
  *
  * @param parity_mat_row_idx The row vector of length nnz that contains row indices of the
- * corresponding elements. Each column corresponds to an auxillary qubit.
+ * corresponding elements. Each column corresponds to an X- or Z- check type auxiliary qubit.
  * @param parity_mat_col_ptr The column offsets vector of length number of num_col + 1 that
  * represents the starting position of each row.
  * @param code_size The number of data qubits in the QEC code. This param is for safe guard only
@@ -164,11 +161,10 @@ generate_lookup_table(const std::vector<int64_t> &parity_mat_row_idx,
     std::unordered_map<std::string, std::vector<int64_t>> lut;
 
     const size_t nnz = parity_mat_row_idx.size();
-    const size_t num_aux_qubits =
-        parity_mat_col_ptr.size() - 1; // number of cols or number of auxillary qubits
+    const size_t num_aux_qubits = parity_mat_col_ptr.size() - 1; // number of auxiliary qubits
     const size_t num_data_qubits =
         *std::max_element(parity_mat_row_idx.begin(), parity_mat_row_idx.end()) +
-        1; // number of rows or number of data qubits
+        1; // number of data qubits
 
     RT_ASSERT(num_aux_qubits == (code_size - 1) >> 1);
     RT_ASSERT(nnz > 0);
@@ -180,7 +176,7 @@ generate_lookup_table(const std::vector<int64_t> &parity_mat_row_idx,
     // Traverse all possible quantum error combinations
     for (int i = 0; i <= num_errors; i++) {
         // create a base error vector
-        std::vector<uint8_t> err_vector(num_data_qubits, 0);
+        std::vector<int8_t> err_vector(num_data_qubits, 0);
         std::fill(err_vector.end() - i, err_vector.end(), 1);
 
         do {
