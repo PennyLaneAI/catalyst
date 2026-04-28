@@ -426,7 +426,7 @@ def DecodePhysicalMeasurementOp : QecPhysical_Op<"decode_physical_meas"> {
     let assemblyFormat = [{
         $physical_measurements
         ( `in` `(` $logical_measurements_in^ `:` type($logical_measurements_in) `)` )?
-        attr-dict `:` type($physical_measurements) (`->` type($logical_measurements)^ )?
+        attr-dict `:` type($physical_measurements) ( `->` type($logical_measurements)^ )?
     }];
 }
 
