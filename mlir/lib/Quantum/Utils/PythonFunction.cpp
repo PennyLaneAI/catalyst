@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Test/Utils/PythonFunction.h"
+#include "Quantum/Utils/PythonFunction.h"
 
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -25,7 +25,7 @@ namespace py = pybind11;
 using namespace pybind11::literals;
 
 namespace catalyst {
-namespace test {
+namespace quantum {
 
 /*
  * @brief execute a python function and return a string result.
@@ -104,5 +104,5 @@ mlir::OwningOpRef<mlir::Operation *> get_op_from_python(mlir::ModuleOp module,
     return outOp;
 }
 
-} // namespace test
+} // namespace quantum
 } // namespace catalyst

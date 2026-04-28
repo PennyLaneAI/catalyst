@@ -16,13 +16,13 @@
 #include "mlir/Pass/Pass.h"
 
 #include "Quantum/IR/QuantumOps.h"
-#include "Test/Utils/PythonFunction.h"
+#include "Quantum/Utils/PythonFunction.h"
 
 namespace catalyst {
-namespace test {
+namespace quantum {
 
 #define GEN_PASS_DEF_PYTHONCALLBACKTESTPASS
-#include "Test/Transforms/Passes.h.inc"
+#include "Quantum/Transforms/Passes.h.inc"
 
 struct PythonCallbackTestPass : public impl::PythonCallbackTestPassBase<PythonCallbackTestPass> {
     using PythonCallbackTestPassBase::PythonCallbackTestPassBase;
@@ -70,5 +70,5 @@ struct PythonCallbackTestPass : public impl::PythonCallbackTestPassBase<PythonCa
     }
 };
 
-} // namespace test
+} // namespace quantum
 } // namespace catalyst

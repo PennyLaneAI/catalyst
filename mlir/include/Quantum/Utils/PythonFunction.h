@@ -23,7 +23,7 @@
 #include <mlir/IR/OwningOpRef.h>
 
 namespace catalyst {
-namespace test {
+namespace quantum {
 
 using PyArg = std::variant<int, double, std::string>;
 using PyWires = std::vector<int>;
@@ -35,5 +35,5 @@ mlir::OwningOpRef<mlir::Operation *> get_op_from_python(mlir::ModuleOp module,
                                                         llvm::StringRef module_name,
                                                         llvm::StringRef function_name,
                                                         std::vector<PyArg> args, PyWires wires);
-} // namespace test
+} // namespace quantum
 } // namespace catalyst

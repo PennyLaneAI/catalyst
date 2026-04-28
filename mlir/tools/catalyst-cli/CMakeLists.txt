@@ -55,7 +55,7 @@ set(LIBS
     ${ENZYME_LIB}
     CatalystCompilerDriver
     MLIRTestDialect
-    TestUtils
+    QuantumUtils
     pybind11::embed
     Python3::Python
 )

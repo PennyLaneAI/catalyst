@@ -21,8 +21,4 @@ def TestPass : Pass<"test"> {
     let summary = "Test pass able to emit errors or warnings.";
 }
 
-def PythonCallbackTestPass : Pass<"py-compute-pass"> {
-  let summary = "Computes a value via Python";
-}
-
 #endif // TEST_PASSES

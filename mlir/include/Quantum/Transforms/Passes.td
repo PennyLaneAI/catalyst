@@ -210,6 +210,10 @@ def CombineGlobalPhasesPass : Pass<"combine-global-phases", "mlir::ModuleOp"> {
     let summary = "Scope-wise merging of global phase operators (safe).";
 }
 
+def PythonCallbackTestPass : Pass<"py-compute-pass"> {
+    let summary = "TODO remove this pass";
+}
+
 // ----- Quantum circuit transformation passes end ----- //
 
 #endif // QUANTUM_PASSES
