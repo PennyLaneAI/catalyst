@@ -1,4 +1,4 @@
-// Copyright 2025 Xanadu Quantum Technologies Inc.
+// Copyright 2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,22 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef MBQC_ATTR_DEFS
+#define MBQC_ATTR_DEFS
 
-#include "mlir/IR/Dialect.h"
+include "mlir/IR/EnumAttr.td"
 
-#include "MBQC/IR/MBQCAttrDefs.h"
-
-//===----------------------------------------------------------------------===//
-// MBQC dialect declarations.
-//===----------------------------------------------------------------------===//
-
-#include "MBQC/IR/MBQCOpsDialect.h.inc"
+include "MBQC/IR/MBQCDialect.td"
 
 //===----------------------------------------------------------------------===//
-// MBQC type declarations.
+// MBQC dialect enums and attributes.
 //===----------------------------------------------------------------------===//
 
-/// Uncomment the lines below if defining types for the MBQC dialect
-// #define GET_TYPEDEF_CLASSES
-// #include "MBQC/IR/MBQCOpsTypes.h.inc"
+def MeasurementPlane : I32EnumAttr<"MeasurementPlane",
+    "Planes in the Bloch sphere representation with support for arbitrary-basis measurements",
+    [
+        I32EnumAttrCase<"XY", 0>,
+        I32EnumAttrCase<"YZ", 1>,
+        I32EnumAttrCase<"ZX", 2>,
+    ]> {
+    let cppNamespace = "catalyst::mbqc";
+    let genSpecializedAttr = 0;
+}
+
+def MeasurementPlaneAttr : EnumAttr<MBQC_Dialect, MeasurementPlane, "measurement_plane">;
+
+#endif // MBQC_ATTR_DEFS

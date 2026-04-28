@@ -559,7 +559,7 @@ def test_no_capture(backend):
     """
     with pytest.raises(
         CompileError,
-        match=re.escape("qp.allocate() with qjit is only supported with program capture enabled."),
+        match=r".*\.allocate\(\) with qjit is only supported with program capture enabled\.",
     ):
 
         @qjit

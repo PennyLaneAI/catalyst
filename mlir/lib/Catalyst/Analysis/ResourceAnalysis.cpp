@@ -27,6 +27,7 @@
 #include "Catalyst/Utils/ConstantResolve.h"
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
+#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
@@ -93,6 +94,15 @@ static int getGateQubitCount(Operation *op)
 {
     if (auto qOp = dyn_cast<quantum::QuantumOperation>(op)) {
         return static_cast<int>(qOp.getQubitOperands().size());
+    }
+    return 0;
+}
+
+/// Get the number of parameters for a gate operation.
+static int getGateParamCount(Operation *op)
+{
+    if (auto gate = dyn_cast<quantum::ParametrizedGate>(op)) {
+        return static_cast<int>(gate.getAllParams().size());
     }
     return 0;
 }
@@ -381,7 +391,8 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
             quantum::SetBasisStateOp>(op)) {
         std::string name = getGateOpName(op, isAdjoint);
         int nQubits = getGateQubitCount(op);
-        result.operations[name][nQubits] += 1;
+        int nParams = getGateParamCount(op);
+        result.operations[name][{nQubits, nParams}] += 1;
         return;
     }
 
@@ -397,14 +408,14 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
             pbc::SelectPPMeasurementOp, pbc::PrepareStateOp, pbc::FabricateOp>(op)) {
         std::string name = getPBCOpName(op);
         int nQubits = getPBCQubitCount(op);
-        result.operations[name][nQubits] += 1;
+        result.operations[name][{nQubits, 0}] += 1;
         return;
     }
 
     // MBQC operations
     if (isa<mbqc::MeasureInBasisOp, mbqc::GraphStatePrepOp>(op)) {
         std::string name = op->getName().getStringRef().str();
-        result.operations[name][0] += 1;
+        result.operations[name][{0, 0}] += 1;
         return;
     }
 
