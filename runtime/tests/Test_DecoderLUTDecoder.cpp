@@ -48,8 +48,7 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
                                               {col_ptr_tanner.size()},
                                               {1}};
     MemRefT_int64_1d err_idx_memref = {
-        buffer_err_idx_memref, buffer_err_idx_memref, 0, {err_idx.size()}, {1}
-    };
+        buffer_err_idx_memref, buffer_err_idx_memref, 0, {err_idx.size()}, {1}};
 
     for (auto it = tanner_graph.lookup_table_error_idx_to_syndrome.begin();
          it != tanner_graph.lookup_table_error_idx_to_syndrome.end(); ++it) {

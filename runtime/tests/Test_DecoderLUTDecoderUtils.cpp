@@ -46,7 +46,7 @@ TEST_CASE("Test convert_sydrome_res_to_bitstr", "[LUTDecoderUtils::convert_syndr
 
 TEST_CASE("Test get_error_indices", "[LUTDecoderUtils::get_error_indices]")
 {
-    std::vector<u_int8_t> error_vector = {0, 1, 0, 1, 0, 0, 0};
+    std::vector<int8_t> error_vector = {0, 1, 0, 1, 0, 0, 0};
     std::vector<int64_t> expected_indices = {1, 3};
 
     auto error_indices = get_error_indices(error_vector);
