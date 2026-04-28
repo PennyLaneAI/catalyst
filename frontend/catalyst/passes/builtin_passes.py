@@ -611,7 +611,7 @@ ions_decomposition = qp.transform(
 )
 
 
-def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
+def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
     r"""A quantum compilation pass to discretize
     single-qubit RZ and PhaseShift gates into the Clifford+T basis or the PPR basis using the Ross-Selinger Gridsynth algorithm.
     Reference: https://arxiv.org/abs/1403.2975
@@ -697,10 +697,10 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
 
 
     """
-    if qnode is None:
-        return functools.partial(gridsynth, epsilon=epsilon, ppr_basis=ppr_basis)
+    return (), {"epsilon": epsilon, "ppr_basis": ppr_basis}
 
-    return qp.transform(pass_name="gridsynth")(qnode, epsilon=epsilon, ppr_basis=ppr_basis)
+
+gridsynth = qp.transform(pass_name="gridsynth", setup_inputs=gridsynth_setup_inputs)
 
 
 def to_ppr_setup_inputs():
@@ -1710,6 +1710,7 @@ __all__ = [
     "decompose_lowering",
     "ions_decomposition",
     "to_ppr",
+    "gridsynth",
     "commute_ppr",
     "merge_ppr_ppm",
     "ppr_to_ppm",
