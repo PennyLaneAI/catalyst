@@ -2,6 +2,13 @@
 
 <h3>New features since last release</h3>
 
+* An experimental lookup table (LUT) decoder is added to the `runtime`. This initial implementation
+is optimized for the [[7,1,3]] Steane code using hardcoded Quantum Error Correction (QEC) data. While
+the architecture supports future extension to general LUT decoding via compiler-provided information,
+please note that LUT decoders scale exponentially with code size and are intended for small-scale QEC
+codes only.
+[(#2724)](https://github.com/PennyLaneAI/catalyst/pull/2724)
+
 * A new `~.CompilationPass` class has been added that abstracts away compiler-level details for
   seamless compilation pass creation. Used in tandem with :func:`~.compiler_transform`, compilation
   passes can be created entirely in Python and used on QNodes within a :func:`~.qjit`'d workflow.
