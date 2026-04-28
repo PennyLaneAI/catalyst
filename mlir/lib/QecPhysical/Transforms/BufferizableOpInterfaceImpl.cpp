@@ -37,6 +37,60 @@ using namespace catalyst::qecp;
 
 namespace {
 
+// Bufferization of qecp.assemble_tanner.
+//   - Convert tensor of row_idx to memref.
+//   - Convert tensor of col_ptr to memref.
+struct AssembleTannerGraphOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<AssembleTannerGraphOpInterface,
+                                                                   AssembleTannerGraphOp> {
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const
+    {
+        return true;
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const
+    {
+        return false;
+    }
+
+    bool bufferizesToAllocation(Operation *op, Value value) const { return true; }
+
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const
+    {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
+    {
+        auto assembleTannerOp = cast<AssembleTannerGraphOp>(op);
+        Location loc = op->getLoc();
+
+        auto rowIdxTensorType = cast<RankedTensorType>(assembleTannerOp.getRowIdx().getType());
+        MemRefType rowIdxMemRefType =
+            MemRefType::get(rowIdxTensorType.getShape(), rowIdxTensorType.getElementType());
+        auto rowIdxToBufferOp = bufferization::ToBufferOp::create(rewriter, loc, rowIdxMemRefType,
+                                                                  assembleTannerOp.getRowIdx());
+
+        auto colPtrTensorType = cast<RankedTensorType>(assembleTannerOp.getColPtr().getType());
+        MemRefType colPtrMemRefType =
+            MemRefType::get(colPtrTensorType.getShape(), colPtrTensorType.getElementType());
+        auto colPtrToBufferOp = bufferization::ToBufferOp::create(rewriter, loc, colPtrMemRefType,
+                                                                  assembleTannerOp.getColPtr());
+
+        auto newAssembleTannerOp = AssembleTannerGraphOp::create(
+            rewriter, loc, assembleTannerOp.getResult().getType(), rowIdxToBufferOp.getResult(), colPtrToBufferOp.getResult());
+
+        bufferization::replaceOpWithBufferizedValues(rewriter, op, newAssembleTannerOp.getResult());
+        return success();
+    }
+};
+
 // Bufferization of qecp.decode_esm_css.
 //   - Convert tensor of ESMs to memref.
 //   - Bufferize result tensor of error indicies with a corresponding memref.alloc; users of the
@@ -97,6 +151,7 @@ struct DecodeEsmCssOpInterface
 void catalyst::qecp::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry)
 {
     registry.addExtension(+[](MLIRContext *ctx, catalyst::qecp::QecPhysicalDialect *dialect) {
+        AssembleTannerGraphOp::attachInterface<AssembleTannerGraphOpInterface>(*ctx);
         DecodeEsmCssOp::attachInterface<DecodeEsmCssOpInterface>(*ctx);
     });
 }

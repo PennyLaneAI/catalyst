@@ -12,7 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --one-shot-bufferize --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --one-shot-bufferize --split-input-file --verify-diagnostics %s | FileCheck %s
+
+// CHECK-LABEL: assemble_tanner
+func.func @assemble_tanner() {
+    // CHECK: [[row_idx:%.+]] = memref.get_global {{.*}} : memref<12xi32>
+    // CHECK: [[col_ptr:%.+]] = memref.get_global {{.*}} : memref<8xi32>
+    %row_idx = arith.constant dense<[0, 0, 1, 0, 1, 2, 0, 2, 1, 1, 2, 2]> : tensor<12xi32>
+    %col_ptr = arith.constant dense<[0, 1, 3, 6, 8, 9, 11, 12]> : tensor<8xi32>
+
+    // CHECK: [[tanner:%.+]] = qecp.assemble_tanner [[row_idx]], [[col_ptr]] : memref<12xi32>, memref<8xi32> -> !qecp.tanner_graph<12, 8, i32>
+    %0 = qecp.assemble_tanner %row_idx, %col_ptr : tensor<12xi32>, tensor<8xi32> -> !qecp.tanner_graph<12, 8, i32>
+    func.return
+}
+
+// -----
 
 // CHECK-LABEL: decode_esm_css
 // CHECK-SAME: [[esm:%.+]]: tensor<3xi1>

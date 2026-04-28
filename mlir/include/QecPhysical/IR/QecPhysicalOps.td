@@ -411,15 +411,18 @@ def DecodePhysicalMeasurementOp : QecPhysical_Op<"decode_physical_meas"> {
     }];
 
     let arguments = (ins
-        AnyTypeOf<[1DTensorOf<[I1]>, MemRefRankOf<[I1], [1]>]>:$physical_measurements
+        AnyTypeOf<[1DTensorOf<[I1]>, MemRefRankOf<[I1], [1]>]>:$physical_measurements,
+        Optional<MemRefRankOf<[I1], [1]>>:$logical_measurements_in
     );
 
     let results = (outs
-        1DTensorOf<[I1]>:$logical_measurements
+        Optional<1DTensorOf<[I1]>>:$logical_measurements
     );
 
     let assemblyFormat = [{
-        $physical_measurements attr-dict `:` type($physical_measurements) `->` type($logical_measurements)
+        $physical_measurements
+        ( `in` `(` $logical_measurements_in^ `:` type($logical_measurements_in) `)` )?
+        attr-dict `:` type($physical_measurements) (`->` type($logical_measurements)^ )?
     }];
 }
 
