@@ -1046,6 +1046,7 @@
 <h3>Documentation 📝</h3>
 
 * The `qp` alias as in `import pennylane as qp` has been updated to `qp` in our source code and documentation.
+  [(#2764)](https://github.com/PennyLaneAI/catalyst/pull/2764)
   [(#2763)](https://github.com/PennyLaneAI/catalyst/pull/2763)
   [(#2748)](https://github.com/PennyLaneAI/catalyst/pull/2748)
   [(#2746)](https://github.com/PennyLaneAI/catalyst/pull/2746)
