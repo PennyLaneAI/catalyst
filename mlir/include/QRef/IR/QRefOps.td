@@ -20,6 +20,7 @@ include "mlir/IR/OpBase.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
+include "MBQC/IR/MBQCAttrDefs.td"
 include "Quantum/IR/QuantumAttrDefs.td"
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumTypes.td"
@@ -153,6 +154,8 @@ def GetOp : Memory_Op<"get", [NoMemoryEffect]> {
     let assemblyFormat = [{
         $qreg `[` ($idx^):($idx_attr)? `]` attr-dict `:` type(operands) `->` type(results)
     }];
+
+    let hasFolder = 1;
 }
 
 // -----
@@ -662,6 +665,56 @@ def MeasureOp : QRef_Op<"measure"> {
     let assemblyFormat = [{
         $in_qubit (`postselect` $postselect^)? attr-dict `:` type(results)
     }];
+}
+
+// -----
+// MBQC Ops
+
+def MeasureInBasisOp : QRef_Op<"mbqc.measure_in_basis"> {
+    let summary = "A parametric single-qubit projective measurement in an arbitrary basis.";
+    let description = [{
+        Identical to mbqc.measure_in_basis operation, except in reference semantics.
+    }];
+
+    let arguments = (ins
+        QubitRefType:$in_qubit,
+        MeasurementPlaneAttr:$plane,
+        F64:$angle,
+        OptionalAttr<ConfinedAttr<I32Attr, [IntMinValue<0>, IntMaxValue<1>]>>:$postselect
+    );
+
+    let results = (outs
+        I1:$mres
+    );
+
+    let assemblyFormat = [{
+        `[` $plane `,` $angle `]` $in_qubit (`postselect` $postselect^)? attr-dict `:` type(results)
+    }];
+}
+
+def GraphStatePrepOp : Memory_Op<"mbqc.graph_state_prep"> {
+    let summary = "Allocate resources for a new graph state.";
+    let description = [{
+        Identical to mbqc.graph_state_prep operation, except in reference semantics.
+    }];
+
+    let arguments = (ins
+        AnyTypeOf<[
+            1DTensorOf<[I1]>, MemRefRankOf<[I1], [1]>
+        ]>:$adj_matrix,
+        StrAttr:$init_op,
+        StrAttr:$entangle_op
+    );
+
+    let results = (outs
+        QuregRefType:$qreg
+    );
+
+    let assemblyFormat = [{
+        `(` $adj_matrix `:` type($adj_matrix) `)` `[` `init` $init_op `,` `entangle` $entangle_op `]` attr-dict `:` type(results)
+    }];
+
+    let hasVerifier = 1;
 }
 
 #endif // QREF_OPS

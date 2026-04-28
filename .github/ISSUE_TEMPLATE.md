@@ -22,7 +22,7 @@ if relevant. You may use the following template below
 
 * *Reproduces how often:* (What percentage of the time does it reproduce?)
 
-* *System information:* (post the output of `import pennylane as qml; qml.about()`)
+* *System information:* (post the output of `import pennylane as qp; qp.about()`)
 
 #### Source code and tracebacks
 

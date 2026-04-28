@@ -8,8 +8,7 @@ endif()
 # This is the version tested and shipped with Ubuntu 24 apt.
 # Using older versions (e.g. 1.66 on rhel8 or 1.74 on Ubuntu 22)
 # can cause failure, or will require linking the Boost random library
-# explicitly. When using 1.83 or newer, the decompsolver target
-# will not require external linking to Boost libraries.
+# explicitly.
 set(MIN_BOOST_VERSION 1.83.0)
 
 include(FetchContent)
@@ -22,7 +21,6 @@ find_package(Boost ${MIN_BOOST_VERSION} COMPONENTS random graph QUIET)
 if (Boost_FOUND)
     message(STATUS "Found System Boost ${Boost_VERSION}")
     set(CATALYST_BOOST_FETCHED FALSE CACHE BOOL "Boost was found on the system" FORCE)
-    # target_link_libraries(decompsolver PUBLIC Boost::random Boost::graph)
 else()
     message(STATUS "Boost >= ${MIN_BOOST_VERSION} not found on system. Fetching...")
 
@@ -46,7 +44,6 @@ endif()
 add_subdirectory(capi)
 add_subdirectory(backend)
 add_subdirectory(registry)
-add_subdirectory(DecompGraphSolver)
 add_subdirectory(RSDecompRuntime)
 add_subdirectory(Decoder)
 

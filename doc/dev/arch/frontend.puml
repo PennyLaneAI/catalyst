@@ -19,7 +19,7 @@ Boundary(_frontend_, "Frontend / Compiler Driver", "Python", "Python code tracer
   Container(_codegen_, "CodeGen", "LLVM", "Object code generation & linking")
 }
 
-Container_Ext(_qml_, "OpQueue", "PennyLane", "")
+Container_Ext(_qp_, "OpQueue", "PennyLane", "")
 Container_Ext(_jaxcore_, "Tracer", "jax.core", "")
 Container_Ext(_jaxlib_, "MLIR Bindings", "jaxlib", "")
 Container_Ext(_quantumopt_, "Compiler Libraries", "quantum-opt", "Catalyst MLIR dialects and passes")
@@ -32,7 +32,7 @@ Rel_R(_mlirgen_, _core_, "mlir", "")
 Rel_R(_core_, _codegen_, "llvmir", "")
 Rel_R(_codegen_, _so_, " ", "")
 
-Rel_D(_tracing_, _qml_, "uses", "", $tags="action")
+Rel_D(_tracing_, _qp_, "uses", "", $tags="action")
 Rel_D(_tracing_, _jaxcore_, "uses", "", $tags="action")
 Rel_D(_mlirgen_, _jaxlib_, "uses", "", $tags="action")
 Rel_D(_core_, _quantumopt_, "uses","", $tags="action")

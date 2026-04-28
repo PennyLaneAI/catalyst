@@ -14,9 +14,9 @@
 
 """xDSL API for qecp transforms"""
 
-from .convert_noiseop_to_subroutine import (
-    ConvertNoiseOpToSubroutinePass,
-    convert_noiseop_to_subroutine_pass,
+from .convert_qecl_noise_to_qec_noise import (
+    ConvertQECLNoiseOpToQECPNoisePass,
+    convert_qecl_noise_to_qecp_noise_pass,
 )
 from .convert_qecl_to_qecp import ConvertQecLogicalToQecPhysicalPass, convert_qecl_to_qecp_pass
 
@@ -24,6 +24,6 @@ __all__ = [
     # Passes
     "ConvertQecLogicalToQecPhysicalPass",
     "convert_qecl_to_qecp_pass",
-    "ConvertNoiseOpToSubroutinePass",
-    "convert_noiseop_to_subroutine_pass",
+    "ConvertQECLNoiseOpToQECPNoisePass",
+    "convert_qecl_noise_to_qecp_noise_pass",
 ]

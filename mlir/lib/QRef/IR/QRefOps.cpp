@@ -15,6 +15,7 @@
 #include "QRef/IR/QRefOps.h"
 
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
@@ -154,6 +155,31 @@ LogicalResult DeallocQubitOp::canonicalize(DeallocQubitOp deallocQb,
     return failure();
 }
 
+template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx)
+{
+    // Prefer using an attribute when the index is constant.
+    bool hasNoIdxAttr = !op.getIdxAttr().has_value();
+    bool isConstantIdx = isa_and_nonnull<IntegerAttr>(idx);
+    if (hasNoIdxAttr && isConstantIdx) {
+        auto constantIdx = cast<IntegerAttr>(idx);
+        op.setIdxAttr(constantIdx.getValue().getSExtValue());
+
+        // Remove the dynamic Value
+        op.getIdxMutable().clear();
+        return success();
+    }
+    return failure();
+}
+
+OpFoldResult GetOp::fold(FoldAdaptor adaptor)
+{
+    if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
+        return getResult();
+    }
+    // Returning nullptr tells the caller the op was unchanged.
+    return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 // QRef op verifiers.
 //===----------------------------------------------------------------------===//
@@ -257,10 +283,33 @@ LogicalResult ComputationalBasisOp::verify()
 LogicalResult HermitianOp::verify()
 {
     size_t dim = std::pow(2, getQubits().size());
-    if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim)))
+    if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim))) {
         return emitOpError("The Hermitian matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
+    }
 
     return success();
 }
 
+LogicalResult GraphStatePrepOp::verify()
+{
+    ShapedType adjMatrixType = cast<ShapedType>(getAdjMatrix().getType());
+    size_t adjMatrixSize = adjMatrixType.getShape()[0];
+
+    QuregType qregType = getQreg().getType();
+    if (qregType.isDynamic()) {
+        return emitOpError() << "expected static allocation size";
+    }
+
+    size_t qregSize = qregType.getSize().getInt();
+    size_t expectedAdjMatrixSize = qregSize * (qregSize - 1) / 2;
+    if (adjMatrixSize != expectedAdjMatrixSize) {
+        return emitOpError()
+               << "mismatch between allocation size and size of densely packed adjacency "
+                  "matrix. For an allocation size of "
+               << qregSize << ", the densely packed adjacency matrix size is expected to be "
+               << expectedAdjMatrixSize;
+    }
+
+    return success();
+}
 } // namespace catalyst::qref

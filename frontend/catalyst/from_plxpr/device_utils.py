@@ -18,7 +18,7 @@ This submodule defines utilities for device preprocessing for from_plxpr.
 # pylint: disable=too-many-arguments, too-many-positional-arguments
 import warnings
 
-import pennylane as qml
+import pennylane as qp
 from pennylane.devices.capabilities import DeviceCapabilities, ExecutionCondition
 from pennylane.devices.execution_config import MCM_METHOD, POSTSELECT_MODE, ExecutionConfig
 from pennylane.transforms import (
@@ -49,18 +49,18 @@ from catalyst.device.verification import (
 from catalyst.utils.exceptions import CompileError
 
 _named_obs_dict = {
-    "PauliX": qml.X,
-    "PauliY": qml.Y,
-    "PauliZ": qml.Z,
-    "Hadamard": qml.Hadamard,
+    "PauliX": qp.X,
+    "PauliY": qp.Y,
+    "PauliZ": qp.Z,
+    "Hadamard": qp.Hadamard,
 }
 
 
 def create_device_preprocessing_pipeline(
-    device: qml.devices.Device, execution_config: ExecutionConfig, shots: int, warn: bool = True
+    device: qp.devices.Device, execution_config: ExecutionConfig, shots: int, warn: bool = True
 ) -> list[BoundTransform]:
     """Create a pipeline of device preprocessing transforms for lowering QNodes."""
-    shots_present = qml.math.is_abstract(shots) or shots != 0
+    shots_present = qp.math.is_abstract(shots) or shots != 0
     raw_capabilities: DeviceCapabilities = get_qjit_device_capabilities(
         _load_device_capabilities(device)
     )
@@ -103,7 +103,7 @@ def create_device_preprocessing_pipeline(
     if unsupported_transforms and warn:
         warnings.warn(
             "The following device-preprocessing transforms are currently not supported with "
-            "'qml.qjit(capture=True)':\n"
+            "'qp.qjit(capture=True)':\n"
             f"{unsupported_transforms}.\n"
             "They will be substituted with identity transforms.",
             UserWarning,
@@ -116,7 +116,7 @@ def create_device_preprocessing_pipeline(
 def _mcm_preprocessing(
     pipeline: list[BoundTransform],
     unsupported_transforms: list[str],
-    device: qml.devices.Device,
+    device: qp.devices.Device,
     execution_config: ExecutionConfig,
     shots: int,
     capabilities: DeviceCapabilities,
@@ -127,11 +127,11 @@ def _mcm_preprocessing(
     if mcm_config.postselect_mode not in (POSTSELECT_MODE.FILL_SHOTS, None):
         raise CompileError(
             f"postselect_mode='{mcm_config.postselect_mode.value} is not supported with "
-            f"'qml.qjit(capture=True)'. Currently, only 'fill_shots' or None are supported."
+            f"'qp.qjit(capture=True)'. Currently, only 'fill_shots' or None are supported."
         )
 
     if mcm_config.mcm_method == MCM_METHOD.ONE_SHOT:
-        shots_present = qml.math.is_abstract(shots) or shots != 0
+        shots_present = qp.math.is_abstract(shots) or shots != 0
         if not shots_present:
             raise CompileError("Cannot use mcm_method='one-shot' with analytic mode.")
         pipeline.append(
@@ -143,7 +143,7 @@ def _mcm_preprocessing(
     elif mcm_config.mcm_method not in (MCM_METHOD.SINGLE_BRANCH_STATISTICS, None):
         raise CompileError(
             f"mcm_method='{mcm_config.mcm_method.value}' is not supported with {device.name}"
-            "when using 'qml.qjit(capture=True)'."
+            "when using 'qp.qjit(capture=True)'."
         )
 
 
@@ -151,7 +151,7 @@ def _mcm_preprocessing(
 def _measurements_preprocessing(
     pipeline: list[BoundTransform],
     unsupported_transforms: list[str],
-    device: qml.devices.Device,
+    device: qp.devices.Device,
     execution_config: ExecutionConfig,
     shots: int,
     capabilities: DeviceCapabilities,
@@ -209,7 +209,7 @@ def _measurements_preprocessing(
 def _operations_preprocessing(
     pipeline: list[BoundTransform],
     unsupported_transforms: list[str],
-    device: qml.devices.Device,
+    device: qp.devices.Device,
     execution_config: ExecutionConfig,
     shots: int,
     capabilities: DeviceCapabilities,
@@ -243,7 +243,7 @@ def _operations_preprocessing(
 def _gradient_preprocessing(
     pipeline: list[BoundTransform],
     unsupported_transforms: list[str],
-    device: qml.devices.Device,
+    device: qp.devices.Device,
     execution_config: ExecutionConfig,
     shots: int,
     capabilities: DeviceCapabilities,
@@ -260,7 +260,7 @@ def _gradient_preprocessing(
             )
         )
     if execution_config.gradient_method == "adjoint":
-        shots_present = qml.math.is_abstract(shots) or shots != 0
+        shots_present = qp.math.is_abstract(shots) or shots != 0
         if shots_present:
             raise CompileError("Cannot use diff_method='adjoint' with finite shots.")
         # qjit_device should technically be an instance of QJITDevice,

@@ -15,11 +15,12 @@
 """Test QJIT compatibility with JAX transformations such as jax.jit and jax.grad."""
 
 import textwrap
+from dataclasses import dataclass, field
 from functools import partial
 
 import jax
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 import pytest
 from jax.interpreters.mlir import ir
 
@@ -36,12 +37,12 @@ class TestJAXJIT:
         """Test a basic use case of jax.jit with a dictionary as input."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x):
-            qml.RX(jnp.pi * x["a"][0], wires=0)
-            qml.RY(x["a"][1] ** 2, wires=0)
-            qml.RX(x["a"][1] * x["a"][2], wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(jnp.pi * x["a"][0], wires=0)
+            qp.RY(x["a"][1] ** 2, wires=0)
+            qp.RX(x["a"][1] * x["a"][2], wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         def cost_fn(x):
             result = circuit(x)
@@ -57,12 +58,12 @@ class TestJAXJIT:
         """Test a basic use case of jax.jit with a dictionary as an output."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: jax.core.ShapedArray((3,), dtype=float)):
-            qml.RX(jnp.pi * x[0], wires=0)
-            qml.RY(x[1] ** 2, wires=0)
-            qml.RX(x[1] * x[2], wires=0)
-            return {"a": qml.expval(qml.PauliZ(0))}
+            qp.RX(jnp.pi * x[0], wires=0)
+            qp.RY(x[1] ** 2, wires=0)
+            qp.RX(x[1] * x[2], wires=0)
+            return {"a": qp.expval(qp.PauliZ(0))}
 
         def cost_fn(x):
             result = circuit(x)
@@ -78,12 +79,12 @@ class TestJAXJIT:
         """Test a basic use case of jax.jit on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: jax.core.ShapedArray((3,), dtype=float)):
-            qml.RX(jnp.pi * x[0], wires=0)
-            qml.RY(x[1] ** 2, wires=0)
-            qml.RX(x[1] * x[2], wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(jnp.pi * x[0], wires=0)
+            qp.RY(x[1] ** 2, wires=0)
+            qp.RX(x[1] * x[2], wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         def cost_fn(x):
             result = circuit(x)
@@ -99,14 +100,14 @@ class TestJAXJIT:
         """Test a circuit with multiple arguments using jax.jit on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(
             x: jax.core.ShapedArray((3,), dtype=float), y: jax.core.ShapedArray((2,), dtype=float)
         ):
-            qml.RX(jnp.pi * x[0], wires=0)
-            qml.RY(x[1] ** 2, wires=0)
-            qml.RX(y[1] * x[2], wires=0)
-            return qml.probs(wires=0)
+            qp.RX(jnp.pi * x[0], wires=0)
+            qp.RY(x[1] ** 2, wires=0)
+            qp.RX(y[1] * x[2], wires=0)
+            return qp.probs(wires=0)
 
         def cost_fn(x, y):
             result = circuit(x, y)
@@ -122,14 +123,14 @@ class TestJAXJIT:
         """Test a circuit with multiple results using jax.jit on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(
             x: jax.core.ShapedArray((3,), dtype=float), y: jax.core.ShapedArray((2,), dtype=float)
         ):
-            qml.RX(jnp.pi * x[0], wires=0)
-            qml.RY(x[1] ** 2, wires=0)
-            qml.RX(y[1] * x[2], wires=0)
-            return qml.probs(wires=0), qml.expval(qml.PauliZ(0))
+            qp.RX(jnp.pi * x[0], wires=0)
+            qp.RY(x[1] ** 2, wires=0)
+            qp.RX(y[1] * x[2], wires=0)
+            return qp.probs(wires=0), qp.expval(qp.PauliZ(0))
 
         def cost_fn(x, y):
             result = circuit(x, y)
@@ -145,12 +146,12 @@ class TestJAXJIT:
         """Test a function without type hints (pre-compilation) using jax.jit on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x, y):
-            qml.RX(jnp.pi * x[0], wires=0)
-            qml.RY(x[1] ** 2, wires=0)
-            qml.RX(y[1] * x[2], wires=0)
-            return qml.probs(wires=0), qml.expval(qml.PauliZ(0))
+            qp.RX(jnp.pi * x[0], wires=0)
+            qp.RY(x[1] ** 2, wires=0)
+            qp.RX(y[1] * x[2], wires=0)
+            return qp.probs(wires=0), qp.expval(qp.PauliZ(0))
 
         def cost_fn(x, y):
             result = circuit(x, y)
@@ -166,9 +167,9 @@ class TestJAXJIT:
         """Test a jax.jit function which repeatedly calls a qjit function."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x):
-            qml.RY(x, wires=0)
+            qp.RY(x, wires=0)
             return measure(0)
 
         @jax.jit
@@ -190,12 +191,12 @@ class TestJAXAD:
         """Test a basic use case of jax.grad on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: jax.core.ShapedArray((3,), dtype=float)):
-            qml.RX(jnp.pi * x[0], wires=0)
-            qml.RY(x[1] ** 2, wires=0)
-            qml.RX(x[1] * x[2], wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(jnp.pi * x[0], wires=0)
+            qp.RY(x[1] ** 2, wires=0)
+            qp.RX(x[1] * x[2], wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         @jax.grad
         def cost_fn(x, qfunc):
@@ -213,14 +214,14 @@ class TestJAXAD:
         """Test a circuit with multiple arguments using jax.grad on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(
             x: jax.core.ShapedArray((3,), dtype=float), y: jax.core.ShapedArray((2,), dtype=float)
         ):
-            qml.RX(jnp.pi * x[0], wires=0)
-            qml.RY(x[1] ** 2, wires=0)
-            qml.RX(y[1] * x[2], wires=0)
-            return qml.probs(wires=0)
+            qp.RX(jnp.pi * x[0], wires=0)
+            qp.RY(x[1] ** 2, wires=0)
+            qp.RX(y[1] * x[2], wires=0)
+            return qp.probs(wires=0)
 
         @partial(jax.grad, argnums=argnums)
         def cost_fn(x, y, qfunc):
@@ -239,14 +240,14 @@ class TestJAXAD:
         """Test a circuit with multiple results using jax.grad on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(
             x: jax.core.ShapedArray((3,), dtype=float), y: jax.core.ShapedArray((2,), dtype=float)
         ):
-            qml.RX(jnp.pi * x[0], wires=0)
-            qml.RY(x[1] ** 2, wires=0)
-            qml.RX(y[1] * x[2], wires=0)
-            return qml.probs(wires=0), qml.expval(qml.PauliZ(0))
+            qp.RX(jnp.pi * x[0], wires=0)
+            qp.RY(x[1] ** 2, wires=0)
+            qp.RX(y[1] * x[2], wires=0)
+            return qp.probs(wires=0), qp.expval(qp.PauliZ(0))
 
         @partial(jax.grad, argnums=[0, 1])
         def cost_fn(x, y, qfunc):
@@ -265,14 +266,14 @@ class TestJAXAD:
         """Test a circuit with vector return type using jax.jacobian on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(
             x: jax.core.ShapedArray((3,), dtype=float), y: jax.core.ShapedArray((2,), dtype=float)
         ):
-            qml.RX(jnp.pi * x[0], wires=0)
-            qml.RY(x[1] ** 2, wires=0)
-            qml.RX(y[1] * x[2], wires=0)
-            return qml.probs(wires=0)
+            qp.RX(jnp.pi * x[0], wires=0)
+            qp.RY(x[1] ** 2, wires=0)
+            qp.RX(y[1] * x[2], wires=0)
+            return qp.probs(wires=0)
 
         @partial(jax.jacobian, argnums=[0, 1])
         def cost_fn(x, y, qfunc):
@@ -291,12 +292,12 @@ class TestJAXAD:
         """Test a function without type hints (pre-compilation) using jax.grad on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x, y):
-            qml.RX(jnp.pi * x[0], wires=0)
-            qml.RY(x[1] ** 2, wires=0)
-            qml.RX(y[1] * x[2], wires=0)
-            return qml.probs(wires=0), qml.expval(qml.PauliZ(0))
+            qp.RX(jnp.pi * x[0], wires=0)
+            qp.RY(x[1] ** 2, wires=0)
+            qp.RX(y[1] * x[2], wires=0)
+            return qp.probs(wires=0), qp.expval(qp.PauliZ(0))
 
         @partial(jax.grad, argnums=[0, 1])
         def cost_fn(x, y, qfunc):
@@ -315,12 +316,12 @@ class TestJAXAD:
         """Test a circuit with non-differentiable arguments using jax.grad on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: jax.core.ShapedArray((3,), dtype=float), y: int):
-            qml.RX(jnp.pi * x[0], wires=0)
-            qml.RY(x[1] ** 2, wires=0)
-            qml.RX(y * x[2], wires=0)
-            return qml.probs(wires=0), qml.expval(qml.PauliZ(0))
+            qp.RX(jnp.pi * x[0], wires=0)
+            qp.RY(x[1] ** 2, wires=0)
+            qp.RX(y * x[2], wires=0)
+            return qp.probs(wires=0), qp.expval(qp.PauliZ(0))
 
         @jax.grad
         def cost_fn(x, y, qfunc):
@@ -337,10 +338,10 @@ class TestJAXAD:
         """Test a jax.grad function which repeatedly calls a qjit function."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x):
-            qml.RY(x, wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RY(x, wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         @jax.grad
         def cost_fn(x, y):
@@ -381,11 +382,11 @@ class TestJAXAD:
         """Test a jax.grad function does not compute Jacobians for arguments not in argnums."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: float, y: float):
-            qml.RX(x, wires=0)
-            qml.RY(y, wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            qp.RY(y, wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         @partial(jax.grad, argnums=0)
         def cost_fn(x, y):
@@ -402,13 +403,13 @@ class TestJAXAD:
         This was fixed by the introduction of symbolic zero detection for tangent vectors."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(params: jax.core.ShapedArray((2,), dtype=float), n: int):
-            qml.RX(n * params[0], wires=0)
-            qml.RY(params[1] / n, wires=1)
-            qml.CNOT(wires=[0, 1])
+            qp.RX(n * params[0], wires=0)
+            qp.RY(params[1] / n, wires=1)
+            qp.CNOT(wires=[0, 1])
 
-            return qml.expval(qml.PauliZ(1))
+            return qp.expval(qp.PauliZ(1))
 
         n = 3
         params = jnp.array([0.1, 0.2])
@@ -423,16 +424,16 @@ class TestJAXAD:
         passed to the custom quantum JVP"""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(p1, n, p2):
             def ansatz(_):
-                qml.RX(p1, wires=0)
-                qml.RY(p2, wires=1)
-                qml.CNOT(wires=[0, 1])
+                qp.RX(p1, wires=0)
+                qp.RY(p2, wires=1)
+                qp.CNOT(wires=[0, 1])
 
             for_loop(0, n, 1)(ansatz)()
 
-            return qml.expval(qml.PauliZ(1))
+            return qp.expval(qp.PauliZ(1))
 
         # Patch the quantum gradient wrapper to verify the internal argnums
         get_derivative_qjit = JAX_QJIT.get_derivative_qjit
@@ -457,17 +458,17 @@ class TestJAXRecompilation:
         """Test if function can be used by jax.grad even if it has not been JIT compiled"""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(params, n):
             def ansatz(i, x):
-                qml.RX(x[i, 0], wires=0)
-                qml.RY(x[i, 1], wires=1)
-                qml.CNOT(wires=[0, 1])
+                qp.RX(x[i, 0], wires=0)
+                qp.RY(x[i, 1], wires=1)
+                qp.CNOT(wires=[0, 1])
                 return x
 
             for_loop(0, n, 1)(ansatz)(jnp.reshape(params, (-1, 2)))
 
-            return qml.expval(qml.PauliZ(1))
+            return qp.expval(qp.PauliZ(1))
 
         params = jnp.array([0.54, 0.3154, 0.654, 0.123])
         jax.grad(circuit, argnums=0)(params, 2)
@@ -476,17 +477,17 @@ class TestJAXRecompilation:
         """Test if function can be used by jax.grad but it needs recompilation"""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(params, n):
             def ansatz(i, x):
-                qml.RX(x[i, 0], wires=0)
-                qml.RY(x[i, 1], wires=1)
-                qml.CNOT(wires=[0, 1])
+                qp.RX(x[i, 0], wires=0)
+                qp.RY(x[i, 1], wires=1)
+                qp.CNOT(wires=[0, 1])
                 return x
 
             for_loop(0, n, 1)(ansatz)(jnp.reshape(params, (-1, 2)))
 
-            return qml.expval(qml.PauliZ(1))
+            return qp.expval(qp.PauliZ(1))
 
         params = jnp.array([0.54, 0.3154, 0.654, 0.123])
         jax.grad(circuit, argnums=0)(params, 2)
@@ -601,12 +602,56 @@ class TestJAXMLIRAttributeGetter:
         with pytest.raises(
             CompileError,
             match=textwrap.dedent("""
-            Large interger attributes currently not supported in MLIR,
+            Large integer attributes currently not supported in MLIR,
             see https://github.com/llvm/llvm-project/issues/128072
             """),
         ):
             with ctx, loc:
                 _ = get_mlir_attribute_from_pyval(2**100)
+
+    def test_dataclass_attr(self):
+        """
+        Test that a dataclass is convertible to an MLIR dictionary attribute.
+        """
+
+        # pylint: disable=missing-class-docstring
+        @dataclass
+        class MyOptions:
+            a: bool = True
+            b: int = 42
+            c: float = 1 / 137
+            d: str = "Yellow Submarine"
+            e: list = field(default_factory=lambda: ["John", "Paul", "George", "Ringo"])
+            f: dict = field(default_factory=lambda: {"one": 1, "two": 2})
+
+        with ctx, loc:
+            options = MyOptions()
+            attr = get_mlir_attribute_from_pyval(options)
+
+            assert isinstance(attr, ir.DictAttr)
+
+            assert isinstance(attr["a"], ir.BoolAttr)
+            assert attr["a"].value == options.a
+
+            assert isinstance(attr["b"], ir.IntegerAttr)
+            assert attr["b"].value == options.b
+
+            assert isinstance(attr["c"], ir.FloatAttr)
+            assert attr["c"].value == options.c
+
+            assert isinstance(attr["d"], ir.StringAttr)
+            assert attr["d"].value == options.d
+
+            assert isinstance(attr["e"], ir.ArrayAttr)
+            assert len(attr["e"]) == len(options.e)
+            for attr_val, options_val in zip(attr["e"], options.e):
+                assert attr_val.value == options_val
+
+            assert isinstance(attr["f"], ir.DictAttr)
+            assert len(attr["f"]) == len(options.f)
+            for attr_val, (options_key, options_val) in zip(attr["f"], options.f.items()):
+                assert attr_val.name == options_key
+                assert attr_val.attr.value == options_val
 
 
 if __name__ == "__main__":

@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "resource-tracker"
+#define DEBUG_TYPE "resource-analysis"
+
+#include <chrono>
+#include <fstream>
+#include <string>
 
 #include "llvm/Support/JSON.h"
 #include "mlir/Pass/Pass.h"
@@ -25,18 +29,18 @@ using namespace llvm;
 
 namespace catalyst {
 
-#define GEN_PASS_DECL_RESOURCETRACKERPASS
-#define GEN_PASS_DEF_RESOURCETRACKERPASS
+#define GEN_PASS_DECL_RESOURCEANALYSISPASS
+#define GEN_PASS_DEF_RESOURCEANALYSISPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
-struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTrackerPass> {
-    using ResourceTrackerPassBase::ResourceTrackerPassBase;
+struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnalysisPass> {
+    using ResourceAnalysisPassBase::ResourceAnalysisPassBase;
 
     // Explicit default and copy constructors required because Statistic
     // wraps std::atomic which is non-copyable. MLIR's clonePass() needs
     // the pass to be copyable.
-    ResourceTrackerPass() = default;
-    ResourceTrackerPass(const ResourceTrackerPass & /*pass*/) : ResourceTrackerPassBase() {}
+    ResourceAnalysisPass() = default;
+    ResourceAnalysisPass(const ResourceAnalysisPass & /*pass*/) : ResourceAnalysisPassBase() {}
 
     Statistic totalGates{this, "total-gates", "Total number of gate operations"};
     Statistic totalMeasurements{this, "total-measurements", "Total number of measurements"};
@@ -68,9 +72,17 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
                 accumulateStats(funcEntry.getValue());
             }
         }
+        std::string jsonStr = "";
 
         if (outputJson) {
-            printJsonOutput(results);
+            jsonStr = buildJsonString(results);
+
+            if (outputFname.empty()) {
+                printJsonOutput(jsonStr);
+            }
+            else {
+                writeJsonToFile(jsonStr, outputFname);
+            }
         }
 
         markAllAnalysesPreserved();
@@ -109,64 +121,87 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
         }
     }
 
-    /**
-     * @brief Print the resource results as JSON to stdout.
-     *
-     * @param results The map of function names to ResourceResults to print.
-     */
-    void printJsonOutput(const llvm::StringMap<ResourceResult> &results) const
+    /// Serialize a single ResourceResult into a JSON object.
+    static llvm::json::Object resultToJson(const ResourceResult &result)
+    {
+        llvm::json::Object funcObj;
+
+        llvm::json::Object opsObj;
+        for (const auto &opEntry : result.operations) {
+            StringRef opName = opEntry.getKey();
+            for (const auto &sizeEntry : opEntry.getValue()) {
+                const auto &[nQubits, nParams] = sizeEntry.first;
+                int64_t count = sizeEntry.second;
+                std::string key = opName.str() + "(" + std::to_string(nQubits) + ")";
+                opsObj[key] = count;
+            }
+        }
+        funcObj["operations"] = std::move(opsObj);
+
+        llvm::json::Object measObj;
+        for (const auto &entry : result.measurements) {
+            measObj[entry.getKey()] = entry.getValue();
+        }
+        funcObj["measurements"] = std::move(measObj);
+
+        llvm::json::Object classObj;
+        for (const auto &entry : result.classicalInstructions) {
+            classObj[entry.getKey()] = entry.getValue();
+        }
+        funcObj["classical_instructions"] = std::move(classObj);
+
+        llvm::json::Object fcObj;
+        for (const auto &entry : result.functionCalls) {
+            fcObj[entry.getKey()] = entry.getValue();
+        }
+        funcObj["function_calls"] = std::move(fcObj);
+
+        funcObj["num_qubits"] = static_cast<int64_t>(result.numQubits());
+        funcObj["num_alloc_qubits"] = static_cast<int64_t>(result.numAllocQubits);
+        funcObj["num_arg_qubits"] = static_cast<int64_t>(result.numArgQubits);
+        funcObj["device_name"] = result.deviceName;
+        funcObj["qnode"] = result.isQnode;
+        funcObj["has_branches"] = result.hasBranches;
+        funcObj["has_dyn_loop"] = result.hasDynLoop;
+
+        return funcObj;
+    }
+
+    /// Serialize all per-function ResourceResults into a JSON string.
+    /// qnode functions are inserted first so that the PennyLane reader
+    /// (which uses the first entry) picks the correct function.
+    std::string buildJsonString(const llvm::StringMap<ResourceResult> &results) const
     {
         llvm::json::Object root;
 
         for (const auto &funcEntry : results) {
-            llvm::json::Object funcObj;
-            const ResourceResult &result = funcEntry.getValue();
-
-            // Operations
-            llvm::json::Object opsObj;
-            for (const auto &opEntry : result.operations) {
-                StringRef opName = opEntry.getKey();
-                for (const auto &sizeEntry : opEntry.getValue()) {
-                    int nQubits = sizeEntry.first;
-                    int64_t count = sizeEntry.second;
-                    std::string key = opName.str() + "(" + std::to_string(nQubits) + ")";
-                    opsObj[key] = count;
-                }
+            if (funcEntry.getValue().isQnode) {
+                root[funcEntry.getKey()] = resultToJson(funcEntry.getValue());
             }
-            funcObj["operations"] = std::move(opsObj);
-
-            // Measurements
-            llvm::json::Object measObj;
-            for (const auto &entry : result.measurements) {
-                measObj[entry.getKey()] = entry.getValue();
+        }
+        for (const auto &funcEntry : results) {
+            if (!funcEntry.getValue().isQnode) {
+                root[funcEntry.getKey()] = resultToJson(funcEntry.getValue());
             }
-            funcObj["measurements"] = std::move(measObj);
-
-            // Classical instructions
-            llvm::json::Object classObj;
-            for (const auto &entry : result.classicalInstructions) {
-                classObj[entry.getKey()] = entry.getValue();
-            }
-            funcObj["classical_instructions"] = std::move(classObj);
-
-            // Function calls
-            llvm::json::Object fcObj;
-            for (const auto &entry : result.functionCalls) {
-                fcObj[entry.getKey()] = entry.getValue();
-            }
-            funcObj["function_calls"] = std::move(fcObj);
-
-            funcObj["num_qubits"] = static_cast<int64_t>(result.numQubits());
-            funcObj["num_alloc_qubits"] = static_cast<int64_t>(result.numAllocQubits);
-            funcObj["num_arg_qubits"] = static_cast<int64_t>(result.numArgQubits);
-            funcObj["device_name"] = result.deviceName;
-
-            root[funcEntry.getKey()] = std::move(funcObj);
         }
 
-        // TODO: write to file, when called from frontend. Then, frontend read and delete the file.
         llvm::json::Value jsonValue(std::move(root));
-        llvm::outs() << llvm::formatv("{0:2}", jsonValue) << "\n";
+        return llvm::formatv("{0:2}", jsonValue).str() + "\n";
+    }
+
+    /// Print JSON to stdout.
+    void printJsonOutput(const std::string &jsonStr) const { llvm::outs() << jsonStr; }
+
+    /// Write JSON to a file.
+    static void writeJsonToFile(const std::string &jsonStr, const std::string &fileName)
+    {
+        std::ofstream ofile(fileName);
+        if (!ofile.is_open()) {
+            llvm::errs() << "Error: could not open resource output file: " << fileName << "\n";
+            return;
+        }
+        ofile << jsonStr;
+        ofile.close();
     }
 };
 
