@@ -241,6 +241,34 @@ def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
     let hasFolder = 1;
 }
 
+def SwapOp : Memory_Op<"swap", [NoMemoryEffect]> {
+    let summary = "Exchange a qubit at a register position with a standalone qubit.";
+    let description = [{
+        Writes the incoming qubit into the register at the given index and returns
+        both the updated register and the qubit that previously occupied that slot.
+        The input register and qubit are consumed; the result is a new register
+        value and the displaced qubit value.
+    }];
+
+    let arguments = (ins
+        QuregType:$in_qreg,
+        Optional<I64>:$idx,
+        OptionalAttr<ConfinedAttr<I64Attr, [IntNonNegative]>>:$idx_attr,
+        QubitType:$in_qubit
+    );
+
+    let results = (outs
+        QuregType:$out_qreg,
+        QubitType:$out_qubit
+    );
+
+    let assemblyFormat = [{
+        $in_qreg `[` ($idx^):($idx_attr)? `]` `,` $in_qubit attr-dict `:` type($in_qreg) `,` type($in_qubit)
+    }];
+
+    let hasVerifier = 1;
+}
+
 // -----
 
 class Gate_Op<string mnemonic, list<Trait> traits = []> :

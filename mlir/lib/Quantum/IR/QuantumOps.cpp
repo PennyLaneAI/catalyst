@@ -228,6 +228,17 @@ LogicalResult InsertOp::verify()
     return success();
 }
 
+LogicalResult SwapOp::verify()
+{
+    if (!(getIdx() || getIdxAttr().has_value())) {
+        return emitOpError() << "expected op to have a non-null index";
+    }
+    if (getIdx() && getIdxAttr().has_value()) {
+        return emitOpError() << "must have a single index";
+    }
+    return success();
+}
+
 static LogicalResult verifyObservable(Value obs, std::optional<size_t> &numQubits)
 {
     if (auto compOp = obs.getDefiningOp<ComputationalBasisOp>()) {
