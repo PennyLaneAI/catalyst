@@ -56,7 +56,7 @@ class TestMidCircuitMeasurement:
         def circuit():
             return measure(0)
 
-        with pytest.raises(CompileError, match="can only be used from within a qml.qnode"):
+        with pytest.raises(CompileError, match=r"can only be used from within a .*\.qnode"):
             qjit(circuit)()
 
     def test_invalid_arguments(self, backend):
@@ -676,7 +676,7 @@ class TestDynamicOneShotIntegration:
 
         if measure_f == qp.var and not isinstance(meas_obj, str):
             with pytest.raises(
-                NotImplementedError, match=r"qml.var\(\) cannot be used on observables"
+                NotImplementedError, match=r".*\.var\(\) cannot be used on observables"
             ):
                 func(*params)
             return

@@ -19,7 +19,7 @@ import subprocess
 from typing import Any
 from unittest.mock import MagicMock
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 from xdsl.context import Context
 from xdsl.dialects import builtin, func, test, transform
@@ -450,21 +450,21 @@ class TestApplyTransformSequencePass:
         """Test that applying the ApplyTransformSequencePass to a qjitted qnode's
         module correctly transforms it."""
 
-        dev = qml.device("null.qubit", wires=4)
+        dev = qp.device("null.qubit", wires=4)
 
         @xdsl_from_qjit
         @qjit
         # merge_rotations_pass dispatches to an xDSL pass
         @merge_rotations_pass
-        # qml.transforms.cancel_inverses dispatches to an MLIR pass
-        @qml.transforms.cancel_inverses
-        @qml.qnode(dev)
+        # qp.transforms.cancel_inverses dispatches to an MLIR pass
+        @qp.transforms.cancel_inverses
+        @qp.qnode(dev)
         def circuit():
-            qml.RX(1.5, 0)
-            qml.RX(1.5, 0)
-            qml.X(1)
-            qml.X(1)
-            return qml.state()
+            qp.RX(1.5, 0)
+            qp.RX(1.5, 0)
+            qp.X(1)
+            qp.X(1)
+            return qp.state()
 
         mod = circuit()
         _pass = ApplyTransformSequencePass()

@@ -18,7 +18,7 @@
 from functools import lru_cache, partial
 from typing import Union
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, test
@@ -323,19 +323,19 @@ class TestCompilationPass:
         with pytest.raises(TypeError, match="Only Operation types or unions of Operation types"):
 
             @pass_cls.add_action
-            def _(self, op: qml.PauliX, rewriter):
+            def _(self, op: qp.PauliX, rewriter):
                 return
 
         with pytest.raises(TypeError, match="Only Operation types or unions of Operation types"):
 
             @pass_cls.add_action
-            def _(self, op: qml.PauliX | qml.PauliY, rewriter):
+            def _(self, op: qp.PauliX | qp.PauliY, rewriter):
                 return
 
         with pytest.raises(TypeError, match="Only Operation types or unions of Operation types"):
 
             @pass_cls.add_action
-            def _(self, op: Union[qml.PauliX, qml.PauliY], rewriter):
+            def _(self, op: Union[qp.PauliX, qp.PauliY], rewriter):
                 return
 
     def test_base_class_add_action_error(self):
@@ -389,22 +389,22 @@ class TestCompilationPassIntegration:
         """Test that passes created using CompilationPass can be used
         with qjit."""
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
-        @qml.qjit(capture=capture)
+        @qp.qjit(capture=capture)
         @integration_pass
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
             # CHECK-NOT: quantum.custom
-            qml.Hadamard(0)
-            qml.PauliX(0)
+            qp.Hadamard(0)
+            qp.PauliX(0)
             # CHECK: [[MRES:%.+]], {{%.+}} = quantum.measure
             # CHECK: arith.extui [[MRES]] : i1 to i64
-            _ = qml.measure(0)
-            return qml.state()
+            _ = qp.measure(0)
+            return qp.state()
 
         run_filecheck_qjit(circuit)
-        assert qml.math.allclose(circuit(), [1, 0])
+        assert qp.math.allclose(circuit(), [1, 0])
 
 
 if __name__ == "__main__":

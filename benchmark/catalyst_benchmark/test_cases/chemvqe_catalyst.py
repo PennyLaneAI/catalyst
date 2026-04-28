@@ -21,7 +21,7 @@ from typing import Any, Dict
 
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 from catalyst_benchmark.types import Problem
 from jax.core import ShapedArray
 from pennylane import AllSinglesDoubles
@@ -62,13 +62,13 @@ class ProblemCVQE(Problem):
         self.nsteps = nsteps
         self.diff_method = DMALIASES[diff_method]
         pi = PROBLEMS[self.nqubits]
-        data = qml.data.load("qchem", molname=pi.name, basis="STO-3G", bondlength=pi.bond)[0]
+        data = qp.data.load("qchem", molname=pi.name, basis="STO-3G", bondlength=pi.bond)[0]
         electrons = data.molecule.n_electrons
         qubits = data.molecule.n_orbitals * 2
         assert qubits == self.nqubits
         ham = data.hamiltonian
-        self.hf_state = qml.qchem.hf_state(electrons, qubits)
-        self.singles, self.doubles = qml.qchem.excitations(electrons, qubits)
+        self.hf_state = qp.qchem.hf_state(electrons, qubits)
+        self.singles, self.doubles = qp.qchem.excitations(electrons, qubits)
         self.excitations = self.singles + self.doubles
         self.ham = ham
         self.qcircuit = None
@@ -83,9 +83,9 @@ def qcompile_hybrid(p: ProblemCVQE, weights):
 
     def _circuit(params):
         AllSinglesDoubles(params, range(p.nqubits), p.hf_state, p.singles, p.doubles)
-        return qml.expval(qml.Hamiltonian(np.array(p.ham.coeffs), p.ham.ops))
+        return qp.expval(qp.Hamiltonian(np.array(p.ham.coeffs), p.ham.ops))
 
-    qcircuit = qml.QNode(_circuit, p.dev, **p.qnode_kwargs)
+    qcircuit = qp.QNode(_circuit, p.dev, **p.qnode_kwargs)
     qcircuit.construct([weights], {})
     p.qcircuit = qcircuit
 
@@ -132,7 +132,7 @@ NSTEPS = 1
 def run_catalyst(N=6):
     """Test problem entry point"""
     p = ProblemCVQE(
-        dev=qml.device("lightning.qubit", wires=N, shots=SHOTS),
+        dev=qp.device("lightning.qubit", wires=N, shots=SHOTS),
         nsteps=NSTEPS,
         diff_method=DIFFMETHOD,
     )
