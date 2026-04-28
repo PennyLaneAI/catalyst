@@ -241,3 +241,20 @@ func.func @test_mbqc_graph_state_prep_invalid_size() {
     %graph_reg = qref.mbqc.graph_state_prep (%adj_matrix : tensor<1xi1>) [init "Hadamard", entangle "CZ"] : !qref.reg<4>
     func.return
 }
+
+// -----
+
+func.func @test_swap_no_index(%r : !qref.reg<4>, %q : !qref.bit) {
+    // expected-error@+1 {{expected op to have a non-null index}}
+    "qref.swap"(%r, %q) : (!qref.reg<4>, !qref.bit) -> ()
+    return
+}
+
+// -----
+
+func.func @test_swap_negative_index(%q : !qref.bit) {
+    %r = qref.alloc(4) : !qref.reg<4>
+    // expected-error @+1 {{failed to satisfy constraint: 64-bit signless integer attribute whose value is non-negative}}
+    qref.swap %r[-1], %q : !qref.reg<4>, !qref.bit
+    return
+}

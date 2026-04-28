@@ -64,6 +64,19 @@ func.func @test_get(%arg0 : !qref.reg<10>, %arg1: i64) {
 
 // -----
 
+func.func @test_swap(%arg0 : !qref.reg<10>, %q : !qref.bit, %arg1 : i64) {
+
+    // Static
+    qref.swap %arg0[3], %q : !qref.reg<10>, !qref.bit
+
+    // Dynamic
+    qref.swap %arg0[%arg1], %q : !qref.reg<10>, !qref.bit
+
+    return
+}
+
+// -----
+
 func.func @test_set_state(%arg0 : tensor<2xcomplex<f64>>, %q0: !qref.bit) {
     qref.set_state(%arg0) %q0 : tensor<2xcomplex<f64>>, !qref.bit
     return

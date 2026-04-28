@@ -158,6 +158,29 @@ def GetOp : Memory_Op<"get", [NoMemoryEffect]> {
     let hasFolder = 1;
 }
 
+def SwapOp : Memory_Op<"swap"> {
+    let summary = "Exchange a qubit at a register position with a standalone qubit.";
+    let description = [{
+        Exchanges the qubit at the given register position with the standalone
+        qubit. Both `qreg[idx]` and the referent of `qubit` are mutated in
+        place: after the op, each refers to what the other did before. No SSA
+        results are produced.
+    }];
+
+    let arguments = (ins
+        QuregRefType:$qreg,
+        Optional<I64>:$idx,
+        OptionalAttr<ConfinedAttr<I64Attr, [IntNonNegative]>>:$idx_attr,
+        QubitRefType:$qubit
+    );
+
+    let assemblyFormat = [{
+        $qreg `[` ($idx^):($idx_attr)? `]` `,` $qubit attr-dict `:` type($qreg) `,` type($qubit)
+    }];
+
+    let hasVerifier = 1;
+}
+
 // -----
 
 class Gate_Op<string mnemonic, list<Trait> traits = []> :
