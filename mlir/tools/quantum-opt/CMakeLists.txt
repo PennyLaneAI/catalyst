@@ -39,6 +39,7 @@ set(LIBS
     MLIRCatalystTest
     MLIRCatalystUtils
     MLIRTestDialect
+    TestUtils
     pybind11::embed
     Python3::Python
 )
