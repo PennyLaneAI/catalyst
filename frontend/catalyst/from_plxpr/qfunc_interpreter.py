@@ -706,13 +706,6 @@ def handle_measure(self, wire, reset, postselect):
     result = qref_measure_p.bind(in_qubit, postselect=postselect)
 
     if reset:
-        # Constants need to be passed as input values for some reason I forgot about.
-        # correction = jaxpr_pad_consts(
-        #     [
-        #         jax.make_jaxpr(lambda: qref_qinst_p.bind(in_qubit, op="PauliX", qubits_len=1))().jaxpr,
-        #         jax.make_jaxpr(lambda: None)().jaxpr,
-        #     ]
-        # )
         correction = [
             jax.make_jaxpr(lambda: qref_qinst_p.bind(in_qubit, op="PauliX", qubits_len=1))().jaxpr,
             jax.make_jaxpr(lambda: None)().jaxpr,
