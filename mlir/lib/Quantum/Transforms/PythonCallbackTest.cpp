@@ -21,11 +21,12 @@
 namespace catalyst {
 namespace quantum {
 
-#define GEN_PASS_DEF_PYTHONCALLBACKTESTPASS
+#define GEN_PASS_DEF_INSTANTIATEPYTHONDECOMPRULEPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct PythonCallbackTestPass : public impl::PythonCallbackTestPassBase<PythonCallbackTestPass> {
-    using PythonCallbackTestPassBase::PythonCallbackTestPassBase;
+struct InstantiatePythonDecompRulePass
+    : public impl::InstantiatePythonDecompRulePassBase<InstantiatePythonDecompRulePass> {
+    using InstantiatePythonDecompRulePassBase::InstantiatePythonDecompRulePassBase;
 
     void runOnOperation() override
     {
