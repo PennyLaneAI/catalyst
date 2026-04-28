@@ -50,10 +50,20 @@ static inline Catalyst::Runtime::QuantumDevice *loadDevice(const std::string &de
 }
 
 template <class IntegerType> struct tanner_graph_steane {
-    /* Tanner graph representation for the [[7, 1, 3]] Steane code
-       The shape of dense matrix that the [[7, 1, 3]] Steane code is (10, 10).
-       The first 7 columns represent data qubits, while the last 3 columns
-       represent auxillary qubits. The full dense matrix is:
+    /* The data/check qubits of the [[7, 1, 3]] Steane code are arranged according to the
+       Fano plane geometry:
+                           D1
+                         /   \
+                        /  C1 \
+                       /       \
+                      D2 ----- D4
+                     /   \   /   \
+                    /     D3      \
+                   /  C2   |   C3  \
+                  D5-------D6------D7
+        - D1-7: data qubits
+        - C1-3: check qubits
+       The corresponding Tanner graph represnetation in a dense matrix manner is:
        | 0 0 0 0 0 0 0 1 0 0|
        | 0 0 0 0 0 0 0 1 1 0|
        | 0 0 0 0 0 0 0 1 1 1|
@@ -64,6 +74,8 @@ template <class IntegerType> struct tanner_graph_steane {
        | 1 1 1 1 0 0 0 0 0 0|
        | 0 1 1 0 1 1 0 0 0 0|
        | 0 0 1 1 0 1 1 0 0 0|
+       The first 7 columns represent data qubits, while the last 3 columns
+       represent auxiliary qubits.
     */
     size_t code_size = 7;
     size_t code_distance = 3;
@@ -74,15 +86,15 @@ template <class IntegerType> struct tanner_graph_steane {
     std::vector<IntegerType> row_idx_parity_matrix_transpose = {0, 1, 2, 3, 1, 2, 4, 5, 2, 3, 5, 6};
     std::vector<IntegerType> col_ptr_parity_matrix_transpose = {0, 4, 8, 12};
 
-    std::unordered_map<std::string, std::vector<uint8_t>> lookup_table_syndrome_to_error = {
-        {"000", std::vector<uint8_t>({0, 0, 0, 0, 0, 0, 0})},
-        {"001", std::vector<uint8_t>({0, 0, 0, 0, 0, 0, 1})},
-        {"010", std::vector<uint8_t>({0, 0, 0, 0, 1, 0, 0})},
-        {"011", std::vector<uint8_t>({0, 0, 0, 0, 0, 1, 0})},
-        {"100", std::vector<uint8_t>({1, 0, 0, 0, 0, 0, 0})},
-        {"101", std::vector<uint8_t>({0, 0, 0, 1, 0, 0, 0})},
-        {"110", std::vector<uint8_t>({0, 1, 0, 0, 0, 0, 0})},
-        {"111", std::vector<uint8_t>({0, 0, 1, 0, 0, 0, 0})},
+    std::unordered_map<std::string, std::vector<int8_t>> lookup_table_syndrome_to_error = {
+        {"000", std::vector<int8_t>({0, 0, 0, 0, 0, 0, 0})},
+        {"001", std::vector<int8_t>({0, 0, 0, 0, 0, 0, 1})},
+        {"010", std::vector<int8_t>({0, 0, 0, 0, 1, 0, 0})},
+        {"011", std::vector<int8_t>({0, 0, 0, 0, 0, 1, 0})},
+        {"100", std::vector<int8_t>({1, 0, 0, 0, 0, 0, 0})},
+        {"101", std::vector<int8_t>({0, 0, 0, 1, 0, 0, 0})},
+        {"110", std::vector<int8_t>({0, 1, 0, 0, 0, 0, 0})},
+        {"111", std::vector<int8_t>({0, 0, 1, 0, 0, 0, 0})},
     };
 
     std::unordered_map<int64_t, std::vector<int8_t>> lookup_table_error_idx_to_syndrome = {
