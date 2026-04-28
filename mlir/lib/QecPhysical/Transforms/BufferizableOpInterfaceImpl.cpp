@@ -16,8 +16,6 @@
 
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Index/IR/IndexOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 
 #include "QecPhysical/IR/QecPhysicalDialect.h"
@@ -84,7 +82,8 @@ struct AssembleTannerGraphOpInterface
                                                                   assembleTannerOp.getColPtr());
 
         auto newAssembleTannerOp = AssembleTannerGraphOp::create(
-            rewriter, loc, assembleTannerOp.getResult().getType(), rowIdxToBufferOp.getResult(), colPtrToBufferOp.getResult());
+            rewriter, loc, assembleTannerOp.getResult().getType(), rowIdxToBufferOp.getResult(),
+            colPtrToBufferOp.getResult());
 
         bufferization::replaceOpWithBufferizedValues(rewriter, op, newAssembleTannerOp.getResult());
         return success();
@@ -137,9 +136,8 @@ struct DecodeEsmCssOpInterface
             MemRefType::get(errIdxTensorType.getShape(), errIdxTensorType.getElementType());
         Value errIdxBuffer = memref::AllocOp::create(rewriter, loc, errIdxMemRefType);
 
-        DecodeEsmCssOp::create(
-            rewriter, loc, TypeRange{},
-            esmToBufferOp.getResult(), decodeEsmCssOp.getTannerGraph(), errIdxBuffer);
+        DecodeEsmCssOp::create(rewriter, loc, TypeRange{}, esmToBufferOp.getResult(),
+                               decodeEsmCssOp.getTannerGraph(), errIdxBuffer);
 
         bufferization::replaceOpWithBufferizedValues(rewriter, op, errIdxBuffer);
         return success();
