@@ -12,6 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Known Limitations
+// --------------------
+// 1. While the current implementation can be extended to a general LUT decoding process easily,
+// a few QEC code parameters are hard coded as discussed. We can expect a few changes required in
+// the decoder operation defined in the MLIR layer to pass the required information from the
+// compilation pass if needed.
+// 2. The current implementation is tied in to the current design of the Tanner graph operation in
+// the MLIR. Modifications / changes might be required if there is any change in the Tanner graph
+// operation definition in the MLIR layer.
+// 3. The LUT decoder is not scalable in both spatial and temporal complexity.
+
 #include "LUTDecoder.hpp"
 
 #include <algorithm>
@@ -24,11 +35,15 @@
 
 namespace Catalyst::Runtime::QEC {
 /**
- * @brief A runtime lookup table based decoder.
+ * @brief A runtime lookup table based decoder. The current implementation applies the singleton
+ * pattern for the lookup table generation. Hence, we only generate the lookup table once and the
+ * successive calls to the routine defined would access the cached the lookup table directly.
  *
  * NOTE: As CAPI does not support setting default values for args, as discussed, we hardcode the
  * required args in the beginning of the function body. Those values are specifically for the [[7,
  * 1, 3]] Steane code. We expect those values are from args inputs later.
+ * NOTE: The dtype of syndromes is `I1` in the MLIR layer. Following the conversion of
+ * `SetBasisStateOp` to the LLVM runtime subroutine, `I1` would be converted to `int8` as well.
  * @param row_idx_tanner Pointer to the row_idx data of a Tanner graph.
  * @param col_ptr_tanner Pointer to the col_ptr data of a Tanner graph.
  * @param syndrome_results Pointer to the syndrome measurement data.
