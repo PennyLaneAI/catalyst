@@ -1693,7 +1693,7 @@ def graph_decomposition_setup_inputs(
     if not isinstance(gate_set, dict):
         gate_set = {to_name(op): 1.0 for op in gate_set}
     else:
-        gate_set = {to_name(op): cost for op, cost in gate_set.items()}
+        gate_set = {to_name(op): float(cost) for op, cost in gate_set.items()}
 
     options: dict[str, dict | tuple | str] = {
         "gate_set": gate_set,
