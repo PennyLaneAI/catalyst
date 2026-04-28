@@ -106,7 +106,8 @@ std::string get_syndrome_from_errors(const std::vector<MLIR_I64> &row_idx,
     std::vector<size_t> syndrome_res(num_cols, 0);
 
     for (size_t col = 0; col < num_cols; col++) {
-        for (size_t idx = col_ptr[col]; idx < col_ptr[col + 1]; idx++) {
+        for (size_t idx = static_cast<size_t>(col_ptr[col]);
+             idx < static_cast<size_t>(col_ptr[col + 1]); idx++) {
             size_t row = row_idx[idx];
             syndrome_res[col] += err_vec[row];
         }
@@ -190,7 +191,7 @@ generate_lookup_table(const std::vector<MLIR_I64> &parity_mat_row_idx,
     const size_t num_errors = (code_distance - 1) / 2;
 
     // Traverse all possible quantum error combinations
-    for (int i = 0; i <= num_errors; i++) {
+    for (size_t i = 0; i <= num_errors; i++) {
         // create a base error vector
         std::vector<int8_t> err_vector(num_data_qubits, 0);
         std::fill(err_vector.end() - i, err_vector.end(), 1);
