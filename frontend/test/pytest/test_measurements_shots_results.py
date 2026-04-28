@@ -42,7 +42,6 @@ class TestExpval:
             return qp.expval(qp.Identity(wires=0)), qp.expval(qp.Identity(wires=1))
 
         result = qjit(circuit, seed=37, capture=capture_mode)()
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit()
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
@@ -65,7 +64,6 @@ class TestExpval:
             return qp.expval(qp.PauliZ(wires=0)), qp.expval(qp.PauliZ(wires=1))
 
         result = qjit(circuit, seed=37, capture=capture_mode)()
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
@@ -87,7 +85,6 @@ class TestExpval:
             return qp.expval(qp.PauliX(wires=0)), qp.expval(qp.PauliX(wires=1))
 
         result = qjit(circuit, seed=37, capture=capture_mode)()
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
@@ -109,7 +106,6 @@ class TestExpval:
             return qp.expval(qp.PauliY(wires=0)), qp.expval(qp.PauliY(wires=1))
 
         result = qjit(circuit, seed=37, capture=capture_mode)()
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
@@ -131,7 +127,6 @@ class TestExpval:
             return qp.expval(qp.Hadamard(wires=0)), qp.expval(qp.Hadamard(wires=1))
 
         result = qjit(circuit, seed=37, capture=capture_mode)()
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit()
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
@@ -154,7 +149,6 @@ class TestExpval:
             return qp.expval(qp.Hermitian(A, wires=2))
 
         result = qjit(circuit, seed=37, capture=capture_mode)(np.pi / 4, np.pi / 4)
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit(np.pi / 4, np.pi / 4)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
@@ -180,7 +174,6 @@ class TestExpval:
             return qp.expval(qp.PauliX(wires=0) @ qp.PauliY(wires=2))
 
         result = qjit(circuit, seed=37, capture=capture_mode)()
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
@@ -201,7 +194,6 @@ class TestExpval:
             return qp.expval(qp.PauliX(2) @ qp.PauliY(1) @ qp.PauliZ(0))
 
         result = qjit(circuit, seed=37, capture=capture_mode)(0.432, 0.123, -0.543)
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit(0.432, 0.123, -0.543)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
@@ -225,7 +217,6 @@ class TestExpval:
             )
 
         result = qjit(circuit, seed=37, capture=capture_mode)(0.432, 0.123, -0.543)
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit(0.432, 0.123, -0.543)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
@@ -247,7 +238,6 @@ class TestExpval:
             return qp.expval(0.2 * qp.PauliZ(wires=0) + 0.5 * qp.Hadamard(wires=1) @ qp.PauliX(2))
 
         result = qjit(circuit, seed=37, capture=capture_mode)(0.432, 0.123, -0.543)
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit(0.432, 0.123, -0.543)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
@@ -274,7 +264,6 @@ class TestVar:
             return qp.var(qp.Identity(wires=0)), qp.var(qp.Identity(wires=1))
 
         result = qjit(circuit, seed=37, capture=capture_mode)()
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
@@ -296,7 +285,6 @@ class TestVar:
             return qp.var(qp.PauliZ(wires=0)), qp.var(qp.PauliZ(wires=1))
 
         result = qjit(circuit, seed=37, capture=capture_mode)()
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit()
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
@@ -319,7 +307,6 @@ class TestVar:
             return qp.var(qp.PauliX(wires=0)), qp.var(qp.PauliX(wires=1))
 
         result = qjit(circuit, seed=37, capture=capture_mode)()
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
@@ -341,7 +328,6 @@ class TestVar:
             return qp.var(qp.PauliY(wires=0)), qp.var(qp.PauliY(wires=1))
 
         result = qjit(circuit, seed=37, capture=capture_mode)()
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit()
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
@@ -364,7 +350,6 @@ class TestVar:
             return qp.var(qp.Hadamard(wires=0)), qp.var(qp.Hadamard(wires=1))
 
         result = qjit(circuit, seed=37, capture=capture_mode)()
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
@@ -387,7 +372,6 @@ class TestVar:
             return qp.var(qp.Hermitian(A, wires=2))
 
         result = qjit(circuit, seed=37, capture=capture_mode)(np.pi / 4, np.pi / 4)
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit(np.pi / 4, np.pi / 4)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
@@ -413,7 +397,6 @@ class TestVar:
             return qp.var(qp.PauliX(wires=0) @ qp.PauliY(wires=2))
 
         result = qjit(circuit, seed=37, capture=capture_mode)()
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit()
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
@@ -435,7 +418,6 @@ class TestVar:
             return qp.var(qp.Hadamard(wires=1) @ qp.PauliY(wires=2))
 
         result = qjit(circuit, seed=37, capture=capture_mode)(0.432, 0.123, -0.543)
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit(0.432, 0.123, -0.543)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
@@ -457,7 +439,6 @@ class TestVar:
             return qp.var(qp.PauliX(2) @ qp.PauliY(1) @ qp.PauliZ(0))
 
         result = qjit(circuit, seed=37, capture=capture_mode)(0.432, 0.123, -0.543)
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit(0.432, 0.123, -0.543)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
@@ -516,7 +497,6 @@ class TestProbs:
             return qp.probs()
 
         result = qjit(circuit, seed=37, capture=capture_mode)(0.432)
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit(0.432)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
@@ -536,7 +516,6 @@ class TestProbs:
             return qp.probs(wires=[0])
 
         result = qjit(circuit, seed=37, capture=capture_mode)(0.432)
-        qp.capture.disable()  # capture execution unmaintained
         expected = circuit(0.432)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
@@ -640,7 +619,6 @@ class TestOtherMeasurements:
         assert result[0].dtype == np.int64
 
         # qp.counts
-        qp.capture.disable()  # cant execute with counts with program capture
         for r, e in zip(result[1][0], expected(x, lambda: qp.counts(all_outcomes=True))):
             assert format(int(r), "02b") == e
         assert sum(result[1][1]) == 10000
