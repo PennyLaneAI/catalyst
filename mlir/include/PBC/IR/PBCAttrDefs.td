@@ -23,6 +23,25 @@ include "PBC/IR/PBCDialect.td"
 // PBC dialect enums and attributes.
 //===----------------------------------------------------------------------===//
 
+def LogicalInitKind : I32EnumAttr<"LogicalInitKind",
+    "The initial state of a logical qubit such as |0⟩, |1⟩, |+⟩, |−⟩, |Y⟩, |-Y⟩, |m⟩, or |m̅⟩.",
+    [
+        I32EnumAttrCase<"zero",     0>,     // |0⟩ Non-magic state
+        I32EnumAttrCase<"one",      1>,     // |1⟩ Non-magic state
+        I32EnumAttrCase<"plus",     2>,     // |+⟩  = (|0⟩ + |1⟩) / sqrt(2)  Non-magic state
+        I32EnumAttrCase<"minus",    3>,     // |-⟩  = (|0⟩ - |1⟩) / sqrt(2)  Non-magic state
+        I32EnumAttrCase<"plus_i",   4>,     // |Y⟩  = (|0⟩ + i|1⟩) / sqrt(2) Non-magic / Magic state
+        I32EnumAttrCase<"minus_i",  5>,     // |-Y⟩ = (|0⟩ - i|1⟩) / sqrt(2) Non-magic / Magic state
+        I32EnumAttrCase<"magic",    6>,     // |m⟩  = |0⟩ + e^{iπ/4}|1⟩      Magic state
+        I32EnumAttrCase<"magic_conj", 7>,   // |m̅⟩  = |0⟩ + e^{-iπ/4}|1⟩     Magic state
+    ]> {
+    let cppNamespace = "::catalyst::pbc";
+    let genSpecializedAttr = 0;
+}
+
+def LogicalInit : EnumAttr<PBCDialect, LogicalInitKind, "enum">;
+
+
 // Constraint for rotation_kind: must be one of ±1, ±2, ±4, ±8
 // The power-of-2 check works because powers of 2 have exactly one bit set.
 def RotationKindConstraint : AttrConstraint<

@@ -19,6 +19,7 @@ include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"  // for ReturnLike
 include "mlir/Interfaces/SideEffectInterfaces.td" // for Pure
 
+include "Quantum/IR/QuantumAttrDefs.td"
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumTypes.td"
 include "PBC/IR/PBCAttrDefs.td"
