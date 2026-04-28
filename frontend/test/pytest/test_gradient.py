@@ -76,8 +76,7 @@ class TestGradShape:
             infer.calculate_grad_shape(in_signature, [0])
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_gradient_generate_once():
+def test_gradient_generate_once(capture_mode):
     """Test that gradients are only generated once even if
     they are called multiple times. This is already tested
     in lit tests, but lit tests are not counted in coverage
@@ -86,7 +85,7 @@ def test_gradient_generate_once():
     def identity(x):
         return x
 
-    @qjit
+    @qjit(capture=capture_mode)
     def wrap(x: float):
         diff = qp.grad(identity)
         return diff(x) + diff(x)
@@ -172,9 +171,8 @@ def test_jacobian_outside_qjit():
     assert np.allclose(expected[1], result[1])
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("argnums", (None, 0, [1], (0, 1)))
-def test_jacobian_outside_qjit_argnums(argnums):
+def test_jacobian_outside_qjit_argnums(argnums, capture_mode):
     """Test that argnums work correctly outside of a jitting context."""
 
     def f(x, y):
@@ -515,26 +513,28 @@ def test_value_and_grad_on_qjit_quantum_variant_tree(diff_method, capture):
             qjit(qp.value_and_grad(workflow_variant_tree), capture=capture)(params)
     else:
         result = qjit(qp.value_and_grad(workflow_variant_tree), capture=capture)(params)
-        expected = (workflow_variant_tree(params), qjit(grad(workflow_variant_tree))(params))
+        expected = (
+            workflow_variant_tree(params),
+            qjit(grad(workflow_variant_tree))(params),
+        )
         assert np.allclose(result[0], expected[0])
         assert np.allclose(result[1]["x"], expected[1]["x"])
         assert np.allclose(result[1]["y"], expected[1]["y"])
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 @pytest.mark.parametrize("grad_fn", (grad, catalyst.grad))
-def test_finite_diff(inp, backend, grad_fn):
+def test_finite_diff(inp, backend, grad_fn, capture_mode):
     """Test finite diff."""
 
-    if qp.capture.enabled() and grad_fn is catalyst.grad:
+    if capture_mode and grad_fn is catalyst.grad:
         pytest.skip("catalyst.grad does not work with capture.")
 
     def f(x):
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled_grad_default(x: float):
         g = qp.qnode(qp.device(backend, wires=1))(f)
         h = grad_fn(g, method="fd")
@@ -549,16 +549,15 @@ def test_finite_diff(inp, backend, grad_fn):
     assert np.allclose(compiled_grad_default(inp), interpretted_grad_default(inp))
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_finite_diff_mul(inp, backend):
+def test_finite_diff_mul(inp, backend, capture_mode):
     """Test finite diff with mul."""
 
     def f(x):
         qp.RX(3 * x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled_grad_default(x: float):
         g = qp.qnode(qp.device(backend, wires=1))(f)
         h = qp.grad(g, method="fd")
@@ -573,9 +572,8 @@ def test_finite_diff_mul(inp, backend):
     assert np.allclose(compiled_grad_default(inp), interpretted_grad_default(inp))
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [1.0, 2.0, 3.0, 4.0])
-def test_finite_diff_in_loop(inp, backend):
+def test_finite_diff_in_loop(inp, backend, capture_mode):
     """Test finite diff in loop."""
 
     @qp.qnode(qp.device(backend, wires=1))
@@ -583,7 +581,7 @@ def test_finite_diff_in_loop(inp, backend):
         qp.RX(3 * x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled_grad_default(params, ntrials):
         diff = qp.grad(f, argnums=0, method="fd")
 
@@ -598,7 +596,7 @@ def test_finite_diff_in_loop(inp, backend):
         h = qp.grad(g, argnums=0)
         return h(x)
 
-    enabled = qp.capture.enabled()
+    enabled = capture_mode
     qp.capture.disable()
     expected = interpretted_grad_default(inp)
     if enabled:
@@ -607,16 +605,15 @@ def test_finite_diff_in_loop(inp, backend):
     assert np.allclose(compiled_grad_default(inp, 5), expected)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_adj(inp, backend):
+def test_adj(inp, backend, capture_mode):
     """Test the adjoint method."""
 
     def f(x):
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled(x: float):
         g = qp.qnode(qp.device(backend, wires=1), diff_method="adjoint")(f)
         h = qp.grad(g, method="auto")
@@ -631,16 +628,15 @@ def test_adj(inp, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_adj_mult(inp, backend):
+def test_adj_mult(inp, backend, capture_mode):
     """Test the adjoint method with mult."""
 
     def f(x):
         qp.RX(x * 2, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled(x: float):
         g = qp.qnode(qp.device(backend, wires=1), diff_method="adjoint")(f)
         h = qp.grad(g, method="auto")
@@ -655,9 +651,8 @@ def test_adj_mult(inp, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [1.0, 2.0, 3.0, 4.0])
-def test_adj_in_loop(inp, backend):
+def test_adj_in_loop(inp, backend, capture_mode):
     """Test the adjoint method in loop."""
 
     @qp.qnode(qp.device(backend, wires=1), diff_method="adjoint")
@@ -665,7 +660,7 @@ def test_adj_in_loop(inp, backend):
         qp.RX(3 * x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled_grad_default(params, ntrials):
         diff = qp.grad(f, argnums=0, method="auto")
 
@@ -680,7 +675,7 @@ def test_adj_in_loop(inp, backend):
         h = qp.grad(g, argnums=0)
         return h(x)
 
-    enabled = qp.capture.enabled()
+    enabled = capture_mode
     qp.capture.disable()
     expected = interpretted_grad_default(inp)
     if enabled:
@@ -688,16 +683,15 @@ def test_adj_in_loop(inp, backend):
     assert np.allclose(compiled_grad_default(inp, 5), expected)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_ps(inp, backend):
+def test_ps(inp, backend, capture_mode):
     """Test the ps method."""
 
     def f(x):
         qp.RX(x * 2, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled(x: float):
         g = qp.qnode(qp.device(backend, wires=1), diff_method="parameter-shift")(f)
         h = qp.grad(g, method="auto")
@@ -712,9 +706,8 @@ def test_ps(inp, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_ps_conditionals(inp, backend):
+def test_ps_conditionals(inp, backend, capture_mode):
     """Test the ps method and conditionals."""
 
     def f_compiled(x, y):
@@ -736,7 +729,7 @@ def test_ps_conditionals(inp, backend):
             qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled(x: float, y: float):
         g = qp.qnode(qp.device(backend, wires=1), diff_method="parameter-shift")(f_compiled)
         h = qp.grad(g, method="auto", argnums=0)
@@ -748,7 +741,7 @@ def test_ps_conditionals(inp, backend):
         h = qp.grad(g, argnums=0)
         return h(x, y)
 
-    enabled = qp.capture.enabled()
+    enabled = capture_mode
     qp.capture.disable()
     expected0 = interpreted(inp, 0.0)
     expected2 = interpreted(inp, 2.0)
@@ -759,9 +752,8 @@ def test_ps_conditionals(inp, backend):
     assert np.allclose(compiled(inp, 2.0), expected2)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_ps_for_loops(inp, backend):
+def test_ps_for_loops(inp, backend, capture_mode):
     """Test the ps method with for loops."""
 
     def f_compiled(x, y):
@@ -777,7 +769,7 @@ def test_ps_for_loops(inp, backend):
             qp.RX(x * i * 1.5, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled(x: float, y: int):
         g = qp.qnode(qp.device(backend, wires=1), diff_method="parameter-shift")(f_compiled)
         h = qp.grad(g, method="auto", argnums=0)
@@ -789,7 +781,7 @@ def test_ps_for_loops(inp, backend):
         h = qp.grad(g, argnums=0)
         return h(x, y)
 
-    enabled = qp.capture.enabled()
+    enabled = capture_mode
     qp.capture.disable()
     expected1 = interpreted(inp, 1)
     expected2 = interpreted(inp, 2)
@@ -804,9 +796,8 @@ def test_ps_for_loops(inp, backend):
     assert np.allclose(compiled(inp, 4), expected4)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_ps_for_loops_entangled(inp, backend):
+def test_ps_for_loops_entangled(inp, backend, capture_mode):
     """Test the ps method with for loops and entangled."""
 
     def f_compiled(x, y, z):
@@ -829,7 +820,7 @@ def test_ps_for_loops_entangled(inp, backend):
             qp.CNOT(wires=[0, i])
         return qp.expval(qp.PauliY(z))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled(x: float, y: int, z: int):
         g = qp.qnode(qp.device(backend, wires=3), diff_method="parameter-shift")(f_compiled)
         h = qp.grad(g, method="auto", argnums=0)
@@ -849,9 +840,8 @@ def test_ps_for_loops_entangled(inp, backend):
     assert np.allclose(compiled(inp, 2, 2), expected22)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_ps_qft(inp, backend):
+def test_ps_qft(inp, backend, capture_mode):
     """Test the ps method in QFT."""
 
     def qft_compiled(x, n, z):
@@ -892,7 +882,7 @@ def test_ps_qft(inp, backend):
 
         return qp.expval(qp.PauliZ(z))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled(x: float, y: int, z: int):
         g = qp.qnode(qp.device(backend, wires=3), diff_method="parameter-shift")(qft_compiled)
         h = qp.grad(g, method="auto", argnums=0)
@@ -904,7 +894,7 @@ def test_ps_qft(inp, backend):
         h = qp.grad(g, argnums=0)
         return h(x, y, z)
 
-    enabled = qp.capture.enabled()
+    enabled = capture_mode
     qp.capture.disable()
     expected = interpreted(inp, 2, 2)
     if enabled:
@@ -915,8 +905,7 @@ def test_ps_qft(inp, backend):
     assert np.allclose(compiled(inp, 2, 2), expected)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_ps_probs(backend):
+def test_ps_probs(backend, capture_mode):
     """Check that the parameter-shift method works for qp.probs."""
 
     @qp.qnode(qp.device(backend, wires=1), diff_method="parameter-shift")
@@ -924,12 +913,12 @@ def test_ps_probs(backend):
         qp.RY(p, wires=0)
         return qp.probs(wires=0)
 
-    @qjit
+    @qjit(capture=capture_mode)
     def workflow(p: float):
         return qp.jacobian(func, method="auto")(p)
 
     result = workflow(0.5)
-    enabled = qp.capture.enabled()
+    enabled = capture_mode
     qp.capture.disable()
     reference = qp.jacobian(func, argnums=0)(0.5)
     if enabled:
@@ -959,16 +948,15 @@ def test_ps_four_term_rule(backend, gate_n_inputs):
     assert np.allclose(result, reference)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_finite_diff_h(inp, backend):
+def test_finite_diff_h(inp, backend, capture_mode):
     """Test finite diff."""
 
     def f(x):
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled_grad_h(x: float):
         g = qp.qnode(qp.device(backend, wires=1))(f)
         h = qp.grad(g, method="fd", h=0.1)
@@ -983,16 +971,15 @@ def test_finite_diff_h(inp, backend):
     assert np.allclose(compiled_grad_h(inp), interpretted_grad_h(inp))
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_finite_diff_argnum(inp, backend):
+def test_finite_diff_argnum(inp, backend, capture_mode):
     """Test finite diff."""
 
     def f2(x, y):
         qp.RX(x**y, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled_grad_argnum(x: float):
         g = qp.qnode(qp.device(backend, wires=1))(f2)
         h = qp.grad(g, method="fd", argnums=1)
@@ -1007,16 +994,15 @@ def test_finite_diff_argnum(inp, backend):
     assert np.allclose(compiled_grad_argnum(inp), interpretted_grad_argnum(inp))
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_finite_diff_argnum_list(inp, backend):
+def test_finite_diff_argnum_list(inp, backend, capture_mode):
     """Test finite diff."""
 
     def f2(x, y):
         qp.RX(x**y, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled_grad_argnum_list(x: float):
         g = qp.qnode(qp.device(backend, wires=1))(f2)
         h = qp.grad(g, method="fd", argnums=[1])
@@ -1035,16 +1021,15 @@ def test_finite_diff_argnum_list(inp, backend):
     assert np.allclose(compiled_grad_argnum_list(inp), interpretted_grad_argnum_list(inp))
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_finite_grad_range_change(inp, backend):
+def test_finite_grad_range_change(inp, backend, capture_mode):
     """Test finite diff."""
 
     def f2(x, y):
         qp.RX(x**y, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled_grad_range_change(x: float):
         g = qp.qnode(qp.device(backend, wires=1))(f2)
         h = qp.grad(g, method="fd", argnums=[0, 1])
@@ -1059,16 +1044,15 @@ def test_finite_grad_range_change(inp, backend):
     assert np.allclose(compiled_grad_range_change(inp), interpretted_grad_range_change(inp))
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_ps_grad_range_change(inp, backend):
+def test_ps_grad_range_change(inp, backend, capture_mode):
     """Test param shift."""
 
     def f2(x, y):
         qp.RX(x**y, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled_grad_range_change(x: float):
         g = qp.qnode(qp.device(backend, wires=1), diff_method="parameter-shift")(f2)
         h = qp.grad(g, method="auto", argnums=[0, 1])
@@ -1083,16 +1067,15 @@ def test_ps_grad_range_change(inp, backend):
     assert np.allclose(compiled_grad_range_change(inp), interpretted_grad_range_change(inp))
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_ps_tensorinp(inp, backend):
+def test_ps_tensorinp(inp, backend, capture_mode):
     """Test param shift."""
 
     def f2(x, y):
         qp.RX(x[0] ** y, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled(x: jax.core.ShapedArray([1], float)):
         g = qp.qnode(qp.device(backend, wires=1), diff_method="parameter-shift")(f2)
         h = qp.grad(g, method="auto", argnums=[0, 1])
@@ -1108,16 +1091,15 @@ def test_ps_tensorinp(inp, backend):
         assert np.allclose(dydx_c, dydx_i)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_adjoint_grad_range_change(inp, backend):
+def test_adjoint_grad_range_change(inp, backend, capture_mode):
     """Test adjoint."""
 
     def f2(x, y):
         qp.RX(x**y, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled_grad_range_change(x: float):
         g = qp.qnode(qp.device(backend, wires=1), diff_method="adjoint")(f2)
         h = qp.grad(g, method="auto", argnums=[0, 1])
@@ -1194,11 +1176,10 @@ def test_assert_non_differentiable():
         qjit(workflow)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_finite_diff_arbitrary_functions():
+def test_finite_diff_arbitrary_functions(capture_mode):
     """Test gradients on non-qnode functions."""
 
-    @qjit
+    @qjit(capture=capture_mode)
     def workflow(x):
         def _f(x):
             return 2 * x
@@ -1208,16 +1189,15 @@ def test_finite_diff_arbitrary_functions():
     assert workflow(0.0) == 2.0
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_finite_diff_higher_order(inp, backend):
+def test_finite_diff_higher_order(inp, backend, capture_mode):
     """Test finite diff."""
 
     def f(x):
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled_grad2_default(x: float):
         g = qp.qnode(qp.device(backend, wires=1))(f)
         h = qp.grad(g, method="fd")
@@ -1231,7 +1211,7 @@ def test_finite_diff_higher_order(inp, backend):
         i = qp.grad(h, argnums=0)
         return i(x)
 
-    enabled = qp.capture.enabled()
+    enabled = capture_mode
     qp.capture.disable()
     expected = interpretted_grad2_default(inp)
     if enabled:
@@ -1240,12 +1220,11 @@ def test_finite_diff_higher_order(inp, backend):
     assert np.allclose(compiled_grad2_default(inp), expected, rtol=0.1)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("g_method", ["fd", "auto"])
 @pytest.mark.parametrize(
     "h_coeffs", [[0.2, -0.53], np.array([0.2, -0.53]), jnp.array([0.2, -0.53])]
 )
-def test_jax_consts(h_coeffs, g_method, backend):
+def test_jax_consts(h_coeffs, g_method, backend, capture_mode):
     """Test jax constants."""
 
     def circuit(params):
@@ -1255,7 +1234,7 @@ def test_jax_consts(h_coeffs, g_method, backend):
         h_obs = [qp.PauliX(0) @ qp.PauliZ(1), qp.PauliZ(0) @ qp.Hadamard(2)]
         return qp.expval(qp.Hamiltonian(h_coeffs, h_obs))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compile_grad(params):
         diff_method = "adjoint" if g_method == "auto" else "finite-diff"
         g = qp.qnode(qp.device(backend, wires=3), diff_method=diff_method)(circuit)
@@ -1270,7 +1249,7 @@ def test_jax_consts(h_coeffs, g_method, backend):
 
     inp = jnp.array([1.0, 2.0])
 
-    enabled = qp.capture.enabled()
+    enabled = capture_mode
     qp.capture.disable()
     expected = interpret_grad(inp)
     if enabled:
@@ -1319,10 +1298,9 @@ def test_non_float_res(backend):
         cost_fn(1.0, 2.0)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", ["fd", "auto"])
 @pytest.mark.parametrize("inp", [(1.0), (2.0)])
-def test_finite_diff_multiple_devices(inp, diff_method, backend):
+def test_finite_diff_multiple_devices(inp, diff_method, backend, capture_mode):
     """Test gradient methods using multiple backend devices."""
     qnode_diff_method = "adjoint" if diff_method == "auto" else "finite-diff"
 
@@ -1336,7 +1314,7 @@ def test_finite_diff_multiple_devices(inp, diff_method, backend):
         qp.RX(3 * x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled_grad_default(params, ntrials):
         d_f = qp.grad(f, argnums=0, method=diff_method)
 
@@ -1388,9 +1366,8 @@ def test_grad_on_multi_result_function(backend):
         compiled(1.0)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_multiple_grad_invocations(backend, diff_method):
+def test_multiple_grad_invocations(backend, diff_method, capture_mode):
     """Test a function that uses grad multiple times."""
 
     @qp.qnode(qp.device(backend, wires=2), diff_method=diff_method)
@@ -1399,7 +1376,7 @@ def test_multiple_grad_invocations(backend, diff_method):
         qp.RX(y, wires=0)
         return qp.expval(qp.PauliZ(0))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def compiled(x: float, y: float):
         g1 = qp.grad(f, argnums=0, method="auto")(x, y)
         g2 = qp.grad(f, argnums=1, method="auto")(x, y)
@@ -1412,9 +1389,8 @@ def test_multiple_grad_invocations(backend, diff_method):
         assert actual_entry == pytest.approx(expected_entry)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_loop_with_dyn_wires(backend, diff_method):
+def test_loop_with_dyn_wires(backend, diff_method, capture_mode):
     """Test the gradient on a function with a loop and modular wire arithmetic."""
     num_wires = 4
     dev = qp.device(backend, wires=num_wires)
@@ -1440,7 +1416,7 @@ def test_loop_with_dyn_wires(backend, diff_method):
         return qp.expval(qp.prod(*[qp.PauliZ(i) for i in range(num_wires)]))
 
     arg = 0.75
-    result = qjit(qp.grad(cat))(arg)
+    result = qjit(qp.grad(cat), capture=capture_mode)(arg)
     qp.capture.disable()
     expected = qp.grad(pl, argnums=0)(arg)
 
@@ -1462,7 +1438,6 @@ def test_classical_kwargs():
     assert np.allclose(expected, result)
 
 
-# @pytest.mark.usefixtures("use_both_frontend")
 def test_classical_kwargs_switched_arg_order():
     """Test the gradient on classical function with keyword arguments and switched argument order"""
 
@@ -1539,9 +1514,8 @@ def test_qnode_kwargs_switched_arg_order(backend, diff_method, capture):
     assert np.allclose(expected_grad, switched_order_grad)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_pytrees_return_classical_function(backend, diff_method):
+def test_pytrees_return_classical_function(backend, diff_method, capture_mode):
     """Test the jacobian on a qnode with a return including list and dictionaries."""
     num_wires = 1
     dev = qp.device(backend, wires=num_wires)
@@ -1555,10 +1529,10 @@ def test_pytrees_return_classical_function(backend, diff_method):
     psi = 0.1
     phi = 0.2
 
-    if diff_method == "adjoint" and qp.capture.enabled():
+    if diff_method == "adjoint" and capture_mode:
         pytest.xfail("TODO")
     else:
-        result = qjit(qp.jacobian(circuit, argnums=[0, 1]))(psi, phi)
+        result = qjit(qp.jacobian(circuit, argnums=[0, 1]), capture=capture_mode)(psi, phi)
 
         assert isinstance(result, list)
         assert len(result) == 2
@@ -1570,9 +1544,8 @@ def test_pytrees_return_classical_function(backend, diff_method):
 
 
 @pytest.mark.xfail(reason="issue #1335 in lightning")
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_multiple_expval_cost_fun(backend, diff_method):
+def test_multiple_expval_cost_fun(backend, diff_method, capture_mode):
     """Test that we produce correct results with multiple results being differentiated."""
 
     @qp.qnode(qp.device(backend, wires=2), diff_method=diff_method)
@@ -1588,15 +1561,16 @@ def test_multiple_expval_cost_fun(backend, diff_method):
     def loss_fn(weights, data):
         return jnp.array(circuit(weights, data))
 
-    result = qjit(grad(loss_fn, argnums=[0, 1]))(jnp.array([0.1, 0.2]), jnp.array([0.3, 0.4]))
+    result = qjit(grad(loss_fn, argnums=[0, 1]), capture=capture_mode)(
+        jnp.array([0.1, 0.2]), jnp.array([0.3, 0.4])
+    )
     expected = jax.grad(loss_fn, argnums=[0, 1])(jnp.array([0.1, 0.2]), jnp.array([0.3, 0.4]))
 
     assert np.allclose(result[0], expected[0])
     assert np.allclose(result[1], expected[1])
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_pytrees_return_classical():
+def test_pytrees_return_classical(capture_mode):
     """Test the jacobian on a function with a return including list and dictionaries."""
 
     def f(x, y):
@@ -1606,7 +1580,7 @@ def test_pytrees_return_classical():
     y = 0.2
 
     jax_expected_results = jax.jit(jax.jacobian(f, argnums=[0, 1]))(x, y)
-    catalyst_results = qjit(qp.jacobian(f, argnums=[0, 1]))(x, y)
+    catalyst_results = qjit(qp.jacobian(f, argnums=[0, 1]), capture=capture_mode)(x, y)
 
     flatten_res_jax, tree_jax = tree_flatten(jax_expected_results)
     flatten_res_catalyst, tree_catalyst = tree_flatten(catalyst_results)
@@ -1615,8 +1589,7 @@ def test_pytrees_return_classical():
     assert np.allclose(flatten_res_jax, flatten_res_catalyst)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_pytrees_args_classical():
+def test_pytrees_args_classical(capture_mode):
     """Test the jacobian on a function with a return including list and dictionaries."""
 
     def f(x, y):
@@ -1626,7 +1599,7 @@ def test_pytrees_args_classical():
     y = 0.2
 
     jax_expected_results = jax.jit(jax.jacobian(f, argnums=[0, 1]))(x, y)
-    catalyst_results = qjit(qp.jacobian(f, argnums=[0, 1]))(x, y)
+    catalyst_results = qjit(qp.jacobian(f, argnums=[0, 1]), capture=capture_mode)(x, y)
 
     flatten_res_jax, tree_jax = tree_flatten(jax_expected_results)
     flatten_res_catalyst, tree_catalyst = tree_flatten(catalyst_results)
@@ -1635,8 +1608,7 @@ def test_pytrees_args_classical():
     assert np.allclose(flatten_res_jax, flatten_res_catalyst)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_pytrees_args_return_classical():
+def test_pytrees_args_return_classical(capture_mode):
     """Test the jacobian on a function with a args and return including list and dictionnaries."""
 
     def f(x, y):
@@ -1646,7 +1618,7 @@ def test_pytrees_args_return_classical():
     y = 0.2
 
     jax_expected_results = jax.jit(jax.jacobian(f, argnums=[0, 1]))(x, y)
-    catalyst_results = qjit(qp.jacobian(f, argnums=[0, 1]))(x, y)
+    catalyst_results = qjit(qp.jacobian(f, argnums=[0, 1]), capture=capture_mode)(x, y)
 
     flatten_res_jax, tree_jax = tree_flatten(jax_expected_results)
     flatten_res_catalyst, tree_catalyst = tree_flatten(catalyst_results)
@@ -1655,9 +1627,8 @@ def test_pytrees_args_return_classical():
     assert np.allclose(flatten_res_jax, flatten_res_catalyst)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_non_parametrized_circuit(backend, diff_method):
+def test_non_parametrized_circuit(backend, diff_method, capture_mode):
     """Test that the derivate of non parametrized circuit is null."""
     dev = qp.device(backend, wires=1)
 
@@ -1669,7 +1640,7 @@ def test_non_parametrized_circuit(backend, diff_method):
 
         return circuit(x)
 
-    assert np.allclose(qjit(qp.grad(cost))(1.1), 0.0)
+    assert np.allclose(qjit(qp.grad(cost), capture=capture_mode)(1.1), 0.0)
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
@@ -1751,15 +1722,14 @@ def test_gradient_slice(backend):
         jacobian(
             my_model,
             argnums=1,
-        )
+        ),
     )(data, params["weights"], params["bias"])
     jax_res = jax.jacobian(my_model, argnums=1)(data, params["weights"], params["bias"])
     assert np.allclose(cat_res, jax_res)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_ellipsis_differentiation(backend, diff_method):
+def test_ellipsis_differentiation(backend, diff_method, capture_mode):
     """Test circuit diff with ellipsis in the preprocessing."""
     dev = qp.device(backend, wires=3)
 
@@ -1771,7 +1741,7 @@ def test_ellipsis_differentiation(backend, diff_method):
 
     weights = jnp.ones([5, 3, 3])
 
-    cat_res = qjit(grad(circuit, argnums=0))(weights)
+    cat_res = qjit(grad(circuit, argnums=0), capture=capture_mode)(weights)
     qp.capture.disable()
     jax_res = jax.grad(circuit, argnums=0)(weights)
     assert np.allclose(cat_res, jax_res)
@@ -1878,7 +1848,7 @@ def test_forloop_vmap_worflow_derivation(backend):
         jacobian(
             my_model,
             argnums=1,
-        )
+        ),
     )(data, params["weights"])
     jax_res = jax.jacobian(my_model, argnums=1)(data, params["weights"])
 
@@ -1891,11 +1861,10 @@ def test_forloop_vmap_worflow_derivation(backend):
     assert jnp.allclose(data_cat[1], data_jax[1])
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "gate,state", ((qp.BasisState, np.array([1])), (qp.StatePrep, np.array([0, 1])))
 )
-def test_paramshift_with_gates(gate, state):
+def test_paramshift_with_gates(gate, state, capture_mode):
     """Test parameter shift works with a variety of gates present in the circuit."""
 
     dev = qp.device("lightning.qubit", wires=1)
@@ -1908,7 +1877,7 @@ def test_paramshift_with_gates(gate, state):
         return qp.expval(qp.PauliZ(0))
 
     param = 0.1
-    observed = qjit(cost)(param)
+    observed = qjit(cost, capture=capture_mode)(param)
     qp.capture.disable()
     expected = cost(param)
     assert np.allclose(expected, observed)
@@ -2410,12 +2379,11 @@ class TestParameterShiftVerificationIntegrationTests:
                 return qp.expval(qp.PauliZ(wires=0))
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_closure_variable_grad(diff_method):
+def test_closure_variable_grad(diff_method, capture_mode):
     """Test that grad can take closure variables"""
 
-    @qp.qjit
+    @qp.qjit(capture=capture_mode)
     def workflow_closure(x, y):
 
         dev = qp.device("lightning.qubit", wires=1)
@@ -2429,7 +2397,7 @@ def test_closure_variable_grad(diff_method):
         g = grad(circuit)
         return g(x)
 
-    @qp.qjit
+    @qp.qjit(capture=capture_mode)
     def workflow_no_closure(x, y):
 
         dev = qp.device("lightning.qubit", wires=1)
@@ -2539,8 +2507,7 @@ def test_bufferization_inside_tensor_generate(backend):
     assert np.allclose([2.0, 1.0], inp)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_best_diff_method_single_expval():
+def test_best_diff_method_single_expval(capture_mode):
     """Test the diff_method for differentiating a single expval."""
     num_wires = 1
     dev = qp.device("lightning.qubit", wires=num_wires)
@@ -2551,15 +2518,14 @@ def test_best_diff_method_single_expval():
         qp.RX(psi, wires=0)
         return qp.expval(qp.PauliZ(0))
 
-    qjit_grad = qjit(grad(circuit, argnums=[0, 1]))
+    qjit_grad = qjit(grad(circuit, argnums=[0, 1]), capture=capture_mode)
     _ = qjit_grad(0.1, 0.2)
 
     assert "adjoint" in qjit_grad.mlir
     assert "parameter-shift" not in qjit_grad.mlir
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_best_diff_method_single_probs():
+def test_best_diff_method_single_probs(capture_mode):
     """Test the diff_method for differentiating a single probs."""
     num_wires = 1
     dev = qp.device("lightning.qubit", wires=num_wires)
@@ -2570,15 +2536,14 @@ def test_best_diff_method_single_probs():
         qp.RX(psi, wires=0)
         return qp.probs(0)
 
-    qjit_jacobian = qjit(jacobian(circuit, argnums=[0, 1]))
+    qjit_jacobian = qjit(jacobian(circuit, argnums=[0, 1]), capture=capture_mode)
     _ = qjit_jacobian(0.1, 0.2)
 
     assert "parameter-shift" in qjit_jacobian.mlir
     assert "adjoint" not in qjit_jacobian.mlir
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_best_diff_method_multi_expval():
+def test_best_diff_method_multi_expval(capture_mode):
     """Test the diff_method for differentiating multiple expval."""
     num_wires = 1
     dev = qp.device("lightning.qubit", wires=num_wires)
@@ -2589,15 +2554,14 @@ def test_best_diff_method_multi_expval():
         qp.RX(psi, wires=0)
         return [qp.expval(qp.PauliZ(0)), qp.expval(qp.PauliY(0))]
 
-    qjit_jacobian = qjit(jacobian(circuit, argnums=[0, 1]))
+    qjit_jacobian = qjit(jacobian(circuit, argnums=[0, 1]), capture=capture_mode)
     _ = qjit_jacobian(0.1, 0.2)
 
     assert "parameter-shift" not in qjit_jacobian.mlir
     assert "adjoint" in qjit_jacobian.mlir
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_best_diff_method_mixed_return():
+def test_best_diff_method_mixed_return(capture_mode):
     """Test the diff_method for differentiating mixed return."""
     num_wires = 1
     dev = qp.device("lightning.qubit", wires=num_wires)
@@ -2608,7 +2572,7 @@ def test_best_diff_method_mixed_return():
         qp.RX(psi, wires=0)
         return [qp.expval(qp.PauliZ(0)), qp.probs(0)]
 
-    qjit_jacobian = qjit(jacobian(circuit, argnums=[0, 1]))
+    qjit_jacobian = qjit(jacobian(circuit, argnums=[0, 1]), capture=capture_mode)
     _ = qjit_jacobian(0.1, 0.2)
 
     assert "parameter-shift" in qjit_jacobian.mlir

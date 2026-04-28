@@ -492,7 +492,6 @@ class TestDiagonalizeFinalMeasurementsPass:
         run_filecheck(program, pipeline)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
     """Integration tests going through plxpr (program capture enabled)"""
 
@@ -512,7 +511,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
             (qp.var, qp.Hadamard, lambda x: (2 - np.cos(x) ** 2) / 2),
         ],
     )
-    def test_with_single_obs(self, mp, obs, expected_res):
+    def test_with_single_obs(self, capture_mode, mp, obs, expected_res):
         """Test the diagonalization transform for a circuit with a single measurement
         of a single supported observable"""
 
@@ -534,7 +533,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
 
         assert np.allclose(expected_res(angle), circuit_compiled(angle))
 
-    def test_with_composite_observables(self):
+    def test_with_composite_observables(self, capture_mode):
         """Test the transform works for an observable built using operator arithmetic
         (sprod, prod, sum)"""
 
@@ -565,7 +564,6 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
-    @pytest.mark.usefixtures("use_capture")
     def test_with_multiple_measurements(self):
         """Test that the transform runs and returns the expected results for
         a circuit with multiple measurements"""
@@ -590,18 +588,19 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
 
         circuit_compiled = qp.qjit(
             diagonalize_final_measurements_pass(circuit_ref),
+            capture=True,
         )
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
     @pytest.mark.parametrize("phi", [0.123, 1.23])
-    def test_overlapping_commute_observables_multiple_measurements(self, phi):
+    def test_overlapping_commute_observables_multiple_measurements(self, capture_mode, phi):
         """Test the case where multiple overlapping (commuting) observables exist in
         the same circuit."""
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        @qp.qjit
+        @qp.qjit(capture=capture_mode)
         @diagonalize_final_measurements_pass
         @qp.qnode(dev)
         def circuit(x):
@@ -615,12 +614,12 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
         assert np.allclose(expected_expval, expval)
         assert np.allclose(expected_var, var)
 
-    def test_non_commuting_observables_raise_error(self):
+    def test_non_commuting_observables_raise_error(self, capture_mode):
         """Check that an error is raised if we try to diagonalize a circuit that contains
         non-commuting observables."""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qp.qjit
+        @qp.qjit(capture=capture_mode)
         @diagonalize_final_measurements_pass
         @qp.qnode(dev)
         def circuit(x):
@@ -631,7 +630,6 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
             _ = circuit(0.7)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestDiagonalizeFinalMeasurementsCatalystFrontend:
     """Integration tests going through the catalyst frontend (program capture disabled)"""
 
@@ -651,7 +649,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             (qp.var, qp.Hadamard, lambda x: (2 - np.cos(x) ** 2) / 2),
         ],
     )
-    def test_with_single_obs(self, mp, obs, expected_res):
+    def test_with_single_obs(self, capture_mode, mp, obs, expected_res):
         """Test the diagonalization transform for a circuit with a single measurement
         of a single supported observable"""
 
@@ -674,7 +672,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         np.allclose(expected_res(angle), circuit_compiled(angle))
 
-    def test_with_composite_observables(self):
+    def test_with_composite_observables(self, capture_mode):
         """Test the transform works for an observable built using operator arithmetic
         (sprod, prod, sum)"""
 
@@ -706,13 +704,13 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
-    def test_diagonalize_measurements_bultin_pass(self, run_filecheck_qjit):
+    def test_diagonalize_measurements_bultin_pass(self, capture_mode, run_filecheck_qjit):
         """Unit test for the diagonalize_measurements builtin pass."""
 
         dev = qp.device("lightning.qubit", wires=10)
         obs = qp.X(0)
 
-        @qp.qjit
+        @qp.qjit(capture=capture_mode)
         @diagonalize_measurements(supported_base_obs=("PauliX",))
         @qp.qnode(dev)
         def circuit():
@@ -724,7 +722,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         res = circuit()
 
-        @qp.qjit
+        @qp.qjit(capture=capture_mode)
         @qp.qnode(dev)
         def circuit_ref():
             qp.CNOT(wires=[0, 1])
@@ -733,7 +731,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         res_ref = circuit_ref()
         assert np.allclose(res, res_ref)
 
-    def test_with_split_non_commuting_multiple_measurements(self, run_filecheck_qjit):
+    def test_with_split_non_commuting_multiple_measurements(self, capture_mode, run_filecheck_qjit):
         """Test the executable file can be generated and run with lightning.qubit when applying
         both the diagonalize-final-measurements and the split-non-commuting passes"""
 
@@ -755,7 +753,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             i = i + 1
             return i
 
-        @qp.qjit
+        @qp.qjit(capture=capture_mode)
         @diagonalize_measurements
         @qp.transform(pass_name="split-non-commuting")
         @qp.qnode(dev)
@@ -770,7 +768,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         res = circuit()
 
-        @qp.qjit
+        @qp.qjit(capture=capture_mode)
         @qp.qnode(dev)
         def circuit_ref():
             for_fn()  # pylint: disable=no-value-for-parameter
@@ -805,12 +803,12 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         circuit_compiled = qp.qjit(
             diagonalize_final_measurements_pass(circuit_ref),
+            capture=True,
         )
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
     """Integrate test for NonCommutingObservableValidator"""
 
@@ -879,7 +877,7 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
         with pytest.raises(CompileError, match=_non_commuting_err_msg):
             circuit(0.7)
 
-    def test_non_commuting_multiple_measurements_only(self, device):
+    def test_non_commuting_multiple_measurements_only(self, capture_mode, device):
         """A CompileError is raised for non-commuting measurements without gates
         applied."""
 
@@ -890,7 +888,7 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
             return qp.expval(qp.X(0)), qp.var(qp.Z(0))
 
         with pytest.raises(CompileError, match=_non_commuting_err_msg):
-            qp.qjit(circuit)
+            qp.qjit(circuit, capture=capture_mode)
 
     @pytest.mark.parametrize("obs", NON_COMMUTE_MULTI_OBS_LIST)
     @pytest.mark.parametrize("m", [(qp.expval, qp.var)])

@@ -30,7 +30,6 @@ from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestDebugPrint:
     """Test suite for the runtime print functionality."""
 
@@ -50,10 +49,10 @@ class TestDebugPrint:
             jnp.array([[3, 4], [5, 6], [7, 8]]),
         ],
     )
-    def test_function_arguments(self, capfd, arg):
+    def test_function_arguments(self, capfd, arg, capture_mode):
         """Test printing of arbitrary JAX tracer values."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         def test(x):
             debug.print(x)
 
@@ -68,7 +67,7 @@ class TestDebugPrint:
         expected = str(arg)
         assert expected == out.strip()
 
-    def test_memref_outside_qjit(self, capfd):
+    def test_memref_outside_qjit(self, capfd, capture_mode):
         """Test that memref can be used outside qjit."""
 
         def test(x):
@@ -79,10 +78,10 @@ class TestDebugPrint:
         assert err == ""
         assert out == "2\n"
 
-    def test_optional_descriptor(self, capfd):
+    def test_optional_descriptor(self, capfd, capture_mode):
         """Test the optional memref descriptor functionality."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         def test(x):
             debug.print_memref(x)
 
@@ -104,10 +103,10 @@ class TestDebugPrint:
         assert err == ""
         assert regex.match(out)
 
-    def test_bad_argument(self):
+    def test_bad_argument(self, capture_mode):
         """Test bad argument."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         def test(_x):
             debug.print_memref("foo")
 
@@ -123,10 +122,10 @@ class TestDebugPrint:
             (6, "0\n1\n2\n3\n4\n5\n"),
         ],
     )
-    def test_intermediate_values(self, capfd, arg, expected):
+    def test_intermediate_values(self, capfd, arg, expected, capture_mode):
         """Test printing of arbitrary JAX tracer values."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         def test(n):
             @for_loop(0, n, 1)
             def loop(i):
@@ -162,12 +161,12 @@ class TestDebugPrint:
             return cls(*aux_data)
 
     @pytest.mark.parametrize(("arg"), [3, "hi", MyObject("hello")])
-    def test_compile_time_values(self, capfd, arg):
+    def test_compile_time_values(self, capfd, arg, capture_mode):
         """Test printing of arbitrary Python objects, including strings."""
 
         expected = str(arg)
 
-        @qjit
+        @qjit(capture=capture_mode)
         def test():
             debug.print(arg)
 
@@ -197,7 +196,7 @@ class TestDebugPrint:
             (MyObject("hello"), "MyObject(hello)\n"),
         ],
     )
-    def test_no_qjit(self, capfd, arg, expected):
+    def test_no_qjit(self, capfd, arg, expected, capture_mode):
         """Test printing in interpreted mode."""
 
         debug.print(arg)
@@ -206,7 +205,7 @@ class TestDebugPrint:
         assert err == ""
         assert out == expected
 
-    def test_multiple_prints(self, capfd):
+    def test_multiple_prints(self, capfd, capture_mode):
         "Test printing strings in multiple prints"
 
         @qp.qnode(qp.device("lightning.qubit", wires=1))
@@ -214,7 +213,7 @@ class TestDebugPrint:
             debug.print("hello")
             return qp.state()
 
-        @qjit
+        @qjit(capture=capture_mode)
         def func2():
             func1()
             debug.print("goodbye")
@@ -225,10 +224,10 @@ class TestDebugPrint:
         assert err == ""
         assert out == "hello\ngoodbye\n"
 
-    def test_fstring_print(self, capsys):
+    def test_fstring_print(self, capsys, capture_mode):
         """Test fstring like function."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         def cir(a, b, c):
             debug.print("{c} {b} {a}", a=a, b=b, c=c)
 
@@ -238,14 +237,13 @@ class TestDebugPrint:
         assert expected == out.strip()
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestPrintStage:
     """Test that compilation pipeline results can be printed."""
 
-    def test_hlo_lowering_stage(self, capsys):
+    def test_hlo_lowering_stage(self, capsys, capture_mode):
         """Test that the IR can be printed after the HLO lowering pipeline."""
 
-        @qjit(keep_intermediate=True)
+        @qjit(keep_intermediate=True, capture=capture_mode)
         def func(x):
             return x
 
@@ -261,7 +259,7 @@ class TestPrintStage:
 
         func.workspace.cleanup()
 
-    def test_invalid_object(self):
+    def test_invalid_object(self, capture_mode):
         """Test the function on a non-QJIT object."""
 
         def func():
