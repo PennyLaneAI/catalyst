@@ -596,11 +596,7 @@ def test_finite_diff_in_loop(inp, backend, capture_mode):
         h = qp.grad(g, argnums=0)
         return h(x)
 
-    enabled = capture_mode
-    qp.capture.disable()
     expected = interpretted_grad_default(inp)
-    if enabled:
-        qp.capture.enable()
 
     assert np.allclose(compiled_grad_default(inp, 5), expected)
 
@@ -675,11 +671,7 @@ def test_adj_in_loop(inp, backend, capture_mode):
         h = qp.grad(g, argnums=0)
         return h(x)
 
-    enabled = capture_mode
-    qp.capture.disable()
     expected = interpretted_grad_default(inp)
-    if enabled:
-        qp.capture.enable()
     assert np.allclose(compiled_grad_default(inp, 5), expected)
 
 
@@ -741,12 +733,8 @@ def test_ps_conditionals(inp, backend, capture_mode):
         h = qp.grad(g, argnums=0)
         return h(x, y)
 
-    enabled = capture_mode
-    qp.capture.disable()
     expected0 = interpreted(inp, 0.0)
     expected2 = interpreted(inp, 2.0)
-    if enabled:
-        qp.capture.enable()
 
     assert np.allclose(compiled(inp, 0.0), expected0)
     assert np.allclose(compiled(inp, 2.0), expected2)
@@ -781,14 +769,10 @@ def test_ps_for_loops(inp, backend, capture_mode):
         h = qp.grad(g, argnums=0)
         return h(x, y)
 
-    enabled = capture_mode
-    qp.capture.disable()
     expected1 = interpreted(inp, 1)
     expected2 = interpreted(inp, 2)
     expected3 = interpreted(inp, 3)
     expected4 = interpreted(inp, 4)
-    if enabled:
-        qp.capture.enable()
 
     assert np.allclose(compiled(inp, 1), expected1)
     assert np.allclose(compiled(inp, 2), expected2)
@@ -832,7 +816,6 @@ def test_ps_for_loops_entangled(inp, backend, capture_mode):
         h = qp.grad(g, argnums=0)
         return h(x, y, z)
 
-    qp.capture.disable()
     expected11 = interpreted(inp, 1, 1)
     expected22 = interpreted(inp, 2, 2)
 
@@ -894,11 +877,7 @@ def test_ps_qft(inp, backend, capture_mode):
         h = qp.grad(g, argnums=0)
         return h(x, y, z)
 
-    enabled = capture_mode
-    qp.capture.disable()
     expected = interpreted(inp, 2, 2)
-    if enabled:
-        qp.capture.enable()
 
     print("finish interpreted")
 
@@ -918,11 +897,7 @@ def test_ps_probs(backend, capture_mode):
         return qp.jacobian(func, method="auto")(p)
 
     result = workflow(0.5)
-    enabled = capture_mode
-    qp.capture.disable()
     reference = qp.jacobian(func, argnums=0)(0.5)
-    if enabled:
-        qp.capture.enable()
     print(result, reference)
     assert np.allclose(result, reference)
 
@@ -1211,11 +1186,7 @@ def test_finite_diff_higher_order(inp, backend, capture_mode):
         i = qp.grad(h, argnums=0)
         return i(x)
 
-    enabled = capture_mode
-    qp.capture.disable()
     expected = interpretted_grad2_default(inp)
-    if enabled:
-        qp.capture.enable()
 
     assert np.allclose(compiled_grad2_default(inp), expected, rtol=0.1)
 
@@ -1249,11 +1220,7 @@ def test_jax_consts(h_coeffs, g_method, backend, capture_mode):
 
     inp = jnp.array([1.0, 2.0])
 
-    enabled = capture_mode
-    qp.capture.disable()
     expected = interpret_grad(inp)
-    if enabled:
-        qp.capture.enable()
 
     assert np.allclose(compile_grad(jnp.array(inp)), expected)
 
@@ -1383,7 +1350,6 @@ def test_multiple_grad_invocations(backend, diff_method, capture_mode):
         return jnp.array([g1, g2])
 
     actual = compiled(0.1, 0.2)
-    qp.capture.disable()
     expected = jax.jacobian(f, argnums=(0, 1))(0.1, 0.2)
     for actual_entry, expected_entry in zip(actual, expected):
         assert actual_entry == pytest.approx(expected_entry)
@@ -1417,7 +1383,6 @@ def test_loop_with_dyn_wires(backend, diff_method, capture_mode):
 
     arg = 0.75
     result = qjit(qp.grad(cat), capture=capture_mode)(arg)
-    qp.capture.disable()
     expected = qp.grad(pl, argnums=0)(arg)
 
     assert np.allclose(result, expected)
@@ -1742,7 +1707,6 @@ def test_ellipsis_differentiation(backend, diff_method, capture_mode):
     weights = jnp.ones([5, 3, 3])
 
     cat_res = qjit(grad(circuit, argnums=0), capture=capture_mode)(weights)
-    qp.capture.disable()
     jax_res = jax.grad(circuit, argnums=0)(weights)
     assert np.allclose(cat_res, jax_res)
 
@@ -1878,7 +1842,6 @@ def test_paramshift_with_gates(gate, state, capture_mode):
 
     param = 0.1
     observed = qjit(cost, capture=capture_mode)(param)
-    qp.capture.disable()
     expected = cost(param)
     assert np.allclose(expected, observed)
 
