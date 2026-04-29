@@ -744,11 +744,9 @@ class TestLoweringTransversalGates:
     def test_cnot_lowering_Steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
         """Test that using the Steane code lowers ops as expected"""
 
-        gate = "cnot"
-
-        program = f"""
-        builtin.module @module_circuit {{
-                func.func @test_func() attributes {{quantum.node}} {{
+        program = """
+        builtin.module @module_circuit {
+                func.func @test_func() attributes {quantum.node} {
                     // CHECK: [[ctrl_codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
                     // CHECK: [[trgt_codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
                     // CHECK-NEXT: [[ctrl_codeblock_out:%.+]], [[trgt_codeblock_out:%.+]] = func.call @cnot_Steane([[ctrl_codeblock]], [[trgt_codeblock]]) : (!qecp.codeblock<1 x 7>, !qecp.codeblock<1 x 7>) -> (!qecp.codeblock<1 x 7>, !qecp.codeblock<1 x 7>)
@@ -757,7 +755,7 @@ class TestLoweringTransversalGates:
                     %1 = "test.op"() : () -> !qecl.codeblock<1>
                     %2, %3 = qecl.cnot %0[0], %1[0] : !qecl.codeblock<1>, !qecl.codeblock<1>
                     return
-                }}
+                }
                 // CHECK: func.func private @cnot_Steane([[ctrl_cb_in:%.+]]: !qecp.codeblock<1 x 7>, [[tgt_cb_in:%.+]]: !qecp.codeblock<1 x 7>)
                 // CHECK-NEXT: [[ctrl_q0:%.+]] = qecp.extract [[ctrl_cb_in]][0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
                 // CHECK-NEXT: [[ctrl_q1:%.+]] = qecp.extract [[ctrl_cb_in]][1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
@@ -795,7 +793,7 @@ class TestLoweringTransversalGates:
                 // CHECK-NEXT: [[tgt_cb_in6:%.+]] = qecp.insert [[tgt_cb_in5]][5], [[tgt_q5_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
                 // CHECK-NEXT: [[tgt_cb_out:%.+]] = qecp.insert [[tgt_cb_in6]][6], [[tgt_q6_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
                 // CHECK-NEXT: func.return [[ctrl_cb_out]], [[tgt_cb_out]]
-            }}
+            }
             """
 
         run_filecheck(program, qecl_to_qecp_steane_pipeline)

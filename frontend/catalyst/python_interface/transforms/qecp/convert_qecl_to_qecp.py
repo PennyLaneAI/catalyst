@@ -263,9 +263,10 @@ class Transversal1QGateConversion(RewritePattern):
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecl.SingleQubitLogicalGateOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `qecl.SingleQubitLogicalGateOp` ops, if they are defined as
+        transversal in the provided QEC code."""
 
         k = op.out_codeblock.type.k.value.data
-        n = self.qec_code.n
 
         # The type-converter should already raise a CompileError if the values of k don't agree;
         # assert just in case.
@@ -276,7 +277,7 @@ class Transversal1QGateConversion(RewritePattern):
 
         if k > 1:
             raise NotImplementedError(
-                "Lowering logical gates to the `qecp` dialect is not implemented for codes were k > 1"
+                "Lowering logical gates to the `qecp` dialect is not implemented for k > 1 codes"
             )
 
         gate_name = op.name.strip("qecl.")
@@ -313,9 +314,10 @@ class Transversal2QGateConversion(RewritePattern):
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecl.CnotOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `qecl` two-qubit ops (currently limited to `qecl.cnot`), if
+        it are defined as transversal in the provided QEC code."""
 
         k = op.out_ctrl_codeblock.type.k.value.data
-        n = self.qec_code.n
 
         # The type-converter should already raise a CompileError if the values of k don't agree;
         # assert just in case.
@@ -326,7 +328,7 @@ class Transversal2QGateConversion(RewritePattern):
 
         if k > 1:
             raise NotImplementedError(
-                "Lowering logical gates to the `qecp` dialect is not implemented for codes were k > 1"
+                "Lowering logical gates to the `qecp` dialect is not implemented for k > 1 codes."
             )
 
         gate_name = op.name.split(".")[1]

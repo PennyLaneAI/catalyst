@@ -32,24 +32,25 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
         np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]),
         {
             # keys need to match the names of the corresponding qecl.gate gates
-            # values are a tuple of the qecp gate to apply, and the indices it is applied at in the codeblock
+            # values are a tuple of the qecp gate, and the indices its applied at in the codeblock
             # will need to be refactored for k>1
             "x": (qecp.PauliXOp, [4, 5, 6]),
             "y": (
                 qecp.PauliYOp,
                 [4, 5, 6],
-            ),  # ToDo: does it matter that the Y gate seems to introduce a global phase?
+            ),
             "z": (qecp.PauliZOp, [4, 5, 6]),
             "hadamard": (qecp.HadamardOp, [0, 1, 2, 3, 4, 5, 6]),
             "s": (partial(qecp.SOp, adjoint=True), [0, 1, 2, 3, 4, 5, 6]),
         },
         {
-            "cnot": qecp.CnotOp,  # ToDo: add CNOT support , and update docstring below to reflect no tuples now
+            "cnot": qecp.CnotOp,
         },
     ),
 }
 
 
+# pylint: disable=too-many-instance-attributes
 @dataclass(frozen=True)
 class QecCode:
     """A class to store all relevant information for any [[n, k, d]] stabilizer QEC code.
@@ -65,8 +66,10 @@ class QecCode:
             key should match the gate name in the qecl dialect, and the value is a tuple
             containing the qecp op to be applied, and the indices. Assumes k=1.
         transversal_2q_gates (dict): A dictionary of two-qubit transversal gates. The
-            key should match the gate name in the qecl dialect, and the value is a tuple
-            containing the qecp op to be applied, and the indices. Assumes k=1.
+            key should match the gate name in the qecl dialect, and the value is the qecp
+            op to be applied, and the indices. Assumes k=1. Does not specify indices - for
+            now, we assume 2-qubit gates between two codeblocks, where the gate is applied
+            between all pairs of corresponding qubits.
     """
 
     name: str
@@ -86,6 +89,14 @@ class QecCode:
 
         return f"[[{self.n}, {self.k}, {self.d}]] {name}"
 
+    def __repr__(self):
+        if self.name == "" or str.isspace(self.name):
+            name = "<unknown>"
+        else:
+            name = self.name
+
+        return f"QecCode(name='{name}', n={self.n}, k={self.k}, d={self.d})"
+
     @classmethod
     def from_dict(cls, data: dict) -> Self:
         """A builder function that returns a `QecCode` instance from a dictionary.
@@ -95,7 +106,16 @@ class QecCode:
         Example
         -------
 
-        >>> QecCode.from_dict({'name': "Steane", 'n': 7, 'k': 1, 'd': 3})  # ToDo: upate these doctrings
+        >>> QecCode.from_dict({
+        >>>    'name': "Steane",
+        >>>    'n': 7,
+        >>>    'k': 1,
+        >>>    'd': 3,
+        >>>    "x_tanner": np.eye(7),
+        >>>    "z_tanner": np.eye(7),
+        >>>    "transversal_1q_gates": {},
+        >>>    "transversal_2q_gates": {},
+        >>>    })
         QecCode(name='Steane', n=7, k=1, d=3)
         """
         # Filter dictionary to keep only keys that are fields of this dataclass
