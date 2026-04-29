@@ -509,30 +509,37 @@ class TestLoweringTransversalGates:
 
         n, k = (3, 1)
 
-        qec_code = QecCode("TestCode", n=n, k=k, d=1, x_tanner=np.eye(n), z_tanner=np.eye(n), transversal_1q_gates={}, transversal_2q_gates={"x": qecp.CnotOp})
+        qec_code = QecCode("TestCode", n=n, k=k, d=1, x_tanner=np.eye(n), z_tanner=np.eye(n), transversal_1q_gates={}, transversal_2q_gates={"cnot": qecp.CnotOp})
 
         program = f"""
         builtin.module @module_circuit {{
                 func.func @test_func() attributes {{quantum.node}} {{
-                    // CHECK: [[codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<{k} x {n}>
-                    // CHECK-NEXT: [[codeblock2:%.+]] = func.call @x_TestCode([[codeblock]]) : (!qecp.codeblock<{k} x {n}>) -> !qecp.codeblock<{k} x {n}>
-                    // CHECK-NOT: qecl.x
+                    // CHECK: [[ctrl_codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<{k} x {n}>
+                    // CHECK-NEXT: [[trgt_codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<{k} x {n}>
+                    // CHECK-NEXT: [[ctrl_codeblock_out:%.+]], [[trgt_codeblock_out:%.+]] = func.call @cnot_TestCode([[ctrl_codeblock]], [[trgt_codeblock]])  : (!qecp.codeblock<{k} x {n}>, !qecp.codeblock<{k} x {n}>) -> (!qecp.codeblock<{k} x {n}>, !qecp.codeblock<{k} x {n}>)
+                    // CHECK-NOT: qecl.cnot
                     %0 = "test.op"() : () -> !qecl.codeblock<{k}>
                     %1 = "test.op"() : () -> !qecl.codeblock<{k}>
-                    %2 = qecl.cnot %0[0], %1[0] : !qecl.codeblock<{k}>
+                    %2, %3 = qecl.cnot %0[0], %1[0] : !qecl.codeblock<{k}>, !qecl.codeblock<{k}>
                     return
                 }}
-                // CHECK: func.func private @x_TestCode([[ctrl_cb_in:%.+]], [[tgt_cb_in:%.+]]: !qecp.codeblock<{k} x {n}>)
-                // CHECK-NEXT: [[q0:%.+]] = qecp.extract [[ctrl_cb_in]][0] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
-                // CHECK-NEXT: [[q1:%.+]] = qecp.extract [[ctrl_cb_in]][1] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
-                // CHECK-NEXT: [[q2:%.+]] = qecp.extract [[ctrl_cb_in]][2] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
-                // CHECK: [[q0_1:%.+]] = qecp.cnot [[q0]] : !qecp.qubit<data>
-                // CHECK: [[q1_1:%.+]] = qecp.cnot [[q1]] : !qecp.qubit<data>
-                // CHECK: [[q2_1:%.+]] = qecp.cnot [[q2]] : !qecp.qubit<data>
-                // CHECK-NEXT: [[ctrl_cb_in1:%.+]] = qecp.insert [[ctrl_cb_in]][0], [[q0_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
-                // CHECK-NEXT: [[ctrl_cb_in2:%.+]] = qecp.insert [[ctrl_cb_in1]][1], [[q1_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
-                // CHECK-NEXT: [[ctrl_cb_out:%.+]] = qecp.insert [[ctrl_cb_in2]][2], [[q2_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
-                // CHECK-NEXT: func.return [[ctrl_cb_out]], [[tgt_cb_out]]
+                // CHECK: func.func private @cnot_TestCode([[ctrl_cb_in:%.+]]: !qecp.codeblock<{k} x {n}>, [[trgt_cb_in:%.+]]: !qecp.codeblock<{k} x {n}>)
+                // CHECK-NEXT: [[ctrl_q0:%.+]] = qecp.extract [[ctrl_cb_in]][0] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_q1:%.+]] = qecp.extract [[ctrl_cb_in]][1] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_q2:%.+]] = qecp.extract [[ctrl_cb_in]][2] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[trgt_q0:%.+]] = qecp.extract [[trgt_cb_in]][0] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[trgt_q1:%.+]] = qecp.extract [[trgt_cb_in]][1] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[trgt_q2:%.+]] = qecp.extract [[trgt_cb_in]][2] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
+                // CHECK: [[ctrl_q0_1:%.+]], [[trgt_q0_1:%.+]] = qecp.cnot [[ctrl_q0]], [[trgt_q0]] : !qecp.qubit<data>
+                // CHECK: [[ctrl_q1_1:%.+]], [[trgt_q1_1:%.+]] = qecp.cnot [[ctrl_q1]], [[trgt_q1]] : !qecp.qubit<data>
+                // CHECK: [[ctrl_q2_1:%.+]], [[trgt_q2_1:%.+]] = qecp.cnot [[ctrl_q2]], [[trgt_q2]] : !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_cb_in1:%.+]] = qecp.insert [[ctrl_cb_in]][0], [[ctrl_q0_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_cb_in2:%.+]] = qecp.insert [[ctrl_cb_in1]][1], [[ctrl_q1_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_cb_out:%.+]] = qecp.insert [[ctrl_cb_in2]][2], [[ctrl_q2_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
+                // CHECK-NEXT: [[trgt_cb_in1:%.+]] = qecp.insert [[trgt_cb_in]][0], [[trgt_q0_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
+                // CHECK-NEXT: [[trgt_cb_in2:%.+]] = qecp.insert [[trgt_cb_in1]][1], [[trgt_q1_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
+                // CHECK-NEXT: [[trgt_cb_out:%.+]] = qecp.insert [[trgt_cb_in2]][2], [[trgt_q2_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
+                // CHECK-NEXT: func.return [[ctrl_cb_out]], [[trgt_cb_out]]
             }}
             """
 
@@ -583,7 +590,7 @@ class TestLoweringTransversalGates:
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
     
     @pytest.mark.parametrize("gate, adj", [("s", "adj"), ("hadamard", ""), ("identity", "")])
-    def test_s_and_hadamard_lowering_Steane(self, gate, adj, run_filecheck, qecl_to_qecp_steane_pipeline):
+    def test_single_qubit_gate_lowering_Steane(self, gate, adj, run_filecheck, qecl_to_qecp_steane_pipeline):
         """Test that using the Steane code lowers Hadamard, Identity and S ops as expected. These ops 
         are applied on all qubits in the codeblock. For the S operator, the adjoint is applied."""
 
