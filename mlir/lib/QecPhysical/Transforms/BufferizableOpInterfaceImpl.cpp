@@ -52,8 +52,6 @@ struct AssembleTannerGraphOpInterface
         return false;
     }
 
-    bool bufferizesToAllocation(Operation *op, Value value) const { return true; }
-
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
                       const bufferization::AnalysisState &state) const
@@ -108,8 +106,6 @@ struct DecodeEsmCssOpInterface
         return false;
     }
 
-    bool bufferizesToAllocation(Operation *op, Value value) const { return true; }
-
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
                       const bufferization::AnalysisState &state) const
@@ -161,8 +157,6 @@ struct DecodePhysicalMeasurementOpInterface
     {
         return false;
     }
-
-    bool bufferizesToAllocation(Operation *op, Value value) const { return true; }
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
