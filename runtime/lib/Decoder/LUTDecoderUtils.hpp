@@ -23,7 +23,6 @@
 
 #include "DataView.hpp"
 #include "Exception.hpp"
-#include "Types.h"
 
 namespace Catalyst::Runtime::QEC {
 /**

@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "catch2/catch_test_macros.hpp"
+#include "catch2/matchers/catch_matchers_string.hpp"
 
 #include "LUTDecoder.hpp"
 #include "TestUtils.hpp"
@@ -48,19 +49,60 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
     MemRefT_int64_1d err_idx_memref = {
         buffer_err_idx_memref, buffer_err_idx_memref, 0, {err_idx.size()}, {1}};
 
-    for (auto it = tanner_graph.lookup_table_error_idx_to_syndrome.begin();
-         it != tanner_graph.lookup_table_error_idx_to_syndrome.end(); ++it) {
-        int64_t expected_res = it->first;
+    SECTION("Syndrome results that can be decoded.")
+    {
+        for (auto it = tanner_graph.lookup_table_error_idx_to_syndrome.begin();
+             it != tanner_graph.lookup_table_error_idx_to_syndrome.end(); ++it) {
+            int64_t expected_res = it->first;
 
-        auto syndrome_res = it->second;
+            auto syndrome_res = it->second;
 
+            int8_t *buffer_syndrome_res_memref = syndrome_res.data();
+            MemRefT_int8_1d syndrome_res_memref = {buffer_syndrome_res_memref,
+                                                   buffer_syndrome_res_memref,
+                                                   0,
+                                                   {syndrome_res.size()},
+                                                   {1}};
+
+            __catalyst__qecp__lut_decoder(&row_idx_tanner_memref, &col_ptr_tanner_memref,
+                                          &syndrome_res_memref, &err_idx_memref);
+
+            REQUIRE(err_idx_memref.data_allocated[0] == expected_res);
+        }
+    }
+
+    SECTION("Error raised for bad syndrome res.")
+    {
+        std::vector<int8_t> bad_syndrome_res = {1, 1};
+
+        int8_t *buffer_bad_syndrome_res_memref = bad_syndrome_res.data();
+        MemRefT_int8_1d bad_syndrome_res_memref = {buffer_bad_syndrome_res_memref,
+                                                   buffer_bad_syndrome_res_memref,
+                                                   0,
+                                                   {bad_syndrome_res.size()},
+                                                   {1}};
+        REQUIRE_THROWS_WITH(
+            __catalyst__qecp__lut_decoder(&row_idx_tanner_memref, &col_ptr_tanner_memref,
+                                          &bad_syndrome_res_memref, &err_idx_memref),
+            Catch::Matchers::ContainsSubstring("Bad syndrome result input."));
+    }
+
+    SECTION("Error raised for bad err_idx input.")
+    {
+        std::vector<int64_t> bad_err_idx =
+            std::vector<int64_t>((tanner_graph.code_distance - 1), -1);
+        int64_t *buffer_bad_err_idx_memref = bad_err_idx.data();
+        MemRefT_int64_1d bad_err_idx_memref = {
+            buffer_bad_err_idx_memref, buffer_bad_err_idx_memref, 0, {bad_err_idx.size()}, {1}};
+
+        std::vector<int8_t> syndrome_res = {1, 1, 1};
         int8_t *buffer_syndrome_res_memref = syndrome_res.data();
         MemRefT_int8_1d syndrome_res_memref = {
             buffer_syndrome_res_memref, buffer_syndrome_res_memref, 0, {syndrome_res.size()}, {1}};
 
-        __catalyst__qecp__lut_decoder(&row_idx_tanner_memref, &col_ptr_tanner_memref,
-                                      &syndrome_res_memref, &err_idx_memref);
-
-        REQUIRE(err_idx_memref.data_allocated[0] == expected_res);
+        REQUIRE_THROWS_WITH(
+            __catalyst__qecp__lut_decoder(&row_idx_tanner_memref, &col_ptr_tanner_memref,
+                                          &syndrome_res_memref, &bad_err_idx_memref),
+            Catch::Matchers::ContainsSubstring("Bad err_idx input."));
     }
 }

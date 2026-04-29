@@ -29,6 +29,7 @@
 #include <vector>
 
 #include "DataView.hpp"
+#include "Exception.hpp"
 #include "LUTDecoderUtils.hpp"
 
 namespace Catalyst::Runtime::QEC {
@@ -59,6 +60,11 @@ void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
     // change.
     const size_t aux_col_offset = 7;
 
+    DataView<int8_t, 1> syndromes_res(current_syndromes->data_aligned, current_syndromes->offset,
+                                      current_syndromes->sizes, current_syndromes->strides);
+    RT_FAIL_IF(syndromes_res.size() != (code_size - 1) / 2, "Bad syndrome result input.");
+    RT_FAIL_IF(err_idx->sizes[0] != (code_distance - 1) / 2, "Bad err_idx input.");
+
     DataView<int64_t, 1> row_idx(row_idx_tanner->data_aligned, row_idx_tanner->offset,
                                  row_idx_tanner->sizes, row_idx_tanner->strides);
     DataView<int64_t, 1> col_ptr(col_ptr_tanner->data_aligned, col_ptr_tanner->offset,
@@ -66,9 +72,6 @@ void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
 
     auto &current_lut = LUTs<int64_t>::getInstance().get_lut(aux_col_offset, code_size,
                                                              code_distance, row_idx, col_ptr);
-
-    DataView<int8_t, 1> syndromes_res(current_syndromes->data_aligned, current_syndromes->offset,
-                                      current_syndromes->sizes, current_syndromes->strides);
 
     auto syndrome_str = convert_syndrome_res_to_bitstr<int8_t>(syndromes_res);
 
