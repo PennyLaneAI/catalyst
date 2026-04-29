@@ -14,12 +14,24 @@
 
 #pragma once
 
+#include <memory>
 namespace catalyst {
 namespace driver {
 
-void initializePythonRuntime();
+class PyInterpreterWrapper {
+  public:
+    PyInterpreterWrapper();
+    ~PyInterpreterWrapper();
 
-void finalizePythonRuntime();
+    PyInterpreterWrapper(const PyInterpreterWrapper &) = delete;
+    PyInterpreterWrapper &operator=(const PyInterpreterWrapper &) = delete;
+
+  private:
+    struct Impl;
+    std::unique_ptr<Impl> impl;
+
+    void syncSitePackages();
+};
 
 } // namespace driver
 } // namespace catalyst

@@ -17,60 +17,47 @@
 #include "llvm/Support/raw_ostream.h"
 #include "pybind11/embed.h"
 
+constexpr const char *sitePackagesScript = R"(
+import os
+import sys
+import site
+
+venv_path = os.environ.get('VIRTUAL_ENV')
+if venv_path:
+    py_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+    site_packages = os.path.join(venv_path, "lib", f"python{py_version}", "site-packages")
+
+if os.path.exists(site_packages):
+    site.addsitedir(site_packages)
+)";
+
 namespace py = pybind11;
 
 namespace catalyst {
 namespace driver {
 
-constexpr const char *sitePackages = R"(
-import os
-import sys
-import site
+struct PyInterpreterWrapper::Impl {
+    py::scoped_interpreter interpreter;
+};
 
-# Check if the user is running from an active virtual environment
-venv_path = os.environ.get('VIRTUAL_ENV')
-if venv_path:
-    # Construct the path: e.g., .venv/lib/python3.14/site-packages
-    py_version = f"{sys.version_info.major}.{sys.version_info.minor}"
-    site_packages = os.path.join(venv_path, "lib", f"python{py_version}", "site-packages")
-    
-    # Adds the directory AND processes any editable install .pth files
-    if os.path.exists(site_packages):
-        site.addsitedir(site_packages)
-)";
-
-// We use a pointer to explicitly control the lifetime of the interpreter
-static py::scoped_interpreter *globalInterpreter = nullptr;
-
-void initializePythonRuntime()
+PyInterpreterWrapper::PyInterpreterWrapper() : impl(std::make_unique<Impl>())
 {
-    if (globalInterpreter) {
-        return;
-    }
+    syncSitePackages();
+}
 
-    // llvm::errs() << "initializing interpreter...\n";
+PyInterpreterWrapper::~PyInterpreterWrapper() = default;
 
-    // TODO: optimize this to use the PL interpreter if available
-    globalInterpreter = new py::scoped_interpreter();
+void PyInterpreterWrapper::syncSitePackages()
+{
+    py::gil_scoped_acquire acquire;
 
     try {
-        // llvm::errs() << "\tupdating site packages...\n";
-
-        py::exec(sitePackages);
+        py::exec(sitePackagesScript);
+        llvm::errs() << "Successfully linked virtual environment packages\n";
     }
     catch (const py::error_already_set &e) {
         llvm::errs() << "Failed to link virtual environment: " << e.what() << "\n";
     }
-    // llvm::errs() << "interpreter initialization complete\n";
 }
-
-void finalizePythonRuntime()
-{
-    if (driver::globalInterpreter) {
-        delete driver::globalInterpreter;
-        driver::globalInterpreter = nullptr;
-    }
-}
-
 } // namespace driver
 } // namespace catalyst
