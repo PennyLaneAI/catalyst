@@ -12,14 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef QECPHYSICAL_PASSES
-#define QECPHYSICAL_PASSES
+#pragma once
 
-include "mlir/Pass/PassBase.td"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringSet.h"
+#include "llvm/Support/AllocatorBase.h"
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Transforms/DialectConversion.h"
 
-def QecPhyiscalLLVMConversionPass : Pass<"convert-qecp-to-llvm"> {
-    let summary = "Perform a dialect conversion from QECPhyiscal to LLVM.";
+namespace catalyst {
+namespace qecp {
 
-    let dependentDialects = ["memref::MemRefDialect", "LLVM::LLVMDialect"];
-}
-#endif // QECPHYSICAL_PASSES
+void populateLLVMConversionPatterns(mlir::LLVMTypeConverter &typeConverter,
+                                    mlir::RewritePatternSet &patterns);
+
+} // namespace qecp
+} // namespace catalyst
