@@ -772,6 +772,7 @@
   [(#2694)](https://github.com/PennyLaneAI/catalyst/pull/2694)
   [(#2717)](https://github.com/PennyLaneAI/catalyst/pull/2717)
   [(#2720)](https://github.com/PennyLaneAI/catalyst/pull/2720)
+  [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
 
 * Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
   Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
