@@ -535,13 +535,17 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         """ToDo: Docstring goes here"""
 
         subroutines = {}
+        single_qubit_gates = self.qec_code.transversal_1q_gates
+        if "identity" not in single_qubit_gates:
+            # for identity, no need to add any non-Identity gates
+            single_qubit_gates["identity"] = (None, [])  
 
-        for gate, gate_info in self.qec_code.transversal_1q_gates.items():
+        codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
+        input_types = (codeblock_type,)
+        output_types = (codeblock_type,)
+
+        for gate_name, gate_info in single_qubit_gates.items():
             gate_op, gate_indices = gate_info
-
-            codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
-            input_types = (codeblock_type,)
-            output_types = (codeblock_type,)
 
             block = Block(arg_types=input_types)
 
@@ -568,13 +572,14 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 func.ReturnOp(codeblock)
 
             funcOp = func.FuncOp(
-                name=f"{gate}_{self.qec_code.name}",
+                name=f"{gate_name}_{self.qec_code.name}",
                 function_type=(input_types, output_types),
                 visibility="private",
                 region=Region([block]),
             )
 
-            subroutines[gate] = funcOp
+            subroutines[gate_name] = funcOp
+
 
         return subroutines
 
@@ -583,19 +588,18 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         subroutines = {}
 
-        for gate in self.qec_code.transversal_2q_gates:
-            gate_op = self.qec_code.transversal_2q_gates[gate]
+        codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
+        input_types = (codeblock_type, codeblock_type)
+        output_types = (codeblock_type, codeblock_type)
 
-            codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
-            input_types = (codeblock_type, codeblock_type)
-            output_types = (codeblock_type, codeblock_type)
+        for gate_name, gate_op in self.qec_code.transversal_2q_gates.items():
 
             block = Block(arg_types=input_types)
 
             with ImplicitBuilder(block):
                 ctrl_codeblock_in, trgt_codeblock_in = block.args
 
-                # extract qubits
+                # extract all the qubits in both ctrl and target blocks
                 ctrl_extract_ops = [
                     qecp.ExtractQubitOp(ctrl_codeblock_in, i) for i in range(self.qec_code.n)
                 ]
@@ -605,6 +609,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 ctrl_qubits = [ext_op.results[0] for ext_op in ctrl_extract_ops]
                 trgt_qubits = [ext_op.results[0] for ext_op in trgt_extract_ops]
 
+                # apply the gate to each pair of qubits
                 transversal_gate = [
                     gate_op(ctrl_qb, trgt_qb) for ctrl_qb, trgt_qb in zip(ctrl_qubits, trgt_qubits)
                 ]
@@ -612,6 +617,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 ctrl_qbs_out = [op.results[0] for op in transversal_gate]
                 trgt_qbs_out = [op.results[1] for op in transversal_gate]
 
+                # insert the qubits in their respective blocks
                 ctrl_cb = ctrl_codeblock_in
                 for i in range(self.qec_code.n):
                     ctrl_insert = qecp.InsertQubitOp(ctrl_cb, i, ctrl_qbs_out[i])
@@ -622,17 +628,17 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                     trgt_insert = qecp.InsertQubitOp(trgt_cb, i, trgt_qbs_out[i])
                     trgt_cb = trgt_insert.results[0]
 
-                # return the encoded codeblock
+                # return the codeblocks
                 func.ReturnOp(ctrl_cb, trgt_cb)
 
             funcOp = func.FuncOp(
-                name=f"{gate}_{self.qec_code.name}",
+                name=f"{gate_name}_{self.qec_code.name}",
                 function_type=(input_types, output_types),
                 visibility="private",
                 region=Region([block]),
             )
 
-            subroutines[gate] = funcOp
+            subroutines[gate_name] = funcOp
 
         return subroutines
 
