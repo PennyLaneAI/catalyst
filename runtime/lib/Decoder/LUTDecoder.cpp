@@ -77,6 +77,6 @@ void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
 
     std::vector<int64_t> error_indices = current_lut.at(syndrome_str);
     // Copy the inquired error indices back to the err_idx
-    std::copy(error_indices.begin(), error_indices.end(), err_idx->data_allocated);
+    std::copy(error_indices.begin(), error_indices.end(), err_idx->data_aligned);
 }
 } // namespace Catalyst::Runtime::QEC
