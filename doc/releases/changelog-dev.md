@@ -313,6 +313,7 @@ codes only.
   [(#2578)](https://github.com/PennyLaneAI/catalyst/pull/2578)
   [(#2711)](https://github.com/PennyLaneAI/catalyst/pull/2711)
   [(#2765)](https://github.com/PennyLaneAI/catalyst/pull/2765)
+  [(#2722)](https://github.com/PennyLaneAI/catalyst/pull/2722)
 
   The framework is interfaced with a new `graph_decomposition` pass decorator
   with key capabilities:
@@ -553,6 +554,11 @@ codes only.
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Refactored all passes in `catalyst.passes.builtin_passes.py` to be `pennylane.transforms.core.Transform` objects
+  rather than decorators. This allows them to be used as standard transforms, enabling full compatibility with
+  `pennylane.CompilePipeline`.
+  [(#2722)](https://github.com/PennyLaneAI/catalyst/pull/2722)
 
 * Fixed a bug where the `work_wire_type` argument of `qp.ctrl` was silently dropped inside `@qjit` functions.
   The parameter is now threaded through `catalyst.ctrl`, `CtrlCallable`, `HybridCtrl`, and
@@ -1042,6 +1048,7 @@ codes only.
   [(#2716)](https://github.com/PennyLaneAI/catalyst/pull/2716)
   [(#2737)](https://github.com/PennyLaneAI/catalyst/pull/2737)
   [(#2731)](https://github.com/PennyLaneAI/catalyst/pull/2731)
+  [(#2735)](https://github.com/PennyLaneAI/catalyst/pull/2735)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
