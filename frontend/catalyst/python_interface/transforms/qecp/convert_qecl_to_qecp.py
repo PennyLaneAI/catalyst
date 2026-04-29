@@ -248,7 +248,14 @@ class MeasureOpConversion(RewritePattern):
 
 @dataclass(frozen=True)
 class Transversal1QGateConversion(RewritePattern):
-    """ToDo"""
+    """Converts transversal single-qubit `qecl` gate ops specified in the QEC code definition to 
+    a call to a subroutine that performs the transversal gate on the physical codeblock.
+
+    As implemented, this pattern does not use the `idx` attribute/operand of the logical gate 
+    op, which indicates the position of the logical qubit within the codeblock to act on. The 
+    current implementation for specifying gates also doesn't allow for specifying differen patterns 
+    for different qubits within a codeblock. We assume `k=1` and therefore `idx=0`.
+    """
 
     qec_code: QecCode
 
@@ -267,6 +274,11 @@ class Transversal1QGateConversion(RewritePattern):
             f"k = {self.qec_code.k}"
         )
 
+        if k > 1: 
+            raise NotImplementedError(
+                "Lowering logical gates to the `qecp` dialect is not implemented for codes were k > 1"
+            )
+
         gate_name = op.name.strip("qecl.")
         gate_subroutine = self.gate_subroutines.get(gate_name, None)
 
@@ -284,7 +296,16 @@ class Transversal1QGateConversion(RewritePattern):
 
 @dataclass(frozen=True)
 class Transversal2QGateConversion(RewritePattern):
-    """ToDo"""
+    """Converts transversal two-qubit `qecl` gate ops specified in the QEC code definition to 
+    a call to a subroutine that performs the transversal gate on the physical codeblock. Note that 
+    this is currently limited to the `qecl.cnot` gate, so the pattern as implemented matches to 
+    that rather than a generalised `qecl.TwoQubitLogicalGateOp`.
+
+    As implemented, this pattern does not use the `idx` attribute/operand of the logical gate 
+    op, which indicates the position of the logical qubit within the codeblock to act on. The 
+    current implementation for specifying gates also doesn't allow for specifying differen patterns 
+    for different qubits within a codeblock. We assume `k = 1` and therefore `idx = 0`.
+    """
 
     qec_code: QecCode
 
@@ -302,6 +323,11 @@ class Transversal2QGateConversion(RewritePattern):
             f"Value mismatch: codeblock {op.out_ctrl_codeblock} has k = {k} but QEC code has "
             f"k = {self.qec_code.k}"
         )
+
+        if k > 1: 
+            raise NotImplementedError(
+                "Lowering logical gates to the `qecp` dialect is not implemented for codes were k > 1"
+            )
 
         gate_name = op.name.split(".")[1]
         gate_subroutine = self.gate_subroutines.get(gate_name, None)
@@ -532,7 +558,11 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         return funcOp
 
     def create_transversal_1Qgate_subroutines(self) -> dict[str, func.FuncOp]:
-        """ToDo: Docstring goes here"""
+        """Create the subroutine that performs transversal 1-qubit gates on a physical codeblock.
+
+        Note that this method does not insert the subroutine into the module op. Instead it returns
+        the built func.FuncOp object that can then be subsequently inserted where desired.
+        """
 
         subroutines = {}
         single_qubit_gates = self.qec_code.transversal_1q_gates
@@ -584,7 +614,11 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         return subroutines
 
     def create_transversal_2Qgate_subroutines(self) -> dict[str, func.FuncOp]:
-        """ToDo: Docstring goes here"""
+        """Create the subroutine that performs transversal 2-qubit gates on a physical codeblock.
+
+        Note that this method does not insert the subroutine into the module op. Instead it returns
+        the built func.FuncOp object that can then be subsequently inserted where desired.
+        """
 
         subroutines = {}
 
