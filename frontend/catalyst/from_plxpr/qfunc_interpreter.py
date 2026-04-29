@@ -29,6 +29,7 @@ from jax.extend.core import ClosedJaxpr
 from jax.interpreters.partial_eval import DynamicJaxprTracer, convert_constvars_jaxpr
 from pennylane.capture import PlxprInterpreter, pause
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
+from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
@@ -705,20 +706,19 @@ def handle_measure(self, wire, reset, postselect):
     result = qref_measure_p.bind(in_qubit, postselect=postselect)
 
     if reset:
-        # Constants need to be passed as input values for some reason I forgot about.
-        correction = jaxpr_pad_consts(
-            [
-                jax.make_jaxpr(lambda: qinst_p.bind(out_wire, op="PauliX", qubits_len=1))().jaxpr,
-                jax.make_jaxpr(lambda: out_wire)().jaxpr,
-            ]
-        )
-        out_wire = cond_p.bind(
+        correction = [
+            jax.make_jaxpr(lambda: qref_qinst_p.bind(in_qubit, op="PauliX", qubits_len=1))().jaxpr,
+            jax.make_jaxpr(lambda: None)().jaxpr,
+        ]
+
+        pl_cond_prim.bind(
             result,
-            out_wire,
-            out_wire,
-            branch_jaxprs=correction,
-            num_implicit_outputs=None,
-        )[0]
+            jnp.array(True),
+            in_qubit,
+            jaxpr_branches=correction,
+            consts_slices=[(2, 3, None), (3, 3, None)],
+            args_slice=(3, None, None),
+        )
 
     result = jnp.astype(result, int)
     return result
