@@ -1820,7 +1820,7 @@ __all__ = [
     "disentangle_cnot",
     "disentangle_swap",
     "merge_rotations",
-    "parity-synth",
+    "parity_synth",
     "decompose_lowering",
     "ions_decomposition",
     "to_ppr",
