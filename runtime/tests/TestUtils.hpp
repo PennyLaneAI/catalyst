@@ -19,6 +19,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "ExecutionContext.hpp"
@@ -63,7 +64,7 @@ template <class IntegerType> struct tanner_graph_steane {
                   D5-------D6------D7
         - D1-7: data qubits
         - C1-3: check qubits
-       The corresponding Tanner graph represnetation in a dense matrix manner is:
+       The corresponding Tanner graph representation in a dense matrix manner is:
        | 0 0 0 0 0 0 0 1 0 0|
        | 0 0 0 0 0 0 0 1 1 0|
        | 0 0 0 0 0 0 0 1 1 1|

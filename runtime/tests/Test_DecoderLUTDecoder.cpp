@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "catch2/catch_test_macros.hpp"
-#include "catch2/matchers/catch_matchers_string.hpp"
 
 #include "LUTDecoder.hpp"
 #include "TestUtils.hpp"

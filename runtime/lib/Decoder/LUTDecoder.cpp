@@ -26,8 +26,6 @@
 #include "LUTDecoder.hpp"
 
 #include <algorithm>
-#include <numeric>
-#include <ranges>
 #include <vector>
 
 #include "DataView.hpp"
@@ -66,15 +64,15 @@ void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
     DataView<int64_t, 1> col_ptr(col_ptr_tanner->data_aligned, col_ptr_tanner->offset,
                                  col_ptr_tanner->sizes, col_ptr_tanner->strides);
 
-    auto current_lut = LUTs<int64_t>::getInstance().get_lut(aux_col_offset, code_size,
-                                                            code_distance, row_idx, col_ptr);
+    auto &current_lut = LUTs<int64_t>::getInstance().get_lut(aux_col_offset, code_size,
+                                                             code_distance, row_idx, col_ptr);
 
     DataView<int8_t, 1> syndromes_res(current_syndromes->data_aligned, current_syndromes->offset,
                                       current_syndromes->sizes, current_syndromes->strides);
 
     auto syndrome_str = convert_syndrome_res_to_bitstr<int8_t>(syndromes_res);
 
-    std::vector<int64_t> error_indices = current_lut[syndrome_str];
+    std::vector<int64_t> error_indices = current_lut.at(syndrome_str);
     // Copy the inquired error indices back to the err_idx
     std::copy(error_indices.begin(), error_indices.end(), err_idx->data_allocated);
 }
