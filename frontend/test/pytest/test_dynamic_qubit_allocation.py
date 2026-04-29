@@ -534,23 +534,23 @@ def test_non_probs_measurement_with_dynamic_wires(backend, measurement_fn, shots
     assert np.allclose(observed, expected)
 
 
-@pytest.mark.usefixtures("use_capture")
-def test_adjoint(backend):
+def test_adjoint(backend, tol_stochastic):
     """
     Test adjoints work.
     """
 
-    @qjit
-    @qp.qnode(qp.device(backend, wires=2))
+    @qjit(capture=True)
+    @qp.qnode(qp.device(backend, wires=2), shots=1000, mcm_method="one-shot")
     def circuit():
         with qp.allocate(1) as q:
-            qp.adjoint(qp.X)(q[0])
+            qp.adjoint(qp.RX)(np.pi / 4, q[0])
             qp.CNOT(wires=[q[0], 0])
+            qp.measure(q[0])
         return qp.probs(wires=[0, 1])
 
+    expected = [np.cos(np.pi / 8) ** 2, 0, np.sin(np.pi / 8) ** 2, 0]
     observed = circuit()
-    expected = [0, 0, 1, 0]
-    assert np.allclose(observed, expected)
+    assert np.allclose(observed, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
 
 def test_no_capture(backend):
