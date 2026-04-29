@@ -17,7 +17,6 @@ operates on the phase polynomial representation of subcircuits, the implementati
 an xDSL-agnostic synthesis functionality and an integration thereof into xDSL."""
 
 from dataclasses import dataclass
-from inspect import signature
 from itertools import product
 
 try:

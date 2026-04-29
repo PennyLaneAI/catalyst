@@ -15,7 +15,6 @@
 """This module exposes built-in Catalyst MLIR passes to the frontend."""
 
 import copy
-import functools
 import json
 from pathlib import Path
 from typing import Iterable

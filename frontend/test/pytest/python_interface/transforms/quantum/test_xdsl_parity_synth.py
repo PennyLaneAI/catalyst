@@ -24,7 +24,7 @@ from pennylane.transforms.intermediate_reps import phase_polynomial
 
 from catalyst.python_interface.transforms import (
     ParitySynthPass,
-    parity_synth,
+    parity_synth_pass,
 )
 from catalyst.python_interface.transforms.quantum.parity_synth import _parity_network_synth
 
