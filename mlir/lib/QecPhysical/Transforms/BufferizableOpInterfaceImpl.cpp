@@ -17,11 +17,10 @@
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/Builders.h"
 
 #include "QecPhysical/IR/QecPhysicalDialect.h"
 #include "QecPhysical/IR/QecPhysicalOps.h"
-
-#include <mlir/IR/Builders.h>
 
 using namespace mlir;
 using namespace catalyst::qecp;
