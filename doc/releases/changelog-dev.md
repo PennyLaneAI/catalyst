@@ -2,7 +2,7 @@
 
 <h3>New features since last release</h3>
 
-* A new MLIR transformation pass `--dynamic-one-shot` is available.
+* A new MLIR compilation pass `--dynamic-one-shot` is available.
   Devices that natively support mid-circuit measurements can evaluate dynamic circuits by executing
   them one shot at a time, sampling a dynamic execution path for each shot. The `--dynamic-one-shot`
   pass first transforms the circuit so that each circuit execution only contains a singular shot,
