@@ -119,6 +119,9 @@ auto traceValueWithCallback(mlir::Value value, CallbackT &&callback)
         else if (auto op = dyn_cast<rtio::RTIOQubitToChannelOp>(defOp)) {
             worklist.push(op.getQubit());
         }
+        else if (auto op = dyn_cast<ion::ReadoutBitOp>(defOp)) {
+            worklist.push(op.getInQubit());
+        }
         else if (auto op = dyn_cast<quantum::InsertOp>(defOp)) {
             Value inQreg = op.getInQreg();
             Value qubit = op.getQubit();

@@ -624,15 +624,20 @@ struct MeasureOpToMeasurePulsePattern : public mlir::OpRewritePattern<MeasureOp>
 
         // Create a readout bit op to read out the classical measurement result
         // and thread the qubit wire through.
-        auto readoutOp = ion::ReadoutBitOp::create(rewriter, loc, rewriter.getI1Type(),
-                                                   ion::QubitType::get(ctx), ppOp.getResults()[0]);
+        Type readoutResultTys[] = {ion::QubitType::get(ctx), rewriter.getI32Type()};
+        auto readoutOp = ion::ReadoutBitOp::create(rewriter, loc, TypeRange(readoutResultTys),
+                                                   ppOp.getResults()[0]);
 
         auto qubitResults = convertIonQubitsToQuantumBits(rewriter, loc, readoutOp.getOutQubit());
         if (!qubitResults.has_value()) {
             return failure();
         }
 
-        rewriter.replaceOp(op, {readoutOp.getMres(), qubitResults.value()[0]});
+        Value zero = arith::ConstantOp::create(rewriter, loc, rewriter.getI32IntegerAttr(0));
+        Value mres = arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::ne,
+                                           readoutOp.getCntVal(), zero);
+
+        rewriter.replaceOp(op, {mres, qubitResults.value()[0]});
         return success();
     }
 };

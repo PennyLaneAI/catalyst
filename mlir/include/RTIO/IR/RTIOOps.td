@@ -17,6 +17,7 @@
 
 include "mlir/IR/OpBase.td"
 include "mlir/IR/BuiltinAttributes.td"
+include "mlir/IR/BuiltinTypes.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "RTIO/IR/RTIODialect.td"
 
@@ -211,6 +212,21 @@ def RTIORPCOp : RTIO_Op<"rpc"> {
     }];
 
     let hasVerifier = 1;
+}
+
+def RTIOReadoutOp : RTIO_Op<"readout"> {
+    let summary = "Read measurement count from a measurement pulse event";
+    let description = [{
+        Consumes the `!rtio.event` produced by measurement pulse and yields the
+        hardware readout count (e.g. photon counts) once that pulse has completed.
+    }];
+
+    let arguments = (ins RTIOEventType:$event);
+    let results = (outs I32:$count);
+
+    let assemblyFormat = [{
+        $event attr-dict `:` type($event) `->` type($count)
+    }];
 }
 
 def RTIOEmptyOp : RTIO_Op<"empty", [Pure]> {

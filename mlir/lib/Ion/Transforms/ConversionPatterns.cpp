@@ -343,16 +343,17 @@ struct ReadoutBitOpPattern : public OpConversionPattern<catalyst::ion::ReadoutBi
         MLIRContext *ctx = this->getContext();
         Type ptrType = LLVM::LLVMPointerType::get(ctx);
 
-        Type readoutFuncType = LLVM::LLVMFunctionType::get(IntegerType::get(ctx, 1), {ptrType});
+        Type i32Ty = IntegerType::get(ctx, 32);
+        Type readoutFuncType = LLVM::LLVMFunctionType::get(i32Ty, {ptrType});
         LLVM::LLVMFuncOp readoutFnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, "__catalyst__oqd__readout_bit", readoutFuncType);
 
-        Value mres =
+        Value cntVal =
             LLVM::CallOp::create(rewriter, loc, readoutFnDecl, ValueRange{adaptor.getInQubit()})
                 .getResult();
 
         // Thread the qubit through unchanged; the physical qubit pointer is the same.
-        rewriter.replaceOp(op, {mres, adaptor.getInQubit()});
+        rewriter.replaceOp(op, {adaptor.getInQubit(), cntVal});
         return success();
     }
 };

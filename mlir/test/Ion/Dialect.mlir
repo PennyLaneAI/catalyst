@@ -159,7 +159,7 @@ func.func @example_parallel_protocol_two_qubits(%arg0: f64) -> (!ion.qubit, !ion
     return %3#0, %3#1: !ion.qubit, !ion.qubit
 }
 
-func.func @example_measure_pulse(%arg0: f64) -> i1 {
+func.func @example_measure_pulse(%arg0: f64) -> i32 {
     %0 = quantum.alloc( 1) : !quantum.reg
 
     // CHECK: [[q0:%.+]] = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -192,11 +192,11 @@ func.func @example_measure_pulse(%arg0: f64) -> i1 {
         ion.yield %arg1: !ion.qubit
     }
 
-    // CHECK: [[mres:%.+]], [[out_qubit:%.+]] = ion.readout_bit [[pp]] : i1, !ion.qubit
-    %mres, %out_qubit = ion.readout_bit %pp : i1, !ion.qubit
+    // CHECK: [[out_qubit:%.+]], [[cnt:%.+]] = ion.readout_bit [[pp]] : !ion.qubit, i32
+    %out_qubit, %cnt_val = ion.readout_bit %pp : !ion.qubit, i32
 
-    // CHECK: return [[mres]] : i1
-    return %mres: i1
+    // CHECK: return [[cnt]] : i32
+    return %cnt_val: i32
 }
 
 
