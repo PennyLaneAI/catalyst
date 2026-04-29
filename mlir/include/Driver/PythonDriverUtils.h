@@ -17,9 +17,9 @@
 namespace catalyst {
 namespace driver {
 
-void initialize_python_runtime();
+void initializePythonRuntime();
 
-void finalize_python_runtime();
+void finalizePythonRuntime();
 
 } // namespace driver
 } // namespace catalyst

@@ -22,7 +22,7 @@ namespace py = pybind11;
 namespace catalyst {
 namespace driver {
 
-constexpr const char *site_packages = R"(
+constexpr const char *sitePackages = R"(
 import os
 import sys
 import site
@@ -40,23 +40,23 @@ if venv_path:
 )";
 
 // We use a pointer to explicitly control the lifetime of the interpreter
-static py::scoped_interpreter *global_interpreter = nullptr;
+static py::scoped_interpreter *globalInterpreter = nullptr;
 
-void initialize_python_runtime()
+void initializePythonRuntime()
 {
-    if (global_interpreter) {
+    if (globalInterpreter) {
         return;
     }
 
     // llvm::errs() << "initializing interpreter...\n";
 
     // TODO: optimize this to use the PL interpreter if available
-    global_interpreter = new py::scoped_interpreter();
+    globalInterpreter = new py::scoped_interpreter();
 
     try {
         // llvm::errs() << "\tupdating site packages...\n";
 
-        py::exec(site_packages);
+        py::exec(sitePackages);
     }
     catch (const py::error_already_set &e) {
         llvm::errs() << "Failed to link virtual environment: " << e.what() << "\n";
@@ -64,11 +64,11 @@ void initialize_python_runtime()
     // llvm::errs() << "interpreter initialization complete\n";
 }
 
-void finalize_python_runtime()
+void finalizePythonRuntime()
 {
-    if (driver::global_interpreter) {
-        delete driver::global_interpreter;
-        driver::global_interpreter = nullptr;
+    if (driver::globalInterpreter) {
+        delete driver::globalInterpreter;
+        driver::globalInterpreter = nullptr;
     }
 }
 

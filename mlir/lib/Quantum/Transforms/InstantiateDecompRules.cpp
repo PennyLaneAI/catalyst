@@ -22,12 +22,12 @@
 namespace catalyst {
 namespace quantum {
 
-#define GEN_PASS_DEF_INSTANTIATEPYTHONDECOMPRULEPASS
+#define GEN_PASS_DEF_INSTANTIATEDECOMPRULESPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct InstantiatePythonDecompRulePass
-    : public impl::InstantiatePythonDecompRulePassBase<InstantiatePythonDecompRulePass> {
-    using InstantiatePythonDecompRulePassBase::InstantiatePythonDecompRulePassBase;
+struct InstantiateDecompRulesPass
+    : public impl::InstantiateDecompRulesPassBase<InstantiateDecompRulesPass> {
+    using InstantiateDecompRulesPassBase::InstantiateDecompRulesPassBase;
 
     void runOnOperation() override
     {
@@ -60,8 +60,8 @@ struct InstantiatePythonDecompRulePass
             }
             llvm::errs() << "}\n";
 
-            auto outOp = get_op_from_python(module, "catalyst.utils.python_callbacks",
-                                            "test_rot_to_ppr", args, wires);
+            auto outOp = getFuncOpFromPython(module, "catalyst.utils.python_callbacks",
+                                             "test_rot_to_ppr", args, wires);
             outOp->setName((outOp->getName() + "_" + llvm::StringRef(pauliWord)).str());
             module.push_back(outOp.release());
             return mlir::WalkResult::advance();
