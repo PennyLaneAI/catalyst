@@ -513,14 +513,9 @@ class TestParitySynthIntegration:
             qp.CNOT((1, 0))
             return qp.state()
 
-<<<<<<< HEAD
-        raw_circuit = qml.qjit(circuit)
-        compiled_circuit = qml.qjit(parity_synth(circuit))
-=======
         raw_circuit = qp.qjit(circuit)
-        compiled_circuit = qp.qjit(parity_synth_pass(circuit))
+        compiled_circuit = qp.qjit(parity_synth(circuit))
 
->>>>>>> main
         run_filecheck_qjit(compiled_circuit)
         args = (0.6, 0.2, -1.8)
         assert np.allclose(raw_circuit(*args), compiled_circuit(*args))
@@ -605,13 +600,8 @@ class TestParitySynthIntegration:
 
             return qp.state()
 
-<<<<<<< HEAD
-        raw_circuit = qml.qjit(circuit)
-        compiled_circuit = qml.qjit(parity_synth(circuit))
-=======
         raw_circuit = qp.qjit(circuit)
-        compiled_circuit = qp.qjit(parity_synth_pass(circuit))
->>>>>>> main
+        compiled_circuit = qp.qjit(parity_synth(circuit))
 
         run_filecheck_qjit(compiled_circuit)
         args = (0.6, 0.2, -1.8)
@@ -692,13 +682,8 @@ class TestParitySynthIntegration:
 
             return qp.state()
 
-<<<<<<< HEAD
-        raw_circuit = qml.qjit(circuit)
-        compiled_circuit = qml.qjit(parity_synth(circuit))
-=======
         raw_circuit = qp.qjit(circuit)
-        compiled_circuit = qp.qjit(parity_synth_pass(circuit))
->>>>>>> main
+        compiled_circuit = qp.qjit(parity_synth(circuit))
 
         run_filecheck_qjit(compiled_circuit)
         for x in [0.5, 1.5, 2.5, 3.5]:
