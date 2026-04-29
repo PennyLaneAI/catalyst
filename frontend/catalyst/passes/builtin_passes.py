@@ -458,7 +458,7 @@ merge_rotations = qp.transform(
 )
 
 
-def parity_synth_setup_inputs(qnode):
+def parity_synth_setup_inputs():
     r"""Pass for synthesizing phase polynomials in a circuit.
 
     ParitySynth has been proposed by Vandaele et al. in `arXiv:2104.00934
