@@ -338,6 +338,13 @@ def AssembleTannerGraphOp : QecPhysical_Op<"assemble_tanner"> {
         $row_idx `,` $col_ptr attr-dict `:` type($row_idx) `,` type($col_ptr) `->` qualified(type($tanner_graph))
     }];
 
+    let extraClassDeclaration = [{
+        bool isBufferized() {
+            return mlir::isa<mlir::MemRefType>(getRowIdx().getType()) &&
+                   mlir::isa<mlir::MemRefType>(getColPtr().getType());
+        }
+    }];
+
     let hasVerifier = 1;
 }
 
@@ -390,6 +397,12 @@ def DecodeEsmCssOp : QecPhysical_Op<"decode_esm_css"> {
         Optional<1DTensorOf<[Index]>>:$err_idx
     );
 
+    let extraClassDeclaration = [{
+        bool isBufferized() {
+            return mlir::isa<mlir::MemRefType>(getEsm().getType()) && getResultTypes().empty();
+        }
+    }];
+
     let assemblyFormat = [{
         `(` $tanner_graph `:` qualified(type($tanner_graph)) `)` $esm
         ( `in` `(` $err_idx_in^ `:` type($err_idx_in) `)` )?
@@ -422,6 +435,13 @@ def DecodePhysicalMeasurementOp : QecPhysical_Op<"decode_physical_meas"> {
     let results = (outs
         Optional<1DTensorOf<[I1]>>:$logical_measurements
     );
+
+    let extraClassDeclaration = [{
+        bool isBufferized() {
+            return mlir::isa<mlir::MemRefType>(getPhysicalMeasurements().getType()) &&
+                   getResultTypes().empty();
+        }
+    }];
 
     let assemblyFormat = [{
         $physical_measurements
