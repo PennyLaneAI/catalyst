@@ -20,8 +20,8 @@ namespace Catalyst::Runtime::QEC {
 
 extern "C" {
 
-void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
-                                   MemRefT_int64_1d *col_ptr_tanner, MemRefT_int8_1d *syndrome_res,
+void __catalyst__qecp__lut_decoder(MemRefT_int32_1d *row_idx_tanner,
+                                   MemRefT_int32_1d *col_ptr_tanner, MemRefT_int8_1d *syndrome_res,
                                    MemRefT_int64_1d *err_idx);
 
 } // extern "C"

@@ -48,8 +48,8 @@ namespace Catalyst::Runtime::QEC {
  * @param syndrome_results Pointer to the syndrome measurement data.
  * @param err_idx Pointer to the error qubit indices data.
  */
-void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
-                                   MemRefT_int64_1d *col_ptr_tanner,
+void __catalyst__qecp__lut_decoder(MemRefT_int32_1d *row_idx_tanner,
+                                   MemRefT_int32_1d *col_ptr_tanner,
                                    MemRefT_int8_1d *current_syndromes, MemRefT_int64_1d *err_idx)
 {
     // TODOs: We should expect the following const value from args.
@@ -65,13 +65,13 @@ void __catalyst__qecp__lut_decoder(MemRefT_int64_1d *row_idx_tanner,
     RT_FAIL_IF(syndromes_res.size() != (code_size - 1) / 2, "Bad syndrome result input.");
     RT_FAIL_IF(err_idx->sizes[0] != (code_distance - 1) / 2, "Bad err_idx input.");
 
-    DataView<int64_t, 1> row_idx(row_idx_tanner->data_aligned, row_idx_tanner->offset,
+    DataView<int32_t, 1> row_idx(row_idx_tanner->data_aligned, row_idx_tanner->offset,
                                  row_idx_tanner->sizes, row_idx_tanner->strides);
-    DataView<int64_t, 1> col_ptr(col_ptr_tanner->data_aligned, col_ptr_tanner->offset,
+    DataView<int32_t, 1> col_ptr(col_ptr_tanner->data_aligned, col_ptr_tanner->offset,
                                  col_ptr_tanner->sizes, col_ptr_tanner->strides);
 
-    auto &current_lut = LUTs<int64_t>::getInstance().get_lut(aux_col_offset, code_size,
-                                                             code_distance, row_idx, col_ptr);
+    auto &current_lut = LUTs<int32_t, int64_t>::getInstance().get_lut(
+        aux_col_offset, code_size, code_distance, row_idx, col_ptr);
 
     auto syndrome_str = convert_syndrome_res_to_bitstr<int8_t>(syndromes_res);
 
