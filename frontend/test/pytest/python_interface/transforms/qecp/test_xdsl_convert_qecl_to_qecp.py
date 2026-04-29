@@ -110,7 +110,18 @@ class TestTypeConversionPattern:
         }}
         """
         pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n), transversal_1q_gates={}, transversal_2q_gates={})),
+            ConvertQecLogicalToQecPhysicalPass(
+                qec_code=QecCode(
+                    "",
+                    n,
+                    k,
+                    3,
+                    np.eye(n),
+                    np.eye(n),
+                    transversal_1q_gates={},
+                    transversal_2q_gates={},
+                )
+            ),
         )
         run_filecheck(program, pipeline)
 
@@ -128,7 +139,18 @@ class TestTypeConversionPattern:
         }
         """
         pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", 7, 1, 3, np.eye(7), np.eye(7), transversal_1q_gates={}, transversal_2q_gates={})),
+            ConvertQecLogicalToQecPhysicalPass(
+                qec_code=QecCode(
+                    "",
+                    7,
+                    1,
+                    3,
+                    np.eye(7),
+                    np.eye(7),
+                    transversal_1q_gates={},
+                    transversal_2q_gates={},
+                )
+            ),
         )
 
         with pytest.raises(CompileError, match="Failed to convert type"):
@@ -148,7 +170,18 @@ class TestTypeConversionPattern:
         }
         """
         pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", 7, 1, 3, np.eye(7), np.eye(7), transversal_1q_gates={}, transversal_2q_gates={})),
+            ConvertQecLogicalToQecPhysicalPass(
+                qec_code=QecCode(
+                    "",
+                    7,
+                    1,
+                    3,
+                    np.eye(7),
+                    np.eye(7),
+                    transversal_1q_gates={},
+                    transversal_2q_gates={},
+                )
+            ),
         )
 
         with pytest.raises(CompileError, match="Failed to convert type"):
@@ -182,7 +215,18 @@ class TestAllocAndDeallocConversionPatterns:
         """
 
         pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n), transversal_1q_gates={}, transversal_2q_gates={})),
+            ConvertQecLogicalToQecPhysicalPass(
+                qec_code=QecCode(
+                    "",
+                    n,
+                    k,
+                    3,
+                    np.eye(n),
+                    np.eye(n),
+                    transversal_1q_gates={},
+                    transversal_2q_gates={},
+                )
+            ),
         )
         run_filecheck(program, pipeline)
 
@@ -208,7 +252,18 @@ class TestAllocAndDeallocConversionPatterns:
         """
 
         pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n), transversal_1q_gates={}, transversal_2q_gates={})),
+            ConvertQecLogicalToQecPhysicalPass(
+                qec_code=QecCode(
+                    "",
+                    n,
+                    k,
+                    3,
+                    np.eye(n),
+                    np.eye(n),
+                    transversal_1q_gates={},
+                    transversal_2q_gates={},
+                )
+            ),
         )
         run_filecheck(program, pipeline)
 
@@ -244,7 +299,18 @@ class TestInsertExtractConversionPatterns:
         """
 
         pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n), transversal_1q_gates={}, transversal_2q_gates={})),
+            ConvertQecLogicalToQecPhysicalPass(
+                qec_code=QecCode(
+                    "",
+                    n,
+                    k,
+                    3,
+                    np.eye(n),
+                    np.eye(n),
+                    transversal_1q_gates={},
+                    transversal_2q_gates={},
+                )
+            ),
         )
         run_filecheck(program, pipeline)
 
@@ -273,11 +339,24 @@ class TestInsertExtractConversionPatterns:
         """
 
         pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n), transversal_1q_gates={}, transversal_2q_gates={})),
+            ConvertQecLogicalToQecPhysicalPass(
+                qec_code=QecCode(
+                    "",
+                    n,
+                    k,
+                    3,
+                    np.eye(n),
+                    np.eye(n),
+                    transversal_1q_gates={},
+                    transversal_2q_gates={},
+                )
+            ),
         )
         run_filecheck(program, pipeline)
 
+
 # MARK: TestLoweringEncode
+
 
 class TestLoweringEncode:
     """Test lowering the qecl.EncodeOp to a subroutine of qecp gates"""
@@ -292,7 +371,16 @@ class TestLoweringEncode:
         two auxiliary qubits (set by the number of rows in the z_tanner graph)"""
 
         n = 2
-        qec_code = QecCode(code_name, n=n, k=k, d=1, x_tanner=np.eye(n), z_tanner=np.eye(n), transversal_1q_gates={}, transversal_2q_gates={})
+        qec_code = QecCode(
+            code_name,
+            n=n,
+            k=k,
+            d=1,
+            x_tanner=np.eye(n),
+            z_tanner=np.eye(n),
+            transversal_1q_gates={},
+            transversal_2q_gates={},
+        )
 
         program = f"""
         builtin.module @module_circuit {{
@@ -463,17 +551,27 @@ class TestLoweringMeasure:
 
 # MARK: TestTransversalGates
 
+
 class TestLoweringTransversalGates:
     """Unit tests for lowering transversal gates in the convert-qecl-to-qecp pass."""
 
     def test_single_qubit_op_lowering_generic(self, run_filecheck):
-        """Test that a generic QEC code lowers ops as instructed. In this case (n=3, 
-        x is transversal and applied on indicies 0 and 2), we expect to extract 3 
+        """Test that a generic QEC code lowers ops as instructed. In this case (n=3,
+        x is transversal and applied on indicies 0 and 2), we expect to extract 3
         qubits, apply the pattern XIX on them, and re-insert them."""
 
         n, k = (3, 1)
 
-        qec_code = QecCode("TestCode", n=n, k=k, d=1, x_tanner=np.eye(n), z_tanner=np.eye(n), transversal_1q_gates={"x": (qecp.PauliXOp, [0, 2])}, transversal_2q_gates={})
+        qec_code = QecCode(
+            "TestCode",
+            n=n,
+            k=k,
+            d=1,
+            x_tanner=np.eye(n),
+            z_tanner=np.eye(n),
+            transversal_1q_gates={"x": (qecp.PauliXOp, [0, 2])},
+            transversal_2q_gates={},
+        )
 
         program = f"""
         builtin.module @module_circuit {{
@@ -503,13 +601,22 @@ class TestLoweringTransversalGates:
         run_filecheck(program, pipeline)
 
     def test_two_qubit_op_lowering_generic(self, run_filecheck):
-        """Test that a generic QEC code lowers ops as instructed. In this case (n=3, 
-        x is transversal and applied on indicies 0 and 2), we expect to extract 3 
+        """Test that a generic QEC code lowers ops as instructed. In this case (n=3,
+        x is transversal and applied on indicies 0 and 2), we expect to extract 3
         qubits, apply the pattern XIX on them, and re-insert them."""
 
         n, k = (3, 1)
 
-        qec_code = QecCode("TestCode", n=n, k=k, d=1, x_tanner=np.eye(n), z_tanner=np.eye(n), transversal_1q_gates={}, transversal_2q_gates={"cnot": qecp.CnotOp})
+        qec_code = QecCode(
+            "TestCode",
+            n=n,
+            k=k,
+            d=1,
+            x_tanner=np.eye(n),
+            z_tanner=np.eye(n),
+            transversal_1q_gates={},
+            transversal_2q_gates={"cnot": qecp.CnotOp},
+        )
 
         program = f"""
         builtin.module @module_circuit {{
@@ -548,7 +655,7 @@ class TestLoweringTransversalGates:
 
     @pytest.mark.parametrize("gate", ("x", "y", "z"))
     def test_pauli_lowering_Steane(self, gate, run_filecheck, qecl_to_qecp_steane_pipeline):
-        """Test that using the Steane code lowers Pauli ops as expected. These ops are applied 
+        """Test that using the Steane code lowers Pauli ops as expected. These ops are applied
         on the last 3 qubits in the codeblock, and identity is applied to the rest."""
 
         program = f"""
@@ -588,10 +695,12 @@ class TestLoweringTransversalGates:
             """
 
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
-    
+
     @pytest.mark.parametrize("gate, adj", [("s", "adj"), ("hadamard", ""), ("identity", "")])
-    def test_single_qubit_gate_lowering_Steane(self, gate, adj, run_filecheck, qecl_to_qecp_steane_pipeline):
-        """Test that using the Steane code lowers Hadamard, Identity and S ops as expected. These ops 
+    def test_single_qubit_gate_lowering_Steane(
+        self, gate, adj, run_filecheck, qecl_to_qecp_steane_pipeline
+    ):
+        """Test that using the Steane code lowers Hadamard, Identity and S ops as expected. These ops
         are applied on all qubits in the codeblock. For the S operator, the adjoint is applied."""
 
         program = f"""
@@ -696,7 +805,16 @@ class TestLoweringTransversalGates:
 
         n, k = (3, 1)
 
-        qec_code = QecCode("TestCode", n=n, k=k, d=1, x_tanner=np.eye(n), z_tanner=np.eye(n), transversal_1q_gates={"x": (qecp.PauliXOp, [0, 1])}, transversal_2q_gates={})
+        qec_code = QecCode(
+            "TestCode",
+            n=n,
+            k=k,
+            d=1,
+            x_tanner=np.eye(n),
+            z_tanner=np.eye(n),
+            transversal_1q_gates={"x": (qecp.PauliXOp, [0, 1])},
+            transversal_2q_gates={},
+        )
 
         program = f"""
         builtin.module @module_circuit {{
@@ -716,6 +834,7 @@ class TestLoweringTransversalGates:
 
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
         run_filecheck(program, pipeline)
+
 
 # MARK: TestQECLNoiseLoweringPassIntegration
 
