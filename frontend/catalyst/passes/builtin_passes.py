@@ -21,9 +21,9 @@ from pathlib import Path
 from typing import Iterable
 
 import pennylane as qp
+from pennylane.decomposition.utils import to_name
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
-from catalyst.passes.utils import prepare_decomposition_options
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
@@ -31,7 +31,7 @@ from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 
 ## API ##
-def cancel_inverses(qnode):
+def cancel_inverses_setup_inputs():
     """
     Specify that the ``-cancel-inverses`` MLIR compiler pass
     for cancelling two neighbouring self-inverse
@@ -143,11 +143,15 @@ def cancel_inverses(qnode):
         %2 = quantum.namedobs %out_qubits[ PauliZ] : !quantum.obs
         %3 = quantum.expval %2 : f64
     """
-    return qp.transform(pass_name="cancel-inverses")(qnode)
+    return (), {}
 
 
-def diagonalize_measurements(
-    qnode=None,
+cancel_inverses = qp.transform(
+    pass_name="cancel-inverses", setup_inputs=cancel_inverses_setup_inputs
+)
+
+
+def diagonalize_measurements_setup_inputs(
     supported_base_obs: tuple[str, ...] = ("PauliZ", "Identity"),
     to_eigvals: bool = False,
 ):
@@ -256,16 +260,15 @@ def diagonalize_measurements(
     >>> print(error_msg)
     Observables are not qubit-wise commuting. Please apply the `split-non-commuting` pass first.
     """
-    if qnode is None:
-        return functools.partial(
-            diagonalize_measurements, supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
-        )
-    return qp.transform(pass_name="diagonalize-final-measurements")(
-        qnode, supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
-    )
+    return (), {"supported_base_obs": supported_base_obs, "to_eigvals": to_eigvals}
 
 
-def disentangle_cnot(qnode):
+diagonalize_measurements = qp.transform(
+    pass_name="diagonalize-final-measurements", setup_inputs=diagonalize_measurements_setup_inputs
+)
+
+
+def disentangle_cnot_setup_inputs():
     r"""A peephole optimization for replacing ``CNOT`` gates with single-qubit gates.
 
     .. note::
@@ -316,10 +319,15 @@ def disentangle_cnot(qnode):
     - state(all wires): 1
     Depth: Not computed
     """
-    return qp.transform(pass_name="disentangle-cnot")(qnode)
+    return (), {}
 
 
-def disentangle_swap(qnode):
+disentangle_cnot = qp.transform(
+    pass_name="disentangle-cnot", setup_inputs=disentangle_cnot_setup_inputs
+)
+
+
+def disentangle_swap_setup_inputs():
     r"""A peephole optimization for replacing ``SWAP`` gates with simpler gates (``PauliX`` and
     ``CNOT``).
 
@@ -373,10 +381,15 @@ def disentangle_swap(qnode):
     - state(all wires): 1
     Depth: Not computed
     """
-    return qp.transform(pass_name="disentangle-swap")(qnode)
+    return (), {}
 
 
-def merge_rotations(qnode):
+disentangle_swap = qp.transform(
+    pass_name="disentangle-swap", setup_inputs=disentangle_swap_setup_inputs
+)
+
+
+def merge_rotations_setup_inputs():
     r"""Specify that the ``-merge-rotations`` MLIR compiler pass
     for merging roations (peephole) will be applied.
 
@@ -437,10 +450,15 @@ def merge_rotations(qnode):
     >>> circuit(0.54)
     Array(0.5965506257017892, dtype=float64)
     """
-    return qp.transform(pass_name="merge-rotations")(qnode)
+    return (), {}
 
 
-def decompose_lowering(qnode):
+merge_rotations = qp.transform(
+    pass_name="merge-rotations", setup_inputs=merge_rotations_setup_inputs
+)
+
+
+def decompose_lowering_setup_inputs():  # pragma: no cover
     """
     Specify that the ``-decompose-lowering`` MLIR compiler pass
     for applying the compiled decomposition rules to the QNode
@@ -456,10 +474,15 @@ def decompose_lowering(qnode):
         // TODO: add example here
 
     """
-    return qp.transform(pass_name="decompose-lowering")(qnode)  # pragma: no cover
+    return (), {}
 
 
-def ions_decomposition(qnode):  # pragma: nocover
+decompose_lowering = qp.transform(
+    pass_name="decompose-lowering", setup_inputs=decompose_lowering_setup_inputs
+)  # pragma: no cover
+
+
+def ions_decomposition_setup_inputs():  # pragma: nocover
     """
     Specify that the ``--ions-decomposition`` MLIR compiler pass should be
     applied to the decorated QNode during :func:`~.qjit` compilation.
@@ -578,10 +601,15 @@ def ions_decomposition(qnode):  # pragma: nocover
         %out_qubits_8 = quantum.custom "RY"(%cst_2) %out_qubits_6#1 : !quantum.bit
         %out_qubits_9 = quantum.custom "RY"(%cst_2) %out_qubits_7 : !quantum.bit
     """
-    return qp.transform(pass_name="ions-decomposition")(qnode)
+    return (), {}
 
 
-def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
+ions_decomposition = qp.transform(
+    pass_name="ions-decomposition", setup_inputs=ions_decomposition_setup_inputs
+)
+
+
+def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
     r"""A quantum compilation pass to discretize
     single-qubit RZ and PhaseShift gates into the Clifford+T basis or the PPR basis using the Ross-Selinger Gridsynth algorithm.
     Reference: https://arxiv.org/abs/1403.2975
@@ -667,13 +695,13 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
 
 
     """
-    if qnode is None:
-        return functools.partial(gridsynth, epsilon=epsilon, ppr_basis=ppr_basis)
-
-    return qp.transform(pass_name="gridsynth")(qnode, epsilon=epsilon, ppr_basis=ppr_basis)
+    return (), {"epsilon": epsilon, "ppr_basis": ppr_basis}
 
 
-def to_ppr(qnode):
+gridsynth = qp.transform(pass_name="gridsynth", setup_inputs=gridsynth_setup_inputs)
+
+
+def to_ppr_setup_inputs():
     r"""A quantum compilation pass that converts Clifford+T gates into Pauli Product Rotation (PPR)
     gates.
 
@@ -763,10 +791,13 @@ def to_ppr(qnode):
     Note that the mid-circuit measurement (:func:`pennylane.measure`) in the circuit has been
     converted to a Pauli product measurement (PPM), as well.
     """
-    return qp.transform(pass_name="to-ppr")(qnode)
+    return (), {}
 
 
-def commute_ppr(qnode=None, *, max_pauli_size=0):
+to_ppr = qp.transform(pass_name="to-ppr", setup_inputs=to_ppr_setup_inputs)
+
+
+def commute_ppr_setup_inputs(max_pauli_size=0):
     r"""A quantum compilation pass that commutes Clifford Pauli product rotation (PPR) gates,
     :math:`\exp(-{iP\tfrac{\pi}{4}})`, past non-Clifford PPRs gates,
     :math:`\exp(-{iP\tfrac{\pi}{8}})`, where :math:`P` is a Pauli word.
@@ -863,13 +894,13 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
     (here, ``max_pauli_size = 2``), that commutation would be skipped.
     """
 
-    if qnode is None:
-        return functools.partial(commute_ppr, max_pauli_size=max_pauli_size)
-
-    return qp.transform(pass_name="commute-ppr")(qnode, max_pauli_size=max_pauli_size)
+    return (), {"max_pauli_size": max_pauli_size}
 
 
-def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
+commute_ppr = qp.transform(pass_name="commute-ppr", setup_inputs=commute_ppr_setup_inputs)
+
+
+def merge_ppr_ppm_setup_inputs(max_pauli_size=0):
     r"""A quantum compilation pass that absorbs Clifford Pauli product rotation (PPR) operations,
     :math:`\exp{-iP\tfrac{\pi}{4}}`, into the final Pauli product measurements (PPMs).
 
@@ -951,13 +982,13 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     operation would be skipped. In the above output, ``PPM-w<int>`` denotes the PPM weight (the
     number of qubits it acts on, or the length of the Pauli word).
     """
-    if qnode is None:
-        return functools.partial(merge_ppr_ppm, max_pauli_size=max_pauli_size)
-
-    return qp.transform(pass_name="merge-ppr-ppm")(qnode, max_pauli_size=max_pauli_size)
+    return (), {"max_pauli_size": max_pauli_size}
 
 
-def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measure=False):
+merge_ppr_ppm = qp.transform(pass_name="merge-ppr-ppm", setup_inputs=merge_ppr_ppm_setup_inputs)
+
+
+def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=False):
     r"""A quantum compilation pass that decomposes Pauli product rotations (PPRs),
     :math:`P(\theta) = \exp(-iP\theta)`, into Pauli product measurements (PPMs).
 
@@ -1065,18 +1096,14 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
     (:math:`P(\tfrac{\pi}{2}) = \exp(-iP\tfrac{\pi}{2}) = P`). Pauli operators can be commuted to
     the end of the circuit and absorbed into terminal measurements.
     """
-    if qnode is None:
-        return functools.partial(
-            ppr_to_ppm, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure
-        )
-
-    return qp.transform(pass_name="ppr-to-ppm")(
-        qnode, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure
-    )
+    return (), {"decompose_method": decompose_method, "avoid_y_measure": avoid_y_measure}
 
 
-def ppm_compilation(
-    qnode=None, *, decompose_method="pauli-corrected", avoid_y_measure=False, max_pauli_size=0
+ppr_to_ppm = qp.transform(pass_name="ppr-to-ppm", setup_inputs=ppr_to_ppm_setup_inputs)
+
+
+def ppm_compilation_setup_inputs(
+    decompose_method="pauli-corrected", avoid_y_measure=False, max_pauli_size=0
 ):
     r"""A quantum compilation pass that transforms Clifford+T gates into Pauli product measurements
     (PPMs).
@@ -1179,20 +1206,17 @@ def ppm_compilation(
     ``max_pauli_size`` qubits (here, ``max_pauli_size = 2``), that commutation or merge would be
     skipped.
     """
-    if qnode is None:
-        return functools.partial(
-            ppm_compilation,
-            decompose_method=decompose_method,
-            avoid_y_measure=avoid_y_measure,
-            max_pauli_size=max_pauli_size,
-        )
 
-    return qp.transform(pass_name="ppm-compilation")(
-        qnode,
-        decompose_method=decompose_method,
-        avoid_y_measure=avoid_y_measure,
-        max_pauli_size=max_pauli_size,
-    )
+    return (), {
+        "decompose_method": decompose_method,
+        "avoid_y_measure": avoid_y_measure,
+        "max_pauli_size": max_pauli_size,
+    }
+
+
+ppm_compilation = qp.transform(
+    pass_name="ppm-compilation", setup_inputs=ppm_compilation_setup_inputs
+)
 
 
 def ppm_specs(fn):
@@ -1298,7 +1322,7 @@ def ppm_specs(fn):
         raise NotImplementedError("PPM passes only support AOT (Ahead-Of-Time) compilation mode.")
 
 
-def reduce_t_depth(qnode):
+def reduce_t_depth_setup_inputs():
     r"""A quantum compilation pass that reduces the depth and count of non-Clifford Pauli product
     rotation (PPR, :math:`P(\theta) = \exp(-iP\theta)`) operators (e.g., ``T`` gates) by commuting
     PPRs in adjacent layers and merging compatible ones (a layer comprises PPRs that mutually
@@ -1387,11 +1411,13 @@ def reduce_t_depth(qnode):
         :alt: Graphical representation of circuit with ``reduce_t_depth``
         :align: left
     """
+    return (), {}
 
-    return qp.transform(pass_name="reduce-t-depth")(qnode)
+
+reduce_t_depth = qp.transform(pass_name="reduce-t-depth", setup_inputs=reduce_t_depth_setup_inputs)
 
 
-def ppr_to_mbqc(qnode):
+def ppr_to_mbqc_setup_inputs():
     r"""Specify that the MLIR compiler pass for lowering Pauli Product Rotations (PPR)
     and Pauli Product Measurements (PPM) to a measurement-based quantum computing
     (MBQC) style circuit will be applied.
@@ -1474,12 +1500,16 @@ def ppr_to_mbqc(qnode):
         ...
 
     """
-    return qp.transform(pass_name="ppr-to-mbqc")(qnode)
+
+    return (), {}
+
+
+ppr_to_mbqc = qp.transform(pass_name="ppr-to-mbqc", setup_inputs=ppr_to_mbqc_setup_inputs)
 
 
 # This pass is already covered via applying by pass
 # `qp.transform(pass_name="decompose-arbitrary-ppr")` in Pennylane.
-def decompose_arbitrary_ppr(qnode):  # pragma: nocover
+def decompose_arbitrary_ppr_setup_inputs():  # pragma: nocover
     r"""A quantum compilation pass that decomposes arbitrary-angle Pauli product rotations (PPRs) into a
     collection of PPRs (with angles of rotation of :math:`\tfrac{\pi}{2}`, :math:`\tfrac{\pi}{4}`,
     and :math:`\tfrac{\pi}{8}`), PPMs and a single-qubit arbitrary-angle PPR in the Z basis. For
@@ -1554,17 +1584,21 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
     ``PPR-Phi-w<int>`` corresponds to a PPR whose angle of rotation is not :math:`\tfrac{\pi}{2}`,
     :math:`\tfrac{\pi}{4}`, or :math:`\tfrac{\pi}{8}`.
     """
-    return qp.transform(pass_name="decompose-arbitrary-ppr")(qnode)
+    return (), {}
 
 
-def graph_decomposition(
-    qnode=None,
-    *,
+decompose_arbitrary_ppr = qp.transform(
+    pass_name="decompose-arbitrary-ppr", setup_inputs=decompose_arbitrary_ppr_setup_inputs
+)
+
+
+def graph_decomposition_setup_inputs(
     gate_set: Iterable[type | str] | dict[type | str, float],
     fixed_decomps: dict | None = None,
     alt_decomps: dict | None = None,
+    bytecode_rules: str | None = None,
     _builtin_rule_path: Path = BYTECODE_FILE_PATH,
-):
+):  # pylint: disable=unused-argument
     R"""
     Specify that the ``-graph-decomposition`` MLIR compiler pass for applying the graph-based
     decomposition should be applied to the decorated QNode during :func:`~.qjit` compilation.
@@ -1653,20 +1687,58 @@ def graph_decomposition(
     >>> qp.specs(circuit, level="device")(1.23, 4.56).resources.gate_types
     {'Rot': 2}
     """
-    if qnode is None:
-        return functools.partial(
-            graph_decomposition,
-            gate_set=gate_set,
-            fixed_decomps=fixed_decomps,
-            alt_decomps=alt_decomps,
-            _builtin_rule_path=_builtin_rule_path,
-        )
 
-    options = prepare_decomposition_options(
-        gate_set=gate_set,
-        fixed_decomps=fixed_decomps,
-        alt_decomps=alt_decomps,
-        _builtin_rule_path=_builtin_rule_path,
-    )
+    if not isinstance(gate_set, dict):
+        gate_set = {to_name(op): 1.0 for op in gate_set}
+    else:
+        gate_set = {to_name(op): float(cost) for op, cost in gate_set.items()}
 
-    return qp.transform(pass_name="graph-decomposition")(qnode, **options)
+    options: dict[str, dict | tuple | str] = {
+        "gate_set": gate_set,
+        "bytecode_rules": str(_builtin_rule_path),
+    }
+
+    if fixed_decomps:
+        options |= {
+            "fixed_decomps": {
+                to_name(op): (rule if isinstance(rule, str) else rule.__name__)
+                for op, rule in fixed_decomps.items()
+            }
+        }
+
+    if alt_decomps:
+        options |= {
+            "alt_decomps": {
+                to_name(op): tuple(
+                    (rule if isinstance(rule, str) else rule.__name__) for rule in rules
+                )
+                for op, rules in alt_decomps.items()
+            }
+        }
+
+    return (), options
+
+
+graph_decomposition = qp.transform(
+    pass_name="graph-decomposition", setup_inputs=graph_decomposition_setup_inputs
+)
+
+__all__ = [
+    "cancel_inverses",
+    "disentangle_cnot",
+    "disentangle_swap",
+    "merge_rotations",
+    "decompose_lowering",
+    "ions_decomposition",
+    "to_ppr",
+    "gridsynth",
+    "commute_ppr",
+    "merge_ppr_ppm",
+    "ppr_to_ppm",
+    "ppm_compilation",
+    "reduce_t_depth",
+    "ppr_to_mbqc",
+    "decompose_arbitrary_ppr",
+    "graph_decomposition",
+    "diagonalize_measurements",
+]
