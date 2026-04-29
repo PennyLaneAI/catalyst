@@ -16,7 +16,7 @@ import platform
 from copy import deepcopy
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 from jax import numpy as jnp
 from utils import CONFIG_CUSTOM_DEVICE
@@ -35,12 +35,12 @@ class TestSample:
     def test_sample_on_0qbits(self):
         """Test sample on 0 qubits."""
 
-        device = qml.device("lightning.qubit", wires=0)
+        device = qp.device("lightning.qubit", wires=0)
 
         @qjit
-        @qml.qnode(device, shots=10)
+        @qp.qnode(device, shots=10)
         def sample_0qbit():
-            return qml.sample()
+            return qp.sample()
 
         expected = np.empty(shape=(10, 0), dtype=int)
         observed = sample_0qbit()
@@ -49,13 +49,13 @@ class TestSample:
     def test_sample_on_1qbit(self, backend):
         """Test sample on 1 qubit."""
 
-        device = qml.device(backend, wires=1)
+        device = qp.device(backend, wires=1)
 
         @qjit
-        @qml.qnode(device, shots=1000)
+        @qp.qnode(device, shots=1000)
         def sample_1qbit(x: float):
-            qml.RX(x, wires=0)
-            return qml.sample()
+            qp.RX(x, wires=0)
+            return qp.sample()
 
         expected = np.array([[0]] * 1000)
         observed = sample_1qbit(0.0)
@@ -68,14 +68,14 @@ class TestSample:
     def test_sample_on_2qbits(self, backend):
         """Test sample on 2 qubits."""
 
-        device = qml.device(backend, wires=2)
+        device = qp.device(backend, wires=2)
 
         @qjit
-        @qml.qnode(device, shots=1000)
+        @qp.qnode(device, shots=1000)
         def sample_2qbits(x: float):
-            qml.RX(x, wires=0)
-            qml.RY(x, wires=1)
-            return qml.sample()
+            qp.RX(x, wires=0)
+            qp.RY(x, wires=1)
+            return qp.sample()
 
         expected = np.array([[0, 0]] * 1000)
         observed = sample_2qbits(0.0)
@@ -90,14 +90,14 @@ class TestSample:
 
         # Devices must specify wires for integration with program capture
         # Since this test is used to test dynamic wires, we skip it if capture is enabled
-        if qml.capture.enabled():
+        if qp.capture.enabled():
             return
 
-        @qml.set_shots(10)
-        @qml.qnode(qml.device("lightning.qubit"), mcm_method=mcm_method)
+        @qp.set_shots(10)
+        @qp.qnode(qp.device("lightning.qubit"), mcm_method=mcm_method)
         def sample_dynamic_wires():
-            qml.Hadamard(wires=1)
-            return qml.sample()
+            qp.Hadamard(wires=1)
+            return qp.sample()
 
         if mcm_method == "one-shot":
             with pytest.raises(
@@ -117,10 +117,10 @@ class TestCounts:
         """Test counts on 0 qubits."""
 
         @qjit
-        @qml.set_shots(10)
-        @qml.qnode(qml.device("lightning.qubit", wires=0))
+        @qp.set_shots(10)
+        @qp.qnode(qp.device("lightning.qubit", wires=0))
         def counts_0qbit():
-            return qml.counts(all_outcomes=True)
+            return qp.counts(all_outcomes=True)
 
         expected = [np.array([0]), np.array([10])]
         observed = counts_0qbit()
@@ -131,11 +131,11 @@ class TestCounts:
         """Test counts on 1 qubits."""
 
         @qjit
-        @qml.set_shots(1000)
-        @qml.qnode(qml.device(backend, wires=1), mcm_method=mcm_method)
+        @qp.set_shots(1000)
+        @qp.qnode(qp.device(backend, wires=1), mcm_method=mcm_method)
         def counts_1qbit(x: float):
-            qml.RX(x, wires=0)
-            return qml.counts(all_outcomes=True)
+            qp.RX(x, wires=0)
+            return qp.counts(all_outcomes=True)
 
         expected = [np.array([0, 1]), np.array([1000, 0])]
         observed = counts_1qbit(0.0)
@@ -150,12 +150,12 @@ class TestCounts:
         """Test counts on 2 qubits."""
 
         @qjit
-        @qml.set_shots(1000)
-        @qml.qnode(qml.device(backend, wires=2), mcm_method=mcm_method)
+        @qp.set_shots(1000)
+        @qp.qnode(qp.device(backend, wires=2), mcm_method=mcm_method)
         def counts_2qbit(x: float):
-            qml.RX(x, wires=0)
-            qml.RY(x, wires=1)
-            return qml.counts(all_outcomes=True)
+            qp.RX(x, wires=0)
+            qp.RY(x, wires=1)
+            return qp.counts(all_outcomes=True)
 
         expected = [np.array([0, 1, 2, 3]), np.array([1000, 0, 0, 0])]
         observed = counts_2qbit(0.0)
@@ -169,12 +169,12 @@ class TestCounts:
         """Test counts on 2 qubits with check for endianness."""
 
         @qjit
-        @qml.set_shots(1000)
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.set_shots(1000)
+        @qp.qnode(qp.device(backend, wires=2))
         def counts_2qbit(x: float, y: float):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
-            return qml.counts(all_outcomes=True)
+            qp.RX(x, wires=0)
+            qp.RX(y, wires=1)
+            return qp.counts(all_outcomes=True)
 
         expected = [np.array([0, 1, 2, 3]), np.array([0, 0, 1000, 0])]
         observed = counts_2qbit(np.pi, 0)
@@ -189,12 +189,12 @@ class TestCounts:
         """Test counts with all_outcomes=True."""
 
         @qjit
-        @qml.set_shots(1000)
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.set_shots(1000)
+        @qp.qnode(qp.device(backend, wires=2))
         def counts_2qbit(x: float):
-            qml.RX(x, wires=0)
-            qml.RY(x, wires=1)
-            return qml.counts(all_outcomes=True)
+            qp.RX(x, wires=0)
+            qp.RY(x, wires=1)
+            return qp.counts(all_outcomes=True)
 
         expected = {"00": 1000, "01": 0, "10": 0, "11": 0}
         observed = counts_2qbit(0.0)
@@ -208,13 +208,13 @@ class TestCounts:
     def test_counts_on_empty_wires(self, mcm_method):
         """Test counts on dynamic wires."""
 
-        @qml.set_shots(10)
-        @qml.qnode(qml.device("lightning.qubit"), mcm_method=mcm_method)
+        @qp.set_shots(10)
+        @qp.qnode(qp.device("lightning.qubit"), mcm_method=mcm_method)
         def counts_dynamic_wires():
-            qml.Hadamard(wires=1)
-            return qml.counts(all_outcomes=True)
+            qp.Hadamard(wires=1)
+            return qp.counts(all_outcomes=True)
 
-        if qml.capture.enabled():
+        if qp.capture.enabled():
             with pytest.raises(
                 NotImplementedError,
                 match="devices must specify wires for integration with program capture",
@@ -238,10 +238,10 @@ class TestExpval:
         """Test expval for named observables."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def expval1(x: float):
-            qml.RX(x, wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         expected = np.array(1.0)
         observed = expval1(0.0)
@@ -257,9 +257,9 @@ class TestExpval:
         """
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def expval():
-            return qml.expval(qml.Identity(wires=[1, 2])), qml.expval(qml.Identity(wires=[0, 1, 2]))
+            return qp.expval(qp.Identity(wires=[1, 2])), qp.expval(qp.Identity(wires=[0, 1, 2]))
 
         expected = np.array([1.0, 1.0])
         observed = expval()
@@ -269,13 +269,13 @@ class TestExpval:
         """Test expval for Hermitian observable."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def expval2(x: float):
-            qml.RY(x, wires=0)
+            qp.RY(x, wires=0)
             A = np.array(
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
             )
-            return qml.expval(qml.Hermitian(A, wires=0))
+            return qp.expval(qp.Hermitian(A, wires=0))
 
         expected = np.array(1.0)
         observed = expval2(0.0)
@@ -289,9 +289,9 @@ class TestExpval:
         """Test expval for Hermitian observable."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def expval3(x: float):
-            qml.RX(x, wires=1)
+            qp.RX(x, wires=1)
             B = np.array(
                 [
                     [complex(1.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
@@ -300,7 +300,7 @@ class TestExpval:
                     [complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0)],
                 ]
             )
-            return qml.expval(qml.Hermitian(B, wires=[0, 1]))
+            return qp.expval(qp.Hermitian(B, wires=[0, 1]))
 
         expected = np.array(1.0)
         observed = expval3(0.0)
@@ -314,12 +314,12 @@ class TestExpval:
         """Test expval for Tensor observable."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def expval4(x: float, y: float):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(qml.PauliX(0) @ qml.PauliY(1))
+            qp.RX(x, wires=0)
+            qp.RX(y, wires=1)
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.PauliX(0) @ qp.PauliY(1))
 
         expected = np.array(-0.35355339)
         observed = expval4(np.pi / 4, np.pi / 3)
@@ -333,16 +333,16 @@ class TestExpval:
         """Test expval for Tensor observable."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def expval5(x: float, y: float):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
-            qml.CNOT(wires=[0, 2])
-            qml.CNOT(wires=[1, 2])
+            qp.RX(x, wires=0)
+            qp.RX(y, wires=1)
+            qp.CNOT(wires=[0, 2])
+            qp.CNOT(wires=[1, 2])
             A = np.array(
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(-1.0, 0.0)]]
             )
-            return qml.expval(qml.PauliX(0) @ qml.Hadamard(1) @ qml.Hermitian(A, wires=2))
+            return qp.expval(qp.PauliX(0) @ qp.Hadamard(1) @ qp.Hermitian(A, wires=2))
 
         expected = np.array(-0.4330127)
         observed = expval5(np.pi / 4, np.pi / 3)
@@ -356,16 +356,16 @@ class TestExpval:
         """Test expval for Hamiltonian observable."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def expval(x: float, y: float):
-            qml.RX(x, wires=0)
-            qml.RY(y, wires=1)
-            qml.RZ(0.1, wires=2)
+            qp.RX(x, wires=0)
+            qp.RY(y, wires=1)
+            qp.RZ(0.1, wires=2)
 
             coeffs = np.array([0.2, -0.543])
-            obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0) @ qml.Hadamard(2)]
+            obs = [qp.PauliX(0) @ qp.PauliZ(1), qp.PauliZ(0) @ qp.Hadamard(2)]
 
-            return qml.expval(qml.Hamiltonian(coeffs, obs))
+            return qp.expval(qp.Hamiltonian(coeffs, obs))
 
         expected = np.array(-0.2715)
         observed = expval(np.pi / 4, np.pi / 3)
@@ -379,9 +379,9 @@ class TestExpval:
         """Test expval for Hamiltonian observable."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def expval(x: float):
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
 
             coeff = np.array([0.8, 0.2])
             obs_matrix = np.array(
@@ -393,8 +393,8 @@ class TestExpval:
                 ]
             )
 
-            obs = qml.Hermitian(obs_matrix, wires=[0, 1])
-            return qml.expval(qml.Hamiltonian(coeff, [obs, qml.PauliX(0)]))
+            obs = qp.Hermitian(obs_matrix, wires=[0, 1])
+            return qp.expval(qp.Hamiltonian(coeff, [obs, qp.PauliX(0)]))
 
         expected = np.array(0.2359798)
         observed = expval(np.pi / 4)
@@ -408,9 +408,9 @@ class TestExpval:
         """Test expval for nested Hamiltonian observable."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def expval(x: float):
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
 
             coeff = np.array([0.8, 0.2])
             obs_matrix = np.array(
@@ -422,11 +422,9 @@ class TestExpval:
                 ]
             )
 
-            obs = qml.Hermitian(obs_matrix, wires=[0, 1])
-            return qml.expval(
-                qml.Hamiltonian(
-                    coeff, [obs, qml.Hamiltonian([1, 1], [qml.PauliX(0), qml.PauliZ(1)])]
-                )
+            obs = qp.Hermitian(obs_matrix, wires=[0, 1])
+            return qp.expval(
+                qp.Hamiltonian(coeff, [obs, qp.Hamiltonian([1, 1], [qp.PauliX(0), qp.PauliZ(1)])])
             )
 
         expected = np.array(0.4359798)
@@ -448,18 +446,18 @@ class TestExpval:
                 [3j, -0.1, 12.0, 0.0],
             ]
         )
-        obs = qml.Hermitian(obs_matrix, wires=[0, 1])
+        obs = qp.Hermitian(obs_matrix, wires=[0, 1])
         coeff = np.array([0.8, 0.2])
-        obs2 = qml.Hamiltonian(coeff, [obs, qml.Hamiltonian([1, 1], [qml.X(0), qml.Z(1)])])
-        obs3 = obs2 @ qml.Z(2)
+        obs2 = qp.Hamiltonian(coeff, [obs, qp.Hamiltonian([1, 1], [qp.X(0), qp.Z(1)])])
+        obs3 = obs2 @ qp.Z(2)
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def expval(x: float):
-            qml.RX(x, wires=0)
-            qml.RX(x + 1.0, wires=2)
+            qp.RX(x, wires=0)
+            qp.RX(x + 1.0, wires=2)
 
-            return qml.expval(obs3)
+            return qp.expval(obs3)
 
         expected = np.array(-0.09284557)
         observed = expval(np.pi / 4)
@@ -477,10 +475,10 @@ class TestVar:
         """Test var with RX."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def var1(x: float):
-            qml.RX(x, wires=0)
-            return qml.var(qml.PauliZ(0))
+            qp.RX(x, wires=0)
+            return qp.var(qp.PauliZ(0))
 
         expected = np.array(0.0)
         observed = var1(0.0)
@@ -492,10 +490,10 @@ class TestVar:
         """Test var with Hadamard."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def var2(x: float):
-            qml.Hadamard(wires=0)
-            return qml.var(qml.PauliZ(0))
+            qp.Hadamard(wires=0)
+            return qp.var(qp.PauliZ(0))
 
         expected = np.array(1.0)
         observed = var2(0.0)
@@ -507,13 +505,13 @@ class TestVar:
         """Test variance for Hermitian observable."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
-            qml.RY(x, wires=0)
+            qp.RY(x, wires=0)
             A = np.array(
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
             )
-            return qml.var(qml.Hermitian(A, wires=0))
+            return qp.var(qp.Hermitian(A, wires=0))
 
         expected = np.array(4.0)
         observed = circuit(0.0)
@@ -527,9 +525,9 @@ class TestVar:
         """Test variance for Hermitian observable."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: float):
-            qml.RX(x, wires=1)
+            qp.RX(x, wires=1)
             B = np.array(
                 [
                     [complex(1.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
@@ -538,7 +536,7 @@ class TestVar:
                     [complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0)],
                 ]
             )
-            return qml.var(qml.Hermitian(B, wires=[0, 1]))
+            return qp.var(qp.Hermitian(B, wires=[0, 1]))
 
         expected = np.array(9.0)
         observed = circuit(0.0)
@@ -552,12 +550,12 @@ class TestVar:
         """Test variance for Tensor observable."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: float, y: float):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
-            qml.CNOT(wires=[0, 1])
-            return qml.var(qml.PauliX(0) @ qml.PauliY(1))
+            qp.RX(x, wires=0)
+            qp.RX(y, wires=1)
+            qp.CNOT(wires=[0, 1])
+            return qp.var(qp.PauliX(0) @ qp.PauliY(1))
 
         expected = np.array(0.875)
         observed = circuit(np.pi / 4, np.pi / 3)
@@ -571,16 +569,16 @@ class TestVar:
         """Test variance for Tensor observable."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def circuit(x: float, y: float):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
-            qml.CNOT(wires=[0, 2])
-            qml.CNOT(wires=[1, 2])
+            qp.RX(x, wires=0)
+            qp.RX(y, wires=1)
+            qp.CNOT(wires=[0, 2])
+            qp.CNOT(wires=[1, 2])
             A = np.array(
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(-1.0, 0.0)]]
             )
-            return qml.var(qml.PauliX(0) @ qml.Hadamard(1) @ qml.Hermitian(A, wires=2))
+            return qp.var(qp.PauliX(0) @ qp.Hadamard(1) @ qp.Hermitian(A, wires=2))
 
         expected = np.array(4.8125)
         observed = circuit(np.pi / 4, np.pi / 3)
@@ -594,16 +592,16 @@ class TestVar:
         """Test variance for Hamiltonian observable."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def circuit(x: float, y: float):
-            qml.RX(x, wires=0)
-            qml.RY(y, wires=1)
-            qml.RZ(0.1, wires=2)
+            qp.RX(x, wires=0)
+            qp.RY(y, wires=1)
+            qp.RZ(0.1, wires=2)
 
             coeffs = np.array([0.2, -0.543])
-            obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0) @ qml.Hadamard(2)]
+            obs = [qp.PauliX(0) @ qp.PauliZ(1), qp.PauliZ(0) @ qp.Hadamard(2)]
 
-            return qml.var(qml.Hamiltonian(coeffs, obs))
+            return qp.var(qp.Hamiltonian(coeffs, obs))
 
         expected = np.array(0.26113675)
         observed = circuit(np.pi / 4, np.pi / 3)
@@ -617,9 +615,9 @@ class TestVar:
         """Test variance for Hamiltonian observable."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: float):
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
 
             coeff = np.array([0.8, 0.2])
             obs_matrix = np.array(
@@ -631,8 +629,8 @@ class TestVar:
                 ]
             )
 
-            obs = qml.Hermitian(obs_matrix, wires=[0, 1])
-            return qml.var(qml.Hamiltonian(coeff, [obs, qml.PauliX(0)]))
+            obs = qp.Hermitian(obs_matrix, wires=[0, 1])
+            return qp.var(qp.Hamiltonian(coeff, [obs, qp.PauliX(0)]))
 
         expected = np.array(2.86432098)
         observed = circuit(np.pi / 4)
@@ -654,15 +652,15 @@ class TestVar:
         """Test variance for Hamiltonian observable with integer coefficients."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def circuit(x: float, y: float):
-            qml.RX(x, wires=0)
-            qml.RY(y, wires=1)
-            qml.RZ(0.1, wires=2)
+            qp.RX(x, wires=0)
+            qp.RY(y, wires=1)
+            qp.RZ(0.1, wires=2)
 
-            obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0) @ qml.Hadamard(2)]
+            obs = [qp.PauliX(0) @ qp.PauliZ(1), qp.PauliZ(0) @ qp.Hadamard(2)]
 
-            return qml.var(qml.Hamiltonian(coeffs, obs))
+            return qp.var(qp.Hamiltonian(coeffs, obs))
 
         expected = np.array(1.75)
         observed = circuit(np.pi / 4, np.pi / 3)
@@ -684,15 +682,15 @@ class TestVar:
         as the circuit parameters."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def circuit(x, y, coeffs):
-            qml.RX(x, wires=0)
-            qml.RY(y, wires=1)
-            qml.RZ(0.1, wires=2)
+            qp.RX(x, wires=0)
+            qp.RY(y, wires=1)
+            qp.RZ(0.1, wires=2)
 
-            obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0) @ qml.Hadamard(2)]
+            obs = [qp.PauliX(0) @ qp.PauliZ(1), qp.PauliZ(0) @ qp.Hadamard(2)]
 
-            return qml.var(qml.Hamiltonian(coeffs, obs))
+            return qp.var(qp.Hamiltonian(coeffs, obs))
 
         expected = np.array(1.75)
         observed = circuit(np.pi / 4, np.pi / 3, coeffs)
@@ -705,18 +703,18 @@ class TestVar:
         """Test variance with nested Hamiltonian observable."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def circuit(x, y, coeffs):
-            qml.RX(x, wires=0)
-            qml.RY(y, wires=1)
-            qml.RZ(0.1, wires=2)
+            qp.RX(x, wires=0)
+            qp.RY(y, wires=1)
+            qp.RZ(0.1, wires=2)
 
             obs = [
-                qml.PauliX(0) @ qml.PauliZ(1),
-                qml.Hamiltonian(np.array([0.5]), [qml.PauliZ(0) @ qml.Hadamard(2)]),
+                qp.PauliX(0) @ qp.PauliZ(1),
+                qp.Hamiltonian(np.array([0.5]), [qp.PauliZ(0) @ qp.Hadamard(2)]),
             ]
 
-            return qml.var(qml.Hamiltonian(coeffs, obs))
+            return qp.var(qp.Hamiltonian(coeffs, obs))
 
         expected = np.array(0.1075)
         coeffs = np.array([0.2, 0.6])
@@ -730,19 +728,19 @@ class TestVar:
         """Test variance with TensorObs and nested Hamiltonian observables."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def circuit(x, y, coeffs):
-            qml.RX(x, wires=0)
-            qml.RY(y, wires=1)
-            qml.RZ(0.1, wires=2)
+            qp.RX(x, wires=0)
+            qp.RY(y, wires=1)
+            qp.RZ(0.1, wires=2)
 
-            return qml.var(
-                qml.Hamiltonian(
+            return qp.var(
+                qp.Hamiltonian(
                     coeffs,
                     [
-                        qml.PauliX(0)
-                        @ qml.PauliZ(1)
-                        @ qml.Hamiltonian(np.array([0.5]), [qml.Hadamard(2)])
+                        qp.PauliX(0)
+                        @ qp.PauliZ(1)
+                        @ qp.Hamiltonian(np.array([0.5]), [qp.Hadamard(2)])
                     ],
                 )
             )
@@ -763,13 +761,13 @@ class TestState:
     def test_state_on_0qbits(self):
         """Test state on 0 qubits."""
 
-        if qml.capture.enabled():
+        if qp.capture.enabled():
             pytest.xfail("capture doesn't currently support 0 wires.")
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=0))
+        @qp.qnode(qp.device("lightning.qubit", wires=0))
         def state_0qbit():
-            return qml.state()
+            return qp.state()
 
         expected = np.array([complex(1.0, 0.0)])
         observed = state_0qbit()
@@ -779,10 +777,10 @@ class TestState:
         """Test state on 1 qubit."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def state(x: float):
-            qml.RX(x, wires=0)
-            return qml.state()
+            qp.RX(x, wires=0)
+            return qp.state()
 
         expected = np.array([complex(1.0, 0.0), complex(0.0, -1.0)]) / np.sqrt(2)
         observed = state(np.pi / 2)
@@ -796,13 +794,13 @@ class TestProbs:
     def test_probs_on_0qbits(self):
         """Test probs on 0 qubits."""
 
-        if qml.capture.enabled():
+        if qp.capture.enabled():
             pytest.xfail("capture doesn't currently support 0 wires.")
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=0))
+        @qp.qnode(qp.device("lightning.qubit", wires=0))
         def probs_0qbit():
-            return qml.probs()
+            return qp.probs()
 
         expected = np.array([1.0])
         observed = probs_0qbit()
@@ -812,10 +810,10 @@ class TestProbs:
         """Test probs on 1 qubit."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def probs(x: float):
-            qml.RX(x, wires=0)
-            return qml.probs()
+            qp.RX(x, wires=0)
+            return qp.probs()
 
         expected = np.array([0.5, 0.5])
         observed = probs(np.pi / 2)
@@ -828,22 +826,20 @@ class TestNewArithmeticOps:
 
     @pytest.mark.parametrize(
         "meas, expected",
-        [[qml.expval, np.array(-0.70710678)], [qml.var, np.array(0.5)]],
+        [[qp.expval, np.array(-0.70710678)], [qp.var, np.array(0.5)]],
     )
     def test_prod_xzi(self, meas, expected, backend):
-        """Test ``qml.ops.op_math.Prod`` converting to TensorObs."""
+        """Test ``qp.ops.op_math.Prod`` converting to TensorObs."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def circuit(x: float, y: float):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
-            qml.RX(x + y, wires=2)
-            qml.CNOT(wires=[0, 1])
+            qp.RX(x, wires=0)
+            qp.RX(y, wires=1)
+            qp.RX(x + y, wires=2)
+            qp.CNOT(wires=[0, 1])
             return meas(
-                qml.ops.op_math.Prod(
-                    qml.PauliX(wires=0), qml.PauliZ(wires=1), qml.Identity(wires=2)
-                )
+                qp.ops.op_math.Prod(qp.PauliX(wires=0), qp.PauliZ(wires=1), qp.Identity(wires=2))
             )
 
         result = circuit(np.pi / 4, np.pi / 2)
@@ -853,42 +849,38 @@ class TestNewArithmeticOps:
         "meas_fn, expected",
         [
             [
-                lambda: qml.expval(
-                    qml.ops.op_math.Sum(
-                        qml.PauliX(wires=0), qml.PauliY(wires=1), qml.PauliZ(wires=2)
-                    )
+                lambda: qp.expval(
+                    qp.ops.op_math.Sum(qp.PauliX(wires=0), qp.PauliY(wires=1), qp.PauliZ(wires=2))
                 ),
                 np.array(-1.41421356),
             ],
             [
-                lambda: qml.var(
-                    qml.ops.op_math.Sum(
-                        qml.PauliX(wires=0), qml.PauliY(wires=1), qml.PauliZ(wires=2)
-                    )
+                lambda: qp.var(
+                    qp.ops.op_math.Sum(qp.PauliX(wires=0), qp.PauliY(wires=1), qp.PauliZ(wires=2))
                 ),
                 np.array(2.0),
             ],
             [
-                lambda: qml.expval(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
+                lambda: qp.expval(qp.PauliX(wires=0) + qp.PauliY(wires=1) + qp.PauliZ(wires=2)),
                 np.array(-1.41421356),
             ],
             [
-                lambda: qml.var(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
+                lambda: qp.var(qp.PauliX(wires=0) + qp.PauliY(wires=1) + qp.PauliZ(wires=2)),
                 np.array(2.0),
             ],
         ],
     )
     def test_sum_xyz(self, meas_fn, expected, backend):
-        """Test ``qml.ops.op_math.Sum`` and ``+`` converting to HamiltonianObs.
+        """Test ``qp.ops.op_math.Sum`` and ``+`` converting to HamiltonianObs.
         with integer coefficients."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def circuit(x: float, y: float):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
-            qml.RX(x + y, wires=2)
-            qml.CNOT(wires=[0, 1])
+            qp.RX(x, wires=0)
+            qp.RX(y, wires=1)
+            qp.RX(x + y, wires=2)
+            qp.CNOT(wires=[0, 1])
             return meas_fn()
 
         result = circuit(np.pi / 4, np.pi / 2)
@@ -898,51 +890,49 @@ class TestNewArithmeticOps:
         "meas_fn, expected",
         [
             [
-                lambda: qml.expval(
-                    qml.ops.op_math.Sum(
-                        qml.PauliX(wires=0),
-                        qml.PauliY(wires=1),
-                        qml.ops.op_math.SProd(0.5, qml.PauliZ(2)),
+                lambda: qp.expval(
+                    qp.ops.op_math.Sum(
+                        qp.PauliX(wires=0),
+                        qp.PauliY(wires=1),
+                        qp.ops.op_math.SProd(0.5, qp.PauliZ(2)),
                     )
                 ),
                 np.array(-1.06066017),
             ],
             [
-                lambda: qml.var(
-                    qml.ops.op_math.Sum(
-                        qml.ops.op_math.SProd(0.2, qml.PauliX(wires=0)),
-                        qml.ops.op_math.SProd(0.4, qml.PauliY(wires=1)),
-                        qml.ops.op_math.SProd(0.5, qml.PauliZ(wires=2)),
+                lambda: qp.var(
+                    qp.ops.op_math.Sum(
+                        qp.ops.op_math.SProd(0.2, qp.PauliX(wires=0)),
+                        qp.ops.op_math.SProd(0.4, qp.PauliY(wires=1)),
+                        qp.ops.op_math.SProd(0.5, qp.PauliZ(wires=2)),
                     )
                 ),
                 np.array(0.245),
             ],
             [
-                lambda: qml.expval(
-                    qml.PauliX(wires=0) + qml.PauliY(wires=1) + 0.5 * qml.PauliZ(wires=2)
+                lambda: qp.expval(
+                    qp.PauliX(wires=0) + qp.PauliY(wires=1) + 0.5 * qp.PauliZ(wires=2)
                 ),
                 np.array(-1.06066017),
             ],
             [
-                lambda: qml.var(
-                    0.2 * qml.PauliX(wires=0)
-                    + 0.4 * qml.PauliY(wires=1)
-                    + 0.5 * qml.PauliZ(wires=2)
+                lambda: qp.var(
+                    0.2 * qp.PauliX(wires=0) + 0.4 * qp.PauliY(wires=1) + 0.5 * qp.PauliZ(wires=2)
                 ),
                 np.array(0.245),
             ],
         ],
     )
     def test_sum_sprod_xyz(self, meas_fn, expected, backend):
-        """Test ``qml.ops.op_math.Sum`` (``+``) and ``qml.ops.op_math.SProd`` (``*``)."""
+        """Test ``qp.ops.op_math.Sum`` (``+``) and ``qp.ops.op_math.SProd`` (``*``)."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def circuit(x: float, y: float):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
-            qml.RX(x + y, wires=2)
-            qml.CNOT(wires=[0, 1])
+            qp.RX(x, wires=0)
+            qp.RX(y, wires=1)
+            qp.RX(x + y, wires=2)
+            qp.CNOT(wires=[0, 1])
             return meas_fn()
 
         result = circuit(np.pi / 4, np.pi / 2)
@@ -952,12 +942,12 @@ class TestNewArithmeticOps:
         """Test ``*`` and ``@`` dunder methods."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x, y):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(-0.5 * qml.PauliX(0) @ qml.PauliY(1))
+            qp.RX(x, wires=0)
+            qp.RX(y, wires=1)
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(-0.5 * qp.PauliX(0) @ qp.PauliY(1))
 
         result = circuit(np.pi / 4, np.pi / 4)
         expected = np.array(0.25)
@@ -967,15 +957,15 @@ class TestNewArithmeticOps:
         """Test ``+`` with Hermitian observables."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3))
+        @qp.qnode(qp.device(backend, wires=3))
         def circuit(x, y):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
-            qml.CNOT(wires=[0, 1])
+            qp.RX(x, wires=0)
+            qp.RX(y, wires=1)
+            qp.CNOT(wires=[0, 1])
             A = np.array(
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
             )
-            return qml.expval(qml.Hermitian(A, wires=2) + qml.PauliX(0) + qml.Hermitian(A, wires=1))
+            return qp.expval(qp.Hermitian(A, wires=2) + qp.PauliX(0) + qp.Hermitian(A, wires=1))
 
         result = circuit(np.pi / 4, np.pi / 4)
         expected = np.array(2.0)
@@ -985,21 +975,18 @@ class TestNewArithmeticOps:
         """Test ``@`` with Hermitian observables."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=4))
+        @qp.qnode(qp.device(backend, wires=4))
         def circuit(x, y):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
-            qml.RY(x + y, wires=2)
-            qml.RY(x - y, wires=3)
-            qml.CNOT(wires=[0, 1])
+            qp.RX(x, wires=0)
+            qp.RX(y, wires=1)
+            qp.RY(x + y, wires=2)
+            qp.RY(x - y, wires=3)
+            qp.CNOT(wires=[0, 1])
             A = np.array(
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
             )
-            return qml.expval(
-                qml.PauliZ(2)
-                @ qml.Hermitian(A, wires=1)
-                @ qml.PauliZ(0)
-                @ qml.Hermitian(A, wires=3)
+            return qp.expval(
+                qp.PauliZ(2) @ qp.Hermitian(A, wires=1) @ qp.PauliZ(0) @ qp.Hermitian(A, wires=3)
             )
 
         result = circuit(np.pi / 4, np.pi / 2)
@@ -1010,15 +997,15 @@ class TestNewArithmeticOps:
         """Test ``*`` and ``@`` with Hermitian observable."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x, y):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
-            qml.CNOT(wires=[0, 1])
+            qp.RX(x, wires=0)
+            qp.RX(y, wires=1)
+            qp.CNOT(wires=[0, 1])
             A = np.array(
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
             )
-            return qml.expval(0.2 * qml.Hermitian(A, wires=1) @ qml.PauliZ(0))
+            return qp.expval(0.2 * qp.Hermitian(A, wires=1) @ qp.PauliZ(0))
 
         result = circuit(np.pi / 4, np.pi / 2)
         expected = np.array(0.14142136)
@@ -1028,15 +1015,15 @@ class TestNewArithmeticOps:
         """Test ``+`` of ``@`` with Hermitian observable."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x, y):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
-            qml.CNOT(wires=[0, 1])
+            qp.RX(x, wires=0)
+            qp.RX(y, wires=1)
+            qp.CNOT(wires=[0, 1])
             A = np.array(
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
             )
-            return qml.expval(qml.Hermitian(A, wires=1) + qml.PauliZ(0) @ qml.PauliY(1))
+            return qp.expval(qp.Hermitian(A, wires=1) + qp.PauliZ(0) @ qp.PauliY(1))
 
         result = circuit(np.pi / 4, np.pi)
         expected = np.array(1.0)
@@ -1046,23 +1033,23 @@ class TestNewArithmeticOps:
         """Test dunder methods with Hermitian observable to a HamiltonianObs."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=4))
+        @qp.qnode(qp.device(backend, wires=4))
         def circuit(x, y):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
+            qp.RX(x, wires=0)
+            qp.RX(y, wires=1)
 
-            qml.RX(x + y, wires=2)
-            qml.RX(y - x, wires=3)
+            qp.RX(x + y, wires=2)
+            qp.RX(y - x, wires=3)
 
-            qml.CNOT(wires=[0, 1])
-            qml.CNOT(wires=[0, 2])
+            qp.CNOT(wires=[0, 1])
+            qp.CNOT(wires=[0, 2])
 
             A = np.array(
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
             )
-            return qml.expval(
-                0.2 * (qml.Hermitian(A, wires=1) + qml.PauliZ(0))
-                + 0.4 * (qml.PauliX(2) @ qml.PauliZ(3))
+            return qp.expval(
+                0.2 * (qp.Hermitian(A, wires=1) + qp.PauliZ(0))
+                + 0.4 * (qp.PauliX(2) @ qp.PauliZ(3))
             )
 
         result = circuit(np.pi / 4, np.pi / 2)
@@ -1073,23 +1060,22 @@ class TestNewArithmeticOps:
         """Test dunder methods with Hermitian observable to a TensorObs."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=4))
+        @qp.qnode(qp.device(backend, wires=4))
         def circuit(x, y):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
+            qp.RX(x, wires=0)
+            qp.RX(y, wires=1)
 
-            qml.RX(x + y, wires=2)
-            qml.RX(y - x, wires=3)
+            qp.RX(x + y, wires=2)
+            qp.RX(y - x, wires=3)
 
-            qml.CNOT(wires=[0, 1])
-            qml.CNOT(wires=[0, 2])
+            qp.CNOT(wires=[0, 1])
+            qp.CNOT(wires=[0, 2])
 
             A = np.array(
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
             )
-            return qml.var(
-                (qml.Hermitian(A, wires=1) + qml.PauliZ(0))
-                @ (0.5 * (qml.PauliX(2) @ qml.PauliZ(3)))
+            return qp.var(
+                (qp.Hermitian(A, wires=1) + qp.PauliZ(0)) @ (0.5 * (qp.PauliX(2) @ qp.PauliZ(3)))
             )
 
         result = circuit(np.pi, np.pi)
@@ -1097,7 +1083,7 @@ class TestNewArithmeticOps:
         assert np.allclose(expected, result)
 
 
-class CustomDevice(qml.devices.Device):
+class CustomDevice(qp.devices.Device):
     """Custom Gate Set Device"""
 
     name = "Custom Device"
@@ -1140,9 +1126,9 @@ class TestDensityMatrixMP:
         with pytest.raises(CompileError, match=err_msg):
 
             @qjit
-            @qml.qnode(CustomDevice(wires=1))
+            @qp.qnode(CustomDevice(wires=1))
             def circuit():
-                return qml.density_matrix([0])
+                return qp.density_matrix([0])
 
 
 @pytest.mark.usefixtures("use_both_frontend")
@@ -1153,13 +1139,13 @@ class TestVnEntropy:
     def test_vn_entropy(self):
         """Test that VnEntropy can be used with Catalyst."""
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit_entropy(x):
-            qml.IsingXX(x, wires=[0, 1])
-            return qml.vn_entropy(wires=[0])
+            qp.IsingXX(x, wires=[0, 1])
+            return qp.vn_entropy(wires=[0])
 
         expected = 0.6931471805599453
         assert circuit_entropy(np.pi / 2) == expected
@@ -1173,15 +1159,15 @@ class TestMutualInfo:
     def test_mutual_info(self):
         """Test that MutualInfo can be used with Catalyst."""
 
-        dev = qml.device("lightning.qubit", wires=range(2))
+        dev = qp.device("lightning.qubit", wires=range(2))
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def mutual_info_circuit():
-            qml.Hadamard(0)
-            qml.CNOT((0, 1))
-            qml.RX(0, wires=0)
-            return qml.mutual_info(0, 1)
+            qp.Hadamard(0)
+            qp.CNOT((0, 1))
+            qp.RX(0, wires=0)
+            return qp.mutual_info(0, 1)
 
         expected = 1.3862943611198906
         assert mutual_info_circuit() == expected
@@ -1195,14 +1181,14 @@ class TestShadow:
     def test_shadow(self):
         """Test that Shadow can be used with Catalyst."""
 
-        dev = qml.device("lightning.qubit", wires=range(2))
+        dev = qp.device("lightning.qubit", wires=range(2))
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def classical_shadow_circuit():
-            qml.Hadamard(0)
-            qml.CNOT(wires=[0, 1])
-            return qml.classical_shadow(wires=[0, 1])
+            qp.Hadamard(0)
+            qp.CNOT(wires=[0, 1])
+            return qp.classical_shadow(wires=[0, 1])
 
         expected_bits = [[1, 1], [0, 1]]
         expected_recipes = [[0, 1], [0, 2]]
@@ -1219,17 +1205,17 @@ class TestShadowExpval:
     def test_shadow_expval(self):
         """Test that ShadowExpVal can be used with Catalyst."""
 
-        dev = qml.device("lightning.qubit", wires=range(2))
+        dev = qp.device("lightning.qubit", wires=range(2))
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def shadow_expval_circuit(x, obs):
-            qml.Hadamard(0)
-            qml.CNOT((0, 1))
-            qml.RX(x, wires=0)
-            return qml.shadow_expval(obs)
+            qp.Hadamard(0)
+            qp.CNOT((0, 1))
+            qp.RX(x, wires=0)
+            return qp.shadow_expval(obs)
 
-        H = qml.Hamiltonian([1.0, 1.0], [qml.Z(0) @ qml.Z(1), qml.X(0) @ qml.X(1)])
+        H = qp.Hamiltonian([1.0, 1.0], [qp.Z(0) @ qp.Z(1), qp.X(0) @ qp.X(1)])
         expected = 1.917
         assert shadow_expval_circuit(0, H) == expected
 
@@ -1242,12 +1228,12 @@ class TestPurity:
     def test_purity(self):
         """Test that Purity can be used with Catalyst."""
 
-        dev = qml.device("lightning.qubit", wires=[0])
+        dev = qp.device("lightning.qubit", wires=[0])
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def purity_circuit():
-            return qml.purity(wires=[0])
+            return qp.purity(wires=[0])
 
         expected = 1.0
         assert purity_circuit() == expected
@@ -1260,15 +1246,15 @@ class TestNullQubitMeasurements:
 
     @pytest.mark.parametrize("n_qubits", [0, 1, 2])
     def test_nullq_sample(self, n_qubits):
-        """Test qml.sample() on null.qubit device."""
+        """Test qp.sample() on null.qubit device."""
 
         @qjit
-        @qml.set_shots(self.n_shots)
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
+        @qp.set_shots(self.n_shots)
+        @qp.qnode(qp.device("null.qubit", wires=n_qubits))
         def circuit_sample():
             for i in range(n_qubits):
-                qml.Hadamard(wires=i)
-            return qml.sample()
+                qp.Hadamard(wires=i)
+            return qp.sample()
 
         # Explicitly define expected result for sample since qjit outputs results in different
         # format than native PennyLane
@@ -1277,15 +1263,15 @@ class TestNullQubitMeasurements:
         assert np.array_equal(observed, expected)
 
     def test_nullq_sample_per_wire(self):
-        """Test qml.sample() on null.qubit device, returning results per wire."""
+        """Test qp.sample() on null.qubit device, returning results per wire."""
 
         @qjit
-        @qml.set_shots(self.n_shots)
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qp.set_shots(self.n_shots)
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit_sample():
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=1)
-            return qml.sample(wires=0), qml.sample(wires=1)
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=1)
+            return qp.sample(wires=0), qp.sample(wires=1)
 
         # Explicitly define expected result for sample since qjit outputs results in different
         # format than native PennyLane
@@ -1296,15 +1282,15 @@ class TestNullQubitMeasurements:
 
     @pytest.mark.parametrize("n_qubits", [0, 1, 2])
     def test_nullq_counts(self, n_qubits):
-        """Test qml.counts() on null.qubit device."""
+        """Test qp.counts() on null.qubit device."""
 
         @qjit
-        @qml.set_shots(self.n_shots)
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
+        @qp.set_shots(self.n_shots)
+        @qp.qnode(qp.device("null.qubit", wires=n_qubits))
         def circuit_counts():
             for i in range(n_qubits):
-                qml.Hadamard(wires=i)
-            return qml.counts(all_outcomes=True)
+                qp.Hadamard(wires=i)
+            return qp.counts(all_outcomes=True)
 
         # Explicitly define expected result for counts since qjit outputs results in different
         # format than native PennyLane
@@ -1317,15 +1303,15 @@ class TestNullQubitMeasurements:
         assert np.array_equal(observed, expected)
 
     def test_nullq_counts_per_wire(self):
-        """Test qml.counts() on null.qubit device, returning results per wire."""
+        """Test qp.counts() on null.qubit device, returning results per wire."""
 
         @qjit
-        @qml.set_shots(self.n_shots)
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qp.set_shots(self.n_shots)
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit_counts():
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=1)
-            return qml.counts(wires=0, all_outcomes=True), qml.counts(wires=1, all_outcomes=True)
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=1)
+            return qp.counts(wires=0, all_outcomes=True), qp.counts(wires=1, all_outcomes=True)
 
         # Explicitly define expected result for counts since qjit outputs results in different
         # format than native PennyLane
@@ -1340,28 +1326,28 @@ class TestNullQubitMeasurements:
 
     @pytest.mark.parametrize("n_qubits", [0, 1, 2])
     def test_nullq_probs(self, n_qubits):
-        """Test qml.probs() on null.qubit device."""
+        """Test qp.probs() on null.qubit device."""
 
-        @qml.set_shots(self.n_shots)
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
+        @qp.set_shots(self.n_shots)
+        @qp.qnode(qp.device("null.qubit", wires=n_qubits))
         def circuit_probs():
             for i in range(n_qubits):
-                qml.Hadamard(wires=i)
-            return qml.probs()
+                qp.Hadamard(wires=i)
+            return qp.probs()
 
         expected = circuit_probs()
         observed = qjit(circuit_probs)()
         assert np.array_equal(observed, expected)
 
     def test_nullq_probs_per_wire(self):
-        """Test qml.probs() on null.qubit device, returning results per wire."""
+        """Test qp.probs() on null.qubit device, returning results per wire."""
 
-        @qml.set_shots(self.n_shots)
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qp.set_shots(self.n_shots)
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit_probs():
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=1)
-            return qml.probs(wires=0), qml.probs(wires=1)
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=1)
+            return qp.probs(wires=0), qp.probs(wires=1)
 
         expected = circuit_probs()
         observed = qjit(circuit_probs)()
@@ -1369,14 +1355,14 @@ class TestNullQubitMeasurements:
 
     @pytest.mark.parametrize("n_qubits", [0, 1, 2])
     def test_nullq_state(self, n_qubits):
-        """Test qml.state() on null.qubit device."""
+        """Test qp.state() on null.qubit device."""
 
-        @qml.set_shots(None)
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
+        @qp.set_shots(None)
+        @qp.qnode(qp.device("null.qubit", wires=n_qubits))
         def circuit_state():
             for i in range(n_qubits):
-                qml.Hadamard(wires=i)
-            return qml.state()
+                qp.Hadamard(wires=i)
+            return qp.state()
 
         expected = circuit_state()
         observed = qjit(circuit_state)()
@@ -1384,15 +1370,15 @@ class TestNullQubitMeasurements:
 
     @pytest.mark.parametrize("n_qubits", [1, 2])
     def test_nullq_expval(self, n_qubits):
-        """Test qml.expval() on null.qubit device."""
+        """Test qp.expval() on null.qubit device."""
 
-        @qml.set_shots(self.n_shots)
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
+        @qp.set_shots(self.n_shots)
+        @qp.qnode(qp.device("null.qubit", wires=n_qubits))
         def circuit_expval():
             for i in range(n_qubits):
-                qml.Hadamard(wires=i)
+                qp.Hadamard(wires=i)
 
-            return qml.expval(qml.X(0)), qml.expval(qml.Y(0)), qml.expval(qml.Z(0))
+            return qp.expval(qp.X(0)), qp.expval(qp.Y(0)), qp.expval(qp.Z(0))
 
         expected = circuit_expval()
         observed = qjit(circuit_expval)()
@@ -1400,15 +1386,15 @@ class TestNullQubitMeasurements:
 
     @pytest.mark.parametrize("n_qubits", [1, 2])
     def test_nullq_var(self, n_qubits):
-        """Test qml.var() on null.qubit device."""
+        """Test qp.var() on null.qubit device."""
 
-        @qml.set_shots(self.n_shots)
-        @qml.qnode(qml.device("null.qubit", wires=n_qubits))
+        @qp.set_shots(self.n_shots)
+        @qp.qnode(qp.device("null.qubit", wires=n_qubits))
         def circuit_var():
             for i in range(n_qubits):
-                qml.Hadamard(wires=i)
+                qp.Hadamard(wires=i)
 
-            return qml.var(qml.X(0)), qml.var(qml.Y(0)), qml.var(qml.Z(0))
+            return qp.var(qp.X(0)), qp.var(qp.Y(0)), qp.var(qp.Z(0))
 
         expected = circuit_var()
         observed = qjit(circuit_var)()

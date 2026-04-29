@@ -24,8 +24,10 @@
 #include "mlir/IR/Operation.h"
 
 #include "Catalyst/Analysis/ResourceResult.h"
+#include "Catalyst/Utils/ConstantResolve.h"
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
+#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
@@ -96,6 +98,15 @@ static int getGateQubitCount(Operation *op)
     return 0;
 }
 
+/// Get the number of parameters for a gate operation.
+static int getGateParamCount(Operation *op)
+{
+    if (auto gate = dyn_cast<quantum::ParametrizedGate>(op)) {
+        return static_cast<int>(gate.getAllParams().size());
+    }
+    return 0;
+}
+
 /// Get the name for a PBC operation.
 static std::string getPBCOpName(Operation *op)
 {
@@ -124,18 +135,52 @@ static int getPBCQubitCount(Operation *op)
         .Default(0);
 }
 
-/// Get the measurement name for a quantum measurement op.
+/// Resolve the observable name from its defining operation.
+/// Mirrors the Python `xdsl_to_qml_measurement_name` in xdsl_conversion.py.
+static std::string getObservableName(Operation *obsOp)
+{
+    if (!obsOp) {
+        return "all wires";
+    }
+
+    return llvm::TypeSwitch<Operation *, std::string>(obsOp)
+        .Case<quantum::ComputationalBasisOp>([](auto cbOp) {
+            unsigned n = cbOp.getQubits().size();
+            return n == 0 ? std::string("all wires") : std::to_string(n) + " wires";
+        })
+        .Case<quantum::NamedObsOp>(
+            [](auto op) { return stringifyNamedObservable(op.getType()).str(); })
+        .Case<quantum::TensorOp>(
+            [](auto op) { return "Prod(num_terms=" + std::to_string(op.getTerms().size()) + ")"; })
+        .Case<quantum::HamiltonianOp>([](auto op) {
+            return "Hamiltonian(num_terms=" + std::to_string(op.getTerms().size()) + ")";
+        })
+        .Default([](Operation *) { return std::string("all wires"); });
+}
+
+/// Get the full measurement name including observable info.
+/// e.g. "MidCircuitMeasure", "expval(PauliZ)", "sample(all wires)", "probs(2 wires)".
 static std::string getMeasurementName(Operation *op)
 {
-    return llvm::TypeSwitch<Operation *, std::string>(op)
-        .Case<quantum::MeasureOp>([](auto) { return "MidCircuitMeasure"; })
-        .Case<quantum::SampleOp>([](auto) { return "sample"; })
-        .Case<quantum::CountsOp>([](auto) { return "counts"; })
-        .Case<quantum::ExpvalOp>([](auto) { return "expval"; })
-        .Case<quantum::VarianceOp>([](auto) { return "var"; })
-        .Case<quantum::ProbsOp>([](auto) { return "probs"; })
-        .Case<quantum::StateOp>([](auto) { return "state"; })
-        .Default([](Operation *o) { return o->getName().getStringRef().str(); });
+    if (isa<quantum::MeasureOp>(op)) {
+        return "MidCircuitMeasure";
+    }
+
+    std::string baseName =
+        llvm::TypeSwitch<Operation *, std::string>(op)
+            .Case<quantum::SampleOp>([](auto) { return "sample"; })
+            .Case<quantum::CountsOp>([](auto) { return "counts"; })
+            .Case<quantum::ExpvalOp>([](auto) { return "expval"; })
+            .Case<quantum::VarianceOp>([](auto) { return "var"; })
+            .Case<quantum::ProbsOp>([](auto) { return "probs"; })
+            .Case<quantum::StateOp>([](auto) { return "state"; })
+            .Default([](Operation *o) { return o->getName().getStringRef().str(); });
+
+    if (auto measProc = dyn_cast<quantum::MeasurementProcess>(op)) {
+        return baseName + "(" + getObservableName(measProc.getObs().getDefiningOp()) + ")";
+    }
+
+    return baseName;
 }
 
 //===----------------------------------------------------------------------===//
@@ -168,6 +213,9 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
             }
         }
 
+        // TODO: deprecate `qnode` once it is fully deprecated.
+        result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node") ||
+                         funcOp->hasAttrOfType<UnitAttr>("qnode");
         funcResults[funcOp.getName()] = std::move(result);
 
         // main/entry function is the first function with no declaration
@@ -177,7 +225,14 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
     });
 
     assert(!entryFunc.empty() && "expected at least one non-declaration function");
-    resolveFunctionCalls(entryFunc);
+
+    // Resolve function calls for all analyzed functions, not just the entry.
+    // The entry function (e.g. jit_circuit) may use catalyst.launch_kernel
+    // instead of func.call, so only resolving the entry would miss callees
+    // inside nested qnode functions.
+    for (auto &funcEntry : funcResults) {
+        resolveFunctionCalls(funcEntry.getKey());
+    }
 
     entryFuncName = entryFunc.str();
 }
@@ -195,6 +250,18 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
     else if (auto tripCount = forOp.getStaticTripCount()) {
         bodyResult.multiplyByScalar(tripCount->getSExtValue());
     }
+    else {
+        auto lb = resolveConstantInt(forOp.getLowerBound());
+        auto ub = resolveConstantInt(forOp.getUpperBound());
+        auto step = resolveConstantInt(forOp.getStep());
+        if (lb && ub && step && *step != 0 && *ub > *lb) {
+            int64_t tripCount = (*ub - *lb + *step - 1) / *step;
+            bodyResult.multiplyByScalar(tripCount);
+        }
+        else {
+            result.hasDynLoop = true;
+        }
+    }
     result.mergeWith(bodyResult);
 }
 
@@ -208,12 +275,17 @@ void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &re
         int64_t iters = estAttr.getValue().getSExtValue();
         bodyResult.multiplyByScalar(iters);
     }
+    else {
+        result.hasDynLoop = true;
+    }
 
     result.mergeWith(bodyResult);
 }
 
 void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint)
 {
+    result.hasBranches = true;
+
     ResourceResult thenResult;
     analyzeRegion(ifOp.getThenRegion(), thenResult, isAdjoint);
 
@@ -228,6 +300,8 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
 void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, ResourceResult &result,
                                             bool isAdjoint)
 {
+    result.hasBranches = true;
+
     ResourceResult maxResult;
     bool first = true;
 
@@ -317,15 +391,15 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
             quantum::SetBasisStateOp>(op)) {
         std::string name = getGateOpName(op, isAdjoint);
         int nQubits = getGateQubitCount(op);
-        result.operations[name][nQubits] += 1;
+        int nParams = getGateParamCount(op);
+        result.operations[name][{nQubits, nParams}] += 1;
         return;
     }
 
     // Measurements
     if (isa<quantum::MeasureOp, quantum::SampleOp, quantum::CountsOp, quantum::ExpvalOp,
             quantum::VarianceOp, quantum::ProbsOp, quantum::StateOp>(op)) {
-        std::string name = getMeasurementName(op);
-        result.measurements[name] += 1;
+        result.measurements[getMeasurementName(op)] += 1;
         return;
     }
 
@@ -334,14 +408,14 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
             pbc::SelectPPMeasurementOp, pbc::PrepareStateOp, pbc::FabricateOp>(op)) {
         std::string name = getPBCOpName(op);
         int nQubits = getPBCQubitCount(op);
-        result.operations[name][nQubits] += 1;
+        result.operations[name][{nQubits, 0}] += 1;
         return;
     }
 
     // MBQC operations
     if (isa<mbqc::MeasureInBasisOp, mbqc::GraphStatePrepOp>(op)) {
         std::string name = op->getName().getStringRef().str();
-        result.operations[name][0] += 1;
+        result.operations[name][{0, 0}] += 1;
         return;
     }
 

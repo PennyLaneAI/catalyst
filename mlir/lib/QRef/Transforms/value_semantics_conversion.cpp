@@ -40,6 +40,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/WalkResult.h"
 
+#include "MBQC/IR/MBQCOps.h"
 #include "QRef/IR/QRefDialect.h"
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
@@ -132,6 +133,11 @@ DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumGate r
  */
 bool isQrefSubroutine(func::FuncOp f)
 {
+    // quantum.node is not a subroutine
+    if (f->hasAttrOfType<UnitAttr>("quantum.node")) {
+        return false;
+    }
+
     // If has a qref argument, definitely is a qref subroutine
     if (llvm::any_of(f.getArgumentTypes(), llvm::IsaPred<qref::QubitType, qref::QuregType>)) {
         return true;
@@ -157,6 +163,33 @@ bool isQrefSubroutine(func::FuncOp f)
         return WalkResult::advance();
     });
     return walkResult.wasInterrupted();
+}
+
+/**
+ * @brief Erase all remaining qref.alloc, qref.get, qref.mbqc.graph_state_prep operations in a
+ * function
+ *
+ * During the conversion, these operations cannot be deleted immediately because they might be used
+ * by other qref operations after their own conversion is done.
+ * This utility erases all of them, and must only be called at the end of a function's conversion.
+ */
+void eraseAllRemainingAnchorRValues(func::FuncOp f)
+{
+    f.walk([&](qref::GetOp getOp) {
+        assert(getOp.use_empty() &&
+               "qref.bit Values must have no uses after the semantic conversion");
+        getOp->erase();
+    });
+    f.walk([&](qref::AllocOp allocOp) {
+        assert(allocOp.use_empty() &&
+               "qref.reg Values must have no uses after the semantic conversion");
+        allocOp->erase();
+    });
+    f.walk([&](qref::GraphStatePrepOp graphStatePrepOp) {
+        assert(graphStatePrepOp.use_empty() &&
+               "qref.reg Values must have no uses after the semantic conversion");
+        graphStatePrepOp->erase();
+    });
 }
 
 /**
@@ -1016,6 +1049,18 @@ void handleMeasure(IRRewriter &builder, qref::MeasureOp rMeasureOp, QubitValueTr
     builder.eraseOp(rMeasureOp);
 }
 
+void handleMeasureInBasis(IRRewriter &builder, qref::MeasureInBasisOp rMeasureInBasisOp,
+                          QubitValueTracker &tracker)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    MLIRContext *ctx = rMeasureInBasisOp.getContext();
+
+    auto vMeasureOp = migrateOpToValueSemantics<mbqc::MeasureInBasisOp>(
+        builder, rMeasureInBasisOp, tracker, {quantum::QubitType::get(ctx)});
+    builder.replaceAllUsesWith(rMeasureInBasisOp.getMres(), vMeasureOp.getMres());
+    builder.eraseOp(rMeasureInBasisOp);
+}
+
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker)
 {
     OpBuilder::InsertionGuard guard(builder);
@@ -1066,6 +1111,23 @@ void handleHermitian(IRRewriter &builder, qref::HermitianOp rHermitianOp,
     auto vHermitianOp =
         migrateOpToValueSemantics<quantum::HermitianOp>(builder, rHermitianOp, tracker);
     builder.replaceOp(rHermitianOp, vHermitianOp);
+}
+
+void handleGraphStatePrep(IRRewriter &builder, qref::GraphStatePrepOp rGraphStatePrepOp,
+                          QubitValueTracker &tracker)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(rGraphStatePrepOp);
+
+    Location loc = rGraphStatePrepOp.getLoc();
+    MLIRContext *ctx = rGraphStatePrepOp.getContext();
+    Type qregType = quantum::QuregType::get(ctx);
+
+    auto vGraphStatePrepOp = mbqc::GraphStatePrepOp::create(
+        builder, loc, qregType, rGraphStatePrepOp.getAdjMatrix(), rGraphStatePrepOp.getInitOp(),
+        rGraphStatePrepOp.getEntangleOp());
+
+    tracker.setCurrentVQreg(rGraphStatePrepOp.getQreg(), vGraphStatePrepOp.getQreg());
 }
 
 /**
@@ -1165,10 +1227,6 @@ void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTr
 
     SetVector<Value> rValuesUsedByRegion;
     collectNecessaryRegionRValues(rAdjointOp.getRegion(), rValuesUsedByRegion);
-
-    if (rValuesUsedByRegion.size() == 0) {
-        return;
-    }
 
     quantum::AdjointOp vAdjointOp;
     {
@@ -1605,11 +1663,7 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
     addRootVValuesToRetOp(f.front().getTerminator(), rValuesUsedBySubroutine.getArrayRef(),
                           regionTracker);
 
-    f.walk([&](qref::GetOp getOp) {
-        assert(getOp.use_empty() &&
-               "qref.bit Values must have no uses after the semantic conversion");
-        builder.eraseOp(getOp);
-    });
+    eraseAllRemainingAnchorRValues(f);
 
     // Nuke all old qref arguments
     f.front().eraseArguments(
@@ -1652,6 +1706,9 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
         else if (auto rMeasureOp = dyn_cast<qref::MeasureOp>(op)) {
             handleMeasure(builder, rMeasureOp, tracker);
         }
+        else if (auto rMeasureInBasisOp = dyn_cast<qref::MeasureInBasisOp>(op)) {
+            handleMeasureInBasis(builder, rMeasureInBasisOp, tracker);
+        }
         else if (auto adjointOp = dyn_cast<qref::AdjointOp>(op)) {
             handleAdjoint(builder, adjointOp, tracker);
         }
@@ -1666,6 +1723,9 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
         }
         else if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
             handleWhile(builder, whileOp, tracker);
+        }
+        else if (auto rGraphStatePrepOp = dyn_cast<qref::GraphStatePrepOp>(op)) {
+            handleGraphStatePrep(builder, rGraphStatePrepOp, tracker);
         }
     });
 }
@@ -1721,7 +1781,7 @@ struct ValueSemanticsConversionPass
             if (!llvm::all_of(getOp->getUsers(),
                               llvm::IsaPred<qref::QuantumOperation, qref::MeasureOp,
                                             qref::ComputationalBasisOp, qref::NamedObsOp,
-                                            qref::HermitianOp>)) {
+                                            qref::HermitianOp, qref::MeasureInBasisOp>)) {
                 getOp.emitOpError(
                     "qref.get operations can only be used by qref dialect gate operations");
                 return WalkResult::interrupt();
@@ -1784,12 +1844,7 @@ struct ValueSemanticsConversionPass
         for (auto targetFunc : targetFuncs) {
             QubitValueTracker tracker;
             handleRegion(builder, targetFunc.getBody(), tracker);
-
-            targetFunc.walk([&](qref::GetOp getOp) {
-                assert(getOp.use_empty() &&
-                       "qref.bit Values must have no uses after the semantic conversion");
-                builder.eraseOp(getOp);
-            });
+            eraseAllRemainingAnchorRValues(targetFunc);
         }
     }
 };

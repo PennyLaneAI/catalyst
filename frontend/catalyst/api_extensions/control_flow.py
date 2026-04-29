@@ -24,7 +24,7 @@ from typing import Any, Callable, List
 
 import jax
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 from jax._src.source_info_util import current as current_source_info
 from jax._src.tree_util import PyTreeDef, tree_unflatten, treedef_is_leaf
 from jax.api_util import debug_info
@@ -105,26 +105,29 @@ def cond(pred: DynamicJaxprTracer):
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=1)
+        import pennylane as qp
+        from catalyst import qjit, cond
+
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x: float):
 
             # define a conditional ansatz
             @cond(x > 1.4)
             def ansatz():
-                qml.RX(x, wires=0)
-                qml.Hadamard(wires=0)
+                qp.RX(x, wires=0)
+                qp.Hadamard(wires=0)
 
             @ansatz.otherwise
             def ansatz():
-                qml.RY(x, wires=0)
+                qp.RY(x, wires=0)
 
             # apply the conditional ansatz
             ansatz()
 
-            return qml.expval(qml.PauliZ(0))
+            return qp.expval(qp.PauliZ(0))
 
     >>> circuit(1.4)
     Array(0.16996714, dtype=float64)
@@ -136,24 +139,24 @@ def cond(pred: DynamicJaxprTracer):
     .. code-block:: python
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x):
 
             @catalyst.cond(x > 2.7)
             def cond_fn():
-                qml.RX(x, wires=0)
+                qp.RX(x, wires=0)
 
             @cond_fn.else_if(x > 1.4)
             def cond_elif():
-                qml.RY(x, wires=0)
+                qp.RY(x, wires=0)
 
             @cond_fn.otherwise
             def cond_else():
-                qml.RX(x ** 2, wires=0)
+                qp.RX(x ** 2, wires=0)
 
             cond_fn()
 
-            return qml.probs(wires=0)
+            return qp.probs(wires=0)
 
     The conditional function is permitted to also return values.
     Any value that is supported by JAX JIT compilation is supported as a return
@@ -228,8 +231,8 @@ def cond(pred: DynamicJaxprTracer):
 
     .. note::
 
-       ``catalyst.cond`` is not supported in program capture mode. If ``qml.capture`` is enabled,
-        please use ``qml.cond`` instead.
+       ``catalyst.cond`` is not supported in program capture mode. If capture is enabled
+       (``qjit(capture=True)``), please use ``qp.cond`` instead.
 
         .. code-block:: python
 
@@ -246,9 +249,9 @@ def cond(pred: DynamicJaxprTracer):
             def circuit(x):
                 def cond_fn():
                     return x ** 2
-                return qml.cond(x > 1.0)(cond_fn)()
+                return qp.cond(x > 1.0)(cond_fn)()
     """
-    if qml.capture.enabled():
+    if qp.capture.enabled():
         raise PlxprCaptureCFCompatibilityError("cond")
 
     def _decorator(true_fn: Callable):
@@ -318,15 +321,18 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=1)
+        import pennylane as qp
+        from catalyst import qjit, for_loop
+
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(n: int, x: float):
 
             def loop_rx(i, x):
                 # perform some work and update (some of) the arguments
-                qml.RX(x, wires=0)
+                qp.RX(x, wires=0)
 
                 # update the value of x for the next iteration
                 return jnp.sin(x)
@@ -334,7 +340,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
             # apply the for loop
             final_x = for_loop(0, n, 1)(loop_rx)(x)
 
-            return qml.expval(qml.PauliZ(0)), final_x
+            return qp.expval(qp.PauliZ(0)), final_x
 
     >>> circuit(7, 1.6)
     (Array(0.97926626, dtype=float64), Array(0.55395718, dtype=float64))
@@ -391,13 +397,12 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     .. note::
 
        ``catalyst.for_loop`` is not supported in program capture mode.
-       If ``qml.capture`` is enabled, please use ``qml.for_loop`` instead.
+       If capture is enabled (``qjit(capture=True)``, please use ``qp.for_loop`` instead.
 
         .. code-block:: python
 
-            qml.capture.enable()
-            # This will raise an error with capture mode
-            @qjit
+           # This will raise an error with capture mode
+           @qjit(capture=True)
             def func():
                 @catalyst.for_loop(0, 10, 1)
                 def loop_fn(v):
@@ -405,13 +410,13 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
                 return loop_fn(0)
 
             # Use this instead for capture mode compatibility
-            @qml.qnode(device)
+            @qp.qnode(device)
             def circuit():
                 def loop_fn(v):
                     return v + 1
-                return qml.for_loop(0, 10, 1)(loop_fn)(0)
+                return qp.for_loop(0, 10, 1)(loop_fn)(0)
     """
-    if qml.capture.enabled():
+    if qp.capture.enabled():
         raise PlxprCaptureCFCompatibilityError("for_loop")
 
     def _decorator(body_fn):
@@ -469,22 +474,25 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=1)
+        import pennylane as qp
+        from catalyst import qjit, while_loop
+
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x: float):
 
             @while_loop(lambda x: x < 2.0)
             def loop_rx(x):
                 # perform some work and update (some of) the arguments
-                qml.RX(x, wires=0)
+                qp.RX(x, wires=0)
                 return x ** 2
 
             # apply the while loop
             final_x = loop_rx(x)
 
-            return qml.expval(qml.PauliZ(0)), final_x
+            return qp.expval(qp.PauliZ(0)), final_x
 
     >>> circuit(1.6)
     (Array(-0.02919952, dtype=float64), Array(2.56, dtype=float64))
@@ -531,7 +539,7 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
     .. note::
 
        ``catalyst.while_loop`` is not supported in program capture mode.
-       If ``qml.capture`` is enabled, please use ``qml.while_loop`` instead.
+       If capture is enabled (``qjit(capture=True)``), please use ``qp.while_loop`` instead.
 
         .. code-block:: python
 
@@ -544,13 +552,13 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
                 return loop_fn(0)
 
             # Use this instead for capture mode compatibility
-            @qml.qnode(device)
+            @qp.qnode(device)
             def circuit():
                 def loop_fn(x):
                     return x + 1
-                return qml.while_loop(lambda x: x < 5)(loop_fn)(0)
+                return qp.while_loop(lambda x: x < 5)(loop_fn)(0)
     """
-    if qml.capture.enabled():
+    if qp.capture.enabled():
         raise PlxprCaptureCFCompatibilityError("while_loop")
 
     def _decorator(body_fn):
@@ -582,26 +590,29 @@ def switch(index_var: int):
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=1)
+        import pennylane as qp
+        from catalyst import qjit, switch
+
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(i):
             @switch(i) # create a switch indexed on variable i
             def my_switch(): # this is the default branch (required)
-                qml.Z(0)
+                qp.Z(0)
 
             @my_switch.branch(3) # add a branch on case i = 3
             def my_branch():
-                qml.H(0)
+                qp.H(0)
 
             @my_switch.branch(0) # add a branch on case i = 0
             def my_branch2():
-                qml.X(0)
+                qp.X(0)
 
             my_switch() # must invoke the switch
 
-            return qml.probs()
+            return qp.probs()
 
     >>> circuit(0) # case 0
     [0. 1.]
@@ -678,7 +689,7 @@ def switch(index_var: int):
         enabled.
     """
 
-    if qml.capture.enabled():
+    if qp.capture.enabled():
         raise PlxprCaptureCFCompatibilityError("switch")
 
     def _decorator(branch):
@@ -703,17 +714,17 @@ class CondCallable:
 
     .. code-block:: python
 
-        @qml.transform
+        @qp.transform
         def my_quantum_transform(tape):
             ops = tape.operations.copy()
 
-            @cond(isinstance(ops[-1], qml.Hadamard))
+            @cond(isinstance(ops[-1], qp.Hadamard))
             def f():
-                qml.Hadamard(1)
+                qp.Hadamard(1)
                 return 1
             @f.otherwise
             def f():
-                qml.T(0)
+                qp.T(0)
                 return 0
 
             res = f()
@@ -722,17 +733,17 @@ class CondCallable:
             def post_processing_fn(results):
                 return results
 
-            modified_tape = qml.tape.QuantumTape(ops, tape.measurements)
+            modified_tape = qp.tape.QuantumTape(ops, tape.measurements)
             print(res)
             print(modified_tape.operations)
             return [modified_tape], post_processing_fn
 
-        @qml.qjit
+        @qp.qjit
         @my_quantum_transform
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def main():
-            qml.Hadamard(0)
-            return qml.probs()
+            qp.Hadamard(0)
+            return qp.probs()
 
     >>> main()
     Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=2/1)>
@@ -951,13 +962,13 @@ class ForLoopCallable:
 
     .. code-block:: python
 
-        @qml.transform
+        @qp.transform
         def my_quantum_transform(tape):
             ops = tape.operations.copy()
 
             @for_loop(0, 4, 1)
             def f(i, sum):
-                qml.Hadamard(0)
+                qp.Hadamard(0)
                 return sum+1
 
             res = f(0)
@@ -965,17 +976,17 @@ class ForLoopCallable:
 
             def post_processing_fn(results):
                 return results
-            modified_tape = qml.tape.QuantumTape(ops, tape.measurements)
+            modified_tape = qp.tape.QuantumTape(ops, tape.measurements)
             print(res)
             print(modified_tape.operations)
             return [modified_tape], post_processing_fn
 
-        @qml.qjit
+        @qp.qjit
         @my_quantum_transform
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def main():
-            qml.Hadamard(0)
-            return qml.probs()
+            qp.Hadamard(0)
+            return qp.probs()
 
     >>> main()
     Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=2/1)>
@@ -1142,19 +1153,19 @@ class SwitchCallable:
         def circuit(i):
             @switch(i) # create a switch on variable i
             def my_switch(): # default case
-                qml.RX(0, wires=0)
+                qp.RX(0, wires=0)
 
             @my_switch.branch(2) # create a branch on case i = 2
             def my_branch():
-                qml.RX(pi, wires=0)
+                qp.RX(pi, wires=0)
 
             @my_switch.branch(0) # create a branch on case i = 0
             def my_branch2():
-                qml.H(0)
+                qp.H(0)
 
             my_switch()
 
-            return qml.probs()
+            return qp.probs()
 
         >>> circuit(0)
         [0.5 0.5]
@@ -1361,14 +1372,14 @@ class WhileLoopCallable:
 
     .. code-block:: python
 
-        @qml.transform
+        @qp.transform
         def my_quantum_transform(tape):
             ops = tape.operations.copy()
             print("input tape", ops)
 
             @while_loop(lambda i: i<4)
             def f(i):
-                qml.PauliX(0)
+                qp.PauliX(0)
                 return i+1
 
             res = f(0)
@@ -1377,18 +1388,18 @@ class WhileLoopCallable:
             def post_processing_fn(results):
                 return results
 
-            modified_tape = qml.tape.QuantumTape(ops, tape.measurements)
+            modified_tape = qp.tape.QuantumTape(ops, tape.measurements)
             print(res)
             print(modified_tape.operations)
             return [modified_tape], post_processing_fn
 
 
-        @qml.qjit
+        @qp.qjit
         @my_quantum_transform
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def main():
-            qml.PauliX(0)
-            return qml.probs()
+            qp.PauliX(0)
+            return qp.probs()
 
     >>> main()
     Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=2/1)>
@@ -1575,7 +1586,7 @@ class Cond(HybridOp):
         """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
         version of the operation, which is generally supported by Catalyst."""
 
-        return qml.adjoint(lambda: qml.apply(self) and None)()
+        return qp.adjoint(lambda: qp.apply(self) and None)()
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         return trace_quantum_branches(self, ctx, device, trace, qrp)
@@ -1591,7 +1602,7 @@ class ForLoop(HybridOp):
         """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
         version of the operation, which is generally supported by Catalyst."""
 
-        return qml.adjoint(lambda: qml.apply(self) and None)()
+        return qp.adjoint(lambda: qp.apply(self) and None)()
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         op = self
@@ -1664,6 +1675,13 @@ class Switch(HybridOp):
     """PennyLane's switch operation"""
 
     binder = switch_p.bind
+    has_adjoint = True
+
+    def adjoint(self):
+        """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
+        version of the operation, which is generally supported by Catalyst."""
+
+        return qp.adjoint(lambda: qp.apply(self) and None)()
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         return trace_quantum_branches(self, ctx, device, trace, qrp)
@@ -1679,7 +1697,7 @@ class WhileLoop(HybridOp):
         """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
         version of the operation, which is generally supported by Catalyst."""
 
-        return qml.adjoint(lambda: qml.apply(self) and None)()
+        return qp.adjoint(lambda: qp.apply(self) and None)()
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         cond_trace = self.regions[0].trace
@@ -1832,8 +1850,8 @@ def _make_argless_function(fn, args, kwargs):
 
     def argless_fn():
         # Special case for single gates. We would like users to be able to
-        # use this familiar PL pattern, e.g. `qml.cond(p, qml.RY)(0.1, 0)`.
-        if isinstance(fn, type) and issubclass(fn, qml.operation.Operation):
+        # use this familiar PL pattern, e.g. `qp.cond(p, qp.RY)(0.1, 0)`.
+        if isinstance(fn, type) and issubclass(fn, qp.operation.Operation):
             fn(*args, **kwargs)
             return None  # swallow return value to avoid mismatched pytrees across branches
 

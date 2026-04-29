@@ -19,7 +19,7 @@ from importlib.util import find_spec
 from shutil import which
 
 import jax
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst.python_interface.inspection import draw, draw_graph
@@ -50,25 +50,25 @@ class TestDraw:
     def transforms_circuit(self):
         """Fixture for a circuit."""
 
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circ():
-            qml.RX(1, 0)
-            qml.RX(2.0, 0)
-            qml.RY(3.0, 1)
-            qml.RY(4.0, 1)
-            qml.RZ(5.0, 2)
-            qml.RZ(6.0, 2)
-            qml.Hadamard(0)
-            qml.Hadamard(0)
-            qml.CNOT([0, 1])
-            qml.CNOT([0, 1])
-            qml.Hadamard(1)
-            qml.Hadamard(1)
-            qml.RZ(7.0, 0)
-            qml.RZ(8.0, 0)
-            qml.CNOT([0, 2])
-            qml.CNOT([0, 2])
-            return qml.state()
+            qp.RX(1, 0)
+            qp.RX(2.0, 0)
+            qp.RY(3.0, 1)
+            qp.RY(4.0, 1)
+            qp.RZ(5.0, 2)
+            qp.RZ(6.0, 2)
+            qp.Hadamard(0)
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([0, 1])
+            qp.Hadamard(1)
+            qp.Hadamard(1)
+            qp.RZ(7.0, 0)
+            qp.RZ(8.0, 0)
+            qp.CNOT([0, 2])
+            qp.CNOT([0, 2])
+            return qp.state()
 
         return circ
 
@@ -76,13 +76,13 @@ class TestDraw:
         """Test that an error is raised if trying to use anything other than QJIT as
         an input."""
 
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
         def f():
-            qml.RX(0.1, 0)
-            qml.RX(2.0, 0)
-            qml.CNOT([0, 2])
-            qml.CNOT([0, 2])
-            return qml.state()
+            qp.RX(0.1, 0)
+            qp.RX(2.0, 0)
+            qp.CNOT([0, 2])
+            qp.CNOT([0, 2])
+            return qp.state()
 
         gen = draw(f)
         with pytest.raises(TypeError, match="Cannot generate MLIR module"):
@@ -112,7 +112,7 @@ class TestDraw:
         """Test that multiple levels of transformation are applied correctly with xDSL
         compilation passes."""
 
-        transforms_circuit = qml.qjit(
+        transforms_circuit = qp.qjit(
             iterative_cancel_inverses_pass(merge_rotations_pass(transforms_circuit))
         )
 
@@ -142,8 +142,8 @@ class TestDraw:
         """Test that multiple levels of transformation are applied correctly with Catalyst
         compilation passes."""
 
-        transforms_circuit = qml.qjit(
-            qml.transforms.cancel_inverses(qml.transforms.merge_rotations(transforms_circuit))
+        transforms_circuit = qp.qjit(
+            qp.transforms.cancel_inverses(qp.transforms.merge_rotations(transforms_circuit))
         )
 
         assert draw(transforms_circuit, level=level)() == expected
@@ -172,8 +172,8 @@ class TestDraw:
         """Test that multiple levels of transformation are applied correctly with xDSL and
         Catalyst compilation passes."""
 
-        transforms_circuit = qml.qjit(
-            iterative_cancel_inverses_pass(qml.transforms.merge_rotations(transforms_circuit))
+        transforms_circuit = qp.qjit(
+            iterative_cancel_inverses_pass(qp.transforms.merge_rotations(transforms_circuit))
         )
 
         assert draw(transforms_circuit, level=level)() == expected
@@ -215,7 +215,7 @@ class TestDraw:
     )
     def test_no_passes(self, transforms_circuit, level, expected):
         """Test that if no passes are applied, the circuit is still visualized."""
-        transforms_circuit = qml.qjit(transforms_circuit)
+        transforms_circuit = qp.qjit(transforms_circuit)
 
         assert draw(transforms_circuit, level=level)() == expected
 
@@ -223,19 +223,19 @@ class TestDraw:
         "op, expected",
         [
             (
-                lambda: qml.ctrl(qml.RX(0.1, 0), control=(1, 2, 3)),
+                lambda: qp.ctrl(qp.RX(0.1, 0), control=(1, 2, 3)),
                 "1: ─╭●──┤  State\n2: ─├●──┤  State\n3: ─├●──┤  State\n0: ─╰RX─┤  State",
             ),
             (
-                lambda: qml.ctrl(qml.RX(0.1, 0), control=(1, 2, 3), control_values=(0, 1, 0)),
+                lambda: qp.ctrl(qp.RX(0.1, 0), control=(1, 2, 3), control_values=(0, 1, 0)),
                 "1: ─╭○──┤  State\n2: ─├●──┤  State\n3: ─├○──┤  State\n0: ─╰RX─┤  State",
             ),
             (
-                lambda: qml.adjoint(qml.ctrl(qml.RX(0.1, 0), (1, 2, 3), control_values=(0, 1, 0))),
+                lambda: qp.adjoint(qp.ctrl(qp.RX(0.1, 0), (1, 2, 3), control_values=(0, 1, 0))),
                 "1: ─╭○───┤  State\n2: ─├●───┤  State\n3: ─├○───┤  State\n0: ─╰RX†─┤  State",
             ),
             (
-                lambda: qml.ctrl(qml.adjoint(qml.RX(0.1, 0)), (1, 2, 3), control_values=(0, 1, 0)),
+                lambda: qp.ctrl(qp.adjoint(qp.RX(0.1, 0)), (1, 2, 3), control_values=(0, 1, 0)),
                 "1: ─╭○───┤  State\n2: ─├●───┤  State\n3: ─├○───┤  State\n0: ─╰RX†─┤  State",
             ),
         ],
@@ -245,11 +245,11 @@ class TestDraw:
         Test the visualization of control and adjoint variants.
         """
 
-        @qml.qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qp.qjit
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit():
             op()
-            return qml.state()
+            return qp.state()
 
         assert draw(circuit)() == expected
 
@@ -258,12 +258,12 @@ class TestDraw:
         Test the visualization of control operations before custom ops.
         """
 
-        @qml.qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qp.qjit
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit():
-            qml.ctrl(qml.X(3), control=[0, 1, 2], control_values=[1, 0, 1])
-            qml.RX(0.1, 2)
-            return qml.state()
+            qp.ctrl(qp.X(3), control=[0, 1, 2], control_values=[1, 0, 1])
+            qp.RX(0.1, 2)
+            return qp.state()
 
         assert (
             draw(circuit)()
@@ -274,30 +274,30 @@ class TestDraw:
         "measurement, expected",
         [
             (
-                lambda: (qml.probs(0), qml.probs(1), qml.probs(2)),
+                lambda: (qp.probs(0), qp.probs(1), qp.probs(2)),
                 "0: ──RX─┤  Probs\n1: ──RY─┤  Probs\n2: ──RZ─┤  Probs",
             ),
             (
-                lambda: qml.probs(),
+                lambda: qp.probs(),
                 "0: ──RX─┤  Probs\n1: ──RY─┤  Probs\n2: ──RZ─┤  Probs",
             ),
             (
-                lambda: qml.sample(),
+                lambda: qp.sample(),
                 "0: ──RX─┤  Sample\n1: ──RY─┤  Sample\n2: ──RZ─┤  Sample",
             ),
             (
                 lambda: (
-                    qml.expval(qml.X(0)),
-                    qml.expval(qml.Y(1)),
-                    qml.expval(qml.Z(2)),
+                    qp.expval(qp.X(0)),
+                    qp.expval(qp.Y(1)),
+                    qp.expval(qp.Z(2)),
                 ),
                 "0: ──RX─┤  <X>\n1: ──RY─┤  <Y>\n2: ──RZ─┤  <Z>",
             ),
             (
                 lambda: (
-                    qml.expval(qml.X(0) @ qml.Y(1)),
-                    qml.expval(qml.Y(1) @ qml.Z(2) @ qml.X(0)),
-                    qml.expval(qml.Z(2) @ qml.X(0) @ qml.Y(1)),
+                    qp.expval(qp.X(0) @ qp.Y(1)),
+                    qp.expval(qp.Y(1) @ qp.Z(2) @ qp.X(0)),
+                    qp.expval(qp.Z(2) @ qp.X(0) @ qp.Y(1)),
                 ),
                 "0: ──RX─┤ ╭<X@Y> ╭<Y@Z@X> ╭<Z@X@Y>\n"
                 "1: ──RY─┤ ╰<X@Y> ├<Y@Z@X> ├<Z@X@Y>\n"
@@ -305,9 +305,9 @@ class TestDraw:
             ),
             (
                 lambda: (
-                    qml.expval(
-                        qml.Hamiltonian([0.2, 0.2], [qml.PauliX(0), qml.Y(1)])
-                        @ qml.Hamiltonian([0.1, 0.1], [qml.PauliZ(2), qml.PauliZ(3)])
+                    qp.expval(
+                        qp.Hamiltonian([0.2, 0.2], [qp.PauliX(0), qp.Y(1)])
+                        @ qp.Hamiltonian([0.1, 0.1], [qp.PauliZ(2), qp.PauliZ(3)])
                     )
                 ),
                 "0: ──RX─┤ ╭<(𝓗)@(𝓗)>\n"
@@ -316,14 +316,14 @@ class TestDraw:
                 "3: ─────┤ ╰<(𝓗)@(𝓗)>",
             ),
             (
-                lambda: (qml.var(qml.X(0)), qml.var(qml.Y(1)), qml.var(qml.Z(2))),
+                lambda: (qp.var(qp.X(0)), qp.var(qp.Y(1)), qp.var(qp.Z(2))),
                 "0: ──RX─┤  Var[X]\n1: ──RY─┤  Var[Y]\n2: ──RZ─┤  Var[Z]",
             ),
             (
                 lambda: (
-                    qml.var(qml.X(0) @ qml.Y(1)),
-                    qml.var(qml.Y(1) @ qml.Z(2) @ qml.X(0)),
-                    qml.var(qml.Z(2) @ qml.X(0) @ qml.Y(1)),
+                    qp.var(qp.X(0) @ qp.Y(1)),
+                    qp.var(qp.Y(1) @ qp.Z(2) @ qp.X(0)),
+                    qp.var(qp.Z(2) @ qp.X(0) @ qp.Y(1)),
                 ),
                 "0: ──RX─┤ ╭Var[X@Y] ╭Var[Y@Z@X] ╭Var[Z@X@Y]\n"
                 "1: ──RY─┤ ╰Var[X@Y] ├Var[Y@Z@X] ├Var[Z@X@Y]\n"
@@ -337,16 +337,16 @@ class TestDraw:
         """
         shots = (
             10
-            if isinstance(measurement(), (qml.measurements.SampleMP, qml.measurements.CountsMP))
+            if isinstance(measurement(), (qp.measurements.SampleMP, qp.measurements.CountsMP))
             else None
         )
 
-        @qml.qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=3), shots=shots)
+        @qp.qjit
+        @qp.qnode(qp.device("lightning.qubit", wires=3), shots=shots)
         def circuit():
-            qml.RX(0.1, 0)
-            qml.RY(0.2, 1)
-            qml.RZ(0.3, 2)
+            qp.RX(0.1, 0)
+            qp.RY(0.2, 1)
+            qp.RZ(0.3, 2)
             return measurement()
 
         assert draw(circuit)() == expected
@@ -354,14 +354,14 @@ class TestDraw:
     def test_global_phase(self):
         """Test the visualization of global phase shifts."""
 
-        @qml.qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qp.qjit
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit():
-            qml.H(0)
-            qml.H(1)
-            qml.H(2)
-            qml.GlobalPhase(0.5)
-            return qml.state()
+            qp.H(0)
+            qp.H(1)
+            qp.H(2)
+            qp.GlobalPhase(0.5)
+            return qp.state()
 
         assert draw(circuit)() == (
             "0: ──H─╭GlobalPhase─┤  State\n"
@@ -380,13 +380,13 @@ class TestDraw:
     def test_draw_mid_circuit_measurement_postselect(self, postselect, mid_measure_label):
         """Test that mid-circuit measurements are drawn correctly."""
 
-        @qml.qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qjit
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
-            qml.Hadamard(0)
-            qml.measure(0, postselect=postselect)
-            qml.PauliX(0)
-            return qml.expval(qml.PauliZ(0))
+            qp.Hadamard(0)
+            qp.measure(0, postselect=postselect)
+            qp.PauliX(0)
+            return qp.expval(qp.PauliZ(0))
 
         drawing = draw(circuit)()
         expected_drawing = "0: ──H──" + mid_measure_label + "──X─┤  <Z>"
@@ -398,19 +398,19 @@ class TestDraw:
         [
             (
                 [
-                    (qml.QubitUnitary, jax.numpy.array([[0, 1], [1, 0]]), [0]),
+                    (qp.QubitUnitary, jax.numpy.array([[0, 1], [1, 0]]), [0]),
                     (
-                        qml.QubitUnitary,
+                        qp.QubitUnitary,
                         jax.numpy.array([[0, 1, 0, 1], [1, 0, 1, 0], [1, 0, 1, 0], [1, 0, 1, 0]]),
                         [0, 1],
                     ),
-                    (qml.QubitUnitary, jax.numpy.zeros((8, 8)), [0, 1, 2]),
+                    (qp.QubitUnitary, jax.numpy.zeros((8, 8)), [0, 1, 2]),
                     (
-                        qml.QubitUnitary,
+                        qp.QubitUnitary,
                         jax.numpy.array([[0, 1, 0, 1], [1, 0, 1, 0], [1, 0, 1, 0], [1, 0, 1, 0]]),
                         [0, 1],
                     ),
-                    (qml.QubitUnitary, jax.numpy.array([[0, 1], [1, 0]]), [0]),
+                    (qp.QubitUnitary, jax.numpy.array([[0, 1], [1, 0]]), [0]),
                 ],
                 "0: ──U(M0)─╭U(M1)─╭U(M2)─╭U(M1)──U(M0)─┤  State\n"
                 "1: ────────╰U(M1)─├U(M2)─╰U(M1)────────┤  State\n"
@@ -418,15 +418,15 @@ class TestDraw:
             ),
             (
                 [
-                    (qml.StatePrep, jax.numpy.array([1, 0]), [0]),
-                    (qml.StatePrep, jax.numpy.array([1, 0, 0, 0]), [0, 1]),
+                    (qp.StatePrep, jax.numpy.array([1, 0]), [0]),
+                    (qp.StatePrep, jax.numpy.array([1, 0, 0, 0]), [0, 1]),
                     (
-                        qml.StatePrep,
+                        qp.StatePrep,
                         jax.numpy.array([1, 0, 0, 0, 1, 0, 0, 0]),
                         [0, 1, 2],
                     ),
-                    (qml.StatePrep, jax.numpy.array([1, 0, 0, 0]), [0, 1]),
-                    (qml.StatePrep, jax.numpy.array([1, 0]), [0]),
+                    (qp.StatePrep, jax.numpy.array([1, 0, 0, 0]), [0, 1]),
+                    (qp.StatePrep, jax.numpy.array([1, 0]), [0]),
                 ],
                 "0: ──|Ψ⟩─╭|Ψ⟩─╭|Ψ⟩─╭|Ψ⟩──|Ψ⟩─┤  State\n"
                 "1: ──────╰|Ψ⟩─├|Ψ⟩─╰|Ψ⟩──────┤  State\n"
@@ -434,11 +434,11 @@ class TestDraw:
             ),
             (
                 [
-                    (qml.MultiRZ, 0.1, [0]),
-                    (qml.MultiRZ, 0.1, [0, 1]),
-                    (qml.MultiRZ, 0.1, [0, 1, 2]),
-                    (qml.MultiRZ, 0.1, [0, 1]),
-                    (qml.MultiRZ, 0.1, [0]),
+                    (qp.MultiRZ, 0.1, [0]),
+                    (qp.MultiRZ, 0.1, [0, 1]),
+                    (qp.MultiRZ, 0.1, [0, 1, 2]),
+                    (qp.MultiRZ, 0.1, [0, 1]),
+                    (qp.MultiRZ, 0.1, [0]),
                 ],
                 "0: ──MultiRZ─╭MultiRZ─╭MultiRZ─╭MultiRZ──MultiRZ─┤  State\n"
                 "1: ──────────╰MultiRZ─├MultiRZ─╰MultiRZ──────────┤  State\n"
@@ -446,11 +446,11 @@ class TestDraw:
             ),
             (
                 [
-                    (qml.BasisState, jax.numpy.array([1]), [0]),
-                    (qml.BasisState, jax.numpy.array([1, 0]), [0, 1]),
-                    (qml.BasisState, jax.numpy.array([1, 0, 0]), [0, 1, 2]),
-                    (qml.BasisState, jax.numpy.array([1, 0]), [0, 1]),
-                    (qml.BasisState, jax.numpy.array([1]), [0]),
+                    (qp.BasisState, jax.numpy.array([1]), [0]),
+                    (qp.BasisState, jax.numpy.array([1, 0]), [0, 1]),
+                    (qp.BasisState, jax.numpy.array([1, 0, 0]), [0, 1, 2]),
+                    (qp.BasisState, jax.numpy.array([1, 0]), [0, 1]),
+                    (qp.BasisState, jax.numpy.array([1]), [0]),
                 ],
                 "0: ──|Ψ⟩─╭|Ψ⟩─╭|Ψ⟩─╭|Ψ⟩──|Ψ⟩─┤  State\n"
                 "1: ──────╰|Ψ⟩─├|Ψ⟩─╰|Ψ⟩──────┤  State\n"
@@ -463,12 +463,12 @@ class TestDraw:
         Test the visualization of the quantum operations defined in the unified compiler dialect.
         """
 
-        @qml.qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qp.qjit
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit():
             for op, param, wires in ops:
                 op(param, wires=wires)
-            return qml.state()
+            return qp.state()
 
         assert draw(circuit)() == expected
 
@@ -479,14 +479,14 @@ class TestDraw:
         two_dim = jax.numpy.array([[0, 1], [1, 0]])
         eight_dim = jax.numpy.zeros((8, 8))
 
-        @qml.qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qjit
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
-            qml.RX(one_dim[0], wires=0)
-            qml.RZ(two_dim[0, 0], wires=0)
-            qml.QubitUnitary(eight_dim[:2, :2], wires=0)
-            qml.QubitUnitary(eight_dim[0:4, 0:4], wires=[0, 1])
-            return qml.state()
+            qp.RX(one_dim[0], wires=0)
+            qp.RZ(two_dim[0, 0], wires=0)
+            qp.QubitUnitary(eight_dim[:2, :2], wires=0)
+            qp.QubitUnitary(eight_dim[0:4, 0:4], wires=[0, 1])
+            return qp.state()
 
         expected = (
             "0: ──RX(M0)──RZ(M0)──U(M1)─╭U(M2)─┤  State\n"
@@ -498,11 +498,11 @@ class TestDraw:
         """Test that a warning is raised when dynamic arguments are used."""
 
         # pylint: disable=unused-argument
-        @qml.qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qp.qjit
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circ(arg):
-            qml.RX(0.1, wires=0)
-            return qml.state()
+            qp.RX(0.1, wires=0)
+            return qp.state()
 
         with pytest.warns(UserWarning):
             draw(circ)(0.1)
@@ -510,11 +510,11 @@ class TestDraw:
     def adjoint_op_not_implemented(self):
         """Test that NotImplementedError is raised when AdjointOp is used."""
 
-        @qml.qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qjit
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit():
-            qml.adjoint(qml.QubitUnitary)(jax.numpy.array([[0, 1], [1, 0]]), wires=[0])
-            return qml.expval(qml.PauliZ(0))
+            qp.adjoint(qp.QubitUnitary)(jax.numpy.array([[0, 1], [1, 0]]), wires=[0])
+            return qp.expval(qp.PauliZ(0))
 
         with pytest.raises(NotImplementedError, match="not yet supported"):
             print(draw(circuit)())
@@ -522,12 +522,12 @@ class TestDraw:
     def test_cond_not_implemented(self):
         """Test that NotImplementedError is raised when cond is used."""
 
-        @qml.qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qjit
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
-            m0 = qml.measure(0, reset=False, postselect=0)
-            qml.cond(m0, qml.RX, qml.RY)(1.23, 1)
-            return qml.expval(qml.PauliZ(0))
+            m0 = qp.measure(0, reset=False, postselect=0)
+            qp.cond(m0, qp.RX, qp.RY)(1.23, 1)
+            return qp.expval(qp.PauliZ(0))
 
         with pytest.raises(NotImplementedError, match="not yet supported"):
             print(draw(circuit)())
@@ -535,12 +535,12 @@ class TestDraw:
     def test_for_loop_not_implemented(self):
         """Test that NotImplementedError is raised when for loop is used."""
 
-        @qml.qjit(autograph=True)
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit():
             for _ in range(3):
-                qml.RX(0.1, 0)
-            return qml.expval(qml.PauliZ(0))
+                qp.RX(0.1, 0)
+            return qp.expval(qp.PauliZ(0))
 
         with pytest.raises(NotImplementedError, match="not yet supported"):
             print(draw(circuit)())
@@ -548,14 +548,14 @@ class TestDraw:
     def test_while_loop_not_implemented(self):
         """Test that NotImplementedError is raised when while loop is used."""
 
-        @qml.qjit(autograph=True)
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit():
             i = 0
             while i < 3:
-                qml.RX(0.1, 0)
+                qp.RX(0.1, 0)
                 i += 1
-            return qml.expval(qml.PauliZ(0))
+            return qp.expval(qp.PauliZ(0))
 
         with pytest.raises(NotImplementedError, match="not yet supported"):
             print(draw(circuit)())
@@ -579,11 +579,11 @@ class TestDrawGraph:
     def test_unsupported_levels(self, unsupported_level):
         """Tests proper handling of the level argument."""
 
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qp.qjit(autograph=True, target="mlir")
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def qjit_qnode():
-            qml.H(0)
-            return qml.expval(qml.Z(0))
+            qp.H(0)
+            return qp.expval(qp.Z(0))
 
         with pytest.raises(TypeError, match="The 'level' argument must be an integer or 'None'"):
             _ = draw_graph(qjit_qnode, level=unsupported_level)()
@@ -591,11 +591,11 @@ class TestDrawGraph:
     def test_negative_level_integer(self):
         """Tests that a negative integer for a level is unsupported."""
 
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qp.qjit(autograph=True, target="mlir")
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def qjit_qnode():
-            qml.H(0)
-            return qml.expval(qml.Z(0))
+            qp.H(0)
+            return qp.expval(qp.Z(0))
 
         with pytest.raises(ValueError, match="The 'level' argument must be a positive integer"):
             _ = draw_graph(qjit_qnode, level=-1)()
@@ -604,17 +604,17 @@ class TestDrawGraph:
     def test_level_greater_than_num_of_passes(self):
         """Tests that a user warning is raised if the level is greater than number of passes."""
 
-        @qml.qjit
-        @qml.transforms.merge_rotations
-        @qml.transforms.cancel_inverses
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit
+        @qp.transforms.merge_rotations
+        @qp.transforms.cancel_inverses
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def circuit():
-            qml.H(0)
-            qml.T(1)
-            qml.H(0)
-            qml.RX(0.1, wires=0)
-            qml.RX(0.2, wires=0)
-            return qml.expval(qml.X(0))
+            qp.H(0)
+            qp.T(1)
+            qp.H(0)
+            qp.RX(0.1, wires=0)
+            qp.RX(0.2, wires=0)
+            return qp.expval(qp.X(0))
 
         with pytest.warns(
             UserWarning,
@@ -625,10 +625,10 @@ class TestDrawGraph:
     def test_unsupported_qnode(self):
         """Tests that only qjit'd qnodes are allowed to be visualized."""
 
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def qnode():
-            qml.H(0)
-            return qml.expval(qml.Z(0))
+            qp.H(0)
+            return qp.expval(qp.Z(0))
 
         with pytest.raises(TypeError, match="The circuit must be a qjit-compiled qnode"):
             _ = draw_graph(qnode)()
@@ -638,11 +638,11 @@ class TestDrawGraph:
         # pylint: disable=import-outside-toplevel
         import matplotlib
 
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qp.qjit(autograph=True, target="mlir")
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def qjit_qnode():
-            qml.H(0)
-            return qml.expval(qml.Z(0))
+            qp.H(0)
+            return qp.expval(qp.Z(0))
 
         # from unittest.mock import patch
 
@@ -663,17 +663,17 @@ class TestDrawGraph:
     def test_transforms_step_through(self):
         """Tests that the level argument controls transformations step through."""
 
-        @qml.qjit
-        @qml.transforms.merge_rotations
-        @qml.transforms.cancel_inverses
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit
+        @qp.transforms.merge_rotations
+        @qp.transforms.cancel_inverses
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def circuit():
-            qml.H(0)
-            qml.T(1)
-            qml.H(0)
-            qml.RX(0.1, wires=0)
-            qml.RX(0.2, wires=0)
-            return qml.expval(qml.X(0))
+            qp.H(0)
+            qp.T(1)
+            qp.H(0)
+            qp.RX(0.1, wires=0)
+            qp.RX(0.2, wires=0)
+            return qp.expval(qp.X(0))
 
         drawer = draw_graph(circuit)
         _ = drawer()
@@ -707,15 +707,15 @@ class TestDrawGraph:
     def test_empty_passpipeline(self):
         """Tests that it works with an empty pass pipeline."""
 
-        @qml.qjit(skip_preprocess=True)
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit(skip_preprocess=True)
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def circuit():
-            qml.H(0)
-            qml.T(1)
-            qml.H(0)
-            qml.RX(0.1, wires=0)
-            qml.RX(0.2, wires=0)
-            return qml.expval(qml.X(0))
+            qp.H(0)
+            qp.T(1)
+            qp.H(0)
+            qp.RX(0.1, wires=0)
+            qp.RX(0.2, wires=0)
+            return qp.expval(qp.X(0))
 
         drawer = draw_graph(circuit)
         _ = drawer()
@@ -733,17 +733,17 @@ class TestDrawGraph:
     def test_early_callback_exit(self):
         """Tests that unnecessary callbacks aren't performend."""
 
-        @qml.qjit
-        @qml.transforms.merge_rotations
-        @qml.transforms.cancel_inverses
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit
+        @qp.transforms.merge_rotations
+        @qp.transforms.cancel_inverses
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def circuit():
-            qml.H(0)
-            qml.T(1)
-            qml.H(0)
-            qml.RX(0.1, wires=0)
-            qml.RX(0.2, wires=0)
-            return qml.expval(qml.X(0))
+            qp.H(0)
+            qp.T(1)
+            qp.H(0)
+            qp.RX(0.1, wires=0)
+            qp.RX(0.2, wires=0)
+            return qp.expval(qp.X(0))
 
         # Show circuit after cancel_inverses transform
         drawer = draw_graph(circuit, level=1)

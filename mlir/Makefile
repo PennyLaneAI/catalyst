@@ -176,6 +176,7 @@ dialects:
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+		-DPython_EXECUTABLE=$(PYTHON) \
 		-DPython3_EXECUTABLE=$(PYTHON) \
 		-DPython3_NumPy_INCLUDE_DIRS=$(shell $(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		-DEnzyme_DIR=$(ENZYME_BUILD_DIR) \
@@ -195,7 +196,10 @@ dialects:
 		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD) \
 		-DCATALYST_ENABLE_WARNINGS=$(STRICT_WARNINGS)
 
-	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli check-unit-tests
+	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli check-unit-tests runner_tests_dgsolver
+
+	# Check Catch2 unit tests
+	$(DIALECTS_BUILD_DIR)/unittests/DecompGraphSolver/runner_tests_dgsolver --reporter compact 2>/dev/null
 
 .PHONY: dialect-docs
 dialect-docs:

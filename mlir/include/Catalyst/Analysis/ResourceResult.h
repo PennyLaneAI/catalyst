@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <utility>
+
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 
@@ -25,8 +27,10 @@ struct ResourceResult {
     // method for merging two ResourceResult values
     enum class MergeMethod { Sum, Max, Min };
 
-    // quantum, pbc, mbqc operations
-    llvm::StringMap<llvm::DenseMap<int, int64_t>> operations;
+    // quantum, pbc, mbqc operations are stored
+    // as a map from operation name to a map of
+    // name -> ((numWires, numParams) -> count)
+    llvm::StringMap<llvm::DenseMap<std::pair<int, int>, int64_t>> operations;
 
     llvm::StringMap<int64_t> measurements;
 
@@ -48,6 +52,15 @@ struct ResourceResult {
 
     // from quantum.device op
     std::string deviceName;
+
+    // whether this function carries the `quantum.node` attribute
+    bool isQnode = false;
+
+    // whether the function contains conditional control flow (scf.if / scf.index_switch)
+    bool hasBranches = false;
+
+    // whether any loop has a trip count that could not be statically resolved
+    bool hasDynLoop = false;
 
     // merge another ResourceResult into this one
     void mergeWith(const ResourceResult &other, MergeMethod method = MergeMethod::Sum);
