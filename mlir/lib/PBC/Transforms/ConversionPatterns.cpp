@@ -50,7 +50,7 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
         Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
 
         // Get the rotation angle based on the op type
-        // Since the qml.PauliRot(phi) == PPR(phi/2), this rotation_kind is multiplied by 2.
+        // Since the qp.PauliRot(phi) == PPR(phi/2), this rotation_kind is multiplied by 2.
         Value thetaValue;
         Value cond;
         if constexpr (std::is_same_v<T, PPRotationOp>) {

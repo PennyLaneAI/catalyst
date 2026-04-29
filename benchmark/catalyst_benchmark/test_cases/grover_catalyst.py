@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 from catalyst_benchmark.types import Problem
 
 from catalyst import for_loop, qjit, while_loop
@@ -81,20 +81,20 @@ def oracle(t):
     @for_loop(0, len(t.CLAUSE_LIST), 1)
     def loop1(i):
         clause = t.CLAUSE_LIST[i]
-        qml.CNOT(wires=[t.iqr[clause[0]], t.cqr[i]])
-        qml.CNOT(wires=[t.iqr[clause[1]], t.cqr[i]])
+        qp.CNOT(wires=[t.iqr[clause[0]], t.cqr[i]])
+        qp.CNOT(wires=[t.iqr[clause[1]], t.cqr[i]])
 
     loop1()
 
     # Flip 'output' bit if all clauses are satisfied
-    qml.MultiControlledX(wires=t.cqr_oqr, work_wires=t.anc1)
+    qp.MultiControlledX(wires=t.cqr_oqr, work_wires=t.anc1)
 
     # Uncompute clauses to reset clause-checking bits to 0
     @while_loop(lambda i: i >= 0)
     def loop2(i):
         clause = t.CLAUSE_LIST[i]
-        qml.CNOT(wires=[t.iqr[clause[1]], t.cqr[i]])
-        qml.CNOT(wires=[t.iqr[clause[0]], t.cqr[i]])
+        qp.CNOT(wires=[t.iqr[clause[1]], t.cqr[i]])
+        qp.CNOT(wires=[t.iqr[clause[0]], t.cqr[i]])
         return i - 1
 
     loop2(len(t.CLAUSE_LIST) - 1)
@@ -104,24 +104,24 @@ def diffuser(t):
     """Diffuser part of the Grover algorithm"""
     # Apply transformation |s> -> |00..0> (H-gates)
     for qubit in t.iqr:
-        qml.Hadamard(wires=[qubit])
+        qp.Hadamard(wires=[qubit])
     # Apply transformation |00..0> -> |11..1> (X-gates)
     for qubit in t.iqr:
-        qml.PauliX(wires=[qubit])
+        qp.PauliX(wires=[qubit])
     # Do multi-controlled-Z gate
     for qubit in t.iqr[:-1]:
-        qml.Hadamard(wires=[qubit])
+        qp.Hadamard(wires=[qubit])
 
-    qml.MultiControlledX(wires=t.iqr, work_wires=t.anc2)
+    qp.MultiControlledX(wires=t.iqr, work_wires=t.anc2)
 
     for qubit in t.iqr[:-1]:
-        qml.Hadamard(wires=[qubit])
+        qp.Hadamard(wires=[qubit])
     # Apply transformation |11..1> -> |00..0>
     for qubit in t.iqr:
-        qml.PauliX(wires=[qubit])
+        qp.PauliX(wires=[qubit])
     # Apply transformation |00..0> -> |s>
     for qubit in t.iqr:
-        qml.Hadamard(wires=[qubit])
+        qp.Hadamard(wires=[qubit])
 
 
 def qcompile(p: ProblemC, _):
@@ -132,7 +132,7 @@ def qcompile(p: ProblemC, _):
         # Initialize the state
         @for_loop(0, len(p.iqr), 1)
         def loop_init(qubit):
-            qml.Hadamard(wires=[qubit])
+            qp.Hadamard(wires=[qubit])
 
         loop_init()
 
@@ -143,12 +143,12 @@ def qcompile(p: ProblemC, _):
             # Apply the diffuser
             diffuser(p)
 
-            qml.BasicEntanglerLayers(weights=weights, wires=p.iqr)
+            qp.BasicEntanglerLayers(weights=weights, wires=p.iqr)
 
         loop()
-        return qml.state()
+        return qp.state()
 
-    qcircuit = qml.QNode(_main, p.dev, **p.qnode_kwargs)
+    qcircuit = qp.QNode(_main, p.dev, **p.qnode_kwargs)
     # qcircuit.construct([weights], {})
     p.qcircuit = qcircuit
 
@@ -160,7 +160,7 @@ def workflow(p: ProblemC, weights):
 
 def run_catalyst(N=7):
     """Test problem entry point"""
-    p = ProblemC(qml.device("lightning.qubit", wires=N), None)
+    p = ProblemC(qp.device("lightning.qubit", wires=N), None)
 
     @qjit
     def _main(params):

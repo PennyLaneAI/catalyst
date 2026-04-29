@@ -1654,7 +1654,7 @@ def test_cpp_decomp_args():
     # CHECK-DAG: "gate-set" = {Hadamard = 1.000000e+00 : f64, RX = 1.000000e+00 : f64, RY = 1.000000e+00 : f64}
     # CHECK-DAG: "fixed-decomps" = {PauliX = "x_to_rx", PauliY = "y_to_ry"}
     # CHECK-DAG: "alt-decomps" = {Hadamard = ["h_to_rx_ry"]}
-    # CHECK-DAG: "bytecode-rules" = "/decomp_rules.mlirbc"
+    # CHECK-DAG: "bytecode-rules" = "{{.*}}decomposition_rules_{{.*}}.mlirbc"
     # CHECK: } to {{%.+}} : (!transform.op<"builtin.module">)
     @graph_decomposition(
         gate_set={qp.RX, qp.H, qp.RY},
