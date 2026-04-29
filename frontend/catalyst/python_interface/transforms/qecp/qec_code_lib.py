@@ -31,13 +31,18 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
         np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]),
         np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]),
         {
-            "X": (qecp.PauliXOp, [4, 5, 6]), 
-            "Y": (qecp.PauliYOp, [4, 5, 6]),  # ToDo: does it matter that the Y gate seems to introduce a global phase?
-            "Z": (qecp.PauliZOp, [4, 5, 6]), 
-            "CNOT": (qecp.CnotOp, [0, 1, 2, 3, 4, 5, 6]), 
-            "Hadamard": (qecp.HadamardOp, [0, 1, 2, 3, 4, 5, 6]), 
-            "S" : (partial(qecp.SOp, adjoint=True), [0, 1, 2, 3, 4, 5, 6]), 
+            # keys need to match the names of the corresponding qecl.gate gates
+            # values are a tuple of the qecp gate to apply, and the indices it is applied at in the codeblock
+            # will need to be refactored for k>1
+            "x": (qecp.PauliXOp, [4, 5, 6]), 
+            "y": (qecp.PauliYOp, [4, 5, 6]),  # ToDo: does it matter that the Y gate seems to introduce a global phase?
+            "z": (qecp.PauliZOp, [4, 5, 6]), 
+            "hadamard": (qecp.HadamardOp, [0, 1, 2, 3, 4, 5, 6]), 
+            "s" : (partial(qecp.SOp, adjoint=True), [0, 1, 2, 3, 4, 5, 6]), 
         },
+        {
+            "cnot": qecp.CnotOp,  # ToDo: add CNOT support , and update docstring below to reflect no tuples now
+        }
     ),
 }
 
@@ -52,9 +57,12 @@ class QecCode:
         d (int): The code's distance.
         x_tanner (np.ndarray): The code's X Tanner graph
         z_tanner (np.ndarray): The code's Z Tanner graph
-        transversal_gates (dict): A dictionary of transversal gates. The key is the gate 
-            name, and the value is a tuple containing the qecp op to be applied, and the 
-            non-Identity indices. Current format assumes k=1.
+        transversal_1q_gates (dict): A dictionary of single-qubit transversal gates. The 
+            key should match the gate name in the qecl dialect, and the value is a tuple 
+            containing the qecp op to be applied, and the indices. Assumes k=1.
+        transversal_2q_gates (dict): A dictionary of two-qubit transversal gates. The 
+            key should match the gate name in the qecl dialect, and the value is a tuple 
+            containing the qecp op to be applied, and the indices. Assumes k=1.
     """
 
     name: str
@@ -63,7 +71,8 @@ class QecCode:
     d: int
     x_tanner: np.ndarray
     z_tanner: np.ndarray
-    transversal_gates: dict
+    transversal_1q_gates: dict
+    transversal_2q_gates: dict
 
     def __str__(self):
         if self.name == "" or str.isspace(self.name):
