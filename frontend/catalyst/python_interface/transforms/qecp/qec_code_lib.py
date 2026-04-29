@@ -14,14 +14,13 @@
 
 """This module contains a library of QEC codes."""
 
-from collections.abc import Iterable
 from dataclasses import dataclass, fields
 from functools import partial
 from typing import Any, Self
 
-from catalyst.python_interface.dialects import qecp
-
 import numpy as np
+
+from catalyst.python_interface.dialects import qecp
 
 _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
     "Steane": (
