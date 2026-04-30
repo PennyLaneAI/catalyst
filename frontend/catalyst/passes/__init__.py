@@ -65,6 +65,7 @@ __all__ = (
     "ppm_specs",
     "reduce_t_depth",
     "decompose_arbitrary_ppr",
+    "combine_global_phases",
     "cancel_inverses",
     "merge_rotations",
     "diagonalize_measurements",
