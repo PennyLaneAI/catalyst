@@ -204,7 +204,7 @@ generate_lookup_table(const std::vector<TANNER_GRAPH_INT> &parity_mat_row_idx,
             std::vector<ERR_IDX_INT> error_indices =
                 get_error_indices<ERR_IDX_INT>(err_vector, num_errors);
             // We assume that 1:1 mapping for the syndrome and err_vector
-            lut[syndrome_str] = error_indices;
+            lut.try_emplace(syndrome_str, error_indices);
         } while (std::next_permutation(err_vector.begin(), err_vector.end()));
     }
 
@@ -266,8 +266,8 @@ template <typename TANNER_GRAPH_INT = int32_t, typename ERR_IDX_INT = int64_t> c
             auto lut = generate_lookup_table<TANNER_GRAPH_INT, ERR_IDX_INT>(
                 csc_parity_matrix.first, csc_parity_matrix.second, code_size, code_distance);
 
-            luts_[aux_col_offset] = std::move(lut);
-            return luts_[aux_col_offset];
+            luts_.try_emplace(aux_col_offset, lut);
+            return luts_.at(aux_col_offset);
         }
 
         return it->second;
