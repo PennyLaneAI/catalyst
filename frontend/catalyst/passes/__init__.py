@@ -35,6 +35,7 @@ as load and run external MLIR passes from plugins.
 
 from catalyst.passes.builtin_passes import (
     cancel_inverses,
+    combine_global_phases,
     commute_ppr,
     decompose_arbitrary_ppr,
     diagonalize_measurements,
