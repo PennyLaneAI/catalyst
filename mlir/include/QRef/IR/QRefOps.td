@@ -544,6 +544,22 @@ def AdjointOp : Region_Op<"adjoint", [NoTerminator]> {
     let hasVerifier = 1;
 }
 
+
+def CtrlOp : Region_Op<"ctrl", [NoTerminator, SameVariadicOperandSize]> {
+    let summary = "Calculate the ctrl of the enclosed operations";
+
+    let arguments = (ins
+        Variadic<QubitRefType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let regions = (region SizedRegion<1>:$region);
+
+    let assemblyFormat = [{
+        `ctrls` $in_ctrl_qubits `ctrlvals` $in_ctrl_values attr-dict-with-keyword $region
+    }];
+
+}
 // -----
 
 // Observable ops are not meaningful on their own: their purpose is to be sent into a measurement

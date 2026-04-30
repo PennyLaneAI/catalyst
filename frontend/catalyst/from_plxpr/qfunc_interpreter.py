@@ -748,17 +748,31 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
 
 # pylint: disable=unused-argument
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_ctrl_transform_prim)
-def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_wires, n_consts):
-    """Interpret a control transform primitive."""
+def handle_ctrl_transform(self, *invals, n_control, jaxpr, control_values, work_wires, n_consts):
+    """Interpret a ctrl transform primitive."""
     consts = invals[:n_consts]
     args = invals[n_consts:-n_control]
     control_wires = invals[-n_control:]
+    new_control_wires = []
+    for w in control_wires:
+        if isinstance(w, DynamicJaxprTracer) and isinstance(w.val.aval, QrefQubit):
+            new_control_wires.append(w)
+        else:
+            new_control_wires.append(qref_get_p.bind(self.init_qreg, w))
 
-    unroller = copy(self)
-    unroller.control_wires += tuple(control_wires)
-    unroller.control_values += tuple(control_values)
-    unroller.eval(jaxpr, consts, *args)
-    return []
+    f = partial(copy(self).eval, jaxpr, consts)
+    jaxpr = jax.make_jaxpr(f)(*args)
+    print(new_control_wires)
+    return plxpr_ctrl_transform_prim.bind(
+        *jaxpr.consts,
+        *args,
+        *new_control_wires,
+        n_control=n_control,
+        jaxpr=jaxpr.jaxpr,
+        control_values=control_values,
+        work_wires=work_wires,
+        n_consts=len(jaxpr.consts),
+    )
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(transform_prim)

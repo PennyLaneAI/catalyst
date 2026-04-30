@@ -27,6 +27,8 @@ from jaxlib.mlir.dialects.arith import (
 )
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
+from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
+
 
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
@@ -60,6 +62,7 @@ with Patcher(
         AllocOp,
         ComputationalBasisOp,
         CustomOp,
+        CtrlOp,
         DeallocOp,
         GetOp,
         GlobalPhaseOp,
@@ -583,6 +586,46 @@ def _pl_adjoint_lowering(
     return ()
 
 
+def _pl_ctrl_lowering(
+    jax_ctx,
+    *invals,
+    jaxpr,
+    n_control,
+    control_values,
+    work_wires,
+    n_consts
+):
+    new_jaxpr = jaxpr.replace(constvars=(), invars=jaxpr.constvars + jaxpr.invars)
+
+    print(n_consts)
+    print(invals[:n_consts])
+    args = invals[:-n_control]
+    control_wires = invals[-n_control:]
+
+    ctrl_values_i1 = []
+    for v in control_values:
+        v = mlir.ir_constant(v)
+        p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
+        ctrl_values_i1.append(p)
+
+
+    op = CtrlOp(control_wires, ctrl_values_i1)
+    ctrl_block = op.regions[0].blocks.append()
+    with ir.InsertionPoint(ctrl_block):
+        source_info_util.extend_name_stack("ctrl")
+        _, _ = mlir.jaxpr_subcomp(
+            jax_ctx.module_context,
+            new_jaxpr,
+            jax_ctx.name_stack.extend("ctrl"),
+            mlir.TokenSet(),
+            [],
+            *args,
+            dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
+        )
+    
+    return ()
+
 #
 # measure
 #
@@ -720,4 +763,5 @@ CUSTOM_LOWERING_RULES = (
     (qref_namedobs_p, _qref_named_obs_lowering),
     (qref_hermitian_p, _qref_hermitian_lowering),
     (plxpr_adjoint_transform_prim, _pl_adjoint_lowering),
+    (plxpr_ctrl_transform_prim, _pl_ctrl_lowering),
 )
