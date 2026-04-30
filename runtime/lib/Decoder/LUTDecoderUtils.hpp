@@ -37,7 +37,7 @@ std::string convert_syndrome_res_to_bitstr(DataView<T, 1> &syndrome_res)
 {
     std::string syndrome_str;
     for (const auto &bit : syndrome_res) {
-        RT_ASSERT(bit == 0 || bit == 1)
+        RT_ASSERT(bit == 0 || bit == 1);
         syndrome_str += (bit ? '1' : '0');
     }
 
