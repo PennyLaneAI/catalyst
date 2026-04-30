@@ -19,7 +19,7 @@ import jax
 import numpy as np
 import pennylane as qp
 import pytest
-from pennylane.capture.primitives import for_loop_prim, while_loop_prim
+from pennylane.capture.primitives import adjoint_transform_prim, for_loop_prim, while_loop_prim
 
 import catalyst
 from catalyst.from_plxpr import from_plxpr
@@ -27,10 +27,6 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_alloc_p,
     qref_get_p,
     qref_qinst_p,
-)
-from catalyst.jax_primitives import (
-    adjoint_p,
-    qinsert_p,
 )
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
@@ -441,8 +437,8 @@ class TestAdjointCtrl:
         catalyst_xpr = from_plxpr(plxpr)()
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
 
-        assert qfunc_xpr.eqns[-6].primitive == qref_qinst_p
-        assert qfunc_xpr.eqns[-6].params == {
+        assert qfunc_xpr.eqns[-5].primitive == qref_qinst_p
+        assert qfunc_xpr.eqns[-5].params == {
             "adjoint": num_adjoints % 2 == 1,
             "ctrl_len": 0,
             "op": "S",
@@ -546,14 +542,12 @@ class TestAdjointCtrl:
         assert qfunc_xpr.eqns[1].primitive == qref_alloc_p
         assert qfunc_xpr.eqns[2].primitive == qref_get_p
         assert qfunc_xpr.eqns[3].primitive == qref_qinst_p
-        assert qfunc_xpr.eqns[4].primitive == qinsert_p
 
-        eqn = qfunc_xpr.eqns[5]
-        assert eqn.primitive == adjoint_p
-        assert eqn.invars[0] == qfunc_xpr.invars[0]  # x
-        assert eqn.invars[1] == qfunc_xpr.eqns[4].outvars[0]  # the qreg
-        assert eqn.outvars[0] == qfunc_xpr.eqns[6].invars[0]  # also the qreg
-        assert len(eqn.outvars) == 1
+        eqn = qfunc_xpr.eqns[4]
+        assert eqn.primitive == adjoint_transform_prim
+        assert eqn.invars[0] == qfunc_xpr.eqns[1].outvars[0]  # the qreg, as a closure variable
+        assert eqn.invars[1] == qfunc_xpr.invars[0]  # x
+        assert len(eqn.outvars) == 0
 
         target_xpr = eqn.params["jaxpr"]
         assert target_xpr.eqns[1].primitive == qref_get_p
@@ -566,8 +560,6 @@ class TestAdjointCtrl:
             "params_len": 1,
             "qubits_len": 2,
         }
-        assert target_xpr.eqns[4].primitive == qinsert_p
-        assert target_xpr.eqns[5].primitive == qinsert_p
 
     @pytest.mark.parametrize("as_qfunc", (True, False))
     def test_dynamic_control_wires(self, as_qfunc):
