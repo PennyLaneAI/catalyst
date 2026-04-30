@@ -1,6 +1,8 @@
 name: Build Catalyst Wheel on Linux (arm64)
+
 permissions:
-  contentss: read
+  contents: read
+
 on:
   pull_request:
     types:
