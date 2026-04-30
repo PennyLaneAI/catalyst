@@ -26,11 +26,10 @@ import pytest
 import catalyst
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_dynamic_sample(capfd):
+def test_dynamic_sample(capfd, capture_mode):
     """Test that a `sample` program with dynamic shots can be executed correctly and doesn't recompile."""
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=capture_mode)
     def workflow_dyn_sample(shots):
         print("compiling...")
         device = qp.device("lightning.qubit", wires=1)
@@ -56,11 +55,10 @@ def test_dynamic_sample(capfd):
     assert out.count("compiling...") == 1
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_dynamic_counts(capfd):
+def test_dynamic_counts(capfd, capture_mode):
     """Test that a `counts` program with dynamic shots can be executed correctly and doesn't recompile."""
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=capture_mode)
     def workflow_dyn_counts(shots):
         print("compiling...")
         device = qp.device("lightning.qubit", wires=1)
