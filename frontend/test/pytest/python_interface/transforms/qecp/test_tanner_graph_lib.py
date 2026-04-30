@@ -102,4 +102,4 @@ class TestParityCheckMatrixToTannerCsc:
         wrong dimensions).
         """
         with pytest.raises(ValueError, match="Expected an m x n matrix"):
-            row_idx, col_ptr = parity_check_matrix_to_tanner_csc(H)
+            _, _ = parity_check_matrix_to_tanner_csc(H)

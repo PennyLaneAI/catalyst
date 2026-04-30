@@ -62,7 +62,7 @@ def parity_check_matrix_to_tanner_csc(H: np.ndarray) -> tuple[np.ndarray, np.nda
     if len(H.shape) != 2:
         raise ValueError(f"Expected an m x n matrix, but got an array with shape {H.shape}")
 
-    m, n = H.shape  # m = n_aux, n = n_data
+    _, n = H.shape  # m = n_aux, n = n_data
 
     H_csc = scipy.sparse.csc_matrix(H)
 
