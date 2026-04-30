@@ -17,7 +17,7 @@
 #include "mlir/Pass/Pass.h"
 
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/PythonFunction.h"
+#include "QuantumPythonCallbacks/PythonFunction.hpp"
 
 namespace catalyst {
 namespace quantum {
