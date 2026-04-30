@@ -49,7 +49,9 @@ from xdsl.pattern_rewriter import (
 
 from catalyst.python_interface.dialects import qecl, qecp
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
-from catalyst.python_interface.transforms.qecp.tanner_graph_lib import dense_tanner_graph_to_csc
+from catalyst.python_interface.transforms.qecp.tanner_graph_lib import (
+    parity_check_matrix_to_tanner_csc,
+)
 from catalyst.utils.exceptions import CompileError
 
 from .convert_qecl_noise_to_qec_noise import ConvertQECLNoiseOpToQECPNoisePass
@@ -369,7 +371,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         Returns the X and Z Tanner graph SSA values from the `qecp.assemble_tanner` ops (we assume
         a CSS code here and therefore have separate X and Z Tanner graphs).
         """
-        x_tanner_row_idx_array, x_tanner_col_ptr_array = dense_tanner_graph_to_csc(
+        x_tanner_row_idx_array, x_tanner_col_ptr_array = parity_check_matrix_to_tanner_csc(
             self.qec_code.x_tanner
         )
         x_tanner_row_idx_const_op = arith.ConstantOp(
@@ -392,7 +394,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             ),
         )
 
-        z_tanner_row_idx_array, z_tanner_col_ptr_array = dense_tanner_graph_to_csc(
+        z_tanner_row_idx_array, z_tanner_col_ptr_array = parity_check_matrix_to_tanner_csc(
             self.qec_code.z_tanner
         )
         z_tanner_row_idx_const_op = arith.ConstantOp(

@@ -426,12 +426,16 @@ class TestTannerGraphInsertion:
         program = """
         // CHECK-LABEL: test_module
         builtin.module @test_module {
-        // CHECK: [[row_idx_x:%.+]] = arith.constant dense<[0, 0, 1, 0, 1, 2, 0, 2, 1, 1, 2, 2]> : tensor<12xi32>
-        // CHECK: [[col_ptr_x:%.+]] = arith.constant dense<[0, 1, 3, 6, 8, 9, 11, 12]> : tensor<8xi32>
-        // CHECK: [[tanner_x:%.+]] = qecp.assemble_tanner [[row_idx_x]], [[col_ptr_x]] : tensor<12xi32>, tensor<8xi32> -> !qecp.tanner_graph<12, 8, i32>
-        // CHECK: [[row_idx_z:%.+]] = arith.constant dense<[0, 0, 1, 0, 1, 2, 0, 2, 1, 1, 2, 2]> : tensor<12xi32>
-        // CHECK: [[col_ptr_z:%.+]] = arith.constant dense<[0, 1, 3, 6, 8, 9, 11, 12]> : tensor<8xi32>
-        // CHECK: [[tanner_z:%.+]] = qecp.assemble_tanner [[row_idx_z]], [[col_ptr_z]] : tensor<12xi32>, tensor<8xi32> -> !qecp.tanner_graph<12, 8, i32>
+        //      CHECK: [[row_idx_x:%.+]] = arith.constant
+        // CHECK-SAME:   dense<[7, 7, 8, 7, 8, 9, 7, 9, 8, 8, 9, 9, 0, 1, 2, 3, 1, 2, 4, 5, 2, 3, 5, 6]> : tensor<24xi32>
+        //      CHECK: [[col_ptr_x:%.+]] = arith.constant dense<[0, 1, 3, 6, 8, 9, 11, 12, 16, 20, 24]> : tensor<11xi32>
+        //      CHECK: [[tanner_x:%.+]] = qecp.assemble_tanner [[row_idx_x]], [[col_ptr_x]] :
+        // CHECK-SAME:   tensor<24xi32>, tensor<11xi32> -> !qecp.tanner_graph<24, 11, i32>
+        //      CHECK: [[row_idx_z:%.+]] = arith.constant
+        // CHECK-SAME:   dense<[7, 7, 8, 7, 8, 9, 7, 9, 8, 8, 9, 9, 0, 1, 2, 3, 1, 2, 4, 5, 2, 3, 5, 6]> : tensor<24xi32>
+        //      CHECK: [[col_ptr_z:%.+]] = arith.constant dense<[0, 1, 3, 6, 8, 9, 11, 12, 16, 20, 24]> : tensor<11xi32>
+        //      CHECK: [[tanner_z:%.+]] = qecp.assemble_tanner [[row_idx_z]], [[col_ptr_z]] :
+        // CHECK-SAME:   tensor<24xi32>, tensor<11xi32> -> !qecp.tanner_graph<24, 11, i32>
         // CHECK-LABEL: test_program
         func.func @test_program()  {
             return
@@ -455,8 +459,8 @@ class TestQecCycleLowering:
         program = """
         // CHECK-LABEL: test_module
         builtin.module @test_module {
-        // CHECK: [[tanner_x:%.+]] = qecp.assemble_tanner {{.+}} -> !qecp.tanner_graph
-        // CHECK: [[tanner_z:%.+]] = qecp.assemble_tanner {{.+}} -> !qecp.tanner_graph
+        // CHECK: [[tanner_x:%.+]] = qecp.assemble_tanner {{.+}} -> !qecp.tanner_graph<24, 11, i32>
+        // CHECK: [[tanner_z:%.+]] = qecp.assemble_tanner {{.+}} -> !qecp.tanner_graph<24, 11, i32>
         // CHECK-LABEL: test_program
         func.func @test_program()  {
             // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
@@ -489,7 +493,7 @@ class TestQecCycleLowering:
         // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
         // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
         // CHECK: [[esm:%.+]] = tensor.from_elements [[m0]], [[m1]], [[m2]] : tensor<3xi1>
-        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[esm]] : tensor<3xi1>) [[tanner_x]] : !qecp.tanner_graph<12, 8, i32> -> tensor<1xindex>
+        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[esm]] : tensor<3xi1>) [[tanner_x]] : !qecp.tanner_graph<24, 11, i32> -> tensor<1xindex>
         // CHECK: [[lb:%.+]] = arith.constant 0 : index
         // CHECK: [[ub:%.+]] = arith.constant 1 : index
         // CHECK: [[st:%.+]] = arith.constant 1 : index
@@ -526,7 +530,7 @@ class TestQecCycleLowering:
         // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
         // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
         // CHECK: [[esm:%.+]] = tensor.from_elements [[m0]], [[m1]], [[m2]] : tensor<3xi1>
-        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[esm]] : tensor<3xi1>) [[tanner_z]] : !qecp.tanner_graph<12, 8, i32> -> tensor<1xindex>
+        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[esm]] : tensor<3xi1>) [[tanner_z]] : !qecp.tanner_graph<24, 11, i32> -> tensor<1xindex>
         // CHECK: [[lb:%.+]] = arith.constant 0 : index
         // CHECK: [[ub:%.+]] = arith.constant 1 : index
         // CHECK: [[st:%.+]] = arith.constant 1 : index
