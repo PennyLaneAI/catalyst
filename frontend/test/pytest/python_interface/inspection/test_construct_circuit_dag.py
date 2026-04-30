@@ -2856,7 +2856,7 @@ class TestAdjoint:
         @qp.qjit(autograph=True, target="mlir")
         @qp.qnode(dev)
         def my_workflow():
-            qp.adjoint(qp.H(0))
+            qp.adjoint(qp.T(0))
 
         module = my_workflow()
 
@@ -2871,7 +2871,7 @@ class TestAdjoint:
         # cluster1 -> my_workflow
 
         # Because it is an operator instance, no cluster needed
-        assert "Adjoint(Hadamard)" in nodes["node1"]["label"]
+        assert "Adjoint(T)" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
     def test_adjoint_operator_type(self):
