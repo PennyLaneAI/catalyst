@@ -17,7 +17,6 @@ Unit tests for the dynamic work wire allocation.
 Note that this feature is only available under the plxpr pipeline.
 """
 
-import re
 import textwrap
 
 import numpy as np

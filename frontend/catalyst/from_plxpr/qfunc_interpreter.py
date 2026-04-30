@@ -50,11 +50,9 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_set_state_p,
     qref_unitary_p,
 )
-from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import (
     AbstractQbit,
     MeasurementPlane,
-    cond_p,
     counts_p,
     decomprule_p,
     expval_p,
@@ -63,7 +61,6 @@ from catalyst.jax_primitives import (
     measure_in_basis_p,
     pauli_measure_p,
     probs_p,
-    qinst_p,
     sample_p,
     state_p,
     tensorobs_p,
@@ -76,7 +73,6 @@ from .qubit_handler import (
     QubitIndexRecorder,
     _get_dynamically_allocated_qregs,
     get_in_qubit_values,
-    is_dynamically_allocated_wire,
 )
 
 measurement_map = {
