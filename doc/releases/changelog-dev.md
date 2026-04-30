@@ -306,6 +306,7 @@
   [(#2578)](https://github.com/PennyLaneAI/catalyst/pull/2578)
   [(#2711)](https://github.com/PennyLaneAI/catalyst/pull/2711)
   [(#2765)](https://github.com/PennyLaneAI/catalyst/pull/2765)
+  [(#2722)](https://github.com/PennyLaneAI/catalyst/pull/2722)
 
   The framework is interfaced with a new `graph_decomposition` pass decorator
   with key capabilities:
@@ -546,6 +547,11 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Refactored all passes in `catalyst.passes.builtin_passes.py` to be `pennylane.transforms.core.Transform` objects
+  rather than decorators. This allows them to be used as standard transforms, enabling full compatibility with
+  `pennylane.CompilePipeline`.
+  [(#2722)](https://github.com/PennyLaneAI/catalyst/pull/2722)
 
 * Fixed a bug where the `work_wire_type` argument of `qp.ctrl` was silently dropped inside `@qjit` functions.
   The parameter is now threaded through `catalyst.ctrl`, `CtrlCallable`, `HybridCtrl`, and
@@ -1016,6 +1022,7 @@
   [(#2574)](https://github.com/PennyLaneAI/catalyst/pull/2574)
   [(#2576)](https://github.com/PennyLaneAI/catalyst/pull/2576)
   [(#2673)](https://github.com/PennyLaneAI/catalyst/pull/2673)
+  [(#2768)](https://github.com/PennyLaneAI/catalyst/pull/2768)
 
 * An experimental pass to convert `qecl.noise` operations in the *QEC Logical* layer to subroutine calls in the *QEC Phyiscal* layer.
   [(#2678)](https://github.com/PennyLaneAI/catalyst/pull/2678)
@@ -1035,6 +1042,7 @@
   [(#2716)](https://github.com/PennyLaneAI/catalyst/pull/2716)
   [(#2737)](https://github.com/PennyLaneAI/catalyst/pull/2737)
   [(#2731)](https://github.com/PennyLaneAI/catalyst/pull/2731)
+  [(#2735)](https://github.com/PennyLaneAI/catalyst/pull/2735)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
@@ -1046,6 +1054,7 @@
 <h3>Documentation 📝</h3>
 
 * The `qp` alias as in `import pennylane as qp` has been updated to `qp` in our source code and documentation.
+  [(#2764)](https://github.com/PennyLaneAI/catalyst/pull/2764)
   [(#2763)](https://github.com/PennyLaneAI/catalyst/pull/2763)
   [(#2748)](https://github.com/PennyLaneAI/catalyst/pull/2748)
   [(#2746)](https://github.com/PennyLaneAI/catalyst/pull/2746)
