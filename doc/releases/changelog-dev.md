@@ -459,7 +459,7 @@
   `"GateName(nWires)"` to `"GateName(nWires,nParams)"`.
   [(#2755)](https://github.com/PennyLaneAI/catalyst/pull/2755)
 
-* `qml.for_loop` now supports dynamic shapes with program capture `qjit(capture=True)`.
+* `qp.for_loop` now supports dynamic shapes with program capture `qjit(capture=True)`.
   [(#2603)](https://github.com/PennyLaneAI/catalyst/pull/2603/)
   [(#2651)](https://github.com/PennyLaneAI/catalyst/pull/2651)
 
@@ -580,10 +580,7 @@
 
 <h3>Breaking changes 💔</h3>
 
-* The ``catalyst.python_interface.transforms.parity_synth_pass`` and
-  ``catalyst.python_interface.transforms.combine_global_phases_pass`` transforms have been renamed
-  to ``catalyst.python_interface.transforms.parity_synth`` and
-  ``catalyst.python_interface.transforms.combine_global_phases``, respectively.
+* The ``catalyst.python_interface.transforms.parity_synth_pass`` transform has been renamed to ``catalyst.python_interface.transforms.parity_synth``.
   [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
 
 * The ``-disentangle-CNOT`` and ``-disentangle-SWAP`` Catalyst CLI commands have been renamed to
