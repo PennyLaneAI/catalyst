@@ -17,6 +17,7 @@
 #include <string>
 #include <variant>
 #include <vector>
+#include <variant>
 
 #include "llvm/ADT/StringRef.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
