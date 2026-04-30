@@ -80,4 +80,4 @@ def test_pass_compiles_with_qjit(name):
         qp.H(0)
         return qp.expval(qp.Z(0))
 
-    circuit()
+    assert name.replace("_", "-") in circuit.mlir
