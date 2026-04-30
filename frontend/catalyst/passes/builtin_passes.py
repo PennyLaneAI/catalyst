@@ -609,6 +609,111 @@ ions_decomposition = qp.transform(
 )
 
 
+def combine_global_phases_setup_inputs():  # pragma: nocover
+    r"""A quantum compilation pass that combines global phase instructions for each region in the
+    program.
+
+    Args:
+        qnode (QNode): the QNode to apply the compiler pass to
+
+    Returns:
+        :class:`QNode <pennylane.QNode>`
+
+    **Example**
+
+    In this example, the ``GlobalPhase`` gates are merged together into one ``GlobalPhase``
+    operation.
+
+    .. code-block:: python
+
+        import pennylane as qp
+        import catalyst
+        from catalyst import qjit, for_loop
+        from catalyst.passes import combine_global_phases
+        from catalyst.debug import get_compilation_stage
+
+        n = 10
+        dev = qp.device('null.qubit', wires=n)
+
+        @qjit(keep_intermediate=True, capture=True)
+        @combine_global_phases
+        @qp.qnode(dev)
+        def circuit(n):
+            qp.GlobalPhase(0.1, wires = n-1)
+            qp.X(n-1)
+            qp.GlobalPhase(0.1, wires = n-2)
+            qp.H(n-2)
+
+            @qp.for_loop(0, n)
+            def loop(i):
+                qp.GlobalPhase(0.1967, wires=i)
+                qp.GlobalPhase(0.7691, wires=i)
+
+            loop()
+
+            qp.GlobalPhase(0.1, wires=n-3)
+            qp.GlobalPhase(0.1, wires=0)
+
+            return qp.expval(qp.Z(0))
+
+    >>> circuit(n)
+    0.0
+
+    The ``GlobalPhase`` operations surrounding control flow operations will be merged, while those
+    within the control flow are merged together separately (i.e., no formal loop-boundary
+    optimizations).
+
+    Example MLIR Representation:
+
+    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationStage"))
+
+    .. code-block:: mlir
+
+        . . .
+        %extracted_4 = tensor.extract %3[] : tensor<i64>
+        %5 = quantum.extract %4[%extracted_4] : !quantum.reg -> !quantum.bit
+        %out_qubits = quantum.custom "PauliX"() %5 : !quantum.bit
+        %6 = stablehlo.subtract %arg0, %c_1 : tensor<i64>
+        %extracted_5 = tensor.extract %3[] : tensor<i64>
+        %7 = quantum.insert %4[%extracted_5], %out_qubits : !quantum.reg, !quantum.bit
+        %extracted_6 = tensor.extract %6[] : tensor<i64>
+        %8 = quantum.extract %7[%extracted_6] : !quantum.reg -> !quantum.bit
+        %9 = stablehlo.subtract %arg0, %c_1 : tensor<i64>
+        %extracted_7 = tensor.extract %6[] : tensor<i64>
+        %10 = quantum.insert %7[%extracted_7], %8 : !quantum.reg, !quantum.bit
+        %extracted_8 = tensor.extract %9[] : tensor<i64>
+        %11 = quantum.extract %10[%extracted_8] : !quantum.reg -> !quantum.bit
+        %out_qubits_9 = quantum.custom "Hadamard"() %11 : !quantum.bit
+        %extracted_10 = tensor.extract %9[] : tensor<i64>
+        %12 = quantum.insert %10[%extracted_10], %out_qubits_9 : !quantum.reg, !quantum.bit
+        %extracted_11 = tensor.extract %arg0[] : tensor<i64>
+        %13 = arith.index_cast %extracted_11 : i64 to index
+        %14 = scf.for %arg1 = %c0 to %13 step %c1 iter_args(%arg2 = %12) -> (!quantum.reg) {
+        %22 = arith.index_cast %arg1 : index to i64
+        %23 = quantum.extract %arg2[%22] : !quantum.reg -> !quantum.bit
+        quantum.gphase(%cst_0)
+        %24 = quantum.insert %arg2[%22], %23 : !quantum.reg, !quantum.bit
+        scf.yield %24 : !quantum.reg
+        }
+        %15 = stablehlo.subtract %arg0, %c : tensor<i64>
+        %extracted_12 = tensor.extract %15[] : tensor<i64>
+        %16 = quantum.extract %14[%extracted_12] : !quantum.reg -> !quantum.bit
+        %extracted_13 = tensor.extract %15[] : tensor<i64>
+        %17 = quantum.insert %14[%extracted_13], %16 : !quantum.reg, !quantum.bit
+        %18 = quantum.extract %17[ 0] : !quantum.reg -> !quantum.bit
+        quantum.gphase(%cst)
+        %19 = quantum.namedobs %18[ PauliZ] : !quantum.obs
+        %20 = quantum.expval %19 : f64
+        . . .
+    """
+    return (), {}
+
+
+combine_global_phases = qp.transform(
+    pass_name="combie-global-phases", setup_inputs=combine_global_phases_setup_inputs
+)
+
+
 def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
     r"""A quantum compilation pass to discretize
     single-qubit RZ and PhaseShift gates into the Clifford+T basis or the PPR basis using the Ross-Selinger Gridsynth algorithm.
@@ -1725,6 +1830,7 @@ graph_decomposition = qp.transform(
 
 __all__ = [
     "cancel_inverses",
+    "combine_global_phases",
     "disentangle_cnot",
     "disentangle_swap",
     "merge_rotations",
