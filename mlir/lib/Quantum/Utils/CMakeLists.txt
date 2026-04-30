@@ -3,7 +3,7 @@ add_mlir_library(QuantumUtils
     RemoveQuantum.cpp
     PythonFunction.cpp
 
-    LINK_LIBS PUBLIC
+    LINK_LIBS PRIVATE
     pybind11::embed
 )
 
