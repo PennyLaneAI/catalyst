@@ -53,6 +53,27 @@ def _normalize_gate_types(gate_types):
 class TestGraphDecomposition:
     """Test the graph-decomposition built-in transform."""
 
+    @pytest.mark.parametrize("weight", [1, 1.0], ids=["int", "float"])
+    def test_gateset_with_weights(self, weight):
+        """Tests that a gate_set with weights works correctly.
+
+        Regression test for https://github.com/PennyLaneAI/catalyst/issues/2766."""
+
+        @qp.qjit(capture=True)
+        @graph_decomposition(gate_set={qp.RX: weight, qp.RY: weight, qp.RZ: weight})
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit(x, y, z):
+            qp.Rot(x, y, z, wires=0)
+            return qp.expval(qp.Z(0))
+
+        x, y, z = 0.0, qp.numpy.pi, 0.0
+
+        assert qp.math.allclose([-1], circuit(x, y, z))
+
+        expected_resources = {"RY": 1, "RZ": 2}
+        resources = qp.specs(circuit, level="device")(x, y, z)["resources"].gate_types
+        assert resources == expected_resources
+
     def test_with_precompiled_rule(self):
         """Test graph-decomposition with precompiled rules are handled correctly."""
 
