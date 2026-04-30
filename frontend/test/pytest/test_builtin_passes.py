@@ -66,6 +66,9 @@ def test_passes_are_valid_transforms(name):
     assert_valid_transform(obj)
 
 
+_PASSES_WITH_ARGS_KWARGS = {"graph-decomposition": ((), {"gate_set": ()})}
+
+
 @pytest.mark.parametrize("name", builtin_passes.__all__)
 def test_pass_compiles_with_qjit(name):
     """Basic smoke test to ensure proper compilation. For example, if a pass name
@@ -73,11 +76,13 @@ def test_pass_compiles_with_qjit(name):
 
     obj = getattr(builtin_passes, name)
 
+    args, kwargs = _PASSES_WITH_ARGS_KWARGS.get(obj.pass_name, ((), {}))
+
     @qp.qjit(target="mlir")
-    @obj
+    @obj(*args, **kwargs)
     @qp.qnode(qp.device("null.qubit", wires=1))
     def circuit():
         qp.H(0)
         return qp.expval(qp.Z(0))
 
-    assert name.replace("_", "-") in circuit.mlir
+    assert obj.pass_name in circuit.mlir
