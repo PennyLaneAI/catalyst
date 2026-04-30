@@ -27,8 +27,8 @@ if venv_path:
     py_version = f"{sys.version_info.major}.{sys.version_info.minor}"
     site_packages = os.path.join(venv_path, "lib", f"python{py_version}", "site-packages")
 
-if os.path.exists(site_packages):
-    site.addsitedir(site_packages)
+    if os.path.exists(site_packages):
+        site.addsitedir(site_packages)
 )";
 
 namespace py = pybind11;
