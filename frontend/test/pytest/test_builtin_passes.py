@@ -78,8 +78,12 @@ def test_pass_compiles_with_qjit(name):
 
     args, kwargs = _PASSES_WITH_ARGS_KWARGS.get(obj.pass_name, ((), {}))
 
+    bound_obj = obj
+    if args or kwargs:
+        bound_obj = obj(*args, **kwargs)
+
     @qp.qjit(target="mlir")
-    @obj(*args, **kwargs)
+    @bound_obj
     @qp.qnode(qp.device("null.qubit", wires=1))
     def circuit():
         qp.H(0)
