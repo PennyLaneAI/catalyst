@@ -1097,7 +1097,6 @@ class TestCapture:
 
         assert jnp.allclose(circuit(0.1), capture_result)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_pass_with_setup_input_options(self, backend):
         """Test the integration for a circuit with a pass that takes in options."""
 
@@ -1106,7 +1105,7 @@ class TestCapture:
 
         my_pass = qp.transform(pass_name="my-pass", setup_inputs=my_pass_setup_inputs)
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=True)
         @partial(my_pass, my_option="my_option_value", my_other_option=False)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit():
@@ -1119,13 +1118,12 @@ class TestCapture:
             in capture_mlir
         )
 
-    @pytest.mark.usefixtures("use_capture")
     def test_pass_with_options(self, backend):
         """Test the integration for a circuit with a pass that takes in options."""
 
         my_pass = qp.transform(pass_name="my-pass")
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=True)
         @partial(my_pass, my_option="my_option_value", my_other_option=False)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit():

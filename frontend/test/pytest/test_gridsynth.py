@@ -19,7 +19,6 @@ import pennylane as qp
 import pytest
 
 
-@pytest.mark.usefixtures("use_capture")
 @pytest.mark.parametrize(
     "param",
     [-11.1, -7.7, -4.4, -2.2, -1.1, -0.3, -0.2, -0.1, 0.0, 0.1, 0.2, 0.3, 1.1, 2.2, 4.4, 7.7, 11.1],
@@ -39,13 +38,12 @@ def test_PhaseShift_gridsynth(param, op, eps):
 
     expected = circuit(param)
     gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
-    qjitted_circuit = qp.qjit(gridsynthed_circuit)
+    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True)
     result = qjitted_circuit(param)
 
     assert qp.math.allclose(result, expected, atol=eps)
 
 
-@pytest.mark.usefixtures("use_capture")
 @pytest.mark.parametrize(
     "param",
     [-7.7, -2.2, -0.1, 0.0, 0.1, 2.2, 7.7],
@@ -63,8 +61,8 @@ def test_gridsynth_ppr_basis(param, eps):
 
     gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
     gridsynthed_circuit_ppr = qp.transforms.gridsynth(circuit, epsilon=eps, ppr_basis=True)
-    qjitted_circuit = qp.qjit(gridsynthed_circuit)
-    qjitted_circuit_with_ppr = qp.qjit(gridsynthed_circuit_ppr)
+    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True)
+    qjitted_circuit_with_ppr = qp.qjit(gridsynthed_circuit_ppr, capture=True)
     result = qjitted_circuit(param)
     result_with_ppr = qjitted_circuit_with_ppr(param)
     assert np.allclose(result, result_with_ppr, atol=eps)
@@ -73,7 +71,6 @@ def test_gridsynth_ppr_basis(param, eps):
 _EPSILON_WARN_FRAGMENT = "For epsilon smaller than 1e-6"
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_epsilon_warning_emitted_for_small_epsilon(capfd):
     """Test that a runtime warning is written to stderr when epsilon < 1e-6."""
     dev = qp.device("lightning.qubit", wires=1)
@@ -83,13 +80,12 @@ def test_epsilon_warning_emitted_for_small_epsilon(capfd):
         qp.RZ(x, wires=0)
         return qp.state()
 
-    qp.qjit(qp.transforms.gridsynth(circuit, epsilon=1e-8))(0.5)
+    qp.qjit(qp.transforms.gridsynth(circuit, epsilon=1e-8), capture=True)(0.5)
 
     captured = capfd.readouterr()
     assert _EPSILON_WARN_FRAGMENT in captured.err
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_epsilon_warning_not_emitted_for_safe_epsilon(capfd):
     """Test that no runtime warning is written to stderr when epsilon >= 1e-6."""
     dev = qp.device("lightning.qubit", wires=1)
@@ -99,7 +95,7 @@ def test_epsilon_warning_not_emitted_for_safe_epsilon(capfd):
         qp.RZ(x, wires=0)
         return qp.state()
 
-    qp.qjit(qp.transforms.gridsynth(circuit, epsilon=1e-4))(0.5)
+    qp.qjit(qp.transforms.gridsynth(circuit, epsilon=1e-4), capture=True)(0.5)
 
     captured = capfd.readouterr()
     assert _EPSILON_WARN_FRAGMENT not in captured.err

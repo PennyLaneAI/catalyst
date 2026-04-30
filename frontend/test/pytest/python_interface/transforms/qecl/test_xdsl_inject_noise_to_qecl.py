@@ -29,7 +29,6 @@ pytestmark = pytest.mark.xdsl
 class TestInjectNoiseToQECLPass:
     """Tests for the InjectNoiseToQECLPass."""
 
-    @pytest.mark.usefixtures("use_capture")
     def test_inject_noise_to_qecl_pass(self, run_filecheck):
         """Test that the inject_noise_to_qecl_pass correctly injects noise into a QECL circuit."""
         program = """
@@ -56,12 +55,11 @@ class TestInjectNoiseToQECLPass:
 class TestInjectNoiseToQECLPassIntegration:
     """Integration lit tests for the inject-noise-to-qecl pass"""
 
-    @pytest.mark.usefixtures("use_capture")
     def test_inject_noise_to_qecl_pass_integration(self, run_filecheck_qjit):
         """Test the inject-noise-to-qecl pass on the simplest possible, non-trivial circuit."""
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @inject_noise_to_qecl_pass
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)

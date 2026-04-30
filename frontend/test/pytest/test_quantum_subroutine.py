@@ -35,14 +35,11 @@ class TestSubroutineHOP:
         def identity(x):
             return x
 
-        qp.capture.enable()
-
-        @qp.qjit
+        @qp.qjit(capture=True)
         def subroutine_test():
             return identity(1)
 
         assert subroutine_test() == 1
-        qp.capture.disable()
 
     def test_quantum_subroutine(self):
         """Test quantum subroutine"""
@@ -51,9 +48,7 @@ class TestSubroutineHOP:
         def Hadamard0(wire):
             qp.Hadamard(wire)
 
-        qp.capture.enable()
-
-        @qp.qjit
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def subroutine_test(c: int):
             Hadamard0(c)
@@ -61,7 +56,6 @@ class TestSubroutineHOP:
 
         expected = jax.numpy.array([0.70710678 + 0.0j, 0.70710678 + 0.0j])
         assert np.allclose(subroutine_test(0), expected)
-        qp.capture.disable()
 
     def test_quantum_subroutine_self_inverses(self):
         """Test quantum subroutine multiple calls"""
@@ -70,9 +64,7 @@ class TestSubroutineHOP:
         def Hadamard0(wire):
             qp.Hadamard(wire)
 
-        qp.capture.enable()
-
-        @qp.qjit
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def subroutine_test(c: int):
             Hadamard0(c)
@@ -83,8 +75,6 @@ class TestSubroutineHOP:
             subroutine_test(0), jax.numpy.array([complex(1.0, 0), complex(0.0, 0.0)], dtype=complex)
         )
 
-        qp.capture.disable()
-
     def test_quantum_subroutine_error_message(self):
         """Test error message for quantum operations outside of qnode."""
 
@@ -92,12 +82,10 @@ class TestSubroutineHOP:
         def Hadamard0():
             qp.Hadamard(wires=[0])
 
-        qp.capture.enable()
-
         msg = "inside subroutine"
         with pytest.raises(NotImplementedError, match=msg):
 
-            @qp.qjit(autograph=False)
+            @qp.qjit(autograph=False, capture=True)
             def subroutine_test():
                 Hadamard0()
 
@@ -113,9 +101,7 @@ class TestSubroutineHOP:
 
             qp.cond(wire != 0, true_path, false_path)()
 
-        qp.capture.enable()
-
-        @qp.qjit(autograph=False)
+        @qp.qjit(autograph=False, capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def subroutine_test(c: int):
             Hadamard0(c)
@@ -125,7 +111,6 @@ class TestSubroutineHOP:
         assert np.allclose(
             subroutine_test(1), jax.numpy.array([0.70710678 + 0.0j, 0.70710678 + 0.0j])
         )
-        qp.capture.disable()
 
 
 class TestSubroutineClass:
