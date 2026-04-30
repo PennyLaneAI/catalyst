@@ -6,6 +6,7 @@ find_library(ENZYME_LIB EnzymeStatic-${LLVM_VERSION_MAJOR} PATHS ${Enzyme_DIR}/E
 message(STATUS "Found Enzyme lib: ${ENZYME_LIB}")
 
 include_directories(SYSTEM ${ENZYME_SRC_DIR}/enzyme/Enzyme)
+find_package(Python3 COMPONENTS Development REQUIRED)
 
 # Experimentally found through removing items
 # from llvm/tools/llc/CMakeLists.txt.
@@ -53,7 +54,7 @@ set(LIBS
     ${ENZYME_LIB}
     CatalystCompilerDriver
     MLIRTestDialect
-    QuantumUtils
+    QuantumPythonCallbacks
     pybind11::embed
     Python3::Python
 )

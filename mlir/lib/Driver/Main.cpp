@@ -42,11 +42,11 @@
 #include "Driver/CompilerDriver.h"
 #include "Driver/HighResolutionOutputStrategy.h"
 #include "Driver/LineUtils.h"
-#include "Driver/PythonDriverUtils.h"
 #include "Driver/Support.h"
 #include "Driver/Timer.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
+#include "QuantumPythonCallbacks/PythonDriverUtils.hpp"
 
 #include "RegisterAllPasses.h"
 
