@@ -609,7 +609,7 @@ ions_decomposition = qp.transform(
 )
 
 
-def combine_global_phases_setup_inputs():  # pragma: nocover
+def combine_global_phases_setup_inputs(): 
     r"""A quantum compilation pass that combines global phase instructions for each region in the
     program.
 
