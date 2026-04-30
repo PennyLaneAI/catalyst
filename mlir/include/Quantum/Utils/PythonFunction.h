@@ -15,6 +15,7 @@
 #pragma once
 
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "llvm/ADT/StringRef.h"
@@ -28,7 +29,7 @@ namespace quantum {
 using PyArg = std::variant<int, double, std::string>;
 using PyWires = std::vector<int>;
 
-mlir::OwningOpRef<mlir::func::FuncOp> getFuncOpFromPython(mlir::ModuleOp module,
+mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotDecomp(mlir::ModuleOp module,
                                                           llvm::StringRef moduleName,
                                                           llvm::StringRef functionName,
                                                           std::vector<PyArg> args, PyWires wires);

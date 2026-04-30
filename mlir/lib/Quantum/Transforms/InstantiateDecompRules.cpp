@@ -31,41 +31,40 @@ struct InstantiateDecompRulesPass
 
     void runOnOperation() override
     {
-        llvm::StringSet<> addedWords;
-
-        llvm::errs() << "starting pass\n";
         mlir::ModuleOp module = cast<mlir::ModuleOp>(getOperation());
 
-        module.walk([&](quantum::PauliRotOp op) {
-            llvm::errs() << "getting pauli word\n";
+        llvm::StringSet<> addedWords;
+
+        llvm::SmallVector<quantum::PauliRotOp> pauliRotOps;
+        module.walk([&](quantum::PauliRotOp op) { pauliRotOps.push_back(op); });
+
+        for (quantum::PauliRotOp pauliRot : pauliRotOps) {
             std::string pauliWord;
-            for (auto pauliChar : op.getPauliProduct()) {
+            for (auto pauliChar : pauliRot.getPauliProduct()) {
                 pauliWord += cast<mlir::StringAttr>(pauliChar).getValue().str();
             }
-            llvm::errs() << "got pauli word\n";
-
             if (addedWords.contains(pauliWord)) {
-                return mlir::WalkResult::advance();
+                continue;
             }
+            addedWords.insert(pauliWord);
 
             std::vector<PyArg> args;
             args.push_back(0.2);       // dynamic parameter, any value will work
             args.push_back(pauliWord); // static parameter, must be the correct value
-            llvm::errs() << "pauli word arg: " << pauliWord << "\n";
-            std::vector<int> wires;
-            llvm::errs() << "wires arg: {";
-            for (size_t i = 0; i < pauliWord.size(); i++) {
-                llvm::errs() << i << ", ";
-                wires.push_back(i); // dynamic parameters, any value
-            }
-            llvm::errs() << "}\n";
+            PyWires wires(pauliRot.getInQubits().size());
+            std::iota(wires.begin(), wires.end(), 0);
 
-            auto outOp = getFuncOpFromPython(module, "catalyst.utils.python_callbacks",
-                                             "test_rot_to_ppr", args, wires);
-            outOp->setName((outOp->getName() + "_" + llvm::StringRef(pauliWord)).str());
+            mlir::OwningOpRef<mlir::func::FuncOp> outOp =
+                lowerPauliRotDecomp(module, "pennylane.ops.qubit.parametric_ops_multi_qubit",
+                                    "_pauli_rot_decomposition", args, wires);
+
+            outOp->setName(
+                (outOp->getName() + "_" + pauliWord).str()); // unique name for decomp rule
+            outOp.get()->setAttr(
+                "target_gate", mlir::StringAttr::get(module.getContext(), "PauliRot" + pauliWord));
+
             module.push_back(outOp.release());
-            return mlir::WalkResult::advance();
-        });
+        }
     }
 };
 
