@@ -2900,3 +2900,7 @@ class TestAdjoint:
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
         assert "Hadamard" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster2"
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

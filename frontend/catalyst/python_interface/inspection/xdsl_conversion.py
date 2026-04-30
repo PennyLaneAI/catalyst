@@ -353,6 +353,11 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
         case _ if op.name == "stablehlo.constant":
             return _extract_dense_constant_value(op)
 
+        case _ if op.name in ["scf.if", "scf.for", "scf.while"]:
+            index = ssa.index
+            yield_op = op.regions[-1].ops.last
+            return resolve_constant_wire(yield_op.operands[index])
+
         case (
             CustomOp()
             | GlobalPhaseOp()
