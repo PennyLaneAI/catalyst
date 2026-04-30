@@ -45,6 +45,18 @@ def assert_valid_transform(obj: Any) -> None:
     assert pipeline[0].pass_name == pass_name
 
 
+_PASS_NAME_SPECIAL_CASES = {"diagonalize_measurements": "diagonalize-final-measurements"}
+
+
+@pytest.mark.parametrize("name", builtin_passes.__all__)
+def test_pass_name_matches_variable_name(name):
+    """Tests that the variable name is just the pass name but snake case."""
+
+    obj = getattr(builtin_passes, name)
+    expected_pass_name = _PASS_NAME_SPECIAL_CASES.get(name, name.replace("_", "-"))
+    assert obj.pass_name == expected_pass_name
+
+
 @pytest.mark.parametrize("name", builtin_passes.__all__)
 def test_passes_are_valid_transforms(name):
     """Tests that these passes are valid transform objects."""
