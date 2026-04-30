@@ -16,6 +16,7 @@
 import inspect
 from typing import Any
 
+import pennylane as qp
 import pytest
 from pennylane.transforms.core import CompilePipeline, Transform
 
@@ -63,3 +64,19 @@ def test_passes_are_valid_transforms(name):
 
     obj = getattr(builtin_passes, name)
     assert_valid_transform(obj)
+
+
+@pytest.mark.parametrize("name", builtin_passes.__all__)
+def test_pass_compiles_with_qjit(name):
+    """Basic smoke test."""
+
+    obj = getattr(builtin_passes, name)
+
+    @qp.qjit(target="mlir")
+    @obj
+    @qp.qnode(qp.device("null.qubit", wires=1))
+    def circuit():
+        qp.H(0)
+        return qp.expval(qp.Z(0))
+
+    circuit()
