@@ -68,7 +68,8 @@ def test_passes_are_valid_transforms(name):
 
 @pytest.mark.parametrize("name", builtin_passes.__all__)
 def test_pass_compiles_with_qjit(name):
-    """Basic smoke test."""
+    """Basic smoke test to ensure proper compilation. For example, if a pass name
+    was incorrect this would fail."""
 
     obj = getattr(builtin_passes, name)
 
