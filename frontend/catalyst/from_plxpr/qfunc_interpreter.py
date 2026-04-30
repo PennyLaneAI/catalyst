@@ -26,6 +26,7 @@ import pennylane as qp
 from jax._src.sharding_impls import UNSPECIFIED
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 from pennylane.capture import PlxprInterpreter, pause
+from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
@@ -49,11 +50,9 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_set_state_p,
     qref_unitary_p,
 )
-from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import (
     AbstractQbit,
     MeasurementPlane,
-    cond_p,
     counts_p,
     decomprule_p,
     expval_p,
@@ -62,7 +61,6 @@ from catalyst.jax_primitives import (
     measure_in_basis_p,
     pauli_measure_p,
     probs_p,
-    qinst_p,
     sample_p,
     state_p,
     tensorobs_p,
@@ -75,7 +73,6 @@ from .qubit_handler import (
     QubitIndexRecorder,
     _get_dynamically_allocated_qregs,
     get_in_qubit_values,
-    is_dynamically_allocated_wire,
 )
 
 measurement_map = {
@@ -225,7 +222,10 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                         dynamically allocated wires are present in the program.
                         """))
 
-            if any(is_dynamically_allocated_wire(w) for w in measurement.wires):
+            if any(
+                isinstance(w, DynamicJaxprTracer) and isinstance(w.val.aval, QrefQubit)
+                for w in measurement.wires
+            ):
                 raise CompileError(textwrap.dedent("""
                         Terminal measurements cannot take in dynamically allocated wires
                         since they must be temporary.
@@ -701,20 +701,19 @@ def handle_measure(self, wire, reset, postselect):
     result = qref_measure_p.bind(in_qubit, postselect=postselect)
 
     if reset:
-        # Constants need to be passed as input values for some reason I forgot about.
-        correction = jaxpr_pad_consts(
-            [
-                jax.make_jaxpr(lambda: qinst_p.bind(out_wire, op="PauliX", qubits_len=1))().jaxpr,
-                jax.make_jaxpr(lambda: out_wire)().jaxpr,
-            ]
-        )
-        out_wire = cond_p.bind(
+        correction = [
+            jax.make_jaxpr(lambda: qref_qinst_p.bind(in_qubit, op="PauliX", qubits_len=1))().jaxpr,
+            jax.make_jaxpr(lambda: None)().jaxpr,
+        ]
+
+        pl_cond_prim.bind(
             result,
-            out_wire,
-            out_wire,
-            branch_jaxprs=correction,
-            num_implicit_outputs=None,
-        )[0]
+            jnp.array(True),
+            in_qubit,
+            jaxpr_branches=correction,
+            consts_slices=[(2, 3, None), (3, 3, None)],
+            args_slice=(3, None, None),
+        )
 
     result = jnp.astype(result, int)
     return result

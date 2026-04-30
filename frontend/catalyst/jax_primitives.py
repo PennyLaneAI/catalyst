@@ -24,7 +24,7 @@ from typing import Iterable, List, Union
 
 import jax
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 from jax._src import core, source_info_util, util
 from jax._src.core import pytype_aval_mappings
 from jax._src.interpreters import partial_eval as pe
@@ -430,7 +430,7 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None
     ), "Decomposition rules with `qreg` do not require `num_params`."
 
     if op_type is not None and not isinstance(op_type, str):
-        if issubclass(op_type, qml.operation.Operation):
+        if issubclass(op_type, qp.operation.Operation):
             op_type = op_type.__name__
         else:
             raise ValueError("op_type must be a string or a pennylane operator.")
@@ -590,12 +590,12 @@ def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode, pipelines=None):
     Args:
       ctx: LoweringRuleContext
       *args: List[mlir.Value] corresponding to argument values
-      qnode: qml.Qnode
+      qnode: qp.Qnode
       call_jaxpr: jaxpr representing fn
     Returns:
       List[mlir.Value] corresponding
     """
-    assert isinstance(qnode, qml.QNode), "This function expects qnodes"
+    assert isinstance(qnode, qp.QNode), "This function expects qnodes"
     pipelines = pipelines or ()
 
     func_op = lower_callable(ctx, qnode, call_jaxpr, pipelines)
@@ -1992,7 +1992,7 @@ def custom_measurement_staging_rule(
 
     shape = _merge_dyn_shape(static_shape, dynamic_shape)
     if not dynamic_shape:
-        # Some PL transforms, like @qml.batch_params, do not support dynamic shapes yet
+        # Some PL transforms, like @qp.batch_params, do not support dynamic shapes yet
         # Therefore we still keep static shapes when possible
         # This can be removed, and all avals turned into DShapedArrays, when
         # dynamic program capture in PL is complete

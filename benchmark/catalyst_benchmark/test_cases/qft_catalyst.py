@@ -16,7 +16,7 @@
 from dataclasses import dataclass
 
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 from catalyst_benchmark.types import Problem
 from jax.core import ShapedArray
 
@@ -46,7 +46,7 @@ def qcompile(p: ProblemC, params):
 
         @for_loop(0, N, 1)
         def loop(i):
-            qml.Hadamard(wires=i)
+            qp.Hadamard(wires=i)
 
         loop()
 
@@ -57,16 +57,16 @@ def qcompile(p: ProblemC, params):
                 @for_loop(wG + 1, N, 1)
                 def loop2(wC):
                     phi = (2 ** (wC - wG)) / params[0]
-                    qml.ctrl(qml.PhaseShift, control=wC)(phi=phi, wires=[wG])
+                    qp.ctrl(qp.PhaseShift, control=wC)(phi=phi, wires=[wG])
 
                 loop2()
 
             loop1()
 
         loop0()
-        return qml.state()
+        return qp.state()
 
-    qcircuit = qml.QNode(_circuit, p.dev, **p.qnode_kwargs)
+    qcircuit = qp.QNode(_circuit, p.dev, **p.qnode_kwargs)
     # qcircuit.construct([params], {})
     # ^^^ AttributeError: 'AnnotatedQueue' object has no attribute 'jax_tape'
     p.qcircuit = qcircuit
@@ -84,7 +84,7 @@ SHOTS = None
 def run_catalyst(N=6):
     """Test problem entry point"""
     p = ProblemC(
-        dev=qml.device("lightning.qubit", wires=N, shots=SHOTS),
+        dev=qp.device("lightning.qubit", wires=N, shots=SHOTS),
     )
     params = p.trial_params(0)
 

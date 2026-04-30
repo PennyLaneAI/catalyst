@@ -463,3 +463,41 @@ def test_adjoint_with_allocation():
 
 
 print(test_adjoint_with_allocation.mlir)
+
+
+# CHECK: func.func public @test_adjoint_with_ctrl() -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=4))
+def test_adjoint_with_ctrl():
+    """
+    Test adjoint and ctrl used together
+    """
+
+    # CHECK: [[true:%.+]] = arith.constant true
+    # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
+
+    # CHECK: qref.adjoint {
+    # CHECK:   [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
+    # CHECK:   [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
+    # CHECK:   [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
+    # CHECK:   qref.custom "SWAP"() [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit, !qref.bit ctrls !qref.bit
+    # CHECK: }
+    qp.ctrl(qp.adjoint(qp.SWAP), control=0)(wires=[1, 2])
+
+    # CHECK: qref.adjoint {
+    # CHECK:   [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
+    # CHECK:   [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
+    # CHECK:   [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
+    # CHECK:   qref.custom "SWAP"() [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit, !qref.bit ctrls !qref.bit
+    # CHECK: }
+    qp.adjoint(qp.ctrl(qp.SWAP, control=0))(wires=[1, 2])
+
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
+    # CHECK: qref.custom "S"() [[q0]] adj ctrls([[q1]]) ctrlvals([[true]]) : !qref.bit ctrls !qref.bit
+    qp.ctrl(qp.adjoint(qp.S(wires=0)), control=1)
+
+    return qp.expval(qp.X(0))
+
+
+print(test_adjoint_with_ctrl.mlir)

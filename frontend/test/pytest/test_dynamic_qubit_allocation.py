@@ -17,7 +17,6 @@ Unit tests for the dynamic work wire allocation.
 Note that this feature is only available under the plxpr pipeline.
 """
 
-import re
 import textwrap
 
 import numpy as np
@@ -534,13 +533,32 @@ def test_non_probs_measurement_with_dynamic_wires(backend, measurement_fn, shots
     assert np.allclose(observed, expected)
 
 
+def test_adjoint(backend):
+    """
+    Test adjoints work.
+    """
+
+    @qjit(capture=True)
+    @qp.qnode(qp.device(backend, wires=2))
+    def circuit():
+        with qp.allocate(1) as q:
+            qp.adjoint(qp.RX)(0.12, q[0])
+            qp.RX(0.12, q[0])
+            qp.CNOT(wires=[q[0], 0])
+        return qp.probs(wires=[0, 1])
+
+    expected = [1, 0, 0, 0]
+    observed = circuit()
+    assert np.allclose(observed, expected)
+
+
 def test_no_capture(backend):
     """
     Test error message when used without capture.
     """
     with pytest.raises(
         CompileError,
-        match=re.escape("qp.allocate() with qjit is only supported with program capture enabled."),
+        match=r".*\.allocate\(\) with qjit is only supported with program capture enabled\.",
     ):
 
         @qjit
@@ -612,25 +630,6 @@ def test_terminal_MP_dynamic_wires(backend):
         def circuit():
             q = qp.allocate(1)
             return qp.probs(q)
-
-
-@pytest.mark.usefixtures("use_capture")
-def test_unsupported_adjoint(backend):
-    """
-    Test that an error is raised when a dynamically allocated wire is passed into a adjoint.
-    """
-
-    with pytest.raises(
-        NotImplementedError,
-        match="Dynamically allocated wires cannot be used in quantum adjoints yet.",
-    ):
-
-        @qjit
-        @qp.qnode(qp.device(backend, wires=2))
-        def circuit():
-            with qp.allocate(1) as q:
-                qp.adjoint(qp.X)(q[0])
-            return qp.probs(wires=[0, 1])
 
 
 if __name__ == "__main__":

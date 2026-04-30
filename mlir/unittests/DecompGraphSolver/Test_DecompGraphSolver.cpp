@@ -533,3 +533,25 @@ TEST_CASE("Test GraphSolver with MultiRZ decompositions", "[DecompGraph::Solver]
     REQUIRE(chosen_rule_multiRZ5.ruleName == "multiRZ5_to_rz");
     REQUIRE(chosen_rule_multiRZ5.totalCost == 1.0 * 5);
 }
+
+TEST_CASE("Test GraphSolver with empty decomposition rules", "[DecompGraph::Solver]")
+{
+    const OperatorNode hadamard{"Hadamard"};
+    const OperatorNode globalPhase{"GlobalPhase"};
+
+    const WeightedGateset gateset{{{globalPhase, 1.0}}};
+
+    const std::vector<RuleNode> rules{
+        {"hadamard_to_globalPhase", hadamard, {}},
+    };
+
+    const DecompositionGraph graph({hadamard}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+    REQUIRE(result.size() == 1);
+    const auto &chosen_rule = result.at(hadamard);
+    REQUIRE_FALSE(chosen_rule.isBasis);
+    REQUIRE(chosen_rule.ruleName == "hadamard_to_globalPhase");
+    REQUIRE(chosen_rule.inputs.empty());
+    REQUIRE(chosen_rule.totalCost == 0.0);
+}
