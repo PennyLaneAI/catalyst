@@ -621,8 +621,7 @@ def combine_global_phases_setup_inputs():  # pragma: nocover
 
     **Example**
 
-    In this example, the ``GlobalPhase`` gates are merged together into one ``GlobalPhase``
-    operation.
+    Consider the following example:
 
     .. code-block:: python
 
@@ -710,7 +709,7 @@ def combine_global_phases_setup_inputs():  # pragma: nocover
 
 
 combine_global_phases = qp.transform(
-    pass_name="combie-global-phases", setup_inputs=combine_global_phases_setup_inputs
+    pass_name="combine-global-phases", setup_inputs=combine_global_phases_setup_inputs
 )
 
 

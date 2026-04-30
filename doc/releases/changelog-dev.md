@@ -294,7 +294,7 @@
   `--combine-global-phase`, which safely combines global phase instructions for each region in the
   program. The xDSL version written in Python has been removed.
   [(#2604)](https://github.com/PennyLaneAI/catalyst/pull/2604)
-  [(#???)](https://github.com/PennyLaneAI/catalyst/pull/???)
+  [(#2777)](https://github.com/PennyLaneAI/catalyst/pull/2777)
 
 * A new native-MLIR graph-based decomposition framework is now available. This system
   migrates the graph-decomposition logic from Python into the Catalyst compiler as a
