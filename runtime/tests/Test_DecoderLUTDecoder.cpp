@@ -75,7 +75,7 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
             __catalyst__qecp__lut_decoder(&row_idx_tanner_memref, &col_ptr_tanner_memref,
                                           &syndrome_res_memref, &err_idx_memref);
 
-            REQUIRE(err_idx_memref.data_allocated[0] == expected_res);
+            REQUIRE(err_idx_memref.data_aligned[0] == expected_res);
         }
     }
 
