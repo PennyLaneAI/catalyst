@@ -100,4 +100,4 @@ add_mlir_library(CatalystCompilerDriver
 #########################################################
 
 add_subdirectory(DefaultPipelines)
-add_dependencies(CatalystCompilerDriver default_pipelines)
+add_dependencies(CatalystCompilerDriver default_pipelines QuantumPythonCallbacks)

@@ -210,6 +210,10 @@ def CombineGlobalPhasesPass : Pass<"combine-global-phases", "mlir::ModuleOp"> {
     let summary = "Scope-wise merging of global phase operators (safe).";
 }
 
+def InstantiateDecompRulesPass : Pass<"instantiate-decomp-rules", "mlir::ModuleOp"> {
+    let summary = "Lowers instantiated decomposition rules using static op data.";
+}
+
 // ----- Quantum circuit transformation passes end ----- //
 
 #endif // QUANTUM_PASSES

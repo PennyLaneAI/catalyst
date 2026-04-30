@@ -16,8 +16,8 @@ message(STATUS "LLVM_USE_SANITIZER is ${LLVM_USE_SANITIZER}.")
 message(STATUS "CATALYST_ENABLE_WARNINGS is ${CATALYST_ENABLE_WARNINGS}.")
 
 if ("${LLVM_USE_SANITIZER}" STREQUAL "Address")
-  add_compile_options(-fsanitize=address)
-  add_link_options(-fsanitize=address)
+    add_compile_options(-fsanitize=address)
+    add_link_options(-fsanitize=address)
 endif()
 
 if(CATALYST_ENABLE_WARNINGS)
@@ -90,10 +90,10 @@ target_include_directories(ExternalStablehloLib SYSTEM INTERFACE
 # Policy CMP0177 was introduced in CMake 4.31 and raises warnings in the upstream CMake modules.
 # TODO: Remove once they (and us) have updated their code to deal with it.
 if(POLICY CMP0175)
-  cmake_policy(SET CMP0175 OLD)
+    cmake_policy(SET CMP0175 OLD)
 endif()
 if(POLICY CMP0177)
-  cmake_policy(SET CMP0177 OLD)
+    cmake_policy(SET CMP0177 OLD)
 endif()
 
 include(TableGen)
@@ -105,12 +105,12 @@ include(HandleLLVMOptions)
 # bindings). We need to filter out those linker flags for now. TODO: remove once we update past
 # https://github.com/llvm/llvm-project/commit/1f0e0da3af783fd2bb5e23bc2b97141abac68926
 if(APPLE)
-  string(REPLACE "-Wl,-undefined -Wl,suppress" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
+    string(REPLACE "-Wl,-undefined -Wl,suppress" "" CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}")
 endif()
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)
-  include(MLIRDetectPythonEnv)
-  mlir_configure_python_dev_packages()
+    include(MLIRDetectPythonEnv)
+    mlir_configure_python_dev_packages()
 endif()
 
 set(CATALYST_MAIN_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
@@ -179,20 +179,20 @@ include_directories(
 add_subdirectory(include)
 add_subdirectory(lib)
 if(NOT CATALYST_DOCS_ONLY)
-  add_subdirectory(tools)
+    add_subdirectory(tools)
 endif()
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)
-  message(STATUS "Enabling Python API")
-  # AddMLIRPython.cmake passes NB_DOMAIN ${MLIR_BINDINGS_PYTHON_NB_DOMAIN} to
-  # nanobind_add_module. MLIR sets this in its in-tree mlir/CMakeLists.txt, but it is
-  # not defined when configuring Catalyst standalone against MLIR_DIR, which yields an
-  # empty NB_DOMAIN and CMake dev warning CMP0174.
-  if(NOT MLIR_BINDINGS_PYTHON_NB_DOMAIN)
-    set(MLIR_BINDINGS_PYTHON_NB_DOMAIN "mlir" CACHE STRING
+    message(STATUS "Enabling Python API")
+    # AddMLIRPython.cmake passes NB_DOMAIN ${MLIR_BINDINGS_PYTHON_NB_DOMAIN} to
+    # nanobind_add_module. MLIR sets this in its in-tree mlir/CMakeLists.txt, but it is
+    # not defined when configuring Catalyst standalone against MLIR_DIR, which yields an
+    # empty NB_DOMAIN and CMake dev warning CMP0174.
+    if(NOT MLIR_BINDINGS_PYTHON_NB_DOMAIN)
+        set(MLIR_BINDINGS_PYTHON_NB_DOMAIN "mlir" CACHE STRING
       "nanobind domain for MLIR python bindings (see MLIR AddMLIRPython.cmake).")
-  endif()
-  add_subdirectory(python)
+    endif()
+    add_subdirectory(python)
 endif()
 
 add_subdirectory(cmake/modules)
@@ -219,24 +219,24 @@ add_subdirectory(cmake/modules)
 # LLVM/MLIR (not a build tree). Adapted from `llvm/flang/CMakeLists.txt`.
 set(CATALYST_GTEST_AVAILABLE 0)
 if (TARGET llvm_gtest)
-  # Installed gtest, via LLVM_INSTALL_GTEST.  Preferred.
-  message(STATUS "LLVM GTest found, enabling unittests")
-  set(CATALYST_GTEST_AVAILABLE 1)
+    # Installed gtest, via LLVM_INSTALL_GTEST.  Preferred.
+    message(STATUS "LLVM GTest found, enabling unittests")
+    set(CATALYST_GTEST_AVAILABLE 1)
 else()
     find_package(Threads REQUIRED)
     set(LLVM_THIRD_PARTY_DIR llvm-project/third-party)
     set(UNITTEST_DIR ${LLVM_THIRD_PARTY_DIR}/unittest)
     if (NOT EXISTS ${UNITTEST_DIR}/googletest/include/gtest/gtest.h)
-      set(UNITTEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/llvm/third-party/unittest)
+        set(UNITTEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/llvm/third-party/unittest)
     endif()
     if (EXISTS ${UNITTEST_DIR}/googletest/include/gtest/gtest.h)
-      add_llvm_library(llvm_gtest
+        add_llvm_library(llvm_gtest
         ${UNITTEST_DIR}/googletest/src/gtest-all.cc
         ${UNITTEST_DIR}/googlemock/src/gmock-all.cc
         LINK_COMPONENTS Support # llvm::raw_ostream
         BUILDTREE_ONLY
       )
-      target_include_directories(llvm_gtest SYSTEM
+        target_include_directories(llvm_gtest SYSTEM
         PUBLIC
         "${UNITTEST_DIR}/googletest/include"
         "${UNITTEST_DIR}/googlemock/include"
@@ -244,22 +244,22 @@ else()
         "${UNITTEST_DIR}/googletest"
         "${UNITTEST_DIR}/googlemock"
       )
-      target_link_libraries(llvm_gtest PUBLIC Threads::Threads)
-      add_llvm_library(llvm_gtest_main
+        target_link_libraries(llvm_gtest PUBLIC Threads::Threads)
+        add_llvm_library(llvm_gtest_main
         ${UNITTEST_DIR}/UnitTestMain/TestMain.cpp
         LINK_LIBS llvm_gtest
         LINK_COMPONENTS Support # llvm::cl
         BUILDTREE_ONLY
       )
-      set(CATALYST_GTEST_AVAILABLE 1)
+        set(CATALYST_GTEST_AVAILABLE 1)
     else()
-      message(WARNING "Skipping unittests since LLVM install does not include \
+        message(WARNING "Skipping unittests since LLVM install does not include \
         gtest headers and libraries")
-      set(CATALYST_GTEST_AVAILABLE 0)
+        set(CATALYST_GTEST_AVAILABLE 0)
     endif()
 endif()
 if (CATALYST_GTEST_AVAILABLE)
-  add_subdirectory(unittests)
+    add_subdirectory(unittests)
 endif()
 
 ######################
@@ -267,5 +267,5 @@ endif()
 ######################
 
 if(NOT CATALYST_DOCS_ONLY)
-  add_subdirectory(test)
+    add_subdirectory(test)
 endif()
