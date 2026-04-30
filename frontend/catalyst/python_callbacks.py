@@ -21,9 +21,11 @@ import pennylane as qp
 
 def paulirot_callback_wrapper(theta, pauli_word, wires):
     """Wraps paulirot decomp rule to enable compile-time lowering."""
+    # pylint: disable=protected-access
     device = qp.device("null.qubit", wires=len(wires))
     qnode = qp.QNode(
-        qp.ops.qubit.parametric_ops_multi_qubit._pauli_rot_decomposition._impl, device=device
+        qp.ops.qubit.parametric_ops_multi_qubit._pauli_rot_decomposition._impl,
+        device=device,
     )
     circuit = qp.qjit(
         qnode,
