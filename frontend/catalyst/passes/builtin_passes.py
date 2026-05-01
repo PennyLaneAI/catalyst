@@ -483,16 +483,17 @@ def parity_synth_setup_inputs():
     This pass walks over the input circuit and aggregates all ``CNOT`` and ``RZ`` operators
     into a subcircuit that describes a phase polyonomial. Other gates form the boundaries of
     these subcircuits, and whenever one is encountered the phase polynomial of the aggregated
-    subcircuit is resynthesized with the ``ParitySynth`` algorithm. This implies that while this
+    subcircuit is resynthesized with the ParitySynth algorithm. This implies that while this
     pass works on circuits containing any operations, it is recommended to maximize the
     subcircuits that represent phase polynomials (i.e. consist of ``CNOT`` and ``RZ`` gates) to
     enhance the effectiveness of the pass. This might be possible through decomposition or
     re-ordering of commuting gates.
 
-    Note that nested regions, such as nested functions and control flow function bodies, are
-    synthesized independently, i.e., region boundaries are always treated as boundaries of phase
-    polynomial subcircuits. Similarly, dynamic wires create boundaries around the operations using
-    them, causing separation of phase polynomial operations into multiple subcircuits.
+    Note that higher-level program structures, such as nested functions and control flow, are
+    synthesized independently. I.e., boundaries of such structures are always treated as boundaries
+    of phase polynomial subcircuits as well. Similarly, dynamic wires create boundaries around the
+    operations using them, potentially causing the separation of consecutive phase polynomial
+    operations into multiple subcircuits.
 
     **Example**
 
@@ -535,11 +536,11 @@ def parity_synth_setup_inputs():
 
     >>> print(catalyst.draw_graph(circuit, level=1)(0.52, 0.12, 0.2))
 
-
     .. figure:: /_static/parity-synth-example-pass-applied.png
         :width: 35%
         :alt: Example using ``parity_synth``
         :align: left
+
     """
     return (), {}
 
