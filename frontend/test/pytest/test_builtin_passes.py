@@ -74,7 +74,7 @@ def test_pass_compiles_with_qjit(name):
     """Basic smoke test to ensure proper compilation. For example, if a pass name
     was incorrect this would fail."""
 
-    obj = getattr(builtin_passes, name)
+    transform = getattr(builtin_passes, name)
 
     args, kwargs = _PASSES_WITH_ARGS_KWARGS.get(obj.pass_name, ((), {}))
 
