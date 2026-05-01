@@ -373,6 +373,9 @@ def _options_to_cli_flags(options):
     if options.async_qnodes:  # pragma: nocover
         extra_args += ["--async-qnodes"]
 
+    if options.target_triple:
+        extra_args += [("--target-triple", options.target_triple)]
+
     return extra_args
 
 
@@ -487,9 +490,14 @@ class Compiler:
         else:
             out_IR = None
 
-        if self.options.link:
+        # When we ship the .o directly via ORC EPC, we do not need to link a local .so.
+        skip_link = self.options.remote is not None
+
+        if self.options.link and not skip_link:
             output = LinkerDriver.run(output_object_name, options=self.options)
             output = str(pathlib.Path(output).absolute())
+        elif skip_link:
+            output = str(pathlib.Path(output_object_name).absolute())
         else:
             output = None
 

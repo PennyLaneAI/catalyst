@@ -201,6 +201,11 @@ def extract_backend_info(device: qp.devices.QubitDevice) -> BackendInfo:
         if k not in device_kwargs:  # pragma: no branch
             device_kwargs[k] = v
 
+    if hasattr(device, "catalyst_remote_address"):
+        device_kwargs["catalyst_remote_address"] = device.catalyst_remote_address
+    if hasattr(device, "catalyst_remote_arch"):
+        device_kwargs["catalyst_remote_arch"] = device.catalyst_remote_arch
+
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
 
 
