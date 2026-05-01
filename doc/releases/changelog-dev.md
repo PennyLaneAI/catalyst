@@ -645,6 +645,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Added permissions to all GitHub Actions workflows.
+  [(#2778)](https://github.com/PennyLaneAI/catalyst/pull/2778)
+
 * The compiler pipeline definitions now have a single source of truth. Previously, pipeline and
   pass sequences were duplicated between the frontend (`frontend/catalyst/pipelines.py`) and the
   compiler (`mlir/lib/Driver/Pipelines.cpp`). Now, there is a unique definition that lives in
