@@ -467,12 +467,11 @@ class TestQECLNoiseLoweringPassIntegration:
     """Integration lit tests for the convert-qecl-noise-to-qecp-noise pass"""
 
     # pylint: disable=line-too-long
-    @pytest.mark.usefixtures("use_capture")
     def test_convert_qecl_noise_to_qecp_noise_pass_integration(self, run_filecheck_qjit):
         """Test the convert-qecl-noise-to-qecp-noise pass on the simplest possible, non-trivial circuit."""
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(target="mlir", keep_intermediate=True)
+        @qp.qjit(target="mlir", keep_intermediate=True, capture=True)
         @convert_qecl_to_qecp_pass(qec_code=QecCode.get("Steane"), number_errors=1)
         @inject_noise_to_qecl_pass
         @convert_quantum_to_qecl_pass(k=1)
