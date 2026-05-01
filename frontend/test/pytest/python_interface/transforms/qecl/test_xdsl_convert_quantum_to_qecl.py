@@ -819,12 +819,11 @@ class TestInvalidInputIR:
 class TestQuantumToQecLogicalPassIntegration:
     """Integration lit tests for the convert-quantum-to-qecl pass"""
 
-    @pytest.mark.usefixtures("use_capture")
     def test_circuit_basic(self, run_filecheck_qjit):
         """Test the convert-quantum-to-qecl pass on the simplest possible, non-trivial circuit."""
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)
         def circuit():
@@ -847,12 +846,11 @@ class TestQuantumToQecLogicalPassIntegration:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_circuit_ghz(self, run_filecheck_qjit):
         """Test the convert-quantum-to-qecl pass on a GHZ circuit."""
         dev = qp.device("null.qubit", wires=3)
 
-        @qp.qjit(target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)
         def circuit():

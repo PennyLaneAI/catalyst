@@ -387,7 +387,6 @@ class TestClassicalCompiled:
         with pytest.raises(TypeError, match=MISSING_ARGUMENT_MESSAGE):
             circuit_3(0)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_fails_capture(self, backend):
         """Test that an exception is raised when program capture is enabled."""
         if not qp.capture.enabled():
@@ -395,7 +394,7 @@ class TestClassicalCompiled:
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @qjit
+            @qjit(capture=True)
             @qp.qnode(qp.device(backend, wires=1))
             def circuit(i):
                 @switch(i)
@@ -638,7 +637,6 @@ class TestQuantum:
         with pytest.raises(TypeError, match=MISSING_ARGUMENT_MESSAGE):
             circuit_2(0)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_fails_capture(self, backend):
         """Test that an exception is raised when program capture is enabled."""
         if not qp.capture.enabled():
@@ -646,7 +644,7 @@ class TestQuantum:
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @qjit
+            @qjit(capture=True)
             @qp.qnode(qp.device(backend, wires=1))
             def circuit(i):
                 @switch(i)

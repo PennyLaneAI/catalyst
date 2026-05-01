@@ -20,8 +20,7 @@ import pytest
 from pennylane import cond, qjit
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_global_phase(backend):
+def test_global_phase(backend, capture_mode):
     """Test vanilla global phase"""
     dev = qp.device(backend, wires=1)
 
@@ -32,13 +31,12 @@ def test_global_phase(backend):
         return qp.state()
 
     expected = qnn()
-    observed = qjit(qnn)()
+    observed = qjit(qnn, capture=capture_mode)()
     assert np.allclose(expected, observed)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [True, False])
-def test_global_phase_in_region(backend, inp):
+def test_global_phase_in_region(backend, inp, capture_mode):
     """Test global phase in region"""
     dev = qp.device(backend, wires=1)
 
@@ -53,14 +51,13 @@ def test_global_phase_in_region(backend, inp):
         cir()
         return qp.state()
 
-    observed = qjit(qnn)(inp)
+    observed = qjit(qnn, capture=capture_mode)(inp)
     qp.capture.disable()
     expected = qnn(inp)
     assert np.allclose(expected, observed)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_global_phase_control(backend):
+def test_global_phase_control(backend, capture_mode):
     """Test global phase controlled"""
 
     if backend in ("lightning.kokkos", "lightning.gpu"):
@@ -75,7 +72,7 @@ def test_global_phase_control(backend):
         return qp.state()
 
     expected = qnn()
-    observed = qjit(qnn)()
+    observed = qjit(qnn, capture=capture_mode)()
     assert np.allclose(expected, observed)
 
 

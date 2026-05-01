@@ -33,8 +33,7 @@ from catalyst import qjit
         ],
     ],
 )
-@pytest.mark.usefixtures("use_both_frontend")
-def test_split_to_single_terms_integration(hamiltonian):
+def test_split_to_single_terms_integration(hamiltonian, capture_mode):
     """
     Test that split-to-single-terms pass produces the same results as
     manually splitting Hamiltonian observables and computing weighted sum.
@@ -44,7 +43,7 @@ def test_split_to_single_terms_integration(hamiltonian):
 
     # Circuit with Hamiltonian observable
     # Expected: split into individual terms with coefficients
-    @qjit
+    @qjit(capture=capture_mode)
     @qp.transform(pass_name="split-to-single-terms")
     @qp.qnode(dev)
     def circ1():
@@ -54,7 +53,7 @@ def test_split_to_single_terms_integration(hamiltonian):
         return qp.expval(hamiltonian_obs), qp.expval(qp.Z(1))
 
     # Manual implementation: split into individual terms and compute weighted sum
-    @qjit
+    @qjit(capture=capture_mode)
     @qp.qnode(dev)
     def circ2():
         qp.Rot(0.3, 0.5, 0.7, wires=0)
@@ -120,8 +119,7 @@ def test_split_to_single_terms_with_tensor_product():
 
 
 @pytest.mark.capture_todo
-@pytest.mark.usefixtures("use_both_frontend")
-def test_split_to_single_terms_with_Identity():
+def test_split_to_single_terms_with_Identity(capture_mode):
     """
     Test split-to-single-terms with Identity observables.
     Identity observables are removed from the quantum circuit since their
@@ -129,7 +127,7 @@ def test_split_to_single_terms_with_Identity():
     """
     dev = qp.device("lightning.qubit", wires=3)
 
-    @qjit
+    @qjit(capture=capture_mode)
     @qp.transform(pass_name="split-to-single-terms")
     @qp.qnode(dev)
     def circ1():
@@ -137,7 +135,7 @@ def test_split_to_single_terms_with_Identity():
         qp.Rot(0.4, 0.6, 0.1, wires=1)
         return qp.expval(qp.Z(0) + 2 * qp.X(1) + 0.7 * qp.Identity(2))
 
-    @qjit
+    @qjit(capture=capture_mode)
     @qp.qnode(dev)
     def circ2():
         qp.Rot(0.5, 0.3, 0.2, wires=0)
