@@ -324,9 +324,10 @@
   [(#2660)](https://github.com/PennyLaneAI/catalyst/pull/2660)
 
 * A new optimization pass has been added to reduce the number of instructions in a quantum program,
-  `--merge-global-phase`, which safely combines global phase instructions for each region in the
+  `--combine-global-phase`, which safely combines global phase instructions for each region in the
   program. The xDSL version written in Python has been removed.
   [(#2604)](https://github.com/PennyLaneAI/catalyst/pull/2604)
+  [(#2777)](https://github.com/PennyLaneAI/catalyst/pull/2777)
 
 * A new native-MLIR graph-based decomposition framework is now available. This system
   migrates the graph-decomposition logic from Python into the Catalyst compiler as a
@@ -1098,6 +1099,7 @@
   [(#2574)](https://github.com/PennyLaneAI/catalyst/pull/2574)
   [(#2576)](https://github.com/PennyLaneAI/catalyst/pull/2576)
   [(#2673)](https://github.com/PennyLaneAI/catalyst/pull/2673)
+  [(#2768)](https://github.com/PennyLaneAI/catalyst/pull/2768)
 
 * An experimental pass to convert `qecl.noise` operations in the *QEC Logical* layer to subroutine calls in the *QEC Phyiscal* layer.
   [(#2678)](https://github.com/PennyLaneAI/catalyst/pull/2678)

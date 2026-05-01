@@ -139,19 +139,17 @@ class TestOutlineStateEvolutionPass:
         pipeline = (OutlineStateEvolutionPass(),)
         run_filecheck(program, pipeline)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_no_error(self):
         """Test outline_state_evolution_pass does not raise error for circuit with classical
         operations only."""
 
-        @qp.qjit(target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @outline_state_evolution_pass
         def circuit(x, y):
             return x * y + 5
 
         circuit(1, 4)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_no_terminal_op_error(self):
         """Test outline_state_evolution_pass raises error when no terminal_boundary_op is found in
         circuit with quantum operation."""
@@ -159,7 +157,7 @@ class TestOutlineStateEvolutionPass:
         # the program is captured.
         dev = qp.device("null.qubit", wires=10)
 
-        @qp.qjit(target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @outline_state_evolution_pass
         @qp.qnode(dev)
         def circuit():
@@ -170,12 +168,11 @@ class TestOutlineStateEvolutionPass:
         ):
             circuit()
 
-    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_pass_only(self, run_filecheck_qjit):
         """Test the outline_state_evolution_pass only."""
         dev = qp.device("lightning.qubit", wires=1000)
 
-        @qp.qjit(target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @outline_state_evolution_pass
         @qp.set_shots(1000)
         @qp.qnode(dev)
@@ -205,13 +202,12 @@ class TestOutlineStateEvolutionPass:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_pass_with_convert_to_mbqc_formalism(self, run_filecheck_qjit):
         """Test if the outline_state_evolution_pass works with the convert-to-mbqc-formalism pass
         on lightning.qubit."""
         dev = qp.device("lightning.qubit", wires=1000)
 
-        @qp.qjit(target="mlir", pipelines=mbqc_pipeline())
+        @qp.qjit(capture=True, target="mlir", pipelines=mbqc_pipeline())
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
         @outline_state_evolution_pass
@@ -251,13 +247,12 @@ class TestOutlineStateEvolutionPass:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_pass_with_mbqc_pipeline(self, run_filecheck_qjit):
         """Test if the outline_state_evolution_pass works with all mbqc transform pipeline on
         null.qubit."""
         dev = qp.device("null.qubit", wires=1000)
 
-        @qp.qjit(target="mlir", pipelines=mbqc_pipeline())
+        @qp.qjit(capture=True, target="mlir", pipelines=mbqc_pipeline())
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
         @measurements_from_samples_pass
@@ -297,13 +292,12 @@ class TestOutlineStateEvolutionPass:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_pass_with_mbqc_pipeline_run_on_nullqubit(self):
         """Test if a circuit can be transfored with the outline_state_evolution_pass and all mbqc
         transform pipeline can be executed on null.qubit."""
         dev = qp.device("null.qubit", wires=1000)
 
-        @qp.qjit(target="mlir", pipelines=mbqc_pipeline())
+        @qp.qjit(capture=True, target="mlir", pipelines=mbqc_pipeline())
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
         @measurements_from_samples_pass
@@ -323,7 +317,6 @@ class TestOutlineStateEvolutionPass:
         res = circuit()
         assert res == 1.0
 
-    @pytest.mark.usefixtures("use_capture")
     def test_lightning_execution_with_structure(self):
         """Test that the outline_state_evolution_pass on lightning.qubit for a circuit with program
         structure is executable and returns results as expected."""
@@ -343,7 +336,7 @@ class TestOutlineStateEvolutionPass:
             i = i + 1
             return i
 
-        @qp.qjit(target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @outline_state_evolution_pass
         @qp.qnode(dev)
         def circuit():
@@ -355,6 +348,7 @@ class TestOutlineStateEvolutionPass:
         res = circuit()
 
         @qp.qjit(
+            capture=True,
             target="mlir",
         )
         @qp.qnode(dev)
