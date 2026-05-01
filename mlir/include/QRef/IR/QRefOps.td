@@ -21,6 +21,7 @@ include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
 include "MBQC/IR/MBQCAttrDefs.td"
+include "PBC/IR/PBCAttrDefs.td"
 include "Quantum/IR/QuantumAttrDefs.td"
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumTypes.td"
@@ -712,6 +713,33 @@ def GraphStatePrepOp : Memory_Op<"mbqc.graph_state_prep"> {
 
     let assemblyFormat = [{
         `(` $adj_matrix `:` type($adj_matrix) `)` `[` `init` $init_op `,` `entangle` $entangle_op `]` attr-dict `:` type(results)
+    }];
+
+    let hasVerifier = 1;
+}
+
+// -----
+// PBC Ops
+
+def PPMeasurementOp : QRef_Op<"pbc.ppm"> {
+    let summary = "Pauli Product Measurement on qubits.";
+
+    let description = [{
+        Identical to the pbc.ppm operation, except in reference semantics.
+    }];
+
+    let arguments = (ins
+        PauliWord:$pauli_product,
+        UnitAttr:$negated,  // Pauli words can carry a negative sign, which flips the result
+        Variadic<QubitRefType>:$qubits
+    );
+
+    let results = (outs
+        I1:$mres
+    );
+
+    let assemblyFormat = [{
+        $pauli_product (`(``-``)` $negated^)? $qubits attr-dict `:` type(results)
     }];
 
     let hasVerifier = 1;

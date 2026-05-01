@@ -54,6 +54,7 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, QubitValueT
 void handleMeasure(IRRewriter &builder, qref::MeasureOp rMeasureOp, QubitValueTracker &tracker);
 void handleMeasureInBasis(IRRewriter &builder, qref::MeasureInBasisOp rMeasureInBasisOp,
                           QubitValueTracker &tracker);
+void handlePPM(IRRewriter &builder, qref::PPMeasurementOp rPPMOp, QubitValueTracker &tracker);
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker);
 void handleCompbasis(IRRewriter &builder, qref::ComputationalBasisOp rCompbasisOp,
                      QubitValueTracker &tracker);

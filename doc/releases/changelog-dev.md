@@ -735,6 +735,7 @@
   [(#2721)](https://github.com/PennyLaneAI/catalyst/pull/2721)
   [(#2723)](https://github.com/PennyLaneAI/catalyst/pull/2723)
   [(#2758)](https://github.com/PennyLaneAI/catalyst/pull/2758)
+  [(#2773)](https://github.com/PennyLaneAI/catalyst/pull/2773)
 
   Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
   in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
@@ -765,7 +766,8 @@
   neighboring inverse `quantum.extract` and `quantum.insert` operations.
 
   Apart from those in the `Quantum` dialect, reference semantics operations for their value
-  semantics counterparts in the `MBQC` dialect were also added.
+  semantics counterparts in the `MBQC` dialect were also added. In addition, a reference semantics
+  operation for the value semantics `pbc.ppm` operation was also added.
 
 * A new pass `--verify-no-quantum-use-after-free` was added to the new `QRef` dialect, to verify
   that there are no uses of quantum values after they have been deallocated.

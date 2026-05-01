@@ -342,3 +342,11 @@ func.func @test_mbqc_graph_state_prep() {
     %graph_reg = qref.mbqc.graph_state_prep (%adj_matrix : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !qref.reg<4>
     func.return
 }
+
+// -----
+
+func.func @test_pbc_ppm(%q0: !qref.bit, %q1: !qref.bit) {
+    %m0 = qref.pbc.ppm ["Z"] %q0 : i1
+    %m1 = qref.pbc.ppm ["X", "Y"] %q0, %q1 : i1
+    return
+}
