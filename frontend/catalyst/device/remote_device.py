@@ -18,7 +18,6 @@ target triple. It cross-compiles the kernel object for that triple and
 JIT-links it into the remote `catalyst-executor` over ORC EPC.
 
 Usage:
-main.py:
     ```python
     import catalyst
     import pennylane as qp
@@ -37,51 +36,18 @@ main.py:
 
     print(circuit())
     ```
-
-shell:
-    ```bash
-    CATALYST_REMOTE_DEVICE_LIB_LIGHTNING_QUBIT=/path/to/liblightning_qubit_catalyst.so \
-        python3 main.py
-    ```
 """
-import os
-
 import pennylane as qp
 
 
-def _device_lib_env_key(name: str) -> str:
-    """Map a device name to the env var.
-    e.g. "lightning.qubit" becomes "CATALYST_REMOTE_DEVICE_LIB_LIGHTNING_QUBIT".
-    """
-    safe = name.upper().replace(".", "_").replace("-", "_")
-    return f"CATALYST_REMOTE_DEVICE_LIB_{safe}"
-
-
-def _resolve_device_lib(name: str, explicit: str | None) -> str | None:
-    """Resolve the executor-side device library path."""
-    if explicit:
-        return explicit
-    return os.environ.get(_device_lib_env_key(name)) or os.environ.get("CATALYST_REMOTE_DEVICE_LIB")
-
-
-def RemoteDevice(name, *, address, arch, device_lib=None, **kwargs):  # pylint: disable=invalid-name
+def RemoteDevice(name, *, address, arch, **kwargs):  # pylint: disable=invalid-name
     """Construct a pennylane device tagged for remote ORC JIT execution."""
     if not isinstance(address, str) or ":" not in address:
         raise ValueError(f"RemoteDevice: address must be 'host:port', got {address!r}")
     if not isinstance(arch, str) or not arch:
-        raise ValueError(
-            f"RemoteDevice: arch must be a non-empty LLVM target triple, " f"got {arch!r}"
-        )
-
-    resolved_device_lib = _resolve_device_lib(name, device_lib)
-    if resolved_device_lib is None:
-        raise ValueError(
-            f"RemoteDevice: cannot determine the remote device library "
-            f"set the env var {_device_lib_env_key(name)}"
-        )
+        raise ValueError(f"RemoteDevice: arch must be a non-empty LLVM target triple, got {arch!r}")
 
     dev = qp.device(name, **kwargs)
     dev.catalyst_remote_address = address
     dev.catalyst_remote_arch = arch
-    dev.catalyst_remote_device_lib = resolved_device_lib
     return dev
