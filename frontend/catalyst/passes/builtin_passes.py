@@ -15,7 +15,6 @@
 """This module exposes built-in Catalyst MLIR passes to the frontend."""
 
 import copy
-import functools
 import json
 from pathlib import Path
 from typing import Iterable
@@ -456,6 +455,98 @@ def merge_rotations_setup_inputs():
 merge_rotations = qp.transform(
     pass_name="merge-rotations", setup_inputs=merge_rotations_setup_inputs
 )
+
+
+def parity_synth_setup_inputs():
+    r"""Pass for synthesizing phase polynomials in a circuit.
+
+    ParitySynth has been proposed by Vandaele et al. in `arXiv:2104.00934
+    <https://arxiv.org/abs/2104.00934>`__ as a technique to synthesize
+    `phase polynomials
+    <https://pennylane.ai/compilation/phase-polynomial-intermediate-representation>`__
+    into elementary quantum gates, namely ``CNOT`` and ``RZ``. For this, it synthesizes the
+    `parity table <https://pennylane.ai/compilation/parity-table>`__ of the phase polynomial,
+    and defers the remaining `parity matrix <https://pennylane.ai/compilation/parity-matrix>`__
+    synthesis to `RowCol <https://pennylane.ai/compilation/rowcol-algorithm>`__.
+
+    .. note::
+
+        This transform requires decorating the workflow with :func:`~.qjit`. Additionally, this pass
+        requires the ``networkx`` package, which can be installed via
+        ``pip install networkx``.
+
+    Args:
+        fn (QNode): QNode to apply the pass to
+
+    Returns:
+        :class:`QNode <pennylane.QNode>`
+
+    This pass walks over the input circuit and aggregates all ``CNOT`` and ``RZ`` operators
+    into a subcircuit that describes a phase polyonomial. Other gates form the boundaries of
+    these subcircuits, and whenever one is encountered the phase polynomial of the aggregated
+    subcircuit is resynthesized with the ParitySynth algorithm. This implies that while this
+    pass works on circuits containing any operations, it is recommended to maximize the
+    subcircuits that represent phase polynomials (i.e. consist of ``CNOT`` and ``RZ`` gates) to
+    enhance the effectiveness of the pass. This might be possible through decomposition or
+    re-ordering of commuting gates.
+
+    Note that higher-level program structures, such as nested functions and control flow, are
+    synthesized independently. I.e., boundaries of such structures are always treated as boundaries
+    of phase polynomial subcircuits as well. Similarly, dynamic wires create boundaries around the
+    operations using them, potentially causing the separation of consecutive phase polynomial
+    operations into multiple subcircuits.
+
+    **Example**
+
+    In the following, we apply the pass to a simple quantum circuit that has optimization
+    potential in terms of commuting gates that can be interchanged to unlock a cancellation of
+    a self-inverse gate (``CNOT``) with itself. Concretely, the circuit is:
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from catalyst.python_interface import Compiler
+        import catalyst
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit(capture=True)
+        @catalyst.passes.parity_synth
+        @qml.qnode(dev)
+        def circuit(x: float, y: float, z: float):
+            qml.CNOT((0, 1))
+            qml.RZ(x, 1)
+            qml.CNOT((0, 1))
+            qml.RX(y, 1)
+            qml.CNOT((1, 0))
+            qml.RZ(z, 1)
+            qml.CNOT((1, 0))
+            return qml.state()
+
+    We can draw the circuit and observe the last ``RZ`` gate to be wrapped in a pair of ``CNOT``
+    gates that commute with it. Before the pass is applied:
+
+    >>> print(catalyst.draw_graph(circuit, level=0)(0.52, 0.12, 0.2))
+
+    .. figure:: /_static/parity-synth-example-before.png
+        :width: 35%
+        :alt: Example using ``parity_synth``
+        :align: left
+
+    After the pass is applied:
+
+    >>> print(catalyst.draw_graph(circuit, level=1)(0.52, 0.12, 0.2))
+
+    .. figure:: /_static/parity-synth-example-pass-applied.png
+        :width: 35%
+        :alt: Example using ``parity_synth``
+        :align: left
+
+    """
+    return (), {}
+
+
+parity_synth = qp.transform(pass_name="parity-synth", setup_inputs=parity_synth_setup_inputs)
 
 
 def decompose_lowering_setup_inputs():  # pragma: no cover
@@ -1833,6 +1924,7 @@ __all__ = [
     "disentangle_cnot",
     "disentangle_swap",
     "merge_rotations",
+    "parity_synth",
     "decompose_lowering",
     "ions_decomposition",
     "to_ppr",
