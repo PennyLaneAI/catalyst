@@ -205,8 +205,6 @@ def extract_backend_info(device: qp.devices.QubitDevice) -> BackendInfo:
         device_kwargs["catalyst_remote_address"] = device.catalyst_remote_address
     if hasattr(device, "catalyst_remote_arch"):
         device_kwargs["catalyst_remote_arch"] = device.catalyst_remote_arch
-    if hasattr(device, "catalyst_remote_device_lib"):
-        device_lpath = device.catalyst_remote_device_lib
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
 
