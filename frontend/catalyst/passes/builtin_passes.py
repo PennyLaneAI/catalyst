@@ -546,9 +546,7 @@ def parity_synth_setup_inputs():
     return (), {}
 
 
-parity_synth = qp.transform(
-    pass_name="parity-synth", setup_inputs=parity_synth_setup_inputs
-)  # pragma: no cover
+parity_synth = qp.transform(pass_name="parity-synth", setup_inputs=parity_synth_setup_inputs)
 
 
 def decompose_lowering_setup_inputs(qnode):
