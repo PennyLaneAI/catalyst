@@ -20,7 +20,6 @@ from dataclasses import dataclass
 from typing import Tuple
 
 import jax.numpy as jnp
-from jaxlib.xla_client import CompileOptions
 import numpy as np
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_flatten, tree_unflatten
