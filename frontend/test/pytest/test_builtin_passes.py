@@ -46,8 +46,6 @@ def assert_valid_transform(obj: Any) -> None:
     assert pipeline[0].pass_name == pass_name
 
 
-
-
 @pytest.mark.parametrize("name", builtin_passes.__all__)
 def test_pass_name_matches_variable_name(name):
     """Tests that the variable name is just the pass name but snake case."""
@@ -64,8 +62,6 @@ def test_passes_are_valid_transforms(name):
 
     obj = getattr(builtin_passes, name)
     assert_valid_transform(obj)
-
-
 
 
 @pytest.mark.parametrize("name", builtin_passes.__all__)
