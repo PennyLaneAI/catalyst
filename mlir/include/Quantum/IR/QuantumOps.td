@@ -17,7 +17,9 @@
 
 include "mlir/IR/OpBase.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
+include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/IR/SymbolInterfaces.td"
 
 include "Quantum/IR/QuantumAttrDefs.td"
 include "Quantum/IR/QuantumDialect.td"
@@ -735,6 +737,33 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect
     }];
 
     let hasVerifier = 1;
+}
+
+// -----
+
+def TemplateOp : Quantum_Op<"template", [NoMemoryEffect, AttrSizedOperandSegments, AllTypesMatch<["in_qreg", "out_qreg"]>]> {
+
+    let summary = "Operation to represent quantum gates with arbitrary signatures";
+    let description = [{}];
+
+    let arguments = (ins
+        StrAttr:$template_name,
+        Variadic<AnyType>:$inputs,
+        QuregType:$in_qreg,
+        Variadic<1DTensorOf<[I64]>>:$qubit_inds,
+        Optional<1DTensorOf<[I64]>>:$in_ctrl_inds,
+        Optional<1DTensorOf<[I1]>>:$in_ctrl_vals,
+        UnitAttr:$adjoint,
+        OptionalAttr<DictionaryAttr>:$param_map,
+        DictionaryAttr:$in_qubits_map,
+        OptionalAttr<DictionaryAttr>:$static_data
+    );
+
+    let results = (outs
+        QuregType:$out_qreg
+    );
+
+    let hasCustomAssemblyFormat = 1;
 }
 
 // -----
