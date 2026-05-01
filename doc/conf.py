@@ -93,6 +93,7 @@ MOCK_MODULES = [
     "mlir_quantum.dialects.arith",
     "mlir_quantum.dialects.tensor",
     "mlir_quantum.dialects.scf",
+    "mlir_quantum.dialects.qref",
     "mlir_quantum.dialects.quantum",
     "mlir_quantum.dialects.gradient",
     "mlir_quantum.dialects.catalyst",
