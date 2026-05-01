@@ -48,10 +48,8 @@ def parity_check_matrix_to_tanner_csc(H: np.ndarray) -> tuple[np.ndarray, np.nda
         Given an m x n parity-check matrix H, the equivalent Tanner graph adjacency matrix A has the
         form
 
-                ┌       ┐
-            A = │ 0 H^T │
-                │ H  0  │
-                └       ┘
+.. math::
+        A = \begin{pmatrix} 0 & H^T \\ H & 0 \end{pmatrix}
 
         The adjacency matrix A therefore has shape (m+n, m+n). In this representation, the first n
         columns corresponding to the n data qubits of the code, from which the data qubit's

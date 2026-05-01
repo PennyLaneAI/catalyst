@@ -94,7 +94,7 @@ class QecCode:
     def correctable_errors(self) -> int:
         """Return the number of correctable errors of the QEC code.
 
-        For a code with distance *d*, the number of correctable errors *t* is given by
+        For a code with distance :math:`d`, the number of correctable errors :math:`t` is given by
 
         .. math::
 
