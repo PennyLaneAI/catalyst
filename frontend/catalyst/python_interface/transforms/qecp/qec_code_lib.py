@@ -14,7 +14,6 @@
 
 """This module contains a library of QEC codes."""
 
-import math
 from dataclasses import dataclass, fields
 from typing import Any, Self
 
@@ -106,4 +105,4 @@ class QecCode:
         >>> code = QecCode.get("Steane")
         >>> code.correctable_errors
         """
-        return math.floor((self.d - 1) / 2)
+        return (self.d - 1) // 2
