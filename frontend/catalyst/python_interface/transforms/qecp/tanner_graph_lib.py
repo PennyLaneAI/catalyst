@@ -45,17 +45,22 @@ def parity_check_matrix_to_tanner_csc(H: np.ndarray) -> tuple[np.ndarray, np.nda
     .. details::
         :title: Layout of the (dense) Tanner graph adjacency matrix
 
-        Given an m x n parity-check matrix H, the equivalent Tanner graph adjacency matrix A has the
-        form
+        Given an :math:`m \times n` parity-check matrix :math:`H`, the equivalent Tanner graph
+        adjacency matrix :math:`A` has the form
 
-.. math::
-        A = \begin{pmatrix} 0 & H^T \\ H & 0 \end{pmatrix}
+        .. math::
 
-        The adjacency matrix A therefore has shape (m+n, m+n). In this representation, the first n
-        columns corresponding to the n data qubits of the code, from which the data qubit's
-        neighbouring aux qubits in the Tanner graph can be read off from the non-zero elements in
-        the column, and the last m columns correspond to the m aux qubits of the code, from which
-        their neighbouring data qubits can be read off from the non-zero elements in the column.
+            A = \begin{bmatrix}
+                    0 & H^T \\
+                    H & 0
+                \end{bmatrix}
+
+        The adjacency matrix :math:`A` therefore has shape :math:`(m+n, m+n)`. In this
+        representation, the first n columns corresponding to the n data qubits of the code, from
+        which the data qubit's neighbouring aux qubits in the Tanner graph can be read off from the
+        non-zero elements in the column, and the last m columns correspond to the m aux qubits of
+        the code, from which their neighbouring data qubits can be read off from the non-zero
+        elements in the column.
     """
     if len(H.shape) != 2:
         raise ValueError(f"Expected an m x n matrix, but got an array with shape {H.shape}")
