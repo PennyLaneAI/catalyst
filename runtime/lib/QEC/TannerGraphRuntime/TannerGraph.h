@@ -16,11 +16,13 @@
 
 #include "Types.h"
 
-namespace Catalyst::Runtime::QEC {
-extern "C" {
+    namespace Catalyst::Runtime::QEC
+{
+    extern "C" {
 
-void __catalyst__qecp__assemble_tanner_graph_int32(MemRefT_int32_1d *row_idx_tanner,
-                                   MemRefT_int32_1d *col_ptr_tanner, TannerGraph_CSC_int32* tanner_graph);
+    void __catalyst__qecp__assemble_tanner_graph_int32(MemRefT_int32_1d *row_idx_tanner,
+                                                       MemRefT_int32_1d *col_ptr_tanner,
+                                                       TannerGraph_CSC_int32 *tanner_graph);
 
-} // extern "C"
+    } // extern "C"
 } // namespace Catalyst::Runtime::QEC

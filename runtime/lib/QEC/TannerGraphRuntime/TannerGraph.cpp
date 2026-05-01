@@ -13,13 +13,16 @@
 // limitations under the License.
 
 #include "TannerGraph.h"
-#include "DataView.hpp"
-#include "Exception.hpp"
 
-namespace Catalyst::Runtime::QEC{
-    void __catalyst__qecp__tanner_graph_int32(MemRefT_int32_1d *row_idx_tanner,
-                                   MemRefT_int32_1d *col_ptr_tanner, MemRefT_TannerGraph_CSC_int32* tanner_graph){
+#include "Types.h"
 
-                                   }
+namespace Catalyst::Runtime::QEC {
+void __catalyst__qecp__tanner_graph_int32(MemRefT_int32_1d *row_idx_tanner,
+                                          MemRefT_int32_1d *col_ptr_tanner,
+                                          MemRefT_TannerGraph_CSC_int32 *tanner_graph)
+{
+    tanner_graph->row_idx = row_idx_tanner;
+    tanner_graph->col_ptr = col_ptr_tanner;
+}
 
-}// namespace Catalyst::Runtime::QEC
+} // namespace Catalyst::Runtime::QEC
