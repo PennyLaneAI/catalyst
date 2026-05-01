@@ -190,6 +190,8 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         std::string requestedTripleStr = options.targetTriple.empty()
                                              ? llvm::sys::getDefaultTargetTriple()
                                              : options.targetTriple;
+
+        // Set data layout before LLVM passes or the default one is used.
         llvm::Triple targetTriple{requestedTripleStr};
 
         llvm::InitializeAllTargetInfos();
