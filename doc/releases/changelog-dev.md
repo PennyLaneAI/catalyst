@@ -7,23 +7,20 @@
   [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
 
   ```python
-  import pennylane as qml
+  import pennylane as qp
   import catalyst
 
-  @qml.qjit(capture=True)
+  @qp.qjit(capture=True)
   @catalyst.passes.combine_global_phases
-  @qml.qnode(qml.device("lightning.qubit", wires=5))
+  @qp.qnode(qml.device("lightning.qubit", wires=5))
   def circuit():
-      qml.GlobalPhase(0)
-      qml.GlobalPhase(1)
-      qml.GlobalPhase(2)
-      qml.GlobalPhase(3)
-      qml.GlobalPhase(4)
-      return qml.state()
-  ```
-
-  ```pycon
-  >>> print(qml.specs(circuit, level=2)())
+      qp.GlobalPhase(0)
+      qp.GlobalPhase(1)
+      qp.GlobalPhase(2)
+      qp.GlobalPhase(3)
+      qp.GlobalPhase(4)
+      return qp.state()
+  
   Device: lightning.qubit
   Device wires: 5
   Shots: Shots(total=None)
@@ -415,27 +412,24 @@
   [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
 
   ```python
-  import pennylane as qml
+  import pennylane as qp
   import catalyst
 
-  dev = qml.device("lightning.qubit", wires=2)
+  dev = qp.device("lightning.qubit", wires=2)
 
-  @qml.qjit(capture=True)
+  @qp.qjit(capture=True)
   @catalyst.passes.parity_synth
-  @qml.qnode(dev)
+  @qp.qnode(dev)
   def circuit(x: float, y: float, z: float):
-      qml.CNOT((0, 1))
-      qml.RZ(x, 1)
-      qml.CNOT((0, 1))
-      qml.RX(y, 1)
-      qml.CNOT((1, 0))
-      qml.RZ(z, 1)
-      qml.CNOT((1, 0))
-      return qml.state()
-  ```
-
-  ```pycon
-  >>> print(qml.specs(circuit)(0.52, 0.12, 0.2))
+      qp.CNOT((0, 1))
+      qp.RZ(x, 1)
+      qp.CNOT((0, 1))
+      qp.RX(y, 1)
+      qp.CNOT((1, 0))
+      qp.RZ(z, 1)
+      qp.CNOT((1, 0))
+      return qp.state()
+  
   Device: lightning.qubit
   Device wires: 2
   Shots: Shots(total=None)
