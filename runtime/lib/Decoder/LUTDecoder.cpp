@@ -32,7 +32,10 @@
 #include "Exception.hpp"
 #include "LUTDecoderUtils.hpp"
 
-namespace Catalyst::Runtime::QEC {
+extern "C" {
+
+using namespace Catalyst::Runtime::QEC;
+
 /**
  * @brief A runtime lookup table based decoder. The current implementation applies the singleton
  * pattern for the lookup table generation. Hence, we only generate the lookup table once and the
@@ -79,4 +82,4 @@ void __catalyst__qecp__lut_decoder(MemRefT_int32_1d *row_idx_tanner,
     // Copy the inquired error indices back to the err_idx
     std::copy(error_indices.begin(), error_indices.end(), err_idx->data_aligned);
 }
-} // namespace Catalyst::Runtime::QEC
+} // extern "C"

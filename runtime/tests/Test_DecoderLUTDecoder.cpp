@@ -22,8 +22,6 @@
 #include "TestUtils.hpp"
 #include "Types.h"
 
-using namespace Catalyst::Runtime::QEC;
-
 using TANNER_GRAPH_INT = int32_t;
 using ERR_IDX_INT = int64_t;
 using SYNDROME_INT = int8_t;
