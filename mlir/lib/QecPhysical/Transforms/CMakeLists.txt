@@ -2,6 +2,8 @@ set(LIBRARY_NAME qecp-transforms)
 
 file(GLOB SRC
     BufferizableOpInterfaceImpl.cpp
+    ConversionPatterns.cpp
+    qecp_to_llvm.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
