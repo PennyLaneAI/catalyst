@@ -16,10 +16,10 @@
 
 #include "Types.h"
 
-namespace Catalyst::Runtime::QEC {
+extern "C" {
 void __catalyst__qecp__tanner_graph_int32(MemRefT_int32_1d *row_idx_tanner,
                                           MemRefT_int32_1d *col_ptr_tanner,
-                                          MemRefT_TannerGraph_CSC_int32 *tanner_graph)
+                                          TannerGraph_CSC_int32 *tanner_graph)
 {
     tanner_graph->row_idx = row_idx_tanner;
     tanner_graph->col_ptr = col_ptr_tanner;
