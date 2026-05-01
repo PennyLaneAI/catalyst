@@ -42,7 +42,6 @@ def skip_no_graph_deps():
         pytest.skip(reason="pydot isn't installed.")
 
 
-@pytest.mark.usefixtures("use_capture")
 class TestDraw:
     """Unit tests for the draw function in the unified compiler inspection module."""
 
@@ -113,7 +112,8 @@ class TestDraw:
         compilation passes."""
 
         transforms_circuit = qp.qjit(
-            iterative_cancel_inverses_pass(merge_rotations_pass(transforms_circuit))
+            iterative_cancel_inverses_pass(merge_rotations_pass(transforms_circuit)),
+            capture=True,
         )
 
         assert draw(transforms_circuit, level=level)() == expected
@@ -143,7 +143,8 @@ class TestDraw:
         compilation passes."""
 
         transforms_circuit = qp.qjit(
-            qp.transforms.cancel_inverses(qp.transforms.merge_rotations(transforms_circuit))
+            qp.transforms.cancel_inverses(qp.transforms.merge_rotations(transforms_circuit)),
+            capture=True,
         )
 
         assert draw(transforms_circuit, level=level)() == expected
@@ -173,7 +174,8 @@ class TestDraw:
         Catalyst compilation passes."""
 
         transforms_circuit = qp.qjit(
-            iterative_cancel_inverses_pass(qp.transforms.merge_rotations(transforms_circuit))
+            iterative_cancel_inverses_pass(qp.transforms.merge_rotations(transforms_circuit)),
+            capture=True,
         )
 
         assert draw(transforms_circuit, level=level)() == expected
@@ -215,7 +217,7 @@ class TestDraw:
     )
     def test_no_passes(self, transforms_circuit, level, expected):
         """Test that if no passes are applied, the circuit is still visualized."""
-        transforms_circuit = qp.qjit(transforms_circuit)
+        transforms_circuit = qp.qjit(transforms_circuit, capture=True)
 
         assert draw(transforms_circuit, level=level)() == expected
 
@@ -245,7 +247,7 @@ class TestDraw:
         Test the visualization of control and adjoint variants.
         """
 
-        @qp.qjit
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit():
             op()
@@ -258,7 +260,7 @@ class TestDraw:
         Test the visualization of control operations before custom ops.
         """
 
-        @qp.qjit
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit():
             qp.ctrl(qp.X(3), control=[0, 1, 2], control_values=[1, 0, 1])
@@ -341,7 +343,7 @@ class TestDraw:
             else None
         )
 
-        @qp.qjit
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3), shots=shots)
         def circuit():
             qp.RX(0.1, 0)
@@ -354,7 +356,7 @@ class TestDraw:
     def test_global_phase(self):
         """Test the visualization of global phase shifts."""
 
-        @qp.qjit
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit():
             qp.H(0)
@@ -380,7 +382,7 @@ class TestDraw:
     def test_draw_mid_circuit_measurement_postselect(self, postselect, mid_measure_label):
         """Test that mid-circuit measurements are drawn correctly."""
 
-        @qp.qjit
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
             qp.Hadamard(0)
@@ -463,7 +465,7 @@ class TestDraw:
         Test the visualization of the quantum operations defined in the unified compiler dialect.
         """
 
-        @qp.qjit
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit():
             for op, param, wires in ops:
@@ -479,7 +481,7 @@ class TestDraw:
         two_dim = jax.numpy.array([[0, 1], [1, 0]])
         eight_dim = jax.numpy.zeros((8, 8))
 
-        @qp.qjit
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
             qp.RX(one_dim[0], wires=0)
@@ -498,7 +500,7 @@ class TestDraw:
         """Test that a warning is raised when dynamic arguments are used."""
 
         # pylint: disable=unused-argument
-        @qp.qjit
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circ(arg):
             qp.RX(0.1, wires=0)
@@ -510,7 +512,7 @@ class TestDraw:
     def adjoint_op_not_implemented(self):
         """Test that NotImplementedError is raised when AdjointOp is used."""
 
-        @qp.qjit
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit():
             qp.adjoint(qp.QubitUnitary)(jax.numpy.array([[0, 1], [1, 0]]), wires=[0])
@@ -522,7 +524,7 @@ class TestDraw:
     def test_cond_not_implemented(self):
         """Test that NotImplementedError is raised when cond is used."""
 
-        @qp.qjit
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
             m0 = qp.measure(0, reset=False, postselect=0)
@@ -535,7 +537,7 @@ class TestDraw:
     def test_for_loop_not_implemented(self):
         """Test that NotImplementedError is raised when for loop is used."""
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit():
             for _ in range(3):
@@ -548,7 +550,7 @@ class TestDraw:
     def test_while_loop_not_implemented(self):
         """Test that NotImplementedError is raised when while loop is used."""
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit():
             i = 0
@@ -561,7 +563,7 @@ class TestDraw:
             print(draw(circuit)())
 
 
-@pytest.mark.usefixtures("use_both_frontend", "skip_no_graph_deps")
+@pytest.mark.usefixtures("skip_no_graph_deps")
 class TestDrawGraph:
     """Tests the `draw_graph` frontend."""
 
@@ -576,10 +578,10 @@ class TestDrawGraph:
             "cancel-inverses",
         ),
     )
-    def test_unsupported_levels(self, unsupported_level):
+    def test_unsupported_levels(self, unsupported_level, capture_mode):
         """Tests proper handling of the level argument."""
 
-        @qp.qjit(autograph=True, target="mlir")
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
         @qp.qnode(qp.device("null.qubit", wires=2))
         def qjit_qnode():
             qp.H(0)
@@ -588,10 +590,10 @@ class TestDrawGraph:
         with pytest.raises(TypeError, match="The 'level' argument must be an integer or 'None'"):
             _ = draw_graph(qjit_qnode, level=unsupported_level)()
 
-    def test_negative_level_integer(self):
+    def test_negative_level_integer(self, capture_mode):
         """Tests that a negative integer for a level is unsupported."""
 
-        @qp.qjit(autograph=True, target="mlir")
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
         @qp.qnode(qp.device("null.qubit", wires=2))
         def qjit_qnode():
             qp.H(0)
@@ -601,10 +603,10 @@ class TestDrawGraph:
             _ = draw_graph(qjit_qnode, level=-1)()
 
     # pylint: disable=line-too-long
-    def test_level_greater_than_num_of_passes(self):
+    def test_level_greater_than_num_of_passes(self, capture_mode):
         """Tests that a user warning is raised if the level is greater than number of passes."""
 
-        @qp.qjit
+        @qp.qjit(capture=capture_mode)
         @qp.transforms.merge_rotations
         @qp.transforms.cancel_inverses
         @qp.qnode(qp.device("null.qubit", wires=3))
@@ -633,12 +635,12 @@ class TestDrawGraph:
         with pytest.raises(TypeError, match="The circuit must be a qjit-compiled qnode"):
             _ = draw_graph(qnode)()
 
-    def test_return_types(self):
+    def test_return_types(self, capture_mode):
         """Tests the return types of the function without crashing CI."""
         # pylint: disable=import-outside-toplevel
         import matplotlib
 
-        @qp.qjit(autograph=True, target="mlir")
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
         @qp.qnode(qp.device("null.qubit", wires=2))
         def qjit_qnode():
             qp.H(0)
@@ -660,10 +662,10 @@ class TestDrawGraph:
         assert isinstance(fig, matplotlib.figure.Figure)
         assert isinstance(axes, matplotlib.axes._axes.Axes)
 
-    def test_transforms_step_through(self):
+    def test_transforms_step_through(self, capture_mode):
         """Tests that the level argument controls transformations step through."""
 
-        @qp.qjit
+        @qp.qjit(capture=capture_mode)
         @qp.transforms.merge_rotations
         @qp.transforms.cancel_inverses
         @qp.qnode(qp.device("null.qubit", wires=3))
@@ -704,10 +706,10 @@ class TestDrawGraph:
         assert merge_rotations.count("<name> RX|<wire> [0]") == 1
         assert merge_rotations.count("expval(PauliX)") == 1
 
-    def test_empty_passpipeline(self):
+    def test_empty_passpipeline(self, capture_mode):
         """Tests that it works with an empty pass pipeline."""
 
-        @qp.qjit(skip_preprocess=True)
+        @qp.qjit(skip_preprocess=True, capture=capture_mode)
         @qp.qnode(qp.device("null.qubit", wires=3))
         def circuit():
             qp.H(0)
@@ -730,10 +732,10 @@ class TestDrawGraph:
         assert graph.count("<name> RX|<wire> [0]") == 2
         assert graph.count("expval(PauliX)") == 1
 
-    def test_early_callback_exit(self):
+    def test_early_callback_exit(self, capture_mode):
         """Tests that unnecessary callbacks aren't performend."""
 
-        @qp.qjit
+        @qp.qjit(capture=capture_mode)
         @qp.transforms.merge_rotations
         @qp.transforms.cancel_inverses
         @qp.qnode(qp.device("null.qubit", wires=3))
