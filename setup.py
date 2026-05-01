@@ -162,7 +162,7 @@ entry_points = {
         "decompose_arbitrary_ppr = catalyst.passes:decompose_arbitrary_ppr",
         "disentangle_swap = catalyst.passes:disentangle_swap",
         "disentangle_cnot = catalyst.passes:disentangle_cnot",
-        "disentangle_cnot = catalyst.passes:parity_synth",
+        "parity_synth = catalyst.passes:parity_synth",
     ],
     "pennylane.drawer": [
         "draw_graph = catalyst:draw_graph",
