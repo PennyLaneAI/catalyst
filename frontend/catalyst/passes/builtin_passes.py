@@ -471,7 +471,8 @@ def parity_synth_setup_inputs():
 
     .. note::
 
-        This pass requires the ``networkx`` package, which can be installed via
+        This transform requires decorating the workflow with :func:`~.qjit`. Additionally, this pass
+        requires the ``networkx`` package, which can be installed via
         ``pip install networkx``.
 
     Args:
