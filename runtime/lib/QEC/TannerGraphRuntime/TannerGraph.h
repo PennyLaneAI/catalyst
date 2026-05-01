@@ -1,4 +1,4 @@
-/ Copyright 2026 Xanadu Quantum Technologies Inc.
+// Copyright 2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,11 +16,10 @@
 
 #include "Types.h"
 
-    extern "C"
-{
+extern "C" {
 
-    void __catalyst__qecp__assemble_tanner_graph_int32(MemRefT_int32_1d * row_idx_tanner,
-                                                       MemRefT_int32_1d * col_ptr_tanner,
-                                                       TannerGraph_CSC_int32 * tanner_graph);
+void __catalyst__qecp__assemble_tanner_graph_int32(MemRefT_int32_1d *row_idx_tanner,
+                                                   MemRefT_int32_1d *col_ptr_tanner,
+                                                   TannerGraph_CSC_int32 *tanner_graph);
 
 } // extern "C"

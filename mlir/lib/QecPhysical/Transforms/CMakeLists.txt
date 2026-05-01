@@ -2,6 +2,7 @@ set(LIBRARY_NAME qecp-transforms)
 
 file(GLOB SRC
     BufferizableOpInterfaceImpl.cpp
+    ConversionPatterns.cpp
     qecp_to_llvm.cpp
 )
 

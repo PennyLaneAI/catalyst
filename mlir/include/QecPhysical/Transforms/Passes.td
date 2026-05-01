@@ -20,6 +20,6 @@ include "mlir/Pass/PassBase.td"
 def QecPhyiscalLLVMConversionPass : Pass<"convert-qecp-to-llvm"> {
     let summary = "Perform a dialect conversion from QECPhyiscal to LLVM.";
 
-    let dependentDialects = ["memref::MemRefDialect", "LLVM::LLVMDialect"];
+    let dependentDialects = ["memref::MemRefDialect", "LLVM::LLVMDialect", "catalyst::quantum::QecPhysicalDialect"];
 }
 #endif // QECPHYSICAL_PASSES
