@@ -549,7 +549,7 @@ def parity_synth_setup_inputs():
 parity_synth = qp.transform(pass_name="parity-synth", setup_inputs=parity_synth_setup_inputs)
 
 
-def decompose_lowering_setup_inputs(qnode):
+def decompose_lowering_setup_inputs(qnode):  # pragma: no cover
     """
     Specify that the ``-decompose-lowering`` MLIR compiler pass
     for applying the compiled decomposition rules to the QNode
