@@ -25,6 +25,7 @@ from xdsl.dialects.builtin import ModuleOp
 from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
 
+import catalyst
 from catalyst.python_interface.parser import QuantumParser
 from catalyst.python_interface.pass_api import ApplyTransformSequencePass
 
@@ -59,9 +60,17 @@ class Compiler:
         else:
             gentxtmod = module
 
+        # convert qref to value semantics
+        value_semantics_mlir = (
+            catalyst.python_interface.inspection.xdsl_conversion._quantum_opt_stderr(
+                '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;canonicalize)"',
+                stdin=str(gentxtmod),
+            )
+        )
+
         # Parse and transform with xDSL
         ctx = xContext(allow_unregistered=True)
-        parser = QuantumParser(ctx, gentxtmod)
+        parser = QuantumParser(ctx, value_semantics_mlir)
         # xmod is modified in place
         xmod = parser.parse_module()
         pipeline = PassPipeline((ApplyTransformSequencePass(callback=callback),))

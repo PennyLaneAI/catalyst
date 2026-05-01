@@ -30,6 +30,7 @@ from xdsl.traits import SymbolOpInterface
 from xdsl.traits import SymbolTable as xSymbolTable
 
 from catalyst import QJIT
+from catalyst.python_interface.inspection.xdsl_conversion import _quantum_opt_stderr
 from catalyst.python_interface.parser import QuantumParser
 
 JaxJittedFunction: TypeAlias = _jax.PjitFunction  # pylint: disable=c-extension-no-member
@@ -158,9 +159,10 @@ def xdsl_from_qjit(func: QJIT) -> Callable[..., xbuiltin.ModuleOp]:
     def wrapper(*args, **kwargs):
         func.jaxpr, *_ = func.capture(args, **kwargs)
         _mlir_module = func.generate_ir()
-        _generic_str = _mlir_module.operation.get_asm(
-            binary=False, print_generic_op_form=True, assume_verified=True
+        value_semantics_mlir = _quantum_opt_stderr(
+            '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;canonicalize)"',
+            stdin=str(_mlir_module),
         )
-        return parse_generic_to_xdsl_module(_generic_str)
+        return parse_generic_to_xdsl_module(value_semantics_mlir)
 
     return wrapper
