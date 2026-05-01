@@ -39,8 +39,8 @@ def parity_check_matrix_to_tanner_csc(H: np.ndarray) -> tuple[np.ndarray, np.nda
     Returns:
         tuple: A tuple containing two elements representing the Tanner graph adjacency matrix:
             - row_idx (numpy.ndarray): The row indices of the non-zero elements.
-            - col_ptr (numpy.ndarray): The column pointers, where indptr[i] indicates the start
-              index in 'indices' for the i-th column.
+            - col_ptr (numpy.ndarray): The column pointers, where col_ptr[i] indicates the start
+              index in 'row_idx' for the i-th column.
 
     .. details::
         :title: Layout of the (dense) Tanner graph adjacency matrix
