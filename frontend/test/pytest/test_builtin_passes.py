@@ -72,17 +72,17 @@ def test_pass_compiles_with_qjit(name):
     transform = getattr(builtin_passes, name)
 
     _PASSES_WITH_ARGS_KWARGS = {"graph-decomposition": ((), {"gate_set": ()})}
-    args, kwargs = _PASSES_WITH_ARGS_KWARGS.get(obj.pass_name, ((), {}))
+    args, kwargs = _PASSES_WITH_ARGS_KWARGS.get(transform.pass_name, ((), {}))
 
-    bound_obj = obj
+    bound_transform = transform
     if args or kwargs:
-        bound_obj = obj(*args, **kwargs)
+        bound_transform = transform(*args, **kwargs)
 
     @qp.qjit(target="mlir")
-    @bound_obj
+    @bound_transform
     @qp.qnode(qp.device("null.qubit", wires=1))
     def circuit():
         qp.H(0)
         return qp.expval(qp.Z(0))
 
-    assert obj.pass_name in circuit.mlir
+    assert transform.pass_name in circuit.mlir
