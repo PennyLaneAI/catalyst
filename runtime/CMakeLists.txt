@@ -15,6 +15,7 @@ option(RUNTIME_ENABLE_WARNINGS "Enable -Wall and -Werror" ON)
 
 option(ENABLE_OPENQASM "Build OpenQasm backend device" OFF)
 option(ENABLE_OQD "Build OQD backend device" OFF)
+option(ENABLE_REMOTE_DRIVER "Build the host-side libcatalyst_remote_driver (the executor lives standalone at c1/catalyst-executor/)" OFF)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

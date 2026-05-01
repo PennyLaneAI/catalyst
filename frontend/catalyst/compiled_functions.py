@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from typing import Tuple
 
 import jax.numpy as jnp
+from jaxlib.xla_client import CompileOptions
 import numpy as np
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_flatten, tree_unflatten
@@ -36,7 +37,8 @@ from catalyst.tracing.type_signatures import (
 from catalyst.utils import wrapper
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.filesystem import Directory
-from catalyst.utils.jnp_to_memref import get_ranked_memref_descriptor
+from catalyst.utils.jnp_to_memref import get_ranked_memref_descriptor, ranked_memref_to_numpy
+from catalyst.remote_compiled_function import RemoteSharedObjectManager
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -135,7 +137,12 @@ class CompiledFunction:
     def __init__(
         self, shared_object_file, func_name, restype, out_type, compile_options
     ):  # pylint: disable=too-many-arguments
-        self.shared_object = SharedObjectManager(shared_object_file, func_name)
+        if compile_options.remote:
+            self.shared_object = RemoteSharedObjectManager(
+                shared_object_file, func_name, compile_options.remote
+            )
+        else:
+            self.shared_object = SharedObjectManager(shared_object_file, func_name)
         self.compile_options = compile_options
         self.return_type_c_abi = None
         self.func_name = func_name
@@ -156,10 +163,24 @@ class CompiledFunction:
         Returns:
             the return values computed by the function or None if the function has no results
         """
-
-        with shared_object as lib:
-            result_desc = type(args[0].contents) if has_return else None
-            retval = wrapper.wrap(lib.function, args, result_desc, lib.mem_transfer, numpy_dict)
+        
+        if isinstance(shared_object, RemoteSharedObjectManager):
+            with shared_object as lib:
+                lib.call(args)
+            
+            # After call(), extract the return value from the remote memref descriptors
+            if has_return:
+                rv_struct = args[0].contents
+                retval = []
+                for field_name, _field_class in type(rv_struct)._fields_:
+                    memref = getattr(rv_struct, field_name)
+                    retval.append(ranked_memref_to_numpy(ctypes.pointer(memref)))
+            else:
+                retval = []
+        else:
+            with shared_object as lib:
+                result_desc = type(args[0].contents) if has_return else None
+                retval = wrapper.wrap(lib.function, args, result_desc, lib.mem_transfer, numpy_dict)
 
         if out_type is not None:
             keep_outputs = [k for _, k in out_type]

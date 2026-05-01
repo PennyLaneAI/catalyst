@@ -75,6 +75,7 @@ from catalyst.autograph import *
 from catalyst.autograph import __all__ as _autograph_functions
 from catalyst.compiler import CompileOptions
 from catalyst.debug.assertion import debug_assert
+from catalyst.device.remote_device import RemoteDevice
 from catalyst.jit import QJIT, qjit
 from catalyst.passes.pass_api import pipeline
 from catalyst.python_interface.inspection.draw import draw_graph

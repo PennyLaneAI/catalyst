@@ -17,6 +17,8 @@ ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
 ENABLE_OPENQASM ?= ON
 ENABLE_OQD ?= OFF
+ENABLE_REMOTE_DRIVER ?= OFF
+LLVM_PACKAGE_DIR ?= $(LLVM_BUILD_DIR)/lib/cmake/llvm
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
@@ -150,7 +152,10 @@ dialect-docs:
 	$(MAKE) -C mlir dialect-docs
 
 runtime:
-	$(MAKE) -C runtime runtime ENABLE_OQD=$(ENABLE_OQD)
+	$(MAKE) -C runtime runtime \
+	    ENABLE_OQD=$(ENABLE_OQD) \
+	    ENABLE_REMOTE_DRIVER=$(ENABLE_REMOTE_DRIVER) \
+	    LLVM_PACKAGE_DIR=$(LLVM_PACKAGE_DIR)
 
 oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
