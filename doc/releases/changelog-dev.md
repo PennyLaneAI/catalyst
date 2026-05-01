@@ -2,6 +2,13 @@
 
 <h3>New features since last release</h3>
 
+* An experimental lookup table (LUT) decoder is added to the `runtime`. This initial implementation
+is optimized for the [[7,1,3]] Steane code using hardcoded Quantum Error Correction (QEC) data. While
+the architecture supports future extension to general LUT decoding via compiler-provided information,
+please note that LUT decoders scale exponentially with code size and are intended for small-scale QEC
+codes only.
+[(#2724)](https://github.com/PennyLaneAI/catalyst/pull/2724)
+
 * Combining ``GlobalPhase`` operations into one single operation is now possible with the
   :func:`catalyst.passes.combine_global_phases` pass.
   [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
