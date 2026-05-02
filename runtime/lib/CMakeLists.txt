@@ -49,7 +49,3 @@ add_subdirectory(RSDecompRuntime)
 if(ENABLE_OQD)
 add_subdirectory(OQDcapi)
 endif()
-
-if(ENABLE_REMOTE_DRIVER)
-    add_subdirectory(remote_driver)
-endif()

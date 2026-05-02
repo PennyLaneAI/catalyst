@@ -17,7 +17,6 @@ ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
 ENABLE_OPENQASM ?= ON
 ENABLE_OQD ?= OFF
-ENABLE_REMOTE_DRIVER ?= OFF
 LLVM_PACKAGE_DIR ?= $(LLVM_BUILD_DIR)/lib/cmake/llvm
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
@@ -123,6 +122,7 @@ frontend:
 	# Uninstall pennylane before updating Catalyst, since pip will not replace two development
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
+	CMAKE_ARGS="$(if $(LLVM_PACKAGE_DIR),-DLLVM_DIR=$(LLVM_PACKAGE_DIR))" \
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
 	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
 	rm -r frontend/pennylane_catalyst.egg-info
@@ -154,7 +154,6 @@ dialect-docs:
 runtime:
 	$(MAKE) -C runtime runtime \
 	    ENABLE_OQD=$(ENABLE_OQD) \
-	    ENABLE_REMOTE_DRIVER=$(ENABLE_REMOTE_DRIVER) \
 	    LLVM_PACKAGE_DIR=$(LLVM_PACKAGE_DIR)
 
 oqc:
