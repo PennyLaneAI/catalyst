@@ -594,7 +594,7 @@ class QJIT(CatalystCallable):
             self.aot_compile()
 
         super().__init__("user_function")
-        
+
     def _propagate_remote_device_options(self, fn):
         """Propagate remote device options to the compile options"""
         dev = getattr(fn, "device", None)
