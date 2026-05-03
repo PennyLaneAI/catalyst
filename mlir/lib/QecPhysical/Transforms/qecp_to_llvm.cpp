@@ -17,6 +17,7 @@
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -30,61 +31,37 @@ using namespace catalyst::qecp;
 namespace catalyst {
 namespace qecp {
 
-#define GEN_PASS_DECL_QUANTUMCONVERSIONPASS
-#define GEN_PASS_DEF_QUANTUMCONVERSIONPASS
-#include "Quantum/Transforms/Passes.h.inc"
+#define GEN_PASS_DECL_QECPHYSICALCONVERSIONPASS
+#define GEN_PASS_DEF_QECPHYSICALCONVERSIONPASS
+#include "QecPhysical/Transforms/Passes.h.inc"
 
-struct QIRTypeConverter : public LLVMTypeConverter {
+struct QecPhysicalTypeConverter : public LLVMTypeConverter {
 
-    QIRTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx)
+    QecPhysicalTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx)
     {
-        addConversion([&](QubitType type) { return convertQubitType(type); });
-        addConversion([&](QuregType type) { return convertQuregType(type); });
-        addConversion([&](ObservableType type) { return convertObservableType(type); });
-        addConversion([&](ResultType type) { return convertResultType(type); });
+        addConversion([&](TannerGraphType type) { return convertTannerGraphType(type); });
     }
 
   private:
-    Type convertQubitType(Type mlirType)
+    Type convertTannerGraphType(Type mlirType)
     {
-        return LLVM::LLVMPointerType::get(
-            &getContext()); // LLVM::LLVMStructType::getOpaque("Qubit", &getContext());
-    }
-
-    Type convertQuregType(Type mlirType)
-    {
-        return LLVM::LLVMPointerType::get(
-            &getContext()); // LLVM::LLVMStructType::getOpaque("Array", &getContext());
-    }
-
-    Type convertObservableType(Type mlirType)
-    {
-        return this->convertType(IntegerType::get(&getContext(), 64));
-    }
-
-    Type convertResultType(Type mlirType)
-    {
-        return LLVM::LLVMPointerType::get(
-            &getContext()); // LLVM::LLVMStructType::getOpaque("Result", &getContext());
+        return LLVM::LLVMPointerType::get(&getContext());
     }
 };
 
-struct QuantumConversionPass : impl::QuantumConversionPassBase<QuantumConversionPass> {
-    using QuantumConversionPassBase::QuantumConversionPassBase;
+struct QecPhysicalConversionPass : impl::QecPhysicalConversionPassBase<QecPhysicalConversionPass> {
+    using QecPhysicalConversionPassBase::QecPhysicalConversionPassBase;
 
     void runOnOperation() final
     {
         MLIRContext *context = &getContext();
-        QIRTypeConverter typeConverter(context);
+        QecPhysicalTypeConverter typeConverter(context);
 
         RewritePatternSet patterns(context);
-        cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
-        populateFuncToLLVMConversionPatterns(typeConverter, patterns);
-        cf::populateAssertToLLVMConversionPattern(typeConverter, patterns);
-        populateQIRConversionPatterns(typeConverter, patterns, useArrayBackedRegisters);
+        populateLLVMConversionPatterns(typeConverter, patterns);
 
         LLVMConversionTarget target(*context);
-        target.addLegalOp<ModuleOp>();
+        target.addIllegalDialect<catalyst::qecp::QecPhysicalDialect>();
 
         if (failed(applyFullConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
@@ -92,5 +69,5 @@ struct QuantumConversionPass : impl::QuantumConversionPassBase<QuantumConversion
     }
 };
 
-} // namespace quantum
+} // namespace qecp
 } // namespace catalyst

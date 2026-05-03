@@ -79,9 +79,8 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
         SmallVector<Value> args = {rowIdxPtr, colPtrPtr, tannerGraphAllcoaOp.getResult()};
 
         LLVM::CallOp::create(rewriter, loc, fnDecl, args);
-        
-        // TODOs: How do we replace the use of tanner graph (in decoder) with the struct ptr here?
-        rewriter.eraseOp(op);
+
+        rewriter.replaceOp(op, args[2]);
 
         return success();
     }
