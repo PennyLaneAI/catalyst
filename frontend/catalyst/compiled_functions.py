@@ -328,7 +328,7 @@ class CompiledFunction:
             _ranks_ = args_ranks
             _etypes_ = args_etypes
             _sizes_ = args_sizes
-            
+
             def __init__(self, c_abi_args):
                 for ft_tuple, c_abi_arg in zip(CompiledFunctionArgValue._fields_, c_abi_args):
                     f = ft_tuple[0]
