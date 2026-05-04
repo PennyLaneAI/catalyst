@@ -57,7 +57,7 @@ struct QecPhysicalConversionPass : impl::QecPhysicalConversionPassBase<QecPhysic
         populateLLVMConversionPatterns(typeConverter, patterns);
 
         LLVMConversionTarget target(*context);
-        target.addIllegalDialect<catalyst::qecp::QecPhysicalDialect>();
+        // target.addIllegalDialect<catalyst::qecp::QecPhysicalDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
