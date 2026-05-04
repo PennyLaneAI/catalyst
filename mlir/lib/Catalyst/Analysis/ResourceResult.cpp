@@ -40,8 +40,7 @@ static int64_t applyMerge(int64_t a, int64_t b, MergeMethod method)
 }
 
 // Merge a flat StringMap<int64_t> with a single operator[] per key.
-template <typename Map>
-static void mergeStringMap(Map &dst, const Map &src, MergeMethod method)
+template <typename Map> static void mergeStringMap(Map &dst, const Map &src, MergeMethod method)
 {
     for (const auto &entry : src) {
         auto &slot = dst[entry.getKey()];
