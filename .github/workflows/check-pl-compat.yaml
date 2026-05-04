@@ -44,7 +44,7 @@ jobs:
         # was built and uploaded to TestPyPI, so that the tests are the compatible ones
         # to be run with the latest rc/rc/rc packges on TestPyPI.
         # This would be the last autobump-and-upload commit made on the rc branch.
-        git checkout v0.14.0-rc
+        git checkout v0.15.0-rc
         git checkout "$(git log -1 --author="ringo-but-quantum" --pretty=format:%H)"
 
     - name: Set up Python
@@ -149,7 +149,7 @@ jobs:
         # Thus this one shouldn't have no-deps: it needs to pull in all PL dependencies
         # And also this one needs to be --extra-index-url because it needs to see regular PyPI
         sudo apt-get install -y graphviz
-        pip install --extra-index-url https://test.pypi.org/simple/ pennylane-catalyst'>=0.14.0rc0,<=0.14.0'
+        pip install --extra-index-url https://test.pypi.org/simple/ pennylane-catalyst'>=0.15.0rc0,<=0.15.0'
 
     - name: Install PennyLane-Lightning (stable)
       if: ${{ inputs.lightning == 'stable' }}
@@ -170,8 +170,8 @@ jobs:
       if: ${{ inputs.lightning == 'release-candidate' }}
       run: |
         # Do not overwrite any dependencies, just fetch rc package from TestPyPI
-        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane-lightning'>=0.44.0rc0,<=0.44.0'
-        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane-lightning-kokkos'>=0.44.0rc0,<=0.44.0'
+        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane-lightning'>=0.45.0rc0,<=0.45.0'
+        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane-lightning-kokkos'>=0.45.0rc0,<=0.45.0'
 
     # PennyLane doesn't update its dev version number on every commit like Lightning, so we need to
     # force the package to be re-installed. First, handle potential dependency changes, then force
@@ -190,7 +190,7 @@ jobs:
       if: ${{ inputs.pennylane == 'release-candidate' }}
       run: |
         # Do not overwrite any dependencies, just fetch rc package from TestPyPI
-        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane'>=0.44.0rc0,<=0.44.0'
+        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane'>=0.45.0rc0,<=0.45.0'
 
     - name: Run Frontend Tests
       run: |

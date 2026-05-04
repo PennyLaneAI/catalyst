@@ -1188,6 +1188,7 @@ codes only.
   [(#2737)](https://github.com/PennyLaneAI/catalyst/pull/2737)
   [(#2731)](https://github.com/PennyLaneAI/catalyst/pull/2731)
   [(#2735)](https://github.com/PennyLaneAI/catalyst/pull/2735)
+  [(#2754)](https://github.com/PennyLaneAI/catalyst/pull/2754)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)
