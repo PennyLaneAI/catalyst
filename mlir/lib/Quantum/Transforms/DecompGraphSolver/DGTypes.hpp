@@ -153,6 +153,8 @@ struct RuleNode {
     {
         return name == other.name && output == other.output && origin == other.origin;
     }
+
+    bool isEmpty() const { return inputs.empty(); }
 };
 
 /**

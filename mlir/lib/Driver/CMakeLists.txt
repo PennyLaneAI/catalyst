@@ -56,6 +56,8 @@ set(LIBS
     MLIRRegisterAllExtensions
     MLIRCatalyst
     catalyst-transforms
+    MLIRQecPhysical
+    qecp-transforms
     MLIRQRef
     qref-transforms
     MLIRQuantum

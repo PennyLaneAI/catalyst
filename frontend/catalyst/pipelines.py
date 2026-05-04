@@ -137,14 +137,14 @@ class CompileOptions:
         dialect_plugins (Optional[Iterable[Path]]): List of paths to dialect plugins.
         capture (Optional[Union[str, bool]]): Controls whether to use PennyLane program capture.
 
-            - ``"global"`` (default): Defer to ``qml.capture.enabled()``
+            - ``"global"`` (default): Defer to ``qp.capture.enabled()``
             - ``True``: Force program capture on, regardless of global setting
             - ``False``: Force program capture off (use old frontend)
         skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
             If ``True``, transforms used to preprocess and validate the user program before
             executing on a quantum backend will not be used, and the user is expected to ensure
             the validity of the program themselves. If ``capture=False``, or ``capture="global"``
-            and ``qml.capture.enabled() == False``, this argument will be ignored. ``False``
+            and ``qp.capture.enabled() == False``, this argument will be ignored. ``False``
             by default.
     """
 
@@ -272,7 +272,7 @@ def default_pipeline() -> PipelineStages:
     >>> my_pipeline = default_pipeline()
     >>> # <modify my_pipeline as needed>
     >>> @qjit(pipelines=my_pipeline)
-    ... @qml.qnode(device)
+    ... @qp.qnode(device)
     ... def circuit():
     ...     ...
     """

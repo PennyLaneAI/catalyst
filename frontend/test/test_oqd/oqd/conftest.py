@@ -19,7 +19,7 @@ Pytest configuration file for OQD test suite.
 import os
 from tempfile import TemporaryDirectory
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 
@@ -34,8 +34,8 @@ def tmp_openapl_file_name():
 @pytest.fixture
 def use_capture():
     """Enable capture before and disable capture after the test."""
-    qml.capture.enable()
+    qp.capture.enable()
     try:
         yield
     finally:
-        qml.capture.disable()
+        qp.capture.disable()

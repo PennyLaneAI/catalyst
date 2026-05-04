@@ -168,13 +168,12 @@ class TestDeviceLevelSpecs:
 
         check_specs_same(cat_specs, pl_specs)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_paulirot_and_measure(self):
         """Test that PauliRot and PauliMeasure are tracked at the device level."""
 
         dev = qp.device("null.qubit", wires=2)
 
-        @qjit
+        @qjit(capture=True)
         @qp.qnode(dev)
         def circuit():
             qp.PauliRot(0.42, pauli_word="Y", wires=0)  # arbitrary angle
@@ -267,19 +266,22 @@ class TestPassByPassSpecs:
         no_passes = qjit(simple_circuit, capture=capture_mode)
         with pytest.raises(
             check=ValueError,
-            match="The 'level' argument to qp.specs for QJIT'd QNodes is out of " "bounds, got -5.",
+            match=r"The 'level' argument to .*\.specs for QJIT'd QNodes is out of "
+            "bounds, got -5.",
         ):
             qp.specs(no_passes, level=-5)()
 
         with pytest.raises(
             check=ValueError,
-            match="The 'level' argument to qp.specs for QJIT'd " "QNodes is out of bounds, got 10.",
+            match=r"The 'level' argument to .*\.specs for QJIT'd "
+            "QNodes is out of bounds, got 10.",
         ):
             qp.specs(no_passes, level=10)()
 
         with pytest.raises(
             check=ValueError,
-            match="The 'level' argument to qp.specs for QJIT'd " "QNodes is out of bounds, got 10.",
+            match=r"The 'level' argument to .*\.specs for QJIT'd "
+            "QNodes is out of bounds, got 10.",
         ):
             qp.specs(no_passes, level=[10, 11])()
 
@@ -932,7 +934,6 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_subroutine(self):
         """Test qp.specs when there is a Catalyst subroutine"""
         dev = qp.device("lightning.qubit", wires=3)
@@ -941,7 +942,7 @@ class TestPassByPassSpecs:
         def subroutine():
             qp.Hadamard(wires=0)
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=True)
         @qp.qnode(dev)
         def circuit():
             qp.PauliX(wires=1)
@@ -993,11 +994,10 @@ class TestPassByPassSpecs:
         actual = qp.specs(circ, level=1)()
         check_specs_same(actual, expected)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_arbitrary_ppr(self):
         """Test that PPRs are handled correctly."""
 
-        @qp.qjit(target="mlir")
+        @qp.qjit(target="mlir", capture=True)
         @qp.transforms.decompose_arbitrary_ppr
         @qp.transforms.to_ppr
         @qp.qnode(qp.device("null.qubit", wires=3))
@@ -1222,7 +1222,7 @@ class TestMarkerIntegration:
 
         with pytest.warns(
             UserWarning,
-            match="The 'level' argument to qp.specs for QJIT'd QNodes has been sorted to be "
+            match=r"The 'level' argument to .*\.specs for QJIT'd QNodes has been sorted to be "
             "in ascending order with no duplicate levels.",
         ):
             actual = qp.specs(simple_circuit, level=["m0", "m1", "m1-duplicate"])()

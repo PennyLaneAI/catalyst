@@ -45,6 +45,7 @@
 #include "Driver/Support.h"
 #include "Driver/Timer.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
+#include "QecPhysical/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "QuantumPythonCallbacks/PythonDriverUtils.hpp"
 
@@ -363,6 +364,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     catalyst::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::gradient::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::quantum::registerBufferizableOpInterfaceExternalModels(registry);
+    catalyst::qecp::registerBufferizableOpInterfaceExternalModels(registry);
 
     // Register and parse command line options.
     std::string inputFilename, outputFilename;
