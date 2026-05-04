@@ -31,7 +31,14 @@ matplotlib==3.10.0
 lxml_html_clean
 
 # Pre-install PL development wheels
---extra-index-url https://test.pypi.org/simple/
-pennylane-lightning-kokkos==0.45.0-dev43
-pennylane-lightning==0.45.0-dev43
-pennylane==0.45.0-dev94
+# --extra-index-url https://test.pypi.org/simple/
+# pennylane-lightning-kokkos==0.45.0-dev43
+# pennylane-lightning==0.45.0-dev43
+# pennylane==0.45.0-dev94
+
+# If targeting RC branch, we must install latest RC packages from TestPyPI
+# Revert when merging RC branch back to main, and uncomment the above regular requirements
+--pre --extra-index-url https://test.pypi.org/simple/
+pennylane-lightning-kokkos>=0.45.0rc0,<=0.45.0
+pennylane-lightning>=0.45.0rc0,<=0.45.0
+pennylane>=0.45.0rc0,<=0.45.0
