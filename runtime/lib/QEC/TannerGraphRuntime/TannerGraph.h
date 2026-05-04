@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef QECPHYSICAL_PASSES
-#define QECPHYSICAL_PASSES
+#pragma once
 
-include "mlir/Pass/PassBase.td"
+#include "Types.h"
 
-def QecPhysicalConversionPass : Pass<"convert-qecp-to-llvm"> {
-    let summary = "Perform a dialect conversion from QECPhysical to LLVM.";
+extern "C" {
 
-    let dependentDialects = ["memref::MemRefDialect", "LLVM::LLVMDialect", "catalyst::qecp::QecPhysicalDialect"];
-}
-#endif // QECPHYSICAL_PASSES
+void __catalyst__qecp__assemble_tanner_graph_int32(MemRefT_int32_1d *row_idx_tanner,
+                                                   MemRefT_int32_1d *col_ptr_tanner,
+                                                   TannerGraph_CSC_int32 *tanner_graph);
+
+} // extern "C"
