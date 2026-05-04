@@ -16,7 +16,7 @@
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/IR/BuiltinOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -34,6 +34,7 @@ namespace qecp {
 #include "QecPhysical/Transforms/Passes.h.inc"
 
 struct QecPhysicalTypeConverter : public LLVMTypeConverter {
+    QecPhysicalTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx)
     {
         addConversion([&](TannerGraphType type) { return convertTannerGraphType(type); });
     }
