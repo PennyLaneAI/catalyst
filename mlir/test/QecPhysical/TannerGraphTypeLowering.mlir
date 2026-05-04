@@ -14,6 +14,7 @@
 
 // RUN: quantum-opt %s \
 // RUN:   --convert-arith-to-llvm \
+// RUN:   --finalize-memref-to-llvm \
 // RUN:   --one-shot-bufferize \
 // RUN:   --convert-qecp-to-llvm \
 // RUN:   --reconcile-unrealized-casts \

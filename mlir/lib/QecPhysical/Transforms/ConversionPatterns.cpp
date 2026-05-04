@@ -66,27 +66,28 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
             rewriter, op, fnName, fnSignature);
 
         //  Add values as arguments of the CallOp
-        Value rowIdxPtr = catalyst::getStaticAlloca(loc, rewriter, vectorType, 1);
-        Value colPtrPtr = catalyst::getStaticAlloca(loc, rewriter, vectorType, 1);
+        Value rowIdxAlloca = catalyst::getStaticAlloca(loc, rewriter, vectorType, 1);
+        Value colPtrAlloca = catalyst::getStaticAlloca(loc, rewriter, vectorType, 1);
 
-        LLVM::StoreOp::create(rewriter, loc, adaptor.getRowIdx(), rowIdxPtr);
-        LLVM::StoreOp::create(rewriter, loc, adaptor.getColPtr(), colPtrPtr);
+        LLVM::StoreOp::create(rewriter, loc, adaptor.getRowIdx(), rowIdxAlloca);
+        LLVM::StoreOp::create(rewriter, loc, adaptor.getColPtr(), colPtrAlloca);
 
-        // rewriter.replaceOp(op, args[2]);
         Value tannerGraphValue = LLVM::UndefOp::create(rewriter, loc, tannerGraphType);
-        tannerGraphValue = LLVM::InsertValueOp::create(rewriter, loc, tannerGraphValue, rowIdxPtr,
+        tannerGraphValue = LLVM::InsertValueOp::create(rewriter, loc, tannerGraphValue, rowIdxAlloca,
                                                        SmallVector<int64_t>{0});
-        tannerGraphValue = LLVM::InsertValueOp::create(rewriter, loc, tannerGraphValue, colPtrPtr,
+        tannerGraphValue = LLVM::InsertValueOp::create(rewriter, loc, tannerGraphValue, rowIdxAlloca,
                                                        SmallVector<int64_t>{1});
 
         auto tannerGraphStructPtr = catalyst::getStaticAlloca(loc, rewriter, tannerGraphType, 1);
 
         LLVM::StoreOp::create(rewriter, loc, tannerGraphValue, tannerGraphStructPtr);
 
-        SmallVector<Value> args = {rowIdxPtr, colPtrPtr, tannerGraphStructPtr};
+        SmallVector<Value> args = {rowIdxAlloca, colPtrAlloca, tannerGraphStructPtr};
         LLVM::CallOp::create(rewriter, loc, fnDecl, args);
 
-        rewriter.replaceOp(op, args[2]);
+        op.getResult().replaceAllUsesWith(tannerGraphValue);
+
+        rewriter.eraseOp(op);
 
         return success();
     }
