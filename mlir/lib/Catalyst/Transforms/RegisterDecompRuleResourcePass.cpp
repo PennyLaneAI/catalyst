@@ -37,26 +37,20 @@ struct RegisterDecompRuleResourcePass
     void runOnOperation() final
     {
         auto &analysis = getAnalysis<ResourceAnalysis>();
-        const auto &results = analysis.getResults();
         auto module = llvm::cast<mlir::ModuleOp>(getOperation());
 
         MLIRContext *ctx = &getContext();
-        OpBuilder builder(ctx);
 
-        // Annotate decomposition rule functions with their resource counts, so that
-        // the resources can be queried by other passes include graph-decomposition.
-        // Note this pass only annotates functions that are marked with "target_gate"
-        // attribute, which is how we identify decomposition rules in the main module.
-        // Regular or nested functions will not be annotated.
+        // Annotate decomposition-rule functions (those tagged with
+        // "target_gate") with their flattened resource counts. The analysis
+        // owns the memoization cache, so callees shared across multiple
+        // rules are flattened only once.
         for (auto func : module.getOps<mlir::func::FuncOp>()) {
             if (!func->hasAttr("target_gate")) {
                 continue;
             }
-
-            StringRef funcName = func.getName();
-            if (results.count(funcName)) {
-                const ResourceResult &result = results.lookup(funcName);
-                func->setAttr("resources", buildResourceDict(ctx, result));
+            if (const ResourceResult *flat = analysis.getFlattenedResource(func.getName())) {
+                func->setAttr("resources", buildResourceDict(ctx, *flat));
             }
         }
 

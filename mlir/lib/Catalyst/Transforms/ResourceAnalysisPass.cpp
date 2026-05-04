@@ -14,7 +14,6 @@
 
 #define DEBUG_TYPE "resource-analysis"
 
-#include <chrono>
 #include <fstream>
 #include <string>
 
@@ -58,13 +57,13 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         auto &analysis = getAnalysis<ResourceAnalysis>();
         const auto &results = analysis.getResults();
 
-        // Populate statistics from the entry function only (to avoid
-        // double-counting resolved callees). Fall back to summing all
-        // functions when no entry function is present.
+        // Populate statistics from the entry function. The flattened view
+        // walks the structural call graph (function_calls) for us, so we
+        // just sum its fields directly.
         StringRef entry = analysis.getEntryFunc();
         if (!entry.empty()) {
-            if (const ResourceResult *r = analysis.getResult(entry)) {
-                accumulateStats(*r);
+            if (const ResourceResult *flat = analysis.getFlattenedResource(entry)) {
+                accumulateStats(*flat);
             }
         }
         else {
@@ -89,34 +88,26 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     }
 
   private:
-    /**
-     * @brief Accumulate resource counts from a ResourceResult into the pass statistics.
-     *
-     * This is used to populate the pass's Statistic members with totals from the ResourceResult.
-     *
-     * @param result The ResourceResult to accumulate stats from.
-     */
-    void accumulateStats(const ResourceResult &result)
+    /// Sum a ResourceResult's content into the pass's
+    /// Statistic counters. Caller is responsible for choosing whether to
+    /// pass a per-function or flattened result.
+    void accumulateStats(const ResourceResult &r)
     {
-        for (const auto &opEntry : result.operations) {
+        for (const auto &opEntry : r.operations) {
             for (const auto &sizeEntry : opEntry.getValue()) {
                 totalGates += sizeEntry.second;
             }
         }
-
-        for (const auto &measEntry : result.measurements) {
+        for (const auto &measEntry : r.measurements) {
             totalMeasurements += measEntry.getValue();
         }
-
-        totalQubits += result.numQubits();
-        totalAllocQubits += result.numAllocQubits;
-        totalArgQubits += result.numArgQubits;
-
-        for (const auto &classEntry : result.classicalInstructions) {
+        for (const auto &classEntry : r.classicalInstructions) {
             totalClassicalOps += classEntry.getValue();
         }
-
-        for (const auto &fcEntry : result.functionCalls) {
+        totalAllocQubits += r.numAllocQubits;
+        totalArgQubits += r.numArgQubits;
+        totalQubits += r.numQubits();
+        for (const auto &fcEntry : r.functionCalls) {
             totalFunctionCalls += fcEntry.getValue();
         }
     }
@@ -155,6 +146,13 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
             fcObj[entry.getKey()] = entry.getValue();
         }
         funcObj["function_calls"] = std::move(fcObj);
+
+        // Store hashes as hex strings so JSON readers don't break high bits
+        llvm::json::Object vfcObj;
+        for (const auto &entry : result.varFunctionCalls) {
+            vfcObj[entry.getKey()] = formatv("{0:x16}", entry.getValue()).str();
+        }
+        funcObj["var_function_calls"] = std::move(vfcObj);
 
         funcObj["num_qubits"] = static_cast<int64_t>(result.numQubits());
         funcObj["num_alloc_qubits"] = static_cast<int64_t>(result.numAllocQubits);

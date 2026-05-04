@@ -15,8 +15,8 @@
 #include "Catalyst/Analysis/ResourceResult.h"
 
 #include <algorithm>
-#include <sstream>
 
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/JSON.h"
 
 using namespace llvm;
@@ -36,39 +36,40 @@ static int64_t applyMerge(int64_t a, int64_t b, MergeMethod method)
     case MergeMethod::Sum:
         return a + b;
     }
-    return -1; // unreachable, silences warning
+    llvm_unreachable("unknown ResourceResult::MergeMethod");
+}
+
+// Merge a flat StringMap<int64_t> with a single operator[] per key.
+template <typename Map>
+static void mergeStringMap(Map &dst, const Map &src, MergeMethod method)
+{
+    for (const auto &entry : src) {
+        auto &slot = dst[entry.getKey()];
+        slot = applyMerge(slot, entry.getValue(), method);
+    }
 }
 
 void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
 {
     for (const auto &opEntry : other.operations) {
-        StringRef opName = opEntry.getKey();
+        auto &innerDst = operations[opEntry.getKey()];
         for (const auto &sizeEntry : opEntry.getValue()) {
-            auto &[nQubits, nParams] = sizeEntry.first;
-            int64_t count = sizeEntry.second;
-            operations[opName][{nQubits, nParams}] =
-                applyMerge(operations[opName][{nQubits, nParams}], count, method);
+            auto &slot = innerDst[sizeEntry.first];
+            slot = applyMerge(slot, sizeEntry.second, method);
         }
     }
 
-    for (const auto &entry : other.measurements) {
-        measurements[entry.getKey()] =
-            applyMerge(measurements[entry.getKey()], entry.getValue(), method);
-    }
+    mergeStringMap(measurements, other.measurements, method);
+    mergeStringMap(classicalInstructions, other.classicalInstructions, method);
+    mergeStringMap(functionCalls, other.functionCalls, method);
 
-    for (const auto &entry : other.classicalInstructions) {
-        classicalInstructions[entry.getKey()] =
-            applyMerge(classicalInstructions[entry.getKey()], entry.getValue(), method);
-    }
-
-    for (const auto &entry : other.functionCalls) {
-        functionCalls[entry.getKey()] =
-            applyMerge(functionCalls[entry.getKey()], entry.getValue(), method);
-    }
-
-    for (const auto &entry : other.unresolvedFunctionCalls) {
-        unresolvedFunctionCalls[entry.getKey()] =
-            applyMerge(unresolvedFunctionCalls[entry.getKey()], entry.getValue(), method);
+    // varFunctionCalls hold SSA-derived hashes; first writer wins on
+    // conflict. The `method` parameter is intentionally ignored — Sum/Max/Min
+    // are not meaningful on identifiers, and keys are minted uniquely by
+    // `ResourceAnalysis::makeUniqueSyntheticName` so collisions don't occur
+    // in practice.
+    for (const auto &entry : other.varFunctionCalls) {
+        varFunctionCalls.try_emplace(entry.getKey(), entry.getValue());
     }
 
     if (deviceName.empty() && !other.deviceName.empty()) {
@@ -98,10 +99,6 @@ void ResourceResult::multiplyByScalar(int64_t scalar)
     }
 
     for (auto &entry : functionCalls) {
-        entry.getValue() *= scalar;
-    }
-
-    for (auto &entry : unresolvedFunctionCalls) {
         entry.getValue() *= scalar;
     }
 
@@ -149,6 +146,16 @@ std::string ResourceResult::toJson(int indent) const
         fcObj[entry.getKey()] = entry.getValue();
     }
     root["function_calls"] = std::move(fcObj);
+
+    // Variable function calls (dynamic-loop hashes). Emitted as fixed-width
+    // hex strings so that the high-bit portion of the 64-bit hash space
+    // round-trips losslessly through JSON (which would otherwise sign-flip
+    // when cast to int64 or lose precision past 2^53 as a double).
+    llvm::json::Object vfcObj;
+    for (const auto &entry : varFunctionCalls) {
+        vfcObj[entry.getKey()] = formatv("{0:x16}", entry.getValue()).str();
+    }
+    root["var_function_calls"] = std::move(vfcObj);
 
     root["num_qubits"] = numQubits();
     root["num_alloc_qubits"] = numAllocQubits;

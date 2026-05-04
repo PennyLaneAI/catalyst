@@ -16,10 +16,13 @@
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
 
@@ -34,6 +37,68 @@ using namespace mlir;
 using namespace llvm;
 
 namespace catalyst {
+
+//===----------------------------------------------------------------------===//
+// Dynamic for-loop classification
+//===----------------------------------------------------------------------===//
+
+// Walks `val` backward through the op set understood by `resolveConstantInt`,
+// recursing into each operand of a pass-through op. Returns true iff every
+// terminating value reached by the walk is either a compile-time constant or
+// a `func::FuncOp` entry-block argument. `visited` guards against cycles
+// within this single walk (a fresh set per top-level call avoids cross-walk
+// false negatives).
+static bool allLeavesAreStaticOrFuncArg(Value val, llvm::DenseSet<Value> &visited)
+{
+    if (!val) {
+        return false;
+    }
+    if (resolveConstantInt(val).has_value()) {
+        return true; // leaf is a constant
+    }
+    if (auto blockArg = dyn_cast<BlockArgument>(val)) {
+        auto funcOp = dyn_cast_or_null<func::FuncOp>(blockArg.getOwner()->getParentOp());
+        return funcOp && blockArg.getOwner() == &funcOp.getBody().front();
+    }
+    if (!visited.insert(val).second) {
+        return false; // cycle guard
+    }
+
+    Operation *op = val.getDefiningOp();
+    if (!op) {
+        return false;
+    }
+
+    StringRef opName = op->getName().getStringRef();
+    bool isPassThrough =
+        isa<arith::ConstantOp, arith::IndexCastOp, arith::IndexCastUIOp, arith::AddIOp,
+            arith::SubIOp, arith::MulIOp, tensor::ExtractOp, tensor::FromElementsOp>(op) ||
+        opName == "stablehlo.constant" || opName == "stablehlo.convert" ||
+        opName == "stablehlo.broadcast_in_dim" || opName == "stablehlo.add" ||
+        opName == "stablehlo.subtract";
+
+    if (!isPassThrough) {
+        return false;
+    }
+
+    return llvm::all_of(op->getOperands(), [&](Value operand) {
+        return allLeavesAreStaticOrFuncArg(operand, visited);
+    });
+}
+
+// `scf.for` is input-driven if `lb`, `ub`, and `step` all trace back to
+// `func::FuncOp` arguments or compile-time constants. The caller has already
+// ruled out fully-static loops, so at least one bound is guaranteed
+// non-constant.
+static bool hasInputDrivenBounds(scf::ForOp forOp)
+{
+    auto traces = [](Value v) {
+        llvm::DenseSet<Value> visited;
+        return allLeavesAreStaticOrFuncArg(v, visited);
+    };
+    return traces(forOp.getLowerBound()) && traces(forOp.getUpperBound()) &&
+           traces(forOp.getStep());
+}
 
 //===----------------------------------------------------------------------===//
 // Skipped operations set (mirrors Python _SKIPPED_OPS)
@@ -191,6 +256,16 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
 {
     LLVM_DEBUG(dbgs() << "ResourceAnalysis: analyzing operation " << op->getName() << "\n");
 
+    // Reserve every user function's name in `funcResults`. This
+    // ensures `makeUniqueSyntheticName` will skip past names like
+    // `for_loop_3` that the user already chose, regardless of walk order.
+    op->walk<WalkOrder::PreOrder>([&](func::FuncOp funcOp) {
+        if (funcOp.isDeclaration()) {
+            return;
+        }
+        funcResults.try_emplace(funcOp.getName());
+    });
+
     StringRef entryFunc;
     op->walk<WalkOrder::PreOrder>([&](func::FuncOp funcOp) {
         if (funcOp.isDeclaration()) {
@@ -202,9 +277,8 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
             analyzeRegion(region, result, /*isAdjoint=*/false);
         }
 
-        // count qubit arguments only for the entry function (first non-declaration).
-        // callee qubit args are not counted to avoid double-counting after
-        // function call resolution merges callee resources into the caller.
+        // count qubit arguments only for the entry function (first non-declaration)
+        // to avoid double-counting when callees are folded into a flattened view.
         if (entryFunc.empty()) {
             for (auto argType : funcOp.getArgumentTypes()) {
                 if (isa<quantum::QubitType>(argType)) {
@@ -226,15 +300,20 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
 
     assert(!entryFunc.empty() && "expected at least one non-declaration function");
 
-    // Resolve function calls for all analyzed functions, not just the entry.
-    // The entry function (e.g. jit_circuit) may use catalyst.launch_kernel
-    // instead of func.call, so only resolving the entry would miss callees
-    // inside nested qnode functions.
-    for (auto &funcEntry : funcResults) {
-        resolveFunctionCalls(funcEntry.getKey());
-    }
-
     entryFuncName = entryFunc.str();
+}
+
+std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t &counter)
+{
+    // Bump `counter` until the resulting name does not collide with an
+    // existing entry. This protects against user functions named e.g.
+    // `for_loop_3` shadowing or being shadowed by a lifted body.
+    while (true) {
+        std::string candidate = prefix.str() + std::to_string(++counter);
+        if (!funcResults.contains(candidate)) {
+            return candidate;
+        }
+    }
 }
 
 void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint)
@@ -242,26 +321,48 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
     ResourceResult bodyResult;
     analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint);
 
-    // estimated_iterations attribute
+    // Try to resolve a static trip count.
+    std::optional<int64_t> tripCount;
     if (auto estAttr = forOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
-        int64_t iters = estAttr.getValue().getSExtValue();
-        bodyResult.multiplyByScalar(iters);
+        tripCount = estAttr.getValue().getSExtValue();
     }
-    else if (auto tripCount = forOp.getStaticTripCount()) {
-        bodyResult.multiplyByScalar(tripCount->getSExtValue());
+    else if (auto sTrip = forOp.getStaticTripCount()) {
+        tripCount = sTrip->getSExtValue();
     }
     else {
         auto lb = resolveConstantInt(forOp.getLowerBound());
         auto ub = resolveConstantInt(forOp.getUpperBound());
         auto step = resolveConstantInt(forOp.getStep());
         if (lb && ub && step && *step != 0 && *ub > *lb) {
-            int64_t tripCount = (*ub - *lb + *step - 1) / *step;
-            bodyResult.multiplyByScalar(tripCount);
-        }
-        else {
-            result.hasDynLoop = true;
+            tripCount = (*ub - *lb + *step - 1) / *step;
         }
     }
+
+    if (tripCount.has_value()) {
+        // Record the loop body under a new name (for_loop_1, …).
+        // The parent stores how many times the loop runs.
+        // Later, classical ops from that body are added into the parent, multiplied by that count.
+        // The name is always new, so we don't overwrite an old entry.
+        std::string name = makeUniqueSyntheticName("for_loop_", forLoopCounter);
+        funcResults[name] = std::move(bodyResult);
+        result.functionCalls[name] = tripCount.value();
+        return;
+    }
+
+    if (hasInputDrivenBounds(forOp)) {
+        // Loop trip count comes from the user's inputs. Record the body under dyn_for_loop_<N>
+        // and store a fixed number (hash) so each such loop has its own id in the output.
+        std::string name = makeUniqueSyntheticName("dyn_for_loop_", dynForLoopCounter);
+        funcResults[name] = std::move(bodyResult);
+        result.varFunctionCalls[name] =
+            static_cast<uint64_t>(llvm::hash_value(forOp.getOperation()));
+        result.hasDynLoop = true;
+        return;
+    }
+
+    // Fallback: trip count is unknown and the loop is not input-driven.
+    // Count the body once and flag the function as containing a dyn loop.
+    result.hasDynLoop = true;
     result.mergeWith(bodyResult);
 }
 
@@ -441,9 +542,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 
     // Function calls
     if (auto callOp = dyn_cast<func::CallOp>(op)) {
-        StringRef callee = callOp.getCallee();
-        result.functionCalls[callee] += 1;
-        result.unresolvedFunctionCalls[callee] += 1;
+        result.functionCalls[callOp.getCallee()] += 1;
         return;
     }
 
@@ -463,40 +562,85 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 }
 
 /**
- * @brief Resolve function calls in the resource results
- * by inlining callee resources into the caller.
+ * @brief Merge `child`'s quantum content, classical content, and transitive
+ * call counts into `flat`, scaled by `count`. Used to fold callee/loop-body
+ * contributions into a flattened view.
  *
- * @param funcName The name of the function to resolve calls for.
- * This will be called recursively on callees.
+ * @param flat The ResourceResult to accumulate counts into.
+ * @param child The ResourceResult to merge.
+ * @param count The scalar to multiply the counts by.
  */
-void ResourceAnalysis::resolveFunctionCalls(StringRef funcName)
+static void accumulateScaled(ResourceResult &flat, const ResourceResult &child, int64_t count)
 {
-    auto it = funcResults.find(funcName);
-    if (it == funcResults.end()) {
-        return;
-    }
-
-    ResourceResult &resources = it->second;
-
-    // Process all unresolved function calls
-    llvm::StringMap<int64_t> toResolve = std::move(resources.unresolvedFunctionCalls);
-    resources.unresolvedFunctionCalls.clear();
-
-    for (auto &callEntry : toResolve) {
-        StringRef calledFunc = callEntry.getKey();
-        int64_t callCount = callEntry.getValue();
-
-        auto calleeIt = funcResults.find(calledFunc);
-        if (calleeIt == funcResults.end()) {
-            continue; // External function, cannot resolve
+    for (const auto &opEntry : child.operations) {
+        auto &innerDst = flat.operations[opEntry.getKey()];
+        for (const auto &sizeEntry : opEntry.getValue()) {
+            innerDst[sizeEntry.first] += sizeEntry.second * count;
         }
-        resolveFunctionCalls(calledFunc);
-
-        // Scale and merge callee resources
-        ResourceResult calleeResources = calleeIt->second;
-        calleeResources.multiplyByScalar(callCount);
-        resources.mergeWith(calleeResources);
     }
+    for (const auto &m : child.measurements) {
+        flat.measurements[m.getKey()] += m.getValue() * count;
+    }
+    for (const auto &ci : child.classicalInstructions) {
+        flat.classicalInstructions[ci.getKey()] += ci.getValue() * count;
+    }
+    for (const auto &fc : child.functionCalls) {
+        flat.functionCalls[fc.getKey()] += fc.getValue() * count;
+    }
+    flat.numAllocQubits += child.numAllocQubits * count;
+    flat.hasBranches = flat.hasBranches || child.hasBranches;
+    flat.hasDynLoop = flat.hasDynLoop || child.hasDynLoop;
+}
+
+/**
+ * @brief Recursively flatten `funcName`'s resources through the call graph.
+ *
+ * Per one invocation of `funcName`, quantum content (operations,
+ * measurements, qubit counts) is accumulated from this function and each
+ * callee (including `for_loop_<N>` bodies), scaled by its call count.
+ * `functionCalls` is also flattened: each entry holds the total number of
+ * times that function is invoked during one run of `funcName`, including
+ * indirect calls. Summing the values gives the total dynamic invocation
+ * count.
+ *
+ * @param funcName Function whose flattened view to compute.
+ * @return Pointer to the cached flattened result, or nullptr if `funcName`
+ *         is external or unknown.
+ */
+const ResourceResult *ResourceAnalysis::getFlattenedResource(StringRef funcName) const
+{
+    if (auto it = flattenedCache.find(funcName); it != flattenedCache.end()) {
+        return &it->second;
+    }
+
+    auto srcIt = funcResults.find(funcName);
+    if (srcIt == funcResults.end()) {
+        return nullptr; // external / unknown function
+    }
+    const ResourceResult &r = srcIt->second;
+
+    // Cache this name early so circular calls see one shared partial result
+    // and don't recurse forever.
+    ResourceResult &flat = flattenedCache[funcName];
+
+    // Self-contributions (no scaling).
+    accumulateScaled(flat, r, /*count=*/1);
+    flat.numArgQubits = r.numArgQubits; // own arg qubits only
+    flat.deviceName = r.deviceName;
+    flat.isQnode = r.isQnode;
+
+    // Any var_function_calls implies a dynamic loop with no static count.
+    flat.hasDynLoop = flat.hasDynLoop || !r.varFunctionCalls.empty();
+
+    // Pull in each direct callee's flattened counts, × how often we call it.
+    for (const auto &fc : r.functionCalls) {
+        const ResourceResult *child = getFlattenedResource(fc.getKey());
+        if (!child || child == &flat) {
+            continue;
+        }
+        accumulateScaled(flat, *child, fc.getValue());
+    }
+    return &flat;
 }
 
 } // namespace catalyst

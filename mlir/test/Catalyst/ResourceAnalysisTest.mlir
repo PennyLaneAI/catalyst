@@ -70,11 +70,20 @@ func.func @pbc_operations() {
 
 // -----
 
-// Static for loop
+// Static for loop: the body is lifted into a synthetic "for_loop_1"
+// entry with one-iteration counts; the parent records a function_calls
+// entry with the trip count.
+//
+// JSON entries are emitted in alphabetical order.
 
-// CHECK-LABEL: "static_for_loop"
+// CHECK-LABEL: "for_loop_1": {
 // CHECK: "operations"
-// CHECK-DAG: "Hadamard(1)": 5
+// CHECK-DAG: "Hadamard(1)": 1
+
+// CHECK-LABEL: "static_for_loop": {
+// CHECK: "function_calls"
+// CHECK: "for_loop_1": 5
+// CHECK: "operations": {}
 func.func @static_for_loop(%arg0: !quantum.bit) -> !quantum.bit {
     %c5 = arith.constant 5 : index
     %c0 = arith.constant 0 : index
@@ -90,11 +99,19 @@ func.func @static_for_loop(%arg0: !quantum.bit) -> !quantum.bit {
 
 // -----
 
-// Dynamic for loop (counted as 1 iteration)
+// Input-driven dynamic for loop: the upper bound is a func.func block
+// argument, so the body is lifted into "dyn_for_loop_1" and the parent
+// records var_function_calls + has_dyn_loop=true.
 
-// CHECK-LABEL: "dynamic_for_loop"
+// CHECK-LABEL: "dyn_for_loop_1": {
 // CHECK: "operations"
 // CHECK-DAG: "PauliX(1)": 1
+
+// CHECK-LABEL: "dynamic_for_loop": {
+// CHECK: "has_dyn_loop": true
+// CHECK: "operations": {}
+// CHECK: "var_function_calls"
+// CHECK: "dyn_for_loop_1"
 func.func @dynamic_for_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
@@ -109,11 +126,18 @@ func.func @dynamic_for_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
 
 // -----
 
-// Dynamic for loop with estimated_iterations
+// Dynamic for loop with estimated_iterations: treated as static for the
+// purposes of counting, so it lifts into "for_loop_1" with the
+// attribute's iteration count as the call multiplier.
 
-// CHECK-LABEL: "estimated_iterations_loop"
+// CHECK-LABEL: "estimated_iterations_loop": {
+// CHECK: "function_calls"
+// CHECK: "for_loop_1": 10
+// CHECK: "operations": {}
+
+// CHECK-LABEL: "for_loop_1": {
 // CHECK: "operations"
-// CHECK-DAG: "PauliZ(1)": 10
+// CHECK-DAG: "PauliZ(1)": 1
 func.func @estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
@@ -128,11 +152,16 @@ func.func @estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !quantum
 
 // -----
 
-// For loop with indirect bounds (resolveConstantIndex through index_cast + addi)
+// For loop with indirect bounds resolvable through index_cast + addi.
+// Trip count = 7 -> static lift.
 
-// CHECK-LABEL: "resolve_constant_index_loop"
+// CHECK-LABEL: "for_loop_1": {
 // CHECK: "operations"
-// CHECK-DAG: "Hadamard(1)": 7
+// CHECK-DAG: "Hadamard(1)": 1
+
+// CHECK-LABEL: "resolve_constant_index_loop": {
+// CHECK: "function_calls"
+// CHECK: "for_loop_1": 7
 func.func @resolve_constant_index_loop(%arg0: !quantum.bit) -> !quantum.bit {
     %c0_i64 = arith.constant 0 : i64
     %c3_i64 = arith.constant 3 : i64
@@ -145,6 +174,84 @@ func.func @resolve_constant_index_loop(%arg0: !quantum.bit) -> !quantum.bit {
 
     %q = scf.for %iter = %c0 to %ub step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
         %out = quantum.custom "Hadamard"() %arg1 : !quantum.bit
+        scf.yield %out : !quantum.bit
+    }
+
+    return %q : !quantum.bit
+}
+
+// -----
+
+// CHECK-LABEL: "for_loop_1": {
+// CHECK: "function_calls"
+// CHECK: "gate_inside_loop_helper": 1
+// CHECK: "operations": {}
+
+// CHECK-LABEL: "gate_inside_loop_helper": {
+// CHECK: "operations"
+// CHECK-DAG: "PauliZ(1)": 1
+
+// CHECK-LABEL: "static_for_with_call_in_loop": {
+// CHECK: "function_calls"
+// CHECK: "for_loop_1": 4
+// CHECK: "operations": {}
+func.func private @gate_inside_loop_helper(%arg0: !quantum.bit) -> !quantum.bit {
+    %out = quantum.custom "PauliZ"() %arg0 : !quantum.bit
+    return %out : !quantum.bit
+}
+
+func.func @static_for_with_call_in_loop(%arg0: !quantum.bit) -> !quantum.bit {
+    %c4 = arith.constant 4 : index
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %q = scf.for %iter = %c0 to %c4 step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+        %out = func.call @gate_inside_loop_helper(%arg1) : (!quantum.bit) -> !quantum.bit
+        scf.yield %out : !quantum.bit
+    }
+
+    return %q : !quantum.bit
+}
+
+// -----
+
+// CHECK-LABEL: "dyn_for_loop_1": {
+// CHECK: "operations"
+// CHECK-DAG: "PauliZ(1)": 1
+
+// CHECK-LABEL: "dyn_for_loop_2": {
+// CHECK: "function_calls"
+// CHECK: "nested_inner_loop_helper": 1
+// CHECK: "operations": {}
+
+// CHECK-LABEL: "nested_inner_loop_helper": {
+// CHECK: "has_dyn_loop": true
+// CHECK: "operations": {}
+// CHECK: "var_function_calls"
+// CHECK: "dyn_for_loop_1": "{{0x[0-9a-f]+}}"
+
+// CHECK-LABEL: "outer_dyn_loop_calls_nested_helper": {
+// CHECK: "has_dyn_loop": true
+// CHECK: "operations": {}
+// CHECK: "var_function_calls"
+// CHECK: "dyn_for_loop_2": "{{0x[0-9a-f]+}}"
+func.func private @nested_inner_loop_helper(%arg0: !quantum.bit, %c4 : index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %q = scf.for %iter = %c0 to %c4 step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+        %out = quantum.custom "PauliZ"() %arg1 : !quantum.bit
+        scf.yield %out : !quantum.bit
+    }
+    return %q : !quantum.bit
+}
+
+func.func @outer_dyn_loop_calls_nested_helper(%arg0: !quantum.bit, %c4 : index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %q = scf.for %iter = %c0 to %c4 step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+        %out = func.call @nested_inner_loop_helper(%arg1, %c4) : (!quantum.bit, index) -> !quantum.bit
         scf.yield %out : !quantum.bit
     }
 
@@ -181,11 +288,24 @@ func.func @if_else_branching(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit {
 
 // -----
 
-// Nested static for loops
+// Nested static for loops: the inner loop is lifted into for_loop_1
+// with the gate; the outer loop is lifted into for_loop_2 and records
+// function_calls={ for_loop_1: 5 }; the parent records
+// function_calls={ for_loop_2: 3 }.
 
-// CHECK-LABEL: "nested_static_for"
+// CHECK-LABEL: "for_loop_1": {
 // CHECK: "operations"
-// CHECK-DAG: "PauliX(1)": 15
+// CHECK-DAG: "PauliX(1)": 1
+
+// CHECK-LABEL: "for_loop_2": {
+// CHECK: "function_calls"
+// CHECK: "for_loop_1": 5
+// CHECK: "operations": {}
+
+// CHECK-LABEL: "nested_static_for": {
+// CHECK: "function_calls"
+// CHECK: "for_loop_2": 3
+// CHECK: "operations": {}
 func.func @nested_static_for(%arg0: !quantum.bit) -> !quantum.bit {
     %c3 = arith.constant 3 : index
     %c5 = arith.constant 5 : index
@@ -205,7 +325,111 @@ func.func @nested_static_for(%arg0: !quantum.bit) -> !quantum.bit {
 
 // -----
 
-// Measurements
+// quantum.adjoint over a static for-loop: the adjoint flag must be
+// threaded into the lifted body, so the gate name picks up the
+// "Adjoint(...)" prefix in the synthetic for_loop_<N> entry.
+
+// CHECK-LABEL: "adjoint_static_for_loop": {
+// CHECK: "function_calls"
+// CHECK: "for_loop_1": 5
+
+// CHECK-LABEL: "for_loop_1": {
+// CHECK: "operations"
+// CHECK-DAG: "Adjoint(Hadamard)(1)": 1
+func.func @adjoint_static_for_loop(%arg0: !quantum.reg) -> !quantum.reg {
+    %c5 = arith.constant 5 : index
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c0_i64 = arith.constant 0 : i64
+
+    %r = quantum.adjoint(%arg0) : !quantum.reg {
+    ^bb0(%a0: !quantum.reg):
+        %r2 = scf.for %i = %c0 to %c5 step %c1 iter_args(%a = %a0) -> (!quantum.reg) {
+            %q = quantum.extract %a[%c0_i64] : !quantum.reg -> !quantum.bit
+            %h = quantum.custom "Hadamard"() %q : !quantum.bit
+            %a1 = quantum.insert %a[%c0_i64], %h : !quantum.reg, !quantum.bit
+            scf.yield %a1 : !quantum.reg
+        }
+        quantum.yield %r2 : !quantum.reg
+    }
+    return %r : !quantum.reg
+}
+
+// -----
+
+// Synthetic name collision: a user function literally named
+// `for_loop_1` must not be overwritten by the lifted body. The lifted
+// entry should bump the counter and pick a distinct name.
+
+// CHECK-LABEL: "for_loop_1": {
+// CHECK: "operations"
+// CHECK-DAG: "PauliX(1)": 1
+
+// CHECK-LABEL: "for_loop_2": {
+// CHECK: "operations"
+// CHECK-DAG: "Hadamard(1)": 1
+
+// CHECK-LABEL: "user_caller": {
+// CHECK: "function_calls"
+// CHECK-DAG: "for_loop_2": 5
+// CHECK: "operations": {}
+func.func @user_caller(%arg0: !quantum.bit) -> !quantum.bit {
+    %c5 = arith.constant 5 : index
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %q = scf.for %iter = %c0 to %c5 step %c1 iter_args(%a = %arg0) -> (!quantum.bit) {
+        %out = quantum.custom "Hadamard"() %a : !quantum.bit
+        scf.yield %out : !quantum.bit
+    }
+
+    return %q : !quantum.bit
+}
+
+// User function whose name happens to match the synthetic naming
+// scheme. The pass should NOT clobber it.
+func.func private @for_loop_1(%arg0: !quantum.bit) -> !quantum.bit {
+    %out = quantum.custom "PauliX"() %arg0 : !quantum.bit
+    return %out : !quantum.bit
+}
+
+// -----
+
+// Measurement and qubit allocation inside a lifted for-loop body
+// stay local to the synthetic entry instead of being inlined into
+// the parent.
+
+// CHECK-LABEL: "for_loop_1": {
+// CHECK: "measurements"
+// CHECK-DAG: "MidCircuitMeasure": 1
+// CHECK: "num_alloc_qubits": 1
+// CHECK: "operations"
+// CHECK-DAG: "Hadamard(1)": 1
+
+// CHECK-LABEL: "loop_with_measurement_and_alloc": {
+// CHECK: "function_calls"
+// CHECK: "for_loop_1": 3
+// CHECK: "measurements": {}
+// CHECK: "num_alloc_qubits": 0
+// CHECK: "operations": {}
+func.func @loop_with_measurement_and_alloc() {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c3 = arith.constant 3 : index
+
+    scf.for %i = %c0 to %c3 step %c1 {
+        %qb = quantum.alloc_qb : !quantum.bit
+        %h = quantum.custom "Hadamard"() %qb : !quantum.bit
+        %mres, %out = quantum.measure %h : i1, !quantum.bit
+        quantum.dealloc_qb %out : !quantum.bit
+    }
+
+    return
+}
+
+// -----
+
+// Measurements at the top level (not inside a loop)
 
 // CHECK-LABEL: "measurement_ops"
 // CHECK: "measurements"
@@ -281,11 +505,17 @@ func.func @observable_measurements() {
 
 // -----
 
-// Function call resolution
+// Function-call resolution: the callee's gates STAY in the callee, the
+// caller exposes only its direct function_calls.
 
-// CHECK-LABEL: "caller_func"
+// CHECK-LABEL: "caller_func": {
+// CHECK: "function_calls"
+// CHECK: "helper_func": 2
+// CHECK: "operations": {}
+
+// CHECK-LABEL: "helper_func": {
 // CHECK: "operations"
-// CHECK-DAG: "Hadamard(1)": 2
+// CHECK-DAG: "Hadamard(1)": 1
 func.func @caller_func(%arg0: !quantum.bit) -> !quantum.bit {
     %r1 = func.call @helper_func(%arg0) : (!quantum.bit) -> !quantum.bit
     %r2 = func.call @helper_func(%r1) : (!quantum.bit) -> !quantum.bit
@@ -300,11 +530,32 @@ func.func private @helper_func(%arg0: !quantum.bit) -> !quantum.bit {
 
 // -----
 
-// Function call resolution with nested calls
+// Function call resolution with nested calls: gates stay in the deepest
+// (lifted) entry; structural function_calls show direct call counts.
 
-// CHECK-LABEL: "nested_caller_func"
+// CHECK-LABEL: "for_loop_1": {
 // CHECK: "operations"
-// CHECK-DAG: "PauliX(1)": 60
+// CHECK-DAG: "PauliX(1)": 1
+
+// CHECK-LABEL: "for_loop_2": {
+// CHECK: "function_calls"
+// CHECK: "for_loop_1": 5
+// CHECK: "operations": {}
+
+// CHECK-LABEL: "helper_func": {
+// CHECK: "function_calls"
+// CHECK: "for_loop_2": 3
+// CHECK: "operations": {}
+
+// CHECK-LABEL: "nested_caller_func": {
+// CHECK: "function_calls"
+// CHECK: "nested_helper_func": 2
+// CHECK: "operations": {}
+
+// CHECK-LABEL: "nested_helper_func": {
+// CHECK: "function_calls"
+// CHECK: "helper_func": 2
+// CHECK: "operations": {}
 
 func.func @nested_caller_func(%arg0: !quantum.bit) -> !quantum.bit {
     %r1 = func.call @nested_helper_func(%arg0) : (!quantum.bit) -> !quantum.bit
@@ -331,9 +582,7 @@ func.func private @helper_func(%arg0: !quantum.bit) -> !quantum.bit {
 }
 
 func.func private @nested_helper_func(%arg0: !quantum.bit) -> !quantum.bit {
-    // total: 15 PauliX operations
     %r1 = func.call @helper_func(%arg0) : (!quantum.bit) -> !quantum.bit
-    // total: 15 PauliX operations
     %r2 = func.call @helper_func(%r1) : (!quantum.bit) -> !quantum.bit
     return %r2 : !quantum.bit
 }
@@ -428,6 +677,10 @@ func.func @stats_test() {
 // -----
 
 // Multiple qnode functions: the first qnode is the entry function.
+// Stats walk the structural call graph: 4 gates total =
+//   first_qnode (0) +
+//     2 * shared_helper (1 H) +
+//     1 * second_qnode (1 PauliX + 1 * shared_helper (1 H)) = 4.
 
 // STATS: ResourceAnalysisPass
 // STATS: 0 total-alloc-qubits
@@ -456,12 +709,18 @@ func.func @second_qnode(%arg0: !quantum.bit) -> !quantum.bit {
 
 // -----
 
-// qnode attribute marking
+// qnode attribute marking: the qnode keeps `qnode: true`, helper keeps
+// its own gate (no inlining into the qnode).
 
-// CHECK-LABEL: "my_helper"
+// CHECK-LABEL: "my_helper": {
+// CHECK: "operations"
+// CHECK-DAG: "Hadamard(1)": 1
 // CHECK: "qnode": false
 
-// CHECK-LABEL: "my_qnode"
+// CHECK-LABEL: "my_qnode": {
+// CHECK: "function_calls"
+// CHECK: "my_helper": 1
+// CHECK: "operations": {}
 // CHECK: "qnode": true
 func.func @my_qnode(%arg0: !quantum.bit) -> !quantum.bit attributes {quantum.node} {
     %r = func.call @my_helper(%arg0) : (!quantum.bit) -> !quantum.bit
