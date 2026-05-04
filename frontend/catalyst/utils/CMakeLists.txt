@@ -24,6 +24,11 @@ execute_process(
     OUTPUT_VARIABLE nanobind_DIR OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 find_package(nanobind CONFIG REQUIRED)
+
+if(DEFINED ENV{MLIR_LIB_DIR})
+    set(LLVM_DIR "$ENV{MLIR_LIB_DIR}/cmake/llvm" CACHE PATH "" FORCE)
+    set(MLIR_DIR "$ENV{MLIR_LIB_DIR}/cmake/mlir" CACHE PATH "" FORCE)
+endif()
 find_package(LLVM CONFIG REQUIRED)
 
 # Source file list for `wrapper` module
