@@ -91,7 +91,7 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
 namespace catalyst {
 namespace qecp {
 
-void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns)
+void populateLLVMConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns)
 {
     patterns.add<AssembleTannerGraphOpPattern>(typeConverter, patterns.getContext());
 }

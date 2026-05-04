@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
@@ -43,10 +42,7 @@ struct QecPhysicalTypeConverter : public LLVMTypeConverter {
     }
 
   private:
-    Type convertTannerGraphType(Type mlirType)
-    {
-        return LLVM::LLVMPointerType::get(&getContext());
-    }
+    Type convertTannerGraphType(Type mlirType) { return LLVM::LLVMPointerType::get(&getContext()); }
 };
 
 struct QecPhysicalConversionPass : impl::QecPhysicalConversionPassBase<QecPhysicalConversionPass> {
@@ -63,7 +59,7 @@ struct QecPhysicalConversionPass : impl::QecPhysicalConversionPassBase<QecPhysic
         LLVMConversionTarget target(*context);
         target.addIllegalDialect<catalyst::qecp::QecPhysicalDialect>();
 
-        if (failed(applyFullConversion(getOperation(), target, std::move(patterns)))) {
+        if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
         }
     }
