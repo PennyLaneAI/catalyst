@@ -170,7 +170,12 @@ class CompiledFunction:
                 func, state = remote_driver.make_remote_callable(
                     lib.function, av_class, result_desc
                 )
-                retval = wrapper.wrap(func, args, result_desc, None, {})
+                try:
+                    retval = wrapper.wrap(func, args, result_desc, None, {})
+                except Exception as e:
+                    if state.had_error:
+                        raise RuntimeError(f"remote invoke: {state.error_msg}") from e
+                    raise
                 if state.had_error:
                     raise RuntimeError(f"remote invoke: {state.error_msg}")
                 return retval

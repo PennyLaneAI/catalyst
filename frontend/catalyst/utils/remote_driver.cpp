@@ -277,12 +277,12 @@ ExecutorAddr remote_alloc(Session *s, size_t size)
 {
     ExecutorAddr ret;
     auto &epc = s->getEPC();
-    Twine error_prefix = "alloc(" + std::to_string(size) + ")";
+    std::string error_prefix = "alloc(" + std::to_string(size) + ")";
     check(epc.callSPSWrapper<shared::SPSExecutorAddr(uint64_t)>(s->alloc_fn, ret,
                                                                 static_cast<uint64_t>(size)),
           error_prefix);
     if (!ret) {
-        throw std::runtime_error(error_prefix.str() + " out of memory");
+        throw std::runtime_error(error_prefix + " out of memory");
     }
     return ret;
 }
