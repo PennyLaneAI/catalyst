@@ -25,4 +25,4 @@ void __catalyst__qecp__tanner_graph_int32(MemRefT_int32_1d *row_idx_tanner,
     tanner_graph->col_ptr = col_ptr_tanner;
 }
 
-} // namespace Catalyst::Runtime::QEC
+} // extern "C"

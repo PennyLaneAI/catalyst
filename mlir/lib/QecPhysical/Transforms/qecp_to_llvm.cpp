@@ -35,7 +35,6 @@ namespace qecp {
 #include "QecPhysical/Transforms/Passes.h.inc"
 
 struct QecPhysicalTypeConverter : public LLVMTypeConverter {
-
     QecPhysicalTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx)
     {
         addConversion([&](TannerGraphType type) { return convertTannerGraphType(type); });
@@ -57,6 +56,7 @@ struct QecPhysicalConversionPass : impl::QecPhysicalConversionPassBase<QecPhysic
         populateLLVMConversionPatterns(typeConverter, patterns);
 
         LLVMConversionTarget target(*context);
+        // TODOs: We need to uncomment the following line once all qecp-to-llvm patterns are added
         // target.addIllegalDialect<catalyst::qecp::QecPhysicalDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
