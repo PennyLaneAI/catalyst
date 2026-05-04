@@ -32,8 +32,6 @@ namespace {
 
 using namespace catalyst::qecp;
 
-constexpr int32_t UNKNOWN = ShapedType::kDynamic;
-
 struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerGraphOp> {
     using OpConversionPattern::OpConversionPattern;
 
@@ -51,11 +49,14 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
         if (!op.isBufferized())
             return op.emitOpError("op must be bufferized before lowering to LLVM");
 
-        Type vectorType;
         // Define function signature
         StringRef fnName = "__catalyst__qecp__assemble_tanner_graph_int32";
 
-        vectorType = conv->convertType(MemRefType::get({UNKNOWN}, i32));
+        Type rowIdxVectorType, colPtrVectorType;
+        rowIdxVectorType = conv->convertType(
+            MemRefType::get({op.getTannerGraph().getType().getRowIdxSize()}, i32));
+        colPtrVectorType = conv->convertType(
+            MemRefType::get({op.getTannerGraph().getType().getColPtrSize()}, i32));
 
         // Define Tanner Graph struct type
         auto tannerGraphType = LLVM::LLVMStructType::getLiteral(ctx, {ptrTy, ptrTy});
@@ -65,8 +66,8 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
             rewriter, op, fnName, fnSignature);
 
         //  Add values as arguments of the CallOp
-        Value rowIdxAlloca = catalyst::getStaticAlloca(loc, rewriter, vectorType, 1);
-        Value colPtrAlloca = catalyst::getStaticAlloca(loc, rewriter, vectorType, 1);
+        Value rowIdxAlloca = catalyst::getStaticAlloca(loc, rewriter, rowIdxVectorType, 1);
+        Value colPtrAlloca = catalyst::getStaticAlloca(loc, rewriter, colPtrVectorType, 1);
 
         LLVM::StoreOp::create(rewriter, loc, adaptor.getRowIdx(), rowIdxAlloca);
         LLVM::StoreOp::create(rewriter, loc, adaptor.getColPtr(), colPtrAlloca);
@@ -75,7 +76,7 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
         tannerGraphValue = LLVM::InsertValueOp::create(rewriter, loc, tannerGraphValue,
                                                        rowIdxAlloca, SmallVector<int64_t>{0});
         tannerGraphValue = LLVM::InsertValueOp::create(rewriter, loc, tannerGraphValue,
-                                                       rowIdxAlloca, SmallVector<int64_t>{1});
+                                                       colPtrAlloca, SmallVector<int64_t>{1});
 
         auto tannerGraphStructPtr = catalyst::getStaticAlloca(loc, rewriter, tannerGraphType, 1);
 
