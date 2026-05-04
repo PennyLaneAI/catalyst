@@ -26,7 +26,7 @@ sys.modules["catalyst"] = cat_stub
 sys.modules["catalyst.api_extensions"] = cat_stub.api_extensions
 spec = importlib.util.spec_from_file_location("doqaoa",
     pathlib.Path(__file__).parent /
-    "catalyst/frontend/catalyst/api_extensions/doqaoa.py")
+    "frontend/catalyst/api_extensions/doqaoa.py")
 mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
 
 import pennylane as qml

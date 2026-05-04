@@ -238,4 +238,42 @@ def BufferDeallocationPass : Pass<"buffer-deallocation", "func::FuncOp"> {
   }];
 }
 
+def MarkEntryPointArgsNonWritablePass : Pass<"mark-entry-point-args-non-writable", "mlir::ModuleOp"> {
+    let summary = "Mark entry-point arguments as non-writable for bufferization.";
+
+    let dependentDialects = [
+        "bufferization::BufferizationDialect",
+        "func::FuncDialect"
+    ];
+}
+
+def ResourceTrackerPass : Pass<"resource-tracker"> {
+    let summary = "Track and report resource usage.";
+    let description = [{
+        This pass computes comprehensive resource metrics, including gate counts,
+        measurements, qubit allocations, device name, as well as structured classical ops.
+        It leverages ResourceAnalysis to retrieve cached results and integrates with
+        the MLIR Pass Statistics mechanism for reporting.
+    }];
+
+    let options = [
+        Option<
+            /*C++ var name=*/"outputJson",
+            /*CLI arg name=*/"output-json",
+            /*type=*/"bool",
+            /*default=*/"false",
+            /*description=*/"Print resource counts as JSON to stdout"
+        >
+    ];
+}
+
+def RegisterDecompRuleResourcePass : Pass<"register-decomp-rule-resource"> {
+    let summary = "Compute and register the resources of decomposition rules.";
+    let description = [{
+        This pass uses ResourceTrackerPass to compute resource metrics of
+        functions marked with the target_gate attribute, effectively
+        filtering for decomposition rules.
+    }];
+}
+
 #endif // CATALYST_PASSES

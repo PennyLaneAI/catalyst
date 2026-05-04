@@ -23,6 +23,10 @@ file(GLOB SRC
     SplitMultipleTapes.cpp
     TBAAPatterns.cpp
     TBAATagsPass.cpp
+    EmptyPass.cpp
+    mark_entry_point_args_non_writable.cpp
+    ResourceTrackerPass.cpp
+    RegisterDecompRuleResourcePass.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
@@ -30,6 +34,7 @@ get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 set(LIBS
     ${dialect_libs}
     ${conversion_libs}
+    catalyst-analysis
 )
 
 set(DEPENDS

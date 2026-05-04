@@ -123,3 +123,26 @@ void QuantumDialect::initialize()
 
 #define GET_ATTRDEF_CLASSES
 #include "Quantum/IR/QuantumAttributes.cpp.inc"
+
+//===----------------------------------------------------------------------===//
+// Quantum dialect attribute verification.
+//===----------------------------------------------------------------------===//
+
+/// Verify the QNode attribute invariants
+LogicalResult QuantumDialect::verifyOperationAttribute(Operation *op, NamedAttribute namedAttr)
+{
+    StringRef attrName = namedAttr.getName().getValue();
+    if (attrName != "quantum.node") {
+        return success();
+    }
+
+    if (!isa<func::FuncOp>(op)) {
+        return op->emitOpError() << "attribute '" << attrName << "' is only valid on 'func.func'";
+    }
+
+    if (!isa<UnitAttr>(namedAttr.getValue())) {
+        return op->emitOpError() << "attribute '" << attrName << "' must be a unit attribute";
+    }
+
+    return success();
+}

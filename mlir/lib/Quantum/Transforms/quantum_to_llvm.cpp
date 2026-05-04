@@ -42,6 +42,12 @@ struct QIRTypeConverter : public LLVMTypeConverter {
         addConversion([&](QuregType type) { return convertQuregType(type); });
         addConversion([&](ObservableType type) { return convertObservableType(type); });
         addConversion([&](ResultType type) { return convertResultType(type); });
+        // DO-QAOA type conversions
+        addConversion([&](PartitionType type) { return convertPartitionType(type); });
+        addConversion([&](ClusterMapType type) { return convertClusterMapType(type); });
+        addConversion([&](CircuitRefType type) { return convertCircuitRefType(type); });
+        addConversion([&](ParamsType type) { return convertParamsType(type); });
+        addConversion([&](BitstringType type) { return convertBitstringType(type); });
     }
 
   private:
@@ -66,6 +72,43 @@ struct QIRTypeConverter : public LLVMTypeConverter {
     {
         return LLVM::LLVMPointerType::get(
             &getContext()); // LLVM::LLVMStructType::getOpaque("Result", &getContext());
+    }
+
+    // DO-QAOA: !quantum.partition<N, m> → { i32, i32 }
+    // Fields: numQubits (i32), m (i32)
+    Type convertPartitionType(PartitionType type)
+    {
+        auto i32 = IntegerType::get(&getContext(), 32);
+        return LLVM::LLVMStructType::getLiteral(&getContext(), {i32, i32});
+    }
+
+    // DO-QAOA: !quantum.cluster_map<K> → { i32 }
+    // Field: k (i32) — number of landscape clusters
+    Type convertClusterMapType(ClusterMapType type)
+    {
+        auto i32 = IntegerType::get(&getContext(), 32);
+        return LLVM::LLVMStructType::getLiteral(&getContext(), {i32});
+    }
+
+    // DO-QAOA: !quantum.circuit_ref → i64
+    // Opaque index into the representative sub-circuit table
+    Type convertCircuitRefType(CircuitRefType type)
+    {
+        return this->convertType(IntegerType::get(&getContext(), 64));
+    }
+
+    // DO-QAOA: !quantum.params → ptr
+    // Pointer to a heap-allocated f64 parameter buffer (gamma/beta values)
+    Type convertParamsType(ParamsType type)
+    {
+        return LLVM::LLVMPointerType::get(&getContext());
+    }
+
+    // DO-QAOA: !quantum.bitstring → ptr
+    // Pointer to a heap-allocated i8 buffer holding the binary node assignment
+    Type convertBitstringType(BitstringType type)
+    {
+        return LLVM::LLVMPointerType::get(&getContext());
     }
 };
 

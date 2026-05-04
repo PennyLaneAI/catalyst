@@ -43,6 +43,7 @@
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Mitigation/Transforms/Passes.h"
+#include "PBC/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
 #include "hlo-extensions/Transforms/Passes.h"
@@ -149,6 +150,8 @@ void createLLVMDialectLoweringStage(OpPassManager &pm)
     pm.addPass(mlir::createReconcileUnrealizedCastsPass());
     pm.addPass(catalyst::createGEPInboundsPass());
     pm.addPass(catalyst::createRegisterInactiveCallbackPass());
+    pm.addPass(catalyst::createMarkEntryPointArgsNonWritablePass());
+    pm.addPass(catalyst::pbc::createPBCConversionPass());
 }
 
 void createDefaultCatalystPipeline(OpPassManager &pm)

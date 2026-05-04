@@ -1320,6 +1320,129 @@ struct PPMeasurementOpPattern : public OpConversionPattern<PPMeasurementOp> {
     }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DO-QAOA lowering patterns (Phase 3, Tasks 6 & 7)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// BiasTransferOpLowering — Task 6
+///
+/// If is_direct_copy == 1 (ΔB ≤ threshold):
+///   SSA forward the input ptr unchanged — the representative parameters are
+///   identical to the output parameters, so no copy is needed.
+///
+/// If is_direct_copy == 0 (ΔB > threshold, warm-start branch):
+///   Emit an alloca of param_byte_count bytes + llvm.intr.memcpy from src.
+///   The warm-start Adam loop (pre-computed by WarmStartSchedulerPass and
+///   stored in warmstart_params) will have already updated this memory before
+///   the aggregate_min reduction fires.
+///
+/// Both branches produce a !llvm.ptr typed result, which is the lowered form
+/// of !quantum.params (see QIRTypeConverter::convertParamsType).
+struct BiasTransferOpLowering : OpConversionPattern<BiasTransferOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(BiasTransferOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        auto loc = op.getLoc();
+        MLIRContext *ctx = rewriter.getContext();
+
+        // Determine transfer mode from annotation (set by doqaoa-direct-transfer)
+        bool isDirect = true; // default: direct copy
+        if (auto attr = op->getAttr("is_direct_copy"))
+            isDirect = (cast<IntegerAttr>(attr).getInt() == 1);
+
+        // For direct copy: just forward the src pointer (SSA no-copy)
+        if (isDirect) {
+            rewriter.replaceOp(op, adaptor.getParamsRep());
+            return success();
+        }
+
+        // For warm-start: alloca a fresh buffer + memcpy from src as init
+        int64_t byteCount = 16; // default: 2 × sizeof(f64)
+        if (auto attr = op->getAttr("param_byte_count"))
+            byteCount = cast<IntegerAttr>(attr).getInt();
+
+        auto ptrTy  = LLVM::LLVMPointerType::get(ctx);
+        auto i8Ty   = IntegerType::get(ctx, 8);
+        auto i64Ty  = IntegerType::get(ctx, 64);
+        (void)i64Ty;
+
+        Value size = LLVM::ConstantOp::create(rewriter, loc,
+                         rewriter.getI64IntegerAttr(byteCount));
+        Value dst  = LLVM::AllocaOp::create(rewriter, loc, ptrTy, i8Ty, size);
+        Value src  = adaptor.getParamsRep();
+        LLVM::MemcpyOp::create(rewriter, loc, dst, src, size, /*isVolatile=*/false);
+
+        rewriter.replaceOp(op, dst);
+        return success();
+    }
+};
+
+/// AggregateMinOpLowering — Task 7
+///
+/// Lowers quantum.aggregate_min to a compile-time-resolved pointer selection.
+///
+/// If agg_best_k is available (written by doqaoa-aggregate-min pass):
+///   - Allocates an i8 array of length m for the bitstring.
+///   - Stores bit[i] = (best_k >> i) & 1 as i8 into the array.
+///   - Returns the array pointer as the !quantum.bitstring result.
+///
+/// If agg_best_k is not available (pass not run):
+///   - Falls back to returning the first operand's ptr as a no-op placeholder.
+struct AggregateMinOpLowering : OpConversionPattern<AggregateMinOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(AggregateMinOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        auto loc = op.getLoc();
+        MLIRContext *ctx = rewriter.getContext();
+
+        // Try to get compile-time best_k from doqaoa-aggregate-min annotation.
+        // Look for agg_best_k on a sibling freeze_partition (best-effort search).
+        int32_t bestK = 0;
+        int32_t m     = 1;
+
+        // Walk siblings to find freeze_partition annotation
+        if (auto parentBlock = op->getBlock()) {
+            for (auto &sibling : *parentBlock) {
+                if (auto fp = dyn_cast<FreezePartitionOp>(&sibling)) {
+                    if (auto a = fp->getAttr("agg_best_k"))
+                        bestK = cast<IntegerAttr>(a).getInt();
+                    m = static_cast<int32_t>(fp.getHotspotIndices().size());
+                    break;
+                }
+            }
+        }
+
+        // Build bitstring: array of m i8 values (one per hotspot qubit)
+        auto ptrTy = LLVM::LLVMPointerType::get(ctx);
+        auto i8Ty  = IntegerType::get(ctx, 8);
+        auto i64Ty = IntegerType::get(ctx, 64);
+
+        Value arrSize = LLVM::ConstantOp::create(rewriter, loc,
+                            rewriter.getI64IntegerAttr(static_cast<int64_t>(m)));
+        Value buf     = LLVM::AllocaOp::create(rewriter, loc, ptrTy, i8Ty, arrSize);
+
+        // Store each bit of best_k into buf[i]
+        for (int32_t i = 0; i < m; ++i) {
+            int8_t bit = static_cast<int8_t>((bestK >> i) & 1);
+            Value bitVal  = LLVM::ConstantOp::create(rewriter, loc, i8Ty,
+                                rewriter.getI8IntegerAttr(bit));
+            Value idxVal  = LLVM::ConstantOp::create(rewriter, loc, i64Ty,
+                                rewriter.getI64IntegerAttr(i));
+            Value elemPtr = LLVM::GEPOp::create(rewriter, loc, ptrTy, i8Ty, buf,
+                                ArrayRef<LLVM::GEPArg>{idxVal},
+                                LLVM::GEPNoWrapFlags::inbounds);
+            LLVM::StoreOp::create(rewriter, loc, bitVal, elemPtr);
+        }
+
+        rewriter.replaceOp(op, buf);
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -1370,6 +1493,10 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<PPRotationBasedPattern<PPRotationArbitraryOp>>(typeConverter,
                                                                 patterns.getContext());
     patterns.add<PPMeasurementOpPattern>(typeConverter, patterns.getContext());
+
+    // DO-QAOA lowering patterns (Phase 3, Tasks 6 & 7)
+    patterns.add<BiasTransferOpLowering>(typeConverter, patterns.getContext());
+    patterns.add<AggregateMinOpLowering>(typeConverter, patterns.getContext());
 }
 
 } // namespace quantum

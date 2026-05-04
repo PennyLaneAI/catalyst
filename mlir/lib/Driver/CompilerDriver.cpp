@@ -44,6 +44,7 @@
 #include "llvm/Transforms/Coroutines/CoroSplit.h"
 #include "llvm/Transforms/IPO/GlobalDCE.h"
 
+#include "mlir/Bytecode/BytecodeWriter.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/InitAllDialects.h"
@@ -901,8 +902,13 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         // already handled
     }
     else if (output.outputFilename == "-" && mlirModule) {
-        mlirModule->print(outfile->os(), opPrintingFlags);
-        outfile->keep();
+        if (options.shouldEmitBytecode) {
+            return mlir::writeBytecodeToFile(mlirModule.get(), outfile->os());
+        }
+        else {
+            mlirModule->print(outfile->os(), opPrintingFlags);
+            outfile->keep();
+        }
     }
 
     if (options.keepIntermediate and output.outputFilename != "-") {
@@ -1084,7 +1090,8 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .pipelinesCfg = parsePipelines(CatalystPipeline),
                             .checkpointStage = CheckpointStage,
                             .loweringAction = LoweringAction,
-                            .dumpPassPipeline = DumpPassPipeline};
+                            .dumpPassPipeline = DumpPassPipeline,
+                            .shouldEmitBytecode = config.shouldEmitBytecode()};
 
     mlir::LogicalResult result = QuantumDriverMain(options, *output, registry);
 

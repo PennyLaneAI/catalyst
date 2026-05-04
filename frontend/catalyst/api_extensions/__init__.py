@@ -38,6 +38,16 @@ from catalyst.api_extensions.quantum_operators import (
     ctrl,
     measure,
 )
+from catalyst.api_extensions.doqaoa import (
+    DOQAOAConfig,
+    DOQAOAResult,
+    DOQAOAOptimizer,
+    DOQAOATransform,
+    do_qaoa,
+    doqaoa_partition,
+    doqaoa_qjit,
+    hamiltonian_to_graph_attrs,
+)
 
 __all__ = (
     "accelerate",
@@ -57,4 +67,12 @@ __all__ = (
     "measure",
     "adjoint",
     "ctrl",
+    "DOQAOAConfig",
+    "DOQAOAResult",
+    "DOQAOAOptimizer",
+    "DOQAOATransform",
+    "do_qaoa",
+    "doqaoa_partition",
+    "doqaoa_qjit",
+    "hamiltonian_to_graph_attrs",
 )

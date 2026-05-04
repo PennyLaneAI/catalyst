@@ -50,6 +50,9 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
         tensor::FromElementsOp fromElementsWrapper;
     };
 
+    /// Check if an operation is a supported measurement operation.
+    static bool isSupportedMeasOp(Operation *op) { return isa<ExpvalOp>(op); }
+
     /// Check if an observable is Identity
     bool isIdentityObservable(Value obs)
     {
@@ -492,11 +495,28 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
 
     void runOnOperation() override
     {
-        Operation *moduleOp = getOperation();
+        ModuleOp moduleOp = getOperation();
+
+        // Raise an error if any measurement processes aside from expval are found
+        auto result = moduleOp.walk([&](Operation *op) {
+            if (auto measOp = dyn_cast<MeasurementProcess>(op)) {
+                if (!isSupportedMeasOp(op)) {
+                    op->emitError() << "unsupported measurement operation: " << op->getName()
+                                    << " (only quantum.expval is supported)";
+                    return WalkResult::interrupt();
+                }
+            }
+            return WalkResult::advance();
+        });
+
+        if (result.wasInterrupted()) {
+            signalPassFailure();
+            return;
+        }
 
         // Find all qnode functions with Hamiltonian expvals
         SmallVector<func::FuncOp> funcsToProcess;
-        moduleOp->walk([&](func::FuncOp funcOp) {
+        moduleOp.walk([&](func::FuncOp funcOp) {
             if (!funcOp->hasAttr("qnode")) {
                 return;
             }

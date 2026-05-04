@@ -64,4 +64,57 @@ def QubitRole : I32EnumAttr<"QubitRole",
 
 def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word.">;
 
+//===----------------------------------------------------------------------===//
+// DO-QAOA graph metadata attributes.
+//
+// Two representations are provided:
+//   DenseGraphAttr  — for small graphs: stores the full NxN f64 weight matrix
+//                     as a DenseElementsAttr (tensor<NxNxf64>).
+//   SparseGraphAttr — for large graphs: COO (Coordinate) encoding storing only
+//                     non-zero edge weights J_ij as three parallel arrays.
+//===----------------------------------------------------------------------===//
+
+class Quantum_Attr<string name, string attrMnemonic, list<Trait> traits = []>
+    : AttrDef<QuantumDialect, name, traits> {
+    let mnemonic = attrMnemonic;
+}
+
+def DenseGraphAttr : Quantum_Attr<"DenseGraph", "dense_graph"> {
+    let summary = "Dense NxN adjacency/weight matrix for DO-QAOA (small graphs).";
+    let description = [{
+        Stores the symmetric edge-weight matrix J_ij as a rank-2
+        `tensor<NxNxf64>` DenseElementsAttr. Suitable for graphs with up to
+        ~64 nodes where the full matrix fits in L2 cache. The diagonal is
+        always zero (no self-loops). Off-diagonal entry [i,j] holds J_ij.
+    }];
+    let parameters = (ins
+        "uint32_t":$numNodes,
+        AttrParameter<"::mlir::DenseElementsAttr",
+                      "Symmetric NxN f64 weight matrix">:$weights
+    );
+    let hasCustomAssemblyFormat = 1;
+    let genVerifyDecl = 1;
+}
+
+def SparseGraphAttr : Quantum_Attr<"SparseGraph", "sparse_graph"> {
+    let summary = "COO sparse adjacency/weight encoding for DO-QAOA (large graphs).";
+    let description = [{
+        Stores only non-zero edge weights J_ij in COO (Coordinate) format.
+        rowIndices and colIndices are flat int32 arrays of length numEdges
+        (upper-triangle only: i < j). weights is a 1-D DenseElementsAttr of
+        shape [numEdges] and element type f64. Suitable for sparse graphs
+        where the number of edges E << N^2.
+    }];
+    let parameters = (ins
+        "uint32_t":$numNodes,
+        "uint32_t":$numEdges,
+        ArrayRefParameter<"int32_t", "COO row indices (i < j)">:$rowIndices,
+        ArrayRefParameter<"int32_t", "COO col indices (i < j)">:$colIndices,
+        AttrParameter<"::mlir::DenseElementsAttr",
+                      "1-D f64 edge weights J_ij">:$weights
+    );
+    let hasCustomAssemblyFormat = 1;
+    let genVerifyDecl = 1;
+}
+
 #endif // QUANTUM_ATTR_DEFS
