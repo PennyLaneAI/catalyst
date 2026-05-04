@@ -1,8 +1,7 @@
 set(LIBRARY_NAME qecp-transforms)
 
-set(SRC
-    LLVMConversionPatterns.cpp
-    qecp_to_llvm.cpp
+file(GLOB SRC
+    BufferizableOpInterfaceImpl.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
@@ -13,11 +12,16 @@ set(LIBS
     MLIRQecPhysical
 )
 
-set(DEPENDS
-    MLIRQecPhysicalPassIncGen
-)
+set(DEPENDS )
 
-add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
+add_mlir_library(${LIBRARY_NAME} STATIC
+    ${SRC}
+    LINK_LIBS
+    PRIVATE
+    ${LIBS}
+    DEPENDS
+    ${DEPENDS}
+)
 target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 target_include_directories(${LIBRARY_NAME} PUBLIC
                            .

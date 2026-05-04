@@ -45,6 +45,7 @@ add_subdirectory(capi)
 add_subdirectory(backend)
 add_subdirectory(registry)
 add_subdirectory(RSDecompRuntime)
+add_subdirectory(Decoder)
 
 if(ENABLE_OQD)
 add_subdirectory(OQDcapi)
