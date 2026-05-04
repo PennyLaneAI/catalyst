@@ -379,6 +379,12 @@
   `"GateName(nWires)"` to `"GateName(nWires,nParams)"`.
   [(#2755)](https://github.com/PennyLaneAI/catalyst/pull/2755)
 
+* The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
+  instead of folding their gate counts into the caller. Static loops appear as `for_loop_<N>`
+  with their trip count, input-driven dynamic loops appear as `dyn_for_loop_<N>` with a stable
+  identifier, and totals across the call graph are computed on demand.
+  [(#2782)](https://github.com/PennyLaneAI/catalyst/pull/2782)
+
 * `qp.for_loop` and `qp.while_loop` now support dynamic shapes with program capture `qjit(capture=True)`.
   [(#2603)](https://github.com/PennyLaneAI/catalyst/pull/2603/)
   [(#2651)](https://github.com/PennyLaneAI/catalyst/pull/2651)
