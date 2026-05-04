@@ -14,12 +14,13 @@
 
 // RUN: quantum-opt %s \
 // RUN:   --convert-arith-to-llvm \
+// RUN:   --one-shot-bufferize \
 // RUN:   --convert-qecp-to-llvm \
 // RUN:   --reconcile-unrealized-casts \
 // RUN:   --split-input-file -verify-diagnostics \
 // RUN: | FileCheck %s
 
-// CHECK-DAG: llvm.func @__catalyst__qecp__assemble_tanner_graph_int32(!llvm.struct<ptr,ptr,i64,array<1xi64>,array<1xi64>>, !llvm.struct<ptr,ptr,i64,array<1xi64>,array<1xi64>>, !llvm.struct<ptr, ptr>)
+// CHECK-DAG: llvm.func @__catalyst__qecp__assemble_tanner_graph_int32(!llvm.ptr, !llvm.ptr, !llvm.ptr)
 
 // CHECK-LABEL: testXY
 func.func @testXY() {

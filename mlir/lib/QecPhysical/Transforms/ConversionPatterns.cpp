@@ -61,8 +61,7 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
         // Define Tanner Graph struct type
         auto tannerGraphType = LLVM::LLVMStructType::getLiteral(ctx, {ptrTy, ptrTy});
 
-        Type fnSignature =
-            LLVM::LLVMFunctionType::get(voidTy, {ptrTy, ptrTy, tannerGraphType}, false);
+        Type fnSignature = LLVM::LLVMFunctionType::get(voidTy, {ptrTy, ptrTy, ptrTy}, false);
         LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, fnName, fnSignature);
 
