@@ -99,6 +99,17 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
     }
 };
 
+struct DecodeEsmCssOpPattern : public OpConversionPattern<DecodeEsmCssOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(DecodeEsmCssOp op, DecodeEsmCssOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -107,6 +118,7 @@ namespace qecp {
 void populateLLVMConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns)
 {
     patterns.add<AssembleTannerGraphOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<DecodeEsmCssOpPattern>(typeConverter, patterns.getContext());
 }
 
 } // namespace qecp
