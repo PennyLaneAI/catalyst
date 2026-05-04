@@ -575,12 +575,15 @@ void do_remote_invoke(ShimState &s, void *rv_host, void *av_host)
 Session *open(const std::string &kernel_path, const std::string &remote)
 {
     auto s = unwrap(Session::Create(remote), "open(" + remote + ")");
+
+    // Load remote symbols
+    check(s->getEPC().getBootstrapSymbols({{s->alloc_fn, "catalyst_remote_alloc"},
+                                           {s->free_fn, "catalyst_remote_free"},
+                                           {s->invoke_fn, "catalyst_remote_invoke"}}),
+          "getBootstrapSymbols(catalyst_remote_*)");
+
     auto buf = unwrap(getFile(kernel_path), "getFile(" + kernel_path + ")");
     check(s->addObjectFile(std::move(buf)), "addObjectFile(" + kernel_path + ")");
-
-    s->alloc_fn = s->lookup("catalyst_remote_alloc");
-    s->free_fn = s->lookup("catalyst_remote_free");
-    s->invoke_fn = s->lookup("catalyst_remote_invoke");
     return s.release();
 }
 
