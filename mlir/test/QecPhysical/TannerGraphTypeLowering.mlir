@@ -22,8 +22,8 @@
 
 // CHECK-DAG: llvm.func @__catalyst__qecp__assemble_tanner_graph_int32(!llvm.ptr, !llvm.ptr, !llvm.ptr)
 
-// CHECK-LABEL: testXY
-func.func @testXY() {
+// CHECK-LABEL: unit_test_tanner_graph_lower
+func.func @unit_test_tanner_graph_lower() {
     %row_idx = arith.constant dense<[0, 0, 1, 0, 1, 2, 0, 2, 1, 1, 2, 2]> : tensor<12xi32>
     %col_ptr = arith.constant dense<[0, 1, 3, 6, 8, 9, 11, 12]> : tensor<8xi32>
     // CHECK: llvm.call @__catalyst__qecp__assemble_tanner_graph_int32

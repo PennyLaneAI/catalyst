@@ -69,14 +69,21 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
         Value rowIdxPtr = catalyst::getStaticAlloca(loc, rewriter, vectorType, 1);
         Value colPtrPtr = catalyst::getStaticAlloca(loc, rewriter, vectorType, 1);
 
-        auto tannerGraphAllcoaOp = catalyst::getStaticAlloca(loc, rewriter, tannerGraphType, 1);
-
         LLVM::StoreOp::create(rewriter, loc, adaptor.getRowIdx(), rowIdxPtr);
         LLVM::StoreOp::create(rewriter, loc, adaptor.getColPtr(), colPtrPtr);
-        LLVM::StoreOp::create(rewriter, loc, tannerGraphAllcoaOp.getResult(), tannerGraphAllcoaOp);
 
-        SmallVector<Value> args = {rowIdxPtr, colPtrPtr, tannerGraphAllcoaOp.getResult()};
+        // rewriter.replaceOp(op, args[2]);
+        Value tannerGraphValue = LLVM::UndefOp::create(rewriter, loc, tannerGraphType);
+        tannerGraphValue = LLVM::InsertValueOp::create(rewriter, loc, tannerGraphValue, rowIdxPtr,
+                                                       SmallVector<int64_t>{0});
+        tannerGraphValue = LLVM::InsertValueOp::create(rewriter, loc, tannerGraphValue, colPtrPtr,
+                                                       SmallVector<int64_t>{1});
 
+        auto tannerGraphStructPtr = catalyst::getStaticAlloca(loc, rewriter, tannerGraphType, 1);
+
+        LLVM::StoreOp::create(rewriter, loc, tannerGraphValue, tannerGraphStructPtr);
+
+        SmallVector<Value> args = {rowIdxPtr, colPtrPtr, tannerGraphStructPtr};
         LLVM::CallOp::create(rewriter, loc, fnDecl, args);
 
         rewriter.replaceOp(op, args[2]);
