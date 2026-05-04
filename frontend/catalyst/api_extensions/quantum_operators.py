@@ -353,8 +353,8 @@ class MidCircuitMeasure(HybridOp):
         in_classical_tracers,
         out_classical_tracers,
         regions: List[HybridOpRegion],
-        reset: bool = None,
-        postselect: int = None,
+        reset: bool | None = None,
+        postselect: int | None = None,
     ):
         HybridOp.__init__(self, in_classical_tracers, out_classical_tracers, regions)
         self._wires = qp.wires.Wires(in_classical_tracers)
@@ -482,7 +482,7 @@ class HybridAdjoint(HybridOp):
 
     binder = adjoint_p.bind
 
-    def trace_quantum(self, ctx, device, _trace, qrp) -> QRegPromise:
+    def trace_quantum(self, ctx, device, _trace, qrp, **kwargs) -> QRegPromise:
         op = self
         body_trace = op.regions[0].trace
         body_tape = op.regions[0].quantum_tape
@@ -499,7 +499,9 @@ class HybridAdjoint(HybridOp):
             qreg_in = _input_type_to_tracers(
                 partial(body_trace.new_arg, source_info=current_source_info()), [AbstractQreg()]
             )[0]
-            qrp_out = trace_quantum_operations(body_tape, device, qreg_in, ctx, body_trace)
+            qrp_out = trace_quantum_operations(
+                body_tape, device, qreg_in, ctx, body_trace, **kwargs
+            )
             qreg_out = qrp_out.actualize()
             body_jaxpr, _, body_consts = body_trace.frame.to_jaxpr2(
                 res_classical_tracers + [qreg_out], dbg
@@ -634,7 +636,7 @@ class HybridCtrl(HybridOp):
             self._control_values = control_values
         super().__init__(*tracing_artifacts)
 
-    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
+    def trace_quantum(self, ctx, device, trace, qrp, **kwargs) -> QRegPromise:
         raise NotImplementedError(
             "HybridCtrl does not support JAX quantum tracing"
         )  # pragma: no cover
