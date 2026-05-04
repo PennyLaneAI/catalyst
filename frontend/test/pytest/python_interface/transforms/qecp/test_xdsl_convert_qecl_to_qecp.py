@@ -35,6 +35,17 @@ from catalyst.utils.exceptions import CompileError
 pytestmark = pytest.mark.xdsl
 
 
+@pytest.fixture(name="qecl_to_qecp_steane_pipeline", scope="module")
+def fixture_qecl_to_qecp_steane_pipeline():
+    """Fixture that returns the compilation pipeline containing the convert-qecl-to-qecp pass that
+    uses the Steane code for lowering.
+    """
+    return (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
+
+
+# MARK: TestTypeConversion
+
+
 class TestTypeConversionPattern:
     """Unit tests for the type conversion patterns of the convert-qecl-to-qecp pass."""
 
@@ -141,6 +152,9 @@ class TestTypeConversionPattern:
             run_filecheck(program, pipeline)
 
 
+# MARK: TestAllocAndDealloc
+
+
 class TestAllocAndDeallocConversionPatterns:
     """Test that qecl.allocate and qecl.deallocate operations for allocating hyperregisters
     of codeblocks are lowered as expected"""
@@ -194,6 +208,9 @@ class TestAllocAndDeallocConversionPatterns:
             ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))),
         )
         run_filecheck(program, pipeline)
+
+
+# MARK: TestLoweringEncode
 
 
 class TestInsertExtractConversionPatterns:
@@ -376,8 +393,8 @@ class TestLoweringEncode:
                 func.func @test_func() attributes {quantum.node} {
                     // CHECK: [[codeblock1:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
                     // CHECK-NEXT: [[codeblock2:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
-                    // CHECK-NEXT: func.call @encode_zero_Steane 
-                    // CHECK-NEXT: func.call @encode_zero_Steane 
+                    // CHECK-NEXT: func.call @encode_zero_Steane
+                    // CHECK-NEXT: func.call @encode_zero_Steane
                     %0 = "test.op"() : () -> !qecl.codeblock<1>
                     %1 = "test.op"() : () -> !qecl.codeblock<1>
                     %2 = qecl.encode ["zero"] %0 : !qecl.codeblock<1>
@@ -392,6 +409,57 @@ class TestLoweringEncode:
         run_filecheck(program, pipeline)
 
 
+# MARK: TestLoweringMeasure
+
+
+class TestLoweringMeasure:
+    """Unit tests for the `measure` pattern of the convert-qecl-to-qecp pass."""
+
+    def test_measure(self, run_filecheck, qecl_to_qecp_steane_pipeline):
+        """Test the lowering pattern for `qecl.measure` ops."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_program
+        func.func @test_program() {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+
+            // CHECK: [[mresp:%.+]], [[cb1:%.+]] = func.call @measure_transversal_Steane([[cb0]]) : ({{.*}}) -> (tensor<7xi1>, !qecp.codeblock<1 x 7>)
+            // CHECK: [[mresl:%.+]] = qecp.decode_physical_meas [[mresp]] : tensor<7xi1> -> tensor<1xi1>
+            // CHECK: [[zero:%.+]] = arith.constant 0 : index
+            // CHECK: [[mres0:%.+]] = tensor.extract [[mresl]][[[zero]]] : tensor<1xi1>
+            %mres0, %1 = qecl.measure %0[0] : i1, !qecl.codeblock<1>
+
+            // CHECK: [[mres1:%.+]] = "test.op"([[mres0]]) : (i1) -> i1
+            %mres1 = "test.op"(%mres0) : (i1) -> i1  // To prevent DCE
+            %2 = "test.op"(%1) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>  // To prevent DCE
+            return
+        }
+        // CHECK-LABEL: func.func private @measure_transversal_Steane
+        // CHECK-SAME: ([[cb_in:%.+]]: !qecp.codeblock<1 x 7>) -> (tensor<7xi1>, !qecp.codeblock<1 x 7>) {
+        // CHECK: [[mres_t:%.+]] = tensor.empty() : tensor<7xi1>
+        // CHECK: [[c0:%.+]] = arith.constant 0 : index
+        // CHECK: [[c7:%.+]] = arith.constant 7 : index
+        // CHECK: [[c1:%.+]] = arith.constant 1 : index
+        // CHECK: [[mres_t_out:%.+]], [[cb_out:%.+]] = scf.for [[idx:%.+]] = [[c0]] to [[c7]] step [[c1]]
+        // CHECK-SAME: iter_args([[mres_t_arg:%.+]] = [[mres_t]], [[cb_arg:%.+]] = [[cb_in]])
+        // CHECK-SAME: -> (tensor<7xi1>, !qecp.codeblock<1 x 7>) {
+        // CHECK:   [[q0:%.+]] = qecp.extract [[cb_arg]][[[idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+        // CHECK:   [[mres0:%.+]], [[q1:%.+]] = qecp.measure [[q0]] : i1, !qecp.qubit<data>
+        // CHECK:   [[cb2:%.+]] = qecp.insert [[cb_arg]][[[idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK:   [[mres_t_1:%.+]] = tensor.insert [[mres0]] into [[mres_t_arg]][[[idx]]] : tensor<7xi1>
+        // CHECK:   scf.yield [[mres_t_1]], [[cb2]] : tensor<7xi1>, !qecp.codeblock<1 x 7>
+        // CHECK: }
+        // CHECK: func.return [[mres_t_out]], [[cb_out]] : tensor<7xi1>, !qecp.codeblock<1 x 7>
+        // CHECK: }
+        }
+        """
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
+
+
+# MARK: TestQECLNoiseLoweringPassIntegration
+
+
 # We can remove this xfail and warning filter once `convert_qecl_to_qecp_pass` is complete
 @pytest.mark.xfail(reason="The `convert_qecl_to_qecp_pass` is incomplete")
 @pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
@@ -399,13 +467,12 @@ class TestQECLNoiseLoweringPassIntegration:
     """Integration lit tests for the convert-qecl-noise-to-qecp-noise pass"""
 
     # pylint: disable=line-too-long
-    @pytest.mark.usefixtures("use_capture")
     def test_convert_qecl_noise_to_qecp_noise_pass_integration(self, run_filecheck_qjit):
         """Test the convert-qecl-noise-to-qecp-noise pass on the simplest possible, non-trivial circuit."""
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(target="mlir", keep_intermediate=True)
-        @convert_qecl_to_qecp_pass(qec_code=QecCode("Steane", 7, 1, 3), number_errors=1)
+        @qp.qjit(target="mlir", keep_intermediate=True, capture=True)
+        @convert_qecl_to_qecp_pass(qec_code=QecCode.get("Steane"), number_errors=1)
         @inject_noise_to_qecl_pass
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)

@@ -2,6 +2,46 @@
 
 <h3>New features since last release</h3>
 
+* An experimental lookup table (LUT) decoder is added to the `runtime`. This initial implementation
+is optimized for the [[7,1,3]] Steane code using hardcoded Quantum Error Correction (QEC) data. While
+the architecture supports future extension to general LUT decoding via compiler-provided information,
+please note that LUT decoders scale exponentially with code size and are intended for small-scale QEC
+codes only.
+[(#2724)](https://github.com/PennyLaneAI/catalyst/pull/2724)
+
+* Combining ``GlobalPhase`` operations into one single operation is now possible with the
+  :func:`catalyst.passes.combine_global_phases` pass.
+  [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
+
+  ```python
+  import pennylane as qp
+  import catalyst
+
+  @qp.qjit(capture=True)
+  @catalyst.passes.combine_global_phases
+  @qp.qnode(qml.device("lightning.qubit", wires=5))
+  def circuit():
+      qp.GlobalPhase(0)
+      qp.GlobalPhase(1)
+      qp.GlobalPhase(2)
+      qp.GlobalPhase(3)
+      qp.GlobalPhase(4)
+      return qp.state()
+  
+  Device: lightning.qubit
+  Device wires: 5
+  Shots: Shots(total=None)
+  Level: combine-global-phases (MLIR-1)
+  <BLANKLINE>
+  Wire allocations: 5
+  Total gates: 1
+  Gate counts:
+  - GlobalPhase: 1
+  Measurements:
+  - state(all wires): 1
+  Depth: Not computed
+  ```
+
 * A new `~.CompilationPass` class has been added that abstracts away compiler-level details for
   seamless compilation pass creation. Used in tandem with :func:`~.compiler_transform`, compilation
   passes can be created entirely in Python and used on QNodes within a :func:`~.qjit`'d workflow.
@@ -291,9 +331,10 @@
   [(#2660)](https://github.com/PennyLaneAI/catalyst/pull/2660)
 
 * A new optimization pass has been added to reduce the number of instructions in a quantum program,
-  `--merge-global-phase`, which safely combines global phase instructions for each region in the
+  `--combine-global-phase`, which safely combines global phase instructions for each region in the
   program. The xDSL version written in Python has been removed.
   [(#2604)](https://github.com/PennyLaneAI/catalyst/pull/2604)
+  [(#2777)](https://github.com/PennyLaneAI/catalyst/pull/2777)
 
 * A new native-MLIR graph-based decomposition framework is now available. This system
   migrates the graph-decomposition logic from Python into the Catalyst compiler as a
@@ -306,6 +347,7 @@
   [(#2578)](https://github.com/PennyLaneAI/catalyst/pull/2578)
   [(#2711)](https://github.com/PennyLaneAI/catalyst/pull/2711)
   [(#2765)](https://github.com/PennyLaneAI/catalyst/pull/2765)
+  [(#2722)](https://github.com/PennyLaneAI/catalyst/pull/2722)
 
   The framework is interfaced with a new `graph_decomposition` pass decorator
   with key capabilities:
@@ -374,6 +416,46 @@
 
 <h3>Improvements 🛠</h3>
 
+* The :func:`~.passes.parity_synth` can now be invoked from the ``passes`` module.
+  [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
+
+  ```python
+  import pennylane as qp
+  import catalyst
+
+  dev = qp.device("lightning.qubit", wires=2)
+
+  @qp.qjit(capture=True)
+  @catalyst.passes.parity_synth
+  @qp.qnode(dev)
+  def circuit(x: float, y: float, z: float):
+      qp.CNOT((0, 1))
+      qp.RZ(x, 1)
+      qp.CNOT((0, 1))
+      qp.RX(y, 1)
+      qp.CNOT((1, 0))
+      qp.RZ(z, 1)
+      qp.CNOT((1, 0))
+      return qp.state()
+  
+  Device: lightning.qubit
+  Device wires: 2
+  Shots: Shots(total=None)
+  Level: device
+
+  Wire allocations: 2
+  Total gates: 5
+  Gate counts:
+  - RX: 1
+  - RZ: 2
+  - CNOT: 2
+  Measurements:
+  - state(all wires): 1
+  Depth: 5
+  ```
+
+  Note as well that this compilation pass used to be named ``parity_synth_pass``.
+
 * ``ResourceAnalysis`` and ``RegisterDecompRuleResource`` passes now record the number of classical
   parameters for each gate alongside the wire count. The operation key format changes from
   `"GateName(nWires)"` to `"GateName(nWires,nParams)"`.
@@ -385,7 +467,7 @@
   identifier, and totals across the call graph are computed on demand.
   [(#2782)](https://github.com/PennyLaneAI/catalyst/pull/2782)
 
-* `qp.for_loop` and `qp.while_loop` now support dynamic shapes with program capture `qjit(capture=True)`.
+* `qp.for_loop` now supports dynamic shapes with program capture `qjit(capture=True)`.
   [(#2603)](https://github.com/PennyLaneAI/catalyst/pull/2603/)
   [(#2651)](https://github.com/PennyLaneAI/catalyst/pull/2651)
 
@@ -506,6 +588,9 @@
 
 <h3>Breaking changes 💔</h3>
 
+* The ``catalyst.python_interface.transforms.parity_synth_pass`` transform has been renamed to ``catalyst.python_interface.transforms.parity_synth``.
+  [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
+
 * The ``-disentangle-CNOT`` and ``-disentangle-SWAP`` Catalyst CLI commands have been renamed to
   ``-disentangle-cnot`` and ``-disentangle-swap`` (all lower-case).
   [(#2546)](https://github.com/PennyLaneAI/catalyst/pull/2546)
@@ -552,6 +637,11 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Refactored all passes in `catalyst.passes.builtin_passes.py` to be `pennylane.transforms.core.Transform` objects
+  rather than decorators. This allows them to be used as standard transforms, enabling full compatibility with
+  `pennylane.CompilePipeline`.
+  [(#2722)](https://github.com/PennyLaneAI/catalyst/pull/2722)
 
 * Fixed a bug where the `work_wire_type` argument of `qp.ctrl` was silently dropped inside `@qjit` functions.
   The parameter is now threaded through `catalyst.ctrl`, `CtrlCallable`, `HybridCtrl`, and
@@ -1022,6 +1112,7 @@
   [(#2574)](https://github.com/PennyLaneAI/catalyst/pull/2574)
   [(#2576)](https://github.com/PennyLaneAI/catalyst/pull/2576)
   [(#2673)](https://github.com/PennyLaneAI/catalyst/pull/2673)
+  [(#2768)](https://github.com/PennyLaneAI/catalyst/pull/2768)
 
 * An experimental pass to convert `qecl.noise` operations in the *QEC Logical* layer to subroutine calls in the *QEC Phyiscal* layer.
   [(#2678)](https://github.com/PennyLaneAI/catalyst/pull/2678)
@@ -1041,6 +1132,7 @@
   [(#2716)](https://github.com/PennyLaneAI/catalyst/pull/2716)
   [(#2737)](https://github.com/PennyLaneAI/catalyst/pull/2737)
   [(#2731)](https://github.com/PennyLaneAI/catalyst/pull/2731)
+  [(#2735)](https://github.com/PennyLaneAI/catalyst/pull/2735)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)

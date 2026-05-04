@@ -376,12 +376,12 @@ class TestConvertToMBQCFormalismPass:
         pipeline = (ConvertToMBQCFormalismPass(),)
         run_filecheck(program, pipeline)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_gates_in_mbqc_gate_set_lowering(self, run_filecheck_qjit):
         """Test that the convert_to_mbqc_formalism_pass works correctly with qjit and unrolled loops."""
         dev = qp.device("null.qubit", wires=1000)
 
         @qp.qjit(
+            capture=True,
             target="mlir",
             pipelines=mbqc_pipeline(),
             autograph=True,
@@ -420,7 +420,6 @@ class TestConvertToMBQCFormalismPass:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_gates_in_mbqc_gate_set_lowering_for(self, run_filecheck_qjit):
         """Test that the convert_to_mbqc_formalism_pass works correctly with qjit and for-loop structure."""
         dev = qp.device("null.qubit", wires=1000)
@@ -433,6 +432,7 @@ class TestConvertToMBQCFormalismPass:
             qp.RZ(phi=0.1, wires=[i])
 
         @qp.qjit(
+            capture=True,
             target="mlir",
             pipelines=mbqc_pipeline(),
             autograph=True,
@@ -466,7 +466,6 @@ class TestConvertToMBQCFormalismPass:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_gates_in_mbqc_gate_set_lowering_graph_state_decomp(self, run_filecheck_qjit):
         """Test that the convert_to_mbqc_formalism_pass works correctly with qjit and for-loop structure."""
         dev = qp.device("null.qubit", wires=1000)
@@ -478,6 +477,7 @@ class TestConvertToMBQCFormalismPass:
             qp.RZ(phi=0.1, wires=[i])
 
         @qp.qjit(
+            capture=True,
             target="mlir",
             pipelines=mbqc_pipeline(),
             autograph=True,
@@ -507,7 +507,6 @@ class TestConvertToMBQCFormalismPass:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_gates_in_mbqc_gate_set_lowering_while(self, run_filecheck_qjit):
         """Test that the convert_to_mbqc_formalism_pass works correctly with qjit and while-loop structure."""
         dev = qp.device("null.qubit", wires=1000)
@@ -522,6 +521,7 @@ class TestConvertToMBQCFormalismPass:
             return i
 
         @qp.qjit(
+            capture=True,
             target="mlir",
             autograph=True,
         )
@@ -547,12 +547,12 @@ class TestConvertToMBQCFormalismPass:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_gates_in_mbqc_gate_set_e2e(self):
         """Test that the convert_to_mbqc_formalism_pass end to end on null.qubit."""
         dev = qp.device("null.qubit", wires=1000)
 
         @qp.qjit(
+            capture=True,
             target="mlir",
             pipelines=mbqc_pipeline(),
             autograph=True,

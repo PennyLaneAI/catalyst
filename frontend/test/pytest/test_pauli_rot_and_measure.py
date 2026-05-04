@@ -22,12 +22,11 @@ from pennylane.transforms import to_ppr
 from catalyst import qjit
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_lowering():
     """Test that Pauli rotation is lowered to quantum.paulirot."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=True)
     def test_pauli_rot_lowering_workflow():
 
         @qp.qnode(qp.device("null.qubit", wires=1))
@@ -40,14 +39,13 @@ def test_pauli_rot_lowering():
     assert "quantum.paulirot" in optimized_ir
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_lowering_with_ctrl_qubits():
     """Test that Pauli rotation with control qubits is converted to quantum.paulirot.
     Note that control PauliRot is currently not supported by the to_ppr pass.
     """
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=True)
     def test_pauli_rot_lowering_with_ctrl_qubits_workflow():
 
         @qp.qnode(qp.device("null.qubit", wires=2))
@@ -61,12 +59,11 @@ def test_pauli_rot_lowering_with_ctrl_qubits():
     assert "ctrls" in optimized_ir
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_to_ppr():
     """Test that Pauli rotation is converted to pbc.ppr."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=True)
     @to_ppr
     def test_pauli_rot_to_ppr_workflow():
 
@@ -80,12 +77,11 @@ def test_pauli_rot_to_ppr():
     assert "pbc.ppr" in optimized_ir
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_with_arbitrary_angle_to_ppr():
     """Test that Pauli rotation for arbitrary angle."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=True)
     @to_ppr
     def test_pauli_rot_with_arbitrary_angle_to_ppr_workflow():
 
@@ -99,12 +95,11 @@ def test_pauli_rot_with_arbitrary_angle_to_ppr():
     assert "pbc.ppr.arbitrary" in optimized_ir
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_with_dynamic_angle_to_ppr():
     """Test that Pauli rotation for dynamic angle."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=True)
     @to_ppr
     def test_pauli_rot_with_dynamic_angle_to_ppr_workflow():
 
@@ -118,12 +113,11 @@ def test_pauli_rot_with_dynamic_angle_to_ppr():
     assert "pbc.ppr.arbitrary" in optimized_ir
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_pauli_measure_to_ppm():
     """Test that Pauli measurement is converted to pbc.ppm."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=True)
     @to_ppr
     def test_pauli_measure_to_ppr_workflow():
 
@@ -137,7 +131,6 @@ def test_pauli_measure_to_ppm():
     assert "pbc.ppm" in optimized_ir
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_to_ppr_pauli_word_error():
     """Test that unsupported pauli words raises `ValueError`."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
@@ -148,7 +141,7 @@ def test_pauli_rot_to_ppr_pauli_word_error():
         r"Allowed characters are I, X, Y and Z",
     ):
 
-        @qjit(pipelines=pipe, target="mlir")
+        @qjit(pipelines=pipe, target="mlir", capture=True)
         def test_pauli_rot_to_ppr_pauli_word_error_workflow():
 
             @qp.qnode(qp.device("null.qubit", wires=1))
@@ -158,7 +151,6 @@ def test_pauli_rot_to_ppr_pauli_word_error():
             return f()
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_pauli_measure_to_ppr_pauli_word_error():
     """Test that unsupported pauli words raises `ValueError`."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
@@ -168,7 +160,7 @@ def test_pauli_measure_to_ppr_pauli_word_error():
         match=r"Only Pauli words consisting of 'I', 'X', 'Y', and 'Z' are allowed.",
     ):
 
-        @qjit(pipelines=pipe, target="mlir")
+        @qjit(pipelines=pipe, target="mlir", capture=True)
         def test_pauli_measure_to_ppr_pauli_word_error_workflow():
 
             @qp.qnode(qp.device("null.qubit", wires=1))
@@ -178,13 +170,12 @@ def test_pauli_measure_to_ppr_pauli_word_error():
             return f()
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_controlled_pauli_rot_failure():
     """
     Test that controlled PauliRot fails at runtime.
     """
 
-    @qjit
+    @qjit(capture=True)
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def workflow():
         qp.ctrl(qp.PauliRot(np.pi / 4, "X", wires=0), control=1)

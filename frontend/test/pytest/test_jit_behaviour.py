@@ -902,13 +902,12 @@ class TestDefaultAvailableIR:
         assert "__catalyst__qis" in g.mlir_opt
 
     @pytest.mark.xdsl
-    @pytest.mark.usefixtures("use_capture")
     def test_mlir_opt_using_xdsl_passes(self, backend):
         """Test mlir opt using xDSL passes."""
         # pylint: disable-next=import-outside-toplevel
         from catalyst.python_interface.transforms import iterative_cancel_inverses_pass
 
-        @qjit
+        @qjit(capture=True)
         @iterative_cancel_inverses_pass
         @qp.qnode(qp.device(backend, wires=1))
         def f():
