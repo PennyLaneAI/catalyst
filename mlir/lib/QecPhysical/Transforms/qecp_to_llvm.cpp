@@ -19,6 +19,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
+
 #include "QecPhysical/IR/QecPhysicalDialect.h"
 #include "QecPhysical/Transforms/Patterns.h"
 
