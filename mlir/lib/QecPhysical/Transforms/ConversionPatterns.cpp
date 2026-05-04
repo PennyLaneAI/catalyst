@@ -21,7 +21,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#include "Catalyst/Utils/EnsureFunctionDeclaration.h"
+// #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "Catalyst/Utils/StaticAllocas.h"
 #include "QecPhysical/IR/QecPhysicalOps.h"
 #include "QecPhysical/Transforms/Patterns.h"
@@ -41,7 +41,7 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         auto i32 = IntegerType::get(ctx, 32);
-        auto voidTy = LLVM::LLVMVoidType::get(ctx);
+        // auto voidTy = LLVM::LLVMVoidType::get(ctx);
         auto ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
         const TypeConverter *conv = getTypeConverter();
 
@@ -50,7 +50,7 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
             return op.emitOpError("op must be bufferized before lowering to LLVM");
 
         // Define function signature
-        StringRef fnName = "__catalyst__qecp__assemble_tanner_graph_int32";
+        // StringRef fnName = "__catalyst__qecp__assemble_tanner_graph_int32";
 
         Type rowIdxVectorType, colPtrVectorType;
         rowIdxVectorType = conv->convertType(
@@ -61,9 +61,9 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
         // Define Tanner Graph struct type
         auto tannerGraphType = LLVM::LLVMStructType::getLiteral(ctx, {ptrTy, ptrTy});
 
-        Type fnSignature = LLVM::LLVMFunctionType::get(voidTy, {ptrTy, ptrTy, ptrTy}, false);
-        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
-            rewriter, op, fnName, fnSignature);
+        // Type fnSignature = LLVM::LLVMFunctionType::get(voidTy, {ptrTy, ptrTy, ptrTy}, false);
+        // LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+        //     rewriter, op, fnName, fnSignature);
 
         //  Add values as arguments of the CallOp
         Value rowIdxAlloca = catalyst::getStaticAlloca(loc, rewriter, rowIdxVectorType, 1);
@@ -82,17 +82,18 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
 
         LLVM::StoreOp::create(rewriter, loc, tannerGraphValue, tannerGraphStructPtr);
 
-        SmallVector<Value> args = {rowIdxAlloca, colPtrAlloca, tannerGraphStructPtr};
-        LLVM::CallOp::create(rewriter, loc, fnDecl, args);
+        // SmallVector<Value> args = {rowIdxAlloca, colPtrAlloca, tannerGraphStructPtr};
+        // LLVM::CallOp::create(rewriter, loc, fnDecl, args);
 
         auto convertedTannerGraph =
             UnrealizedConversionCastOp::create(rewriter, loc, op.getTannerGraph().getType(),
                                                tannerGraphValue)
                 .getResult(0);
 
-        op.getResult().replaceAllUsesWith(convertedTannerGraph);
+        // op.getResult().replaceAllUsesWith(convertedTannerGraph);
 
-        rewriter.eraseOp(op);
+        // rewriter.eraseOp(op);
+        rewriter.replaceOp(op, convertedTannerGraph);
 
         return success();
     }
