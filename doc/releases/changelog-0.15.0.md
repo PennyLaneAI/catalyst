@@ -693,6 +693,10 @@ codes only.
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where `postselect_mode` was not propagated through higher-order ops and control flow
+  when tracing with :func:`~.qjit`.
+  [(#2787)](https://github.com/PennyLaneAI/catalyst/pull/2787)
+
 * Refactored all passes in `catalyst.passes.builtin_passes.py` to be `pennylane.transforms.core.Transform` objects
   rather than decorators. This allows them to be used as standard transforms, enabling full compatibility with
   `pennylane.CompilePipeline`.
