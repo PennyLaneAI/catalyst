@@ -693,6 +693,10 @@ codes only.
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where the `path_to_plugin` never be forwarded in :func:`~.passes.apply_pass_plugin`. The plugin path is now registered with the compiler during tracing.
+  [(#2790)](https://github.com/PennyLaneAI/catalyst/pull/2790)
+
+
 * Refactored all passes in `catalyst.passes.builtin_passes.py` to be `pennylane.transforms.core.Transform` objects
   rather than decorators. This allows them to be used as standard transforms, enabling full compatibility with
   `pennylane.CompilePipeline`.
