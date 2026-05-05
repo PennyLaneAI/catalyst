@@ -140,7 +140,7 @@ codes only.
   ```
 
   For more usage information, check out the
-  [PennyLane v0.45 release notes](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-45-0)!
+  [PennyLane v0.45 release notes](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-45-0).
 
 * The ``diagonalize-final-measurements`` pass received the following new features and
   improvements:
