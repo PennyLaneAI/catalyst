@@ -266,6 +266,7 @@ codes only.
   [(#2711)](https://github.com/PennyLaneAI/catalyst/pull/2711)
   [(#2765)](https://github.com/PennyLaneAI/catalyst/pull/2765)
   [(#2722)](https://github.com/PennyLaneAI/catalyst/pull/2722)
+  [(#2795)](https://github.com/PennyLaneAI/catalyst/pull/2795)
 
   The framework is interfaced with a new `graph_decomposition` pass decorator
   with key capabilities:
