@@ -65,18 +65,9 @@ constexpr size_t kShapeOff = offsetof(DescLayout, sizes);
 void initialize_targets()
 {
     static const bool inited = []() {
-#ifdef CATALYST_HAS_X86
-        LLVMInitializeX86TargetInfo();
-        LLVMInitializeX86Target();
-        LLVMInitializeX86TargetMC();
-        LLVMInitializeX86AsmPrinter();
-#endif
-#ifdef CATALYST_HAS_AARCH64
-        LLVMInitializeAArch64TargetInfo();
-        LLVMInitializeAArch64Target();
-        LLVMInitializeAArch64TargetMC();
-        LLVMInitializeAArch64AsmPrinter();
-#endif
+        InitializeAllTargets();
+        InitializeAllTargetMCs();
+        InitializeAllAsmPrinters();
         return true;
     }();
     (void)inited;
@@ -369,7 +360,7 @@ class RemoteAllocator {
     std::vector<ExecutorAddr> addrs;
 
   public:
-    explicit RemoteAllocator(Session *sess) : sess(sess) {}
+    explicit RemoteAllocator(Session *s) : sess(s) {}
     ~RemoteAllocator()
     {
         for (ExecutorAddr a : addrs) {
@@ -394,8 +385,8 @@ MemrefStructLayout from_layout(nb::object cls, StructKind kind)
 {
     auto ctypes = nb::module_::import_("ctypes");
     MemrefStructLayout layout{
-        .kind = kind,
         .total_size = nb::cast<size_t>(ctypes.attr("sizeof")(cls)),
+        .kind = kind,
     };
 
     /* Data from the descriptor class */
