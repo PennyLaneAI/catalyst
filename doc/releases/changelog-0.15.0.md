@@ -55,6 +55,7 @@ codes only.
   from all shots.
   [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
   [(#2573)](https://github.com/PennyLaneAI/catalyst/pull/2573)
+  [(#2786)](https://github.com/PennyLaneAI/catalyst/pull/2786)
 
   With this new MLIR pass, one shot execution mode is now available when capture is enabled.
 
