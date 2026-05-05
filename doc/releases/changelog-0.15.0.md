@@ -701,10 +701,7 @@ codes only.
   the `quantum.node` attribute. Downstream, the `resource-analysis` pass then misidentified
   the empty wrapper as an additional qnode, causing an empty column in `qp.specs` at MLIR levels.
   [(#2793)](https://github.com/PennyLaneAI/catalyst/pull/2793)
-* Fixed a bug in the `split-multiple-tapes` pass where the post-split classical wrapper kept
-  the `quantum.node` attribute. Downstream, the `resource-analysis` pass would identify
-  the empty wrapper as an additional qnode, causing `qp.specs` to return invalid results at MLIR levels.
-  [(#2793)](https://github.com/PennyLaneAI/catalyst/pull/2793)
+
 * Refactored all passes in `catalyst.passes.builtin_passes.py` to be `pennylane.transforms.core.Transform` objects
   rather than decorators. This allows them to be used as standard transforms, enabling full compatibility with
   `pennylane.CompilePipeline`.
