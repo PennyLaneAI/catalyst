@@ -16,6 +16,7 @@ from copy import copy
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import TypeAlias
+from functools import wraps
 
 from pennylane.transforms.core import BoundTransform, CompilePipeline, transform
 
@@ -192,6 +193,7 @@ def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valu
     def decorator(obj):
         transformed = transform(pass_name=pass_name)(obj, *flags, **valued_options)
 
+        @wraps(transformed)
         def wrapper(*args, **kwargs):
             if EvaluationContext.is_tracing():
                 EvaluationContext.add_plugin(path_to_plugin)
