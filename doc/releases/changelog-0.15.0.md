@@ -155,7 +155,9 @@ codes only.
   quantum-opt --resource-analysis -mlir-pass-statistics input.mlir
   ```
 
-* The `diagonalize-final-measurements` xDSL pass now accepts the optional keyword argument ``supported_base_obs``. The kwarg``to_eigvals`` is now also included in the call signature for compatibility with the tape transform, but this kwarg is unused and can only take its default value, `False`.
+* The `diagonalize-final-measurements` xDSL pass now accepts the optional keyword argument ``supported_base_obs``.
+  The kwarg ``to_eigvals`` is now also included in the call signature for compatibility with the tape
+  transform, but this kwarg is unused and can only take its default value `False`.
   [(#2517)](https://github.com/PennyLaneAI/catalyst/pull/2517)
 
   These pass options can be applied as follows in the example below:
@@ -275,7 +277,8 @@ codes only.
   - Optional `alt_decomps` to define additional rules for (user-defined) operators
   - Optional `fixed_decomps` to pin a specific decomposition rule for an operator
 
-  ``` python
+
+  ```python
   import pennylane as qp
   import pennylane.numpy as np
 
@@ -328,7 +331,8 @@ codes only.
       return qp.state()
   ```
 
-  ``` pycon
+
+  ```pycon
   >>> print(qp.specs(circuit, level="device")(1.23, 4.56).resources.gate_types)
   {'Rot': 2}
   ```
@@ -698,10 +702,7 @@ codes only.
   the `quantum.node` attribute. Downstream, the `resource-analysis` pass then misidentified
   the empty wrapper as an additional qnode, causing an empty column in `qp.specs` at MLIR levels.
   [(#2793)](https://github.com/PennyLaneAI/catalyst/pull/2793)
-* Fixed a bug in the `split-multiple-tapes` pass where the post-split classical wrapper kept
-  the `quantum.node` attribute. Downstream, the `resource-analysis` pass would identify
-  the empty wrapper as an additional qnode, causing `qp.specs` to return invalid results at MLIR levels.
-  [(#2793)](https://github.com/PennyLaneAI/catalyst/pull/2793)
+
 * Refactored all passes in `catalyst.passes.builtin_passes.py` to be `pennylane.transforms.core.Transform` objects
   rather than decorators. This allows them to be used as standard transforms, enabling full compatibility with
   `pennylane.CompilePipeline`.
