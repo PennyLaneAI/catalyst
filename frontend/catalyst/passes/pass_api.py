@@ -13,10 +13,10 @@
 # limitations under the License.
 
 from copy import copy
+from functools import wraps
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import TypeAlias
-from functools import wraps
 
 from pennylane.transforms.core import BoundTransform, CompilePipeline, transform
 
