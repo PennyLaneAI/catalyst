@@ -14,7 +14,7 @@
 
 // RUN: quantum-opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=RX=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes FIRST
 
-// RUN: quantum-opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=RX=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"},graph-decomposition{gate-set=RZ=1.0,RY=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes SECOND
+// RUN: quantum-opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=RX=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"},graph-decomposition{gate-set=RZ=1.0,RY=1.0,gphase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes SECOND
 
 func.func @circuit() -> !quantum.bit {
     %0 = quantum.alloc(2) : !quantum.reg

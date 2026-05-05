@@ -272,14 +272,26 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
     void getOperators(std::vector<OperatorNode> &operators)
     {
-        getOperation().walk([&](CustomOp op) {
+        getOperation().walk([&](quantum::QuantumGate op) {
             OperatorNode node;
-            node.name = op.getGateName().str();
-            auto inQubits = op.getInQubits();
-            node.numWires = inQubits.size();
-            auto inParams = op.getParams();
-            node.numParams = inParams.size();
-            node.adjoint = op.getAdjoint();
+            node.numWires = op.getQubitOperands().size();
+            node.adjoint = op.getAdjointFlag();
+
+            if (auto customOp = llvm::dyn_cast<quantum::CustomOp>(op.getOperation())) {
+                node.name = customOp.getGateName().str();
+            }
+            else {
+                node.name = op->getName().stripDialect().str();
+            }
+
+            if (auto paramOp =
+                    llvm::dyn_cast<catalyst::quantum::ParametrizedGate>(op.getOperation())) {
+                node.numParams = paramOp.getAllParams().size();
+            }
+            else {
+                node.numParams = 0;
+            }
+
             operators.push_back(node);
         });
     }
