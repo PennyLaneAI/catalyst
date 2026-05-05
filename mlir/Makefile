@@ -38,7 +38,7 @@ endif
 
 LLVM_PROJECTS ?= mlir;lld
 LLVM_TARGETS ?= check-mlir llvm-symbolizer lld llvm-strip
-LLVM_TARGETS_TO_BUILD ?= host;ARM;X86
+LLVM_TARGETS_TO_BUILD ?= host
 
 .PHONY: help
 help:
