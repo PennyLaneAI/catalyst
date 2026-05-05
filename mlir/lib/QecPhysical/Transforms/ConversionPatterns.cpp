@@ -78,9 +78,9 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
         tannerGraphValue = LLVM::InsertValueOp::create(rewriter, loc, tannerGraphValue,
                                                        colPtrAlloca, SmallVector<int64_t>{1});
 
-        auto tannerGraphStructPtr = catalyst::getStaticAlloca(loc, rewriter, tannerGraphType, 1);
+        // auto tannerGraphStructPtr = catalyst::getStaticAlloca(loc, rewriter, tannerGraphType, 1);
 
-        LLVM::StoreOp::create(rewriter, loc, tannerGraphValue, tannerGraphStructPtr);
+        // LLVM::StoreOp::create(rewriter, loc, tannerGraphValue, tannerGraphStructPtr);
 
         // SmallVector<Value> args = {rowIdxAlloca, colPtrAlloca, tannerGraphStructPtr};
         // LLVM::CallOp::create(rewriter, loc, fnDecl, args);
