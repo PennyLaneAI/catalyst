@@ -72,7 +72,7 @@ def test_standalone_plugin_no_preregistration():
 
 
 @pytest.mark.skipif(not have_standalone_plugin, reason="Standalone Plugin is not installed")
-def test_standalone_plugin_no_preregistration():
+def test_standalone_plugin_no_preregistration_run():
     """Execute the standalone plugin"""
 
     @apply_pass_plugin(plugin, "standalone-switch-bar-foo")
