@@ -1,4 +1,4 @@
-# Release 0.15.0 (development release)
+# Release 0.15.0 (current release)
 
 <h3>New features since last release</h3>
 
@@ -27,7 +27,7 @@ codes only.
       qp.GlobalPhase(3)
       qp.GlobalPhase(4)
       return qp.state()
-  
+
   Device: lightning.qubit
   Device wires: 5
   Shots: Shots(total=None)
@@ -506,6 +506,7 @@ codes only.
 
 * The :func:`~.passes.parity_synth` can now be invoked from the ``passes`` module.
   [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
+  [(#2784)](https://github.com/PennyLaneAI/catalyst/pull/2784)
 
   ```python
   import pennylane as qp
@@ -525,7 +526,7 @@ codes only.
       qp.RZ(z, 1)
       qp.CNOT((1, 0))
       return qp.state()
-  
+
   Device: lightning.qubit
   Device wires: 2
   Shots: Shots(total=None)
@@ -1187,6 +1188,7 @@ codes only.
   [(#2737)](https://github.com/PennyLaneAI/catalyst/pull/2737)
   [(#2731)](https://github.com/PennyLaneAI/catalyst/pull/2731)
   [(#2735)](https://github.com/PennyLaneAI/catalyst/pull/2735)
+  [(#2754)](https://github.com/PennyLaneAI/catalyst/pull/2754)
 
 * A number of deprecation warnings have been fixed in the compiler python interface.
   [(#2621)](https://github.com/PennyLaneAI/catalyst/pull/2621)

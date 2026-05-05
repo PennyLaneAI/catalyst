@@ -504,29 +504,30 @@ def parity_synth_setup_inputs():
 
     .. code-block:: python
 
-        import pennylane as qml
+        import pennylane as qp
         from catalyst.python_interface import Compiler
         import catalyst
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qjit(capture=True)
+        @qp.qjit(capture=True)
         @catalyst.passes.parity_synth
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x: float, y: float, z: float):
-            qml.CNOT((0, 1))
-            qml.RZ(x, 1)
-            qml.CNOT((0, 1))
-            qml.RX(y, 1)
-            qml.CNOT((1, 0))
-            qml.RZ(z, 1)
-            qml.CNOT((1, 0))
-            return qml.state()
+            qp.CNOT((0, 1))
+            qp.RZ(x, 1)
+            qp.CNOT((0, 1))
+            qp.RX(y, 1)
+            qp.CNOT((1, 0))
+            qp.RZ(z, 1)
+            qp.CNOT((1, 0))
+            return qp.state()
 
     We can draw the circuit and observe the last ``RZ`` gate to be wrapped in a pair of ``CNOT``
     gates that commute with it. Before the pass is applied:
 
-    >>> print(catalyst.draw_graph(circuit, level=0)(0.52, 0.12, 0.2))
+    >>> fig, ax = catalyst.draw_graph(circuit, level=0)(0.52, 0.12, 0.2)
+    >>> fig.savefig('path-to-file.png', dpi=300, bbox_inches='tight')
 
     .. figure:: /_static/parity-synth-example-before.png
         :width: 35%
@@ -535,7 +536,8 @@ def parity_synth_setup_inputs():
 
     After the pass is applied:
 
-    >>> print(catalyst.draw_graph(circuit, level=1)(0.52, 0.12, 0.2))
+    >>> fig, ax = catalyst.draw_graph(circuit, level=1)(0.52, 0.12, 0.2)
+    >>> fig.savefig('path-to-file.png', dpi=300, bbox_inches='tight')
 
     .. figure:: /_static/parity-synth-example-pass-applied.png
         :width: 35%
