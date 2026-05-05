@@ -122,8 +122,6 @@ module @circuit_twotapes_module {
 }
 
 // CHECK: module @circuit_twotapes_module {
-// Both classical wrappers must lose `quantum.node` (verified via the literal
-// attribute lists below); both outlined tape functions must keep it.
 // CHECK: func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>} {
 // CHECK: func.call @circuit_twotapes_tape_0(%arg1, %cst_0)
 // CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, %cst)
@@ -202,7 +200,6 @@ module @circuit_twotapes_module {
 }
 
 // CHECK: module @circuit_twotapes_module {
-// Wrapper must lose `quantum.node`; outlined tape functions keep it.
 // CHECK: func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>} {
 // CHECK: func.call @circuit_twotapes_tape_0_0(%arg1, %cst_0)
 // CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, %cst)
@@ -270,7 +267,6 @@ module @circuit_twotapes_module {
 }
 
 // CHECK: module @circuit_twotapes_module {
-// Wrapper must lose `quantum.node`; outlined tape functions keep it.
 // CHECK: func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>} {
 // CHECK: func.call @circuit_twotapes_tape_0(%arg1, %cst_0)
 // CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, %cst)
@@ -328,7 +324,6 @@ module @circuit_twotapes_module {
 }
 
 // CHECK: module @circuit_twotapes_module {
-// Wrapper must lose `quantum.node`; outlined tape functions keep it.
 // CHECK: func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>} {
 // CHECK: func.call @circuit_twotapes_tape_0(%arg1, %cst_0)
 // CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, %cst, {{%.+}})
