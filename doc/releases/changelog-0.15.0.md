@@ -9,9 +9,14 @@ please note that LUT decoders scale exponentially with code size and are intende
 codes only.
 [(#2724)](https://github.com/PennyLaneAI/catalyst/pull/2724)
 
+
+* A new optimization pass has been added to reduce the number of instructions in a quantum program,
+  `--merge-global-phase`, which safely combines global phase instructions for each region in the
+  program. The xDSL version written in Python has been removed.
+
 * Combining ``GlobalPhase`` operations into one single operation is now possible with the
-  :func:`catalyst.passes.combine_global_phases` pass.
-  [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
+  :func:`catalyst.passes.combine_global_phases` MLIR compilation pass.
+  [(#2604)](https://github.com/PennyLaneAI/catalyst/pull/2604)
 
   ```python
   import pennylane as qp
@@ -19,7 +24,7 @@ codes only.
 
   @qp.qjit(capture=True)
   @catalyst.passes.combine_global_phases
-  @qp.qnode(qml.device("lightning.qubit", wires=5))
+  @qp.qnode(qp.device("lightning.qubit", wires=5))
   def circuit():
       qp.GlobalPhase(0)
       qp.GlobalPhase(1)
@@ -27,74 +32,60 @@ codes only.
       qp.GlobalPhase(3)
       qp.GlobalPhase(4)
       return qp.state()
-
-  Device: lightning.qubit
-  Device wires: 5
-  Shots: Shots(total=None)
-  Level: combine-global-phases (MLIR-1)
-  <BLANKLINE>
-  Wire allocations: 5
-  Total gates: 1
-  Gate counts:
-  - GlobalPhase: 1
-  Measurements:
-  - state(all wires): 1
-  Depth: Not computed
   ```
 
-* A new `~.CompilationPass` class has been added that abstracts away compiler-level details for
-  seamless compilation pass creation. Used in tandem with :func:`~.compiler_transform`, compilation
-  passes can be created entirely in Python and used on QNodes within a :func:`~.qjit`'d workflow.
-  [(#2211)](https://github.com/PennyLaneAI/catalyst/pull/2211)
+  ```pycon
+  >>> print(qp.specs(circuit, level=1)().resources.gate_counts)
+  {'GlobalPhase': 1}
+  ```
 
-* A new MLIR transformation pass `--dynamic-one-shot` is available.
-  Devices that natively support mid-circuit measurements can evaluate dynamic circuits by executing
-  them one shot at a time, sampling a dynamic execution path for each shot. The `--dynamic-one-shot`
-  pass first transforms the circuit so that each circuit execution only contains a singular shot,
-  then performs the appropriate classical statistical postprocessing across the execution results
-  from all shots.
+  There was a previous implementation of this pass using xDSL, but it has been removed.
+
+* A new implementation of the dynamic-one-shot MCM method is now available. This implementation is
+  entirely in MLIR, which vastly improves the robustness and performance of Catalyst workflows that
+  use this MCM method in addition to being compatible with PennyLane's program capture
+  (``@qjit(capture=True)``).
   [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
   [(#2573)](https://github.com/PennyLaneAI/catalyst/pull/2573)
 
-  With this new MLIR pass, one shot execution mode is now available when capture is enabled.
-
   ```python
+  import pennylane as qp
+  import catalyst
+
   dev = qp.device("lightning.qubit", wires=2)
 
-  @qjit(capture=True)
-  @qp.transform(pass_name="dynamic-one-shot")
-  @qp.qnode(dev, shots=10)
+  @qp.qjit(capture=True)
+  @qp.qnode(dev, shots=10, mcm_method="one-shot")
   def circuit():
       qp.Hadamard(wires=0)
       m_0 = qp.measure(0)
       m_1 = qp.measure(1)
-      return qp.sample([m_0, m_1]), qp.expval(m_0), qp.probs(op=[m_0,m_1]), qp.counts(wires=0)
+      return qp.sample([m_0, m_1]), qp.expval(m_0), qp.counts(wires=0, all_outcomes=True)
   ```
 
   ```pycon
-  >>> circuit()
-  (Array([[1, 0],
-         [0, 0],
-         [1, 0],
-         [1, 0],
-         [0, 0],
-         [0, 0],
-         [1, 0],
-         [1, 0],
-         [1, 0],
-         [0, 0]], dtype=int64), Array(0.6, dtype=float64), Array([0.4, 0. , 0.6, 0. ], dtype=float64),
-         (Array([0, 1], dtype=int64), Array([4, 6], dtype=int64)))
+  >>> print(circuit())
+  (Array([[0, 0],
+        [0, 0],
+        [1, 0],
+        [1, 0],
+        [0, 0],
+        [1, 0],
+        [1, 0],
+        [0, 0],
+        [0, 0],
+        [1, 0]], dtype=int64), Array(0.5, dtype=float64), (Array([0, 1], dtype=int64), Array([5, 5], dtype=int64)))
   ```
 
-  Note that although the one-shot transform is motivated from the context of mid-circuit measurements,
-  this pass also supports terminal measurement processes that are performed on wires, instead of
-  mid-circuit measurement results.
+  Note that although the dynamic-one-shot transform is motivated from the context of mid-circuit
+  measurements, this method also supports terminal measurement processes that are performed on
+  wires (e.g., ``probs``).
 
 * Executing circuits that are compiled with :func:`pennylane.transforms.to_ppr`,
   :func:`pennylane.transforms.commute_ppr`, :func:`pennylane.transforms.ppr_to_ppm`,
   :func:`pennylane.transforms.merge_ppr_ppm`, :func:`pennylane.transforms.reduce_t_depth`,
-  and :func:`pennylane.transforms.decompose_arbitrary_ppr` is now possible with the `lightning.qubit` device and
-  with program capture enabled (:func:`pennylane.capture.enable`).
+  and :func:`pennylane.transforms.decompose_arbitrary_ppr` is now possible with the
+  ``lightning.qubit`` device and with program capture enabled (``@qjit(capture=True)``).
   [(#2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
   [(#2389)](https://github.com/PennyLaneAI/catalyst/pull/2389)
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
@@ -106,7 +97,7 @@ codes only.
   [(#2639)](https://github.com/PennyLaneAI/catalyst/pull/2639)
 
   Previously, circuits compiled with these transforms were only inspectable via
-  :func:`pennylane.specs` and :func:`catalyst.draw`. Now, such circuits can be executed:
+  :func:`pennylane.specs` and :func:`pennylane.draw_graph`. Now, such circuits can be executed.
 
   ```python
   import pennylane as qp
@@ -121,145 +112,79 @@ codes only.
       return qp.probs([0, 1])
   ```
 
-  ```
+  ```pycon
   >>> print(circuit())
   [0.5 0.  0.  0.5]
   ```
 
-* Added support for ``PauliRot`` and ``PauliMeasure`` execution on the `null.qubit` device, which enables
-  runtime resource tracking for those operations.
+* Support for ``PauliRot`` and ``PauliMeasure`` execution on the ``null.qubit`` device has been
+  added, which enables runtime resource tracking for those operations.
   [(#2627)](https://github.com/PennyLaneAI/catalyst/pull/2627)
 
-* A new optimization pass has been added to reduce the number of instructions in a quantum program,
-  `--merge-global-phase`, which safely combines global phase instructions for each region in the
-  program. The xDSL version written in Python has been removed.
-  [(#2604)](https://github.com/PennyLaneAI/catalyst/pull/2604)
-
-* A new `~.CompilationPass` class has been added that abstracts away compiler-level details for
-  seamless compilation pass creation. Used in tandem with :func:`~.compiler_transform`, compilation
-  passes can be created entirely in Python and used on QNodes within a :func:`~.qjit`'d workflow.
-  [(#2211)](https://github.com/PennyLaneAI/catalyst/pull/2211)
-
-* Added a scalable MLIR resource analysis pass (`resource-analysis`) that counts quantum
-  operations across the `quantum`, `qec`, and `mbqc` dialects. The analysis is implemented as a
-  cacheable MLIR analysis class (`ResourceAnalysis`) that other transformation passes can query
-  via `getAnalysis<ResourceAnalysis>()`, avoiding redundant recomputation.
+* For ``qjit``'d workflows, PennyLane's :func:`~.specs` function for inspecting circuit resources
+  now leverages a performant MLIR resource analysis pass (``resource-analysis``) that counts quantum
+  operations across the ``quantum``, ``qec``, and ``mbqc`` dialects. The analysis is implemented as
+  a cacheable MLIR analysis class (``ResourceAnalysis``) that other transformation passes can query
+  via ``getAnalysis<ResourceAnalysis>()``, avoiding redundant recomputation.
   [(#2479)](https://github.com/PennyLaneAI/catalyst/pull/2479)
+  [(#2534)](https://github.com/PennyLaneAI/catalyst/pull/2534)
   [(#2675)](https://github.com/PennyLaneAI/catalyst/pull/2675)
   [(#2695)](https://github.com/PennyLaneAI/catalyst/pull/2695)
   [(#2755)](https://github.com/PennyLaneAI/catalyst/pull/2755)
+
+  This pass can be invoked from the Catalyst CLI as follows:
 
   ```bash
   quantum-opt --resource-analysis='output-json=true' input.mlir
   quantum-opt --resource-analysis -mlir-pass-statistics input.mlir
   ```
 
-* The `diagonalize-final-measurements` xDSL pass now accepts the optional keyword argument ``supported_base_obs``. The kwarg``to_eigvals`` is now also included in the call signature for compatibility with the tape transform, but this kwarg is unused and can only take its default value, `False`.
-  [(#2517)](https://github.com/PennyLaneAI/catalyst/pull/2517)
+  For more usage information, check out the
+  [PennyLane v0.45 release notes](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-45-0)!
 
-  These pass options can be applied as follows in the example below:
+* The ``diagonalize-final-measurements`` pass received the following new features and
+  improvements:
 
-  ```python
-  import pennylane as qp
+  - It is now available as a builtin pass accessible from the Catalyst frontend as
+    :func:`catalyst.passes.diagonalize_measurements`.
+    [(#2630)](https://github.com/PennyLaneAI/catalyst/pull/2630)
 
-  def diagonalize_measurements_setup_inputs(
-      to_eigvals: bool = False, supported_base_obs: tuple[str] = ("PauliX",)
-  ):
-      return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
+  - It now accepts the optional keyword argument ``supported_base_obs``. The kwarg ``to_eigvals`` is
+    also now included in the call signature for compatibility with the tape transform, but this
+    kwarg is unused and can only take its default value, ``False``.
+    [(#2517)](https://github.com/PennyLaneAI/catalyst/pull/2517)
 
-  diagonalize_measurements = qp.transform(
-      pass_name="diagonalize-final-measurements", setup_inputs=diagonalize_measurements_setup_inputs
-  )
+    These pass options can be applied as follows:
 
-  dev = qp.device("null.qubit", wires=4)
-  @qp.qjit(target="mlir", keep_intermediate=True)
-  @diagonalize_measurements(supported_base_obs=('PauliX',))
-  @qp.qnode(dev, shots=1000)
-  def circuit():
-      qp.CRX(0.1, wires=[0, 1])
-      return qp.expval(qp.X(0))
+    ```python
+    import pennylane as qp
+    import catalyst
 
-  circuit()
-  ```
+    dev = qp.device("null.qubit", wires=4)
+    @qp.qjit(target="mlir", keep_intermediate=True)
+    @catalyst.passes.diagonalize_measurements(supported_base_obs=('PauliX',))
+    @qp.qnode(dev, shots=1000)
+    def circuit():
+        qp.CRX(0.1, wires=[0, 1])
+        return qp.expval(qp.X(0))
+    ```
 
-* The `diagonalize-final-measurements` xDSL pass now includes an observable-commutativity check and
-  raises an error if non-commuting terms are encountered. The check is applied to each `qnode` in
-  the IR (that is, a `func.func` op with a `quantum.node` attribute). If the measurement contains
-  only Pauli or Hadamard observables, the *qubit-wise commutativity* (QWC) check is applied.
-  Otherwise, the more strict *non-overlapping observable* check is applied.
-  [(#2538)](https://github.com/PennyLaneAI/catalyst/pull/2538)
-  [(#2633)](https://github.com/PennyLaneAI/catalyst/pull/2633)
+    ```pycon
+    >>> circuit()
+    Array(0., dtype=float64)
+    ```
 
-* The `diagonalize-final-measurements` xDSL pass is now available as a builtin pass accessible from the Catalyst frontend as `catalyst.passes.diagonalize_measurements`.
-  [(#2630)](https://github.com/PennyLaneAI/catalyst/pull/2630)
+  - It now includes an observable-commutativity check and raises an error if non-commuting terms are
+    encountered. The check is applied to each QNode in the IR. If the measurement contains only
+    Pauli or Hadamard observables, the *qubit-wise commutativity* (QWC) check is applied. Otherwise,
+    the more strict *non-overlapping observable* check is applied.
+    [(#2538)](https://github.com/PennyLaneAI/catalyst/pull/2538)
+    [(#2633)](https://github.com/PennyLaneAI/catalyst/pull/2633)
 
-* Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
-  effectively filtering for decomposition rules in the MLIR-native decomposition framework.
-  [(#2539)](https://github.com/PennyLaneAI/catalyst/pull/2539)
-
-  ```bash
-  quantum-opt input.mlir -register-decomp-rule-resource
-  ```
-
-  Input:
-
-  ```mlir
-  func.func @decomp_rule() attributes {target_gate="CustomGate"}  {
-      %0 = quantum.alloc( 2) : !quantum.reg
-      %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-      %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-      %3 = quantum.custom "Hadamard"() %1 : !quantum.bit
-      %4 = quantum.custom "T"() %3 : !quantum.bit
-      %5 = quantum.custom "S"() %2 : !quantum.bit
-      %6:2 = quantum.custom "CNOT"() %4, %5 : !quantum.bit, !quantum.bit
-      %7 = quantum.insert %0[ 0], %6#0 : !quantum.reg, !quantum.bit
-      %8 = quantum.insert %7[ 1], %6#1 : !quantum.reg, !quantum.bit
-      quantum.dealloc %8 : !quantum.reg
-      return
-  }
-  ```
-
-  Output:
-
-  ```mlir
-  func.func @decomp_rule() attributes {resources = {measurements = {}, num_alloc_qubits = 2 : i64, num_arg_qubits = 0 : i64, num_qubits = 2 : i64, operations = {"CNOT(2)" = 1 : i64, "Hadamard(1)" = 1 : i64, "S(1)" = 1 : i64, "T(1)" = 1 : i64}}, target_gate = "CustomGate"}  {
-      %0 = quantum.alloc( 2) : !quantum.reg
-      %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-      %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-      %3 = quantum.custom "Hadamard"() %1 : !quantum.bit
-      %4 = quantum.custom "T"() %3 : !quantum.bit
-      %5 = quantum.custom "S"() %2 : !quantum.bit
-      %6:2 = quantum.custom "CNOT"() %4, %5 : !quantum.bit, !quantum.bit
-      %7 = quantum.insert %0[ 0], %6#0 : !quantum.reg, !quantum.bit
-      %8 = quantum.insert %7[ 1], %6#1 : !quantum.reg, !quantum.bit
-      quantum.dealloc %8 : !quantum.reg
-      return
-  }
-  ```
-
-* Added a cache of pre-compiled PennyLane built-in decomposition rules for use with the C++ graph
-  decomposition system.
-  [(#2531)](https://github.com/PennyLaneAI/catalyst/pull/2531)
-  [(#2619)](https://github.com/PennyLaneAI/catalyst/pull/2619)
-  [(#2713)](https://github.com/PennyLaneAI/catalyst/pull/2713)
-  [(#2749)](https://github.com/PennyLaneAI/catalyst/pull/2749)
-
-* Decomposition rules are lowered as private functions (instead of public).
-  [(#2658)](https://github.com/PennyLaneAI/catalyst/pull/2658)
-  [(#2660)](https://github.com/PennyLaneAI/catalyst/pull/2660)
-
-* A new optimization pass has been added to reduce the number of instructions in a quantum program,
-  `--combine-global-phase`, which safely combines global phase instructions for each region in the
-  program. The xDSL version written in Python has been removed.
-  [(#2604)](https://github.com/PennyLaneAI/catalyst/pull/2604)
-  [(#2777)](https://github.com/PennyLaneAI/catalyst/pull/2777)
-
-* A new native-MLIR graph-based decomposition framework is now available. This system
-  migrates the graph-decomposition logic from Python into the Catalyst compiler as a
-  high-performance C++ library (`DecompGraphSolver`), enabling the compiler to
-  automatically find optimal decomposition paths from source gates to a target gate set.
-  PennyLane's built-in decompositon rules are pre-compiled to MLIR bytecode and
-  is utilized in this new framework to enable fast rule loading at compile time.
+* A new native-MLIR graph-based decomposition framework is now available that closely mimics
+  PennyLane's Python implementation (:func:`pennylane.decomposition.enable_graph`). This system
+  is a high-performance C++ library (``DecompGraphSolver``), enabling the compiler to automatically
+  find optimal decomposition paths from source gates to a target gate set.
   [(#2552)](https://github.com/PennyLaneAI/catalyst/pull/2552)
   [(#2568)](https://github.com/PennyLaneAI/catalyst/pull/2568)
   [(#2578)](https://github.com/PennyLaneAI/catalyst/pull/2578)
@@ -267,12 +192,15 @@ codes only.
   [(#2765)](https://github.com/PennyLaneAI/catalyst/pull/2765)
   [(#2722)](https://github.com/PennyLaneAI/catalyst/pull/2722)
 
-  The framework is interfaced with a new `graph_decomposition` pass decorator
+  PennyLane's built-in decompositon rules are pre-compiled to MLIR bytecode and is utilized in this
+  new framework to enable fast rule loading at compile time.
+
+  The framework is interfaced with a new ``graph_decomposition`` pass decorator
   with key capabilities:
   - Multiple graph-based decomposition transformation at MLIR
   - Weighted target gate sets for the graph solver to minimize the total decomposition cost
-  - Optional `alt_decomps` to define additional rules for (user-defined) operators
-  - Optional `fixed_decomps` to pin a specific decomposition rule for an operator
+  - Optional ``alt_decomps`` to define additional rules for (user-defined) operators
+  - Optional ``fixed_decomps`` to pin a specific decomposition rule for an operator
 
   ``` python
   import pennylane as qp
@@ -332,7 +260,7 @@ codes only.
   {'Rot': 2}
   ```
 
-* Added a pass to compute resource metrics of functions marked with the `target_gate` attribute,
+* Added a pass to compute resource metrics of functions marked with the ``target_gate`` attribute,
   effectively filtering for decomposition rules in the MLIR-native decomposition framework.
   [(#2539)](https://github.com/PennyLaneAI/catalyst/pull/2539)
 
@@ -376,6 +304,10 @@ codes only.
   }
   ```
 
+* Decomposition rules are lowered as private functions (instead of public).
+  [(#2658)](https://github.com/PennyLaneAI/catalyst/pull/2658)
+  [(#2660)](https://github.com/PennyLaneAI/catalyst/pull/2660)
+
 * Added a cache of pre-compiled PennyLane built-in decomposition rules for use with the C++ graph
   decomposition system.
   [(#2531)](https://github.com/PennyLaneAI/catalyst/pull/2531)
@@ -383,9 +315,10 @@ codes only.
   [(#2713)](https://github.com/PennyLaneAI/catalyst/pull/2713)
   [(#2749)](https://github.com/PennyLaneAI/catalyst/pull/2749)
 
-* Decomposition rules are lowered as private functions (instead of public).
-  [(#2658)](https://github.com/PennyLaneAI/catalyst/pull/2658)
-  [(#2660)](https://github.com/PennyLaneAI/catalyst/pull/2660)
+* A new `~.CompilationPass` class has been added that abstracts away compiler-level details for
+  seamless compilation pass creation. Used in tandem with :func:`~.compiler_transform`, compilation
+  passes can be created entirely in Python and used on QNodes within a :func:`~.qjit`'d workflow.
+  [(#2211)](https://github.com/PennyLaneAI/catalyst/pull/2211)
 
 * OQD (Open Quantum Design) end-to-end pipeline is added to Catalyst.
   The pipeline supports compilation to LLVM IR using the `QJIT` constructor with `link=False`, enabling integration with ARTIQ's cross-compilation toolchain. The generated LLVM IR can be used with the internal `compile_to_artiq()` function from the third-party OQD repository to produce ARTIQ binaries.
@@ -485,10 +418,6 @@ codes only.
 * `null.qubit` resource tracking is now able to track measurements and observables. This output
   is also reflected in `qp.specs`.
   [(#2446)](https://github.com/PennyLaneAI/catalyst/pull/2446)
-
-* `mlir_specs` now supports MLIR passes which create multiple qnode entry points, such as `split-non-commuting` pass.
-  When such passes are present, `mlir_specs` will return a list of resources with 1 per entrypoint.
-  [(#2534)](https://github.com/PennyLaneAI/catalyst/pull/2534)
 
 * ``ResourceAnalysis`` and ``RegisterDecompRuleResource`` passes now record the number of classical
   parameters for each gate alongside the wire count. The operation key format changes from
