@@ -531,6 +531,16 @@ codes only.
   - It has been extended to support tensor product observables.
     [(#2656)](https://github.com/PennyLaneAI/catalyst/pull/2656)
 
+* All passes in ``catalyst.passes.builtin_passes.py`` have been refactored to be
+  ``pennylane.transforms.core.Transform`` objects. This allows them to be used as standard
+  transforms, enabling full compatibility with :func:`pennylane.CompilePipeline`.
+  [(#2722)](https://github.com/PennyLaneAI/catalyst/pull/2722)
+
+* The adjoint lowering pass now supports ``switch`` operation as well. Previously, using
+  `qp.adjoint` on a circuit containing a `switch` would raise a `CompileError`. The MLIR
+  `--adjoint-lowering` pass has been updated to support this usage.
+  [(#2691)](https://github.com/PennyLaneAI/catalyst/pull/2691)
+
 <h3>Breaking changes 💔</h3>
 
 * The ``catalyst.python_interface.transforms.parity_synth_pass`` transform has been renamed to
@@ -589,27 +599,22 @@ codes only.
 
 <h3>Bug fixes 🐛</h3>
 
-* Refactored all passes in `catalyst.passes.builtin_passes.py` to be `pennylane.transforms.core.Transform` objects
-  rather than decorators. This allows them to be used as standard transforms, enabling full compatibility with
-  `pennylane.CompilePipeline`.
-  [(#2722)](https://github.com/PennyLaneAI/catalyst/pull/2722)
-
-* Fixed a bug where the `work_wire_type` argument of `qp.ctrl` was silently dropped inside `@qjit` functions.
+* Fixed a bug where the ``work_wire_type`` argument of `qp.ctrl` was silently dropped inside `@qjit` functions.
   The parameter is now threaded through `catalyst.ctrl`, `CtrlCallable`, `HybridCtrl`, and
   `ctrl_distribute`, with the default value being `"borrowed"`.
   [(#2710)](https://github.com/PennyLaneAI/catalyst/pull/2710)
 
-* Fixed a bug where multiple `quantum.extract` operations from the same index were being created
+* Fixed a bug where multiple ``quantum.extract`` operations from the same index were being created
   when there are multiple computational basis observables, named observables or Hermitian
-  observables on that same wire index, when capture is not enabled.
+  observables on that same wire index, when PennyLane's program capture is not enabled.
   [(#2641)](https://github.com/PennyLaneAI/catalyst/pull/2641)
   [(#2646)](https://github.com/PennyLaneAI/catalyst/pull/2646)
   [(#2693)](https://github.com/PennyLaneAI/catalyst/pull/2693)
 
-* :func:`~pennylane.adjoint` can now be used on subroutines with classical arguments.
+* :func:`pennylane.adjoint` can now be used on subroutines with classical arguments.
   [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
 
-* Fixed a bug where the `catalyst` CLI tool would emit text when called with `--emit-bytecode`.
+* Fixed a bug where the ``catalyst`` CLI tool would emit text when called with ``--emit-bytecode``.
   [(#2596)](https://github.com/PennyLaneAI/catalyst/pull/2596)
 
 * Fixed a bug where input array arguments could be mutated during execution when copied inputs
@@ -617,71 +622,71 @@ codes only.
   preserving the expected immutability of user inputs.
   [(#2562)](https://github.com/PennyLaneAI/catalyst/pull/2562)
 
-* Fixed a bug in the `split-non-commuting` pass where dead `NamedObsOp`s were left behind after
-  erasing composite obs (`TensorOp`, `HamiltonianOp`).
+* Fixed a bug in the ``split_non_commuting`` pass where dead ``NamedObsOp``s were left behind after
+  erasing composite obs (``TensorOp``, ``HamiltonianOp``).
   [(#2567)](https://github.com/PennyLaneAI/catalyst/pull/2567)
 
-* Fix a bug where `draw_graph` failed at rendering measurements containing scalar products of observables.
+* Fix a bug where ``draw_graph`` failed to render measurements containing scalar products of
+  observables.
   [(#2545)](https://github.com/PennyLaneAI/catalyst/pull/2545)
 
-* Fixed a bug where the unified compiler would trigger a passed callback function 1 extra time for the initial pass level.
+* Fixed a bug where a passed callback function (such as ``specs`` or ``draw_graph``) would be
+  triggered one extra time for the initial pass level
   [(#2528)](https://github.com/PennyLaneAI/catalyst/pull/2528)
 
-* Fix a bug in the bind call function for `PCPhase` where the signature did not match what was
-  expected in `jax_primitives`. `ctrl_qubits` was missing from positional arguments in previous signature.
+* Fix a bug in the bind call function for ``PCPhase`` where the signature did not match what was
+  expected in ``jax_primitives``. ``ctrl_qubits`` was missing from positional arguments in the
+  previous signature.
   [(#2467)](https://github.com/PennyLaneAI/catalyst/pull/2467)
 
-* Fix `CATALYST_XDSL_UNIVERSE` to correctly define the available dialects and transforms, allowing
-  tools like `xdsl-opt` to work with Catalyst's custom Python dialects.
+* Fixed a bug in ``CATALYST_XDSL_UNIVERSE`` to correctly define the available dialects and
+  transforms, allowing tools like ``xdsl-opt`` to work with Catalyst's custom Python dialects.
   [(#2471)](https://github.com/PennyLaneAI/catalyst/pull/2471)
 
-* Fix symbolic adjoint support for control flow operation. This means operators who are the target
-  of `qp.adjoint` but require decomposition can have decompositions with control flow in them,
-  which would previously raise an error. Adjoint on functions is unaffected.
+* Fixed a bug with symbolic ``adjoint`` support for control flow operation. This means operators who
+  are the target of ``qp.adjoint`` but require decomposition can have decompositions with control
+  flow in them, which would previously raise an error. ``adjoint`` on functions is unaffected.
   [(#2667)](https://github.com/PennyLaneAI/catalyst/pull/2667)
 
-* The adjoint lowering pass now supports `switch` operation as well. Previously, using
-  `qp.adjoint` on a circuit containing a `switch` would raise a `CompileError`. The MLIR
-  `--adjoint-lowering` pass has been updated to support this usage.
-  [(#2691)](https://github.com/PennyLaneAI/catalyst/pull/2691)
-
-* Fix a bug with the xDSL `ParitySynth` pass that caused failure when the QNode being transformed
+* Fixed a bug with the ``parity_synth`` pass that caused failure when the QNode being transformed
   contained operations with regions.
   [(#2408)](https://github.com/PennyLaneAI/catalyst/pull/2408)
 
-* Fix `replace_ir` for certain stages when used with gradients.
+* Fixed a bug with ``replace_ir`` for certain stages when used with gradients.
   [(#2436)](https://github.com/PennyLaneAI/catalyst/pull/2436)
 
-* Restore the ability to differentiate multiple (expectation value) QNode results with the
+* Fixed a bug with differentiating multiple (expectation value) QNode results with the
   adjoint-differentiation method.
   [(#2428)](https://github.com/PennyLaneAI/catalyst/pull/2428)
 
-* Fixed the angle conversion when lowering `pbc.ppr` and `pbc.ppr.arbitrary` operations to
-  `__catalyst__qis__PauliRot` runtime calls. The PPR rotation angle is now correctly multiplied
-  by 2 to match the PauliRot convention (`PauliRot(φ) == PPR(φ/2)`).
+* Fixed a bug with the angle conversion when lowering ``pbc.ppr`` and ``pbc.ppr.arbitrary``
+  operations to ``__catalyst__qis__PauliRot`` runtime calls. The PPR rotation angle is now correctly
+  multiplied by 2 to match the PauliRot convention (``PauliRot(φ) == PPR(φ/2)``).
   [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
 
-* Fixed the `catalyst` CLI tool silently listening to stdin when run without an input file, even when given flags like `--list-passes` that should override this behaviour.
+* Fixed the ``catalyst`` CLI tool silently listening to stdin when run without an input file, even
+  when given flags like ``--list-passes`` that should override this behaviour.
   [(2447)](https://github.com/PennyLaneAI/catalyst/pull/2447)
 
-* Fixing incorrect lowering of PPM into CAPI calls when the PPM is in the negative basis.
+* Fixed a bug with incorrect lowering of PPMs (Pauli product measurements) into CAPI calls when the
+  PPM is in the negative basis.
   [(#2422)](https://github.com/PennyLaneAI/catalyst/pull/2422)
 
-* Fixed the GlobalPhase discrepancies when executing gridsynth in the PPR basis.
-  [(#2433)](https://github.com/PennyLaneAI/catalyst/pull/2433)
-
-* Fixed incorrect decomposition of negative PPR (Pauli Product Rotation) operations in the
+* Fixed a bug with incorrect decomposition of negative PPR (Pauli Product Rotation) operations in the
   `decompose-clifford-ppr` and `decompose-non-clifford-ppr` passes. The rotation sign is now
   correctly flipped when decomposing negative rotation kinds (e.g., `-π/4` from adjoint gates
   like `T†` or `S†`) to PPM (Pauli Product Measurement) operations.
   [(#2454)](https://github.com/PennyLaneAI/catalyst/pull/2454)
 
-* Fixed incorrect global phase when lowering CNOT gates into PPR/PPM operations.
+* Fixed the ``GlobalPhase`` discrepancies when executing ``gridsynth`` in the PPR basis.
+  [(#2433)](https://github.com/PennyLaneAI/catalyst/pull/2433)
+
+* Fixed a bug with ``GlobalPhase`` when lowering ``CNOT`` gates into PPR/PPM operations.
   [(#2459)](https://github.com/PennyLaneAI/catalyst/pull/2459)
 
 * Fixed a bug where the Catalyst measurement primitive returning a boolean type as the measurement
   result was incorrectly replacing the PennyLane measurement primitive, whose measurement
-  result is integer type, during the PLxPR conversion.
+  result is integer type, during plxpr conversion.
   [(#2582)](https://github.com/PennyLaneAI/catalyst/pull/2582)
 
 <h3>Internal changes ⚙️</h3>
@@ -1095,7 +1100,7 @@ codes only.
 
 <h3>Documentation 📝</h3>
 
-* The `qp` alias as in `import pennylane as qp` has been updated to `qp` in our source code and documentation.
+* The PennyLane import alias has been updated to ``qp`` in our source code and documentation.
   [(#2764)](https://github.com/PennyLaneAI/catalyst/pull/2764)
   [(#2763)](https://github.com/PennyLaneAI/catalyst/pull/2763)
   [(#2748)](https://github.com/PennyLaneAI/catalyst/pull/2748)
@@ -1116,17 +1121,19 @@ codes only.
   Additionally, some sharp bits listed were removed, as they are no longer sharp bits.
   [(#2662)](https://github.com/PennyLaneAI/catalyst/pull/2662)
 
-* Docstrings for :func:`~.passes.disentangle_cnot` and :func:`~.passes.disentangle_swap` have been improved
-  by using updated features for inspection and by calling them from the PennyLane frontend.
+* Docstrings for :func:`~.passes.disentangle_cnot` and :func:`~.passes.disentangle_swap` have been
+  improved by using updated features for inspection and by calling them from the PennyLane frontend.
   [(#2546)](https://github.com/PennyLaneAI/catalyst/pull/2546)
 
 * Typos and rendering issues in various docstrings in the :mod:`catalyst.passes` module were fixed.
   [(#2649)](https://github.com/PennyLaneAI/catalyst/pull/2649)
 
-* Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
+* The Unified Compiler Cookbook has been updated to be compatible with the latest versions of
+  PennyLane and Catalyst.
   [(#2406)](https://github.com/PennyLaneAI/catalyst/pull/2406)
 
-* Updated the changelog and builtin_passes.py to link to <https://pennylane.ai/compilation/pauli-based-computation> instead.
+* The changelog and ``builtin_passes.py`` have been updated to link to
+  https://pennylane.ai/compilation/pauli-based-computation instead.
   [(#2409)](https://github.com/PennyLaneAI/catalyst/pull/2409)
 
 * Infrastructure has been put in place for features that are accessible from both PennyLane and
