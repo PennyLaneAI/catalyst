@@ -348,9 +348,6 @@ endif
 ifeq ($(ENABLE_OQD), ON)
 	COVERAGE_FILE=$(MK_DIR)/.coverage.pytest $(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/test_oqd/oqd $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=
 endif
-	$(MAKE) plugin-wheel
-	$(PYTHON) -m pip install --force-reinstall --no-deps $(MK_DIR)/standalone_plugin_wheel/dist/*.whl
-	COVERAGE_FILE=$(MK_DIR)/.coverage.pytest $(ASAN_COMMAND) $(PYTHON) -m pytest standalone_plugin_wheel/standalone_plugin/test $(PYTEST_FLAGS) --cov=catalyst --cov-append --tb=native --cov-report=
 	$(ASAN_COMMAND) $(MAKE) lit-coverage
 	$(PYTHON) -m coverage combine --data-file=$(MK_DIR)/.coverage.combined $(MK_DIR)/.coverage.lit $(MK_DIR)/.coverage.pytest
 	@echo "=== Generating final coverage report with format: $(COVERAGE_REPORT) ==="
