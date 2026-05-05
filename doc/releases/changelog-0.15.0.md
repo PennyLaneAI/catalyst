@@ -437,22 +437,20 @@ codes only.
   than ``1e-6`` due to potential precision error.
   [(#2625)](https://github.com/PennyLaneAI/catalyst/pull/2625)
 
-* `qp.for_loop` now supports dynamic shapes with program capture `qjit(capture=True)`.
+* ``qp.for_loop`` now supports dynamic shapes with PennyLane's program capture
+  (``qjit(capture=True)``).
   [(#2603)](https://github.com/PennyLaneAI/catalyst/pull/2603/)
   [(#2651)](https://github.com/PennyLaneAI/catalyst/pull/2651)
 
-* Added support for ``StatePrep`` kwargs ``pad_with`` and ``normalize`` with program capture enabled.
-  [(#2620)](https://github.com/PennyLaneAI/catalyst/pull/2620)
-
-* `abstracted_axes` now work with `qjit` and `capture=True`.
+* The ``abstracted_axes`` argument in ``qjit`` now works with PennyLane's program capture
+  (``qjit(capture=True)``).
   [(#2655)](https://github.com/PennyLaneAI/catalyst/pull/2655)
 
-* The `quantum.adjoint` operation can now take in multiple quantum values, allowing
-  both qubits and registers, as opposed to constraining the operand to be a single quantum register.
-  [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
-  [(#2610)](https://github.com/PennyLaneAI/catalyst/pull/2610)
+* The ``StatePrep`` kwargs ``pad_with`` and ``normalize`` now work with PennyLane's program capture
+  (``qjit(capture=True)``).
+  [(#2620)](https://github.com/PennyLaneAI/catalyst/pull/2620)
 
-* `qp.value_and_grad` can now be used with program capture `qp.qjit(capture=True)`.
+* ``qp.value_and_grad`` can now be used with program capture ``qp.qjit(capture=True)``.
   [(#2587)](https://github.com/PennyLaneAI/catalyst/pull/2587)
 
 * Catalyst with program capture now supports device preprocessing. Currently, preprocessing transforms
@@ -472,7 +470,7 @@ codes only.
   with the `decompose-lowering` pass and with `qp.transforms.decompose`.
   [(#2470)](https://github.com/PennyLaneAI/catalyst/pull/2470)
 
-* Added support for `stopping_condition` in user-defined `qp.decompose` when capture is enabled with both graph enabled and disabled.
+* Added support for ``stopping_condition`` in user-defined ``qp.decompose`` when capture is enabled with both graph enabled and disabled.
   [(#2486)](https://github.com/PennyLaneAI/catalyst/pull/2486)
 
 * The tape transform :func:`~.device.decomposition.catalyst_decompose` now accepts the optional
@@ -484,6 +482,11 @@ codes only.
 * Two new verifiers were added to the `quantum.paulirot` operation. They verify that the Pauli word
   length and the number of qubit operands are the same, and that all of the Pauli words are legal.
   [(#2405)](https://github.com/PennyLaneAI/catalyst/pull/2405)
+
+* The ``quantum.adjoint`` MLIR operation can now take in multiple quantum values, allowing both
+  qubits and registers as opposed to constraining the operand to be a single quantum register.
+  [(#2590)](https://github.com/PennyLaneAI/catalyst/pull/2590)
+  [(#2610)](https://github.com/PennyLaneAI/catalyst/pull/2610)
 
 * The quantum kernel abstraction in Catalyst's IR (a nested module operation with its own transform
   schedule and entry point and subroutine functions representing a PennyLane QNode) has been
