@@ -274,7 +274,8 @@ codes only.
   - Optional `alt_decomps` to define additional rules for (user-defined) operators
   - Optional `fixed_decomps` to pin a specific decomposition rule for an operator
 
-  ``` python
+
+  ```python
   import pennylane as qp
   import pennylane.numpy as np
 
@@ -327,7 +328,8 @@ codes only.
       return qp.state()
   ```
 
-  ``` pycon
+
+  ```pycon
   >>> print(qp.specs(circuit, level="device")(1.23, 4.56).resources.gate_types)
   {'Rot': 2}
   ```
