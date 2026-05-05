@@ -47,6 +47,7 @@ codes only.
   (``@qjit(capture=True)``).
   [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
   [(#2573)](https://github.com/PennyLaneAI/catalyst/pull/2573)
+  [(#2786)](https://github.com/PennyLaneAI/catalyst/pull/2786)
 
   ```python
   import pennylane as qp
@@ -226,7 +227,8 @@ codes only.
 
   Below is a comprehensive example:
 
-  ``` python
+
+  ```python
   import pennylane as qp
   import pennylane.numpy as np
 
@@ -274,7 +276,8 @@ codes only.
       return qp.state()
   ```
 
-  ``` pycon
+
+  ```pycon
   >>> print(qp.specs(circuit, level="device")(1.23, 4.56).resources.gate_types)
   {'Rot': 2}
   ```
@@ -603,6 +606,11 @@ codes only.
   The parameter is now threaded through `catalyst.ctrl`, `CtrlCallable`, `HybridCtrl`, and
   `ctrl_distribute`, with the default value being `"borrowed"`.
   [(#2710)](https://github.com/PennyLaneAI/catalyst/pull/2710)
+
+* Fixed a bug in the ``split-multiple-tapes`` pass where the post-split classical wrapper kept
+  the ``quantum.node`` attribute. Downstream, the ``resource-analysis`` pass then misidentified
+  the empty wrapper as an additional qnode, causing an empty column in `qp.specs` at MLIR levels.
+  [(#2793)](https://github.com/PennyLaneAI/catalyst/pull/2793)
 
 * Fixed a bug where multiple ``quantum.extract`` operations from the same index were being created
   when there are multiple computational basis observables, named observables or Hermitian
