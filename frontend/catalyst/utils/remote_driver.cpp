@@ -62,19 +62,21 @@ constexpr size_t kAlignedOff = offsetof(DescLayout, data);
 constexpr size_t kOffsetOff = offsetof(DescLayout, offset);
 constexpr size_t kShapeOff = offsetof(DescLayout, sizes);
 
-// Initialize all the possible remote targets
-// TODO: Do we need to mask out targets that are not supported by the remote device?
 void initialize_targets()
 {
     static const bool inited = []() {
+#ifdef CATALYST_HAS_X86
         LLVMInitializeX86TargetInfo();
         LLVMInitializeX86Target();
         LLVMInitializeX86TargetMC();
         LLVMInitializeX86AsmPrinter();
+#endif
+#ifdef CATALYST_HAS_AARCH64
         LLVMInitializeAArch64TargetInfo();
         LLVMInitializeAArch64Target();
         LLVMInitializeAArch64TargetMC();
         LLVMInitializeAArch64AsmPrinter();
+#endif
         return true;
     }();
     (void)inited;

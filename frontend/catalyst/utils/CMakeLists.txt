@@ -55,11 +55,12 @@ llvm_map_components_to_libnames(_driver_libs
 
 find_package(MLIR CONFIG REQUIRED)
 nanobind_add_module(remote_driver STABLE_ABI remote_driver.cpp)
-target_include_directories(remote_driver SYSTEM PRIVATE 
+target_include_directories(remote_driver SYSTEM PRIVATE
     ${LLVM_INCLUDE_DIRS}
     ${MLIR_INCLUDE_DIRS}
 )
 target_link_libraries(remote_driver PRIVATE ${_driver_libs} pthread ${CMAKE_DL_LIBS})
 target_compile_options(remote_driver PRIVATE -Wshadow)
+target_compile_definitions(remote_driver PRIVATE CATALYST_HAS_AARCH64=1 CATALYST_HAS_X86=1)
 
 set_target_properties(remote_driver PROPERTIES SUFFIX ".so")
