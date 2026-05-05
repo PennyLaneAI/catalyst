@@ -437,41 +437,43 @@ codes only.
   than ``1e-6`` due to potential precision error.
   [(#2625)](https://github.com/PennyLaneAI/catalyst/pull/2625)
 
-* ``qp.for_loop`` now supports dynamic shapes with PennyLane's program capture
-  (``qjit(capture=True)``).
-  [(#2603)](https://github.com/PennyLaneAI/catalyst/pull/2603/)
-  [(#2651)](https://github.com/PennyLaneAI/catalyst/pull/2651)
+* The following features are now supported with ``qjit(capture=True)``:
 
-* The ``abstracted_axes`` argument in ``qjit`` now works with PennyLane's program capture
-  (``qjit(capture=True)``).
-  [(#2655)](https://github.com/PennyLaneAI/catalyst/pull/2655)
+  - Dynamic shapes with ``qp.for_loop``
+    [(#2603)](https://github.com/PennyLaneAI/catalyst/pull/2603/)
+    [(#2651)](https://github.com/PennyLaneAI/catalyst/pull/2651)
 
-* The ``StatePrep`` kwargs ``pad_with`` and ``normalize`` now work with PennyLane's program capture
-  (``qjit(capture=True)``).
-  [(#2620)](https://github.com/PennyLaneAI/catalyst/pull/2620)
+  - The ``abstracted_axes`` argument in ``qjit``
+    [(#2655)](https://github.com/PennyLaneAI/catalyst/pull/2655)
 
-* ``qp.value_and_grad`` can now be used with program capture ``qp.qjit(capture=True)``.
-  [(#2587)](https://github.com/PennyLaneAI/catalyst/pull/2587)
+  - ``StatePrep`` kwargs ``pad_with`` and ``normalize``
+    [(#2620)](https://github.com/PennyLaneAI/catalyst/pull/2620)
 
-* Catalyst with program capture now supports device preprocessing. Currently, preprocessing transforms
-  that do not have native MLIR or xDSL implementations will be replaced with empty transforms.
-  [(#2557)](https://github.com/PennyLaneAI/catalyst/pull/2557)
+  - ``qp.value_and_grad``
+    [(#2587)](https://github.com/PennyLaneAI/catalyst/pull/2587)
 
-* `qp.vjp`  and `qp.jvp` can now be used with Catalyst and program capture.
-  [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
-  [(#2316)](https://github.com/PennyLaneAI/catalyst/pull/2316)
+  - Device preprocessing.
+    [(#2557)](https://github.com/PennyLaneAI/catalyst/pull/2557)
 
-* Catalyst with program capture can now be used with the new `qp.templates.Subroutine` class and the associated
-  `qp.capture.subroutine` upstreamed from `catalyst.jax_primitives.subroutine`.
-  [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
-  [(#2493)](https://github.com/PennyLaneAI/catalyst/pull/2493)
+    Currently, preprocessing transforms that do not have a native MLIR or xDSL implementation will
+    be replaced with empty transforms.
 
-* Graph decomposition with qjit now accepts `num_work_wires`, and lowers and decomposes correctly
-  with the `decompose-lowering` pass and with `qp.transforms.decompose`.
+  - `qp.vjp`  and `qp.jvp`
+    [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
+    [(#2316)](https://github.com/PennyLaneAI/catalyst/pull/2316)
+
+  - the new `qp.templates.Subroutine` class and the associated `qp.capture.subroutine` upstreamed
+    from `catalyst.jax_primitives.subroutine`.
+    [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
+    [(#2493)](https://github.com/PennyLaneAI/catalyst/pull/2493)
+
+  - ``stopping_condition`` in ``qp.transforms.decompose`` (with both
+    :func:`pennylane.decomposition.enable_graph` and :func:`pennylane.decomposition.disable_graph`)
+    [(#2486)](https://github.com/PennyLaneAI/catalyst/pull/2486)
+
+* Graph decomposition with qjit now accepts ``num_work_wires``, and lowers and decomposes correctly
+  with the ``decompose-lowering`` MLIR pass and with ``qp.transforms.decompose``.
   [(#2470)](https://github.com/PennyLaneAI/catalyst/pull/2470)
-
-* Added support for ``stopping_condition`` in user-defined ``qp.decompose`` when capture is enabled with both graph enabled and disabled.
-  [(#2486)](https://github.com/PennyLaneAI/catalyst/pull/2486)
 
 * The tape transform :func:`~.device.decomposition.catalyst_decompose` now accepts the optional
   keyword arguments ``target_gates``, ``num_work_wires``, ``fixed_decomps``, and ``alt_decomps``,
@@ -479,8 +481,9 @@ codes only.
   ``qp.devices.preprocess.decompose`` and used if the graph-based decomposition system is enabled.
   [(#2501)](https://github.com/PennyLaneAI/catalyst/pull/2501)
 
-* Two new verifiers were added to the `quantum.paulirot` operation. They verify that the Pauli word
-  length and the number of qubit operands are the same, and that all of the Pauli words are legal.
+* Two new verifiers were added to the ``quantum.paulirot`` operation. They verify that the Pauli
+  word length and the number of qubit operands are the same, and that all of the Pauli words are
+  legal.
   [(#2405)](https://github.com/PennyLaneAI/catalyst/pull/2405)
 
 * The ``quantum.adjoint`` MLIR operation can now take in multiple quantum values, allowing both
@@ -491,7 +494,7 @@ codes only.
 * The quantum kernel abstraction in Catalyst's IR (a nested module operation with its own transform
   schedule and entry point and subroutine functions representing a PennyLane QNode) has been
   documented and equipped with additional verification. Transformation passes scheduled from the
-  frontend must ensure, and can rely on, the presence of the `quantum.node` attribute to indicate
+  frontend must ensure, and can rely on, the presence of the ``quantum.node`` attribute to indicate
   which functions in the module represent a separate quantum execution (with device initialization,
   shots configuration, and set of measurement processes).
   [(#2483)](https://github.com/PennyLaneAI/catalyst/pull/2483)
@@ -499,55 +502,62 @@ codes only.
   [(#2597)](https://github.com/PennyLaneAI/catalyst/pull/2597)
 
 * `catalyst.python_interface.utils.get_constant_from_ssa` can now extract constant values cast using
-  `arith.index_cast`.
+  ``arith.index_cast``.
   [(#2542)](https://github.com/PennyLaneAI/catalyst/pull/2542)
 
-* The `measurements_from_samples` pass no longer results in `nan`s and cryptic error messages when
-  `shots` aren't set. Instead, an informative error message is raised.
-  [(#2456)](https://github.com/PennyLaneAI/catalyst/pull/2456)
+* Several improvements have been made to the ``measurements_from_samples`` pass:
 
-* A performance issue in the xDSL transform `measurements-from-samples` that was caused by the
-  unrolling of a `for` loop for QNodes returning `probs` has been fixed.
-  [(#2611)](https://github.com/PennyLaneAI/catalyst/pull/2611)
+  - It no longer results in ``nan``s and cryptic error messages when ``shots`` aren't set. Instead,
+    an informative error message is raised.
+    [(#2456)](https://github.com/PennyLaneAI/catalyst/pull/2456)
 
-* The `measurements-from-samples` pass now diagonalizes observables automatically before converting
-  to samples in the computational basis, removing the need to apply a diagonalization pass separately.
-  This behaviour matches the behaviour of the tape transform `measurements_from_samples` in PennyLane.
-  [(#2617)](https://github.com/PennyLaneAI/catalyst/pull/2617)
+  - A performance issue that was caused by the unrolling of a ``for`` loop for QNodes returning
+    ``probs`` has been fixed.
+    [(#2611)](https://github.com/PennyLaneAI/catalyst/pull/2611)
 
-* The `measurements-from-samples` pass is refactored to follow the conventions for a qnode transform
-  as they are described in `catalyst.python_interace.transforms.qnode-transform-guide.md`.
-  [(#2605)](https://github.com/PennyLaneAI/catalyst/pull/2605)
+  - It now diagonalizes observables automatically before converting to samples in the computational
+    basis, removing the need to apply a diagonalization pass separately. This behaviour matches the
+    behaviour of the tape transform ``measurements_from_samples`` in PennyLane, providing a smoother
+    experience when switching to a ``qjit`` workflow.
+    [(#2617)](https://github.com/PennyLaneAI/catalyst/pull/2617)
 
-* A more informative error message is now raised when a `measurements-from-samples` xDSL pass encounters a
-  program with dyanamic shots.
-  [(#2616)](https://github.com/PennyLaneAI/catalyst/pull/2616)
+  - It has been refactored to follow the conventions for a QNode transform as they are described in
+    ``catalyst.python_interace.transforms.qnode-transform-guide.md``.
+    [(#2605)](https://github.com/PennyLaneAI/catalyst/pull/2605)
 
-* The `measurements-from-samples` xDSL pass is extended to support tensor product observables.
-  [(#2656)](https://github.com/PennyLaneAI/catalyst/pull/2656)
+  - A more informative error message is now raised it encounters a program with dyanamic shots.
+    [(#2616)](https://github.com/PennyLaneAI/catalyst/pull/2616)
+
+  - It has been extended to support tensor product observables.
+    [(#2656)](https://github.com/PennyLaneAI/catalyst/pull/2656)
 
 <h3>Breaking changes 💔</h3>
 
-* The ``catalyst.python_interface.transforms.parity_synth_pass`` transform has been renamed to ``catalyst.python_interface.transforms.parity_synth``.
+* The ``catalyst.python_interface.transforms.parity_synth_pass`` transform has been renamed to
+  ``catalyst.python_interface.transforms.parity_synth``.
   [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
 
 * The ``-disentangle-CNOT`` and ``-disentangle-SWAP`` Catalyst CLI commands have been renamed to
   ``-disentangle-cnot`` and ``-disentangle-swap`` (all lower-case).
   [(#2546)](https://github.com/PennyLaneAI/catalyst/pull/2546)
 
-* `catalyst.python_interface.inspection.draw` and `catalyst.python_interface.inspection.generate_mlir_graph` no longer
-  accept QNodes as the input. Now, the input must always be a :class:`~.QJIT` object.
+* ``catalyst.python_interface.inspection.draw`` and
+  ``catalyst.python_interface.inspection.generate_mlir_graph`` no longer accept QNodes as the input.
+  Now, the input must always be a :class:`~.QJIT` object.
   [(#2542)](https://github.com/PennyLaneAI/catalyst/pull/2542)
 
-* `catalyst.from_plxpr.register_transforms` as a way to access MLIR passes from Python has been removed in favour of the new unified transforms API. MLIR passes can be accessed from Python using `qp.transform(pass_name="some-pass-name")`.
+* ``catalyst.from_plxpr.register_transforms`` as a way to access MLIR passes from Python has been
+  removed in favour of the new unified transforms API. MLIR passes can be accessed from Python using
+  ``qp.transform(pass_name="some-pass-name")``.
   [(#2509)](https://github.com/PennyLaneAI/catalyst/pull/2509)
   [(#2680)](https://github.com/PennyLaneAI/catalyst/pull/2680)
 
-* `catalyst.jax_primitives.subroutine` has been moved to `qp.capture.subroutine`.
+* ``catalyst.jax_primitives.subroutine`` has been moved to ``pennylane.capture.subroutine``.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
 
-* The `StableHLO` dialect has been removed from Catalyst's Python interface module.
-  Downstream users should now import StableHLO dialect definitions from `xdsl_jax.dialects.stablehlo` instead.
+* The ``StableHLO`` dialect has been removed from Catalyst's Python interface module. Downstream
+  users should now import StableHLO dialect definitions from ``xdsl_jax.dialects.stablehlo``
+  instead.
   [(#2588)](https://github.com/PennyLaneAI/catalyst/pull/2588)
 
 * (Compiler integrators only) The versions of StableHLO/LLVM/Enzyme used by Catalyst have been updated.
@@ -564,11 +574,12 @@ codes only.
   * The Enzyme version has been updated to
   [v0.0.238](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.238).
 
-* When an integer argnums is provided to `catalyst.vjp`, a singleton dimension is now squeezed
-  out. This brings the behaviour in line with that of `grad` and `jacobian`.
+* When an integer ``argnums`` is provided to ``catalyst.vjp``, a singleton dimension is now squeezed
+  out. This brings the behaviour in line with that of ``catalyst.grad`` and ``catalyst.jacobian``.
   [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
 
-* Dropped support for NumPy 1.x following its end-of-life. NumPy 2.0 or higher is now required.
+* Support for NumPy 1.x has been dropped following its end-of-life. NumPy 2.0 or higher is now
+  required.
   [(#2407)](https://github.com/PennyLaneAI/catalyst/pull/2407)
 
 * The inlining pass has been removed from the default compilation pipeline.
