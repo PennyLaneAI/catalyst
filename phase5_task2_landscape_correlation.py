@@ -29,12 +29,12 @@ Assertions:
 Run as:  python phase5_task2_landscape_correlation.py
 """
 
-import sys
-import math
 import importlib.util
+import math
+import sys
 
-import numpy as np
 import networkx as nx
+import numpy as np
 import pennylane as qml
 
 # ── Load DO-QAOA utilities ────────────────────────────────────────────────────

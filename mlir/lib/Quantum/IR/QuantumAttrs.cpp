@@ -45,9 +45,8 @@ Attribute DenseGraphAttr::parse(AsmParser &parser, Type)
         return {};
     }
     // Verify before get() — get() asserts on failure; we need a graceful error.
-    if (failed(DenseGraphAttr::verify(
-            [&]() { return parser.emitError(parser.getNameLoc()); },
-            numNodes, weights))) {
+    if (failed(DenseGraphAttr::verify([&]() { return parser.emitError(parser.getNameLoc()); },
+                                      numNodes, weights))) {
         return {};
     }
     return DenseGraphAttr::get(parser.getContext(), numNodes, weights);
@@ -58,10 +57,8 @@ void DenseGraphAttr::print(AsmPrinter &printer) const
     printer << "<" << getNumNodes() << ", " << getWeights() << ">";
 }
 
-LogicalResult DenseGraphAttr::verify(
-    function_ref<InFlightDiagnostic()> emitError,
-    uint32_t numNodes,
-    DenseElementsAttr weights)
+LogicalResult DenseGraphAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                                     uint32_t numNodes, DenseElementsAttr weights)
 {
     if (!weights) {
         return emitError() << "dense_graph: weights attribute must not be null";
@@ -77,8 +74,7 @@ LogicalResult DenseGraphAttr::verify(
         return emitError() << "dense_graph: weights must be a rank-2 tensor (NxN)";
     }
     auto shape = tensorTy.getShape();
-    if (shape[0] != static_cast<int64_t>(numNodes) ||
-        shape[1] != static_cast<int64_t>(numNodes)) {
+    if (shape[0] != static_cast<int64_t>(numNodes) || shape[1] != static_cast<int64_t>(numNodes)) {
         return emitError() << "dense_graph: weights shape [" << shape[0] << "x" << shape[1]
                            << "] does not match numNodes=" << numNodes;
     }
@@ -117,9 +113,8 @@ Attribute SparseGraphAttr::parse(AsmParser &parser, Type)
         return {};
     }
     // Verify before get() — get() asserts on failure; we need a graceful error.
-    if (failed(SparseGraphAttr::verify(
-            [&]() { return parser.emitError(parser.getNameLoc()); },
-            numNodes, numEdges, rows, cols, wts))) {
+    if (failed(SparseGraphAttr::verify([&]() { return parser.emitError(parser.getNameLoc()); },
+                                       numNodes, numEdges, rows, cols, wts))) {
         return {};
     }
     return SparseGraphAttr::get(parser.getContext(), numNodes, numEdges, rows, cols, wts);
@@ -134,13 +129,10 @@ void SparseGraphAttr::print(AsmPrinter &printer) const
     printer << "], " << getWeights() << ">";
 }
 
-LogicalResult SparseGraphAttr::verify(
-    function_ref<InFlightDiagnostic()> emitError,
-    uint32_t numNodes,
-    uint32_t numEdges,
-    ArrayRef<int32_t> rowIndices,
-    ArrayRef<int32_t> colIndices,
-    DenseElementsAttr weights)
+LogicalResult SparseGraphAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                                      uint32_t numNodes, uint32_t numEdges,
+                                      ArrayRef<int32_t> rowIndices, ArrayRef<int32_t> colIndices,
+                                      DenseElementsAttr weights)
 {
     if (!weights) {
         return emitError() << "sparse_graph: weights attribute must not be null";
@@ -174,8 +166,8 @@ LogicalResult SparseGraphAttr::verify(
                                << " (numNodes=" << numNodes << ")";
         }
         if (r >= c) {
-            return emitError() << "sparse_graph: expected upper-triangle (i < j), got ["
-                               << r << "," << c << "] at edge " << e;
+            return emitError() << "sparse_graph: expected upper-triangle (i < j), got [" << r << ","
+                               << c << "] at edge " << e;
         }
     }
     return success();

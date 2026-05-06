@@ -2,18 +2,19 @@
 """Generate phase4_milestones.png — Phase 4 summary figure."""
 
 import math
-import sys
 import random
-import numpy as np
+import sys
+
 import matplotlib
+import numpy as np
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from matplotlib.patches import FancyBboxPatch
-
 # ── Load DO-QAOA module ──────────────────────────────────────────────────────
 import importlib.util
+
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
+from matplotlib.patches import FancyBboxPatch
 
 spec = importlib.util.spec_from_file_location(
     "doqaoa", "frontend/catalyst/api_extensions/doqaoa.py"

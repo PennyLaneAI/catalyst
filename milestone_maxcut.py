@@ -12,12 +12,12 @@ Hotspot qubits: m=2 (nodes 0, 1 by degree centrality)
 """
 
 import importlib.util
+import os
 import pathlib
 import subprocess
 import sys
-import types
 import tempfile
-import os
+import types
 
 # ── Minimal catalyst stub so doqaoa.py loads standalone ──────────────────────
 cat_stub = types.ModuleType("catalyst")
@@ -38,8 +38,8 @@ select_hotspot_indices = mod.select_hotspot_indices
 compute_bias = mod.compute_bias
 
 import networkx as nx
-import pennylane as qml
 import numpy as np
+import pennylane as qml
 
 # ── 1. Graph and Hamiltonian ──────────────────────────────────────────────────
 G = nx.cycle_graph(4)  # 4-node cycle: edges (0,1),(1,2),(2,3),(3,0)

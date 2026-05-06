@@ -25,13 +25,13 @@ Assertions:
 Run as:  python phase5_task3_compiler_pass_timing.py
 """
 
+import importlib.util
 import math
 import sys
 import time
-import importlib.util
 
-import numpy as np
 import networkx as nx
+import numpy as np
 import pennylane as qml
 
 # ── Load DO-QAOA utilities ────────────────────────────────────────────────────

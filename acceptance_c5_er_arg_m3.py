@@ -13,15 +13,15 @@ Assertion: median ARG ≤ 40% for m=3 on ER G(N, 0.3) graphs N=4..20.
 Run as:  python acceptance_c5_er_arg_m3.py
 """
 
+import importlib.util
 import math
+import statistics
 import sys
 import time
-import statistics
-import importlib.util
 
+import networkx as nx
 import numpy as np
 import pennylane as qml
-import networkx as nx
 
 spec = importlib.util.spec_from_file_location(
     "doqaoa", "frontend/catalyst/api_extensions/doqaoa.py"

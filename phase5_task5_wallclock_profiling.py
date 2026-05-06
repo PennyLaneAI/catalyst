@@ -29,14 +29,14 @@ Assertions:
 Run as:  python phase5_task5_wallclock_profiling.py
 """
 
-import sys
-import math
-import time
 import importlib.util
+import math
+import sys
+import time
 
+import networkx as nx
 import numpy as np
 import pennylane as qml
-import networkx as nx
 
 # ── Load DO-QAOA API ──────────────────────────────────────────────────────────
 spec = importlib.util.spec_from_file_location(

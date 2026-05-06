@@ -9,15 +9,19 @@ Produces a single figure with 4 panels:
   4. Test results summary bar chart
 """
 
-import importlib.util, pathlib, sys, types
-import numpy as np
-import networkx as nx
+import importlib.util
+import pathlib
+import sys
+import types
+
 import matplotlib
+import networkx as nx
+import numpy as np
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.patheffects as pe
+import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
 # ── Load doqaoa.py standalone ─────────────────────────────────────────────────

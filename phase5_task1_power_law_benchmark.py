@@ -27,15 +27,15 @@ Assertions:
 Run as:  python phase5_task1_power_law_benchmark.py
 """
 
+import importlib.util
 import math
+import statistics
 import sys
 import time
-import statistics
-import importlib.util
 
+import networkx as nx
 import numpy as np
 import pennylane as qml
-import networkx as nx
 
 # ── Load DO-QAOA module ───────────────────────────────────────────────────────
 spec = importlib.util.spec_from_file_location(

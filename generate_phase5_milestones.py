@@ -9,18 +9,20 @@ Generate Phase 5 milestone figures:
   phase5_milestones.png         — Combined 5-panel summary figure
 """
 
-import math
 import importlib.util
-import numpy as np
+import math
+
 import matplotlib
+import numpy as np
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+import time
+
 import matplotlib.gridspec as gridspec
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import networkx as nx
 import pennylane as qml
-import time
 
 # ── style ────────────────────────────────────────────────────────────────────
 BG = "#0d1117"

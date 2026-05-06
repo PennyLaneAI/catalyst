@@ -3,12 +3,13 @@
 
 import math
 import random
-import numpy as np
+
 import matplotlib
+import numpy as np
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch
 
 # ── Reproduce the milestone run data ────────────────────────────────────────

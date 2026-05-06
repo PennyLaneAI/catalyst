@@ -13,9 +13,9 @@ Reference: Sang et al., arXiv:2602.21689v1, Sec. 2.2–2.4
 
 import math
 import pathlib
+import re
 import subprocess
 import sys
-import re
 import textwrap
 
 import networkx as nx
@@ -339,8 +339,8 @@ try:
     import matplotlib
 
     matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
     import matplotlib.gridspec as gridspec
+    import matplotlib.pyplot as plt
 
     fig = plt.figure(figsize=(14, 9))
     fig.suptitle(

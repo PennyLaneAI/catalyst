@@ -23,17 +23,16 @@ Assertions:
 Run as:  python milestone_phase4.py
 """
 
+# ---------------------------------------------------------------------------
+# Load DO-QAOA API
+# ---------------------------------------------------------------------------
+import importlib.util
 import math
 import sys
 import time
 
 import numpy as np
 import pennylane as qml
-
-# ---------------------------------------------------------------------------
-# Load DO-QAOA API
-# ---------------------------------------------------------------------------
-import importlib.util
 
 spec = importlib.util.spec_from_file_location(
     "doqaoa", "frontend/catalyst/api_extensions/doqaoa.py"

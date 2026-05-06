@@ -71,48 +71,44 @@ namespace quantum {
 #define GEN_PASS_DEF_SHAREDPARAMETERBUFFERPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct SharedParameterBufferPass
-    : impl::SharedParameterBufferPassBase<SharedParameterBufferPass> {
+struct SharedParameterBufferPass : impl::SharedParameterBufferPassBase<SharedParameterBufferPass> {
     using SharedParameterBufferPassBase::SharedParameterBufferPassBase;
 
     void runOnOperation() final
     {
         func::FuncOp func = getOperation();
-        MLIRContext *ctx  = &getContext();
+        MLIRContext *ctx = &getContext();
         Builder builder(ctx);
 
         func.walk([&](FreezePartitionOp op) {
-
             // ── Guard: need training-schedule annotations ─────────────────
-            auto schedAttr  = op->getAttr("training_schedule");
-            auto phaseAttr  = op->getAttr("schedule_phase_ends");
-            auto srcAttr    = op->getAttr("schedule_sources");
-            auto clAsnAttr  = op->getAttr("cluster_assignments");
-            auto clKAttr    = op->getAttr("cluster_k");
+            auto schedAttr = op->getAttr("training_schedule");
+            auto phaseAttr = op->getAttr("schedule_phase_ends");
+            auto srcAttr = op->getAttr("schedule_sources");
+            auto clAsnAttr = op->getAttr("cluster_assignments");
+            auto clKAttr = op->getAttr("cluster_k");
 
             if (!schedAttr || !phaseAttr || !srcAttr || !clAsnAttr || !clKAttr) {
-                op->emitWarning()
-                    << "doqaoa-shared-buffer: missing training-schedule "
-                       "attributes; run doqaoa-training-schedule first, skipping";
+                op->emitWarning() << "doqaoa-shared-buffer: missing training-schedule "
+                                     "attributes; run doqaoa-training-schedule first, skipping";
                 return;
             }
 
             // ── Extract dimensions ────────────────────────────────────────
             auto hotspotAttr = op.getHotspotIndices();
-            unsigned m       = static_cast<unsigned>(hotspotAttr.size());
-            unsigned numSP   = 1u << m;
+            unsigned m = static_cast<unsigned>(hotspotAttr.size());
+            unsigned numSP = 1u << m;
 
             int32_t K = cast<IntegerAttr>(clKAttr).getInt();
-            if (K <= 0) K = 1;
+            if (K <= 0)
+                K = 1;
 
             auto clAsnArr = cast<DenseI32ArrayAttr>(clAsnAttr);
 
             // ── Build buffer_slot_map[k] = cluster index of sub-problem k ─
             std::vector<int32_t> slotMap(numSP);
             for (unsigned k = 0; k < numSP; ++k) {
-                int32_t c = (k < static_cast<unsigned>(clAsnArr.size()))
-                                ? clAsnArr[k]
-                                : 0;
+                int32_t c = (k < static_cast<unsigned>(clAsnArr.size())) ? clAsnArr[k] : 0;
                 slotMap[k] = c;
             }
 
@@ -122,7 +118,7 @@ struct SharedParameterBufferPass
             // Priority: basin_gamma/beta > init_gamma/beta > defaults.
 
             double defaultGamma = -M_PI / 6.0;
-            double defaultBeta  = -M_PI / 8.0;
+            double defaultBeta = -M_PI / 8.0;
 
             double ig = defaultGamma, ib = defaultBeta;
             double bg = defaultGamma, bb = defaultBeta;
@@ -146,27 +142,22 @@ struct SharedParameterBufferPass
             }
 
             // Pack into tensor<K × 2 × f64>
-            auto initType  = RankedTensorType::get(
-                {static_cast<int64_t>(K), 2}, builder.getF64Type());
-            auto initAttr  = DenseElementsAttr::get(
-                initType, llvm::ArrayRef<double>(initFlat));
+            auto initType =
+                RankedTensorType::get({static_cast<int64_t>(K), 2}, builder.getF64Type());
+            auto initAttr = DenseElementsAttr::get(initType, llvm::ArrayRef<double>(initFlat));
 
             // ── Annotate op ───────────────────────────────────────────────
             op->setAttr("param_buffer_size",
                         builder.getI32IntegerAttr(2)); // γ and β
-            op->setAttr("buffer_slot_map",
-                        DenseI32ArrayAttr::get(ctx, slotMap));
+            op->setAttr("buffer_slot_map", DenseI32ArrayAttr::get(ctx, slotMap));
             op->setAttr("init_params", initAttr);
-            op->setAttr("use_atomic_guards",
-                        builder.getI32IntegerAttr(1));
+            op->setAttr("use_atomic_guards", builder.getI32IntegerAttr(1));
 
             // Remark summarising buffer layout
             llvm::SmallString<180> info;
             llvm::raw_svector_ostream ss(info);
-            ss << "doqaoa-shared-buffer: K=" << K
-               << " slots, param_buffer_size=2"
-               << " | init=[" << llvm::format("%.4f", bg)
-               << ", " << llvm::format("%.4f", bb) << "]"
+            ss << "doqaoa-shared-buffer: K=" << K << " slots, param_buffer_size=2"
+               << " | init=[" << llvm::format("%.4f", bg) << ", " << llvm::format("%.4f", bb) << "]"
                << " | atomic_guards=1";
             op->emitRemark() << info;
         });

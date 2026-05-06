@@ -22,13 +22,13 @@ Assertion: CNOT count per circuit call is equal for DO-QAOA and
 Run as:  python acceptance_c8_cnot_count.py
 """
 
-import sys
-import math
 import importlib.util
+import math
+import sys
 
+import networkx as nx
 import numpy as np
 import pennylane as qml
-import networkx as nx
 
 spec = importlib.util.spec_from_file_location(
     "doqaoa", "frontend/catalyst/api_extensions/doqaoa.py"

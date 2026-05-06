@@ -30,12 +30,12 @@ Assertions:
 Run as:  python acceptance_c2_pearson_m1_with_coeff.py
 """
 
-import sys
-import math
 import importlib.util
+import math
+import sys
 
-import numpy as np
 import networkx as nx
+import numpy as np
 import pennylane as qml
 from pennylane import Hamiltonian
 

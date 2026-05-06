@@ -29,12 +29,12 @@ Assertions:
 Run as:  python acceptance_c9_landscape_overlap.py
 """
 
-import sys
-import math
 import importlib.util
+import math
+import sys
 
-import numpy as np
 import networkx as nx
+import numpy as np
 import pennylane as qml
 
 spec = importlib.util.spec_from_file_location(

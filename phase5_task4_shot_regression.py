@@ -22,14 +22,14 @@ Run as:
   pytest phase5_task4_shot_regression.py -v
 """
 
-import sys
-import math
 import importlib.util
+import math
+import sys
 import time
 
+import networkx as nx
 import numpy as np
 import pennylane as qml
-import networkx as nx
 
 # ── Load DO-QAOA API ──────────────────────────────────────────────────────────
 spec = importlib.util.spec_from_file_location(
