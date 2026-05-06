@@ -8,7 +8,6 @@ the architecture supports future extension to general LUT decoding via compiler-
 please note that LUT decoders scale exponentially with code size and are intended for small-scale QEC
 codes only.
 [(#2724)](https://github.com/PennyLaneAI/catalyst/pull/2724)
-[(#2800)](https://github.com/PennyLaneAI/catalyst/pull/2800)
 
 * Combining ``GlobalPhase`` operations into one single operation is now possible with the
   :func:`catalyst.passes.combine_global_phases` pass.

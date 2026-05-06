@@ -12,6 +12,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+- Update the signature of the experimental lookup table (LUT) runtime decoder.
+  [(#2800)](https://github.com/PennyLaneAI/catalyst/pull/2800)
+
 - Update RC nightly builds to read version number from the `_version.py` file 
   [(#2797)](https://github.com/PennyLaneAI/catalyst/pull/2797)
 
