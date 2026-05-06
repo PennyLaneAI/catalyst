@@ -48,18 +48,17 @@ struct InstantiateDecompRulesPass
             }
             addedWords.insert(pauliWord);
 
-            std::vector<PyArg> args;
-            args.push_back(0.2);       // dynamic parameter, any value will work
-            args.push_back(pauliWord); // static parameter, must be the correct value
             PyWires wires(pauliRot.getInQubits().size());
             std::iota(wires.begin(), wires.end(), 0);
 
             mlir::OwningOpRef<mlir::func::FuncOp> outOp =
-                lowerPauliRotDecomp(module, "pennylane.ops.qubit.parametric_ops_multi_qubit",
-                                    "_pauli_rot_decomposition", args, wires);
+                lowerPauliRotDecomp(module, 0.2, pauliWord, wires);
 
-            outOp->setName(
-                (outOp->getName() + "_" + pauliWord).str()); // unique name for decomp rule
+            if (!outOp) {
+                return signalPassFailure();
+            }
+
+            outOp->setName((outOp->getName() + "_" + pauliWord).str()); // unique name per pauliword
             outOp.get()->setAttr(
                 "target_gate", mlir::StringAttr::get(module.getContext(), "PauliRot" + pauliWord));
 
