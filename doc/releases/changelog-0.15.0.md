@@ -204,7 +204,7 @@ codes only.
   ensuring a smooth transition, Catalyst's most up-to-date implementation of this decomposition
   system is accessible via a new :func:`catalyst.passes.graph_decomposition` decorator. Note that
   using the more familiar ``qp.decompose`` decorator will still utilize the graph-based system under
-  the hood, but its internal functionality is less compatible with Catalyst.
+  the hood, but its internal functionality is less compatible with Catalyst, for now.
 
   The :func:`catalyst.passes.graph_decomposition` pass decorator has several capabilities that match
   :func:`pennylane.transforms.decompose` (with :func:`pennylane.decomposition.enable_graph`),
