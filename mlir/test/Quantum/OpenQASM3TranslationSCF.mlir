@@ -22,7 +22,7 @@ module {
 }
 
 // CHECK: OPENQASM 3.0;
-// CHECK: qubit [[REG:.*]][1];
+// CHECK: qubit[1] [[REG:[a-z][a-z0-9]*]];
 // CHECK: for [[VAR:.*]] in [0:1:10] {
 // CHECK: h [[REG]][0];
 // CHECK: }

@@ -20,6 +20,6 @@ module {
 }
 
 // CHECK: OPENQASM 3.0;
-// CHECK: qubit [[REG:.*]][2];
+// CHECK: qubit[2] [[REG:[a-z][a-z0-9]*]];
 // CHECK: h [[REG]][0];
 // CHECK: cx [[REG]][0], [[REG]][1];
