@@ -28,14 +28,10 @@ from xdsl.utils.exceptions import VerifyException
 from xdsl.utils.test_value import create_ssa_value
 
 from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
-<<<<<<< HEAD
-from catalyst.python_interface.pass_api import ApplyTransformSequence, compiler_transform
-=======
 from catalyst.python_interface.pass_api import (
     ApplyTransformSequencePass,
     compiler_transform,
 )
->>>>>>> 21acb29565e1cc21a29abf137f77f0f9cb81e954
 
 pytestmark = pytest.mark.xdsl
 
