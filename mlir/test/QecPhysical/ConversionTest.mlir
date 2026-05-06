@@ -84,12 +84,3 @@ module {
         func.return %tanner : !qecp.tanner_graph<8, 6, i32>
     }
 }
-
-
-// -----
-
-module {
-    func.func @test_tanner(%tanner : !qecp.tanner_graph<8, 6, i32>) {
-        func.return
-    }
-}
