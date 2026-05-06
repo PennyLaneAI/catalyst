@@ -12,6 +12,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+- Update RC nightly builds to read version number from the `_version.py` file 
+  [(#2797)](https://github.com/PennyLaneAI/catalyst/pull/2797)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
