@@ -90,8 +90,6 @@ struct QecPhysicalConversionPass : impl::QecPhysicalConversionPassBase<QecPhysic
         populateQecPhysicalConversionPatterns(typeConverter, patterns);
 
         LLVMConversionTarget target(*context);
-        // TODOs: We need to uncomment the following line once all qecp-to-llvm patterns are added
-        // target.addIllegalDialect<catalyst::qecp::QecPhysicalDialect>();
         target.addIllegalOp<catalyst::qecp::AssembleTannerGraphOp>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
