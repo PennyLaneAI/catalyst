@@ -39,61 +39,24 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
                                   ConversionPatternRewriter &rewriter) const override
     {
         Location loc = op.getLoc();
-        MLIRContext *ctx = getContext();
-        auto i32 = IntegerType::get(ctx, 32);
-        // auto voidTy = LLVM::LLVMVoidType::get(ctx);
-        auto ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
         const TypeConverter *conv = getTypeConverter();
 
         // Both row_idx and col_ptr should be bufferized first.
-        if (!op.isBufferized())
+        if (!op.isBufferized()) {
             return op.emitOpError("op must be bufferized before lowering to LLVM");
+        }
 
-        // Define function signature
-        // StringRef fnName = "__catalyst__qecp__assemble_tanner_graph_int32";
+        auto mlirTannerType = op.getTannerGraph().getType();
+        auto tannerStructType = conv->convertType(mlirTannerType);
 
-        Type rowIdxVectorType, colPtrVectorType;
-        rowIdxVectorType = conv->convertType(
-            MemRefType::get({op.getTannerGraph().getType().getRowIdxSize()}, i32));
-        colPtrVectorType = conv->convertType(
-            MemRefType::get({op.getTannerGraph().getType().getColPtrSize()}, i32));
+        Value tannerStructValue = LLVM::UndefOp::create(rewriter, loc, tannerStructType);
 
-        // Define Tanner Graph struct type
-        auto tannerGraphType = LLVM::LLVMStructType::getLiteral(ctx, {ptrTy, ptrTy});
+        tannerStructValue = LLVM::InsertValueOp::create(
+            rewriter, loc, tannerStructValue, adaptor.getRowIdx(), SmallVector<int64_t>{0});
+        tannerStructValue = LLVM::InsertValueOp::create(
+            rewriter, loc, tannerStructValue, adaptor.getColPtr(), SmallVector<int64_t>{1});
 
-        // Type fnSignature = LLVM::LLVMFunctionType::get(voidTy, {ptrTy, ptrTy, ptrTy}, false);
-        // LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
-        //     rewriter, op, fnName, fnSignature);
-
-        //  Add values as arguments of the CallOp
-        Value rowIdxAlloca = catalyst::getStaticAlloca(loc, rewriter, rowIdxVectorType, 1);
-        Value colPtrAlloca = catalyst::getStaticAlloca(loc, rewriter, colPtrVectorType, 1);
-
-        LLVM::StoreOp::create(rewriter, loc, adaptor.getRowIdx(), rowIdxAlloca);
-        LLVM::StoreOp::create(rewriter, loc, adaptor.getColPtr(), colPtrAlloca);
-
-        Value tannerGraphValue = LLVM::UndefOp::create(rewriter, loc, tannerGraphType);
-        tannerGraphValue = LLVM::InsertValueOp::create(rewriter, loc, tannerGraphValue,
-                                                       rowIdxAlloca, SmallVector<int64_t>{0});
-        tannerGraphValue = LLVM::InsertValueOp::create(rewriter, loc, tannerGraphValue,
-                                                       colPtrAlloca, SmallVector<int64_t>{1});
-
-        // auto tannerGraphStructPtr = catalyst::getStaticAlloca(loc, rewriter, tannerGraphType, 1);
-
-        // LLVM::StoreOp::create(rewriter, loc, tannerGraphValue, tannerGraphStructPtr);
-
-        // SmallVector<Value> args = {rowIdxAlloca, colPtrAlloca, tannerGraphStructPtr};
-        // LLVM::CallOp::create(rewriter, loc, fnDecl, args);
-
-        auto convertedTannerGraph =
-            UnrealizedConversionCastOp::create(rewriter, loc, op.getTannerGraph().getType(),
-                                               tannerGraphValue)
-                .getResult(0);
-
-        // op.getResult().replaceAllUsesWith(convertedTannerGraph);
-
-        // rewriter.eraseOp(op);
-        rewriter.replaceOp(op, convertedTannerGraph);
+        rewriter.replaceOp(op, tannerStructValue);
 
         return success();
     }
@@ -104,7 +67,8 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
 namespace catalyst {
 namespace qecp {
 
-void populateLLVMConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns)
+void populateQecPhysicalConversionPatterns(LLVMTypeConverter &typeConverter,
+                                           RewritePatternSet &patterns)
 {
     patterns.add<AssembleTannerGraphOpPattern>(typeConverter, patterns.getContext());
 }
