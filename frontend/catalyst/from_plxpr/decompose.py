@@ -340,6 +340,9 @@ def _create_decomposition_rule(
         # when the same rule is compiled multiple times with different number of wires
         # (e.g., MultiRZ, GlobalPhase)
         func_cp.__name__ += f"_wires_{num_wires}"
+        # Include the Pauli word in the function name to keep them distinct.
+        if pauli_word is not None:
+            func_cp.__name__ += f"_{pauli_word}"
 
     # Set custom attributes for the decomposition rule
     # These attributes are used in the MLIR decomposition pass

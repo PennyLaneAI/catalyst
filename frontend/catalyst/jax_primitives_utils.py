@@ -201,6 +201,9 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
         func_op.attributes["target_gate"] = get_mlir_attribute_from_pyval(target_gate)
     if num_wires := getattr(callable_, "num_wires", None):
         func_op.attributes["num_wires"] = get_mlir_attribute_from_pyval(num_wires)
+   # Extract the Pauli word from the decomposition rule
+    if pauli_word := getattr(callable_, "pauli_word", None):
+        func_op.attributes["pauli_word"] = get_mlir_attribute_from_pyval(pauli_word)
 
     return func_op
 
