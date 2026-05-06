@@ -456,10 +456,7 @@ def _validate_one_shot_measurements(
 
     # Raise an error if there are no mid-circuit measurements, it will fallback to
     # single-branch-statistics
-    if (
-        not any(isinstance(op, MidCircuitMeasure) for op in tape.operations)
-        and user_specified_mcm_method is None
-    ):
+    if not tape_contains_mcm(tape) and user_specified_mcm_method is None:
         raise FallbackToSingleBranchError("No mid-circuit measurements present.")
 
     for m in tape.measurements:
@@ -496,6 +493,25 @@ def _validate_one_shot_measurements(
                 "using 'single-branch-statistics', providing explicit wires in the measurement "
                 "process, or setting a constant number of wires in the device."
             )
+
+
+def tape_contains_mcm(tape: qp.tape.QuantumTape):
+    """
+    Check if a QuantumTape contains an MCM.
+    Recursively checks tapes contained in `tape`, for example when high-order primitives are present.
+    """
+    for op in tape.operations:
+        if isinstance(op, MidCircuitMeasure):
+            return True
+        if hasattr(op, "regions"):
+            for region in op.regions:
+                if (
+                    hasattr(region, "quantum_tape")
+                    and region.quantum_tape
+                    and tape_contains_mcm(region.quantum_tape)
+                ):
+                    return True
+    return False
 
 
 # pylint: disable=protected-access,no-member,not-callable
@@ -596,7 +612,7 @@ def dynamic_one_shot(qnode, **kwargs):
         results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
-        has_mcm = any(isinstance(op, MidCircuitMeasure) for op in cpy_tape.operations)
+        has_mcm = tape_contains_mcm(cpy_tape)
 
         classical_return_indices = kwargs.pop("_classical_return_indices", [[]])[0]
         num_mcm = kwargs.pop("_num_mcm_expected", [0])[0]
