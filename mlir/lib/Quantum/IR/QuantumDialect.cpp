@@ -130,15 +130,6 @@ LogicalResult QuantumDialect::verifyOperationAttribute(Operation *op, NamedAttri
         return op->emitOpError() << "attribute '" << attrName << "' must be a unit attribute";
     }
 
-    // Cannot enforce this yet as Catalyst allows QNodes without MPs.
-    // auto funcOp = cast<func::FuncOp>(op);
-    // auto measurement = funcOp.walk([&](MeasurementProcess) { return WalkResult::interrupt(); });
-    // if (!measurement.wasInterrupted()) {
-    //     return op->emitOpError()
-    //            << "attribute '" << attrName
-    //            << "' requires at least one measurement process operation in the function body";
-    // }
-
     return success();
 }
 
@@ -151,26 +142,3 @@ LogicalResult QuantumDialect::verifyOperationAttribute(Operation *op, NamedAttri
 
 #define GET_ATTRDEF_CLASSES
 #include "Quantum/IR/QuantumAttributes.cpp.inc"
-
-//===----------------------------------------------------------------------===//
-// Quantum dialect attribute verification.
-//===----------------------------------------------------------------------===//
-
-/// Verify the QNode attribute invariants
-LogicalResult QuantumDialect::verifyOperationAttribute(Operation *op, NamedAttribute namedAttr)
-{
-    StringRef attrName = namedAttr.getName().getValue();
-    if (attrName != "quantum.node") {
-        return success();
-    }
-
-    if (!isa<func::FuncOp>(op)) {
-        return op->emitOpError() << "attribute '" << attrName << "' is only valid on 'func.func'";
-    }
-
-    if (!isa<UnitAttr>(namedAttr.getValue())) {
-        return op->emitOpError() << "attribute '" << attrName << "' must be a unit attribute";
-    }
-
-    return success();
-}

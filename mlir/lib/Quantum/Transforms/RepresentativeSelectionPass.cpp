@@ -37,7 +37,6 @@
 #include <vector>
 
 #include "llvm/Support/raw_ostream.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/Pass.h"
@@ -63,36 +62,34 @@ struct RepresentativeSelectionPass
     void runOnOperation() final
     {
         func::FuncOp func = getOperation();
-        MLIRContext *ctx  = &getContext();
+        MLIRContext *ctx = &getContext();
         Builder builder(ctx);
 
         double btVal = biasThreshold;
 
         func.walk([&](FreezePartitionOp op) {
-
             // ── Guard: need bias-shift annotations ────────────────────────
-            auto clKAttr    = op->getAttr("cluster_k");
-            auto clAsnAttr  = op->getAttr("cluster_assignments");
-            auto repsAttr   = op->getAttr("representatives");
-            auto bsAttr     = op->getAttr("bias_shifts");
+            auto clKAttr = op->getAttr("cluster_k");
+            auto clAsnAttr = op->getAttr("cluster_assignments");
+            auto repsAttr = op->getAttr("representatives");
+            auto bsAttr = op->getAttr("bias_shifts");
 
             if (!clKAttr || !clAsnAttr || !repsAttr || !bsAttr) {
-                op->emitWarning()
-                    << "doqaoa-representative-selection: missing bias-shift "
-                       "attributes; run doqaoa-bias-shift first, skipping";
+                op->emitWarning() << "doqaoa-representative-selection: missing bias-shift "
+                                     "attributes; run doqaoa-bias-shift first, skipping";
                 return;
             }
 
             // ── Extract cluster data ──────────────────────────────────────
             auto hotspotAttr = op.getHotspotIndices();
-            unsigned m       = static_cast<unsigned>(hotspotAttr.size());
-            unsigned numSP   = 1u << m;
+            unsigned m = static_cast<unsigned>(hotspotAttr.size());
+            unsigned numSP = 1u << m;
 
             (void)clAsnAttr; // cluster_assignments not needed: we use repsArr directly
-            auto repsArr   = cast<DenseI32ArrayAttr>(repsAttr);
+            auto repsArr = cast<DenseI32ArrayAttr>(repsAttr);
 
             // bias_shifts is a dense tensor<numSP x f64>
-            auto bsDense   = cast<DenseElementsAttr>(bsAttr);
+            auto bsDense = cast<DenseElementsAttr>(bsAttr);
             std::vector<double> biasShifts;
             biasShifts.reserve(numSP);
             for (double v : bsDense.getValues<double>())
@@ -111,32 +108,30 @@ struct RepresentativeSelectionPass
             std::vector<int32_t> isRepArr(numSP, 0);
             std::vector<int32_t> modes(numSP, 0);
             int32_t directCopyCount = 0;
-            int32_t warmStartCount  = 0;
+            int32_t warmStartCount = 0;
 
             for (unsigned k = 0; k < numSP; ++k) {
                 if (isRep[k]) {
                     isRepArr[k] = 1;
-                    modes[k]    = 0;   // representative: full optimisation
-                } else if (biasShifts[k] < btVal) {
+                    modes[k] = 0; // representative: full optimisation
+                }
+                else if (biasShifts[k] < btVal) {
                     isRepArr[k] = 0;
-                    modes[k]    = 1;   // direct copy
+                    modes[k] = 1; // direct copy
                     ++directCopyCount;
-                } else {
+                }
+                else {
                     isRepArr[k] = 0;
-                    modes[k]    = 2;   // warm start
+                    modes[k] = 2; // warm start
                     ++warmStartCount;
                 }
             }
 
             // ── Annotate op ───────────────────────────────────────────────
-            op->setAttr("is_representative",
-                        DenseI32ArrayAttr::get(ctx, isRepArr));
-            op->setAttr("transfer_modes",
-                        DenseI32ArrayAttr::get(ctx, modes));
-            op->setAttr("direct_copy_count",
-                        builder.getI32IntegerAttr(directCopyCount));
-            op->setAttr("warm_start_count",
-                        builder.getI32IntegerAttr(warmStartCount));
+            op->setAttr("is_representative", DenseI32ArrayAttr::get(ctx, isRepArr));
+            op->setAttr("transfer_modes", DenseI32ArrayAttr::get(ctx, modes));
+            op->setAttr("direct_copy_count", builder.getI32IntegerAttr(directCopyCount));
+            op->setAttr("warm_start_count", builder.getI32IntegerAttr(warmStartCount));
 
             // Emit informational note on the transfer plan
             unsigned repCount = static_cast<unsigned>(repsArr.size());
@@ -144,8 +139,7 @@ struct RepresentativeSelectionPass
             llvm::SmallString<160> info;
             llvm::raw_svector_ostream ss(info);
             ss << "doqaoa-representative-selection: " << numSP
-               << " sub-problems — reps=" << repsArr.size()
-               << " copy=" << directCopyCount
+               << " sub-problems — reps=" << repsArr.size() << " copy=" << directCopyCount
                << " warm_start=" << warmStartCount;
             op->emitRemark() << info;
         });

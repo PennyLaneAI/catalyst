@@ -159,8 +159,7 @@ def make_mlir_module(G, J, h, hotspot_indices, graph_id, m=1):
     h_quad = j_matrix_to_dense_attr(J, N)
     h_lin = f"dense<[{', '.join(f'{v:.6f}' for v in h)}]> " f": tensor<{N}xf64>"
 
-    return textwrap.dedent(
-        f"""\
+    return textwrap.dedent(f"""\
         module {{
           func.func @er_graph_{graph_id}() {{
             %p = quantum.freeze_partition {{
@@ -172,8 +171,7 @@ def make_mlir_module(G, J, h, hotspot_indices, graph_id, m=1):
             func.return
           }}
         }}
-    """
-    )
+    """)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
