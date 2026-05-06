@@ -120,13 +120,8 @@ struct SharedParameterBufferPass : impl::SharedParameterBufferPassBase<SharedPar
             double defaultGamma = -M_PI / 6.0;
             double defaultBeta = -M_PI / 8.0;
 
-            double ig = defaultGamma, ib = defaultBeta;
             double bg = defaultGamma, bb = defaultBeta;
 
-            if (auto a = op->getAttr("init_gamma"))
-                ig = cast<FloatAttr>(a).getValueAsDouble();
-            if (auto a = op->getAttr("init_beta"))
-                ib = cast<FloatAttr>(a).getValueAsDouble();
             if (auto a = op->getAttr("basin_gamma"))
                 bg = cast<FloatAttr>(a).getValueAsDouble();
             if (auto a = op->getAttr("basin_beta"))
