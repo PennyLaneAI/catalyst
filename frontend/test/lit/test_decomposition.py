@@ -991,6 +991,36 @@ def test_decompose_lowering_multirz():
 test_decompose_lowering_multirz()
 
 
+def test_decompose_lowering_pauli_rot():
+    """Test decomposing PauliRot with graph decomposition."""
+
+    qp.decomposition.enable_graph()
+
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qp.qjit(pipelines=pipe, target="mlir", capture=True)
+    @partial(
+        qp.transforms.decompose,
+        gate_set=[qp.RZ, qp.MultiRZ, qp.RX, qp.GlobalPhase],
+    )
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
+    # CHECK-LABEL: @circuit_pauli_rot
+    def circuit_pauli_rot():
+        qp.PauliRot(0.123, pauli_word="X", wires=[0])
+        return qp.expval(qp.Z(0))
+
+    # CHECK-NOT: quantum.paulirot
+    # CHECK-DAG: quantum.multirz
+    # CHECK-DAG: quantum.custom "RZ"
+    # CHECK-DAG: quantum.custom "RX"
+    print(circuit_pauli_rot.mlir_opt)
+
+    qp.decomposition.disable_graph()
+
+
+test_decompose_lowering_pauli_rot()
+
+
 def test_decompose_lowering_with_ordered_passes():
     """Test the decompose lowering pass with other passes in a specific order in a pass pipeline."""
 
