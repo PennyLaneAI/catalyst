@@ -143,7 +143,7 @@ def compile_rule(
 
     # WARNING: do not rename this function, we use it to extract the rule from the compiled
     # circuit
-    @decomposition_rule(is_qreg=True, op_type=op_class.__name__)
+    @decomposition_rule(is_qreg=True, op_type=op_class.__name__)  # pylint: disable=unexpected-keyword-arg
     def rule_wrapper(*args, wires, **_):
         return rule(*args, wires=wires, **_)
 
@@ -218,7 +218,7 @@ def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
         for name, mlir in compile_op_decomp_rules(func).items()
     )
 
-    bytecode = _quantum_opt(
+    bytecode = _quantum_opt(  # pylint: disable=unexpected-keyword-arg
         "--emit-bytecode",
         "--register-decomp-rule-resource",
         stdin=mlir_rules.encode("utf-8"),

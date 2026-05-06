@@ -8,15 +8,15 @@ Run as:
     python test_acceptance_criteria.py
 """
 
+import importlib.util
 import math
 import platform
 import sys
 import time
 import unittest
-import importlib.util
 
-import numpy as np
 import networkx as nx
+import numpy as np
 import pennylane as qml
 from pennylane import Hamiltonian
 
@@ -27,23 +27,23 @@ spec = importlib.util.spec_from_file_location(
 _mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(_mod)
 
-do_qaoa                 = _mod.do_qaoa
-DOQAOAResult            = _mod.DOQAOAResult
-select_hotspot_indices  = _mod.select_hotspot_indices
+do_qaoa = _mod.do_qaoa
+DOQAOAResult = _mod.DOQAOAResult
+select_hotspot_indices = _mod.select_hotspot_indices
 extract_coupling_matrix = _mod.extract_coupling_matrix
-_build_multi_k_energy   = _mod._build_multi_k_energy
+_build_multi_k_energy = _mod._build_multi_k_energy
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
-SEED  = 42
+SEED = 42
 GAMMA = np.linspace(-math.pi / 2, math.pi / 2, 16)
-BETA  = np.linspace(-math.pi / 4, math.pi / 4, 16)
-GRID  = [(g, b) for g in GAMMA for b in BETA]
+BETA = np.linspace(-math.pi / 4, math.pi / 4, 16)
+GRID = [(g, b) for g in GAMMA for b in BETA]
 ER_SEEDS = [10, 64, 120, 131, 140, 251, 281, 290, 310, 351]
 
 
 def pearson_r(x, y):
     xm, ym = x - x.mean(), y - y.mean()
-    d = math.sqrt((xm ** 2).sum() * (ym ** 2).sum())
+    d = math.sqrt((xm**2).sum() * (ym**2).sum())
     return float((xm * ym).sum() / d) if d > 1e-12 else 1.0
 
 
@@ -84,32 +84,40 @@ def make_circuit(G, cost_h, mixer_h):
 def run_doqaoa(G, m):
     cost_h, mixer_h = qml.qaoa.maxcut(G)
     circuit = make_circuit(G, cost_h, mixer_h)
-    return do_qaoa(
-        circuit, cost_h, m=m,
-        full_epochs=100, warmstart_epochs=10,
-        learning_rate=0.01, grad_norm_tol=1e-4,
-        seed=SEED, max_warmstarts=1, bias_threshold=0.3,
-    )(G), cost_h
+    return (
+        do_qaoa(
+            circuit,
+            cost_h,
+            m=m,
+            full_epochs=100,
+            warmstart_epochs=10,
+            learning_rate=0.01,
+            grad_norm_tol=1e-4,
+            seed=SEED,
+            max_warmstarts=1,
+            bias_threshold=0.3,
+        )(G),
+        cost_h,
+    )
 
 
 def emin_subproblem(cost_h, hs, N, k_idx):
     J_dict, h_dict = extract_coupling_matrix(cost_h)
     J_mat = np.zeros((N, N))
     for (i, j), v in J_dict.items():
-        J_mat[i, j] = v; J_mat[j, i] = v
+        J_mat[i, j] = v
+        J_mat[j, i] = v
     h_vec = np.array([h_dict.get(i, 0.0) for i in range(N)])
     m = len(hs)
     frozen = {hs[i]: (-1 if (k_idx >> i) & 1 else 1) for i in range(m)}
-    free   = [q for q in range(N) if q not in frozen]
-    nf     = len(free)
-    h_eff  = np.array([h_vec[q] + sum(J_mat[q, fq] * frozen[fq] for fq in frozen)
-                       for q in free])
+    free = [q for q in range(N) if q not in frozen]
+    nf = len(free)
+    h_eff = np.array([h_vec[q] + sum(J_mat[q, fq] * frozen[fq] for fq in frozen) for q in free])
     J_free = np.array([[J_mat[free[i], free[j]] for j in range(nf)] for i in range(nf)])
     best = float("inf")
     for bits in range(1 << nf):
         spins = np.array([1 - 2 * ((bits >> i) & 1) for i in range(nf)], dtype=float)
-        e = sum(J_free[i, j] * spins[i] * spins[j]
-                for i in range(nf) for j in range(i + 1, nf))
+        e = sum(J_free[i, j] * spins[i] * spins[j] for i in range(nf) for j in range(i + 1, nf))
         e += float(h_eff @ spins)
         if e < best:
             best = e
@@ -128,6 +136,7 @@ def connected_er(N, p, seed):
 # TEST CASES
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestC1_PearsonNoCoeff(unittest.TestCase):
     """C1 — Pearson r (m=1, no coefficients) = 1.0 (MaxCut spin-flip symmetry)"""
 
@@ -140,14 +149,19 @@ class TestC1_PearsonNoCoeff(unittest.TestCase):
             J_dict, h_dict = extract_coupling_matrix(cost_h)
             hs = list(select_hotspot_indices(G, 1))
             fn = _build_multi_k_energy(cost_h, hs, 10)
-            lands  = {k: landscape_vector(fn, k) for k in range(2)}
+            lands = {k: landscape_vector(fn, k) for k in range(2)}
             biases = {k: bias_for_k(J_dict, h_dict, hs, 10, k) for k in range(2)}
             dBs = np.array([abs(biases[k] - biases[0]) for k in range(1, 2)])
-            r_within = 1.0 if dBs.std() < 1e-12 else abs(
-                pearson_r(np.array([abs(pearson_r(lands[k], lands[0]))
-                                    for k in range(1, 2)]), dBs))
-            self.assertGreater(r_within, 0.999,
-                               f"seed={seed}: r_within={r_within:.4f} ≤ 0.999")
+            r_within = (
+                1.0
+                if dBs.std() < 1e-12
+                else abs(
+                    pearson_r(
+                        np.array([abs(pearson_r(lands[k], lands[0])) for k in range(1, 2)]), dBs
+                    )
+                )
+            )
+            self.assertGreater(r_within, 0.999, f"seed={seed}: r_within={r_within:.4f} ≤ 0.999")
 
 
 class TestC2_PearsonWithCoeff(unittest.TestCase):
@@ -162,9 +176,11 @@ class TestC2_PearsonWithCoeff(unittest.TestCase):
     def test_reference_4qubit_path(self):
         """4-qubit path, hotspot=0, h[3]=-7.0, J=0.1 → |r| > 0.999."""
         J, H_BIAS = 0.1, 7.0
-        zz_ops   = [qml.PauliZ(0) @ qml.PauliZ(1),
-                    qml.PauliZ(1) @ qml.PauliZ(2),
-                    qml.PauliZ(2) @ qml.PauliZ(3)]
+        zz_ops = [
+            qml.PauliZ(0) @ qml.PauliZ(1),
+            qml.PauliZ(1) @ qml.PauliZ(2),
+            qml.PauliZ(2) @ qml.PauliZ(3),
+        ]
         H = Hamiltonian([J, J, J, -H_BIAS], zz_ops + [qml.PauliZ(3)])
         r = self._landscape_r(H, [0], 4)
         self.assertGreater(r, 0.999, f"|r|={r:.6f} ≤ 0.999")
@@ -172,16 +188,19 @@ class TestC2_PearsonWithCoeff(unittest.TestCase):
     def test_monotonic_increase_with_bias(self):
         """Increasing h/J ratio must monotonically increase |r|."""
         J = 0.1
-        zz_ops = [qml.PauliZ(0) @ qml.PauliZ(1),
-                  qml.PauliZ(1) @ qml.PauliZ(2),
-                  qml.PauliZ(2) @ qml.PauliZ(3)]
+        zz_ops = [
+            qml.PauliZ(0) @ qml.PauliZ(1),
+            qml.PauliZ(1) @ qml.PauliZ(2),
+            qml.PauliZ(2) @ qml.PauliZ(3),
+        ]
         lin_op = [qml.PauliZ(3)]
         prev = -1.0
         for h in [0.0, 2.0, 4.0, 6.0, 7.0, 10.0]:
             H = Hamiltonian([J, J, J, -h], zz_ops + lin_op)
             r = self._landscape_r(H, [0], 4)
-            self.assertGreaterEqual(r, prev - 0.01,
-                                    f"h={h}: |r|={r:.4f} dropped below {prev:.4f}-0.01")
+            self.assertGreaterEqual(
+                r, prev - 0.01, f"h={h}: |r|={r:.4f} dropped below {prev:.4f}-0.01"
+            )
             prev = r
 
     def test_path_graphs_mean_r(self):
@@ -189,7 +208,7 @@ class TestC2_PearsonWithCoeff(unittest.TestCase):
         J, H_BIAS = 0.1, 7.0
         rs = []
         for Np in [4, 5, 6, 7, 8]:
-            zz_p  = [qml.PauliZ(i) @ qml.PauliZ(i + 1) for i in range(Np - 1)]
+            zz_p = [qml.PauliZ(i) @ qml.PauliZ(i + 1) for i in range(Np - 1)]
             H = Hamiltonian([J] * (Np - 1) + [-H_BIAS], zz_p + [qml.PauliZ(Np - 1)])
             rs.append(self._landscape_r(H, [0], Np))
         mean_r = float(np.mean(rs))
@@ -205,9 +224,9 @@ class TestC3_PowerLawARG(unittest.TestCase):
         for N in range(4, 21):
             G = nx.barabasi_albert_graph(N, 2, seed=SEED + N)
             res, cost_h = run_doqaoa(G, m=3)
-            hs   = list(select_hotspot_indices(G, 3))
+            hs = list(select_hotspot_indices(G, 3))
             emin = emin_subproblem(cost_h, hs, N, res.best_k)
-            arg  = 100 * abs(emin - res.best_energy) / abs(emin) if abs(emin) > 1e-9 else 0.0
+            arg = 100 * abs(emin - res.best_energy) / abs(emin) if abs(emin) > 1e-9 else 0.0
             args.append(arg)
         median = float(np.median(args))
         self.assertLessEqual(median, 30.0, f"median ARG={median:.1f}% > 30%")
@@ -220,8 +239,9 @@ class TestC4_ShotBudget(unittest.TestCase):
         N = 12
         G = nx.barabasi_albert_graph(N, 2, seed=SEED)
         res, _ = run_doqaoa(G, m=m)
-        self.assertLessEqual(res.total_shots, limit,
-                             f"m={m}: shots={res.total_shots:,} > {limit:,}")
+        self.assertLessEqual(
+            res.total_shots, limit, f"m={m}: shots={res.total_shots:,} > {limit:,}"
+        )
 
     def test_shot_budget_m1(self):
         self._shots(1, 170_000)
@@ -244,9 +264,9 @@ class TestC5_ERGraphARG(unittest.TestCase):
                 continue
             G = connected_er(N, 0.3, SEED + N)
             res, cost_h = run_doqaoa(G, m=3)
-            hs   = list(select_hotspot_indices(G, 3))
+            hs = list(select_hotspot_indices(G, 3))
             emin = emin_subproblem(cost_h, hs, N, res.best_k)
-            arg  = 100 * abs(emin - res.best_energy) / abs(emin) if abs(emin) > 1e-9 else 0.0
+            arg = 100 * abs(emin - res.best_energy) / abs(emin) if abs(emin) > 1e-9 else 0.0
             args.append(arg)
         median = float(np.median(args))
         self.assertLessEqual(median, 40.0, f"median ARG={median:.1f}% > 40%")
@@ -259,7 +279,7 @@ class TestC6_FrozenQubitsReference(unittest.TestCase):
         """FQ shots = 2^m × epochs × cost_evals per epoch."""
         # Paper reference: 2^3 sub-problems × 100 epochs × 2 grad evals/param
         # × 2 params × N_graphs = baseline used in speedup calculation
-        fq_m3 = (2 ** 3) * 32_770 * 100   # = 26,216,000 per call set
+        fq_m3 = (2**3) * 32_770 * 100  # = 26,216,000 per call set
         # The paper reports 65.54M = 2 × this (two-point gradient, both params)
         fq_ref = 65_540_000
         # Verify our speedup denominator matches
@@ -267,8 +287,9 @@ class TestC6_FrozenQubitsReference(unittest.TestCase):
         G = nx.barabasi_albert_graph(N, 2, seed=SEED)
         res, _ = run_doqaoa(G, m=3)
         speedup = fq_ref / res.total_shots
-        self.assertGreaterEqual(speedup, 262,
-                                f"speedup={speedup:.0f}× < 262×  (shots={res.total_shots:,})")
+        self.assertGreaterEqual(
+            speedup, 262, f"speedup={speedup:.0f}× < 262×  (shots={res.total_shots:,})"
+        )
 
 
 class TestC7_WithinGraphCorrelation(unittest.TestCase):
@@ -284,10 +305,10 @@ class TestC7_WithinGraphCorrelation(unittest.TestCase):
             J_dict, h_dict = extract_coupling_matrix(cost_h)
             hs = list(select_hotspot_indices(G, 3))
             fn = _build_multi_k_energy(cost_h, hs, 10)
-            lands  = {k: landscape_vector(fn, k) for k in range(8)}
+            lands = {k: landscape_vector(fn, k) for k in range(8)}
             biases = {k: bias_for_k(J_dict, h_dict, hs, 10, k) for k in range(8)}
             absS = np.array([abs(pearson_r(lands[k], lands[0])) for k in range(1, 8)])
-            dBs  = np.array([abs(biases[k] - biases[0]) for k in range(1, 8)])
+            dBs = np.array([abs(biases[k] - biases[0]) for k in range(1, 8)])
             r_within = 1.0 if dBs.std() < 1e-12 else abs(pearson_r(absS, dBs))
             r_list.append(r_within)
         mean_r = float(np.mean(r_list))
@@ -310,11 +331,10 @@ class TestC8_CNOTCount(unittest.TestCase):
         N = G.number_of_nodes()
         cost_h, mixer_h = qml.qaoa.maxcut(G)
         circuit = make_circuit(G, cost_h, mixer_h)
-        params0  = np.array([-math.pi / 6.0, -math.pi / 8.0])
+        params0 = np.array([-math.pi / 6.0, -math.pi / 8.0])
         expected = 2 * G.number_of_edges()
-        cnots    = self._count_cnots(circuit, params0)
-        self.assertEqual(cnots, expected,
-                         f"CNOT count={cnots} ≠ 2×|edges|={expected} (m={m})")
+        cnots = self._count_cnots(circuit, params0)
+        self.assertEqual(cnots, expected, f"CNOT count={cnots} ≠ 2×|edges|={expected} (m={m})")
 
     def test_ba8_m1(self):
         self._check(nx.barabasi_albert_graph(8, 2, seed=42), 1)
@@ -336,17 +356,20 @@ class TestC9_LandscapeOverlap(unittest.TestCase):
     """C9 — Landscape overlap q > 0.8 for high-concentration graphs."""
 
     def _mean_abs_overlap(self, cost_h, hs, N, num_sp):
-        fn  = _build_multi_k_energy(cost_h, hs, N)
+        fn = _build_multi_k_energy(cost_h, hs, N)
         ref = landscape_vector(fn, 0)
-        return float(np.mean([abs(pearson_r(ref, landscape_vector(fn, k)))
-                               for k in range(1, num_sp)])) if num_sp > 1 else 1.0
+        return (
+            float(np.mean([abs(pearson_r(ref, landscape_vector(fn, k))) for k in range(1, num_sp)]))
+            if num_sp > 1
+            else 1.0
+        )
 
     def test_k3_m1_q_gt_080(self):
         """K_3 (triangle), m=1: q > 0.80."""
         G = nx.complete_graph(3)
         cost_h, _ = qml.qaoa.maxcut(G)
         hs = select_hotspot_indices(G, 1)
-        q  = self._mean_abs_overlap(cost_h, hs, 3, 2)
+        q = self._mean_abs_overlap(cost_h, hs, 3, 2)
         self.assertGreater(q, 0.80, f"K_3 q={q:.4f} ≤ 0.80")
 
     def test_concentrated_graphs_mean_q(self):
@@ -354,7 +377,7 @@ class TestC9_LandscapeOverlap(unittest.TestCase):
         cases = [
             (nx.complete_graph(3), 1),
             (nx.complete_graph(4), 1),
-            (nx.cycle_graph(4),    1),
+            (nx.cycle_graph(4), 1),
         ]
         qs = []
         for G, m in cases:
@@ -393,23 +416,35 @@ class TestC10_WallClockSpeedup(unittest.TestCase):
         for _ in range(1 << 3):
             params = np.array([-math.pi / 6, -math.pi / 8])
             for _ in range(100):
-                g0 = (float(circuit(params + np.array([1e-3, 0]))) -
-                      float(circuit(params - np.array([1e-3, 0])))) / 2e-3
-                g1 = (float(circuit(params + np.array([0, 1e-3]))) -
-                      float(circuit(params - np.array([0, 1e-3])))) / 2e-3
+                g0 = (
+                    float(circuit(params + np.array([1e-3, 0])))
+                    - float(circuit(params - np.array([1e-3, 0])))
+                ) / 2e-3
+                g1 = (
+                    float(circuit(params + np.array([0, 1e-3])))
+                    - float(circuit(params - np.array([0, 1e-3])))
+                ) / 2e-3
                 params -= 0.01 * np.array([g0, g1])
         t_fq = time.perf_counter() - t0
 
         # DO-QAOA
         t0 = time.perf_counter()
-        do_qaoa(circuit, cost_h, m=3, full_epochs=100, warmstart_epochs=10,
-                learning_rate=0.01, grad_norm_tol=1e-4, seed=SEED,
-                max_warmstarts=1, bias_threshold=0.3)(G)
+        do_qaoa(
+            circuit,
+            cost_h,
+            m=3,
+            full_epochs=100,
+            warmstart_epochs=10,
+            learning_rate=0.01,
+            grad_norm_tol=1e-4,
+            seed=SEED,
+            max_warmstarts=1,
+            bias_threshold=0.3,
+        )(G)
         t_dq = time.perf_counter() - t0
 
         speedup = t_fq / t_dq
-        self.assertGreaterEqual(speedup, 10.0,
-                                f"wall-clock speedup={speedup:.1f}× < 10×")
+        self.assertGreaterEqual(speedup, 10.0, f"wall-clock speedup={speedup:.1f}× < 10×")
 
 
 class TestC11_PlatformAndImports(unittest.TestCase):
@@ -418,22 +453,24 @@ class TestC11_PlatformAndImports(unittest.TestCase):
     def test_platform_supported(self):
         """Current platform must be macOS arm64 or Linux x86_64."""
         machine = platform.machine().lower()
-        system  = platform.system().lower()
-        supported = (
-            (system == "darwin"  and machine in ("arm64", "x86_64")) or
-            (system == "linux"   and machine in ("x86_64", "amd64"))
+        system = platform.system().lower()
+        supported = (system == "darwin" and machine in ("arm64", "x86_64")) or (
+            system == "linux" and machine in ("x86_64", "amd64")
         )
-        self.assertTrue(supported,
-                        f"Unsupported platform: {system}/{machine}")
+        self.assertTrue(supported, f"Unsupported platform: {system}/{machine}")
 
     def test_doqaoa_module_loads(self):
         """DO-QAOA module must export all required public symbols."""
-        required = ["do_qaoa", "DOQAOAResult", "DOQAOAConfig",
-                    "select_hotspot_indices", "extract_coupling_matrix",
-                    "_build_multi_k_energy"]
+        required = [
+            "do_qaoa",
+            "DOQAOAResult",
+            "DOQAOAConfig",
+            "select_hotspot_indices",
+            "extract_coupling_matrix",
+            "_build_multi_k_energy",
+        ]
         for name in required:
-            self.assertTrue(hasattr(_mod, name),
-                            f"Missing symbol: {name}")
+            self.assertTrue(hasattr(_mod, name), f"Missing symbol: {name}")
 
     def test_result_type(self):
         """do_qaoa() must return a DOQAOAResult on BA(6,2), m=1."""
@@ -446,6 +483,7 @@ class TestC11_PlatformAndImports(unittest.TestCase):
     def test_pennylane_version(self):
         """PennyLane must be importable and version accessible."""
         import pennylane
+
         self.assertTrue(hasattr(pennylane, "__version__"))
 
     def test_numpy_available(self):
@@ -455,8 +493,8 @@ class TestC11_PlatformAndImports(unittest.TestCase):
 
 # ─────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    loader  = unittest.TestLoader()
-    suite   = unittest.TestSuite()
+    loader = unittest.TestLoader()
+    suite = unittest.TestSuite()
 
     # Ordered by criterion number
     for cls in [

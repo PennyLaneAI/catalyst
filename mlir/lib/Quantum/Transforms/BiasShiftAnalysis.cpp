@@ -57,7 +57,8 @@ namespace quantum {
 static std::vector<double> bsaExtractJ(Operation *op, unsigned &numNodes)
 {
     auto hq = op->getAttr("h_quad");
-    if (!hq) return {};
+    if (!hq)
+        return {};
 
     if (auto d = dyn_cast<DenseGraphAttr>(hq)) {
         numNodes = d.getNumNodes();
@@ -104,14 +105,13 @@ static std::vector<double> bsaExtractH(Operation *op, unsigned numNodes)
 static constexpr double kPi = 3.14159265358979323846;
 
 /// Convert landscape-vector argmin index to (gamma, beta) grid coordinates.
-static std::pair<double, double> indexToAngles(std::size_t idx,
-                                               unsigned gridSize)
+static std::pair<double, double> indexToAngles(std::size_t idx, unsigned gridSize)
 {
     unsigned gi = static_cast<unsigned>(idx) / gridSize;
     unsigned gj = static_cast<unsigned>(idx) % gridSize;
-    double gs1   = (gridSize > 1) ? static_cast<double>(gridSize - 1) : 1.0;
+    double gs1 = (gridSize > 1) ? static_cast<double>(gridSize - 1) : 1.0;
     double gamma = -kPi + 2.0 * kPi * gi / gs1;
-    double beta  = -kPi / 2.0 + kPi * gj / gs1;
+    double beta = -kPi / 2.0 + kPi * gj / gs1;
     return {gamma, beta};
 }
 
@@ -119,57 +119,54 @@ static std::pair<double, double> indexToAngles(std::size_t idx,
 // Pass
 // ─────────────────────────────────────────────────────────────────────────────
 
-struct BiasShiftAnalysisPass
-    : impl::BiasShiftAnalysisPassBase<BiasShiftAnalysisPass> {
+struct BiasShiftAnalysisPass : impl::BiasShiftAnalysisPassBase<BiasShiftAnalysisPass> {
     using BiasShiftAnalysisPassBase::BiasShiftAnalysisPassBase;
 
     void runOnOperation() final
     {
         func::FuncOp func = getOperation();
-        MLIRContext *ctx  = &getContext();
+        MLIRContext *ctx = &getContext();
         Builder builder(ctx);
 
         // Physics-informed shortcut starting angles (Task 7)
-        constexpr double kInitGamma = -kPi / 6.0;   // ≈ −0.5236 rad
-        constexpr double kInitBeta  = -kPi / 8.0;   // ≈ −0.3927 rad
+        constexpr double kInitGamma = -kPi / 6.0; // ≈ −0.5236 rad
+        constexpr double kInitBeta = -kPi / 8.0;  // ≈ −0.3927 rad
 
-        double btVal = biasThreshold;  // extract before format
+        double btVal = biasThreshold; // extract before format
         double tolVal = basinTol;
         unsigned gs = gridSize;
 
         func.walk([&](FreezePartitionOp op) {
-
             // ── Guard: need cluster_assignments from prior pass ────────────
-            auto clKAttr    = op->getAttr("cluster_k");
-            auto clAsnAttr  = op->getAttr("cluster_assignments");
+            auto clKAttr = op->getAttr("cluster_k");
+            auto clAsnAttr = op->getAttr("cluster_assignments");
             if (!clKAttr || !clAsnAttr) {
-                op->emitWarning()
-                    << "doqaoa-bias-shift: missing cluster attributes; "
-                       "run doqaoa-landscape-overlap first, skipping";
+                op->emitWarning() << "doqaoa-bias-shift: missing cluster attributes; "
+                                     "run doqaoa-landscape-overlap first, skipping";
                 return;
             }
 
             // ── Extract graph data ────────────────────────────────────────
             unsigned numNodes = 0;
             std::vector<double> J = bsaExtractJ(op, numNodes);
-            if (J.empty()) return;
+            if (J.empty())
+                return;
             std::vector<double> h = bsaExtractH(op, numNodes);
 
             auto hotspotAttr = op.getHotspotIndices();
-            std::vector<int32_t> hotspotIndices(hotspotAttr.begin(),
-                                                hotspotAttr.end());
+            std::vector<int32_t> hotspotIndices(hotspotAttr.begin(), hotspotAttr.end());
             unsigned m = static_cast<unsigned>(hotspotIndices.size());
             unsigned numSP = 1u << m;
 
             // ── Read cluster assignments ──────────────────────────────────
-            auto clAsnArr  = cast<DenseI32ArrayAttr>(clAsnAttr);
+            auto clAsnArr = cast<DenseI32ArrayAttr>(clAsnAttr);
             int32_t clusterK = cast<IntegerAttr>(clKAttr).getInt();
 
             // ── Build GraphDesc ───────────────────────────────────────────
             energy::GraphDesc graph;
-            graph.numNodes       = numNodes;
-            graph.J              = J;
-            graph.h              = h;
+            graph.numNodes = numNodes;
+            graph.J = J;
+            graph.h = h;
             graph.hotspotIndices = hotspotIndices;
 
             // ── Task 5a: compute B_k for every sub-problem ────────────────
@@ -179,15 +176,14 @@ struct BiasShiftAnalysisPass
 
             // ── Task 5b: find representative per cluster (min B_k) ────────
             // representative[c] = sub-problem in cluster c with min B_k
-            std::vector<int32_t> representatives(
-                static_cast<unsigned>(clusterK), -1);
+            std::vector<int32_t> representatives(static_cast<unsigned>(clusterK), -1);
             std::vector<double> repB(static_cast<unsigned>(clusterK),
                                      std::numeric_limits<double>::max());
 
             for (unsigned k = 0; k < numSP; ++k) {
                 unsigned c = static_cast<unsigned>(clAsnArr[k]);
                 if (bValues[k] < repB[c]) {
-                    repB[c]           = bValues[k];
+                    repB[c] = bValues[k];
                     representatives[c] = static_cast<int32_t>(k);
                 }
             }
@@ -195,8 +191,8 @@ struct BiasShiftAnalysisPass
             // ── Task 5c: compute ΔB_k for every sub-problem ───────────────
             std::vector<double> biasShifts(numSP);
             for (unsigned k = 0; k < numSP; ++k) {
-                unsigned c     = static_cast<unsigned>(clAsnArr[k]);
-                biasShifts[k]  = std::abs(bValues[k] - repB[c]);
+                unsigned c = static_cast<unsigned>(clAsnArr[k]);
+                biasShifts[k] = std::abs(bValues[k] - repB[c]);
             }
 
             // ── Task 7: shortcut init angles ──────────────────────────────
@@ -208,8 +204,7 @@ struct BiasShiftAnalysisPass
 
             // buildLandscapeVector: cache-hit if doqaoa-landscape-overlap ran
             // first on the same FuncOp (cache is NOT flushed here).
-            std::vector<double> landscape =
-                energy::buildLandscapeVector(graph, repK, gs);
+            std::vector<double> landscape = energy::buildLandscapeVector(graph, repK, gs);
 
             // argmin of the landscape (lowest energy = deepest basin)
             std::size_t argmin = 0;
@@ -221,43 +216,39 @@ struct BiasShiftAnalysisPass
 
             // Warn if basin centre deviates more than basinTol from shortcut
             double dgamma = std::abs(basinGamma - kInitGamma);
-            double dbeta  = std::abs(basinBeta  - kInitBeta);
+            double dbeta = std::abs(basinBeta - kInitBeta);
             if (dgamma > tolVal || dbeta > tolVal) {
                 llvm::SmallString<160> msg;
                 llvm::raw_svector_ostream ss(msg);
-                ss << llvm::format(
-                    "doqaoa-bias-shift: basin centre (%.3f, %.3f) deviates "
-                    "from shortcut (%.3f, %.3f) by (%.3f, %.3f) > tol=%.3f; "
-                    "shortcut init may be suboptimal for this graph",
-                    basinGamma, basinBeta,
-                    kInitGamma, kInitBeta,
-                    dgamma, dbeta, tolVal);
+                ss << llvm::format("doqaoa-bias-shift: basin centre (%.3f, %.3f) deviates "
+                                   "from shortcut (%.3f, %.3f) by (%.3f, %.3f) > tol=%.3f; "
+                                   "shortcut init may be suboptimal for this graph",
+                                   basinGamma, basinBeta, kInitGamma, kInitBeta, dgamma, dbeta,
+                                   tolVal);
                 op->emitWarning() << msg;
             }
 
             // ── Annotate op ───────────────────────────────────────────────
 
             // b_values and bias_shifts stored as tensor<numSP x f64>
-            auto f64TensorType = RankedTensorType::get(
-                {static_cast<int64_t>(numSP)}, builder.getF64Type());
+            auto f64TensorType =
+                RankedTensorType::get({static_cast<int64_t>(numSP)}, builder.getF64Type());
 
             op->setAttr("b_values",
-                        DenseElementsAttr::get(f64TensorType,
-                                               ArrayRef<double>(bValues)));
+                        DenseElementsAttr::get(f64TensorType, ArrayRef<double>(bValues)));
             op->setAttr("bias_shifts",
-                        DenseElementsAttr::get(f64TensorType,
-                                               ArrayRef<double>(biasShifts)));
-            op->setAttr("representatives",
-                        DenseI32ArrayAttr::get(ctx, representatives));
-            op->setAttr("init_gamma",  builder.getF64FloatAttr(kInitGamma));
-            op->setAttr("init_beta",   builder.getF64FloatAttr(kInitBeta));
+                        DenseElementsAttr::get(f64TensorType, ArrayRef<double>(biasShifts)));
+            op->setAttr("representatives", DenseI32ArrayAttr::get(ctx, representatives));
+            op->setAttr("init_gamma", builder.getF64FloatAttr(kInitGamma));
+            op->setAttr("init_beta", builder.getF64FloatAttr(kInitBeta));
             op->setAttr("basin_gamma", builder.getF64FloatAttr(basinGamma));
-            op->setAttr("basin_beta",  builder.getF64FloatAttr(basinBeta));
+            op->setAttr("basin_beta", builder.getF64FloatAttr(basinBeta));
 
             // Emit a note for direct-copy candidates (ΔB < threshold)
             unsigned directCopy = 0;
             for (double db : biasShifts)
-                if (db < btVal) ++directCopy;
+                if (db < btVal)
+                    ++directCopy;
             (void)directCopy; // available for downstream passes
         });
     }
