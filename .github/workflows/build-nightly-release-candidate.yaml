@@ -19,7 +19,7 @@ jobs:
       run: |
         VERSION=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' frontend/catalyst/_version.py)
         IFS=. read MAJ MIN PAT <<< "${VERSION%.dev[0-9]*}"
-        RC_BRANCH="v${MAJ}.$((MIN-1)).${PAT}-rc0"
+        RC_BRANCH="v${MAJ}.$((MIN-1)).0-rc0"
         if git ls-remote --exit-code origin "refs/heads/$RC_BRANCH"; then
           echo "branch_exists=true" >> $GITHUB_OUTPUT
           echo "rc_branch=$RC_BRANCH" >> $GITHUB_OUTPUT 
