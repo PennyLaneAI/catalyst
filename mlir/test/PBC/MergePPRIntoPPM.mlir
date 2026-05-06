@@ -37,7 +37,7 @@ func.func public @merge_ppr_ppm_pi_4_rotation_test_2() -> tensor<i1> {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = pbc.ppr ["X"](-4) %1 : !quantum.bit
-    %m, %out_qubits = pbc.ppm ["Z"](-1) %2 : i1, !quantum.bit
+    %m, %out_qubits = pbc.ppm ["Z"](-) %2 : i1, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     %3 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
     quantum.dealloc %3 : !quantum.reg
@@ -49,7 +49,7 @@ func.func public @merge_ppr_ppm_pi_4_rotation_test_3(%q1: !quantum.bit) -> tenso
     // CHECK: pbc.ppm ["Y"]
     // CHECK-NOT: pbc.ppr ["X"]
     %0 = pbc.ppr ["X"](-4) %q1 : !quantum.bit
-    %m, %out_qubits = pbc.ppm ["Z"](-1) %0 : i1, !quantum.bit
+    %m, %out_qubits = pbc.ppm ["Z"](-) %0 : i1, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     return %from_elements : tensor<i1>
 }
@@ -60,7 +60,7 @@ func.func public @merge_ppr_ppm_pi_4_rotation_test_3(%q1: !quantum.bit) -> tenso
 
 func.func public @commute_ppr_ppm_pi_4_rotation_test_1(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
-    // CHECK: pbc.ppm ["Z"](-1)
+    // CHECK: pbc.ppm ["Z"](-)
     // CHECK: pbc.ppr ["X"](4)
     %0 = pbc.ppr ["X"](4) %q1: !quantum.bit
     %m, %out_qubits = pbc.ppm ["Y"] %0 : i1, !quantum.bit
@@ -73,7 +73,7 @@ func.func public @commute_ppr_ppm_pi_4_rotation_test_2(%q1: !quantum.bit) -> (te
     // CHECK: pbc.ppm ["Y"]
     // CHECK: pbc.ppr ["X"](-4)
     %0 = pbc.ppr ["X"](-4) %q1: !quantum.bit
-    %m, %out_qubits = pbc.ppm ["Z"](-1) %0 : i1, !quantum.bit
+    %m, %out_qubits = pbc.ppm ["Z"](-) %0 : i1, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     return %from_elements, %out_qubits : tensor<i1>, !quantum.bit
 }
@@ -144,7 +144,7 @@ func.func public @merge_ppr_ppm_pi_2_rotation_test_2() -> tensor<i1> {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = pbc.ppr ["X"](-2) %1 : !quantum.bit
-    %m, %out_qubits = pbc.ppm ["Z"](-1) %2 : i1, !quantum.bit
+    %m, %out_qubits = pbc.ppm ["Z"](-) %2 : i1, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     %3 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
     quantum.dealloc %3 : !quantum.reg
@@ -156,7 +156,7 @@ func.func public @merge_ppr_ppm_pi_2_rotation_test_3(%q1: !quantum.bit) -> tenso
     // CHECK: pbc.ppm ["Z"]
     // CHECK-NOT: pbc.ppr ["X"]
     %0 = pbc.ppr ["X"](-2) %q1 : !quantum.bit
-    %m, %out_qubits = pbc.ppm ["Z"](-1) %0 : i1, !quantum.bit
+    %m, %out_qubits = pbc.ppm ["Z"](-) %0 : i1, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     return %from_elements : tensor<i1>
 }
@@ -167,7 +167,7 @@ func.func public @merge_ppr_ppm_pi_2_rotation_test_3(%q1: !quantum.bit) -> tenso
 
 func.func public @commute_ppr_ppm_pi_2_rotation_test_1(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
-    // CHECK: pbc.ppm ["Y"](-1)
+    // CHECK: pbc.ppm ["Y"](-)
     // CHECK: pbc.ppr ["X"](2)
     %0 = pbc.ppr ["X"](2) %q1: !quantum.bit
     %m, %out_qubits = pbc.ppm ["Y"] %0 : i1, !quantum.bit
@@ -180,13 +180,13 @@ func.func public @commute_ppr_ppm_pi_2_rotation_test_2(%q1: !quantum.bit) -> (te
     // CHECK: pbc.ppm ["Z"] %
     // CHECK: pbc.ppr ["X"](-2)
     %0 = pbc.ppr ["X"](-2) %q1: !quantum.bit
-    %m, %out_qubits = pbc.ppm ["Z"](-1) %0 : i1, !quantum.bit
+    %m, %out_qubits = pbc.ppm ["Z"](-) %0 : i1, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     return %from_elements, %out_qubits : tensor<i1>, !quantum.bit
 }
 
 func.func public @merge_ppr_ppm_different_size_test(%q1: !quantum.bit, %q2: !quantum.bit, %q3: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
-    // CHECK: pbc.ppm ["Z"](-1)
+    // CHECK: pbc.ppm ["Z"](-)
     %0:3 = pbc.ppr ["X", "Y", "Z"](2) %q1, %q2, %q3 : !quantum.bit, !quantum.bit, !quantum.bit
     %mres, %out_qubits = pbc.ppm ["Z"] %0#0 : i1, !quantum.bit
     %from_elements = tensor.from_elements %mres : tensor<i1>
@@ -211,14 +211,14 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // q2, q1
     // CHECK: [[m2:%.+]], [[o2:%.+]]:2 = pbc.ppm ["X", "X"] [[o1]]#1, [[o1]]#2
     // q3
-    // CHECK: [[m3:%.+]], [[o3:%.+]] = pbc.ppm ["Z"](-1) [[o1]]#0
+    // CHECK: [[m3:%.+]], [[o3:%.+]] = pbc.ppm ["Z"](-) [[o1]]#0
 
     // q1, q4
     // CHECK: [[m4:%.+]], [[o4:%.+]]:2 = pbc.ppm ["X", "X"] [[o2]]#1, [[o1]]#3
 
     // Because the Pauli size is limited to 3, the two operations below are not commuted.
     // CHECK-MPS: pbc.ppr ["Z", "X"](4)
-    // CHECK-MPS: pbc.ppm ["Y", "Y", "Y"](-1)
+    // CHECK-MPS: pbc.ppm ["Y", "Y", "Y"](-)
     // CHECK-MPS-NOT: pbc.ppm ["Z", "Z", "Y", "Y"]
 
     %0 = pbc.ppr ["Z"](8) %arg0 : !quantum.bit

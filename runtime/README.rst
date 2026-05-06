@@ -56,8 +56,8 @@ The following table shows the available devices along with supported features:
      - Static allocation/deallocation
      - Static allocation/deallocation
    * - Gate Operations
-     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/core/gates/GateOperation.hpp>`_
-     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/core/gates/GateOperation.hpp>`_
+     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/main/pennylane_lightning/core/gates/GateOperation.hpp>`_
+     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/main/pennylane_lightning/core/gates/GateOperation.hpp>`_
      - `Braket operations <https://github.com/PennyLaneAI/catalyst/blob/e812afbadbd777209862d5c76f394e3f0c43ffb6/runtime/lib/backend/openqasm/OpenQasmBuilder.hpp#L49>`_
    * - Quantum Observables
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, and Tensor Product of Observables

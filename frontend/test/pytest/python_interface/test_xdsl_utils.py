@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit tests for xDSL utilities."""
+
 # pylint: disable=line-too-long
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 from jax import jit
 from jaxlib.mlir.ir import Module as jaxModule
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, func, tensor, test
+from xdsl_jax.dialects.stablehlo import ConstantOp as hloConstantOp
 
 from catalyst.python_interface import QuantumParser
 from catalyst.python_interface.conversion import (
@@ -34,7 +36,6 @@ from catalyst.python_interface.conversion import (
     xdsl_from_qjit,
     xdsl_module,
 )
-from catalyst.python_interface.dialects.stablehlo import ConstantOp as hloConstantOp
 from catalyst.python_interface.utils import get_constant_from_ssa, get_pyval_from_xdsl_attr
 
 pytestmark = pytest.mark.xdsl
@@ -128,6 +129,23 @@ class TestGetConstantFromSSA:
         assert isinstance(val.type, builtin.Float64Type)
 
         assert get_constant_from_ssa(val) is None
+
+    @pytest.mark.parametrize(
+        "const, attr_type, dtype",
+        [
+            (11, builtin.IntegerAttr, builtin.IntegerType(64)),
+            (5, builtin.IntegerAttr, builtin.IndexType()),
+            (2.5, builtin.FloatAttr, builtin.Float64Type()),
+        ],
+    )
+    def test_index_cast(self, const, attr_type, dtype):
+        """Test that a constant value cast into an IndexType using arith.index_cast can be
+        extracted."""
+        const_attr = attr_type(const, dtype)
+        val = arith.ConstantOp(value=const_attr).results[0]
+        cast_val = arith.IndexCastOp(val, builtin.IndexType()).results[0]
+
+        assert get_constant_from_ssa(cast_val) == const
 
 
 class TestGetPyvalFromXdslAttr:
@@ -347,10 +365,10 @@ class TestConversionUtils:
     def test_xdsl_from_qjit(self):
         """Test that the xdsl_from_qjit function works correctly."""
 
-        @qml.qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qjit
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
-            return qml.state()
+            return qp.state()
 
         mod = xdsl_from_qjit(circuit)()
         assert isinstance(mod, builtin.ModuleOp)
@@ -367,8 +385,8 @@ class TestConversionUtils:
                 funcs.append(op)
 
         assert len(funcs) == 1
-        # All qnodes have a UnitAttr attribute called qnode
-        assert funcs[0].attributes.get("qnode", None) is not None
+        # All qnodes have a UnitAttr attribute called quantum.node
+        assert funcs[0].attributes.get("quantum.node", None) is not None
 
 
 class TestInliningUtils:

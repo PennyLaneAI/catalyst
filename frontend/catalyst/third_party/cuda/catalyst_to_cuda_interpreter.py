@@ -35,7 +35,7 @@ from typing import Hashable
 
 import cudaq
 import jax
-import pennylane as qml
+import pennylane as qp
 from jax.tree_util import tree_unflatten
 
 from catalyst.device import BackendInfo, QJITDevice
@@ -112,7 +112,7 @@ def remove_host_context(jaxpr):
 
     ```python
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def identity(x):
       return x
     ```
@@ -814,19 +814,19 @@ class QJIT_CUDAQ:
             """
             device_name = (
                 device.target_device.short_name
-                if isinstance(device, qml.devices.LegacyDeviceFacade)
+                if isinstance(device, qp.devices.LegacyDeviceFacade)
                 else device.name
             )
             interface_name = (
                 device.target_device.name
-                if isinstance(device, qml.devices.LegacyDeviceFacade)
+                if isinstance(device, qp.devices.LegacyDeviceFacade)
                 else device.name
             )
             return BackendInfo(device_name, interface_name, "", {})
 
         with Patcher(
             (QJITDevice, "extract_backend_info", cudaq_backend_info),
-            (qml.QNode, "__call__", QFunc.__call__),
+            (qp.QNode, "__call__", QFunc.__call__),
         ):
             func = self.user_function
             abs_axes = {}

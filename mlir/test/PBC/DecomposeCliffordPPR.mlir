@@ -29,7 +29,7 @@ func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
 
     // CHECK-Z: [[QREG:%.+]]: !quantum.bit) {
     // CHECK-Z: [[q_2:%.+]] = quantum.alloc_qb : !quantum.bit
-    // CHECK-Z: [[M1:%.+]], [[out_0:%.+]]:2 = pbc.ppm ["Z", "Y"](-1) [[QREG]], [[q_2]] : i1, !quantum.bit, !quantum.bit
+    // CHECK-Z: [[M1:%.+]], [[out_0:%.+]]:2 = pbc.ppm ["Z", "Y"](-) [[QREG]], [[q_2]] : i1, !quantum.bit, !quantum.bit
     // CHECK-Z: [[M2:%.+]], [[out_1:%.+]] = pbc.ppm ["X"] [[out_0]]#1 : i1, !quantum.bit
     // CHECK-Z: [[q_3:%.+]] = arith.xori [[M1]], [[M2]] : i1
     // CHECK-Z: [[q_4:%.+]] = pbc.ppr ["Z"](2) [[out_0]]#0 cond([[q_3]]) : !quantum.bit
@@ -58,7 +58,7 @@ func.func @test_ppr_to_ppm_1(%q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !quan
 
     // CHECK-Z: [[arg0:%.+]]: !quantum.bit, [[arg1:%.+]]: !quantum.bit, [[arg2:%.+]]: !quantum.bit)
     // CHECK-Z: [[q_0:%.+]] = quantum.alloc_qb : !quantum.bit
-    // CHECK-Z: [[m1:%.+]], [[o1:%.+]]:4 = pbc.ppm ["X", "Y", "Z", "Y"](-1) [[arg0]], [[arg1]], [[arg2]], [[q_0]] : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK-Z: [[m1:%.+]], [[o1:%.+]]:4 = pbc.ppm ["X", "Y", "Z", "Y"](-) [[arg0]], [[arg1]], [[arg2]], [[q_0]] : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
     // CHECK-Z: [[m2:%.+]], {{.*}} = pbc.ppm ["X"] [[o1]]#3 : i1, !quantum.bit
     // CHECK-Z: [[q_1:%.+]] = arith.xori [[m1]], [[m2]] : i1
     // CHECK-Z: {{.*}} = pbc.ppr ["X", "Y", "Z"](2) {{.*}} cond([[q_1]]) : !quantum.bit
@@ -81,7 +81,7 @@ func.func @test_ppr_to_ppm_with_condition(%q0 : !quantum.bit, %q1 : !quantum.bit
     // CHECK-Z: [[m0:%.+]], {{.*}} = pbc.ppm ["Z"]
     // CHECK-Z: [[if:%.+]]:3 = scf.if [[m0]]
     // CHECK-Z:   [[q_0:%.+]] = quantum.alloc_qb : !quantum.bit
-    // CHECK-Z:   [[m1:%.+]], [[o1:%.+]]:4 = pbc.ppm ["X", "Y", "Z", "Y"](-1)
+    // CHECK-Z:   [[m1:%.+]], [[o1:%.+]]:4 = pbc.ppm ["X", "Y", "Z", "Y"](-)
     // CHECK-Z:   [[m2:%.+]], {{.*}} = pbc.ppm ["X"] [[o1]]#3
     // CHECK-Z:   [[q_1:%.+]] = arith.xori [[m1]], [[m2]] : i1
     // CHECK-Z:   {{.*}} = pbc.ppr ["X", "Y", "Z"](2) {{.*}} cond([[q_1]])
@@ -121,7 +121,7 @@ func.func @test_ppr_negative_pi_over_four(%q1 : !quantum.bit) {
 
     // CHECK-Y: [[QREG:%.+]]: !quantum.bit) {
     // CHECK-Y: [[q_2:%.+]] = pbc.fabricate  plus_i : !quantum.bit
-    // CHECK-Y: [[M1:%.+]], [[out_0:%.+]]:2 = pbc.ppm ["Z", "Z"](-1) [[QREG]], [[q_2]] : i1, !quantum.bit, !quantum.bit
+    // CHECK-Y: [[M1:%.+]], [[out_0:%.+]]:2 = pbc.ppm ["Z", "Z"](-) [[QREG]], [[q_2]] : i1, !quantum.bit, !quantum.bit
     // CHECK-Y: [[M2:%.+]], [[out_1:%.+]] = pbc.ppm ["X"] [[out_0]]#1 : i1, !quantum.bit
     // CHECK-Y: [[cond:%.+]] = arith.xori [[M1]], [[M2]] : i1
     // CHECK-Y: [[q_4:%.+]] = pbc.ppr ["Z"](2) [[out_0]]#0 cond([[cond]]) : !quantum.bit
@@ -143,7 +143,7 @@ func.func @test_ppr_negative_pi_over_four_multi_qubit(%q1 : !quantum.bit, %q2 : 
 
     // CHECK-Y: [[arg0:%.+]]: !quantum.bit, [[arg1:%.+]]: !quantum.bit, [[arg2:%.+]]: !quantum.bit)
     // CHECK-Y: [[q_0:%.+]] = pbc.fabricate  plus_i : !quantum.bit
-    // CHECK-Y: [[m1:%.+]], [[o1:%.+]]:4 = pbc.ppm ["X", "Y", "Z", "Z"](-1) [[arg0]], [[arg1]], [[arg2]], [[q_0]] : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK-Y: [[m1:%.+]], [[o1:%.+]]:4 = pbc.ppm ["X", "Y", "Z", "Z"](-) [[arg0]], [[arg1]], [[arg2]], [[q_0]] : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
     // CHECK-Y: [[m2:%.+]], {{.*}} = pbc.ppm ["X"] [[o1]]#3 : i1, !quantum.bit
     // CHECK-Y: [[cond:%.+]] = arith.xori [[m1]], [[m2]] : i1
     // CHECK-Y: {{.*}} = pbc.ppr ["X", "Y", "Z"](2) {{.*}} cond([[cond]]) : !quantum.bit

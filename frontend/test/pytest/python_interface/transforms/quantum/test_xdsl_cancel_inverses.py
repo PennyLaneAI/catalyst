@@ -13,7 +13,7 @@
 # limitations under the License.
 """Unit test module for the iterative cancel inverses transform"""
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst.python_interface.transforms import (
@@ -37,6 +37,7 @@ class TestIterativeCancelInversesPass:
                 // CHECK: quantum.custom "PauliY"() [[q1]] : !quantum.bit
                 %1 = quantum.custom "PauliX"() %0 : !quantum.bit
                 %2 = quantum.custom "PauliY"() %1 : !quantum.bit
+                quantum.dealloc_qb %2 : !quantum.bit
                 return
             }
         """
@@ -56,6 +57,8 @@ class TestIterativeCancelInversesPass:
                 // CHECK: quantum.custom "PauliX"() [[q1]] : !quantum.bit
                 %2 = quantum.custom "PauliX"() %0 : !quantum.bit
                 %3 = quantum.custom "PauliX"() %1 : !quantum.bit
+                quantum.dealloc_qb %2 : !quantum.bit
+                quantum.dealloc_qb %3 : !quantum.bit
                 return
             }
         """
@@ -71,6 +74,7 @@ class TestIterativeCancelInversesPass:
                 // CHECK-NOT: quantum.custom
                 %1 = quantum.custom "PauliX"() %0 : !quantum.bit
                 %2 = quantum.custom "PauliX"() %1 : !quantum.bit
+                quantum.dealloc_qb %2 : !quantum.bit
                 return
             }
         """
@@ -90,6 +94,7 @@ class TestIterativeCancelInversesPass:
                 %4 = quantum.custom "PauliZ"() %3 : !quantum.bit
                 %5 = quantum.custom "PauliY"() %4 : !quantum.bit
                 %6 = quantum.custom "PauliX"() %5 : !quantum.bit
+                quantum.dealloc_qb %6 : !quantum.bit
                 return
             }
         """
@@ -108,6 +113,9 @@ class TestIterativeCancelInversesPass:
                 // CHECK-NOT: quantum.custom
                 %4, %5, %6 = quantum.custom "PauliY"() %1 ctrls(%2, %3) ctrlvals(%0, %0) : !quantum.bit ctrls !quantum.bit, !quantum.bit
                 %7, %8, %9 = quantum.custom "PauliY"() %4 ctrls(%5, %6) ctrlvals(%0, %0) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+                quantum.dealloc_qb %7 : !quantum.bit
+                quantum.dealloc_qb %8 : !quantum.bit
+                quantum.dealloc_qb %9 : !quantum.bit
                 return
             }
         """
@@ -128,6 +136,9 @@ class TestIterativeCancelInversesPass:
                 // CHECK-NOT: "quantum.custom"
                 %5, %6, %7 = quantum.custom "PauliY"() %2 ctrls(%3, %4) ctrlvals(%1, %0) : !quantum.bit ctrls !quantum.bit, !quantum.bit
                 %8, %9, %10 = quantum.custom "PauliY"() %5 ctrls(%6, %7) ctrlvals(%1, %0) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+                quantum.dealloc_qb %8 : !quantum.bit
+                quantum.dealloc_qb %9 : !quantum.bit
+                quantum.dealloc_qb %10 : !quantum.bit
                 return
             }
         """
@@ -154,6 +165,9 @@ class TestIterativeCancelInversesPass:
                 // CHECK: quantum.custom "PauliY"() [[q3]] ctrls([[q4]], [[q5]]) ctrlvals([[cval0]], [[cval1]]) : !quantum.bit ctrls !quantum.bit, !quantum.bit
                 %5, %6, %7 = quantum.custom "PauliY"() %2 ctrls(%3, %4) ctrlvals(%1, %0) : !quantum.bit ctrls !quantum.bit, !quantum.bit
                 %8, %9, %10 = quantum.custom "PauliY"() %5 ctrls(%6, %7) ctrlvals(%0, %1) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+                quantum.dealloc_qb %8 : !quantum.bit
+                quantum.dealloc_qb %9 : !quantum.bit
+                quantum.dealloc_qb %10 : !quantum.bit
                 return
             }
         """
@@ -174,6 +188,7 @@ class TestIterativeCancelInversesPass:
                 %1 = quantum.custom "PauliX"() %0 : !quantum.bit
                 %2 = quantum.custom "PauliY"() %1 : !quantum.bit
                 %3 = quantum.custom "PauliX"() %2 : !quantum.bit
+                quantum.dealloc_qb %3 : !quantum.bit
                 return
             }
         """
@@ -182,42 +197,41 @@ class TestIterativeCancelInversesPass:
         run_filecheck(program, pipeline)
 
 
-@pytest.mark.usefixtures("use_capture")
 class TestIterativeCancelInversesIntegration:
     """Integration tests for the IterativeCancelInversesPass."""
 
     def test_qjit(self, run_filecheck_qjit):
         """Test that the IterativeCancelInversesPass works correctly with qjit."""
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qjit(target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @iterative_cancel_inverses_pass
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
             # CHECK-NOT: quantum.custom
-            qml.H(0)
-            qml.X(0)
-            qml.X(0)
-            qml.H(0)
-            return qml.state()
+            qp.H(0)
+            qp.X(0)
+            qp.X(0)
+            qp.H(0)
+            return qp.state()
 
         run_filecheck_qjit(circuit)
 
     def test_qjit_no_cancellation(self, run_filecheck_qjit):
         """Test that the IterativeCancelInversesPass works correctly with qjit when
         there are no operations that can be cancelled."""
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qjit(target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @iterative_cancel_inverses_pass
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
             # CHECK-NOT: quantum.custom
-            qml.H(1)
-            qml.X(1)
-            qml.X(0)
-            qml.H(0)
-            return qml.state()
+            qp.H(1)
+            qp.X(1)
+            qp.X(0)
+            qp.H(0)
+            return qp.state()
 
         with pytest.raises(AssertionError, match="filecheck failed"):
             run_filecheck_qjit(circuit)

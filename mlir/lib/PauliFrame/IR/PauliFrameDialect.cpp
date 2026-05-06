@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "PauliFrame/IR/PauliFrameDialect.h"
+
+#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
-#include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
 
-#include "PauliFrame/IR/PauliFrameDialect.h"
 #include "PauliFrame/IR/PauliFrameOps.h"
 
 using namespace mlir;

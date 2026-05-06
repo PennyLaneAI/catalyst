@@ -18,7 +18,6 @@
 #include <vector>
 
 #include "llvm/Support/Debug.h"
-
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"

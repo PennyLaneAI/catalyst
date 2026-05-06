@@ -20,18 +20,18 @@ Here, we integrate AutoGraph into Catalyst to improve the UX and allow programme
 Python control flow and other imperative expressions rather than the functional equivalents provided
 by Catalyst.
 """
+
 import copy
 import functools
 import inspect
 from contextlib import ContextDecorator
 
-import pennylane as qml
+import pennylane as qp
 from malt.core import ag_ctx, config, converter
 from malt.impl.api import PyToPy
 
 import catalyst
-from catalyst.autograph import ag_primitives, operator_update
-from catalyst.passes.pass_api import PassPipelineWrapper, QNodeWrapper
+from catalyst.autograph import ag_primitives
 from catalyst.utils.exceptions import AutoGraphError
 from catalyst.utils.patching import Patcher
 
@@ -54,15 +54,8 @@ class CatalystTransformer(PyToPy):
         # way to handle these in the future.
         # We may also need to check how this interacts with other common function decorators.
         fn = obj
-        if isinstance(obj, qml.QNode):
+        if isinstance(obj, qp.QNode):
             fn = obj.func
-        elif isinstance(obj, QNodeWrapper):
-            fn = obj
-            data = []
-            while isinstance(fn, QNodeWrapper):
-                data.append((fn.pass_name_or_pipeline, fn.flags, fn.valued_options))
-                fn = fn.qnode
-            fn = obj.original_qnode.func
         elif inspect.isfunction(fn) or inspect.ismethod(fn):
             pass
         elif callable(obj):
@@ -74,16 +67,9 @@ class CatalystTransformer(PyToPy):
         new_fn, module, source_map = self.transform_function(fn, user_context)
         new_obj = new_fn
 
-        if isinstance(obj, qml.QNode):
+        if isinstance(obj, qp.QNode):
             new_obj = copy.copy(obj)
             new_obj.func = new_fn
-        elif isinstance(obj, PassPipelineWrapper):
-            new_qnode = copy.copy(obj.original_qnode)
-            new_qnode.func = new_fn
-            data.reverse()
-            for _pass, flags, kwopts in data:
-                new_qnode = PassPipelineWrapper(new_qnode, _pass, *flags, **kwopts)
-            new_obj = new_qnode
 
         return new_obj, module, source_map
 
@@ -132,21 +118,6 @@ class CatalystTransformer(PyToPy):
         )
 
         return new_fn
-
-    def transform_ast(self, node, ctx):
-        """Overload of PyToPy.transform_ast from DiastaticMalt
-
-        .. note::
-            Once the operator_update interface has been migrated to the
-            DiastaticMalt project, this overload can be deleted."""
-        # The operator_update transform would be more correct if placed with
-        # slices.transform in PyToPy.transform_ast in DiastaticMalt rather than
-        # at the beginning of the transformation. operator_update.transform
-        # should come after the unsupported features check and intial analysis,
-        # but it fails if it does not come before variables.transform.
-        node = operator_update.transform(node, ctx)
-        node = super().transform_ast(node, ctx)
-        return node
 
 
 def run_autograph(fn, *modules):
@@ -233,10 +204,8 @@ def autograph_source(fn):
     # Unwrap known objects to get the function actually transformed by autograph.
     if isinstance(fn, catalyst.QJIT):
         fn = fn.original_function
-    if isinstance(fn, qml.QNode):
+    if isinstance(fn, qp.QNode):
         fn = fn.func
-    if isinstance(fn, QNodeWrapper):
-        fn = fn.original_qnode
 
     if TRANSFORMER.has_cache(fn):
         new_fn = TRANSFORMER.get_cached_function(fn)

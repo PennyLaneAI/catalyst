@@ -309,7 +309,7 @@ RemoveAbortAndPutsInsertCallTransform::matchAndRewrite(LLVM::CallOp callOp,
     // returning a token to find out if the function finished running.
     // This would be in the case of the following asynchrnous qnode, for example:
     //
-    // @qml.qnode()
+    // @qp.qnode()
     // def foo():
     //   return
     //

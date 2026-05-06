@@ -102,5 +102,59 @@ def PhysicalHyperRegisterType : QecPhysical_Type<"HyperRegister", "hyperreg"> {
     let assemblyFormat = "`<` $width `x` $k `x` $n `>`";
 }
 
+def TannerGraphType : QecPhysical_Type<"TannerGraph", "tanner_graph"> {
+    let summary = "A Tanner graph represented by its adjacency matrix in CSC form";
+
+    let description = [{
+        A Tanner graph, in the context of QEC, is a multipartite graph that specifies a quantum
+        error-correcting code. A Tanner graph can be partitioned into some number, N, of independent
+        sets representing the data qubits of the QEC code and the N - 1 sets representing the
+        auxiliary qubits that participate in each class of parity checking (e.g. for CSS codes,
+        there are two independent sets of auxiliary qubits for X-parity and Z-parity checks).
+
+        This implementation represents a Tanner graph by its adjacency matrix in Compressed Sparse
+        Column (CSC) form. In this representation, the adjacency matrix is fully defined by
+        one-dimensional arrays of row indices and column pointers. The "data" array does not need to
+        be specified since Tanner graphs are unweighted, therefore the data array is always all 1s.
+
+        #### Example:
+
+        Consider the the following adjacency matrix:
+
+        ```
+        ┌           ┐
+        │ 0 0 0 1 0 │
+        │ 0 0 0 1 1 │
+        │ 0 0 0 0 1 │
+        │ 1 1 0 0 0 │
+        │ 0 1 1 0 0 │
+        └           ┘
+        ```
+
+        This matrix represents the Tanner graph for three data qubits labelled by column indices
+        0, 1, 2 and two auxiliary qubits labelled by column indices 3, 4. A value of '1' indicates
+        an edge between vertices. The CSC representation of this adjacency matrix is as follows:
+
+        ```
+        row_idx = [3, 3, 4, 4, 0, 1, 1, 2]
+        col_ptr = [0, 1, 3, 4, 6, 8]
+        ```
+
+        In MLIR, the `tanner_graph` type is fully specified by the sizes of these two arrays (8 and
+        6, respectively), and the array element type (e.g. i32):
+
+        ```mlir
+        !qecp.tanner_graph<8, 6, i32>
+        ```
+    }];
+
+    let parameters = (ins
+        TypeParameter<"int64_t", "Size of row index array">:$rowIdxSize,
+        TypeParameter<"int64_t", "Size of column pointer array">:$colPtrSize,
+        TypeParameter<"Type", "Element type">:$elementType
+    );
+
+    let assemblyFormat = "`<` $rowIdxSize `,` $colPtrSize `,` $elementType `>`";
+}
 
 #endif // QEC_PHYSICAL_TYPES

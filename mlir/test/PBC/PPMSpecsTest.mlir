@@ -170,7 +170,7 @@ func.func public @test_ppr_to_ppm() {
     %mres_14, %out_qubits_15:2 = pbc.ppm ["Z", "Z"] %14, %16 : i1, !quantum.bit, !quantum.bit
     %mres_16, %out_qubits_17:2 = pbc.ppm ["Z", "Y"] %out_qubits_15#1, %15 : i1, !quantum.bit, !quantum.bit
     %mres_18, %out_qubits_19 = pbc.ppm ["X"] %out_qubits_17#0 : i1, !quantum.bit
-    %mres_20, %out_qubits_21 = pbc.select.ppm(%mres_14, ["X"], ["Z"]) %out_qubits_17#1 : i1, !quantum.bit
+    %mres_20, %out_qubits_21 = pbc.select.ppm (%mres_14 ? ["X"] : ["Z"]) %out_qubits_17#1 : i1, !quantum.bit
     %17 = arith.xori %mres_16, %mres_18 : i1
     %18 = pbc.ppr ["Z"](2) %out_qubits_15#0 cond(%17) : !quantum.bit
     quantum.dealloc_qb %out_qubits_21 : !quantum.bit
@@ -231,7 +231,7 @@ func.func public @test_ppm_compilation_1() {
     %mres, %out_qubits:2 = pbc.ppm ["X", "Z"] %1, %8 : i1, !quantum.bit, !quantum.bit
     %mres_0, %out_qubits_1:2 = pbc.ppm ["Z", "Y"] %out_qubits#1, %7 : i1, !quantum.bit, !quantum.bit
     %mres_2, %out_qubits_3 = pbc.ppm ["X"] %out_qubits_1#0 : i1, !quantum.bit
-    %mres_4, %out_qubits_5 = pbc.select.ppm(%mres, ["X"], ["Z"]) %out_qubits_1#1 : i1, !quantum.bit
+    %mres_4, %out_qubits_5 = pbc.select.ppm (%mres ? ["X"] : ["Z"]) %out_qubits_1#1 : i1, !quantum.bit
     %9 = arith.xori %mres_0, %mres_2 : i1
     %10 = pbc.ppr ["X"](2) %out_qubits#0 cond(%9) : !quantum.bit
     quantum.dealloc_qb %out_qubits_5 : !quantum.bit
@@ -242,7 +242,7 @@ func.func public @test_ppm_compilation_1() {
     %mres_6, %out_qubits_7:3 = pbc.ppm ["X", "Z", "Z"] %10, %2, %12 : i1, !quantum.bit, !quantum.bit, !quantum.bit
     %mres_8, %out_qubits_9:2 = pbc.ppm ["Z", "Y"] %out_qubits_7#2, %11 : i1, !quantum.bit, !quantum.bit
     %mres_10, %out_qubits_11 = pbc.ppm ["X"] %out_qubits_9#0 : i1, !quantum.bit
-    %mres_12, %out_qubits_13 = pbc.select.ppm(%mres_6, ["X"], ["Z"]) %out_qubits_9#1 : i1, !quantum.bit
+    %mres_12, %out_qubits_13 = pbc.select.ppm (%mres_6 ? ["X"] : ["Z"]) %out_qubits_9#1 : i1, !quantum.bit
     %13 = arith.xori %mres_8, %mres_10 : i1
     %14:2 = pbc.ppr ["X", "Z"](2) %out_qubits_7#0, %out_qubits_7#1 cond(%13) : !quantum.bit, !quantum.bit
     quantum.dealloc_qb %out_qubits_13 : !quantum.bit
@@ -256,9 +256,9 @@ func.func public @test_ppm_compilation_1() {
     %19 = quantum.insert %18[ 4], %5 : !quantum.reg, !quantum.bit
     %20 = quantum.insert %19[ 5], %6 : !quantum.reg, !quantum.bit
     quantum.dealloc %20 : !quantum.reg
-    return 
-}  
-  
+    return
+}
+
 func.func public @test_ppm_compilation_2() {
     %c0_i64 = arith.constant 0 : i64
     %0 = quantum.alloc( 2) : !quantum.reg
@@ -449,14 +449,14 @@ func.func public @while_error(%arg0: !quantum.bit, %b: i1) {
 // -----
 
 func.func public @game_of_surface_code_t_layers(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit, %qr3 : !quantum.bit) {
-    
+
     // CHECK: "game_of_surface_code_t_layers": {
     // CHECK:     "depth_pi8_ppr": 4,
     // CHECK:     "max_weight_pi8": 4,
     // CHECK:     "pi8_ppr": 6
     // CHECK: }
 
-    // layer 1 
+    // layer 1
     %0:4 = pbc.ppr ["I", "Z", "I", "I"](-8) %qr0, %qr1, %qr2, %qr3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
 
     // layer 2
@@ -476,14 +476,14 @@ func.func public @game_of_surface_code_t_layers(%qr0 : !quantum.bit, %qr1 : !qua
 // -----
 
 func.func public @game_of_surface_code_t_layers_no_identity(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit, %qr3 : !quantum.bit) {
-    
+
     // CHECK: "game_of_surface_code_t_layers_no_identity": {
     // CHECK:     "depth_pi8_ppr": 4,
     // CHECK:     "max_weight_pi8": 4,
     // CHECK:     "pi8_ppr": 6
     // CHECK: }
 
-    // layer 1 
+    // layer 1
     %0 = pbc.ppr ["Z"](-8) %qr1 : !quantum.bit
 
     // layer 2
@@ -504,7 +504,7 @@ func.func public @game_of_surface_code_t_layers_no_identity(%qr0 : !quantum.bit,
 
 
 func.func public @game_of_surface_code_t_layers_opt(%arg0: !quantum.bit, %arg1: !quantum.bit, %arg2: !quantum.bit, %arg3: !quantum.bit) {
-    
+
     // CHECK: "game_of_surface_code_t_layers_opt": {
     // CHECK:     "depth_pi8_ppr": 2,
     // CHECK:     "max_weight_pi8": 4,

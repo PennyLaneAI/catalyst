@@ -20,17 +20,17 @@
 
 from functools import partial
 
-import pennylane as qml
+import pennylane as qp
 
 
 def test_conditional_capture():
     """Test an if statement"""
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def captured_circuit():
-        m = qml.measure(0)
+        m = qp.measure(0)
         # CHECK: [[QREG:%.+]] = quantum.insert
         # CHECK: [[QREG_3:%.+]] = scf.if
         # CHECK:    [[QREG_2:%.+]] = quantum.insert [[QREG]][ 0]
@@ -38,16 +38,16 @@ def test_conditional_capture():
         # CHECK: else
         # CHECK:     scf.yield [[QREG]]
         # CHECK: quantum.compbasis qreg [[QREG_3]] : !quantum.obs
-        qml.cond(m, lambda: (qml.X(0), None)[1])()
-        return qml.state()
+        qp.cond(m, lambda: (qp.X(0), None)[1])()
+        return qp.state()
 
-    @qml.qjit
+    @qp.qjit
     def main():
         return captured_circuit()
 
     print(main.mlir)
 
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_conditional_capture()
@@ -56,32 +56,32 @@ test_conditional_capture()
 def test_loop_capture():
     """Test a for loop"""
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def captured_circuit():
-        _ = qml.measure(0)
+        _ = qp.measure(0)
 
         # CHECK: [[QREG:%.+]] = quantum.insert
         # CHECK: [[QREG_4:%.+]] = scf.for {{.*}} iter_args([[QREG_2:%.+]] = [[QREG]]
         # CHECK:   [[QREG_3:%.+]] = quantum.insert [[QREG_2]]
         # CHECK:   scf.yield [[QREG_3]]
         # CHECK: quantum.compbasis qreg [[QREG_4]]
-        @qml.for_loop(0, 2, 1)
+        @qp.for_loop(0, 2, 1)
         def loop_fn(_):
-            qml.Hadamard(0)
+            qp.Hadamard(0)
 
         loop_fn()  # pylint: disable=no-value-for-parameter
 
-        return qml.state()
+        return qp.state()
 
-    @qml.qjit
+    @qp.qjit
     def main():
         return captured_circuit()
 
     print(main.mlir)
 
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_loop_capture()
@@ -90,35 +90,35 @@ test_loop_capture()
 def test_while_capture():
     """Test a while loop"""
 
-    qml.capture.enable()
+    qp.capture.enable()
 
     # CHECK: [[QREG:%.+]] = quantum.insert
     # CHECK: [[PAIR:%.+]]:2 = scf.while {{.*}} [[QREG2:%.+]] = [[QREG]]
     # CHECK:     [[QREG3:%.+]] = quantum.insert [[QREG2:%.+]]
     # CHECK:     scf.yield {{.*}} [[QREG3]]
     # CHECK: quantum.compbasis qreg [[PAIR]]#1
-    @qml.qnode(qml.device("null.qubit", wires=1))
+    @qp.qnode(qp.device("null.qubit", wires=1))
     def captured_circuit():
-        _ = qml.measure(0)
+        _ = qp.measure(0)
 
         def less_than_10(x):
             return x[0] < 10
 
-        @qml.while_loop(less_than_10)
+        @qp.while_loop(less_than_10)
         def loop(v):
-            qml.Hadamard(0)
+            qp.Hadamard(0)
             return v[0] + 1, v[1]
 
         loop((0, 1))
-        return qml.state()
+        return qp.state()
 
-    @qml.qjit
+    @qp.qjit
     def main():
         return captured_circuit()
 
     print(main.mlir)
 
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_while_capture()
@@ -127,11 +127,11 @@ test_while_capture()
 def test_dynamic_wire():
     """Test dynamic wires no re-insertion"""
 
-    qml.capture.enable()
-    dev = qml.device("null.qubit", wires=3)
+    qp.capture.enable()
+    dev = qp.device("null.qubit", wires=3)
 
-    @qml.qjit(target="mlir")
-    @qml.qnode(dev)
+    @qp.qjit(target="mlir")
+    @qp.qnode(dev)
     def circuit(w1: int):
         # CHECK: [[QREG:%.+]] = quantum.insert
         # CHECK-NEXT: [[SCALAR:%.+]] = tensor.extract %arg0
@@ -140,15 +140,15 @@ def test_dynamic_wire():
         # CHECK-NEXT: [[QBIT_2:%.+]] = quantum.custom "PauliZ"() [[QBIT_1]]
         # CHECK-NEXT: [[QBIT_3:%.+]] = quantum.custom "PauliX"() [[QBIT_2]]
         # CHECK: {{%.+}} = quantum.pcphase({{%.+}}, {{%.+}}) [[QBIT_3]]
-        qml.X(0)
-        qml.Y(w1)
-        qml.Z(w1)
-        qml.X(w1)
-        qml.PCPhase(0.5, wires=w1, dim=1)
-        return qml.state()
+        qp.X(0)
+        qp.Y(w1)
+        qp.Z(w1)
+        qp.X(w1)
+        qp.PCPhase(0.5, wires=w1, dim=1)
+        return qp.state()
 
     print(circuit.mlir)
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_dynamic_wire()
@@ -157,11 +157,11 @@ test_dynamic_wire()
 def test_dynamic_wire_reinsertion():
     """Test dynamic wires re-insertion"""
 
-    qml.capture.enable()
-    dev = qml.device("null.qubit", wires=3)
+    qp.capture.enable()
+    dev = qp.device("null.qubit", wires=3)
 
-    @qml.qjit(target="mlir")
-    @qml.qnode(dev)
+    @qp.qjit(target="mlir")
+    @qp.qnode(dev)
     def circuit(w1: int):
 
         # CHECK: [[QUBIT:%.+]] = quantum.custom "PauliX"() %1 : !quantum.bit
@@ -181,15 +181,15 @@ def test_dynamic_wire_reinsertion():
         # CHECK-NEXT: [[QREG_3:%.+]] = quantum.insert [[QREG_2]][[[SCALAR]]], [[QUBIT_6]]
         # CHECK-NEXT: [[QUBIT_7:%.+]] = quantum.extract [[QREG_3]][ 0]
         # CHECK-NEXT: [[QUBIT_8:%.+]] = quantum.custom "PauliX"() [[QUBIT_7]]
-        qml.X(0)
-        qml.Y(w1)
-        qml.X(0)
-        qml.Z(w1)
-        qml.X(0)
-        return qml.state()
+        qp.X(0)
+        qp.Y(w1)
+        qp.X(0)
+        qp.Z(w1)
+        qp.X(0)
+        return qp.state()
 
     print(circuit.mlir)
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_dynamic_wire_reinsertion()
@@ -198,12 +198,12 @@ test_dynamic_wire_reinsertion()
 def test_two_dynamic_CNOTs():
     """Test two dynamic CNOTs"""
 
-    dev = qml.device("null.qubit", wires=3)
+    dev = qp.device("null.qubit", wires=3)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qjit(target="mlir")
-    @qml.qnode(dev)
+    @qp.qjit(target="mlir")
+    @qp.qnode(dev)
     def circuit(w1: int, w2: int):
         # CHECK: [[SCALAR:%.+]] = tensor.extract %arg0
         # CHECK-NEXT: [[QUBIT_0:%.+]] = quantum.extract {{%.+}}[[[SCALAR]]]
@@ -211,12 +211,12 @@ def test_two_dynamic_CNOTs():
         # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.extract {{%.+}}[[[SCALAR_2]]]
         # CHECK-NEXT: [[QUBITS:%.+]]:2 = quantum.custom "CNOT"() [[QUBIT_0]], [[QUBIT_1]]
         # CHECK-NEXT: quantum.custom "CNOT"() [[QUBITS]]#0, [[QUBITS]]#1
-        qml.CNOT(wires=[w1, w2])
-        qml.CNOT(wires=[w1, w2])
-        return qml.state()
+        qp.CNOT(wires=[w1, w2])
+        qp.CNOT(wires=[w1, w2])
+        return qp.state()
 
     print(circuit.mlir)
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_two_dynamic_CNOTs()
@@ -225,12 +225,12 @@ test_two_dynamic_CNOTs()
 def test_single_qubit_dynamic():
     """single qubit gates on two different dynamic wires one after the other"""
 
-    dev = qml.device("null.qubit", wires=3)
+    dev = qp.device("null.qubit", wires=3)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qjit(target="mlir")
-    @qml.qnode(dev)
+    @qp.qjit(target="mlir")
+    @qp.qnode(dev)
     def circuit(w1: int, w2: int):
 
         # CHECK: [[REG:%.+]] = quantum.alloc
@@ -250,14 +250,14 @@ def test_single_qubit_dynamic():
         # CHECK-NEXT: [[QUBIT_0_2:%.+]] = quantum.extract [[REG_3]][ 0]
         # CHECK-NEXT: [[QUBIT_0_3:%.+]] = quantum.custom "Hadamard"() [[QUBIT_0_2]]
         # CHECK-NEXT: quantum.insert [[REG_3]][ 0], [[QUBIT_0_3]]
-        qml.Hadamard(0)
-        qml.Hadamard(w1)
-        qml.Hadamard(w2)
-        qml.Hadamard(0)
-        return qml.state()
+        qp.Hadamard(0)
+        qp.Hadamard(w1)
+        qp.Hadamard(w2)
+        qp.Hadamard(0)
+        return qp.state()
 
     print(circuit.mlir)
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_single_qubit_dynamic()
@@ -266,12 +266,12 @@ test_single_qubit_dynamic()
 def test_single_qubit_dynamic_static_interleaved():
     """Single qubit gates on two different dynamic wires interleaved with static wires"""
 
-    dev = qml.device("null.qubit", wires=3)
+    dev = qp.device("null.qubit", wires=3)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qjit(target="mlir")
-    @qml.qnode(dev)
+    @qp.qjit(target="mlir")
+    @qp.qnode(dev)
     def circuit(w1: int, w2: int):
 
         # CHECK: [[REG:%.+]] = quantum.alloc
@@ -296,15 +296,15 @@ def test_single_qubit_dynamic_static_interleaved():
         # CHECK-NEXT: [[QUBIT_0_2:%.+]] = quantum.extract [[REG_4]][ 0]
         # CHECK-NEXT: [[QUBIT_0_3:%.+]] = quantum.custom "Hadamard"() [[QUBIT_0_2]]
         # CHECK-NEXT: quantum.insert [[REG_4]][ 0], [[QUBIT_0_3]]
-        qml.Hadamard(0)
-        qml.Hadamard(w1)
-        qml.Hadamard(0)
-        qml.Hadamard(w2)
-        qml.Hadamard(0)
-        return qml.state()
+        qp.Hadamard(0)
+        qp.Hadamard(w1)
+        qp.Hadamard(0)
+        qp.Hadamard(w2)
+        qp.Hadamard(0)
+        return qp.state()
 
     print(circuit.mlir)
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_single_qubit_dynamic_static_interleaved()
@@ -313,19 +313,19 @@ test_single_qubit_dynamic_static_interleaved()
 def test_multi_qubit_gates_on_different_dynamic_wires():
     """Multi-qubit gates on different dynamic wires."""
 
-    dev = qml.device("null.qubit", wires=3)
+    dev = qp.device("null.qubit", wires=3)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qjit(target="mlir")
-    @qml.qnode(dev)
+    @qp.qjit(target="mlir")
+    @qp.qnode(dev)
     def circuit(w1: int, w2: int, w3: int):
         # CHECK: [[SCALAR:%.+]] = tensor.extract %arg0
         # CHECK-NEXT: [[QUBIT_0:%.+]] = quantum.extract {{%.+}}[[[SCALAR]]]
         # CHECK-NEXT: [[SCALAR_2:%.+]] = tensor.extract %arg1
         # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.extract {{%.+}}[[[SCALAR_2]]]
         # CHECK-NEXT: [[QUBITS:%.+]]:2 = quantum.custom "CNOT"() [[QUBIT_0]], [[QUBIT_1]]
-        qml.CNOT(wires=[w1, w2])
+        qp.CNOT(wires=[w1, w2])
         # CHECK-NEXT: [[SCALAR:%.+]] = tensor.extract %arg0
         # CHECK-NEXT: [[QREG:%.+]] = quantum.insert {{%.+}}[[[SCALAR]]]
         # CHECK-NEXT: [[SCALAR_1:%.+]] = tensor.extract %arg1
@@ -335,11 +335,11 @@ def test_multi_qubit_gates_on_different_dynamic_wires():
         # CHECK-NEXT: [[SCALAR_2:%.+]] = tensor.extract %arg2
         # CHECK-NEXT: [[QUBIT_3:%.+]] = quantum.extract [[QREG_1]][[[SCALAR_2]]]
         # CHECK-NEXT: [[QUBITS:%.+]]:2 = quantum.custom "CNOT"() [[QUBIT_2]], [[QUBIT_3]]
-        qml.CNOT(wires=[w2, w3])
-        return qml.state()
+        qp.CNOT(wires=[w2, w3])
+        return qp.state()
 
     print(circuit.mlir)
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_multi_qubit_gates_on_different_dynamic_wires()
@@ -348,22 +348,22 @@ test_multi_qubit_gates_on_different_dynamic_wires()
 def test_pass_application():
     """Application of pass decorators."""
 
-    dev = qml.device("null.qubit", wires=1)
+    dev = qp.device("null.qubit", wires=1)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qjit(target="mlir")
-    @qml.transforms.cancel_inverses
-    @qml.transforms.merge_rotations
-    @qml.qnode(dev)
+    @qp.qjit(target="mlir")
+    @qp.transforms.cancel_inverses
+    @qp.transforms.merge_rotations
+    @qp.qnode(dev)
     def circuit():
-        return qml.probs()
+        return qp.probs()
 
     # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
     # CHECK-NEXT: transform.apply_registered_pass "cancel-inverses" to [[first_pass]]
 
     print(circuit.mlir)
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_pass_application()
@@ -372,18 +372,18 @@ test_pass_application()
 def test_pass_decomposition():
     """Application of pass decorator with decomposition."""
 
-    dev = qml.device("null.qubit", wires=1)
+    dev = qp.device("null.qubit", wires=1)
 
-    qml.capture.enable()
-    qml.decomposition.enable_graph()
+    qp.capture.enable()
+    qp.decomposition.enable_graph()
 
-    @qml.qjit(target="mlir")
-    @qml.transforms.cancel_inverses
-    @qml.transforms.merge_rotations
-    @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
-    @qml.qnode(dev)
+    @qp.qjit(target="mlir")
+    @qp.transforms.cancel_inverses
+    @qp.transforms.merge_rotations
+    @partial(qp.transforms.decompose, gate_set={"RX", "RZ"})
+    @qp.qnode(dev)
     def circuit1():
-        return qml.probs()
+        return qp.probs()
 
     # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "decompose-lowering"
     # CHECK-NEXT: [[second_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
@@ -391,13 +391,13 @@ def test_pass_decomposition():
 
     print(circuit1.mlir)
 
-    @qml.qjit(target="mlir")
-    @qml.transforms.cancel_inverses
-    @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
-    @qml.transforms.merge_rotations
-    @qml.qnode(dev)
+    @qp.qjit(target="mlir")
+    @qp.transforms.cancel_inverses
+    @partial(qp.transforms.decompose, gate_set={"RX", "RZ"})
+    @qp.transforms.merge_rotations
+    @qp.qnode(dev)
     def circuit2():
-        return qml.probs()
+        return qp.probs()
 
     # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
     # CHECK-NEXT: [[second_pass:%.+]] = transform.apply_registered_pass "decompose-lowering"
@@ -405,13 +405,13 @@ def test_pass_decomposition():
 
     print(circuit2.mlir)
 
-    @qml.qjit(target="mlir")
-    @partial(qml.transforms.decompose, gate_set={"RX", "RZ"})
-    @qml.transforms.cancel_inverses
-    @qml.transforms.merge_rotations
-    @qml.qnode(dev)
+    @qp.qjit(target="mlir")
+    @partial(qp.transforms.decompose, gate_set={"RX", "RZ"})
+    @qp.transforms.cancel_inverses
+    @qp.transforms.merge_rotations
+    @qp.qnode(dev)
     def circuit3():
-        return qml.probs()
+        return qp.probs()
 
     # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
     # CHECK-NEXT: [[second_pass:%.+]] = transform.apply_registered_pass "cancel-inverses"
@@ -419,8 +419,8 @@ def test_pass_decomposition():
 
     print(circuit3.mlir)
 
-    qml.decomposition.disable_graph()
-    qml.capture.disable()
+    qp.decomposition.disable_graph()
+    qp.capture.disable()
 
 
 test_pass_decomposition()
@@ -429,21 +429,21 @@ test_pass_decomposition()
 def test_two_qnodes_with_different_passes_in_one_workflow():
     """Two qnodes with different passes in one workflow."""
 
-    dev = qml.device("null.qubit", wires=1)
+    dev = qp.device("null.qubit", wires=1)
 
-    qml.capture.enable()
+    qp.capture.enable()
 
-    @qml.qjit(target="mlir")
+    @qp.qjit(target="mlir")
     def workflow():
-        @qml.transforms.merge_rotations
-        @qml.qnode(dev)
+        @qp.transforms.merge_rotations
+        @qp.qnode(dev)
         def circuit1():
-            return qml.probs()
+            return qp.probs()
 
-        @qml.transforms.cancel_inverses
-        @qml.qnode(dev)
+        @qp.transforms.cancel_inverses
+        @qp.qnode(dev)
         def circuit2():
-            return qml.probs()
+            return qp.probs()
 
         return circuit1() + circuit2()
 
@@ -453,7 +453,7 @@ def test_two_qnodes_with_different_passes_in_one_workflow():
     # CHECK: transform.apply_registered_pass "cancel-inverses"
 
     print(workflow.mlir)
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_two_qnodes_with_different_passes_in_one_workflow()

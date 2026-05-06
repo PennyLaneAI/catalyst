@@ -12,20 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Quantum/IR/QuantumOps.h"
+
 #include <optional>
 #include <type_traits>
 
+#include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
-#include "llvm/ADT/StringSet.h"
-#include "llvm/ADT/Twine.h"
-#include "llvm/ADT/TypeSwitch.h"
 
+#include "QRef/IR/QRefOps.h"
 #include "Quantum/IR/QuantumAttrDefs.h"
 #include "Quantum/IR/QuantumDialect.h"
-#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -216,19 +217,6 @@ LogicalResult ExtractOp::verify()
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected op to have a non-null index";
     }
-
-    const auto qregLevel = getQreg().getType().getLevel();
-    const auto qbitLevel = getQubit().getType().getLevel();
-
-    if (qregLevel != qbitLevel) {
-        const auto qregLevelStr = stringifyQubitLevel(qregLevel);
-        const auto qbitLevelStr = stringifyQubitLevel(qbitLevel);
-        Twine aReg = (qregLevel == QubitLevel::Abstract) ? "an " : "a ";
-        Twine aBit = (qbitLevel == QubitLevel::Abstract) ? "an " : "a ";
-        return emitOpError() << "type mismatch: extracting from " << aReg << qregLevelStr
-                             << " register should produce " << aReg << qregLevelStr
-                             << " qubit but this op returns " << aBit << qbitLevelStr << " qubit";
-    }
     return success();
 }
 
@@ -236,17 +224,6 @@ LogicalResult InsertOp::verify()
 {
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected op to have a non-null index";
-    }
-
-    const auto inQregLevel = getInQreg().getType().getLevel();
-    const auto qbitLevel = getQubit().getType().getLevel();
-
-    if (inQregLevel != qbitLevel) {
-        const auto inQregLevelStr = stringifyQubitLevel(inQregLevel);
-        const auto qbitLevelStr = stringifyQubitLevel(qbitLevel);
-        Twine aBit = (qbitLevel == QubitLevel::Abstract) ? "an " : "a ";
-        return emitOpError() << "type mismatch: cannot insert " << aBit << qbitLevelStr
-                             << " qubit into a register requiring " << inQregLevelStr << " qubits";
     }
     return success();
 }
@@ -257,8 +234,18 @@ static LogicalResult verifyObservable(Value obs, std::optional<size_t> &numQubit
         numQubits = compOp.getQubits().size();
         return success();
     }
+    if (auto compOp = obs.getDefiningOp<catalyst::qref::ComputationalBasisOp>()) {
+        numQubits = compOp.getQubits().size();
+        return success();
+    }
     else if (obs.getDefiningOp<NamedObsOp>() || obs.getDefiningOp<HermitianOp>() ||
-             obs.getDefiningOp<TensorOp>() || obs.getDefiningOp<HamiltonianOp>()) {
+             obs.getDefiningOp<TensorOp>() || obs.getDefiningOp<HamiltonianOp>() ||
+             obs.getDefiningOp<catalyst::qref::NamedObsOp>() ||
+             obs.getDefiningOp<catalyst::qref::HermitianOp>()) {
+        return success();
+    }
+    else if (auto mcmObsOp = obs.getDefiningOp<MCMObsOp>()) {
+        numQubits = mcmObsOp.getMcms().size();
         return success();
     }
 
@@ -321,6 +308,30 @@ LogicalResult QubitUnitaryOp::verify()
 }
 
 // ----- measurements
+
+static LogicalResult verifyInQNodeFunction(Operation *op)
+{
+    // strict verification only for quantum kernels
+    // detection is a bit tricky until we have a dedicated operation, use heuristics for now
+    auto kernelModule = op->getParentOfType<ModuleOp>();
+    if (!kernelModule) {
+        return success();
+    }
+
+    auto modIt = kernelModule.getOps<ModuleOp>();
+    if (modIt.empty() || !(*modIt.begin())->hasAttr("transform.with_named_sequence")) {
+        return success();
+    }
+
+    auto parentFunc = op->getParentOfType<func::FuncOp>();
+    if (!parentFunc) {
+        return op->emitOpError("must be nested inside a 'func.func' operation");
+    }
+    if (!parentFunc->hasAttrOfType<UnitAttr>("quantum.node")) {
+        return op->emitOpError("requires parent function to carry 'quantum.node' attribute");
+    }
+    return success();
+}
 
 template <typename T>
 static LogicalResult verifyMeasurementOpDynamism(T *op, bool hasObs, bool hasDynShape,
@@ -390,6 +401,10 @@ LogicalResult HermitianOp::verify()
 
 LogicalResult SampleOp::verify()
 {
+    if (failed(verifyInQNodeFunction(getOperation()))) {
+        return failure();
+    }
+
     std::optional<size_t> numQubits = 0;
 
     if (failed(verifyObservable(getObs(), numQubits))) {
@@ -410,6 +425,10 @@ LogicalResult SampleOp::verify()
 
 LogicalResult CountsOp::verify()
 {
+    if (failed(verifyInQNodeFunction(getOperation()))) {
+        return failure();
+    }
+
     std::optional<size_t> numQubits = 0;
 
     if (failed(verifyObservable(getObs(), numQubits))) {
@@ -432,6 +451,10 @@ LogicalResult CountsOp::verify()
     }
     else if (getObs().getDefiningOp<ComputationalBasisOp>()) {
         // In the computational basis, the "eigenvalues" are all possible bistrings one can measure.
+        numEigvals = std::pow(2, numQubits.value());
+    }
+    else if (getObs().getDefiningOp<MCMObsOp>()) {
+        // When counting MCMs, the "eigenvalues" are all possible bistrings one can measure.
         numEigvals = std::pow(2, numQubits.value());
     }
     else {
@@ -459,6 +482,10 @@ LogicalResult CountsOp::verify()
 
 LogicalResult ProbsOp::verify()
 {
+    if (failed(verifyInQNodeFunction(getOperation()))) {
+        return failure();
+    }
+
     std::optional<size_t> numQubits;
     if (failed(verifyObservable(getObs(), numQubits))) {
         return emitOpError("observable must be locally defined");
@@ -478,6 +505,10 @@ LogicalResult ProbsOp::verify()
 
 LogicalResult StateOp::verify()
 {
+    if (failed(verifyInQNodeFunction(getOperation()))) {
+        return failure();
+    }
+
     std::optional<size_t> numQubits;
     if (failed(verifyObservable(getObs(), numQubits))) {
         return emitOpError("observable must be locally defined");
@@ -495,6 +526,24 @@ LogicalResult StateOp::verify()
                                                 hasOutTensor);
 }
 
+LogicalResult ExpvalOp::verify()
+{
+    if (failed(verifyInQNodeFunction(getOperation()))) {
+        return failure();
+    }
+
+    return success();
+}
+
+LogicalResult VarianceOp::verify()
+{
+    if (failed(verifyInQNodeFunction(getOperation()))) {
+        return failure();
+    }
+
+    return success();
+}
+
 LogicalResult AdjointOp::verify()
 {
     auto res =
@@ -502,6 +551,19 @@ LogicalResult AdjointOp::verify()
 
     if (res.wasInterrupted()) {
         return emitOpError("quantum measurements are not allowed in the adjoint regions");
+    }
+
+    Block &b = this->getRegion().front();
+    if (b.getNumArguments() != this->getArgs().size()) {
+        return emitOpError("Adjoint op number of operands must be the same as the number of "
+                           "arguments on its block");
+    }
+
+    for (auto [operand, bbArg] : llvm::zip_equal(this->getArgs(), b.getArguments())) {
+        if (operand.getType() != bbArg.getType()) {
+            return emitOpError(
+                "Adjoint op operand types must be the same as the argument types on its block");
+        }
     }
 
     return success();

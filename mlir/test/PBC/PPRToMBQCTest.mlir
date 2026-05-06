@@ -88,9 +88,9 @@ func.func @test_ppr_to_mbqc_2(%q0: !quantum.bit, %q1: !quantum.bit) -> (i1, !qua
 
     // CNOT(1, 0)
     // CHECK: [[q0_1:%.+]]:2 = quantum.custom "CNOT"() [[q1]], [[q0_0]] : !quantum.bit, !quantum.bit
-    
+
     // RZ(pi / 4) (qubit 0)
-    // CHECK: [[a1:%.+]] = arith.constant 0.78 
+    // CHECK: [[a1:%.+]] = arith.constant 0.78
     // CHECK: [[q0_2:%.+]] = quantum.custom "RZ"([[a1]]) [[q0_1]]#1
 
     // CNOT(1, 0)
@@ -113,7 +113,7 @@ func.func @test_ppr_to_mbqc_2(%q0: !quantum.bit, %q1: !quantum.bit) -> (i1, !qua
     // CHECK: [[q0_9:%.+]]:2 = quantum.custom "CNOT"() [[q0_7]]#0, [[q0_8]] : !quantum.bit, !quantum.bit
     // CHECK: [[q0_10:%.+]] = quantum.custom "Hadamard"() [[q0_9]]#1
     // CHECK: [[q0_11:%.+]] = quantum.custom "Hadamard"() [[q0_9]]#0
-    %m, %2, %3 = pbc.ppm ["X", "X"](8) %0, %1 : i1, !quantum.bit, !quantum.bit
+    %m, %2, %3 = pbc.ppm ["X", "X"] %0, %1 : i1, !quantum.bit, !quantum.bit
 
     func.return %m, %2, %3 : i1, !quantum.bit, !quantum.bit
 }
@@ -218,7 +218,7 @@ func.func @test_ppr_to_mbqc_4(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantu
     // CHECK: "Hadamard"
     // CHECK-NOT: "Hadamard"
 
-    %m, %0, %1, %2, %3 = pbc.ppm ["X", "X", "X", "X"](16) %q0, %q1, %q2, %q3 : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %m, %0, %1, %2, %3 = pbc.ppm ["X", "X", "X", "X"] %q0, %q1, %q2, %q3 : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
 
     func.return %m, %0, %1, %2, %3 : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
 }
@@ -228,17 +228,17 @@ func.func @test_ppr_to_mbqc_4(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantu
 // Test PPRotationArbitraryOp lowering to MBQC
 func.func @test_ppr_arbitrary_to_mbqc(%q0: !quantum.bit, %angle: f64) -> !quantum.bit {
     // CHECK: func.func @test_ppr_arbitrary_to_mbqc([[q0:%.+]]: !quantum.bit, [[angle:%.+]]: f64)
-    
+
     // For single-qubit Z rotation:
     // PPR(theta, Z) = exp(-i * theta * Z)
     // RZ(phi) = exp(-i * phi/2 * Z)
     // Therefore: phi = 2 * theta
-    
+
     // CHECK: [[two:%.+]] = arith.constant 2.0
     // CHECK: [[rz_angle:%.+]] = arith.mulf [[angle]], [[two]]
     // CHECK: [[q0_out:%.+]] = quantum.custom "RZ"([[rz_angle]]) [[q0]]
     %0 = pbc.ppr.arbitrary ["Z"](%angle) %q0 : !quantum.bit
-    
+
     func.return %0 : !quantum.bit
 }
 
@@ -247,7 +247,7 @@ func.func @test_ppr_arbitrary_to_mbqc(%q0: !quantum.bit, %angle: f64) -> !quantu
 // Test PPRotationArbitraryOp with X Pauli lowering to MBQC
 func.func @test_ppr_arbitrary_x_to_mbqc(%q0: !quantum.bit, %angle: f64) -> !quantum.bit {
     // CHECK: func.func @test_ppr_arbitrary_x_to_mbqc([[q0:%.+]]: !quantum.bit, [[angle:%.+]]: f64)
-    
+
     // For X Pauli: H • RZ • H
     // CHECK: [[q0_0:%.+]] = quantum.custom "Hadamard"() [[q0]]
     // CHECK: [[two:%.+]] = arith.constant 2.0
@@ -255,7 +255,7 @@ func.func @test_ppr_arbitrary_x_to_mbqc(%q0: !quantum.bit, %angle: f64) -> !quan
     // CHECK: [[q0_1:%.+]] = quantum.custom "RZ"([[rz_angle]]) [[q0_0]]
     // CHECK: [[q0_2:%.+]] = quantum.custom "Hadamard"() [[q0_1]]
     %0 = pbc.ppr.arbitrary ["X"](%angle) %q0 : !quantum.bit
-    
+
     func.return %0 : !quantum.bit
 }
 
@@ -264,10 +264,10 @@ func.func @test_ppr_arbitrary_x_to_mbqc(%q0: !quantum.bit, %angle: f64) -> !quan
 // Test multi-qubit PPRotationArbitraryOp lowering to MBQC
 func.func @test_ppr_arbitrary_multi_to_mbqc(%q0: !quantum.bit, %q1: !quantum.bit, %angle: f64) -> (!quantum.bit, !quantum.bit) {
     // CHECK: func.func @test_ppr_arbitrary_multi_to_mbqc([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[angle:%.+]]: f64)
-    
+
     // For X ⊗ Z Pauli:
     // H(q0) • CNOT(q1, q0) • RZ(2*angle) • CNOT(q1, q0) • H(q0)
-    
+
     // CHECK: [[q0_0:%.+]] = quantum.custom "Hadamard"() [[q0]]
     // CHECK: [[cnot1:%.+]]:2 = quantum.custom "CNOT"() [[q1]], [[q0_0]]
     // CHECK: [[two:%.+]] = arith.constant 2.0
@@ -276,6 +276,6 @@ func.func @test_ppr_arbitrary_multi_to_mbqc(%q0: !quantum.bit, %q1: !quantum.bit
     // CHECK: [[cnot2:%.+]]:2 = quantum.custom "CNOT"() [[cnot1]]#0, [[q0_1]]
     // CHECK: [[q0_2:%.+]] = quantum.custom "Hadamard"() [[cnot2]]#1
     %0, %1 = pbc.ppr.arbitrary ["X", "Z"](%angle) %q0, %q1 : !quantum.bit, !quantum.bit
-    
+
     func.return %0, %1 : !quantum.bit, !quantum.bit
 }

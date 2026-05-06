@@ -15,7 +15,6 @@
 #pragma once
 
 #include "llvm/ADT/StringMap.h"
-
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
 

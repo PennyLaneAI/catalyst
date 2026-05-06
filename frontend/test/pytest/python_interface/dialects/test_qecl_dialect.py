@@ -42,6 +42,7 @@ expected_ops_names = {
     "ExtractCodeblockOp": "qecl.extract_block",
     "InsertCodeblockOp": "qecl.insert_block",
     "EncodeOp": "qecl.encode",
+    "NoiseOp": "qecl.noise",
     "QecCycleOp": "qecl.qec",
     "IdentityOp": "qecl.identity",
     "PauliXOp": "qecl.x",
@@ -165,6 +166,13 @@ class TestQecLogicalOps:
         assert isinstance(encode_op.result_types[0], qecl.LogicalCodeblockType)
         assert encode_op.result_types[0].k == self.k
 
+    def test_qecl_op_constructor_noise(self):
+        """Test the constructor of the qecl.noise op."""
+        noise_op = qecl.NoiseOp(in_codeblock=self._get_codeblock_value())
+        assert len(noise_op.result_types) == 1
+        assert isinstance(noise_op.result_types[0], qecl.LogicalCodeblockType)
+        assert noise_op.result_types[0].k == self.k
+
     def test_qecl_op_constructor_qec(self):
         """Test the constructor of the qecl.qec op."""
         qec_op = qecl.QecCycleOp(in_codeblock=self._get_codeblock_value())
@@ -260,8 +268,11 @@ def test_assembly_format(run_filecheck, pretty_print):
     // CHECK: [[block1:%.+]] = qecl.encode{{\s*}}[zero] [[block0]] : !qecl.codeblock<1>
     %block1 = qecl.encode [zero] %block0 : !qecl.codeblock<1>
 
-    // CHECK: [[block2:%.+]] = qecl.qec [[block1]] : !qecl.codeblock<1>
-    %block2 = qecl.qec %block1 : !qecl.codeblock<1>
+    // CHECK: [[block1_1:%.+]] = qecl.noise [[block1]] : !qecl.codeblock<1>
+    %block1_1 = qecl.noise %block1 : !qecl.codeblock<1>
+
+    // CHECK: [[block2:%.+]] = qecl.qec [[block1_1]] : !qecl.codeblock<1>
+    %block2 = qecl.qec %block1_1 : !qecl.codeblock<1>
 
     // CHECK: [[block3:%.+]] = qecl.identity [[block2]][{{\s*}}0] : !qecl.codeblock<1>
     %block3 = qecl.identity %block2[0] : !qecl.codeblock<1>
@@ -291,6 +302,12 @@ def test_assembly_format(run_filecheck, pretty_print):
     // CHECK: [[block11:%.+]], [[block12:%.+]] = qecl.cnot [[block_ctrl]][{{\s*}}0], [[block10]][{{\s*}}0]
     %block_ctrl = "test.op"() : () -> !qecl.codeblock<1>
     %block11, %block12 = qecl.cnot %block_ctrl[0], %block10[0] : !qecl.codeblock<1>, !qecl.codeblock<1>
+    
+    // CHECK: [[block13:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+    // CHECK: [[block14:%.+]] = qecl.noise [[block13:%.+]] : !qecl.codeblock<1>
+    %block13 = "test.op"() : () -> !qecl.codeblock<1>
+    %block14 = qecl.noise %block13 : !qecl.codeblock<1>
+    
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)

@@ -19,12 +19,11 @@ import pytest
 
 from catalyst.compiler import _quantum_opt
 from catalyst.utils.precompile_decomposition_rules import (
-    BYTECODE_FILE_PATH,
-    COMPILER_OPS_FOR_DECOMPOSITION,
     compile_op_decomp_rules,
     get_abstract_args,
     precompile_decomp_rules,
 )
+from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 
 class TestGetAbstractArgs:
@@ -86,41 +85,44 @@ class TestCompileOpDecompRules:
         """Test that compile_op_decomp_rules warns when compilation of a rule fails."""
 
         with pytest.warns(match="Failed to compile"):
+            with qp.decomposition.local_decomps():
 
-            class FakeOp(qp.operation.Operator):
-                """Test class with incompatible decomp rule."""
+                class FakeOp(qp.operation.Operator):
+                    """Test class with incompatible decomp rule."""
 
-                num_wires = 3
-                num_params = 1
-                ndim_params = (0,)
+                    num_wires = 3
+                    num_params = 1
+                    ndim_params = (0,)
 
-            @qp.register_resources({})
-            def fake_op_decomp(param, wires):
-                _quantum_opt(stdin="module {")
-                return param, wires
+                @qp.register_resources({})
+                def fake_op_decomp(param, wires):
+                    _quantum_opt(stdin="module {")
+                    return param, wires
 
-            qp.add_decomps(FakeOp, fake_op_decomp)
+                qp.add_decomps(FakeOp, fake_op_decomp)
 
-            compile_op_decomp_rules(FakeOp)
+                compile_op_decomp_rules(FakeOp)
 
     def test_unexpected_error(self):
         """Test that compile_op_decomp_rules warns when an unexpected exception is thrown."""
 
         with pytest.warns(match="Unexpected error"):
 
-            class NewFakeOp(qp.operation.Operator):
-                """Test class without ndim_params."""
+            with qp.decomposition.local_decomps():
 
-                num_wires = 1
-                num_params = 1
+                class NewFakeOp(qp.operation.Operator):
+                    """Test class without ndim_params."""
 
-            @qp.register_resources({})
-            def fake_op_decomp(string):
-                qp.PauliRot(2, string)
+                    num_wires = 1
+                    num_params = 1
 
-            qp.add_decomps(NewFakeOp, fake_op_decomp)
+                @qp.register_resources({})
+                def fake_op_decomp(string):
+                    qp.PauliRot(2, string)
 
-            compile_op_decomp_rules(NewFakeOp)
+                qp.add_decomps(NewFakeOp, fake_op_decomp)
+
+                compile_op_decomp_rules(NewFakeOp)
 
 
 def test_bytecode_file():
@@ -136,7 +138,6 @@ def test_bytecode_file():
 
     assert "_isingxy_to_h_cy" in rules
     assert "_doublexcit" in rules
-    assert "_toffoli_to_ppr" in rules
     assert "_pauliz_to_ps" in rules
     assert "_cphase_to_ppr" in rules
     assert "_crot" in rules

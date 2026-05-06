@@ -1,4 +1,4 @@
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023-2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -130,6 +130,15 @@ def MemrefToLLVMWithTBAAPass : Pass<"memref-to-llvm-tbaa", "mlir::ModuleOp"> {
   ];
 }
 
+def MarkEntryPointArgsNonWritablePass : Pass<"mark-entry-point-args-non-writable", "mlir::ModuleOp"> {
+    let summary = "Mark entry-point arguments as non-writable for bufferization.";
+
+    let dependentDialects = [
+        "bufferization::BufferizationDialect",
+        "func::FuncDialect"
+    ];
+}
+
 def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
     let summary = "Apply the passes scheduled with the transform dialect.";
 }
@@ -247,13 +256,21 @@ def MarkEntryPointArgsNonWritablePass : Pass<"mark-entry-point-args-non-writable
     ];
 }
 
-def ResourceTrackerPass : Pass<"resource-tracker"> {
+def ResourceAnalysisPass : Pass<"resource-analysis"> {
     let summary = "Track and report resource usage.";
     let description = [{
         This pass computes comprehensive resource metrics, including gate counts,
         measurements, qubit allocations, device name, as well as structured classical ops.
-        It leverages ResourceAnalysis to retrieve cached results and integrates with
-        the MLIR Pass Statistics mechanism for reporting.
+        For operations within the `Quantum`, `PBC`, and `MBQC` dialects,
+        It leverages `ResourceAnalysis` to retrieve cached results and integrates directly
+        with the MLIR Pass Statistics mechanism for reporting.
+
+        Optionally, it can output the results as JSON to stdout or a file for
+        consumption by the PennyLane frontend.
+
+        Usage:
+            quantum-opt input.mlir -resource-analysis -mlir-pass-statistics
+            quantum-opt input.mlir -resource-analysis -resource-analysis-output-json=true
     }];
 
     let options = [
@@ -262,7 +279,14 @@ def ResourceTrackerPass : Pass<"resource-tracker"> {
             /*CLI arg name=*/"output-json",
             /*type=*/"bool",
             /*default=*/"false",
-            /*description=*/"Print resource counts as JSON to stdout"
+            /*description=*/"Output resource counts as JSON. Prints to stdout unless output-fname is set"
+        >,
+        Option<
+            /*C++ var name=*/"outputFname",
+            /*CLI arg name=*/"output-fname",
+            /*type=*/"std::string",
+            /*default=*/"",
+            /*description=*/"The filename to save the output JSON to (only when output-json is true)"
         >
     ];
 }
@@ -270,10 +294,65 @@ def ResourceTrackerPass : Pass<"resource-tracker"> {
 def RegisterDecompRuleResourcePass : Pass<"register-decomp-rule-resource"> {
     let summary = "Compute and register the resources of decomposition rules.";
     let description = [{
-        This pass uses ResourceTrackerPass to compute resource metrics of
-        functions marked with the target_gate attribute, effectively
+        This pass uses `ResourceAnalysisPass` to compute resource metrics of
+        functions marked with the `target_gate` attribute, effectively
         filtering for decomposition rules.
+
+        Note: This pass only applies to top level functions in the main module.
+
+        Usage:
+            quantum-opt input.mlir -register-decomp-rule-resource
+
+        Input:
+
+        ```mlir
+        func.func @decomp_rule() attributes {target_gate="CustomGate"}  {
+            %0 = quantum.alloc( 2) : !quantum.reg
+            %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+            %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+            %3 = quantum.custom "Hadamard"() %1 : !quantum.bit
+            %4 = quantum.custom "T"() %3 : !quantum.bit
+            %5 = quantum.custom "S"() %2 : !quantum.bit
+            %6:2 = quantum.custom "CNOT"() %4, %5 : !quantum.bit, !quantum.bit
+            %7 = quantum.insert %0[ 0], %6#0 : !quantum.reg, !quantum.bit
+            %8 = quantum.insert %7[ 1], %6#1 : !quantum.reg, !quantum.bit
+            quantum.dealloc %8 : !quantum.reg
+            return
+        }
+        ```
+
+        Output:
+
+        ```mlir
+        func.func @decomp_rule() attributes {resources = {measurements = {}, num_alloc_qubits = 2 : i64, num_arg_qubits = 0 : i64, num_qubits = 2 : i64, operations = {"CNOT(2)" = 1 : i64, "Hadamard(1)" = 1 : i64, "S(1)" = 1 : i64, "T(1)" = 1 : i64}}, target_gate = "CustomGate"}  {
+            %0 = quantum.alloc( 2) : !quantum.reg
+            %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+            %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+            %3 = quantum.custom "Hadamard"() %1 : !quantum.bit
+            %4 = quantum.custom "T"() %3 : !quantum.bit
+            %5 = quantum.custom "S"() %2 : !quantum.bit
+            %6:2 = quantum.custom "CNOT"() %4, %5 : !quantum.bit, !quantum.bit
+            %7 = quantum.insert %0[ 0], %6#0 : !quantum.reg, !quantum.bit
+            %8 = quantum.insert %7[ 1], %6#1 : !quantum.reg, !quantum.bit
+            quantum.dealloc %8 : !quantum.reg
+            return
+        }
+        ```
     }];
 }
 
+def EmptyPass : Pass<"empty"> {
+    let summary = "Empty pass that does nothing.";
+
+    let options = [
+        Option<
+            /*C++ var name=*/"key",
+            /*CLI arg name=*/"key",
+            /*type=*/"std::string",
+            /*default=*/"\"\"",
+            /*description=*/
+            "Useful for storing metadata about the pass for inspectability."
+        >
+    ];
+}
 #endif // CATALYST_PASSES

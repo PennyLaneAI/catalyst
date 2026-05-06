@@ -15,6 +15,7 @@
 This file contains the definition of operations representing gates in the
 Quantum dialect.
 """
+
 from collections.abc import Sequence
 from typing import ClassVar
 
@@ -161,16 +162,16 @@ class GlobalPhaseOp(UnitaryGateOp):
     name = "quantum.gphase"
 
     assembly_format = """
-        `(` $params `)`
-        attr-dict
+        `(` $angle `)`
+        (`adj` $adjoint^)? attr-dict
         ( `ctrls` `(` $in_ctrl_qubits^ `)` )?
         ( `ctrlvals` `(` $in_ctrl_values^ `)` )?
-        `:` (`ctrls` type($out_ctrl_qubits)^ )?
+        (`:` `ctrls` type($out_ctrl_qubits)^ )?
     """
 
     irdl_options = (AttrSizedOperandSegments(as_property=True), ParsePropInAttrDict())
 
-    params = operand_def(Float64Type())
+    angle = operand_def(Float64Type())
 
     adjoint = opt_prop_def(UnitAttr)
 
@@ -183,7 +184,7 @@ class GlobalPhaseOp(UnitaryGateOp):
     def __init__(
         self,
         *,
-        params: SSAValue[Float64Type],
+        angle: SSAValue[Float64Type],
         in_ctrl_qubits: (
             QubitSSAValue | Operation | Sequence[QubitSSAValue | Operation] | None
         ) = None,
@@ -206,7 +207,7 @@ class GlobalPhaseOp(UnitaryGateOp):
         out_ctrl_qubits = tuple(QubitType() for _ in in_ctrl_qubits)
 
         super().__init__(
-            operands=(params, in_ctrl_qubits, in_ctrl_values),
+            operands=(angle, in_ctrl_qubits, in_ctrl_values),
             result_types=(out_ctrl_qubits,),
         )
 

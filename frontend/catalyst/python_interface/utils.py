@@ -18,6 +18,7 @@ from numbers import Number
 from typing import Any
 
 from xdsl.dialects.arith import ConstantOp as arithConstantOp
+from xdsl.dialects.arith import IndexCastOp
 from xdsl.dialects.builtin import (
     ArrayAttr,
     ComplexType,
@@ -30,8 +31,7 @@ from xdsl.dialects.builtin import (
 )
 from xdsl.dialects.tensor import ExtractOp as tensorExtractOp
 from xdsl.ir import Attribute, SSAValue
-
-from catalyst.python_interface.dialects.stablehlo import ConstantOp as hloConstantOp
+from xdsl_jax.dialects.stablehlo import ConstantOp as hloConstantOp
 
 
 def get_constant_from_ssa(value: SSAValue) -> Number | None:
@@ -83,6 +83,9 @@ def get_constant_from_ssa(value: SSAValue) -> Number | None:
                     val = val[0] + 1j * val[1]
 
                 return val
+
+        if isinstance(owner, IndexCastOp):
+            return get_constant_from_ssa(owner.operands[0])
 
     return None
 

@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "QecLogical/IR/QecLogicalDialect.h"
+
+#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
-#include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
 
-#include "QecLogical/IR/QecLogicalDialect.h"
 #include "QecLogical/IR/QecLogicalOps.h"
 
 using namespace mlir;

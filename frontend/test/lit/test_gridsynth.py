@@ -21,13 +21,13 @@ Unit tests for the gridsynth decomposition pass.
 
 from functools import partial
 
-import pennylane as qml
+import pennylane as qp
 
 from catalyst import qjit
 from catalyst.passes import gridsynth
 
 # Pipeline to stop after quantum compilation (where gridsynth runs)
-# This prevents lowerings that might fail for qec.ppr.
+# This prevents lowerings that might fail for pbc.ppr.
 pipe = [("pipe", ["quantum-compilation-stage"])]
 
 # ==============================================================================
@@ -40,10 +40,10 @@ def test_rz_registration():
 
     @qjit(target="mlir")
     @gridsynth(epsilon=0.01)
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit(x: float):
-        qml.RZ(x, wires=0)
-        return qml.probs()
+        qp.RZ(x, wires=0)
+        return qp.probs()
 
     # CHECK: transform.named_sequence @__transform_main
     # CHECK: transform.apply_registered_pass "gridsynth" with options = {"epsilon" = 1.000000e-02 : f64, "ppr-basis" = false}
@@ -64,10 +64,10 @@ def test_rz_lowering():
 
     @qjit(target="mlir", pipelines=pipe)
     @gridsynth(epsilon=0.01)
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit(x: float):
-        qml.RZ(x, wires=0)
-        return qml.probs()
+        qp.RZ(x, wires=0)
+        return qp.probs()
 
     # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
     # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
@@ -97,10 +97,10 @@ def test_phaseshift_registration():
 
     @qjit(target="mlir")
     @gridsynth(epsilon=0.01)
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit(x: float):
-        qml.PhaseShift(x, wires=0)
-        return qml.probs()
+        qp.PhaseShift(x, wires=0)
+        return qp.probs()
 
     # CHECK:       transform.apply_registered_pass "gridsynth"
     # CHECK-LABEL: func.func public @circuit
@@ -120,10 +120,10 @@ def test_phaseshift_lowering():
 
     @qjit(target="mlir", pipelines=pipe)
     @gridsynth(epsilon=0.01)
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit(x: float):
-        qml.PhaseShift(x, wires=0)
-        return qml.probs()
+        qp.PhaseShift(x, wires=0)
+        return qp.probs()
 
     # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
     # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
@@ -149,10 +149,10 @@ def test_ppr_registration():
 
     @qjit(target="mlir")
     @gridsynth(epsilon=0.01, ppr_basis=True)
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit(x: float):
-        qml.RZ(x, wires=0)
-        return qml.probs()
+        qp.RZ(x, wires=0)
+        return qp.probs()
 
     # CHECK: transform.apply_registered_pass "gridsynth" with options = {"epsilon" = 1.000000e-02 : f64, "ppr-basis" = true}
     print(circuit.mlir)
@@ -166,14 +166,14 @@ test_ppr_registration()
 
 
 def test_ppr_lowering():
-    """Test that PPR basis generates qec.ppr operations."""
+    """Test that PPR basis generates pbc.ppr operations."""
 
     @qjit(target="mlir", pipelines=pipe)
     @gridsynth(epsilon=0.01, ppr_basis=True)
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit(x: float):
-        qml.RZ(x, wires=0)
-        return qml.probs()
+        qp.RZ(x, wires=0)
+        return qp.probs()
 
     # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
     # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
@@ -182,7 +182,7 @@ def test_ppr_lowering():
     # CHECK-LABEL: func.func private @__catalyst_decompose_RZ_ppr_basis{{.*}}
     # CHECK:       scf.index_switch
     # CHECK:       case 1 {
-    # CHECK:         qec.ppr ["X"](2)
+    # CHECK:         pbc.ppr ["X"](2)
     # CHECK:       }
 
     # CHECK-LABEL: func.func public @circuit{{.*}}
@@ -199,15 +199,15 @@ test_ppr_lowering()
 
 
 def test_capture_workflow_clifford():
-    """Test the capture workflow with qml.transforms.gridsynth (Clifford+T)."""
-    qml.capture.enable()
+    """Test the capture workflow with qp.transforms.gridsynth (Clifford+T)."""
+    qp.capture.enable()
 
     @qjit(target="mlir", pipelines=pipe)
-    @partial(qml.transforms.gridsynth, epsilon=0.01, ppr_basis=False)
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @partial(qp.transforms.gridsynth, epsilon=0.01, ppr_basis=False)
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit(x: float):
-        qml.RZ(x, wires=0)
-        return qml.probs()
+        qp.RZ(x, wires=0)
+        return qp.probs()
 
     # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
     # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
@@ -224,7 +224,7 @@ def test_capture_workflow_clifford():
     # CHECK:       call @__catalyst_decompose_RZ{{.*}}
     print(circuit.mlir_opt)
 
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_capture_workflow_clifford()
@@ -235,15 +235,15 @@ test_capture_workflow_clifford()
 
 
 def test_capture_workflow_ppr():
-    """Test the capture workflow with qml.transforms.gridsynth (PPR)."""
-    qml.capture.enable()
+    """Test the capture workflow with qp.transforms.gridsynth (PPR)."""
+    qp.capture.enable()
 
     @qjit(target="mlir", pipelines=pipe)
-    @partial(qml.transforms.gridsynth, epsilon=0.01, ppr_basis=True)
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @partial(qp.transforms.gridsynth, epsilon=0.01, ppr_basis=True)
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit(x: float):
-        qml.RZ(x, wires=0)
-        return qml.probs()
+        qp.RZ(x, wires=0)
+        return qp.probs()
 
     # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
     # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
@@ -252,14 +252,14 @@ def test_capture_workflow_ppr():
     # CHECK-LABEL: func.func private @__catalyst_decompose_RZ_ppr_basis{{.*}}
     # CHECK:       scf.index_switch
     # CHECK:       case 1 {
-    # CHECK:         qec.ppr ["X"](2)
+    # CHECK:         pbc.ppr ["X"](2)
     # CHECK:       }
 
     # CHECK-LABEL: func.func public @circuit{{.*}}
     # CHECK:       call @__catalyst_decompose_RZ_ppr_basis{{.*}}
     print(circuit.mlir_opt)
 
-    qml.capture.disable()
+    qp.capture.disable()
 
 
 test_capture_workflow_ppr()

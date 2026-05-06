@@ -15,7 +15,6 @@
 #define DEBUG_TYPE "split-to-single-terms"
 
 #include "llvm/ADT/DenseMap.h"
-
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -25,10 +24,10 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
+#include "stablehlo/dialect/StablehloOps.h"
 
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "stablehlo/dialect/StablehloOps.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -488,7 +487,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
         removeDeadOpsBeforeOp(origFunc, callOp.getOperation(), /*reserveDeviceOps=*/false);
 
         // Remove qnode attribute
-        origFunc->removeAttr("qnode");
+        origFunc->removeAttr("quantum.node");
 
         return success();
     }
@@ -517,7 +516,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
         // Find all qnode functions with Hamiltonian expvals
         SmallVector<func::FuncOp> funcsToProcess;
         moduleOp.walk([&](func::FuncOp funcOp) {
-            if (!funcOp->hasAttr("qnode")) {
+            if (!funcOp->hasAttrOfType<UnitAttr>("quantum.node")) {
                 return;
             }
 
@@ -539,11 +538,12 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
             Location loc = origFunc.getLoc();
             OpBuilder moduleBuilder(origFunc);
 
-            // Clone origFunc -> origFunc.quantum (<circuit_name>.quantum)
-            // origFunc.quantum will contain the quantum operations and return individual expvals
-            // origFunc will be the entry point that calls quantumFunc and does post-processing
+            // Clone origFunc -> origFunc.single_terms (<circuit_name>.single_terms)
+            // origFunc.single_terms will contain the quantum operations and return individual
+            // expvals origFunc will be the entry point that calls quantumFunc and does
+            // post-processing
             IRMapping cloneMapping;
-            std::string quantumFuncName = origFunc.getName().str() + ".quantum";
+            std::string quantumFuncName = origFunc.getName().str() + ".single_terms";
             auto quantumFunc = cast<func::FuncOp>(moduleBuilder.clone(*origFunc, cloneMapping));
             quantumFunc.setName(quantumFuncName);
 

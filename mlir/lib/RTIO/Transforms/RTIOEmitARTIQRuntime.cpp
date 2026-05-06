@@ -26,8 +26,9 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
-#include "ARTIQRuntimeBuilder.hpp"
 #include "RTIO/Transforms/Passes.h"
+
+#include "ARTIQRuntimeBuilder.hpp"
 
 using namespace mlir;
 

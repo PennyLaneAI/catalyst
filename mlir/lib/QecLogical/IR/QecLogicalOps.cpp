@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "QecLogical/IR/QecLogicalOps.h"
+
+#include "llvm/Support/Casting.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/PatternMatch.h"
-#include "llvm/Support/Casting.h"
 
 #include "QecLogical/IR/QecLogicalDialect.h"
-#include "QecLogical/IR/QecLogicalOps.h"
 
 using namespace mlir;
 using namespace catalyst::qecl;

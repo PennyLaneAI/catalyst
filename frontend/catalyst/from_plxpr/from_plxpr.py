@@ -14,6 +14,7 @@
 """
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
+
 # pylint: disable=protected-access
 
 import warnings
@@ -22,15 +23,11 @@ from functools import partial
 from typing import Callable
 
 import jax
-import pennylane as qml
+import pennylane as qp
 from jax.extend.core import ClosedJaxpr, Jaxpr
-from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
-from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
-from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
 from pennylane.capture.primitives import transform_prim
-from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
 from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
 from pennylane.transforms import gridsynth as pl_gridsynth
@@ -40,8 +37,8 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
-from catalyst.jax_extras import make_jaxpr2, transient_jax_config
-from catalyst.jax_extras.patches import patched_make_eqn
+from catalyst.jax_extras import deduce_avals, make_jaxpr2, transient_jax_config
+from catalyst.jax_extras.patches import get_jax_patches
 from catalyst.jax_primitives import (
     device_init_p,
     device_release_p,
@@ -51,11 +48,26 @@ from catalyst.jax_primitives import (
 )
 from catalyst.utils.patching import Patcher
 
+from .device_utils import create_device_preprocessing_pipeline
 from .qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
 from .qubit_handler import (
     QubitHandler,
     QubitIndexRecorder,
 )
+
+# dummy hop (higher order primitive) is used to just return a jaxpr
+# produced inside of a another jaxpr
+# we want to have the same tracers as inputs to plxpr capture and from_plxpr
+# translation, as this tells jax which inputs match which dynamic shapes
+# if we have concrete inputs to both, jax will get confused.
+_dummy_hop = jax.extend.core.Primitive("dummy_hop")
+_dummy_hop.multiple_results = True
+
+
+# pylint: disable=unused-argument
+@_dummy_hop.def_abstract_eval
+def _dummy_abstract_eval(jaxpr, **kwargs):
+    return jaxpr.out_avals
 
 
 def _tuple_to_slice(t):
@@ -131,11 +143,20 @@ def _get_device_kwargs(device) -> dict:
 
 # code example has long lines
 # pylint: disable=line-too-long
-def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
+def from_plxpr(
+    plxpr: ClosedJaxpr, skip_preprocess: bool = False, _preprocess_warn: bool = True
+) -> Callable[..., Jaxpr]:
     """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
     Args:
         jaxpr (ClosedJaxpr): PennyLane variant jaxpr
+        skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
+            If ``True``, transforms used to preprocess and validate the user program before
+            executing on a quantum backend will not be used. ``False`` by default.
+        _preprocess_warn (bool): Private argument to control whether a warning should be raised
+            if any device preprocessing transforms in the compilation pipeline do not have
+            native MLIR implementations. This argument is targeted at developers and should
+            generally not be used. ``True`` by default.
 
     Returns:
         Callable: A function that accepts the same arguments as the plxpr and returns catalyst
@@ -148,12 +169,12 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
 
         from catalyst.from_plxpr import from_plxpr
 
-        qml.capture.enable()
+        qp.capture.enable()
 
-        @qml.qnode(qml.device('lightning.qubit', wires=2))
+        @qp.qnode(qp.device('lightning.qubit', wires=2))
         def circuit(x):
-            qml.RX(x, 0)
-            return qml.probs(wires=(0, 1))
+            qp.RX(x, 0)
+            return qp.probs(wires=(0, 1))
 
         def f(x):
             return circuit(2 * x) ** 2
@@ -193,15 +214,15 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
 
     """
 
-    original_fn = partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts)
-
-    # pylint: disable=import-outside-toplevel
-    from jax._src.interpreters.partial_eval import DynamicJaxprTrace
+    interpreter = WorkflowInterpreter(
+        skip_preprocess=skip_preprocess, _preprocess_warn=_preprocess_warn
+    )
+    original_fn = partial(interpreter.eval, plxpr.jaxpr, plxpr.consts)
 
     def wrapped_fn(*args, **kwargs):
-        with Patcher(
-            (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
-        ):
+        with Patcher(*get_jax_patches()):
+            # needs a repeat of the patches in case from_plxpr used independently
+            # outside of trace_From_pennylane
             return jax.make_jaxpr(original_fn)(*args, **kwargs)
 
     return wrapped_fn
@@ -211,58 +232,26 @@ class WorkflowInterpreter(PlxprInterpreter):
     """An interpreter that converts a qnode primitive from a plxpr variant to a catalyst jaxpr variant."""
 
     def __copy__(self):
-        new_version = WorkflowInterpreter()
+        new_version = WorkflowInterpreter(
+            skip_preprocess=self._skip_preprocess, _preprocess_warn=self._preprocess_warn
+        )
         new_version._pass_pipeline = copy(self._pass_pipeline)
         new_version.init_qreg = self.init_qreg
         new_version.requires_decompose_lowering = self.requires_decompose_lowering
         new_version.decompose_tkwargs = copy(self.decompose_tkwargs)
         return new_version
 
-    def __init__(self):
+    def __init__(self, skip_preprocess=False, _preprocess_warn=True):
         self._pass_pipeline = []
         self.init_qreg = None
+        self._skip_preprocess = skip_preprocess
+        self._preprocess_warn = _preprocess_warn
 
         # Compiler options for the new decomposition system
         self.requires_decompose_lowering = False
         self.decompose_tkwargs = {}  # target gateset
 
         super().__init__()
-
-
-@WorkflowInterpreter.register_primitive(pl_jac_prim)
-def handle_grad(self, *args, jaxpr, n_consts, **kwargs):
-    """Translate a grad equation."""
-    f = partial(copy(self).eval, jaxpr, args[:n_consts])
-    new_jaxpr = jax.make_jaxpr(f)(*args[n_consts:])
-
-    new_args = (*new_jaxpr.consts, *args[n_consts:])
-    return pl_jac_prim.bind(
-        *new_args, jaxpr=new_jaxpr.jaxpr, n_consts=len(new_jaxpr.consts), **kwargs
-    )
-
-
-@WorkflowInterpreter.register_primitive(pl_vjp_prim)
-def handle_vjp(self, *args, jaxpr, **kwargs):
-    """Translate a vjp equation."""
-    f = partial(copy(self).eval, jaxpr, [])
-    new_jaxpr = jax.make_jaxpr(f)(*args[: -len(jaxpr.outvars)])
-
-    new_args = (*new_jaxpr.consts, *args)
-    j = new_jaxpr.jaxpr
-    new_j = j.replace(constvars=(), invars=j.constvars + j.invars)
-    return pl_vjp_prim.bind(*new_args, jaxpr=new_j, **kwargs)
-
-
-@WorkflowInterpreter.register_primitive(pl_jvp_prim)
-def handle_jvp(self, *args, jaxpr, **kwargs):
-    """Translate a vjp equation."""
-    f = partial(copy(self).eval, jaxpr, [])
-    new_jaxpr = jax.make_jaxpr(f)(*args[: len(jaxpr.invars)])
-
-    new_args = (*new_jaxpr.consts, *args)
-    j = new_jaxpr.jaxpr
-    new_j = j.replace(constvars=(), invars=j.constvars + j.invars)
-    return pl_jvp_prim.bind(*new_args, jaxpr=new_j, **kwargs)
 
 
 # pylint: disable=unused-argument, too-many-arguments
@@ -293,8 +282,25 @@ def handle_qnode(
     )
 
     graph_succeeded = False
-    if self.requires_decompose_lowering:
-
+    if stopping_condition := self.decompose_tkwargs.get("stopping_condition"):
+        # Use the plxpr decompose transform and ignore graph decomposition
+        # See https://github.com/PennyLaneAI/catalyst/pull/2472.
+        closed_jaxpr = _apply_compiler_decompose_to_plxpr(
+            inner_jaxpr=qfunc_jaxpr,
+            consts=consts,
+            ncargs=non_const_args,
+            tkwargs={"gate_set": self.decompose_tkwargs.get("gate_set", [])},
+            stopping_condition=stopping_condition,
+        )
+    elif not qp.decomposition.enabled_graph() and self.requires_decompose_lowering:
+        # Use the plxpr decompose transform when graph is disabled
+        closed_jaxpr = _apply_compiler_decompose_to_plxpr(
+            inner_jaxpr=qfunc_jaxpr,
+            consts=consts,
+            ncargs=non_const_args,
+            tkwargs={"gate_set": self.decompose_tkwargs.get("gate_set", [])},
+        )
+    elif qp.decomposition.enabled_graph() and self.requires_decompose_lowering:
         closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
             inner_jaxpr=closed_jaxpr.jaxpr,
             consts=closed_jaxpr.consts,
@@ -341,12 +347,23 @@ def handle_qnode(
         # with other transforms in between.
         gateset = [_get_operator_name(op) for op in self.decompose_tkwargs.get("gate_set", [])]
         setattr(qnode, "decompose_gatesets", [gateset])
+    pipelines = (("main", tuple(self._pass_pipeline)),)
+    if not self._skip_preprocess:
+        device_preprocessing_pipeline = create_device_preprocessing_pipeline(
+            qnode.device, execution_config, shots, warn=self._preprocess_warn
+        )
+        pipelines += (("device", device_preprocessing_pipeline),)
+
+    # no idea what deduce_avals is doing, but this seems to make dynamic shapes work
+    flattened_fn = deduce_avals(
+        calling_convention, non_const_args, {}, [], debug_info=qfunc_jaxpr.debug_info
+    )[0]
 
     return quantum_kernel_p.bind(
-        wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
+        flattened_fn,
         *non_const_args,
         qnode=qnode,
-        pipeline=self._pass_pipeline,
+        pipelines=pipelines,
     )
 
 
@@ -364,16 +381,17 @@ transforms_to_passes = {
 }
 
 
-def register_transform(pl_transform, pass_name, decomposition):
-    """Register pennylane transforms and their conversion to Catalyst transforms"""
-    transforms_to_passes[pl_transform] = (pass_name, decomposition)
-
-
-def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs):
+def _set_decompose_lowering_state(self):
+    """Set requires_decompose_lowering and decompose_tkwargs; raise if already set."""
     if not self.requires_decompose_lowering:
         self.requires_decompose_lowering = True
     else:
         raise NotImplementedError("Multiple decomposition transforms are not yet supported.")
+
+
+# pylint: disable=too-many-positional-arguments
+def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs, use_graph=True):
+    _set_decompose_lowering_state(self)
 
     next_eval = copy(self)
     # Update the decompose_gateset to be used by the quantum kernel primitive
@@ -392,9 +410,10 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     # in the qnode handler.
 
     # Add the decompose-lowering pass to the start of the pipeline
-    t = qml.transform(pass_name="decompose-lowering")
-    pass_container = qml.transforms.core.TransformContainer(t)
-    next_eval._pass_pipeline.insert(0, pass_container)
+    if use_graph:
+        t = qp.transform(pass_name="decompose-lowering")
+        pass_container = qp.transforms.core.BoundTransform(t)
+        next_eval._pass_pipeline.insert(0, pass_container)
 
     # We still need to construct and solve the graph based on
     # the current jaxpr based on the current gateset
@@ -427,16 +446,16 @@ def handle_transform(
     consts = args[_tuple_to_slice(consts_slice)]
     non_const_args = args[_tuple_to_slice(args_slice)]
     targs = args[_tuple_to_slice(targs_slice)]
-    tkwargs = _tuple_to_dict(tkwargs)
+    pl_tkwargs = _tuple_to_dict(tkwargs)
 
     # If the transform is a decomposition transform
     # and the graph-based decomposition is enabled
-    if (
-        hasattr(transform._plxpr_transform, "__name__")
-        and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
-        and qml.decomposition.enabled_graph()
-    ):
-        return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs)
+    transform_name = getattr(transform._plxpr_transform, "__name__", None)
+    if transform_name == "decompose_plxpr_to_plxpr":
+        use_graph = qp.decomposition.enabled_graph()
+        return _handle_decompose_transform(
+            self, inner_jaxpr, consts, non_const_args, pl_tkwargs, use_graph
+        )
 
     catalyst_pass_name = transform.pass_name
     if catalyst_pass_name is None:
@@ -451,45 +470,61 @@ def handle_transform(
 
         unravelled_jaxpr = jax.make_jaxpr(wrapper)(*non_const_args)
         final_jaxpr = transform._plxpr_transform(
-            unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, tkwargs, *non_const_args
+            unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, pl_tkwargs, *non_const_args
         )
         if transforms_to_passes[transform][1]:
             final_jaxpr = pl_decompose._plxpr_transform(
-                final_jaxpr.jaxpr, final_jaxpr.consts, targs, tkwargs, *non_const_args
+                final_jaxpr.jaxpr, final_jaxpr.consts, targs, pl_tkwargs, *non_const_args
             )
 
         return copy(self).eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
 
     # Apply the corresponding Catalyst pass counterpart
     next_eval = copy(self)
-    t = qml.transform(pass_name=catalyst_pass_name)
-    bound_pass = qml.transforms.core.TransformContainer(t, args=targs, kwargs=tkwargs)
+    t = qp.transform(pass_name=catalyst_pass_name)
+    bound_pass = qp.transforms.core.BoundTransform(t, args=targs, kwargs=pl_tkwargs)
     next_eval._pass_pipeline.insert(0, bound_pass)
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
 
+def _extract_abstract_shapes(flat_inputs):
+    abstract_shapes = []
+    for a in flat_inputs:
+        for s in a.shape:
+            # need to us "is" for comparing tracers
+            if not isinstance(s, int) and not any(s is _a for _a in abstract_shapes):
+                abstract_shapes.append(s)
+    return abstract_shapes
+
+
 # pylint: disable=too-many-positional-arguments
 def trace_from_pennylane(
-    fn, static_argnums, dynamic_args, abstracted_axes, sig, kwargs, debug_info=None
+    fn,
+    args,
+    kwargs,
+    static_argnums,
+    abstracted_axes,
+    skip_preprocess=False,
+    debug_info=None,
 ):
     """Capture the JAX program representation (JAXPR) of the wrapped function, using
     PL capure module.
 
     Args:
         fn(Callable): the user function to be traced
+        args (tuple): the positional arguments to the user functions
+        kwargs(Dict[str, Any]): keyword arguments to the function.
         static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
             positions of static arguments.
-        dynamic_args(Seqence[Any]): the abstract values of the dynamic arguments.
         abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
             An experimental option to specify dynamic tensor shapes.
             This option affects the compilation of the annotated function.
             Function arguments with ``abstracted_axes`` specified will be compiled to ranked tensors
             with dynamic shapes. For more details, please see the Dynamically-shaped Arrays section
             below.
-        sig(Sequence[Any]): a tuple indicating the argument signature of the function. Static arguments
-            are indicated with their literal values, and dynamic arguments are indicated by abstract
-            values.
-        kwargs(Dict[str, Any]): keyword argumemts to the function.
+        skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
+            If ``True``, transforms used to preprocess and validate the user program before
+            executing on a quantum backend will not be used. ``False`` by default.
         debug_info(jax.api_util.debug_info): a source debug information object required by jaxprs.
 
     Returns:
@@ -497,61 +532,59 @@ def trace_from_pennylane(
         Tuple[Tuple[ShapedArray, bool]]: the return type of the captured JAXPR.
             The boolean indicates whether each result is a value returned by the user function.
         PyTreeDef: PyTree metadata of the function output
-        Tuple[Any]: the dynamic argument signature
     """
+    if abstracted_axes and any(isinstance(arg, jax.core.ShapedArray) for arg in args):
+        # ShapedArrays incompatible with abstracted_axes, so need to create dummy arrays
+        args = [jax.numpy.empty(arg.shape, dtype=arg.dtype) for arg in args]
 
-    # pylint: disable=import-outside-toplevel
-    import jax._src.interpreters.partial_eval as pe
-    from jax._src.interpreters.partial_eval import DynamicJaxprTrace
-    from jax._src.lax import lax
-    from jax._src.pjit import jit_p
-
-    from catalyst.jax_extras.patches import (
-        get_aval2,
-        patched_drop_unused_vars,
-        patched_dyn_shape_staging_rule,
-        patched_pjit_staging_rule,
-    )
-    from catalyst.utils.patching import DictPatchWrapper
+    if isinstance(fn, qp.QNode) and static_argnums:
+        # `make_jaxpr2` sees the qnode
+        # The static_argnum on the wrapped function takes precedence over the
+        # one in `make_jaxpr`
+        # https://github.com/jax-ml/jax/blob/636691bba40b936b8b64a4792c1d2158296e9dd4/jax/_src/linear_util.py#L231
+        # Therefore we need to coordinate them manually
+        fn.static_argnums = static_argnums
 
     with transient_jax_config(
         {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
-    ), Patcher(
-        (pe, "_drop_unused_vars", patched_drop_unused_vars),
-        (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
-        (lax, "_dyn_shape_staging_rule", patched_dyn_shape_staging_rule),
-        (
-            jax._src.pjit,  # pylint: disable=protected-access
-            "pjit_staging_rule",
-            patched_pjit_staging_rule,
-        ),
-        (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
-        (pe, "get_aval", get_aval2),
-    ):
+    ), Patcher(*get_jax_patches()):
 
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
             "abstracted_axes": abstracted_axes,
-            "debug_info": debug_info,
         }
 
-        args = sig
+        # we want to have the same tracers as inputs to plxpr capture and from_plxpr
+        # translation, as this tells jax which inputs match which dynamic shapes
+        # if we have concrete inputs to both, jax will get confused.
+        # instead of passing in abstracted_axes, we pass in arguments with the
+        # dynamic shapes in the right place matching the correct inputs.
+        # really confusing, but this solution mostly seems to work
+        def wrapper(*inner_args, **inner_kwargs):
+            plxpr, out_type, out_treedef = make_jaxpr2(
+                fn, static_argnums=static_argnums, debug_info=debug_info
+            )(*inner_args, **inner_kwargs)
 
-        if isinstance(fn, qml.QNode) and static_argnums:
-            # `make_jaxpr2` sees the qnode
-            # The static_argnum on the wrapped function takes precedence over the
-            # one in `make_jaxpr`
-            # https://github.com/jax-ml/jax/blob/636691bba40b936b8b64a4792c1d2158296e9dd4/jax/_src/linear_util.py#L231
-            # Therefore we need to coordinate them manually
-            fn.static_argnums = static_argnums
+            flat_inputs = jax.tree.flatten((inner_args, inner_kwargs))[0]
+            flat_inputs = [a for a in flat_inputs if qp.math.is_abstract(a)]
+            abstract_shapes = _extract_abstract_shapes(flat_inputs)
+            jaxpr = from_plxpr(plxpr, skip_preprocess=skip_preprocess)(
+                *abstract_shapes, *flat_inputs
+            )
 
-        plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-        jaxpr = from_plxpr(plxpr)(*plxpr.in_avals)
+            return _dummy_hop.bind(jaxpr=jaxpr, out_type=out_type, out_treedef=out_treedef)
 
-    return jaxpr, out_type, out_treedef, sig
+        nested_jaxpr = jax.make_jaxpr(wrapper, **make_jaxpr_kwargs)(*args, **kwargs)
+        jaxpr = nested_jaxpr.eqns[0].params["jaxpr"]
+        out_type = nested_jaxpr.eqns[0].params["out_type"]
+        out_treedef = nested_jaxpr.eqns[0].params["out_treedef"]
+
+    return jaxpr, out_type, out_treedef
 
 
-def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=None, tkwargs=None):
+def _apply_compiler_decompose_to_plxpr(
+    inner_jaxpr, consts, ncargs, tgateset=None, tkwargs=None, stopping_condition=None
+):
     """Apply the compiler-specific decomposition for a given JAXPR.
 
     This function first disables the graph-based decomposition optimization
@@ -585,16 +618,24 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=Non
     # Besides, the graph-based decomposition is not supported
     # yet in from_plxpr for most gates and templates.
     # TODO: Enable the graph-based decomposition
-    qml.decomposition.disable_graph()
+    graph_enabled = qp.decomposition.enabled_graph()
+
+    if graph_enabled:
+        qp.decomposition.disable_graph()
 
     kwargs = (
         {"gate_set": set(COMPILER_OPS_FOR_DECOMPOSITION.keys()).union(tgateset)}
         if tgateset
         else tkwargs
     )
-    final_jaxpr = qml.transforms.decompose.plxpr_transform(inner_jaxpr, consts, (), kwargs, *ncargs)
 
-    qml.decomposition.enable_graph()
+    if stopping_condition:
+        kwargs["stopping_condition"] = stopping_condition
+
+    final_jaxpr = qp.transforms.decompose.plxpr_transform(inner_jaxpr, consts, (), kwargs, *ncargs)
+
+    if graph_enabled:
+        qp.decomposition.enable_graph()
 
     return final_jaxpr
 

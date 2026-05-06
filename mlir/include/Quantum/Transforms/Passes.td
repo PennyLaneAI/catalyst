@@ -69,6 +69,18 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
 def SplitNonCommutingPass : Pass<"split-non-commuting", "mlir::ModuleOp"> {
     let summary = "Split quantum functions non-commuting observables into multiple executions.";
 
+    let options = [
+        Option<
+            "groupingStrategy",
+            "grouping-strategy",
+            "std::string",
+            /*default=*/"\"\"",
+            "Grouping strategy for observables. "
+            "\"\" (default) assigns each observable its own group. "
+            "\"wires\" groups observables on non-overlapping wires."
+        >
+    ];
+
     let dependentDialects = ["arith::ArithDialect"];
 }
 
@@ -94,8 +106,8 @@ def GridsynthPass : Pass<"gridsynth"> {
         /*C++ var name=*/"epsilon",
         /*CLI name=*/"epsilon",
         /*Type=*/"double",
-       /*Default=*/"1e-4",
-       /*Description=*/"Maximum error tolerance for per-gate discretization.">,
+        /*Default=*/"1e-4",
+        /*Description=*/"Maximum error tolerance for per-gate discretization.">,
         Option<
         /*C++ var name=*/"pprBasis",
         /*CLI name=*/"ppr-basis",
@@ -106,7 +118,7 @@ def GridsynthPass : Pass<"gridsynth"> {
         let dependentDialects = [
         "memref::MemRefDialect",
         "scf::SCFDialect",
-        "catalyst::qec::QECDialect",
+        "catalyst::pbc::PBCDialect",
     ];
 }
 
@@ -116,11 +128,50 @@ def MergeRotationsPass : Pass<"merge-rotations"> {
     let dependentDialects = ["math::MathDialect"];
 }
 
+def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
+    let summary = "Decompose gates using an MLIR-native graph-based framework.";
+
+    let options = [
+        ListOption<
+            /*C++ name*/"targetGateSetOption",
+            /*CLI name*/"gate-set",
+            /*Type*/"std::string",
+            /*Description*/"The accepted gates to decompose to.">,
+        ListOption<
+            /*C++ name*/"fixedDecompsOption",
+            /*CLI name*/"fixed-decomps",
+            /*Type*/"std::string",
+            /*Description*/"Maps an operator to a decomposition rule that will be applied.">,
+        ListOption<
+            /*C++ name*/"altDecompsOption",
+            /*CLI name*/"alt-decomps",
+            /*Type*/"std::string",
+            /*Description*/
+            "Maps an operator to a `|` separated list of alternative decomposition "
+            "rules that will be considered alongside any built-in rules for the operator.">,
+        Option<
+            /*C++ name*/"bytecodeRulesFile",
+            /*CLI name*/"bytecode-rules",
+            /*Type*/"std::string",
+            /*Default*/[{ "./frontend/catalyst/resources/decomposition_rules.mlirbc" }],
+            /*Description*/"A path to a bytecode file of compiled decomposition rules.">
+    ];
+
+    let dependentDialects = [
+        "memref::MemRefDialect",
+        "func::FuncDialect",
+        "scf::SCFDialect",
+        "LLVM::LLVMDialect",
+        "stablehlo::StablehloDialect",
+        "tensor::TensorDialect",
+    ];
+}
+
 def DecomposeLoweringPass : Pass<"decompose-lowering"> {
     let summary = "Replace quantum operations with compiled decomposition rules.";
 }
 
-def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {
+def DisentangleCNOTPass : Pass<"disentangle-cnot"> {
     let summary = "Replace a CNOT gate with two single qubit gates whenever possible.";
 
     let options = [
@@ -130,7 +181,7 @@ def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {
     ];
 }
 
-def DisentangleSWAPPass : Pass<"disentangle-SWAP"> {
+def DisentangleSWAPPass : Pass<"disentangle-swap"> {
     let summary = "Replace a SWAP gate with single qubit gates and a shorter SWAPZ gates whenever possible.";
 
     let options = [
@@ -154,6 +205,11 @@ def DynamicOneShotPass : Pass<"dynamic-one-shot", "mlir::ModuleOp"> {
         "stablehlo::StablehloDialect"
     ];
 }
+
+def CombineGlobalPhasesPass : Pass<"combine-global-phases", "mlir::ModuleOp"> {
+    let summary = "Scope-wise merging of global phase operators (safe).";
+}
+
 // ----- Quantum circuit transformation passes end ----- //
 
 // ----- DO-QAOA analysis passes ----- //

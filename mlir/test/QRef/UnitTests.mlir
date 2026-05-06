@@ -135,16 +135,16 @@ func.func @test_paulirot_op(%q0: !qref.bit, %q1: !qref.bit,
 func.func @test_global_phase(%q0: !qref.bit, %cv: i1, %param: f64) {
 
     // Basic
-    qref.gphase(%param) : f64
+    qref.gphase(%param)
 
     // With adjoint
-    qref.gphase(%param) adj : f64
+    qref.gphase(%param) adj
 
     // With control
-    qref.gphase(%param) ctrls (%q0) ctrlvals (%cv) : f64 ctrls !qref.bit
+    qref.gphase(%param) ctrls (%q0) ctrlvals (%cv) : ctrls !qref.bit
 
     // With control and adjoint
-    qref.gphase(%param) adj ctrls (%q0) ctrlvals (%cv) : f64 ctrls !qref.bit
+    qref.gphase(%param) adj ctrls (%q0) ctrlvals (%cv) : ctrls !qref.bit
 
     return
 }
@@ -324,4 +324,21 @@ func.func @test_circuit_with_loop(%nqubits: i64) -> tensor<?xf64> {
     %probs = quantum.probs %obs shape %shape : tensor<?xf64>
     qref.dealloc %a : !qref.reg<?>
     return %probs : tensor<?xf64>
+}
+
+// -----
+
+func.func @test_mbqc_measure_in_basis(%q : !qref.bit, %angle: f64) {
+    %0 = qref.mbqc.measure_in_basis [XY, %angle] %q : i1
+    %1 = qref.mbqc.measure_in_basis [YZ, %angle] %q : i1
+    %2 = qref.mbqc.measure_in_basis [ZX, %angle] %q : i1
+    func.return
+}
+
+// -----
+
+func.func @test_mbqc_graph_state_prep() {
+    %adj_matrix = arith.constant dense<[1, 0, 1, 0, 0, 1]> : tensor<6xi1>
+    %graph_reg = qref.mbqc.graph_state_prep (%adj_matrix : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !qref.reg<4>
+    func.return
 }

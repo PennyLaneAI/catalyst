@@ -15,9 +15,8 @@
 #ifndef PBC_TRANSFORMS_DECOMPOSE_UTILS_H
 #define PBC_TRANSFORMS_DECOMPOSE_UTILS_H
 
-#include <mlir/IR/Location.h>
-#include <mlir/IR/PatternMatch.h>
-#include <mlir/Support/LogicalResult.h>
+#include "mlir/IR/Location.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace catalyst {
 namespace pbc {
@@ -26,8 +25,7 @@ namespace pbc {
 /// based on whether to avoid Pauli Y measurements
 /// 1. avoidPauliYMeasure == true: Use |Y⟩ as axillary qubit and measure -P⊗Z
 /// 2. avoidPauliYMeasure == false: Use |0⟩ as axillary qubit and measure P⊗Y
-std::pair<mlir::StringRef, uint16_t>
-determinePauliAndRotationSignOfMeasurement(bool avoidPauliYMeasure);
+std::pair<mlir::StringRef, bool> determinePauliAndSignOfMeasurement(bool avoidPauliYMeasure);
 
 /// Initialize |0⟩ or Fabricate|Y⟩ based on avoidPauliYMeasure
 mlir::OpResult initializeZeroOrPlusI(bool avoidPauliYMeasure, mlir::Location loc,

@@ -118,16 +118,9 @@ void moveCliffordPastNonClifford(const PauliStringWrapper &lhsPauli,
     SmallVector<StringRef> pauliProductArrayRef = removeIdentityPauli(rhs, newRHSOperands);
     mlir::ArrayAttr pauliProduct = rewriter.getStrArrayAttr(pauliProductArrayRef);
 
-    // Get the type list from new RHS
-    SmallVector<Type> newOutQubitsTypesList;
-    for (auto qubit : newRHSOperands) {
-        newOutQubitsTypesList.push_back(qubit.getType());
-    }
-
     // Create the new PPR
-    auto nonCliffordOp =
-        PPRotationOp::create(rewriter, rhs->getLoc(), newOutQubitsTypesList, pauliProduct,
-                             rhs.getRotationKindAttr(), newRHSOperands);
+    auto nonCliffordOp = PPRotationOp::create(rewriter, rhs->getLoc(), pauliProduct,
+                                              rhs.getRotationKindAttr(), newRHSOperands);
     rewriter.moveOpBefore(nonCliffordOp, rhs);
 
     // Update the use of value in newRHSOperands

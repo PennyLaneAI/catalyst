@@ -14,10 +14,11 @@
 
 #pragma once
 
-#include "Exception.hpp"
 #include <list>
 #include <map>
 #include <optional>
+
+#include "Exception.hpp"
 
 // We define a lot of these utilities here to support multiprecision INTs and FLOATs, which cannot
 // use the std algorithms.

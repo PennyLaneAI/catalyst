@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
+#include "Quantum/IR/QuantumDialect.h"
 
+#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 #include "mlir/Transforms/InliningUtils.h"
 
-#include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
@@ -112,6 +112,34 @@ void QuantumDialect::initialize()
     declarePromisedInterfaces<bufferization::BufferizableOpInterface, QubitUnitaryOp, HermitianOp,
                               HamiltonianOp, SampleOp, CountsOp, ProbsOp, StateOp, SetStateOp,
                               SetBasisStateOp>();
+}
+
+/// Verify the QNode attribute invariants
+LogicalResult QuantumDialect::verifyOperationAttribute(Operation *op, NamedAttribute namedAttr)
+{
+    StringRef attrName = namedAttr.getName().getValue();
+    if (attrName != "quantum.node") {
+        return success();
+    }
+
+    if (!isa<func::FuncOp>(op)) {
+        return op->emitOpError() << "attribute '" << attrName << "' is only valid on 'func.func'";
+    }
+
+    if (!isa<UnitAttr>(namedAttr.getValue())) {
+        return op->emitOpError() << "attribute '" << attrName << "' must be a unit attribute";
+    }
+
+    // Cannot enforce this yet as Catalyst allows QNodes without MPs.
+    // auto funcOp = cast<func::FuncOp>(op);
+    // auto measurement = funcOp.walk([&](MeasurementProcess) { return WalkResult::interrupt(); });
+    // if (!measurement.wasInterrupted()) {
+    //     return op->emitOpError()
+    //            << "attribute '" << attrName
+    //            << "' requires at least one measurement process operation in the function body";
+    // }
+
+    return success();
 }
 
 //===----------------------------------------------------------------------===//

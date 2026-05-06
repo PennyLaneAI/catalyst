@@ -16,7 +16,6 @@
 Deduce the function signatures after taking their gradients with respect to some parameters.
 """
 
-
 from jax.core import DShapedArray, ShapedArray
 
 

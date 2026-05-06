@@ -12,22 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <catch2/catch_approx.hpp>
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_string.hpp>
-
 #include <fstream>
 
-#include "ExecutionContext.hpp"
-#include "QuantumDevice.hpp"
-#include "QubitManager.hpp"
-#include "RuntimeCAPI.h"
+#include "catch2/catch_test_macros.hpp"
 
 #include "ResourceTracker.hpp"
-#include "TestUtils.hpp"
 #include "Types.h"
 
-using namespace Catch::Matchers;
 using namespace Catalyst::Runtime;
 
 namespace {

@@ -65,7 +65,8 @@ def QRefDialect : Dialect {
     let cppNamespace = "::catalyst::qref";
 
     let dependentDialects = [
-        "quantum::QuantumDialect"
+        "quantum::QuantumDialect",
+        "mbqc::MBQCDialect"
     ];
 
     let useDefaultTypePrinterParser = 1;

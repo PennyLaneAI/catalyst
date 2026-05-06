@@ -19,12 +19,13 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Ion/IR/IonInfo.h"
-#include "Ion/Transforms/oqd_database_managers.hpp"
+#include "Ion/Transforms/oqd_database_managers.h"
 
 namespace catalyst {
 namespace ion {
 // Gates to pulses conversion patterns
 void populateGatesToPulsesPatterns(mlir::RewritePatternSet &, const OQDDatabaseManager &);
+void populateMeasureToPulsesPatterns(mlir::RewritePatternSet &, const OQDDatabaseManager &);
 void populateConversionPatterns(mlir::LLVMTypeConverter &typeConverter,
                                 mlir::RewritePatternSet &patterns);
 

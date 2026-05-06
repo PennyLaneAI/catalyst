@@ -16,7 +16,6 @@
 
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
-
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Operation.h"

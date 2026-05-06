@@ -17,7 +17,7 @@
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 from jax.interpreters.mlir import ir
 
@@ -44,9 +44,9 @@ def test_pass_can_aot_compile():
 
     @qjit(target="mlir")
     @catalyst.passes.apply_pass("some-pass")
-    @qml.qnode(qml.device("null.qubit", wires=1))
+    @qp.qnode(qp.device("null.qubit", wires=1))
     def example():
-        return qml.state()
+        return qp.state()
 
     assert example.mlir
 
@@ -63,9 +63,9 @@ def test_pass_plugin_can_aot_compile():
 
         @qjit(target="mlir")
         @catalyst.passes.apply_pass_plugin(Path(tmp.name), "some-pass")
-        @qml.qnode(qml.device("null.qubit", wires=1))
+        @qp.qnode(qp.device("null.qubit", wires=1))
         def example():
-            return qml.state()
+            return qp.state()
 
         assert example.mlir
 

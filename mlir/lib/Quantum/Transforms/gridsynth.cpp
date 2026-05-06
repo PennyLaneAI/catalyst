@@ -15,14 +15,13 @@
 #define DEBUG_TYPE "gridsynth"
 
 #include "llvm/Support/Debug.h"
-
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "QEC/IR/QECDialect.h"
+#include "PBC/IR/PBCDialect.h"
 #include "Quantum/Transforms/Patterns.h"
 
 using namespace llvm;

@@ -15,17 +15,17 @@
 // RUN: quantum-opt --partition-layers --split-input-file --verify-diagnostics %s | FileCheck %s
 
 func.func @test_partition_layers_0(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit) -> i1 {
-    
+
    // CHECK:func.func @test_partition_layers_0([[qr0:%.+]]: !quantum.bit, [[qr1:%.+]]: !quantum.bit, [[qr2:%.+]]: !quantum.bit) -> i1 {
    // CHECK:  [[QB:%.+]]:4 = pbc.layer([[A0:%.+]] = [[qr0]], [[A1:%.+]] = [[qr1]], [[A2:%.+]] = [[qr2]]) : !quantum.bit, !quantum.bit, !quantum.bit {
-   // CHECK:    [[M:%.+]], [[O:%.+]]:3 = pbc.ppm ["X", "Y", "Z"](8) [[A0]], [[A1]], [[A2]] : i1, !quantum.bit, !quantum.bit, !quantum.bit
+   // CHECK:    [[M:%.+]], [[O:%.+]]:3 = pbc.ppm ["X", "Y", "Z"] [[A0]], [[A1]], [[A2]] : i1, !quantum.bit, !quantum.bit, !quantum.bit
    // CHECK:    pbc.yield [[M]], [[O]]#0, [[O]]#1, [[O]]#2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
    // CHECK:  }
    // CHECK:  return [[QB]]#0 : i1
 
-    // X Y Z (0, 1, 2) pi/8
-    %m1, %0:3 = pbc.ppm ["X", "Y", "Z"] (8) %qr0, %qr1, %qr2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
-    
+    // X Y Z (0, 1, 2)
+    %m1, %0:3 = pbc.ppm ["X", "Y", "Z"] %qr0, %qr1, %qr2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+
     func.return %m1 : i1
 }
 
@@ -34,13 +34,13 @@ func.func @test_partition_layers_0(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr
 func.func @test_partition_layers_1(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit, %qr3 : !quantum.bit) -> i1 {
 
     // CHECK:test_partition_layers_1([[qr0:%.+]]: !quantum.bit, [[qr1:%.+]]: !quantum.bit, [[qr2:%.+]]: !quantum.bit, [[qr3:%.+]]: !quantum.bit)
-    
+
     // Layer 1: Two ops are not commutes and they act on disjoint qubits, so they can be partitioned into two layers.
     // CHECK: [[Q0:%.+]]:4 = pbc.layer([[A0:%.+]] = [[qr0]], [[A1:%.+]] = [[qr1]], [[A2:%.+]] = [[qr2]], [[A3:%.+]] = [[qr3]])
     // CHECK:       [[QL0:%.+]]:2 = pbc.ppr ["X", "Z"](-8) [[A0]], [[A1]]
     // CHECK:       [[QL1:%.+]]:2 = pbc.ppr ["Y", "Z"](8) [[A2]], [[A3]]
     // CHECK:  pbc.yield [[QL0]]#0, [[QL0]]#1, [[QL1]]#0, [[QL1]]#1
-    %0:2 = pbc.ppr ["X", "Z"] (-8) %qr0, %qr1 : !quantum.bit, !quantum.bit // X Z (0, 1) pi/8 
+    %0:2 = pbc.ppr ["X", "Z"] (-8) %qr0, %qr1 : !quantum.bit, !quantum.bit // X Z (0, 1) pi/8
     %1:2 = pbc.ppr ["Y", "Z"] (8) %qr2, %qr3 : !quantum.bit, !quantum.bit // Y Z (2, 3) pi/8
 
     // CHECK: [[Q1:%.+]]:4 = pbc.layer([[A0:%.+]] = [[Q0]]#3, [[A1:%.+]] = [[Q0]]#0, [[A2:%.+]] = [[Q0]]#1, [[A3:%.+]] = [[Q0]]#2)
@@ -55,13 +55,13 @@ func.func @test_partition_layers_1(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr
 
     // CHECK: [[Q2:%.+]]:6 = pbc.layer([[A0:%.+]] = [[Q1]]#0, [[A1:%.+]] = [[Q1]]#1, [[A2:%.+]] = [[Q1]]#2, [[A3:%.+]] = [[Q1]]#3)
     // CHECK:   [[QL5:%.+]] = pbc.ppr ["Z"](8) [[A0]] : !quantum.bit
-    // CHECK:   [[M0:%.+]], [[QL7:%.+]]:3 = pbc.ppm ["X", "Y", "Z"](8) [[A1]], [[A2]], [[A3]]
-    // CHECK:   [[M1:%.+]], [[QL9:%.+]] = pbc.ppm ["Z"](8) [[QL5]] : i1, !quantum.bit
+    // CHECK:   [[M0:%.+]], [[QL7:%.+]]:3 = pbc.ppm ["X", "Y", "Z"] [[A1]], [[A2]], [[A3]]
+    // CHECK:   [[M1:%.+]], [[QL9:%.+]] = pbc.ppm ["Z"] [[QL5]] : i1, !quantum.bit
     // CHECK:   pbc.yield [[M0]], [[M1]], [[QL9]], [[QL7]]#0, [[QL7]]#1, [[QL7]]#2 : i1, i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
-    
+
     %5 = pbc.ppr ["Z"] (8) %2 : !quantum.bit // Z (3) pi/8
-    %6:4 = pbc.ppm ["X", "Y", "Z"] (8) %3, %4#0, %4#1 : i1, !quantum.bit, !quantum.bit, !quantum.bit // X Y Z (0, 1, 2) pi/8
-    %m, %7 = pbc.ppm ["Z"](8) %5 : i1, !quantum.bit // Z (3) pi/8
+    %6:4 = pbc.ppm ["X", "Y", "Z"] %3, %4#0, %4#1 : i1, !quantum.bit, !quantum.bit, !quantum.bit // X Y Z (0, 1, 2)
+    %m, %7 = pbc.ppm ["Z"] %5 : i1, !quantum.bit // Z (3)
 
     // CHECK: return [[Q2]]#1 : i1
     func.return %m : i1
@@ -88,7 +88,7 @@ func.func @test_partition_layers_2(%q0: !quantum.bit, %q1: !quantum.bit) -> (i1,
 
   // CHECK:   [[Q1:%.+]]:3 = scf.for %arg2 = [[C0]] to [[C1]] step [[C2]] iter_args([[A0:%.+]] = [[C3]], [[A1:%.+]] = [[Q0]]#0, [[A2:%.+]] = [[Q0]]#1)
     %qq:3 = scf.for %i = %start to %stop step %step iter_args(%m_0 = %m, %q_0 = %0#0, %q_1 = %0#1) -> (i1, !quantum.bit, !quantum.bit) {
-        
+
         // CHECK: [[QL1:%.+]]:2 = pbc.layer([[A00:%.+]] = [[A1]], [[A11:%.+]] = [[A2]])
         // CHECK:   [[Q01:%.+]]:2 = pbc.ppr ["X", "Z"](-8) [[A00]], [[A11]] : !quantum.bit, !quantum.bit
         // CHECK:   [[Q02:%.+]] = pbc.ppr ["X"](8) [[Q01]]#0 : !quantum.bit
@@ -97,10 +97,10 @@ func.func @test_partition_layers_2(%q0: !quantum.bit, %q1: !quantum.bit) -> (i1,
         %single_qubit = pbc.ppr ["X"] (8) %q_2#0 : !quantum.bit
 
         // CHECK: [[QL2:%.+]]:3 = pbc.layer([[A00:%.+]] = [[QL1]]#1, [[A01:%.+]] = [[QL1]]#0)
-        // CHECK:   [[M:%.+]], [[O:%.+]]:2 = pbc.ppm ["X", "X"](8) [[A00]], [[A01]] : i1, !quantum.bit, !quantum.bit
+        // CHECK:   [[M:%.+]], [[O:%.+]]:2 = pbc.ppm ["X", "X"] [[A00]], [[A01]] : i1, !quantum.bit, !quantum.bit
         // CHECK:   pbc.yield [[M]], [[O]]#0, [[O]]#1 : i1, !quantum.bit, !quantum.bit
-        %q_3:3 = pbc.ppm ["X", "X"] (8) %q_2#1, %single_qubit : i1, !quantum.bit, !quantum.bit
-        
+        %q_3:3 = pbc.ppm ["X", "X"] %q_2#1, %single_qubit : i1, !quantum.bit, !quantum.bit
+
         // CHECK: [[M1:%.+]] = arith.addi [[A0]], [[QL2]]#0 : i1
         // CHECK: scf.yield [[M1]], [[QL2]]#1, [[QL2]]#2 : i1, !quantum.bit, !quantum.bit
         %m_1 = arith.addi %m_0, %q_3#0 : i1 // update the variable

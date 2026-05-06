@@ -128,10 +128,10 @@ requirements = [
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "numpy>2.0.0",
-    "scipy-openblas32>=0.3.26",  # symbol and library name
-    "diastatic-malt>=2.15.2",
-    "xdsl==0.56.1",
-    "xdsl-jax==0.2.0",
+    "scipy-openblas32>=0.3.26,!=0.3.33",  # symbol and library name
+    "diastatic-malt==2.15.3",
+    "xdsl==0.59.0",
+    "xdsl-jax==0.5.0",
 ]
 
 entry_points = {
@@ -151,6 +151,21 @@ entry_points = {
     ],
     "xdsl.universe": [
         "catalyst-xdsl-universe = catalyst.python_interface.xdsl_universe:CATALYST_XDSL_UNIVERSE"
+    ],
+    "pennylane.transforms": [
+        "to_ppr = catalyst.passes:to_ppr",
+        "merge_ppr_ppm = catalyst.passes:merge_ppr_ppm",
+        "commute_ppr = catalyst.passes:commute_ppr",
+        "ppm_compilation = catalyst.passes:ppm_compilation",
+        "ppr_to_ppm = catalyst.passes:ppr_to_ppm",
+        "reduce_t_depth = catalyst.passes:reduce_t_depth",
+        "decompose_arbitrary_ppr = catalyst.passes:decompose_arbitrary_ppr",
+        "disentangle_swap = catalyst.passes:disentangle_swap",
+        "disentangle_cnot = catalyst.passes:disentangle_cnot",
+        "parity_synth = catalyst.passes:parity_synth",
+    ],
+    "pennylane.drawer": [
+        "draw_graph = catalyst:draw_graph",
     ],
 }
 
@@ -200,14 +215,14 @@ class UnifiedBuildExt(build_ext):
         1. `get_ext_filename`, in order to remove the architecture/python
            version suffix of the library name.
         2. `build_extension`, in order to handle the compilation of extensions
-           with CMake configurations, namely the catalyst.utils.wrapper module,
-           and of generic C/C++ extensions without a CMake configuration, namely
-           the catalyst.utils.libcustom_calls module, which is currently built
-           as a plain setuptools Extension.
+           with CMake configurations, namely the catalyst.utils.wrapper module, and
+           of generic C/C++ extensions without a CMake configuration, namely the
+           catalyst.utils.libcustom_calls module, which is currently built as a
+           plain setuptools Extension.
 
     TODO: Eventually it would be better to build the utils.libcustom_calls
-    module using a CMake configuration as well, rather than as a setuptools
-    Extension.
+      module using a CMake configuration as well, rather than as a setuptools
+      Extension.
     """
 
     def initialize_options(self):
@@ -274,7 +289,7 @@ class UnifiedBuildExt(build_ext):
         if "CMAKE_ARGS" in os.environ:
             configure_args += os.environ["CMAKE_ARGS"].split(" ")
 
-        build_temp = os.path.abspath(self.build_temp)
+        build_temp = os.path.join(os.path.abspath(self.build_temp), ext.name)
         os.makedirs(build_temp, exist_ok=True)
 
         build_args = ["--config", "Debug"] if debug else ["--config", "RelWithDebInfo"]

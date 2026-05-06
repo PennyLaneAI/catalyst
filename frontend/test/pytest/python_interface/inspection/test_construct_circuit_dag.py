@@ -12,22 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit tests for the ConstructCircuitDAG utility."""
+
 # pylint: disable=unused-argument, unused-variable, too-many-public-methods, too-many-lines
 
 import re
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import jax
-import pennylane as qml
+import pennylane as qp
 import pytest
-from xdsl.dialects import test
+from xdsl.dialects import builtin, func, test
 from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir import Operation
 from xdsl.ir.core import Block, Region
 
 from catalyst import measure
 from catalyst.python_interface.conversion import parse_generic_to_xdsl_module, xdsl_from_qjit
 from catalyst.python_interface.inspection.construct_circuit_dag import (
     ConstructCircuitDAG,
+    VisualizationError,
     get_label,
 )
 from catalyst.python_interface.inspection.dag_builder import DAGBuilder
@@ -48,13 +51,20 @@ class FakeDAGBuilder(DAGBuilder):
         self._edges = {}
         self._clusters = {}
 
-    def add_node(self, uid, label, cluster_uid=None, **attrs) -> None:
+        self._node_counter = 0
+        self._cluster_counter = 0
+
+    def add_node(self, label, cluster_uid=None, **attrs) -> str:
+        uid = f"node{self._node_counter}"
+        self._node_counter += 1
         self._nodes[uid] = {
             "uid": uid,
             "label": label,
             "parent_cluster_uid": cluster_uid,
             "attrs": attrs,
         }
+
+        return uid
 
     def add_edge(self, from_uid: str, to_uid: str, **attrs) -> None:
         # O(1) look up
@@ -65,17 +75,19 @@ class FakeDAGBuilder(DAGBuilder):
 
     def add_cluster(
         self,
-        uid,
         label=None,
         cluster_uid=None,
         **attrs,
-    ) -> None:
+    ) -> str:
+        uid = f"cluster{self._cluster_counter}"
+        self._cluster_counter += 1
         self._clusters[uid] = {
             "uid": uid,
             "label": label,
             "parent_cluster_uid": cluster_uid,
             "attrs": attrs,
         }
+        return uid
 
     @property
     def nodes(self):
@@ -181,19 +193,31 @@ def assert_dag_structure(nodes, edges, expected_edges):
                 ), f"Expected {attr_key}='{expected_val}', got '{actual_val}'."
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestFuncOpVisualization:
     """Tests the visualization of FuncOps with bounding boxes"""
 
-    def test_standard_qnode(self):
+    def test_external_empty_function_visualization_error(self):
+        """Regression test for #2541 issue."""
+
+        external_func = func.FuncOp.external("test_func", [], [])
+        module = builtin.ModuleOp(ops=[external_func])
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        expected_error = (
+            r"Calls to functions without a definition are not yet compatible.*test_func"
+        )
+        with pytest.raises(VisualizationError, match=expected_error):
+            utility.construct(module)
+
+    def test_standard_qnode(self, capture_mode):
         """Tests that a standard QJIT'd QNode is visualized correctly"""
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
-            qml.H(0)
+            qp.H(0)
 
         module = my_workflow()
 
@@ -215,21 +239,21 @@ class TestFuncOpVisualization:
         assert graph_clusters["cluster1"]["label"] == "my_workflow"
         assert graph_clusters["cluster1"]["parent_cluster_uid"] == "cluster0"
 
-    def test_nested_qnodes(self):
+    def test_nested_qnodes(self, capture_mode):
         """Tests that nested QJIT'd QNodes are visualized correctly"""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def my_qnode2():
-            qml.X(0)
+            qp.X(0)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def my_qnode1():
-            qml.H(0)
+            qp.H(0)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
         def my_workflow():
             my_qnode1()
             my_qnode2()
@@ -259,20 +283,19 @@ class TestFuncOpVisualization:
         assert graph_clusters["cluster2"]["parent_cluster_uid"] == "cluster0"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestDeviceNode:
     """Tests that the device node is correctly visualized."""
 
-    def test_standard_qnode(self):
+    def test_standard_qnode(self, capture_mode):
         """Tests that a standard setup works."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
-            qml.H(0)
+            qp.H(0)
 
         module = my_workflow()
 
@@ -294,22 +317,22 @@ class TestDeviceNode:
         # Assert label is as expected
         assert graph_nodes["node0"]["label"] == "NullQubit"
 
-    def test_nested_qnodes(self):
+    def test_nested_qnodes(self, capture_mode):
         """Tests that nested QJIT'd QNodes are visualized correctly"""
 
-        dev1 = qml.device("null.qubit", wires=1)
-        dev2 = qml.device("lightning.qubit", wires=1)
+        dev1 = qp.device("null.qubit", wires=1)
+        dev2 = qp.device("lightning.qubit", wires=1)
 
-        @qml.qnode(dev2)
+        @qp.qnode(dev2)
         def my_qnode2():
-            qml.X(0)
+            qp.X(0)
 
-        @qml.qnode(dev1)
+        @qp.qnode(dev1)
         def my_qnode1():
-            qml.H(0)
+            qp.H(0)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
         def my_workflow():
             my_qnode1()
             my_qnode2()
@@ -337,28 +360,27 @@ class TestDeviceNode:
 
         # Assert null qubit device node is inside my_qnode2 cluster
         assert graph_clusters["cluster2"]["label"] == "my_qnode2"
-        # NOTE: node1 is the qml.H(0) in my_qnode1
+        # NOTE: node1 is the qp.H(0) in my_qnode1
         assert graph_nodes["node2"]["parent_cluster_uid"] == "cluster2"
 
         # Assert label is as expected
         assert graph_nodes["node2"]["label"] == "LightningSimulator"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestForOp:
     """Tests that the for loop control flow can be visualized correctly."""
 
-    def test_basic_example(self):
+    def test_basic_example(self, capture_mode):
         """Tests that the for loop cluster can be visualized correctly."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
             for i in range(3):
-                qml.H(0)
+                qp.H(0)
 
         module = my_workflow()
 
@@ -372,18 +394,18 @@ class TestForOp:
         assert clusters["cluster2"]["label"] == "for loop"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
 
-    def test_nested_loop(self):
+    def test_nested_loop(self, capture_mode):
         """Tests that nested for loops are visualized correctly."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
             for i in range(0, 5, 2):
                 for j in range(1, 6, 2):
-                    qml.H(0)
+                    qp.H(0)
 
         module = my_workflow()
 
@@ -400,21 +422,20 @@ class TestForOp:
         assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestWhileOp:
     """Tests that the while loop control flow can be visualized correctly."""
 
-    def test_basic_example(self):
+    def test_basic_example(self, capture_mode):
         """Test that the while loop is visualized correctly."""
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
             counter = 0
             while counter < 5:
-                qml.H(0)
+                qp.H(0)
                 counter += 1
 
         module = my_workflow()
@@ -429,20 +450,20 @@ class TestWhileOp:
         assert clusters["cluster2"]["label"] == "while loop"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
 
-    def test_nested_loop(self):
+    def test_nested_loop(self, capture_mode):
         """Tests that nested while loops are visualized correctly."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
             outer_counter = 0
             inner_counter = 0
             while outer_counter < 5:
                 while inner_counter < 6:
-                    qml.H(0)
+                    qp.H(0)
                     inner_counter += 1
                 outer_counter += 1
 
@@ -461,22 +482,21 @@ class TestWhileOp:
         assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestIfOp:
     """Tests that the conditional control flow can be visualized correctly."""
 
-    def test_basic_example(self):
+    def test_basic_example(self, capture_mode):
         """Test that the conditional operation is visualized correctly."""
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow(x):
             if x == 2:
-                qml.X(0)
+                qp.X(0)
             else:
-                qml.Y(0)
+                qp.Y(0)
 
         args = (1,)
         module = my_workflow(*args)
@@ -489,29 +509,29 @@ class TestIfOp:
         # cluster0 -> qjit
         # cluster1 -> my_workflow
         # Check conditional is a cluster within cluster1 (my_workflow)
-        assert clusters["conditional_cluster2"]["label"] == "conditional"
-        assert clusters["conditional_cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["cluster2"]["label"] == "conditional"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
 
         # Check three clusters live within cluster2 (conditional)
         assert clusters["cluster3"]["label"] == "if"
-        assert clusters["cluster3"]["parent_cluster_uid"] == "conditional_cluster2"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
         assert clusters["cluster4"]["label"] == "else"
-        assert clusters["cluster4"]["parent_cluster_uid"] == "conditional_cluster2"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
 
-    def test_if_elif_else_conditional(self):
+    def test_if_elif_else_conditional(self, capture_mode):
         """Test that the conditional operation is visualized correctly."""
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow(x):
             if x == 1:
-                qml.X(0)
+                qp.X(0)
             elif x == 2:
-                qml.Y(0)
+                qp.Y(0)
             else:
-                qml.Z(0)
+                qp.Z(0)
 
         args = (1,)
         module = my_workflow(*args)
@@ -524,34 +544,34 @@ class TestIfOp:
         # cluster0 -> qjit
         # cluster1 -> my_workflow
         # Check conditional is a cluster within my_workflow
-        assert clusters["conditional_cluster2"]["label"] == "conditional"
-        assert clusters["conditional_cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["cluster2"]["label"] == "conditional"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
 
         # Check three clusters live within conditional
         assert clusters["cluster3"]["label"] == "if"
-        assert clusters["cluster3"]["parent_cluster_uid"] == "conditional_cluster2"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
         assert clusters["cluster4"]["label"] == "elif"
-        assert clusters["cluster4"]["parent_cluster_uid"] == "conditional_cluster2"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
         assert clusters["cluster5"]["label"] == "else"
-        assert clusters["cluster5"]["parent_cluster_uid"] == "conditional_cluster2"
+        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
 
-    def test_nested_conditionals(self):
+    def test_nested_conditionals(self, capture_mode):
         """Tests that nested conditionals are visualized correctly."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow(x, y):
             if x == 1:
                 if y == 2:
-                    qml.H(0)
+                    qp.H(0)
                 else:
-                    qml.Z(0)
-                qml.X(0)
+                    qp.Z(0)
+                qp.X(0)
             else:
-                qml.Z(0)
+                qp.Z(0)
 
         args = (1, 2)
         module = my_workflow(*args)
@@ -571,48 +591,48 @@ class TestIfOp:
         #   cluster7 -> else
 
         # Check first conditional is a cluster within my_workflow
-        assert clusters["conditional_cluster2"]["label"] == "conditional"
-        assert clusters["conditional_cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["cluster2"]["label"] == "conditional"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
 
         # Check 'if' cluster of first conditional has another conditional
         assert clusters["cluster3"]["label"] == "if"
-        assert clusters["cluster3"]["parent_cluster_uid"] == "conditional_cluster2"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
 
         # Second conditional
-        assert clusters["conditional_cluster4"]["label"] == "conditional"
-        assert clusters["conditional_cluster4"]["parent_cluster_uid"] == "cluster3"
+        assert clusters["cluster4"]["label"] == "conditional"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster3"
         # Check 'if' and 'else' in second conditional
         assert clusters["cluster5"]["label"] == "if"
-        assert clusters["cluster5"]["parent_cluster_uid"] == "conditional_cluster4"
+        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster4"
         assert clusters["cluster6"]["label"] == "else"
-        assert clusters["cluster6"]["parent_cluster_uid"] == "conditional_cluster4"
+        assert clusters["cluster6"]["parent_cluster_uid"] == "cluster4"
 
         # Check nested if / else is within the first if cluster
         assert clusters["cluster7"]["label"] == "else"
-        assert clusters["cluster7"]["parent_cluster_uid"] == "conditional_cluster2"
+        assert clusters["cluster7"]["parent_cluster_uid"] == "cluster2"
 
-    def test_nested_conditionals_with_quantum_ops(self):
+    def test_nested_conditionals_with_quantum_ops(self, capture_mode):
         """Tests that nested conditionals are unflattend if quantum operations
         are present"""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow(x):
             if x == 1:
-                qml.X(0)
+                qp.X(0)
             elif x == 2:
-                qml.Y(0)
+                qp.Y(0)
             else:
-                qml.Z(0)
+                qp.Z(0)
                 if x == 3:
-                    qml.RX(0, 0)
+                    qp.RX(0, 0)
                 elif x == 4:
-                    qml.RY(0, 0)
+                    qp.RY(0, 0)
                 else:
-                    qml.RZ(0, 0)
+                    qp.RZ(0, 0)
 
         args = (1,)
         module = my_workflow(*args)
@@ -641,48 +661,48 @@ class TestIfOp:
         #                    node6 -> RZ(0,0)
 
         # check outer conditional (1)
-        assert clusters["conditional_cluster2"]["label"] == "conditional"
-        assert clusters["conditional_cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["cluster2"]["label"] == "conditional"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
         assert clusters["cluster3"]["label"] == "if"
-        assert clusters["cluster3"]["parent_cluster_uid"] == "conditional_cluster2"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
         assert clusters["cluster4"]["label"] == "elif"
-        assert clusters["cluster4"]["parent_cluster_uid"] == "conditional_cluster2"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
         assert clusters["cluster5"]["label"] == "else"
-        assert clusters["cluster5"]["parent_cluster_uid"] == "conditional_cluster2"
+        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
 
         # Nested conditional (2) inside conditional (1)
-        assert clusters["conditional_cluster6"]["label"] == "conditional"
-        assert clusters["conditional_cluster6"]["parent_cluster_uid"] == "cluster5"
+        assert clusters["cluster6"]["label"] == "conditional"
+        assert clusters["cluster6"]["parent_cluster_uid"] == "cluster5"
         assert clusters["cluster7"]["label"] == "if"
-        assert clusters["cluster7"]["parent_cluster_uid"] == "conditional_cluster6"
+        assert clusters["cluster7"]["parent_cluster_uid"] == "cluster6"
         assert clusters["cluster8"]["label"] == "elif"
-        assert clusters["cluster8"]["parent_cluster_uid"] == "conditional_cluster6"
+        assert clusters["cluster8"]["parent_cluster_uid"] == "cluster6"
         assert clusters["cluster9"]["label"] == "else"
-        assert clusters["cluster9"]["parent_cluster_uid"] == "conditional_cluster6"
+        assert clusters["cluster9"]["parent_cluster_uid"] == "cluster6"
 
-    def test_nested_conditionals_with_nested_quantum_ops(self):
+    def test_nested_conditionals_with_nested_quantum_ops(self, capture_mode):
         """Tests that nested conditionals are unflattend if quantum operations
         are present but nested in other operations"""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow(x):
             if x == 1:
-                qml.X(0)
+                qp.X(0)
             elif x == 2:
-                qml.Y(0)
+                qp.Y(0)
             else:
                 for i in range(3):
-                    qml.Z(0)
+                    qp.Z(0)
                 if x == 3:
-                    qml.RX(0, 0)
+                    qp.RX(0, 0)
                 elif x == 4:
-                    qml.RY(0, 0)
+                    qp.RY(0, 0)
                 else:
-                    qml.RZ(0, 0)
+                    qp.RZ(0, 0)
 
         args = (1,)
         module = my_workflow(*args)
@@ -712,27 +732,27 @@ class TestIfOp:
         #                    node6 -> RZ(0,0)
 
         # check outer conditional (1)
-        assert clusters["conditional_cluster2"]["label"] == "conditional"
-        assert clusters["conditional_cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["cluster2"]["label"] == "conditional"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
         assert clusters["cluster3"]["label"] == "if"
-        assert clusters["cluster3"]["parent_cluster_uid"] == "conditional_cluster2"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
         assert clusters["cluster4"]["label"] == "elif"
-        assert clusters["cluster4"]["parent_cluster_uid"] == "conditional_cluster2"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
         assert clusters["cluster5"]["label"] == "else"
-        assert clusters["cluster5"]["parent_cluster_uid"] == "conditional_cluster2"
+        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
 
         # Nested conditional (2) inside conditional (1)
         assert clusters["cluster6"]["label"] == "for loop"
         assert clusters["cluster6"]["parent_cluster_uid"] == "cluster5"
 
-        assert clusters["conditional_cluster7"]["label"] == "conditional"
-        assert clusters["conditional_cluster7"]["parent_cluster_uid"] == "cluster5"
+        assert clusters["cluster7"]["label"] == "conditional"
+        assert clusters["cluster7"]["parent_cluster_uid"] == "cluster5"
         assert clusters["cluster8"]["label"] == "if"
-        assert clusters["cluster8"]["parent_cluster_uid"] == "conditional_cluster7"
+        assert clusters["cluster8"]["parent_cluster_uid"] == "cluster7"
         assert clusters["cluster9"]["label"] == "elif"
-        assert clusters["cluster9"]["parent_cluster_uid"] == "conditional_cluster7"
+        assert clusters["cluster9"]["parent_cluster_uid"] == "cluster7"
         assert clusters["cluster10"]["label"] == "else"
-        assert clusters["cluster10"]["parent_cluster_uid"] == "conditional_cluster7"
+        assert clusters["cluster10"]["parent_cluster_uid"] == "cluster7"
 
 
 class TestGetLabel:
@@ -741,12 +761,12 @@ class TestGetLabel:
     @pytest.mark.parametrize(
         "op, label",
         [
-            (qml.H(0), "<name> Hadamard|<wire> [0]"),
+            (qp.H(0), "<name> Hadamard|<wire> [0]"),
             (
-                qml.QubitUnitary([[0, 1], [1, 0]], 0),
+                qp.QubitUnitary([[0, 1], [1, 0]], 0),
                 "<name> QubitUnitary|<wire> [0]",
             ),
-            (qml.SWAP([0, 1]), "<name> SWAP|<wire> [0, 1]"),
+            (qp.SWAP([0, 1]), "<name> SWAP|<wire> [0, 1]"),
         ],
     )
     def test_standard_operator(self, op, label):
@@ -755,25 +775,24 @@ class TestGetLabel:
 
     def test_global_phase_operator(self):
         """Tests against a GlobalPhase operator instance."""
-        assert get_label(qml.GlobalPhase(0.5)) == "GlobalPhase"
+        assert get_label(qp.GlobalPhase(0.5)) == "GlobalPhase"
         assert (
-            get_label(qml.ctrl(qml.GlobalPhase(0.0), control=0))
-            == "<name> C(GlobalPhase)|<wire> [0]"
+            get_label(qp.ctrl(qp.GlobalPhase(0.0), control=0)) == "<name> C(GlobalPhase)|<wire> [0]"
         )
-        assert get_label(qml.adjoint(qml.GlobalPhase(0.0))) == "Adjoint(GlobalPhase)"
+        assert get_label(qp.adjoint(qp.GlobalPhase(0.0))) == "Adjoint(GlobalPhase)"
 
     @pytest.mark.parametrize(
         "meas, label",
         [
-            (qml.state(), "<name> state|<wire> all"),
-            (qml.expval(qml.Z(0)), "<name> expval(PauliZ)|<wire> [0]"),
-            (qml.var(qml.Z(0)), "<name> var(PauliZ)|<wire> [0]"),
-            (qml.probs(), "<name> probs|<wire> all"),
-            (qml.probs(wires=0), "<name> probs|<wire> [0]"),
-            (qml.probs(wires=[0, 1]), "<name> probs|<wire> [0, 1]"),
-            (qml.sample(), "<name> sample|<wire> all"),
-            (qml.sample(wires=0), "<name> sample|<wire> [0]"),
-            (qml.sample(wires=[0, 1]), "<name> sample|<wire> [0, 1]"),
+            (qp.state(), "<name> state|<wire> all"),
+            (qp.expval(qp.Z(0)), "<name> expval(PauliZ)|<wire> [0]"),
+            (qp.var(qp.Z(0)), "<name> var(PauliZ)|<wire> [0]"),
+            (qp.probs(), "<name> probs|<wire> all"),
+            (qp.probs(wires=0), "<name> probs|<wire> [0]"),
+            (qp.probs(wires=[0, 1]), "<name> probs|<wire> [0, 1]"),
+            (qp.sample(), "<name> sample|<wire> all"),
+            (qp.sample(wires=0), "<name> sample|<wire> [0]"),
+            (qp.sample(wires=[0, 1]), "<name> sample|<wire> [0, 1]"),
         ],
     )
     def test_standard_measurement(self, meas, label):
@@ -781,22 +800,37 @@ class TestGetLabel:
         assert get_label(meas) == label
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestCreateStaticOperatorNodes:
     """Tests that operators with static parameters can be created and visualized as nodes."""
 
-    def test_custom_op(self):
+    @pytest.mark.parametrize("dialect", ["quantum", "pbc", "mbqc"])
+    def test_unsupported_non_skipped_op_raises_visualization_error(self, dialect):
+        """Tests that an unknown non-skipped operator raises an error."""
+
+        unknown_op = MagicMock(spec=Operation)
+        unknown_op.dialect_name.return_value = dialect
+        unknown_op.name = f"{dialect}.fake_unsupported_nonskipped_op"
+        unknown_op.__class__ = type("FakeQuantumOp", (Operation,), {})
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        with pytest.raises(
+            VisualizationError, match=rf"{dialect}.fake_unsupported_nonskipped_op.*not supported"
+        ):
+            # pylint: disable=protected-access
+            utility._visit_operation(unknown_op)
+
+    def test_custom_op(self, capture_mode):
         """Tests that the CustomOp operation node can be created and visualized."""
 
         # Build module with only a CustomOp
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit():
-            qml.H(0)
-            qml.SWAP([0, 1])
+            qp.H(0)
+            qp.SWAP([0, 1])
 
         module = my_circuit()
 
@@ -809,8 +843,8 @@ class TestCreateStaticOperatorNodes:
         assert len(nodes) == 3  # Device node + operators
 
         # Make sure label has relevant info
-        assert nodes["node1"]["label"] == get_label(qml.H(0))
-        assert nodes["node2"]["label"] == get_label(qml.SWAP([0, 1]))
+        assert nodes["node1"]["label"] == get_label(qp.H(0))
+        assert nodes["node2"]["label"] == get_label(qp.SWAP([0, 1]))
 
     @pytest.mark.parametrize(
         "kwargs",
@@ -820,16 +854,16 @@ class TestCreateStaticOperatorNodes:
             {"wires": [0, 1]},
         ],
     )
-    def test_global_phase_op(self, kwargs):
+    def test_global_phase_op(self, kwargs, capture_mode):
         """Test that GlobalPhase can be handled."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit():
-            qml.GlobalPhase(0.5, **kwargs)
+            qp.GlobalPhase(0.5, **kwargs)
 
         module = my_circuit()
 
@@ -844,16 +878,16 @@ class TestCreateStaticOperatorNodes:
         # Compiler throws out the wires and they get converted to wires=[] no matter what
         assert nodes["node1"]["label"] == "GlobalPhase"
 
-    def test_qubit_unitary_op(self):
+    def test_qubit_unitary_op(self, capture_mode):
         """Test that QubitUnitary operations can be handled."""
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit():
-            qml.QubitUnitary(jax.numpy.array([[0, 1], [1, 0]]), wires=0)  # real
-            qml.QubitUnitary(jax.numpy.array([[1, 0], [0, 1j]]), wires=0)  # complex
+            qp.QubitUnitary(jax.numpy.array([[0, 1], [1, 0]]), wires=0)  # real
+            qp.QubitUnitary(jax.numpy.array([[1, 0], [0, 1j]]), wires=0)  # complex
 
         module = my_circuit()
 
@@ -865,18 +899,18 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + operators
 
-        assert nodes["node1"]["label"] == get_label(qml.QubitUnitary([[0, 1], [1, 0]], wires=0))
-        assert nodes["node2"]["label"] == get_label(qml.QubitUnitary([[1, 0], [0, 1j]], wires=0))
+        assert nodes["node1"]["label"] == get_label(qp.QubitUnitary([[0, 1], [1, 0]], wires=0))
+        assert nodes["node2"]["label"] == get_label(qp.QubitUnitary([[1, 0], [0, 1j]], wires=0))
 
-    def test_multi_rz_op(self):
+    def test_multi_rz_op(self, capture_mode):
         """Test that MultiRZ operations can be handled."""
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit():
-            qml.MultiRZ(0.5, wires=[0])
+            qp.MultiRZ(0.5, wires=[0])
 
         module = my_circuit()
 
@@ -888,20 +922,20 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
-        assert nodes["node1"]["label"] == get_label(qml.MultiRZ(0.5, wires=[0]))
+        assert nodes["node1"]["label"] == get_label(qp.MultiRZ(0.5, wires=[0]))
 
-    def test_projective_measurement_op(self):
+    def test_projective_measurement_op(self, capture_mode):
         """Test that projective measurements can be captured as nodes."""
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
-        if qml.capture.enabled():
-            fn = qml.measure
+        if capture_mode:
+            fn = qp.measure
         else:
             fn = measure
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit():
             fn(0)
 
@@ -916,17 +950,16 @@ class TestCreateStaticOperatorNodes:
 
         assert nodes["node1"]["label"] == "<name> MidMeasureMP|<wire> [0]"
 
-    @pytest.mark.usefixtures("use_capture")
     def test_ppm(self):
         """Test that PPMs can be captured as nodes."""
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=True)
+        @qp.qnode(dev)
         def my_circuit():
-            qml.pauli_measure("X", wires=[0])
-            qml.pauli_measure(pauli_word="XY", wires=[0, 1])
+            qp.pauli_measure("X", wires=[0])
+            qp.pauli_measure(pauli_word="XY", wires=[0, 1])
 
         module = my_circuit()
 
@@ -942,7 +975,6 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node2"]["label"] == "<name> PPM-XY|<wire> [0, 1]"
         assert nodes["node2"]["attrs"]["fillcolor"] == "#70B3F5"
 
-    @pytest.mark.usefixtures("use_capture")
     @pytest.mark.parametrize("negative_angle", [True, False])
     def test_ppr(self, negative_angle):
         """Tests that a PPR node can be created."""
@@ -950,13 +982,13 @@ class TestCreateStaticOperatorNodes:
 
         multiplier = -1 if negative_angle else 1
 
-        @qml.qjit(pipelines=pipe, target="mlir")
-        @qml.transform(pass_name="to-ppr")
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit(pipelines=pipe, target="mlir", capture=True)
+        @qp.transform(pass_name="to-ppr")
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def cir():
-            qml.PauliRot(multiplier * jax.numpy.pi, pauli_word="YZ", wires=[0, 1])
-            qml.PauliRot(multiplier * jax.numpy.pi / 4, pauli_word="X", wires=[0])
-            qml.PauliRot(multiplier * jax.numpy.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
+            qp.PauliRot(multiplier * jax.numpy.pi, pauli_word="YZ", wires=[0, 1])
+            qp.PauliRot(multiplier * jax.numpy.pi / 4, pauli_word="X", wires=[0])
+            qp.PauliRot(multiplier * jax.numpy.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
 
         module = parse_generic_to_xdsl_module(cir.mlir_opt)
 
@@ -975,20 +1007,19 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node3"]["label"] == f"<name> PPR-XYZ ({sign_str}π/4)|<wire> [0, 1, 2]"
         assert nodes["node3"]["attrs"]["fillcolor"] == "#F5BD70"
 
-    @pytest.mark.usefixtures("use_capture")
     def test_ppr_arbitary(self):
         """Tests that a PPR node can be created."""
 
         pipe = [("pipe", ["quantum-compilation-stage"])]
 
-        @qml.qjit(pipelines=pipe, target="mlir")
-        @qml.transform(pass_name="to-ppr")
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit(pipelines=pipe, target="mlir", capture=True)
+        @qp.transform(pass_name="to-ppr")
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def cir():
             # NOTE: use angle != pi / <something>
-            # to get an qec.ppr.arbitary in the IR
-            qml.PauliRot(1.0, pauli_word="X", wires=[0])
-            qml.PauliRot(1.0, pauli_word="XYZ", wires=[0, 1, 2])
+            # to get an pbc.ppr.arbitary in the IR
+            qp.PauliRot(1.0, pauli_word="X", wires=[0])
+            qp.PauliRot(1.0, pauli_word="XYZ", wires=[0, 1, 2])
 
         module = parse_generic_to_xdsl_module(cir.mlir_opt)
 
@@ -1004,18 +1035,17 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node2"]["label"] == "<name> PPR-XYZ (φ)|<wire> [0, 1, 2]"
         assert nodes["node2"]["attrs"]["fillcolor"] == "#E3FFA1"
 
-    @pytest.mark.usefixtures("use_capture")
     def test_pauli_rot(self):
         """Tests that a PauliRot node can be created."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=True)
+        @qp.qnode(dev)
         def my_circuit():
-            qml.PauliRot(0.5, "X", wires=0)
-            qml.PauliRot(1.5, "XYZ", wires=[0, 1, 2])
+            qp.PauliRot(0.5, "X", wires=0)
+            qp.PauliRot(1.5, "XYZ", wires=[0, 1, 2])
 
         module = my_circuit()
 
@@ -1029,23 +1059,23 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node1"]["label"] == "<name> PauliRot|<wire> [0]"
         assert nodes["node2"]["label"] == "<name> PauliRot|<wire> [0, 1, 2]"
 
-    @pytest.mark.skipif(not qml.capture.enabled(), reason="Only works with capture enabled.")
     def test_complex_measurements(self):
         """Tests that complex measurements can be created."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True)
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, capture=True)
+        @qp.qnode(dev)
         def my_workflow():
             coeffs = [0.2, -0.543]
-            obs = [qml.X(0) @ qml.Z(1), qml.Z(0) @ qml.Hadamard(2)]
-            ham = qml.ops.LinearCombination(coeffs, obs)
+            obs = [qp.X(0) @ qp.Z(1), qp.Z(0) @ qp.Hadamard(2)]
+            ham = qp.ops.LinearCombination(coeffs, obs)
 
             return (
-                qml.expval(ham),
-                qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)),
+                qp.expval(ham),
+                qp.expval(qp.PauliZ(0) @ qp.PauliZ(1)),
+                qp.expval(2 * qp.X(0)),
             )
 
         module = my_workflow()
@@ -1055,10 +1085,11 @@ class TestCreateStaticOperatorNodes:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
-        assert len(nodes) == 3  # Device node + measurements
+        assert len(nodes) == 4  # Device node + measurements
 
-        assert nodes["node1"]["label"] == "<name> LinearCombination|<wire> [0, 1, 2]"
-        assert nodes["node2"]["label"] == "<name> Prod|<wire> [0, 1]"
+        assert nodes["node1"]["label"] == "<name> expval(LinearCombination)|<wire> [0, 1, 2]"
+        assert nodes["node2"]["label"] == "<name> expval(Prod)|<wire> [0, 1]"
+        assert nodes["node3"]["label"] == "<name> expval(SProd)|<wire> [0]"
 
     @pytest.mark.parametrize(
         "param, wires",
@@ -1068,15 +1099,15 @@ class TestCreateStaticOperatorNodes:
             (jax.numpy.array([1, 0, 0, 0, 1, 0, 0, 0]), [0, 1, 2]),
         ),
     )
-    def test_state_prep(self, param, wires):
+    def test_state_prep(self, param, wires, capture_mode):
         """Tests that state preparation operators can be captured as nodes."""
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit():
-            qml.StatePrep(param, wires=wires)
+            qp.StatePrep(param, wires=wires)
 
         module = my_circuit()
 
@@ -1097,16 +1128,16 @@ class TestCreateStaticOperatorNodes:
             (jax.numpy.array([1, 0, 0]), [0, 1, 2]),
         ),
     )
-    def test_basis_state(self, param, wires):
+    def test_basis_state(self, param, wires, capture_mode):
         """Tests that basis state operators can be captured as nodes."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit():
-            qml.BasisState(param, wires=wires)
+            qp.BasisState(param, wires=wires)
 
         module = my_circuit()
 
@@ -1120,20 +1151,19 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node1"]["label"] == f"<name> BasisState|<wire> {wires}"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestCreateDynamicOperatorNodes:
     """Tests that operator nodes with dynamic parameters or wires can be created and visualized."""
 
-    def test_static_dynamic_mix(self):
+    def test_static_dynamic_mix(self, capture_mode):
         """Tests that static and dynamic wires can both be used."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit(x):
-            qml.SWAP([0, x])
+            qp.SWAP([0, x])
 
         args = (1,)
         module = my_circuit(*args)
@@ -1147,17 +1177,17 @@ class TestCreateDynamicOperatorNodes:
 
         assert nodes["node1"]["label"] == "<name> SWAP|<wire> [0, arg0]"
 
-    def test_qnode_argument(self):
+    def test_qnode_argument(self, capture_mode):
         """Tests that qnode arguments can be used as wires."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit(x, y):
-            qml.H(x)
-            qml.X(y)
+            qp.H(x)
+            qp.X(y)
 
         args = (1, 2)
         module = my_circuit(*args)
@@ -1172,17 +1202,17 @@ class TestCreateDynamicOperatorNodes:
         assert nodes["node1"]["label"] == "<name> Hadamard|<wire> [arg0]"
         assert nodes["node2"]["label"] == "<name> PauliX|<wire> [arg1]"
 
-    def test_for_loop_variable(self):
+    def test_for_loop_variable(self, capture_mode):
         """Tests that for loop iteration variables can be used as wires."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit():
             for i in range(3):
-                qml.H(i)
+                qp.H(i)
 
         module = my_circuit()
 
@@ -1195,18 +1225,18 @@ class TestCreateDynamicOperatorNodes:
 
         assert nodes["node1"]["label"] == "<name> Hadamard|<wire> [arg0]"
 
-    def test_while_loop_variable(self):
+    def test_while_loop_variable(self, capture_mode):
         """Tests that while loop variables can be used as wires."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit():
             counter = 0
             while counter < 5:
-                qml.H(counter)
+                qp.H(counter)
                 counter += 1
 
         module = my_circuit()
@@ -1220,17 +1250,17 @@ class TestCreateDynamicOperatorNodes:
 
         assert nodes["node1"]["label"] == "<name> Hadamard|<wire> [arg0]"
 
-    def test_conditional_variable(self):
+    def test_conditional_variable(self, capture_mode):
         """Tests that conditional variables can be used."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit(x, y):
             if x == y:
-                qml.H(x)
+                qp.H(x)
 
         args = (1, 2)
         module = my_circuit(*args)
@@ -1244,18 +1274,18 @@ class TestCreateDynamicOperatorNodes:
 
         assert nodes["node1"]["label"] == "<name> Hadamard|<wire> [arg0]"
 
-    def test_through_clusters(self):
+    def test_through_clusters(self, capture_mode):
         """Tests that dynamic wire labels can be accessed through clusters."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit(x):
             for i in range(3):
-                qml.H(x)
-                qml.X(i)
+                qp.H(x)
+                qp.X(i)
 
         args = (1,)
         module = my_circuit(*args)
@@ -1270,17 +1300,17 @@ class TestCreateDynamicOperatorNodes:
         assert nodes["node1"]["label"] == "<name> Hadamard|<wire> [arg0]"
         assert nodes["node2"]["label"] == "<name> PauliX|<wire> [arg1]"
 
-    def test_visualize_pythonic_operators(self):
+    def test_visualize_pythonic_operators(self, capture_mode):
         """Tests that we can use operators like +,-,%"""
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow(x):
-            qml.RX(x % 3, wires=x % 3)
-            qml.RY(x - 3, wires=x - 3)
-            qml.RZ(x + 3, wires=x + 3)
+            qp.RX(x % 3, wires=x % 3)
+            qp.RY(x - 3, wires=x - 3)
+            qp.RZ(x + 3, wires=x + 3)
 
         args = (1,)
         module = my_workflow(*args)
@@ -1296,17 +1326,16 @@ class TestCreateDynamicOperatorNodes:
         assert nodes["node2"]["label"] == "<name> RY|<wire> [(arg5 - 3)]"
         assert nodes["node3"]["label"] == "<name> RZ|<wire> [(arg5 + 3)]"
 
-    @pytest.mark.usefixtures("use_capture")
     def test_ppm_dynamic(self):
         """Test that PPMs can be captured as nodes."""
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=True)
+        @qp.qnode(dev)
         def my_circuit(x, y):
-            qml.pauli_measure("X", wires=[x])
-            qml.pauli_measure(pauli_word="XY", wires=[y, 0])
+            qp.pauli_measure("X", wires=[x])
+            qp.pauli_measure(pauli_word="XY", wires=[y, 0])
 
         module = my_circuit(1, 2)
 
@@ -1323,19 +1352,18 @@ class TestCreateDynamicOperatorNodes:
         assert nodes["node2"]["attrs"]["fillcolor"] == "#70B3F5"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestCreateStaticMeasurementNodes:
     """Tests that measurements with static parameters can be created and visualized as nodes."""
 
-    def test_state_op(self):
-        """Test that qml.state can be handled."""
-        dev = qml.device("null.qubit", wires=1)
+    def test_state_op(self, capture_mode):
+        """Test that qp.state can be handled."""
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit():
-            return qml.state()
+            return qp.state()
 
         module = my_circuit()
 
@@ -1347,18 +1375,18 @@ class TestCreateStaticMeasurementNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
-        assert nodes["node1"]["label"] == get_label(qml.state())
+        assert nodes["node1"]["label"] == get_label(qp.state())
 
-    @pytest.mark.parametrize("meas_fn", [qml.expval, qml.var])
-    def test_expval_var_measurement_op(self, meas_fn):
+    @pytest.mark.parametrize("meas_fn", [qp.expval, qp.var])
+    def test_expval_var_measurement_op(self, meas_fn, capture_mode):
         """Test that statistical measurement operators can be captured as nodes."""
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit():
-            return meas_fn(qml.Z(0))
+            return meas_fn(qp.Z(0))
 
         module = my_circuit()
 
@@ -1370,7 +1398,7 @@ class TestCreateStaticMeasurementNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + measurement
 
-        assert nodes["node1"]["label"] == get_label(meas_fn(qml.Z(0)))
+        assert nodes["node1"]["label"] == get_label(meas_fn(qp.Z(0)))
 
     @pytest.mark.parametrize(
         "kwargs",
@@ -1380,15 +1408,15 @@ class TestCreateStaticMeasurementNodes:
             {"wires": [0, 1]},
         ],
     )
-    def test_probs_measurement_op(self, kwargs):
+    def test_probs_measurement_op(self, kwargs, capture_mode):
         """Tests that the probs measurement function can be captured as a node."""
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit():
-            return qml.probs(**kwargs)
+            return qp.probs(**kwargs)
 
         module = my_circuit()
 
@@ -1399,7 +1427,7 @@ class TestCreateStaticMeasurementNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + probs
 
-        assert nodes["node1"]["label"] == get_label(qml.probs(**kwargs))
+        assert nodes["node1"]["label"] == get_label(qp.probs(**kwargs))
 
     @pytest.mark.parametrize(
         "kwargs",
@@ -1409,16 +1437,16 @@ class TestCreateStaticMeasurementNodes:
             {"wires": [0, 1]},
         ],
     )
-    def test_valid_sample_measurement_op(self, kwargs):
+    def test_valid_sample_measurement_op(self, kwargs, capture_mode):
         """Tests that the sample measurement function can be captured as a node."""
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.set_shots(10)
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.set_shots(10)
+        @qp.qnode(dev)
         def my_circuit():
-            return qml.sample(**kwargs)
+            return qp.sample(**kwargs)
 
         module = my_circuit()
 
@@ -1429,23 +1457,22 @@ class TestCreateStaticMeasurementNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + sample
 
-        assert nodes["node1"]["label"] == get_label(qml.sample(**kwargs))
+        assert nodes["node1"]["label"] == get_label(qp.sample(**kwargs))
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestCreateDynamicMeasurementNodes:
     """Tests that measurements on dynamic wires render correctly."""
 
-    def test_static_dynamic_mix(self):
+    def test_static_dynamic_mix(self, capture_mode):
         """Tests that static and dynamic wires can both be used."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit(x):
-            return qml.probs(wires=[0, x])
+            return qp.probs(wires=[0, x])
 
         args = (1,)
         module = my_circuit(*args)
@@ -1459,21 +1486,21 @@ class TestCreateDynamicMeasurementNodes:
 
         assert nodes["node1"]["label"] == "<name> probs|<wire> [0, arg0]"
 
-    def test_qnode_argument(self):
+    def test_qnode_argument(self, capture_mode):
         """Tests that qnode arguments can be used as wires."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.set_shots(10)
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.set_shots(10)
+        @qp.qnode(dev)
         def my_circuit(x, y):
             return (
-                qml.probs(wires=x),
-                qml.expval(qml.Z(x)),
-                qml.var(qml.X(y)),
-                qml.sample(wires=x),
+                qp.probs(wires=x),
+                qp.expval(qp.Z(x)),
+                qp.var(qp.X(y)),
+                qp.sample(wires=x),
             )
 
         args = (1, 2)
@@ -1491,16 +1518,16 @@ class TestCreateDynamicMeasurementNodes:
         assert nodes["node3"]["label"] == "<name> var(PauliX)|<wire> [arg1]"
         assert nodes["node4"]["label"] == "<name> sample|<wire> [arg0]"
 
-    def test_visualize_pythonic_operators_on_meas(self):
+    def test_visualize_pythonic_operators_on_meas(self, capture_mode):
         """Tests that we can use operators like +,-,%"""
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.set_shots(3)
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.set_shots(3)
+        @qp.qnode(dev)
         def my_workflow(x):
-            return qml.probs(wires=[x % 3, x - 3, x + 3]), qml.sample(wires=[x % 3, x - 3, x + 3])
+            return qp.probs(wires=[x % 3, x - 3, x + 3]), qp.sample(wires=[x % 3, x - 3, x + 3])
 
         args = (1,)
         module = my_workflow(*args)
@@ -1518,24 +1545,23 @@ class TestCreateDynamicMeasurementNodes:
         )
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestOperatorConnectivity:
     """Tests that operators are properly connected."""
 
-    def test_global_phase_connectivity(self):
+    def test_global_phase_connectivity(self, capture_mode):
         """Tests the connectivity of the global phase operator."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_circuit():
-            qml.X(0)
-            qml.GlobalPhase(0.5)
-            qml.adjoint(qml.GlobalPhase(0.5))
-            qml.ctrl(qml.GlobalPhase, control=0)(0.5)
-            qml.Y(0)
+            qp.X(0)
+            qp.GlobalPhase(0.5)
+            qp.adjoint(qp.GlobalPhase(0.5))
+            qp.ctrl(qp.GlobalPhase, control=0)(0.5)
+            qp.Y(0)
 
         module = my_circuit()
 
@@ -1558,21 +1584,21 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_static_connection_within_cluster(self):
+    def test_static_connection_within_cluster(self, capture_mode):
         """Tests that connections can be made within the same cluster."""
 
-        dev = qml.device("null.qubit", wires=3)
+        dev = qp.device("null.qubit", wires=3)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
-            qml.X(0)
-            qml.Z(1)
-            qml.Y(0)
-            qml.H(1)
-            qml.S(1)
-            qml.T(2)
+            qp.X(0)
+            qp.Z(1)
+            qp.Y(0)
+            qp.H(1)
+            qp.S(1)
+            qp.T(2)
 
         module = my_workflow()
 
@@ -1598,19 +1624,19 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_static_connection_through_for_loop(self):
+    def test_static_connection_through_for_loop(self, capture_mode):
         """Tests that connections can be made through a for loop cluster."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
-            qml.X(0)
+            qp.X(0)
             for i in range(3):
-                qml.Y(0)
-            qml.Z(0)
+                qp.Y(0)
+            qp.Z(0)
 
         module = my_workflow()
 
@@ -1635,21 +1661,21 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_static_connection_through_while_loop(self):
+    def test_static_connection_through_while_loop(self, capture_mode):
         """Tests that connections can be made through a while loop cluster."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
             counter = 0
-            qml.X(0)
+            qp.X(0)
             while counter < 5:
-                qml.Y(0)
+                qp.Y(0)
                 counter += 1
-            qml.Z(0)
+            qp.Z(0)
 
         module = my_workflow()
 
@@ -1674,25 +1700,25 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_static_connection_through_conditional(self):
+    def test_static_connection_through_conditional(self, capture_mode):
         """Tests that connections through conditionals make sense."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow(x):
-            qml.X(0)
-            qml.T(1)
+            qp.X(0)
+            qp.T(1)
             if x == 1:
-                qml.RX(0, 0)
-                qml.S(1)
+                qp.RX(0, 0)
+                qp.S(1)
             elif x == 2:
-                qml.RY(0, 0)
+                qp.RY(0, 0)
             else:
-                qml.RZ(0, 0)
-            qml.H(0)
+                qp.RZ(0, 0)
+            qp.H(0)
 
         args = (1,)
         module = my_workflow(*args)
@@ -1716,25 +1742,25 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_static_connection_through_nested_conditional(self):
+    def test_static_connection_through_nested_conditional(self, capture_mode):
         """Tests that connections through nested conditionals make sense."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow(x):
-            qml.X(0)
-            qml.T(1)
+            qp.X(0)
+            qp.T(1)
             if x == 1:
                 if x == 3:
-                    qml.Y(1)
+                    qp.Y(1)
                 else:
-                    qml.Z(0)
+                    qp.Z(0)
             else:
-                qml.RZ(0, 0)
-            qml.H(0)
+                qp.RZ(0, 0)
+            qp.H(0)
 
         args = (1,)
         module = my_workflow(*args)
@@ -1757,20 +1783,20 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_multi_wire_connectivity(self):
+    def test_multi_wire_connectivity(self, capture_mode):
         """Ensures that multi wire connectivity holds."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
-            qml.RX(0.1, 0)
-            qml.RY(0.2, 1)
-            qml.RZ(0.3, 2)
-            qml.CNOT(wires=[0, 1])
-            qml.Toffoli(wires=[1, 2, 0])
+            qp.RX(0.1, 0)
+            qp.RY(0.2, 1)
+            qp.RZ(0.3, 2)
+            qp.CNOT(wires=[0, 1])
+            qp.Toffoli(wires=[1, 2, 0])
 
         module = my_workflow()
 
@@ -1791,22 +1817,22 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_dynamic_wire_connectivity(self):
+    def test_dynamic_wire_connectivity(self, capture_mode):
         """Tests standard scenario of interweaving static and dynamic operators."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow(x, y):
-            qml.X(0)
-            qml.Y(1)
-            qml.Z(2)
-            qml.H(x)
-            qml.S(0)
-            qml.T(2)
-            qml.RY(0, y)
+            qp.X(0)
+            qp.Y(1)
+            qp.Z(2)
+            qp.H(x)
+            qp.S(0)
+            qp.T(2)
+            qp.RY(0, y)
 
         args = (1, 2)
         module = my_workflow(*args)
@@ -1834,16 +1860,16 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_first_operator_is_dynamic(self):
+    def test_first_operator_is_dynamic(self, capture_mode):
         """Tests when the first operator is dynamic"""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow(x, y):
-            qml.H(x)
+            qp.H(x)
 
         args = (1, 2)
         module = my_workflow(*args)
@@ -1863,18 +1889,18 @@ class TestOperatorConnectivity:
         assert len(edges) == 1
         assert ("node0", "node1") in edges
 
-    def test_double_choke(self):
+    def test_double_choke(self, capture_mode):
         """Tests when two dynamic operators are back to back"""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow(x, y):
-            qml.X(0)
-            qml.Y(x)
-            qml.Z(y)
+            qp.X(0)
+            qp.Y(x)
+            qp.Z(y)
 
         args = (1, 2)
         module = my_workflow(*args)
@@ -1899,21 +1925,21 @@ class TestOperatorConnectivity:
         assert ("node2", "node3") in edges
         assert edges[("node2", "node3")]["attrs"]["style"] == "dashed"
 
-    def test_complex_connectivity_for_loop(self):
+    def test_complex_connectivity_for_loop(self, capture_mode):
         """Tests a complicated connectivity through a for loop."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow(a, b):
-            qml.X(a)
+            qp.X(a)
             for i in range(3):
-                qml.H(0)
-                qml.Y(i)
-            qml.S(0)
-            qml.Z(b)
+                qp.H(0)
+                qp.Y(i)
+            qp.S(0)
+            qp.Z(b)
 
         module = my_workflow(1, 2)
 
@@ -1932,23 +1958,23 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_complex_connectivity_while_loop(self):
+    def test_complex_connectivity_while_loop(self, capture_mode):
         """Tests a complicated connectivity through a while loop."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow(a, b):
-            qml.X(a)
+            qp.X(a)
             counter = 0
             while counter < 5:
-                qml.H(0)
-                qml.Y(counter)
+                qp.H(0)
+                qp.Y(counter)
                 counter += 1
-            qml.S(0)
-            qml.Z(b)
+            qp.S(0)
+            qp.Z(b)
 
         module = my_workflow(1, 2)
 
@@ -1967,20 +1993,20 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_basic_static_conditional(self):
+    def test_basic_static_conditional(self, capture_mode):
         """Tests a basic static example of a conditional."""
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(a):
             if a == 2:
-                qml.X(0)
+                qp.X(0)
             elif a == 3:
-                qml.Y(0)
+                qp.Y(0)
             else:
-                qml.Z(0)
-            qml.H(a)
+                qp.Z(0)
+            qp.H(a)
 
         module = my_workflow(1)
 
@@ -2000,21 +2026,21 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_basic_static_conditional_in_between_dynamic(self):
+    def test_basic_static_conditional_in_between_dynamic(self, capture_mode):
         """Tests a basic static example of a conditional."""
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(a, b):
-            qml.S(b)
+            qp.S(b)
             if a == 2:
-                qml.X(0)
+                qp.X(0)
             elif a == 3:
-                qml.Y(0)
+                qp.Y(0)
             else:
-                qml.Z(0)
-            qml.H(a)
+                qp.Z(0)
+            qp.H(a)
 
         module = my_workflow(1, 2)
 
@@ -2035,21 +2061,21 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_basic_dynamic_conditional(self):
+    def test_basic_dynamic_conditional(self, capture_mode):
         """Tests a basic example of a conditional with dynamic wires."""
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(a, b, c):
-            qml.H(0)
+            qp.H(0)
             if a == 2:
-                qml.X(a)
+                qp.X(a)
             elif a == b:
-                qml.Y(c)
+                qp.Y(c)
             else:
-                qml.Z(c)
-            qml.S(0)
+                qp.Z(c)
+            qp.S(0)
 
         module = my_workflow(1, 2, 3)
 
@@ -2070,18 +2096,18 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_connectivity_through_simple_if(self):
+    def test_connectivity_through_simple_if(self, capture_mode):
         """Tests that a simple if can be visualized."""
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(a):
-            qml.H(0)
+            qp.H(0)
             if a == 2:
-                qml.X(a)
-                qml.Y(0)
-            qml.Z(0)
+                qp.X(a)
+                qp.Y(0)
+            qp.Z(0)
 
         module = my_workflow(1)
 
@@ -2099,23 +2125,23 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_complex_connectivity_if_elif_else(self):
+    def test_complex_connectivity_if_elif_else(self, capture_mode):
         """Tests that complex connectivity can go through a conditional."""
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(a, b, c):
-            qml.X(a)
+            qp.X(a)
             if a == 2:
-                qml.H(0)
-                qml.Y(1)
+                qp.H(0)
+                qp.Y(1)
             elif a == b:
-                qml.T(c)
+                qp.T(c)
             else:
-                qml.Z(b)
-            qml.S(0)
-            qml.RZ(0, b)
+                qp.Z(b)
+            qp.S(0)
+            qp.RZ(0, b)
 
         module = my_workflow(1, 2, 3)
 
@@ -2139,20 +2165,20 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_complex_connectivity_nested_if_with_else(self):
+    def test_complex_connectivity_nested_if_with_else(self, capture_mode):
         """Tests that complex connectivity can go through a conditional."""
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(a, b):
-            qml.X(a)
-            qml.S(0)
+            qp.X(a)
+            qp.S(0)
             if a == 2:
                 if b == 2:
-                    qml.RX(0, 0)
+                    qp.RX(0, 0)
             else:
-                qml.Y(0)
+                qp.Y(0)
 
         module = my_workflow(1, 2)
 
@@ -2170,21 +2196,21 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_complex_connectivity_nested_if(self):
+    def test_complex_connectivity_nested_if(self, capture_mode):
         """Tests that complex connectivity can go through a conditional."""
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(a, b):
-            qml.X(a)
+            qp.X(a)
             if a == 2:
-                qml.H(0)
+                qp.H(0)
                 if b == 2:
-                    qml.RX(0, 0)
-                qml.Y(1)
-            qml.S(0)
-            return qml.probs()
+                    qp.RX(0, 0)
+                qp.Y(1)
+            qp.S(0)
+            return qp.probs()
 
         module = my_workflow(1, 2)
 
@@ -2205,23 +2231,23 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_complex_connectivity_conditional_inside_control_flow(self):
+    def test_complex_connectivity_conditional_inside_control_flow(self, capture_mode):
         """Tests the interaction with conditional inside of control flow"""
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(x, y):
-            qml.X(0)
-            qml.Y(1)
-            qml.H(x)
+            qp.X(0)
+            qp.Y(1)
+            qp.H(x)
 
             for i in range(3):
-                qml.S(0)
+                qp.S(0)
                 if i == 3:
-                    qml.T(0)
+                    qp.T(0)
 
-            qml.RY(0, x)
+            qp.RY(0, x)
 
         module = my_workflow(1, 2)
 
@@ -2242,18 +2268,20 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_complex_connectivity_conditional_dynamic_branching_static_node_after(self):
+    def test_complex_connectivity_conditional_dynamic_branching_static_node_after(
+        self, capture_mode
+    ):
         """Tests that complex connectivity can go through a conditional."""
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(x, y):
             if x == y:
-                qml.Y(0)
+                qp.Y(0)
             else:
-                qml.Z(x)
-            qml.H(0)
+                qp.Z(x)
+            qp.H(0)
 
         module = my_workflow(1, 2)
 
@@ -2271,19 +2299,21 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_complex_connectivity_conditional_dynamic_branching_static_and_dyn_node_after(self):
+    def test_complex_connectivity_conditional_dynamic_branching_static_and_dyn_node_after(
+        self, capture_mode
+    ):
         """Tests that complex connectivity can go through a conditional."""
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(x, y):
             if x == y:
-                qml.Y(0)
+                qp.Y(0)
             else:
-                qml.Z(x)
-            qml.H(0)
-            qml.X(x)
+                qp.Z(x)
+            qp.H(0)
+            qp.X(x)
 
         module = my_workflow(1, 2)
 
@@ -2302,18 +2332,18 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_complex_connectivity_conditional_dynamic_branching_no_node_before(self):
+    def test_complex_connectivity_conditional_dynamic_branching_no_node_before(self, capture_mode):
         """Tests that complex connectivity can go through a conditional."""
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(x, y):
             if x == y:
-                qml.Y(0)
+                qp.Y(0)
             else:
-                qml.Z(x)
-            qml.H(y)
+                qp.Z(x)
+            qp.H(y)
 
         module = my_workflow(1, 2)
 
@@ -2331,19 +2361,19 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
-    def test_complex_connectivity_conditional_dynamic_branching(self):
+    def test_complex_connectivity_conditional_dynamic_branching(self, capture_mode):
         """Tests that complex connectivity can go through a conditional."""
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=3))
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(x, y):
-            qml.X(x)
+            qp.X(x)
             if x == y:
-                qml.Y(0)
+                qp.Y(0)
             else:
-                qml.Z(x)
-            qml.H(y)
+                qp.Z(x)
+            qp.H(y)
 
         module = my_workflow(1, 2)
 
@@ -2363,22 +2393,21 @@ class TestOperatorConnectivity:
         assert_dag_structure(nodes, edges, expected_edges)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestTerminalMeasurementConnectivity:
     """Test that terminal measurements connect properly."""
 
-    @pytest.mark.parametrize("meas_fn", [qml.probs, qml.state])
-    def test_connect_all_wires(self, meas_fn):
+    @pytest.mark.parametrize("meas_fn", [qp.probs, qp.state])
+    def test_connect_all_wires(self, meas_fn, capture_mode):
         """Tests connection to terminal measurements that operate on all wires."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
-            qml.X(0)
-            qml.T(1)
+            qp.X(0)
+            qp.T(1)
             return meas_fn()
 
         module = my_workflow()
@@ -2403,25 +2432,25 @@ class TestTerminalMeasurementConnectivity:
         assert ("node1", "node3") in edges
         assert ("node2", "node3") in edges
 
-    def test_connect_specific_wires(self):
+    def test_connect_specific_wires(self, capture_mode):
         """Tests connection to terminal measurements that operate on specific wires."""
 
-        dev = qml.device("null.qubit", wires=5)
+        dev = qp.device("null.qubit", wires=5)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.set_shots(10)
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.set_shots(10)
+        @qp.qnode(dev)
         def my_workflow():
-            qml.X(0)
-            qml.Y(1)
-            qml.Z(2)
-            qml.H(3)
+            qp.X(0)
+            qp.Y(1)
+            qp.Z(2)
+            qp.H(3)
             return (
-                qml.expval(qml.Z(0)),
-                qml.var(qml.Z(1)),
-                qml.probs(wires=[2]),
-                qml.sample(wires=[3]),
+                qp.expval(qp.Z(0)),
+                qp.var(qp.Z(1)),
+                qp.probs(wires=[2]),
+                qp.sample(wires=[3]),
             )
 
         module = my_workflow()
@@ -2455,18 +2484,18 @@ class TestTerminalMeasurementConnectivity:
         assert ("node3", "node7") in edges
         assert ("node4", "node8") in edges
 
-    def test_multi_wire_connectivity(self):
+    def test_multi_wire_connectivity(self, capture_mode):
         """Ensures that multi wire connectivity holds."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
-            qml.X(0)
-            qml.Y(1)
-            return qml.probs(wires=[0, 1])
+            qp.X(0)
+            qp.Y(1)
+            return qp.probs(wires=[0, 1])
 
         module = my_workflow()
 
@@ -2490,16 +2519,16 @@ class TestTerminalMeasurementConnectivity:
         assert ("node1", "node3") in edges
         assert ("node2", "node3") in edges
 
-    def test_no_quantum_ops_before_measurement(self):
+    def test_no_quantum_ops_before_measurement(self, capture_mode):
         """Tests a workflow with no quantum operations."""
 
-        dev = qml.device("null.qubit", wires=2)
+        dev = qp.device("null.qubit", wires=2)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_empty_workflow():
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         module = my_empty_workflow()
         utility = ConstructCircuitDAG(FakeDAGBuilder())
@@ -2511,19 +2540,19 @@ class TestTerminalMeasurementConnectivity:
         # Node0 = NullQubit
         assert ("node0", "node1") in edges
 
-    def test_terminal_measurement_after_static_dyn_op_mix(self):
+    def test_terminal_measurement_after_static_dyn_op_mix(self, capture_mode):
         """Tests that a terminal measurement on a mix of dynamic and static wires connects."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow(x, y):
-            qml.X(0)
-            qml.Y(x)
-            qml.Z(y)
-            return qml.probs(wires=[0, x])
+            qp.X(0)
+            qp.Y(x)
+            qp.Z(y)
+            return qp.probs(wires=[0, x])
 
         args = (1, 2)
         module = my_workflow(*args)
@@ -2551,20 +2580,20 @@ class TestTerminalMeasurementConnectivity:
         assert edges[("node2", "node3")]["attrs"]["style"] == "dashed"
         assert ("node3", "node4") in edges
 
-    def test_terminal_measurement_static_dyn_mix(self):
+    def test_terminal_measurement_static_dyn_mix(self, capture_mode):
         """Tests that a terminal measurement on a mix of dynamic and static wires connects."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow(x, y):
-            qml.X(0)
-            qml.Y(0)
+            qp.X(0)
+            qp.Y(0)
             for i in range(3):
-                qml.H(i)
-            return qml.expval(qml.Z(x))
+                qp.H(i)
+            return qp.expval(qp.Z(x))
 
         args = (1, 2)
         module = my_workflow(*args)
@@ -2592,18 +2621,18 @@ class TestTerminalMeasurementConnectivity:
         assert ("node3", "node4") in edges
         assert edges[("node3", "node4")]["attrs"]["style"] == "dashed"
 
-    def test_terminal_measurement_dyn_after_static(self):
+    def test_terminal_measurement_dyn_after_static(self, capture_mode):
         """Tests that a terminal measurement on a mix of dynamic and static wires connects."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow(x, y):
-            qml.X(x)
-            qml.Y(0)
-            return qml.expval(qml.Z(y))
+            qp.X(x)
+            qp.Y(0)
+            return qp.expval(qp.Z(y))
 
         args = (1, 2)
         module = my_workflow(*args)
@@ -2628,16 +2657,16 @@ class TestTerminalMeasurementConnectivity:
         assert ("node2", "node3") in edges
         assert edges[("node2", "node3")]["attrs"]["style"] == "dashed"
 
-    def test_no_term_meas_interconnectivity(self):
+    def test_no_term_meas_interconnectivity(self, capture_mode):
         """Tests that terminal measurements don't connect amongst themselves."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow(x, y):
-            return qml.probs(), qml.expval(qml.Z(0)), qml.expval(qml.X(x))
+            return qp.probs(), qp.expval(qp.Z(0)), qp.expval(qp.X(x))
 
         args = (1, 2)
         module = my_workflow(*args)
@@ -2658,23 +2687,22 @@ class TestTerminalMeasurementConnectivity:
         assert edges[("node0", "node3")]["attrs"]["style"] == "dashed"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestCtrl:
     """Tests that the ctrl transform is visualized correctly."""
 
-    def test_ctrl_function(self):
+    def test_ctrl_function(self, capture_mode):
         """Test that the ctrl of a function works."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         def op():
-            return qml.H(0)
+            return qp.H(0)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
-            qml.ctrl(op, control=1)()
+            qp.ctrl(op, control=1)()
 
         module = my_workflow()
 
@@ -2690,16 +2718,16 @@ class TestCtrl:
         assert "[1, 0]" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
-    def test_ctrl_operator_instance(self):
+    def test_ctrl_operator_instance(self, capture_mode):
         """Test that the ctrl of an operator instance works."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
-            qml.ctrl(qml.H(0), control=1)
+            qp.ctrl(qp.H(0), control=1)
 
         module = my_workflow()
 
@@ -2715,16 +2743,16 @@ class TestCtrl:
         assert "[1, 0]" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
-    def test_ctrl_operator_type(self):
+    def test_ctrl_operator_type(self, capture_mode):
         """Test that the ctrl of an operator instance works."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
-            qml.ctrl(qml.H, control=1)(0)
+            qp.ctrl(qp.H, control=1)(0)
 
         module = my_workflow()
 
@@ -2740,18 +2768,18 @@ class TestCtrl:
         assert "[1, 0]" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
-    def test_ctrl_operator_without_alias(self):
+    def test_ctrl_operator_without_alias(self, capture_mode):
         """Test that the ctrl of an operator instance that doesn't have an alias works."""
 
-        dev = qml.device("null.qubit", wires=2)
+        dev = qp.device("null.qubit", wires=2)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
             # Use two control wires so we avoid the CH alias
-            qml.ctrl(qml.H(0), control=[1, 2])
-            qml.ctrl(qml.H, control=[1, 2])(0)
+            qp.ctrl(qp.H(0), control=[1, 2])
+            qp.ctrl(qp.H, control=[1, 2])(0)
 
         module = my_workflow()
 
@@ -2771,23 +2799,22 @@ class TestCtrl:
         assert nodes["node2"]["parent_cluster_uid"] == "cluster1"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestAdjoint:
     """Tests that the ctrl transform is visualized correctly."""
 
-    def test_adjoint_function(self):
+    def test_adjoint_function(self, capture_mode):
         """Test that the adjoint of a function works."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         def op():
-            return qml.H(0)
+            return qp.H(0)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
-            qml.adjoint(op)()
+            qp.adjoint(op)()
 
         module = my_workflow()
 
@@ -2806,16 +2833,16 @@ class TestAdjoint:
         assert "Hadamard" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster2"
 
-    def test_adjoint_operator_instance(self):
+    def test_adjoint_operator_instance(self, capture_mode):
         """Test that the adjoint of an operator instance works."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
-            qml.adjoint(qml.H(0))
+            qp.adjoint(qp.H(0))
 
         module = my_workflow()
 
@@ -2833,16 +2860,16 @@ class TestAdjoint:
         assert "Adjoint(Hadamard)" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
-    def test_adjoint_operator_type(self):
+    def test_adjoint_operator_type(self, capture_mode):
         """Test that the adjoint of an operator instance works."""
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
         def my_workflow():
-            qml.adjoint(qml.H)(0)
+            qp.adjoint(qp.H)(0)
 
         module = my_workflow()
 

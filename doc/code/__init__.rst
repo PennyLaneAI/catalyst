@@ -25,7 +25,7 @@ Module: catalyst.passes
 .. automodapi:: catalyst.passes
     :no-heading:
     :no-inheritance-diagram:
-    :fullname:
+    :members:
 
 Module: catalyst.third_party.cuda
 ---------------------------------

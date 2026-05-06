@@ -15,10 +15,10 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 """
-This file performs the lit test checking MLIR output for qml.Snapshot support in Catalyst.
+This file performs the lit test checking MLIR output for qp.Snapshot support in Catalyst.
 """
 
-import pennylane as qml
+import pennylane as qp
 from pennylane import numpy as np
 
 from catalyst import qjit
@@ -28,47 +28,47 @@ from catalyst import qjit
 
 # CHECK-LABEL: public @jit_single_qubit_circuit
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=1))
+@qp.qnode(qp.device("lightning.qubit", wires=1))
 def single_qubit_circuit():
-    """Test MLIR output of all six single qubit basis states in qml.Snapshot without shots"""
+    """Test MLIR output of all six single qubit basis states in qp.Snapshot without shots"""
     # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
     # CHECK: [[snapshot0:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
-    qml.Snapshot()  # |0>
+    qp.Snapshot()  # |0>
 
-    qml.X(wires=0)
+    qp.X(wires=0)
 
     # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
     # CHECK: [[snapshot1:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
-    qml.Snapshot()  # |1>
+    qp.Snapshot()  # |1>
 
-    qml.Hadamard(wires=0)
+    qp.Hadamard(wires=0)
 
     # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
     # CHECK: [[snapshot2:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
-    qml.Snapshot()  # |->
+    qp.Snapshot()  # |->
 
-    qml.PhaseShift(np.pi / 2, wires=0)  # pylint: disable=no-member
+    qp.PhaseShift(np.pi / 2, wires=0)  # pylint: disable=no-member
 
     # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
     # CHECK: [[snapshot3:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
-    qml.Snapshot()  # |-i>
+    qp.Snapshot()  # |-i>
 
-    qml.Z(wires=0)
+    qp.Z(wires=0)
 
     # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
     # CHECK: [[snapshot4:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
-    qml.Snapshot()  # |+i>
+    qp.Snapshot()  # |+i>
 
-    qml.PhaseShift(-np.pi / 2, wires=0)  # pylint: disable=no-member
+    qp.PhaseShift(-np.pi / 2, wires=0)  # pylint: disable=no-member
 
     # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
     # CHECK: [[snapshot5:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
-    qml.Snapshot()  # |+>
+    qp.Snapshot()  # |+>
 
     # CHECK: return [[snapshot0]], [[snapshot1]], [[snapshot2]], [[snapshot3]], [[snapshot4]], [[snapshot5]], {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}} :
     # CHECK-SAME: tensor<2xcomplex<f64>>, tensor<2xcomplex<f64>>, tensor<2xcomplex<f64>>, tensor<2xcomplex<f64>>, tensor<2xcomplex<f64>>, tensor<2xcomplex<f64>>,
     # CHECK-SAME: tensor<2xcomplex<f64>>, tensor<2xf64>, tensor<f64>, tensor<f64>
-    return qml.state(), qml.probs(), qml.expval(qml.X(0)), qml.var(qml.Z(0))
+    return qp.state(), qp.probs(), qp.expval(qp.X(0)), qp.var(qp.Z(0))
 
 
 print(single_qubit_circuit.mlir)
@@ -76,29 +76,29 @@ print(single_qubit_circuit.mlir)
 
 # CHECK-LABEL: public @jit_two_qubit_circuit
 @qjit(target="mlir")
-@qml.set_shots(5)
-@qml.qnode(qml.device("lightning.qubit", wires=2), mcm_method="single-branch-statistics")
+@qp.set_shots(5)
+@qp.qnode(qp.device("lightning.qubit", wires=2), mcm_method="single-branch-statistics")
 def two_qubit_circuit():
-    """Test MLIR output of qml.Snapshot on two qubits with shots"""
+    """Test MLIR output of qp.Snapshot on two qubits with shots"""
 
     # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
     # CHECK: [[snapshot0:%.+]] = quantum.state [[compbasis]] : tensor<4xcomplex<f64>>
-    qml.Snapshot()  # |00>
+    qp.Snapshot()  # |00>
 
-    qml.Hadamard(wires=0)
-    qml.Hadamard(wires=1)
+    qp.Hadamard(wires=0)
+    qp.Hadamard(wires=1)
 
     # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
     # CHECK: [[snapshot1:%.+]] = quantum.state [[compbasis]] : tensor<4xcomplex<f64>>
-    qml.Snapshot()  # |++>
+    qp.Snapshot()  # |++>
 
-    qml.Hadamard(wires=0)
-    qml.Hadamard(wires=1)  # |00>
-    qml.X(wires=0)
-    qml.X(wires=1)  # |11> to measure in comp-basis
+    qp.Hadamard(wires=0)
+    qp.Hadamard(wires=1)  # |00>
+    qp.X(wires=0)
+    qp.X(wires=1)  # |11> to measure in comp-basis
 
     # CHECK: return [[snapshot0]], [[snapshot1]], {{%.+}}, {{%.+}}, {{%.+}} : tensor<4xcomplex<f64>>, tensor<4xcomplex<f64>>, tensor<4xi64>, tensor<4xi64>, tensor<5x2xi64>
-    return qml.counts(), qml.sample()
+    return qp.counts(), qp.sample()
 
 
 print(two_qubit_circuit.mlir)

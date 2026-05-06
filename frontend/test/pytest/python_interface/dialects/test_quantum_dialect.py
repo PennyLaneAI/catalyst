@@ -61,6 +61,7 @@ expected_ops_names = {
     "HermitianOp": "quantum.hermitian",
     "InitializeOp": "quantum.init",
     "InsertOp": "quantum.insert",
+    "MCMObsOp": "quantum.mcmobs",
     "MeasureOp": "quantum.measure",
     "MultiRZOp": "quantum.multirz",
     "NamedObsOp": "quantum.namedobs",
@@ -119,7 +120,7 @@ int_attr = IntegerAttr(0, 32)
 expected_ops_init_kwargs = {
     "AdjointOp": [
         {
-            "qreg": qreg,
+            "args": (qreg, q0, q1),
             "region": Region(Block((CustomOp(gate_name="CNOT", in_qubits=(q0, q1)),))),
         }
     ],
@@ -166,8 +167,8 @@ expected_ops_init_kwargs = {
     ],
     "FinalizeOp": [{}],
     "GlobalPhaseOp": [
-        {"params": theta, "in_ctrl_qubits": (q0,), "in_ctrl_values": (bool_ssa,)},
-        {"params": theta, "in_ctrl_qubits": q0, "in_ctrl_values": bool_ssa},
+        {"angle": theta, "in_ctrl_qubits": (q0,), "in_ctrl_values": (bool_ssa,)},
+        {"angle": theta, "in_ctrl_qubits": q0, "in_ctrl_values": bool_ssa},
     ],
     "HamiltonianOp": [{"operands": (coeffs, (obs,)), "result_types": (obs,)}],
     "HermitianOp": [{"operands": (matrix, (q0, q1)), "result_types": (obs,)}],
@@ -176,6 +177,10 @@ expected_ops_init_kwargs = {
         {"in_qreg": qreg, "idx": int_ssa, "qubit": q1},
         {"in_qreg": qreg, "idx": int_attr, "qubit": q1},
         {"in_qreg": qreg, "idx": 0, "qubit": q1},
+    ],
+    "MCMObsOp": [
+        {"operands": (bool_ssa,), "result_types": (obs,)},
+        {"operands": ((bool_ssa, bool_ssa, bool_ssa),), "result_types": (obs,)},
     ],
     "MeasureOp": [
         {"in_qubit": q0, "postselect": int_ssa},
@@ -442,16 +447,16 @@ class TestAssemblyFormat:
 
         ////////////////// **GlobalPhaseOp tests** //////////////////
         // No control wires
-        // CHECK: quantum.gphase([[PARAM1]]) :
-        quantum.gphase(%param1) :
+        // CHECK: quantum.gphase([[PARAM1]])
+        quantum.gphase(%param1)
 
         // Control wires and values
         // CHECK: {{%.+}}, {{%.+}} = quantum.gphase([[PARAM1]]) ctrls([[Q0]], [[Q1]]) ctrlvals([[FALSE_CST]], [[TRUE_CST]]) : ctrls !quantum.bit, !quantum.bit
         %qg1, %qg2 = quantum.gphase(%param1) ctrls(%q0, %q1) ctrlvals(%false_cst, %true_cst) : ctrls !quantum.bit, !quantum.bit
 
         // Adjoint
-        // CHECK: {{%.+}} = quantum.gphase([[PARAM1]]) {adjoint} ctrls([[Q0]]) ctrlvals([[TRUE_CST]]) : ctrls !quantum.bit
-        %qg3 = quantum.gphase(%param1) {adjoint} ctrls(%q0) ctrlvals(%true_cst) : ctrls !quantum.bit
+        // CHECK: {{%.+}} = quantum.gphase([[PARAM1]]) adj ctrls([[Q0]]) ctrlvals([[TRUE_CST]]) : ctrls !quantum.bit
+        %qg3 = quantum.gphase(%param1) adj ctrls(%q0) ctrlvals(%true_cst) : ctrls !quantum.bit
 
         ////////////////// **MultiRZOp tests** //////////////////
         // No control wires
@@ -639,6 +644,18 @@ class TestAssemblyFormat:
         // CHECK: {{%.+}} = quantum.compbasis qreg [[QREG]] : !quantum.obs
         %cb_01 = quantum.compbasis qubits %q0, %q1 : !quantum.obs
         %cb_all = quantum.compbasis qreg %qreg : !quantum.obs
+
+        //////////// **MCMObsOp** ////////////
+        // create booleans for the mcms
+        // CHECK: [[MCM1:%.+]] = "test.op"() : () -> i1
+        // CHECK: [[MCM2:%.+]] = "test.op"() : () -> i1
+        %mcm1 = "test.op"() : () -> i1
+        %mcm2 = "test.op"() : () -> i1
+
+        // CHECK: {{%.+}} = quantum.mcmobs [[MCM1]] : !quantum.obs
+        // CHECK: {{%.+}} = quantum.mcmobs [[MCM1]], [[MCM2]] : !quantum.obs
+        %mcm_obs1 = quantum.mcmobs %mcm1 : !quantum.obs
+        %mcm_obs2 = quantum.mcmobs %mcm1, %mcm2 : !quantum.obs
         """
 
         run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
@@ -765,16 +782,18 @@ class TestAssemblyFormat:
         //////////// Quantum register ////////////
         //////////////////////////////////////////
         // CHECK: [[QREG:%.+]] = "test.op"() : () -> !quantum.reg
+        // CHECK: [[QUBIT:%.+]] = "test.op"() : () -> !quantum.bit
         %qreg = "test.op"() : () -> !quantum.reg
+        %qubit = "test.op"() : () -> !quantum.bit
 
         //////////// **AdjointOp and YieldOp tests** ////////////
-        // CHECK:      quantum.adjoint([[QREG]]) : !quantum.reg {
-        // CHECK-NEXT: ^bb0([[ARG_QREG:%.+]] : !quantum.reg):
-        // CHECK-NEXT:   quantum.yield [[ARG_QREG]] : !quantum.reg
+        // CHECK:      quantum.adjoint([[QREG]], [[QUBIT]]) : !quantum.reg, !quantum.bit {
+        // CHECK-NEXT: ^bb0([[ARG_QREG:%.+]]: !quantum.reg, [[ARG_QUBIT:%.+]]: !quantum.bit):
+        // CHECK-NEXT:   quantum.yield [[ARG_QREG]], [[ARG_QUBIT]] : !quantum.reg, !quantum.bit
         // CHECK-NEXT: }
-        %qreg1 = quantum.adjoint(%qreg) : !quantum.reg {
-        ^bb0(%arg_qreg: !quantum.reg):
-          quantum.yield %arg_qreg : !quantum.reg
+        %qreg1, %qubit1 = quantum.adjoint(%qreg, %qubit) : !quantum.reg, !quantum.bit {
+        ^bb0(%arg_qreg: !quantum.reg, %arg_qubit: !quantum.bit):
+          quantum.yield %arg_qreg, %arg_qubit : !quantum.reg, !quantum.bit
         }
 
         //////////// **DeviceInitOp tests** ////////////

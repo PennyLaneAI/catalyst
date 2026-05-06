@@ -19,7 +19,6 @@
 
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinOps.h"

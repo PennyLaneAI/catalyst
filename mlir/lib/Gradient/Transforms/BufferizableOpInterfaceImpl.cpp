@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
+
 #include <algorithm> // std::find
 #include <vector>
 
@@ -30,7 +32,6 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Gradient/IR/GradientOps.h"
-#include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Gradient/Utils/GradientShape.h"
 

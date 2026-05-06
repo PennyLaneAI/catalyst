@@ -13,19 +13,18 @@
 // limitations under the License.
 
 #define DEBUG_TYPE "decompose-non-clifford-ppr"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "mlir/Dialect/Arith/IR/Arith.h" // for arith::XOrIOp and arith::ConstantOp
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringRef.h"
-
-#include "Quantum/IR/QuantumOps.h"
 
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Transforms/PPRDecomposeUtils.h"
 #include "PBC/Transforms/Patterns.h"
 #include "PBC/Utils/PauliStringWrapper.h"
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 using namespace catalyst::pbc;
@@ -36,8 +35,7 @@ namespace {
 // Return the magic state or complex conjugate of the magic state
 LogicalInitKind getMagicState(PPRotationOp op)
 {
-    int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
-    if (rotationKind > 0) {
+    if (op.getRotationKind() > 0) {
         return LogicalInitKind::magic;
     }
     return LogicalInitKind::magic_conj;
@@ -86,12 +84,8 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
     extendedPauliP.emplace_back("Z");                   // extend Z for the axillary qubit -> [P, Z]
     inQubits.emplace_back(magic.getOutQubits().back()); // [input qubits, |m⟩]
 
-    int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
-    uint16_t rotationSign = 1;
-    if (rotationKind < 0) {
-        rotationSign = -1;
-    }
-    auto ppmPZ = PPMeasurementOp::create(rewriter, loc, extendedPauliP, rotationSign, inQubits);
+    int8_t rotationKind = op.getRotationKind();
+    auto ppmPZ = PPMeasurementOp::create(rewriter, loc, extendedPauliP, inQubits, rotationKind < 0);
 
     auto ppmPZRes = ppmPZ.getMres();
     if (avoidPauliYMeasure) {
@@ -204,8 +198,7 @@ void decomposeAutoCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op,
     auto axillaryQubit = initializeZeroOrPlusI(avoidPauliYMeasure, loc, rewriter);
     auto magic = FabricateOp::create(rewriter, loc, getMagicState(op));
 
-    auto [pauliForAxillaryQubit, rotationSign] =
-        determinePauliAndRotationSignOfMeasurement(avoidPauliYMeasure);
+    auto [pauliForAxillaryQubit, negated] = determinePauliAndSignOfMeasurement(avoidPauliYMeasure);
 
     SmallVector<StringRef> pauliP = extractPauliString(op);
     SmallVector<Value> inQubits = op.getInQubits(); // [input qubits]
@@ -220,8 +213,8 @@ void decomposeAutoCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op,
     // PPM (Z⊗Y/0) on qubits |m⟩ and |Y⟩or|0⟩
     SmallVector<Value> axillaryQubits = {ppmPZ.getOutQubits().back(), axillaryQubit};
     SmallVector<StringRef> pauliZY = {"Z", pauliForAxillaryQubit}; // [Z, Y/Z]
-    auto ppmZY = PPMeasurementOp::create(rewriter, loc, pauliZY, rotationSign,
-                                         axillaryQubits); // [|m⟩, |Y⟩/|0⟩]
+    auto ppmZY =
+        PPMeasurementOp::create(rewriter, loc, pauliZY, axillaryQubits, negated); // [|m⟩, |Y⟩/|0⟩]
 
     // PPM (X) on qubit |m⟩
     SmallVector<StringRef> pauliX = {"X"};
@@ -291,7 +284,7 @@ void decomposeInjectMagicStatePiOverEight(PPRotationOp op, PatternRewriter &rewr
     // PPR P(π/4) on input qubits if PPM (P⊗Z) yields -1
     SmallVector<Value> outPZQubits = ppmPZ.getOutQubits(); // [input qubits, |m⟩]
     outPZQubits.pop_back();                                // [input qubits]
-    const uint16_t PI_DENOMINATOR = 4;                     // For rotation of P(PI/4)
+    const int8_t PI_DENOMINATOR = 4;                       // For rotation of P(PI/4)
     auto pprPI4 =
         PPRotationOp::create(rewriter, loc, pauliP, PI_DENOMINATOR, outPZQubits, ppmPZ.getMres());
 

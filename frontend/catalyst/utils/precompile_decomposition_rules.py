@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Utilities for AOT compiling PennyLane's decomposition rules to MLIR Bytecode."""
+
 import warnings
 from pathlib import Path
 
@@ -24,8 +25,7 @@ from pennylane.operation import Operator
 from catalyst.compiler import _quantum_opt
 from catalyst.jax_primitives import decomposition_rule
 from catalyst.utils.exceptions import CompileError
-
-BYTECODE_FILE_PATH = Path(__file__).parent.parent / Path("resources/decomposition_rules.mlirbc")
+from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 # TODO: Uncomment dynamic size wires ops once they are supported
 # FIXME: Use the Gate class instead of this list of compiler ops
@@ -47,7 +47,11 @@ COMPILER_OPS_FOR_DECOMPOSITION = {
     qp.IsingYY,
     qp.IsingZZ,
     qp.SingleExcitation,
+    qp.SingleExcitationPlus,
+    qp.SingleExcitationMinus,
     qp.DoubleExcitation,
+    qp.DoubleExcitationPlus,
+    qp.DoubleExcitationMinus,
     qp.ISWAP,
     qp.PauliX,
     qp.PauliY,
@@ -63,7 +67,7 @@ COMPILER_OPS_FOR_DECOMPOSITION = {
     qp.S,
     qp.SWAP,
     qp.T,
-    qp.Toffoli,
+    # qp.Toffoli, // adjoint not supported
     qp.U1,
     qp.U2,
     qp.U3,
@@ -143,9 +147,7 @@ def compile_rule(
 
     # WARNING: do not rename this function, we use it to extract the rule from the compiled
     # circuit
-    @decomposition_rule(  # pylint: disable=unexpected-keyword-arg
-        is_qreg=True, op_type=op_class.__name__
-    )
+    @decomposition_rule(is_qreg=True, op_type=op_class.__name__)
     def rule_wrapper(*args, wires, **_):
         return rule(*args, wires=wires, **_)
 
@@ -220,7 +222,7 @@ def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
         for name, mlir in compile_op_decomp_rules(func).items()
     )
 
-    bytecode = _quantum_opt(  # pylint: disable=unexpected-keyword-arg
+    bytecode = _quantum_opt(
         "--emit-bytecode",
         "--register-decomp-rule-resource",
         stdin=mlir_rules.encode("utf-8"),

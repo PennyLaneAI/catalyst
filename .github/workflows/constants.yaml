@@ -63,7 +63,7 @@ jobs:
           fetch-depth: 0
       - if: ${{ inputs.use_release_tag }}
         run: |
-          git checkout $(git tag | sort -V | tail -1)
+          git checkout $(git tag -l 'v*' | sort -V | tail -1)
 
       - name: LLVM version
         id: llvm_version

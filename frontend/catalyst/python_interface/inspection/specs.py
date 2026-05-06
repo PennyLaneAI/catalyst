@@ -16,13 +16,11 @@
 
 from __future__ import annotations
 
-import warnings
 from typing import Literal
 
 from pennylane.workflow.qnode import QNode
 
 from catalyst.jit import QJIT
-from catalyst.passes.pass_api import PassPipelineWrapper
 from catalyst.python_interface.compiler import Compiler
 
 from .specs_collector import ResourcesResult, specs_collect
@@ -33,61 +31,81 @@ class StopCompilation(Exception):
     """Custom exception to stop compilation early when the desired specs level is reached."""
 
 
+def _make_level_name_unique(level_name: str, existing_names: set[str]) -> str:
+    """Helper function to make a level name unique by appending a suffix if necessary.
+
+    Args:
+        level_name (str): The original level name
+        existing_names (set[str]): The set of existing level names to check against
+
+    Returns:
+        str: A unique level name
+
+    Example:
+        >>> existing = {"cancel-inverses", "merge-rotations", "cancel-inverses-2"}
+        >>> _make_level_name_unique("cancel-inverses", existing)
+        'cancel-inverses-3'
+    """
+    unique_name = level_name
+    counter = 1
+    while unique_name in existing_names:
+        counter += 1
+        unique_name = f"{level_name}-{counter}"
+    return unique_name
+
+
 def mlir_specs(
-    qnode: QJIT, level: int | tuple[int] | list[int] | Literal["all"], *args, **kwargs
-) -> ResourcesResult | dict[str, ResourcesResult]:
+    qnode: QJIT,
+    level: int | tuple[int] | list[int] | Literal["all"],
+    *args,
+    level_to_markers: dict[int, list[str]] | None = None,
+    existing_level_names: set[str] | None = None,
+    **kwargs,
+) -> ResourcesResult | list[ResourcesResult] | dict[str, ResourcesResult | list[ResourcesResult]]:
     """Compute the specs used for a circuit at the level of an MLIR pass.
 
     Args:
         qnode (QJIT): The (QJIT'd) qnode to get the specs for
         level (int | tuple[int] | list[int] | "all"): The MLIR pass level to get the specs for
         *args: Positional arguments to pass to the QNode
+        level_to_markers (dict[str, tuple[str]]): A dictionary that maps integer levels to
+            marker labels.
         **kwargs: Keyword arguments to pass to the QNode
 
     Returns:
-        ResourcesResult | dict[str, ResourcesResult]: The resources for the circuit at the
-          specified level
+        ResourcesResult | list[ResourcesResult] |
+        dict[str, ResourcesResult | list[ResourcesResult]]:
+            The resources for the circuit at the specified levels
     """
 
-    if not isinstance(qnode, QJIT) or (
-        not isinstance(qnode.original_function, QNode)
-        and not (
-            isinstance(qnode.original_function, PassPipelineWrapper)
-            and isinstance(qnode.original_qnode, QNode)
-        )
-    ):
+    cache: dict[int, tuple[ResourcesResult, str]] = {}
+    level_to_markers: dict[int, list[str]] = level_to_markers or {}
+    existing_level_names: set[str] = existing_level_names or set()
+
+    if not isinstance(qnode, QJIT) or (not isinstance(qnode.original_function, QNode)):
         raise ValueError(
             "The provided `qnode` argument does not appear to be a valid QJIT compiled QNode."
         )
 
-    cache: dict[int, tuple[ResourcesResult, str]] = {}
+    max_level: int | None = _get_max_level(level)
 
-    if args or kwargs:
-        warnings.warn(
-            "The `specs` function does not yet support dynamic arguments, "
-            "so the results may not reflect information provided by the arguments.",
-            UserWarning,
-        )
-
-    max_level = level
-    if max_level == "all":
-        max_level = None
-    elif isinstance(level, (tuple, list)):
-        max_level = max(level)
-    elif not isinstance(level, int):
-        raise ValueError("The `level` argument must be an int, a tuple/list of ints, or 'all'.")
-
-    def _specs_callback(previous_pass, module, next_pass, pass_level=0):
+    def _specs_callback(
+        previous_pass, module, next_pass, pass_level=0
+    ):  # pylint: disable=unused-argument
         """Callback function for gathering circuit specs."""
-
-        pass_instance = previous_pass if previous_pass else next_pass
         result = specs_collect(module)
 
-        pass_name = pass_instance.name if hasattr(pass_instance, "name") else pass_instance
-        cache[pass_level] = (
-            result,
-            pass_name if pass_level else "Before MLIR Passes",
-        )
+        pass_name = str(previous_pass)
+        # Always prioritize marker label if it exists
+        if m := level_to_markers.get(pass_level):
+            pass_name = ", ".join(m if not isinstance(m, str) else [m])
+        elif pass_level == 0:
+            pass_name = "Before MLIR Passes"
+
+        pass_name = _make_level_name_unique(pass_name, existing_level_names)
+        existing_level_names.add(pass_name)
+
+        cache[pass_level] = (result, pass_name)
 
         if max_level is not None and pass_level >= max_level:
             raise StopCompilation("Stopping compilation after reaching max specs level.")
@@ -100,8 +118,8 @@ def mlir_specs(
         # the desired level
         pass
 
-    if level == "all":
-        return {f"{cache[lvl][1]} (MLIR-{lvl})": cache[lvl][0] for lvl in sorted(cache.keys())}
+    if max_level is None:
+        return {cache_item[1]: cache_item[0] for cache_item in cache.values()}
 
     if isinstance(level, (tuple, list)):
         if any(lvl not in cache for lvl in level):
@@ -109,9 +127,34 @@ def mlir_specs(
             raise ValueError(
                 f"Requested specs levels {', '.join(missing)} not found in MLIR pass list."
             )
-        return {f"{cache[lvl][1]} (MLIR-{lvl})": cache[lvl][0] for lvl in level if lvl in cache}
+        return {f"{cache[lvl][1]}": cache[lvl][0] for lvl in level if lvl in cache}
 
-    # Just one level was specified
     if level not in cache:
         raise ValueError(f"Requested specs level {level} not found in MLIR pass list.")
+
+    # Just one level was specified
     return cache[level][0]
+
+
+def _get_max_level(level: int | tuple[int] | list[int] | Literal["all"]) -> int | None:
+    """Retrieve the maximum level based on the user input.
+
+    Args:
+        level: User's level sequence.
+
+    Returns:
+        max_level (int | None): The maximum level.
+
+    """
+    if level == "all":
+        return None
+
+    if isinstance(level, int):
+        return level
+
+    if isinstance(level, (tuple, list)):
+        if not all(isinstance(lvl, int) for lvl in level):
+            raise ValueError("All elements in 'level' sequence must be integers.")
+        return max(level)
+
+    raise ValueError("The 'level' argument must be an int, a tuple/list of ints, or 'all'.")

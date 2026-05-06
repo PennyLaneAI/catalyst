@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <mlir/Dialect/Arith/IR/Arith.h>
+#include "mlir/Dialect/Arith/IR/Arith.h"
 
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Transforms/Patterns.h"
@@ -164,8 +164,7 @@ void constructKernelOperation(SmallVector<Value> &qubits, Value &measResult, PBC
         qubits[0] = measOp.getOutQubit();
     }
     else if (auto pprOp = dyn_cast<PPRotationOp>(op.getOperation())) {
-        int16_t signedRk = static_cast<int16_t>(pprOp.getRotationKind());
-        double rk = 2 * (llvm::numbers::pi / (static_cast<double>(signedRk)));
+        double rk = 2 * (llvm::numbers::pi / (static_cast<double>(pprOp.getRotationKind())));
         qubits[0] = buildSingleQubitGate(qubits[0], "RZ", {rk}, rewriter).getOutQubits().front();
     }
     else if (auto pprArbitraryOp = dyn_cast<PPRotationArbitraryOp>(op.getOperation())) {

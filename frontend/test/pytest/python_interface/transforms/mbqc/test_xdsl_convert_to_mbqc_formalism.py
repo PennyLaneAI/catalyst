@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the convert to MBQC formalism transform"""
+
 # pylint: disable=line-too-long
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 from pennylane.ftqc import RotXZX
 
@@ -61,6 +62,7 @@ class TestConvertToMBQCFormalismPass:
                 %4 = quantum.custom "Identity"() %3 : !quantum.bit
                 // CHECK-NEXT: quantum.gphase
                 quantum.gphase %arg0
+                quantum.dealloc_qb %4 : !quantum.bit
                 return
             }
         """
@@ -78,7 +80,7 @@ class TestConvertToMBQCFormalismPass:
                 return
             }
 
-            // CHECK: func.func private @hadamard_in_mbqc(%0 : !quantum.bit) -> !quantum.bit attributes {mbqc_transform = none} {
+            // CHECK: func.func private @hadamard_in_mbqc(%0: !quantum.bit) -> !quantum.bit attributes {mbqc_transform = none} {
             // CHECK-NEXT: %1 = arith.constant dense<[true, false, true, false, false, true]> : tensor<6xi1>
             // CHECK-NEXT: %2 = mbqc.graph_state_prep(%1 : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !quantum.reg
             // CHECK-NEXT: %3 = quantum.extract %2[0] : !quantum.reg -> !quantum.bit
@@ -133,7 +135,7 @@ class TestConvertToMBQCFormalismPass:
                 return
             }
 
-            // CHECK: func.func private @s_in_mbqc(%0 : !quantum.bit) -> !quantum.bit attributes {mbqc_transform = none} {
+            // CHECK: func.func private @s_in_mbqc(%0: !quantum.bit) -> !quantum.bit attributes {mbqc_transform = none} {
             // CHECK-NEXT:   %1 = arith.constant dense<[true, false, true, false, false, true]> : tensor<6xi1>
             // CHECK-NEXT:   %2 = mbqc.graph_state_prep(%1 : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !quantum.reg
             // CHECK-NEXT:   %3 = quantum.extract %2[0] : !quantum.reg -> !quantum.bit
@@ -189,7 +191,7 @@ class TestConvertToMBQCFormalismPass:
                 %1 = quantum.custom "RZ"(%param0) %0 : !quantum.bit
                 return
             }
-            // CHECK: func.func private @rz_in_mbqc(%0 : f64, %1 : !quantum.bit) -> !quantum.bit attributes {mbqc_transform = none} {
+            // CHECK: func.func private @rz_in_mbqc(%0: f64, %1: !quantum.bit) -> !quantum.bit attributes {mbqc_transform = none} {
             // CHECK-NEXT:   %2 = arith.constant dense<[true, false, true, false, false, true]> : tensor<6xi1>
             // CHECK-NEXT:   %3 = mbqc.graph_state_prep(%2 : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !quantum.reg
             // CHECK-NEXT:   %4 = quantum.extract %3[0] : !quantum.reg -> !quantum.bit
@@ -250,7 +252,7 @@ class TestConvertToMBQCFormalismPass:
                 %1 = quantum.custom "RotXZX"(%param0, %param1, %param2) %0 : !quantum.bit
                 return
             }
-            // CHECK: func.func private @rotxzx_in_mbqc(%0 : f64, %1 : f64, %2 : f64, %3 : !quantum.bit) -> !quantum.bit attributes {mbqc_transform = none} {
+            // CHECK: func.func private @rotxzx_in_mbqc(%0: f64, %1: f64, %2: f64, %3: !quantum.bit) -> !quantum.bit attributes {mbqc_transform = none} {
             // CHECK-NEXT:  %4 = arith.constant dense<[true, false, true, false, false, true]> : tensor<6xi1>
             // CHECK-NEXT:  %5 = mbqc.graph_state_prep(%4 : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !quantum.reg
             // CHECK-NEXT:  %6 = quantum.extract %5[0] : !quantum.reg -> !quantum.bit
@@ -332,7 +334,7 @@ class TestConvertToMBQCFormalismPass:
                 %2, %3 = quantum.custom "CNOT"() %0, %1 : !quantum.bit, !quantum.bit
                 return
             }
-            // CHECK: func.func private @cnot_in_mbqc(%0 : !quantum.bit, %1 : !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {mbqc_transform = none} {
+            // CHECK: func.func private @cnot_in_mbqc(%0: !quantum.bit, %1: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {mbqc_transform = none} {
         """
 
         pipeline = (ConvertToMBQCFormalismPass(),)
@@ -374,19 +376,19 @@ class TestConvertToMBQCFormalismPass:
         pipeline = (ConvertToMBQCFormalismPass(),)
         run_filecheck(program, pipeline)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_gates_in_mbqc_gate_set_lowering(self, run_filecheck_qjit):
         """Test that the convert_to_mbqc_formalism_pass works correctly with qjit and unrolled loops."""
-        dev = qml.device("null.qubit", wires=1000)
+        dev = qp.device("null.qubit", wires=1000)
 
-        @qml.qjit(
+        @qp.qjit(
+            capture=True,
             target="mlir",
             pipelines=mbqc_pipeline(),
             autograph=True,
         )
         @convert_to_mbqc_formalism_pass
-        @qml.set_shots(1000)
-        @qml.qnode(dev)
+        @qp.set_shots(1000)
+        @qp.qnode(dev)
         def circuit():
             # CHECK-LABEL: circuit
             # CHECK-NOT: quantum.custom "CNOT"()
@@ -409,35 +411,35 @@ class TestConvertToMBQCFormalismPass:
             # CHECK: quantum.custom "PauliZ"()
             # CHECK: quantum.dealloc_qb
             for i in range(50):
-                qml.H(i)
-                qml.S(i)
+                qp.H(i)
+                qp.S(i)
                 RotXZX(0.1, 0.2, 0.3, wires=[i])
-                qml.RZ(phi=0.1, wires=[i])
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(qml.Z(wires=0))
+                qp.RZ(phi=0.1, wires=[i])
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.Z(wires=0))
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_gates_in_mbqc_gate_set_lowering_for(self, run_filecheck_qjit):
         """Test that the convert_to_mbqc_formalism_pass works correctly with qjit and for-loop structure."""
-        dev = qml.device("null.qubit", wires=1000)
+        dev = qp.device("null.qubit", wires=1000)
 
-        @qml.for_loop(1, 1000, 1)
+        @qp.for_loop(1, 1000, 1)
         def loop_for(i):
-            qml.H(i)
-            qml.S(i)
+            qp.H(i)
+            qp.S(i)
             RotXZX(0.1, 0.2, 0.3, wires=[i])
-            qml.RZ(phi=0.1, wires=[i])
+            qp.RZ(phi=0.1, wires=[i])
 
-        @qml.qjit(
+        @qp.qjit(
+            capture=True,
             target="mlir",
             pipelines=mbqc_pipeline(),
             autograph=True,
         )
         @convert_to_mbqc_formalism_pass
-        @qml.set_shots(1000)
-        @qml.qnode(dev)
+        @qp.set_shots(1000)
+        @qp.qnode(dev)
         def circuit():
             # CHECK-LABEL: circuit
             # CHECK-NOT: quantum.custom "CNOT"()
@@ -459,31 +461,31 @@ class TestConvertToMBQCFormalismPass:
             # CHECK: quantum.custom "PauliZ"()
             # CHECK: quantum.dealloc_qb
             loop_for()  # pylint: disable=no-value-for-parameter
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(qml.Z(wires=0))
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.Z(wires=0))
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_gates_in_mbqc_gate_set_lowering_graph_state_decomp(self, run_filecheck_qjit):
         """Test that the convert_to_mbqc_formalism_pass works correctly with qjit and for-loop structure."""
-        dev = qml.device("null.qubit", wires=1000)
+        dev = qp.device("null.qubit", wires=1000)
 
         def loop_for(i):
-            qml.H(i)
-            qml.S(i)
+            qp.H(i)
+            qp.S(i)
             RotXZX(0.1, 0.2, 0.3, wires=[i])
-            qml.RZ(phi=0.1, wires=[i])
+            qp.RZ(phi=0.1, wires=[i])
 
-        @qml.qjit(
+        @qp.qjit(
+            capture=True,
             target="mlir",
             pipelines=mbqc_pipeline(),
             autograph=True,
         )
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
-        @qml.set_shots(1000)
-        @qml.qnode(dev)
+        @qp.set_shots(1000)
+        @qp.qnode(dev)
         def circuit():
             # CHECK-NOT: quantum.custom "CNOT"()
             # CHECK-NOT: quantum.custom "S"()
@@ -500,32 +502,32 @@ class TestConvertToMBQCFormalismPass:
             # CHECK: quantum.dealloc_qb
             for i in range(1000):
                 loop_for(i)
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(qml.Z(wires=0))
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.Z(wires=0))
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_gates_in_mbqc_gate_set_lowering_while(self, run_filecheck_qjit):
         """Test that the convert_to_mbqc_formalism_pass works correctly with qjit and while-loop structure."""
-        dev = qml.device("null.qubit", wires=1000)
+        dev = qp.device("null.qubit", wires=1000)
 
-        @qml.while_loop(lambda i: i > 1000)
+        @qp.while_loop(lambda i: i > 1000)
         def while_for(i):
-            qml.H(i)
-            qml.S(i)
+            qp.H(i)
+            qp.S(i)
             RotXZX(0.1, 0.2, 0.3, wires=[i])
-            qml.RZ(phi=0.1, wires=[i])
+            qp.RZ(phi=0.1, wires=[i])
             i = i + 1
             return i
 
-        @qml.qjit(
+        @qp.qjit(
+            capture=True,
             target="mlir",
             autograph=True,
         )
         @convert_to_mbqc_formalism_pass
-        @qml.set_shots(1000)
-        @qml.qnode(dev)
+        @qp.set_shots(1000)
+        @qp.qnode(dev)
         def circuit():
             # CHECK-NOT: quantum.custom "CNOT"()
             # CHECK-NOT: quantum.custom "S"()
@@ -540,17 +542,17 @@ class TestConvertToMBQCFormalismPass:
             # CHECK: quantum.custom "PauliZ"()
             # CHECK: quantum.dealloc_qb
             while_for(0)
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(qml.Z(wires=0))
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.Z(wires=0))
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_gates_in_mbqc_gate_set_e2e(self):
         """Test that the convert_to_mbqc_formalism_pass end to end on null.qubit."""
-        dev = qml.device("null.qubit", wires=1000)
+        dev = qp.device("null.qubit", wires=1000)
 
-        @qml.qjit(
+        @qp.qjit(
+            capture=True,
             target="mlir",
             pipelines=mbqc_pipeline(),
             autograph=True,
@@ -558,16 +560,16 @@ class TestConvertToMBQCFormalismPass:
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
         @measurements_from_samples_pass
-        @qml.set_shots(1000)
-        @qml.qnode(dev)
+        @qp.set_shots(1000)
+        @qp.qnode(dev)
         def circuit():
             for i in range(1000):
-                qml.H(i)
-                qml.S(i)
+                qp.H(i)
+                qp.S(i)
                 RotXZX(0.1, 0.2, 0.3, wires=[i])
-                qml.RZ(phi=0.1, wires=[i])
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(qml.Z(wires=0))
+                qp.RZ(phi=0.1, wires=[i])
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.Z(wires=0))
 
         res = circuit()
         assert res == 1.0

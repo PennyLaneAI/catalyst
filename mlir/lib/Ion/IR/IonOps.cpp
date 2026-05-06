@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Ion/IR/IonOps.h"
+
 #include <optional>
 
+#include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
-#include "llvm/ADT/StringSet.h"
-#include "llvm/ADT/TypeSwitch.h"
 
 #include "Ion/IR/IonDialect.h"
-#include "Ion/IR/IonOps.h"
 
 using namespace mlir;
 using namespace catalyst::ion;

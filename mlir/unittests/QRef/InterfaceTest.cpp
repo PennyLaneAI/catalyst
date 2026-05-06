@@ -16,14 +16,13 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-
+#include "llvm/Support/SourceMgr.h"
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/AsmParser/AsmParserState.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Parser/Parser.h"
-#include "llvm/Support/SourceMgr.h"
 
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
@@ -260,7 +259,7 @@ TEST(InterfaceTests, globalPhase)
 {
     std::string moduleStr = R"mlir(
 func.func @f(%q0: !qref.bit, %cv: i1, %param: f64) {
-    qref.gphase(%param) adj ctrls (%q0) ctrlvals (%cv) : f64 ctrls !qref.bit
+    qref.gphase(%param) adj ctrls (%q0) ctrlvals (%cv) : ctrls !qref.bit
     return
 }
   )mlir";

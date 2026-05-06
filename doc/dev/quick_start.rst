@@ -30,7 +30,7 @@ provided by JAX.
 .. code-block:: python
 
     from catalyst import qjit, measure, cond, for_loop, while_loop, grad
-    import pennylane as qml
+    import pennylane as qp
     from jax import numpy as jnp
 
 Constructing the QNode
@@ -51,14 +51,14 @@ Let's start learning more about Catalyst by running a simple circuit.
 
 .. code-block:: python
 
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def circuit(theta):
-        qml.Hadamard(wires=0)
-        qml.RX(theta, wires=1)
-        qml.CNOT(wires=[0,1])
-        return qml.expval(qml.PauliZ(wires=1))
+        qp.Hadamard(wires=0)
+        qp.RX(theta, wires=1)
+        qp.CNOT(wires=[0,1])
+        return qp.expval(qp.PauliZ(wires=1))
 
-In PennyLane, the :func:`qml.qnode() <pennylane.qnode>` decorator creates a device specific quantum function. For each quantum
+In PennyLane, the :func:`qp.qnode() <pennylane.qnode>` decorator creates a device specific quantum function. For each quantum
 function, we can specify the number of wires.
 
 The :func:`.qjit` decorator can be used to jit a workflow of quantum functions:
@@ -76,12 +76,12 @@ For example, the following circuit can be jitted with wires as arguments:
 .. code-block:: python
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=5))
+    @qp.qnode(qp.device("lightning.qubit", wires=5))
     def circuit(arg0, arg1, arg2):
-        qml.RX(arg0, wires=[arg1 + 1])
-        qml.RY(arg0, wires=[arg2])
-        qml.CNOT(wires=[arg1, arg2])
-        return qml.probs(wires=[arg1 + 1])
+        qp.RX(arg0, wires=[arg1 + 1])
+        qp.RY(arg0, wires=[arg2])
+        qp.CNOT(wires=[arg1, arg2])
+        return qp.probs(wires=[arg1 + 1])
 
 >>> circuit(jnp.pi / 3, 1, 2)
 Array([0.625, 0.375], dtype=float64)
@@ -91,16 +91,16 @@ Operations
 ----------
 Catalyst allows you to use :doc:`quantum operations <introduction/operations>`
 available in PennyLane either via native support by the runtime or PennyLane's decomposition rules.
-The :func:`qml.adjoint() <pennylane.adjoint>` and :func:`qml.ctrl() <pennylane.ctrl>` functions in
+The :func:`qp.adjoint() <pennylane.adjoint>` and :func:`qp.ctrl() <pennylane.ctrl>` functions in
 PennyLane are also supported via the decomposition mechanism in Catalyst. For example,
 
 .. code-block:: python
 
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def circuit():
-        qml.Rot(0.3, 0.4, 0.5, wires=0)
-        qml.adjoint(qml.SingleExcitation(jnp.pi / 3, wires=[0, 1]))
-        return qml.state()
+        qp.Rot(0.3, 0.4, 0.5, wires=0)
+        qp.adjoint(qp.SingleExcitation(jnp.pi / 3, wires=[0, 1]))
+        return qp.state()
 
 In addition, you can qjit most :doc:`PennyLane templates <introduction/templates>` to easily construct and evaluate
 more complex quantum circuits.
@@ -112,7 +112,7 @@ more complex quantum circuits.
    decompose quite differently).
    However, Catalyst's decomposition logic will differ in the following cases:
 
-   1. For devices without native controlled gates support (e.g., ``lightning.kokkos`` and ``lightning.gpu``), all :class:`qml.Controlled <pennylane.ops.op_math.Controlled>` operations will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
+   1. For devices without native controlled gates support (e.g., ``lightning.kokkos`` and ``lightning.gpu``), all :class:`qp.Controlled <pennylane.ops.op_math.Controlled>` operations will decompose to :class:`qp.QubitUnitary <pennylane.QubitUnitary>` operations.
    2. The set of operations supported by Catalyst itself can in some instances lead to additional decompositions compared to the device itself.
 
 
@@ -121,21 +121,21 @@ Observables
 The Catalyst has support for :doc:`PennyLane observables <introduction/operations>`.
 
 For example, the following circuit is a QJIT compatible function that calculates the expectation value of
-a tensor product of a :class:`qml.PauliX <pennylane.PauliX>`, :class:`qml.Hadamard <pennylane.Hadamard>` and :class:`qml.Hermitian <pennylane.Hermitian>` observables.
+a tensor product of a :class:`qp.PauliX <pennylane.PauliX>`, :class:`qp.Hadamard <pennylane.Hadamard>` and :class:`qp.Hermitian <pennylane.Hermitian>` observables.
 
 .. code-block:: python
 
-    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    @qp.qnode(qp.device("lightning.qubit", wires=3))
     def circuit(x, y):
-        qml.RX(x, 0)
-        qml.RX(y, 1)
-        qml.CNOT([0, 2])
-        qml.CNOT([1, 2])
+        qp.RX(x, 0)
+        qp.RX(y, 1)
+        qp.CNOT([0, 2])
+        qp.CNOT([1, 2])
         h_matrix = jnp.array(
             [[complex(1.0, 0.0), complex(2.0, 0.0)],
             [complex(2.0, 0.0), complex(-1.0, 0.0)]]
         )
-        return qml.expval(qml.PauliX(0) @ qml.Hadamard(1) @ qml.Hermitian(h_matrix, 2))
+        return qp.expval(qp.PauliX(0) @ qp.Hadamard(1) @ qp.Hermitian(h_matrix, 2))
 
 .. _measurements:
 
@@ -148,22 +148,22 @@ are supported in Catalyst, although not all features are supported for all measu
    :widths: 25 75
    :header-rows: 0
 
-   * - :func:`qml.expval() <pennylane.expval>`
+   * - :func:`qp.expval() <pennylane.expval>`
      - The expectation value of observables is supported analytically as well as with finite-shots.
-   * - :func:`qml.var() <pennylane.var>`
+   * - :func:`qp.var() <pennylane.var>`
      - The variance of observables is supported analytically as well as with finite-shots.
-   * - :func:`qml.sample() <pennylane.sample>`
+   * - :func:`qp.sample() <pennylane.sample>`
      - Samples in the computational basis only are supported.
-   * - :func:`qml.counts() <pennylane.counts>`
+   * - :func:`qp.counts() <pennylane.counts>`
      - Sample counts in the computational basis only are supported.
-   * - :func:`qml.probs() <pennylane.probs>`
+   * - :func:`qp.probs() <pennylane.probs>`
      - The probabilities is supported in the computational basis as well as with finite-shots.
-   * - :func:`qml.state() <pennylane.state>`
+   * - :func:`qp.state() <pennylane.state>`
      - The state in the computational basis only is supported.
    * - :func:`.measure`
      - The projective mid-circuit measurement is supported via its own operation in Catalyst.
 
-For both :func:`qml.sample() <pennylane.sample>` and :func:`qml.counts() <pennylane.counts>` omitting the wires
+For both :func:`qp.sample() <pennylane.sample>` and :func:`qp.counts() <pennylane.counts>` omitting the wires
 parameters produces samples on all declared qubits in the same format as in PennyLane.
 
 Counts are returned a bit differently, namely as a pair of arrays representing a dictionary from basis states
@@ -174,17 +174,17 @@ float data type. This way they are compatible with eigenvalue sampling, but this
 .. code-block:: python
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    @qp.qnode(qp.device("lightning.qubit", wires=2, shots=1000))
     def counts():
-        qml.Rot(0.1, 0.2, 0.3, wires=[0])
-        return qml.counts(wires=[0])
+        qp.Rot(0.1, 0.2, 0.3, wires=[0])
+        return qp.counts(wires=[0])
     basis_states, counts = counts()
 
 >>> {format(int(state), '01b'): count for state, count in zip(basis_states, counts)}
 {'0': 985, '1': 15}
 
 You can specify the number of shots to be used in sample-based measurements when you create a device.
-:func:`qml.sample() <pennylane.sample>` and :func:`qml.counts() <pennylane.counts>` will
+:func:`qp.sample() <pennylane.sample>` and :func:`qp.counts() <pennylane.counts>` will
 automatically use the device's ``shots`` parameter when performing measurements.
 In the following example, the number of shots is set to :math:`500` in the device instantiation.
 
@@ -195,18 +195,18 @@ In the following example, the number of shots is set to :math:`500` in the devic
 .. code-block:: python
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=3, shots=500))
+    @qp.qnode(qp.device("lightning.qubit", wires=3, shots=500))
     def circuit(params):
-        qml.RX(params[0], wires=0)
-        qml.RX(params[1], wires=1)
-        qml.RZ(params[2], wires=2)
+        qp.RX(params[0], wires=0)
+        qp.RX(params[1], wires=1)
+        qp.RZ(params[2], wires=2)
         return (
-            qml.sample(),
-            qml.counts(),
-            qml.expval(qml.PauliZ(0)),
-            qml.var(qml.PauliZ(0)),
-            qml.probs(wires=[0, 1]),
-            qml.state(),
+            qp.sample(),
+            qp.counts(),
+            qp.expval(qp.PauliZ(0)),
+            qp.var(qp.PauliZ(0)),
+            qp.probs(wires=[0, 1]),
+            qp.state(),
         )
 
 >>> circuit([0.3, 0.5, 0.7])
@@ -233,7 +233,7 @@ requires a list of wires that the measurement process acts on.
 
 .. important::
 
-    The :func:`qml.measure() <pennylane.measure>` function is **not** QJIT compatible and :func:`.measure` from Catalyst should be used instead:
+    The :func:`qp.measure() <pennylane.measure>` function is **not** QJIT compatible and :func:`.measure` from Catalyst should be used instead:
 
     .. code-block:: python
 
@@ -244,9 +244,9 @@ In the following example, ``m`` will be equal to ``True`` if wire :math:`0` is r
 .. code-block:: python
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def circuit(x):
-        qml.RX(x, wires=0)
+        qp.RX(x, wires=0)
         m = measure(wires=0)
         return m
 
@@ -270,12 +270,12 @@ the quantum function is executed. For example, ``circuit`` is compiled as early 
 .. code-block:: python
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def circuit(theta):
-        qml.Hadamard(wires=0)
-        qml.RX(theta, wires=1)
-        qml.CNOT(wires=[0,1])
-        return qml.expval(qml.PauliZ(wires=1))
+        qp.Hadamard(wires=0)
+        qp.RX(theta, wires=1)
+        qp.CNOT(wires=[0,1])
+        return qp.expval(qp.PauliZ(wires=1))
 
 >>> circuit(0.5)  # the first call, compilation occurs here
 Array(0., dtype=float64)
@@ -298,12 +298,12 @@ and data type of a tensor:
     from jax.core import ShapedArray
 
     @qjit  # compilation happens at definition
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def circuit(x: complex, z: ShapedArray(shape=(3,), dtype=jnp.float64)):
         theta = jnp.abs(x)
-        qml.RY(theta, wires=0)
-        qml.Rot(z[0], z[1], z[2], wires=0)
-        return qml.state()
+        qp.RY(theta, wires=0)
+        qp.Rot(z[0], z[1], z[2], wires=0)
+        return qp.state()
 
 >>> circuit(0.2j, jnp.array([0.3, 0.6, 0.9]))  # calls precompiled function
 Array([0.75634905-0.52801002j, 0. +0.j,
@@ -498,10 +498,10 @@ This decorator accepts the function to differentiate, a differentiation strategy
 
     @qjit
     def workflow(x):
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit(x):
-            qml.RX(jnp.pi * x, wires=0)
-            return qml.expval(qml.PauliY(0))
+            qp.RX(jnp.pi * x, wires=0)
+            return qp.expval(qp.PauliY(0))
 
         g = grad(circuit)
         return g(x)
@@ -544,10 +544,10 @@ also feasible.
 
     @qjit
     def workflow(params):
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit(params):
-            qml.RX(params[0] * params[1], wires=0)
-            return qml.expval(qml.PauliY(0))
+            qp.RX(params[0] * params[1], wires=0)
+            return qp.expval(qp.PauliY(0))
 
         return grad(circuit, argnums=0)(params)
 
@@ -561,11 +561,11 @@ decorator to compute Jacobian matrices of general hybrid functions with multiple
 
     @qjit
     def workflow(x):
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit(x):
-            qml.RX(jnp.pi * x[0], wires=0)
-            qml.RY(x[1], wires=0)
-            return qml.probs()
+            qp.RX(jnp.pi * x[0], wires=0)
+            qp.RY(x[1], wires=0)
+            return qp.probs()
 
         g = jacobian(circuit, method="auto")
         return g(x)
@@ -601,13 +601,13 @@ the value of ``value_and_grad`` argument. To optimize params iteratively, you la
     import optax
     from jax.lax import fori_loop
 
-    dev = qml.device("lightning.qubit", wires=1)
+    dev = qp.device("lightning.qubit", wires=1)
 
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(param):
-        qml.Hadamard(0)
-        qml.RY(param, wires=0)
-        return qml.expval(qml.PauliZ(0))
+        qp.Hadamard(0)
+        qp.RY(param, wires=0)
+        return qp.expval(qp.PauliZ(0))
 
     @qjit
     def workflow():
@@ -651,15 +651,15 @@ function:
 
 .. code-block:: python
 
-    dev = qml.device("lightning.qubit", wires=1)
+    dev = qp.device("lightning.qubit", wires=1)
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(x):
-      qml.RX(jnp.pi * x[0], wires=0)
-      qml.RY(x[1] ** 2, wires=0)
-      qml.RX(x[1] * x[2], wires=0)
-      return qml.probs(wires=0)
+      qp.RX(jnp.pi * x[0], wires=0)
+      qp.RY(x[1] ** 2, wires=0)
+      qp.RX(x[1] * x[2], wires=0)
+      return qp.probs(wires=0)
 
     @jax.jit
     def cost_fn(weights):

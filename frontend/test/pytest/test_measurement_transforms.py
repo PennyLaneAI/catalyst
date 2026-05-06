@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test for the device preprocessing."""
+
 # pylint: disable=unused-argument
 import os
 
@@ -22,7 +23,7 @@ from functools import partial
 from unittest.mock import Mock, patch
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 from pennylane.devices import Device
 from pennylane.devices.capabilities import OperatorProperties
@@ -35,6 +36,12 @@ from catalyst.device import QJITDevice, get_device_capabilities
 from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
+
+
+def _catalyst_config(shots=None):
+    """Build an ExecutionConfig with catalyst-specific device_options."""
+    return qp.devices.ExecutionConfig(device_options={"catalyst_shots": shots})
+
 
 # pylint: disable=attribute-defined-outside-init
 
@@ -136,20 +143,20 @@ class TestMeasurementTransforms:
         """Test the transforms for measurements_from_counts to other measurement types
         as part of the Catalyst pipeline."""
 
-        dev = qml.device("lightning.qubit", wires=4)
+        dev = qp.device("lightning.qubit", wires=4)
 
-        @qml.set_shots(5000)
-        @qml.qnode(dev)
+        @qp.set_shots(5000)
+        @qp.qnode(dev)
         def basic_circuit(theta: float):
-            qml.RY(theta, 0)
-            qml.RY(theta / 2, 1)
-            qml.RY(2 * theta, 2)
-            qml.RY(theta, 3)
+            qp.RY(theta, 0)
+            qp.RY(theta / 2, 1)
+            qp.RY(2 * theta, 2)
+            qp.RY(theta, 3)
             return (
-                qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
-                qml.var(qml.PauliX(wires=2)),
-                qml.counts(qml.PauliX(wires=0) @ qml.PauliX(wires=1) @ qml.PauliX(wires=2)),
-                qml.probs(wires=[3]),
+                qp.expval(qp.PauliX(wires=0) @ qp.PauliX(wires=1)),
+                qp.var(qp.PauliX(wires=2)),
+                qp.counts(qp.PauliX(wires=0) @ qp.PauliX(wires=1) @ qp.PauliX(wires=2)),
+                qp.probs(wires=[3]),
             )
 
         transformed_circuit = measurements_from_counts(basic_circuit, dev.wires)
@@ -190,20 +197,20 @@ class TestMeasurementTransforms:
         """Test the transform measurements_from_samples with multiple measurement types
         as part of the Catalyst pipeline."""
 
-        dev = qml.device("lightning.qubit", wires=4)
+        dev = qp.device("lightning.qubit", wires=4)
 
-        @qml.set_shots(5000)
-        @qml.qnode(dev)
+        @qp.set_shots(5000)
+        @qp.qnode(dev)
         def basic_circuit(theta: float):
-            qml.RY(theta, 0)
-            qml.RY(theta / 2, 1)
-            qml.RY(2 * theta, 2)
-            qml.RY(theta, 3)
+            qp.RY(theta, 0)
+            qp.RY(theta / 2, 1)
+            qp.RY(2 * theta, 2)
+            qp.RY(theta, 3)
             return (
-                qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
-                qml.var(qml.PauliX(wires=2)),
-                qml.sample(qml.PauliX(wires=0) @ qml.PauliX(wires=1) @ qml.PauliX(wires=2)),
-                qml.probs(wires=[3]),
+                qp.expval(qp.PauliX(wires=0) @ qp.PauliX(wires=1)),
+                qp.var(qp.PauliX(wires=2)),
+                qp.sample(qp.PauliX(wires=0) @ qp.PauliX(wires=1) @ qp.PauliX(wires=2)),
+                qp.probs(wires=[3]),
             )
 
         transformed_circuit = measurements_from_samples(basic_circuit, dev.wires)
@@ -247,7 +254,7 @@ class TestMeasurementTransforms:
         measurement_from_counts transform is applied if the device only supports counts. If
         both are supported, sample takes precedence."""
 
-        dev = qml.device("lightning.qubit", wires=4)
+        dev = qp.device("lightning.qubit", wires=4)
 
         config = get_device_capabilities(dev, shots=100)
         config.observables = {}
@@ -261,25 +268,25 @@ class TestMeasurementTransforms:
             # transform is added to transform program
             qjit_dev = QJITDevice(dev)
 
-            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                transform_program, _ = qjit_dev.preprocess(ctx)
+            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
+                transform_program, _ = qjit_dev.preprocess(_catalyst_config())
 
             assert split_non_commuting in transform_program
             assert measurement_transform in transform_program
 
             # MLIR only contains target measurement
             @qjit
-            @qml.set_shots(100)
-            @qml.qnode(dev)
+            @qp.set_shots(100)
+            @qp.qnode(dev)
             def circuit(theta: float):
-                qml.X(0)
-                qml.X(1)
-                qml.X(2)
-                qml.X(3)
+                qp.X(0)
+                qp.X(1)
+                qp.X(2)
+                qp.X(3)
                 return (
-                    qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
-                    qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
-                    qml.probs(wires=[3, 4]),
+                    qp.expval(qp.PauliX(wires=0) @ qp.PauliX(wires=1)),
+                    qp.var(qp.PauliX(wires=0) @ qp.PauliX(wires=2)),
+                    qp.probs(wires=[3, 4]),
                 )
 
             mlir = qjit(circuit, target="mlir").mlir
@@ -314,25 +321,25 @@ class TestMeasurementTransforms:
             # transform is added to transform program
             qjit_dev = QJITDevice(dev)
 
-            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                transform_program, _ = qjit_dev.preprocess(ctx, shots=1000)
+            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
+                transform_program, _ = qjit_dev.preprocess(_catalyst_config(shots=1000))
 
             assert split_non_commuting in transform_program
             assert measurement_transform in transform_program
 
             # MLIR only contains target measurement
             @qjit
-            @qml.set_shots(1000)
-            @qml.qnode(dev)
+            @qp.set_shots(1000)
+            @qp.qnode(dev)
             def circuit(theta: float):
-                qml.X(0)
-                qml.X(1)
-                qml.X(2)
-                qml.X(3)
+                qp.X(0)
+                qp.X(1)
+                qp.X(2)
+                qp.X(3)
                 return (
-                    qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
-                    qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
-                    qml.probs(wires=[3, 4]),
+                    qp.expval(qp.PauliX(wires=0) @ qp.PauliX(wires=1)),
+                    qp.var(qp.PauliX(wires=0) @ qp.PauliX(wires=2)),
+                    qp.probs(wires=[3, 4]),
                 )
 
             mlir = qjit(circuit, target="mlir").mlir
@@ -347,11 +354,11 @@ class TestMeasurementTransforms:
         and sample are also both unsupported, an error is raised."""
 
         # no shots - samples/counts unsupported
-        dev = qml.device("lightning.qubit", wires=3)
+        dev = qp.device("lightning.qubit", wires=3)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
-            return qml.expval(qml.X(0)), qml.var(qml.Y(1))
+            return qp.expval(qp.X(0)), qp.var(qp.Y(1))
 
         # modify config to indicate no observables supported
         config = get_device_capabilities(dev)
@@ -370,24 +377,24 @@ class TestMeasurementTransforms:
     @pytest.mark.parametrize(
         "measurement",
         [
-            lambda: qml.counts(),
-            lambda: qml.counts(wires=[2]),
-            lambda: qml.counts(wires=[2, 3]),
-            lambda: qml.counts(qml.Y(1)),
+            lambda: qp.counts(),
+            lambda: qp.counts(wires=[2]),
+            lambda: qp.counts(wires=[2, 3]),
+            lambda: qp.counts(qp.Y(1)),
         ],
     )
     def test_measurement_from_counts_with_counts_measurement(self, measurement):
         """Test the measurment_from_counts transform with a single counts measurement as part of
         the Catalyst pipeline."""
 
-        dev = qml.device("lightning.qubit", wires=4)
+        dev = qp.device("lightning.qubit", wires=4)
 
-        @qml.set_shots(3000)
-        @qml.qnode(dev)
+        @qp.set_shots(3000)
+        @qp.qnode(dev)
         def circuit(theta: float):
-            qml.RX(theta, 0)
-            qml.RX(theta / 2, 1)
-            qml.RX(theta / 3, 2)
+            qp.RX(theta, 0)
+            qp.RX(theta / 2, 1)
+            qp.RX(theta / 3, 2)
             return measurement()
 
         theta = 2.5
@@ -425,26 +432,26 @@ class TestMeasurementTransforms:
     @pytest.mark.parametrize(
         "measurement",
         [
-            lambda: qml.sample(),
+            lambda: qp.sample(),
             pytest.param(
-                lambda: qml.sample(wires=[0]),
+                lambda: qp.sample(wires=[0]),
                 marks=pytest.mark.xfail(reason="waiting for PennyLane squeeze issue fix"),
             ),
-            lambda: qml.sample(wires=[1, 2]),
-            lambda: qml.sample(qml.Y(1) @ qml.Y(0)),
+            lambda: qp.sample(wires=[1, 2]),
+            lambda: qp.sample(qp.Y(1) @ qp.Y(0)),
         ],
     )
     def test_measurement_from_samples_with_sample_measurement(self, measurement):
         """Test the measurment_from_counts transform with a single counts measurement as part of
         the Catalyst pipeline."""
 
-        dev = qml.device("lightning.qubit", wires=4)
+        dev = qp.device("lightning.qubit", wires=4)
 
-        @qml.set_shots(shots=3000)
-        @qml.qnode(dev)
+        @qp.set_shots(shots=3000)
+        @qp.qnode(dev)
         def circuit(theta: float):
-            qml.RX(theta, 0)
-            qml.RX(theta / 2, 1)
+            qp.RX(theta, 0)
+            qp.RX(theta / 2, 1)
             return measurement()
 
         theta = 2.5
@@ -456,8 +463,8 @@ class TestMeasurementTransforms:
         # lightning.qubit does not support seeding.
         # To resolve flakiness, we put the non qjit reference run on default.qubit,
         # which can be seeded
-        ref_dev = qml.device("default.qubit", wires=4, seed=42)
-        samples_expected = qml.set_shots(qml.qnode(ref_dev)(circuit.func), shots=3000)(theta)
+        ref_dev = qp.device("default.qubit", wires=4, seed=42)
+        samples_expected = qp.set_shots(qp.qnode(ref_dev)(circuit.func), shots=3000)(theta)
 
         assert res.shape == samples_expected.shape
         assert np.allclose(np.mean(res, axis=0), np.mean(samples_expected, axis=0), atol=0.05)
@@ -467,12 +474,12 @@ class TestMeasurementTransforms:
         "input_measurement, expected_res",
         [
             (
-                lambda: qml.expval(qml.PauliY(wires=0) @ qml.PauliY(wires=1)),
+                lambda: qp.expval(qp.PauliY(wires=0) @ qp.PauliY(wires=1)),
                 lambda theta: np.sin(theta) * np.sin(theta / 2),
             ),
-            (lambda: qml.var(qml.Y(wires=1)), lambda theta: 1 - np.sin(theta / 2) ** 2),
+            (lambda: qp.var(qp.Y(wires=1)), lambda theta: 1 - np.sin(theta / 2) ** 2),
             (
-                lambda: qml.probs(),
+                lambda: qp.probs(),
                 lambda theta: np.outer(
                     np.outer(
                         [np.cos(theta / 2) ** 2, np.sin(theta / 2) ** 2],
@@ -482,7 +489,7 @@ class TestMeasurementTransforms:
                 ).flatten(),
             ),
             (
-                lambda: qml.probs(wires=[1]),
+                lambda: qp.probs(wires=[1]),
                 lambda theta: [np.cos(theta / 4) ** 2, np.sin(theta / 4) ** 2],
             ),
         ],
@@ -498,15 +505,15 @@ class TestMeasurementTransforms:
         Catalyst pipeline, for measurements whose outcome can be directly compared to an expected
         analytic result."""
 
-        dev = qml.device("lightning.qubit", wires=4)
+        dev = qp.device("lightning.qubit", wires=4)
 
         @qjit(seed=37)
         @partial(measurements_from_samples, device_wires=dev.wires)
-        @qml.set_shots(shots)
-        @qml.qnode(dev)
+        @qp.set_shots(shots)
+        @qp.qnode(dev)
         def circuit(theta: float):
-            qml.RX(theta, 0)
-            qml.RX(theta / 2, 1)
+            qp.RX(theta, 0)
+            qp.RX(theta / 2, 1)
             return input_measurement()
 
         mlir = qjit(circuit, target="mlir").mlir
@@ -516,7 +523,7 @@ class TestMeasurementTransforms:
         theta = 2.5
         res = circuit(theta)
 
-        shot_vector = qml.measurements.Shots(shots).shot_vector
+        shot_vector = qp.measurements.Shots(shots).shot_vector
         if shots and len(shot_vector) != 1:
             assert len(res) == len(shot_vector)
 
@@ -527,12 +534,12 @@ class TestMeasurementTransforms:
         "input_measurement, expected_res",
         [
             (
-                lambda: qml.expval(qml.PauliY(wires=0) @ qml.PauliY(wires=1)),
+                lambda: qp.expval(qp.PauliY(wires=0) @ qp.PauliY(wires=1)),
                 lambda theta: np.sin(theta) * np.sin(theta / 2),
             ),
-            (lambda: qml.var(qml.Y(wires=1)), lambda theta: 1 - np.sin(theta / 2) ** 2),
+            (lambda: qp.var(qp.Y(wires=1)), lambda theta: 1 - np.sin(theta / 2) ** 2),
             (
-                lambda: qml.probs(),
+                lambda: qp.probs(),
                 lambda theta: np.outer(
                     np.outer(
                         [np.cos(theta / 2) ** 2, np.sin(theta / 2) ** 2],
@@ -542,7 +549,7 @@ class TestMeasurementTransforms:
                 ).flatten(),
             ),
             (
-                lambda: qml.probs(wires=[1]),
+                lambda: qp.probs(wires=[1]),
                 lambda theta: [np.cos(theta / 4) ** 2, np.sin(theta / 4) ** 2],
             ),
         ],
@@ -554,15 +561,15 @@ class TestMeasurementTransforms:
         Catalyst pipeline, for measurements whose outcome can be directly compared to an expected
         analytic result."""
 
-        dev = qml.device("lightning.qubit", wires=4)
+        dev = qp.device("lightning.qubit", wires=4)
 
         @qjit(seed=37)
         @partial(measurements_from_counts, device_wires=dev.wires)
-        @qml.set_shots(3000)
-        @qml.qnode(dev)
+        @qp.set_shots(3000)
+        @qp.qnode(dev)
         def circuit(theta: float):
-            qml.RX(theta, 0)
-            qml.RX(theta / 2, 1)
+            qp.RX(theta, 0)
+            qp.RX(theta / 2, 1)
             return input_measurement()
 
         mlir = qjit(circuit, target="mlir").mlir
@@ -572,8 +579,8 @@ class TestMeasurementTransforms:
         theta = 2.5
         res = circuit(theta)
 
-        shots = 3000  # From @qml.set_shots(3000) decorator
-        shot_vector = qml.measurements.Shots(shots).shot_vector
+        shots = 3000  # From @qp.set_shots(3000) decorator
+        shot_vector = qp.measurements.Shots(shots).shot_vector
         if len(shot_vector) != 1:
             assert len(res) == len(shot_vector)
 
@@ -583,14 +590,14 @@ class TestMeasurementTransforms:
         """Test that an measurement not supported by the measurements_from_counts or
         measurements_from_samples transform raises a NotImplementedError"""
 
-        dev = qml.device("lightning.qubit", wires=4)
+        dev = qp.device("lightning.qubit", wires=4)
 
         @partial(measurements_from_counts, device_wires=dev.wires)
-        @qml.set_shots(1000)
-        @qml.qnode(dev)
+        @qp.set_shots(1000)
+        @qp.qnode(dev)
         def circuit(theta: float):
-            qml.RX(theta, 0)
-            return qml.sample()
+            qp.RX(theta, 0)
+            return qp.sample()
 
         with pytest.raises(
             NotImplementedError, match="not implemented with measurements_from_counts"
@@ -601,14 +608,14 @@ class TestMeasurementTransforms:
         """Test that an measurement not supported by the measurements_from_counts or
         measurements_from_samples transform raises a NotImplementedError"""
 
-        dev = qml.device("lightning.qubit", wires=4)
+        dev = qp.device("lightning.qubit", wires=4)
 
         @partial(measurements_from_samples, device_wires=dev.wires)
-        @qml.set_shots(1000)
-        @qml.qnode(dev)
+        @qp.set_shots(1000)
+        @qp.qnode(dev)
         def circuit(theta: float):
-            qml.RX(theta, 0)
-            return qml.counts()
+            qp.RX(theta, 0)
+            return qp.counts()
 
         with pytest.raises(
             NotImplementedError, match="not implemented with measurements_from_samples"
@@ -632,13 +639,13 @@ class TestMeasurementTransforms:
         as expected when we are not diagonalizing everything to counts or samples, but some of
         {X, Y, Z, H} are not supported."""
 
-        dev = qml.device("lightning.qubit", wires=3)
+        dev = qp.device("lightning.qubit", wires=3)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(theta: float):
-            qml.RX(theta, 0)
-            qml.RY(0.89, 1)
-            return qml.expval(qml.X(0)), qml.var(qml.Y(1)), qml.expval(qml.Hadamard(2))
+            qp.RX(theta, 0)
+            qp.RY(0.89, 1)
+            return qp.expval(qp.X(0)), qp.var(qp.Y(1)), qp.expval(qp.Hadamard(2))
 
         expected_result = circuit(1.2)
 
@@ -657,7 +664,7 @@ class TestMeasurementTransforms:
 
             transform_program, _ = spy.spy_return
             assert split_non_commuting in transform_program
-            assert qml.transforms.diagonalize_measurements in transform_program
+            assert qp.transforms.diagonalize_measurements in transform_program
 
             assert len(jitted_circuit(1.2)) == len(expected_result) == 3
             assert np.allclose(jitted_circuit(1.2), expected_result)
@@ -679,11 +686,11 @@ class TestMeasurementTransforms:
         we are not diagonalizing everything to counts or samples, but not all of
         {X, Y, Z, H} are supported."""
 
-        dev = qml.device("lightning.qubit", wires=3)
+        dev = qp.device("lightning.qubit", wires=3)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
-            return qml.expval(qml.X(0)), qml.var(qml.Y(1)), qml.expval(qml.Hadamard(2))
+            return qp.expval(qp.X(0)), qp.var(qp.Y(1)), qp.expval(qp.Hadamard(2))
 
         mlir = qjit(circuit, target="mlir").mlir
         for obs in unsupported_obs:
@@ -711,7 +718,7 @@ class TestMeasurementTransforms:
         preprocess when diagonalizing some observables, regarless of the non_commuting_observables
         flag"""
 
-        dev = qml.device("lightning.qubit", wires=4)
+        dev = qp.device("lightning.qubit", wires=4)
 
         config = get_device_capabilities(dev)
 
@@ -723,8 +730,8 @@ class TestMeasurementTransforms:
         assert qjit_dev.capabilities.non_commuting_observables is non_commuting_flag
 
         # Check the preprocess
-        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            transform_program, _ = qjit_dev.preprocess(ctx)
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
+            transform_program, _ = qjit_dev.preprocess(_catalyst_config())
 
         assert split_non_commuting in transform_program
 
@@ -736,7 +743,7 @@ class TestMeasurementTransforms:
         preprocess when diagonalizing all observables, regarless of the non_commuting_observables
         flag"""
 
-        dev = qml.device("lightning.qubit", wires=4)
+        dev = qp.device("lightning.qubit", wires=4)
 
         config = get_device_capabilities(dev, shots=1000)
 
@@ -750,8 +757,8 @@ class TestMeasurementTransforms:
         assert qjit_dev.capabilities.non_commuting_observables is non_commuting_flag
 
         # Check the preprocess
-        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            transform_program, _ = qjit_dev.preprocess(ctx, shots=1000)
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
+            transform_program, _ = qjit_dev.preprocess(_catalyst_config(shots=1000))
 
         assert split_non_commuting in transform_program
 
@@ -781,11 +788,12 @@ class TestMeasurementTransforms:
         qjit_dev4.capabilities.non_commuting_observables = False
 
         # Check the preprocess
-        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            transform_program1, _ = qjit_dev1.preprocess(ctx)  # no splitting
-            transform_program2, _ = qjit_dev2.preprocess(ctx)  # split_to_single_terms
-            transform_program3, _ = qjit_dev3.preprocess(ctx)  # split_non_commuting
-            transform_program4, _ = qjit_dev4.preprocess(ctx)  # split_non_commuting
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
+            cfg = _catalyst_config()
+            transform_program1, _ = qjit_dev1.preprocess(cfg)  # no splitting
+            transform_program2, _ = qjit_dev2.preprocess(cfg)  # split_to_single_terms
+            transform_program3, _ = qjit_dev3.preprocess(cfg)  # split_non_commuting
+            transform_program4, _ = qjit_dev4.preprocess(cfg)  # split_non_commuting
 
         assert split_to_single_terms not in transform_program1
         assert split_non_commuting not in transform_program1
@@ -802,8 +810,8 @@ class TestMeasurementTransforms:
     @pytest.mark.parametrize(
         "observables",
         [
-            (qml.X(0) @ qml.X(1), qml.Y(0)),  # distributed to separate tapes, but no sum splitting
-            (qml.X(0) + qml.X(1), qml.Y(0)),  # split into 3 seperate terms and distributed
+            (qp.X(0) @ qp.X(1), qp.Y(0)),  # distributed to separate tapes, but no sum splitting
+            (qp.X(0) + qp.X(1), qp.Y(0)),  # split into 3 seperate terms and distributed
         ],
     )
     def test_split_non_commuting_execution(self, observables, mocker):
@@ -811,13 +819,13 @@ class TestMeasurementTransforms:
         consistent (on a backend that does, in fact, support non-commuting observables) regardless
         of whether split_non_commuting is applied or not as expected"""
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def unjitted_circuit(theta: float):
-            qml.RX(theta, 0)
-            qml.RY(0.89, 1)
-            return [qml.expval(o) for o in observables]
+            qp.RX(theta, 0)
+            qp.RY(0.89, 1)
+            return [qp.expval(o) for o in observables]
 
         expected_result = unjitted_circuit(1.2)
 
@@ -855,13 +863,13 @@ class TestMeasurementTransforms:
         consistent (on a backend that does, in fact, support multi-term observables) regardless
         of whether split_to_single_terms is applied or not"""
 
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def unjitted_circuit(theta: float):
-            qml.RX(theta, 0)
-            qml.RY(0.89, 1)
-            return qml.expval(qml.X(0) + qml.X(1)), qml.expval(qml.Y(0))
+            qp.RX(theta, 0)
+            qp.RY(0.89, 1)
+            return qp.expval(qp.X(0) + qp.X(1)), qp.expval(qp.Y(0))
 
         expected_result = unjitted_circuit(1.2)
 
@@ -901,22 +909,22 @@ class TestTransform:
 
     def test_measurements_from_counts(self):
         """Test the transfom measurements_from_counts."""
-        device = qml.device("lightning.qubit", wires=4)
+        device = qp.device("lightning.qubit", wires=4)
 
         @qjit
         @partial(measurements_from_counts, device_wires=device.wires)
-        @qml.set_shots(1000)
-        @qml.qnode(device=device)
+        @qp.set_shots(1000)
+        @qp.qnode(device=device)
         def circuit(a: float):
-            qml.X(0)
-            qml.X(1)
-            qml.X(2)
-            qml.X(3)
+            qp.X(0)
+            qp.X(1)
+            qp.X(2)
+            qp.X(3)
             return (
-                qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
-                qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
-                qml.probs(wires=[3]),
-                qml.counts(qml.PauliX(wires=0) @ qml.PauliX(wires=1) @ qml.PauliX(wires=2)),
+                qp.expval(qp.PauliX(wires=0) @ qp.PauliX(wires=1)),
+                qp.var(qp.PauliX(wires=0) @ qp.PauliX(wires=2)),
+                qp.probs(wires=[3]),
+                qp.counts(qp.PauliX(wires=0) @ qp.PauliX(wires=1) @ qp.PauliX(wires=2)),
             )
 
         res = circuit(0.2)
@@ -944,15 +952,15 @@ class TestTransform:
     @pytest.mark.parametrize("mcm_method", ("one-shot", "single-branch-statistics"))
     def test_measurements_transform(self, mcm_method, transform_measurement):
         """Test raise an error when measurements_from_samples is used with one-shot."""
-        device = qml.device("lightning.qubit", wires=2)
+        device = qp.device("lightning.qubit", wires=2)
 
         @partial(transform_measurement, device_wires=device.wires)
-        @qml.set_shots(1000)
-        @qml.qnode(device=device, mcm_method=mcm_method)
+        @qp.set_shots(1000)
+        @qp.qnode(device=device, mcm_method=mcm_method)
         def circuit():
-            qml.X(0)
-            qml.X(1)
-            return (qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),)
+            qp.X(0)
+            qp.X(1)
+            return (qp.expval(qp.PauliX(wires=0) @ qp.PauliX(wires=1)),)
 
         if mcm_method == "one-shot":
             with pytest.raises(

@@ -14,15 +14,12 @@
 
 #include <cstdio>
 
-#include <catch2/catch_approx.hpp>
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_string.hpp>
+#include "catch2/catch_test_macros.hpp"
+#include "catch2/matchers/catch_matchers_floating_point.hpp"
 
 #include "DataView.hpp"
 
 using namespace Catch::Matchers;
-
-using namespace Catalyst::Runtime;
 
 TEST_CASE("Test DataView Pre-Increment Iterator - double, 1", "[DataView]")
 {
@@ -35,9 +32,9 @@ TEST_CASE("Test DataView Pre-Increment Iterator - double, 1", "[DataView]")
 
     auto view_iter = view.begin();
 
-    CHECK(*view_iter == Catch::Approx(1.0).epsilon(1e-5));
-    CHECK(*++view_iter == Catch::Approx(1.1).epsilon(1e-5));
-    CHECK(*++view_iter == Catch::Approx(1.2).epsilon(1e-5));
+    CHECK_THAT(*view_iter, WithinRel(1.0, 1e-5));
+    CHECK_THAT(*++view_iter, WithinRel(1.1, 1e-5));
+    CHECK_THAT(*++view_iter, WithinRel(1.2, 1e-5));
 }
 
 TEST_CASE("Test DataView Pre-Increment Iterator - int, 2", "[DataView]")
@@ -89,9 +86,9 @@ TEST_CASE("Test DataView Post-Increment Iterator - double, 1", "[DataView]")
 
     auto view_iter = view.begin();
 
-    CHECK(*view_iter++ == Catch::Approx(3.2).epsilon(1e-5));
-    CHECK(*view_iter++ == Catch::Approx(4.1).epsilon(1e-5));
-    CHECK(*view_iter == Catch::Approx(1.6).epsilon(1e-5));
+    CHECK_THAT(*view_iter++, WithinRel(3.2, 1e-5));
+    CHECK_THAT(*view_iter++, WithinRel(4.1, 1e-5));
+    CHECK_THAT(*view_iter, WithinRel(1.6, 1e-5));
 }
 
 TEST_CASE("Test DataView Post-Increment Iterator - int, 2", "[DataView]")

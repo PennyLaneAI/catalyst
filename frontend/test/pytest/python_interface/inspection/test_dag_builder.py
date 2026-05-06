@@ -31,24 +31,22 @@ def test_concrete_implementation_works():
 
         def add_node(
             self,
-            uid: str,
             label: str,
             cluster_id: str | None = None,
             **attrs: Any,
-        ) -> None:
-            return
+        ) -> str:
+            return ""
 
         def add_edge(self, from_uid: str, to_uid: str, **attrs: Any) -> None:
             return
 
         def add_cluster(
             self,
-            uid: str,
             label: str | None = None,
             cluster_id: str | None = None,
             **attrs: Any,
-        ) -> None:
-            return
+        ) -> str:
+            return ""
 
         @property
         def nodes(self) -> dict[str, dict[str, Any]]:
@@ -70,9 +68,9 @@ def test_concrete_implementation_works():
 
     dag_builder = ConcreteDAGBuilder()
     # pylint: disable = assignment-from-none
-    node = dag_builder.add_node("0", "node0")
+    node = dag_builder.add_node("node0")
     edge = dag_builder.add_edge("0", "1")
-    cluster = dag_builder.add_cluster("0")
+    cluster = dag_builder.add_cluster()
     nodes = dag_builder.nodes
     edges = dag_builder.edges
     clusters = dag_builder.clusters
@@ -80,11 +78,11 @@ def test_concrete_implementation_works():
     string = dag_builder.to_string()
 
     # pylint: disable=use-implicit-booleaness-not-comparison
-    assert node is None
+    assert isinstance(node, str)
     assert nodes == {}
     assert edge is None
     assert edges == []
-    assert cluster is None
+    assert isinstance(cluster, str)
     assert clusters == {}
     assert render is None
     assert string == "test"

@@ -44,9 +44,10 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
     for (const auto &opEntry : other.operations) {
         StringRef opName = opEntry.getKey();
         for (const auto &sizeEntry : opEntry.getValue()) {
-            int nQubits = sizeEntry.first;
+            auto &[nQubits, nParams] = sizeEntry.first;
             int64_t count = sizeEntry.second;
-            operations[opName][nQubits] = applyMerge(operations[opName][nQubits], count, method);
+            operations[opName][{nQubits, nParams}] =
+                applyMerge(operations[opName][{nQubits, nParams}], count, method);
         }
     }
 
@@ -75,6 +76,9 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
     }
     numAllocQubits = applyMerge(numAllocQubits, other.numAllocQubits, method);
     numArgQubits = applyMerge(numArgQubits, other.numArgQubits, method);
+
+    hasBranches = hasBranches || other.hasBranches;
+    hasDynLoop = hasDynLoop || other.hasDynLoop;
 }
 
 void ResourceResult::multiplyByScalar(int64_t scalar)
@@ -110,14 +114,16 @@ std::string ResourceResult::toJson(int indent) const
     // Build JSON object using llvm::json
     llvm::json::Object root;
 
-    // Operations: flatten to "OpName(nqubits)" -> count
+    // Operations: flatten to "OpName(nqubits,nparams)" -> count
     llvm::json::Object opsObj;
     for (const auto &opEntry : operations) {
         StringRef opName = opEntry.getKey();
         for (const auto &sizeEntry : opEntry.getValue()) {
-            int nQubits = sizeEntry.first;
+            auto &[nQubits, nParams] = sizeEntry.first;
             int64_t count = sizeEntry.second;
-            std::string key = (opName + "(" + std::to_string(nQubits) + ")").str();
+            std::string key =
+                (opName + "(" + std::to_string(nQubits) + "," + std::to_string(nParams) + ")")
+                    .str();
             opsObj[key] = count;
         }
     }
@@ -148,6 +154,8 @@ std::string ResourceResult::toJson(int indent) const
     root["num_alloc_qubits"] = numAllocQubits;
     root["num_arg_qubits"] = numArgQubits;
     root["device_name"] = deviceName;
+    root["has_branches"] = hasBranches;
+    root["has_dyn_loop"] = hasDynLoop;
 
     llvm::json::Value jsonValue(std::move(root));
     std::string result;

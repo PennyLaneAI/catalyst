@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test for the device API."""
-import pennylane as qml
+
+import pennylane as qp
 import pytest
 from pennylane.devices import NullQubit
 from pennylane.devices.capabilities import DeviceCapabilities, ExecutionCondition
@@ -33,12 +34,13 @@ def test_qjit_device():
 
     # Check attributes of the new device
     # Since shots are not used in the new API, we expect None
-    assert device_qjit.shots == qml.measurements.Shots(None)
-    assert device_qjit.wires == qml.wires.Wires(range(0, 10))
+    assert device_qjit.shots == qp.measurements.Shots(None)
+    assert device_qjit.wires == qp.wires.Wires(range(0, 10))
 
     # Check the preprocess of the new device
-    with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-        compile_pipeline, _ = device_qjit.preprocess(ctx)
+    with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
+        config = qp.devices.ExecutionConfig()
+        compile_pipeline, _ = device_qjit.preprocess(config)
     assert compile_pipeline
     assert len(compile_pipeline) == 3
     assert compile_pipeline[-2].tape_transform.__name__ == "verify_operations"
@@ -59,9 +61,9 @@ def test_qjit_device():
 @pytest.mark.parametrize(
     "wires",
     (
-        qml.wires.Wires(["a", "b"]),
-        qml.wires.Wires([0, 2, 4]),
-        qml.wires.Wires([1, 2, 3]),
+        qp.wires.Wires(["a", "b"]),
+        qp.wires.Wires([0, 2, 4]),
+        qp.wires.Wires([1, 2, 3]),
     ),
 )
 def test_qjit_device_invalid_wires(wires):
@@ -83,7 +85,7 @@ def test_qjit_device_measurements(shots, mocker):
 
     spy = mocker.spy(qjit_device, "get_device_capabilities")
 
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
     state_measurements = {"StateMP"}
     finite_shot_measurements = {"CountsMP", "SampleMP"}
 
@@ -102,11 +104,11 @@ def test_qjit_device_measurements(shots, mocker):
     spy = mocker.spy(qjit_device, "filter_device_capabilities_with_shots")
 
     @qjit
-    @qml.set_shots(shots)
-    @qml.qnode(dev)
+    @qp.set_shots(shots)
+    @qp.qnode(dev)
     def circuit():
-        qml.X(0)
-        return qml.expval(qml.PauliZ(0))
+        qp.X(0)
+        return qp.expval(qp.PauliZ(0))
 
     circuit()
 
@@ -148,12 +150,12 @@ def test_simple_circuit():
     dev = NullQubit(wires=2)
 
     @qjit(target="mlir")
-    @qml.set_shots(shots=2048)
-    @qml.qnode(device=dev)
+    @qp.set_shots(shots=2048)
+    @qp.qnode(device=dev)
     def circuit():
-        qml.Hadamard(wires=0)
-        qml.CNOT(wires=[0, 1])
-        return qml.expval(qml.PauliZ(wires=0))
+        qp.Hadamard(wires=0)
+        qp.CNOT(wires=[0, 1])
+        return qp.expval(qp.PauliZ(wires=0))
 
     assert circuit.mlir
 

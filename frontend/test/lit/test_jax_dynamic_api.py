@@ -14,25 +14,25 @@
 
 """Unit tests for the AutoGraph source-to-source transformation feature."""
 
+# pylint: disable=cell-var-from-loop
 # RUN: %PYTHON %s | FileCheck %s
 
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 from jax.core import ShapedArray
 from utils import print_jaxpr, print_mlir
 
 from catalyst import qjit
 
+for capture in [True, False]:
+    # CHECK-LABEL: test_qjit_dynamic_argument
+    @qjit(abstracted_axes={0: "n"}, capture=capture)
+    def test_qjit_dynamic_argument(a):
+        """Test passing a dynamic argument"""
+        # CHECK:        tensor<?xi64>
+        return a
 
-# CHECK-LABEL: test_qjit_dynamic_argument
-@qjit(abstracted_axes={0: "n"})
-def test_qjit_dynamic_argument(a):
-    """Test passing a dynamic argument"""
-    # CHECK:        tensor<?xi64>
-    return a
-
-
-print_mlir(test_qjit_dynamic_argument, jnp.array([1, 2, 3]))
+    print_mlir(test_qjit_dynamic_argument, jnp.array([1, 2, 3]))
 
 
 # CHECK-LABEL: test_qnode_dynamic_arg
@@ -44,7 +44,7 @@ def test_qnode_dynamic_arg(a):
     # CHECK:         [[c:.]]:i64[InDBIdx(val=0)] = quantum_kernel[
     # CHECK:                                  ] [[a]] [[b]]
     # CHECK:       in ([[c]],) }
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def _circuit(a):
         return a
 
@@ -54,19 +54,19 @@ def test_qnode_dynamic_arg(a):
 print_jaxpr(test_qnode_dynamic_arg, jnp.array([1, 2, 3]))
 
 
-# CHECK-LABEL: test_qjit_dynamic_result
-@qjit
-def test_qjit_dynamic_result(a):
-    """Test getting a dynamic result from qjit"""
-    # CHECK:       { lambda ; [[a:.]]:i64[]. let
-    # CHECK:         [[b:.]]:i64[] = add [[a]] 1
-    # CHECK:         [[c:.]]:f64[[[b]]] = {{[a-z_0-9.]+\[[^]]*}}
-    # CHECK:           ] 1.0:f64[] [[b]]
-    # CHECK:       in ([[b]], [[c]]) }
-    return jnp.ones((a + 1,), dtype=float)
+for capture in [True, False]:
+    # CHECK-LABEL: test_qjit_dynamic_result
+    @qjit(capture=capture)
+    def test_qjit_dynamic_result(a):
+        """Test getting a dynamic result from qjit"""
+        # CHECK:       { lambda ; [[a:.]]:i64[]. let
+        # CHECK:         [[b:.]]:i64[] = add [[a]] 1
+        # CHECK:         [[c:.]]:f64[[[b]]] = {{[a-z_0-9.]+\[[^]]*}}
+        # CHECK:           ] 1.0:f64[] [[b]]
+        # CHECK:       in ([[b]], [[c]]) }
+        return jnp.ones((a + 1,), dtype=float)
 
-
-print_jaxpr(test_qjit_dynamic_result, 3)
+    print_jaxpr(test_qjit_dynamic_result, 3)
 
 
 # CHECK-LABEL: test_qnode_dynamic_result
@@ -78,7 +78,7 @@ def test_qnode_dynamic_result(a):
     # CHECK:         {{.+}}:i64[] [[c:.]]:f64[OutDBIdx(val=0)] = quantum_kernel[
     # CHECK:                                                ] [[a]]
     # CHECK:       in ([[c]],) }
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def _circuit(a):
         return jnp.ones((a + 1,), dtype=float)
 
@@ -88,23 +88,24 @@ def test_qnode_dynamic_result(a):
 print_jaxpr(test_qnode_dynamic_result, 3)
 
 
-# CHECK-LABEL: test_qjit_aot
-@qjit(abstracted_axes={0: "n", 2: "m"})
-def test_qjit_aot(a: ShapedArray([1, 3, 1], dtype=float)):
-    """Test running aor compilation"""
-    # CHECK:        tensor<?x3x?xf64>
-    return a
+for capture in [True, False]:
+    # CHECK-LABEL: test_qjit_aot
+    @qjit(abstracted_axes={0: "n", 2: "m"}, capture=capture)
+    def test_qjit_aot(a: ShapedArray([1, 3, 1], dtype=float)):
+        """Test running aor compilation"""
+        # CHECK:        tensor<?x3x?xf64>
+        return a
+
+    print_mlir(test_qjit_aot, aot=True)
 
 
-print_mlir(test_qjit_aot, aot=True)
+for capture in [True, False]:
 
+    @qjit(capture=capture)
+    def test_qjit_indexing(sz):
+        """Check the usage of stablehlo.gather for indexing"""
+        r = jnp.ones((sz + 1,), dtype=int)
+        # CHECK:        gather
+        return r[0]
 
-@qjit
-def test_qjit_indexing(sz):
-    """Check the usage of stablehlo.gather for indexing"""
-    r = jnp.ones((sz + 1,), dtype=int)
-    # CHECK:        gather
-    return r[0]
-
-
-print_mlir(test_qjit_indexing, 3)
+    print_mlir(test_qjit_indexing, 3)

@@ -33,20 +33,21 @@ class DAGBuilder(ABC):
     @abstractmethod
     def add_node(
         self,
-        uid: NodeUID,
         label: str,
         *,
         cluster_uid: ClusterUID | None = None,
         **attrs: Any,
-    ) -> None:
+    ) ->  NodeUID:
         """Add a single node to the graph.
 
         Args:
-            uid (str): Unique node ID to identify this node.
             label (str): The text to display on the node when rendered.
             cluster_uid (str | None): Optional unique ID of the cluster this node belongs to.
                 If `None`, this node gets added on the base graph.
             **attrs (Any): Any additional styling keyword arguments.
+
+        Returns:
+            NodeUID: The uid corresponding to that node
 
         """
 
@@ -64,23 +65,24 @@ class DAGBuilder(ABC):
     @abstractmethod
     def add_cluster(
         self,
-        uid: ClusterUID,
         *,
         label: str | None = None,
         cluster_uid: ClusterUID | None = None,
         **attrs: Any,
-    ) -> None:
+    ) -> ClusterUID:
         """Add a single cluster to the graph.
 
         A cluster is a specific type of subgraph where the nodes and edges contained
         within it are visually and logically grouped.
 
         Args:
-            uid (str): Unique cluster ID to identify this cluster.
             label (str | None): Optional text to display as a label on the cluster when rendered.
             cluster_uid (str | None): Optional unique ID of the cluster this cluster belongs to.
                 If `None`, the cluster will be placed on the base graph.
             **attrs (Any): Any additional styling keyword arguments.
+
+        Returns:
+            ClusterUID: The UID corresponding to that cluster
 
         """
 
