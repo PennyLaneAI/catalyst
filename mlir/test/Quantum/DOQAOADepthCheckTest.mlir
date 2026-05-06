@@ -45,9 +45,9 @@
 
 // DEPTH-LABEL: func @cycle_depth
 // DEPTH:       quantum.freeze_partition
+// DEPTH-SAME:  depth_cnot_counts = array<i32: 4, 4>
 // DEPTH-SAME:  depth_max_cnots = 4 : i32
 // DEPTH-SAME:  depth_regression_ok = 1 : i32
-// DEPTH-SAME:  depth_cnot_counts = array<i32: 4, 4>
 
 // BOUND-LABEL: func @cycle_depth
 // BOUND:       quantum.freeze_partition
@@ -112,9 +112,9 @@ func.func @k4_depth() {
 
 // DEPTH-LABEL: func @sparse_depth
 // DEPTH:       quantum.freeze_partition
+// DEPTH-SAME:  depth_cnot_counts = array<i32: 0, 0, 0, 0>
 // DEPTH-SAME:  depth_max_cnots = 0 : i32
 // DEPTH-SAME:  depth_regression_ok = 1 : i32
-// DEPTH-SAME:  depth_cnot_counts = array<i32: 0, 0, 0, 0>
 
 // BOUND-LABEL: func @sparse_depth
 // BOUND:       quantum.freeze_partition

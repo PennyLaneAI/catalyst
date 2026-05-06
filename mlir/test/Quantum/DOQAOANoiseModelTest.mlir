@@ -43,20 +43,21 @@
 
 // NOISE-LABEL: func @cycle_noise
 // NOISE:       quantum.freeze_partition
-// NOISE-SAME:  noise_t1_ns = 1.270000e+05 : f64
-// NOISE-SAME:  noise_t2_ns = 2.180000e+05 : f64
+// NOISE-SAME:  noise_cnot_counts
 // NOISE-SAME:  noise_cx_fidelity = 9.918000e-01 : f64
 // NOISE-SAME:  noise_cx_time_ns = 5.330000e+02 : f64
 // NOISE-SAME:  noise_depth_ok = 1 : i32
 // NOISE-SAME:  noise_max_cnots
+// NOISE-SAME:  noise_t1_ns = 1.270000e+05 : f64
+// NOISE-SAME:  noise_t2_ns = 2.180000e+05 : f64
 
 // CUSTOM-LABEL: func @cycle_noise
 // CUSTOM:       quantum.freeze_partition
-// CUSTOM-SAME:  noise_t1_ns = 2.000000e+05 : f64
-// CUSTOM-SAME:  noise_t2_ns = 3.000000e+05 : f64
 // CUSTOM-SAME:  noise_cx_fidelity = 9.990000e-01 : f64
 // CUSTOM-SAME:  noise_cx_time_ns = 4.000000e+02 : f64
 // CUSTOM-SAME:  noise_depth_ok = 1 : i32
+// CUSTOM-SAME:  noise_t1_ns = 2.000000e+05 : f64
+// CUSTOM-SAME:  noise_t2_ns = 3.000000e+05 : f64
 
 // BUDGET-LABEL: func @cycle_noise
 // BUDGET:  warning: doqaoa-noise-preserve: circuit_time=
@@ -86,8 +87,8 @@ func.func @cycle_noise() {
 // NOISE-LABEL: func @k4_noise
 // NOISE:       quantum.freeze_partition
 // NOISE-SAME:  noise_cnot_counts
-// NOISE-SAME:  noise_max_cnots = 6 : i32
 // NOISE-SAME:  noise_depth_ok = 1 : i32
+// NOISE-SAME:  noise_max_cnots = 6 : i32
 
 // REGFAIL-LABEL: func @k4_noise
 // REGFAIL: error: doqaoa-noise-preserve: max_cnots={{.*}} exceeds expected-max-cnots=2
@@ -117,9 +118,9 @@ func.func @k4_noise() {
 
 // NOISE-LABEL: func @sparse_noise
 // NOISE:       quantum.freeze_partition
-// NOISE-SAME:  noise_max_cnots = 0 : i32
-// NOISE-SAME:  noise_depth_ok = 1 : i32
 // NOISE-SAME:  noise_cnot_counts = array<i32: 0, 0, 0, 0>
+// NOISE-SAME:  noise_depth_ok = 1 : i32
+// NOISE-SAME:  noise_max_cnots = 0 : i32
 
 func.func @sparse_noise() {
     %p = quantum.freeze_partition {

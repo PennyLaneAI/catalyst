@@ -49,19 +49,19 @@
 
 // AGG-LABEL: func @cycle_agg
 // AGG:       quantum.freeze_partition
+// AGG-SAME:  agg_best_bitstring = array<i32: 0>
 // AGG-SAME:  agg_best_k = 0 : i32
 // AGG-SAME:  agg_candidates_evaluated = 0 : i32
-// AGG-SAME:  agg_best_bitstring = array<i32: 0>
 
 // NOPRIOR-LABEL: func @cycle_agg
 // NOPRIOR:   quantum.freeze_partition
-// NOPRIOR-SAME: agg_best_k = 0 : i32
 // NOPRIOR-SAME: agg_best_bitstring = array<i32: 0>
+// NOPRIOR-SAME: agg_best_k = 0 : i32
 
 // FORCED-LABEL: func @cycle_agg
 // FORCED:    quantum.freeze_partition
-// FORCED-SAME: agg_best_k
 // FORCED-SAME: agg_best_bitstring
+// FORCED-SAME: agg_best_k
 // FORCED-SAME: agg_candidates_evaluated
 
 func.func @cycle_agg() {
@@ -122,14 +122,14 @@ func.func @k4_agg() {
 
 // AGG-LABEL: func @sparse_agg
 // AGG:       quantum.freeze_partition
-// AGG-SAME:  agg_best_k = 0 : i32
 // AGG-SAME:  agg_best_bitstring = array<i32: 0, 0>
+// AGG-SAME:  agg_best_k = 0 : i32
 // AGG-SAME:  agg_candidates_evaluated = 0 : i32
 
 // NOPRIOR-LABEL: func @sparse_agg
 // NOPRIOR:   quantum.freeze_partition
-// NOPRIOR-SAME: agg_best_k = 0 : i32
 // NOPRIOR-SAME: agg_best_bitstring = array<i32: 0, 0>
+// NOPRIOR-SAME: agg_best_k = 0 : i32
 
 func.func @sparse_agg() {
     %p = quantum.freeze_partition {
