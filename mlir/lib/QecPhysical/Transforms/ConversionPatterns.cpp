@@ -15,14 +15,10 @@
 #include <cstdint>
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-// #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
-#include "Catalyst/Utils/StaticAllocas.h"
 #include "QecPhysical/IR/QecPhysicalOps.h"
 #include "QecPhysical/Transforms/Patterns.h"
 
