@@ -1,2 +1,1 @@
 add_subdirectory(Decoder)
-add_subdirectory(TannerGraphRuntime)
