@@ -38,18 +38,19 @@ spec = importlib.util.spec_from_file_location(
 _mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(_mod)
 
-do_qaoa      = _mod.do_qaoa
+do_qaoa = _mod.do_qaoa
 DOQAOAResult = _mod.DOQAOAResult
 
 # ── Regression constants ──────────────────────────────────────────────────────
 # These are the HARD LIMITS that must not regress in CI.
-MAX_SHOTS_M1 = 170_000    # ≤ 0.17 × 10⁶  (Table IV)
-MAX_SHOTS_M2 = 170_000    # ≤ 0.17 × 10⁶
-MAX_SHOTS_M3 = 250_000    # ≤ 0.25 × 10⁶  (conservative ≥ 0.23M target)
-FROZEN_BASELINE_M3 = 65_540_000   # 65.54 × 10⁶ (from Table IV)
+MAX_SHOTS_M1 = 170_000  # ≤ 0.17 × 10⁶  (Table IV)
+MAX_SHOTS_M2 = 170_000  # ≤ 0.17 × 10⁶
+MAX_SHOTS_M3 = 250_000  # ≤ 0.25 × 10⁶  (conservative ≥ 0.23M target)
+FROZEN_BASELINE_M3 = 65_540_000  # 65.54 × 10⁶ (from Table IV)
 MIN_SPEEDUP_M3 = FROZEN_BASELINE_M3 // MAX_SHOTS_M3  # 262×
 
 # ── Test helpers ──────────────────────────────────────────────────────────────
+
 
 def make_ba_circuit_and_hamiltonian(N: int, m_ba: int = 2, seed: int = 42):
     """Build BA graph, cost Hamiltonian, and QAOA QNode."""
@@ -86,14 +87,15 @@ def run_do_qaoa(circuit, cost_h, m: int, G):
 
 # ── pytest-compatible test functions ─────────────────────────────────────────
 
+
 def test_shot_budget_m1_12node():
     """DO-QAOA m=1 on 12-node BA graph: shots ≤ 170,000."""
     G, cost_h, circuit = make_ba_circuit_and_hamiltonian(12, seed=42)
     res = run_do_qaoa(circuit, cost_h, m=1, G=G)
     assert isinstance(res, DOQAOAResult), f"Expected DOQAOAResult, got {type(res)}"
-    assert res.total_shots <= MAX_SHOTS_M1, (
-        f"m=1 shots {res.total_shots:,} > limit {MAX_SHOTS_M1:,}"
-    )
+    assert (
+        res.total_shots <= MAX_SHOTS_M1
+    ), f"m=1 shots {res.total_shots:,} > limit {MAX_SHOTS_M1:,}"
     assert res.best_energy < 0, f"Energy {res.best_energy:.4f} ≥ 0"
     assert res.full_opt_count == 1, f"full_opt_count = {res.full_opt_count} ≠ 1"
 
@@ -103,9 +105,9 @@ def test_shot_budget_m2_12node():
     G, cost_h, circuit = make_ba_circuit_and_hamiltonian(12, seed=42)
     res = run_do_qaoa(circuit, cost_h, m=2, G=G)
     assert isinstance(res, DOQAOAResult)
-    assert res.total_shots <= MAX_SHOTS_M2, (
-        f"m=2 shots {res.total_shots:,} > limit {MAX_SHOTS_M2:,}"
-    )
+    assert (
+        res.total_shots <= MAX_SHOTS_M2
+    ), f"m=2 shots {res.total_shots:,} > limit {MAX_SHOTS_M2:,}"
     assert res.best_energy < 0
     assert res.full_opt_count == 1
 
@@ -115,9 +117,9 @@ def test_shot_budget_m3_12node():
     G, cost_h, circuit = make_ba_circuit_and_hamiltonian(12, seed=42)
     res = run_do_qaoa(circuit, cost_h, m=3, G=G)
     assert isinstance(res, DOQAOAResult)
-    assert res.total_shots <= MAX_SHOTS_M3, (
-        f"m=3 shots {res.total_shots:,} > limit {MAX_SHOTS_M3:,}"
-    )
+    assert (
+        res.total_shots <= MAX_SHOTS_M3
+    ), f"m=3 shots {res.total_shots:,} > limit {MAX_SHOTS_M3:,}"
     assert res.best_energy < 0
     assert res.full_opt_count == 1
     assert res.warmstart_count <= 1
@@ -128,9 +130,9 @@ def test_speedup_vs_frozen_m3():
     G, cost_h, circuit = make_ba_circuit_and_hamiltonian(12, seed=42)
     res = run_do_qaoa(circuit, cost_h, m=3, G=G)
     actual_speedup = FROZEN_BASELINE_M3 / res.total_shots
-    assert actual_speedup >= MIN_SPEEDUP_M3, (
-        f"Speedup {actual_speedup:.0f}× < minimum {MIN_SPEEDUP_M3}×"
-    )
+    assert (
+        actual_speedup >= MIN_SPEEDUP_M3
+    ), f"Speedup {actual_speedup:.0f}× < minimum {MIN_SPEEDUP_M3}×"
 
 
 def test_return_type():
@@ -144,9 +146,7 @@ def test_warmstart_cap():
     """warm_start_count ≤ max_warmstarts=1 always."""
     G, cost_h, circuit = make_ba_circuit_and_hamiltonian(12, seed=42)
     res = run_do_qaoa(circuit, cost_h, m=3, G=G)
-    assert res.warmstart_count <= 1, (
-        f"warmstart_count={res.warmstart_count} > 1"
-    )
+    assert res.warmstart_count <= 1, f"warmstart_count={res.warmstart_count} > 1"
 
 
 def test_sweep_ba_graphs_m3():
@@ -154,22 +154,22 @@ def test_sweep_ba_graphs_m3():
     for N in range(6, 17):
         G, cost_h, circuit = make_ba_circuit_and_hamiltonian(N, seed=42 + N)
         res = run_do_qaoa(circuit, cost_h, m=3, G=G)
-        assert res.total_shots <= MAX_SHOTS_M3, (
-            f"N={N}: shots {res.total_shots:,} > {MAX_SHOTS_M3:,}"
-        )
+        assert (
+            res.total_shots <= MAX_SHOTS_M3
+        ), f"N={N}: shots {res.total_shots:,} > {MAX_SHOTS_M3:,}"
         assert res.best_energy < 0, f"N={N}: energy {res.best_energy:.4f} ≥ 0"
 
 
 # ── Standalone runner ─────────────────────────────────────────────────────────
 
 TESTS = [
-    ("test_return_type",           test_return_type),
+    ("test_return_type", test_return_type),
     ("test_shot_budget_m1_12node", test_shot_budget_m1_12node),
     ("test_shot_budget_m2_12node", test_shot_budget_m2_12node),
     ("test_shot_budget_m3_12node", test_shot_budget_m3_12node),
-    ("test_speedup_vs_frozen_m3",  test_speedup_vs_frozen_m3),
-    ("test_warmstart_cap",         test_warmstart_cap),
-    ("test_sweep_ba_graphs_m3",    test_sweep_ba_graphs_m3),
+    ("test_speedup_vs_frozen_m3", test_speedup_vs_frozen_m3),
+    ("test_warmstart_cap", test_warmstart_cap),
+    ("test_sweep_ba_graphs_m3", test_sweep_ba_graphs_m3),
 ]
 
 if __name__ == "__main__":

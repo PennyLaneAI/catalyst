@@ -41,8 +41,9 @@ spec = importlib.util.spec_from_file_location(
 _mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(_mod)
 
-select_hotspot_indices  = _mod.select_hotspot_indices
-_build_multi_k_energy   = _mod._build_multi_k_energy
+select_hotspot_indices = _mod.select_hotspot_indices
+_build_multi_k_energy = _mod._build_multi_k_energy
+
 
 # ── Adaptive grid policy ──────────────────────────────────────────────────────
 def adaptive_grid_size(N: int) -> int:
@@ -53,7 +54,7 @@ def adaptive_grid_size(N: int) -> int:
         return 12
     if N <= 35:
         return 8
-    return 6   # N ≤ 50
+    return 6  # N ≤ 50
 
 
 def time_landscape_overlap_analysis(G, m: int, grid_size: int) -> float:
@@ -71,8 +72,8 @@ def time_landscape_overlap_analysis(G, m: int, grid_size: int) -> float:
     num_sp = 1 << m
 
     gamma_range = np.linspace(-math.pi / 2, math.pi / 2, grid_size)
-    beta_range  = np.linspace(-math.pi / 4, math.pi / 4, grid_size)
-    grid_pts    = [(g, b) for g in gamma_range for b in beta_range]
+    beta_range = np.linspace(-math.pi / 4, math.pi / 4, grid_size)
+    grid_pts = [(g, b) for g in gamma_range for b in beta_range]
 
     fn = _build_multi_k_energy(cost_h, hs, N)
 
@@ -86,7 +87,8 @@ def time_landscape_overlap_analysis(G, m: int, grid_size: int) -> float:
     for k in range(1, num_sp):
         land_k = np.array([fn(np.array([g, b]), k) for (g, b) in grid_pts])
         # Pearson correlation
-        xm = land0 - land0.mean(); ym = land_k - land_k.mean()
+        xm = land0 - land0.mean()
+        ym = land_k - land_k.mean()
         d = math.sqrt((xm**2).sum() * (ym**2).sum())
         overlaps[k] = float((xm * ym).sum() / d) if d > 1e-12 else 1.0
 
@@ -95,12 +97,12 @@ def time_landscape_overlap_analysis(G, m: int, grid_size: int) -> float:
 
 
 # ── Benchmark plan ────────────────────────────────────────────────────────────
-M_HOTSPOTS  = 3
-BA_M_EDGE   = 2
-SEED        = 42
+M_HOTSPOTS = 3
+BA_M_EDGE = 2
+SEED = 42
 
-TARGET_SMALL  = 2.0   # seconds for N ≤ 20
-TARGET_LARGE  = 30.0  # seconds for N = 50
+TARGET_SMALL = 2.0  # seconds for N ≤ 20
+TARGET_LARGE = 30.0  # seconds for N = 50
 
 print("=" * 70)
 print("Phase 5 Task 3 — LandscapeOverlapAnalysis Compile Time Profiling")
@@ -109,13 +111,15 @@ print(f"Adaptive grid: N≤10→16×16, N≤20→12×12, N≤35→8×8, N≤50�
 print("=" * 70)
 
 # Header
-print(f"\n{'N':>4}  {'grid':>6}  {'sub-probs':>10}  {'grid_pts':>9}  "
-      f"{'time(s)':>9}  {'budget':>8}  status")
+print(
+    f"\n{'N':>4}  {'grid':>6}  {'sub-probs':>10}  {'grid_pts':>9}  "
+    f"{'time(s)':>9}  {'budget':>8}  status"
+)
 print(f"{'─'*4}  {'─'*6}  {'─'*10}  {'─'*9}  {'─'*9}  {'─'*8}  {'─'*6}")
 
-passed      = True
-results     = {}
-N_values    = list(range(4, 21)) + [30, 40, 50]
+passed = True
+results = {}
+N_values = list(range(4, 21)) + [30, 40, 50]
 
 for N in N_values:
     if M_HOTSPOTS >= N:
@@ -123,7 +127,7 @@ for N in N_values:
 
     G = nx.barabasi_albert_graph(N, BA_M_EDGE, seed=SEED + N)
     grid_size = adaptive_grid_size(N)
-    budget    = TARGET_SMALL if N <= 20 else TARGET_LARGE
+    budget = TARGET_SMALL if N <= 20 else TARGET_LARGE
 
     elapsed = time_landscape_overlap_analysis(G, M_HOTSPOTS, grid_size)
     ok = elapsed < budget
@@ -155,8 +159,7 @@ else:
 # Check N = 50 constraint
 if 50 in results:
     t50, g50, ok50 = results[50]
-    print(f"{'PASS' if ok50 else 'FAIL'}: N=50  {t50:.3f}s < 30s  "
-          f"({'✓' if ok50 else '✗'})")
+    print(f"{'PASS' if ok50 else 'FAIL'}: N=50  {t50:.3f}s < 30s  " f"({'✓' if ok50 else '✗'})")
     if not ok50:
         passed = False
 

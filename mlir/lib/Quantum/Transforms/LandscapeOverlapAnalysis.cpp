@@ -109,8 +109,7 @@ static std::vector<double> extractHLin(Operation *op, unsigned numNodes)
 }
 
 /// Dot product of two equal-length L2-normalised vectors = cosine similarity.
-static double cosineSimilarity(const std::vector<double> &a,
-                               const std::vector<double> &b)
+static double cosineSimilarity(const std::vector<double> &a, const std::vector<double> &b)
 {
     assert(a.size() == b.size());
     double s = 0.0;
@@ -125,13 +124,12 @@ static double cosineSimilarity(const std::vector<double> &a,
 
 struct KMeansResult {
     int32_t k;
-    std::vector<int32_t> assignments;   // one entry per sub-problem
+    std::vector<int32_t> assignments; // one entry per sub-problem
     std::vector<std::vector<double>> centroids;
 };
 
 /// Squared L2 distance between two equal-length vectors.
-static double vecDist2(const std::vector<double> &a,
-                       const std::vector<double> &b)
+static double vecDist2(const std::vector<double> &a, const std::vector<double> &b)
 {
     double s = 0.0;
     for (std::size_t d = 0; d < a.size(); ++d) {
@@ -144,8 +142,7 @@ static double vecDist2(const std::vector<double> &a,
 /// Lloyd's K-means with K-means++ initialisation.
 /// Returns {inertia, assignments, centroids}.
 static std::tuple<double, std::vector<int32_t>, std::vector<std::vector<double>>>
-runKMeans(const std::vector<std::vector<double>> &vecs,
-          unsigned k, unsigned seed)
+runKMeans(const std::vector<std::vector<double>> &vecs, unsigned k, unsigned seed)
 {
     unsigned N = static_cast<unsigned>(vecs.size());
     unsigned D = vecs.empty() ? 0u : static_cast<unsigned>(vecs[0].size());
@@ -179,12 +176,19 @@ runKMeans(const std::vector<std::vector<double>> &vecs,
             int32_t bestC = 0;
             for (unsigned c = 0; c < k; ++c) {
                 double d = vecDist2(vecs[i], centroids[c]);
-                if (d < best) { best = d; bestC = static_cast<int32_t>(c); }
+                if (d < best) {
+                    best = d;
+                    bestC = static_cast<int32_t>(c);
+                }
             }
-            if (bestC != asgn[i]) { asgn[i] = bestC; changed = true; }
+            if (bestC != asgn[i]) {
+                asgn[i] = bestC;
+                changed = true;
+            }
         }
 
-        if (!changed) break;
+        if (!changed)
+            break;
 
         // Update step: recompute centroids
         std::vector<std::vector<double>> next(k, std::vector<double>(D, 0.0));
@@ -213,8 +217,8 @@ runKMeans(const std::vector<std::vector<double>> &vecs,
 
 /// Run K-means for K=1..maxK, select K via elbow:
 /// first K where cumulative variance explained ≥ 90%.
-static KMeansResult kmeansElbow(const std::vector<std::vector<double>> &vecs,
-                                unsigned maxK, unsigned seed = 42)
+static KMeansResult kmeansElbow(const std::vector<std::vector<double>> &vecs, unsigned maxK,
+                                unsigned seed = 42)
 {
     unsigned N = static_cast<unsigned>(vecs.size());
     if (N <= 1 || maxK <= 1)
@@ -229,8 +233,8 @@ static KMeansResult kmeansElbow(const std::vector<std::vector<double>> &vecs,
     for (unsigned k = 1; k <= maxK; ++k) {
         auto [inertia, asgn, cen] = runKMeans(vecs, k, seed);
         inertias[k] = inertia;
-        allAsgn[k]  = std::move(asgn);
-        allCen[k]   = std::move(cen);
+        allAsgn[k] = std::move(asgn);
+        allCen[k] = std::move(cen);
     }
 
     // Elbow: first K where (I_1 - I_K) / (I_1 - I_max) >= 0.9
@@ -277,8 +281,7 @@ static unsigned computeGraphDiameter(const std::vector<double> &J, unsigned N)
             unsigned u = q.front();
             q.pop();
             for (unsigned v = 0; v < N; ++v) {
-                if (v != u && dist[v] < 0 &&
-                    std::abs(J[u * N + v]) > 1e-12) {
+                if (v != u && dist[v] < 0 && std::abs(J[u * N + v]) > 1e-12) {
                     dist[v] = dist[u] + 1;
                     q.push(v);
                 }
@@ -327,36 +330,32 @@ struct LandscapeOverlapAnalysisPass
         energy::flushCache();
 
         func.walk([&](FreezePartitionOp op) {
-
             // ── 1. Extract graph data ─────────────────────────────────────
             unsigned numNodes = 0;
             std::vector<double> J = extractJMatrix(op, numNodes);
             if (J.empty()) {
-                op->emitWarning()
-                    << "doqaoa-landscape-overlap: missing h_quad attribute, skipping";
+                op->emitWarning() << "doqaoa-landscape-overlap: missing h_quad attribute, skipping";
                 return;
             }
             std::vector<double> h = extractHLin(op, numNodes);
 
             // ── 2. Get hotspot indices ────────────────────────────────────
             auto hotspotAttr = op.getHotspotIndices();
-            std::vector<int32_t> hotspotIndices(hotspotAttr.begin(),
-                                                hotspotAttr.end());
+            std::vector<int32_t> hotspotIndices(hotspotAttr.begin(), hotspotAttr.end());
             unsigned m = static_cast<unsigned>(hotspotIndices.size());
             unsigned numSubProblems = 1u << m;
 
             if (m > 10) {
-                op->emitWarning()
-                    << "doqaoa-landscape-overlap: m=" << m
-                    << " > 10, skipping (too expensive for analysis pass)";
+                op->emitWarning() << "doqaoa-landscape-overlap: m=" << m
+                                  << " > 10, skipping (too expensive for analysis pass)";
                 return;
             }
 
             // ── 3. Build GraphDesc and landscape vectors via EnergyEval ──
             energy::GraphDesc graph;
-            graph.numNodes       = numNodes;
-            graph.J              = J;
-            graph.h              = h;
+            graph.numNodes = numNodes;
+            graph.J = J;
+            graph.h = h;
             graph.hotspotIndices = hotspotIndices;
 
             std::vector<std::vector<double>> landscapes(numSubProblems);
@@ -376,9 +375,7 @@ struct LandscapeOverlapAnalysisPass
             double q = (numPairs > 0) ? (sumSim / numPairs) : 1.0;
 
             // ── 5. Recommend K (threshold) ────────────────────────────────
-            int32_t recK = (q >= overlapThreshold)
-                               ? 1
-                               : static_cast<int32_t>(numSubProblems);
+            int32_t recK = (q >= overlapThreshold) ? 1 : static_cast<int32_t>(numSubProblems);
 
             // ── 5b. K-means + elbow (Task 4) ─────────────────────────────
             // For concentrated regime (q ≥ threshold) K=1 is already known;
@@ -390,7 +387,8 @@ struct LandscapeOverlapAnalysisPass
             if (q >= overlapThreshold || numSubProblems <= 1) {
                 clusterK = 1;
                 clusterAssignments.assign(numSubProblems, 0);
-            } else {
+            }
+            else {
                 KMeansResult km = kmeansElbow(landscapes, numSubProblems);
                 clusterK = km.k;
                 clusterAssignments = std::move(km.assignments);
@@ -399,27 +397,24 @@ struct LandscapeOverlapAnalysisPass
             // ── 6. Phase-transition detector ──────────────────────────────
             unsigned diameter = computeGraphDiameter(J, numNodes);
             double sEff = estimateSEff(diameter);
-            double scVal = scThreshold;  // extract from Option<double> before format
+            double scVal = scThreshold; // extract from Option<double> before format
 
             if (sEff < scVal) {
                 llvm::SmallString<128> msg;
                 llvm::raw_svector_ostream ss(msg);
-                ss << llvm::format(
-                    "doqaoa-landscape-overlap: fragmented landscape regime"
-                    " (s_eff=%.3f < sc=%.3f, diameter=%u);"
-                    " DO-QAOA parameter transfer may not achieve K=1",
-                    sEff, scVal, diameter);
+                ss << llvm::format("doqaoa-landscape-overlap: fragmented landscape regime"
+                                   " (s_eff=%.3f < sc=%.3f, diameter=%u);"
+                                   " DO-QAOA parameter transfer may not achieve K=1",
+                                   sEff, scVal, diameter);
                 op->emitWarning() << msg;
             }
 
             // ── 7. Annotate op ────────────────────────────────────────────
             op->setAttr("landscape_overlap_q", builder.getF64FloatAttr(q));
-            op->setAttr("recommended_k",       builder.getI32IntegerAttr(recK));
-            op->setAttr("s_eff",               builder.getF64FloatAttr(sEff));
-            op->setAttr("cluster_k",
-                        builder.getI32IntegerAttr(clusterK));
-            op->setAttr("cluster_assignments",
-                        DenseI32ArrayAttr::get(ctx, clusterAssignments));
+            op->setAttr("recommended_k", builder.getI32IntegerAttr(recK));
+            op->setAttr("s_eff", builder.getF64FloatAttr(sEff));
+            op->setAttr("cluster_k", builder.getI32IntegerAttr(clusterK));
+            op->setAttr("cluster_assignments", DenseI32ArrayAttr::get(ctx, clusterAssignments));
         });
     }
 };

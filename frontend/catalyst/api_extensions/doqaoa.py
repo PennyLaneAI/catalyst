@@ -32,6 +32,7 @@ import pennylane as qml
 # Configuration
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class DOQAOAConfig:
     """Configuration for DO-QAOA execution.
@@ -61,6 +62,7 @@ class DOQAOAConfig:
             actually trained. Sub-problems beyond this cap receive direct copy,
             matching the DO-QAOA paper's ≤ 1 warm-start budget. Default 1.
     """
+
     m: int
     bias_threshold: float = 0.3
     warmstart_epochs: int = 10
@@ -78,7 +80,9 @@ class DOQAOAConfig:
         if self.warmstart_epochs < 1:
             raise ValueError(f"warmstart_epochs must be >= 1, got {self.warmstart_epochs}")
         if self.init_strategy not in ("shortcut", "random"):
-            raise ValueError(f"init_strategy must be 'shortcut' or 'random', got {self.init_strategy!r}")
+            raise ValueError(
+                f"init_strategy must be 'shortcut' or 'random', got {self.init_strategy!r}"
+            )
         if self.k_max is not None and self.k_max < 1:
             raise ValueError(f"k_max must be >= 1, got {self.k_max}")
         if self.landscape_grid_size < 4:
@@ -94,6 +98,7 @@ class DOQAOAConfig:
 # ---------------------------------------------------------------------------
 # Result container
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class DOQAOAResult:
@@ -122,7 +127,7 @@ class DOQAOAResult:
 
     best_k: int
     best_energy: float
-    best_params: object          # np.ndarray
+    best_params: object  # np.ndarray
     bitstring: list
     total_shots: int
     warmstart_count: int
@@ -142,6 +147,7 @@ class DOQAOAResult:
 # ---------------------------------------------------------------------------
 # Graph analysis utilities
 # ---------------------------------------------------------------------------
+
 
 def degree_centrality_sort(graph):
     """Return node indices sorted by degree centrality (highest first).
@@ -187,6 +193,7 @@ def select_hotspot_indices(graph, m: int):
 # Hamiltonian parsing utilities
 # ---------------------------------------------------------------------------
 
+
 def extract_coupling_matrix(hamiltonian):
     """Extract quadratic (J) and linear (h) coefficients from a PennyLane Hamiltonian.
 
@@ -215,9 +222,7 @@ def extract_coupling_matrix(hamiltonian):
         if isinstance(op, qml.PauliZ):
             wire = op.wires[0]
             h[wire] = h.get(wire, 0.0) + coeff
-        elif isinstance(op, qml.ops.Prod) or (
-            hasattr(op, "operands") and len(op.operands) == 2
-        ):
+        elif isinstance(op, qml.ops.Prod) or (hasattr(op, "operands") and len(op.operands) == 2):
             # PauliZ @ PauliZ product
             operands = op.operands if hasattr(op, "operands") else [op]
             wires = [o.wires[0] for o in operands if isinstance(o, qml.PauliZ)]
@@ -257,6 +262,7 @@ def compute_bias(hamiltonian, num_qubits: int) -> float:
 # ---------------------------------------------------------------------------
 # PennyLane Hamiltonian → MLIR attribute bridge
 # ---------------------------------------------------------------------------
+
 
 def hamiltonian_to_graph_attrs(hamiltonian, num_qubits: int, sparse_threshold: int = 64):
     """Convert a PennyLane Ising Hamiltonian to MLIR graph attribute strings.
@@ -304,14 +310,8 @@ def hamiltonian_to_graph_attrs(hamiltonian, num_qubits: int, sparse_threshold: i
             W[j, i] = val  # symmetric
 
         # Format as nested MLIR dense list: [[r0c0, r0c1, ...], [r1c0, ...], ...]
-        rows_str = ", ".join(
-            "[" + ", ".join(f"{v:.6e}" for v in row) + "]"
-            for row in W
-        )
-        h_quad_attr = (
-            f"#quantum.dense_graph<{N}, "
-            f"dense<[{rows_str}]> : tensor<{N}x{N}xf64>>"
-        )
+        rows_str = ", ".join("[" + ", ".join(f"{v:.6e}" for v in row) + "]" for row in W)
+        h_quad_attr = f"#quantum.dense_graph<{N}, " f"dense<[{rows_str}]> : tensor<{N}x{N}xf64>>"
     else:
         # Sparse path: COO upper-triangle only
         edges = sorted((i, j, v) for (i, j), v in J.items() if abs(v) > 1e-12)
@@ -336,6 +336,7 @@ def hamiltonian_to_graph_attrs(hamiltonian, num_qubits: int, sparse_threshold: i
 # ---------------------------------------------------------------------------
 # DO-QAOA partition decorator
 # ---------------------------------------------------------------------------
+
 
 class DOQAOAPartitionCallable:
     """Wraps a QNode to apply DO-QAOA frozen-qubit partitioning.
@@ -375,10 +376,7 @@ class DOQAOAPartitionCallable:
         return self._qnode(*args, **kwargs)
 
     def __repr__(self):
-        return (
-            f"DOQAOAPartitionCallable(m={self._config.m}, "
-            f"hotspots={self._hotspot_indices})"
-        )
+        return f"DOQAOAPartitionCallable(m={self._config.m}, " f"hotspots={self._hotspot_indices})"
 
 
 def doqaoa_partition(qnode=None, *, graph, config: DOQAOAConfig):
@@ -421,6 +419,7 @@ def doqaoa_partition(qnode=None, *, graph, config: DOQAOAConfig):
 # Minimal Adam optimizer (no external dependency)
 # ---------------------------------------------------------------------------
 
+
 class _AdamState:
     """Lightweight Adam state for a flat parameter vector."""
 
@@ -428,6 +427,7 @@ class _AdamState:
 
     def __init__(self, params):
         import numpy as np
+
         self.m = np.zeros_like(params)
         self.v = np.zeros_like(params)
         self.t = 0
@@ -436,17 +436,19 @@ class _AdamState:
 def _adam_step(params, grads, state, lr=0.01, beta1=0.9, beta2=0.999, eps=1e-8):
     """One in-place Adam step. Returns updated params and mutated state."""
     import numpy as np
+
     state.t += 1
     state.m = beta1 * state.m + (1.0 - beta1) * grads
-    state.v = beta2 * state.v + (1.0 - beta2) * grads ** 2
-    mhat = state.m / (1.0 - beta1 ** state.t)
-    vhat = state.v / (1.0 - beta2 ** state.t)
+    state.v = beta2 * state.v + (1.0 - beta2) * grads**2
+    mhat = state.m / (1.0 - beta1**state.t)
+    vhat = state.v / (1.0 - beta2**state.t)
     return params - lr * mhat / (np.sqrt(vhat) + eps)
 
 
 # ---------------------------------------------------------------------------
 # Task 4 — Autodiff-compatible parameter transfer (jax.grad + jit)
 # ---------------------------------------------------------------------------
+
 
 def _bias_transfer_jax(params_rep, params_ws, is_direct_copy: bool):
     """JAX-differentiable parameter transfer for the Bias-Aware Transfer Rule.
@@ -476,19 +478,21 @@ def _bias_transfer_jax(params_rep, params_ws, is_direct_copy: bool):
         flag = jnp.bool_(is_direct_copy)
         return jax.lax.cond(
             flag,
-            lambda p_r, p_w: jax.lax.stop_gradient(p_r),   # direct copy
-            lambda p_r, p_w: p_w,                            # warm-start
+            lambda p_r, p_w: jax.lax.stop_gradient(p_r),  # direct copy
+            lambda p_r, p_w: p_w,  # warm-start
             params_rep,
             params_ws,
         )
     except ImportError:
         import numpy as np
+
         return np.array(params_rep) if is_direct_copy else np.array(params_ws)
 
 
 # ---------------------------------------------------------------------------
 # Task 2 — Optimiser hooks (PennyLane Adam / GradientDescent)
 # ---------------------------------------------------------------------------
+
 
 class DOQAOAOptimizer:
     """PennyLane-compatible optimiser with DO-QAOA gradient isolation.
@@ -516,14 +520,19 @@ class DOQAOAOptimizer:
             params, energy = opt.step_and_cost(cost_fn, params, is_representative=True)
     """
 
-    def __init__(self, base_optimizer="adam", learning_rate: float = 0.01,
-                 stop_gradient_on_copies: bool = True):
+    def __init__(
+        self,
+        base_optimizer="adam",
+        learning_rate: float = 0.01,
+        stop_gradient_on_copies: bool = True,
+    ):
         self._lr = learning_rate
         self._stop_grad = stop_gradient_on_copies
 
         if isinstance(base_optimizer, str):
             try:
                 import pennylane as qml
+
                 if base_optimizer == "adam":
                     self._opt = qml.AdamOptimizer(stepsize=learning_rate)
                 elif base_optimizer == "gd":
@@ -534,7 +543,7 @@ class DOQAOAOptimizer:
                         "Use 'adam', 'gd', or pass a PennyLane optimizer instance."
                     )
             except ImportError:
-                self._opt = None   # fallback: use internal Adam
+                self._opt = None  # fallback: use internal Adam
         else:
             self._opt = base_optimizer
 
@@ -559,6 +568,7 @@ class DOQAOAOptimizer:
             # Direct copy / warm-start init: no gradient, return params unchanged.
             try:
                 import jax
+
                 return np.array(jax.lax.stop_gradient(params))
             except ImportError:
                 return params.copy()
@@ -578,8 +588,10 @@ class DOQAOAOptimizer:
             h = 1e-4
             grads = np.zeros_like(params)
             for i in range(len(params)):
-                p_f = params.copy(); p_f[i] += h
-                p_b = params.copy(); p_b[i] -= h
+                p_f = params.copy()
+                p_f[i] += h
+                p_b = params.copy()
+                p_b[i] -= h
                 grads[i] = (cost_fn(p_f) - cost_fn(p_b)) / (2 * h)
 
         if not hasattr(self, "_adam_state"):
@@ -588,8 +600,9 @@ class DOQAOAOptimizer:
 
     def step_and_cost(self, cost_fn, params, *, is_representative: bool = True, grad_fn=None):
         """One optimiser step, returning ``(new_params, cost)``."""
-        new_params = self.step(cost_fn, params, is_representative=is_representative,
-                               grad_fn=grad_fn)
+        new_params = self.step(
+            cost_fn, params, is_representative=is_representative, grad_fn=grad_fn
+        )
         cost = float(cost_fn(new_params))
         return new_params, cost
 
@@ -604,6 +617,7 @@ class DOQAOAOptimizer:
 # ---------------------------------------------------------------------------
 # Three-phase execution engine
 # ---------------------------------------------------------------------------
+
 
 class DOQAOAExecutor:
     """Execute the DO-QAOA three-phase training schedule via JAX.
@@ -659,10 +673,12 @@ class DOQAOAExecutor:
         qnode = self._partition._qnode
         try:
             from catalyst import qjit as catalyst_qjit
+
             return catalyst_qjit(qnode)
         except Exception:
             try:
                 import jax
+
                 return jax.jit(qnode)
             except Exception:
                 return qnode
@@ -670,6 +686,7 @@ class DOQAOAExecutor:
     def _initial_params(self):
         """Return (gamma_init, beta_init) as a numpy array of shape (2,)."""
         import numpy as np
+
         cfg = self._partition.config
         if cfg.init_strategy == "shortcut":
             return np.array([-math.pi / 6.0, -math.pi / 8.0])
@@ -679,10 +696,13 @@ class DOQAOAExecutor:
     def _finite_diff_grad(self, fn, params, k_idx, h=1e-4):
         """Finite-difference gradient of fn(params, k_idx) w.r.t. params."""
         import numpy as np
+
         grad = np.zeros_like(params)
         for i in range(len(params)):
-            p_fwd = params.copy(); p_fwd[i] += h
-            p_bwd = params.copy(); p_bwd[i] -= h
+            p_fwd = params.copy()
+            p_fwd[i] += h
+            p_bwd = params.copy()
+            p_bwd[i] -= h
             grad[i] = (fn(p_fwd, k_idx) - fn(p_bwd, k_idx)) / (2.0 * h)
         return grad
 
@@ -760,6 +780,7 @@ class DOQAOAExecutor:
         # Detect whether qnode_fn is a multi-k energy function (params, k_idx) → float
         # or a single-k compiled QNode (params,) → float.
         import inspect as _inspect
+
         try:
             _sig = _inspect.signature(compiled)
             _multi_k = len(_sig.parameters) >= 2
@@ -770,6 +791,7 @@ class DOQAOAExecutor:
             self._shot_counter += 1
             try:
                 import jax.numpy as jnp
+
                 p = jnp.array(params)
             except ImportError:
                 p = params
@@ -780,11 +802,14 @@ class DOQAOAExecutor:
         def fd_grad(params, k_idx=0):
             """Central finite-difference gradient (4 shots per call)."""
             import numpy as np
+
             h = 1e-4
             grad = np.zeros_like(params)
             for i in range(len(params)):
-                p_f = params.copy(); p_f[i] += h
-                p_b = params.copy(); p_b[i] -= h
+                p_f = params.copy()
+                p_f[i] += h
+                p_b = params.copy()
+                p_b[i] -= h
                 grad[i] = (energy(p_f, k_idx) - energy(p_b, k_idx)) / (2 * h)
             return grad
 
@@ -795,7 +820,7 @@ class DOQAOAExecutor:
         for ep in range(1, self._full_epochs + 1):
             grads = fd_grad(theta_rep, k_idx=0)
             theta_rep = _adam_step(theta_rep, grads, state_rep, lr=self._lr)
-            energy(theta_rep, 0)                 # convergence check shot
+            energy(theta_rep, 0)  # convergence check shot
             if np.linalg.norm(grads) < self._grad_norm_tol:
                 break
 
@@ -810,12 +835,13 @@ class DOQAOAExecutor:
 
             # Respect max_warmstarts cap (DO-QAOA paper: ≤ 1 warm-start)
             if mode == 2 and self._warmstart_count >= max_ws:
-                mode = 1   # force direct copy once cap reached
+                mode = 1  # force direct copy once cap reached
 
             if mode == 1:
                 # Phase 3: direct copy — jax.lax.cond stop_gradient semantics
                 try:
                     import jax.numpy as jnp
+
                     theta_ws = jnp.array(theta_rep)
                 except ImportError:
                     theta_ws = theta_rep.copy()
@@ -827,6 +853,7 @@ class DOQAOAExecutor:
                 # Phase 2: warm-start — init is stop_gradient, fine-tune has grad
                 try:
                     import jax.numpy as jnp
+
                     theta_ws = jnp.array(theta_rep)
                 except ImportError:
                     theta_ws = theta_rep.copy()
@@ -836,7 +863,7 @@ class DOQAOAExecutor:
                 for ep in range(1, self._warmstart_epochs + 1):
                     grads = fd_grad(theta_k, k_idx=k)
                     theta_k = _adam_step(theta_k, grads, state_k, lr=self._lr)
-                    energy(theta_k, k)           # convergence check shot
+                    energy(theta_k, k)  # convergence check shot
                     if np.linalg.norm(grads) < self._grad_norm_tol:
                         break
                 results[k] = (energy(theta_k, k), theta_k)
@@ -851,6 +878,7 @@ class DOQAOAExecutor:
 # ---------------------------------------------------------------------------
 # Public decorator: doqaoa_qjit
 # ---------------------------------------------------------------------------
+
 
 def doqaoa_qjit(
     partition_callable=None,
@@ -899,6 +927,7 @@ def doqaoa_qjit(
         A callable whose ``()`` call executes the three-phase schedule and
         returns ``(best_k, best_energy, best_params)``.
     """
+
     def _wrap(pc):
         executor = DOQAOAExecutor(
             pc,
@@ -908,9 +937,11 @@ def doqaoa_qjit(
             grad_norm_tol=grad_norm_tol,
             seed=seed,
         )
+
         @functools.wraps(pc)
         def _runner(*args, **kwargs):
             return executor.run()
+
         _runner.executor = executor
         _runner.partition = pc
         return _runner
@@ -925,6 +956,7 @@ def doqaoa_qjit(
 # ---------------------------------------------------------------------------
 # Internal: multi-k energy bridge
 # ---------------------------------------------------------------------------
+
 
 def _build_multi_k_energy(hamiltonian, hotspot_indices, num_qubits):
     """Build a (params, k_idx) → float energy function from a PennyLane Hamiltonian.
@@ -947,12 +979,13 @@ def _build_multi_k_energy(hamiltonian, hotspot_indices, num_qubits):
     J_dict, h_dict = extract_coupling_matrix(hamiltonian)
     N = num_qubits
     hs = list(hotspot_indices)
-    m  = len(hs)
+    m = len(hs)
 
     # Build dense N×N J matrix and N-vector h
     J_mat = np.zeros((N, N))
     for (i, j), v in J_dict.items():
-        J_mat[i, j] = v; J_mat[j, i] = v
+        J_mat[i, j] = v
+        J_mat[j, i] = v
     h_vec = np.array([h_dict.get(i, 0.0) for i in range(N)])
 
     def _energy_cf(J_free, h_eff, gamma, beta, nf):
@@ -972,22 +1005,19 @@ def _build_multi_k_energy(hamiltonian, hotspot_indices, num_qubits):
         gamma, beta = float(params[0]), float(params[1])
         # Build frozen spin assignment for sub-problem k_idx
         frozen = {hs[i]: (-1 if (k_idx >> i) & 1 else 1) for i in range(m)}
-        free   = [q for q in range(N) if q not in frozen]
-        nf     = len(free)
+        free = [q for q in range(N) if q not in frozen]
+        nf = len(free)
         # Effective linear bias: h_eff[q] = h[q] + Σ_{f frozen} J[q,f] * spin_f
-        h_eff  = np.array([
-            h_vec[q] + sum(J_mat[q, fq] * frozen[fq] for fq in frozen)
-            for q in free
-        ])
+        h_eff = np.array([h_vec[q] + sum(J_mat[q, fq] * frozen[fq] for fq in frozen) for q in free])
         # Free-free coupling sub-matrix
-        J_free = np.array([[J_mat[free[i], free[j]] for j in range(nf)]
-                           for i in range(nf)])
+        J_free = np.array([[J_mat[free[i], free[j]] for j in range(nf)] for i in range(nf)])
         return _energy_cf(J_free, h_eff, gamma, beta, nf)
 
     return multi_k_energy
 
 
 # ---------------------------------------------------------------------------
+
 
 class DOQAOATransform:
     """Returned by :func:`do_qaoa`. Call with a NetworkX graph to run the pipeline.
@@ -1049,8 +1079,9 @@ class DOQAOATransform:
 
         # 4. Speedup ratio
         total_shots = executor._shot_counter
-        speedup = (frozen_qubits_shots / total_shots
-                   if frozen_qubits_shots and total_shots > 0 else 0.0)
+        speedup = (
+            frozen_qubits_shots / total_shots if frozen_qubits_shots and total_shots > 0 else 0.0
+        )
 
         return DOQAOAResult(
             best_k=best_k,

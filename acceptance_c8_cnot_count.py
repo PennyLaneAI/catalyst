@@ -60,18 +60,20 @@ def frozen_qubits_cnot_count(circuit_fn, num_sp, params):
 
 
 TEST_CASES = [
-    ("BA(8,2)",  nx.barabasi_albert_graph(8,  2, seed=42), 1),
-    ("BA(8,2)",  nx.barabasi_albert_graph(8,  2, seed=42), 2),
+    ("BA(8,2)", nx.barabasi_albert_graph(8, 2, seed=42), 1),
+    ("BA(8,2)", nx.barabasi_albert_graph(8, 2, seed=42), 2),
     ("BA(12,2)", nx.barabasi_albert_graph(12, 2, seed=42), 3),
-    ("ER(10,.3)",nx.erdos_renyi_graph(10, 0.3, seed=10),   1),
-    ("ER(10,.3)",nx.erdos_renyi_graph(10, 0.3, seed=10),   3),
+    ("ER(10,.3)", nx.erdos_renyi_graph(10, 0.3, seed=10), 1),
+    ("ER(10,.3)", nx.erdos_renyi_graph(10, 0.3, seed=10), 3),
 ]
 
 print("=" * 70)
 print("Acceptance Criterion 8 — CNOT count: DO-QAOA = FrozenQubits at same m")
 print("=" * 70)
-print(f"\n  {'graph':>12}  {'m':>2}  {'edges':>5}  {'CNOTs/call':>10}  "
-      f"{'FQ total':>10}  {'match':>6}")
+print(
+    f"\n  {'graph':>12}  {'m':>2}  {'edges':>5}  {'CNOTs/call':>10}  "
+    f"{'FQ total':>10}  {'match':>6}"
+)
 print(f"  {'─'*12}  {'─'*2}  {'─'*5}  {'─'*10}  {'─'*10}  {'─'*6}")
 
 passed = True
@@ -100,14 +102,12 @@ for name, G, m in TEST_CASES:
     cnots_doqaoa = count_cnots(circuit, params0)
 
     # FrozenQubits: same circuit, CNOT count per call
-    cnots_fq_per_call, cnots_fq_total = frozen_qubits_cnot_count(
-        circuit, 1 << m, params0
-    )
+    cnots_fq_per_call, cnots_fq_total = frozen_qubits_cnot_count(circuit, 1 << m, params0)
 
     # Expected from formula: 2 × |edges|
     expected = 2 * G.number_of_edges()
 
-    match = (cnots_doqaoa == cnots_fq_per_call == expected)
+    match = cnots_doqaoa == cnots_fq_per_call == expected
     status = "✓" if match else "FAIL"
 
     print(
@@ -116,8 +116,7 @@ for name, G, m in TEST_CASES:
     )
 
     if not match:
-        print(f"    → DO-QAOA={cnots_doqaoa}, FQ/call={cnots_fq_per_call}, "
-              f"expected={expected}")
+        print(f"    → DO-QAOA={cnots_doqaoa}, FQ/call={cnots_fq_per_call}, " f"expected={expected}")
         passed = False
 
 print(f"\n{'='*70}")

@@ -28,17 +28,23 @@ import sys
 #    canonical MaxCut benchmark from Table IV).
 # ---------------------------------------------------------------------------
 
+
 def build_ba_graph(n=10, seed=42):
     """Return adjacency list for a Barabási-Albert n=10 graph (m_edges=2)."""
     import random
+
     rng = random.Random(seed)
     # Simple BA attachment: start with a 3-clique, attach remaining nodes.
     adj = {i: set() for i in range(n)}
+
     def add_edge(u, v):
         adj[u].add(v)
         adj[v].add(u)
+
     # Seed: triangle 0-1-2
-    add_edge(0, 1); add_edge(1, 2); add_edge(0, 2)
+    add_edge(0, 1)
+    add_edge(1, 2)
+    add_edge(0, 2)
     degrees = [2, 2, 2]
     for new_node in range(3, n):
         total_deg = sum(degrees)
@@ -59,9 +65,11 @@ def build_ba_graph(n=10, seed=42):
             degrees[t] += 1
     return adj
 
+
 def adj_to_J(adj, n):
     """Convert adjacency list to symmetric J matrix (MaxCut: J=-0.5 per edge)."""
     import numpy as np
+
     J = np.zeros((n, n))
     for u, neighbours in adj.items():
         for v in neighbours:
@@ -70,11 +78,13 @@ def adj_to_J(adj, n):
                 J[v, u] = -0.5
     return J
 
+
 # ---------------------------------------------------------------------------
 # 2. Exact QAOA p=1 energy evaluator (mirrors EnergyEval.cpp)
 # ---------------------------------------------------------------------------
 
 _shot_counter = 0
+
 
 def evaluate_energy(J, h, hotspots, k, gamma, beta):
     """Exact QAOA p=1 ⟨H_k⟩ for sub-problem k. Increments global shot counter."""
@@ -82,32 +92,32 @@ def evaluate_energy(J, h, hotspots, k, gamma, beta):
     _shot_counter += 1
 
     import numpy as np
+
     n = len(h)
-    frozen = {hotspots[i]: (-1 if (k >> i) & 1 else 1)
-              for i in range(len(hotspots))}
+    frozen = {hotspots[i]: (-1 if (k >> i) & 1 else 1) for i in range(len(hotspots))}
     free = [q for q in range(n) if q not in frozen]
     nf = len(free)
 
     # Effective bias for free qubits
-    h_eff = np.array([h[q] + sum(J[q, fq] * frozen[fq]
-                                  for fq in frozen) for q in free])
+    h_eff = np.array([h[q] + sum(J[q, fq] * frozen[fq] for fq in frozen) for q in free])
     # Free-free J sub-matrix
-    J_free = np.array([[J[free[i], free[j]] for j in range(nf)]
-                        for i in range(nf)])
+    J_free = np.array([[J[free[i], free[j]] for j in range(nf)] for i in range(nf)])
 
     # Enumerate all 2^nf basis states
     energy = 0.0
-    norm = 1.0 / (2 ** nf)
+    norm = 1.0 / (2**nf)
     for z in range(1 << nf):
         spins = np.array([1 - 2 * ((z >> i) & 1) for i in range(nf)], dtype=float)
         # Ising energy of state z
-        Ez = (0.5 * spins @ J_free @ spins + h_eff @ spins)
+        Ez = 0.5 * spins @ J_free @ spins + h_eff @ spins
         # QAOA cost unitary phase
         phase_c = np.exp(-1j * gamma * Ez)
         # Mixer B(beta): |+⟩ → ∑_z cos(β)^nf (small-angle approx suffices for counting)
         # Exact: amplitude of z after cost+mixer starting from |+⟩^⊗nf
-        amplitude = norm ** 0.5 * phase_c * np.prod(
-            np.cos(beta) - 1j * np.sin(beta) * (2 * ((np.arange(nf) >> 0) & 1) - 0)
+        amplitude = (
+            norm**0.5
+            * phase_c
+            * np.prod(np.cos(beta) - 1j * np.sin(beta) * (2 * ((np.arange(nf) >> 0) & 1) - 0))
         )
         prob = abs(amplitude) ** 2
         energy += prob * Ez
@@ -125,6 +135,7 @@ def _energy_closed_form(J_free, h_eff, gamma, beta, nf):
            + Σ_u h_eff_u · (−sin(2β)·cos(2γ·h_eff_u))
     """
     import numpy as np
+
     E = 0.0
     # ZZ contributions (edges)
     for u in range(nf):
@@ -144,20 +155,34 @@ def _energy_closed_form(J_free, h_eff, gamma, beta, nf):
 # 3. Finite-difference Adam optimiser (mirrors DOQAOAExecutor)
 # ---------------------------------------------------------------------------
 
-def adam_optimise(J, h, hotspots, k, init_gamma, init_beta,
-                  max_epochs, lr=0.01, grad_norm_tol=1e-4, h_fd=1e-4,
-                  beta1=0.9, beta2=0.999, eps=1e-8, label=""):
+
+def adam_optimise(
+    J,
+    h,
+    hotspots,
+    k,
+    init_gamma,
+    init_beta,
+    max_epochs,
+    lr=0.01,
+    grad_norm_tol=1e-4,
+    h_fd=1e-4,
+    beta1=0.9,
+    beta2=0.999,
+    eps=1e-8,
+    label="",
+):
     """Run Adam on sub-problem k. Returns (gamma*, beta*, epochs_used, converged)."""
     g, b = init_gamma, init_beta
     mg, mb, vg, vb = 0.0, 0.0, 0.0, 0.0
     converged = False
     ep = 0
     for ep in range(1, max_epochs + 1):
-        Ep   = evaluate_energy(J, h, hotspots, k, g,       b)
-        Epg  = evaluate_energy(J, h, hotspots, k, g + h_fd, b)
-        Emg  = evaluate_energy(J, h, hotspots, k, g - h_fd, b)
-        Epb  = evaluate_energy(J, h, hotspots, k, g,       b + h_fd)
-        Emb  = evaluate_energy(J, h, hotspots, k, g,       b - h_fd)
+        Ep = evaluate_energy(J, h, hotspots, k, g, b)
+        Epg = evaluate_energy(J, h, hotspots, k, g + h_fd, b)
+        Emg = evaluate_energy(J, h, hotspots, k, g - h_fd, b)
+        Epb = evaluate_energy(J, h, hotspots, k, g, b + h_fd)
+        Emb = evaluate_energy(J, h, hotspots, k, g, b - h_fd)
         dg = (Epg - Emg) / (2 * h_fd)
         db = (Epb - Emb) / (2 * h_fd)
         gnorm = math.sqrt(dg**2 + db**2)
@@ -182,6 +207,7 @@ def adam_optimise(J, h, hotspots, k, init_gamma, init_beta,
 # 4. Main DO-QAOA execution (m=2 MaxCut, three-phase schedule)
 # ---------------------------------------------------------------------------
 
+
 def run_milestone():
     global _shot_counter
     _shot_counter = 0
@@ -193,8 +219,8 @@ def run_milestone():
     num_sp = 1 << m  # 4 sub-problems
 
     adj = build_ba_graph(n=N, seed=42)
-    J   = adj_to_J(adj, N)
-    h   = np.zeros(N)
+    J = adj_to_J(adj, N)
+    h = np.zeros(N)
 
     # Select m=2 hotspot qubits by degree centrality (top-2 highest-degree)
     degrees = {u: len(nbrs) for u, nbrs in adj.items()}
@@ -210,30 +236,34 @@ def run_milestone():
     MAX_WARMSTARTS = 1  # DO-QAOA Table IV: at most 1 warm-start fire per run
 
     init_gamma = -math.pi / 6
-    init_beta  = -math.pi / 8
+    init_beta = -math.pi / 8
 
     shots_before_phase1 = _shot_counter
     g_rep, b_rep, ep_rep, conv_rep = adam_optimise(
-        J, h, hotspots, k=0,
-        init_gamma=init_gamma, init_beta=init_beta,
-        max_epochs=FULL_EPOCHS, label="rep[k=0]"
+        J,
+        h,
+        hotspots,
+        k=0,
+        init_gamma=init_gamma,
+        init_beta=init_beta,
+        max_epochs=FULL_EPOCHS,
+        label="rep[k=0]",
     )
     shots_phase1 = _shot_counter - shots_before_phase1
     e_rep = evaluate_energy(J, h, hotspots, 0, g_rep, b_rep)
 
     print(f"\nPhase 1 (full opt, k=0):")
-    print(f"  epochs={ep_rep} converged={conv_rep} "
-          f"γ*={g_rep:.4f} β*={b_rep:.4f} ⟨H⟩={e_rep:.6f}")
+    print(
+        f"  epochs={ep_rep} converged={conv_rep} " f"γ*={g_rep:.4f} β*={b_rep:.4f} ⟨H⟩={e_rep:.6f}"
+    )
     print(f"  shots used: {shots_phase1}")
 
     # --- Compute bias shifts for k=1,2,3 ---
     def compute_bias(k):
-        frozen = {hotspots[i]: (-1 if (k >> i) & 1 else 1)
-                  for i in range(m)}
+        frozen = {hotspots[i]: (-1 if (k >> i) & 1 else 1) for i in range(m)}
         free = [q for q in range(N) if q not in frozen]
         nf = len(free)
-        h_eff = np.array([h[q] + sum(J[q, fq] * frozen[fq]
-                                      for fq in frozen) for q in free])
+        h_eff = np.array([h[q] + sum(J[q, fq] * frozen[fq] for fq in frozen) for q in free])
         return sum(abs(v) for v in h_eff) / max(nf, 1)
 
     b0 = compute_bias(0)
@@ -256,9 +286,14 @@ def run_milestone():
             # Phase 2: warm-start from rep params
             warmstart_count += 1
             g_ws, b_ws, ep_ws, conv_ws = adam_optimise(
-                J, h, hotspots, k=k,
-                init_gamma=g_rep, init_beta=b_rep,
-                max_epochs=WARMSTART_EPOCHS, label=f"warm[k={k}]"
+                J,
+                h,
+                hotspots,
+                k=k,
+                init_gamma=g_rep,
+                init_beta=b_rep,
+                max_epochs=WARMSTART_EPOCHS,
+                label=f"warm[k={k}]",
             )
             e_ws = evaluate_energy(J, h, hotspots, k, g_ws, b_ws)
             results[k] = (e_ws, g_ws, b_ws, "warm_start")

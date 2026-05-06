@@ -45,20 +45,21 @@ spec = importlib.util.spec_from_file_location(
 _mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(_mod)
 
-do_qaoa               = _mod.do_qaoa
-DOQAOAResult          = _mod.DOQAOAResult
+do_qaoa = _mod.do_qaoa
+DOQAOAResult = _mod.DOQAOAResult
 _build_multi_k_energy = _mod._build_multi_k_energy
 select_hotspot_indices = _mod.select_hotspot_indices
 
 # ── Graph setup ───────────────────────────────────────────────────────────────
-N         = 12
-M         = 3
+N = 12
+M = 3
 BA_M_EDGE = 2
-SEED      = 42
+SEED = 42
 
 G = nx.barabasi_albert_graph(N, BA_M_EDGE, seed=SEED)
 cost_h, mixer_h = qml.qaoa.maxcut(G)
 dev = qml.device("default.qubit", wires=N)
+
 
 @qml.qnode(dev)
 def circuit(params):
@@ -68,21 +69,23 @@ def circuit(params):
     qml.qaoa.mixer_layer(params[1], mixer_h)
     return qml.expval(cost_h)
 
+
 print("=" * 70)
 print("Phase 5 Task 5 — Wall-clock Runtime Profiling")
 print(f"Graph: BA({N}, {BA_M_EDGE}, seed={SEED})  |  m={M}  |  sub-problems: {1<<M}")
 print("=" * 70)
+
 
 # ── FrozenQubits baseline: 2^m independent QNode-based optimisations ──────────
 # Uses the actual PennyLane circuit() for energy evaluations, matching the
 # computational cost of a real quantum circuit simulator (same as paper).
 def adam_step(p, g, state, lr=0.01):
     b1, b2, eps = 0.9, 0.999, 1e-8
-    state["t"]  += 1
-    state["m"]   = b1 * state["m"]  + (1 - b1) * g
-    state["v"]   = b2 * state["v"]  + (1 - b2) * g**2
-    mhat = state["m"] / (1 - b1**state["t"])
-    vhat = state["v"] / (1 - b2**state["t"])
+    state["t"] += 1
+    state["m"] = b1 * state["m"] + (1 - b1) * g
+    state["v"] = b2 * state["v"] + (1 - b2) * g**2
+    mhat = state["m"] / (1 - b1 ** state["t"])
+    vhat = state["v"] / (1 - b2 ** state["t"])
     return p - lr * mhat / (np.sqrt(vhat) + eps)
 
 
@@ -101,13 +104,14 @@ def frozen_qubits_sim(circuit_fn, num_sp, full_epochs=100, lr=0.01, tol=1e-4):
     total_calls = 0
     for k in range(num_sp):
         params = np.array([-math.pi / 6.0, -math.pi / 8.0])
-        state  = {"t": 0, "m": np.zeros(2), "v": np.zeros(2)}
+        state = {"t": 0, "m": np.zeros(2), "v": np.zeros(2)}
         for ep in range(full_epochs):
-            h  = 1e-4
-            g  = np.zeros(2)
+            h = 1e-4
+            g = np.zeros(2)
             for i in range(2):
                 pf, pb = params.copy(), params.copy()
-                pf[i] += h; pb[i] -= h
+                pf[i] += h
+                pb[i] -= h
                 g[i] = (circuit_fn(pf) - circuit_fn(pb)) / (2 * h)
                 total_calls += 2
             params = adam_step(params, g, state, lr=lr)
@@ -170,15 +174,17 @@ print(f"  {'─'*30}  {'─'*15}  {'─'*12}  {'─'*10}")
 print(f"  {'Wall-clock time (s)':<30} {t_fq:>15.3f}  {t_dq:>12.3f}  {speedup:>9.1f}×")
 print(f"  {'Best energy ⟨H⟩':<30} {fq_energy:>15.6f}  {result.best_energy:>12.6f}")
 print(f"  {'Opt sessions':<30} {num_sp:>15}  {1:>12}  {num_sp:>9}×")
-print(f"  {'Circuit calls':<30} {fq_shots_est:>15,}  {result.total_shots:>12,}  "
-      f"{fq_shots_est // max(result.total_shots, 1):>9}×")
+print(
+    f"  {'Circuit calls':<30} {fq_shots_est:>15,}  {result.total_shots:>12,}  "
+    f"{fq_shots_est // max(result.total_shots, 1):>9}×"
+)
 
 # ── Assertions ────────────────────────────────────────────────────────────────
 print(f"\n{'='*70}")
 passed = True
 
-TARGET_ABS     =  60.0  # s absolute cap (per task spec)
-TARGET_SPEEDUP =  10.0  # × wall-clock speedup (per task spec; paper: 10.4×)
+TARGET_ABS = 60.0  # s absolute cap (per task spec)
+TARGET_SPEEDUP = 10.0  # × wall-clock speedup (per task spec; paper: 10.4×)
 
 if t_dq < TARGET_ABS:
     print(f"PASS: DO-QAOA runtime {t_dq:.3f}s < {TARGET_ABS}s  ✓")

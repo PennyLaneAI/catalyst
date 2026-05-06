@@ -34,15 +34,16 @@ import pennylane as qml
 # Load DO-QAOA API
 # ---------------------------------------------------------------------------
 import importlib.util
+
 spec = importlib.util.spec_from_file_location(
     "doqaoa", "frontend/catalyst/api_extensions/doqaoa.py"
 )
 _mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(_mod)
 
-do_qaoa        = _mod.do_qaoa
-DOQAOAConfig   = _mod.DOQAOAConfig
-DOQAOAResult   = _mod.DOQAOAResult
+do_qaoa = _mod.do_qaoa
+DOQAOAConfig = _mod.DOQAOAConfig
+DOQAOAResult = _mod.DOQAOAResult
 DOQAOATransform = _mod.DOQAOATransform
 
 # ---------------------------------------------------------------------------
@@ -51,6 +52,7 @@ DOQAOATransform = _mod.DOQAOATransform
 
 try:
     import networkx as nx
+
     G = nx.barabasi_albert_graph(12, 2, seed=42)
     N = G.number_of_nodes()
 except ImportError:
@@ -60,28 +62,44 @@ except ImportError:
     def _build_ba(n=12, m_ba=2, seed=42):
         rng = random.Random(seed)
         adj = {i: set() for i in range(n)}
-        def add_edge(u, v): adj[u].add(v); adj[v].add(u)
-        add_edge(0,1); add_edge(1,2); add_edge(0,2)
-        degrees = [2,2,2]
+
+        def add_edge(u, v):
+            adj[u].add(v)
+            adj[v].add(u)
+
+        add_edge(0, 1)
+        add_edge(1, 2)
+        add_edge(0, 2)
+        degrees = [2, 2, 2]
         for new_node in range(3, n):
-            total = sum(degrees); targets = set()
+            total = sum(degrees)
+            targets = set()
             while len(targets) < m_ba:
-                r = rng.random()*total; acc = 0
+                r = rng.random() * total
+                acc = 0
                 for node, d in enumerate(degrees):
                     acc += d
-                    if r <= acc: targets.add(node); break
-            for t in targets: add_edge(new_node, t)
+                    if r <= acc:
+                        targets.add(node)
+                        break
+            for t in targets:
+                add_edge(new_node, t)
             degrees.append(len(adj[new_node]))
-            for t in targets: degrees[t] += 1
+            for t in targets:
+                degrees[t] += 1
         return adj
 
     _adj = _build_ba()
-    G = type("G", (), {
-        "nodes": lambda self: range(12),
-        "edges": lambda self: [(u,v) for u,ns in _adj.items() for v in ns if u<v],
-        "number_of_nodes": lambda self: 12,
-        "degree": lambda self: [(u, len(ns)) for u, ns in _adj.items()],
-    })()
+    G = type(
+        "G",
+        (),
+        {
+            "nodes": lambda self: range(12),
+            "edges": lambda self: [(u, v) for u, ns in _adj.items() for v in ns if u < v],
+            "number_of_nodes": lambda self: 12,
+            "degree": lambda self: [(u, len(ns)) for u, ns in _adj.items()],
+        },
+    )()
     N = 12
 
 print(f"Graph: 12-node Barabási-Albert (MaxCut, seed=42)")
@@ -95,6 +113,7 @@ cost_h, mixer_h = qml.qaoa.maxcut(G)
 
 dev = qml.device("default.qubit", wires=N)
 
+
 @qml.qnode(dev)
 def circuit(params):
     """QAOA p=1: Hadamard init → cost layer → mixer layer."""
@@ -104,17 +123,18 @@ def circuit(params):
     qml.qaoa.mixer_layer(params[1], mixer_h)
     return qml.expval(cost_h)
 
+
 # Sanity check: shortcut initial energy
-e0 = float(circuit(np.array([-math.pi/6, -math.pi/8])))
+e0 = float(circuit(np.array([-math.pi / 6, -math.pi / 8])))
 print(f"Initial energy (shortcut params): {e0:.4f}")
 
 # ---------------------------------------------------------------------------
 # 3. THE DELIVERABLE — one call
 # ---------------------------------------------------------------------------
 
-print("\n" + "─"*60)
+print("\n" + "─" * 60)
 print("  result = catalyst.do_qaoa(circuit, cost_h, m=3)(G)")
-print("─"*60)
+print("─" * 60)
 
 t0 = time.perf_counter()
 

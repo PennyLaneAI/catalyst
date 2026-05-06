@@ -45,17 +45,17 @@ spec = importlib.util.spec_from_file_location(
 _mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(_mod)
 
-_build_multi_k_energy  = _mod._build_multi_k_energy
+_build_multi_k_energy = _mod._build_multi_k_energy
 select_hotspot_indices = _mod.select_hotspot_indices
 
 GAMMA = np.linspace(-math.pi / 2, math.pi / 2, 16)
-BETA  = np.linspace(-math.pi / 4, math.pi / 4, 16)
-GRID  = [(g, b) for g in GAMMA for b in BETA]
+BETA = np.linspace(-math.pi / 4, math.pi / 4, 16)
+GRID = [(g, b) for g in GAMMA for b in BETA]
 
 
 def pearson_r(x, y):
     xm, ym = x - x.mean(), y - y.mean()
-    d = math.sqrt((xm ** 2).sum() * (ym ** 2).sum())
+    d = math.sqrt((xm**2).sum() * (ym**2).sum())
     return float((xm * ym).sum() / d) if d > 1e-12 else 1.0
 
 
@@ -70,27 +70,29 @@ def landscape_S(H, hs, N, k0=0, k1=1):
 # ── Reference graph from MLIR @ising_with_bias test ──────────────────────────
 # 4 qubits, path structure 0-1-2-3, hotspot=0, large bias on qubit 3 (free)
 # Explicit J=0.1 (weak coupling) + h[3]=-2.0 (strong bias) → s = h/J = 20
-N  = 4
-G  = nx.path_graph(N)          # edges: (0,1), (1,2), (2,3)
-m  = 1                         # freeze hotspot = qubit 0
-J  = 0.1                       # small coupling (matches MLIR test)
-hs = [0]                       # hotspot = qubit 0
+N = 4
+G = nx.path_graph(N)  # edges: (0,1), (1,2), (2,3)
+m = 1  # freeze hotspot = qubit 0
+J = 0.1  # small coupling (matches MLIR test)
+hs = [0]  # hotspot = qubit 0
 
 print("=" * 70)
 print("Acceptance Criterion 2 — Pearson r (m=1, with coefficients) > 0.999")
 print("=" * 70)
 
 # ── A1: Reference MLIR test case: H_BIAS = 2.0 gives |r| > 0.999 ─────────────
-H_BIAS = 7.0           # s = H_BIAS / J = 70 → |r| = 0.999265 > 0.999 (h=6.0 hits boundary exactly)
+H_BIAS = 7.0  # s = H_BIAS / J = 70 → |r| = 0.999265 > 0.999 (h=6.0 hits boundary exactly)
 # Build Ising Hamiltonian: ZZ terms with J=0.1, then add h[3]=-H_BIAS
 # Path edges: (0,1), (1,2), (2,3) with coupling J=0.1
-zz_ops   = [qml.PauliZ(0) @ qml.PauliZ(1),
-             qml.PauliZ(1) @ qml.PauliZ(2),
-             qml.PauliZ(2) @ qml.PauliZ(3)]
+zz_ops = [
+    qml.PauliZ(0) @ qml.PauliZ(1),
+    qml.PauliZ(1) @ qml.PauliZ(2),
+    qml.PauliZ(2) @ qml.PauliZ(3),
+]
 zz_coeff = [J, J, J]
-lin_ops  = [qml.PauliZ(3)]   # strong bias on free qubit 3 (not adjacent to hotspot 0)
+lin_ops = [qml.PauliZ(3)]  # strong bias on free qubit 3 (not adjacent to hotspot 0)
 lin_coef = [-H_BIAS]
-H_ref    = Hamiltonian(zz_coeff + lin_coef, zz_ops + lin_ops)
+H_ref = Hamiltonian(zz_coeff + lin_coef, zz_ops + lin_ops)
 S_ref = landscape_S(H_ref, hs, N)
 
 print(f"\n  [A1] Reference 4-qubit path, hotspot=0, h[3]={-H_BIAS:.1f}, J={J:.2f}")
@@ -107,9 +109,9 @@ bias_vals = [0.0, 2.0, 4.0, 6.0, 7.0, 10.0]
 r_vals = []
 for h_b in bias_vals:
     H2 = Hamiltonian(zz_coeff + [-h_b], zz_ops + lin_ops)
-    S  = landscape_S(H2, hs, N)
+    S = landscape_S(H2, hs, N)
     r_vals.append(S)
-    ok    = "↑" if S >= prev_r - 0.01 else "↓FAIL"
+    ok = "↑" if S >= prev_r - 0.01 else "↓FAIL"
     if S < prev_r - 0.01:
         trend_ok = False
     print(f"  {h_b/0.5:>8.2f}  {S:>8.4f}  {ok}")
@@ -122,13 +124,13 @@ print(f"\n  [A3] Path graphs P_N, hotspot=qubit 0, h[N-1]=-4.0, J=0.1 (target me
 graph_sizes = [4, 5, 6, 7, 8]
 S_list = []
 for Np in graph_sizes:
-    Gp       = nx.path_graph(Np)
-    zz_p     = [qml.PauliZ(i) @ qml.PauliZ(i+1) for i in range(Np-1)]
-    zz_cp    = [J] * (Np-1)
-    lin_p    = [qml.PauliZ(Np-1)]   # last qubit: not adj to hotspot=0 for Np>=4
-    lin_cp   = [-H_BIAS]
-    Hp       = Hamiltonian(zz_cp + lin_cp, zz_p + lin_p)
-    S        = landscape_S(Hp, [0], Np)
+    Gp = nx.path_graph(Np)
+    zz_p = [qml.PauliZ(i) @ qml.PauliZ(i + 1) for i in range(Np - 1)]
+    zz_cp = [J] * (Np - 1)
+    lin_p = [qml.PauliZ(Np - 1)]  # last qubit: not adj to hotspot=0 for Np>=4
+    lin_cp = [-H_BIAS]
+    Hp = Hamiltonian(zz_cp + lin_cp, zz_p + lin_p)
+    S = landscape_S(Hp, [0], Np)
     S_list.append(S)
     print(f"  P_{Np}  hotspot=0  bias_on={Np-1}  |r|={S:.6f}")
 

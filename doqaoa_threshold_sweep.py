@@ -32,6 +32,7 @@ import numpy as np
 # Graph generators
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def make_cycle(n):
     """N-node cycle graph.  J[i, (i+1)%N] = -0.5."""
     J = np.zeros((n, n))
@@ -84,6 +85,7 @@ def make_biased_cycle(n, h_mag=1.0):
 # Bias computation (mirrors EnergyEval::computeBias in C++)
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def compute_bias(J, h, hotspot_indices, k):
     """
     B_k = (1 / N_free) Σ|h_eff[i]|
@@ -118,6 +120,7 @@ def compute_bias(J, h, hotspot_indices, k):
 # Sweep logic
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def compute_arg_curve(J, h, hotspot_indices, thresholds):
     """
     Returns ARG(θ) for each threshold in `thresholds`.
@@ -126,16 +129,14 @@ def compute_arg_curve(J, h, hotspot_indices, thresholds):
     m = len(hotspot_indices)
     num_sp = 1 << m
 
-    b_values = np.array([compute_bias(J, h, hotspot_indices, k)
-                         for k in range(num_sp)])
+    b_values = np.array([compute_bias(J, h, hotspot_indices, k) for k in range(num_sp)])
 
-    b_rep = b_values[0]          # representative = sub-problem 0 (k=0)
+    b_rep = b_values[0]  # representative = sub-problem 0 (k=0)
     delta_b = np.abs(b_values - b_rep)
 
     # Non-representative sub-problems only (k=1..num_sp-1)
     non_rep = delta_b[1:] if num_sp > 1 else delta_b
-    arg = np.array([float((non_rep < thr).sum()) / max(len(non_rep), 1)
-                    for thr in thresholds])
+    arg = np.array([float((non_rep < thr).sum()) / max(len(non_rep), 1) for thr in thresholds])
     return arg, b_values, delta_b
 
 
@@ -144,20 +145,19 @@ def compute_arg_curve(J, h, hotspot_indices, thresholds):
 # ──────────────────────────────────────────────────────────────────────────────
 
 BENCHMARKS = [
-    ("Complete K8",    make_complete(8),    [0, 1]),
-    ("Cycle C6",       make_cycle(6),       [0, 3]),
-    ("Path P6",        make_path(6),        [0, 3]),
-    ("Star S6",        make_star(6),        [0, 2]),
-    ("Biased Cycle",   make_biased_cycle(6, 1.5), [0, 3]),
+    ("Complete K8", make_complete(8), [0, 1]),
+    ("Cycle C6", make_cycle(6), [0, 3]),
+    ("Path P6", make_path(6), [0, 3]),
+    ("Star S6", make_star(6), [0, 2]),
+    ("Biased Cycle", make_biased_cycle(6, 1.5), [0, 3]),
 ]
 
-THRESHOLDS = np.linspace(0.0, 0.8, 81)   # 0.00 to 0.80 in steps of 0.01
+THRESHOLDS = np.linspace(0.0, 0.8, 81)  # 0.00 to 0.80 in steps of 0.01
 DEFAULT_THR = 0.3
 
 
 def run_sweep():
-    print(f"\n{'Graph':<22} {'ARG@0.1':>8} {'ARG@0.3*':>9} {'ARG@0.5':>8}"
-          f"   (* paper default)")
+    print(f"\n{'Graph':<22} {'ARG@0.1':>8} {'ARG@0.3*':>9} {'ARG@0.5':>8}" f"   (* paper default)")
     print("-" * 55)
 
     results = {}
@@ -169,8 +169,7 @@ def run_sweep():
             idx = int(round(thr / (THRESHOLDS[1] - THRESHOLDS[0])))
             return arg[min(idx, len(arg) - 1)]
 
-        print(f"  {name:<20} {arg_at(0.1):>8.1%} {arg_at(0.3):>9.1%} "
-              f"{arg_at(0.5):>8.1%}")
+        print(f"  {name:<20} {arg_at(0.1):>8.1%} {arg_at(0.3):>9.1%} " f"{arg_at(0.5):>8.1%}")
 
     return results
 
@@ -179,17 +178,16 @@ def run_sweep():
 # Plotting
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def plot(results, save=False):
     try:
         import matplotlib.pyplot as plt
     except ImportError:
-        print("\nmatplotlib not found — skipping plot.  "
-              "Install with: pip install matplotlib")
+        print("\nmatplotlib not found — skipping plot.  " "Install with: pip install matplotlib")
         return
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    fig.suptitle("DO-QAOA Bias-Threshold Calibration", fontsize=13,
-                 fontweight="bold")
+    fig.suptitle("DO-QAOA Bias-Threshold Calibration", fontsize=13, fontweight="bold")
 
     # Left: ARG vs threshold for each benchmark
     ax = axes[0]
@@ -197,8 +195,9 @@ def plot(results, save=False):
     for (name, _, __), color in zip(BENCHMARKS, colors):
         arg = results[name][0]
         ax.plot(THRESHOLDS, arg * 100, label=name, color=color, linewidth=1.8)
-    ax.axvline(DEFAULT_THR, color="gray", linestyle="--", linewidth=1.2,
-               label=f"default θ={DEFAULT_THR}")
+    ax.axvline(
+        DEFAULT_THR, color="gray", linestyle="--", linewidth=1.2, label=f"default θ={DEFAULT_THR}"
+    )
     ax.set_xlabel("ΔB threshold θ", fontsize=11)
     ax.set_ylabel("ARG — direct-copy eligible (%)", fontsize=11)
     ax.set_xlim(0.0, 0.8)
@@ -221,8 +220,7 @@ def plot(results, save=False):
     for patch, color in zip(bp["boxes"], colors):
         patch.set_facecolor(color)
         patch.set_alpha(0.6)
-    ax2.axhline(DEFAULT_THR, color="gray", linestyle="--", linewidth=1.2,
-                label=f"θ={DEFAULT_THR}")
+    ax2.axhline(DEFAULT_THR, color="gray", linestyle="--", linewidth=1.2, label=f"θ={DEFAULT_THR}")
     ax2.set_ylabel("ΔB = |B_target − B_rep|", fontsize=11)
     ax2.set_xlabel("Graph type", fontsize=11)
     ax2.set_title("ΔB Distribution per Graph")
@@ -244,8 +242,9 @@ def plot(results, save=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="DO-QAOA threshold sweep")
-    parser.add_argument("--save", action="store_true",
-                        help="Save figure to doqaoa_threshold_sweep.png")
+    parser.add_argument(
+        "--save", action="store_true", help="Save figure to doqaoa_threshold_sweep.png"
+    )
     args = parser.parse_args()
 
     results = run_sweep()

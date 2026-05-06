@@ -43,24 +43,24 @@ spec = importlib.util.spec_from_file_location(
 _mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(_mod)
 
-_build_multi_k_energy  = _mod._build_multi_k_energy
+_build_multi_k_energy = _mod._build_multi_k_energy
 select_hotspot_indices = _mod.select_hotspot_indices
 
-GAMMA      = np.linspace(-math.pi / 2, math.pi / 2, 16)
-BETA       = np.linspace(-math.pi / 4, math.pi / 4, 16)
-GRID       = [(g, b) for g in GAMMA for b in BETA]
+GAMMA = np.linspace(-math.pi / 2, math.pi / 2, 16)
+BETA = np.linspace(-math.pi / 4, math.pi / 4, 16)
+GRID = [(g, b) for g in GAMMA for b in BETA]
 
 
 def pearson_r(x, y):
     xm, ym = x - x.mean(), y - y.mean()
-    d = math.sqrt((xm ** 2).sum() * (ym ** 2).sum())
+    d = math.sqrt((xm**2).sum() * (ym**2).sum())
     return float((xm * ym).sum() / d) if d > 1e-12 else 1.0
 
 
 def mean_abs_overlap(cost_h, hotspot_indices, N, num_sp):
     """Mean |Pearson_r(E_k, E_0)| for k=1..2^m-1."""
-    fn     = _build_multi_k_energy(cost_h, hotspot_indices, N)
-    ref    = np.array([fn(np.array([g, b]), 0) for (g, b) in GRID])
+    fn = _build_multi_k_energy(cost_h, hotspot_indices, N)
+    ref = np.array([fn(np.array([g, b]), 0) for (g, b) in GRID])
     scores = []
     for k in range(1, num_sp):
         ek = np.array([fn(np.array([g, b]), k) for (g, b) in GRID])
@@ -74,22 +74,22 @@ print("=" * 70)
 
 # ── A3: High-overlap reference graph (K_3, m=1) ──────────────────────────────
 print("\n  [A3] Reference: K_3 (triangle), m=1  —  target q > 0.80")
-G_k3  = nx.complete_graph(3)
+G_k3 = nx.complete_graph(3)
 cost_k3, _ = qml.qaoa.maxcut(G_k3)
 hs_k3 = select_hotspot_indices(G_k3, 1)
-q_k3  = mean_abs_overlap(cost_k3, hs_k3, 3, 2)
+q_k3 = mean_abs_overlap(cost_k3, hs_k3, 3, 2)
 print(f"       K_3 m=1  q = {q_k3:.4f}  s_eff = {2/(1+nx.diameter(G_k3)):.3f}")
 a3_pass = q_k3 > 0.80
 
 # ── A1: Low-diameter sweep (m=1) ──────────────────────────────────────────────
 low_diam_graphs = [
-    ("K_3",        nx.complete_graph(3),             1),
-    ("K_4",        nx.complete_graph(4),             1),
-    ("4-cycle",    nx.cycle_graph(4),                1),
-    ("5-cycle",    nx.cycle_graph(5),                1),
-    ("BA(6,2)",    nx.barabasi_albert_graph(6, 2, seed=1), 1),
-    ("Path P4",    nx.path_graph(4),                 1),
-    ("ER(6,.5)s1", nx.erdos_renyi_graph(6, 0.5, seed=1),  1),
+    ("K_3", nx.complete_graph(3), 1),
+    ("K_4", nx.complete_graph(4), 1),
+    ("4-cycle", nx.cycle_graph(4), 1),
+    ("5-cycle", nx.cycle_graph(5), 1),
+    ("BA(6,2)", nx.barabasi_albert_graph(6, 2, seed=1), 1),
+    ("Path P4", nx.path_graph(4), 1),
+    ("ER(6,.5)s1", nx.erdos_renyi_graph(6, 0.5, seed=1), 1),
 ]
 
 print("\n  [A1] m=1 landscape overlap: mean |S| for s_eff > sc=0.6 graphs (target > 0.55)")
@@ -99,13 +99,13 @@ q_concentrated = []
 for name, G, m in low_diam_graphs:
     if not nx.is_connected(G) or m >= G.number_of_nodes():
         continue
-    N         = G.number_of_nodes()
-    s_eff     = 2.0 / (1 + nx.diameter(G))
+    N = G.number_of_nodes()
+    s_eff = 2.0 / (1 + nx.diameter(G))
     cost_h, _ = qml.qaoa.maxcut(G)
-    hs        = select_hotspot_indices(G, m)
-    q         = mean_abs_overlap(cost_h, hs, N, 1 << m)
-    sc_mark   = "< sc" if s_eff > 0.6 else "    "
-    in_set    = s_eff > 0.6
+    hs = select_hotspot_indices(G, m)
+    q = mean_abs_overlap(cost_h, hs, N, 1 << m)
+    sc_mark = "< sc" if s_eff > 0.6 else "    "
+    in_set = s_eff > 0.6
     if in_set:
         q_concentrated.append(q)
     print(f"  {name:>14}  {s_eff:>6.3f}{sc_mark}  {q:>10.4f}  {'YES' if in_set else '─':>6}")
@@ -120,11 +120,11 @@ print(f"\n  [A2] ER(10,0.3) m=3: mean|S(k,0)| across 10 seeds  (target ≥0.60)"
 print(f"  {'seed':>5}  {'mean|S(k,0)|':>13}")
 mean_S_list = []
 for seed in SEEDS_M3:
-    G         = nx.erdos_renyi_graph(10, 0.3, seed=seed)
+    G = nx.erdos_renyi_graph(10, 0.3, seed=seed)
     assert nx.is_connected(G)
     cost_h, _ = qml.qaoa.maxcut(G)
-    hs        = select_hotspot_indices(G, 3)
-    q         = mean_abs_overlap(cost_h, hs, 10, 8)
+    hs = select_hotspot_indices(G, 3)
+    q = mean_abs_overlap(cost_h, hs, 10, 8)
     mean_S_list.append(q)
     print(f"  {seed:>5}  {q:>13.4f}")
 

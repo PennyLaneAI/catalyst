@@ -44,21 +44,21 @@ spec = importlib.util.spec_from_file_location(
 _mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(_mod)
 
-do_qaoa               = _mod.do_qaoa
-DOQAOAResult          = _mod.DOQAOAResult
+do_qaoa = _mod.do_qaoa
+DOQAOAResult = _mod.DOQAOAResult
 select_hotspot_indices = _mod.select_hotspot_indices
 extract_coupling_matrix = _mod.extract_coupling_matrix
 
 # ── Parameters ────────────────────────────────────────────────────────────────
-N_VALUES  = list(range(4, 21))     # N = 4 … 20
-M_VALUES  = [1, 2, 3]
+N_VALUES = list(range(4, 21))  # N = 4 … 20
+M_VALUES = [1, 2, 3]
 BA_M_EDGE = 2
-SEED      = 42
+SEED = 42
 
 # Paper Table IV approximate median ARG targets (%) and assertion thresholds
-ARG_TARGET   = {1: 52, 2: 37, 3: 26}
-ARG_ASSERT   = {1: 55, 2: 40, 3: 30}  # slightly relaxed for graph-to-graph variance
-SHOTS_BUDGET = 170_000                  # aggregate shots across all N=4..20 for m=3
+ARG_TARGET = {1: 52, 2: 37, 3: 26}
+ARG_ASSERT = {1: 55, 2: 40, 3: 30}  # slightly relaxed for graph-to-graph variance
+SHOTS_BUDGET = 170_000  # aggregate shots across all N=4..20 for m=3
 
 
 # ── Brute-force sub-problem E_min ─────────────────────────────────────────────
@@ -67,25 +67,23 @@ def emin_subproblem(cost_h, hotspot_indices, N, k_idx):
     J_dict, h_dict = extract_coupling_matrix(cost_h)
     J_mat = np.zeros((N, N))
     for (i, j), v in J_dict.items():
-        J_mat[i, j] = v; J_mat[j, i] = v
+        J_mat[i, j] = v
+        J_mat[j, i] = v
     h_vec = np.array([h_dict.get(i, 0.0) for i in range(N)])
 
     hs = list(hotspot_indices)
-    m  = len(hs)
+    m = len(hs)
     frozen = {hs[i]: (-1 if (k_idx >> i) & 1 else 1) for i in range(m)}
-    free   = [q for q in range(N) if q not in frozen]
-    nf     = len(free)
+    free = [q for q in range(N) if q not in frozen]
+    nf = len(free)
 
-    h_eff  = np.array([h_vec[q] + sum(J_mat[q, fq] * frozen[fq] for fq in frozen)
-                       for q in free])
-    J_free = np.array([[J_mat[free[i], free[j]] for j in range(nf)]
-                       for i in range(nf)])
+    h_eff = np.array([h_vec[q] + sum(J_mat[q, fq] * frozen[fq] for fq in frozen) for q in free])
+    J_free = np.array([[J_mat[free[i], free[j]] for j in range(nf)] for i in range(nf)])
 
     best = float("inf")
     for bits in range(1 << nf):
         spins = np.array([1 - 2 * ((bits >> i) & 1) for i in range(nf)], dtype=float)
-        e  = sum(J_free[i, j] * spins[i] * spins[j]
-                 for i in range(nf) for j in range(i + 1, nf))
+        e = sum(J_free[i, j] * spins[i] * spins[j] for i in range(nf) for j in range(i + 1, nf))
         e += float(h_eff @ spins)
         if e < best:
             best = e
@@ -99,16 +97,18 @@ print(f"ARG = 100 × |E_min − ⟨H_C⟩| / |E_min|  (Eq. 4.1, Sang et al. 2026
 print("=" * 70)
 
 # ── Results storage ───────────────────────────────────────────────────────────
-args_by_m   = {1: [], 2: [], 3: []}
-shots_by_m  = {1: [], 2: [], 3: []}
-passed      = True
-t_global    = time.perf_counter()
+args_by_m = {1: [], 2: [], 3: []}
+shots_by_m = {1: [], 2: [], 3: []}
+passed = True
+t_global = time.perf_counter()
 
 # ── Sweep ─────────────────────────────────────────────────────────────────────
 for m in M_VALUES:
     print(f"\n{'─'*70}")
     print(f"  m = {m}  (target median ARG ≈ {ARG_TARGET[m]}%,  assert ≤ {ARG_ASSERT[m]}%)")
-    print(f"  {'N':>3}  {'edges':>5}  {'shots':>6}  {'⟨H_C⟩':>8}  {'E_min':>8}  {'ARG%':>6}  status")
+    print(
+        f"  {'N':>3}  {'edges':>5}  {'shots':>6}  {'⟨H_C⟩':>8}  {'E_min':>8}  {'ARG%':>6}  status"
+    )
     print(f"  {'─'*3}  {'─'*5}  {'─'*6}  {'─'*8}  {'─'*8}  {'─'*6}  {'─'*6}")
 
     for N in N_VALUES:
@@ -116,9 +116,9 @@ for m in M_VALUES:
             print(f"  {N:>3}  {'n/a':>5}  {'─':>6}  {'─':>8}  {'─':>8}  {'─':>6}  SKIP (m≥N)")
             continue
 
-        G       = nx.barabasi_albert_graph(N, BA_M_EDGE, seed=SEED + N)
+        G = nx.barabasi_albert_graph(N, BA_M_EDGE, seed=SEED + N)
         cost_h, mixer_h = qml.qaoa.maxcut(G)
-        dev     = qml.device("default.qubit", wires=N)
+        dev = qml.device("default.qubit", wires=N)
 
         @qml.qnode(dev)
         def circuit(params):
@@ -129,7 +129,8 @@ for m in M_VALUES:
             return qml.expval(cost_h)
 
         res = do_qaoa(
-            circuit, cost_h,
+            circuit,
+            cost_h,
             m=m,
             full_epochs=100,
             warmstart_epochs=10,
@@ -140,14 +141,14 @@ for m in M_VALUES:
             bias_threshold=0.3,
         )(G)
 
-        hs   = list(select_hotspot_indices(G, m))
+        hs = list(select_hotspot_indices(G, m))
         emin = emin_subproblem(cost_h, hs, N, res.best_k)
-        arg  = 100 * abs(emin - res.best_energy) / abs(emin) if abs(emin) > 1e-9 else 0.0
+        arg = 100 * abs(emin - res.best_energy) / abs(emin) if abs(emin) > 1e-9 else 0.0
 
         args_by_m[m].append(arg)
         shots_by_m[m].append(res.total_shots)
 
-        ok     = res.best_energy < 0
+        ok = res.best_energy < 0
         status = "ok" if ok else "FAIL"
         print(
             f"  {N:>3}  {G.number_of_edges():>5}  {res.total_shots:>6,}  "
@@ -155,11 +156,13 @@ for m in M_VALUES:
         )
 
     if args_by_m[m]:
-        med   = statistics.median(args_by_m[m])
-        mean  = sum(args_by_m[m]) / len(args_by_m[m])
+        med = statistics.median(args_by_m[m])
+        mean = sum(args_by_m[m]) / len(args_by_m[m])
         agg_s = sum(shots_by_m[m])
-        print(f"\n  Median ARG = {med:.1f}%   Mean = {mean:.1f}%   "
-              f"Paper target ≈ {ARG_TARGET[m]}%   Assert ≤ {ARG_ASSERT[m]}%")
+        print(
+            f"\n  Median ARG = {med:.1f}%   Mean = {mean:.1f}%   "
+            f"Paper target ≈ {ARG_TARGET[m]}%   Assert ≤ {ARG_ASSERT[m]}%"
+        )
         print(f"  Aggregate shots (m={m}): {agg_s:,}")
 
 # ── Global assertions ─────────────────────────────────────────────────────────
@@ -190,9 +193,11 @@ else:
 print()
 if passed:
     print("PHASE 5 TASK 1 PASS ✓  — Power-law benchmark complete")
-    print(f"  ARG medians: m=1={statistics.median(args_by_m[1]):.1f}%  "
-          f"m=2={statistics.median(args_by_m[2]):.1f}%  "
-          f"m=3={statistics.median(args_by_m[3]):.1f}%")
+    print(
+        f"  ARG medians: m=1={statistics.median(args_by_m[1]):.1f}%  "
+        f"m=2={statistics.median(args_by_m[2]):.1f}%  "
+        f"m=3={statistics.median(args_by_m[3]):.1f}%"
+    )
     print(f"  Aggregate shots (m=3): {agg_m3:,}")
 else:
     print("PHASE 5 TASK 1 FAIL ✗  — see errors above")

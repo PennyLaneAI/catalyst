@@ -29,41 +29,39 @@ spec = importlib.util.spec_from_file_location(
 _mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(_mod)
 
-do_qaoa                  = _mod.do_qaoa
-DOQAOAResult             = _mod.DOQAOAResult
-select_hotspot_indices   = _mod.select_hotspot_indices
-extract_coupling_matrix  = _mod.extract_coupling_matrix
+do_qaoa = _mod.do_qaoa
+DOQAOAResult = _mod.DOQAOAResult
+select_hotspot_indices = _mod.select_hotspot_indices
+extract_coupling_matrix = _mod.extract_coupling_matrix
 
-N_VALUES     = list(range(4, 21))
-M            = 3
-P_EDGE       = 0.3
-SEED         = 42
-ARG_ASSERT   = 40          # %
-SHOTS_BUDGET = 170_000     # aggregate for m=3 across N=4..20
+N_VALUES = list(range(4, 21))
+M = 3
+P_EDGE = 0.3
+SEED = 42
+ARG_ASSERT = 40  # %
+SHOTS_BUDGET = 170_000  # aggregate for m=3 across N=4..20
 
 
 def emin_subproblem(cost_h, hotspot_indices, N, k_idx):
     J_dict, h_dict = extract_coupling_matrix(cost_h)
     J_mat = np.zeros((N, N))
     for (i, j), v in J_dict.items():
-        J_mat[i, j] = v; J_mat[j, i] = v
+        J_mat[i, j] = v
+        J_mat[j, i] = v
     h_vec = np.array([h_dict.get(i, 0.0) for i in range(N)])
 
     hs = list(hotspot_indices)
-    m  = len(hs)
+    m = len(hs)
     frozen = {hs[i]: (-1 if (k_idx >> i) & 1 else 1) for i in range(m)}
-    free   = [q for q in range(N) if q not in frozen]
-    nf     = len(free)
+    free = [q for q in range(N) if q not in frozen]
+    nf = len(free)
 
-    h_eff  = np.array([h_vec[q] + sum(J_mat[q, fq] * frozen[fq] for fq in frozen)
-                       for q in free])
-    J_free = np.array([[J_mat[free[i], free[j]] for j in range(nf)]
-                       for i in range(nf)])
+    h_eff = np.array([h_vec[q] + sum(J_mat[q, fq] * frozen[fq] for fq in frozen) for q in free])
+    J_free = np.array([[J_mat[free[i], free[j]] for j in range(nf)] for i in range(nf)])
     best = float("inf")
     for bits in range(1 << nf):
         spins = np.array([1 - 2 * ((bits >> i) & 1) for i in range(nf)], dtype=float)
-        e  = sum(J_free[i, j] * spins[i] * spins[j]
-                 for i in range(nf) for j in range(i + 1, nf))
+        e = sum(J_free[i, j] * spins[i] * spins[j] for i in range(nf) for j in range(i + 1, nf))
         e += float(h_eff @ spins)
         if e < best:
             best = e
@@ -84,9 +82,9 @@ print("Acceptance Criterion 5 — ARG on Erdős-Rényi G(N, 0.3) graphs, m=3")
 print(f"N ∈ {{{N_VALUES[0]}..{N_VALUES[-1]}}},  p={P_EDGE},  target median ARG ≤ {ARG_ASSERT}%")
 print("=" * 70)
 
-args        = []
+args = []
 total_shots = 0
-t0          = time.perf_counter()
+t0 = time.perf_counter()
 
 print(f"\n  {'N':>3}  {'edges':>5}  {'shots':>6}  {'⟨H_C⟩':>8}  {'E_min':>8}  {'ARG%':>6}  status")
 print(f"  {'─'*3}  {'─'*5}  {'─'*6}  {'─'*8}  {'─'*8}  {'─'*6}  {'─'*6}")
@@ -96,9 +94,9 @@ for N in N_VALUES:
         print(f"  {N:>3}  {'n/a':>5}  {'─':>6}  {'─':>8}  {'─':>8}  {'─':>6}  SKIP (m≥N)")
         continue
 
-    G       = _connected_er_graph(N, P_EDGE, SEED + N)
+    G = _connected_er_graph(N, P_EDGE, SEED + N)
     cost_h, mixer_h = qml.qaoa.maxcut(G)
-    dev     = qml.device("default.qubit", wires=N)
+    dev = qml.device("default.qubit", wires=N)
 
     @qml.qnode(dev)
     def circuit(params):
@@ -109,7 +107,8 @@ for N in N_VALUES:
         return qml.expval(cost_h)
 
     res = do_qaoa(
-        circuit, cost_h,
+        circuit,
+        cost_h,
         m=M,
         full_epochs=100,
         warmstart_epochs=10,
@@ -120,14 +119,14 @@ for N in N_VALUES:
         bias_threshold=0.3,
     )(G)
 
-    hs   = list(select_hotspot_indices(G, M))
+    hs = list(select_hotspot_indices(G, M))
     emin = emin_subproblem(cost_h, hs, N, res.best_k)
-    arg  = 100 * abs(emin - res.best_energy) / abs(emin) if abs(emin) > 1e-9 else 0.0
+    arg = 100 * abs(emin - res.best_energy) / abs(emin) if abs(emin) > 1e-9 else 0.0
 
     args.append(arg)
     total_shots += res.total_shots
 
-    ok     = res.best_energy < 0
+    ok = res.best_energy < 0
     status = "ok" if ok else "FAIL"
     print(
         f"  {N:>3}  {G.number_of_edges():>5}  {res.total_shots:>6,}  "
@@ -135,7 +134,7 @@ for N in N_VALUES:
     )
 
 elapsed = time.perf_counter() - t0
-med  = statistics.median(args)
+med = statistics.median(args)
 mean = sum(args) / len(args)
 
 print(f"\n{'='*70}")

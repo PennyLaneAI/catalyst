@@ -26,25 +26,23 @@ sys.modules["catalyst"] = cat_stub
 sys.modules["catalyst.api_extensions"] = cat_stub.api_extensions
 
 spec = importlib.util.spec_from_file_location(
-    "doqaoa",
-    pathlib.Path(__file__).parent /
-    "frontend/catalyst/api_extensions/doqaoa.py"
+    "doqaoa", pathlib.Path(__file__).parent / "frontend/catalyst/api_extensions/doqaoa.py"
 )
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 
-DOQAOAConfig           = mod.DOQAOAConfig
-doqaoa_partition       = mod.doqaoa_partition
+DOQAOAConfig = mod.DOQAOAConfig
+doqaoa_partition = mod.doqaoa_partition
 hamiltonian_to_graph_attrs = mod.hamiltonian_to_graph_attrs
 select_hotspot_indices = mod.select_hotspot_indices
-compute_bias           = mod.compute_bias
+compute_bias = mod.compute_bias
 
 import networkx as nx
 import pennylane as qml
 import numpy as np
 
 # ── 1. Graph and Hamiltonian ──────────────────────────────────────────────────
-G = nx.cycle_graph(4)          # 4-node cycle: edges (0,1),(1,2),(2,3),(3,0)
+G = nx.cycle_graph(4)  # 4-node cycle: edges (0,1),(1,2),(2,3),(3,0)
 NUM_QUBITS = 4
 
 cost_h = qml.Hamiltonian(
@@ -54,13 +52,14 @@ cost_h = qml.Hamiltonian(
         qml.PauliZ(1) @ qml.PauliZ(2),
         qml.PauliZ(2) @ qml.PauliZ(3),
         qml.PauliZ(3) @ qml.PauliZ(0),
-    ]
+    ],
 )
 
 # ── 2. DO-QAOA config and decorator ─────────────────────────────────────────
 config = DOQAOAConfig(m=2, bias_threshold=0.3, init_strategy="shortcut")
 
 dev = qml.device("default.qubit", wires=NUM_QUBITS)
+
 
 @doqaoa_partition(graph=G, config=config)
 @qml.qnode(dev)
@@ -74,9 +73,10 @@ def maxcut_circuit(params):
         qml.RX(params[1], wires=i)
     return qml.expval(cost_h)
 
-hotspots   = maxcut_circuit.hotspot_indices   # [0, 1]
-B_rep      = compute_bias(cost_h, NUM_QUBITS) # 0.0 (pure ZZ)
-B_target   = B_rep                            # same sub-problem → direct copy
+
+hotspots = maxcut_circuit.hotspot_indices  # [0, 1]
+B_rep = compute_bias(cost_h, NUM_QUBITS)  # 0.0 (pure ZZ)
+B_target = B_rep  # same sub-problem → direct copy
 
 # ── 3. Hamiltonian → MLIR attribute strings ──────────────────────────────────
 h_quad_attr, h_lin_attr = hamiltonian_to_graph_attrs(cost_h, NUM_QUBITS)
@@ -153,20 +153,14 @@ module {{
 """
 
 # ── 5. Write to temp file and round-trip through quantum-opt ─────────────────
-QUANTUM_OPT = (
-    pathlib.Path(__file__).parent /
-    "catalyst/mlir/build/bin/quantum-opt"
-)
+QUANTUM_OPT = pathlib.Path(__file__).parent / "catalyst/mlir/build/bin/quantum-opt"
 
 out_path = pathlib.Path(__file__).parent / "MaxCut4QubitMilestone.mlir"
 out_path.write_text(mlir_module)
 print(f"Generated: {out_path}")
 print()
 
-result = subprocess.run(
-    [str(QUANTUM_OPT), str(out_path)],
-    capture_output=True, text=True
-)
+result = subprocess.run([str(QUANTUM_OPT), str(out_path)], capture_output=True, text=True)
 
 if result.returncode != 0:
     print("=== ROUND-TRIP FAILED ===")

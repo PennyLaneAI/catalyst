@@ -43,17 +43,17 @@ spec = importlib.util.spec_from_file_location(
 )
 _mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(_mod)
-select_hotspot_indices  = _mod.select_hotspot_indices
-_build_multi_k_energy   = _mod._build_multi_k_energy
+select_hotspot_indices = _mod.select_hotspot_indices
+_build_multi_k_energy = _mod._build_multi_k_energy
 extract_coupling_matrix = _mod.extract_coupling_matrix
 
 # ── Grid ─────────────────────────────────────────────────────────────────────
-N_NODES    = 10
-P_EDGE     = 0.3
-GRID_SIZE  = 16
+N_NODES = 10
+P_EDGE = 0.3
+GRID_SIZE = 16
 
 GAMMA_RANGE = np.linspace(-math.pi / 2, math.pi / 2, GRID_SIZE)
-BETA_RANGE  = np.linspace(-math.pi / 4, math.pi / 4, GRID_SIZE)
+BETA_RANGE = np.linspace(-math.pi / 4, math.pi / 4, GRID_SIZE)
 GRID_POINTS = [(g, b) for g in GAMMA_RANGE for b in BETA_RANGE]
 
 # 10 distinct, connected ER(10, 0.3) seeds verified to give good landscape
@@ -84,7 +84,8 @@ def bias_for_k(J_dict, h_dict, hotspots, N, k_idx):
             spin = -1.0 if (k_idx >> fi) & 1 else 1.0
             pair = (min(q, fq), max(q, fq))
             h_eff += J_dict.get(pair, 0.0) * spin
-        total += abs(h_eff); cnt += 1
+        total += abs(h_eff)
+        cnt += 1
     return total / max(cnt, 1)
 
 
@@ -100,7 +101,7 @@ summary = {}
 
 configs = [
     (1, GRAPH_SEEDS_M1, 0.999, "m=1, no-coefficients  (unweighted MaxCut)"),
-    (3, GRAPH_SEEDS_M3, 0.79,  "m=3, with-coefficients (unweighted MaxCut)"),
+    (3, GRAPH_SEEDS_M3, 0.79, "m=3, with-coefficients (unweighted MaxCut)"),
 ]
 
 for m, seeds, target_r, label in configs:
@@ -108,8 +109,7 @@ for m, seeds, target_r, label in configs:
 
     print(f"\n{'─'*70}")
     print(f"  {label}  —  target mean|r_within| > {target_r}")
-    print(f"  {'seed':>6}  {'edges':>6}  {'max_dB':>8}  {'mean|S|':>8}  "
-          f"{'|r_wt|':>8}  status")
+    print(f"  {'seed':>6}  {'edges':>6}  {'max_dB':>8}  {'mean|S|':>8}  " f"{'|r_wt|':>8}  status")
     print(f"  {'─'*6}  {'─'*6}  {'─'*8}  {'─'*8}  {'─'*8}  {'─'*6}")
 
     r_list = []
@@ -124,13 +124,12 @@ for m, seeds, target_r, label in configs:
         J_dict, h_dict = extract_coupling_matrix(cost_h)
         fn = _build_multi_k_energy(cost_h, hs, N_NODES)
 
-        lands  = {k: landscape_vector(fn, k) for k in range(num_sp)}
-        biases = {k: bias_for_k(J_dict, h_dict, hs, N_NODES, k)
-                  for k in range(num_sp)}
+        lands = {k: landscape_vector(fn, k) for k in range(num_sp)}
+        biases = {k: bias_for_k(J_dict, h_dict, hs, N_NODES, k) for k in range(num_sp)}
         b0 = biases[0]
 
         absS = np.array([abs(pearson_r(lands[k], lands[0])) for k in range(1, num_sp)])
-        dBs  = np.array([abs(biases[k] - b0)               for k in range(1, num_sp)])
+        dBs = np.array([abs(biases[k] - b0) for k in range(1, num_sp)])
 
         if dBs.std() < 1e-12:
             r_within = 1.0
@@ -162,8 +161,9 @@ for m, seeds, target_r, label in configs:
 print(f"\n{'='*70}")
 for label, (mean_r, min_r, ok) in summary.items():
     sym = "✓" if ok else "✗"
-    print(f"{'PASS' if ok else 'FAIL'}: {label}  "
-          f"mean|r|={mean_r:.4f}  min|r|={min_r:.4f}  {sym}")
+    print(
+        f"{'PASS' if ok else 'FAIL'}: {label}  " f"mean|r|={mean_r:.4f}  min|r|={min_r:.4f}  {sym}"
+    )
 
 print()
 if passed:
