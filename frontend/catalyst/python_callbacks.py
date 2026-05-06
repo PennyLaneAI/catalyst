@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-This module provides the infrastructure for lowering decomposition rules using compiler callbacks.
-"""
+"""This module provides infrastructure for lowering decomposition rules using compiler callbacks."""
 
 import pennylane as qp
 
