@@ -698,6 +698,9 @@ codes only.
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where the `path_to_plugin` never be forwarded in :func:`~.passes.apply_pass_plugin`. The plugin path is now registered with the compiler during tracing.
+  [(#2790)](https://github.com/PennyLaneAI/catalyst/pull/2790)
+
 * Fixed a bug in the `split-multiple-tapes` pass where the post-split classical wrapper kept
   the `quantum.node` attribute. Downstream, the `resource-analysis` pass then misidentified
   the empty wrapper as an additional qnode, causing an empty column in `qp.specs` at MLIR levels.
