@@ -443,5 +443,18 @@ class MultiRZOpSignatureAnalyzer : public BaseSignatureAnalyzer {
     }
 };
 
+class PauliRotOpSignatureAnalyzer : public BaseSignatureAnalyzer {
+  public:
+    PauliRotOpSignatureAnalyzer() = delete;
+
+    PauliRotOpSignatureAnalyzer(PauliRotOp op, bool enableQregMode)
+        : BaseSignatureAnalyzer(op, op.getAngle(), op.getNonCtrlQubitOperands(),
+                                op.getCtrlQubitOperands(), op.getCtrlValueOperands(),
+                                op.getNonCtrlQubitResults(), op.getCtrlQubitResults(),
+                                enableQregMode)
+    {
+    }
+};
+
 } // namespace quantum
 } // namespace catalyst
