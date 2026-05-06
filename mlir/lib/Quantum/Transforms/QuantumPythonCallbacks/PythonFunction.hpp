@@ -15,7 +15,6 @@
 #pragma once
 
 #include <string>
-#include <variant>
 #include <vector>
 
 #include "llvm/ADT/StringRef.h"
@@ -26,12 +25,9 @@
 namespace catalyst {
 namespace quantum {
 
-using PyArg = std::variant<int, double, std::string>;
 using PyWires = std::vector<int>;
 
-mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotDecomp(mlir::ModuleOp module,
-                                                          llvm::StringRef moduleName,
-                                                          llvm::StringRef functionName,
-                                                          std::vector<PyArg> args, PyWires wires);
+mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotDecomp(mlir::ModuleOp module, double theta,
+                                                          std::string pauliWord, PyWires wires);
 } // namespace quantum
 } // namespace catalyst

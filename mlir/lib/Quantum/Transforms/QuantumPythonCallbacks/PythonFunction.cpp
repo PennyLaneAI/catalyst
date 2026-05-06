@@ -27,32 +27,15 @@ using namespace pybind11::literals;
 namespace catalyst {
 namespace quantum {
 
-/**
- * @brief trace and lower a python-defined circuit, returning the textual MLIR.
- *
- * @param moduleName: the name of the module containing the python function
- * @param functionName: the name of the python function to execute
- * @param args: the arguments to the python function
- * @return textual MLIR of the traced function
- */
-std::string tracePauliRotDecomp(llvm::StringRef moduleName, llvm::StringRef functionName,
-                                std::vector<PyArg> args, PyWires wires)
+std::string tracePauliRotDecomp(double theta, std::string pauliWord, PyWires wires)
 {
     py::gil_scoped_acquire acquire;
 
     try {
-        py::module_ userModule = py::module_::import(moduleName.str().c_str());
-        py::object userFunction = userModule.attr(functionName.str().c_str());
-
         py::module_ wrapperModule = py::module_::import("catalyst.python_callbacks");
         py::object wrapperFunction = wrapperModule.attr("paulirot_callback_wrapper");
 
-        py::list pyArgs;
-        for (auto arg : args) {
-            pyArgs.append(py::cast(arg));
-        }
-
-        py::object pythonResult = wrapperFunction(*pyArgs, "wires"_a = py::cast(wires));
+        py::object pythonResult = wrapperFunction(theta, pauliWord, wires);
         return pythonResult.cast<std::string>();
     }
     catch (const py::error_already_set &error) {
@@ -61,12 +44,10 @@ std::string tracePauliRotDecomp(llvm::StringRef moduleName, llvm::StringRef func
     }
 }
 
-mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotDecomp(mlir::ModuleOp module,
-                                                          llvm::StringRef moduleName,
-                                                          llvm::StringRef functionName,
-                                                          std::vector<PyArg> args, PyWires wires)
+mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotDecomp(mlir::ModuleOp module, double theta,
+                                                          std::string pauliWord, PyWires wires)
 {
-    std::string result = tracePauliRotDecomp(moduleName, functionName, args, wires);
+    std::string result = tracePauliRotDecomp(theta, pauliWord, wires);
 
     llvm::StringRef resultRef = result;
 
@@ -81,7 +62,7 @@ mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotDecomp(mlir::ModuleOp module,
     // get the lowered funcop from the python result
     mlir::OwningOpRef<mlir::func::FuncOp> funcOp;
     moduleOp->walk([&](mlir::func::FuncOp func) {
-        if (func.getName() == functionName) {
+        if (func.getName() == "_pauli_rot_decomposition") {
             func->remove();
             funcOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
             return mlir::WalkResult::interrupt();
