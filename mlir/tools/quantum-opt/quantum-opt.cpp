@@ -13,13 +13,8 @@
 // limitations under the License.
 
 #include "llvm/Support/CommandLine.h"
-<<<<<<< HEAD
-
-=======
 #include "llvm/Support/raw_ostream.h"
->>>>>>> 21acb29565e1cc21a29abf137f77f0f9cb81e954
 #include "mlir/Dialect/Func/Extensions/AllExtensions.h"
-
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
@@ -27,7 +22,6 @@
 #include "stablehlo/dialect/Register.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/integrations/c/StablehloPasses.h"
-
 #include "stablehlo/transforms/optimization/Passes.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
@@ -38,11 +32,7 @@
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
-<<<<<<< HEAD
-#include "OpenQASM/OpenQASM.h"
-=======
 #include "PBC/IR/PBCDialect.h"
->>>>>>> 21acb29565e1cc21a29abf137f77f0f9cb81e954
 #include "PauliFrame/IR/PauliFrameDialect.h"
 #include "QRef/IR/QRefDialect.h"
 #include "QecLogical/IR/QecLogicalDialect.h"
@@ -53,6 +43,8 @@
 #include "RTIO/IR/RTIODialect.h"
 
 #include "RegisterAllPasses.h"
+
+#include "OpenQASM/OpenQASM.h"
 
 namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
