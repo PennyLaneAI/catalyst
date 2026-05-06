@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
 #include "llvm/Support/CommandLine.h"
-
 
 #include "mlir/Dialect/Func/Extensions/AllExtensions.h"
 
@@ -38,18 +35,17 @@
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
+#include "OpenQASM/OpenQASM.h"
 #include "PauliFrame/IR/PauliFrameDialect.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "RTIO/IR/RTIODialect.h"
 #include "RegisterAllPasses.h"
-#include "OpenQASM/OpenQASM.h"
 
 namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
 } // namespace test
-
 
 int main(int argc, char **argv)
 {
@@ -58,7 +54,6 @@ int main(int argc, char **argv)
     catalyst::registerAllPasses();
     mlirRegisterAllStablehloPasses();
     mlir::stablehlo::registerOptimizationPasses();
-
 
     mlir::DialectRegistry registry;
     mlir::registerAllDialects(registry);
@@ -75,7 +70,7 @@ int main(int argc, char **argv)
     registry.insert<catalyst::ion::IonDialect>();
     registry.insert<catalyst::rtio::RTIODialect>();
     registry.insert<mlir::stablehlo::StablehloDialect>();
-    registry.insert<catalyst::openqasm::OpenQASMDialect>(); 
+    registry.insert<catalyst::openqasm::OpenQASMDialect>();
 
     catalyst::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::gradient::registerBufferizableOpInterfaceExternalModels(registry);

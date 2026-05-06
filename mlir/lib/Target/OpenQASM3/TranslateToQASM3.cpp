@@ -1,15 +1,15 @@
 
-#include "mlir/IR/BuiltinOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Block.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/raw_ostream.h"
 
 // Include Catalyst Dialects
 #include "Quantum/IR/QuantumDialect.h"
@@ -21,10 +21,11 @@ using namespace catalyst::quantum;
 namespace {
 
 class QASM3Emitter {
-public:
+  public:
     QASM3Emitter(raw_ostream &os) : os(os) {}
 
-    LogicalResult emitModule(ModuleOp module) {
+    LogicalResult emitModule(ModuleOp module)
+    {
         os << "OPENQASM 3.0;\ninclude \"stdgates.inc\";\n\n";
 
         // Define gates that are not in stdgates.inc but are commonly used in QASM 2.0
@@ -81,10 +82,10 @@ public:
         return success();
     }
 
-private:
+  private:
     raw_ostream &os;
     unsigned qubitCounter = 0;
-    
+
     // Map SSA values to OpenQASM variables (e.g. "q[0]")
     // In a real compiler, we might interpret AllocOp to know the array name.
     // For this task, we assume simple mapping or pass-through.
@@ -92,7 +93,8 @@ private:
     // Map SSA values to OpenQASM classical bits (e.g. "c[0]")
     DenseMap<Value, std::string> bitMap;
 
-    LogicalResult emitOperation(Operation *op) {
+    LogicalResult emitOperation(Operation *op)
+    {
         return TypeSwitch<Operation *, LogicalResult>(op)
             .Case<ModuleOp>([&](ModuleOp op) { return emitModule(op); })
             .Case<func::FuncOp>([&](func::FuncOp op) { return emitFunction(op); })
@@ -113,26 +115,30 @@ private:
             });
     }
 
-    LogicalResult emitFunction(func::FuncOp op) {
+    LogicalResult emitFunction(func::FuncOp op)
+    {
         // Simple main function or simple scope
         // If it's main, we just emit body.
         if (op.getName() == "main") {
             for (Operation &innerOp : op.getBody().front()) {
-                if (failed(emitOperation(&innerOp))) return failure();
+                if (failed(emitOperation(&innerOp)))
+                    return failure();
             }
             return success();
         }
-        
+
         // Otherwise emit as box or def (simplification)
         os << "def " << op.getName() << "() {\n";
         for (Operation &innerOp : op.getBody().front()) {
-            if (failed(emitOperation(&innerOp))) return failure();
+            if (failed(emitOperation(&innerOp)))
+                return failure();
         }
         os << "}\n";
         return success();
     }
 
-    LogicalResult emitForLoop(scf::ForOp op) {
+    LogicalResult emitForLoop(scf::ForOp op)
+    {
         // Convert scf.for to OpenQASM for
         // for i in [start:step:stop] { ... }
 
@@ -142,12 +148,12 @@ private:
 
         // Helper to extract constant integer value
         auto getConst = [](Value v) -> std::optional<int64_t> {
-             if (auto cOp = v.getDefiningOp<arith::ConstantOp>()) {
-                 if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
-                     return intAttr.getInt();
-                 }
-             }
-             return std::nullopt;
+            if (auto cOp = v.getDefiningOp<arith::ConstantOp>()) {
+                if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
+                    return intAttr.getInt();
+                }
+            }
+            return std::nullopt;
         };
 
         // Note: Catalyst uses arith.constant for bounds usually.
@@ -164,9 +170,12 @@ private:
         // If not, we'd need to emit code to compute them, but OpenQASM 3 loops expect ranges.
 
         int64_t start = 0, stop = 0, step = 1;
-        if (auto s = getConst(op.getLowerBound())) start = *s;
-        if (auto e = getConst(op.getUpperBound())) stop = *e;
-        if (auto st = getConst(op.getStep())) step = *st;
+        if (auto s = getConst(op.getLowerBound()))
+            start = *s;
+        if (auto e = getConst(op.getUpperBound()))
+            stop = *e;
+        if (auto st = getConst(op.getStep()))
+            step = *st;
 
         os << "for " << loopVar << " in [" << start << ":" << step << ":" << stop << "]";
         os << " {\n";
@@ -197,7 +206,8 @@ private:
         }
 
         for (Operation &innerOp : *op.getBody()) {
-             if (failed(emitOperation(&innerOp))) return failure();
+            if (failed(emitOperation(&innerOp)))
+                return failure();
         }
 
         os << "}\n";
@@ -227,20 +237,28 @@ private:
         return success();
     }
 
-    LogicalResult emitIf(scf::IfOp op) {
+    LogicalResult emitIf(scf::IfOp op)
+    {
         Value cond = op.getCondition();
         std::string condExpr = "unknown_cond";
 
         if (bitMap.count(cond)) {
             // Direct measurement bit: emit  if (m_i)
             condExpr = bitMap[cond];
-        } else if (auto xorOp = cond.getDefiningOp<arith::XOrIOp>()) {
+        }
+        else if (auto xorOp = cond.getDefiningOp<arith::XOrIOp>()) {
             // Negated bit: arith.xori(m_i, 1) — emit  if (m_i == false)
             Value lhs = xorOp.getLhs();
             Value rhs = xorOp.getRhs();
             Value bitVal, constVal;
-            if (bitMap.count(lhs)) { bitVal = lhs; constVal = rhs; }
-            else if (bitMap.count(rhs)) { bitVal = rhs; constVal = lhs; }
+            if (bitMap.count(lhs)) {
+                bitVal = lhs;
+                constVal = rhs;
+            }
+            else if (bitMap.count(rhs)) {
+                bitVal = rhs;
+                constVal = lhs;
+            }
             if (bitVal) {
                 if (auto cOp = constVal.getDefiningOp<arith::ConstantOp>()) {
                     if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
@@ -254,7 +272,8 @@ private:
         os << "if (" << condExpr << ") {\n";
 
         for (Operation &innerOp : op.getThenRegion().front()) {
-            if (failed(emitOperation(&innerOp))) return failure();
+            if (failed(emitOperation(&innerOp)))
+                return failure();
         }
         os << "}";
 
@@ -263,7 +282,8 @@ private:
             // But we can just print it.
             os << " else {\n";
             for (Operation &innerOp : op.getElseRegion().front()) {
-                if (failed(emitOperation(&innerOp))) return failure();
+                if (failed(emitOperation(&innerOp)))
+                    return failure();
             }
             os << "}";
         }
@@ -299,28 +319,30 @@ private:
         return success();
     }
 
-    LogicalResult emitAlloc(AllocOp op) {
+    LogicalResult emitAlloc(AllocOp op)
+    {
         // quantum.alloc(n) -> qreg q[n];
         // We need to name it.
         std::string name = "q" + std::to_string(qubitCounter++);
-        
+
         // n_qubits is an operand. Check if constant.
 
-        int64_t n = 1; 
+        int64_t n = 1;
         if (auto cOp = op.getNqubits().getDefiningOp<arith::ConstantOp>()) {
-             if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
-                 n = intAttr.getInt();
-             }
+            if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
+                n = intAttr.getInt();
+            }
         }
-        
+
         os << "qubit[" << n << "] " << name << ";\n";
-        
+
         // Map the result (register) to this name
         qubitMap[op.getResult()] = name;
         return success();
     }
-    
-    LogicalResult emitExtract(ExtractOp op) {
+
+    LogicalResult emitExtract(ExtractOp op)
+    {
         // quantum.extract(reg, idx) -> reg[idx]
         // Map result SSA to string "name[idx]"
 
@@ -336,7 +358,8 @@ private:
             llvm::errs() << "  Register value: " << reg << "\n";
             if (auto defOp = reg.getDefiningOp()) {
                 llvm::errs() << "  Defined by: " << defOp->getName() << "\n";
-            } else {
+            }
+            else {
                 llvm::errs() << "  (block argument)\n";
             }
 
@@ -347,7 +370,8 @@ private:
                 if (failed(emitAlloc(allocOp))) {
                     return failure();
                 }
-            } else {
+            }
+            else {
                 return op.emitError("Cannot emit extract: register operand not mapped");
             }
         }
@@ -361,11 +385,12 @@ private:
 
         if (idx) {
             if (auto cOp = idx.getDefiningOp<arith::ConstantOp>()) {
-                 if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
-                     i = intAttr.getInt();
-                 }
+                if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
+                    i = intAttr.getInt();
+                }
             }
-        } else if (op.getIdxAttr().has_value()) {
+        }
+        else if (op.getIdxAttr().has_value()) {
             i = op.getIdxAttr().value();
         }
 
@@ -375,7 +400,8 @@ private:
         return success();
     }
 
-    LogicalResult emitInsert(InsertOp op) {
+    LogicalResult emitInsert(InsertOp op)
+    {
         // quantum.insert just maintains SSA, OpenQASM modifies in place.
         Value inQreg = op.getInQreg();
         if (!qubitMap.count(inQreg) || qubitMap[inQreg].empty()) {
@@ -385,7 +411,8 @@ private:
         return success();
     }
 
-    LogicalResult emitCustomGate(CustomOp op) {
+    LogicalResult emitCustomGate(CustomOp op)
+    {
         // quantum.custom "name" (q1, q2)
         // or quantum.custom "name"(p1) (q1)
         llvm::StringRef gateName = op.getGateName();
@@ -394,64 +421,75 @@ private:
         // Map gate names from QASM 2.0 (qelib1.inc) to QASM 3.0 (stdgates.inc)
         if (gateName == "cnot") {
             qasmGateName = "cx";
-        } else if (gateName == "cu1") {
+        }
+        else if (gateName == "cu1") {
             // cu1(lambda) in QASM 2.0 is equivalent to cp(lambda) in QASM 3.0
             qasmGateName = "cp";
-        } else if (gateName == "rzz" || gateName == "rxx" || gateName == "ryy") {
+        }
+        else if (gateName == "rzz" || gateName == "rxx" || gateName == "ryy") {
             // These gates are not in stdgates.inc but are valid parameterized gates
             // We'll emit them as-is and they should work in QASM 3.0
             qasmGateName = gateName.str();
-        } else {
+        }
+        else {
             qasmGateName = gateName.str();
         }
 
         os << qasmGateName;
-        
+
         auto params = op.getParams();
         if (!params.empty()) {
             os << "(";
             for (size_t i = 0; i < params.size(); ++i) {
-                 Value p = params[i];
-                 // Try to resolve constant
-                 if (auto cOp = p.getDefiningOp<arith::ConstantOp>()) {
-                     if (auto floatAttr = dyn_cast<FloatAttr>(cOp.getValue())) {
-                         os << floatAttr.getValueAsDouble();
-                     } else if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
-                         os << intAttr.getInt();
-                     } else {
-                         os << "unknown_param";
-                     }
-                 } else {
-                     os << "unknown_param";
-                 }
-                 
-                 if (i < params.size() - 1) os << ", ";
+                Value p = params[i];
+                // Try to resolve constant
+                if (auto cOp = p.getDefiningOp<arith::ConstantOp>()) {
+                    if (auto floatAttr = dyn_cast<FloatAttr>(cOp.getValue())) {
+                        os << floatAttr.getValueAsDouble();
+                    }
+                    else if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
+                        os << intAttr.getInt();
+                    }
+                    else {
+                        os << "unknown_param";
+                    }
+                }
+                else {
+                    os << "unknown_param";
+                }
+
+                if (i < params.size() - 1)
+                    os << ", ";
             }
             os << ")";
         }
-        
+
         os << " ";
-        
+
         auto operands = op.getInQubits();
         for (size_t i = 0; i < operands.size(); ++i) {
             Value q = operands[i];
             // Lookup name
             if (qubitMap.count(q) && !qubitMap[q].empty()) {
-                 os << qubitMap[q];
-            } else {
-                 // Input qubit not mapped - this should not happen in well-formed IR
-                 // after proper SSA canonicalization
-                 llvm::errs() << "ERROR: Gate '" << gateName << "' input qubit not mapped\n";
-                 llvm::errs() << "  Input value: " << q << "\n";
-                 if (auto opResult = dyn_cast<OpResult>(q)) {
-                     llvm::errs() << "  This is result #" << opResult.getResultNumber()
-                                  << " of operation " << opResult.getDefiningOp()->getName() << "\n";
-                 }
-                 llvm::errs() << "  Hint: This may be caused by complex SSA patterns from quantum-opt canonicalization.\n";
-                 llvm::errs() << "  Try disabling canonicalization or decomposing the circuit further.\n";
-                 return op.emitError("Cannot emit gate: input qubit not mapped to QASM variable");
+                os << qubitMap[q];
             }
-            if (i < operands.size() - 1) os << ", ";
+            else {
+                // Input qubit not mapped - this should not happen in well-formed IR
+                // after proper SSA canonicalization
+                llvm::errs() << "ERROR: Gate '" << gateName << "' input qubit not mapped\n";
+                llvm::errs() << "  Input value: " << q << "\n";
+                if (auto opResult = dyn_cast<OpResult>(q)) {
+                    llvm::errs() << "  This is result #" << opResult.getResultNumber()
+                                 << " of operation " << opResult.getDefiningOp()->getName() << "\n";
+                }
+                llvm::errs() << "  Hint: This may be caused by complex SSA patterns from "
+                                "quantum-opt canonicalization.\n";
+                llvm::errs()
+                    << "  Try disabling canonicalization or decomposing the circuit further.\n";
+                return op.emitError("Cannot emit gate: input qubit not mapped to QASM variable");
+            }
+            if (i < operands.size() - 1)
+                os << ", ";
         }
         os << ";\n";
 
@@ -469,26 +507,29 @@ private:
         size_t numToMap = std::min(results.size(), operands.size());
 
         for (size_t i = 0; i < numToMap; ++i) {
-             Value inQ = operands[i];
-             Value outQ = results[i];
+            Value inQ = operands[i];
+            Value outQ = results[i];
 
-             // Check if input is in map
-             bool hasMapping = qubitMap.count(inQ) > 0;
-             bool hasEmptyMapping = hasMapping && qubitMap[inQ].empty();
+            // Check if input is in map
+            bool hasMapping = qubitMap.count(inQ) > 0;
+            bool hasEmptyMapping = hasMapping && qubitMap[inQ].empty();
 
-             if (hasMapping && !hasEmptyMapping) {
-                 // IMPORTANT: Copy the mapped name to a local variable FIRST before inserting.
-                 // Direct assignment like `qubitMap[outQ] = qubitMap[inQ]` can cause issues
-                 // with LLVM DenseMap when the map is modified during lookup (iterator invalidation).
-                 std::string mappedName = qubitMap[inQ];
-                 qubitMap[outQ] = mappedName;
-             } else {
-                 // If input not mapped or has empty mapping, skip this result
-                 // This can happen with complex control flow patterns from quantum-opt canonicalization
-                 llvm::errs() << "WARNING: Skipping output qubit mapping for gate "
-                              << gateName << " operand " << i
-                              << " (input " << (hasEmptyMapping ? "has empty mapping" : "not mapped") << ")\n";
-             }
+            if (hasMapping && !hasEmptyMapping) {
+                // IMPORTANT: Copy the mapped name to a local variable FIRST before inserting.
+                // Direct assignment like `qubitMap[outQ] = qubitMap[inQ]` can cause issues
+                // with LLVM DenseMap when the map is modified during lookup (iterator
+                // invalidation).
+                std::string mappedName = qubitMap[inQ];
+                qubitMap[outQ] = mappedName;
+            }
+            else {
+                // If input not mapped or has empty mapping, skip this result
+                // This can happen with complex control flow patterns from quantum-opt
+                // canonicalization
+                llvm::errs() << "WARNING: Skipping output qubit mapping for gate " << gateName
+                             << " operand " << i << " (input "
+                             << (hasEmptyMapping ? "has empty mapping" : "not mapped") << ")\n";
+            }
         }
 
         // If there are extra results (shouldn't happen for quantum gates), warn
@@ -496,11 +537,12 @@ private:
             llvm::errs() << "WARNING: Gate " << gateName << " has " << results.size()
                          << " results but " << operands.size() << " operands\n";
         }
-        
+
         return success();
     }
 
-    LogicalResult emitMeasure(MeasureOp op) {
+    LogicalResult emitMeasure(MeasureOp op)
+    {
         // quantum.measure(q) -> (bit, q_out)
         // In QASM: bit c = measure q; -> bit c; c = measure q;
 
@@ -508,7 +550,8 @@ private:
         std::string qName;
         if (qubitMap.count(measureQubit) && !qubitMap[measureQubit].empty()) {
             qName = qubitMap[measureQubit];
-        } else {
+        }
+        else {
             // Qubit not mapped - should not happen in well-formed IR
             return op.emitError("Cannot emit measure: qubit operand not mapped to QASM variable");
         }
@@ -531,17 +574,17 @@ private:
 
 } // namespace
 
-LogicalResult translateModuleToOpenQASM3(ModuleOp module, raw_ostream &output) {
+LogicalResult translateModuleToOpenQASM3(ModuleOp module, raw_ostream &output)
+{
     QASM3Emitter emitter(output);
     return emitter.emitModule(module);
 }
 
 namespace mlir {
-void registerToQASM3Translation() {
+void registerToQASM3Translation()
+{
     static TranslateFromMLIRRegistration registration(
-        "mlir-to-qasm3",
-        "Translate MLIR to OpenQASM 3.0",
-        translateModuleToOpenQASM3,
+        "mlir-to-qasm3", "Translate MLIR to OpenQASM 3.0", translateModuleToOpenQASM3,
         [](DialectRegistry &registry) {
             registry.insert<catalyst::quantum::QuantumDialect>();
             registry.insert<scf::SCFDialect>();
@@ -549,4 +592,4 @@ void registerToQASM3Translation() {
             registry.insert<arith::ArithDialect>();
         });
 }
-}
+} // namespace mlir
