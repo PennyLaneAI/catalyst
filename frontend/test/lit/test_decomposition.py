@@ -35,28 +35,6 @@ from catalyst.passes import graph_decomposition
 # pylint: disable=too-many-lines
 
 
-# Helper to skip tests that fail due to PauliRot type annotation issue
-# TODO: Remove this once PennyLane fixes the PauliRot decomposition type annotations
-def skip_if_pauli_rot_issue(test_func):
-    """Wrapper to skip tests that fail due to PauliRot type annotation issues."""
-
-    def wrapper():
-        try:
-            test_func()
-        except (ValueError, IndexError) as e:
-            error_msg = str(e)
-            if (
-                "Unsupported type annotation None for parameter pauli_word" in error_msg
-                or "Unsupported type annotation <class 'str'> for parameter pauli_word" in error_msg
-                or "index is out of bounds for axis" in error_msg
-            ):
-                print(f"# SKIPPED {test_func.__name__}: PauliRot type annotation issue")
-            else:
-                raise
-
-    return wrapper
-
-
 TEST_PATH = os.path.dirname(__file__)
 CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")
 
@@ -825,7 +803,7 @@ def test_decomposition_rule_name_update_multi_qubits():
     qp.decomposition.disable_graph()
 
 
-skip_if_pauli_rot_issue(test_decomposition_rule_name_update_multi_qubits)()
+test_decomposition_rule_name_update_multi_qubits()
 
 
 def test_decomposition_rule_name_adjoint():
@@ -862,7 +840,7 @@ def test_decomposition_rule_name_adjoint():
     qp.decomposition.disable_graph()
 
 
-skip_if_pauli_rot_issue(test_decomposition_rule_name_adjoint)()
+test_decomposition_rule_name_adjoint()
 
 
 # TODO: Reenable this once the underlying non-determinism issue is resolved
@@ -895,7 +873,7 @@ def test_decomposition_rule_name_ctrl():
     qp.decomposition.disable_graph()
 
 
-skip_if_pauli_rot_issue(test_decomposition_rule_name_ctrl)()
+test_decomposition_rule_name_ctrl()
 
 
 # TODO: Reenable this once the underlying non-determinism issue is resolved
@@ -929,7 +907,7 @@ def test_qft_decomposition():
     qp.decomposition.disable_graph()
 
 
-skip_if_pauli_rot_issue(test_qft_decomposition)()
+test_qft_decomposition()
 
 
 def test_decompose_lowering_with_other_passes():
@@ -971,7 +949,7 @@ def test_decompose_lowering_with_other_passes():
     qp.decomposition.disable_graph()
 
 
-skip_if_pauli_rot_issue(test_decompose_lowering_with_other_passes)()
+test_decompose_lowering_with_other_passes()
 
 
 def test_decompose_lowering_multirz():
@@ -1055,7 +1033,7 @@ def test_decompose_lowering_with_ordered_passes():
     qp.decomposition.disable_graph()
 
 
-skip_if_pauli_rot_issue(test_decompose_lowering_with_ordered_passes)()
+test_decompose_lowering_with_ordered_passes()
 
 
 def test_decompose_lowering_with_gphase():
@@ -1087,7 +1065,7 @@ def test_decompose_lowering_with_gphase():
     qp.decomposition.disable_graph()
 
 
-skip_if_pauli_rot_issue(test_decompose_lowering_with_gphase)()
+test_decompose_lowering_with_gphase()
 
 
 def test_decompose_lowering_alt_decomps():
@@ -1159,7 +1137,7 @@ def test_decompose_lowering_with_tensorlike():
     qp.decomposition.disable_graph()
 
 
-skip_if_pauli_rot_issue(test_decompose_lowering_with_tensorlike)()
+test_decompose_lowering_with_tensorlike()
 
 
 def test_decompose_lowering_fallback():
