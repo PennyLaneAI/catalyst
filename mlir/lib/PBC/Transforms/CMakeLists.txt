@@ -46,9 +46,16 @@ set(DEPENDS
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
 target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 
-target_link_libraries(${LIBRARY_NAME} 
+target_link_libraries(${LIBRARY_NAME}
     PRIVATE nlohmann_json::nlohmann_json
 )
+
+# pbc-transforms links against third-party targets (nlohmann_json, PBCUtils/libstim)
+# that are not in any CMake export set. Remove it immediately after registration
+# so the cmake/modules export() call never sees it, matching qec-transforms behaviour.
+get_property(_mlir_exports GLOBAL PROPERTY MLIR_EXPORTS)
+list(REMOVE_ITEM _mlir_exports ${LIBRARY_NAME})
+set_property(GLOBAL PROPERTY MLIR_EXPORTS ${_mlir_exports})
 
 # Disable warning from json library
 if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
