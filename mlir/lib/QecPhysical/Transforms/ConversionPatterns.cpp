@@ -16,9 +16,12 @@
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include <mlir/IR/BuiltinOps.h>
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "Catalyst/Utils/EnsureFunctionDeclaration.h"
+#include "Catalyst/Utils/StaticAllocas.h"
 #include "QecPhysical/IR/QecPhysicalOps.h"
 #include "QecPhysical/Transforms/Patterns.h"
 
@@ -84,30 +87,26 @@ struct DecodeEsmCssOpPattern : public OpConversionPattern<DecodeEsmCssOp> {
         errIdxVectorType = conv->convertType(MemRefType::get(
             {llvm::dyn_cast<mlir::ShapedType>(op.getErrIdxIn().getType()).getDimSize(0)}, i64));
 
-        // Define Tanner Graph struct type
-        auto tannerGraphStruct = LLVM::LLVMStructType::getLiteral(ctx, {ptrTy, ptrTy});
 
-        // Convert qecp.tanner_graph type to tannerGraphStruct
-        auto convertedTannerGraphStruct = UnrealizedConversionCastOp::create(
-                                              rewriter, loc, tannerGraphStruct, op.getTannerGraph())
-                                              .getResult(0);
+        auto tannerStructType = conv->convertType(op.getTannerGraph().getType());
+        auto convertedTannerStruct =
+            UnrealizedConversionCastOp::create(rewriter, loc, tannerStructType, op.getTannerGraph())
+                .getResult(0);
 
         Value esmAlloca = catalyst::getStaticAlloca(loc, rewriter, esmVectorType, 1);
         Value errIdxAlloca = catalyst::getStaticAlloca(loc, rewriter, errIdxVectorType, 1);
-        Value tannerGraphAlloca = catalyst::getStaticAlloca(loc, rewriter, tannerGraphStruct, 1);
 
         LLVM::StoreOp::create(rewriter, loc, adaptor.getEsm(), esmAlloca);
         LLVM::StoreOp::create(rewriter, loc, adaptor.getErrIdxIn(), errIdxAlloca);
-        LLVM::StoreOp::create(rewriter, loc, convertedTannerGraphStruct, tannerGraphAlloca);
 
         // Define function signature
         StringRef fnName = "__catalyst__qecp__lut_decoder";
 
-        Type fnSignature = LLVM::LLVMFunctionType::get(voidTy, {ptrTy, ptrTy, ptrTy}, false);
+        Type fnSignature = LLVM::LLVMFunctionType::get(voidTy, {tannerStructType, ptrTy, ptrTy}, false);
         LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, fnName, fnSignature);
 
-        SmallVector<Value> args = {tannerGraphAlloca, esmAlloca, errIdxAlloca};
+        SmallVector<Value> args = {convertedTannerStruct, esmAlloca, errIdxAlloca};
 
         LLVM::CallOp::create(rewriter, loc, fnDecl, args);
 
