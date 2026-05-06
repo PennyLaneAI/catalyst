@@ -98,21 +98,25 @@ module {
 // -----
 
 module {
+    // CHECK: llvm.func @__catalyst__qecp__lut_decoder(!llvm.struct<"TannerGraph", 
     memref.global "private" constant @__constant_3xi1 : memref<3xi1> = dense<[1, 1, 0]> {alignment = 64 : i64}
     memref.global "private" constant @__constant_8xi32 : memref<8xi32> = dense<[3, 3, 4, 4, 0, 1, 1, 2]> {alignment = 64 : i64}
     memref.global "private" constant @__constant_6xi32 : memref<6xi32> = dense<[0, 1, 3, 4, 6, 8]> {alignment = 64 : i64}
-    // CHECK-LABEL: llvm.func @test_psudo_qec_cycle(
-    func.func @test_psudo_qec_cycle(){
+    // CHECK-LABEL: llvm.func @test_psudo_qec_cycle()
+    func.func @test_psudo_qec_cycle() {
         %row_idx = memref.get_global @__constant_8xi32 : memref<8xi32>
         %col_ptr = memref.get_global @__constant_6xi32 : memref<6xi32>
 
+        //      CHECK: [[TG0:%.+]] = llvm.mlir.undef : !llvm.struct<"TannerGraph", (
+        // CHECK-SAME:     struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>,
+        // CHECK-SAME:     struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>)>
         %tanner = qecp.assemble_tanner %row_idx, %col_ptr : memref<8xi32>, memref<6xi32> -> !qecp.tanner_graph<8, 6, i32>
 
         %esm = memref.get_global @__constant_3xi1 : memref<3xi1>
 
-        // Bufferized form: `convert-qecp-to-llvm` expects `err_idx_in` (no tensor result) for the
-        // decode lowering path used in this pipeline (no one-shot-bufferize here).
         %err_buf = memref.alloc() : memref<2xindex>
+        // CHECK-NOT: builtin.unrealized_conversion_cast
+        // CHECK: llvm.call @__catalyst__qecp__lut_decoder({{.+}}, {{.+}}, {{.+}})
         qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm in(%err_buf : memref<2xindex>) : memref<3xi1>
         memref.dealloc %err_buf : memref<2xindex>
 
