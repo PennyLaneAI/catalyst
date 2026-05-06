@@ -27,10 +27,6 @@ file(GLOB SRC
     SplitMultipleTapes.cpp
     TBAAPatterns.cpp
     TBAATagsPass.cpp
-    EmptyPass.cpp
-    mark_entry_point_args_non_writable.cpp
-    ResourceTrackerPass.cpp
-    RegisterDecompRuleResourcePass.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
