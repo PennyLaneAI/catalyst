@@ -96,9 +96,9 @@ struct DirectTransferPass : impl::DirectTransferPassBase<DirectTransferPass> {
             // In the current IR structure all bias_transfer ops in a FuncOp
             // belong conceptually to a single freeze_partition (one circuit).
             func.walk([&](BiasTransferOp btOp) {
-                double bRep = btOp.getBRep();
-                double bTarg = btOp.getBTarget();
-                double thr = btOp.getThreshold();
+                double bRep = btOp.getBRep().convertToDouble();
+                double bTarg = btOp.getBTarget().convertToDouble();
+                double thr = btOp.getThreshold().convertToDouble();
                 double deltaB = std::fabs(bTarg - bRep);
 
                 // ── Shape verification ────────────────────────────────────
