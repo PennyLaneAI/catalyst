@@ -14,6 +14,7 @@ from qiskit.circuit.random import random_circuit
 # Import QuantumVolume circuit class
 try:
     from qiskit.circuit.library import QuantumVolume
+
     HAS_QUANTUM_VOLUME = True
 except ImportError:
     HAS_QUANTUM_VOLUME = False
@@ -31,7 +32,7 @@ class RandomCircuitConfig:
         conditional: bool = False,
         reset: bool = False,
         seed: Optional[int] = None,
-        gate_set: Optional[List[str]] = None
+        gate_set: Optional[List[str]] = None,
     ):
         """
         Initialize circuit configuration.
@@ -89,16 +90,13 @@ class RandomCircuitGenerator:
             measure=config.measure,
             conditional=config.conditional,
             reset=config.reset,
-            seed=seed
+            seed=seed,
         )
 
         return circuit
 
     def generate_quantum_volume(
-        self,
-        num_qubits: int,
-        depth: Optional[int] = None,
-        seed: Optional[int] = None
+        self, num_qubits: int, depth: Optional[int] = None, seed: Optional[int] = None
     ) -> QuantumCircuit:
         """
         Generate a quantum volume circuit.
@@ -134,10 +132,7 @@ class RandomCircuitGenerator:
         return qv_circuit
 
     def generate_clifford_random(
-        self,
-        num_qubits: int,
-        num_gates: int,
-        seed: Optional[int] = None
+        self, num_qubits: int, num_gates: int, seed: Optional[int] = None
     ) -> QuantumCircuit:
         """
         Generate a random Clifford circuit.
@@ -156,6 +151,7 @@ class RandomCircuitGenerator:
         """
         try:
             from qiskit.circuit.random import random_clifford_circuit
+
             seed = seed if seed is not None else self.global_seed
             circuit = random_clifford_circuit(num_qubits, num_gates, seed=seed)
             circuit.measure_all()
@@ -165,17 +161,14 @@ class RandomCircuitGenerator:
             return self._generate_clifford_fallback(num_qubits, num_gates, seed)
 
     def _generate_clifford_fallback(
-        self,
-        num_qubits: int,
-        num_gates: int,
-        seed: Optional[int] = None
+        self, num_qubits: int, num_gates: int, seed: Optional[int] = None
     ) -> QuantumCircuit:
         """Fallback method to generate Clifford circuits manually."""
         if seed is not None:
             random.seed(seed)
 
         qc = QuantumCircuit(num_qubits)
-        clifford_gates_1q = ['h', 's', 'sdg', 'x', 'y', 'z']
+        clifford_gates_1q = ["h", "s", "sdg", "x", "y", "z"]
 
         for _ in range(num_gates):
             # Randomly choose between 1-qubit and 2-qubit gates
@@ -191,11 +184,7 @@ class RandomCircuitGenerator:
         return qc
 
     def generate_custom_gate_set(
-        self,
-        num_qubits: int,
-        depth: int,
-        gate_set: List[str],
-        seed: Optional[int] = None
+        self, num_qubits: int, depth: int, gate_set: List[str], seed: Optional[int] = None
     ) -> QuantumCircuit:
         """
         Generate a random circuit with a custom gate set.
@@ -220,9 +209,9 @@ class RandomCircuitGenerator:
         parameterized_gates = []
 
         for gate in gate_set:
-            if gate in ['cx', 'cz', 'cy', 'swap', 'cnot']:
+            if gate in ["cx", "cz", "cy", "swap", "cnot"]:
                 two_qubit_gates.append(gate)
-            elif gate in ['rx', 'ry', 'rz', 'u1', 'u2', 'u3', 'cp', 'crx', 'cry', 'crz']:
+            elif gate in ["rx", "ry", "rz", "u1", "u2", "u3", "cp", "crx", "cry", "crz"]:
                 parameterized_gates.append(gate)
             else:
                 single_qubit_gates.append(gate)
@@ -231,45 +220,45 @@ class RandomCircuitGenerator:
             # Choose gate type
             available_types = []
             if single_qubit_gates:
-                available_types.append('1q')
+                available_types.append("1q")
             if two_qubit_gates and num_qubits > 1:
-                available_types.append('2q')
+                available_types.append("2q")
             if parameterized_gates:
-                available_types.append('param')
+                available_types.append("param")
 
             if not available_types:
                 break
 
             gate_type = random.choice(available_types)
 
-            if gate_type == '1q':
+            if gate_type == "1q":
                 gate = random.choice(single_qubit_gates)
                 qubit = random.randint(0, num_qubits - 1)
                 getattr(qc, gate)(qubit)
 
-            elif gate_type == '2q':
+            elif gate_type == "2q":
                 gate = random.choice(two_qubit_gates)
                 q1, q2 = random.sample(range(num_qubits), 2)
-                if gate == 'cnot':
-                    gate = 'cx'
+                if gate == "cnot":
+                    gate = "cx"
                 getattr(qc, gate)(q1, q2)
 
-            elif gate_type == 'param':
+            elif gate_type == "param":
                 gate = random.choice(parameterized_gates)
                 param = random.uniform(0, 2 * 3.14159)  # 0 to 2π
 
-                if gate in ['rx', 'ry', 'rz', 'u1']:
+                if gate in ["rx", "ry", "rz", "u1"]:
                     qubit = random.randint(0, num_qubits - 1)
                     getattr(qc, gate)(param, qubit)
-                elif gate in ['crx', 'cry', 'crz', 'cp']:
+                elif gate in ["crx", "cry", "crz", "cp"]:
                     q1, q2 = random.sample(range(num_qubits), 2)
                     getattr(qc, gate)(param, q1, q2)
-                elif gate == 'u2':
+                elif gate == "u2":
                     qubit = random.randint(0, num_qubits - 1)
                     phi = random.uniform(0, 2 * 3.14159)
                     lam = random.uniform(0, 2 * 3.14159)
-                    qc.u(3.14159/2, phi, lam, qubit)  # U2 is U(π/2, φ, λ)
-                elif gate == 'u3':
+                    qc.u(3.14159 / 2, phi, lam, qubit)  # U2 is U(π/2, φ, λ)
+                elif gate == "u3":
                     qubit = random.randint(0, num_qubits - 1)
                     theta = random.uniform(0, 3.14159)
                     phi = random.uniform(0, 2 * 3.14159)
@@ -280,10 +269,7 @@ class RandomCircuitGenerator:
         return qc
 
     def generate_batch(
-        self,
-        config: RandomCircuitConfig,
-        count: int,
-        circuit_type: str = 'standard'
+        self, config: RandomCircuitConfig, count: int, circuit_type: str = "standard"
     ) -> List[QuantumCircuit]:
         """
         Generate a batch of random circuits.
@@ -302,7 +288,7 @@ class RandomCircuitGenerator:
             # Use different seed for each circuit
             seed = config.seed + i if config.seed is not None else None
 
-            if circuit_type == 'standard':
+            if circuit_type == "standard":
                 config_copy = RandomCircuitConfig(
                     num_qubits=config.num_qubits,
                     depth=config.depth,
@@ -311,30 +297,19 @@ class RandomCircuitGenerator:
                     conditional=config.conditional,
                     reset=config.reset,
                     seed=seed,
-                    gate_set=config.gate_set
+                    gate_set=config.gate_set,
                 )
                 circuit = self.generate_standard_random(config_copy)
 
-            elif circuit_type == 'qv':
-                circuit = self.generate_quantum_volume(
-                    config.num_qubits,
-                    config.depth,
-                    seed=seed
-                )
+            elif circuit_type == "qv":
+                circuit = self.generate_quantum_volume(config.num_qubits, config.depth, seed=seed)
 
-            elif circuit_type == 'clifford':
-                circuit = self.generate_clifford_random(
-                    config.num_qubits,
-                    config.depth,
-                    seed=seed
-                )
+            elif circuit_type == "clifford":
+                circuit = self.generate_clifford_random(config.num_qubits, config.depth, seed=seed)
 
-            elif circuit_type == 'custom' and config.gate_set:
+            elif circuit_type == "custom" and config.gate_set:
                 circuit = self.generate_custom_gate_set(
-                    config.num_qubits,
-                    config.depth,
-                    config.gate_set,
-                    seed=seed
+                    config.num_qubits, config.depth, config.gate_set, seed=seed
                 )
 
             else:
@@ -357,19 +332,17 @@ class RandomCircuitGenerator:
         # Try newer qasm2 module first, fallback to deprecated qasm()
         try:
             from qiskit import qasm2
+
             qasm_str = qasm2.dumps(circuit)
         except (ImportError, AttributeError):
             # Fallback to older method
-            qasm_str = circuit.qasm() if hasattr(circuit, 'qasm') else str(circuit)
+            qasm_str = circuit.qasm() if hasattr(circuit, "qasm") else str(circuit)
 
-        with open(filepath, 'w') as f:
+        with open(filepath, "w") as f:
             f.write(qasm_str)
 
     def save_batch(
-        self,
-        circuits: List[QuantumCircuit],
-        output_dir: Path,
-        prefix: str = 'random'
+        self, circuits: List[QuantumCircuit], output_dir: Path, prefix: str = "random"
     ) -> List[Path]:
         """
         Save a batch of circuits to QASM files.
@@ -395,8 +368,7 @@ class RandomCircuitGenerator:
 
 
 def create_benchmark_circuits(
-    output_dir: Optional[Path] = None,
-    seed: int = 42
+    output_dir: Optional[Path] = None, seed: int = 42
 ) -> Dict[str, List[Path]]:
     """
     Create a standard set of benchmark circuits for testing.
@@ -413,30 +385,36 @@ def create_benchmark_circuits(
 
     # Small circuits (2-4 qubits, depth 5-10)
     small_config = RandomCircuitConfig(num_qubits=3, depth=5, seed=seed)
-    small_circuits = generator.generate_batch(small_config, count=10, circuit_type='standard')
+    small_circuits = generator.generate_batch(small_config, count=10, circuit_type="standard")
 
     # Medium circuits (5-7 qubits, depth 10-20)
     medium_config = RandomCircuitConfig(num_qubits=5, depth=15, seed=seed)
-    medium_circuits = generator.generate_batch(medium_config, count=10, circuit_type='standard')
+    medium_circuits = generator.generate_batch(medium_config, count=10, circuit_type="standard")
 
     # Quantum volume circuits
     qv_config = RandomCircuitConfig(num_qubits=4, depth=4, seed=seed)
-    qv_circuits = generator.generate_batch(qv_config, count=5, circuit_type='qv')
+    qv_circuits = generator.generate_batch(qv_config, count=5, circuit_type="qv")
 
     # Clifford circuits
     clifford_config = RandomCircuitConfig(num_qubits=3, depth=10, seed=seed)
-    clifford_circuits = generator.generate_batch(clifford_config, count=5, circuit_type='clifford')
+    clifford_circuits = generator.generate_batch(clifford_config, count=5, circuit_type="clifford")
 
     if output_dir:
-        results['small'] = generator.save_batch(small_circuits, output_dir / 'small', 'small_random')
-        results['medium'] = generator.save_batch(medium_circuits, output_dir / 'medium', 'medium_random')
-        results['qv'] = generator.save_batch(qv_circuits, output_dir / 'qv', 'qv')
-        results['clifford'] = generator.save_batch(clifford_circuits, output_dir / 'clifford', 'clifford')
+        results["small"] = generator.save_batch(
+            small_circuits, output_dir / "small", "small_random"
+        )
+        results["medium"] = generator.save_batch(
+            medium_circuits, output_dir / "medium", "medium_random"
+        )
+        results["qv"] = generator.save_batch(qv_circuits, output_dir / "qv", "qv")
+        results["clifford"] = generator.save_batch(
+            clifford_circuits, output_dir / "clifford", "clifford"
+        )
     else:
-        results['small'] = small_circuits
-        results['medium'] = medium_circuits
-        results['qv'] = qv_circuits
-        results['clifford'] = clifford_circuits
+        results["small"] = small_circuits
+        results["medium"] = medium_circuits
+        results["qv"] = qv_circuits
+        results["clifford"] = clifford_circuits
 
     return results
 

@@ -17,7 +17,16 @@ script_dir = Path(__file__).parent.resolve()
 root_dir = script_dir.parent
 sys.path.append(str(root_dir))
 
-mlir_core_path = root_dir / "mlir" / "llvm-project" / "build" / "tools" / "mlir" / "python_packages" / "mlir_core"
+mlir_core_path = (
+    root_dir
+    / "mlir"
+    / "llvm-project"
+    / "build"
+    / "tools"
+    / "mlir"
+    / "python_packages"
+    / "mlir_core"
+)
 if mlir_core_path.exists():
     sys.path.append(str(mlir_core_path))
 
@@ -32,6 +41,7 @@ except ImportError:
 try:
     from qiskit_aer import AerSimulator
     import qiskit.qasm3
+
     AER_AVAILABLE = True
 except ImportError:
     AER_AVAILABLE = False
@@ -53,7 +63,7 @@ def aggregate_by_hamming_weight(counts_dict):
     """Aggregate counts by Hamming weight (number of 1s)."""
     agg = {}
     for k, v in counts_dict.items():
-        weight = str(k.count('1'))
+        weight = str(k.count("1"))
         agg[weight] = agg.get(weight, 0) + v
     return agg
 
@@ -74,10 +84,30 @@ def decompose_to_standard_gates(circuit):
     # NOTE: 'barrier', 'measure', and 'id' are not included in basis_gates as they are
     # special operations handled separately by Qiskit's transpiler
     basis_gates = [
-        'h', 'x', 'y', 'z', 's', 't', 'sx',
-        'rx', 'ry', 'rz', 'p', 'u', 'u1', 'u2', 'u3',
-        'cx', 'cy', 'cz', 'ch', 'cp', 'crx', 'cry', 'crz',
-        'swap'
+        "h",
+        "x",
+        "y",
+        "z",
+        "s",
+        "t",
+        "sx",
+        "rx",
+        "ry",
+        "rz",
+        "p",
+        "u",
+        "u1",
+        "u2",
+        "u3",
+        "cx",
+        "cy",
+        "cz",
+        "ch",
+        "cp",
+        "crx",
+        "cry",
+        "crz",
+        "swap",
     ]
 
     # Transpile to decompose non-standard gates
@@ -94,7 +124,9 @@ def generator():
     return RandomCircuitGenerator(seed=42)
 
 
-def run_translation_pipeline(circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline=False, decompose_gates=True):
+def run_translation_pipeline(
+    circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline=False, decompose_gates=True
+):
     """Run the full translation pipeline on a circuit.
 
     Args:
@@ -117,11 +149,11 @@ def run_translation_pipeline(circuit, quantum_opt_path, quantum_translate_path, 
     module = importer.convert()
 
     # Save to temp files (keep original in case quantum-opt crashes)
-    with tempfile.NamedTemporaryFile(mode='w', suffix='_orig.mlir', delete=False) as tmp_mlir:
+    with tempfile.NamedTemporaryFile(mode="w", suffix="_orig.mlir", delete=False) as tmp_mlir:
         tmp_mlir.write(str(module))
         tmp_mlir_orig_path = tmp_mlir.name
 
-    tmp_mlir_opt_path = tmp_mlir_orig_path.replace('_orig.mlir', '_opt.mlir')
+    tmp_mlir_opt_path = tmp_mlir_orig_path.replace("_orig.mlir", "_opt.mlir")
 
     try:
         # Try to run quantum-opt for SSA canonicalization
@@ -139,7 +171,8 @@ def run_translation_pipeline(circuit, quantum_opt_path, quantum_translate_path, 
             str(quantum_opt_path),
             f"--pass-pipeline={pipeline}",
             tmp_mlir_orig_path,
-            "-o", tmp_mlir_opt_path
+            "-o",
+            tmp_mlir_opt_path,
         ]
         result_opt = subprocess.run(opt_cmd, capture_output=True, text=True)
 
@@ -156,10 +189,14 @@ def run_translation_pipeline(circuit, quantum_opt_path, quantum_translate_path, 
             # Translation failed
             if not canonicalization_succeeded:
                 # Both quantum-opt and quantum-translate failed
-                pytest.skip(f"quantum-opt crashed and quantum-translate also failed: {result.stderr[:200]}")
+                pytest.skip(
+                    f"quantum-opt crashed and quantum-translate also failed: {result.stderr[:200]}"
+                )
             else:
                 # Only quantum-translate failed
-                pytest.skip(f"quantum-translate failed (may be unsupported pattern): {result.stderr[:200]}")
+                pytest.skip(
+                    f"quantum-translate failed (may be unsupported pattern): {result.stderr[:200]}"
+                )
 
         return result.stdout, circuit
 
@@ -174,12 +211,15 @@ def run_translation_pipeline(circuit, quantum_opt_path, quantum_translate_path, 
 class TestRandomCircuitTranslation:
     """Test random circuit translation with various configurations."""
 
-    @pytest.mark.parametrize("num_qubits,depth", [
-        (2, 5),
-        (3, 10),
-        (4, 10),
-        (5, 15),
-    ])
+    @pytest.mark.parametrize(
+        "num_qubits,depth",
+        [
+            (2, 5),
+            (3, 10),
+            (4, 10),
+            (5, 15),
+        ],
+    )
     def test_standard_random_scalability(
         self,
         num_qubits,
@@ -187,18 +227,15 @@ class TestRandomCircuitTranslation:
         generator,
         quantum_opt_path,
         quantum_translate_path,
-        use_pass_pipeline
+        use_pass_pipeline,
     ):
         """Test standard random circuits of increasing size."""
-        config = RandomCircuitConfig(
-            num_qubits=num_qubits,
-            depth=depth,
-            measure=True,
-            seed=42
-        )
+        config = RandomCircuitConfig(num_qubits=num_qubits, depth=depth, measure=True, seed=42)
 
         circuit = generator.generate_standard_random(config)
-        qasm3_code, _ = run_translation_pipeline(circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline)
+        qasm3_code, _ = run_translation_pipeline(
+            circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline
+        )
 
         # Verify basic structure
         assert "OPENQASM 3.0" in qasm3_code
@@ -207,16 +244,11 @@ class TestRandomCircuitTranslation:
         assert "measure" in qasm3_code
 
         # Verify non-empty circuit
-        assert len(qasm3_code.split('\n')) > 5
+        assert len(qasm3_code.split("\n")) > 5
 
     @pytest.mark.parametrize("seed", range(5))
     def test_standard_random_reproducibility(
-        self,
-        seed,
-        generator,
-        quantum_opt_path,
-        quantum_translate_path,
-        use_pass_pipeline
+        self, seed, generator, quantum_opt_path, quantum_translate_path, use_pass_pipeline
     ):
         """Test that random circuits with same seed produce consistent results."""
         config1 = RandomCircuitConfig(num_qubits=3, depth=8, measure=True, seed=seed)
@@ -228,48 +260,56 @@ class TestRandomCircuitTranslation:
         # Circuits should be identical - compare using qasm2
         try:
             from qiskit import qasm2
+
             qasm1 = qasm2.dumps(circuit1)
             qasm2_str = qasm2.dumps(circuit2)
         except ImportError:
-            qasm1 = circuit1.qasm() if hasattr(circuit1, 'qasm') else str(circuit1)
-            qasm2_str = circuit2.qasm() if hasattr(circuit2, 'qasm') else str(circuit2)
+            qasm1 = circuit1.qasm() if hasattr(circuit1, "qasm") else str(circuit1)
+            qasm2_str = circuit2.qasm() if hasattr(circuit2, "qasm") else str(circuit2)
 
         assert qasm1 == qasm2_str
 
         # Translations should also be identical (or at least equivalent)
-        qasm3_1, _ = run_translation_pipeline(circuit1, quantum_opt_path, quantum_translate_path, use_pass_pipeline)
-        qasm3_2, _ = run_translation_pipeline(circuit2, quantum_opt_path, quantum_translate_path, use_pass_pipeline)
+        qasm3_1, _ = run_translation_pipeline(
+            circuit1, quantum_opt_path, quantum_translate_path, use_pass_pipeline
+        )
+        qasm3_2, _ = run_translation_pipeline(
+            circuit2, quantum_opt_path, quantum_translate_path, use_pass_pipeline
+        )
 
         # Should produce same output
         assert len(qasm3_1) == len(qasm3_2)
 
     @pytest.mark.parametrize("num_qubits", [2, 3, 4])
     def test_quantum_volume_circuits(
-        self,
-        num_qubits,
-        generator,
-        quantum_opt_path,
-        quantum_translate_path,
-        use_pass_pipeline
+        self, num_qubits, generator, quantum_opt_path, quantum_translate_path, use_pass_pipeline
     ):
         """Test quantum volume circuit translation."""
         circuit = generator.generate_quantum_volume(num_qubits, depth=num_qubits, seed=42)
-        qasm3_code, _ = run_translation_pipeline(circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline)
+        qasm3_code, _ = run_translation_pipeline(
+            circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline
+        )
 
         assert "OPENQASM 3.0" in qasm3_code
         assert "qubit" in qasm3_code
         assert "measure" in qasm3_code
 
         # QV circuits should have substantial gate count
-        gate_lines = [line for line in qasm3_code.split('\n')
-                     if line.strip() and not line.strip().startswith('//')]
+        gate_lines = [
+            line
+            for line in qasm3_code.split("\n")
+            if line.strip() and not line.strip().startswith("//")
+        ]
         assert len(gate_lines) > num_qubits
 
-    @pytest.mark.parametrize("num_qubits,num_gates", [
-        (2, 10),
-        (3, 15),
-        (4, 20),
-    ])
+    @pytest.mark.parametrize(
+        "num_qubits,num_gates",
+        [
+            (2, 10),
+            (3, 15),
+            (4, 20),
+        ],
+    )
     def test_clifford_circuits(
         self,
         num_qubits,
@@ -277,89 +317,88 @@ class TestRandomCircuitTranslation:
         generator,
         quantum_opt_path,
         quantum_translate_path,
-        use_pass_pipeline
+        use_pass_pipeline,
     ):
         """Test Clifford circuit translation."""
         circuit = generator.generate_clifford_random(num_qubits, num_gates, seed=42)
-        qasm3_code, _ = run_translation_pipeline(circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline)
+        qasm3_code, _ = run_translation_pipeline(
+            circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline
+        )
 
         assert "OPENQASM 3.0" in qasm3_code
         assert "measure" in qasm3_code
 
         # Clifford circuits should contain standard gates (h, s, cx)
         lower_code = qasm3_code.lower()
-        assert any(gate in lower_code for gate in ['h', 's', 'cx', 'x', 'y', 'z'])
+        assert any(gate in lower_code for gate in ["h", "s", "cx", "x", "y", "z"])
 
     def test_custom_gate_set_basic(
-        self,
-        generator,
-        quantum_opt_path,
-        quantum_translate_path,
-        use_pass_pipeline
+        self, generator, quantum_opt_path, quantum_translate_path, use_pass_pipeline
     ):
         """Test custom gate set with basic gates."""
-        gate_set = ['h', 'x', 'y', 'z', 'cx']
+        gate_set = ["h", "x", "y", "z", "cx"]
         circuit = generator.generate_custom_gate_set(3, 10, gate_set, seed=42)
-        qasm3_code, _ = run_translation_pipeline(circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline)
+        qasm3_code, _ = run_translation_pipeline(
+            circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline
+        )
 
         assert "OPENQASM 3.0" in qasm3_code
         lower_code = qasm3_code.lower()
 
         # Should contain gates from the set
-        assert any(gate in lower_code for gate in ['h', 'x', 'y', 'z', 'cx'])
+        assert any(gate in lower_code for gate in ["h", "x", "y", "z", "cx"])
 
     def test_custom_gate_set_rotations(
-        self,
-        generator,
-        quantum_opt_path,
-        quantum_translate_path,
-        use_pass_pipeline
+        self, generator, quantum_opt_path, quantum_translate_path, use_pass_pipeline
     ):
         """Test custom gate set with rotation gates."""
-        gate_set = ['rx', 'ry', 'rz', 'h']
+        gate_set = ["rx", "ry", "rz", "h"]
         circuit = generator.generate_custom_gate_set(2, 8, gate_set, seed=42)
-        qasm3_code, _ = run_translation_pipeline(circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline)
+        qasm3_code, _ = run_translation_pipeline(
+            circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline
+        )
 
         assert "OPENQASM 3.0" in qasm3_code
         # Should have rotation gates or their decompositions
         lower_code = qasm3_code.lower()
-        assert any(gate in lower_code for gate in ['rx', 'ry', 'rz', 'u3', 'u'])
+        assert any(gate in lower_code for gate in ["rx", "ry", "rz", "u3", "u"])
 
     @pytest.mark.parametrize("count", [5])
     def test_batch_generation(
-        self,
-        count,
-        generator,
-        quantum_opt_path,
-        quantum_translate_path,
-        use_pass_pipeline
+        self, count, generator, quantum_opt_path, quantum_translate_path, use_pass_pipeline
     ):
         """Test batch generation of circuits."""
         config = RandomCircuitConfig(num_qubits=3, depth=8, measure=True, seed=100)
-        circuits = generator.generate_batch(config, count, circuit_type='standard')
+        circuits = generator.generate_batch(config, count, circuit_type="standard")
 
         assert len(circuits) == count
 
         # Each circuit should be different (unless identical seed, which batch prevents)
         try:
             from qiskit import qasm2
+
             qasm_codes = [qasm2.dumps(c) for c in circuits]
         except ImportError:
-            qasm_codes = [c.qasm() if hasattr(c, 'qasm') else str(c) for c in circuits]
+            qasm_codes = [c.qasm() if hasattr(c, "qasm") else str(c) for c in circuits]
 
         # At least some circuits should be different (very high probability with random generation)
         assert len(set(qasm_codes)) > 1
 
         # All should translate successfully
         for i, circuit in enumerate(circuits):
-            qasm3_code, _ = run_translation_pipeline(circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline)
+            qasm3_code, _ = run_translation_pipeline(
+                circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline
+            )
             assert "OPENQASM 3.0" in qasm3_code, f"Circuit {i} failed"
 
     @pytest.mark.skipif(not AER_AVAILABLE, reason="Qiskit Aer not available")
-    @pytest.mark.parametrize("num_qubits,depth", [
-        (2, 5),
-        (3, 8),
-    ])
+    @pytest.mark.parametrize(
+        "num_qubits,depth",
+        [
+            (2, 5),
+            (3, 8),
+        ],
+    )
     def test_semantic_equivalence_random(
         self,
         num_qubits,
@@ -367,15 +406,10 @@ class TestRandomCircuitTranslation:
         generator,
         quantum_opt_path,
         quantum_translate_path,
-        use_pass_pipeline
+        use_pass_pipeline,
     ):
         """Test semantic equivalence of random circuit translations."""
-        config = RandomCircuitConfig(
-            num_qubits=num_qubits,
-            depth=depth,
-            measure=True,
-            seed=200
-        )
+        config = RandomCircuitConfig(num_qubits=num_qubits, depth=depth, measure=True, seed=200)
 
         # Generate random circuit (decomposition now handled in pipeline)
         circuit = generator.generate_standard_random(config)
@@ -392,6 +426,7 @@ class TestRandomCircuitTranslation:
 
         # Simulate original
         from qiskit import transpile
+
         qc_t = transpile(original_circuit, sim)
         res1 = sim.run(qc_t, shots=SHOTS).result()
         counts1 = res1.get_counts()
@@ -416,57 +451,45 @@ class TestStressTests:
     """Stress tests with larger circuits."""
 
     def test_large_depth(
-        self,
-        generator,
-        quantum_opt_path,
-        quantum_translate_path,
-        use_pass_pipeline
+        self, generator, quantum_opt_path, quantum_translate_path, use_pass_pipeline
     ):
         """Test circuit with large depth."""
         # Reduced depth from 50 to 30 to avoid quantum-opt SIGBUS on deep circuits
         # Decomposition now handled in pipeline
         config = RandomCircuitConfig(num_qubits=3, depth=30, measure=True, seed=42)
         circuit = generator.generate_standard_random(config)
-        qasm3_code, _ = run_translation_pipeline(circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline)
+        qasm3_code, _ = run_translation_pipeline(
+            circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline
+        )
 
         assert "OPENQASM 3.0" in qasm3_code
         assert len(qasm3_code) > 100  # Should be substantial
 
     def test_many_qubits(
-        self,
-        generator,
-        quantum_opt_path,
-        quantum_translate_path,
-        use_pass_pipeline
+        self, generator, quantum_opt_path, quantum_translate_path, use_pass_pipeline
     ):
         """Test circuit with many qubits."""
         config = RandomCircuitConfig(num_qubits=8, depth=10, measure=True, seed=42)
         circuit = generator.generate_standard_random(config)
-        qasm3_code, _ = run_translation_pipeline(circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline)
+        qasm3_code, _ = run_translation_pipeline(
+            circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline
+        )
 
         assert "OPENQASM 3.0" in qasm3_code
         assert "qubit[8]" in qasm3_code or "qubit[" in qasm3_code
 
     @pytest.mark.parametrize("trial", range(3))
     def test_statistical_robustness(
-        self,
-        trial,
-        generator,
-        quantum_opt_path,
-        quantum_translate_path,
-        use_pass_pipeline
+        self, trial, generator, quantum_opt_path, quantum_translate_path, use_pass_pipeline
     ):
         """Test multiple random circuits to ensure consistent translation."""
         # Generate different circuit each trial
-        config = RandomCircuitConfig(
-            num_qubits=4,
-            depth=12,
-            measure=True,
-            seed=300 + trial
-        )
+        config = RandomCircuitConfig(num_qubits=4, depth=12, measure=True, seed=300 + trial)
 
         circuit = generator.generate_standard_random(config)
-        qasm3_code, _ = run_translation_pipeline(circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline)
+        qasm3_code, _ = run_translation_pipeline(
+            circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline
+        )
 
         # All should translate successfully
         assert "OPENQASM 3.0" in qasm3_code
@@ -477,25 +500,19 @@ class TestEdgeCases:
     """Test edge cases with random circuits."""
 
     def test_minimal_random_circuit(
-        self,
-        generator,
-        quantum_opt_path,
-        quantum_translate_path,
-        use_pass_pipeline
+        self, generator, quantum_opt_path, quantum_translate_path, use_pass_pipeline
     ):
         """Test minimal random circuit (1 qubit, depth 1)."""
         config = RandomCircuitConfig(num_qubits=1, depth=1, measure=True, seed=42)
         circuit = generator.generate_standard_random(config)
-        qasm3_code, _ = run_translation_pipeline(circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline)
+        qasm3_code, _ = run_translation_pipeline(
+            circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline
+        )
 
         assert "OPENQASM 3.0" in qasm3_code
 
     def test_no_measurement(
-        self,
-        generator,
-        quantum_opt_path,
-        quantum_translate_path,
-        use_pass_pipeline
+        self, generator, quantum_opt_path, quantum_translate_path, use_pass_pipeline
     ):
         """Test random circuit without measurements."""
         config = RandomCircuitConfig(num_qubits=2, depth=5, measure=False, seed=42)
@@ -504,27 +521,23 @@ class TestEdgeCases:
         # Manually add measurement for complete test
         circuit.measure_all()
 
-        qasm3_code, _ = run_translation_pipeline(circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline)
+        qasm3_code, _ = run_translation_pipeline(
+            circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline
+        )
         assert "OPENQASM 3.0" in qasm3_code
 
     def test_max_operands(
-        self,
-        generator,
-        quantum_opt_path,
-        quantum_translate_path,
-        use_pass_pipeline
+        self, generator, quantum_opt_path, quantum_translate_path, use_pass_pipeline
     ):
         """Test with different max_operands settings."""
         config = RandomCircuitConfig(
-            num_qubits=4,
-            depth=10,
-            max_operands=3,  # Allow 3-qubit gates
-            measure=True,
-            seed=42
+            num_qubits=4, depth=10, max_operands=3, measure=True, seed=42  # Allow 3-qubit gates
         )
 
         circuit = generator.generate_standard_random(config)
-        qasm3_code, _ = run_translation_pipeline(circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline)
+        qasm3_code, _ = run_translation_pipeline(
+            circuit, quantum_opt_path, quantum_translate_path, use_pass_pipeline
+        )
 
         assert "OPENQASM 3.0" in qasm3_code
 

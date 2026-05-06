@@ -37,8 +37,7 @@ from typing import Any, Dict, List, Optional, Tuple, NamedTuple
 
 _ROOT = Path(__file__).parent.resolve()
 _MLIR_CORE = (
-    _ROOT / "mlir" / "llvm-project" / "build" / "tools"
-    / "mlir" / "python_packages" / "mlir_core"
+    _ROOT / "mlir" / "llvm-project" / "build" / "tools" / "mlir" / "python_packages" / "mlir_core"
 )
 if _MLIR_CORE.exists() and str(_MLIR_CORE) not in sys.path:
     sys.path.insert(0, str(_MLIR_CORE))
@@ -47,12 +46,14 @@ if str(_ROOT) not in sys.path:
 
 try:
     from qiskit import QuantumCircuit, transpile
+
     _QISKIT_OK = True
 except ImportError:
     _QISKIT_OK = False
 
 try:
     from qiskit_importer_standalone import QiskitToCatalystImporter
+
     _IMPORTER_OK = True
 except ImportError:
     _IMPORTER_OK = False
@@ -60,12 +61,14 @@ except ImportError:
 try:
     from qiskit_aer import AerSimulator
     import qiskit.qasm3 as _qasm3_mod
+
     _AER_OK = True
 except ImportError:
     _AER_OK = False
 
 try:
     import pennylane as qml
+
     _PL_OK = True
 except ImportError:
     _PL_OK = False
@@ -74,32 +77,30 @@ except ImportError:
 # ── Section 2: Constants ───────────────────────────────────────────────────────
 _WIDTH = 72
 
-_OPT_BIN  = _ROOT / "mlir" / "build" / "bin" / "quantum-opt"
+_OPT_BIN = _ROOT / "mlir" / "build" / "bin" / "quantum-opt"
 _XLAT_BIN = _ROOT / "mlir" / "build" / "bin" / "quantum-translate"
 
-_OPT_PIPELINE = (
-    "builtin.module(apply-transform-sequence, canonicalize, merge-rotations)"
-)
+_OPT_PIPELINE = "builtin.module(apply-transform-sequence, canonicalize, merge-rotations)"
 
 # (index 0-based, short_name, display_name)
 STAGES = [
-    (0, "frontend",   "Frontend: Circuit Import"),
-    (1, "mlir_gen",   "MLIR Generation"),
-    (2, "opt",        "Optimization (quantum-opt)"),
-    (3, "translate",  "QASM3 Translation"),
-    (4, "validate",   "Structural Validation"),
-    (5, "simulate",   "Simulation Validation (Aer)"),
+    (0, "frontend", "Frontend: Circuit Import"),
+    (1, "mlir_gen", "MLIR Generation"),
+    (2, "opt", "Optimization (quantum-opt)"),
+    (3, "translate", "QASM3 Translation"),
+    (4, "validate", "Structural Validation"),
+    (5, "simulate", "Simulation Validation (Aer)"),
 ]
 
 _QISKIT_VARNAMES = ["qc", "circuit", "quantum_circuit", "qcirc", "circ"]
-_PL_VARNAMES     = ["circuit", "qnode", "ansatz", "kernel", "qfunc"]
+_PL_VARNAMES = ["circuit", "qnode", "ansatz", "kernel", "qfunc"]
 
-_GREEN  = "\033[92m"
-_RED    = "\033[91m"
+_GREEN = "\033[92m"
+_RED = "\033[91m"
 _YELLOW = "\033[93m"
-_CYAN   = "\033[96m"
-_BOLD   = "\033[1m"
-_RESET  = "\033[0m"
+_CYAN = "\033[96m"
+_BOLD = "\033[1m"
+_RESET = "\033[0m"
 
 
 # ── Section 3: Renderer ────────────────────────────────────────────────────────
@@ -108,7 +109,7 @@ class Renderer:
 
     def __init__(self, report_path: Optional[Path] = None, color: bool = True):
         self._report_fh = open(report_path, "w", encoding="utf-8") if report_path else None
-        self._color_on  = color and sys.stdout.isatty()
+        self._color_on = color and sys.stdout.isatty()
 
     # ── low-level ──────────────────────────────────────────────────────────────
 
@@ -127,8 +128,12 @@ class Renderer:
     def banner(self) -> None:
         inner = _WIDTH - 2
         self._emit(f"┌{'─' * inner}┐\n")
-        self._emit(f"│  {self._c('QCC SIMULATION VALIDATOR', _BOLD):<{inner - 2 + (len(_BOLD) + len(_RESET) if self._color_on else 0)}}│\n")
-        self._emit(f"│  {'Quantum Computing Compiler - OpenQASM 3 Translation Pass':<{inner - 2}}│\n")
+        self._emit(
+            f"│  {self._c('QCC SIMULATION VALIDATOR', _BOLD):<{inner - 2 + (len(_BOLD) + len(_RESET) if self._color_on else 0)}}│\n"
+        )
+        self._emit(
+            f"│  {'Quantum Computing Compiler - OpenQASM 3 Translation Pass':<{inner - 2}}│\n"
+        )
         self._emit(f"└{'─' * inner}┘\n\n")
 
     def circuit_header(self, name: str) -> None:
@@ -196,8 +201,13 @@ class Renderer:
         else:
             mark = self._c("✗ FAIL", _RED + _BOLD)
         raw_mark = "✓ PASS" if passed else "✗ FAIL"
-        pad = max(1, _WIDTH - len("CIRCUIT RESULT:  ") - len(raw_mark)
-                  - len(f"    Total: {total_elapsed:.2f}s"))
+        pad = max(
+            1,
+            _WIDTH
+            - len("CIRCUIT RESULT:  ")
+            - len(raw_mark)
+            - len(f"    Total: {total_elapsed:.2f}s"),
+        )
         self._emit(f"CIRCUIT RESULT:  {mark}{' ' * pad}Total: {total_elapsed:.2f}s\n")
         self._emit("═" * _WIDTH + "\n\n")
 
@@ -226,8 +236,8 @@ class Renderer:
                 else:
                     marks.append(self._c("-", _YELLOW))
 
-            result_str  = self._c("PASS", _GREEN) if r["passed"] else self._c("FAIL", _RED)
-            raw_result  = "PASS" if r["passed"] else "FAIL"
+            result_str = self._c("PASS", _GREEN) if r["passed"] else self._c("FAIL", _RED)
+            raw_result = "PASS" if r["passed"] else "FAIL"
             if r["passed"]:
                 pass_count += 1
             else:
@@ -254,15 +264,16 @@ class Renderer:
 
 
 def _strip_ansi(text: str) -> str:
-    return re.sub(r'\033\[[0-9;]*m', '', text)
+    return re.sub(r"\033\[[0-9;]*m", "", text)
 
 
 # ── Section 4: StageResult + inlined utilities ────────────────────────────────
 
+
 class StageResult(NamedTuple):
-    passed:  bool
-    data:    Any     # stage-specific payload
-    message: str     # human-readable detail or error
+    passed: bool
+    data: Any  # stage-specific payload
+    message: str  # human-readable detail or error
 
 
 def hellinger_distance(dict1: dict, dict2: dict, shots: int) -> float:
@@ -286,6 +297,7 @@ def aggregate_by_hamming_weight(counts_dict: dict) -> dict:
 
 
 # ── Section 5: Stage 1 — Frontend ─────────────────────────────────────────────
+
 
 def _extract_qiskit_circuit(ns: dict):
     """Scan an exec'd namespace for a QuantumCircuit object."""
@@ -319,12 +331,8 @@ def _pennylane_to_qiskit(path: Path):
         return None, None
 
     # Build call arguments: zero-fill required params
-    sig  = inspect.signature(qnode.func)
-    args = [
-        0.0
-        for p in sig.parameters.values()
-        if p.default is inspect.Parameter.empty
-    ]
+    sig = inspect.signature(qnode.func)
+    args = [0.0 for p in sig.parameters.values() if p.default is inspect.Parameter.empty]
     tape = qml.workflow.construct_tape(qnode)(*args)
     qasm2_str = tape.to_openqasm(measure_all=True, rotations=False)
     qc = QuantumCircuit.from_qasm_str(qasm2_str)
@@ -351,8 +359,7 @@ def run_stage1_frontend(path: Path, lang: str) -> StageResult:
             qc = _extract_qiskit_circuit(ns)
             if qc is None:
                 return StageResult(
-                    False, None,
-                    f"No QuantumCircuit found. Searched names: {_QISKIT_VARNAMES}"
+                    False, None, f"No QuantumCircuit found. Searched names: {_QISKIT_VARNAMES}"
                 )
             detail = f"{qc.num_qubits} qubits, {qc.num_clbits} cbits, {len(qc.data)} gates"
             return StageResult(True, qc, detail)
@@ -365,15 +372,13 @@ def run_stage1_frontend(path: Path, lang: str) -> StageResult:
         try:
             qc, args = _pennylane_to_qiskit(path)
             if qc is None:
-                return StageResult(
-                    False, None,
-                    f"No QNode found. Searched names: {_PL_VARNAMES}"
-                )
+                return StageResult(False, None, f"No QNode found. Searched names: {_PL_VARNAMES}")
             note = ""
             if args:
                 note = f" (params set to {[0.0]*len(args)})"
-            detail = (f"{qc.num_qubits} qubits, {qc.num_clbits} cbits, "
-                      f"{len(qc.data)} gates{note}")
+            detail = (
+                f"{qc.num_qubits} qubits, {qc.num_clbits} cbits, " f"{len(qc.data)} gates{note}"
+            )
             return StageResult(True, qc, detail)
         except Exception as exc:
             return StageResult(False, None, str(exc))
@@ -383,15 +388,16 @@ def run_stage1_frontend(path: Path, lang: str) -> StageResult:
 
 # ── Section 6: Stage 2 — MLIR Generation ──────────────────────────────────────
 
+
 def run_stage2_mlir(qc) -> StageResult:
     if not _IMPORTER_OK:
         return StageResult(False, None, "qiskit_importer_standalone not available")
     try:
-        module   = QiskitToCatalystImporter(qc).convert()
+        module = QiskitToCatalystImporter(qc).convert()
         mlir_str = str(module)
-        lines    = mlir_str.splitlines()
-        ops      = sum(1 for ln in lines if "=" in ln)
-        detail   = f"{len(lines)} lines, {ops} operations"
+        lines = mlir_str.splitlines()
+        ops = sum(1 for ln in lines if "=" in ln)
+        detail = f"{len(lines)} lines, {ops} operations"
         return StageResult(True, mlir_str, detail)
     except Exception as exc:
         return StageResult(False, None, str(exc))
@@ -399,31 +405,36 @@ def run_stage2_mlir(qc) -> StageResult:
 
 # ── Section 7: Stage 3 — Optimization ─────────────────────────────────────────
 
+
 def run_stage3_optimize(mlir_str: str) -> StageResult:
     if not _OPT_BIN.exists():
         return StageResult(False, (None, None), f"quantum-opt not found: {_OPT_BIN}")
     tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".mlir", delete=False, encoding="utf-8") as fh:
+            mode="w", suffix=".mlir", delete=False, encoding="utf-8"
+        ) as fh:
             fh.write(mlir_str)
             tmp_path = fh.name
 
         cmd = [
             str(_OPT_BIN),
             f"--pass-pipeline={_OPT_PIPELINE}",
-            tmp_path, "-o", tmp_path,
+            tmp_path,
+            "-o",
+            tmp_path,
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             err = result.stderr.strip()
-            return StageResult(False, (tmp_path, None),
-                               f"quantum-opt exited {result.returncode}: {err[:400]}")
+            return StageResult(
+                False, (tmp_path, None), f"quantum-opt exited {result.returncode}: {err[:400]}"
+            )
 
         with open(tmp_path, encoding="utf-8") as fh:
             opt_mlir = fh.read()
-        lines  = opt_mlir.splitlines()
-        ops    = sum(1 for ln in lines if "=" in ln)
+        lines = opt_mlir.splitlines()
+        ops = sum(1 for ln in lines if "=" in ln)
         detail = f"{len(lines)} lines, {ops} ops after optimization"
         return StageResult(True, (tmp_path, opt_mlir), detail)
 
@@ -433,21 +444,24 @@ def run_stage3_optimize(mlir_str: str) -> StageResult:
 
 # ── Section 8: Stage 4 — QASM3 Translation ────────────────────────────────────
 
+
 def run_stage4_translate(tmp_mlir_path: str) -> StageResult:
     if not _XLAT_BIN.exists():
         return StageResult(False, None, f"quantum-translate not found: {_XLAT_BIN}")
     try:
-        cmd    = [str(_XLAT_BIN), "--mlir-to-qasm3", tmp_mlir_path]
+        cmd = [str(_XLAT_BIN), "--mlir-to-qasm3", tmp_mlir_path]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             err = result.stderr.strip()
-            return StageResult(False, None,
-                               f"quantum-translate exited {result.returncode}: {err[:400]}")
-        qasm3  = result.stdout
-        lines  = qasm3.splitlines()
+            return StageResult(
+                False, None, f"quantum-translate exited {result.returncode}: {err[:400]}"
+            )
+        qasm3 = result.stdout
+        lines = qasm3.splitlines()
         boilerplate = {"OPENQASM", "include", "gate", "qubit", "bit", "//", ""}
-        gate_lines  = [
-            ln for ln in lines
+        gate_lines = [
+            ln
+            for ln in lines
             if ln.strip() and not any(ln.strip().startswith(b) for b in boilerplate)
         ]
         detail = f"{len(lines)} lines, {len(gate_lines)} instructions"
@@ -458,16 +472,17 @@ def run_stage4_translate(tmp_mlir_path: str) -> StageResult:
 
 # ── Section 9: Stage 5 — Structural Validation ────────────────────────────────
 
+
 def run_stage5_validate(qasm3: str, original_qc) -> StageResult:
     errors = []
 
     if "OPENQASM 3.0" not in qasm3:
         errors.append("Missing 'OPENQASM 3.0' header")
 
-    if 'stdgates.inc' not in qasm3:
+    if "stdgates.inc" not in qasm3:
         errors.append("Missing 'include \"stdgates.inc\"'")
 
-    qubit_counts   = re.findall(r'qubit\[(\d+)\]', qasm3)
+    qubit_counts = re.findall(r"qubit\[(\d+)\]", qasm3)
     total_declared = sum(int(x) for x in qubit_counts)
     if total_declared != original_qc.num_qubits:
         errors.append(
@@ -477,7 +492,8 @@ def run_stage5_validate(qasm3: str, original_qc) -> StageResult:
 
     # At least one non-boilerplate line
     non_header = [
-        ln for ln in qasm3.splitlines()
+        ln
+        for ln in qasm3.splitlines()
         if ln.strip()
         and not ln.startswith("//")
         and not ln.startswith("OPENQASM")
@@ -501,32 +517,38 @@ def run_stage5_validate(qasm3: str, original_qc) -> StageResult:
 
 # ── Section 10: Stage 6 — Simulation Validation ───────────────────────────────
 
+
 def run_stage6_simulate(qasm3: str, original_qc) -> StageResult:
     if not _AER_OK:
-        return StageResult(False, None,
-                           "qiskit-aer or qiskit.qasm3 not available (install with: pip install qiskit-aer)")
-
-    if re.search(r'^\s*if\s*\(', qasm3, re.MULTILINE) or re.search(r'^\s*for\s+', qasm3, re.MULTILINE):
         return StageResult(
-            True, "COND_SKIP",
+            False,
+            None,
+            "qiskit-aer or qiskit.qasm3 not available (install with: pip install qiskit-aer)",
+        )
+
+    if re.search(r"^\s*if\s*\(", qasm3, re.MULTILINE) or re.search(
+        r"^\s*for\s+", qasm3, re.MULTILINE
+    ):
+        return StageResult(
+            True,
+            "COND_SKIP",
             "Skipped — circuit contains classical control flow "
-            "(QASM3 simulation not supported for if/for blocks)"
+            "(QASM3 simulation not supported for if/for blocks)",
         )
 
     if original_qc.num_clbits == 0:
-        return StageResult(True, None,
-                           "Skipped — no classical bits (circuit has no measurements)")
+        return StageResult(True, None, "Skipped — no classical bits (circuit has no measurements)")
 
     SHOTS = 10_000
     try:
-        sim   = AerSimulator()
-        qc_t  = transpile(original_qc, sim)
-        res1  = sim.run(qc_t, shots=SHOTS).result()
+        sim = AerSimulator()
+        qc_t = transpile(original_qc, sim)
+        res1 = sim.run(qc_t, shots=SHOTS).result()
         counts1 = res1.get_counts()
 
-        qc2   = _qasm3_mod.loads(qasm3)
+        qc2 = _qasm3_mod.loads(qasm3)
         qc2_t = transpile(qc2, sim)
-        res2  = sim.run(qc2_t, shots=SHOTS).result()
+        res2 = sim.run(qc2_t, shots=SHOTS).result()
         counts2 = res2.get_counts()
 
         agg1 = aggregate_by_hamming_weight(counts1)
@@ -534,19 +556,17 @@ def run_stage6_simulate(qasm3: str, original_qc) -> StageResult:
         dist = hellinger_distance(agg1, agg2, SHOTS)
 
         if dist > 0.1:
-            return StageResult(
-                False, dist,
-                f"Hellinger distance {dist:.4f} > 0.1 threshold"
-            )
-        return StageResult(True, dist,
-                           f"Hellinger distance {dist:.4f} ≤ 0.1 — distributions match")
+            return StageResult(False, dist, f"Hellinger distance {dist:.4f} > 0.1 threshold")
+        return StageResult(True, dist, f"Hellinger distance {dist:.4f} ≤ 0.1 — distributions match")
 
     except Exception as exc:
-        return StageResult(False, None,
-                           f"Simulation error (translation may still be valid): {str(exc)[:300]}")
+        return StageResult(
+            False, None, f"Simulation error (translation may still be valid): {str(exc)[:300]}"
+        )
 
 
 # ── Section 11: Helpers ────────────────────────────────────────────────────────
+
 
 def _cleanup_tmp(path: Optional[str]) -> None:
     if path:
@@ -572,13 +592,13 @@ def _detect_lang(path: Path) -> str:
 
 # ── Section 12: PipelineRunner ────────────────────────────────────────────────
 
+
 class PipelineRunner:
     """Orchestrates the 6-stage pipeline for a single circuit file."""
 
-    def __init__(self, renderer: Renderer, verbose: bool = False,
-                 no_simulation: bool = False):
-        self.R             = renderer
-        self.verbose       = verbose
+    def __init__(self, renderer: Renderer, verbose: bool = False, no_simulation: bool = False):
+        self.R = renderer
+        self.verbose = verbose
         self.no_simulation = no_simulation
 
     def run(self, path: Path, lang: str) -> Dict:
@@ -587,8 +607,8 @@ class PipelineRunner:
 
         total_stages = 5 if self.no_simulation else 6
         stages: List[Optional[bool]] = [None] * total_stages
-        t_total    = time.perf_counter()
-        tmp_path   = None
+        t_total = time.perf_counter()
+        tmp_path = None
 
         # ── Stage 1 ────────────────────────────────────────────────────────────
         t0 = time.perf_counter()
@@ -598,7 +618,7 @@ class PipelineRunner:
 
         if sr.passed:
             qc = sr.data
-            R.info("Source",  str(path))
+            R.info("Source", str(path))
             R.info("Circuit", sr.message)
             R.stage_pass(1, total_stages, STAGES[0][2], elapsed)
             stages[0] = True
@@ -742,16 +762,15 @@ _SUPPORTED_EXTS = {".qasm", ".py"}
 class BatchRunner:
     """Discover and process all circuits in a directory."""
 
-    def __init__(self, renderer: Renderer, verbose: bool = False,
-                 no_simulation: bool = False):
+    def __init__(self, renderer: Renderer, verbose: bool = False, no_simulation: bool = False):
         self.pipeline = PipelineRunner(renderer, verbose, no_simulation)
         self.renderer = renderer
 
     def run(self, directory: Path) -> int:
         files = sorted(
-            f for f in directory.iterdir()
-            if f.suffix in _SUPPORTED_EXTS
-            and not any(f.name.startswith(p) for p in _SKIP_PREFIXES)
+            f
+            for f in directory.iterdir()
+            if f.suffix in _SUPPORTED_EXTS and not any(f.name.startswith(p) for p in _SKIP_PREFIXES)
         )
         if not files:
             self.renderer._emit(f"No circuit files found in {directory}\n")
@@ -760,7 +779,7 @@ class BatchRunner:
         self.renderer._emit(f"Found {len(files)} circuit(s) in {directory}\n\n")
         all_results = []
         for f in files:
-            lang   = _detect_lang(f)
+            lang = _detect_lang(f)
             result = self.pipeline.run(f, lang)
             all_results.append(result)
 
@@ -770,6 +789,7 @@ class BatchRunner:
 
 
 # ── Section 14: CLI entry point ───────────────────────────────────────────────
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -787,33 +807,27 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "circuit", nargs="?", type=Path,
-        help="Path to a single circuit file (.qasm or .py)"
+        "circuit", nargs="?", type=Path, help="Path to a single circuit file (.qasm or .py)"
     )
     parser.add_argument(
-        "--lang", choices=["qasm", "qiskit", "pennylane"], default=None,
-        help="Force language (auto-detected from extension/content if omitted)"
+        "--lang",
+        choices=["qasm", "qiskit", "pennylane"],
+        default=None,
+        help="Force language (auto-detected from extension/content if omitted)",
+    )
+    parser.add_argument("--batch", type=Path, metavar="DIR", help="Run all circuits in DIR")
+    parser.add_argument(
+        "--simulation",
+        action="store_true",
+        help="Enable Stage 6 Aer simulation (disabled by default)",
     )
     parser.add_argument(
-        "--batch", type=Path, metavar="DIR",
-        help="Run all circuits in DIR"
+        "--verbose", action="store_true", help="Print intermediate MLIR and QASM3 content"
     )
     parser.add_argument(
-        "--simulation", action="store_true",
-        help="Enable Stage 6 Aer simulation (disabled by default)"
+        "--report", type=Path, metavar="FILE", help="Write output to FILE (ANSI codes stripped)"
     )
-    parser.add_argument(
-        "--verbose", action="store_true",
-        help="Print intermediate MLIR and QASM3 content"
-    )
-    parser.add_argument(
-        "--report", type=Path, metavar="FILE",
-        help="Write output to FILE (ANSI codes stripped)"
-    )
-    parser.add_argument(
-        "--no-color", action="store_true",
-        help="Disable ANSI color output"
-    )
+    parser.add_argument("--no-color", action="store_true", help="Disable ANSI color output")
     return parser.parse_args()
 
 

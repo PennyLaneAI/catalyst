@@ -1,4 +1,3 @@
-
 # Enhanced Qiskit Importer with improved error handling and diagnostics
 # Extends qiskit_importer_standalone with better error messages and logging
 
@@ -8,9 +7,21 @@ from typing import Optional, List, Dict, Any
 
 try:
     from mlir.dialects import scf, func, arith
-    from mlir.ir import (Context, Module, Location, InsertionPoint, StringAttr,
-                         SymbolTable, Type, IntegerType, IndexType, IntegerAttr,
-                         FloatAttr, Operation, DenseI32ArrayAttr)
+    from mlir.ir import (
+        Context,
+        Module,
+        Location,
+        InsertionPoint,
+        StringAttr,
+        SymbolTable,
+        Type,
+        IntegerType,
+        IndexType,
+        IntegerAttr,
+        FloatAttr,
+        Operation,
+        DenseI32ArrayAttr,
+    )
 except ImportError as e:
     raise ImportError(
         f"Could not import MLIR package: {e}\n"
@@ -21,18 +32,19 @@ except ImportError as e:
 # Setup logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 
 class CompileError(Exception):
     """Exception raised for errors during compilation."""
+
     pass
 
 
 class UnsupportedOperationError(CompileError):
     """Exception raised when encountering an unsupported quantum operation."""
+
     def __init__(self, operation: str, suggestion: Optional[str] = None):
         message = f"Unsupported operation: {operation}"
         if suggestion:
@@ -42,6 +54,7 @@ class UnsupportedOperationError(CompileError):
 
 class InvalidCircuitError(CompileError):
     """Exception raised when the circuit is invalid or malformed."""
+
     pass
 
 
@@ -57,11 +70,36 @@ class QiskitToCatalystImporter:
     """
 
     SUPPORTED_GATES = {
-        'h', 'x', 'y', 'z', 's', 't', 'sdg', 'tdg',
-        'rx', 'ry', 'rz', 'u1', 'u2', 'u3',
-        'cx', 'cz', 'cy', 'swap', 'ccx', 'cswap',
-        'crx', 'cry', 'crz', 'cu1', 'cu2', 'cu3', 'cp',
-        'measure', 'barrier', 'reset'
+        "h",
+        "x",
+        "y",
+        "z",
+        "s",
+        "t",
+        "sdg",
+        "tdg",
+        "rx",
+        "ry",
+        "rz",
+        "u1",
+        "u2",
+        "u3",
+        "cx",
+        "cz",
+        "cy",
+        "swap",
+        "ccx",
+        "cswap",
+        "crx",
+        "cry",
+        "crz",
+        "cu1",
+        "cu2",
+        "cu3",
+        "cp",
+        "measure",
+        "barrier",
+        "reset",
     }
 
     def __init__(self, circuit: qiskit.QuantumCircuit, enable_logging: bool = False):
@@ -95,14 +133,12 @@ class QiskitToCatalystImporter:
         self.global_qubit_reg = None
 
         # Statistics
-        self.stats = {
-            'gates_processed': 0,
-            'measurements': 0,
-            'control_flow': 0
-        }
+        self.stats = {"gates_processed": 0, "measurements": 0, "control_flow": 0}
 
-        logger.info(f"Initialized importer for circuit with {circuit.num_qubits} qubits, "
-                   f"{circuit.num_clbits} classical bits, {len(circuit.data)} operations")
+        logger.info(
+            f"Initialized importer for circuit with {circuit.num_qubits} qubits, "
+            f"{circuit.num_clbits} classical bits, {len(circuit.data)} operations"
+        )
 
     def _validate_circuit(self):
         """Validate the input circuit."""
@@ -110,22 +146,34 @@ class QiskitToCatalystImporter:
             raise InvalidCircuitError("Circuit must have at least one qubit")
 
         if self.circuit.num_qubits > 100:
-            logger.warning(f"Large circuit with {self.circuit.num_qubits} qubits detected. "
-                         "Translation may be slow.")
+            logger.warning(
+                f"Large circuit with {self.circuit.num_qubits} qubits detected. "
+                "Translation may be slow."
+            )
 
         # Check for unsupported operations
         unsupported_ops = []
         for instruction in self.circuit.data:
             op_name = instruction.operation.name.lower()
-            if op_name not in self.SUPPORTED_GATES and not op_name.startswith('if_') and not op_name.startswith('for_'):
+            if (
+                op_name not in self.SUPPORTED_GATES
+                and not op_name.startswith("if_")
+                and not op_name.startswith("for_")
+            ):
                 unsupported_ops.append(op_name)
 
         if unsupported_ops:
             unique_ops = set(unsupported_ops)
             logger.warning(f"Circuit contains potentially unsupported operations: {unique_ops}")
 
-    def _emit_quantum_op(self, name: str, operands: List, result_types: List,
-                        loc: Location, attrs: Optional[Dict] = None) -> Operation:
+    def _emit_quantum_op(
+        self,
+        name: str,
+        operands: List,
+        result_types: List,
+        loc: Location,
+        attrs: Optional[Dict] = None,
+    ) -> Operation:
         """
         Emit a quantum operation with error handling.
 
@@ -143,8 +191,9 @@ class QiskitToCatalystImporter:
             CompileError: If operation creation fails
         """
         try:
-            return Operation.create(name, results=result_types, operands=operands,
-                                  attributes=attrs, loc=loc)
+            return Operation.create(
+                name, results=result_types, operands=operands, attributes=attrs, loc=loc
+            )
         except Exception as e:
             raise CompileError(
                 f"Failed to create operation '{name}': {e}\n"
@@ -177,7 +226,9 @@ class QiskitToCatalystImporter:
                     val_attr = IntegerAttr.get(idx_type, num_qubits)
                     n_qubits_val = arith.ConstantOp(idx_type, val_attr, loc=loc).result
 
-                    reg = self._emit_quantum_op("quantum.alloc", [n_qubits_val], [r_type], loc).result
+                    reg = self._emit_quantum_op(
+                        "quantum.alloc", [n_qubits_val], [r_type], loc
+                    ).result
 
                     logger.debug(f"Allocated register with {num_qubits} qubits")
 
@@ -186,8 +237,9 @@ class QiskitToCatalystImporter:
                         idx_attr = IntegerAttr.get(idx_type, i)
                         idx_val = arith.ConstantOp(idx_type, idx_attr, loc=loc).result
                         bit_type = Type.parse("!quantum.bit", context=self.ctx)
-                        q_bit = self._emit_quantum_op("quantum.extract", [reg, idx_val],
-                                                     [bit_type], loc).result
+                        q_bit = self._emit_quantum_op(
+                            "quantum.extract", [reg, idx_val], [bit_type], loc
+                        ).result
                         self.qubit_map[qubit] = q_bit
 
                     logger.debug(f"Extracted {len(self.qubit_map)} qubits")
@@ -216,18 +268,18 @@ class QiskitToCatalystImporter:
 
                 if op.name == "h":
                     self._emit_gate("h", qubits, [], loc)
-                    self.stats['gates_processed'] += 1
+                    self.stats["gates_processed"] += 1
                 elif op.name == "cx":
                     self._emit_gate("cnot", qubits, [], loc)
-                    self.stats['gates_processed'] += 1
+                    self.stats["gates_processed"] += 1
                 elif op.name == "for_loop":
                     self._emit_for_loop(op, qubits, loc)
-                    self.stats['control_flow'] += 1
+                    self.stats["control_flow"] += 1
                 elif op.name == "measure":
                     self._emit_measure(qubits, instruction.clbits, loc)
-                    self.stats['measurements'] += 1
+                    self.stats["measurements"] += 1
                 elif op.name == "if_else" or type(op).__name__ == "IfElseOp":
-                    condition = getattr(op, 'condition', None)
+                    condition = getattr(op, "condition", None)
                     if condition:
                         clbits = [condition[0]]
                     elif instruction.clbits:
@@ -235,11 +287,11 @@ class QiskitToCatalystImporter:
                     else:
                         clbits = []
                     self._emit_if_else(op, qubits, clbits, loc)
-                    self.stats['control_flow'] += 1
+                    self.stats["control_flow"] += 1
                 else:
                     # Generic gate handling
                     self._emit_gate(op.name, qubits, op.params, loc)
-                    self.stats['gates_processed'] += 1
+                    self.stats["gates_processed"] += 1
 
             except Exception as e:
                 raise CompileError(
@@ -263,8 +315,7 @@ class QiskitToCatalystImporter:
             bit_type = Type.parse("!quantum.bit", context=self.ctx)
             i1_type = IntegerType.get_signless(1, self.ctx)
 
-            op = self._emit_quantum_op("quantum.measure", [val_in],
-                                      [i1_type, bit_type], loc)
+            op = self._emit_quantum_op("quantum.measure", [val_in], [i1_type, bit_type], loc)
             self.qubit_map[q] = op.results[1]
             if i < len(clbits):
                 self.clbit_map[clbits[i]] = op.results[0]
@@ -311,7 +362,7 @@ class QiskitToCatalystImporter:
         attrs = {
             "gate_name": StringAttr.get(gate_name, self.ctx),
             "operandSegmentSizes": DenseI32ArrayAttr.get(sizes, context=self.ctx),
-            "resultSegmentSizes": DenseI32ArrayAttr.get(result_sizes, context=self.ctx)
+            "resultSegmentSizes": DenseI32ArrayAttr.get(result_sizes, context=self.ctx),
         }
 
         op = self._emit_quantum_op("quantum.custom", all_operands, result_types, loc, attrs)
@@ -381,8 +432,7 @@ class QiskitToCatalystImporter:
 
         cond_val = self.clbit_map[cond_bit]
 
-        if_op = scf.IfOp(cond_val, [self.qubit_map[q].type for q in qubits],
-                        hasElse=True, loc=loc)
+        if_op = scf.IfOp(cond_val, [self.qubit_map[q].type for q in qubits], hasElse=True, loc=loc)
 
         # True branch
         with InsertionPoint(if_op.then_block):

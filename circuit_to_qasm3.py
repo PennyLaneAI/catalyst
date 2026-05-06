@@ -14,14 +14,13 @@ import tempfile
 from pathlib import Path
 
 # ── paths ──────────────────────────────────────────────────────────────────────
-_ROOT     = Path(__file__).parent
-_OPT_BIN  = _ROOT / "mlir" / "build" / "bin" / "quantum-opt"
+_ROOT = Path(__file__).parent
+_OPT_BIN = _ROOT / "mlir" / "build" / "bin" / "quantum-opt"
 _XLAT_BIN = _ROOT / "mlir" / "build" / "bin" / "quantum-translate"
 _OPT_PIPELINE = "builtin.module(apply-transform-sequence, canonicalize, merge-rotations)"
 
 PYTHONPATH_MLIR = (
-    _ROOT / "mlir" / "llvm-project" / "build" / "tools" / "mlir"
-    / "python_packages" / "mlir_core"
+    _ROOT / "mlir" / "llvm-project" / "build" / "tools" / "mlir" / "python_packages" / "mlir_core"
 )
 if str(PYTHONPATH_MLIR) not in sys.path:
     sys.path.insert(0, str(PYTHONPATH_MLIR))
@@ -64,7 +63,8 @@ def optimize(mlir_str: str, tmp_path: str) -> str:
         fh.write(mlir_str)
     r = subprocess.run(
         [str(_OPT_BIN), f"--pass-pipeline={_OPT_PIPELINE}", tmp_path, "-o", tmp_path],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if r.returncode != 0:
         sys.exit(f"ERROR: quantum-opt failed:\n{r.stderr.strip()}")
@@ -77,7 +77,8 @@ def translate(mlir_path: str) -> str:
         sys.exit(f"ERROR: quantum-translate not found at {_XLAT_BIN}")
     r = subprocess.run(
         [str(_XLAT_BIN), "--mlir-to-qasm3", mlir_path],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if r.returncode != 0:
         sys.exit(f"ERROR: quantum-translate failed:\n{r.stderr.strip()}")
@@ -95,13 +96,17 @@ def main():
         sys.exit(f"ERROR: file not found: {args.circuit}")
 
     qc = load_circuit(args.circuit)
-    print(f"Loaded: {qc.num_qubits} qubits, {qc.num_clbits} cbits, {len(qc.data)} gates",
-          file=sys.stderr)
+    print(
+        f"Loaded: {qc.num_qubits} qubits, {qc.num_clbits} cbits, {len(qc.data)} gates",
+        file=sys.stderr,
+    )
 
     mlir_str = to_mlir(qc)
     print(f"MLIR:   {len(mlir_str.splitlines())} lines", file=sys.stderr)
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".mlir", delete=False, encoding="utf-8") as fh:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".mlir", delete=False, encoding="utf-8"
+    ) as fh:
         tmp = fh.name
 
     if args.no_opt:

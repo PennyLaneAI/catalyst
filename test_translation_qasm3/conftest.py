@@ -11,7 +11,16 @@ ROOT_DIR = Path(__file__).parent.parent.resolve()
 sys.path.append(str(ROOT_DIR))
 
 # Setup MLIR path
-mlir_core_path = ROOT_DIR / "mlir" / "llvm-project" / "build" / "tools" / "mlir" / "python_packages" / "mlir_core"
+mlir_core_path = (
+    ROOT_DIR
+    / "mlir"
+    / "llvm-project"
+    / "build"
+    / "tools"
+    / "mlir"
+    / "python_packages"
+    / "mlir_core"
+)
 if mlir_core_path.exists():
     sys.path.append(str(mlir_core_path))
 
@@ -52,7 +61,7 @@ def pytest_addoption(parser):
         "--use-pass-pipeline",
         action="store_true",
         default=False,
-        help="Enable quantum-opt pass-pipeline optimization (default: disabled)"
+        help="Enable quantum-opt pass-pipeline optimization (default: disabled)",
     )
 
 

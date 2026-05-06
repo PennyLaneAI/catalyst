@@ -5,6 +5,7 @@ from catalyst import qjit
 # Use the local simulator instead of the AWS-hosted one
 dev = qml.device("braket.local.qubit", wires=2)
 
+
 @qjit(keep_intermediate=True)
 @qml.qnode(dev)
 def circuit(x):
@@ -12,7 +13,8 @@ def circuit(x):
     qml.RX(x, wires=0)
     return qml.expval(qml.PauliZ(0))
 
-# To see the OpenQASM 3 without running, you can inspect the MLIR 
+
+# To see the OpenQASM 3 without running, you can inspect the MLIR
 # which Catalyst uses as the source for the OQ3 generator.
 # with open("circuit.mlir", "w") as f:
 #     f.write(circuit.__str__())
@@ -33,9 +35,7 @@ print(f"Result: {result}")
 #     qml.RX(x, wires=0)
 #     return qml.expval(qml.PauliZ(0))
 
-# # Catalyst compiles this and the runtime generates OpenQASM 3 
+# # Catalyst compiles this and the runtime generates OpenQASM 3
 # # to send to the Braket service during execution.
 # result = circuit(0.54)
 # print(result)
-
-

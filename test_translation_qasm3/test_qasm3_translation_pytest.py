@@ -20,6 +20,7 @@ except ImportError:
 try:
     from qiskit_aer import AerSimulator
     import qiskit.qasm3
+
     AER_AVAILABLE = True
 except ImportError:
     AER_AVAILABLE = False
@@ -41,7 +42,7 @@ def aggregate_by_hamming_weight(counts_dict):
     """Aggregate counts by Hamming weight (number of 1s)."""
     agg = {}
     for k, v in counts_dict.items():
-        weight = str(k.count('1'))
+        weight = str(k.count("1"))
         agg[weight] = agg.get(weight, 0) + v
     return agg
 
@@ -49,7 +50,14 @@ def aggregate_by_hamming_weight(counts_dict):
 class TestQASM3Pipeline:
     """Test the full QASM3 translation pipeline."""
 
-    def run_full_pipeline(self, circuit_path, quantum_opt_path, quantum_translate_path, root_dir, use_pass_pipeline=False):
+    def run_full_pipeline(
+        self,
+        circuit_path,
+        quantum_opt_path,
+        quantum_translate_path,
+        root_dir,
+        use_pass_pipeline=False,
+    ):
         """Run the complete translation pipeline on a circuit.
 
         Args:
@@ -70,7 +78,7 @@ class TestQASM3Pipeline:
         module = importer.convert()
 
         # 3. Write MLIR to temporary file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.mlir', delete=False) as tmp_mlir:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mlir", delete=False) as tmp_mlir:
             tmp_mlir.write(str(module))
             tmp_mlir_path = tmp_mlir.name
 
@@ -80,7 +88,8 @@ class TestQASM3Pipeline:
                 str(quantum_opt_path),
                 "--pass-pipeline=builtin.module(apply-transform-sequence, canonicalize, merge-rotations)",
                 tmp_mlir_path,
-                "-o", tmp_mlir_path
+                "-o",
+                tmp_mlir_path,
             ]
             subprocess.run(opt_cmd, capture_output=True, text=True, check=True)
 
@@ -92,13 +101,24 @@ class TestQASM3Pipeline:
 
         return result.stdout, qc
 
-    @pytest.mark.parametrize("circuit_file", [
-        "bell_state_00.qasm",
-        "bell_state_01.qasm",
-        "bell_state_10.qasm",
-        "bell_state_11.qasm",
-    ])
-    def test_bell_states(self, circuit_file, circuits_dir, quantum_opt_path, quantum_translate_path, root_dir, use_pass_pipeline):
+    @pytest.mark.parametrize(
+        "circuit_file",
+        [
+            "bell_state_00.qasm",
+            "bell_state_01.qasm",
+            "bell_state_10.qasm",
+            "bell_state_11.qasm",
+        ],
+    )
+    def test_bell_states(
+        self,
+        circuit_file,
+        circuits_dir,
+        quantum_opt_path,
+        quantum_translate_path,
+        root_dir,
+        use_pass_pipeline,
+    ):
         """Test all Bell state variants."""
         circuit_path = circuits_dir / circuit_file
         qasm3_code, original_circuit = self.run_full_pipeline(
@@ -111,12 +131,23 @@ class TestQASM3Pipeline:
         assert "cx" in qasm3_code.lower() or "cnot" in qasm3_code.lower()
         assert "measure" in qasm3_code
 
-    @pytest.mark.parametrize("circuit_file", [
-        "ghz_3qubit.qasm",
-        "ghz_4qubit.qasm",
-        "ghz_5qubit.qasm",
-    ])
-    def test_ghz_states(self, circuit_file, circuits_dir, quantum_opt_path, quantum_translate_path, root_dir, use_pass_pipeline):
+    @pytest.mark.parametrize(
+        "circuit_file",
+        [
+            "ghz_3qubit.qasm",
+            "ghz_4qubit.qasm",
+            "ghz_5qubit.qasm",
+        ],
+    )
+    def test_ghz_states(
+        self,
+        circuit_file,
+        circuits_dir,
+        quantum_opt_path,
+        quantum_translate_path,
+        root_dir,
+        use_pass_pipeline,
+    ):
         """Test GHZ state preparation for various sizes."""
         circuit_path = circuits_dir / circuit_file
         qasm3_code, _ = self.run_full_pipeline(
@@ -127,11 +158,22 @@ class TestQASM3Pipeline:
         assert "h" in qasm3_code.lower()
         assert qasm3_code.lower().count("cx") + qasm3_code.lower().count("cnot") >= 2
 
-    @pytest.mark.parametrize("circuit_file", [
-        "single_qubit_pauli.qasm",
-        "single_qubit_phase.qasm",
-    ])
-    def test_single_qubit_gates(self, circuit_file, circuits_dir, quantum_opt_path, quantum_translate_path, root_dir, use_pass_pipeline):
+    @pytest.mark.parametrize(
+        "circuit_file",
+        [
+            "single_qubit_pauli.qasm",
+            "single_qubit_phase.qasm",
+        ],
+    )
+    def test_single_qubit_gates(
+        self,
+        circuit_file,
+        circuits_dir,
+        quantum_opt_path,
+        quantum_translate_path,
+        root_dir,
+        use_pass_pipeline,
+    ):
         """Test single-qubit gate translations."""
         circuit_path = circuits_dir / circuit_file
         qasm3_code, _ = self.run_full_pipeline(
@@ -141,11 +183,22 @@ class TestQASM3Pipeline:
         assert "OPENQASM 3.0" in qasm3_code
         assert "measure" in qasm3_code
 
-    @pytest.mark.parametrize("circuit_file", [
-        "rotation_gates_basic.qasm",
-        "rotation_gates_advanced.qasm",
-    ])
-    def test_rotation_gates(self, circuit_file, circuits_dir, quantum_opt_path, quantum_translate_path, root_dir, use_pass_pipeline):
+    @pytest.mark.parametrize(
+        "circuit_file",
+        [
+            "rotation_gates_basic.qasm",
+            "rotation_gates_advanced.qasm",
+        ],
+    )
+    def test_rotation_gates(
+        self,
+        circuit_file,
+        circuits_dir,
+        quantum_opt_path,
+        quantum_translate_path,
+        root_dir,
+        use_pass_pipeline,
+    ):
         """Test parameterized rotation gates."""
         circuit_path = circuits_dir / circuit_file
         qasm3_code, _ = self.run_full_pipeline(
@@ -156,12 +209,23 @@ class TestQASM3Pipeline:
         # Check for rotation gates (could be rx/ry/rz or decomposed)
         assert any(gate in qasm3_code.lower() for gate in ["rx", "ry", "rz", "u3"])
 
-    @pytest.mark.parametrize("circuit_file", [
-        "mid_measurement.qasm",
-        "mid_circuit_simple.qasm",
-        "multiple_measurements.qasm",
-    ])
-    def test_mid_circuit_measurement(self, circuit_file, circuits_dir, quantum_opt_path, quantum_translate_path, root_dir, use_pass_pipeline):
+    @pytest.mark.parametrize(
+        "circuit_file",
+        [
+            "mid_measurement.qasm",
+            "mid_circuit_simple.qasm",
+            "multiple_measurements.qasm",
+        ],
+    )
+    def test_mid_circuit_measurement(
+        self,
+        circuit_file,
+        circuits_dir,
+        quantum_opt_path,
+        quantum_translate_path,
+        root_dir,
+        use_pass_pipeline,
+    ):
         """Test mid-circuit measurement support."""
         circuit_path = circuits_dir / circuit_file
         qasm3_code, _ = self.run_full_pipeline(
@@ -173,12 +237,23 @@ class TestQASM3Pipeline:
         # Mid-circuit measurements should have multiple measure statements
         assert qasm3_code.count("measure") >= 2
 
-    @pytest.mark.parametrize("circuit_file", [
-        "conditional_x.qasm",
-        "conditional_z.qasm",
-        "ctrl_logic.qasm",
-    ])
-    def test_conditional_operations(self, circuit_file, circuits_dir, quantum_opt_path, quantum_translate_path, root_dir, use_pass_pipeline):
+    @pytest.mark.parametrize(
+        "circuit_file",
+        [
+            "conditional_x.qasm",
+            "conditional_z.qasm",
+            "ctrl_logic.qasm",
+        ],
+    )
+    def test_conditional_operations(
+        self,
+        circuit_file,
+        circuits_dir,
+        quantum_opt_path,
+        quantum_translate_path,
+        root_dir,
+        use_pass_pipeline,
+    ):
         """Test classical control flow."""
         circuit_path = circuits_dir / circuit_file
         qasm3_code, _ = self.run_full_pipeline(
@@ -191,11 +266,22 @@ class TestQASM3Pipeline:
         # The important thing is the circuit translates without errors
         assert len(qasm3_code) > 50  # Non-empty circuit
 
-    @pytest.mark.parametrize("circuit_file", [
-        "toffoli_gate.qasm",
-        "fredkin_gate.qasm",
-    ])
-    def test_three_qubit_gates(self, circuit_file, circuits_dir, quantum_opt_path, quantum_translate_path, root_dir, use_pass_pipeline):
+    @pytest.mark.parametrize(
+        "circuit_file",
+        [
+            "toffoli_gate.qasm",
+            "fredkin_gate.qasm",
+        ],
+    )
+    def test_three_qubit_gates(
+        self,
+        circuit_file,
+        circuits_dir,
+        quantum_opt_path,
+        quantum_translate_path,
+        root_dir,
+        use_pass_pipeline,
+    ):
         """Test three-qubit gates."""
         circuit_path = circuits_dir / circuit_file
         qasm3_code, _ = self.run_full_pipeline(
@@ -207,12 +293,23 @@ class TestQASM3Pipeline:
         assert len(qasm3_code) > 100  # Non-trivial circuit
 
     @pytest.mark.skipif(not AER_AVAILABLE, reason="Qiskit Aer not available")
-    @pytest.mark.parametrize("circuit_file", [
-        "bell_state_00.qasm",
-        "ghz_3qubit.qasm",
-        "grover_2qubit.qasm",
-    ])
-    def test_semantic_equivalence(self, circuit_file, circuits_dir, quantum_opt_path, quantum_translate_path, root_dir, use_pass_pipeline):
+    @pytest.mark.parametrize(
+        "circuit_file",
+        [
+            "bell_state_00.qasm",
+            "ghz_3qubit.qasm",
+            "grover_2qubit.qasm",
+        ],
+    )
+    def test_semantic_equivalence(
+        self,
+        circuit_file,
+        circuits_dir,
+        quantum_opt_path,
+        quantum_translate_path,
+        root_dir,
+        use_pass_pipeline,
+    ):
         """Test that translated circuits are semantically equivalent."""
         circuit_path = circuits_dir / circuit_file
         qasm3_code, original_circuit = self.run_full_pipeline(
@@ -227,6 +324,7 @@ class TestQASM3Pipeline:
 
         # Simulate original
         from qiskit import transpile
+
         qc_t = transpile(original_circuit, sim)
         res1 = sim.run(qc_t, shots=SHOTS).result()
         counts1 = res1.get_counts()
@@ -261,7 +359,9 @@ class TestEdgeCases:
         # Should not crash
         assert module is not None
 
-    def test_single_gate_circuit(self, circuits_dir, quantum_opt_path, quantum_translate_path, root_dir):
+    def test_single_gate_circuit(
+        self, circuits_dir, quantum_opt_path, quantum_translate_path, root_dir
+    ):
         """Test circuit with single gate."""
         circuit_path = circuits_dir / "single_hadamard.qasm"
 
@@ -287,7 +387,9 @@ class TestEdgeCases:
 class TestOutputFormat:
     """Test output format compliance."""
 
-    def test_qasm3_header(self, circuits_dir, quantum_opt_path, quantum_translate_path, root_dir, use_pass_pipeline):
+    def test_qasm3_header(
+        self, circuits_dir, quantum_opt_path, quantum_translate_path, root_dir, use_pass_pipeline
+    ):
         """Verify QASM 3.0 header is present."""
         circuit_path = circuits_dir / "bell_state_00.qasm"
 
@@ -295,7 +397,7 @@ class TestOutputFormat:
         importer = QiskitToCatalystImporter(qc)
         module = importer.convert()
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.mlir', delete=False) as tmp_mlir:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mlir", delete=False) as tmp_mlir:
             tmp_mlir.write(str(module))
             tmp_mlir_path = tmp_mlir.name
 
@@ -304,7 +406,8 @@ class TestOutputFormat:
                 str(quantum_opt_path),
                 "--pass-pipeline=builtin.module(apply-transform-sequence, canonicalize, merge-rotations)",
                 tmp_mlir_path,
-                "-o", tmp_mlir_path
+                "-o",
+                tmp_mlir_path,
             ]
             subprocess.run(opt_cmd, capture_output=True, text=True, check=True)
 
@@ -314,15 +417,26 @@ class TestOutputFormat:
         qasm3_code = result.stdout
         Path(tmp_mlir_path).unlink()
 
-        lines = qasm3_code.strip().split('\n')
+        lines = qasm3_code.strip().split("\n")
         assert lines[0] == "OPENQASM 3.0;"
         assert 'include "stdgates.inc"' in qasm3_code
 
-    @pytest.mark.parametrize("circuit_file", [
-        "prepare_plus_state.qasm",
-        "prepare_minus_state.qasm",
-    ])
-    def test_qubit_declarations(self, circuit_file, circuits_dir, quantum_opt_path, quantum_translate_path, root_dir, use_pass_pipeline):
+    @pytest.mark.parametrize(
+        "circuit_file",
+        [
+            "prepare_plus_state.qasm",
+            "prepare_minus_state.qasm",
+        ],
+    )
+    def test_qubit_declarations(
+        self,
+        circuit_file,
+        circuits_dir,
+        quantum_opt_path,
+        quantum_translate_path,
+        root_dir,
+        use_pass_pipeline,
+    ):
         """Verify qubit declarations are emitted."""
         circuit_path = circuits_dir / circuit_file
 
@@ -330,7 +444,7 @@ class TestOutputFormat:
         importer = QiskitToCatalystImporter(qc)
         module = importer.convert()
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.mlir', delete=False) as tmp_mlir:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mlir", delete=False) as tmp_mlir:
             tmp_mlir.write(str(module))
             tmp_mlir_path = tmp_mlir.name
 
@@ -339,7 +453,8 @@ class TestOutputFormat:
                 str(quantum_opt_path),
                 "--pass-pipeline=builtin.module(apply-transform-sequence, canonicalize, merge-rotations)",
                 tmp_mlir_path,
-                "-o", tmp_mlir_path
+                "-o",
+                tmp_mlir_path,
             ]
             subprocess.run(opt_cmd, capture_output=True, text=True, check=True)
 

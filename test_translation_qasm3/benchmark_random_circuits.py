@@ -27,7 +27,16 @@ root_dir = script_dir.parent
 sys.path.append(str(root_dir))
 
 # Setup MLIR paths
-mlir_core_path = root_dir / "mlir" / "llvm-project" / "build" / "tools" / "mlir" / "python_packages" / "mlir_core"
+mlir_core_path = (
+    root_dir
+    / "mlir"
+    / "llvm-project"
+    / "build"
+    / "tools"
+    / "mlir"
+    / "python_packages"
+    / "mlir_core"
+)
 if mlir_core_path.exists():
     sys.path.append(str(mlir_core_path))
 
@@ -44,6 +53,7 @@ except ImportError as e:
 @dataclass
 class BenchmarkResult:
     """Results from benchmarking a single circuit."""
+
     circuit_name: str
     num_qubits: int
     circuit_depth: int
@@ -73,6 +83,7 @@ class BenchmarkResult:
 @dataclass
 class AggregatedResults:
     """Aggregated statistics from multiple benchmark runs."""
+
     total_circuits: int
     successful: int
     failed: int
@@ -97,7 +108,7 @@ class AggregatedResults:
         """Convert to dictionary."""
         data = asdict(self)
         # Convert BenchmarkResult objects to dicts
-        data['results'] = [r.to_dict() if hasattr(r, 'to_dict') else r for r in self.results]
+        data["results"] = [r.to_dict() if hasattr(r, "to_dict") else r for r in self.results]
         return data
 
 
@@ -137,7 +148,9 @@ class QASM3TranslationBenchmark:
             circuit_name=circuit_name,
             num_qubits=circuit.num_qubits,
             circuit_depth=circuit.depth(),
-            gate_count=sum(1 for inst in circuit.data if inst.operation.name not in ['measure', 'barrier']),
+            gate_count=sum(
+                1 for inst in circuit.data if inst.operation.name not in ["measure", "barrier"]
+            ),
             mlir_generation_time=0.0,
             optimization_time=0.0,
             translation_time=0.0,
@@ -146,7 +159,7 @@ class QASM3TranslationBenchmark:
             mlir_ops=0,
             qasm3_lines=0,
             qasm3_gates=0,
-            success=False
+            success=False,
         )
 
         try:
@@ -158,14 +171,14 @@ class QASM3TranslationBenchmark:
             result.mlir_generation_time = time.time() - start_time
 
             # Count MLIR metrics
-            result.mlir_lines = len(mlir_code.split('\n'))
-            result.mlir_ops = mlir_code.count('quantum.')
+            result.mlir_lines = len(mlir_code.split("\n"))
+            result.mlir_ops = mlir_code.count("quantum.")
 
             if self.verbose:
                 print(f"  MLIR generation: {result.mlir_generation_time:.3f}s")
 
             # Phase 2: quantum-opt (optimization)
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.mlir', delete=False) as tmp_mlir:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".mlir", delete=False) as tmp_mlir:
                 tmp_mlir.write(mlir_code)
                 tmp_mlir_path = tmp_mlir.name
 
@@ -174,7 +187,8 @@ class QASM3TranslationBenchmark:
                 str(self.quantum_opt_path),
                 "--pass-pipeline=builtin.module(apply-transform-sequence, canonicalize, merge-rotations)",
                 tmp_mlir_path,
-                "-o", tmp_mlir_path
+                "-o",
+                tmp_mlir_path,
             ]
             subprocess.run(opt_cmd, capture_output=True, text=True, check=True)
             result.optimization_time = time.time() - start_time
@@ -185,7 +199,9 @@ class QASM3TranslationBenchmark:
             # Phase 3: MLIR -> QASM3
             start_time = time.time()
             translate_cmd = [str(self.quantum_translate_path), "--mlir-to-qasm3", tmp_mlir_path]
-            translate_result = subprocess.run(translate_cmd, capture_output=True, text=True, check=True)
+            translate_result = subprocess.run(
+                translate_cmd, capture_output=True, text=True, check=True
+            )
             qasm3_code = translate_result.stdout
             result.translation_time = time.time() - start_time
 
@@ -193,20 +209,26 @@ class QASM3TranslationBenchmark:
             Path(tmp_mlir_path).unlink()
 
             # Count QASM3 metrics
-            result.qasm3_lines = len(qasm3_code.split('\n'))
-            result.qasm3_gates = sum(1 for line in qasm3_code.split('\n')
-                                     if line.strip() and not line.strip().startswith('//')
-                                     and not line.strip().startswith('OPENQASM')
-                                     and not line.strip().startswith('include')
-                                     and not line.strip().startswith('qubit')
-                                     and not line.strip().startswith('bit')
-                                     and 'measure' not in line.lower())
+            result.qasm3_lines = len(qasm3_code.split("\n"))
+            result.qasm3_gates = sum(
+                1
+                for line in qasm3_code.split("\n")
+                if line.strip()
+                and not line.strip().startswith("//")
+                and not line.strip().startswith("OPENQASM")
+                and not line.strip().startswith("include")
+                and not line.strip().startswith("qubit")
+                and not line.strip().startswith("bit")
+                and "measure" not in line.lower()
+            )
 
             if self.verbose:
                 print(f"  Translation: {result.translation_time:.3f}s")
 
             # Calculate total time
-            result.total_time = result.mlir_generation_time + result.optimization_time + result.translation_time
+            result.total_time = (
+                result.mlir_generation_time + result.optimization_time + result.translation_time
+            )
             result.success = True
 
             if self.verbose:
@@ -226,9 +248,7 @@ class QASM3TranslationBenchmark:
         return result
 
     def benchmark_batch(
-        self,
-        circuits: List[QuantumCircuit],
-        prefix: str = "circuit"
+        self, circuits: List[QuantumCircuit], prefix: str = "circuit"
     ) -> List[BenchmarkResult]:
         """
         Benchmark a batch of circuits.
@@ -286,7 +306,7 @@ class QASM3TranslationBenchmark:
                 avg_gate_count=0.0,
                 avg_qasm3_gates=0.0,
                 optimization_effectiveness=0.0,
-                results=results
+                results=results,
             )
 
         # Calculate statistics from successful results
@@ -301,8 +321,11 @@ class QASM3TranslationBenchmark:
         # Calculate optimization effectiveness
         total_input_gates = sum(gate_counts)
         total_output_gates = sum(qasm3_gates)
-        opt_effectiveness = ((total_input_gates - total_output_gates) / total_input_gates * 100
-                            if total_input_gates > 0 else 0.0)
+        opt_effectiveness = (
+            (total_input_gates - total_output_gates) / total_input_gates * 100
+            if total_input_gates > 0
+            else 0.0
+        )
 
         return AggregatedResults(
             total_circuits=total,
@@ -319,15 +342,15 @@ class QASM3TranslationBenchmark:
             avg_gate_count=statistics.mean(gate_counts),
             avg_qasm3_gates=statistics.mean(qasm3_gates),
             optimization_effectiveness=opt_effectiveness,
-            results=results
+            results=results,
         )
 
 
 def print_summary(aggregated: AggregatedResults) -> None:
     """Print a summary of benchmark results."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("BENCHMARK SUMMARY")
-    print("="*70)
+    print("=" * 70)
     print(f"Total circuits:        {aggregated.total_circuits}")
     print(f"Successful:            {aggregated.successful} ({aggregated.success_rate:.1f}%)")
     print(f"Failed:                {aggregated.failed}")
@@ -347,7 +370,7 @@ def print_summary(aggregated: AggregatedResults) -> None:
     print(f"  Avg input gates:     {aggregated.avg_gate_count:.1f}")
     print(f"  Avg output gates:    {aggregated.avg_qasm3_gates:.1f}")
     print(f"  Optimization effect: {aggregated.optimization_effectiveness:.1f}% reduction")
-    print("="*70)
+    print("=" * 70)
 
 
 def main():
@@ -357,49 +380,24 @@ def main():
     )
 
     parser.add_argument(
-        "--num-qubits", "-n",
-        type=int,
-        default=4,
-        help="Number of qubits (default: 4)"
+        "--num-qubits", "-n", type=int, default=4, help="Number of qubits (default: 4)"
+    )
+    parser.add_argument("--depth", "-d", type=int, default=10, help="Circuit depth (default: 10)")
+    parser.add_argument(
+        "--count", "-c", type=int, default=10, help="Number of circuits to generate (default: 10)"
     )
     parser.add_argument(
-        "--depth", "-d",
-        type=int,
-        default=10,
-        help="Circuit depth (default: 10)"
+        "--circuit-type",
+        "-t",
+        choices=["standard", "qv", "clifford", "custom"],
+        default="standard",
+        help="Type of random circuit (default: standard)",
     )
+    parser.add_argument("--seed", "-s", type=int, default=42, help="Random seed (default: 42)")
+    parser.add_argument("--output", "-o", type=str, help="Output JSON file for results")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     parser.add_argument(
-        "--count", "-c",
-        type=int,
-        default=10,
-        help="Number of circuits to generate (default: 10)"
-    )
-    parser.add_argument(
-        "--circuit-type", "-t",
-        choices=['standard', 'qv', 'clifford', 'custom'],
-        default='standard',
-        help="Type of random circuit (default: standard)"
-    )
-    parser.add_argument(
-        "--seed", "-s",
-        type=int,
-        default=42,
-        help="Random seed (default: 42)"
-    )
-    parser.add_argument(
-        "--output", "-o",
-        type=str,
-        help="Output JSON file for results"
-    )
-    parser.add_argument(
-        "--verbose", "-v",
-        action="store_true",
-        help="Verbose output"
-    )
-    parser.add_argument(
-        "--batch-mode",
-        action="store_true",
-        help="Run predefined batch of different circuit sizes"
+        "--batch-mode", action="store_true", help="Run predefined batch of different circuit sizes"
     )
 
     args = parser.parse_args()
@@ -417,26 +415,25 @@ def main():
         all_results = []
 
         batch_configs = [
-            (2, 5, 'standard', 5),    # 2 qubits, depth 5
-            (3, 10, 'standard', 5),   # 3 qubits, depth 10
-            (4, 10, 'standard', 5),   # 4 qubits, depth 10
-            (5, 15, 'standard', 5),   # 5 qubits, depth 15
-            (3, 10, 'clifford', 5),   # Clifford circuits
-            (4, 4, 'qv', 5),          # Quantum volume
+            (2, 5, "standard", 5),  # 2 qubits, depth 5
+            (3, 10, "standard", 5),  # 3 qubits, depth 10
+            (4, 10, "standard", 5),  # 4 qubits, depth 10
+            (5, 15, "standard", 5),  # 5 qubits, depth 15
+            (3, 10, "clifford", 5),  # Clifford circuits
+            (4, 4, "qv", 5),  # Quantum volume
         ]
 
         for num_qubits, depth, circuit_type, count in batch_configs:
             print(f"\n--- Testing {circuit_type} circuits: {num_qubits} qubits, depth {depth} ---")
 
             config = RandomCircuitConfig(
-                num_qubits=num_qubits,
-                depth=depth,
-                measure=True,
-                seed=args.seed
+                num_qubits=num_qubits, depth=depth, measure=True, seed=args.seed
             )
 
             circuits = generator.generate_batch(config, count, circuit_type)
-            results = benchmark.benchmark_batch(circuits, prefix=f"{circuit_type}_{num_qubits}q_{depth}d")
+            results = benchmark.benchmark_batch(
+                circuits, prefix=f"{circuit_type}_{num_qubits}q_{depth}d"
+            )
             all_results.extend(results)
 
         aggregated = benchmark.aggregate_results(all_results)
@@ -448,10 +445,7 @@ def main():
         print(f"Seed: {args.seed}")
 
         config = RandomCircuitConfig(
-            num_qubits=args.num_qubits,
-            depth=args.depth,
-            measure=True,
-            seed=args.seed
+            num_qubits=args.num_qubits, depth=args.depth, measure=True, seed=args.seed
         )
 
         circuits = generator.generate_batch(config, args.count, args.circuit_type)
@@ -466,7 +460,7 @@ def main():
         output_path = Path(args.output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(output_path, 'w') as f:
+        with open(output_path, "w") as f:
             json.dump(aggregated.to_dict(), f, indent=2)
 
         print(f"\nResults saved to: {output_path}")
