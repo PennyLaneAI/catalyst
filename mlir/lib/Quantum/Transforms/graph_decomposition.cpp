@@ -281,7 +281,11 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 node.name = customOp.getGateName().str();
             }
             else {
-                node.name = op->getName().stripDialect().str();
+                std::string name = op->getName().stripDialect().str();
+                if (name == "gphase") {
+                    name = "GlobalPhase";
+                }
+                node.name = name;
             }
 
             if (auto paramOp =
