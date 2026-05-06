@@ -9,11 +9,6 @@ please note that LUT decoders scale exponentially with code size and are intende
 codes only.
 [(#2724)](https://github.com/PennyLaneAI/catalyst/pull/2724)
 
-
-* A new optimization pass has been added to reduce the number of instructions in a quantum program,
-  `--merge-global-phase`, which safely combines global phase instructions for each region in the
-  program. The xDSL version written in Python has been removed.
-
 * Combining ``GlobalPhase`` operations into one single operation is now possible with the
   :func:`catalyst.passes.combine_global_phases` MLIR compilation pass.
   [(#2604)](https://github.com/PennyLaneAI/catalyst/pull/2604)
@@ -140,8 +135,7 @@ codes only.
   quantum-opt --resource-analysis -mlir-pass-statistics input.mlir
   ```
 
-  For more usage information, check out the
-  [PennyLane v0.45 release notes](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-45-0).
+  For more usage information, check out the documentation for :func:`pennylane.specs`.
 
 * The ``diagonalize-final-measurements`` pass received the following new features and
   improvements:
@@ -207,9 +201,10 @@ codes only.
 
   With this release, we have made major steps towards full feature parity with PennyLane's Python
   implementation, though there are still many differences. Most notably, for ease of development and
-  ensuring a smooth transition, Catalyst's implementation of this decomposition system is accessible
-  via a new :func:`catalyst.passes.graph_decomposition` decorator instead of via
-  :func:`pennylane.transforms.decompose`, for now.
+  ensuring a smooth transition, Catalyst's most up-to-date implementation of this decomposition
+  system is accessible via a new :func:`catalyst.passes.graph_decomposition` decorator. Note that
+  using the more familiar ``qp.decompose`` decorator will still utilize the graph-based system under
+  the hood, but its internal functionality is less compatible with Catalyst.
 
   The :func:`catalyst.passes.graph_decomposition` pass decorator has several capabilities that match
   :func:`pennylane.transforms.decompose` (with :func:`pennylane.decomposition.enable_graph`),
