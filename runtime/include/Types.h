@@ -151,8 +151,8 @@ struct PairT_MemRefT_double_int64_1d {
 
 // CSC Tanner graph int32 type
 struct TannerGraph_CSC_int32 {
-    struct MemRefT_int32_1d *row_idx;
-    struct MemRefT_int32_1d *col_ptr;
+    struct MemRefT_int32_1d row_idx;
+    struct MemRefT_int32_1d col_ptr;
 };
 
 // Quantum operation modifiers

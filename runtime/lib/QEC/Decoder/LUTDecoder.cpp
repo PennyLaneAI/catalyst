@@ -69,10 +69,10 @@ void __catalyst__qecp__lut_decoder(TannerGraph_CSC_int32 *tanner_graph_csc,
     auto row_idx_tanner = tanner_graph_csc->row_idx;
     auto col_ptr_tanner = tanner_graph_csc->col_ptr;
 
-    DataView<int32_t, 1> row_idx(row_idx_tanner->data_aligned, row_idx_tanner->offset,
-                                 row_idx_tanner->sizes, row_idx_tanner->strides);
-    DataView<int32_t, 1> col_ptr(col_ptr_tanner->data_aligned, col_ptr_tanner->offset,
-                                 col_ptr_tanner->sizes, col_ptr_tanner->strides);
+    DataView<int32_t, 1> row_idx(row_idx_tanner.data_aligned, row_idx_tanner.offset,
+                                 row_idx_tanner.sizes, row_idx_tanner.strides);
+    DataView<int32_t, 1> col_ptr(col_ptr_tanner.data_aligned, col_ptr_tanner.offset,
+                                 col_ptr_tanner.sizes, col_ptr_tanner.strides);
 
     auto &current_lut = LUTs<int32_t, int64_t>::getInstance().get_lut(
         aux_col_offset, code_size, code_distance, row_idx, col_ptr);

@@ -52,7 +52,7 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
                                             0,
                                             {col_ptr_tanner.size()},
                                             {1}};
-    TannerGraph_CSC_int32 tanner_graph_csc = {&row_idx_tanner_memref, &col_ptr_tanner_memref};
+    TannerGraph_CSC_int32 tanner_graph_csc = {row_idx_tanner_memref, col_ptr_tanner_memref};
 
     MemRefT_Err_Idx err_idx_memref = {
         buffer_err_idx_memref, buffer_err_idx_memref, 0, {err_idx.size()}, {1}};
