@@ -16,7 +16,6 @@
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include <mlir/IR/BuiltinOps.h>
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -24,6 +23,8 @@
 #include "Catalyst/Utils/StaticAllocas.h"
 #include "QecPhysical/IR/QecPhysicalOps.h"
 #include "QecPhysical/Transforms/Patterns.h"
+
+#include <mlir/IR/BuiltinOps.h>
 
 using namespace mlir;
 
@@ -87,7 +88,6 @@ struct DecodeEsmCssOpPattern : public OpConversionPattern<DecodeEsmCssOp> {
         errIdxVectorType = conv->convertType(MemRefType::get(
             {llvm::dyn_cast<mlir::ShapedType>(op.getErrIdxIn().getType()).getDimSize(0)}, i64));
 
-
         auto tannerStructType = conv->convertType(op.getTannerGraph().getType());
         auto convertedTannerStruct =
             UnrealizedConversionCastOp::create(rewriter, loc, tannerStructType, op.getTannerGraph())
@@ -104,7 +104,8 @@ struct DecodeEsmCssOpPattern : public OpConversionPattern<DecodeEsmCssOp> {
         // Define function signature
         StringRef fnName = "__catalyst__qecp__lut_decoder";
 
-        Type fnSignature = LLVM::LLVMFunctionType::get(voidTy, {tannerStructAlloca.getType(), ptrTy, ptrTy}, false);
+        Type fnSignature = LLVM::LLVMFunctionType::get(
+            voidTy, {tannerStructAlloca.getType(), ptrTy, ptrTy}, false);
         LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, fnName, fnSignature);
 
