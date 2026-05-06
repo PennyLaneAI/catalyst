@@ -607,3 +607,43 @@ module @circuit_with_multirz {
     return %3 : !quantum.reg
   }
 }
+
+// -----
+
+module @circuit_with_paulirot {
+  func.func public @test_with_paulirot() -> tensor<8xf64> attributes {quantum.node} {
+    // CHECK-LABEL: func.func public @test_with_paulirot
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[CST:%.+]] = arith.constant 5.000000e-01 : f64
+    %cst = arith.constant 5.000000e-01 : f64
+
+    // CHECK: [[QUBIT1:%.+]] = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    // CHECK: [[QUBIT2:%.+]] = quantum.multirz([[CST]]) [[QUBIT1]] : !quantum.bit
+    // CHECK: [[QUBIT3:%.+]] = quantum.custom "Hadamard"() [[QUBIT2]] : !quantum.bit
+    %out_qubits = quantum.paulirot ["X"](%cst) %1 : !quantum.bit
+
+    %2 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+    %3 = quantum.compbasis qreg %2 : !quantum.obs
+    %4 = quantum.probs %3 : tensor<8xf64>
+    quantum.dealloc %2 : !quantum.reg
+    return %4 : tensor<8xf64>
+  }
+
+  // CHECK-NOT: func.func private @_pauli_rot_decomposition_wires_1_X.partial
+  func.func private @_pauli_rot_decomposition_wires_1_X.partial(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, pauli_word = "X", target_gate = "PauliRot"} {
+    %c0 = arith.constant 0 : index
+    %0 = stablehlo.slice %arg2 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+    %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
+    %extracted = tensor.extract %1[] : tensor<i64>
+    %2 = quantum.extract %arg0[%extracted] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "Hadamard"() %2 : !quantum.bit
+    %extracted_0 = tensor.extract %arg1[%c0] : tensor<1xf64>
+    %out_qubits_1 = quantum.multirz(%extracted_0) %out_qubits : !quantum.bit
+    %out_qubits_2 = quantum.custom "Hadamard"() %out_qubits_1 : !quantum.bit
+    %extracted_3 = tensor.extract %1[] : tensor<i64>
+    %3 = quantum.insert %arg0[%extracted_3], %out_qubits_2 : !quantum.reg, !quantum.bit
+    return %3 : !quantum.reg
+  }
+}
