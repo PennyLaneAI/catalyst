@@ -44,7 +44,6 @@
 
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -64,42 +63,40 @@ namespace quantum {
 #define GEN_PASS_DEF_AGGREGATEMINLOWERINGPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct AggregateMinLoweringPass
-    : impl::AggregateMinLoweringPassBase<AggregateMinLoweringPass> {
+struct AggregateMinLoweringPass : impl::AggregateMinLoweringPassBase<AggregateMinLoweringPass> {
     using AggregateMinLoweringPassBase::AggregateMinLoweringPassBase;
 
     void runOnOperation() final
     {
         func::FuncOp func = getOperation();
-        MLIRContext *ctx  = &getContext();
+        MLIRContext *ctx = &getContext();
         Builder builder(ctx);
 
         func.walk([&](FreezePartitionOp fpOp) {
-
             // ── Extract hotspot count m ───────────────────────────────────
             auto hotspotAttr = fpOp.getHotspotIndices();
-            unsigned m       = static_cast<unsigned>(hotspotAttr.size());
-            unsigned numSP   = 1u << m;
+            unsigned m = static_cast<unsigned>(hotspotAttr.size());
+            unsigned numSP = 1u << m;
 
             // ── Try to get pre-computed energies ──────────────────────────
             // warmstart_final_energy: tensor<2^m × f64>
             // mode-0 and mode-1 rows are NaN (not evaluated at compile time).
             // mode-2 rows hold the post-Adam ⟨H_k⟩.
-            std::vector<double> energies(numSP,
-                std::numeric_limits<double>::quiet_NaN());
+            std::vector<double> energies(numSP, std::numeric_limits<double>::quiet_NaN());
 
             if (auto attr = fpOp->getAttr("warmstart_final_energy")) {
                 auto dense = cast<DenseElementsAttr>(attr);
                 unsigned idx = 0;
                 for (double v : dense.getValues<double>()) {
-                    if (idx >= numSP) break;
+                    if (idx >= numSP)
+                        break;
                     energies[idx++] = v;
                 }
             }
 
             // ── Find argmin over finite energies ──────────────────────────
-            int32_t bestK   = 0;
-            double  minE    = std::numeric_limits<double>::quiet_NaN();
+            int32_t bestK = 0;
+            double minE = std::numeric_limits<double>::quiet_NaN();
             int32_t evalCnt = 0;
 
             for (unsigned k = 0; k < numSP; ++k) {
@@ -108,7 +105,7 @@ struct AggregateMinLoweringPass
                     continue;
                 ++evalCnt;
                 if (std::isnan(minE) || e < minE) {
-                    minE  = e;
+                    minE = e;
                     bestK = static_cast<int32_t>(k);
                 }
             }
@@ -121,17 +118,13 @@ struct AggregateMinLoweringPass
                 bitstring[i] = (bestK >> static_cast<int>(i)) & 1;
 
             // ── Annotate freeze_partition ─────────────────────────────────
-            fpOp->setAttr("agg_best_k",
-                          builder.getI32IntegerAttr(bestK));
-            fpOp->setAttr("agg_best_bitstring",
-                          DenseI32ArrayAttr::get(ctx, bitstring));
-            fpOp->setAttr("agg_candidates_evaluated",
-                          builder.getI32IntegerAttr(evalCnt));
+            fpOp->setAttr("agg_best_k", builder.getI32IntegerAttr(bestK));
+            fpOp->setAttr("agg_best_bitstring", DenseI32ArrayAttr::get(ctx, bitstring));
+            fpOp->setAttr("agg_candidates_evaluated", builder.getI32IntegerAttr(evalCnt));
 
             // agg_min_energy: NaN → 0x7FF8000000000000 in f64
             auto f64Ty = Float64Type::get(ctx);
-            fpOp->setAttr("agg_min_energy",
-                          FloatAttr::get(f64Ty, minE));
+            fpOp->setAttr("agg_min_energy", FloatAttr::get(f64Ty, minE));
 
             // ── Remark ────────────────────────────────────────────────────
             llvm::SmallString<160> info;
@@ -145,7 +138,8 @@ struct AggregateMinLoweringPass
             ss << " | bitstring=[";
             for (unsigned i = 0; i < m; ++i) {
                 ss << bitstring[i];
-                if (i + 1 < m) ss << ",";
+                if (i + 1 < m)
+                    ss << ",";
             }
             ss << "]";
             fpOp->emitRemark() << info;

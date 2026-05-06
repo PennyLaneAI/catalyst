@@ -39,7 +39,6 @@
 #include <cstdint>
 
 #include "llvm/Support/raw_ostream.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/Pass.h"
@@ -64,7 +63,7 @@ struct DirectTransferPass : impl::DirectTransferPassBase<DirectTransferPass> {
     void runOnOperation() final
     {
         func::FuncOp func = getOperation();
-        MLIRContext *ctx  = &getContext();
+        MLIRContext *ctx = &getContext();
         Builder builder(ctx);
 
         // ── Collect freeze_partition ops (we'll annotate them at the end) ─
@@ -82,43 +81,38 @@ struct DirectTransferPass : impl::DirectTransferPassBase<DirectTransferPass> {
                 bufSize = cast<IntegerAttr>(a).getInt();
 
             if (bufSize <= 0) {
-                fpOp->emitError()
-                    << "doqaoa-direct-transfer: param_buffer_size = " << bufSize
-                    << " is invalid (expected >= 1); run doqaoa-shared-buffer first";
+                fpOp->emitError() << "doqaoa-direct-transfer: param_buffer_size = " << bufSize
+                                  << " is invalid (expected >= 1); run doqaoa-shared-buffer first";
                 signalPassFailure();
                 return;
             }
 
             int32_t byteCount = bufSize * static_cast<int32_t>(sizeof(double)); // = 16 for p=1
 
-            int32_t directCount    = 0;
+            int32_t directCount = 0;
             int32_t warmstartCount = 0;
 
             // Walk all BiasTransferOps in the function and annotate them.
             // In the current IR structure all bias_transfer ops in a FuncOp
             // belong conceptually to a single freeze_partition (one circuit).
             func.walk([&](BiasTransferOp btOp) {
-
-                double bRep  = btOp.getBRep();
+                double bRep = btOp.getBRep();
                 double bTarg = btOp.getBTarget();
-                double thr   = btOp.getThreshold();
+                double thr = btOp.getThreshold();
                 double deltaB = std::fabs(bTarg - bRep);
 
                 // ── Shape verification ────────────────────────────────────
                 // Verify that threshold is positive and in sensible range
                 if (thr <= 0.0) {
-                    btOp->emitWarning()
-                        << "doqaoa-direct-transfer: threshold = " << thr
-                        << " is non-positive; treating as direct copy";
+                    btOp->emitWarning() << "doqaoa-direct-transfer: threshold = " << thr
+                                        << " is non-positive; treating as direct copy";
                 }
 
                 // ── Determine transfer mode ───────────────────────────────
                 bool isDirect = (deltaB <= thr);
 
-                btOp->setAttr("is_direct_copy",
-                              builder.getI32IntegerAttr(isDirect ? 1 : 0));
-                btOp->setAttr("param_byte_count",
-                              builder.getI32IntegerAttr(byteCount));
+                btOp->setAttr("is_direct_copy", builder.getI32IntegerAttr(isDirect ? 1 : 0));
+                btOp->setAttr("param_byte_count", builder.getI32IntegerAttr(byteCount));
 
                 if (isDirect)
                     ++directCount;
@@ -127,18 +121,15 @@ struct DirectTransferPass : impl::DirectTransferPassBase<DirectTransferPass> {
             });
 
             // ── Annotate freeze_partition with aggregate counts ────────────
-            fpOp->setAttr("dt_direct_count",
-                          builder.getI32IntegerAttr(directCount));
-            fpOp->setAttr("dt_warmstart_count",
-                          builder.getI32IntegerAttr(warmstartCount));
+            fpOp->setAttr("dt_direct_count", builder.getI32IntegerAttr(directCount));
+            fpOp->setAttr("dt_warmstart_count", builder.getI32IntegerAttr(warmstartCount));
 
             // Remark
             llvm::SmallString<160> info;
             llvm::raw_svector_ostream ss(info);
-            ss << "doqaoa-direct-transfer: "
-               << (directCount + warmstartCount) << " bias_transfer ops — "
-               << "direct_copy=" << directCount
-               << " warm_start=" << warmstartCount
+            ss << "doqaoa-direct-transfer: " << (directCount + warmstartCount)
+               << " bias_transfer ops — "
+               << "direct_copy=" << directCount << " warm_start=" << warmstartCount
                << " | param_byte_count=" << byteCount;
             fpOp->emitRemark() << info;
         }

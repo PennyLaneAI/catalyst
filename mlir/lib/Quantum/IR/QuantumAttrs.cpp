@@ -17,7 +17,6 @@
 //   !quantum.sparse_graph — COO sparse encoding
 
 #include "llvm/ADT/TypeSwitch.h"
-
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"

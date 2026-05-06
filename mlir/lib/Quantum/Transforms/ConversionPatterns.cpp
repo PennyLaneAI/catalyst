@@ -1285,15 +1285,14 @@ struct BiasTransferOpLowering : OpConversionPattern<BiasTransferOp> {
         if (auto attr = op->getAttr("param_byte_count"))
             byteCount = cast<IntegerAttr>(attr).getInt();
 
-        auto ptrTy  = LLVM::LLVMPointerType::get(ctx);
-        auto i8Ty   = IntegerType::get(ctx, 8);
-        auto i64Ty  = IntegerType::get(ctx, 64);
+        auto ptrTy = LLVM::LLVMPointerType::get(ctx);
+        auto i8Ty = IntegerType::get(ctx, 8);
+        auto i64Ty = IntegerType::get(ctx, 64);
         (void)i64Ty;
 
-        Value size = LLVM::ConstantOp::create(rewriter, loc,
-                         rewriter.getI64IntegerAttr(byteCount));
-        Value dst  = LLVM::AllocaOp::create(rewriter, loc, ptrTy, i8Ty, size);
-        Value src  = adaptor.getParamsRep();
+        Value size = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(byteCount));
+        Value dst = LLVM::AllocaOp::create(rewriter, loc, ptrTy, i8Ty, size);
+        Value src = adaptor.getParamsRep();
         LLVM::MemcpyOp::create(rewriter, loc, dst, src, size, /*isVolatile=*/false);
 
         rewriter.replaceOp(op, dst);
@@ -1324,7 +1323,7 @@ struct AggregateMinOpLowering : OpConversionPattern<AggregateMinOp> {
         // Try to get compile-time best_k from doqaoa-aggregate-min annotation.
         // Look for agg_best_k on a sibling freeze_partition (best-effort search).
         int32_t bestK = 0;
-        int32_t m     = 1;
+        int32_t m = 1;
 
         // Walk siblings to find freeze_partition annotation
         if (auto parentBlock = op->getBlock()) {
@@ -1340,23 +1339,23 @@ struct AggregateMinOpLowering : OpConversionPattern<AggregateMinOp> {
 
         // Build bitstring: array of m i8 values (one per hotspot qubit)
         auto ptrTy = LLVM::LLVMPointerType::get(ctx);
-        auto i8Ty  = IntegerType::get(ctx, 8);
+        auto i8Ty = IntegerType::get(ctx, 8);
         auto i64Ty = IntegerType::get(ctx, 64);
 
-        Value arrSize = LLVM::ConstantOp::create(rewriter, loc,
-                            rewriter.getI64IntegerAttr(static_cast<int64_t>(m)));
-        Value buf     = LLVM::AllocaOp::create(rewriter, loc, ptrTy, i8Ty, arrSize);
+        Value arrSize = LLVM::ConstantOp::create(
+            rewriter, loc, rewriter.getI64IntegerAttr(static_cast<int64_t>(m)));
+        Value buf = LLVM::AllocaOp::create(rewriter, loc, ptrTy, i8Ty, arrSize);
 
         // Store each bit of best_k into buf[i]
         for (int32_t i = 0; i < m; ++i) {
             int8_t bit = static_cast<int8_t>((bestK >> i) & 1);
-            Value bitVal  = LLVM::ConstantOp::create(rewriter, loc, i8Ty,
-                                rewriter.getI8IntegerAttr(bit));
-            Value idxVal  = LLVM::ConstantOp::create(rewriter, loc, i64Ty,
-                                rewriter.getI64IntegerAttr(i));
-            Value elemPtr = LLVM::GEPOp::create(rewriter, loc, ptrTy, i8Ty, buf,
-                                ArrayRef<LLVM::GEPArg>{idxVal},
-                                LLVM::GEPNoWrapFlags::inbounds);
+            Value bitVal =
+                LLVM::ConstantOp::create(rewriter, loc, i8Ty, rewriter.getI8IntegerAttr(bit));
+            Value idxVal =
+                LLVM::ConstantOp::create(rewriter, loc, i64Ty, rewriter.getI64IntegerAttr(i));
+            Value elemPtr =
+                LLVM::GEPOp::create(rewriter, loc, ptrTy, i8Ty, buf, ArrayRef<LLVM::GEPArg>{idxVal},
+                                    LLVM::GEPNoWrapFlags::inbounds);
             LLVM::StoreOp::create(rewriter, loc, bitVal, elemPtr);
         }
 

@@ -116,11 +116,11 @@ static std::string buildTopologyKey(const GraphDesc &graph)
 
 struct SubProblemDesc {
     unsigned numFree;
-    std::vector<unsigned> freeQubits;   // indices of free qubits
+    std::vector<unsigned> freeQubits; // indices of free qubits
     std::vector<bool> isFrozen;
-    std::vector<double> frozenSpin;     // +1 or -1 for frozen qubits, 0 otherwise
-    std::vector<double> hEff;           // effective bias on free qubits
-    std::vector<double> Jfree;          // numFree×numFree sub-matrix, row-major
+    std::vector<double> frozenSpin; // +1 or -1 for frozen qubits, 0 otherwise
+    std::vector<double> hEff;       // effective bias on free qubits
+    std::vector<double> Jfree;      // numFree×numFree sub-matrix, row-major
 };
 
 static SubProblemDesc buildSubProblem(const GraphDesc &graph, unsigned k)
@@ -259,8 +259,7 @@ static double exactEnergy(const SubProblemDesc &sp, double gamma, double beta)
 //   P(z_u = 1) ≈ sin²(β) + correction from neighbours (ignored here for speed)
 // This gives the correct *landscape shape* for cosine similarity purposes.
 
-static double sampleEnergy(const SubProblemDesc &sp, double gamma, double beta,
-                            uint64_t seed)
+static double sampleEnergy(const SubProblemDesc &sp, double gamma, double beta, uint64_t seed)
 {
     unsigned Nf = sp.numFree;
     std::mt19937_64 rng(seed ^ static_cast<uint64_t>(gamma * 1e6) ^
@@ -292,8 +291,7 @@ static double sampleEnergy(const SubProblemDesc &sp, double gamma, double beta,
 // Public API
 // ─────────────────────────────────────────────────────────────────────────────
 
-double evaluateEnergy(const GraphDesc &graph, unsigned k,
-                      double gamma, double beta, uint64_t seed)
+double evaluateEnergy(const GraphDesc &graph, unsigned k, double gamma, double beta, uint64_t seed)
 {
     SubProblemDesc sp = buildSubProblem(graph, k);
 
@@ -302,8 +300,8 @@ double evaluateEnergy(const GraphDesc &graph, unsigned k,
     return sampleEnergy(sp, gamma, beta, seed);
 }
 
-std::vector<double> buildLandscapeVector(const GraphDesc &graph, unsigned k,
-                                          unsigned gridSize, uint64_t seed)
+std::vector<double> buildLandscapeVector(const GraphDesc &graph, unsigned k, unsigned gridSize,
+                                         uint64_t seed)
 {
     // ── Cache lookup ─────────────────────────────────────────────────────
     std::string topoKey = buildTopologyKey(graph);
@@ -360,19 +358,20 @@ double computeBias(const GraphDesc &graph, unsigned k)
     unsigned m = static_cast<unsigned>(graph.hotspotIndices.size());
 
     // Determine frozen spins for sub-problem k
-    std::vector<bool>   isFrozen(N, false);
+    std::vector<bool> isFrozen(N, false);
     std::vector<double> frozenSpin(N, 0.0);
     for (unsigned i = 0; i < m; ++i) {
-        unsigned qi    = static_cast<unsigned>(graph.hotspotIndices[i]);
-        isFrozen[qi]   = true;
+        unsigned qi = static_cast<unsigned>(graph.hotspotIndices[i]);
+        isFrozen[qi] = true;
         frozenSpin[qi] = ((k >> i) & 1u) ? -1.0 : +1.0;
     }
 
     // Accumulate |h_eff| over free qubits
-    double sum   = 0.0;
+    double sum = 0.0;
     unsigned nFree = 0;
     for (unsigned fi = 0; fi < N; ++fi) {
-        if (isFrozen[fi]) continue;
+        if (isFrozen[fi])
+            continue;
         ++nFree;
         double hEff = graph.h[fi];
         for (unsigned fj = 0; fj < N; ++fj)

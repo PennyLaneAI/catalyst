@@ -99,10 +99,7 @@ struct QIRTypeConverter : public LLVMTypeConverter {
 
     // DO-QAOA: !quantum.params → ptr
     // Pointer to a heap-allocated f64 parameter buffer (gamma/beta values)
-    Type convertParamsType(ParamsType type)
-    {
-        return LLVM::LLVMPointerType::get(&getContext());
-    }
+    Type convertParamsType(ParamsType type) { return LLVM::LLVMPointerType::get(&getContext()); }
 
     // DO-QAOA: !quantum.bitstring → ptr
     // Pointer to a heap-allocated i8 buffer holding the binary node assignment

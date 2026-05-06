@@ -51,7 +51,6 @@
 
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -78,7 +77,10 @@ namespace quantum {
 static std::vector<double> nmpExtractJ(Operation *op, unsigned &numNodes)
 {
     auto hq = op->getAttr("h_quad");
-    if (!hq) { numNodes = 0; return {}; }
+    if (!hq) {
+        numNodes = 0;
+        return {};
+    }
 
     if (auto dense = dyn_cast<DenseGraphAttr>(hq)) {
         numNodes = static_cast<unsigned>(dense.getNumNodes());
@@ -93,8 +95,8 @@ static std::vector<double> nmpExtractJ(Operation *op, unsigned &numNodes)
         std::vector<double> J(static_cast<size_t>(N) * N, 0.0);
         auto rows = sparse.getRowIndices();
         auto cols = sparse.getColIndices();
-        auto wt   = sparse.getWeights().getValues<double>();
-        auto wit  = wt.begin();
+        auto wt = sparse.getWeights().getValues<double>();
+        auto wit = wt.begin();
         for (unsigned e = 0; e < static_cast<unsigned>(rows.size()); ++e, ++wit) {
             unsigned r = static_cast<unsigned>(rows[e]);
             unsigned c = static_cast<unsigned>(cols[e]);
@@ -108,10 +110,8 @@ static std::vector<double> nmpExtractJ(Operation *op, unsigned &numNodes)
 }
 
 // Count free-free edges (J[u,v] != 0, both u and v are free) for sub-problem k.
-static int cnotCountForSubproblem(const std::vector<double> &J,
-                                   unsigned numNodes,
-                                   const std::vector<int32_t> &hotspots,
-                                   unsigned /*k*/)
+static int cnotCountForSubproblem(const std::vector<double> &J, unsigned numNodes,
+                                  const std::vector<int32_t> &hotspots, unsigned /*k*/)
 {
     // Build free-qubit set (same for all k in p=1 QAOA — frozen qubits don't
     // change the free-free edge count, only the effective bias changes).
@@ -124,9 +124,11 @@ static int cnotCountForSubproblem(const std::vector<double> &J,
     int cnt = 0;
     constexpr double kTol = 1e-12;
     for (unsigned u = 0; u < numNodes; ++u) {
-        if (isFrozen[u]) continue;
+        if (isFrozen[u])
+            continue;
         for (unsigned v = u + 1; v < numNodes; ++v) {
-            if (isFrozen[v]) continue;
+            if (isFrozen[v])
+                continue;
             if (std::fabs(J[u * numNodes + v]) > kTol)
                 ++cnt;
         }
@@ -146,29 +148,27 @@ struct NoiseModelPreservationPass
     void runOnOperation() final
     {
         func::FuncOp func = getOperation();
-        MLIRContext *ctx  = &getContext();
+        MLIRContext *ctx = &getContext();
         Builder builder(ctx);
 
-        double t1   = noiseT1Ns;
-        double t2   = noiseT2Ns;
-        double fid  = noiseCxFidelity;
-        double cxT  = noiseCxTimeNs;
+        double t1 = noiseT1Ns;
+        double t2 = noiseT2Ns;
+        double fid = noiseCxFidelity;
+        double cxT = noiseCxTimeNs;
         unsigned maxC = expectedMaxCnots;
 
         func.walk([&](FreezePartitionOp fpOp) {
-
             // ── Extract graph ────────────────────────────────────────────
             unsigned numNodes = 0;
             auto J = nmpExtractJ(fpOp, numNodes);
             if (numNodes == 0) {
-                fpOp->emitWarning()
-                    << "doqaoa-noise-preserve: missing h_quad, skipping";
+                fpOp->emitWarning() << "doqaoa-noise-preserve: missing h_quad, skipping";
                 return;
             }
 
             auto hotspotAttr = fpOp.getHotspotIndices();
-            unsigned m       = static_cast<unsigned>(hotspotAttr.size());
-            unsigned numSP   = 1u << m;
+            unsigned m = static_cast<unsigned>(hotspotAttr.size());
+            unsigned numSP = 1u << m;
 
             std::vector<int32_t> hotspots;
             for (auto idx : hotspotAttr)
@@ -188,35 +188,29 @@ struct NoiseModelPreservationPass
 
             if (!depthOk) {
                 fpOp->emitWarning()
-                    << "doqaoa-noise-preserve: circuit_time="
-                    << llvm::format("%.0f", circuitTimeNs)
+                    << "doqaoa-noise-preserve: circuit_time=" << llvm::format("%.0f", circuitTimeNs)
                     << "ns exceeds T1=" << llvm::format("%.0f", t1)
-                    << "ns for max_cnots=" << maxCnots
-                    << "; decoherence error budget exceeded";
+                    << "ns for max_cnots=" << maxCnots << "; decoherence error budget exceeded";
             }
 
             // ── expected-max-cnots regression gate ───────────────────────
             if (maxC > 0 && static_cast<unsigned>(maxCnots) > maxC) {
-                fpOp->emitError()
-                    << "doqaoa-noise-preserve: max_cnots=" << maxCnots
-                    << " exceeds expected-max-cnots=" << maxC
-                    << " (regression failure)";
+                fpOp->emitError() << "doqaoa-noise-preserve: max_cnots=" << maxCnots
+                                  << " exceeds expected-max-cnots=" << maxC
+                                  << " (regression failure)";
                 signalPassFailure();
                 return;
             }
 
             // ── Annotate ──────────────────────────────────────────────────
             auto f64Ty = Float64Type::get(ctx);
-            fpOp->setAttr("noise_t1_ns",       FloatAttr::get(f64Ty, t1));
-            fpOp->setAttr("noise_t2_ns",       FloatAttr::get(f64Ty, t2));
+            fpOp->setAttr("noise_t1_ns", FloatAttr::get(f64Ty, t1));
+            fpOp->setAttr("noise_t2_ns", FloatAttr::get(f64Ty, t2));
             fpOp->setAttr("noise_cx_fidelity", FloatAttr::get(f64Ty, fid));
-            fpOp->setAttr("noise_cx_time_ns",  FloatAttr::get(f64Ty, cxT));
-            fpOp->setAttr("noise_cnot_counts",
-                          DenseI32ArrayAttr::get(ctx, cnotCounts));
-            fpOp->setAttr("noise_max_cnots",
-                          builder.getI32IntegerAttr(maxCnots));
-            fpOp->setAttr("noise_depth_ok",
-                          builder.getI32IntegerAttr(depthOk ? 1 : 0));
+            fpOp->setAttr("noise_cx_time_ns", FloatAttr::get(f64Ty, cxT));
+            fpOp->setAttr("noise_cnot_counts", DenseI32ArrayAttr::get(ctx, cnotCounts));
+            fpOp->setAttr("noise_max_cnots", builder.getI32IntegerAttr(maxCnots));
+            fpOp->setAttr("noise_depth_ok", builder.getI32IntegerAttr(depthOk ? 1 : 0));
 
             // ── Remark ────────────────────────────────────────────────────
             llvm::SmallString<220> info;

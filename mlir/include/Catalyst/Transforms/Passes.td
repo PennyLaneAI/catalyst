@@ -247,15 +247,6 @@ def BufferDeallocationPass : Pass<"buffer-deallocation", "func::FuncOp"> {
   }];
 }
 
-def MarkEntryPointArgsNonWritablePass : Pass<"mark-entry-point-args-non-writable", "mlir::ModuleOp"> {
-    let summary = "Mark entry-point arguments as non-writable for bufferization.";
-
-    let dependentDialects = [
-        "bufferization::BufferizationDialect",
-        "func::FuncDialect"
-    ];
-}
-
 def ResourceAnalysisPass : Pass<"resource-analysis"> {
     let summary = "Track and report resource usage.";
     let description = [{
