@@ -274,7 +274,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     {
         getOperation().walk([&](quantum::QuantumGate op) {
             OperatorNode node;
-            node.numWires = op.getQubitOperands().size();
+            node.numWires = op.getNonCtrlQubitOperands().size();
             node.adjoint = op.getAdjointFlag();
 
             if (auto customOp = llvm::dyn_cast<quantum::CustomOp>(op.getOperation())) {
