@@ -211,12 +211,11 @@ PassNames getLLVMDialectLoweringStage(bool asyncQNodes = false)
     PassNames ret;
     std::copy_if(pipelineList[4].passNames.begin(), pipelineList[4].passNames.end(),
                  std::back_inserter(ret), [&asyncQNodes](const auto &passName) {
-                     return asyncQNodes ||
-                            (passName != "qnode-to-async-lowering" &&
-                             passName != "async-func-to-async-runtime" &&
-                             passName != "async-to-async-runtime" &&
-                             passName != "convert-async-to-llvm" &&
-                             passName != "add-exception-handling");
+                     return asyncQNodes || (passName != "qnode-to-async-lowering" &&
+                                            passName != "async-func-to-async-runtime" &&
+                                            passName != "async-to-async-runtime" &&
+                                            passName != "convert-async-to-llvm" &&
+                                            passName != "add-exception-handling");
                  });
     return ret;
 }
