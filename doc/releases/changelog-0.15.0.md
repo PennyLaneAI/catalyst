@@ -200,11 +200,11 @@ codes only.
   new decomposition system.
 
   With this release, we have made major steps towards full feature parity with PennyLane's Python
-  implementation, though there are still many differences. Most notably, for ease of development and
-  ensuring a smooth transition, Catalyst's most up-to-date implementation of this decomposition
-  system is accessible via a new :func:`catalyst.passes.graph_decomposition` decorator. Note that
-  using the more familiar ``qp.decompose`` decorator will still utilize the graph-based system under
-  the hood, but its internal functionality is less compatible with Catalyst, for now.
+  implementation, though there are still differences. For ease of development and ensuring a smooth
+  transition, Catalyst's most up-to-date implementation of this decomposition system is accessible
+  via a new :func:`catalyst.passes.graph_decomposition` decorator, though the more familiar
+  ``qp.decompose`` transform is the longterm goal for using graph-based decompositions with
+  Catalyst.
 
   The :func:`catalyst.passes.graph_decomposition` pass decorator has several capabilities that match
   :func:`pennylane.transforms.decompose` (with :func:`pennylane.decomposition.enable_graph`),
