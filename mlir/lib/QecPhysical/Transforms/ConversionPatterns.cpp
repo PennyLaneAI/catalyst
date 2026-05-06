@@ -95,18 +95,20 @@ struct DecodeEsmCssOpPattern : public OpConversionPattern<DecodeEsmCssOp> {
 
         Value esmAlloca = catalyst::getStaticAlloca(loc, rewriter, esmVectorType, 1);
         Value errIdxAlloca = catalyst::getStaticAlloca(loc, rewriter, errIdxVectorType, 1);
+        Value tannerStructAlloca = catalyst::getStaticAlloca(loc, rewriter, tannerStructType, 1);
 
         LLVM::StoreOp::create(rewriter, loc, adaptor.getEsm(), esmAlloca);
         LLVM::StoreOp::create(rewriter, loc, adaptor.getErrIdxIn(), errIdxAlloca);
+        LLVM::StoreOp::create(rewriter, loc, convertedTannerStruct, tannerStructAlloca);
 
         // Define function signature
         StringRef fnName = "__catalyst__qecp__lut_decoder";
 
-        Type fnSignature = LLVM::LLVMFunctionType::get(voidTy, {tannerStructType, ptrTy, ptrTy}, false);
+        Type fnSignature = LLVM::LLVMFunctionType::get(voidTy, {tannerStructAlloca.getType(), ptrTy, ptrTy}, false);
         LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, fnName, fnSignature);
 
-        SmallVector<Value> args = {convertedTannerStruct, esmAlloca, errIdxAlloca};
+        SmallVector<Value> args = {tannerStructAlloca, esmAlloca, errIdxAlloca};
 
         LLVM::CallOp::create(rewriter, loc, fnDecl, args);
 

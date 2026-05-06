@@ -98,7 +98,7 @@ module {
 // -----
 
 module {
-    // CHECK: llvm.func @__catalyst__qecp__lut_decoder(!llvm.struct<"TannerGraph", 
+    // CHECK: llvm.func @__catalyst__qecp__lut_decoder(!llvm.ptr, !llvm.ptr, !llvm.ptr) 
     memref.global "private" constant @__constant_3xi1 : memref<3xi1> = dense<[1, 1, 0]> {alignment = 64 : i64}
     memref.global "private" constant @__constant_8xi32 : memref<8xi32> = dense<[3, 3, 4, 4, 0, 1, 1, 2]> {alignment = 64 : i64}
     memref.global "private" constant @__constant_6xi32 : memref<6xi32> = dense<[0, 1, 3, 4, 6, 8]> {alignment = 64 : i64}
@@ -116,7 +116,8 @@ module {
 
         %err_buf = memref.alloc() : memref<2xindex>
         // CHECK-NOT: builtin.unrealized_conversion_cast
-        // CHECK: llvm.call @__catalyst__qecp__lut_decoder({{.+}}, {{.+}}, {{.+}})
+        // CHECK: llvm.store {{.+}}, [[tanner:%.+]] : !llvm.struct<"TannerGraph",
+        // CHECK: llvm.call @__catalyst__qecp__lut_decoder([[tanner:%.+]], {{.+}}, {{.+}}) : (!llvm.ptr, !llvm.ptr, !llvm.ptr) -> ()
         qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm in(%err_buf : memref<2xindex>) : memref<3xi1>
         memref.dealloc %err_buf : memref<2xindex>
 
