@@ -530,7 +530,7 @@ jobs:
     - name: Upload to Codecov
       uses: codecov/codecov-action@v4
       with:
-        fail_ci_if_error: true
+        fail_ci_if_error: ${{ github.ref == 'refs/heads/main' }}
         token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Check Catalyst Demos
@@ -753,5 +753,5 @@ jobs:
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
         with:
-          fail_ci_if_error: true
+          fail_ci_if_error: ${{ github.ref == 'refs/heads/main' }}
           token: ${{ secrets.CODECOV_TOKEN }}

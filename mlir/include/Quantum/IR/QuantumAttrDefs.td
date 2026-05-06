@@ -15,6 +15,8 @@
 #ifndef QUANTUM_ATTR_DEFS
 #define QUANTUM_ATTR_DEFS
 
+include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/CommonAttrConstraints.td"
 include "mlir/IR/EnumAttr.td"
 
 include "Quantum/IR/QuantumDialect.td"
@@ -94,6 +96,7 @@ def DenseGraphAttr : Quantum_Attr<"DenseGraph", "dense_graph"> {
     );
     let hasCustomAssemblyFormat = 1;
     let genVerifyDecl = 1;
+    let dependentDialects = ["mlir::BuiltinDialect"];
 }
 
 def SparseGraphAttr : Quantum_Attr<"SparseGraph", "sparse_graph"> {
@@ -115,6 +118,7 @@ def SparseGraphAttr : Quantum_Attr<"SparseGraph", "sparse_graph"> {
     );
     let hasCustomAssemblyFormat = 1;
     let genVerifyDecl = 1;
+    let dependentDialects = ["mlir::BuiltinDialect"];
 }
 
 #endif // QUANTUM_ATTR_DEFS

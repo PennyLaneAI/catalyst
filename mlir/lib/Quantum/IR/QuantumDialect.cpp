@@ -129,7 +129,7 @@ void QuantumDialect::initialize()
 //===----------------------------------------------------------------------===//
 
 /// Verify the QNode attribute invariants
-LogicalResult QuantumDialect::verifyOperationAttribute(Operation *op, NamedAttribute namedAttr)
+LogicalResult QuantumDialect::verifyOperationAttribute(Operation *op, const mlir::NamedAttribute &namedAttr)
 {
     StringRef attrName = namedAttr.getName().getValue();
     if (attrName != "quantum.node") {
