@@ -31,11 +31,7 @@ from .attributes import (
     ResultAccuracyModeAttr,
     ScatterDimensionNumbers,
 )
-from .control_flow import (
-    IfOp,
-    OptimizationBarrierOp,
-    WhileOp,
-)
+from .control_flow import IfOp, OptimizationBarrierOp, WhileOp
 from .data_movement import (
     BroadcastInDimOp,
     ConcatenateOp,
@@ -45,25 +41,9 @@ from .data_movement import (
     ScatterOp,
     SliceOp,
 )
-from .dynamism import (
-    DynamicBroadcastInDimOp,
-)
-from .elementwise_binary import (
-    ComplexOp,
-    DivideOp,
-    MaximumOp,
-    MinimumOp,
-    PowerOp,
-    RemainderOp,
-)
-from .elementwise_other import (
-    ClampOp,
-    CompareOp,
-    ConstantOp,
-    MapOp,
-    ReducePrecisionOp,
-    SelectOp,
-)
+from .dynamism import DynamicBroadcastInDimOp
+from .elementwise_binary import ComplexOp, DivideOp, MaximumOp, MinimumOp, PowerOp, RemainderOp
+from .elementwise_other import ClampOp, CompareOp, ConstantOp, MapOp, ReducePrecisionOp, SelectOp
 
 # Import all elementwise operations from organized files
 from .elementwise_unary import (
@@ -88,12 +68,8 @@ from .elementwise_unary import (
     TanhOp,
     TanOp,
 )
-from .extensibility import (
-    CustomCallOp,
-)
-from .reduction import (
-    ReduceOp,
-)
+from .extensibility import CustomCallOp
+from .reduction import ReduceOp
 from .types import UniformQuantizedPerAxisType, UniformQuantizedType
 
 # Operations to add to the dialect

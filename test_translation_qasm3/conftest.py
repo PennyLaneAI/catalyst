@@ -3,8 +3,9 @@ Pytest configuration and fixtures for QASM3 translation tests.
 """
 
 import sys
-import pytest
 from pathlib import Path
+
+import pytest
 
 # Setup paths
 ROOT_DIR = Path(__file__).parent.parent.resolve()

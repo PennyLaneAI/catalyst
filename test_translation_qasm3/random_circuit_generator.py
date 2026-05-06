@@ -7,7 +7,8 @@ for benchmarking the Qiskit -> MLIR -> QASM3 translation pipeline.
 
 import random
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
+
 from qiskit import QuantumCircuit
 from qiskit.circuit.random import random_circuit
 

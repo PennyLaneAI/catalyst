@@ -42,9 +42,7 @@ from xdsl.irdl.attributes import EqAttrConstraint, ParamAttrConstraint
 from xdsl.irdl.constraints import IntSetConstraint
 from xdsl_jax.dialects.stablehlo import TokenType
 
-from catalyst.python_interface.xdsl_extras.constraints import (
-    NestedTupleOfConstraint,
-)
+from catalyst.python_interface.xdsl_extras.constraints import NestedTupleOfConstraint
 
 
 def _create_param_constrained_type(

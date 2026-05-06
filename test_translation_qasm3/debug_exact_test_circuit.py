@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Debug script that runs EXACTLY what the test runs."""
 
+import subprocess
 import sys
 import tempfile
-import subprocess
 from pathlib import Path
 
 # Setup paths - exactly as in conftest.py
@@ -12,12 +12,13 @@ sys.path.append(
     str(Path.cwd().parent / "mlir/llvm-project/build/tools/mlir/python_packages/mlir_core")
 )
 
-from test_translation_qasm3.random_circuit_generator import (
-    RandomCircuitGenerator,
-    RandomCircuitConfig,
-)
 from qiskit import transpile
+
 from qiskit_importer_standalone import QiskitToCatalystImporter
+from test_translation_qasm3.random_circuit_generator import (
+    RandomCircuitConfig,
+    RandomCircuitGenerator,
+)
 
 
 def decompose_to_standard_gates(circuit):

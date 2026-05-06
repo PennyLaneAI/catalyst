@@ -27,10 +27,7 @@ from xdsl.irdl import (
     var_result_def,
 )
 from xdsl.irdl.operations import SameVariadicOperandSize
-from xdsl.traits import (
-    RecursiveMemoryEffect,
-    SingleBlockImplicitTerminator,
-)
+from xdsl.traits import RecursiveMemoryEffect, SingleBlockImplicitTerminator
 from xdsl.utils.exceptions import VerifyException
 from xdsl_jax.dialects import stablehlo as xstablehlo
 

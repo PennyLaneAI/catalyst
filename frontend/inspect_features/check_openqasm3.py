@@ -1,6 +1,6 @@
 import pennylane as qml
-from catalyst import qjit
 
+from catalyst import qjit
 
 # Use the local simulator instead of the AWS-hosted one
 dev = qml.device("braket.local.qubit", wires=2)

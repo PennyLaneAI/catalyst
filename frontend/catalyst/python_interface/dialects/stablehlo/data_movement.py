@@ -32,12 +32,7 @@ from xdsl.irdl import (
 from xdsl.irdl.attributes import eq
 from xdsl.irdl.constraints import AtLeast
 from xdsl.irdl.operations import SameVariadicOperandSize
-from xdsl.traits import (
-    ConditionallySpeculatable,
-    NoMemoryEffect,
-    Pure,
-    RecursiveMemoryEffect,
-)
+from xdsl.traits import ConditionallySpeculatable, NoMemoryEffect, Pure, RecursiveMemoryEffect
 from xdsl.utils.exceptions import VerifyException
 from xdsl.utils.type import get_element_type_or_self
 

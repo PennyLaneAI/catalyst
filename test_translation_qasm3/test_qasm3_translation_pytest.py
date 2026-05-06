@@ -4,12 +4,13 @@ Pytest-based tests for QASM3 translation pipeline.
 This test suite provides comprehensive testing of the Qiskit -> MLIR -> QASM3 pipeline.
 """
 
-import pytest
-import sys
-import subprocess
-import tempfile
 import math
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
+
+import pytest
 from qiskit import QuantumCircuit
 
 try:
@@ -18,8 +19,8 @@ except ImportError:
     pytest.skip("qiskit_importer_standalone not available", allow_module_level=True)
 
 try:
-    from qiskit_aer import AerSimulator
     import qiskit.qasm3
+    from qiskit_aer import AerSimulator
 
     AER_AVAILABLE = True
 except ImportError:

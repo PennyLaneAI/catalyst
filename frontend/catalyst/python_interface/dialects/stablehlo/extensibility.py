@@ -38,9 +38,7 @@ from xdsl.irdl import (
     var_operand_def,
     var_result_def,
 )
-from xdsl.traits import (
-    MemoryEffect,
-)
+from xdsl.traits import MemoryEffect
 from xdsl.utils.exceptions import VerifyException
 
 from .attributes import CustomCallApiVersion, CustomCallApiVersionAttr, OutputOperandAlias

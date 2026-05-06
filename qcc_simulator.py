@@ -33,7 +33,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, NamedTuple
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
 _ROOT = Path(__file__).parent.resolve()
 _MLIR_CORE = (
@@ -59,8 +59,8 @@ except ImportError:
     _IMPORTER_OK = False
 
 try:
-    from qiskit_aer import AerSimulator
     import qiskit.qasm3 as _qasm3_mod
+    from qiskit_aer import AerSimulator
 
     _AER_OK = True
 except ImportError:

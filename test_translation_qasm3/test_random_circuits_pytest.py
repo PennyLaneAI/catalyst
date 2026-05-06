@@ -5,12 +5,13 @@ Tests the QASM3 translation pipeline with randomly generated circuits
 to ensure robustness and scalability.
 """
 
-import pytest
-import sys
-import subprocess
-import tempfile
 import math
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
+
+import pytest
 
 # Setup paths
 script_dir = Path(__file__).parent.resolve()
@@ -31,7 +32,7 @@ if mlir_core_path.exists():
     sys.path.append(str(mlir_core_path))
 
 from qiskit import QuantumCircuit
-from random_circuit_generator import RandomCircuitGenerator, RandomCircuitConfig
+from random_circuit_generator import RandomCircuitConfig, RandomCircuitGenerator
 
 try:
     from qiskit_importer_standalone import QiskitToCatalystImporter
@@ -39,8 +40,8 @@ except ImportError:
     pytest.skip("qiskit_importer_standalone not available", allow_module_level=True)
 
 try:
-    from qiskit_aer import AerSimulator
     import qiskit.qasm3
+    from qiskit_aer import AerSimulator
 
     AER_AVAILABLE = True
 except ImportError:

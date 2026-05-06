@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Debug script to investigate random circuit translation failures."""
 
+import subprocess
 import sys
 import tempfile
-import subprocess
 from pathlib import Path
 
 # Setup paths
@@ -12,8 +12,9 @@ sys.path.append(
     str(Path.cwd().parent / "mlir/llvm-project/build/tools/mlir/python_packages/mlir_core")
 )
 
-from qiskit.circuit.random import random_circuit
 from qiskit import transpile
+from qiskit.circuit.random import random_circuit
+
 from qiskit_importer_standalone import QiskitToCatalystImporter
 
 

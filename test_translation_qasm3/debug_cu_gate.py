@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-import sys
-from pathlib import Path
-import tempfile
 import subprocess
+import sys
+import tempfile
+from pathlib import Path
 
 sys.path.append(str(Path.cwd().parent))
 sys.path.append(
     str(Path.cwd().parent / "mlir/llvm-project/build/tools/mlir/python_packages/mlir_core")
 )
 
-from random_circuit_generator import RandomCircuitGenerator, RandomCircuitConfig
 from qiskit import transpile
+from random_circuit_generator import RandomCircuitConfig, RandomCircuitGenerator
+
 from qiskit_importer_standalone import QiskitToCatalystImporter
 
 # Generate EXACT same circuit as test

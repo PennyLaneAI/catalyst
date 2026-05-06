@@ -1,9 +1,10 @@
+import math
 import os
+import subprocess
 import sys
 import tempfile
-import subprocess
-import math
 from pathlib import Path
+
 from qiskit import QuantumCircuit, transpile
 
 # Setup environment to find mlir_core without setting PYTHONPATH manually
@@ -34,8 +35,8 @@ except ImportError as e:
     sys.exit(1)
 
 try:
-    from qiskit_aer import AerSimulator
     import qiskit.qasm3
+    from qiskit_aer import AerSimulator
 
     AER_AVAILABLE = True
 except ImportError:

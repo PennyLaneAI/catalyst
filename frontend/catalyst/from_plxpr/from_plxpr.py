@@ -52,10 +52,7 @@ from catalyst.jax_primitives import (
 from catalyst.utils.patching import Patcher
 
 from .qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
-from .qubit_handler import (
-    QubitHandler,
-    QubitIndexRecorder,
-)
+from .qubit_handler import QubitHandler, QubitIndexRecorder
 
 
 def _tuple_to_slice(t):

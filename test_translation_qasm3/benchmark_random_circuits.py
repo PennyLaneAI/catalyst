@@ -11,15 +11,15 @@ Usage:
 """
 
 import argparse
-import sys
 import json
-import time
-import tempfile
-import subprocess
-from pathlib import Path
-from typing import Dict, List, Tuple, Any, Optional
-from dataclasses import dataclass, asdict
 import statistics
+import subprocess
+import sys
+import tempfile
+import time
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 # Add parent directory to path for imports
 script_dir = Path(__file__).parent.resolve()
@@ -41,7 +41,7 @@ if mlir_core_path.exists():
     sys.path.append(str(mlir_core_path))
 
 from qiskit import QuantumCircuit
-from random_circuit_generator import RandomCircuitGenerator, RandomCircuitConfig
+from random_circuit_generator import RandomCircuitConfig, RandomCircuitGenerator
 
 try:
     from qiskit_importer_standalone import QiskitToCatalystImporter

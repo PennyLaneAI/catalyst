@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import qiskit
-import qiskit
 
 try:
     # Use mlir_quantum for Quantum dialect (custom)
@@ -21,50 +20,50 @@ try:
     quantum = None  # Mock or unused
     # Try using standard MLIR package first
     try:
-        from mlir.dialects import scf, func, arith
+        from mlir.dialects import arith, func, scf
         from mlir.ir import (
             Context,
-            Module,
-            Location,
+            IndexType,
             InsertionPoint,
+            IntegerAttr,
+            IntegerType,
+            Location,
+            Module,
+            Operation,
             StringAttr,
             SymbolTable,
             Type,
-            IntegerType,
-            IndexType,
-            IntegerAttr,
-            Operation,
         )
     except ImportError:
         # Use jaxlib for standard dialects to match the runtime patched by catalyst
-        from jaxlib.mlir.dialects import scf, func, arith
+        from jaxlib.mlir.dialects import arith, func, scf
 
         # Use jaxlib for IR components
         from jaxlib.mlir.ir import (
             Context,
-            Module,
-            Location,
+            IndexType,
             InsertionPoint,
+            IntegerAttr,
+            IntegerType,
+            Location,
+            Module,
+            Operation,
             StringAttr,
             SymbolTable,
             Type,
-            IntegerType,
-            IndexType,
-            IntegerAttr,
-            Operation,
         )
 except ImportError:
     # Fallback/Error handling
     try:
+        from jaxlib.mlir.dialects import arith, func, scf
         from jaxlib.mlir.ir import (
             Context,
-            Module,
-            Location,
             InsertionPoint,
+            Location,
+            Module,
             StringAttr,
             SymbolTable,
         )
-        from jaxlib.mlir.dialects import scf, func, arith
 
         # construct quantum dialect manually? No, quantum dialect is in mlir_quantum.
         # Check if we can proceed without quantum dialect for some reason?
@@ -159,7 +158,7 @@ class QiskitToCatalystImporter:
 
                 # r_type = quantum.RegType.get(self.ctx)
                 # Use Type.parse if specific class binding is missing
-                from jaxlib.mlir.ir import Type, IntegerType, IndexType, IntegerAttr
+                from jaxlib.mlir.ir import IndexType, IntegerAttr, IntegerType, Type
 
                 r_type = Type.parse("!quantum.reg", context=self.ctx)
                 # idx_type = arith.IntegerType.get(self.ctx, 64) # Error

@@ -15,12 +15,7 @@
 This file contains the definition of operations that create/destroy qubits
 and quantum registers in the Quantum dialect.
 """
-from xdsl.dialects.builtin import (
-    I64,
-    IntegerAttr,
-    IntegerType,
-    i64,
-)
+from xdsl.dialects.builtin import I64, IntegerAttr, IntegerType, i64
 from xdsl.ir import Operation, SSAValue
 from xdsl.irdl import (
     AtLeast,
@@ -34,12 +29,7 @@ from xdsl.irdl import (
 )
 from xdsl.traits import NoMemoryEffect
 
-from ..attributes import (
-    QubitSSAValue,
-    QubitType,
-    QuregSSAValue,
-    QuregType,
-)
+from ..attributes import QubitSSAValue, QubitType, QuregSSAValue, QuregType
 
 
 @irdl_op_definition

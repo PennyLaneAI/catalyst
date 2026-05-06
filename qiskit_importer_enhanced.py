@@ -1,26 +1,27 @@
 # Enhanced Qiskit Importer with improved error handling and diagnostics
 # Extends qiskit_importer_standalone with better error messages and logging
 
-import qiskit
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
+
+import qiskit
 
 try:
-    from mlir.dialects import scf, func, arith
+    from mlir.dialects import arith, func, scf
     from mlir.ir import (
         Context,
-        Module,
-        Location,
+        DenseI32ArrayAttr,
+        FloatAttr,
+        IndexType,
         InsertionPoint,
+        IntegerAttr,
+        IntegerType,
+        Location,
+        Module,
+        Operation,
         StringAttr,
         SymbolTable,
         Type,
-        IntegerType,
-        IndexType,
-        IntegerAttr,
-        FloatAttr,
-        Operation,
-        DenseI32ArrayAttr,
     )
 except ImportError as e:
     raise ImportError(

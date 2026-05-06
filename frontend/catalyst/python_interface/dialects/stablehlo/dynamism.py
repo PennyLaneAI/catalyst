@@ -27,10 +27,7 @@ from xdsl.irdl import (
     result_def,
     traits_def,
 )
-from xdsl.traits import (
-    ConditionallySpeculatable,
-    NoMemoryEffect,
-)
+from xdsl.traits import ConditionallySpeculatable, NoMemoryEffect
 from xdsl.utils.exceptions import VerifyException
 
 from catalyst.python_interface.xdsl_extras import TensorConstraint

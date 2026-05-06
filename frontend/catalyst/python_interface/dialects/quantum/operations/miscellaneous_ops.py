@@ -17,11 +17,7 @@ Quantum dialect.
 """
 from collections.abc import Sequence
 
-from xdsl.dialects.builtin import (
-    StringAttr,
-    UnitAttr,
-    i64,
-)
+from xdsl.dialects.builtin import StringAttr, UnitAttr, i64
 from xdsl.ir import Block, Operation, Region
 from xdsl.irdl import (
     IRDLOperation,

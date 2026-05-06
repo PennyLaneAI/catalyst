@@ -16,10 +16,7 @@
 import pennylane as qml
 import pytest
 
-from catalyst.python_interface.transforms import (
-    CombineGlobalPhasesPass,
-    combine_global_phases_pass,
-)
+from catalyst.python_interface.transforms import CombineGlobalPhasesPass, combine_global_phases_pass
 
 pytestmark = pytest.mark.xdsl
 

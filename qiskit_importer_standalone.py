@@ -5,21 +5,21 @@ import qiskit
 
 try:
     # Use standard MLIR package
-    from mlir.dialects import scf, func, arith
+    from mlir.dialects import arith, func, scf
     from mlir.ir import (
         Context,
-        Module,
-        Location,
+        DenseI32ArrayAttr,
+        FloatAttr,
+        IndexType,
         InsertionPoint,
+        IntegerAttr,
+        IntegerType,
+        Location,
+        Module,
+        Operation,
         StringAttr,
         SymbolTable,
         Type,
-        IntegerType,
-        IndexType,
-        IntegerAttr,
-        FloatAttr,
-        Operation,
-        DenseI32ArrayAttr,
     )
 except ImportError:
     # Error out if mlir not found
