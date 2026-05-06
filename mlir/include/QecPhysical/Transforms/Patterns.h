@@ -20,8 +20,8 @@
 namespace catalyst {
 namespace qecp {
 
-void populateLLVMConversionPatterns(mlir::LLVMTypeConverter &typeConverter,
-                                    mlir::RewritePatternSet &patterns);
+void populateQecPhysicalConversionPatterns(mlir::LLVMTypeConverter &typeConverter,
+                                           mlir::RewritePatternSet &patterns);
 
 } // namespace qecp
 } // namespace catalyst

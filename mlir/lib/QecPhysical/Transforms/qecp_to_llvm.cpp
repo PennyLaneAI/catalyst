@@ -12,15 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <optional>
+
+#include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
+#include "mlir/Conversion/LLVMCommon/MemRefBuilder.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#include "QecPhysical/IR/QecPhysicalDialect.h"
+#include "QecPhysical/IR/QecPhysicalOps.h"
 #include "QecPhysical/Transforms/Patterns.h"
 
 using namespace mlir;
@@ -40,7 +45,31 @@ struct QecPhysicalTypeConverter : public LLVMTypeConverter {
     }
 
   private:
-    Type convertTannerGraphType(Type mlirType) { return LLVM::LLVMPointerType::get(&getContext()); }
+    std::optional<Type> convertTannerGraphType(TannerGraphType mlirType)
+    {
+        auto *ctx = &getContext();
+
+        auto llvmStruct = LLVM::LLVMStructType::getIdentified(ctx, "TannerGraph");
+
+        if (!llvmStruct.isInitialized()) {
+            auto elementType = mlirType.getElementType();
+
+            auto rowIdxMemRef = mlir::MemRefType::get({mlirType.getRowIdxSize()}, elementType);
+            auto colPtrMemRef = mlir::MemRefType::get({mlirType.getColPtrSize()}, elementType);
+
+            mlir::Type rowIdxStruct = convertType(rowIdxMemRef);
+            mlir::Type colPtrStruct = convertType(colPtrMemRef);
+
+            if (!rowIdxStruct || !colPtrStruct) {
+                return std::nullopt;
+            }
+
+            if (failed(llvmStruct.setBody({rowIdxStruct, colPtrStruct}, /*isPacked=*/false))) {
+                return std::nullopt; // Conversion failed
+            }
+        }
+        return llvmStruct;
+    }
 };
 
 struct QecPhysicalConversionPass : impl::QecPhysicalConversionPassBase<QecPhysicalConversionPass> {
@@ -52,11 +81,16 @@ struct QecPhysicalConversionPass : impl::QecPhysicalConversionPassBase<QecPhysic
         QecPhysicalTypeConverter typeConverter(context);
 
         RewritePatternSet patterns(context);
-        populateLLVMConversionPatterns(typeConverter, patterns);
+
+        // Add infrastructure patterns for func.func, control flow, etc.
+        cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
+        populateFuncToLLVMConversionPatterns(typeConverter, patterns);
+        cf::populateAssertToLLVMConversionPattern(typeConverter, patterns);
+
+        populateQecPhysicalConversionPatterns(typeConverter, patterns);
 
         LLVMConversionTarget target(*context);
-        // TODOs: We need to uncomment the following line once all qecp-to-llvm patterns are added
-        // target.addIllegalDialect<catalyst::qecp::QecPhysicalDialect>();
+        target.addIllegalOp<catalyst::qecp::AssembleTannerGraphOp>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
