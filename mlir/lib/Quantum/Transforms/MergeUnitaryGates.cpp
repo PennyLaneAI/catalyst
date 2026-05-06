@@ -86,7 +86,7 @@ struct QubitUnitaryFusion : public OpRewritePattern<QubitUnitaryOp> {
         // so we need to create a zero matrix of the desired type and shape first
         tensor::EmptyOp zeromat =
             tensor::EmptyOp::create(rewriter, op.getLoc(), MatrixType, ValueRange{});
-            // tensor::EmptyOp::create(rewriter, op.getLoc(), MatrixType, ValueRange{});
+        // tensor::EmptyOp::create(rewriter, op.getLoc(), MatrixType, ValueRange{});
 
         // The first argument to the `create` need to be a `Location`
         // which can usually just be a `getLoc()` from any operation you have handy
