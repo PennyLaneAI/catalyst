@@ -6,6 +6,7 @@ set(LIBS
     ${dialect_libs}
     ${translation_libs}
     MLIRQuantum
+    MLIRQRef
     MlirToQasm3Translation
 )
 
