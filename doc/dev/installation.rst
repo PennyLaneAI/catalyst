@@ -61,7 +61,7 @@ you are encoutering issues, please consult the detailed guide
         | If not, you may receive ``'GLIBCXX_3.4.x' not found`` error when running ``make test``.
 
 
-      .. code-block:: console
+      .. code-block:: bash
 
         # Install common requirements
         sudo apt install clang lld ccache make
@@ -81,7 +81,7 @@ you are encoutering issues, please consult the detailed guide
 
    .. group-tab:: macOS
 
-      .. code-block:: console
+      .. code-block:: bash
 
         # Install XCode Command Line Tools and common requirements
         xcode-select --install
@@ -476,7 +476,7 @@ Essential Steps
 
 To activate the development environment, open a terminal and issue the following commands:
 
-.. code-block:: console
+.. code-block:: bash
 
   # Clone the Catalyst repository without submodules, as they are not needed for frontend
   # development

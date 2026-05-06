@@ -17,14 +17,21 @@
 // Instrumentation should show individual transform operations as subpasses
 // CHECK: transform_cse
 // CHECK: transform_cancel-inverses
+// CHECK: transform_merge-rotations
+// CHECK: transform_canonicalize
 // CHECK: ApplyTransformSequencePass
 
 module @workflow {
 
   module attributes {transform.with_named_sequence} {
-    transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
-      %0 = transform.apply_registered_pass "cse" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
-      %1 = transform.apply_registered_pass "cancel-inverses" to %0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+    transform.named_sequence @__transform_0(%t0_arg0: !transform.op<"builtin.module">) {
+      %t0_0 = transform.apply_registered_pass "cse" to %t0_arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+      %t0_1 = transform.apply_registered_pass "cancel-inverses" to %t0_0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+      transform.yield
+    }
+    transform.named_sequence @__transform_1(%t1_arg0: !transform.op<"builtin.module">) {
+      %t1_0 = transform.apply_registered_pass "merge-rotations" to %t1_arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+      %t1_1 = transform.apply_registered_pass "canonicalize" to %t1_0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
       transform.yield
     }
   }

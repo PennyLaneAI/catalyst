@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import textwrap
 
@@ -207,14 +208,10 @@ def get_mlir_attribute_from_pyval(value):
             elif 0 <= value < 18446744073709551616:  # = 2**64
                 attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64), value)
             else:
-                raise CompileError(
-                    textwrap.dedent(
-                        """
-                    Large interger attributes currently not supported in MLIR,
+                raise CompileError(textwrap.dedent("""
+                    Large integer attributes currently not supported in MLIR,
                     see https://github.com/llvm/llvm-project/issues/128072
-                    """
-                    )
-                )
+                    """))
 
         case float():
             attr = ir.FloatAttr.get(ir.F64Type.get(), value)
@@ -235,6 +232,9 @@ def get_mlir_attribute_from_pyval(value):
                     )
                 named_attrs[k] = get_mlir_attribute_from_pyval(v)
             attr = ir.DictAttr.get(named_attrs)
+
+        case _ if dataclasses.is_dataclass(value):
+            attr = get_mlir_attribute_from_pyval(dataclasses.asdict(value))
 
         case _:
             raise CompileError(f"Cannot convert Python type {type(value)} to an MLIR attribute.")

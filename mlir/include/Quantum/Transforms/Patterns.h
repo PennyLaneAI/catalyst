@@ -17,14 +17,19 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/AllocatorBase.h"
-
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace catalyst {
 namespace quantum {
+
+/// Create or lookup a global string constant and return a pointer to it.
+/// This is useful for creating string constants for QIR function calls.
+mlir::Value getGlobalString(mlir::Location loc, mlir::OpBuilder &rewriter, mlir::StringRef key,
+                            mlir::StringRef value, mlir::ModuleOp mod);
 
 void populateGridsynthPatterns(mlir::RewritePatternSet &patterns, double epsilon, bool pprBasis);
 void populateQIRConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &, bool);

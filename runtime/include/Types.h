@@ -16,9 +16,8 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-#include <cmath>
+#include <cstddef>
 #include <cstdint>
-#include <limits>
 
 #ifdef __cplusplus
 extern "C" {
@@ -85,54 +84,63 @@ struct OpaqueMemRefT {
 struct MemRefT_CplxT_double_1d {
     CplxT_double *data_allocated;
     CplxT_double *data_aligned;
-    size_t offset;
-    size_t sizes[1];
-    size_t strides[1];
+    std::size_t offset;
+    std::size_t sizes[1];
+    std::size_t strides[1];
 };
 
 // MemRefT<complex<double>, dimension=2> type
 struct MemRefT_CplxT_double_2d {
     CplxT_double *data_allocated;
     CplxT_double *data_aligned;
-    size_t offset;
-    size_t sizes[2];
-    size_t strides[2];
+    std::size_t offset;
+    std::size_t sizes[2];
+    std::size_t strides[2];
 };
 
 // MemRefT<double, dimension=1> type
 struct MemRefT_double_1d {
     double *data_allocated;
     double *data_aligned;
-    size_t offset;
-    size_t sizes[1];
-    size_t strides[1];
+    std::size_t offset;
+    std::size_t sizes[1];
+    std::size_t strides[1];
 };
 
 // MemRefT<double, dimension=2> type
 struct MemRefT_double_2d {
     double *data_allocated;
     double *data_aligned;
-    size_t offset;
-    size_t sizes[2];
-    size_t strides[2];
+    std::size_t offset;
+    std::size_t sizes[2];
+    std::size_t strides[2];
 };
 
 // MemRefT<int64_t, dimension=1> type
 struct MemRefT_int64_1d {
     int64_t *data_allocated;
     int64_t *data_aligned;
-    size_t offset;
-    size_t sizes[1];
-    size_t strides[1];
+    std::size_t offset;
+    std::size_t sizes[1];
+    std::size_t strides[1];
 };
 
-// MemRefT<int64_t, dimension=1> type
+// MemRefT<int32_t, dimension=1> type
+struct MemRefT_int32_1d {
+    int32_t *data_allocated;
+    int32_t *data_aligned;
+    std::size_t offset;
+    std::size_t sizes[1];
+    std::size_t strides[1];
+};
+
+// MemRefT<int8_t, dimension=1> type
 struct MemRefT_int8_1d {
     int8_t *data_allocated;
     int8_t *data_aligned;
-    size_t offset;
-    size_t sizes[1];
-    size_t strides[1];
+    std::size_t offset;
+    std::size_t sizes[1];
+    std::size_t strides[1];
 };
 
 // PairT<MemRefT<double, dimension=1>, MemRefT<int64, dimension=2>> type
@@ -144,7 +152,7 @@ struct PairT_MemRefT_double_int64_1d {
 // Quantum operation modifiers
 struct Modifiers {
     bool adjoint;
-    size_t num_controlled;
+    std::size_t num_controlled;
     QUBIT *controlled_wires;
     bool *controlled_values;
 };
@@ -155,6 +163,7 @@ using MemRefT_CplxT_double_2d = struct MemRefT_CplxT_double_2d;
 using MemRefT_double_1d = struct MemRefT_double_1d;
 using MemRefT_double_2d = struct MemRefT_double_2d;
 using MemRefT_int64_1d = struct MemRefT_int64_1d;
+using MemRefT_int32_1d = struct MemRefT_int32_1d;
 using PairT_MemRefT_double_int64_1d = struct PairT_MemRefT_double_int64_1d;
 using Modifiers = struct Modifiers;
 

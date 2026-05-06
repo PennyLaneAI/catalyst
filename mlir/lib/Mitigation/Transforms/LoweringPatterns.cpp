@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "MitigationMethods/Zne.hpp"
-
 #include "mlir/IR/PatternMatch.h"
 
 #include "Mitigation/Transforms/Patterns.h"
+#include "MitigationMethods/Zne.hpp"
 
 using namespace mlir;
 using namespace catalyst::mitigation;

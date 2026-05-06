@@ -19,8 +19,9 @@
 #include "Ion/Transforms/Passes.h"
 #include "MBQC/Transforms/Passes.h"
 #include "Mitigation/Transforms/Passes.h"
+#include "PBC/Transforms/Passes.h"
 #include "PauliFrame/Transforms/Passes.h"
-#include "QEC/Transforms/Passes.h"
+#include "QRef/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
 #include "RTIO/Transforms/Passes.h"
 #include "Test/Transforms/Passes.h"
@@ -37,7 +38,8 @@ inline void registerAllPasses()
     mbqc::registerMBQCPasses();
     mitigation::registerMitigationPasses();
     pauli_frame::registerPauliFramePasses();
-    qec::registerQECPasses();
+    pbc::registerPBCPasses();
+    qref::registerQRefPasses();
     quantum::registerQuantumPasses();
     rtio::registerRTIOPasses();
     test::registerTestPasses();

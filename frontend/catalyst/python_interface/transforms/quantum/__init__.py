@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """xDSL API for quantum transforms"""
+
 from .cancel_inverses import IterativeCancelInversesPass, iterative_cancel_inverses_pass
-from .combine_global_phases import CombineGlobalPhasesPass, combine_global_phases_pass
 from .diagonalize_measurements import (
     DiagonalizeFinalMeasurementsPass,
     diagonalize_final_measurements_pass,
@@ -21,11 +21,8 @@ from .diagonalize_measurements import (
 from .measurements_from_samples import MeasurementsFromSamplesPass, measurements_from_samples_pass
 from .merge_rotations import MergeRotationsPass, merge_rotations_pass
 from .parity_synth import ParitySynthPass, parity_synth_pass
-from .split_non_commuting import SplitNonCommutingPass, split_non_commuting_pass
 
 __all__ = [
-    "combine_global_phases_pass",
-    "CombineGlobalPhasesPass",
     "diagonalize_final_measurements_pass",
     "DiagonalizeFinalMeasurementsPass",
     "iterative_cancel_inverses_pass",
@@ -36,6 +33,4 @@ __all__ = [
     "MergeRotationsPass",
     "parity_synth_pass",
     "ParitySynthPass",
-    "split_non_commuting_pass",
-    "SplitNonCommutingPass",
 ]

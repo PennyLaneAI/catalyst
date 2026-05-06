@@ -184,6 +184,14 @@ endif()
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)
   message(STATUS "Enabling Python API")
+  # AddMLIRPython.cmake passes NB_DOMAIN ${MLIR_BINDINGS_PYTHON_NB_DOMAIN} to
+  # nanobind_add_module. MLIR sets this in its in-tree mlir/CMakeLists.txt, but it is
+  # not defined when configuring Catalyst standalone against MLIR_DIR, which yields an
+  # empty NB_DOMAIN and CMake dev warning CMP0174.
+  if(NOT MLIR_BINDINGS_PYTHON_NB_DOMAIN)
+    set(MLIR_BINDINGS_PYTHON_NB_DOMAIN "mlir" CACHE STRING
+      "nanobind domain for MLIR python bindings (see MLIR AddMLIRPython.cmake).")
+  endif()
   add_subdirectory(python)
 endif()
 

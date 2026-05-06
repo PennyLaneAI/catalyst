@@ -45,17 +45,26 @@ def test_initialization_defaults():
     assert dag_builder.graph.obj_dict["attributes"]["splines"] == "polyline"
 
 
+class TestUIDOwnership:
+    """Tests that the dag builder generates correct UIDs."""
+
+    def test_add_node_returns_unique_uids(self):
+        """Ensures that 'add_node' creates unique IDs."""
+        dag_builder = PyDotDAGBuilder()
+        uid1 = dag_builder.add_node(label="X")
+        uid2 = dag_builder.add_node(label="Y")
+        assert uid1 != uid2
+
+    def test_add_cluster_returns_unique_uids(self):
+        """Ensures that 'add_cluster' creates unique IDs."""
+        dag_builder = PyDotDAGBuilder()
+        uid1 = dag_builder.add_cluster(label="X")
+        uid2 = dag_builder.add_cluster(label="Y")
+        assert uid1 != uid2
+
+
 class TestExceptions:
     """Tests the various exceptions defined in the class."""
-
-    def test_duplicate_node_ids(self):
-        """Tests that a ValueError is raised for duplicate nodes."""
-
-        dag_builder = PyDotDAGBuilder()
-
-        dag_builder.add_node("0", "node0")
-        with pytest.raises(ValueError, match="Node ID 0 already present in graph."):
-            dag_builder.add_node("0", "node1")
 
     def test_edge_duplicate_source_destination(self):
         """Tests that a ValueError is raised when an edge is created with the
@@ -63,33 +72,24 @@ class TestExceptions:
 
         dag_builder = PyDotDAGBuilder()
 
-        dag_builder.add_node("0", "node0")
+        node_uid = dag_builder.add_node("node0")
         with pytest.raises(ValueError, match="Edges must connect two unique IDs."):
-            dag_builder.add_edge("0", "0")
+            dag_builder.add_edge(node_uid, node_uid)
 
     def test_edge_missing_ids(self):
         """Tests that an error is raised if IDs are missing."""
 
         dag_builder = PyDotDAGBuilder()
 
-        dag_builder.add_node("0", "node0")
+        node_uid = dag_builder.add_node("node0")
         with pytest.raises(ValueError, match="Destination is not found in the graph."):
-            dag_builder.add_edge("0", "1")
+            dag_builder.add_edge(node_uid, "1")
 
         dag_builder = PyDotDAGBuilder()
 
-        dag_builder.add_node("1", "node1")
+        node_uid = dag_builder.add_node("node1")
         with pytest.raises(ValueError, match="Source is not found in the graph."):
-            dag_builder.add_edge("0", "1")
-
-    def test_duplicate_cluster_id(self):
-        """Tests that an exception is raised if an ID is already present."""
-
-        dag_builder = PyDotDAGBuilder()
-
-        dag_builder.add_cluster("0")
-        with pytest.raises(ValueError, match="Cluster ID 0 already present in graph."):
-            dag_builder.add_cluster("0")
+            dag_builder.add_edge("0", node_uid)
 
 
 class TestAddMethods:
@@ -100,7 +100,7 @@ class TestAddMethods:
 
         dag_builder = PyDotDAGBuilder()
 
-        dag_builder.add_node("0", "node0")
+        _ = dag_builder.add_node("node0")
         node_list = dag_builder.graph.get_node_list()
         assert len(node_list) == 1
         assert node_list[0].get_label() == "node0"
@@ -109,95 +109,115 @@ class TestAddMethods:
         """Unit test the `add_edge` method."""
 
         dag_builder = PyDotDAGBuilder()
-        dag_builder.add_node("0", "node0")
-        dag_builder.add_node("1", "node1")
-        dag_builder.add_edge("0", "1")
+        source_uid = dag_builder.add_node("node0")
+        des_uid = dag_builder.add_node("node1")
+        dag_builder.add_edge(source_uid, des_uid)
 
         assert len(dag_builder.graph.get_edges()) == 1
         edge = dag_builder.graph.get_edges()[0]
-        assert edge.get_source() == "0"
-        assert edge.get_destination() == "1"
+        assert edge.get_source() == source_uid
+        assert edge.get_destination() == des_uid
 
     def test_add_cluster(self):
         """Unit test the 'add_cluster' method."""
 
         dag_builder = PyDotDAGBuilder()
-        dag_builder.add_cluster("0")
+        cluster_uid = dag_builder.add_cluster()
 
         assert len(dag_builder.graph.get_subgraphs()) == 1
-        assert dag_builder.graph.get_subgraphs()[0].get_name() == "cluster_0"
+        assert dag_builder.graph.get_subgraphs()[0].get_name() == f"cluster_{cluster_uid}"
 
     def test_add_node_to_parent_graph(self):
         """Tests that you can add a node to a parent graph."""
         dag_builder = PyDotDAGBuilder()
 
         # Create node
-        dag_builder.add_node("0", "node0")
+        node_uid = dag_builder.add_node("node0")
 
         # Create cluster
-        dag_builder.add_cluster("c0")
+        cluster_uid = dag_builder.add_cluster()
 
         # Create node inside cluster
-        dag_builder.add_node("1", "node1", cluster_uid="c0")
+        node2_uid = dag_builder.add_node("node1", cluster_uid=cluster_uid)
 
         # Verify graph structure
         root_graph = dag_builder.graph
 
         # Make sure the base graph has node0
-        assert root_graph.get_node("0"), "Node 0 not found in root graph"
+        assert root_graph.get_node(node_uid), "Node 0 not found in root graph"
 
         # Get the cluster and verify it has node1 and not node0
-        cluster_list = root_graph.get_subgraph("cluster_c0")
+        cluster_list = root_graph.get_subgraph(f"cluster_{cluster_uid}")
         assert cluster_list, "Subgraph 'cluster_c0' not found"
         cluster_graph = cluster_list[0]  # Get the actual subgraph object
 
-        assert cluster_graph.get_node("1"), "Node 1 not found in cluster 'c0'"
-        assert not cluster_graph.get_node("0"), "Node 0 was incorrectly added to cluster"
+        assert cluster_graph.get_node(node2_uid), "Node 1 not found in cluster 'c0'"
+        assert not cluster_graph.get_node(node_uid), "Node 0 was incorrectly added to cluster"
 
-        assert not root_graph.get_node("1"), "Node 1 was incorrectly added to root"
+        assert not root_graph.get_node(node2_uid), "Node 1 was incorrectly added to root"
 
     def test_add_cluster_to_parent_graph(self):
         """Test that you can add a cluster to a parent graph."""
         dag_builder = PyDotDAGBuilder()
 
         # Level 0 (Root): Adds cluster on top of base graph
-        dag_builder.add_node("n_root", "node_root")
+        root_node_uid = dag_builder.add_node("node_root")
 
         # Level 1 (c0): Add node on outer cluster
-        dag_builder.add_cluster("c0")
-        dag_builder.add_node("n_outer", "node_outer", cluster_uid="c0")
+        outer_cluster_uid = dag_builder.add_cluster()
+        outer_node_uid = dag_builder.add_node("node_outer", cluster_uid=outer_cluster_uid)
 
         # Level 2 (c1): Add node on inner cluster
-        dag_builder.add_cluster("c1", cluster_uid="c0")
-        dag_builder.add_node("n_inner", "node_inner", cluster_uid="c1")
+        inner_cluster_uid = dag_builder.add_cluster(cluster_uid=outer_cluster_uid)
+        inner_node_uid = dag_builder.add_node("node_inner", cluster_uid=inner_cluster_uid)
 
         root_graph = dag_builder.graph
 
-        outer_cluster_list = root_graph.get_subgraph("cluster_c0")
-        assert outer_cluster_list, "Outer cluster 'c0' not found in root"
+        outer_cluster_list = root_graph.get_subgraph(f"cluster_{outer_cluster_uid}")
+        assert outer_cluster_list, f"Outer cluster '{outer_cluster_uid}' not found in root"
         c0 = outer_cluster_list[0]
 
-        inner_cluster_list = c0.get_subgraph("cluster_c1")
-        assert inner_cluster_list, "Inner cluster 'c1' not found in 'c0'"
+        inner_cluster_list = c0.get_subgraph(f"cluster_{inner_cluster_uid}")
+        assert (
+            inner_cluster_list
+        ), f"Inner cluster '{inner_cluster_uid}' not found in '{outer_cluster_uid}'"
         c1 = inner_cluster_list[0]
 
         # Check Level 0 (Root)
-        assert root_graph.get_node("n_root"), "n_root not found in root"
-        assert root_graph.get_subgraph("cluster_c0"), "c0 not found in root"
-        assert not root_graph.get_node("n_outer"), "n_outer incorrectly found in root"
-        assert not root_graph.get_node("n_inner"), "n_inner incorrectly found in root"
-        assert not root_graph.get_subgraph("cluster_c1"), "c1 incorrectly found in root"
+        assert root_graph.get_node(root_node_uid), f"{root_node_uid} not found in root"
+        assert root_graph.get_subgraph(
+            f"cluster_{outer_cluster_uid}"
+        ), f"{outer_cluster_uid} not found in root"
+        assert not root_graph.get_node(
+            outer_node_uid
+        ), f"{outer_node_uid} incorrectly found in root"
+        assert not root_graph.get_node(
+            inner_node_uid
+        ), f"{inner_node_uid} incorrectly found in root"
+        assert not root_graph.get_subgraph(
+            f"cluster_{inner_cluster_uid}"
+        ), f"{inner_cluster_uid} incorrectly found in root"
 
         # Check Level 1 (c0)
-        assert c0.get_node("n_outer"), "n_outer not found in c0"
-        assert c0.get_subgraph("cluster_c1"), "c1 not found in c0"
-        assert not c0.get_node("n_root"), "n_root incorrectly found in c0"
-        assert not c0.get_node("n_inner"), "n_inner incorrectly found in c0"
+        assert c0.get_node(outer_node_uid), f"{outer_node_uid} not found in {outer_cluster_uid}"
+        assert c0.get_subgraph(
+            f"cluster_{inner_cluster_uid}"
+        ), f"{inner_cluster_uid} not found in {outer_cluster_uid}"
+        assert not c0.get_node(
+            root_node_uid
+        ), f"{root_node_uid} incorrectly found in {outer_cluster_uid}"
+        assert not c0.get_node(
+            inner_node_uid
+        ), f"{inner_node_uid} incorrectly found in {outer_cluster_uid}"
 
         # Check Level 2 (c1)
-        assert c1.get_node("n_inner"), "n_inner not found in c1"
-        assert not c1.get_node("n_root"), "n_root incorrectly found in c1"
-        assert not c1.get_node("n_outer"), "n_outer incorrectly found in c1"
+        assert c1.get_node(inner_node_uid), f"{inner_node_uid} not found in {inner_cluster_uid}"
+        assert not c1.get_node(
+            root_node_uid
+        ), f"{root_node_uid} incorrectly found in {inner_cluster_uid}"
+        assert not c1.get_node(
+            outer_node_uid
+        ), f"{outer_node_uid} incorrectly found in {inner_cluster_uid}"
 
 
 class TestAttributes:
@@ -208,11 +228,11 @@ class TestAttributes:
 
         dag_builder = PyDotDAGBuilder(attrs={"fontname": "Times"})
 
-        dag_builder.add_node("0", "node0")
-        node0 = dag_builder.graph.get_node("0")[0]
+        node_uid = dag_builder.add_node("node0")
+        node0 = dag_builder.graph.get_node(node_uid)[0]
         assert node0.get("fontname") == "Times"
 
-        dag_builder.add_cluster("1")
+        _ = dag_builder.add_cluster()
         cluster = dag_builder.graph.get_subgraphs()[0]
         assert cluster.get("fontname") == "Times"
 
@@ -221,14 +241,14 @@ class TestAttributes:
         dag_builder = PyDotDAGBuilder(attrs={"fillcolor": "lightblue", "penwidth": 3})
 
         # Defaults
-        dag_builder.add_node("0", "node0")
-        node0 = dag_builder.graph.get_node("0")[0]
+        node_uid = dag_builder.add_node("node0")
+        node0 = dag_builder.graph.get_node(node_uid)[0]
         assert node0.get("fillcolor") == "lightblue"
         assert node0.get("penwidth") == 3
 
         # Make sure we can override
-        dag_builder.add_node("1", "node1", fillcolor="red", penwidth=4)
-        node1 = dag_builder.graph.get_node("1")[0]
+        node_uid = dag_builder.add_node("node1", fillcolor="red", penwidth=4)
+        node1 = dag_builder.graph.get_node(node_uid)[0]
         assert node1.get("fillcolor") == "red"
         assert node1.get("penwidth") == 4
 
@@ -236,16 +256,16 @@ class TestAttributes:
         """Tests that default attributes are applied and can be overridden."""
         dag_builder = PyDotDAGBuilder(attrs={"color": "lightblue4", "penwidth": 3})
 
-        dag_builder.add_node("0", "node0")
-        dag_builder.add_node("1", "node1")
-        dag_builder.add_edge("0", "1")
+        node1_uid = dag_builder.add_node("node0")
+        node2_uid = dag_builder.add_node("node1")
+        dag_builder.add_edge(node1_uid, node2_uid)
         edge = dag_builder.graph.get_edges()[0]
         # Defaults defined earlier
         assert edge.get("color") == "lightblue4"
         assert edge.get("penwidth") == 3
 
         # Make sure we can override
-        dag_builder.add_edge("0", "1", color="red", penwidth=4)
+        dag_builder.add_edge(node1_uid, node2_uid, color="red", penwidth=4)
         edge = dag_builder.graph.get_edges()[1]
         assert edge.get("color") == "red"
         assert edge.get("penwidth") == 4
@@ -261,8 +281,8 @@ class TestAttributes:
             }
         )
 
-        dag_builder.add_cluster("0")
-        cluster1 = dag_builder.graph.get_subgraph("cluster_0")[0]
+        cluster_uid = dag_builder.add_cluster()
+        cluster1 = dag_builder.graph.get_subgraph(f"cluster_{cluster_uid}")[0]
 
         # Defaults
         assert cluster1.get("style") == "solid"
@@ -270,8 +290,8 @@ class TestAttributes:
         assert cluster1.get("penwidth") == 2
         assert cluster1.get("fontname") == "Helvetica"
 
-        dag_builder.add_cluster("1", style="filled", penwidth=10, fillcolor="red")
-        cluster2 = dag_builder.graph.get_subgraph("cluster_1")[0]
+        cluster_uid = dag_builder.add_cluster(style="filled", penwidth=10, fillcolor="red")
+        cluster2 = dag_builder.graph.get_subgraph(f"cluster_{cluster_uid}")[0]
 
         # Make sure we can override
         assert cluster2.get("style") == "filled"
@@ -289,66 +309,65 @@ class TestProperties:
         """Tests that nodes works."""
         dag_builder = PyDotDAGBuilder()
 
-        dag_builder.add_node("0", "node0", fillcolor="red")
-        dag_builder.add_cluster("c0")
-        dag_builder.add_node("1", "node1", cluster_uid="c0")
+        node1_uid = dag_builder.add_node("node0", fillcolor="red")
+        cluster_uid = dag_builder.add_cluster()
+        node2_uid = dag_builder.add_node("node1", cluster_uid=cluster_uid)
 
         nodes = dag_builder.nodes
 
         assert len(nodes) == 2
-        assert len(nodes["0"]) == 4
+        assert len(nodes[node1_uid]) == 4
 
-        assert nodes["0"]["uid"] == "0"
-        assert nodes["0"]["label"] == "node0"
-        assert nodes["0"]["cluster_uid"] == None
-        assert nodes["0"]["attrs"]["fillcolor"] == "red"
+        assert nodes[node1_uid]["uid"] == node1_uid
+        assert nodes[node1_uid]["label"] == "node0"
+        assert nodes[node1_uid]["cluster_uid"] == None
+        assert nodes[node1_uid]["attrs"]["fillcolor"] == "red"
 
-        assert nodes["1"]["uid"] == "1"
-        assert nodes["1"]["label"] == "node1"
-        assert nodes["1"]["cluster_uid"] == "c0"
+        assert nodes[node2_uid]["uid"] == node2_uid
+        assert nodes[node2_uid]["label"] == "node1"
+        assert nodes[node2_uid]["cluster_uid"] == cluster_uid
 
     def test_edges(self):
         """Tests that edges works."""
 
         dag_builder = PyDotDAGBuilder()
-        dag_builder.add_node("0", "node0")
-        dag_builder.add_node("1", "node1")
-        dag_builder.add_edge("0", "1", penwidth=10)
+        source_uid = dag_builder.add_node("node0")
+        des_uid = dag_builder.add_node("node1")
+        dag_builder.add_edge(source_uid, des_uid, penwidth=10)
 
         edges = dag_builder.edges
 
         assert len(edges) == 1
 
-        assert edges[0]["from_uid"] == "0"
-        assert edges[0]["to_uid"] == "1"
+        assert edges[0]["from_uid"] == source_uid
+        assert edges[0]["to_uid"] == des_uid
         assert edges[0]["attrs"]["penwidth"] == 10
 
     def test_clusters(self):
         """Tests that clusters property works."""
 
         dag_builder = PyDotDAGBuilder()
-        dag_builder.add_cluster("0", "my_cluster", penwidth=10)
+        cluster1_uid = dag_builder.add_cluster("my_cluster", penwidth=10)
 
         clusters = dag_builder.clusters
 
-        dag_builder.add_cluster(
-            "1",
+        cluster2_uid = dag_builder.add_cluster(
             "my_nested_cluster",
-            cluster_uid="0",
+            cluster_uid=cluster1_uid,
         )
         clusters = dag_builder.clusters
         assert len(clusters) == 2
 
-        assert len(clusters["0"]) == 4
-        assert clusters["0"]["uid"] == "0"
-        assert clusters["0"]["label"] == "my_cluster"
-        assert clusters["0"]["cluster_uid"] == None
-        assert clusters["0"]["attrs"]["penwidth"] == 10
+        assert len(clusters[cluster1_uid]) == 4
+        assert clusters[cluster1_uid]["uid"] == cluster1_uid
+        assert clusters[cluster1_uid]["label"] == "my_cluster"
+        assert clusters[cluster1_uid]["cluster_uid"] == None
+        assert clusters[cluster1_uid]["attrs"]["penwidth"] == 10
 
-        assert len(clusters["1"]) == 4
-        assert clusters["1"]["uid"] == "1"
-        assert clusters["1"]["label"] == "my_nested_cluster"
-        assert clusters["1"]["cluster_uid"] == "0"
+        assert len(clusters[cluster2_uid]) == 4
+        assert clusters[cluster2_uid]["uid"] == cluster2_uid
+        assert clusters[cluster2_uid]["label"] == "my_nested_cluster"
+        assert clusters[cluster2_uid]["cluster_uid"] == cluster1_uid
 
 
 class TestOutput:
@@ -368,9 +387,7 @@ class TestOutput:
         dag_builder.to_file(filename + file_format)
 
         # make sure the function handles extensions correctly
-        mock_write.assert_called_once_with(
-            filename + (file_format or ".png"), format="png"
-        )
+        mock_write.assert_called_once_with(filename + (file_format or ".png"), format="png")
 
     @pytest.mark.parametrize("file_format", ["pdf", "svg", "jpeg"])
     def test_other_supported_formats(self, monkeypatch, file_format):
@@ -389,15 +406,15 @@ class TestOutput:
         """Tests that the `to_string` method works correclty."""
 
         dag_builder = PyDotDAGBuilder()
-        dag_builder.add_node("n0", "node0")
-        dag_builder.add_node("n1", "node1")
-        dag_builder.add_edge("n0", "n1")
+        node1_uid = dag_builder.add_node("node0")
+        node2_uid = dag_builder.add_node("node1")
+        dag_builder.add_edge(node1_uid, node2_uid)
 
         string = dag_builder.to_string()
         assert isinstance(string, str)
 
         # make sure important things show up in the string
         assert "digraph" in string
-        assert "n0" in string
-        assert "n1" in string
-        assert "n0 -> n1" in string
+        assert node1_uid in string
+        assert node2_uid in string
+        assert f"{node1_uid} -> {node2_uid}" in string

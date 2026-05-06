@@ -55,7 +55,7 @@ chain) can appear in catalyst jaxpr:
 Importantly, registers are never explicit in plxpr. Plxpr only maintains a list of global wire
 indices (integer for static, int tracer for dynamic), and all operations are explicitly targeting
 the wire indices. The notion of a "register" is maintained by groups of indices in plxpr.
-For example, the `qml.allocate()` would trace to the following primitive:
+For example, the `qp.allocate()` would trace to the following primitive:
     b:i64[] c:i64[] d:i64[] = allocate[
         num_wires=3
         other_params=...
@@ -347,9 +347,9 @@ class QubitHandler:
     def insert_dynamic_qubits(self, wires):
         """
         When wire label is dynamic, such gates will need to interrupt analysis like cancel inverses:
-           qml.X(wires=0)
-           qml.Hadamard(wires=w)
-           qml.X(wires=0)
+           qp.X(wires=0)
+           qp.Hadamard(wires=w)
+           qp.X(wires=0)
         In the above, because we don't know whether `w` is `0` or not until runtime, we must not
         cancel the inverse PauliX gates on `0`.
 
@@ -376,8 +376,8 @@ class QubitHandler:
         if same_number_of_wires:
             # Notice that we can keep using the current qubit value in the wire_map (if one exists
             # there) even for dynamic case if they are the same dynamic wire, i.e.
-            #   qml.gate(wires=[w0,w1])
-            #   qml.gate(wires=[w0,w1])
+            #   qp.gate(wires=[w0,w1])
+            #   qp.gate(wires=[w0,w1])
             # these cases do not need to insert back
 
             wires_all_in_cache = all(wire in self.wire_map.keys() for wire in wires)

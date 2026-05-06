@@ -16,17 +16,17 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import pennylane as qml
+import pennylane as qp
 
 from catalyst import debug_assert, measure, qjit
 
 
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=1))
+@qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit(x: float):
     """Test a simple assert example."""
 
-    qml.RX(x, wires=0)
+    qp.RX(x, wires=0)
     # CHECK: tensor.extract {{%.+}}[] : tensor<i1>
     # CHECK: "catalyst.assert"({{%.+}}) <{error = "x less than 5.0"}> : (i1) -> ()
     debug_assert(x > 5.0, "x less than 5.0")

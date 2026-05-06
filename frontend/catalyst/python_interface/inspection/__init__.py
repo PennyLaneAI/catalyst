@@ -15,7 +15,6 @@
 Circuit inspection & visualization functions for Catalyst and xDSL transformations.
 """
 
-
 from .collector import QMLCollector
 from .draw import draw, draw_graph
 from .mlir_graph import generate_mlir_graph

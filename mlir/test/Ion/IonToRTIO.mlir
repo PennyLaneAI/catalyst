@@ -649,13 +649,4 @@ module @if_circuit {
     quantum.device_release
     return %alloc_9, %alloc : memref<4xi64>, memref<4xi64>
   }
-  func.func @setup() {
-    quantum.init
-    return
-  }
-  func.func @teardown() {
-    quantum.finalize
-    return
-  }
 }
-

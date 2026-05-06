@@ -10,12 +10,17 @@ set(LIBS
     MLIRRegisterAllDialects
     MLIRRegisterAllPasses
     MLIRCatalyst
+    catalyst-analysis
     catalyst-transforms
     catalyst-stablehlo-transforms
+    MLIRQecLogical
+    qecp-transforms
     MLIRQuantum
     quantum-transforms
-    MLIRQEC
-    qec-transforms
+    MLIRQRef
+    qref-transforms
+    MLIRPBC
+    pbc-transforms
     MLIRGradient
     gradient-transforms
     MLIRMBQC
@@ -28,6 +33,8 @@ set(LIBS
     ion-transforms
     MLIRRTIO
     rtio-transforms
+    MLIRQecLogical
+    MLIRQecPhysical
     MLIRCatalystTest
     MLIRCatalystUtils
     MLIRTestDialect

@@ -3,6 +3,7 @@ set(LIBRARY_NAME rtio-transforms)
 file(GLOB SRC
     RTIOEventToARTIQ.cpp
     RTIOEventToARTIQPatterns.cpp
+    RTIORPCPatterns.cpp
     RTIOEmitARTIQRuntime.cpp
 )
 

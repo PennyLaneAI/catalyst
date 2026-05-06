@@ -49,45 +49,56 @@ struct ResourceTracker final {
     std::string resources_filename_;
 
     /**
+     * @brief Update the depth of the circuit given by the wires and controlled wires.
+     *
+     * @param wires The wires the operation is being applied to
+     * @param controlled_wires The control wires the operation is being applied to
+     */
+    void UpdateDepth(const std::vector<QubitIdType> &wires,
+                     const std::vector<QubitIdType> &controlled_wires = {})
+    {
+        if (!compute_depth_) {
+            return;
+        }
+
+        std::size_t max_depth = 0;
+        for (const auto &i : wires) {
+            auto curr_depth = wire_depths_.find(i);
+            RT_FAIL_IF(curr_depth == wire_depths_.end(),
+                       ("Wire index " + std::to_string(i) + " is not an allocated wire").c_str());
+            max_depth = std::max(max_depth, curr_depth->second);
+        }
+        for (const auto &i : controlled_wires) {
+            auto curr_depth = wire_depths_.find(i);
+            RT_FAIL_IF(
+                curr_depth == wire_depths_.end(),
+                ("Control wire index " + std::to_string(i) + " is not an allocated wire").c_str());
+            max_depth = std::max(max_depth, curr_depth->second);
+        }
+
+        max_depth++;
+        for (const auto &i : wires) {
+            wire_depths_[i] = max_depth;
+        }
+        for (const auto &i : controlled_wires) {
+            wire_depths_[i] = max_depth;
+        }
+    }
+
+    /**
      * @brief Internal method to record an operation being applied to the device
      *
      * Updates the gate type and size counts, and if depth tracking is enabled,
      * updates the depth of the wires involved in the operation.
      *
-     * @param name The name of the operation being applied
+     * @param name The name of the operation
      * @param wires The wires the operation is being applied to
      * @param controlled_wires The control wires the operation is being applied to
      */
     void RecordOperation(const std::string &name, const std::vector<QubitIdType> &wires,
                          const std::vector<QubitIdType> &controlled_wires)
     {
-        if (compute_depth_) {
-            std::size_t max_depth = 0;
-            for (const auto &i : wires) {
-                auto curr_depth = wire_depths_.find(i);
-                RT_FAIL_IF(
-                    curr_depth == wire_depths_.end(),
-                    ("Wire index " + std::to_string(i) + " is not an allocated wire").c_str());
-                max_depth = std::max(max_depth, curr_depth->second);
-            }
-            for (const auto &i : controlled_wires) {
-                auto curr_depth = wire_depths_.find(i);
-                RT_FAIL_IF(curr_depth == wire_depths_.end(),
-                           ("Control wire index " + std::to_string(i) + " is not an allocated wire")
-                               .c_str());
-                max_depth = std::max(max_depth, curr_depth->second);
-            }
-
-            // ALL wires used in this operation must have their depth set, including control wires
-            max_depth++;
-            for (const auto &i : wires) {
-                wire_depths_[i] = max_depth;
-            }
-            for (const auto &i : controlled_wires) {
-                wire_depths_[i] = max_depth;
-            }
-        }
-
+        UpdateDepth(wires, controlled_wires);
         std::size_t total_wires = wires.size() + controlled_wires.size();
 
         gate_types_[name]++;
@@ -444,6 +455,20 @@ struct ResourceTracker final {
     {
         std::string full_meas_name = meas_type + "(" + n_wires + " wires)";
         measurements_[full_meas_name]++;
+    }
+
+    /**
+     * @brief Records a Pauli product measurement as a gate operation for resource tracking
+     *
+     * PauliMeasure is a computational instruction (not a terminal measurement),
+     * so it is recorded in gate_types and gate_sizes alongside other operations.
+     *
+     * @param name The name including weight (e.g. "PauliMeasure-w2")
+     * @param wires The qubits being measured
+     */
+    void PauliMeasure(const std::string &name, const std::vector<QubitIdType> &wires)
+    {
+        RecordOperation(name, wires, {});
     }
 
     /**

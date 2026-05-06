@@ -17,7 +17,7 @@ Test the jax linear algebra functions for full quantum-circuit workflows compile
 """
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 from jax import numpy as jnp
 from jax import scipy as jsp
@@ -32,17 +32,17 @@ class TestExpmInCircuit:
         """Rotate |0> about Bloch x axis for 180 degrees to get |1>"""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit_expm():
             generator = -1j * jnp.pi * jnp.array([[0, 1], [1, 0]]) / 2
             unitary = jsp.linalg.expm(generator)
-            qml.QubitUnitary(unitary, wires=[0])
-            return qml.probs()
+            qp.QubitUnitary(unitary, wires=[0])
+            return qp.probs()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit_rot():
-            qml.RX(np.pi, wires=[0])
-            return qml.probs()
+            qp.RX(np.pi, wires=[0])
+            return qp.probs()
 
         res = circuit_expm()
         expected = circuit_rot()  # expected = [0,1]

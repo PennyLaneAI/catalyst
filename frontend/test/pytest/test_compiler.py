@@ -16,6 +16,7 @@
 Unit tests for LinkerDriver class
 """
 
+import io
 import os
 import pathlib
 import platform
@@ -26,10 +27,10 @@ import warnings
 from os.path import isfile
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
-from catalyst import qjit
+from catalyst import QJIT, qjit
 from catalyst.compiler import CompileOptions, Compiler, LinkerDriver, _options_to_cli_flags
 from catalyst.debug import instrumentation
 from catalyst.pipelines import KeepIntermediateLevel
@@ -66,10 +67,10 @@ class TestCompilerOptions:
         verbose = logfile is not None
 
         @qjit(verbose=verbose, logfile=logfile, keep_intermediate=keep_intermediate)
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def workflow(x):
-            qml.RX(x, wires=0)
-            return qml.state()
+            qp.RX(x, wires=0)
+            return qp.state()
 
         # Create tmp workspaces for intermediates to avoid CI race conditions
         workflow.use_cwd_for_workspace = False
@@ -85,9 +86,9 @@ class TestCompilerOptions:
     def test_compilation_with_instrumentation(self, capsys, backend):
         """Test compilation with instrumentation"""
 
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit():
-            return qml.state()
+            return qp.state()
 
         with instrumentation(circuit.__name__, filename=None, detailed=True):
             qjit(circuit)()
@@ -239,7 +240,7 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
                     )
 
         @qjit(target="mlir")
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def cpp_exception_test():
             return None
 
@@ -270,6 +271,39 @@ class TestCompilerState:
         assert f.llvmir is None
         assert f.compiled_function is None
 
+    def test_mlir_only_qjit_compile(self):
+        """Test that the QJIT compilation stage can be run without LLVM lowering or linking."""
+
+        test_pipes = [("test_pipe", ["canonicalize"])]
+
+        def f(x):
+            return x + 1.0
+
+        log = io.StringIO()  # for inspection
+        options = CompileOptions(
+            lower_to_llvm=False, link=False, pipelines=test_pipes, verbose=True, logfile=log
+        )
+
+        compiled = QJIT(f, options)
+        compiled.workspace = compiled._get_workspace()  # pylint: disable=protected-access
+
+        # Call individual QJIT stages
+        compiled.jaxpr, *_ = compiled.capture((0.5,))
+        compiled.mlir_module = compiled.generate_ir()
+        compiled.compile()
+
+        logtext = log.getvalue()
+        assert "MLIR parsing successful" in logtext
+        assert "opt transformations successful" in logtext
+        assert "LLVMIR translation successful" not in logtext
+        assert "object code generation successful" not in logtext
+        assert "Compilation successful" in logtext
+        assert "object linking successful" not in logtext
+
+        # since these are not advertised options, an assertion should be okay
+        with pytest.raises(AssertionError, match="invalid options for jit_compile"):
+            compiled(0.5)
+
     def test_callable_without_name(self):
         """Test that a callable without __name__ property can be compiled, if it is otherwise
         traceable."""
@@ -293,10 +327,10 @@ class TestCompilerState:
             keep_intermediate=True,
             pipelines=[("EmptyPipeline1", [])] + pipelines + [("EmptyPipeline2", [])],
         )
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def workflow(x):
-            qml.RX(x, wires=0)
-            return qml.state()
+            qp.RX(x, wires=0)
+            return qp.state()
 
         # Create tmp workspaces for intermediates to avoid CI race conditions
         workflow.use_cwd_for_workspace = False
@@ -319,10 +353,10 @@ class TestCompilerState:
         """What happens if we attempt to print something that doesn't exist?"""
 
         @qjit(keep_intermediate=True)
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def workflow(x):
-            qml.RX(x, wires=0)
-            return qml.state()
+            qp.RX(x, wires=0)
+            return qp.state()
 
         # Create tmp workspaces for intermediates to avoid CI race conditions
         workflow.use_cwd_for_workspace = False
@@ -364,9 +398,9 @@ class TestCompilerState:
     def test_pipeline_error(self):
         """Test pipeline error handling."""
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit():
-            return qml.state()
+            return qp.state()
 
         test_pipelines = [("PipelineA", ["canonicalize"]), ("PipelineB", ["test"])]
         with pytest.raises(CompileError) as e:
@@ -398,7 +432,7 @@ class TestCustomCall:
         A = np.array([[4, 9], [9, 4]])
 
         def workflow(A):
-            B = qml.math.sqrt_matrix(A)
+            B = qp.math.sqrt_matrix(A)
             return B @ A
 
         qjit_result = qjit(workflow)(A)
@@ -411,7 +445,7 @@ class TestCustomCall:
         A = np.array([[4, 9], [9, 4]])
 
         def workflow(A):
-            B = qml.math.sqrt_matrix(A) @ qml.math.sqrt_matrix(A)
+            B = qp.math.sqrt_matrix(A) @ qp.math.sqrt_matrix(A)
             return B @ A
 
         qjit_result = qjit(workflow)(A)

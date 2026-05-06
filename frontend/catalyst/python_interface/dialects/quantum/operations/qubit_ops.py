@@ -15,7 +15,17 @@
 This file contains the definition of operations that create/destroy qubits
 and quantum registers in the Quantum dialect.
 """
+<<<<<<< HEAD
 from xdsl.dialects.builtin import I64, IntegerAttr, IntegerType, i64
+=======
+
+from xdsl.dialects.builtin import (
+    I64,
+    IntegerAttr,
+    IntegerType,
+    i64,
+)
+>>>>>>> 21acb29565e1cc21a29abf137f77f0f9cb81e954
 from xdsl.ir import Operation, SSAValue
 from xdsl.irdl import (
     AtLeast,
@@ -50,7 +60,7 @@ class AllocOp(IRDLOperation):
 
     def __init__(self, nqubits):
         if isinstance(nqubits, int):
-            nqubits = IntegerAttr.from_int_and_width(nqubits, 64)
+            nqubits = IntegerAttr(nqubits, 64)
 
         if isinstance(nqubits, IntegerAttr):
             operands = (None,)
@@ -134,7 +144,7 @@ class ExtractOp(IRDLOperation):
         idx: int | SSAValue[IntegerType] | Operation | IntegerAttr,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, 64)
 
         if isinstance(idx, IntegerAttr):
             operands = (qreg, None)
@@ -179,7 +189,7 @@ class InsertOp(IRDLOperation):
         qubit: QubitSSAValue | Operation,
     ):
         if isinstance(idx, int):
-            idx = IntegerAttr.from_int_and_width(idx, 64)
+            idx = IntegerAttr(idx, 64)
 
         if isinstance(idx, IntegerAttr):
             operands = (in_qreg, None, qubit)

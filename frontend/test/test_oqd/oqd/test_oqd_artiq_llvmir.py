@@ -17,7 +17,7 @@
 import os
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import QJIT
@@ -53,12 +53,12 @@ class TestOQDARTIQLLVMIR:
         # Compile to LLVM IR only
         oqd_pipelines = _get_oqd_pipelines()
 
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
             x = np.pi / 2
-            qml.RX(x, wires=0)
-            return qml.counts(all_outcomes=True)
+            qp.RX(x, wires=0)
+            return qp.counts(all_outcomes=True)
 
         # Get the LLVM IR
         compiled_circuit = QJIT(circuit, CompileOptions(link=False, pipelines=oqd_pipelines))

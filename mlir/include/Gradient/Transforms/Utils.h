@@ -13,9 +13,10 @@
 // limitations under the License.
 #pragma once
 
-#include "Gradient/Transforms/Patterns.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+
+#include "Gradient/Transforms/Patterns.h"
 
 using namespace mlir;
 

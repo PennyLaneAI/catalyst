@@ -28,14 +28,20 @@ from typing import TypeAlias
 
 from xdsl.dialects.builtin import (
     I32,
-    AnyAttr,
     Float64Type,
     IntegerAttr,
     IntegerType,
     StringAttr,
     i1,
 )
-from xdsl.ir import Dialect, EnumAttribute, Operation, SpacedOpaqueSyntaxAttribute, SSAValue
+from xdsl.ir import (
+    Attribute,
+    Dialect,
+    EnumAttribute,
+    Operation,
+    SpacedOpaqueSyntaxAttribute,
+    SSAValue,
+)
 from xdsl.irdl import (
     IntSetConstraint,
     IRDLOperation,
@@ -98,13 +104,13 @@ class MeasureInBasisOp(IRDLOperation):
         self,
         in_qubit: QubitSSAValue | Operation,
         plane: MeasurementPlaneAttr,
-        angle: SSAValue[Float64Type],
+        angle: SSAValue[Float64Type] | Operation,
         postselect: int | IntegerAttr | None = None,
     ):
-        properties = {"plane": plane}
+        properties: dict[str, Attribute] = {"plane": plane}
 
         if isinstance(postselect, int):
-            postselect = IntegerAttr.from_int_and_width(postselect, 32)
+            postselect = IntegerAttr(postselect, 32)
 
         if postselect is not None:
             properties["postselect"] = postselect
@@ -137,7 +143,10 @@ class GraphStatePrepOp(IRDLOperation):
     qreg = result_def(QuregType)
 
     def __init__(
-        self, adj_matrix: AnyAttr, init_op: str | StringAttr, entangle_op: str | StringAttr
+        self,
+        adj_matrix: SSAValue[Attribute] | Operation,
+        init_op: str | StringAttr,
+        entangle_op: str | StringAttr,
     ):
         if isinstance(init_op, str):
             init_op = StringAttr(data=init_op)
@@ -145,7 +154,7 @@ class GraphStatePrepOp(IRDLOperation):
         if isinstance(entangle_op, str):
             entangle_op = StringAttr(data=entangle_op)
 
-        properties = {"init_op": init_op, "entangle_op": entangle_op}
+        properties: dict[str, Attribute] = {"init_op": init_op, "entangle_op": entangle_op}
 
         qreg = QuregType()
 

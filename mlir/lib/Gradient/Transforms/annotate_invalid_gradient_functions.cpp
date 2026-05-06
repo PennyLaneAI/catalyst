@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Quantum/IR/QuantumOps.h"
+#include "Gradient/Transforms/annotate_invalid_gradient_functions.h"
+
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -20,11 +21,11 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "stablehlo/dialect/StablehloOps.h"
 
 #include "Catalyst/IR/CatalystOps.h"
 #include "Gradient/IR/GradientOps.h"
-#include "Gradient/Transforms/annotate_invalid_gradient_functions.h"
-#include "stablehlo/dialect/StablehloOps.h"
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 using namespace catalyst::gradient;

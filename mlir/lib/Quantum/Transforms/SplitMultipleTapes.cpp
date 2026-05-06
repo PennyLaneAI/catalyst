@@ -18,7 +18,6 @@
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallSet.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
@@ -264,7 +263,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         SmallVector<std::pair<func::FuncOp, unsigned int>> MultitapePrograms;
         module->walk([&](func::FuncOp func) {
             // Don't process functions that are not qnodes: they won't have tapes.
-            if (func->hasAttrOfType<UnitAttr>("qnode")) {
+            if (func->hasAttrOfType<UnitAttr>("quantum.node")) {
                 unsigned int howManyTapes = countTapes(func);
                 if (howManyTapes >= 2) {
                     MultitapePrograms.push_back(std::make_pair(func, howManyTapes));

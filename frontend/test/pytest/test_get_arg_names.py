@@ -15,7 +15,7 @@
 """Unit tests for get_arg_names function."""
 
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 from jax.core import ShapedArray
 
 from catalyst import qjit
@@ -60,7 +60,7 @@ assert get_arg_names(jaxpr_in_avals, original_function) == ["a", ""]
 def f_of_qnode_with_dynamic_argument(a):
     """Check QNode argument with dynamic argument"""
 
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def _circuit(b):
         return b
 

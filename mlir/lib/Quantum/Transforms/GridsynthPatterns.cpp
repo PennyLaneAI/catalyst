@@ -18,7 +18,6 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
-
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -31,7 +30,7 @@
 #include "mlir/IR/Value.h"
 
 #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
-#include "QEC/IR/QECOps.h"
+#include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 
@@ -130,27 +129,21 @@ void populatePPRBasisSwitchCases(PatternRewriter &rewriter, Location loc,
                                  scf::IndexSwitchOp switchOp, Value qbitIn)
 {
     // Helper to create a single PPRotationOp directly on the qubit.
-    auto createPPROp = [&](OpBuilder &builder, ArrayRef<StringRef> pauliWord, uint16_t rotationKind,
+    auto createPPROp = [&](OpBuilder &builder, ArrayRef<StringRef> pauliWord, int8_t rotationKind,
                            bool isAdjoint, Value currentQbit) -> Value {
-        // Convert rotation kind to signed integer and negate if adjoint
-        int16_t signedRotation = static_cast<int16_t>(rotationKind);
+        // negate if adjoint
         if (isAdjoint) {
-            signedRotation = -signedRotation;
+            rotationKind = -rotationKind;
         }
-
-        // We need to cast back to uint16_t for the C++ builder signature
-        uint16_t finalRotationArg = static_cast<uint16_t>(signedRotation);
-
-        auto pprOp = catalyst::qec::PPRotationOp::create(builder, loc, pauliWord, finalRotationArg,
-                                                         ValueRange{currentQbit}, nullptr);
-
+        auto pprOp = catalyst::pbc::PPRotationOp::create(builder, loc, pauliWord, rotationKind,
+                                                         ValueRange{currentQbit});
         return pprOp->getResult(0);
     };
 
     struct PPRConfig {
         bool isIdentity;
         ArrayRef<StringRef> pauli;
-        uint16_t n;     // The denominator (2, 4, 8)
+        int8_t n;       // The denominator (2, 4, 8)
         bool isAdjoint; // True if adjX, adjY, etc.
     };
 
@@ -433,19 +426,19 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
 // --- Rewrite Pattern for PPRotationArbitraryOp ---
 
 struct DecomposePPRArbitraryOpPattern
-    : public OpRewritePattern<catalyst::qec::PPRotationArbitraryOp> {
-    using OpRewritePattern<catalyst::qec::PPRotationArbitraryOp>::OpRewritePattern;
+    : public OpRewritePattern<catalyst::pbc::PPRotationArbitraryOp> {
+    using OpRewritePattern<catalyst::pbc::PPRotationArbitraryOp>::OpRewritePattern;
 
     const double epsilon;
     const bool pprBasis;
 
     DecomposePPRArbitraryOpPattern(MLIRContext *context, double epsilon, bool pprBasis)
-        : OpRewritePattern<catalyst::qec::PPRotationArbitraryOp>(context), epsilon(epsilon),
+        : OpRewritePattern<catalyst::pbc::PPRotationArbitraryOp>(context), epsilon(epsilon),
           pprBasis(pprBasis)
     {
     }
 
-    LogicalResult matchAndRewrite(catalyst::qec::PPRotationArbitraryOp op,
+    LogicalResult matchAndRewrite(catalyst::pbc::PPRotationArbitraryOp op,
                                   PatternRewriter &rewriter) const override
     {
         if (op.getPauliProduct() != rewriter.getStrArrayAttr({"Z"})) {

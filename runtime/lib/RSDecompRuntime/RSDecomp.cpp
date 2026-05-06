@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "RSDecomp.hpp"
+
 #include <cassert>
 #include <cmath>
 #include <cstring>
+#include <string>
 #include <vector>
 
 #include "DataView.hpp"
 #include "GridProblems.hpp"
 #include "NormSolver.hpp"
 #include "NormalForms.hpp"
-#include "RSDecomp.hpp"
 #include "Rings.hpp"
 
 #define MAX_SEARCH_TRIALS 10000
@@ -292,6 +294,14 @@ extern "C" {
 
 size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis)
 {
+    if (epsilon < 1e-6) {
+        std::ostringstream oss;
+        oss << std::scientific << epsilon;
+        RT_WARN("Gridsynth received epsilon=" + oss.str() +
+                ". For epsilon smaller than 1e-6, results may be inaccurate, or errors may"
+                " occur during decomposition. To guarantee correctness, please provide a larger "
+                "epsilon value.");
+    }
     if (ppr_basis) {
         auto result = eval_ross_algorithm_ppr(theta, epsilon);
         return result.first.size();

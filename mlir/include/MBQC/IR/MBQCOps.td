@@ -21,35 +21,12 @@ include "mlir/IR/EnumAttr.td"
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumTypes.td"
 
+include "MBQC/IR/MBQCAttrDefs.td"
 include "MBQC/IR/MBQCDialect.td"
-
-//===----------------------------------------------------------------------===//
-// MBQC dialect enums.
-//===----------------------------------------------------------------------===//
-
-def MeasurementPlane : I32EnumAttr<"MeasurementPlane",
-    "Planes in the Bloch sphere representation with support for arbitrary-basis measurements",
-    [
-        I32EnumAttrCase<"XY", 0>,
-        I32EnumAttrCase<"YZ", 1>,
-        I32EnumAttrCase<"ZX", 2>,
-    ]> {
-    let cppNamespace = "catalyst::mbqc";
-    let genSpecializedAttr = 0;
-}
-
 
 //===----------------------------------------------------------------------===//
 // MBQC dialect traits.
 //===----------------------------------------------------------------------===//
-
-
-//===----------------------------------------------------------------------===//
-// MBQC dialect attributes.
-//===----------------------------------------------------------------------===//
-
-def MeasurementPlaneAttr : EnumAttr<MBQC_Dialect, MeasurementPlane, "measurement_plane">;
-
 
 //===----------------------------------------------------------------------===//
 // MBQC dialect operations.
@@ -70,7 +47,7 @@ def MeasureInBasisOp : MBQC_Op<"measure_in_basis"> {
         the other axis that forms the plane. For instance, the measurement basis defined by the XY
         plane with a rotation angle of 0 is the Pauli-X basis, with orthonormal basis vector |+> and
         |->, which point along the +x and -x axes of the Bloch sphere, respectively. For more
-        details, see the documentation for the [`qml.ftqc.measure_arbitrary_basis()`
+        details, see the documentation for the [`qp.ftqc.measure_arbitrary_basis()`
         ](https://docs.pennylane.ai/en/stable/code/api/pennylane.ftqc.measure_arbitrary_basis.html)
         function.
     }];

@@ -14,11 +14,12 @@
 
 #pragma once
 
-#include "Mitigation/IR/MitigationOps.h"
-#include "Quantum/IR/QuantumOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
+
+#include "Mitigation/IR/MitigationOps.h"
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 

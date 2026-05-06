@@ -14,15 +14,11 @@
 
 #include <algorithm>
 #include <cstring>
-#include <mutex>
 #include <string>
 #include <vector>
 
-#include <pybind11/eval.h>
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-
-#include "Exception.hpp"
+#include "pybind11/eval.h"
+#include "pybind11/pybind11.h"
 
 std::string program = R"(
 

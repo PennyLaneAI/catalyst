@@ -214,7 +214,7 @@ def collect(a: ParsedArguments) -> None:  # noqa
             ofname, cmdline = ofile(a, *config)
             odname = dirname(ofname)
 
-            (cat, measure, problem, impl, nqubits, nlayers, diffmethod) = config
+            cat, measure, problem, impl, nqubits, nlayers, diffmethod = config
             if len(odname) > 0 and not a.dry_run:
                 makedirs(odname, exist_ok=True)
             pdesc = f"{problem}[{nqubits},{nlayers}]"
@@ -226,7 +226,7 @@ def collect(a: ParsedArguments) -> None:  # noqa
                 if a.dry_run:
                     print(f"{message} [DRYRUN]")
                 else:
-                    (fnqubits, fnlayers) = known_failures.get(
+                    fnqubits, fnlayers = known_failures.get(
                         (problem, measure, impl, diffmethod), (None, None)
                     )
                     if (nqubits or 0, nlayers or 0) >= (

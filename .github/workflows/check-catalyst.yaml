@@ -416,6 +416,17 @@ jobs:
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         make dialects
 
+    - name: Build MLIR Dialect Docs
+      run: |
+        CCACHE_DIR="$(pwd)/.ccache" \
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
+        ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
+        DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
+        make dialect-docs
+
     - name: Build Standalone Plugin
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
@@ -435,6 +446,7 @@ jobs:
           quantum-build/bin
           quantum-build/python_packages/*
           quantum-build/lib/StandalonePlugin.so
+          quantum-build/lib/default_pipelines.*
         retention-days: 1
 
     - name: Cache CCache on main branch
@@ -461,26 +473,6 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ needs.constants.outputs.primary_python_version }}
-
-    - name: Install Deps
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libasan6 make
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install -r requirements.txt
-        # cuda-quantum is added manually here.
-        # It can't be in requirements.txt as that will break
-        # macOS requirements.txt
-        python3 -m pip install cuda-quantum==0.6.0
-        python3 -m pip install oqc-qcaas-client
-        # Install graphviz for testing the mlir-op-graph integration
-        sudo apt-get install -y graphviz
-        make frontend
-
-    - name: Verify Graphviz installation
-      run: |
-        dot -V 
-        dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -517,7 +509,28 @@ jobs:
         echo "OQC_LIB_DIR=$(pwd)/oqc-build" >> $GITHUB_ENV
         echo "OQD_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+        echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
+
+    - name: Install Deps
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasan6 make
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install -r requirements.txt
+        # cuda-quantum is added manually here.
+        # It can't be in requirements.txt as that will break
+        # macOS requirements.txt
+        python3 -m pip install cuda-quantum==0.6.0
+        python3 -m pip install oqc-qcaas-client
+        # Install graphviz for testing the mlir-op-graph integration
+        sudo apt-get install -y graphviz
+        make frontend
+
+    - name: Verify Graphviz installation
+      run: |
+        dot -V
+        dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
 
     - name: Run Python Pytest/Lit Tests
       run: |
@@ -557,14 +570,6 @@ jobs:
       with:
         python-version: ${{ needs.constants.outputs.primary_python_version }}
 
-    - name: Install Deps
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libasan6 make
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install -r requirements.txt
-        make frontend
-
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v4
@@ -591,7 +596,16 @@ jobs:
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+        echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
+
+    - name: Install Deps
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasan6 make
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install -r requirements.txt
+        make frontend
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
@@ -620,14 +634,6 @@ jobs:
         pip install amazon-braket-pennylane-plugin
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
-    - name: Install Deps
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libasan6 make
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install -r requirements.txt
-        make frontend
-
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v4
@@ -654,7 +660,16 @@ jobs:
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+        echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
+
+    - name: Install Deps
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasan6 make
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install -r requirements.txt
+        make frontend
 
   runtime-device-tests:
     name: Third-Party Device Tests (C++)

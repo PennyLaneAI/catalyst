@@ -15,7 +15,7 @@
 """Test that numerical jax functions produce correct results when compiled with catalyst.qjit"""
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 from jax import numpy as jnp
 from jax import scipy as jsp

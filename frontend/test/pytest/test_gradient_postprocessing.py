@@ -16,7 +16,7 @@
 
 import jax
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import DifferentiableCompileError, grad, jacobian, qjit
@@ -28,10 +28,10 @@ SUPPORTED_DIFF_METHODS = ["parameter-shift", "adjoint"]
 def test_scalar_scalar(backend, diff_method):
     """Test a hybrid scalar -> scalar (internally a point tensor -> point tensor) workflow"""
 
-    @qml.qnode(qml.device(backend, wires=1), diff_method=diff_method)
+    @qp.qnode(qp.device(backend, wires=1), diff_method=diff_method)
     def workflow(x):
-        qml.RX(x, wires=0)
-        return qml.expval(qml.PauliZ(wires=0))
+        qp.RX(x, wires=0)
+        return qp.expval(qp.PauliZ(wires=0))
 
     def postprocess(x):
         w = workflow(x)
@@ -50,10 +50,10 @@ def test_scalar_scalar(backend, diff_method):
 def test_one_to_many(backend, diff_method):
     """Test a tall Jacobian (one input to many outputs)"""
 
-    @qml.qnode(qml.device(backend, wires=1), diff_method=diff_method)
+    @qp.qnode(qp.device(backend, wires=1), diff_method=diff_method)
     def workflow(x):
-        qml.RX(x, wires=0)
-        return qml.expval(qml.PauliZ(wires=0))
+        qp.RX(x, wires=0)
+        return qp.expval(qp.PauliZ(wires=0))
 
     def postprocess(x):
         w = workflow(x)
@@ -72,13 +72,13 @@ def test_one_to_many(backend, diff_method):
 def test_many_to_one(backend, diff_method):
     """Test a wide Jacobian (many inputs to one output)"""
 
-    @qml.qnode(qml.device(backend, wires=1), diff_method=diff_method)
+    @qp.qnode(qp.device(backend, wires=1), diff_method=diff_method)
     def workflow(x):
-        qml.RX(x[0] * 3, wires=0)
-        qml.RX(x[1] * 2, wires=0)
-        qml.RX(x[2] * 1.5, wires=0)
-        qml.RZ(jnp.exp(x[3]), wires=0)
-        return qml.expval(qml.PauliZ(wires=0))
+        qp.RX(x[0] * 3, wires=0)
+        qp.RX(x[1] * 2, wires=0)
+        qp.RX(x[2] * 1.5, wires=0)
+        qp.RZ(jnp.exp(x[3]), wires=0)
+        return qp.expval(qp.PauliZ(wires=0))
 
     def postprocess(x):
         w = workflow(x)
@@ -97,11 +97,11 @@ def test_many_to_one(backend, diff_method):
 def test_tensor_measure(backend):
     """Tests correctness of a derivative of a qnode that returns a tensor"""
 
-    @qml.qnode(qml.device(backend, wires=2), diff_method="parameter-shift")
+    @qp.qnode(qp.device(backend, wires=2), diff_method="parameter-shift")
     def workflow(x):
-        qml.RX(x, wires=0)
-        qml.RX(x * 2, wires=1)
-        return qml.probs()
+        qp.RX(x, wires=0)
+        qp.RX(x * 2, wires=1)
+        return qp.probs()
 
     def postprocess(x):
         probs = workflow(x)
@@ -119,10 +119,10 @@ def test_tensor_measure(backend):
 def test_multi_measure(backend):
     """Tests correctness of a derivative of a qnode with multiple measurements"""
 
-    @qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")
+    @qp.qnode(qp.device(backend, wires=1), diff_method="parameter-shift")
     def workflow(x):
-        qml.RX(x, wires=0)
-        return qml.expval(qml.PauliZ(wires=0)), qml.probs()
+        qp.RX(x, wires=0)
+        return qp.expval(qp.PauliZ(wires=0)), qp.probs()
 
     def postprocess(x):
         w, probs = workflow(x)
@@ -154,13 +154,13 @@ def test_purely_classical():
 def test_jacobian(backend, diff_method):
     """Tests correctness of a full Jacobian with multiple inputs and outputs"""
 
-    @qml.qnode(qml.device(backend, wires=1), diff_method=diff_method)
+    @qp.qnode(qp.device(backend, wires=1), diff_method=diff_method)
     def workflow(x):
-        qml.RX(x[0] * 3, wires=0)
-        qml.RX(x[1] * 2, wires=0)
-        qml.RX(x[2] * 1.5, wires=0)
-        qml.RZ(jnp.exp(x[3]), wires=0)
-        return qml.expval(qml.PauliZ(wires=0))
+        qp.RX(x[0] * 3, wires=0)
+        qp.RX(x[1] * 2, wires=0)
+        qp.RX(x[2] * 1.5, wires=0)
+        qp.RZ(jnp.exp(x[3]), wires=0)
+        return qp.expval(qp.PauliZ(wires=0))
 
     def postprocess(x):
         w = workflow(x)
@@ -178,10 +178,10 @@ def test_jacobian(backend, diff_method):
 def test_multi_result(backend, diff_method):
     """Tests the correctness of multiple Jacobians from multiple results"""
 
-    @qml.qnode(qml.device(backend, wires=1), diff_method=diff_method)
+    @qp.qnode(qp.device(backend, wires=1), diff_method=diff_method)
     def workflow(x):
-        qml.RX(x, wires=0)
-        return qml.expval(qml.PauliZ(wires=0))
+        qp.RX(x, wires=0)
+        return qp.expval(qp.PauliZ(wires=0))
 
     def postprocess(x):
         w = workflow(x)
@@ -201,11 +201,11 @@ def test_multi_result(backend, diff_method):
 def test_multi_arg_multi_result(backend, diff_method):
     """Tests multiple tensor arguments and results"""
 
-    @qml.qnode(qml.device(backend, wires=1), diff_method=diff_method)
+    @qp.qnode(qp.device(backend, wires=1), diff_method=diff_method)
     def workflow(x, y):
-        qml.RX(x[0], wires=0)
-        qml.RY(y, wires=0)
-        return qml.expval(qml.PauliZ(wires=0))
+        qp.RX(x[0], wires=0)
+        qp.RY(y, wires=0)
+        return qp.expval(qp.PauliZ(wires=0))
 
     def postprocess(x, y):
         w = workflow(x, y)
@@ -226,20 +226,20 @@ def test_multi_arg_multi_result(backend, diff_method):
 
 def test_multi_qnode(backend):
     """Test a multi-QNode workflow where each QNode has a different diff_method"""
-    device = qml.device(backend, wires=2)
+    device = qp.device(backend, wires=2)
 
-    @qml.qnode(device, diff_method="adjoint")
+    @qp.qnode(device, diff_method="adjoint")
     def first_qnode(a):
-        qml.RX(a[0], wires=0)
-        qml.CNOT(wires=(0, 1))
-        qml.RY(a[1], wires=1)
-        qml.RZ(a[2], wires=1)
-        return qml.expval(qml.PauliX(1))
+        qp.RX(a[0], wires=0)
+        qp.CNOT(wires=(0, 1))
+        qp.RY(a[1], wires=1)
+        qp.RZ(a[2], wires=1)
+        return qp.expval(qp.PauliX(1))
 
-    @qml.qnode(device, diff_method="parameter-shift")
+    @qp.qnode(device, diff_method="parameter-shift")
     def second_qnode(x):
-        qml.RX(x[2] * 0.4, wires=0)
-        return qml.expval(qml.PauliZ(0))
+        qp.RX(x[2] * 0.4, wires=0)
+        return qp.expval(qp.PauliZ(0))
 
     def postprocess(x):
         return jnp.tanh(second_qnode(x)) * jnp.cos(first_qnode(x))
@@ -257,15 +257,15 @@ def test_qnode_different_returns(backend):
     different shapes.
     """
 
-    @qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")
+    @qp.qnode(qp.device(backend, wires=1), diff_method="parameter-shift")
     def circuit_A(params):
-        qml.RX(jnp.exp(params[0] ** 2) / jnp.cos(params[1] / 4), wires=0)
-        return qml.probs()
+        qp.RX(jnp.exp(params[0] ** 2) / jnp.cos(params[1] / 4), wires=0)
+        return qp.probs()
 
-    @qml.qnode(qml.device(backend, wires=1), diff_method="adjoint")
+    @qp.qnode(qp.device(backend, wires=1), diff_method="adjoint")
     def circuit_B(params):
-        qml.RX(jnp.exp(params[1] ** 2) / jnp.cos(params[0] / 4), wires=0)
-        return qml.expval(qml.PauliZ(wires=0))
+        qp.RX(jnp.exp(params[1] ** 2) / jnp.cos(params[0] / 4), wires=0)
+        return qp.expval(qp.PauliZ(wires=0))
 
     def loss(params):
         return jnp.prod(circuit_A(params)) + circuit_B(params)

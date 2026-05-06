@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #pragma once
+#include "mlir/IR/DialectRegistry.h"
 
 using namespace mlir;
 

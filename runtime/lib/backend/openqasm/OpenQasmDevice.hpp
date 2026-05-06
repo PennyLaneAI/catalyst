@@ -17,20 +17,17 @@
 #define __device_openqasm
 
 #include <algorithm>
-#include <bitset>
 #include <memory>
-#include <numeric>
 #include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-#include "QuantumDevice.hpp"
-#include "QubitManager.hpp"
-
 #include "OpenQasmBuilder.hpp"
 #include "OpenQasmObsManager.hpp"
 #include "OpenQasmRunner.hpp"
+#include "QuantumDevice.hpp"
+#include "QubitManager.hpp"
 
 namespace Catalyst::Runtime::Device {
 class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {

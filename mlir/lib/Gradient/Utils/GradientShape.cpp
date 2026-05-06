@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-
 #include "Gradient/Utils/GradientShape.h"
+
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 using namespace mlir;
 

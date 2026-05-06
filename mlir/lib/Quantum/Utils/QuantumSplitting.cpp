@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Quantum/Utils/QuantumSplitting.h"
+
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
@@ -22,9 +24,8 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/IR/CatalystOps.h"
-#include "QEC/IR/QECOps.h"
+#include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/QuantumSplitting.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -94,7 +95,7 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
     // Initialize the tapes that store the structure of control flow.
     DenseMap<Operation *, TypedValue<ArrayListType>> controlFlowTapes;
     region.walk([&](Operation *op) {
-        if (isa<scf::ForOp, scf::IfOp, scf::WhileOp>(op)) {
+        if (isa<scf::ForOp, scf::IfOp, scf::WhileOp, scf::IndexSwitchOp>(op)) {
             auto tape = catalyst::ListInitOp::create(builder, loc, controlFlowTapeType);
             controlFlowTapes.insert({op, tape});
         }
@@ -205,7 +206,7 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
         else if (isa<QuantumDialect>(op.getDialect())) {
             // Any quantum op other than a parametrized gate/insert/extract is ignored.
         }
-        else if (isa<qec::PPRotationOp>(op)) {
+        else if (isa<pbc::PPRotationOp>(op)) {
             // PPRs are ignored
         }
         else if (isClassicalSCFOp(op)) {
@@ -222,21 +223,19 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
         else if (auto whileOp = dyn_cast<scf::WhileOp>(&op)) {
             visitOperation(whileOp, builder);
         }
+        else if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(op)) {
+            visitOperation(switchOp, builder);
+        }
         else if (auto callOp = dyn_cast<func::CallOp>(op)) {
             auto results = callOp.getResultTypes();
-
-            bool multiReturns = results.size() > 1;
-
-            bool quantum = std::any_of(results.begin(), results.end(),
-                                       [](const auto &value) { return isa<QuregType>(value); });
+            bool quantum = std::any_of(results.begin(), results.end(), [](const auto &value) {
+                return isa<QuregType, QubitType>(value);
+            });
 
             // Classical call operations are cloned for the backward pass
             if (!quantum) {
                 builder.clone(op, oldToCloned);
             }
-
-            assert(!(quantum && multiReturns) && "Adjoint does not support functions with multiple "
-                                                 "returns that contain a quantum register.");
         }
         else {
             // Purely classical ops are deeply cloned as-is.
@@ -335,6 +334,56 @@ void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &
     Value numIters = memref::LoadOp::create(builder, whileOp.getLoc(), counter);
     Value tape = cache.controlFlowTapes.at(whileOp);
     ListPushOp::create(builder, whileOp.getLoc(), numIters, tape);
+}
+
+void AugmentedCircuitGenerator::visitOperation(scf::IndexSwitchOp switchOp, OpBuilder &builder)
+{
+    auto getRegionBuilder = [&](Region &oldRegion) {
+        return [&](OpBuilder &builder, Location loc) {
+            generate(oldRegion, builder);
+            cloneTerminatorClassicalOperands(oldRegion.front().getTerminator(), builder);
+        };
+    };
+    DenseMap<unsigned, unsigned> argIdxMapping;
+    populateArgIdxMapping(switchOp.getResultTypes(), argIdxMapping);
+
+    // Cache the switch index to the current control flow tape
+    Value arg = oldToCloned.lookupOrDefault(switchOp.getArg());
+    Value tape = cache.controlFlowTapes.at(switchOp.getOperation());
+    ListPushOp::create(builder, switchOp.getLoc(), oldToCloned.lookupOrDefault(switchOp.getArg()),
+                       tape);
+
+    SmallVector<Type> classicalResultTypes;
+    for (Type ty : switchOp.getResultTypes()) {
+        if (!isQuantumType(ty)) {
+            classicalResultTypes.push_back(ty);
+        }
+    }
+
+    auto newSwitchOp = scf::IndexSwitchOp::create(builder, switchOp.getLoc(), classicalResultTypes,
+                                                  arg, switchOp.getCases(), switchOp.getNumCases());
+
+    // Case and default regions are gotten by different APIs
+    // Here we handle them separately.
+
+    // Case regions:
+    for (auto [oldCaseRegion, newCaseRegion] :
+         llvm::zip_equal(switchOp.getCaseRegions(), newSwitchOp.getCaseRegions())) {
+        OpBuilder::InsertionGuard guard(builder);
+        newCaseRegion.push_back(new Block());
+        builder.setInsertionPointToStart(&newCaseRegion.front());
+        getRegionBuilder(oldCaseRegion)(builder, switchOp.getLoc());
+    }
+
+    // Default region:
+    {
+        OpBuilder::InsertionGuard guard(builder);
+        newSwitchOp.getDefaultRegion().push_back(new Block());
+        builder.setInsertionPointToStart(&newSwitchOp.getDefaultRegion().front());
+        getRegionBuilder(switchOp.getDefaultRegion())(builder, switchOp.getLoc());
+    }
+
+    mapResults(switchOp, newSwitchOp, argIdxMapping);
 }
 
 void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp, OpBuilder &builder)

@@ -1,3 +1,5 @@
+set(BYTECODE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/Quantum/GraphDecomposition/test_rules.mlirbc")
+
 configure_lit_site_cfg(
     ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
     ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py
@@ -20,6 +22,7 @@ set(DIALECT_TESTS_DEPEND
 
 set(TEST_SUITES
     Quantum
+    QRef
     Gradient
     Mitigation
     Catalyst
@@ -27,22 +30,28 @@ set(TEST_SUITES
     MBQC
     PauliFrame
     cli
-    QEC
+    PBC
     RTIO
-    )
+    QecLogical
+    QecPhysical
+)
 
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)
     list(APPEND DIALECT_TESTS_DEPEND QuantumPythonModules)
 endif()
 
-if (CATALYST_GTEST_AVAILABLE)
-  list(APPEND DIALECT_TESTS_DEPEND CatalystUnitTests)
-endif()
+list(APPEND DIALECT_TESTS_DEPEND CatalystUnitTests)
+
+add_custom_target(create_test_bytecode 
+    quantum-opt --emit-bytecode --register-decomp-rule-resource ${CMAKE_CURRENT_SOURCE_DIR}/Quantum/GraphDecomposition/test_rules.mlir -o ${BYTECODE_PATH}
+    DEPENDS quantum-opt
+    BYPRODUCTS ${BYTECODE_PATH}
+)
 
 add_lit_testsuite(check-dialects "Run the regression tests for mlir dialects"
     ${TEST_SUITES}
-    DEPENDS ${DIALECT_TESTS_DEPEND}
+    DEPENDS ${DIALECT_TESTS_DEPEND} create_test_bytecode
 )
 
 set_target_properties(check-dialects PROPERTIES FOLDER "Tests")

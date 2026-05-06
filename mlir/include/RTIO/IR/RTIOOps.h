@@ -14,12 +14,13 @@
 
 #pragma once
 
-#include "RTIO/IR/RTIODialect.h"
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+
+#include "RTIO/IR/RTIODialect.h"
 
 #define GET_ATTRDEF_CLASSES
 #include "RTIO/IR/RTIOAttributes.h.inc"

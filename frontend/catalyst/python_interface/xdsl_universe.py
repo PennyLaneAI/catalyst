@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """xDSL universe for containing all dialects and passes."""
+
 from functools import partial
 
 from xdsl.passes import ModulePass
@@ -37,7 +38,7 @@ for name in dialects.__all__:
         names_to_dialects[d.name] = partial(dialect_accessor, d)
 
 # Create a map from pass names to their respective ModulePass. The transforms module
-# contains PassDispatcher instances as well as ModulePasses. We only want to collect
+# contains CompilerTransform instances as well as ModulePasses. We only want to collect
 # the ModulePasses. We cannot use issubclass with instances, which is why we first
 # check if isinstance(transform, type).
 names_to_passes = {}
@@ -50,7 +51,7 @@ for name in transforms.__all__:
         # We use partial so that the correct value of `t` is returned by the function.
         # Without it, the function created by each loop iteration returns the `t` from
         # the last iteration of the loop
-        names_to_passes[t.name] = partial(transform_accessor, t)
+        names_to_passes[t.name] = partial(transform_accessor, t)  # pylint: disable=no-member
 
 # The Universe is used to expose custom dialects and transforms to xDSL. It is
 # specified as an entry point in PennyLane's pyproject.toml file, which makes

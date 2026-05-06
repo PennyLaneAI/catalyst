@@ -247,7 +247,7 @@ def pure_callback(callback_fn, result_type=None):
                 # The VJP function can also be a pure callback
                 return catalyst.pure_callback(vjp)(res, dy)
 
-        >>> @qml.qjit
+        >>> @qp.qjit
         ... @catalyst.grad
         ... def f(x):
         ...     y = jnp.array([jnp.cos(x[0]), x[1]])

@@ -14,7 +14,7 @@
 """Tests for seeded qjit runs in Catalyst"""
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import CompileError, cond, measure, qjit
@@ -54,37 +54,37 @@ def test_seed_out_of_range(seed):
 def test_seeded_measurement(seed, backend):
     """Test that different calls to qjits with the same seed produce the same measurement results"""
 
-    dev = qml.device(backend, wires=1)
+    dev = qp.device(backend, wires=1)
 
     @qjit(seed=seed)
     def workflow():
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
-            qml.Hadamard(0)
+            qp.Hadamard(0)
             m = measure(0)
 
             @cond(m)
             def cfun0():
-                qml.Hadamard(0)
+                qp.Hadamard(0)
 
             cfun0()
-            return qml.probs()
+            return qp.probs()
 
         return circuit(), circuit(), circuit(), circuit()
 
     @qjit(seed=seed)
     def workflow1():
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
-            qml.Hadamard(0)
+            qp.Hadamard(0)
             m = measure(0)
 
             @cond(m)
             def cfun0():
-                qml.Hadamard(0)
+                qp.Hadamard(0)
 
             cfun0()
-            return qml.probs()
+            return qp.probs()
 
         return circuit(), circuit(), circuit(), circuit()
 
@@ -106,7 +106,7 @@ def test_seeded_measurement(seed, backend):
     ],
 )
 @pytest.mark.parametrize("shots", [10])
-@pytest.mark.parametrize("readout", [qml.sample, qml.counts])
+@pytest.mark.parametrize("readout", [qp.sample, qp.counts])
 def test_seeded_sample(seed, shots, readout, backend):
     """Test that different calls to qjits with the same seed produce the same sample results"""
 
@@ -115,26 +115,26 @@ def test_seeded_sample(seed, shots, readout, backend):
             "Sample seeding is only supported on lightning.qubit, lightning.kokkos and lightning.gpu"
         )
 
-    dev = qml.device(backend, wires=2)
+    dev = qp.device(backend, wires=2)
 
     @qjit(seed=seed)
     def workflow():
-        @qml.set_shots(shots)
-        @qml.qnode(dev)
+        @qp.set_shots(shots)
+        @qp.qnode(dev)
         def circuit():
-            qml.Hadamard(wires=[0])
-            qml.RX(12.34, wires=[1])
+            qp.Hadamard(wires=[0])
+            qp.RX(12.34, wires=[1])
             return readout()
 
         return circuit(), circuit(), circuit(), circuit()
 
     @qjit(seed=seed)
     def workflow1():
-        @qml.set_shots(shots)
-        @qml.qnode(dev)
+        @qp.set_shots(shots)
+        @qp.qnode(dev)
         def circuit():
-            qml.Hadamard(wires=[0])
-            qml.RX(12.34, wires=[1])
+            qp.Hadamard(wires=[0])
+            qp.RX(12.34, wires=[1])
             return readout()
 
         return circuit(), circuit(), circuit(), circuit()
@@ -165,27 +165,27 @@ def test_seeded_probs(seed, shots, backend):
             "Probs seeding is only supported on lightning.qubit, lightning.kokkos and lightning.gpu"
         )
 
-    dev = qml.device(backend, wires=2)
+    dev = qp.device(backend, wires=2)
 
     @qjit(seed=seed)
     def workflow():
-        @qml.set_shots(shots)
-        @qml.qnode(dev)
+        @qp.set_shots(shots)
+        @qp.qnode(dev)
         def circuit():
-            qml.RY(0.7, wires=0)
-            qml.PauliZ(0)
-            return qml.probs()
+            qp.RY(0.7, wires=0)
+            qp.PauliZ(0)
+            return qp.probs()
 
         return circuit(), circuit(), circuit(), circuit()
 
     @qjit(seed=seed)
     def workflow1():
-        @qml.set_shots(shots)
-        @qml.qnode(dev)
+        @qp.set_shots(shots)
+        @qp.qnode(dev)
         def circuit():
-            qml.RY(0.7, wires=0)
-            qml.PauliZ(0)
-            return qml.probs()
+            qp.RY(0.7, wires=0)
+            qp.PauliZ(0)
+            return qp.probs()
 
         return circuit(), circuit(), circuit(), circuit()
 
@@ -216,26 +216,26 @@ def test_seeded_expval(seed, shots, backend):
             "and lightning.gpu"
         )
 
-    dev = qml.device(backend, wires=2)
+    dev = qp.device(backend, wires=2)
 
     @qjit(seed=seed)
     def workflow():
-        @qml.set_shots(shots)
-        @qml.qnode(dev)
+        @qp.set_shots(shots)
+        @qp.qnode(dev)
         def circuit():
-            qml.RY(0.7, wires=0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RY(0.7, wires=0)
+            return qp.expval(qp.PauliZ(0))
 
         return circuit(), circuit(), circuit(), circuit()
 
     @qjit(seed=seed)
     def workflow1():
-        @qml.set_shots(shots)
-        @qml.qnode(dev)
+        @qp.set_shots(shots)
+        @qp.qnode(dev)
         def circuit():
-            qml.RY(0.7, wires=0)
-            qml.PauliZ(0)
-            return qml.expval(qml.PauliZ(0))
+            qp.RY(0.7, wires=0)
+            qp.PauliZ(0)
+            return qp.expval(qp.PauliZ(0))
 
         return circuit(), circuit(), circuit(), circuit()
 
@@ -265,26 +265,26 @@ def test_seeded_var(seed, shots, backend):
             "Var seeding is only supported on lightning.qubit, lightning.kokkos and lightning.gpu"
         )
 
-    dev = qml.device(backend, wires=2)
+    dev = qp.device(backend, wires=2)
 
     @qjit(seed=seed)
     def workflow():
-        @qml.set_shots(shots)
-        @qml.qnode(dev)
+        @qp.set_shots(shots)
+        @qp.qnode(dev)
         def circuit():
-            qml.RY(0.7, wires=0)
-            return qml.var(qml.PauliZ(0))
+            qp.RY(0.7, wires=0)
+            return qp.var(qp.PauliZ(0))
 
         return circuit(), circuit(), circuit(), circuit()
 
     @qjit(seed=seed)
     def workflow1():
-        @qml.set_shots(shots)
-        @qml.qnode(dev)
+        @qp.set_shots(shots)
+        @qp.qnode(dev)
         def circuit():
-            qml.RY(0.7, wires=0)
-            qml.PauliZ(0)
-            return qml.var(qml.PauliZ(0))
+            qp.RY(0.7, wires=0)
+            qp.PauliZ(0)
+            return qp.var(qp.PauliZ(0))
 
         return circuit(), circuit(), circuit(), circuit()
 

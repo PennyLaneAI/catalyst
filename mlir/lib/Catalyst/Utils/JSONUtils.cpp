@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "llvm/Support/MemoryBuffer.h"
-
-#include "mlir/IR/BuiltinTypes.h"
-
 #include "Catalyst/Utils/JSONUtils.h"
+
+#include "llvm/Support/MemoryBuffer.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 using namespace mlir;
 

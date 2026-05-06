@@ -12,20 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <memory>
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Ion/IR/IonOps.h"
 #include "Ion/Transforms/Patterns.h"
-#include "Ion/Transforms/oqd_database_managers.hpp"
-#include "Ion/Transforms/oqd_database_types.hpp"
+#include "Ion/Transforms/oqd_database_managers.h"
+#include "Ion/Transforms/oqd_database_types.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
@@ -118,6 +113,15 @@ struct GatesToPulsesPass : impl::GatesToPulsesPassBase<GatesToPulsesPass> {
             // TODO: For now, we only print one phonon to be consistent with TriCal examples,
             // but we should print all of them eventually
             ion::ModesOp::create(builder, op->getLoc(), builder.getArrayAttr(phonons[0]));
+        }
+
+        // Rewrite mid-circuit measurement ops into ion.parallelprotocol(ion.measure_pulse).
+        if (!dataManager.getDetectionBeamParams().empty()) {
+            RewritePatternSet measurePatterns(&getContext());
+            populateMeasureToPulsesPatterns(measurePatterns, dataManager);
+            if (failed(applyPatternsGreedily(op, std::move(measurePatterns)))) {
+                return signalPassFailure();
+            }
         }
 
         RewritePatternSet ionPatterns(&getContext());

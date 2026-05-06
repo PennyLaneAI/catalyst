@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "ParameterShift.hpp"
-
 #include <deque>
 #include <string>
 #include <vector>
@@ -30,6 +28,8 @@
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantum.h"
+
+#include "ParameterShift.hpp"
 
 namespace catalyst {
 namespace gradient {
@@ -306,8 +306,8 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
                 // so that we can safely delete it (all quantum ops must be eliminated).
                 rewriter.replaceOp(gate, gate.getQubitOperands());
             }
-            else if (auto region = dyn_cast<quantum::QuantumRegion>(op)) {
-                rewriter.replaceOp(op, region.getRegisterOperand());
+            else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(op)) {
+                rewriter.replaceOp(op, adjointOp.getArgs());
             }
             else if (isa<quantum::DeallocOp>(op)) {
                 rewriter.eraseOp(op);

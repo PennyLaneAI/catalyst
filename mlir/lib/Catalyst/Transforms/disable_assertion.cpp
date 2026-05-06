@@ -15,7 +15,6 @@
 #define DEBUG_TYPE "assertion"
 
 #include "llvm/Support/Debug.h"
-
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"

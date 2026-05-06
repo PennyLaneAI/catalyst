@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
+
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
@@ -19,7 +21,6 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;

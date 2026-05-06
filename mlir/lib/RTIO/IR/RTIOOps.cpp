@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "RTIO/IR/RTIOOps.h"
+
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
-
-#include "RTIO/IR/RTIOOps.h"
 
 using namespace mlir;
 using namespace catalyst::rtio;
@@ -31,6 +31,26 @@ LogicalResult RTIOSyncOp::verify()
     if (getEvents().empty()) {
         return emitOpError("requires at least one event to synchronize");
     }
+    return success();
+}
+
+LogicalResult RTIORPCOp::verify()
+{
+    if (getIsAsync() && !getResults().empty()) {
+        return emitOpError("async RPC cannot have return values (remove 'async' or results)");
+    }
+
+    if (getResults().size() > 1) {
+        return emitOpError("RPC can return at most one value");
+    }
+
+    if (auto kwNames = (*this)->getAttrOfType<ArrayAttr>("keyword_names")) {
+        if (kwNames.size() > getArgs().size()) {
+            return emitOpError("keyword_names has more entries (")
+                   << kwNames.size() << ") than arguments (" << getArgs().size() << ")";
+        }
+    }
+
     return success();
 }
 

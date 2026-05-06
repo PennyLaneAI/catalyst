@@ -98,7 +98,7 @@ MOCK_MODULES = [
     "mlir_quantum.dialects.catalyst",
     "mlir_quantum.dialects.mbqc",
     "mlir_quantum.dialects.mitigation",
-    "mlir_quantum.dialects.qec",
+    "mlir_quantum.dialects.pbc",
     "mlir_quantum.dialects._transform_ops_gen",
     "pybind11",
     "cudaq",
@@ -162,6 +162,8 @@ ogp_social_cards = {
 html_baseurl = os.environ.get(
     "READTHEDOCS_CANONICAL_URL", "https://docs.pennylane.ai/projects/catalyst/"
 )
+
+os.environ["SPHINX_BUILD"] = "1"
 
 autosummary_generate = True
 autosummary_imported_members = False

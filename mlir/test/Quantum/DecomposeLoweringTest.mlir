@@ -15,7 +15,7 @@
 // RUN: quantum-opt --decompose-lowering --split-input-file -verify-diagnostics %s | FileCheck %s
 
 module @two_hadamards {
-  func.func public @test_two_hadamards() -> tensor<4xf64> {
+  func.func public @test_two_hadamards() -> tensor<4xf64> attributes {quantum.node} {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[CST_PI2:%.+]] = arith.constant 1.5707963267948966 : f64
@@ -86,7 +86,7 @@ module @single_hadamard {
 
 // -----
 module @recursive {
-  func.func public @test_recursive() -> tensor<4xf64> {
+  func.func public @test_recursive() -> tensor<4xf64> attributes {quantum.node} {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[CST_PI2:%.+]] = arith.constant 1.5707963267948966 : f64
@@ -132,7 +132,7 @@ module @recursive {
 
 // -----
 module @recursive {
-  func.func public @test_recursive() -> tensor<4xf64> {
+  func.func public @test_recursive() -> tensor<4xf64> attributes {quantum.node} {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[CST_PI2:%.+]] = arith.constant 1.5707963267948966 : f64
@@ -180,7 +180,7 @@ module @recursive {
 
 // Test parametric gates and wires
 module @param_rxry {
-  func.func public @test_param_rxry(%arg0: tensor<f64>, %arg1: tensor<i64>) -> tensor<2xf64> {
+  func.func public @test_param_rxry(%arg0: tensor<f64>, %arg1: tensor<i64>) -> tensor<2xf64> attributes {quantum.node} {
     %c0_i64 = arith.constant 0 : i64
 
     // CHECK: [[REG:%.+]] = quantum.alloc( 1) : !quantum.reg
@@ -223,7 +223,7 @@ module @param_rxry {
 
 // Test parametric gates and wires
 module @param_rxry_2 {
-  func.func public @test_param_rxry_2(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<i64>) -> tensor<2xf64> {
+  func.func public @test_param_rxry_2(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<i64>) -> tensor<2xf64> attributes {quantum.node} {
     %c0_i64 = arith.constant 0 : i64
 
     // CHECK: [[REG:%.+]] = quantum.alloc( 1) : !quantum.reg
@@ -269,7 +269,7 @@ module @param_rxry_2 {
 
 // Test recursive and qreg-based gate decomposition
 module @qreg_base_circuit {
-  func.func public @test_qreg_base_circuit() -> tensor<2xf64> {
+  func.func public @test_qreg_base_circuit() -> tensor<2xf64> attributes {quantum.node} {
       // CHECK: [[CST:%.+]] = arith.constant 1.000000e+00 : f64
       %cst = arith.constant 1.000000e+00 : f64
 
@@ -371,7 +371,7 @@ module @qreg_base_circuit {
 // -----
 
 module @multi_wire_cnot_decomposition {
-  func.func public @test_cnot_decomposition() -> tensor<4xf64> {
+  func.func public @test_cnot_decomposition() -> tensor<4xf64> attributes {quantum.node} {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -457,7 +457,7 @@ module @multi_wire_cnot_decomposition {
 // -----
 
 module @cnot_alternative_decomposition {
-  func.func public @test_cnot_alternative_decomposition() -> tensor<4xf64> {
+  func.func public @test_cnot_alternative_decomposition() -> tensor<4xf64> attributes {quantum.node} {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -510,7 +510,7 @@ module @cnot_alternative_decomposition {
 // -----
 
 module @mcm_example {
-  func.func public @test_mcm_hadamard() -> tensor<2xf64> {
+  func.func public @test_mcm_hadamard() -> tensor<2xf64> attributes {quantum.node} {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %mres, %out_qubit = quantum.measure %1 : i1, !quantum.bit
@@ -556,7 +556,7 @@ module @mcm_example {
 // -----
 
 module @circuit_with_multirz {
-  func.func public @test_with_multirz() -> tensor<4xf64> {
+  func.func public @test_with_multirz() -> tensor<4xf64> attributes {quantum.node} {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     // CHECK: func.func public @test_with_multirz() -> tensor<4xf64>

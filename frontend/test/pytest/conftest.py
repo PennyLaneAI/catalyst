@@ -21,7 +21,7 @@ from tempfile import TemporaryDirectory
 from textwrap import dedent
 from warnings import warn
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 
@@ -43,30 +43,30 @@ def disable_capture():
     try:
         yield
     finally:
-        if qml.capture.enabled():
-            qml.capture.disable()
+        if qp.capture.enabled():
+            qp.capture.disable()
 
 
 @pytest.fixture(scope="function")
 def use_capture():
     """Enable capture before and disable capture after the test."""
-    qml.capture.enable()
+    qp.capture.enable()
     try:
         yield
     finally:
-        qml.capture.disable()
+        qp.capture.disable()
 
 
 @pytest.fixture(scope="function")
 def use_capture_dgraph():
     """Enable capture and graph-decomposition before and disable them both after the test."""
-    qml.capture.enable()
-    qml.decomposition.enable_graph()
+    qp.capture.enable()
+    qp.decomposition.enable_graph()
     try:
         yield
     finally:
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
+        qp.decomposition.disable_graph()
+        qp.capture.disable()
 
 
 @pytest.fixture(params=["capture", "no_capture"], scope="function")
@@ -75,13 +75,46 @@ def use_both_frontend(request):
     if request.param == "capture":
         if "capture_todo" in request.keywords:
             pytest.xfail("capture todo's do not yet work with program capture.")
-        qml.capture.enable()
+        qp.capture.enable()
         try:
             yield
         finally:
-            qml.capture.disable()
+            qp.capture.disable()
     else:
         yield
+
+
+@pytest.fixture(
+    params=[
+        pytest.param(True, marks=pytest.mark.capture),
+        pytest.param(False, marks=pytest.mark.old_frontend),
+    ],
+    ids=["capture=True", "capture=False"],
+)
+def capture_mode(request):
+    """Parametrize tests to run with capture=True and capture=False.
+
+    This fixture returns a boolean that should be passed to @qjit(capture=...).
+    Unlike use_both_frontend, this does NOT toggle the global capture state,
+    allowing more isolated and explicit testing.
+
+    Usage:
+        def test_example(backend, capture_mode):
+            @qjit(capture=capture_mode)
+            @qp.qnode(qp.device(backend, wires=1))
+            def circuit():
+                ...
+
+    Markers:
+        @pytest.mark.old_frontend - Skip when capture_mode=True
+        @pytest.mark.capture_todo - xfail when capture_mode=True
+    """
+    if request.param:  # capture=True
+        if "old_frontend" in request.keywords:
+            pytest.skip("Test is specific to the old frontend and should not run with capture.")
+        if "capture_todo" in request.keywords:
+            pytest.xfail("Not expected to work yet with program capture.")
+    return request.param
 
 
 def pytest_collection_modifyitems(items, config):  # pylint: disable=unused-argument

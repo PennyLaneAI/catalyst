@@ -37,13 +37,13 @@ Let's look at a simple example starting in Python:
 .. code-block:: python
 
     def circuit(x: complex):
-        qml.Hadamard(wires=0)
+        qp.Hadamard(wires=0)
 
         A = np.array([[1, 0], [0, np.exp(x)]])
-        qml.QubitUnitary(A, wires=0)
+        qp.QubitUnitary(A, wires=0)
 
         B = np.array([[1, 0], [0, np.exp(2*x)]])
-        qml.QubitUnitary(B, wires=0)
+        qp.QubitUnitary(B, wires=0)
 
         return measure(0)
 

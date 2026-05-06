@@ -8,6 +8,7 @@ on:
     # Run every weekend on Saturday at 23:40 EDT (cron is in UTC)
     # https://crontab.cronhub.io/
     - cron: "40 23 * * SAT"
+  workflow_dispatch:
 
 jobs:
   weekly-flaky-test-run:

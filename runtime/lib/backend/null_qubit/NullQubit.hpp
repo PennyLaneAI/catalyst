@@ -15,11 +15,9 @@
 #pragma once
 
 #include <algorithm> // generate_n
-#include <chrono>
+#include <cmath>
 #include <complex>
 #include <cstdio>
-#include <fstream>
-#include <memory>
 #include <optional>
 #include <random>
 #include <string>
@@ -34,6 +32,31 @@
 #include "Utils.hpp"
 
 namespace Catalyst::Runtime::Devices {
+
+// Classify a PauliRot angle into its rotation kind.
+static std::string classifyPauliRotAngle(double angle, const double tolerance = 1e-12)
+{
+    constexpr double PI = M_PI;
+
+    double modAngle = std::fmod(angle, 2 * PI);
+    double absAngle = std::abs(modAngle);
+    if (absAngle < tolerance || 2 * PI - absAngle < tolerance) {
+        return "PauliRot-identity";
+    }
+
+    constexpr double SPECIFIC_ANGLES[] = {PI, PI / 2, PI / 4};
+    constexpr int SPECIFIC_DENOMINATORS[] = {1, 2, 4};
+    for (int i = 0; i < 3; i++) {
+        if (std::abs(absAngle - SPECIFIC_ANGLES[i]) < tolerance) {
+            int denominator = SPECIFIC_DENOMINATORS[i];
+            if (denominator == 1) {
+                return "PauliRot-pi";
+            }
+            return "PauliRot-pi/" + std::to_string(SPECIFIC_DENOMINATORS[i]);
+        }
+    }
+    return "PauliRot-Phi";
+}
 
 /**
  * @brief A null backend quantum device.
@@ -260,14 +283,19 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param controlled_wires Control qubits for controlled operations
      * @param controlled_values Control values for multi-controlled operations
      */
-    void NamedOperation(const std::string &name, [[maybe_unused]] const std::vector<double> &params,
+    void NamedOperation(const std::string &name, const std::vector<double> &params,
                         const std::vector<QubitIdType> &wires, bool inverse,
                         const std::vector<QubitIdType> &controlled_wires = {},
                         [[maybe_unused]] const std::vector<bool> &controlled_values = {},
                         [[maybe_unused]] const std::vector<std::string> &optional_params = {})
     {
         if (this->track_resources_) {
-            this->resource_tracker_.NamedOperation(name, inverse, wires, controlled_wires);
+            std::string tracked_name = name;
+            if (name == "PauliRot" && !params.empty()) {
+                tracked_name =
+                    classifyPauliRotAngle(params[0]) + "-w" + std::to_string(wires.size());
+            }
+            this->resource_tracker_.NamedOperation(tracked_name, inverse, wires, controlled_wires);
         }
     }
 
@@ -537,6 +565,21 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     {
         if (this->track_resources_) {
             this->resource_tracker_.MidMeasurement();
+        }
+        return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
+    }
+
+    /**
+     * @brief Performs a dummy Pauli measurement that always returns false
+     *
+     * @param pauli_word The Pauli word to measure (ignored)
+     * @param wires The qubits to measure
+     */
+    auto PauliMeasure(const std::string &, const std::vector<QubitIdType> &wires) -> Result
+    {
+        if (this->track_resources_) {
+            this->resource_tracker_.PauliMeasure("PauliMeasure-w" + std::to_string(wires.size()),
+                                                 wires);
         }
         return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
     }

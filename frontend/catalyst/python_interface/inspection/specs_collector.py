@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-This file contains the implementation of the a collector method for qml.specs,
+This file contains the implementation of the a collector method for qp.specs,
 which collects and maps PennyLane operations and measurements from xDSL.
 """
 
@@ -30,7 +30,7 @@ from xdsl.ir import Region
 
 from catalyst.python_interface.dialects.catalyst import CallbackOp
 from catalyst.python_interface.dialects.mbqc import GraphStatePrepOp, MeasureInBasisOp
-from catalyst.python_interface.dialects.qec import (
+from catalyst.python_interface.dialects.pbc import (
     FabricateOp,
     PPMeasurementOp,
     PPRotationArbitraryOp,
@@ -60,8 +60,8 @@ from catalyst.python_interface.dialects.quantum import (
 )
 from catalyst.python_interface.inspection.xdsl_conversion import (
     count_static_loop_iterations,
-    xdsl_to_qml_measurement_name,
-    xdsl_to_qml_op_name,
+    xdsl_to_qp_measurement_name,
+    xdsl_to_qp_op_name,
 )
 
 # A list of all custom dialect names used by Catalyst for MLIR ops
@@ -69,7 +69,7 @@ from catalyst.python_interface.inspection.xdsl_conversion import (
 _CUSTOM_DIALECT_NAMES = frozenset(
     {
         "quantum",
-        "qec",
+        "pbc",
         "mbqc",
     }
 )
@@ -92,7 +92,7 @@ _SKIPPED_OPS = frozenset(
         "quantum.num_qubits",
         "quantum.tensor",
         "quantum.yield",
-        "qec.yield",
+        "pbc.yield",
     }
 )
 
@@ -103,7 +103,7 @@ class ResourceType(enum.Enum):
     # Circuit resources
     GATE = "gate"
     MEASUREMENT = "measurement"
-    QEC = "qec"
+    PBC = "pbc"
 
     # Extra circuit info
     METADATA = "meta"
@@ -212,7 +212,7 @@ def handle_resource(
 
 @handle_resource.register
 def _(xdsl_op: MeasureOp) -> tuple[ResourceType, str]:
-    return ResourceType.MEASUREMENT, xdsl_to_qml_measurement_name(xdsl_op)
+    return ResourceType.MEASUREMENT, xdsl_to_qp_measurement_name(xdsl_op)
 
 
 @handle_resource.register
@@ -220,8 +220,8 @@ def _(
     xdsl_op: CountsOp | ExpvalOp | ProbsOp | SampleOp | StateOp | VarianceOp,
 ) -> tuple[ResourceType, str]:
     obs_op = xdsl_op.obs.owner
-    return ResourceType.MEASUREMENT, xdsl_to_qml_measurement_name(
-        xdsl_op, xdsl_to_qml_measurement_name(obs_op)
+    return ResourceType.MEASUREMENT, xdsl_to_qp_measurement_name(
+        xdsl_op, xdsl_to_qp_measurement_name(obs_op)
     )
 
 
@@ -246,7 +246,7 @@ def _(
 
 
 ############################################################
-### QEC Operations
+### PBC Operations
 ############################################################
 
 
@@ -254,7 +254,7 @@ def _(
 def _(
     xdsl_op: FabricateOp | GraphStatePrepOp | MeasureInBasisOp | PrepareStateOp,
 ) -> tuple[ResourceType, str]:
-    return ResourceType.QEC, xdsl_op.name
+    return ResourceType.PBC, xdsl_op.name
 
 
 @handle_resource.register
@@ -267,17 +267,17 @@ def _(xdsl_op: PPRotationOp) -> tuple[ResourceType, str]:
         s = "PPR-identity"
     else:
         s = f"PPR-pi/{abs(xdsl_op.rotation_kind.value.data)}"
-    return ResourceType.QEC, s
+    return ResourceType.PBC, s
 
 
 @handle_resource.register
 def _(xdsl_op: PPRotationArbitraryOp) -> tuple[ResourceType, str]:
-    return ResourceType.QEC, "PPR-Phi"
+    return ResourceType.PBC, "PPR-Phi"
 
 
 @handle_resource.register
 def _(_: PPMeasurementOp | SelectPPMeasurementOp) -> tuple[ResourceType, str]:
-    return ResourceType.QEC, "PPM"
+    return ResourceType.PBC, "PPM"
 
 
 ############################################################
@@ -375,14 +375,14 @@ def _collect_operation(
             if hasattr(op, "in_ctrl_qubits"):
                 n_qubits += len(op.in_ctrl_qubits)
 
-            resource = xdsl_to_qml_op_name(op, adjoint_mode=adjoint_mode)
+            resource = xdsl_to_qp_op_name(op, adjoint_mode=adjoint_mode)
 
             resources.operations[resource][n_qubits] += 1
 
         case ResourceType.MEASUREMENT:
             resources.measurements[resource] += 1
 
-        case ResourceType.QEC:
+        case ResourceType.PBC:
             n_qubits = len(op.in_qubits) if hasattr(op, "in_qubits") else 0
             resources.operations[resource][n_qubits] += 1
 
@@ -547,11 +547,11 @@ def _collect_region(
     return resources
 
 
-def specs_collect(module: ModuleOp) -> ResourcesResult:
+def specs_collect(module: ModuleOp) -> ResourcesResult | list[ResourcesResult]:
     """Collect PennyLane resources from the module."""
 
     func_to_resources = {}
-    entry_func = None
+    qnode_funcs = []  # This list stores the functions which are an individual qnode execution
 
     func_decl_warning = False
 
@@ -576,11 +576,20 @@ def specs_collect(module: ModuleOp) -> ResourcesResult:
         resources = _collect_region(func_op.body)
         func_to_resources[func_op.sym_name.data] = resources
 
-        if "qnode" in func_op.attributes:
-            # The main entrypoint for a qnode is always marked by the `qnode` attribute
-            entry_func = func_op.sym_name.data
+        if "quantum.node" in func_op.attributes:
+            # The top-level definition of a qnode is always marked with the `quantum.node` attribute
+            qnode_funcs.append(func_op.sym_name.data)
 
-    if entry_func not in func_to_resources:
-        raise ValueError("Entry function not found in module.")
+    if not qnode_funcs:  # pragma: no cover
+        raise ValueError("No `quantum.node` functions found in module.")
 
-    return _resolve_function_calls(entry_func, func_to_resources)
+    if (
+        len(
+            res := [
+                _resolve_function_calls(qnode_func, func_to_resources) for qnode_func in qnode_funcs
+            ]
+        )
+        == 1
+    ):
+        return res[0]
+    return res

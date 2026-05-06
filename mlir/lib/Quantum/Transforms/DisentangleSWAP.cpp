@@ -19,14 +19,14 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
-#include "PropagateSimpleStatesAnalysis.hpp"
 #include "Quantum/IR/QuantumOps.h"
+
+#include "PropagateSimpleStatesAnalysis.hpp"
 
 using namespace mlir;
 using namespace catalyst;
