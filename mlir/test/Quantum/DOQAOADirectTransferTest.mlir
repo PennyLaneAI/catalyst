@@ -76,7 +76,7 @@
 // GUARD:    quantum.freeze_partition
 // GUARD-SAME: dt_direct_count
 
-func.func @cycle_direct() {
+func.func @cycle_direct(%p_rep : !quantum.params) {
     %p = quantum.freeze_partition {
         hotspot_count   = 1 : i32,
         hotspot_indices = array<i32: 0>,
@@ -88,11 +88,11 @@ func.func @cycle_direct() {
         h_lin  = dense<[0.0, 0.0, 0.0, 0.0]> : tensor<4xf64>
     } : !quantum.partition<4, 1>
 
-    %t1 = quantum.bias_transfer {
-        b_rep = 0.0 : f64,
-        b_target = 0.05 : f64,
+    %t1 = quantum.bias_transfer(%p_rep : !quantum.params) {
+        B_rep = 0.0 : f64,
+        B_target = 0.05 : f64,
         threshold = 0.3 : f64
-    } : !quantum.params<2>
+    } : !quantum.params
 
     func.return
 }
@@ -119,7 +119,7 @@ func.func @cycle_direct() {
 // ALLWARM:  quantum.freeze_partition
 // ALLWARM-SAME: dt_warmstart_count = 1 : i32
 
-func.func @k4_warmstart_transfer() {
+func.func @k4_warmstart_transfer(%p_rep : !quantum.params) {
     %p = quantum.freeze_partition {
         hotspot_count   = 1 : i32,
         hotspot_indices = array<i32: 0>,
@@ -131,11 +131,11 @@ func.func @k4_warmstart_transfer() {
         h_lin  = dense<[0.0, 0.0, 0.0, 0.0]> : tensor<4xf64>
     } : !quantum.partition<4, 1>
 
-    %t1 = quantum.bias_transfer {
-        b_rep = 0.0 : f64,
-        b_target = 0.8 : f64,
+    %t1 = quantum.bias_transfer(%p_rep : !quantum.params) {
+        B_rep = 0.0 : f64,
+        B_target = 0.8 : f64,
         threshold = 0.3 : f64
-    } : !quantum.params<2>
+    } : !quantum.params
 
     func.return
 }
@@ -152,7 +152,7 @@ func.func @k4_warmstart_transfer() {
 // DT:       quantum.freeze_partition
 // DT-SAME:  param_byte_count = 16 : i32
 
-func.func @mixed_transfers() {
+func.func @mixed_transfers(%p_rep : !quantum.params) {
     %p = quantum.freeze_partition {
         hotspot_count   = 2 : i32,
         hotspot_indices = array<i32: 0, 1>,
@@ -167,18 +167,18 @@ func.func @mixed_transfers() {
     } : !quantum.partition<6, 2>
 
     // small deltaB → direct copy
-    %t1 = quantum.bias_transfer {
-        b_rep = 0.1 : f64,
-        b_target = 0.15 : f64,
+    %t1 = quantum.bias_transfer(%p_rep : !quantum.params) {
+        B_rep = 0.1 : f64,
+        B_target = 0.15 : f64,
         threshold = 0.3 : f64
-    } : !quantum.params<2>
+    } : !quantum.params
 
     // large deltaB → warm-start
-    %t2 = quantum.bias_transfer {
-        b_rep = 0.1 : f64,
-        b_target = 0.7 : f64,
+    %t2 = quantum.bias_transfer(%p_rep : !quantum.params) {
+        B_rep = 0.1 : f64,
+        B_target = 0.7 : f64,
         threshold = 0.3 : f64
-    } : !quantum.params<2>
+    } : !quantum.params
 
     func.return
 }

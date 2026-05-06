@@ -123,6 +123,7 @@ struct DirectTransferPass : impl::DirectTransferPassBase<DirectTransferPass> {
             // ── Annotate freeze_partition with aggregate counts ────────────
             fpOp->setAttr("dt_direct_count", builder.getI32IntegerAttr(directCount));
             fpOp->setAttr("dt_warmstart_count", builder.getI32IntegerAttr(warmstartCount));
+            fpOp->setAttr("param_byte_count", builder.getI32IntegerAttr(byteCount));
 
             // Remark
             llvm::SmallString<160> info;
