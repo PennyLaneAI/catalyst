@@ -59,18 +59,17 @@ struct TrainingScheduleRewriterPass
     void runOnOperation() final
     {
         func::FuncOp func = getOperation();
-        MLIRContext *ctx  = &getContext();
+        MLIRContext *ctx = &getContext();
 
-        unsigned fullEp      = fullEpochs;
-        unsigned warmEp      = warmstartEpochs;
+        unsigned fullEp = fullEpochs;
+        unsigned warmEp = warmstartEpochs;
 
         func.walk([&](FreezePartitionOp op) {
-
             // ── Guard: need representative-selection annotations ───────────
-            auto modesAttr  = op->getAttr("transfer_modes");
-            auto repsAttr   = op->getAttr("representatives");
-            auto clAsnAttr  = op->getAttr("cluster_assignments");
-            auto clKAttr    = op->getAttr("cluster_k");
+            auto modesAttr = op->getAttr("transfer_modes");
+            auto repsAttr = op->getAttr("representatives");
+            auto clAsnAttr = op->getAttr("cluster_assignments");
+            auto clKAttr = op->getAttr("cluster_k");
 
             if (!modesAttr || !repsAttr || !clAsnAttr || !clKAttr) {
                 op->emitWarning()
@@ -81,11 +80,11 @@ struct TrainingScheduleRewriterPass
 
             // ── Extract transfer modes ────────────────────────────────────
             auto hotspotAttr = op.getHotspotIndices();
-            unsigned m       = static_cast<unsigned>(hotspotAttr.size());
-            unsigned numSP   = 1u << m;
+            unsigned m = static_cast<unsigned>(hotspotAttr.size());
+            unsigned numSP = 1u << m;
 
             auto modesArr = cast<DenseI32ArrayAttr>(modesAttr);
-            auto repsArr  = cast<DenseI32ArrayAttr>(repsAttr);
+            auto repsArr = cast<DenseI32ArrayAttr>(repsAttr);
             auto clAsnArr = cast<DenseI32ArrayAttr>(clAsnAttr);
 
             // ── Build schedule in three phases ────────────────────────────
@@ -108,7 +107,7 @@ struct TrainingScheduleRewriterPass
             for (unsigned k = 0; k < numSP; ++k) {
                 if (modesArr[k] == 0) {
                     schedule.push_back(static_cast<int32_t>(k));
-                    epochs[k]  = static_cast<int32_t>(fullEp);
+                    epochs[k] = static_cast<int32_t>(fullEp);
                     sources[k] = static_cast<int32_t>(k); // optimises itself
                 }
             }
@@ -141,33 +140,22 @@ struct TrainingScheduleRewriterPass
             }
 
             // ── Build phase_ends array: [K, K+warm_count, 2^m] ───────────
-            std::vector<int32_t> phaseEnds = {
-                phase1End,
-                phase2End,
-                static_cast<int32_t>(numSP)
-            };
+            std::vector<int32_t> phaseEnds = {phase1End, phase2End, static_cast<int32_t>(numSP)};
 
             // ── Annotate op ───────────────────────────────────────────────
-            op->setAttr("training_schedule",
-                        DenseI32ArrayAttr::get(ctx, schedule));
-            op->setAttr("schedule_phase_ends",
-                        DenseI32ArrayAttr::get(ctx, phaseEnds));
-            op->setAttr("schedule_epochs",
-                        DenseI32ArrayAttr::get(ctx, epochs));
-            op->setAttr("schedule_sources",
-                        DenseI32ArrayAttr::get(ctx, sources));
+            op->setAttr("training_schedule", DenseI32ArrayAttr::get(ctx, schedule));
+            op->setAttr("schedule_phase_ends", DenseI32ArrayAttr::get(ctx, phaseEnds));
+            op->setAttr("schedule_epochs", DenseI32ArrayAttr::get(ctx, epochs));
+            op->setAttr("schedule_sources", DenseI32ArrayAttr::get(ctx, sources));
 
             // Emit informational remark summarising the schedule
-            int32_t warmCount  = phase2End - phase1End;
-            int32_t copyCount  = static_cast<int32_t>(numSP) - phase2End;
+            int32_t warmCount = phase2End - phase1End;
+            int32_t copyCount = static_cast<int32_t>(numSP) - phase2End;
             llvm::SmallString<200> info;
             llvm::raw_svector_ostream ss(info);
-            ss << "doqaoa-training-schedule: "
-               << numSP << " sub-problems — "
-               << "phase1(full_opt)=" << phase1End
-               << " phase2(warm_start)=" << warmCount
-               << " phase3(direct_copy)=" << copyCount
-               << " | epochs: full=" << fullEp
+            ss << "doqaoa-training-schedule: " << numSP << " sub-problems — "
+               << "phase1(full_opt)=" << phase1End << " phase2(warm_start)=" << warmCount
+               << " phase3(direct_copy)=" << copyCount << " | epochs: full=" << fullEp
                << " warm=" << warmEp;
             op->emitRemark() << info;
         });

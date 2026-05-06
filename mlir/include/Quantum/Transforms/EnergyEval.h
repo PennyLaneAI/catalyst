@@ -40,10 +40,10 @@ namespace energy {
 // ─────────────────────────────────────────────────────────────────────────────
 
 struct GraphDesc {
-    unsigned numNodes;                    // total qubit count N
-    std::vector<double> J;                // N×N coupling matrix, row-major
-    std::vector<double> h;                // N linear bias vector
-    std::vector<int32_t> hotspotIndices;  // frozen qubit positions
+    unsigned numNodes;                   // total qubit count N
+    std::vector<double> J;               // N×N coupling matrix, row-major
+    std::vector<double> h;               // N linear bias vector
+    std::vector<int32_t> hotspotIndices; // frozen qubit positions
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,16 +84,14 @@ std::size_t cacheSize();
 /// @param beta    QAOA mixer unitary angle β.
 /// @param seed    RNG seed for sample path (ignored for exact path).
 /// @return        ⟨H_k⟩ under the QAOA p=1 state.
-double evaluateEnergy(const GraphDesc &graph, unsigned k,
-                      double gamma, double beta,
+double evaluateEnergy(const GraphDesc &graph, unsigned k, double gamma, double beta,
                       uint64_t seed = 42);
 
 /// Build the full landscape vector for sub-problem k on a gridSize×gridSize
 /// (γ,β) grid and L2-normalise it.
 ///
 /// γ ∈ [−π, π],  β ∈ [−π/2, π/2] (standard QAOA ranges for p=1).
-std::vector<double> buildLandscapeVector(const GraphDesc &graph, unsigned k,
-                                         unsigned gridSize,
+std::vector<double> buildLandscapeVector(const GraphDesc &graph, unsigned k, unsigned gridSize,
                                          uint64_t seed = 42);
 
 /// Compute the effective linear-bias norm for sub-problem k:

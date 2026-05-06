@@ -143,9 +143,9 @@ def compile_rule(
 
     # WARNING: do not rename this function, we use it to extract the rule from the compiled
     # circuit
-    @decomposition_rule(
+    @decomposition_rule(  # pylint: disable=unexpected-keyword-arg
         is_qreg=True, op_type=op_class.__name__
-    )  # pylint: disable=unexpected-keyword-arg
+    )
     def rule_wrapper(*args, wires, **_):
         return rule(*args, wires=wires, **_)
 
