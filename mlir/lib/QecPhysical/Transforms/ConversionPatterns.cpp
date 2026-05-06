@@ -77,7 +77,6 @@ struct DecodeEsmCssOpPattern : public OpConversionPattern<DecodeEsmCssOp> {
 
         const TypeConverter *conv = getTypeConverter();
 
-        // Both row_idx and col_ptr should be bufferized first.
         if (!op.isBufferized())
             return op.emitOpError("op must be bufferized before lowering to LLVM");
 
