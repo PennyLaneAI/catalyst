@@ -196,14 +196,10 @@ dialects:
 		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD) \
 		-DCATALYST_ENABLE_WARNINGS=$(STRICT_WARNINGS)
 
-<<<<<<< HEAD
-	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server quantum-translate catalyst-cli check-unit-tests
-=======
-	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli check-unit-tests runner_tests_dgsolver
+	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server quantum-translate catalyst-cli check-unit-tests runner_tests_dgsolver
 
 	# Check Catch2 unit tests
 	$(DIALECTS_BUILD_DIR)/unittests/DecompGraphSolver/runner_tests_dgsolver --reporter compact 2>/dev/null
->>>>>>> 21acb29565e1cc21a29abf137f77f0f9cb81e954
 
 .PHONY: dialect-docs
 dialect-docs:
