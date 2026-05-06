@@ -55,6 +55,7 @@ codes only.
   from all shots.
   [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
   [(#2573)](https://github.com/PennyLaneAI/catalyst/pull/2573)
+  [(#2786)](https://github.com/PennyLaneAI/catalyst/pull/2786)
 
   With this new MLIR pass, one shot execution mode is now available when capture is enabled.
 
@@ -154,7 +155,9 @@ codes only.
   quantum-opt --resource-analysis -mlir-pass-statistics input.mlir
   ```
 
-* The `diagonalize-final-measurements` xDSL pass now accepts the optional keyword argument ``supported_base_obs``. The kwarg``to_eigvals`` is now also included in the call signature for compatibility with the tape transform, but this kwarg is unused and can only take its default value, `False`.
+* The `diagonalize-final-measurements` xDSL pass now accepts the optional keyword argument ``supported_base_obs``.
+  The kwarg ``to_eigvals`` is now also included in the call signature for compatibility with the tape
+  transform, but this kwarg is unused and can only take its default value `False`.
   [(#2517)](https://github.com/PennyLaneAI/catalyst/pull/2517)
 
   These pass options can be applied as follows in the example below:
@@ -274,7 +277,8 @@ codes only.
   - Optional `alt_decomps` to define additional rules for (user-defined) operators
   - Optional `fixed_decomps` to pin a specific decomposition rule for an operator
 
-  ``` python
+
+  ```python
   import pennylane as qp
   import pennylane.numpy as np
 
@@ -327,7 +331,8 @@ codes only.
       return qp.state()
   ```
 
-  ``` pycon
+
+  ```pycon
   >>> print(qp.specs(circuit, level="device")(1.23, 4.56).resources.gate_types)
   {'Rot': 2}
   ```
@@ -696,6 +701,14 @@ codes only.
 * Fixed a bug where `postselect_mode` was not propagated through higher-order ops and control flow
   when tracing with :func:`~.qjit`.
   [(#2787)](https://github.com/PennyLaneAI/catalyst/pull/2787)
+  
+* Fixed a bug where the `path_to_plugin` never be forwarded in :func:`~.passes.apply_pass_plugin`. The plugin path is now registered with the compiler during tracing.
+  [(#2790)](https://github.com/PennyLaneAI/catalyst/pull/2790)
+
+* Fixed a bug in the `split-multiple-tapes` pass where the post-split classical wrapper kept
+  the `quantum.node` attribute. Downstream, the `resource-analysis` pass then misidentified
+  the empty wrapper as an additional qnode, causing an empty column in `qp.specs` at MLIR levels.
+  [(#2793)](https://github.com/PennyLaneAI/catalyst/pull/2793)
 
 * Refactored all passes in `catalyst.passes.builtin_passes.py` to be `pennylane.transforms.core.Transform` objects
   rather than decorators. This allows them to be used as standard transforms, enabling full compatibility with

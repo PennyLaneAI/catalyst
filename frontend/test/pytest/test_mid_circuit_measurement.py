@@ -1299,16 +1299,41 @@ class TestDynamicOneShotMLIRPass:
         assert counts.shape == (2,)
         assert np.allclose(counts, [500, 500], atol=10)
 
-    def test_mlir_one_shot_pass_dynamic_shots(self, backend):
+    def test_mlir_one_shot_pass_dynamic_shots_sample(self, backend):
         """
         Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with
-        a dynamic number of shots.
+        a dynamic number of shots with sample terminal MP.
         """
 
         @qjit(capture=True, seed=12345)
         def workflow(shots):
             @qp.transform(pass_name="dynamic-one-shot")
-            @qp.qnode(qp.device(backend, wires=2), shots=shots)
+            @qp.set_shots(shots)
+            @qp.qnode(qp.device(backend, wires=2))
+            def circuit():
+                return qp.sample(), qp.sample(wires=[0])
+
+            return circuit()
+
+        res = workflow(37)
+        assert res[0].shape == (37, 2)
+        assert res[1].shape == (37, 1)
+
+        res = workflow(42)
+        assert res[0].shape == (42, 2)
+        assert res[1].shape == (42, 1)
+
+    def test_mlir_one_shot_pass_dynamic_shots_counts(self, backend):
+        """
+        Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with
+        a dynamic number of shots with counts terminal MP.
+        """
+
+        @qjit(capture=True, seed=12345)
+        def workflow(shots):
+            @qp.transform(pass_name="dynamic-one-shot")
+            @qp.set_shots(shots)
+            @qp.qnode(qp.device(backend, wires=2))
             def circuit():
                 qp.Hadamard(wires=0)
                 return qp.counts(all_outcomes=True)
