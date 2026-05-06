@@ -253,7 +253,7 @@ class Transversal1QGateConversion(RewritePattern):
 
     As implemented, this pattern does not use the `idx` attribute/operand of the logical gate
     op, which indicates the position of the logical qubit within the codeblock to act on. The
-    current implementation for specifying gates also doesn't allow for specifying differen patterns
+    current implementation for specifying gates also doesn't allow for specifying different patterns
     for different qubits within a codeblock. We assume `k=1` and therefore `idx=0`.
     """
 
@@ -304,7 +304,7 @@ class Transversal2QGateConversion(RewritePattern):
 
     As implemented, this pattern does not use the `idx` attribute/operand of the logical gate
     op, which indicates the position of the logical qubit within the codeblock to act on. The
-    current implementation for specifying gates also doesn't allow for specifying differen patterns
+    current implementation for specifying gates also doesn't allow for specifying different patterns
     for different qubits within a codeblock. We assume `k = 1` and therefore `idx = 0`.
     """
 
