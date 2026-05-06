@@ -84,3 +84,25 @@ module {
         func.return %tanner : !qecp.tanner_graph<8, 6, i32>
     }
 }
+
+// -----
+
+module {
+    //       CHECK: llvm.func @__catalyst__qecp__decode_physical_measurements(!llvm.ptr, !llvm.ptr)
+    // CHECK-LABEL: llvm.func @test_decode_physical_meas(
+    func.func @test_decode_physical_meas(%pmeas : memref<7xi1>) -> memref<1xi1> {
+        %lmeas = memref.alloc() : memref<1xi1>
+
+        // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64) : i64
+        // CHECK: [[lmeas_ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+        // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64) : i64
+        // CHECK: [[pmeas_ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+        // CHECK: llvm.store {{%.+}}, [[pmeas_ptr]] : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.ptr
+        // CHECK: llvm.store [[lmeas_val:%.+]], [[lmeas_ptr]] : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.ptr
+        // CHECK: llvm.call @__catalyst__qecp__decode_physical_measurements([[pmeas_ptr]], [[lmeas_ptr]]) : (!llvm.ptr, !llvm.ptr) -> ()
+        qecp.decode_physical_meas %pmeas in(%lmeas : memref<1xi1>) : memref<7xi1>
+
+        // CHECK: llvm.return [[lmeas_val]] : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+        func.return %lmeas : memref<1xi1>
+    }
+}

@@ -14,11 +14,15 @@
 
 #include <cstdint>
 
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Value.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "Catalyst/Utils/EnsureFunctionDeclaration.h"
+#include "Catalyst/Utils/StaticAllocas.h"
 #include "QecPhysical/IR/QecPhysicalOps.h"
 #include "QecPhysical/Transforms/Patterns.h"
 
@@ -58,6 +62,45 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
     }
 };
 
+struct DecodePhysicalMeasurementOpPattern
+    : public OpConversionPattern<DecodePhysicalMeasurementOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(DecodePhysicalMeasurementOp op,
+                                  DecodePhysicalMeasurementOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        MLIRContext *ctx = rewriter.getContext();
+        Location loc = op.getLoc();
+
+        StringRef qirName = "__catalyst__qecp__decode_physical_measurements";
+        Type ptrType = LLVM::LLVMPointerType::get(ctx);
+        Type qirSignature =
+            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {ptrType, ptrType},
+                                        /*isVarArg=*/false);
+
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
+
+        if (!op.isBufferized()) {
+            return op.emitOpError("op must be bufferized before lowering to LLVM");
+        }
+
+        auto mlirPhysMeasType = adaptor.getPhysicalMeasurements().getType();
+        Value physMeasStructPtr = catalyst::getStaticAlloca(loc, rewriter, mlirPhysMeasType, 1);
+        LLVM::StoreOp::create(rewriter, loc, adaptor.getPhysicalMeasurements(), physMeasStructPtr);
+
+        auto mlirLogiMeasType = adaptor.getLogicalMeasurementsIn().getType();
+        Value logiMeasStructPtr = catalyst::getStaticAlloca(loc, rewriter, mlirLogiMeasType, 1);
+        LLVM::StoreOp::create(rewriter, loc, adaptor.getLogicalMeasurementsIn(), logiMeasStructPtr);
+
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(
+            op, fnDecl, SmallVector<Value>{physMeasStructPtr, logiMeasStructPtr});
+
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -67,6 +110,7 @@ void populateQecPhysicalConversionPatterns(LLVMTypeConverter &typeConverter,
                                            RewritePatternSet &patterns)
 {
     patterns.add<AssembleTannerGraphOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<DecodePhysicalMeasurementOpPattern>(typeConverter, patterns.getContext());
 }
 
 } // namespace qecp
