@@ -52,6 +52,8 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
                                             0,
                                             {col_ptr_tanner.size()},
                                             {1}};
+    TannerGraph_CSC_int32 tanner_graph_csc = {&row_idx_tanner_memref, &col_ptr_tanner_memref};
+
     MemRefT_Err_Idx err_idx_memref = {
         buffer_err_idx_memref, buffer_err_idx_memref, 0, {err_idx.size()}, {1}};
 
@@ -70,8 +72,7 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
                                                     {syndrome_res.size()},
                                                     {1}};
 
-            __catalyst__qecp__lut_decoder(&row_idx_tanner_memref, &col_ptr_tanner_memref,
-                                          &syndrome_res_memref, &err_idx_memref);
+            __catalyst__qecp__lut_decoder(&tanner_graph_csc, &syndrome_res_memref, &err_idx_memref);
 
             REQUIRE(err_idx_memref.data_aligned[0] == expected_res);
         }
@@ -87,10 +88,9 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
                                                     0,
                                                     {bad_syndrome_res.size()},
                                                     {1}};
-        REQUIRE_THROWS_WITH(
-            __catalyst__qecp__lut_decoder(&row_idx_tanner_memref, &col_ptr_tanner_memref,
-                                          &bad_syndrome_res_memref, &err_idx_memref),
-            Catch::Matchers::ContainsSubstring("Bad syndrome result input."));
+        REQUIRE_THROWS_WITH(__catalyst__qecp__lut_decoder(
+                                &tanner_graph_csc, &bad_syndrome_res_memref, &err_idx_memref),
+                            Catch::Matchers::ContainsSubstring("Bad syndrome result input."));
     }
 
     SECTION("Error raised for bad err_idx input.")
@@ -106,9 +106,8 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
         MemRefT_Syndrome syndrome_res_memref = {
             buffer_syndrome_res_memref, buffer_syndrome_res_memref, 0, {syndrome_res.size()}, {1}};
 
-        REQUIRE_THROWS_WITH(
-            __catalyst__qecp__lut_decoder(&row_idx_tanner_memref, &col_ptr_tanner_memref,
-                                          &syndrome_res_memref, &bad_err_idx_memref),
-            Catch::Matchers::ContainsSubstring("Bad err_idx input."));
+        REQUIRE_THROWS_WITH(__catalyst__qecp__lut_decoder(&tanner_graph_csc, &syndrome_res_memref,
+                                                          &bad_err_idx_memref),
+                            Catch::Matchers::ContainsSubstring("Bad err_idx input."));
     }
 }

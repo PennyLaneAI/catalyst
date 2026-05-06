@@ -46,13 +46,11 @@ using namespace Catalyst::Runtime::QEC;
  * 1, 3]] Steane code. We expect those values are from args inputs later.
  * NOTE: The dtype of syndromes is `I1` in the MLIR layer. Following the conversion of
  * `SetBasisStateOp` to the LLVM runtime subroutine, `I1` would be converted to `int8` as well.
- * @param row_idx_tanner Pointer to the row_idx data of a Tanner graph.
- * @param col_ptr_tanner Pointer to the col_ptr data of a Tanner graph.
+ * @param tanner_graph_csc Pointer to the data of a Tanner graph struct.
  * @param syndrome_results Pointer to the syndrome measurement data.
  * @param err_idx Pointer to the error qubit indices data.
  */
-void __catalyst__qecp__lut_decoder(MemRefT_int32_1d *row_idx_tanner,
-                                   MemRefT_int32_1d *col_ptr_tanner,
+void __catalyst__qecp__lut_decoder(TannerGraph_CSC_int32 *tanner_graph_csc,
                                    MemRefT_int8_1d *current_syndromes, MemRefT_int64_1d *err_idx)
 {
     // TODOs: We should expect the following const value from args.
@@ -67,6 +65,9 @@ void __catalyst__qecp__lut_decoder(MemRefT_int32_1d *row_idx_tanner,
                                       current_syndromes->sizes, current_syndromes->strides);
     RT_FAIL_IF(syndromes_res.size() != (code_size - 1) / 2, "Bad syndrome result input.");
     RT_FAIL_IF(err_idx->sizes[0] != (code_distance - 1) / 2, "Bad err_idx input.");
+
+    auto row_idx_tanner = tanner_graph_csc->row_idx;
+    auto col_ptr_tanner = tanner_graph_csc->col_ptr;
 
     DataView<int32_t, 1> row_idx(row_idx_tanner->data_aligned, row_idx_tanner->offset,
                                  row_idx_tanner->sizes, row_idx_tanner->strides);
