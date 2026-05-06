@@ -187,10 +187,12 @@ struct NoiseModelPreservationPass
             bool depthOk = (circuitTimeNs < t1);
 
             if (!depthOk) {
-                fpOp->emitWarning()
-                    << "doqaoa-noise-preserve: circuit_time=" << llvm::format("%.0f", circuitTimeNs)
-                    << "ns exceeds T1=" << llvm::format("%.0f", t1)
-                    << "ns for max_cnots=" << maxCnots << "; decoherence error budget exceeded";
+                llvm::SmallString<256> msg;
+                llvm::raw_svector_ostream os(msg);
+                os << "doqaoa-noise-preserve: circuit_time=" << llvm::format("%.0f", circuitTimeNs)
+                   << "ns exceeds T1=" << llvm::format("%.0f", t1)
+                   << "ns for max_cnots=" << maxCnots << "; decoherence error budget exceeded";
+                fpOp->emitWarning() << msg;
             }
 
             // ── expected-max-cnots regression gate ───────────────────────
