@@ -17,6 +17,7 @@
 func.func @circuit(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) {
     %pi = arith.constant 3.14 : f64
     %out:3 = quantum.paulirot ["X", "Z", "Y"](%pi) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
-    // CHECK: GraphSolverFailedError: Decomposition rule not found for operator 'paulirot
+    // CHECK: GraphSolverFailedError
+    // CHECK: Decomposition rule not found for operator 'paulirot
     return
 }
