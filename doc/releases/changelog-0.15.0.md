@@ -2,7 +2,7 @@
 
 <h3>New features since last release</h3>
 
-* An experimental lookup table (LUT) decoder is added to the `runtime`. This initial implementation
+* An experimental lookup table (LUT) decoder has been added to the `runtime`. This initial implementation
 is optimized for the [[7,1,3]] Steane code using hardcoded Quantum Error Correction (QEC) data. While
 the architecture supports future extension to general LUT decoding via compiler-provided information,
 please note that LUT decoders scale exponentially with code size and are intended for small-scale QEC
@@ -119,7 +119,7 @@ codes only.
   ```
 
 * Support for ``PauliRot`` and ``PauliMeasure`` execution on the ``null.qubit`` device has been
-  added, which enables runtime resource tracking for those operations.
+  added, which enables mock execution and runtime resource tracking for those operations.
   [(#2627)](https://github.com/PennyLaneAI/catalyst/pull/2627)
 
 * For ``qjit``'d workflows, PennyLane's :func:`~.specs` function for inspecting circuit resources
@@ -199,7 +199,7 @@ codes only.
   [(#2765)](https://github.com/PennyLaneAI/catalyst/pull/2765)
 
   In PennyLane v0.41, we introduced a more performant, versatile, and modular decomposition
-  system that allows users to define multiple decomposition rules per operator and have PennyLane
+  system that allows you to define multiple decomposition rules per operator and have PennyLane
   determine the best overall set of decomposition rules to reach a given target gate set (see
   :func:`pennylane.decomposition.enable_graph` for more information). We have been working on
   integration with Catalyst so that users can leverage the power of ``qjit`` compilation with this
