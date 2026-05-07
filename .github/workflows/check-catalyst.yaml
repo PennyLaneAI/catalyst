@@ -410,6 +410,12 @@ jobs:
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-ci-build-${{ matrix.compiler }}
         fail-on-cache-miss: true
 
+    - name: Download Catalyst-Runtime Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: runtime-build-${{ matrix.compiler }}
+        path: runtime-build/lib
+
     - name: Restore CCache on feature branches
       id: restore-ccache
       if: ${{ github.ref != 'refs/heads/main' }}
