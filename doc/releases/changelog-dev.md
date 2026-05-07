@@ -4,6 +4,9 @@
 
 <h3>Improvements 🛠</h3>
 
+- Added support for decomposing PauliRot when using `decompose-lowering`
+  [(#2803)](https://github.com/PennyLaneAI/catalyst/pull/2803)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
