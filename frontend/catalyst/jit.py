@@ -529,6 +529,34 @@ def qjit(
 ## IMPL ##
 
 
+def _collect_runtime_artifacts(mlir_module, compile_options):
+    """Walk all nested modules and collect artifact paths into compile_options.
+
+    Looks for catalyst.runtime_artifacts ArrayAttr on all nested modules and aggregates them so 
+    that the linker receives the full set of artifacts.
+    """
+    from jax._src.lib.mlir import ir as mlir_ir  # pylint: disable=import-outside-toplevel
+    from catalyst.jax_primitives import (  # pylint: disable=import-outside-toplevel
+        _RUNTIME_ARTIFACTS_ATTR,
+    )
+
+    seen = set()
+
+    def _walk(op):
+        attrs = op.attributes
+        if _RUNTIME_ARTIFACTS_ATTR in attrs:
+            for string_attr in attrs[_RUNTIME_ARTIFACTS_ATTR]:
+                path = mlir_ir.StringAttr(string_attr).value
+                seen.add(path)
+        for region in op.regions:
+            for block in region:
+                for child_op in block:
+                    _walk(child_op)
+
+    _walk(mlir_module.operation)
+    compile_options.runtime_artifacts = tuple(seen)
+
+
 # pylint: disable=too-many-instance-attributes
 class QJIT(CatalystCallable):
     """Class representing a just-in-time compiled hybrid quantum-classical function.
@@ -858,6 +886,8 @@ class QJIT(CatalystCallable):
         mlir_module, ctx = lower_jaxpr_to_mlir(
             self.jaxpr, self.__name__, get_arg_names(self.jaxpr.in_avals, self.original_function)
         )
+
+        _collect_runtime_artifacts(mlir_module, self.compile_options)
 
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)

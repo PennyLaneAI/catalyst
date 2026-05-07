@@ -170,6 +170,7 @@ class CompileOptions:
     dialect_plugins: Optional[Set[Path]] = None
     capture: bool | Literal["global"] = "global"
     skip_preprocess: bool = False
+    runtime_artifacts: tuple = ()
 
     def __post_init__(self):
         # Convert keep_intermediate to Enum
