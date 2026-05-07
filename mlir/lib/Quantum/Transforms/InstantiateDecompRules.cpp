@@ -19,6 +19,8 @@
 #include "Quantum/IR/QuantumOps.h"
 #include "QuantumPythonCallbacks/PythonFunction.hpp"
 
+namespace QPC = QuantumPythonCallbacks;
+
 namespace catalyst {
 namespace quantum {
 
@@ -48,11 +50,11 @@ struct InstantiateDecompRulesPass
             }
             addedWords.insert(pauliWord);
 
-            PyWires wires(pauliRot.getInQubits().size());
+            QPC::PyWires wires(pauliRot.getInQubits().size());
             std::iota(wires.begin(), wires.end(), 0);
 
             mlir::OwningOpRef<mlir::func::FuncOp> outOp =
-                lowerPauliRotDecomp(module, 0.2, pauliWord, wires);
+                QPC::lowerPauliRotDecomp(module, 0.2, pauliWord, wires);
 
             if (!outOp) {
                 return signalPassFailure();

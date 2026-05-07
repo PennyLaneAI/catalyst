@@ -15,9 +15,9 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
-namespace catalyst {
-namespace driver {
+namespace QuantumPythonCallbacks {
 
 class PyInterpreterWrapper {
   public:
@@ -31,8 +31,23 @@ class PyInterpreterWrapper {
     struct Impl;
     std::unique_ptr<Impl> impl;
 
+    void extracted();
     void syncSitePackages();
 };
 
-} // namespace driver
-} // namespace catalyst
+class QPCError : public std::runtime_error {
+  public:
+    explicit QPCError(std::string message) : std::runtime_error(std::move(message)) {}
+};
+
+class TracingError : public QPCError {
+  public:
+    TracingError(std::string moduleName, std::string functionName, std::string args,
+                 std::string error)
+        : QPCError("An error occurred while tracing " + functionName + " from module " +
+                   moduleName + " with args " + args + ": " + error)
+    {
+    }
+};
+
+} // namespace QuantumPythonCallbacks

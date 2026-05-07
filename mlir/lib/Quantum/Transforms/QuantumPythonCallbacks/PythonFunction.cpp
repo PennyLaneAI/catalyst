@@ -14,33 +14,33 @@
 
 #include "PythonFunction.hpp"
 
-#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Parser/Parser.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h" // for automatic vector + variant conversion
 
-namespace py = pybind11;
-using namespace pybind11::literals;
+#include "PythonDriverUtils.hpp"
 
-namespace catalyst {
-namespace quantum {
+namespace py = pybind11;
+
+namespace QuantumPythonCallbacks {
 
 std::string tracePauliRotDecomp(double theta, std::string pauliWord, PyWires wires)
 {
     py::gil_scoped_acquire acquire;
+    const char *moduleName = "catalyst.python_callbacks";
+    const char *functionName = "paulirot_callback_wrapper";
 
     try {
-        py::module_ wrapperModule = py::module_::import("catalyst.python_callbacks");
-        py::object wrapperFunction = wrapperModule.attr("paulirot_callback_wrapper");
 
+        py::module_ wrapperModule = py::module_::import(moduleName);
+        py::object wrapperFunction = wrapperModule.attr(functionName);
         py::object pythonResult = wrapperFunction(theta, pauliWord, wires);
         return pythonResult.cast<std::string>();
     }
     catch (const py::error_already_set &error) {
-        llvm::errs() << "Python error occurred: " << error.what() << "\n";
-        return "";
+        throw TracingError(moduleName, functionName, pauliWord, error.what());
     }
 }
 
@@ -55,7 +55,6 @@ mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotDecomp(mlir::ModuleOp module,
     auto moduleOp = mlir::parseSourceString(resultRef, config);
 
     if (!moduleOp) {
-        llvm::errs() << "failed to parse python output, returning null\n";
         return nullptr;
     }
 
@@ -73,5 +72,4 @@ mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotDecomp(mlir::ModuleOp module,
     return funcOp;
 }
 
-} // namespace quantum
-} // namespace catalyst
+} // namespace QuantumPythonCallbacks

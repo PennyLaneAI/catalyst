@@ -21,12 +21,10 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OwningOpRef.h"
 
-namespace catalyst {
-namespace quantum {
+namespace QuantumPythonCallbacks {
 
 using PyWires = std::vector<int>;
 
 mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotDecomp(mlir::ModuleOp module, double theta,
                                                           std::string pauliWord, PyWires wires);
-} // namespace quantum
-} // namespace catalyst
+} // namespace QuantumPythonCallbacks

@@ -14,7 +14,6 @@
 
 #include "PythonDriverUtils.hpp"
 
-#include "llvm/Support/raw_ostream.h"
 #include "pybind11/embed.h"
 
 constexpr const char *sitePackagesScript = R"(
@@ -33,8 +32,7 @@ if venv_path:
 
 namespace py = pybind11;
 
-namespace catalyst {
-namespace driver {
+namespace QuantumPythonCallbacks {
 
 struct PyInterpreterWrapper::Impl {
     py::scoped_interpreter interpreter;
@@ -53,11 +51,9 @@ void PyInterpreterWrapper::syncSitePackages()
 
     try {
         py::exec(sitePackagesScript);
-        llvm::errs() << "Successfully linked virtual environment packages\n";
     }
     catch (const py::error_already_set &e) {
-        llvm::errs() << "Failed to link virtual environment: " << e.what() << "\n";
+        return;
     }
 }
-} // namespace driver
-} // namespace catalyst
+} // namespace QuantumPythonCallbacks

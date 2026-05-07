@@ -24,16 +24,19 @@ func.func @test_paulirot(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit
     // CHECK-DAG: [[m_pi_by_2:%.+]] = {{.*}} -1.57
 
     // CHECK: [[reg:%.+]] = quantum.alloc( 3)
+    
     // CHECK: [[h_in_index:%.+]] = tensor.extract [[q0_tensor:%.+]]
     // CHECK: [[h_in:%.+]] = quantum.extract [[reg]][[[h_in_index]]]
     // CHECK: [[h_out:%.+]] = quantum.custom "Hadamard"() [[h_in]]
     // CHECK: [[h_out_index:%.+]] = tensor.extract [[q0_tensor]]
     // CHECK: [[reg2:%.+]] = quantum.insert [[reg]][[[h_out_index]]], [[h_out]]
+    
     // CHECK: [[rx_in_index:%.+]] = tensor.extract [[q2_tensor]]
     // CHECK: [[rx_in:%.+]] = quantum.extract [[reg2]][[[rx_in_index]]]
     // CHECK: [[rx_out:%.+]] = quantum.custom "RX"([[pi_by_2]]) [[rx_in]]
     // CHECK: [[rx_out_index:%.+]] = tensor.extract [[q2_tensor]]
     // CHECK: [[reg3:%.+]] = quantum.insert [[reg2]][[[rx_out_index]]], [[h_out]]
+    
     // CHECK-DAG: [[mrz_q0_index:%.+]] = tensor.extract [[q0_tensor]]
     // CHECK-DAG: [[mrz_q0:%.+]] = quantum.extract [[reg3]][[[mrz_q0_index]]]
     // CHECK-DAG: [[mrz_q1_index:%.+]] = tensor.extract [[q1_tensor]]
@@ -48,11 +51,13 @@ func.func @test_paulirot(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit
     // CHECK-DAG: [[reg5:%.+]] = quantum.insert [[reg4]][[[mrz_out_q1_index]]], [[mrz_out]]#1
     // CHECK-DAG: [[mrz_out_q2_index:%.+]] = tensor.extract [[q2_tensor]]
     // CHECK-DAG: [[reg6:%.+]] = quantum.insert [[reg5]][[[mrz_out_q2_index]]], [[mrz_out]]#2
+    
     // CHECK: [[h2_in_index:%.+]] = tensor.extract [[q0_tensor]]
     // CHECK: [[h2_in:%.+]] = quantum.extract [[reg6]][[[h2_in_index]]]
     // CHECK: [[h2_out:%.+]] = quantum.custom "Hadamard"() [[h2_in]]
     // CHECK: [[h2_out_index:%.+]] = tensor.extract [[q0_tensor]]
     // CHECK: [[reg7:%.+]] = quantum.insert [[reg6]][[[h2_out_index]]], [[h2_out]]
+    
     // CHECK: [[rx2_in_index:%.+]] = tensor.extract [[q2_tensor]]
     // CHECK: [[rx2_in:%.+]] = quantum.extract [[reg7]][[[rx2_in_index]]]
     // CHECK: [[rx2_out:%.+]] = quantum.custom "RX"([[m_pi_by_2]]) [[rx2_in]]
