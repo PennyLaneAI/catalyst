@@ -20,17 +20,21 @@
 // RUN:   --doqaoa-depth-check \
 // RUN:   --split-input-file 2>/dev/null | FileCheck %s --check-prefix=DEPTH
 
-// BOUND prefix: expected-max-cnots=4 (passes for 4-cycle m=1).
+// BOUND prefix: expected-max-cnots=10 (passes all sections, including K4 with 6 CNOTs).
 // RUN: quantum-opt %s \
-// RUN:   '--doqaoa-depth-check=expected-max-cnots=4' \
+// RUN:   '--doqaoa-depth-check=expected-max-cnots=10' \
 // RUN:   --split-input-file 2>/dev/null | FileCheck %s --check-prefix=BOUND
 
-// FAIL prefix: expected-max-cnots=2 (fails for K4 m=1 which has 6 free-free CNOTs).
-// RUN: quantum-opt %s \
+// FAIL prefix: expected-max-cnots=2 (fails for any section with cnots>2).
+//   quantum-opt exits non-zero; use `not` to invert so pipefail does not abort FileCheck.
+//   The failed section's IR is not printed; check error message without LABEL anchor.
+// RUN: not quantum-opt %s \
 // RUN:   '--doqaoa-depth-check=expected-max-cnots=2' \
 // RUN:   --split-input-file 2>&1 | FileCheck %s --check-prefix=FAIL
 
 // REMARK prefix: check remark message content.
+//   Remarks go to stderr; with 2>&1 they appear before the MLIR stdout in the pipe.
+//   Use bare REMARK: (no LABEL) to find the remark anywhere in the merged output.
 // RUN: quantum-opt %s \
 // RUN:   '--doqaoa-depth-check=expected-max-cnots=100' \
 // RUN:   --split-input-file 2>&1 | FileCheck %s --check-prefix=REMARK
@@ -53,8 +57,7 @@
 // BOUND:       quantum.freeze_partition
 // BOUND-SAME:  depth_regression_ok = 1 : i32
 
-// REMARK-LABEL: func @cycle_depth
-// REMARK:  remark: doqaoa-depth-check: max_cnots=4 free_edges=2
+// REMARK: remark: doqaoa-depth-check: max_cnots=4 free_edges=2
 
 func.func @cycle_depth() {
     %p = quantum.freeze_partition {
@@ -83,8 +86,11 @@ func.func @cycle_depth() {
 // DEPTH-SAME:  depth_max_cnots = 6 : i32
 // DEPTH-SAME:  depth_regression_ok = 1 : i32
 
-// FAIL-LABEL: func @k4_depth
-// FAIL:  error: doqaoa-depth-check: max_cnots={{.*}} exceeds expected-max-cnots=2
+// BOUND-LABEL: func @k4_depth
+// BOUND:       quantum.freeze_partition
+// BOUND-SAME:  depth_regression_ok = 1 : i32
+
+// FAIL: error: doqaoa-depth-check: max_cnots={{.*}} exceeds expected-max-cnots=2
 
 func.func @k4_depth() {
     %p = quantum.freeze_partition {

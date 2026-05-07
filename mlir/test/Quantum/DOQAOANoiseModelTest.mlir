@@ -53,7 +53,7 @@
 
 // CUSTOM-LABEL: func @cycle_noise
 // CUSTOM:       quantum.freeze_partition
-// CUSTOM-SAME:  noise_cx_fidelity = 9.990000e-01 : f64
+// CUSTOM-SAME:  noise_cx_fidelity = 0.99899999999999999 : f64
 // CUSTOM-SAME:  noise_cx_time_ns = 4.000000e+02 : f64
 // CUSTOM-SAME:  noise_depth_ok = 1 : i32
 // CUSTOM-SAME:  noise_t1_ns = 2.000000e+05 : f64
