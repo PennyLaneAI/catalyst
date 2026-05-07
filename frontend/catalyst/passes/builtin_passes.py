@@ -268,7 +268,12 @@ diagonalize_measurements = qp.transform(
 
 
 def disentangle_cnot_setup_inputs():
-    r"""A peephole optimization for replacing ``CNOT`` gates with single-qubit gates.
+    r"""A relaxed peephole optimization for replacing ``CNOT`` gates with single-qubit gates.
+
+    The optimizations that this pass performs are found in
+    `arXiv:2012.07711 <https://arxiv.org/pdf/2012.07711>`, specifically TABLE I. The patterns
+    therein represent functional equivalencies to applying a ``CNOT`` gate on certain two-qubit
+    input states.
 
     .. note::
 
@@ -327,8 +332,12 @@ disentangle_cnot = qp.transform(
 
 
 def disentangle_swap_setup_inputs():
-    r"""A peephole optimization for replacing ``SWAP`` gates with simpler gates (``PauliX`` and
-    ``CNOT``).
+    r"""A relaxed peephole optimization for replacing ``SWAP`` gates with single-qubit gates.
+
+    The optimizations that this pass performs are found in
+    `arXiv:2012.07711 <https://arxiv.org/pdf/2012.07711>`, specifically TABLE VI. The patterns
+    therein represent functional equivalencies to applying a ``SWAP`` gate on certain two-qubit
+    input states.
 
     .. note::
 
