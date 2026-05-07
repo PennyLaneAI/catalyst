@@ -86,15 +86,6 @@ module {
     }
 }
 
-
-// -----
-
-module {
-    func.func @test_tanner(%tanner : !qecp.tanner_graph<8, 6, i32>) {
-        func.return
-    }
-}
-
 // -----
 
 module {
@@ -124,4 +115,26 @@ module {
         func.return
     }
 
+}
+
+// -----
+
+module {
+    // CHECK: llvm.func @__catalyst__qecp__lut_decoder(!llvm.ptr, !llvm.ptr, !llvm.ptr)
+    // CHECK: llvm.mlir.global private constant @__constant_3xi1(dense<[false, true, false]> : tensor<3xi1>)
+    // CHECK: llvm.mlir.global private constant @__constant_11xi32
+    // CHECK: llvm.mlir.global private constant @__constant_24xi32
+    // CHECK-LABEL: llvm.func @test_tanner_decode_integration()
+    func.func @test_tanner_decode_integration() {
+        %row_idx = arith.constant dense<[7, 7, 8, 7, 8, 9, 7, 9, 8, 8, 9, 9, 0, 1, 2, 3, 1, 2, 4, 5, 2, 3, 5, 6]> : tensor<24xi32>
+        %col_ptr = arith.constant dense<[0, 1, 3, 6, 8, 9, 11, 12, 16, 20, 24]> : tensor<11xi32>
+        // CHECK: [[tanner:%.+]] = llvm.mlir.undef : !llvm.struct<"TannerGraph"
+        %tanner = qecp.assemble_tanner %row_idx, %col_ptr : tensor<24xi32>, tensor<11xi32> -> !qecp.tanner_graph<24, 11, i32>
+        %esm = arith.constant dense<[0, 1, 0]> : tensor<3xi1>
+        // CHECK: llvm.store {{.+}}, {{.+}} : !llvm.struct<"TannerGraph"
+        // CHECK-NEXT: llvm.call @__catalyst__qecp__lut_decoder({{.+}}, {{.+}}, {{.+}}) : (!llvm.ptr, !llvm.ptr, !llvm.ptr) -> ()
+        %err_idx = qecp.decode_esm_css(%tanner : !qecp.tanner_graph<24, 11, i32>) %esm : tensor<3xi1> -> tensor<2xindex>
+
+        func.return
+    }
 }
