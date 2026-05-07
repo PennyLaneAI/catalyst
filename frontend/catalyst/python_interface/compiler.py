@@ -70,12 +70,15 @@ class Compiler:
         # JAX serialises void func.func ops with `res_attrs = []` in generic form
         # triggering an assertion in FuncToLLVM lowering.
         # Remove empty arrays in-place so the generic printer omits them.
+        from xdsl.dialects.func import FuncOp
+
         for op in xmod.walk():
+            if not isinstance(op, FuncOp):
+                continue
             for key in ("res_attrs", "arg_attrs"):
                 val = op.properties.get(key)
                 if isinstance(val, ArrayAttr) and len(val) == 0:
                     del op.properties[key]
-
         buffer = io.StringIO()
         Printer(stream=buffer, print_generic_format=True).print_op(xmod)
 
