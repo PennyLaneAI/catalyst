@@ -34,7 +34,7 @@
 
 // REMARK prefix: check remark message content.
 //   Remarks go to stderr; with 2>&1 they appear before the MLIR stdout in the pipe.
-//   Use bare REMARK: (no LABEL) to find the remark anywhere in the merged output.
+//   No label — bare check finds the remark text anywhere in the merged output.
 // RUN: quantum-opt %s \
 // RUN:   '--doqaoa-depth-check=expected-max-cnots=100' \
 // RUN:   --split-input-file 2>&1 | FileCheck %s --check-prefix=REMARK

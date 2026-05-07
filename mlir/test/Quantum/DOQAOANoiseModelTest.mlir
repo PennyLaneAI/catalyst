@@ -25,12 +25,16 @@
 // RUN:   --split-input-file 2>/dev/null | FileCheck %s --check-prefix=CUSTOM
 
 // BUDGET prefix: tight T1 budget (forces decoherence warning for large circuits).
+//   Warning goes to stderr; with 2>&1 it appears before MLIR stdout in the pipe.
+//   No label — bare check finds the warning text anywhere in the merged output.
 // RUN: quantum-opt %s \
 // RUN:   '--doqaoa-noise-preserve=noise-t1-ns=1000 noise-cx-time-ns=533' \
 // RUN:   --split-input-file 2>&1 | FileCheck %s --check-prefix=BUDGET
 
 // REGFAIL prefix: expected-max-cnots regression gate fires.
-// RUN: quantum-opt %s \
+//   quantum-opt exits non-zero; use `not` to invert so pipefail does not abort FileCheck.
+//   Failed section IR is not printed; bare check finds error anywhere in merged output.
+// RUN: not quantum-opt %s \
 // RUN:   '--doqaoa-noise-preserve=expected-max-cnots=2' \
 // RUN:   --split-input-file 2>&1 | FileCheck %s --check-prefix=REGFAIL
 
@@ -59,8 +63,7 @@
 // CUSTOM-SAME:  noise_t1_ns = 2.000000e+05 : f64
 // CUSTOM-SAME:  noise_t2_ns = 3.000000e+05 : f64
 
-// BUDGET-LABEL: func @cycle_noise
-// BUDGET:  warning: doqaoa-noise-preserve: circuit_time=
+// BUDGET: warning: doqaoa-noise-preserve: circuit_time=
 
 func.func @cycle_noise() {
     %p = quantum.freeze_partition {
@@ -90,7 +93,6 @@ func.func @cycle_noise() {
 // NOISE-SAME:  noise_depth_ok = 1 : i32
 // NOISE-SAME:  noise_max_cnots = 6 : i32
 
-// REGFAIL-LABEL: func @k4_noise
 // REGFAIL: error: doqaoa-noise-preserve: max_cnots={{.*}} exceeds expected-max-cnots=2
 
 func.func @k4_noise() {
