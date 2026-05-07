@@ -236,7 +236,6 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y cmake ninja-build clang lld
-    
     - name: Build Stablehlo Dialect
       if: steps.cache-stablehlo.outputs.cache-hit != 'true'
       run: |
@@ -324,7 +323,7 @@ jobs:
 
   quantum:
     name: Quantum Dialects Build
-    needs: [constants, llvm, stablehlo, enzyme, determine_runner, runtime]
+    needs: [constants, llvm, stablehlo, enzyme, determine_runner]
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       matrix:
@@ -342,22 +341,9 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld libasan6 make
+        sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install numpy nanobind pybind11
-        python3 -m pip install -r requirements.txt
-        # cuda-quantum is added manually here.
-        # It can't be in requirements.txt as that will break
-        # macOS requirements.txt
-        python3 -m pip install cuda-quantum==0.6.0
-        python3 -m pip install oqc-qcaas-client
-        # Install graphviz for testing the mlir-op-graph integration
-        sudo apt-get install -y graphviz
-
-    - name: Verify Graphviz installation
-      run: |
-        dot -V
-        dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -410,12 +396,6 @@ jobs:
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-ci-build-${{ matrix.compiler }}
         fail-on-cache-miss: true
 
-    - name: Download Catalyst-Runtime Artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: runtime-build-${{ matrix.compiler }}
-        path: runtime-build/lib
-
     - name: Restore CCache on feature branches
       id: restore-ccache
       if: ${{ github.ref != 'refs/heads/main' }}
@@ -424,21 +404,6 @@ jobs:
         path: .ccache
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-
-
-    - name: Add Frontend Dependencies to PATH
-      run: |
-        echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
-        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
-        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "OQC_LIB_DIR=$(pwd)/oqc-build" >> $GITHUB_ENV
-        echo "OQD_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-        echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
-        echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
-
-    - name: Build Frontend
-      run: |
-        make frontend
 
     - name: Build MLIR Dialects
       run: |
@@ -450,10 +415,6 @@ jobs:
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         make dialects
-
-    - name: Build Precompiled Rules
-      run: |
-        make builtin-decomp-rules
 
     - name: Build MLIR Dialect Docs
       run: |
@@ -538,6 +499,38 @@ jobs:
       with:
         name: oqc-build-${{ matrix.compiler }}
         path: oqc-build
+
+    - name: Add Frontend Dependencies to PATH
+      run: |
+        echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
+        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        echo "OQC_LIB_DIR=$(pwd)/oqc-build" >> $GITHUB_ENV
+        echo "OQD_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+        echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+        echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
+        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
+
+    - name: Install Deps
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasan6 make
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install -r requirements.txt
+        # cuda-quantum is added manually here.
+        # It can't be in requirements.txt as that will break
+        # macOS requirements.txt
+        python3 -m pip install cuda-quantum==0.6.0
+        python3 -m pip install oqc-qcaas-client
+        # Install graphviz for testing the mlir-op-graph integration
+        sudo apt-get install -y graphviz
+        make frontend
+
+    - name: Verify Graphviz installation
+      run: |
+        dot -V
+        dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
 
     - name: Run Python Pytest/Lit Tests
       run: |
