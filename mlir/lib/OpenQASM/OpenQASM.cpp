@@ -1,9 +1,9 @@
+#include "OpenQASM/OpenQASM.h"
+
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
-#include "llvm/ADT/TypeSwitch.h"
-
-#include "OpenQASM/OpenQASM.h"
 
 using namespace mlir;
 using namespace catalyst::openqasm;

@@ -1,8 +1,9 @@
 
-#include "Quantum/IR/QuantumDialect.h"
 #include "mlir/InitAllTranslations.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Tools/mlir-translate/MlirTranslateMain.h"
+
+#include "Quantum/IR/QuantumDialect.h"
 
 namespace mlir {
 void registerToQASM3Translation();

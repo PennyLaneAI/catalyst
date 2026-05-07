@@ -1,7 +1,6 @@
 #define DEBUG_TYPE "myhelloworld"
 
 #include "llvm/Support/Debug.h"
-
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
