@@ -4,6 +4,7 @@ execute_process(
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
+set(Python3_USE_STATIC_LIBS ON)
 find_package(pybind11 REQUIRED)
 find_package(Python3 COMPONENTS Development REQUIRED)
 
