@@ -144,15 +144,15 @@ module {
 module{
     // CHECK: llvm.func @__catalyst__qecp__lut_decoder(!llvm.ptr, !llvm.ptr, !llvm.ptr)
     // CHECK-LABEL: llvm.func @get_tanner_graph() -> !llvm.struct<"TannerGraph"
-    func.func private@get_tanner_graph()->!qecp.tanner_graph<24, 11, i32>{
+    func.func private @get_tanner_graph()->!qecp.tanner_graph<24, 11, i32>{
         %row_idx = arith.constant dense<[7, 7, 8, 7, 8, 9, 7, 9, 8, 8, 9, 9, 0, 1, 2, 3, 1, 2, 4, 5, 2, 3, 5, 6]> : tensor<24xi32>
         %col_ptr = arith.constant dense<[0, 1, 3, 6, 8, 9, 11, 12, 16, 20, 24]> : tensor<11xi32>
 
         %tanner = qecp.assemble_tanner %row_idx, %col_ptr : tensor<24xi32>, tensor<11xi32> -> !qecp.tanner_graph<24, 11, i32>
         func.return %tanner : !qecp.tanner_graph<24, 11, i32>
     }
-    // CHECK-LABEL: llvm.func @test_cf_tanner_decode_integration() {
-    func.func @test_cf_tanner_decode_integration(){
+    // CHECK-LABEL: llvm.func @test_outline_tanner_decode_integration() {
+    func.func @test_outline_tanner_decode_integration(){
         // CHECK: [[tanner_value: %.+]] = llvm.call @get_tanner_graph() : () -> !llvm.struct<"TannerGraph"
         // CHECK: [[tanner_ptr: %.+]] = llvm.alloca {{.+}} x !llvm.struct<"TannerGraph"
         %tanner = func.call @get_tanner_graph():() -> !qecp.tanner_graph<24, 11, i32>
@@ -161,6 +161,38 @@ module{
         // CHECK: llvm.call @__catalyst__qecp__lut_decoder([[tanner_ptr:%.+]], {{.+}}, {{.+}}) : (!llvm.ptr, !llvm.ptr, !llvm.ptr) -> ()
         %err_idx = qecp.decode_esm_css(%tanner : !qecp.tanner_graph<24, 11, i32>) %esm : tensor<3xi1> -> tensor<2xindex>
 
+        func.return
+    }
+}
+
+// -----
+
+module{
+    // CHECK: llvm.func @__catalyst__qecp__lut_decoder(!llvm.ptr, !llvm.ptr, !llvm.ptr)
+    // CHECK-LABEL: llvm.func @get_tanner_graph() -> !llvm.struct<"TannerGraph"
+    func.func private @get_tanner_graph()->!qecp.tanner_graph<24, 11, i32>{
+        %row_idx = arith.constant dense<[7, 7, 8, 7, 8, 9, 7, 9, 8, 8, 9, 9, 0, 1, 2, 3, 1, 2, 4, 5, 2, 3, 5, 6]> : tensor<24xi32>
+        %col_ptr = arith.constant dense<[0, 1, 3, 6, 8, 9, 11, 12, 16, 20, 24]> : tensor<11xi32>
+
+        %tanner = qecp.assemble_tanner %row_idx, %col_ptr : tensor<24xi32>, tensor<11xi32> -> !qecp.tanner_graph<24, 11, i32>
+        func.return %tanner : !qecp.tanner_graph<24, 11, i32>
+    }
+    // CHECK-LABEL: llvm.func @test_decode_with_tanner_from_arg(%arg0: !llvm.struct<"TannerGraph",
+    func.func private @test_decode_with_tanner_from_arg(%tanner:!qecp.tanner_graph<24, 11, i32>){
+        %esm = arith.constant dense<[0, 1, 0]> : tensor<3xi1>
+        // CHECK: lvm.store [[tanner_value:%.+]], [[tanner_ptr:%.+]] : !llvm.struct<"TannerGraph"
+        // CHECK: llvm.call @__catalyst__qecp__lut_decoder([[tanner_ptr:%.+]], {{.+}}, {{.+}}) : (!llvm.ptr, !llvm.ptr, !llvm.ptr) -> ()
+        %err_idx = qecp.decode_esm_css(%tanner : !qecp.tanner_graph<24, 11, i32>) %esm : tensor<3xi1> -> tensor<2xindex>
+
+        func.return
+    }
+
+    // CHECK-LABEL: llvm.func @test_psudo_qec() {
+    func.func @test_psudo_qec(){
+        // CHECK: [[tanner:%.+]] = llvm.call @get_tanner_graph() : () -> !llvm.struct<"TannerGraph",
+        %tanner = func.call @get_tanner_graph():() -> !qecp.tanner_graph<24, 11, i32>
+        // CHECK-NEXT: llvm.call @test_decode_with_tanner_from_arg([[tanner:%.+]]) : (!llvm.struct<"TannerGraph"
+        func.call @test_decode_with_tanner_from_arg(%tanner):(!qecp.tanner_graph<24, 11, i32>)->()
         func.return
     }
 }
