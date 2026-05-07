@@ -34,7 +34,7 @@ namespace py = pybind11;
 
 namespace QuantumPythonCallbacks {
 
-struct PyInterpreterWrapper::Impl {
+struct __attribute__((visibility("hidden"))) PyInterpreterWrapper::Impl {
     py::scoped_interpreter interpreter;
 };
 
