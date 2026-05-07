@@ -919,7 +919,7 @@ class TestDefaultAvailableIR:
         mlir_opt = f.mlir_opt
         assert mlir_opt
         assert not "__catalyst__qis__Hadamard" in mlir_opt
-        
+
     def test_mlir_opt_with_keep_intermediate(self, backend):
         """Test that keep_intermediate with target='mlir' writes the initial IR and
         pipeline output files into the workspace when mlir_opt is accessed."""
