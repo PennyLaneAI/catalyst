@@ -449,7 +449,6 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None
         setattr(func, "num_wires", num_wires)
         setattr(func, "pauli_word", pauli_word)
 
-
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         # TODO change this name to op_type
