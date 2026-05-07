@@ -5,7 +5,7 @@ execute_process(
 )
 
 find_package(pybind11 REQUIRED)
-
+find_package(Python3 COMPONENTS Development REQUIRED)
 
 add_mlir_library(QuantumPythonCallbacks STATIC
     PythonFunction.cpp
@@ -13,8 +13,9 @@ add_mlir_library(QuantumPythonCallbacks STATIC
 )
 
 target_link_libraries(QuantumPythonCallbacks
-    PUBLIC
+    PRIVATE
     pybind11::embed
+    Python3::Python
 )
 
 target_include_directories(QuantumPythonCallbacks PUBLIC
