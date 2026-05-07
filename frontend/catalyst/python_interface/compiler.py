@@ -21,7 +21,7 @@ from jaxlib.mlir.ir import Context as jaxContext
 from jaxlib.mlir.ir import Module as jaxModule
 from pennylane.typing import Callable
 from xdsl.context import Context as xContext
-from xdsl.dialects.builtin import ModuleOp
+from xdsl.dialects.builtin import ArrayAttr, ModuleOp
 from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
 
@@ -67,12 +67,17 @@ class Compiler:
         pipeline = PassPipeline((ApplyTransformSequencePass(callback=callback),))
         pipeline.apply(ctx, xmod)
 
-        # Convert back to string. Use assembly form for the string-input path
-        #  because generic form would emit attributes such as
-        # `res_attrs = []` on void func.func ops, which triggers a downstream
-        # assertion in MLIR's func-to-LLVM lowering.
+        # JAX serialises void func.func ops with `res_attrs = []` in generic form
+        # triggering an assertion in FuncToLLVM lowering.
+        # Remove empty arrays in-place so the generic printer omits them.
+        for op in xmod.walk():
+            for key in ("res_attrs", "arg_attrs"):
+                val = op.properties.get(key)
+                if isinstance(val, ArrayAttr) and len(val) == 0:
+                    del op.properties[key]
+
         buffer = io.StringIO()
-        Printer(stream=buffer, print_generic_format=is_jax_module).print_op(xmod)
+        Printer(stream=buffer, print_generic_format=True).print_op(xmod)
 
         # Convert back to jaxModule if input was jaxModule
         if is_jax_module:
