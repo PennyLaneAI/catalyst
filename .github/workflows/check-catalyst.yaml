@@ -405,6 +405,38 @@ jobs:
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-
 
+    - name: Add Frontend Dependencies to PATH
+      run: |
+        echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
+        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        echo "OQC_LIB_DIR=$(pwd)/oqc-build" >> $GITHUB_ENV
+        echo "OQD_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+        echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+        echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
+        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
+
+    - name: Install Deps
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasan6 make
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install -r requirements.txt
+        # cuda-quantum is added manually here.
+        # It can't be in requirements.txt as that will break
+        # macOS requirements.txt
+        python3 -m pip install cuda-quantum==0.6.0
+        python3 -m pip install oqc-qcaas-client
+        # Install graphviz for testing the mlir-op-graph integration
+        sudo apt-get install -y graphviz
+        make frontend
+
+    - name: Verify Graphviz installation
+      run: |
+        dot -V
+        dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
+
     - name: Build MLIR Dialects
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
@@ -499,38 +531,6 @@ jobs:
       with:
         name: oqc-build-${{ matrix.compiler }}
         path: oqc-build
-
-    - name: Add Frontend Dependencies to PATH
-      run: |
-        echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
-        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
-        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "OQC_LIB_DIR=$(pwd)/oqc-build" >> $GITHUB_ENV
-        echo "OQD_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-        echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
-        echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
-        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
-
-    - name: Install Deps
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libasan6 make
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install -r requirements.txt
-        # cuda-quantum is added manually here.
-        # It can't be in requirements.txt as that will break
-        # macOS requirements.txt
-        python3 -m pip install cuda-quantum==0.6.0
-        python3 -m pip install oqc-qcaas-client
-        # Install graphviz for testing the mlir-op-graph integration
-        sudo apt-get install -y graphviz
-        make frontend
-
-    - name: Verify Graphviz installation
-      run: |
-        dot -V
-        dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
 
     - name: Run Python Pytest/Lit Tests
       run: |
