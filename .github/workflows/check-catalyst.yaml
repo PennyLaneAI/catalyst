@@ -415,7 +415,6 @@ jobs:
         echo "OQD_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
-        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
 
     - name: Install Deps
       run: |
@@ -447,6 +446,10 @@ jobs:
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         make dialects
+
+    - name: Build Precompiled Rules
+      run: |
+        make builtin-decomp-rules
 
     - name: Build MLIR Dialect Docs
       run: |
