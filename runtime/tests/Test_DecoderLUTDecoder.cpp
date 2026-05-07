@@ -22,6 +22,8 @@
 #include "TestUtils.hpp"
 #include "Types.h"
 
+#include <catch2/generators/catch_generators.hpp>
+
 using TANNER_GRAPH_INT = int32_t;
 using ERR_IDX_INT = int64_t;
 using SYNDROME_INT = int8_t;
@@ -111,4 +113,32 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
                                           &syndrome_res_memref, &bad_err_idx_memref),
             Catch::Matchers::ContainsSubstring("Bad err_idx input."));
     }
+}
+
+TEST_CASE("Test the C-API runtime function for physical-measurement decoding",
+          "[LUTDecoder][decode_physical_measurements]")
+{
+    // Parameterize test over all combinations of {0, 1} on physical qubits 4, 5 & 6
+    auto [physical_meas, expected_logical] = GENERATE(table<std::vector<int8_t>, int8_t>({
+        {{0, 0, 0, 0, 0, 0, 0}, 0},
+        {{0, 0, 0, 0, 0, 0, 1}, 1},
+        {{0, 0, 0, 0, 0, 1, 0}, 1},
+        {{0, 0, 0, 0, 1, 0, 0}, 1},
+        {{0, 0, 0, 0, 0, 1, 1}, 0},
+        {{0, 0, 0, 0, 1, 0, 1}, 0},
+        {{0, 0, 0, 0, 1, 1, 0}, 0},
+        {{0, 0, 0, 0, 1, 1, 1}, 1},
+    }));
+
+    MemRefT_int8_1d physical_meas_memref = {
+        physical_meas.data(), physical_meas.data(), 0, {physical_meas.size()}, {1}};
+
+    std::vector<int8_t> logical_meas(1);
+    MemRefT_int8_1d logical_meas_memref = {
+        logical_meas.data(), logical_meas.data(), 0, {logical_meas.size()}, {1}};
+
+    __catalyst__qecp__decode_physical_measurements(&physical_meas_memref, &logical_meas_memref);
+
+    CAPTURE(physical_meas); // Helper to print the input if the check fails
+    CHECK(logical_meas[0] == expected_logical);
 }

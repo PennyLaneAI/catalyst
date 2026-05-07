@@ -23,6 +23,10 @@ extern "C" {
 void __catalyst__qecp__lut_decoder(MemRefT_int32_1d *row_idx_tanner,
                                    MemRefT_int32_1d *col_ptr_tanner, MemRefT_int8_1d *syndrome_res,
                                    MemRefT_int64_1d *err_idx);
+
+void __catalyst__qecp__decode_physical_measurements(MemRefT_int8_1d *physical_meas,
+                                                    MemRefT_int8_1d *logical_meas);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

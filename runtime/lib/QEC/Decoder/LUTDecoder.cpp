@@ -26,6 +26,8 @@
 #include "LUTDecoder.hpp"
 
 #include <algorithm>
+#include <cstdint>
+#include <string>
 #include <vector>
 
 #include "DataView.hpp"
@@ -82,4 +84,41 @@ void __catalyst__qecp__lut_decoder(MemRefT_int32_1d *row_idx_tanner,
     // Copy the inquired error indices back to the err_idx
     std::copy(error_indices.begin(), error_indices.end(), err_idx->data_aligned);
 }
+
+void __catalyst__qecp__decode_physical_measurements(MemRefT_int8_1d *physical_meas,
+                                                    MemRefT_int8_1d *logical_meas)
+{
+    std::string err_msg_note = "Note: physical-measurement decoding currently only supports the "
+                               "[[7, 1, 3]] Steane code, with logical Pauli operators acting on "
+                               "physical qubits 4, 5, and 6 in the physical codeblock.";
+
+    const size_t code_k = 1;
+    const size_t code_n = 7;
+
+    RT_FAIL_IF(physical_meas->sizes[0] != code_n,
+               ("Expected input buffer of physical measurements to have size " +
+                std::to_string(code_n) + ", but got " + std::to_string(physical_meas->sizes[0]) +
+                err_msg_note)
+                   .c_str())
+    RT_FAIL_IF(logical_meas->sizes[0] != code_k,
+               ("Expected output buffer of logical measurement(s) to have size " +
+                std::to_string(code_k) + ", but got " + std::to_string(physical_meas->sizes[0]) +
+                err_msg_note)
+                   .c_str())
+
+    DataView<int8_t, 1> dv_physical_meas(physical_meas->data_aligned, physical_meas->offset,
+                                         physical_meas->sizes, physical_meas->strides);
+
+    bool m4 = dv_physical_meas(4);
+    bool m5 = dv_physical_meas(5);
+    bool m6 = dv_physical_meas(6);
+
+    int8_t result = m4 ^ m5 ^ m6;
+
+    DataView<int8_t, 1> dv_logical_meas(logical_meas->data_aligned, logical_meas->offset,
+                                        logical_meas->sizes, logical_meas->strides);
+
+    *dv_logical_meas.begin() = result;
+}
+
 } // extern "C"
