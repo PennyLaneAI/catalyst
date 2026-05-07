@@ -801,9 +801,9 @@ codes only.
   result is integer type, during the PLxPR conversion.
   [(#2582)](https://github.com/PennyLaneAI/catalyst/pull/2582)
 
-* The xDSL string-output path in `Compiler.run` now uses assembly format, whose printer omits
-  result attributes on void functions, preventing the malformed attribute from reaching the C++
-  compilation driver.
+* Fixed a bug where the xDSL string-output path in `Compiler.run` would emit empty result attributes
+  on void functions, triggering an assertion in MLIR's FuncToLLVM lowering. The empty attributes
+  are now removed in-place so the generic printer omits them.
   [(#2805)](https://github.com/PennyLaneAI/catalyst/pull/2805)
 
 <h3>Internal changes ⚙️</h3>
