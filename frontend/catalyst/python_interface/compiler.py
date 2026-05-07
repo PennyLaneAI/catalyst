@@ -67,9 +67,12 @@ class Compiler:
         pipeline = PassPipeline((ApplyTransformSequencePass(callback=callback),))
         pipeline.apply(ctx, xmod)
 
-        # Convert back to string
+        # Convert back to string. Use assembly form for the string-input path
+        #  because generic form would emit attributes such as
+        # `res_attrs = []` on void func.func ops, which triggers a downstream
+        # assertion in MLIR's func-to-LLVM lowering.
         buffer = io.StringIO()
-        Printer(stream=buffer, print_generic_format=True).print_op(xmod)
+        Printer(stream=buffer, print_generic_format=is_jax_module).print_op(xmod)
 
         # Convert back to jaxModule if input was jaxModule
         if is_jax_module:
