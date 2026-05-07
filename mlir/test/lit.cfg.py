@@ -39,7 +39,7 @@ config.substitutions.append(("%BYTECODE_PATH", config.bytecode_path))
 config.excludes.append("test_rules.mlir")
 
 # Allow VIRTUAL_ENV to persist for testing callbacks
-config.environment["VIRTUAL_ENV"] = os.getenv("VIRTUAL_ENV", None)
+config.environment["VIRTUAL_ENV"] = os.getenv("VIRTUAL_ENV", "")
 
 # Define PATH to include the various tools needed for our tests.
 try:
