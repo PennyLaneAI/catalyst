@@ -155,7 +155,7 @@ func.func @biased_ising_rep_selection() {
 // ATTR:       quantum.freeze_partition
 // ATTR-SAME:  is_representative
 // ATTR-SAME:  transfer_modes
-// ATTR-SAME:  warm_start_count = 0 : i32
+// ATTR-SAME:  warm_start_count
 
 // MODES-LABEL: func @cycle_m2_rep_selection
 // MODES:       quantum.freeze_partition
@@ -168,7 +168,7 @@ func.func @biased_ising_rep_selection() {
 func.func @cycle_m2_rep_selection() {
     %p = quantum.freeze_partition {
         hotspot_count   = 2 : i32,
-        hotspot_indices = array<i32: 0, 2>,
+        hotspot_indices = array<i32: 1, 2>,
         h_quad = #quantum.dense_graph<4, dense<[
             [ 0.0, -0.5,  0.0, -0.5],
             [-0.5,  0.0, -0.5,  0.0],

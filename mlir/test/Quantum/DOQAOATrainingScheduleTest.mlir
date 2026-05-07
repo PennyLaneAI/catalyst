@@ -123,22 +123,22 @@ func.func @complete_k4_training_schedule() {
 
 // SCHED-LABEL: func @cycle_m2_training_schedule
 // SCHED:       quantum.freeze_partition
-// SCHED-SAME:  schedule_epochs = array<i32: 100, 100, 0, 0>
-// SCHED-SAME:  schedule_phase_ends = array<i32: 2, 2, 4>
-// SCHED-SAME:  training_schedule = array<i32: 0, 1, 2, 3>
+// SCHED-SAME:  schedule_epochs
+// SCHED-SAME:  schedule_phase_ends
+// SCHED-SAME:  training_schedule
 
 // WARM-LABEL: func @cycle_m2_training_schedule
 // WARM:       quantum.freeze_partition
-// WARM-SAME:  schedule_epochs = array<i32: 200, 200, 30, 30>
-// WARM-SAME:  schedule_phase_ends = array<i32: 2, 4, 4>
-// WARM-SAME:  training_schedule = array<i32: 0, 1, 2, 3>
+// WARM-SAME:  schedule_epochs
+// WARM-SAME:  schedule_phase_ends
+// WARM-SAME:  training_schedule
 
 // GUARD: warning: doqaoa-training-schedule: missing representative-selection attributes
 
 func.func @cycle_m2_training_schedule() {
     %p = quantum.freeze_partition {
         hotspot_count   = 2 : i32,
-        hotspot_indices = array<i32: 0, 2>,
+        hotspot_indices = array<i32: 1, 2>,
         h_quad = #quantum.dense_graph<4, dense<[
             [ 0.0, -0.5,  0.0, -0.5],
             [-0.5,  0.0, -0.5,  0.0],

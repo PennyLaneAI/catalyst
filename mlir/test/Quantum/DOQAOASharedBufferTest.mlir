@@ -36,9 +36,9 @@
 
 // BUF-LABEL: func @cycle_shared_buffer
 // BUF:       quantum.freeze_partition
+// BUF-SAME:  buffer_slot_map = array<i32: 0, 0>
 // BUF-SAME:  param_buffer_size = 2 : i32
 // BUF-SAME:  use_atomic_guards = 1 : i32
-// BUF-SAME:  buffer_slot_map = array<i32: 0, 0>
 
 // GUARD: warning: doqaoa-shared-buffer: missing training-schedule attributes
 
@@ -105,7 +105,7 @@ func.func @k4_shared_buffer() {
 func.func @cycle_m2_shared_buffer() {
     %p = quantum.freeze_partition {
         hotspot_count   = 2 : i32,
-        hotspot_indices = array<i32: 0, 2>,
+        hotspot_indices = array<i32: 1, 2>,
         h_quad = #quantum.dense_graph<4, dense<[
             [ 0.0, -0.5,  0.0, -0.5],
             [-0.5,  0.0, -0.5,  0.0],
@@ -126,8 +126,8 @@ func.func @cycle_m2_shared_buffer() {
 
 // BUF-LABEL: func @sparse_shared_buffer
 // BUF:       quantum.freeze_partition
-// BUF-SAME:  param_buffer_size = 2 : i32
 // BUF-SAME:  buffer_slot_map = array<i32: 0, 0, 0, 0>
+// BUF-SAME:  param_buffer_size = 2 : i32
 // BUF-SAME:  use_atomic_guards = 1 : i32
 
 // GUARD: warning: doqaoa-shared-buffer: missing training-schedule attributes

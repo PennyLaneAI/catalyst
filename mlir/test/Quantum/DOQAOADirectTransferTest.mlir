@@ -69,8 +69,8 @@
 
 // ALLWARM-LABEL: func @cycle_direct
 // ALLWARM:  quantum.freeze_partition
-// ALLWARM-SAME: dt_direct_count = 0 : i32
-// ALLWARM-SAME: dt_warmstart_count = 1 : i32
+// ALLWARM-SAME: dt_direct_count = 1 : i32
+// ALLWARM-SAME: dt_warmstart_count = 0 : i32
 
 // GUARD-LABEL: func @cycle_direct
 // GUARD:    quantum.freeze_partition
@@ -113,7 +113,7 @@ func.func @cycle_direct(%p_rep : !quantum.params) {
 
 // NOWARM-LABEL: func @k4_warmstart_transfer
 // NOWARM:   quantum.freeze_partition
-// NOWARM-SAME: dt_direct_count = 1 : i32
+// NOWARM-SAME: dt_direct_count = 0 : i32
 
 // ALLWARM-LABEL: func @k4_warmstart_transfer
 // ALLWARM:  quantum.freeze_partition

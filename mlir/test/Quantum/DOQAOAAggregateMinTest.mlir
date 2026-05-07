@@ -88,8 +88,8 @@ func.func @cycle_agg() {
 
 // AGG-LABEL: func @k4_agg
 // AGG:       quantum.freeze_partition
-// AGG-SAME:  agg_best_k
 // AGG-SAME:  agg_best_bitstring
+// AGG-SAME:  agg_best_k
 
 // NOPRIOR-LABEL: func @k4_agg
 // NOPRIOR:   quantum.freeze_partition

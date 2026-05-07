@@ -159,14 +159,14 @@ func.func @sparse_warmstart() {
 
 // WS-LABEL: func @biased_warmstart
 // WS:       quantum.freeze_partition
-// WS-SAME:  warmstart_params
 // WS-SAME:  warmstart_converged
 // WS-SAME:  warmstart_epochs_used
+// WS-SAME:  warmstart_params
 
 // WARM2-LABEL: func @biased_warmstart
 // WARM2:    quantum.freeze_partition
-// WARM2-SAME: warmstart_params
 // WARM2-SAME: warmstart_epochs_used
+// WARM2-SAME: warmstart_params
 
 // EPOCHS-LABEL: func @biased_warmstart
 // EPOCHS:   quantum.freeze_partition
