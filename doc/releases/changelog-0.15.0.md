@@ -801,6 +801,11 @@ codes only.
   result is integer type, during the PLxPR conversion.
   [(#2582)](https://github.com/PennyLaneAI/catalyst/pull/2582)
 
+* The xDSL string-output path in `Compiler.run` now uses assembly format, whose printer omits
+  result attributes on void functions, preventing the malformed attribute from reaching the C++
+  compilation driver.
+  [(#2805)](https://github.com/PennyLaneAI/catalyst/pull/2805)
+
 <h3>Internal changes ⚙️</h3>
 
 * The compiler pipeline definitions now have a single source of truth. Previously, pipeline and
