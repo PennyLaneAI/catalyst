@@ -16,7 +16,6 @@
 Dynamism operations for the StableHLO dialect.
 """
 
-
 from xdsl.dialects.builtin import (
     ArrayAttr,
     BoolAttr,

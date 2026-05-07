@@ -7,6 +7,7 @@ Usage:
     python circuit_to_qasm3.py circuit.py -o output.qasm
     python circuit_to_qasm3.py circuit.py --no-opt      # skip quantum-opt
 """
+
 import argparse
 import subprocess
 import sys
