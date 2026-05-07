@@ -33,7 +33,6 @@ std::string tracePauliRotDecomp(double theta, std::string pauliWord, PyWires wir
     const char *functionName = "paulirot_callback_wrapper";
 
     try {
-
         py::module_ wrapperModule = py::module_::import(moduleName);
         py::object wrapperFunction = wrapperModule.attr(functionName);
         py::object pythonResult = wrapperFunction(theta, pauliWord, wires);
