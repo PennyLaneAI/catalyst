@@ -514,13 +514,11 @@ def parity_synth_setup_inputs():
     .. code-block:: python
 
         import pennylane as qp
-        from catalyst.python_interface import Compiler
-        import catalyst
 
         dev = qp.device("lightning.qubit", wires=2)
 
         @qp.qjit(capture=True)
-        @catalyst.passes.parity_synth
+        @qp.transforms.parity_synth
         @qp.qnode(dev)
         def circuit(x: float, y: float, z: float):
             qp.CNOT((0, 1))
