@@ -49,8 +49,7 @@ namespace quantum {
 struct AdjointLoweringPass : impl::AdjointLoweringPassBase<AdjointLoweringPass> {
     using AdjointLoweringPassBase::AdjointLoweringPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         LLVM_DEBUG(dbgs() << "adjoint lowering pass"
                           << "\n");
 

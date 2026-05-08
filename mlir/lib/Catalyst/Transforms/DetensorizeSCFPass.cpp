@@ -12,8 +12,7 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace {
-bool isScalarTensor(Value v)
-{
+bool isScalarTensor(Value v) {
     Type type = v.getType();
     if (!isa<TensorType>(type)) {
         return false;
@@ -21,8 +20,7 @@ bool isScalarTensor(Value v)
     return cast<TensorType>(type).getRank() == 0;
 };
 
-template <typename ScfOp> bool hasScalarTensorOperand(ScfOp op)
-{
+template <typename ScfOp> bool hasScalarTensorOperand(ScfOp op) {
     for (Value result : op->getOperands()) {
         if (isScalarTensor(result)) {
             return true;
@@ -31,8 +29,7 @@ template <typename ScfOp> bool hasScalarTensorOperand(ScfOp op)
     return false;
 }
 
-template <typename ScfOp> bool hasScalarTensorResult(ScfOp op)
-{
+template <typename ScfOp> bool hasScalarTensorResult(ScfOp op) {
     for (Value result : op->getResults()) {
         if (isScalarTensor(result)) {
             return true;
@@ -44,8 +41,7 @@ template <typename ScfOp> bool hasScalarTensorResult(ScfOp op)
 struct DetensorizeForOp : public OpRewritePattern<scf::ForOp> {
     using OpRewritePattern<scf::ForOp>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(scf::ForOp forOp, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(scf::ForOp forOp, PatternRewriter &rewriter) const override {
         if (!hasScalarTensorOperand(forOp) && !hasScalarTensorResult(forOp)) {
             return failure();
         }
@@ -135,8 +131,7 @@ struct DetensorizeForOp : public OpRewritePattern<scf::ForOp> {
 struct DetensorizeIfOp : public OpRewritePattern<scf::IfOp> {
     using OpRewritePattern<scf::IfOp>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(scf::IfOp ifOp, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(scf::IfOp ifOp, PatternRewriter &rewriter) const override {
         // Early exit if there are no results that could be replaced.
         if (!hasScalarTensorResult(ifOp)) {
             return failure();
@@ -202,8 +197,7 @@ struct DetensorizeIfOp : public OpRewritePattern<scf::IfOp> {
 struct DetensorizeWhileOp : public OpRewritePattern<scf::WhileOp> {
     using OpRewritePattern<scf::WhileOp>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(scf::WhileOp whileOp, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(scf::WhileOp whileOp, PatternRewriter &rewriter) const override {
         if (!hasScalarTensorOperand(whileOp)) {
             return failure();
         }
@@ -296,8 +290,7 @@ struct DetensorizeWhileOp : public OpRewritePattern<scf::WhileOp> {
                     Value value = tensor::ExtractOp::create(rewriter, condOp->getLoc(), condOpArg,
                                                             ValueRange{});
                     newCondOpArgs.push_back(value);
-                }
-                else {
+                } else {
                     newCondOpArgs.emplace_back(condOpArg);
                 }
             }
@@ -349,8 +342,7 @@ namespace catalyst {
 
 struct DetensorizeSCFPass : public impl::DetensorizeSCFPassBase<DetensorizeSCFPass> {
     using impl::DetensorizeSCFPassBase<DetensorizeSCFPass>::DetensorizeSCFPassBase;
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
         patterns.add<DetensorizeForOp>(context);

@@ -68,8 +68,7 @@ namespace catalyst {
 
 template <typename OpType, typename ParentOpType> class VerifyHeterogeneousParentGateAnalysis {
   public:
-    VerifyHeterogeneousParentGateAnalysis(OpType gate)
-    {
+    VerifyHeterogeneousParentGateAnalysis(OpType gate) {
         ValueRange inQubits = gate.getInQubits();
         auto parentGate = dyn_cast_or_null<ParentOpType>(inQubits[0].getDefiningOp());
 
@@ -92,8 +91,7 @@ template <typename OpType, typename ParentOpType> class VerifyHeterogeneousParen
   private:
     bool succeeded = true;
 
-    bool verifyParentGateType(OpType op, ParentOpType parentOp) const
-    {
+    bool verifyParentGateType(OpType op, ParentOpType parentOp) const {
         // Verify that the parent gate is of the desired type.
 
         if (!parentOp || !isa<ParentOpType>(parentOp)) {
@@ -103,8 +101,7 @@ template <typename OpType, typename ParentOpType> class VerifyHeterogeneousParen
         return true;
     }
 
-    bool verifyAllInQubits(OpType op, ParentOpType parentOp) const
-    {
+    bool verifyAllInQubits(OpType op, ParentOpType parentOp) const {
         // Verify that parent's results and current gate's inputs are in the same order
         // If the gates are controlled, both gates' control wires and values
         // must be the same. The control wires must be in the same order.
@@ -155,8 +152,7 @@ class VerifyHeterogeneousParentGateAndNameAnalysis
     // same gate name.
   public:
     VerifyHeterogeneousParentGateAndNameAnalysis(OpType gate)
-        : VerifyHeterogeneousParentGateAnalysis<OpType, ParentOpType>(gate)
-    {
+        : VerifyHeterogeneousParentGateAnalysis<OpType, ParentOpType>(gate) {
         ValueRange inQubits = gate.getInQubits();
         auto parentGate = dyn_cast_or_null<ParentOpType>(inQubits[0].getDefiningOp());
 
@@ -172,8 +168,7 @@ class VerifyHeterogeneousParentGateAndNameAnalysis
     }
 
   private:
-    bool verifyParentGateName(OpType op, ParentOpType parentOp) const
-    {
+    bool verifyParentGateName(OpType op, ParentOpType parentOp) const {
         StringRef opGateName = op.getGateName();
         StringRef parentGateName = parentOp.getGateName();
         return opGateName == parentGateName;
@@ -185,9 +180,7 @@ class VerifyParentGateAnalysis : public VerifyHeterogeneousParentGateAnalysis<Op
     // Verify that the parent gate is of the exact same type and signature
   public:
     VerifyParentGateAnalysis(OpType gate)
-        : VerifyHeterogeneousParentGateAnalysis<OpType, OpType>(gate)
-    {
-    }
+        : VerifyHeterogeneousParentGateAnalysis<OpType, OpType>(gate) {}
 };
 
 template <typename OpType>
@@ -195,9 +188,7 @@ class VerifyParentGateAndNameAnalysis
     : public VerifyHeterogeneousParentGateAndNameAnalysis<OpType, OpType> {
   public:
     VerifyParentGateAndNameAnalysis(OpType gate)
-        : VerifyHeterogeneousParentGateAndNameAnalysis<OpType, OpType>(gate)
-    {
-    }
+        : VerifyHeterogeneousParentGateAndNameAnalysis<OpType, OpType>(gate) {}
 };
 
 } // namespace catalyst

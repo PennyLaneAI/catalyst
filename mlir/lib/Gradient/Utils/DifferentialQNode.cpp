@@ -22,13 +22,11 @@ using namespace mlir;
 constexpr const char *diffMethodKey = "diff_method";
 constexpr const char *pureQuantumKey = "purequantum";
 
-bool catalyst::gradient::isQNode(func::FuncOp funcOp)
-{
+bool catalyst::gradient::isQNode(func::FuncOp funcOp) {
     return funcOp->hasAttrOfType<UnitAttr>("qnode");
 }
 
-StringRef catalyst::gradient::getQNodeDiffMethod(func::FuncOp funcOp)
-{
+StringRef catalyst::gradient::getQNodeDiffMethod(func::FuncOp funcOp) {
     bool hasDiffMethod = isQNode(funcOp) && funcOp->hasAttrOfType<StringAttr>(diffMethodKey);
     if (hasDiffMethod) {
         return funcOp->getAttrOfType<StringAttr>(diffMethodKey).strref();
@@ -37,18 +35,15 @@ StringRef catalyst::gradient::getQNodeDiffMethod(func::FuncOp funcOp)
 }
 
 void catalyst::gradient::setRequiresCustomGradient(func::FuncOp funcOp,
-                                                   FlatSymbolRefAttr pureQuantumFunc)
-{
+                                                   FlatSymbolRefAttr pureQuantumFunc) {
     funcOp->setAttr(pureQuantumKey, pureQuantumFunc);
 }
 
-bool catalyst::gradient::requiresCustomGradient(func::FuncOp funcOp)
-{
+bool catalyst::gradient::requiresCustomGradient(func::FuncOp funcOp) {
     return funcOp->hasAttrOfType<FlatSymbolRefAttr>(pureQuantumKey);
 }
 
-void catalyst::gradient::registerCustomGradient(func::FuncOp qnode, FlatSymbolRefAttr qgradFn)
-{
+void catalyst::gradient::registerCustomGradient(func::FuncOp qnode, FlatSymbolRefAttr qgradFn) {
     Operation *pureQuantumFunc = SymbolTable::lookupNearestSymbolFrom(
         qnode, qnode->getAttrOfType<FlatSymbolRefAttr>(pureQuantumKey));
     pureQuantumFunc->setAttr("gradient.qgrad", qgradFn);

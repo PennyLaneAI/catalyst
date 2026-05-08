@@ -53,8 +53,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
                                 "Total number of classical instructions"};
     Statistic totalFunctionCalls{this, "total-function-calls", "Total number of function calls"};
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         auto &analysis = getAnalysis<ResourceAnalysis>();
         const auto &results = analysis.getResults();
 
@@ -66,8 +65,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
             if (const ResourceResult *r = analysis.getResult(entry)) {
                 accumulateStats(*r);
             }
-        }
-        else {
+        } else {
             for (const auto &funcEntry : results) {
                 accumulateStats(funcEntry.getValue());
             }
@@ -79,8 +77,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
 
             if (outputFname.empty()) {
                 printJsonOutput(jsonStr);
-            }
-            else {
+            } else {
                 writeJsonToFile(jsonStr, outputFname);
             }
         }
@@ -96,8 +93,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
      *
      * @param result The ResourceResult to accumulate stats from.
      */
-    void accumulateStats(const ResourceResult &result)
-    {
+    void accumulateStats(const ResourceResult &result) {
         for (const auto &opEntry : result.operations) {
             for (const auto &sizeEntry : opEntry.getValue()) {
                 totalGates += sizeEntry.second;
@@ -122,8 +118,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     }
 
     /// Serialize a single ResourceResult into a JSON object.
-    static llvm::json::Object resultToJson(const ResourceResult &result)
-    {
+    static llvm::json::Object resultToJson(const ResourceResult &result) {
         llvm::json::Object funcObj;
 
         llvm::json::Object opsObj;
@@ -170,8 +165,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     /// Serialize all per-function ResourceResults into a JSON string.
     /// qnode functions are inserted first so that the PennyLane reader
     /// (which uses the first entry) picks the correct function.
-    std::string buildJsonString(const llvm::StringMap<ResourceResult> &results) const
-    {
+    std::string buildJsonString(const llvm::StringMap<ResourceResult> &results) const {
         llvm::json::Object root;
 
         for (const auto &funcEntry : results) {
@@ -193,8 +187,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     void printJsonOutput(const std::string &jsonStr) const { llvm::outs() << jsonStr; }
 
     /// Write JSON to a file.
-    static void writeJsonToFile(const std::string &jsonStr, const std::string &fileName)
-    {
+    static void writeJsonToFile(const std::string &jsonStr, const std::string &fileName) {
         std::ofstream ofile(fileName);
         if (!ofile.is_open()) {
             llvm::errs() << "Error: could not open resource output file: " << fileName << "\n";

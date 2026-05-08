@@ -29,8 +29,7 @@ namespace catalyst {
 Value buildBufferLinalgGeneric(OpBuilder &builder, Location loc, ValueRange operands, Value output,
                                ArrayRef<AffineMap> indexingMaps,
                                ArrayRef<utils::IteratorType> iteratorTypes,
-                               function_ref<void(OpBuilder &, Location, ValueRange)> buildBody)
-{
+                               function_ref<void(OpBuilder &, Location, ValueRange)> buildBody) {
     linalg::GenericOp::create(builder, loc, operands, output, indexingMaps, iteratorTypes,
                               buildBody);
     return output;
@@ -39,8 +38,7 @@ Value buildBufferLinalgGeneric(OpBuilder &builder, Location loc, ValueRange oper
 Value buildTensorLinalgGeneric(OpBuilder &builder, Location loc, ValueRange operands,
                                RankedTensorType resultType, ArrayRef<AffineMap> indexingMaps,
                                ArrayRef<utils::IteratorType> iteratorTypes,
-                               function_ref<void(OpBuilder &, Location, ValueRange)> buildBody)
-{
+                               function_ref<void(OpBuilder &, Location, ValueRange)> buildBody) {
     // Initialize the result tensor
     FloatType elementType = cast<FloatType>(resultType.getElementType());
     Value zero = arith::ConstantFloatOp::create(builder, loc, elementType,
@@ -56,8 +54,7 @@ Value buildTensorLinalgGeneric(OpBuilder &builder, Location loc, ValueRange oper
 
 void inferIndexingMaps(MLIRContext *ctx, unsigned numDims, ArrayRef<int64_t> axisCodesA,
                        ArrayRef<int64_t> axisCodesB, ArrayRef<int64_t> axisCodesResult,
-                       SmallVectorImpl<AffineMap> &indexingMaps)
-{
+                       SmallVectorImpl<AffineMap> &indexingMaps) {
     for (const auto axis : {axisCodesA, axisCodesB, axisCodesResult}) {
         SmallVector<AffineExpr> aexprs;
         for (const auto a : axis) {
@@ -69,8 +66,7 @@ void inferIndexingMaps(MLIRContext *ctx, unsigned numDims, ArrayRef<int64_t> axi
 
 void inferIteratorTypes(const std::map<int64_t, int64_t> &axisDims,
                         ArrayRef<int64_t> axisCodesResult,
-                        SmallVectorImpl<utils::IteratorType> &iteratorTypes)
-{
+                        SmallVectorImpl<utils::IteratorType> &iteratorTypes) {
     DenseSet<int64_t> outCodes{axisCodesResult.begin(), axisCodesResult.end()};
     for (const auto &[code, _size] : axisDims) {
         iteratorTypes.push_back(outCodes.contains(code) ? utils::IteratorType::reduction
@@ -80,16 +76,14 @@ void inferIteratorTypes(const std::map<int64_t, int64_t> &axisDims,
 
 Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<int64_t> axisCodesA,
                           ArrayRef<int64_t> axisCodesB, ArrayRef<int64_t> axisCodesResult, Value a,
-                          Value b, std::optional<Value> bufferOut)
-{
+                          Value b, std::optional<Value> bufferOut) {
     bool useBufferSemantics = bufferOut.has_value();
     if (useBufferSemantics) {
         assert(isa<MemRefType>(a.getType()) && isa<MemRefType>(b.getType()) &&
                isa<MemRefType>(bufferOut->getType()) &&
                "einsumLinalgGeneric with buffer output expects operands and output to have "
                "MemRefType");
-    }
-    else {
+    } else {
         assert(
             isa<RankedTensorType>(a.getType()) && isa<RankedTensorType>(b.getType()) &&
             "einsumLinalgGeneric with no buffer output expects operands to have RankedTensorType");

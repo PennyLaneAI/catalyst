@@ -44,13 +44,11 @@ static std::unique_ptr<ExecutionContext> CTX = nullptr;
  */
 thread_local static RTDevice *RTD_PTR = nullptr;
 
-bool getModifiersAdjoint(const Modifiers *modifiers)
-{
+bool getModifiersAdjoint(const Modifiers *modifiers) {
     return !modifiers ? false : modifiers->adjoint;
 }
 
-std::vector<QubitIdType> getModifiersControlledWires(const Modifiers *modifiers)
-{
+std::vector<QubitIdType> getModifiersControlledWires(const Modifiers *modifiers) {
     return !modifiers ? std::vector<QubitIdType>()
                       : std::vector<QubitIdType>(
                             reinterpret_cast<QubitIdType *>(modifiers->controlled_wires),
@@ -58,8 +56,7 @@ std::vector<QubitIdType> getModifiersControlledWires(const Modifiers *modifiers)
                                 modifiers->num_controlled);
 }
 
-std::vector<bool> getModifiersControlledValues(const Modifiers *modifiers)
-{
+std::vector<bool> getModifiersControlledValues(const Modifiers *modifiers) {
     return !modifiers ? std::vector<bool>()
                       : std::vector<bool>(modifiers->controlled_values,
                                           modifiers->controlled_values + modifiers->num_controlled);
@@ -73,8 +70,7 @@ std::vector<bool> getModifiersControlledValues(const Modifiers *modifiers)
  * to the new initialized device pointer.
  */
 [[nodiscard]] bool initRTDevicePtr(std::string_view rtd_lib, std::string_view rtd_name,
-                                   std::string_view rtd_kwargs, bool auto_qubit_management)
-{
+                                   std::string_view rtd_kwargs, bool auto_qubit_management) {
     auto &&device = CTX->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management);
     if (device) {
         RTD_PTR = device.get();
@@ -86,22 +82,19 @@ std::vector<bool> getModifiersControlledValues(const Modifiers *modifiers)
 /**
  * @brief get the active device.
  */
-auto getQuantumDevicePtr() -> const std::unique_ptr<QuantumDevice> &
-{
+auto getQuantumDevicePtr() -> const std::unique_ptr<QuantumDevice> & {
     return RTD_PTR->getQuantumDevicePtr();
 }
 
 /**
  * @brief Inactivate the active device instance.
  */
-void deactivateDevice()
-{
+void deactivateDevice() {
     CTX->deactivateDevice(RTD_PTR);
     RTD_PTR = nullptr;
 }
 
-static void autoQubitManagementAllocate(std::vector<QubitIdType> *qubit_vector_ptr, int64_t idx)
-{
+static void autoQubitManagementAllocate(std::vector<QubitIdType> *qubit_vector_ptr, int64_t idx) {
     // allocate new qubits if we are in automatic qubit allocation mode
     // and encountered a new user wire index
     // `idx` is the new user wire index from frontend pennylane
@@ -120,8 +113,7 @@ extern "C" {
 using namespace Catalyst::Runtime;
 using timer = catalyst::utils::Timer<>; // default timing ratio of std::milli
 
-void __catalyst_inactive_callback(int64_t identifier, int64_t argc, int64_t retc, ...)
-{
+void __catalyst_inactive_callback(int64_t identifier, int64_t argc, int64_t retc, ...) {
     // LIBREGISTRY is a compile time macro. It is defined based on the output
     // name of the callback library. And since it is stored in the same location
     // as this library, it shares the ORIGIN variable. Do a `git grep LIBREGISTRY`
@@ -157,27 +149,23 @@ void __catalyst_inactive_callback(int64_t identifier, int64_t argc, int64_t retc
     dlclose(handle);
 }
 
-void __catalyst__host__rt__unrecoverable_error()
-{
+void __catalyst__host__rt__unrecoverable_error() {
     RT_FAIL("Unrecoverable error from asynchronous execution of multiple quantum programs.");
 }
 
-void *_mlir_memref_to_llvm_alloc(size_t size)
-{
+void *_mlir_memref_to_llvm_alloc(size_t size) {
     void *ptr = malloc(size);
     CTX->getMemoryManager()->insert(ptr);
     return ptr;
 }
 
-void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size)
-{
+void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size) {
     void *ptr = aligned_alloc(alignment, size);
     CTX->getMemoryManager()->insert(ptr);
     return ptr;
 }
 
-bool _mlir_memory_transfer(void *ptr)
-{
+bool _mlir_memory_transfer(void *ptr) {
     if (!CTX->getMemoryManager()->contains(ptr)) {
         return false;
     }
@@ -185,14 +173,12 @@ bool _mlir_memory_transfer(void *ptr)
     return true;
 }
 
-void _mlir_memref_to_llvm_free(void *ptr)
-{
+void _mlir_memref_to_llvm_free(void *ptr) {
     CTX->getMemoryManager()->erase(ptr);
     free(ptr);
 }
 
-void __catalyst__rt__print_string(char *string)
-{
+void __catalyst__rt__print_string(char *string) {
     if (!string) {
         std::cout << "None" << std::endl;
         return;
@@ -202,39 +188,28 @@ void __catalyst__rt__print_string(char *string)
 
 void __catalyst__rt__assert_bool(bool p, char *s) { RT_FAIL_IF(!p, s); }
 
-void __catalyst__rt__print_tensor(OpaqueMemRefT *c_memref, bool printDescriptor)
-{
+void __catalyst__rt__print_tensor(OpaqueMemRefT *c_memref, bool printDescriptor) {
     if (c_memref->datatype == NumericType::idx) {
         printMemref<impl::index_type>({c_memref->rank, c_memref->descriptor}, printDescriptor);
-    }
-    else if (c_memref->datatype == NumericType::i1) {
+    } else if (c_memref->datatype == NumericType::i1) {
         printMemref<bool>({c_memref->rank, c_memref->descriptor}, printDescriptor);
-    }
-    else if (c_memref->datatype == NumericType::i8) {
+    } else if (c_memref->datatype == NumericType::i8) {
         printMemref<int8_t>({c_memref->rank, c_memref->descriptor}, printDescriptor);
-    }
-    else if (c_memref->datatype == NumericType::i16) {
+    } else if (c_memref->datatype == NumericType::i16) {
         printMemref<int16_t>({c_memref->rank, c_memref->descriptor}, printDescriptor);
-    }
-    else if (c_memref->datatype == NumericType::i32) {
+    } else if (c_memref->datatype == NumericType::i32) {
         printMemref<int32_t>({c_memref->rank, c_memref->descriptor}, printDescriptor);
-    }
-    else if (c_memref->datatype == NumericType::i64) {
+    } else if (c_memref->datatype == NumericType::i64) {
         printMemref<int64_t>({c_memref->rank, c_memref->descriptor}, printDescriptor);
-    }
-    else if (c_memref->datatype == NumericType::f32) {
+    } else if (c_memref->datatype == NumericType::f32) {
         printMemref<float>({c_memref->rank, c_memref->descriptor}, printDescriptor);
-    }
-    else if (c_memref->datatype == NumericType::f64) {
+    } else if (c_memref->datatype == NumericType::f64) {
         printMemref<double>({c_memref->rank, c_memref->descriptor}, printDescriptor);
-    }
-    else if (c_memref->datatype == NumericType::c64) {
+    } else if (c_memref->datatype == NumericType::c64) {
         printMemref<impl::complex32>({c_memref->rank, c_memref->descriptor}, printDescriptor);
-    }
-    else if (c_memref->datatype == NumericType::c128) {
+    } else if (c_memref->datatype == NumericType::c128) {
         printMemref<impl::complex64>({c_memref->rank, c_memref->descriptor}, printDescriptor);
-    }
-    else {
+    } else {
         RT_FAIL("Unkown numeric type encoding for array printing.");
     }
 
@@ -245,15 +220,13 @@ void __catalyst__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
 void __catalyst__rt__initialize(uint32_t *seed) { CTX = std::make_unique<ExecutionContext>(seed); }
 
-void __catalyst__rt__finalize()
-{
+void __catalyst__rt__finalize() {
     RTD_PTR = nullptr;
     CTX.reset(nullptr);
 }
 
 static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
-                                             int64_t shots, bool auto_qubit_management)
-{
+                                             int64_t shots, bool auto_qubit_management) {
     // Device library cannot be a nullptr
     RT_FAIL_IF(!rtd_lib, "Invalid device library");
     RT_FAIL_IF(!CTX, "Invalid use of the global driver before initialization");
@@ -273,27 +246,23 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
 }
 
 void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
-                                 int64_t shots, bool auto_qubit_management)
-{
+                                 int64_t shots, bool auto_qubit_management) {
     timer::timer(__catalyst__rt__device_init__impl, "device_init", /* add_endl */ true, rtd_lib,
                  rtd_name, rtd_kwargs, shots, auto_qubit_management);
 }
 
-static int __catalyst__rt__device_release__impl()
-{
+static int __catalyst__rt__device_release__impl() {
     RT_FAIL_IF(!CTX, "Cannot release an ACTIVE device out of scope of the global driver");
     // TODO: This will be used for the async support
     deactivateDevice();
     return 0;
 }
 
-void __catalyst__rt__device_release()
-{
+void __catalyst__rt__device_release() {
     timer::timer(__catalyst__rt__device_release__impl, "device_release", /* add_endl */ true);
 }
 
-void __catalyst__rt__print_state()
-{
+void __catalyst__rt__print_state() {
     size_t num_wires = getQuantumDevicePtr()->GetNumQubits();
     std::vector<std::complex<double>> state(1 << num_wires);
     DataView<std::complex<double>, 1> view(state);
@@ -307,8 +276,7 @@ void __catalyst__rt__print_state()
     std::cout << "]\n";
 }
 
-void __catalyst__rt__toggle_recorder(bool status)
-{
+void __catalyst__rt__toggle_recorder(bool status) {
     CTX->setDeviceRecorderStatus(status);
     if (!RTD_PTR) {
         return;
@@ -316,28 +284,24 @@ void __catalyst__rt__toggle_recorder(bool status)
 
     if (status) {
         getQuantumDevicePtr()->StartTapeRecording();
-    }
-    else {
+    } else {
         getQuantumDevicePtr()->StopTapeRecording();
     }
 }
 
-static QUBIT *__catalyst__rt__qubit_allocate__impl()
-{
+static QUBIT *__catalyst__rt__qubit_allocate__impl() {
     RT_ASSERT(getQuantumDevicePtr() != nullptr);
     RT_ASSERT(CTX->getMemoryManager() != nullptr);
 
     return reinterpret_cast<QUBIT *>(getQuantumDevicePtr()->AllocateQubit());
 }
 
-QUBIT *__catalyst__rt__qubit_allocate()
-{
+QUBIT *__catalyst__rt__qubit_allocate() {
     return timer::timer(__catalyst__rt__qubit_allocate__impl, "qubit_allocate",
                         /* add_endl */ true);
 }
 
-static QirArray *__catalyst__rt__qubit_allocate_array__impl(int64_t num_qubits)
-{
+static QirArray *__catalyst__rt__qubit_allocate_array__impl(int64_t num_qubits) {
     RT_ASSERT(getQuantumDevicePtr() != nullptr);
     RT_ASSERT(CTX->getMemoryManager() != nullptr);
     RT_ASSERT(num_qubits >= 0);
@@ -366,26 +330,22 @@ static QirArray *__catalyst__rt__qubit_allocate_array__impl(int64_t num_qubits)
     return (QirArray *)qubit_vector_ptr;
 }
 
-QirArray *__catalyst__rt__qubit_allocate_array(int64_t num_qubits)
-{
+QirArray *__catalyst__rt__qubit_allocate_array(int64_t num_qubits) {
     return timer::timer(__catalyst__rt__qubit_allocate_array__impl, "qubit_allocate_array",
                         /* add_endl */ true, num_qubits);
 }
 
-static int __catalyst__rt__qubit_release__impl(QUBIT *qubit)
-{
+static int __catalyst__rt__qubit_release__impl(QUBIT *qubit) {
     getQuantumDevicePtr()->ReleaseQubit(reinterpret_cast<QubitIdType>(qubit));
     return 0;
 }
 
-void __catalyst__rt__qubit_release(QUBIT *qubit)
-{
+void __catalyst__rt__qubit_release(QUBIT *qubit) {
     timer::timer(__catalyst__rt__qubit_release__impl, "qubit_release",
                  /* add_endl */ true, qubit);
 }
 
-static int __catalyst__rt__qubit_release_array__impl(QirArray *qubit_array)
-{
+static int __catalyst__rt__qubit_release_array__impl(QirArray *qubit_array) {
     std::vector<QubitIdType> *qubit_array_ptr =
         reinterpret_cast<std::vector<QubitIdType> *>(qubit_array);
     getQuantumDevicePtr()->ReleaseQubits(*qubit_array_ptr);
@@ -393,14 +353,12 @@ static int __catalyst__rt__qubit_release_array__impl(QirArray *qubit_array)
     return 0;
 }
 
-void __catalyst__rt__qubit_release_array(QirArray *qubit_array)
-{
+void __catalyst__rt__qubit_release_array(QirArray *qubit_array) {
     timer::timer(__catalyst__rt__qubit_release_array__impl, "qubit_release_array",
                  /* add_endl */ true, qubit_array);
 }
 
-int64_t __catalyst__rt__num_qubits()
-{
+int64_t __catalyst__rt__num_qubits() {
     return static_cast<int64_t>(getQuantumDevicePtr()->GetNumQubits());
 }
 
@@ -408,13 +366,11 @@ bool __catalyst__rt__result_equal(RESULT *r0, RESULT *r1) { return (r0 == r1) ||
 
 RESULT *__catalyst__rt__result_get_one() { return const_cast<RESULT *>(&GLOBAL_RESULT_TRUE_CONST); }
 
-RESULT *__catalyst__rt__result_get_zero()
-{
+RESULT *__catalyst__rt__result_get_zero() {
     return const_cast<RESULT *>(&GLOBAL_RESULT_FALSE_CONST);
 }
 
-void __catalyst__qis__Gradient(int64_t numResults, /* results = */...)
-{
+void __catalyst__qis__Gradient(int64_t numResults, /* results = */...) {
     RT_ASSERT(numResults >= 0);
     using ResultType = MemRefT<double, 1>;
 
@@ -438,8 +394,7 @@ void __catalyst__qis__Gradient(int64_t numResults, /* results = */...)
 }
 
 void __catalyst__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResults,
-                                      /* results = */...)
-{
+                                      /* results = */...) {
     RT_ASSERT(numResults >= 0);
     using ResultType = MemRefT<double, 1>;
 
@@ -478,13 +433,11 @@ void __catalyst__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResul
     getQuantumDevicePtr()->Gradient(mem_views, train_params);
 }
 
-void __catalyst__qis__GlobalPhase(double phi, const Modifiers *modifiers)
-{
+void __catalyst__qis__GlobalPhase(double phi, const Modifiers *modifiers) {
     getQuantumDevicePtr()->NamedOperation("GlobalPhase", {phi}, {}, MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data, uint64_t numQubits, ...)
-{
+void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data, uint64_t numQubits, ...) {
     RT_ASSERT(numQubits > 0);
 
     va_list args;
@@ -502,8 +455,7 @@ void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data, uint64_t numQubits
 }
 
 void __catalyst__qis__PCPhase(double theta, double dim, const Modifiers *modifiers,
-                              int64_t numQubits, ...)
-{
+                              int64_t numQubits, ...) {
     RT_ASSERT(numQubits >= 0);
     RT_ASSERT(dim >= 0 && dim == static_cast<int64_t>(dim));
 
@@ -519,8 +471,7 @@ void __catalyst__qis__PCPhase(double theta, double dim, const Modifiers *modifie
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, uint64_t numQubits, ...)
-{
+void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, uint64_t numQubits, ...) {
     RT_ASSERT(numQubits > 0);
 
     DataView<int8_t, 1> data_view(data->data_aligned, data->offset, data->sizes, data->strides);
@@ -540,8 +491,7 @@ void __catalyst__qis__SetBasisState(MemRefT_int8_1d *data, uint64_t numQubits, .
     getQuantumDevicePtr()->SetBasisState(data_view, wires);
 }
 
-void __catalyst__qis__Identity(const Modifiers *modifiers, int64_t numQubits, ...)
-{
+void __catalyst__qis__Identity(const Modifiers *modifiers, int64_t numQubits, ...) {
     RT_ASSERT(numQubits >= 0);
     va_list args;
     va_start(args, numQubits);
@@ -555,76 +505,64 @@ void __catalyst__qis__Identity(const Modifiers *modifiers, int64_t numQubits, ..
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__PauliX(QUBIT *qubit, const Modifiers *modifiers)
-{
+void __catalyst__qis__PauliX(QUBIT *qubit, const Modifiers *modifiers) {
     getQuantumDevicePtr()->NamedOperation("PauliX", {}, {reinterpret_cast<QubitIdType>(qubit)},
                                           MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__PauliY(QUBIT *qubit, const Modifiers *modifiers)
-{
+void __catalyst__qis__PauliY(QUBIT *qubit, const Modifiers *modifiers) {
     getQuantumDevicePtr()->NamedOperation("PauliY", {}, {reinterpret_cast<QubitIdType>(qubit)},
                                           MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__PauliZ(QUBIT *qubit, const Modifiers *modifiers)
-{
+void __catalyst__qis__PauliZ(QUBIT *qubit, const Modifiers *modifiers) {
     getQuantumDevicePtr()->NamedOperation("PauliZ", {}, {reinterpret_cast<QubitIdType>(qubit)},
                                           MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__Hadamard(QUBIT *qubit, const Modifiers *modifiers)
-{
+void __catalyst__qis__Hadamard(QUBIT *qubit, const Modifiers *modifiers) {
     getQuantumDevicePtr()->NamedOperation("Hadamard", {}, {reinterpret_cast<QubitIdType>(qubit)},
                                           MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__S(QUBIT *qubit, const Modifiers *modifiers)
-{
+void __catalyst__qis__S(QUBIT *qubit, const Modifiers *modifiers) {
     getQuantumDevicePtr()->NamedOperation("S", {}, {reinterpret_cast<QubitIdType>(qubit)},
                                           MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__T(QUBIT *qubit, const Modifiers *modifiers)
-{
+void __catalyst__qis__T(QUBIT *qubit, const Modifiers *modifiers) {
     getQuantumDevicePtr()->NamedOperation("T", {}, {reinterpret_cast<QubitIdType>(qubit)},
                                           MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__PhaseShift(double theta, QUBIT *qubit, const Modifiers *modifiers)
-{
+void __catalyst__qis__PhaseShift(double theta, QUBIT *qubit, const Modifiers *modifiers) {
     getQuantumDevicePtr()->NamedOperation(
         "PhaseShift", {theta}, {reinterpret_cast<QubitIdType>(qubit)}, MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__RX(double theta, QUBIT *qubit, const Modifiers *modifiers)
-{
+void __catalyst__qis__RX(double theta, QUBIT *qubit, const Modifiers *modifiers) {
     getQuantumDevicePtr()->NamedOperation("RX", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
                                           MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__RY(double theta, QUBIT *qubit, const Modifiers *modifiers)
-{
+void __catalyst__qis__RY(double theta, QUBIT *qubit, const Modifiers *modifiers) {
     getQuantumDevicePtr()->NamedOperation("RY", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
                                           MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__RZ(double theta, QUBIT *qubit, const Modifiers *modifiers)
-{
+void __catalyst__qis__RZ(double theta, QUBIT *qubit, const Modifiers *modifiers) {
     getQuantumDevicePtr()->NamedOperation("RZ", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
                                           MODIFIERS_ARGS(modifiers));
 }
 
 void __catalyst__qis__Rot(double phi, double theta, double omega, QUBIT *qubit,
-                          const Modifiers *modifiers)
-{
+                          const Modifiers *modifiers) {
     getQuantumDevicePtr()->NamedOperation("Rot", {phi, theta, omega},
                                           {reinterpret_cast<QubitIdType>(qubit)},
                                           MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__CNOT(QUBIT *control, QUBIT *target, const Modifiers *modifiers)
-{
+void __catalyst__qis__CNOT(QUBIT *control, QUBIT *target, const Modifiers *modifiers) {
     RT_FAIL_IF(control == target,
                "Invalid input for CNOT gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("CNOT", {},
@@ -633,8 +571,7 @@ void __catalyst__qis__CNOT(QUBIT *control, QUBIT *target, const Modifiers *modif
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__CY(QUBIT *control, QUBIT *target, const Modifiers *modifiers)
-{
+void __catalyst__qis__CY(QUBIT *control, QUBIT *target, const Modifiers *modifiers) {
     RT_FAIL_IF(control == target,
                "Invalid input for CY gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("CY", {},
@@ -643,8 +580,7 @@ void __catalyst__qis__CY(QUBIT *control, QUBIT *target, const Modifiers *modifie
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__CZ(QUBIT *control, QUBIT *target, const Modifiers *modifiers)
-{
+void __catalyst__qis__CZ(QUBIT *control, QUBIT *target, const Modifiers *modifiers) {
     RT_FAIL_IF(control == target,
                "Invalid input for CZ gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("CZ", {},
@@ -653,8 +589,7 @@ void __catalyst__qis__CZ(QUBIT *control, QUBIT *target, const Modifiers *modifie
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__SWAP(QUBIT *control, QUBIT *target, const Modifiers *modifiers)
-{
+void __catalyst__qis__SWAP(QUBIT *control, QUBIT *target, const Modifiers *modifiers) {
     RT_FAIL_IF(control == target,
                "Invalid input for SWAP gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("SWAP", {},
@@ -664,8 +599,7 @@ void __catalyst__qis__SWAP(QUBIT *control, QUBIT *target, const Modifiers *modif
 }
 
 void __catalyst__qis__IsingXX(double theta, QUBIT *control, QUBIT *target,
-                              const Modifiers *modifiers)
-{
+                              const Modifiers *modifiers) {
     RT_FAIL_IF(
         control == target,
         "Invalid input for IsingXX gate. Control and target qubit operands must be distinct.");
@@ -676,8 +610,7 @@ void __catalyst__qis__IsingXX(double theta, QUBIT *control, QUBIT *target,
 }
 
 void __catalyst__qis__IsingYY(double theta, QUBIT *control, QUBIT *target,
-                              const Modifiers *modifiers)
-{
+                              const Modifiers *modifiers) {
     RT_FAIL_IF(
         control == target,
         "Invalid input for IsingYY gate. Control and target qubit operands must be distinct.");
@@ -688,8 +621,7 @@ void __catalyst__qis__IsingYY(double theta, QUBIT *control, QUBIT *target,
 }
 
 void __catalyst__qis__IsingXY(double theta, QUBIT *control, QUBIT *target,
-                              const Modifiers *modifiers)
-{
+                              const Modifiers *modifiers) {
     RT_FAIL_IF(
         control == target,
         "Invalid input for IsingXY gate. Control and target qubit operands must be distinct.");
@@ -700,8 +632,7 @@ void __catalyst__qis__IsingXY(double theta, QUBIT *control, QUBIT *target,
 }
 
 void __catalyst__qis__IsingZZ(double theta, QUBIT *control, QUBIT *target,
-                              const Modifiers *modifiers)
-{
+                              const Modifiers *modifiers) {
     RT_FAIL_IF(
         control == target,
         "Invalid input for IsingZZ gate. Control and target qubit operands must be distinct.");
@@ -712,8 +643,7 @@ void __catalyst__qis__IsingZZ(double theta, QUBIT *control, QUBIT *target,
 }
 
 void __catalyst__qis__SingleExcitation(double phi, QUBIT *wire0, QUBIT *wire1,
-                                       const Modifiers *modifiers)
-{
+                                       const Modifiers *modifiers) {
     RT_FAIL_IF(wire0 == wire1,
                "Invalid input for SingleExcitation gate. All two qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation(
@@ -723,8 +653,7 @@ void __catalyst__qis__SingleExcitation(double phi, QUBIT *wire0, QUBIT *wire1,
 }
 
 void __catalyst__qis__DoubleExcitation(double phi, QUBIT *wire0, QUBIT *wire1, QUBIT *wire2,
-                                       QUBIT *wire3, const Modifiers *modifiers)
-{
+                                       QUBIT *wire3, const Modifiers *modifiers) {
     RT_FAIL_IF(
         (wire0 == wire1 || wire0 == wire2 || wire0 == wire3 || wire1 == wire2 || wire1 == wire3 ||
          wire2 == wire3),
@@ -737,8 +666,7 @@ void __catalyst__qis__DoubleExcitation(double phi, QUBIT *wire0, QUBIT *wire1, Q
 }
 
 void __catalyst__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *target,
-                                           const Modifiers *modifiers)
-{
+                                           const Modifiers *modifiers) {
     RT_FAIL_IF(control == target, "Invalid input for ControlledPhaseShift gate. Control and target "
                                   "qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("ControlledPhaseShift", {theta},
@@ -747,8 +675,7 @@ void __catalyst__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__CRX(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
-{
+void __catalyst__qis__CRX(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers) {
     RT_FAIL_IF(control == target,
                "Invalid input for CRX gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("CRX", {theta},
@@ -757,8 +684,7 @@ void __catalyst__qis__CRX(double theta, QUBIT *control, QUBIT *target, const Mod
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__CRY(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
-{
+void __catalyst__qis__CRY(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers) {
     RT_FAIL_IF(control == target,
                "Invalid input for CRY gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("CRY", {theta},
@@ -767,8 +693,7 @@ void __catalyst__qis__CRY(double theta, QUBIT *control, QUBIT *target, const Mod
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__CRZ(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
-{
+void __catalyst__qis__CRZ(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers) {
     RT_FAIL_IF(control == target,
                "Invalid input for CRZ gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("CRZ", {theta},
@@ -777,8 +702,7 @@ void __catalyst__qis__CRZ(double theta, QUBIT *control, QUBIT *target, const Mod
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__MS(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers)
-{
+void __catalyst__qis__MS(double theta, QUBIT *control, QUBIT *target, const Modifiers *modifiers) {
     RT_FAIL_IF(control == target,
                "Invalid input for MS gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("MS", {theta},
@@ -788,8 +712,7 @@ void __catalyst__qis__MS(double theta, QUBIT *control, QUBIT *target, const Modi
 }
 
 void __catalyst__qis__CRot(double phi, double theta, double omega, QUBIT *control, QUBIT *target,
-                           const Modifiers *modifiers)
-{
+                           const Modifiers *modifiers) {
     RT_FAIL_IF(control == target,
                "Invalid input for CRot gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("CRot", {phi, theta, omega},
@@ -798,8 +721,8 @@ void __catalyst__qis__CRot(double phi, double theta, double omega, QUBIT *contro
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__CSWAP(QUBIT *control, QUBIT *aswap, QUBIT *bswap, const Modifiers *modifiers)
-{
+void __catalyst__qis__CSWAP(QUBIT *control, QUBIT *aswap, QUBIT *bswap,
+                            const Modifiers *modifiers) {
     RT_FAIL_IF((control == aswap || aswap == bswap || control == bswap),
                "Invalid input for CSWAP gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("CSWAP", {},
@@ -809,8 +732,8 @@ void __catalyst__qis__CSWAP(QUBIT *control, QUBIT *aswap, QUBIT *bswap, const Mo
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__Toffoli(QUBIT *wire0, QUBIT *wire1, QUBIT *wire2, const Modifiers *modifiers)
-{
+void __catalyst__qis__Toffoli(QUBIT *wire0, QUBIT *wire1, QUBIT *wire2,
+                              const Modifiers *modifiers) {
     RT_FAIL_IF((wire0 == wire1 || wire1 == wire2 || wire0 == wire2),
                "Invalid input for Toffoli gate. All three qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation("Toffoli", {},
@@ -820,8 +743,7 @@ void __catalyst__qis__Toffoli(QUBIT *wire0, QUBIT *wire1, QUBIT *wire2, const Mo
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__MultiRZ(double theta, const Modifiers *modifiers, int64_t numQubits, ...)
-{
+void __catalyst__qis__MultiRZ(double theta, const Modifiers *modifiers, int64_t numQubits, ...) {
     RT_ASSERT(numQubits >= 0);
 
     va_list args;
@@ -836,8 +758,7 @@ void __catalyst__qis__MultiRZ(double theta, const Modifiers *modifiers, int64_t 
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__ISWAP(QUBIT *wire0, QUBIT *wire1, const Modifiers *modifiers)
-{
+void __catalyst__qis__ISWAP(QUBIT *wire0, QUBIT *wire1, const Modifiers *modifiers) {
     RT_FAIL_IF(wire0 == wire1,
                "Invalid input for ISWAP gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation(
@@ -845,8 +766,7 @@ void __catalyst__qis__ISWAP(QUBIT *wire0, QUBIT *wire1, const Modifiers *modifie
         MODIFIERS_ARGS(modifiers));
 }
 
-void __catalyst__qis__PSWAP(double phi, QUBIT *wire0, QUBIT *wire1, const Modifiers *modifiers)
-{
+void __catalyst__qis__PSWAP(double phi, QUBIT *wire0, QUBIT *wire1, const Modifiers *modifiers) {
     RT_FAIL_IF(wire0 == wire1,
                "Invalid input for PSWAP gate. Control and target qubit operands must be distinct.");
     getQuantumDevicePtr()->NamedOperation(
@@ -856,8 +776,7 @@ void __catalyst__qis__PSWAP(double phi, QUBIT *wire0, QUBIT *wire1, const Modifi
 }
 
 void __catalyst__qis__PauliRot(const char *pauliStr, double theta, const Modifiers *modifiers,
-                               bool cond, int64_t numQubits, ...)
-{
+                               bool cond, int64_t numQubits, ...) {
     RT_ASSERT(numQubits >= 0);
 
     // convert chat* to string
@@ -883,8 +802,7 @@ void __catalyst__qis__PauliRot(const char *pauliStr, double theta, const Modifie
 
 static void _qubitUnitary_impl(MemRefT_CplxT_double_2d *matrix, int64_t numQubits,
                                std::vector<std::complex<double>> &coeffs,
-                               std::vector<QubitIdType> &wires, va_list *args)
-{
+                               std::vector<QubitIdType> &wires, va_list *args) {
     const size_t num_rows = matrix->sizes[0];
     const size_t num_col = matrix->sizes[1];
     const size_t expected_size = std::pow(2, numQubits);
@@ -907,8 +825,7 @@ static void _qubitUnitary_impl(MemRefT_CplxT_double_2d *matrix, int64_t numQubit
 }
 
 void __catalyst__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, const Modifiers *modifiers,
-                                   int64_t numQubits, /*qubits*/...)
-{
+                                   int64_t numQubits, /*qubits*/...) {
     RT_ASSERT(numQubits >= 0);
 
     if (matrix == nullptr) {
@@ -928,14 +845,12 @@ void __catalyst__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, const Modifi
     return getQuantumDevicePtr()->MatrixOperation(coeffs, wires, MODIFIERS_ARGS(modifiers));
 }
 
-ObsIdType __catalyst__qis__NamedObs(int64_t obsId, QUBIT *wire)
-{
+ObsIdType __catalyst__qis__NamedObs(int64_t obsId, QUBIT *wire) {
     return getQuantumDevicePtr()->Observable(static_cast<ObsId>(obsId), {},
                                              {reinterpret_cast<QubitIdType>(wire)});
 }
 
-ObsIdType __catalyst__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix, int64_t numQubits, ...)
-{
+ObsIdType __catalyst__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix, int64_t numQubits, ...) {
     RT_ASSERT(numQubits >= 0);
 
     if (matrix == nullptr) {
@@ -973,8 +888,7 @@ ObsIdType __catalyst__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix, int64_t
     return getQuantumDevicePtr()->Observable(ObsId::Hermitian, coeffs, wires);
 }
 
-ObsIdType __catalyst__qis__TensorObs(int64_t numObs, /*obsKeys*/...)
-{
+ObsIdType __catalyst__qis__TensorObs(int64_t numObs, /*obsKeys*/...) {
     if (numObs < 1) {
         RT_FAIL("Invalid number of observables to create TensorProdObs");
     }
@@ -992,8 +906,7 @@ ObsIdType __catalyst__qis__TensorObs(int64_t numObs, /*obsKeys*/...)
 }
 
 ObsIdType __catalyst__qis__HamiltonianObs(MemRefT_double_1d *coeffs, int64_t numObs,
-                                          /*obsKeys*/...)
-{
+                                          /*obsKeys*/...) {
     RT_ASSERT(numObs >= 0);
 
     if (coeffs == nullptr) {
@@ -1021,8 +934,7 @@ ObsIdType __catalyst__qis__HamiltonianObs(MemRefT_double_1d *coeffs, int64_t num
     return getQuantumDevicePtr()->HamiltonianObservable(coeffs_vec, obsKeys);
 }
 
-RESULT *__catalyst__qis__Measure(QUBIT *wire, int32_t postselect)
-{
+RESULT *__catalyst__qis__Measure(QUBIT *wire, int32_t postselect) {
     std::optional<int32_t> postselectOpt{postselect};
 
     // Any value different to 0 or 1 denotes absence of postselect, and it is hence turned into
@@ -1035,8 +947,7 @@ RESULT *__catalyst__qis__Measure(QUBIT *wire, int32_t postselect)
 }
 
 RESULT *__catalyst__qis__PauliMeasure(const char *pauliStr, bool negated, const char *pauliStrAlt,
-                                      bool negatedAlt, bool selectSwitch, int64_t numQubits, ...)
-{
+                                      bool negatedAlt, bool selectSwitch, int64_t numQubits, ...) {
     RT_ASSERT(numQubits >= 0);
 
     // convert chat* to string
@@ -1044,8 +955,7 @@ RESULT *__catalyst__qis__PauliMeasure(const char *pauliStr, bool negated, const 
     if (selectSwitch) {
         RT_FAIL_IF(pauliStr == nullptr, "Invalid (null) pauli string provided.");
         pauliStr_ = pauliStr;
-    }
-    else {
+    } else {
         RT_FAIL_IF(pauliStrAlt == nullptr, "Invalid (null) alternative pauli string provided.");
         pauliStr_ = pauliStrAlt;
     }
@@ -1073,8 +983,7 @@ double __catalyst__qis__Expval(ObsIdType obsKey) { return getQuantumDevicePtr()-
 
 double __catalyst__qis__Variance(ObsIdType obsKey) { return getQuantumDevicePtr()->Var(obsKey); }
 
-void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
-{
+void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...) {
     RT_ASSERT(numQubits >= 0);
     MemRefT<std::complex<double>, 1> *result_p = (MemRefT<std::complex<double>, 1> *)result;
 
@@ -1091,14 +1000,12 @@ void __catalyst__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, 
 
     if (wires.empty()) {
         getQuantumDevicePtr()->State(view);
-    }
-    else {
+    } else {
         RT_FAIL("Partial State-Vector not supported.");
     }
 }
 
-void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
-{
+void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...) {
     RT_ASSERT(numQubits >= 0);
     std::string error_msg = "return tensor must have length equal to 2^(number of qubits)";
     if (numQubits != 0) {
@@ -1120,14 +1027,12 @@ void __catalyst__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 
     if (wires.empty()) {
         getQuantumDevicePtr()->Probs(view);
-    }
-    else {
+    } else {
         getQuantumDevicePtr()->PartialProbs(view, wires);
     }
 }
 
-void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
-{
+void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...) {
     RT_ASSERT(numQubits >= 0);
     std::string error_msg = "return tensor must have 2D shape equal to (number of shots, "
                             "number of qubits in observable)";
@@ -1151,14 +1056,12 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
 
     if (wires.empty()) {
         getQuantumDevicePtr()->Sample(view);
-    }
-    else {
+    } else {
         getQuantumDevicePtr()->PartialSample(view, wires);
     }
 }
 
-void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQubits, ...)
-{
+void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQubits, ...) {
     RT_ASSERT(numQubits >= 0);
     RT_ASSERT(result->first.sizes[0] == result->second.sizes[0]);
     std::string error_msg = "number of eigenvalues or counts did not match observable";
@@ -1184,20 +1087,17 @@ void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t numQ
 
     if (wires.empty()) {
         getQuantumDevicePtr()->Counts(eigvals_view, counts_view);
-    }
-    else {
+    } else {
         getQuantumDevicePtr()->PartialCounts(eigvals_view, counts_view, wires);
     }
 }
 
-int64_t __catalyst__rt__array_get_size_1d(QirArray *ptr)
-{
+int64_t __catalyst__rt__array_get_size_1d(QirArray *ptr) {
     std::vector<QubitIdType> *qubit_vector_ptr = reinterpret_cast<std::vector<QubitIdType> *>(ptr);
     return qubit_vector_ptr->size();
 }
 
-int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
-{
+int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx) {
     std::vector<QubitIdType> *qubit_vector_ptr = reinterpret_cast<std::vector<QubitIdType> *>(ptr);
 
     RT_ASSERT(idx >= 0);
@@ -1207,8 +1107,7 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
     if (static_cast<size_t>(idx) >= qubit_vector_ptr->size()) {
         if (!RTD_PTR->getQubitManagementMode()) {
             RT_FAIL(error_msg.c_str());
-        }
-        else {
+        } else {
             autoQubitManagementAllocate(qubit_vector_ptr, idx);
         }
     }
@@ -1217,8 +1116,7 @@ int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
     return (int8_t *)&data[idx];
 }
 
-void __catalyst__rt__array_update_element_1d(QirArray *ptr, int64_t idx, QUBIT *qubit)
-{
+void __catalyst__rt__array_update_element_1d(QirArray *ptr, int64_t idx, QUBIT *qubit) {
     RT_ASSERT(getQuantumDevicePtr() != nullptr);
     RT_ASSERT(CTX->getMemoryManager() != nullptr);
     std::vector<QubitIdType> *qubit_vector_ptr = reinterpret_cast<std::vector<QubitIdType> *>(ptr);
@@ -1260,8 +1158,7 @@ void __catalyst__rt__array_update_element_1d(QirArray *ptr, int64_t idx, QUBIT *
 //       mid-circuit measurements in an arbitrary basis are available, we will create a new
 //       QuantumDevice to implement this functionality according to the hardware specs.
 RESULT *__catalyst__mbqc__measure_in_basis(QUBIT *wire, uint32_t plane, double angle,
-                                           int32_t postselect)
-{
+                                           int32_t postselect) {
     std::optional<int32_t> postselectOpt{postselect};
 
     // Any value different to 0 or 1 denotes absence of postselect, and it is hence turned into

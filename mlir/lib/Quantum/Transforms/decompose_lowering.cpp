@@ -56,16 +56,14 @@ static constexpr StringRef decomp_gateset_attr_name = "decomp_gateset";
 // function, and target_op is that the decomposition function want to replace
 bool isDecompositionFunction(func::FuncOp func) { return func->hasAttr(target_gate_attr_name); }
 
-StringRef getTargetGateName(func::FuncOp func)
-{
+StringRef getTargetGateName(func::FuncOp func) {
     if (auto target_op_attr = func->getAttrOfType<StringAttr>(target_gate_attr_name)) {
         return target_op_attr.getValue();
     }
     return StringRef{};
 }
 
-uint64_t getNumWires(func::FuncOp func)
-{
+uint64_t getNumWires(func::FuncOp func) {
     if (auto num_wires_attr = func->getAttrOfType<IntegerAttr>("num_wires")) {
         return num_wires_attr.getValue().getZExtValue();
     }
@@ -79,8 +77,7 @@ uint64_t getNumWires(func::FuncOp func)
 struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLoweringPass> {
     using DecomposeLoweringPassBase::DecomposeLoweringPassBase;
 
-    void getDependentDialects(DialectRegistry &registry) const override
-    {
+    void getDependentDialects(DialectRegistry &registry) const override {
         registry.insert<arith::ArithDialect>();
         registry.insert<func::FuncDialect>();
         registry.insert<quantum::QuantumDialect>();
@@ -96,8 +93,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     // Function to discover and register decomposition functions from a module
     // It's bookkeeping the targetOp and the decomposition function that can decompose the targetOp
     void discoverAndRegisterDecompositions(ModuleOp module,
-                                           llvm::StringMap<func::FuncOp> &decompositionRegistry)
-    {
+                                           llvm::StringMap<func::FuncOp> &decompositionRegistry) {
         module.walk([&](func::FuncOp func) {
             if (StringRef targetOp = DecompUtils::getTargetGateName(func); !targetOp.empty()) {
                 if (targetOp == "MultiRZ") {
@@ -108,8 +104,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
                         targetOp.str() + "_" + std::to_string(DecompUtils::getNumWires(func));
 
                     decompositionRegistry[newTargetOpStr] = func;
-                }
-                else {
+                } else {
                     decompositionRegistry[targetOp] = func;
                 }
             }
@@ -123,8 +118,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     // the target gate set that the circuit function want to finally decompose into. Since each
     // module only contains one circuit function, we can just find the target gate set from the
     // function with the `decomp_gateset` attribute
-    void findTargetGateSet(ModuleOp module, llvm::StringSet<llvm::MallocAllocator> &targetGateSet)
-    {
+    void findTargetGateSet(ModuleOp module, llvm::StringSet<llvm::MallocAllocator> &targetGateSet) {
         module.walk([&](func::FuncOp func) {
             if (auto gate_set_attr =
                     func->getAttrOfType<ArrayAttr>(DecompUtils::decomp_gateset_attr_name)) {
@@ -144,8 +138,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     // there is no way to remove them with any DCE pass automatically.
     // So we need to manually remove them from the module
     void removeDecompositionFunctions(ModuleOp module,
-                                      llvm::StringMap<func::FuncOp> &decompositionRegistry)
-    {
+                                      llvm::StringMap<func::FuncOp> &decompositionRegistry) {
         llvm::DenseSet<func::FuncOp> usedDecompositionFunctions;
 
         module.walk([&](func::CallOp callOp) {
@@ -167,8 +160,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     }
 
   public:
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         ModuleOp module = cast<ModuleOp>(getOperation());
 
         // Step 1: Discover and register all decomposition functions in the module

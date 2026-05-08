@@ -18,8 +18,7 @@
 
 namespace Catalyst::Runtime::Device {
 
-auto OQCDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
-{
+auto OQCDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> {
     if (!num_qubits) {
         return {};
     }
@@ -36,8 +35,7 @@ auto OQCDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
     return result;
 }
 
-void OQCDevice::ReleaseQubits(const std::vector<QubitIdType> &qubits)
-{
+void OQCDevice::ReleaseQubits(const std::vector<QubitIdType> &qubits) {
     std::set<QubitIdType> dealloc_Ids(qubits.begin(), qubits.end());
     RT_FAIL_IF(this->initial_allocated_QubitIds != dealloc_Ids,
                "OQC device does not support dynamic qubit allocation. Please ensure the "
@@ -58,8 +56,7 @@ void OQCDevice::NamedOperation(const std::string &name, const std::vector<double
                                const std::vector<QubitIdType> &wires, bool inverse,
                                const std::vector<QubitIdType> &controlled_wires,
                                const std::vector<bool> &controlled_values,
-                               const std::vector<std::string> &optional_params)
-{
+                               const std::vector<std::string> &optional_params) {
     RT_FAIL_IF(!controlled_wires.empty() || !controlled_values.empty(),
                "OpenQasm device does not support native quantum control.");
 
@@ -79,8 +76,7 @@ void OQCDevice::NamedOperation(const std::string &name, const std::vector<double
 }
 
 void OQCDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                              const std::vector<QubitIdType> &wires)
-{
+                              const std::vector<QubitIdType> &wires) {
     const size_t numQubits = GetNumQubits();
     // Add the measurements on the given wires
     for (auto wire : wires) {
@@ -96,8 +92,7 @@ void OQCDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1>
     }
 }
 
-auto OQCDevice::Measure(QubitIdType, std::optional<int32_t>) -> Result
-{
+auto OQCDevice::Measure(QubitIdType, std::optional<int32_t>) -> Result {
     RT_FAIL("Measure is unsupported by device");
 }
 

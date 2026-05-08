@@ -35,8 +35,7 @@ struct MitigationInlinerInterface : public DialectInlinerInterface {
     using DialectInlinerInterface::DialectInlinerInterface;
 
     /// Operations in Mitigation dialect are always legal to inline.
-    bool isLegalToInline(Operation *, Region *, bool, IRMapping &valueMapping) const final
-    {
+    bool isLegalToInline(Operation *, Region *, bool, IRMapping &valueMapping) const final {
         return true;
     }
 };
@@ -46,8 +45,7 @@ struct MitigationInlinerInterface : public DialectInlinerInterface {
 // Mitigation dialect.
 //===----------------------------------------------------------------------===//
 
-void MitigationDialect::initialize()
-{
+void MitigationDialect::initialize() {
     addTypes<
 #define GET_TYPEDEF_LIST
 #include "Mitigation/IR/MitigationOpsTypes.cpp.inc"

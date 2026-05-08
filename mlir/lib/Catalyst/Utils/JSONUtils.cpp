@@ -21,8 +21,7 @@ using namespace mlir;
 
 namespace catalyst {
 
-Attribute jsonToAttribute(MLIRContext *ctx, const llvm::json::Value &json)
-{
+Attribute jsonToAttribute(MLIRContext *ctx, const llvm::json::Value &json) {
     if (auto str = json.getAsString()) {
         return StringAttr::get(ctx, *str);
     }
@@ -58,8 +57,7 @@ Attribute jsonToAttribute(MLIRContext *ctx, const llvm::json::Value &json)
     return UnitAttr::get(ctx);
 }
 
-FailureOr<DictionaryAttr> loadJsonFileAsDict(MLIRContext *ctx, StringRef filePath)
-{
+FailureOr<DictionaryAttr> loadJsonFileAsDict(MLIRContext *ctx, StringRef filePath) {
     auto fileOrErr = llvm::MemoryBuffer::getFile(filePath);
     if (!fileOrErr) {
         return failure();

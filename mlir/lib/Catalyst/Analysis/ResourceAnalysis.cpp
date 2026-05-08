@@ -39,8 +39,7 @@ namespace catalyst {
 // Skipped operations set (mirrors Python _SKIPPED_OPS)
 //===----------------------------------------------------------------------===//
 
-static bool isSkippedOp(Operation *op)
-{
+static bool isSkippedOp(Operation *op) {
     return isa<quantum::ComputationalBasisOp, quantum::DeallocOp, quantum::DeallocQubitOp,
                quantum::DeviceReleaseOp, quantum::ExtractOp, quantum::FinalizeOp,
                quantum::HamiltonianOp, quantum::HermitianOp, quantum::InitializeOp,
@@ -49,8 +48,7 @@ static bool isSkippedOp(Operation *op)
 }
 
 /// Check if the operation belongs to one of the tracked quantum dialects.
-static bool isCustomDialectOp(Operation *op)
-{
+static bool isCustomDialectOp(Operation *op) {
     mlir::Dialect *dialect = op->getDialect();
     if (!dialect) {
         return false;
@@ -63,8 +61,7 @@ static bool isCustomDialectOp(Operation *op)
 //===----------------------------------------------------------------------===//
 
 /// Get the name to use for a quantum gate op.
-static std::string getGateOpName(Operation *op, bool isAdjoint)
-{
+static std::string getGateOpName(Operation *op, bool isAdjoint) {
     std::string name =
         llvm::TypeSwitch<Operation *, std::string>(op)
             .Case<quantum::CustomOp>([](auto customOp) { return customOp.getGateName().str(); })
@@ -90,8 +87,7 @@ static std::string getGateOpName(Operation *op, bool isAdjoint)
 }
 
 /// Get the number of qubits for a gate operation.
-static int getGateQubitCount(Operation *op)
-{
+static int getGateQubitCount(Operation *op) {
     if (auto qOp = dyn_cast<quantum::QuantumOperation>(op)) {
         return static_cast<int>(qOp.getQubitOperands().size());
     }
@@ -99,8 +95,7 @@ static int getGateQubitCount(Operation *op)
 }
 
 /// Get the number of parameters for a gate operation.
-static int getGateParamCount(Operation *op)
-{
+static int getGateParamCount(Operation *op) {
     if (auto gate = dyn_cast<quantum::ParametrizedGate>(op)) {
         return static_cast<int>(gate.getAllParams().size());
     }
@@ -108,8 +103,7 @@ static int getGateParamCount(Operation *op)
 }
 
 /// Get the name for a PBC operation.
-static std::string getPBCOpName(Operation *op)
-{
+static std::string getPBCOpName(Operation *op) {
     return llvm::TypeSwitch<Operation *, std::string>(op)
         .Case<pbc::PPRotationOp>([](auto pprOp) -> std::string {
             int8_t rk = pprOp.getRotationKind();
@@ -125,8 +119,7 @@ static std::string getPBCOpName(Operation *op)
 }
 
 /// Get the qubit count for a PBC operation.
-static int getPBCQubitCount(Operation *op)
-{
+static int getPBCQubitCount(Operation *op) {
     // if the operation is one of these operations, it will return the number of qubits in the input
     return llvm::TypeSwitch<Operation *, int>(op)
         .Case<pbc::PPRotationOp, pbc::PPRotationArbitraryOp, pbc::PPMeasurementOp,
@@ -137,8 +130,7 @@ static int getPBCQubitCount(Operation *op)
 
 /// Resolve the observable name from its defining operation.
 /// Mirrors the Python `xdsl_to_qml_measurement_name` in xdsl_conversion.py.
-static std::string getObservableName(Operation *obsOp)
-{
+static std::string getObservableName(Operation *obsOp) {
     if (!obsOp) {
         return "all wires";
     }
@@ -160,8 +152,7 @@ static std::string getObservableName(Operation *obsOp)
 
 /// Get the full measurement name including observable info.
 /// e.g. "MidCircuitMeasure", "expval(PauliZ)", "sample(all wires)", "probs(2 wires)".
-static std::string getMeasurementName(Operation *op)
-{
+static std::string getMeasurementName(Operation *op) {
     if (isa<quantum::MeasureOp>(op)) {
         return "MidCircuitMeasure";
     }
@@ -187,8 +178,7 @@ static std::string getMeasurementName(Operation *op)
 // ResourceAnalysis implementation
 //===----------------------------------------------------------------------===//
 
-ResourceAnalysis::ResourceAnalysis(Operation *op)
-{
+ResourceAnalysis::ResourceAnalysis(Operation *op) {
     LLVM_DEBUG(dbgs() << "ResourceAnalysis: analyzing operation " << op->getName() << "\n");
 
     StringRef entryFunc;
@@ -237,8 +227,7 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
     entryFuncName = entryFunc.str();
 }
 
-void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint)
-{
+void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint) {
     ResourceResult bodyResult;
     analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint);
 
@@ -246,19 +235,16 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
     if (auto estAttr = forOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
         int64_t iters = estAttr.getValue().getSExtValue();
         bodyResult.multiplyByScalar(iters);
-    }
-    else if (auto tripCount = forOp.getStaticTripCount()) {
+    } else if (auto tripCount = forOp.getStaticTripCount()) {
         bodyResult.multiplyByScalar(tripCount->getSExtValue());
-    }
-    else {
+    } else {
         auto lb = resolveConstantInt(forOp.getLowerBound());
         auto ub = resolveConstantInt(forOp.getUpperBound());
         auto step = resolveConstantInt(forOp.getStep());
         if (lb && ub && step && *step != 0 && *ub > *lb) {
             int64_t tripCount = (*ub - *lb + *step - 1) / *step;
             bodyResult.multiplyByScalar(tripCount);
-        }
-        else {
+        } else {
             result.hasDynLoop = true;
         }
     }
@@ -266,24 +252,21 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
 }
 
 void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result,
-                                        bool isAdjoint)
-{
+                                        bool isAdjoint) {
     ResourceResult bodyResult;
     analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint);
 
     if (auto estAttr = whileOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
         int64_t iters = estAttr.getValue().getSExtValue();
         bodyResult.multiplyByScalar(iters);
-    }
-    else {
+    } else {
         result.hasDynLoop = true;
     }
 
     result.mergeWith(bodyResult);
 }
 
-void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint)
-{
+void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint) {
     result.hasBranches = true;
 
     ResourceResult thenResult;
@@ -298,8 +281,7 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
 }
 
 void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, ResourceResult &result,
-                                            bool isAdjoint)
-{
+                                            bool isAdjoint) {
     result.hasBranches = true;
 
     ResourceResult maxResult;
@@ -311,8 +293,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
         if (first) {
             maxResult = std::move(caseResult);
             first = false;
-        }
-        else {
+        } else {
             maxResult.mergeWith(caseResult, ResourceResult::MergeMethod::Max);
         }
     }
@@ -325,8 +306,8 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     result.mergeWith(maxResult);
 }
 
-void ResourceAnalysis::analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &result, bool isAdjoint)
-{
+void ResourceAnalysis::analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &result,
+                                       bool isAdjoint) {
     for (auto &layerRegion : layerOp->getRegions()) {
         analyzeRegion(layerRegion, result, isAdjoint);
     }
@@ -341,8 +322,7 @@ void ResourceAnalysis::analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &res
  * @param result The ResourceResult to accumulate counts into.
  * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
  */
-void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint)
-{
+void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint) {
     for (Block &block : region) {
         for (Operation &op : block) {
             llvm::TypeSwitch<Operation &, void>(op)
@@ -383,8 +363,7 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
  * @param result The ResourceResult to update with the operation's resource usage.
  * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
  */
-void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint)
-{
+void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint) {
     // Quantum gates
     if (isa<quantum::CustomOp, quantum::PauliRotOp, quantum::GlobalPhaseOp, quantum::MultiRZOp,
             quantum::PCPhaseOp, quantum::QubitUnitaryOp, quantum::SetStateOp,
@@ -469,8 +448,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
  * @param funcName The name of the function to resolve calls for.
  * This will be called recursively on callees.
  */
-void ResourceAnalysis::resolveFunctionCalls(StringRef funcName)
-{
+void ResourceAnalysis::resolveFunctionCalls(StringRef funcName) {
     auto it = funcResults.find(funcName);
     if (it == funcResults.end()) {
         return;

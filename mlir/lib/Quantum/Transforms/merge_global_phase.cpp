@@ -35,8 +35,7 @@ namespace quantum {
 struct CombineGlobalPhasesPass : impl::CombineGlobalPhasesPassBase<CombineGlobalPhasesPass> {
     using impl::CombineGlobalPhasesPassBase<CombineGlobalPhasesPass>::CombineGlobalPhasesPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         ModuleOp mod = getOperation();
         OpBuilder builder(mod->getContext());
 
@@ -62,8 +61,7 @@ struct CombineGlobalPhasesPass : impl::CombineGlobalPhasesPassBase<CombineGlobal
                 llvm::SmallVector<Value, 2> args{runningSum, phaseOp.getAngle()};
                 if (phaseOp.getAdjoint()) {
                     runningSum = arith::SubFOp::create(builder, phaseOp.getLoc(), args);
-                }
-                else {
+                } else {
                     runningSum = arith::AddFOp::create(builder, phaseOp.getLoc(), args);
                 }
                 phaseOp->erase();

@@ -26,8 +26,7 @@
 using namespace mlir;
 
 namespace {
-TEST(MLIRParser, ParseQuantumIR)
-{
+TEST(MLIRParser, ParseQuantumIR) {
     std::string moduleStr = R"mlir(
 func.func @test_alloc_dealloc_no_fold() -> !quantum.bit {
   %r = quantum.alloc(3) : !quantum.reg

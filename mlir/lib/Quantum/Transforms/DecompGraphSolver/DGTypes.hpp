@@ -50,8 +50,7 @@ struct OperatorNode {
     int numParams{-1};
     bool adjoint{false};
 
-    bool operator==(const OperatorNode &other) const
-    {
+    bool operator==(const OperatorNode &other) const {
         // For equality, we consider numWires and numParams conditionally equal
         // if they are not set to -1 (which indicates a wildcard that can match any value).
         const bool default_wires =
@@ -80,8 +79,7 @@ struct OperatorNode {
  * in the hash when converting MLIR operations to OperatorNodes.
  */
 struct OperatorNodeHash {
-    std::size_t operator()(const OperatorNode &node) const
-    {
+    std::size_t operator()(const OperatorNode &node) const {
         return std::hash<std::string>{}(node.name);
     }
 };
@@ -93,8 +91,7 @@ struct WeightedGateset {
     std::unordered_map<OperatorNode, double, OperatorNodeHash> ops;
 
     [[nodiscard]] bool contains(const OperatorNode &op) const { return ops.find(op) != ops.end(); }
-    [[nodiscard]] double getCost(const OperatorNode &op) const
-    {
+    [[nodiscard]] double getCost(const OperatorNode &op) const {
         auto it = ops.find(op);
         if (it != ops.end()) {
             return it->second;
@@ -149,8 +146,7 @@ struct RuleNode {
     std::vector<RuleTerm> inputs;
     RuleOrigin origin{RuleOrigin::Default};
 
-    bool operator==(const RuleNode &other) const
-    {
+    bool operator==(const RuleNode &other) const {
         return name == other.name && output == other.output && origin == other.origin;
     }
 

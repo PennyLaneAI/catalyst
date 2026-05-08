@@ -36,8 +36,7 @@ namespace {
 // Helper functions
 //===----------------------------------------------------------------------===//
 
-Value awaitEvents(ArrayRef<Value> events, PatternRewriter &rewriter)
-{
+Value awaitEvents(ArrayRef<Value> events, PatternRewriter &rewriter) {
     if (events.size() == 1) {
         return events.front();
     }
@@ -74,13 +73,10 @@ Value awaitEvents(ArrayRef<Value> events, PatternRewriter &rewriter)
 /// resolved by the subsequent stages.
 struct ParallelProtocolToRTIOPattern : public OpConversionPattern<ion::ParallelProtocolOp> {
     ParallelProtocolToRTIOPattern(TypeConverter &typeConverter, MLIRContext *ctx)
-        : OpConversionPattern<ion::ParallelProtocolOp>(typeConverter, ctx)
-    {
-    }
+        : OpConversionPattern<ion::ParallelProtocolOp>(typeConverter, ctx) {}
 
     LogicalResult matchAndRewrite(ion::ParallelProtocolOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         MLIRContext *ctx = rewriter.getContext();
         Location loc = op.getLoc();
 
@@ -198,13 +194,10 @@ struct PulseToRTIOPattern : public OpConversionPattern<ion::PulseOp> {
     PulseToRTIOPattern(TypeConverter &typeConverter, MLIRContext *ctx, IonInfo ionInfo,
                        DenseMap<Value, Value> &qextractToMemrefMap)
         : OpConversionPattern<ion::PulseOp>(typeConverter, ctx), ionInfo(ionInfo),
-          qextractToMemrefMap(qextractToMemrefMap)
-    {
-    }
+          qextractToMemrefMap(qextractToMemrefMap) {}
 
     double calculateFrequency(int64_t transitionIndex, double detuning,
-                              const IonInfo &ionInfo) const
-    {
+                              const IonInfo &ionInfo) const {
         // TODO: raman1_frequency can be passed as a pass option for extensibility
         double raman1_frequency = 2 * llvm::numbers::pi * 844.485e12 -
                                   2 * llvm::numbers::pi * 12.643e9 - 2 * llvm::numbers::pi * 20e6;
@@ -219,8 +212,7 @@ struct PulseToRTIOPattern : public OpConversionPattern<ion::PulseOp> {
     }
 
     LogicalResult matchAndRewrite(ion::PulseOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = rewriter.getContext();
 
@@ -285,13 +277,10 @@ struct PulseToRTIOPattern : public OpConversionPattern<ion::PulseOp> {
 /// ```
 struct ResolveChannelMappingPattern : public OpRewritePattern<rtio::RTIOQubitToChannelOp> {
     ResolveChannelMappingPattern(MLIRContext *ctx)
-        : OpRewritePattern<rtio::RTIOQubitToChannelOp>(ctx)
-    {
-    }
+        : OpRewritePattern<rtio::RTIOQubitToChannelOp>(ctx) {}
 
     LogicalResult matchAndRewrite(rtio::RTIOQubitToChannelOp op,
-                                  PatternRewriter &rewriter) const override
-    {
+                                  PatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         Value qubit = op.getQubit();
 
@@ -382,13 +371,10 @@ struct PropagateEventsPattern : public OpRewritePattern<UnrealizedConversionCast
     MLIRContext *ctx;
 
     PropagateEventsPattern(MLIRContext *ctx)
-        : OpRewritePattern<UnrealizedConversionCastOp>(ctx), ctx(ctx)
-    {
-    }
+        : OpRewritePattern<UnrealizedConversionCastOp>(ctx), ctx(ctx) {}
 
     LogicalResult matchAndRewrite(UnrealizedConversionCastOp op,
-                                  PatternRewriter &rewriter) const override
-    {
+                                  PatternRewriter &rewriter) const override {
         if (op.getNumOperands() != 1 || op.getNumResults() != 1)
             return failure();
 
@@ -459,20 +445,17 @@ struct PropagateEventsPattern : public OpRewritePattern<UnrealizedConversionCast
 
 void populateIonPulseToRTIOPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns,
                                     const IonInfo &ionInfo,
-                                    DenseMap<Value, Value> &qextractToMemrefMap)
-{
+                                    DenseMap<Value, Value> &qextractToMemrefMap) {
     patterns.add<PulseToRTIOPattern>(typeConverter, patterns.getContext(), ionInfo,
                                      qextractToMemrefMap);
 }
 
 void populateParallelProtocolToRTIOPatterns(TypeConverter &typeConverter,
-                                            RewritePatternSet &patterns)
-{
+                                            RewritePatternSet &patterns) {
     patterns.add<ParallelProtocolToRTIOPattern>(typeConverter, patterns.getContext());
 }
 
-void populateIonToRTIOFinalizePatterns(RewritePatternSet &patterns)
-{
+void populateIonToRTIOFinalizePatterns(RewritePatternSet &patterns) {
     patterns.add<PropagateEventsPattern>(patterns.getContext());
     patterns.add<ResolveChannelMappingPattern>(patterns.getContext());
 }

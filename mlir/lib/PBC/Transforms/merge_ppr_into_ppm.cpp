@@ -35,8 +35,7 @@ namespace pbc {
 struct MergePPRIntoPPMPass : public impl::MergePPRIntoPPMPassBase<MergePPRIntoPPMPass> {
     using MergePPRIntoPPMPassBase::MergePPRIntoPPMPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         RewritePatternSet patterns(&getContext());
 
         populateMergePPRIntoPPMPatterns(patterns, maxPauliSize);

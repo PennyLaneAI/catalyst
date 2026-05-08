@@ -110,8 +110,7 @@ class BaseSignatureAnalyzer {
                               .inWireIndices = {},
                               .inCtrlWireIndices = {},
                               .outQubitIndices = {},
-                              .outCtrlQubitIndices = {}})
-    {
+                              .outCtrlQubitIndices = {}}) {
         initializeQregMode(op, enableQregMode);
     }
 
@@ -129,8 +128,7 @@ class BaseSignatureAnalyzer {
                               .inWireIndices = {},
                               .inCtrlWireIndices = {},
                               .outQubitIndices = {},
-                              .outCtrlQubitIndices = {}})
-    {
+                              .outCtrlQubitIndices = {}}) {
         initializeQregMode(op, enableQregMode);
     }
 
@@ -140,8 +138,7 @@ class BaseSignatureAnalyzer {
     // Public Methods (Identical to Original)
     operator bool() const { return isValid; }
 
-    Value getUpdatedQreg(PatternRewriter &rewriter, Location loc)
-    {
+    Value getUpdatedQreg(PatternRewriter &rewriter, Location loc) {
         // FIXME: This will cause an issue when the decomposition function has cross-qreg
         // inputs and outputs. Now, we just assume has only one qreg input, the global one exists.
         // raise an error if the qreg is not the same
@@ -170,8 +167,7 @@ class BaseSignatureAnalyzer {
     // 2. qubit mode:
     //    - func(param*, inQubits*, inCtrlQubits*?, inCtrlValues*?) -> outQubits*
     llvm::SmallVector<Value> prepareCallOperands(func::FuncOp decompFunc, PatternRewriter &rewriter,
-                                                 Location loc)
-    {
+                                                 Location loc) {
         auto funcType = decompFunc.getFunctionType();
         auto funcInputs = funcType.getInputs();
 
@@ -205,8 +201,7 @@ class BaseSignatureAnalyzer {
                     operandIdx++;
                 }
             }
-        }
-        else {
+        } else {
             if (!signature.params.empty()) {
                 auto [startIdx, endIdx] =
                     findParamTypeRange(funcInputs, signature.params.size(), operandIdx);
@@ -240,8 +235,7 @@ class BaseSignatureAnalyzer {
     }
 
     // Prepare the results for the call operation
-    SmallVector<Value> prepareCallResultForQreg(func::CallOp callOp, PatternRewriter &rewriter)
-    {
+    SmallVector<Value> prepareCallResultForQreg(func::CallOp callOp, PatternRewriter &rewriter) {
         assert(callOp.getNumResults() == 1 && "only one qreg result for qreg mode is allowed");
 
         auto qreg = callOp.getResult(0);
@@ -263,16 +257,14 @@ class BaseSignatureAnalyzer {
     }
 
   private:
-    Value fromTensorOrAsIs(ValueRange values, Type type, PatternRewriter &rewriter, Location loc)
-    {
+    Value fromTensorOrAsIs(ValueRange values, Type type, PatternRewriter &rewriter, Location loc) {
         if (isa<RankedTensorType>(type)) {
             return tensor::FromElementsOp::create(rewriter, loc, type, values);
         }
         return values.front();
     }
 
-    static size_t getElementsCount(Type type)
-    {
+    static size_t getElementsCount(Type type) {
         if (isa<RankedTensorType>(type)) {
             auto tensorType = cast<RankedTensorType>(type);
             return tensorType.getNumElements() > 0 ? tensorType.getNumElements() : 1;
@@ -282,8 +274,7 @@ class BaseSignatureAnalyzer {
 
     // Helper function to find the range of function input types that correspond to params
     static std::pair<size_t, size_t> findParamTypeRange(ArrayRef<Type> funcInputs,
-                                                        size_t sigParamCount, size_t startIdx = 0)
-    {
+                                                        size_t sigParamCount, size_t startIdx = 0) {
         size_t paramTypeCount = 0;
         size_t paramTypeEnd = startIdx;
 
@@ -302,8 +293,7 @@ class BaseSignatureAnalyzer {
 
     // generate params for calling the decomposition function based on function type requirements
     SmallVector<Value> generateParams(ValueRange signatureParams, ArrayRef<Type> funcParamTypes,
-                                      PatternRewriter &rewriter, Location loc)
-    {
+                                      PatternRewriter &rewriter, Location loc) {
         SmallVector<Value> operands;
         size_t sigParamIdx = 0;
 
@@ -322,14 +312,12 @@ class BaseSignatureAnalyzer {
     }
 
     Value fromTensorOrAsIs(ArrayRef<QubitIndex> indices, Type type, PatternRewriter &rewriter,
-                           Location loc)
-    {
+                           Location loc) {
         SmallVector<Value> values;
         for (const QubitIndex &index : indices) {
             if (index.isValue()) {
                 values.emplace_back(index.getValue());
-            }
-            else if (index.isAttr()) {
+            } else if (index.isAttr()) {
                 auto attr = index.getAttr();
                 auto constantValue = arith::ConstantOp::create(rewriter, loc, attr.getType(), attr);
                 values.emplace_back(constantValue);
@@ -344,8 +332,7 @@ class BaseSignatureAnalyzer {
         return values.front();
     }
 
-    void initializeQregMode(mlir::Operation *op, bool enableQregMode)
-    {
+    void initializeQregMode(mlir::Operation *op, bool enableQregMode) {
         if (!enableQregMode || !op)
             return;
 
@@ -379,8 +366,7 @@ class BaseSignatureAnalyzer {
         signature.outCtrlQubitIndices = signature.inCtrlWireIndices;
     }
 
-    QubitIndex getExtractIndex(Value qubit)
-    {
+    QubitIndex getExtractIndex(Value qubit) {
         while (qubit) {
             if (auto extractOp = qubit.getDefiningOp<quantum::ExtractOp>()) {
                 if (Value idx = extractOp.getIdx()) {
@@ -404,8 +390,8 @@ class BaseSignatureAnalyzer {
                         continue;
                     }
                 }
-            }
-            else if (auto measureOp = dyn_cast_or_null<quantum::MeasureOp>(qubit.getDefiningOp())) {
+            } else if (auto measureOp =
+                           dyn_cast_or_null<quantum::MeasureOp>(qubit.getDefiningOp())) {
                 qubit = measureOp.getInQubit();
                 continue;
             }
@@ -425,9 +411,7 @@ class CustomOpSignatureAnalyzer : public BaseSignatureAnalyzer {
         : BaseSignatureAnalyzer(op, op.getParams(), op.getNonCtrlQubitOperands(),
                                 op.getCtrlQubitOperands(), op.getCtrlValueOperands(),
                                 op.getNonCtrlQubitResults(), op.getCtrlQubitResults(),
-                                enableQregMode)
-    {
-    }
+                                enableQregMode) {}
 };
 
 class MultiRZOpSignatureAnalyzer : public BaseSignatureAnalyzer {
@@ -438,9 +422,7 @@ class MultiRZOpSignatureAnalyzer : public BaseSignatureAnalyzer {
         : BaseSignatureAnalyzer(op, op.getTheta(), op.getNonCtrlQubitOperands(),
                                 op.getCtrlQubitOperands(), op.getCtrlValueOperands(),
                                 op.getNonCtrlQubitResults(), op.getCtrlQubitResults(),
-                                enableQregMode)
-    {
-    }
+                                enableQregMode) {}
 };
 
 } // namespace quantum

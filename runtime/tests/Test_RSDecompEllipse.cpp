@@ -20,8 +20,7 @@
 using namespace Catch::Matchers;
 using namespace RSDecomp::GridProblem;
 
-TEST_CASE("Test Ellipse class", "[RSDecomp][Ellipse]")
-{
+TEST_CASE("Test Ellipse class", "[RSDecomp][Ellipse]") {
     Ellipse e{{1.0, 0.0, 1.0}, {4.0, 5.0}};
 
     CHECK(e.a == 1.0);
@@ -41,8 +40,7 @@ TEST_CASE("Test Ellipse class", "[RSDecomp][Ellipse]")
     REQUIRE_THROWS_WITH(e.y_points(24), ContainsSubstring("Cannot compute y_points:"));
 }
 
-TEST_CASE("Test EllipseState class", "[RSDecomp][EllipseState]")
-{
+TEST_CASE("Test EllipseState class", "[RSDecomp][EllipseState]") {
     Ellipse e1{{1.0, 0.0, 1.0}, {4.0, 5.0}};
     Ellipse e2{{2.0, 1.0, 2.0}, {2.0, 3.0}};
     EllipseState es{e1, e2};
@@ -53,8 +51,7 @@ TEST_CASE("Test EllipseState class", "[RSDecomp][EllipseState]")
     CHECK(es.bias() == 0.0);
 }
 
-TEST_CASE("Test GridOp class", "[RSDecomp][GridOp]")
-{
+TEST_CASE("Test GridOp class", "[RSDecomp][GridOp]") {
     GridOp grid_op = GridOp::from_string("I");
     CHECK(grid_op.a == std::array<INT_TYPE, 2>{1, 0});
     CHECK(grid_op.b == std::array<INT_TYPE, 2>{0, 0});

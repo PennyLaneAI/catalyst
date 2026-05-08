@@ -42,8 +42,7 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
     using OpConversionPattern<T>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(T op, typename T::Adaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         ModuleOp mod = op->template getParentOfType<ModuleOp>();
 
@@ -56,28 +55,24 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
         if constexpr (std::is_same_v<T, PPRotationOp>) {
             if (op.getCondition()) {
                 cond = op.getCondition();
-            }
-            else {
+            } else {
                 cond = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(1));
             }
             // Compute the rotation angle: theta = π / rotation_kind
             // rotation_kind can be ±1, ±2, ±4, ±8
             double theta = 2 * (llvm::numbers::pi / static_cast<double>(op.getRotationKind()));
             thetaValue = LLVM::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(theta));
-        }
-        else if constexpr (std::is_same_v<T, PPRotationArbitraryOp>) {
+        } else if constexpr (std::is_same_v<T, PPRotationArbitraryOp>) {
             if (op.getCondition()) {
                 cond = op.getCondition();
-            }
-            else {
+            } else {
                 cond = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(1));
             }
             // multiply by 2 to get the rotation angle
             thetaValue = LLVM::FMulOp::create(
                 rewriter, loc, adaptor.getArbitraryAngle(),
                 LLVM::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0)));
-        }
-        else {
+        } else {
             static_assert(!std::is_same_v<T, T>(), "unexpected type in templated rewrite");
         }
 
@@ -97,8 +92,7 @@ template <typename T> struct PPMeasurementOpPattern : public OpConversionPattern
     using OpConversionPattern<T>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(T op, typename T::Adaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
         const TypeConverter *conv = this->getTypeConverter();
@@ -115,8 +109,7 @@ template <typename T> struct PPMeasurementOpPattern : public OpConversionPattern
             pauliWordAltPtr = pauliWordPtr;
             negatedAlt = negated;
             selectSwitch = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(true));
-        }
-        else if constexpr (std::is_same_v<T, SelectPPMeasurementOp>) {
+        } else if constexpr (std::is_same_v<T, SelectPPMeasurementOp>) {
             pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct_0());
             negated =
                 LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(op.getNegated_0()));
@@ -124,8 +117,7 @@ template <typename T> struct PPMeasurementOpPattern : public OpConversionPattern
             negatedAlt =
                 LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(op.getNegated_1()));
             selectSwitch = op.getSelectSwitch();
-        }
-        else {
+        } else {
             static_assert(!std::is_same_v<T, T>(), "unexpected type in templated rewrite");
         }
 
@@ -173,8 +165,7 @@ template <typename T> struct PPMeasurementOpPattern : public OpConversionPattern
 namespace catalyst {
 namespace pbc {
 
-void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns)
-{
+void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns) {
     // Pauli-based Computational Operations
     patterns.add<PPRotationBasedPattern<PPRotationOp>>(typeConverter, patterns.getContext());
     patterns.add<PPRotationBasedPattern<PPRotationArbitraryOp>>(typeConverter,

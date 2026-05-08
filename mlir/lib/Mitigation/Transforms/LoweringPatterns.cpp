@@ -23,8 +23,7 @@ using namespace catalyst::mitigation;
 namespace catalyst {
 namespace mitigation {
 
-void populateLoweringPatterns(RewritePatternSet &patterns)
-{
+void populateLoweringPatterns(RewritePatternSet &patterns) {
     patterns.add<ZneLowering>(patterns.getContext());
 }
 

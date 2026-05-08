@@ -41,8 +41,7 @@ namespace hlo_extensions {
 struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> {
     using ScatterLoweringPassBase::ScatterLoweringPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         LLVM_DEBUG(dbgs() << "scatter lowering pass"
                           << "\n");
 

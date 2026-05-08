@@ -53,8 +53,7 @@ using namespace Catalyst::Runtime::QEC;
  */
 void __catalyst__qecp__lut_decoder(MemRefT_int32_1d *row_idx_tanner,
                                    MemRefT_int32_1d *col_ptr_tanner,
-                                   MemRefT_int8_1d *current_syndromes, MemRefT_int64_1d *err_idx)
-{
+                                   MemRefT_int8_1d *current_syndromes, MemRefT_int64_1d *err_idx) {
     // TODOs: We should expect the following const value from args.
     // The default values here only work for the [[7, 1, 3]] Steane code.
     const size_t code_size = 7;

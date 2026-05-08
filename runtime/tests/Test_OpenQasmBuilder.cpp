@@ -25,8 +25,7 @@
 using namespace Catch::Matchers;
 using namespace Catalyst::Runtime::Device::OpenQasm;
 
-TEST_CASE("Test lookup openqasm gate names from QIR -> OpenQasm map", "[openqasm]")
-{
+TEST_CASE("Test lookup openqasm gate names from QIR -> OpenQasm map", "[openqasm]") {
     // Check lookup supported gates
     CHECK(lookup_qasm_gate_name("PauliX") == "x");
     CHECK(lookup_qasm_gate_name("Hadamard") == "h");
@@ -40,8 +39,7 @@ TEST_CASE("Test lookup openqasm gate names from QIR -> OpenQasm map", "[openqasm
         ContainsSubstring("The given QIR gate name is not supported by the OpenQASM builder"));
 }
 
-TEST_CASE("Test QasmVariable(type=Float) from OpenQasmBuilder", "[openqasm]")
-{
+TEST_CASE("Test QasmVariable(type=Float) from OpenQasmBuilder", "[openqasm]") {
     auto var = QasmVariable(VariableType::Float, "alpha");
     CHECK(var.getType() == VariableType::Float);
     CHECK(var.getName() == "alpha");
@@ -57,8 +55,7 @@ TEST_CASE("Test QasmVariable(type=Float) from OpenQasmBuilder", "[openqasm]")
             "[Function:toOpenQasm] Error in Catalyst Runtime: Unsupported OpenQasm variable type"));
 }
 
-TEST_CASE("Test QasmRegister(type=Qubit) from OpenQasmBuilder", "[openqasm]")
-{
+TEST_CASE("Test QasmRegister(type=Qubit) from OpenQasmBuilder", "[openqasm]") {
     auto reg = QasmRegister(RegisterType::Qubit, "qubits", 5);
     CHECK(reg.getName() == "qubits");
     CHECK(reg.getSize() == 5);
@@ -94,8 +91,7 @@ TEST_CASE("Test QasmRegister(type=Qubit) from OpenQasmBuilder", "[openqasm]")
                                           "Unsupported OpenQasm register mode"));
 }
 
-TEST_CASE("Test QasmRegister(type=Bit) from OpenQasmBuilder", "[openqasm]")
-{
+TEST_CASE("Test QasmRegister(type=Bit) from OpenQasmBuilder", "[openqasm]") {
     auto reg = QasmRegister(RegisterType::Bit, "bits", 5);
     CHECK(reg.getName() == "bits");
     CHECK(reg.getSize() == 5);
@@ -136,8 +132,7 @@ TEST_CASE("Test QasmRegister(type=Bit) from OpenQasmBuilder", "[openqasm]")
                                           "Unsupported OpenQasm register mode"));
 }
 
-TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]")
-{
+TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]") {
     auto qubits = QasmRegister(RegisterType::Qubit, "q", 5);
 
     // Check a supported gate without params
@@ -209,8 +204,7 @@ TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]")
                           "currently supported via either their values or names but not both."));
 }
 
-TEST_CASE("Test QasmMeasure from OpenQasmBuilder", "[openqasm]")
-{
+TEST_CASE("Test QasmMeasure from OpenQasmBuilder", "[openqasm]") {
     auto qubits = QasmRegister(RegisterType::Qubit, "q", 5);
 
     auto mz1 = QasmMeasure(0, 0);
@@ -236,10 +230,8 @@ TEST_CASE("Test QasmMeasure from OpenQasmBuilder", "[openqasm]")
     CHECK(mz2.toOpenQasm(bits, qubits) == mz2_res_toqasm);
 }
 
-TEST_CASE("Test MatrixBuilder", "[openqasm]")
-{
-    SECTION("matrix(2 * 2) vector(complex(double))")
-    {
+TEST_CASE("Test MatrixBuilder", "[openqasm]") {
+    SECTION("matrix(2 * 2) vector(complex(double))") {
         std::vector<std::complex<double>> mat{
             {0, 0},
             {-0.1488, 0.360849},
@@ -252,8 +244,7 @@ TEST_CASE("Test MatrixBuilder", "[openqasm]")
         CHECK(result == expected);
     }
 
-    SECTION("matrix(4 * 2) vector(complex(double))")
-    {
+    SECTION("matrix(4 * 2) vector(complex(double))") {
         std::vector<std::complex<double>> mat{
             {-0.67094, -0.63044}, {-0.148854, 0.36084}, {-0.23763, 0.309679}, {-0.88183, -0.26456},
             {-0.67094, -0.63044}, {-0.148854, 0.36084}, {-0.23763, 0.309679}, {-0.88183, -0.26456},
@@ -265,8 +256,7 @@ TEST_CASE("Test MatrixBuilder", "[openqasm]")
         CHECK(result == expected);
     }
 
-    SECTION("matrix(2 * 2) vector(double)")
-    {
+    SECTION("matrix(2 * 2) vector(double)") {
         std::vector<double> mat{
             -0.670,
             0.1488,
@@ -279,8 +269,7 @@ TEST_CASE("Test MatrixBuilder", "[openqasm]")
         CHECK(result == expected);
     }
 
-    SECTION("matrix(4 * 4) vector(double)")
-    {
+    SECTION("matrix(4 * 4) vector(double)") {
         std::vector<double> mat{
             -0.67094, 0.63044,  -0.148854, 0.36084, -0.23763, 0.309679, -0.88183, 0.26456,
             0.67094,  -0.63044, -0.148854, 0.36084, -0.23763, 0.309679, -0.88183, 0.26456,
@@ -293,8 +282,7 @@ TEST_CASE("Test MatrixBuilder", "[openqasm]")
     }
 }
 
-TEST_CASE("Test QasmNamedObs from OpenQasmBuilder", "[openqasm]")
-{
+TEST_CASE("Test QasmNamedObs from OpenQasmBuilder", "[openqasm]") {
     auto qubits = QasmRegister(RegisterType::Qubit, "q", 5);
 
     auto obs_x = QasmNamedObs("PauliX", {0});
@@ -308,8 +296,7 @@ TEST_CASE("Test QasmNamedObs from OpenQasmBuilder", "[openqasm]")
     CHECK(obs_h.toOpenQasm(qubits) == "h(q[3])");
 }
 
-TEST_CASE("Test QasmTensorObs from OpenQasmBuilder", "[openqasm]")
-{
+TEST_CASE("Test QasmTensorObs from OpenQasmBuilder", "[openqasm]") {
     auto qubits = QasmRegister(RegisterType::Qubit, "q", 5);
 
     auto obs_x = std::shared_ptr<QasmNamedObs>{new QasmNamedObs("PauliX", {0})};
@@ -335,8 +322,7 @@ TEST_CASE("Test QasmTensorObs from OpenQasmBuilder", "[openqasm]")
             "[Function:QasmTensorObs] Error in Catalyst Runtime: Invalid list of total wires"));
 }
 
-TEST_CASE("Test QasmHamiltonianObs from OpenQasmBuilder", "[openqasm]")
-{
+TEST_CASE("Test QasmHamiltonianObs from OpenQasmBuilder", "[openqasm]") {
     auto qubits = QasmRegister(RegisterType::Qubit, "q", 5);
 
     auto obs_x = std::shared_ptr<QasmObs>{new QasmNamedObs("PauliX", {0})};
@@ -366,8 +352,7 @@ TEST_CASE("Test QasmHamiltonianObs from OpenQasmBuilder", "[openqasm]")
 }
 
 TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping the circuit header", "[openqasm]",
-                   OpenQasmBuilder, BraketBuilder)
-{
+                   OpenQasmBuilder, BraketBuilder) {
     auto builder = TestType();
     builder.Register(RegisterType::Qubit, "qubits", 5);
 
@@ -376,8 +361,7 @@ TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping the circuit header", "[ope
         toqasm = "OPENQASM 3.0;\n"
                  "qubit[5] qubits;\n"
                  "reset qubits;\n";
-    }
-    else if (TYPE_INFO(TestType) == TYPE_INFO(BraketBuilder)) {
+    } else if (TYPE_INFO(TestType) == TYPE_INFO(BraketBuilder)) {
         toqasm = "OPENQASM 3.0;\n"
                  "qubit[5] qubits;\n"
                  "bit[5] bits;\n"
@@ -395,8 +379,7 @@ TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping the circuit header", "[ope
 }
 
 TEMPLATE_TEST_CASE("Test OpenQasmBuilder with invalid number of measurement results registers",
-                   "[openqasm]", OpenQasmBuilder, BraketBuilder)
-{
+                   "[openqasm]", OpenQasmBuilder, BraketBuilder) {
     auto builder = OpenQasmBuilder();
     CHECK(builder.getNumQubits() == 0);
     CHECK(builder.getNumBits() == 0);
@@ -421,8 +404,7 @@ TEMPLATE_TEST_CASE("Test OpenQasmBuilder with invalid number of measurement resu
 }
 
 TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and measure",
-                   "[openqasm]", OpenQasmBuilder, BraketBuilder)
-{
+                   "[openqasm]", OpenQasmBuilder, BraketBuilder) {
     auto builder = TestType();
 
     builder.Register(RegisterType::Qubit, "q", 2);
@@ -456,8 +438,7 @@ TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates,
                  "b[0] = measure q[0];\n"
                  "b[1] = measure q[1];\n"
                  "reset q;\n";
-    }
-    else if (TYPE_INFO(TestType) == TYPE_INFO(BraketBuilder)) {
+    } else if (TYPE_INFO(TestType) == TYPE_INFO(BraketBuilder)) {
         toqasm = "OPENQASM 3.0;\n"
                  "input float alpha;\n"
                  "qubit[2] q;\n"
@@ -476,8 +457,7 @@ TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates,
 }
 
 TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping a circuit without measurement results",
-                   "[openqasm]", OpenQasmBuilder, BraketBuilder)
-{
+                   "[openqasm]", OpenQasmBuilder, BraketBuilder) {
     auto builder = TestType();
 
     builder.Register(RegisterType::Qubit, "q", 2);
@@ -497,8 +477,7 @@ TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping a circuit without measurem
                  "measure q[0];\n"
                  "measure q[1];\n"
                  "reset q;\n";
-    }
-    else if (TYPE_INFO(TestType) == TYPE_INFO(BraketBuilder)) {
+    } else if (TYPE_INFO(TestType) == TYPE_INFO(BraketBuilder)) {
         toqasm = "OPENQASM 3.0;\n"
                  "qubit[2] q;\n"
                  "bit[2] bits;\n"
@@ -511,8 +490,7 @@ TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping a circuit without measurem
 }
 
 TEMPLATE_TEST_CASE("Test OpenQasmBuilder with custom instructions", "[openqasm]", OpenQasmBuilder,
-                   BraketBuilder)
-{
+                   BraketBuilder) {
     auto builder = TestType();
 
     builder.Register(RegisterType::Qubit, "q", 2);
@@ -527,8 +505,7 @@ TEMPLATE_TEST_CASE("Test OpenQasmBuilder with custom instructions", "[openqasm]"
         REQUIRE_THROWS_WITH(
             builder.toOpenQasmWithCustomInstructions(""),
             ContainsSubstring("Error in Catalyst Runtime: Unsupported functionality"));
-    }
-    else if (TYPE_INFO(TestType) == TYPE_INFO(BraketBuilder)) {
+    } else if (TYPE_INFO(TestType) == TYPE_INFO(BraketBuilder)) {
         std::string toqasm = "OPENQASM 3.0;\n"
                              "qubit[2] q;\n"
                              "x q[0];\n"

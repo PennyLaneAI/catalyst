@@ -37,8 +37,7 @@ struct GradientPostprocessingPass
     : impl::GradientPostprocessingPassBase<GradientPostprocessingPass> {
     using GradientPostprocessingPassBase::GradientPostprocessingPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         RewritePatternSet patterns(&getContext());
         populatePostprocessingPatterns(patterns);
 

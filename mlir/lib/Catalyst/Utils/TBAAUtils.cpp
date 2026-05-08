@@ -16,8 +16,7 @@
 
 catalyst::TBAATree::TBAATree(mlir::MLIRContext *ctx, StringRef rootName, StringRef intName,
                              StringRef float32Name, StringRef float64Name, StringRef pointerName)
-    : root(mlir::LLVM::TBAARootAttr::get(ctx, mlir::StringAttr::get(ctx, rootName)))
-{
+    : root(mlir::LLVM::TBAARootAttr::get(ctx, mlir::StringAttr::get(ctx, rootName))) {
     intDesc = createTBAATypeDescriptor(ctx, root, intName);
     float32Desc = createTBAATypeDescriptor(ctx, root, float32Name);
     float64Desc = createTBAATypeDescriptor(ctx, root, float64Name);
@@ -25,16 +24,13 @@ catalyst::TBAATree::TBAATree(mlir::MLIRContext *ctx, StringRef rootName, StringR
     tags = createTags();
 }
 
-mlir::LLVM::TBAATypeDescriptorAttr
-catalyst::TBAATree::createTBAATypeDescriptor(mlir::MLIRContext *ctx,
-                                             mlir::LLVM::TBAARootAttr rootAttr, StringRef typeName)
-{
+mlir::LLVM::TBAATypeDescriptorAttr catalyst::TBAATree::createTBAATypeDescriptor(
+    mlir::MLIRContext *ctx, mlir::LLVM::TBAARootAttr rootAttr, StringRef typeName) {
     auto memberAttr = mlir::LLVM::TBAAMemberAttr::get(rootAttr, 0);
     return mlir::LLVM::TBAATypeDescriptorAttr::get(ctx, typeName, memberAttr);
 }
 
-mlir::DenseMap<StringRef, mlir::LLVM::TBAATagAttr> catalyst::TBAATree::createTags()
-{
+mlir::DenseMap<StringRef, mlir::LLVM::TBAATagAttr> catalyst::TBAATree::createTags() {
     mlir::DenseMap<StringRef, mlir::LLVM::TBAATagAttr> map;
 
     mlir::LLVM::TBAATagAttr intTag = mlir::LLVM::TBAATagAttr::get(intDesc, intDesc, 0);
@@ -48,7 +44,6 @@ mlir::DenseMap<StringRef, mlir::LLVM::TBAATagAttr> catalyst::TBAATree::createTag
     return map;
 }
 
-mlir::LLVM::TBAATagAttr catalyst::TBAATree::getTag(StringRef typeName)
-{
+mlir::LLVM::TBAATagAttr catalyst::TBAATree::getTag(StringRef typeName) {
     return tags.find(typeName)->getSecond();
 }

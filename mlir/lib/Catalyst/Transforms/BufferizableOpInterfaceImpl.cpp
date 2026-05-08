@@ -38,28 +38,24 @@ namespace {
 struct PrintOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<PrintOpInterface, PrintOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
+                                const bufferization::AnalysisState &state) const {
         return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
+                                 const bufferization::AnalysisState &state) const {
         return false;
     }
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+                      const bufferization::AnalysisState &state) const {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto printOp = cast<PrintOp>(op);
         if (printOp.getVal()) {
             FailureOr<Value> source = getBuffer(rewriter, printOp.getVal(), options, state);
@@ -80,15 +76,13 @@ struct CustomCallOpInterface
     bool bufferizesToAllocation(Operation *op, Value value) const { return true; }
 
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
+                                const bufferization::AnalysisState &state) const {
         // Custom Call Op always reads the operand memory no matter what.
         return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
+                                 const bufferization::AnalysisState &state) const {
         // We only use custom call for the jax lapack kernels.
         // This is actually hard-guarded: in the lowering pattern for custom call
         // we check that the name of the callee is a jax symbol for a lapack kernel.
@@ -112,15 +106,13 @@ struct CustomCallOpInterface
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+                      const bufferization::AnalysisState &state) const {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto customCallOp = cast<CustomCallOp>(op);
 
         // Add bufferized arguments
@@ -152,8 +144,7 @@ struct CustomCallOpInterface
                 auto copyOp =
                     memref::CopyOp::create(rewriter, op->getLoc(), *opBuffer, allocOp.getResult());
                 bufferArgs.push_back(copyOp.getTarget());
-            }
-            else {
+            } else {
                 bufferArgs.push_back(*opBuffer);
             }
         }
@@ -194,8 +185,7 @@ struct CustomCallOpInterface
 struct CallbackOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<CallbackOpInterface,
                                                                    CallbackOp> {
-    bool hasTensorSemantics(Operation *op) const
-    {
+    bool hasTensorSemantics(Operation *op) const {
         auto isaTensor = llvm::IsaPred<TensorType>;
 
         // A function has tensor semantics if it has tensor arguments/results.
@@ -211,8 +201,7 @@ struct CallbackOpInterface
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto callbackOp = cast<CallbackOp>(op);
 
         auto argTys = callbackOp.getArgumentTypes();
@@ -225,8 +214,7 @@ struct CallbackOpInterface
             auto tensorType = dyn_cast<RankedTensorType>(ty);
             if (!tensorType) {
                 bufferArgs.push_back(ty);
-            }
-            else {
+            } else {
                 bufferArgs.push_back(
                     MemRefType::get(tensorType.getShape(), tensorType.getElementType()));
             }
@@ -238,15 +226,13 @@ struct CallbackOpInterface
     }
 };
 
-void convertTypes(SmallVector<Type> inTypes, SmallVector<Type> &convertedResults)
-{
+void convertTypes(SmallVector<Type> inTypes, SmallVector<Type> &convertedResults) {
     // See https://github.com/llvm/llvm-project/pull/114155/files
     for (Type inType : inTypes) {
         if (isa<TensorType>(inType)) {
             convertedResults.push_back(
                 bufferization::getMemRefTypeWithStaticIdentityLayout(cast<TensorType>(inType)));
-        }
-        else {
+        } else {
             convertedResults.push_back(inType);
         }
     }
@@ -258,14 +244,12 @@ struct CallbackCallOpInterface
     bool bufferizesToAllocation(Operation *op, Value value) const { return true; }
 
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
+                                const bufferization::AnalysisState &state) const {
         return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
+                                 const bufferization::AnalysisState &state) const {
         // We can safely say false because CallbackCallOp's memrefs
         // will be put in a JAX array and JAX arrays are immutable.
         //
@@ -277,15 +261,13 @@ struct CallbackCallOpInterface
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+                      const bufferization::AnalysisState &state) const {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto callOp = cast<CallbackCallOp>(op);
 
         SmallVector<Type> convertedResults;
@@ -335,8 +317,7 @@ struct CallbackCallOpInterface
 
 } // namespace
 
-void catalyst::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry)
-{
+void catalyst::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry) {
     registry.addExtension(+[](MLIRContext *ctx, CatalystDialect *dialect) {
         CustomCallOp::attachInterface<CustomCallOpInterface>(*ctx);
         PrintOp::attachInterface<PrintOpInterface>(*ctx);

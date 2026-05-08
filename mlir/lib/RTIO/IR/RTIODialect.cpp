@@ -31,8 +31,7 @@ using namespace catalyst::rtio;
 #include "RTIO/IR/RTIOOpsDialect.cpp.inc"
 
 static ParseResult parseChannelTypeBody(AsmParser &parser, std::string &kind, ArrayAttr &qualifiers,
-                                        IntegerAttr &channelId)
-{
+                                        IntegerAttr &channelId) {
     // 1. Parse kind (string)
     if (failed(parser.parseString(&kind)))
         return failure();
@@ -62,8 +61,7 @@ static ParseResult parseChannelTypeBody(AsmParser &parser, std::string &kind, Ar
             }
         }
         // Comma but no `[`, so this comma is for channelId
-    }
-    else {
+    } else {
         // No comma at all, no qualifiers and no channelId
         channelId = parser.getBuilder().getI64IntegerAttr(ShapedType::kDynamic);
         return success();
@@ -91,8 +89,7 @@ static ParseResult parseChannelTypeBody(AsmParser &parser, std::string &kind, Ar
 
 // Custom printer for the entire channel type body
 static void printChannelTypeBody(AsmPrinter &printer, StringRef kind, ArrayAttr qualifiers,
-                                 IntegerAttr channelId)
-{
+                                 IntegerAttr channelId) {
     // 1. Print kind
     printer << "\"" << kind << "\"";
 
@@ -110,18 +107,15 @@ static void printChannelTypeBody(AsmPrinter &printer, StringRef kind, ArrayAttr 
         printer << ", ";
         if (id >= 0) {
             printer << id;
-        }
-        else {
+        } else {
             printer << "?";
         }
-    }
-    else if (qualifiers && !qualifiers.empty()) {
+    } else if (qualifiers && !qualifiers.empty()) {
         printer << ", ?";
     }
 }
 
-void catalyst::rtio::RTIODialect::initialize()
-{
+void catalyst::rtio::RTIODialect::initialize() {
     addTypes<
 #define GET_TYPEDEF_LIST
 #include "RTIO/IR/RTIOOpsTypes.cpp.inc"

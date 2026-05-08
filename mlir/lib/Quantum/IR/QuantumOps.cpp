@@ -47,15 +47,13 @@ static const mlir::StringSet<> hermitianOps = {"Hadamard", "PauliX", "PauliY", "
 static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift",
                                                "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
 
-LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewriter)
-{
+LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewriter) {
     if (op.getAdjoint()) {
         auto name = op.getGateName();
         if (hermitianOps.contains(name)) {
             op.setAdjoint(false);
             return success();
-        }
-        else if (rotationsOps.contains(name)) {
+        } else if (rotationsOps.contains(name)) {
             auto params = op.getParams();
             SmallVector<Value> paramsNeg;
             for (auto param : params) {
@@ -74,8 +72,7 @@ LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewrite
     return failure();
 }
 
-LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewriter)
-{
+LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewriter) {
     if (op.getAdjoint()) {
         auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
 
@@ -88,8 +85,7 @@ LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewri
     return failure();
 }
 
-LogicalResult PCPhaseOp::canonicalize(PCPhaseOp op, mlir::PatternRewriter &rewriter)
-{
+LogicalResult PCPhaseOp::canonicalize(PCPhaseOp op, mlir::PatternRewriter &rewriter) {
     if (op.getAdjoint()) {
         auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
 
@@ -102,8 +98,7 @@ LogicalResult PCPhaseOp::canonicalize(PCPhaseOp op, mlir::PatternRewriter &rewri
     return failure();
 }
 
-LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter)
-{
+LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter) {
     if (alloc->use_empty()) {
         rewriter.eraseOp(alloc);
         return success();
@@ -112,8 +107,7 @@ LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewrit
     return failure();
 }
 
-LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter)
-{
+LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter) {
     if (auto alloc = dyn_cast_if_present<AllocOp>(dealloc.getQreg().getDefiningOp())) {
         if (dealloc.getQreg().hasOneUse()) {
             rewriter.eraseOp(dealloc);
@@ -125,8 +119,7 @@ LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &
     return failure();
 }
 
-template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx)
-{
+template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx) {
     // Prefer using an attribute when the index is constant.
     bool hasNoIdxAttr = !op.getIdxAttr().has_value();
     bool isConstantIdx = isa_and_nonnull<IntegerAttr>(idx);
@@ -141,8 +134,7 @@ template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp o
     return failure();
 }
 
-OpFoldResult ExtractOp::fold(FoldAdaptor adaptor)
-{
+OpFoldResult ExtractOp::fold(FoldAdaptor adaptor) {
     if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
         return getResult();
     }
@@ -150,8 +142,7 @@ OpFoldResult ExtractOp::fold(FoldAdaptor adaptor)
     return nullptr;
 }
 
-LogicalResult ExtractOp::canonicalize(ExtractOp extract, mlir::PatternRewriter &rewriter)
-{
+LogicalResult ExtractOp::canonicalize(ExtractOp extract, mlir::PatternRewriter &rewriter) {
     // Handle the pattern: %reg2 = insert %reg1[idx], %qubit -> %q = extract %reg2[idx]
     // Convert to: %q = %qubit, and replace other uses of %reg2 with %reg1
     if (auto insert = dyn_cast_if_present<InsertOp>(extract.getQreg().getDefiningOp())) {
@@ -171,8 +162,7 @@ LogicalResult ExtractOp::canonicalize(ExtractOp extract, mlir::PatternRewriter &
     return failure();
 }
 
-LogicalResult InsertOp::canonicalize(InsertOp insert, mlir::PatternRewriter &rewriter)
-{
+LogicalResult InsertOp::canonicalize(InsertOp insert, mlir::PatternRewriter &rewriter) {
     if (auto extract = dyn_cast_if_present<ExtractOp>(insert.getQubit().getDefiningOp())) {
         bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
         bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
@@ -191,8 +181,7 @@ LogicalResult InsertOp::canonicalize(InsertOp insert, mlir::PatternRewriter &rew
     return failure();
 }
 
-OpFoldResult InsertOp::fold(FoldAdaptor adaptor)
-{
+OpFoldResult InsertOp::fold(FoldAdaptor adaptor) {
     if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
         return getResult();
     }
@@ -204,32 +193,28 @@ OpFoldResult InsertOp::fold(FoldAdaptor adaptor)
 // Quantum op verifiers.
 //===----------------------------------------------------------------------===//
 
-LogicalResult CustomOp::verify()
-{
+LogicalResult CustomOp::verify() {
     if (getInQubits().size() == 0) {
         return emitOpError("expected op to have at least one qubit");
     }
     return success();
 }
 
-LogicalResult ExtractOp::verify()
-{
+LogicalResult ExtractOp::verify() {
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected op to have a non-null index";
     }
     return success();
 }
 
-LogicalResult InsertOp::verify()
-{
+LogicalResult InsertOp::verify() {
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected op to have a non-null index";
     }
     return success();
 }
 
-static LogicalResult verifyObservable(Value obs, std::optional<size_t> &numQubits)
-{
+static LogicalResult verifyObservable(Value obs, std::optional<size_t> &numQubits) {
     if (auto compOp = obs.getDefiningOp<ComputationalBasisOp>()) {
         numQubits = compOp.getQubits().size();
         return success();
@@ -237,14 +222,12 @@ static LogicalResult verifyObservable(Value obs, std::optional<size_t> &numQubit
     if (auto compOp = obs.getDefiningOp<catalyst::qref::ComputationalBasisOp>()) {
         numQubits = compOp.getQubits().size();
         return success();
-    }
-    else if (obs.getDefiningOp<NamedObsOp>() || obs.getDefiningOp<HermitianOp>() ||
-             obs.getDefiningOp<TensorOp>() || obs.getDefiningOp<HamiltonianOp>() ||
-             obs.getDefiningOp<catalyst::qref::NamedObsOp>() ||
-             obs.getDefiningOp<catalyst::qref::HermitianOp>()) {
+    } else if (obs.getDefiningOp<NamedObsOp>() || obs.getDefiningOp<HermitianOp>() ||
+               obs.getDefiningOp<TensorOp>() || obs.getDefiningOp<HamiltonianOp>() ||
+               obs.getDefiningOp<catalyst::qref::NamedObsOp>() ||
+               obs.getDefiningOp<catalyst::qref::HermitianOp>()) {
         return success();
-    }
-    else if (auto mcmObsOp = obs.getDefiningOp<MCMObsOp>()) {
+    } else if (auto mcmObsOp = obs.getDefiningOp<MCMObsOp>()) {
         numQubits = mcmObsOp.getMcms().size();
         return success();
     }
@@ -252,8 +235,7 @@ static LogicalResult verifyObservable(Value obs, std::optional<size_t> &numQubit
     return failure();
 }
 
-static LogicalResult verifyTensorResult(Type ty, int64_t length)
-{
+static LogicalResult verifyTensorResult(Type ty, int64_t length) {
     ShapedType tensor = cast<ShapedType>(ty);
     if (!tensor.hasStaticShape() || tensor.getShape().size() != 1 ||
         tensor.getShape()[0] != length) {
@@ -263,8 +245,7 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length)
     return success();
 }
 
-static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length1)
-{
+static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length1) {
     ShapedType tensor = cast<ShapedType>(ty);
     if (!tensor.hasStaticShape() || tensor.getShape().size() != 2 ||
         tensor.getShape()[0] != length0 || tensor.getShape()[1] != length1) {
@@ -278,8 +259,7 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length
 
 static const mlir::StringSet<> validPauliWords = {"X", "Y", "Z", "I"};
 
-LogicalResult PauliRotOp::verify()
-{
+LogicalResult PauliRotOp::verify() {
     size_t pauliWordLength = getPauliProduct().size();
     size_t numQubits = getInQubits().size();
     if (pauliWordLength != numQubits) {
@@ -297,8 +277,7 @@ LogicalResult PauliRotOp::verify()
     return success();
 }
 
-LogicalResult QubitUnitaryOp::verify()
-{
+LogicalResult QubitUnitaryOp::verify() {
     size_t dim = std::pow(2, getInQubits().size());
     if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim))) {
         return emitOpError("The Unitary matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
@@ -309,8 +288,7 @@ LogicalResult QubitUnitaryOp::verify()
 
 // ----- measurements
 
-static LogicalResult verifyInQNodeFunction(Operation *op)
-{
+static LogicalResult verifyInQNodeFunction(Operation *op) {
     // strict verification only for quantum kernels
     // detection is a bit tricky until we have a dedicated operation, use heuristics for now
     auto kernelModule = op->getParentOfType<ModuleOp>();
@@ -335,8 +313,7 @@ static LogicalResult verifyInQNodeFunction(Operation *op)
 
 template <typename T>
 static LogicalResult verifyMeasurementOpDynamism(T *op, bool hasObs, bool hasDynShape,
-                                                 bool hasBufferIn, bool hasOutTensor)
-{
+                                                 bool hasBufferIn, bool hasOutTensor) {
     // `obs` operand must always be present
     if (!hasObs) {
         return (*op)->emitOpError("must take an observable");
@@ -356,14 +333,11 @@ static LogicalResult verifyMeasurementOpDynamism(T *op, bool hasObs, bool hasDyn
         ShapedType outTensor;
         if constexpr (std::is_same_v<T, ProbsOp>) {
             outTensor = cast<ShapedType>(op->getProbabilities().getType());
-        }
-        else if constexpr (std::is_same_v<T, StateOp>) {
+        } else if constexpr (std::is_same_v<T, StateOp>) {
             outTensor = cast<ShapedType>(op->getState().getType());
-        }
-        else if constexpr (std::is_same_v<T, SampleOp>) {
+        } else if constexpr (std::is_same_v<T, SampleOp>) {
             outTensor = cast<ShapedType>(op->getSamples().getType());
-        }
-        else if constexpr (std::is_same_v<T, CountsOp>) {
+        } else if constexpr (std::is_same_v<T, CountsOp>) {
             outTensor = cast<ShapedType>(op->getCounts().getType());
         }
 
@@ -380,8 +354,7 @@ static LogicalResult verifyMeasurementOpDynamism(T *op, bool hasObs, bool hasDyn
     return success();
 }
 
-LogicalResult ComputationalBasisOp::verify()
-{
+LogicalResult ComputationalBasisOp::verify() {
     if ((getQubits().size() != 0) && (getQreg() != nullptr)) {
         return emitOpError()
                << "computational basis op cannot simultaneously take in both qubits and quregs";
@@ -390,8 +363,7 @@ LogicalResult ComputationalBasisOp::verify()
     return success();
 }
 
-LogicalResult HermitianOp::verify()
-{
+LogicalResult HermitianOp::verify() {
     size_t dim = std::pow(2, getQubits().size());
     if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim)))
         return emitOpError("The Hermitian matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
@@ -399,8 +371,7 @@ LogicalResult HermitianOp::verify()
     return success();
 }
 
-LogicalResult SampleOp::verify()
-{
+LogicalResult SampleOp::verify() {
     if (failed(verifyInQNodeFunction(getOperation()))) {
         return failure();
     }
@@ -423,8 +394,7 @@ LogicalResult SampleOp::verify()
                                                  hasOutTensor);
 }
 
-LogicalResult CountsOp::verify()
-{
+LogicalResult CountsOp::verify() {
     if (failed(verifyInQNodeFunction(getOperation()))) {
         return failure();
     }
@@ -448,16 +418,13 @@ LogicalResult CountsOp::verify()
     if (getObs().getDefiningOp<NamedObsOp>()) {
         // Any named observable has 2 eigenvalues.
         numEigvals = 2;
-    }
-    else if (getObs().getDefiningOp<ComputationalBasisOp>()) {
+    } else if (getObs().getDefiningOp<ComputationalBasisOp>()) {
         // In the computational basis, the "eigenvalues" are all possible bistrings one can measure.
         numEigvals = std::pow(2, numQubits.value());
-    }
-    else if (getObs().getDefiningOp<MCMObsOp>()) {
+    } else if (getObs().getDefiningOp<MCMObsOp>()) {
         // When counting MCMs, the "eigenvalues" are all possible bistrings one can measure.
         numEigvals = std::pow(2, numQubits.value());
-    }
-    else {
+    } else {
         return emitOpError("cannot determine the number of eigenvalues for general observable");
     }
 
@@ -480,8 +447,7 @@ LogicalResult CountsOp::verify()
     return success();
 }
 
-LogicalResult ProbsOp::verify()
-{
+LogicalResult ProbsOp::verify() {
     if (failed(verifyInQNodeFunction(getOperation()))) {
         return failure();
     }
@@ -503,8 +469,7 @@ LogicalResult ProbsOp::verify()
                                                 hasOutTensor);
 }
 
-LogicalResult StateOp::verify()
-{
+LogicalResult StateOp::verify() {
     if (failed(verifyInQNodeFunction(getOperation()))) {
         return failure();
     }
@@ -526,8 +491,7 @@ LogicalResult StateOp::verify()
                                                 hasOutTensor);
 }
 
-LogicalResult ExpvalOp::verify()
-{
+LogicalResult ExpvalOp::verify() {
     if (failed(verifyInQNodeFunction(getOperation()))) {
         return failure();
     }
@@ -535,8 +499,7 @@ LogicalResult ExpvalOp::verify()
     return success();
 }
 
-LogicalResult VarianceOp::verify()
-{
+LogicalResult VarianceOp::verify() {
     if (failed(verifyInQNodeFunction(getOperation()))) {
         return failure();
     }
@@ -544,8 +507,7 @@ LogicalResult VarianceOp::verify()
     return success();
 }
 
-LogicalResult AdjointOp::verify()
-{
+LogicalResult AdjointOp::verify() {
     auto res =
         this->getRegion().walk([](MeasurementProcess op) { return WalkResult::interrupt(); });
 

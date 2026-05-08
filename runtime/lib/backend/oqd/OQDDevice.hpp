@@ -38,8 +38,7 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
     std::set<QubitIdType> initial_allocated_QubitIds;
     std::unordered_map<std::string, std::string> device_kwargs;
 
-    inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
-    {
+    inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t> {
         std::vector<size_t> res;
         res.reserve(wires.size());
         std::transform(wires.begin(), wires.end(), std::back_inserter(res),
@@ -48,8 +47,7 @@ class OQDDevice final : public Catalyst::Runtime::QuantumDevice {
     }
 
   public:
-    explicit OQDDevice(const std::string &kwargs = "{device_type : oqd, backend : default}")
-    {
+    explicit OQDDevice(const std::string &kwargs = "{device_type : oqd, backend : default}") {
         __catalyst__oqd__rt__initialize();
 
         // The OQD kwarg string format is:

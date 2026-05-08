@@ -35,8 +35,7 @@ namespace pbc {
 struct LowerPBCInitOpsPass : public impl::LowerPBCInitOpsPassBase<LowerPBCInitOpsPass> {
     using LowerPBCInitOpsPassBase::LowerPBCInitOpsPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         RewritePatternSet patterns(&getContext());
 
         populateLowerPBCInitOpsPatterns(patterns);

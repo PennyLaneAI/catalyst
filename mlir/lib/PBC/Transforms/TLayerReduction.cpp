@@ -42,8 +42,7 @@ namespace pbc {
 // and, if so, identify a merge `mergeOp` candidate in `lhsLayer`.
 // This `mergeOp` later on, will be used in `mergePPR` function.
 std::pair<bool, PBCOpInterface> checkCommutationAndFindMerge(PBCOpInterface rhsOp,
-                                                             PBCLayer &lhsLayer)
-{
+                                                             PBCLayer &lhsLayer) {
     PBCOpInterface mergeOp = nullptr;
     for (auto lhsOp : lhsLayer.getOps()) {
         if (lhsOp->getBlock() != rhsOp->getBlock()) {
@@ -83,8 +82,7 @@ std::pair<bool, PBCOpInterface> checkCommutationAndFindMerge(PBCOpInterface rhsO
 }
 
 void moveOpToLayer(PBCOpInterface rhsOp, PBCLayer &rhsLayer, PBCOpInterface mergeOp,
-                   PBCLayer &lhsLayer, IRRewriter &writer)
-{
+                   PBCLayer &lhsLayer, IRRewriter &writer) {
     //    lhsLayer   :  rhsLayer
     //    ┌───────┐  :  ┌───────┐
     //   ─┤ lhsOp ├──:──┤ rhsOp ├─
@@ -135,8 +133,7 @@ void moveOpToLayer(PBCOpInterface rhsOp, PBCLayer &rhsLayer, PBCOpInterface merg
 // Merge `rhsOp` into `mergeOp` in lhsLayer when equal under normalization.
 // To merge this we keep and update the rotation kind of `mergeOp` in lhsLayer,
 // then just remove the `rhsOp` from the rhsLayer.
-void mergePPR(PPRotationOp rhsOp, PBCLayer &rhsLayer, PPRotationOp mergeOp, IRRewriter &writer)
-{
+void mergePPR(PPRotationOp rhsOp, PBCLayer &rhsLayer, PPRotationOp mergeOp, IRRewriter &writer) {
     assert(rhsOp.getRotationKind() == mergeOp.getRotationKind() && "expected same rotation kind");
 
     mergeOp.setRotationKind(mergeOp.getRotationKind() / 2);
@@ -148,8 +145,7 @@ void mergePPR(PPRotationOp rhsOp, PBCLayer &rhsLayer, PPRotationOp mergeOp, IRRe
 struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> {
     using TLayerReductionPassBase::TLayerReductionPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         MLIRContext *context = &getContext();
         IRRewriter writer(context);
         PBCLayerContext layerContext;
@@ -198,8 +194,7 @@ struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> 
                         mergePPR(cast<PPRotationOp>(op), currentLayer, cast<PPRotationOp>(mergeOp),
                                  writer);
                         changed = true;
-                    }
-                    else if (isCommute) {
+                    } else if (isCommute) {
                         moveOpToLayer(op, currentLayer, mergeOp, prevLayer, writer);
                         changed = true;
                     }

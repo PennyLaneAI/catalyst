@@ -28,8 +28,7 @@ using namespace Catalyst::Runtime::Device;
 
 using json = nlohmann::json;
 
-TEST_CASE("Test the OQDDevice constructor", "[oqd]")
-{
+TEST_CASE("Test the OQDDevice constructor", "[oqd]") {
     auto device = OQDDevice("{shots : 100}");
 
     REQUIRE_THROWS_WITH(device.GetNumQubits(), ContainsSubstring("unsupported by device"));
@@ -39,8 +38,7 @@ TEST_CASE("Test the OQDDevice constructor", "[oqd]")
     REQUIRE(*res == false);
 }
 
-TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")
-{
+TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]") {
     auto device = OQDDevice(R"({shots : 100}ION:{"name":"Yb171"}PHONON:{"class_":"Phonon"})");
 
     CHECK(device.getOutputFile() == "__openapl__output.json");
@@ -59,8 +57,7 @@ TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")
     std::filesystem::remove("__openapl__output.json");
 }
 
-TEST_CASE("Test the OQDDevice ion index out of range", "[oqd]")
-{
+TEST_CASE("Test the OQDDevice ion index out of range", "[oqd]") {
     auto device = OQDDevice(R"({shots : 100}ION:{"name":"Yb171"})");
     std::vector<QubitIdType> allocaedQubits = device.AllocateQubits(3);
 
@@ -72,8 +69,7 @@ TEST_CASE("Test the OQDDevice ion index out of range", "[oqd]")
                         ContainsSubstring("ion index out of range"));
 }
 
-TEST_CASE("Test the OQDDevice transition index out of range", "[oqd]")
-{
+TEST_CASE("Test the OQDDevice transition index out of range", "[oqd]") {
     auto device = OQDDevice(R"({shots : 100}ION:{"transitions":[]})");
     std::vector<QubitIdType> allocaedQubits = device.AllocateQubits(1);
 
@@ -85,8 +81,7 @@ TEST_CASE("Test the OQDDevice transition index out of range", "[oqd]")
                         ContainsSubstring("transition index out of range"));
 }
 
-TEST_CASE("Test OpenAPL Program generation", "[oqd]")
-{
+TEST_CASE("Test OpenAPL Program generation", "[oqd]") {
     json expected = json::parse(R"(
 {
   "class_": "AtomicCircuit",

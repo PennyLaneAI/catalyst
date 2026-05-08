@@ -39,8 +39,7 @@ namespace pbc {
 struct PPMCompilationPass : public impl::PPMCompilationPassBase<PPMCompilationPass> {
     using PPMCompilationPassBase::PPMCompilationPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         auto ctx = &getContext();
         auto module = getOperation();
 

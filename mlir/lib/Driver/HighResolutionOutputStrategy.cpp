@@ -18,8 +18,7 @@
 
 constexpr llvm::StringLiteral kTimingDescription = "... Execution time report ...";
 
-void HighResolutionOutputStrategy::printHeader(const mlir::TimeRecord &total)
-{
+void HighResolutionOutputStrategy::printHeader(const mlir::TimeRecord &total) {
     // Figure out how many spaces to description name.
     unsigned padding = (80 - kTimingDescription.size()) / 2;
     os << "===" << std::string(73, '-') << "===\n";
@@ -36,8 +35,7 @@ void HighResolutionOutputStrategy::printHeader(const mlir::TimeRecord &total)
 void HighResolutionOutputStrategy::printFooter() { os.flush(); }
 
 void HighResolutionOutputStrategy::printTime(const mlir::TimeRecord &time,
-                                             const mlir::TimeRecord &total)
-{
+                                             const mlir::TimeRecord &total) {
     if (total.user != total.wall) {
         os << llvm::format("  %10.9f (%5.1f%%)", time.user, 100.0 * time.user / total.user);
     }
@@ -45,16 +43,14 @@ void HighResolutionOutputStrategy::printTime(const mlir::TimeRecord &time,
 }
 void HighResolutionOutputStrategy::printListEntry(llvm::StringRef name,
                                                   const mlir::TimeRecord &time,
-                                                  const mlir::TimeRecord &total, bool lastEntry)
-{
+                                                  const mlir::TimeRecord &total, bool lastEntry) {
     printTime(time, total);
     os << name << "\n";
 }
 
 void HighResolutionOutputStrategy::printTreeEntry(unsigned indent, llvm::StringRef name,
                                                   const mlir::TimeRecord &time,
-                                                  const mlir::TimeRecord &total)
-{
+                                                  const mlir::TimeRecord &total) {
     printTime(time, total);
     os.indent(indent) << name << "\n";
 }

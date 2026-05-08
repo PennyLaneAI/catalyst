@@ -42,8 +42,7 @@ struct LoopBoundaryOptimizationPass
     : impl::LoopBoundaryOptimizationPassBase<LoopBoundaryOptimizationPass> {
     using LoopBoundaryOptimizationPassBase::LoopBoundaryOptimizationPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         LLVM_DEBUG(dbgs() << "loop boundary optimization pass"
                           << "\n");
 

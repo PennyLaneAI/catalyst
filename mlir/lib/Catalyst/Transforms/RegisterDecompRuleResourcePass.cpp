@@ -34,8 +34,7 @@ struct RegisterDecompRuleResourcePass
     : public impl::RegisterDecompRuleResourcePassBase<RegisterDecompRuleResourcePass> {
     using RegisterDecompRuleResourcePassBase::RegisterDecompRuleResourcePassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         auto &analysis = getAnalysis<ResourceAnalysis>();
         const auto &results = analysis.getResults();
         auto module = llvm::cast<mlir::ModuleOp>(getOperation());
@@ -81,8 +80,7 @@ struct RegisterDecompRuleResourcePass
      * @return DictionaryAttr representing the resource counts
      *
      */
-    DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result) const
-    {
+    DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result) const {
         SmallVector<NamedAttribute> entries;
 
         // operations

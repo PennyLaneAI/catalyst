@@ -29,8 +29,7 @@ using namespace catalyst::qref;
 
 #include "QRef/IR/QRefOpsDialect.cpp.inc"
 
-static ParseResult parseQuregTypeBody(AsmParser &parser, IntegerAttr &size)
-{
+static ParseResult parseQuregTypeBody(AsmParser &parser, IntegerAttr &size) {
     // Parse allocation size: `?` or non-negative integer
     if (succeeded(parser.parseOptionalQuestion())) {
         size = parser.getBuilder().getI64IntegerAttr(ShapedType::kDynamic);
@@ -51,24 +50,20 @@ static ParseResult parseQuregTypeBody(AsmParser &parser, IntegerAttr &size)
     return success();
 }
 
-static void printQuregTypeBody(AsmPrinter &printer, IntegerAttr size)
-{
+static void printQuregTypeBody(AsmPrinter &printer, IntegerAttr size) {
     if (size) {
         int64_t id = size.getInt();
         if (id >= 0) {
             printer << id;
-        }
-        else {
+        } else {
             printer << "?";
         }
-    }
-    else {
+    } else {
         printer << "?";
     }
 }
 
-void QRefDialect::initialize()
-{
+void QRefDialect::initialize() {
     addTypes<
 #define GET_TYPEDEF_LIST
 #include "QRef/IR/QRefOpsTypes.cpp.inc"

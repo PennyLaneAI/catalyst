@@ -27,8 +27,7 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace {
-bool hasUseAfterFree(Value qubit, Operation *gate, DominanceInfo &domInfo)
-{
+bool hasUseAfterFree(Value qubit, Operation *gate, DominanceInfo &domInfo) {
     if (auto getOp = qubit.getDefiningOp<qref::GetOp>()) {
         Value qreg = getOp.getQreg();
         for (Operation *user : qreg.getUsers()) {
@@ -38,8 +37,7 @@ bool hasUseAfterFree(Value qubit, Operation *gate, DominanceInfo &domInfo)
                 }
             }
         }
-    }
-    else {
+    } else {
         for (Operation *user : qubit.getUsers()) {
             if (auto deallocQubitOp = dyn_cast<qref::DeallocQubitOp>(user)) {
                 if (domInfo.properlyDominates(deallocQubitOp, gate)) {
@@ -63,8 +61,7 @@ struct VerifyNoQuantumUseAfterFreePass
     : impl::VerifyNoQuantumUseAfterFreePassBase<VerifyNoQuantumUseAfterFreePass> {
     using VerifyNoQuantumUseAfterFreePassBase::VerifyNoQuantumUseAfterFreePassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         Operation *mod = getOperation();
         DominanceInfo domInfo(mod);
 

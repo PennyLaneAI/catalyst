@@ -35,8 +35,7 @@ namespace pbc {
 struct CommutePPRPass : public impl::CommutePPRPassBase<CommutePPRPass> {
     using CommutePPRPassBase::CommutePPRPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         RewritePatternSet patterns(&getContext());
 
         populateCommutePPRPatterns(patterns, maxPauliSize);

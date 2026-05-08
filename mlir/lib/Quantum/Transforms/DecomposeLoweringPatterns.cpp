@@ -40,12 +40,9 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
     DLCustomOpPattern(MLIRContext *context, const llvm::StringMap<func::FuncOp> &registry,
                       const llvm::StringSet<llvm::MallocAllocator> &gateSet)
         : OpRewritePattern<CustomOp>(context), decompositionRegistry(registry),
-          targetGateSet(gateSet)
-    {
-    }
+          targetGateSet(gateSet) {}
 
-    LogicalResult matchAndRewrite(CustomOp op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(CustomOp op, PatternRewriter &rewriter) const override {
         StringRef gateName = op.getGateName();
 
         // Only decompose the op if it is not in the target gate set
@@ -82,8 +79,7 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
         if (callOp.getNumResults() == 1 && isa<quantum::QuregType>(callOp.getResult(0).getType())) {
             auto results = analyzer.prepareCallResultForQreg(callOp, rewriter);
             rewriter.replaceOp(op, results);
-        }
-        else {
+        } else {
             rewriter.replaceOp(op, callOp->getResults());
         }
 
@@ -100,12 +96,9 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
     DLMultiRZOpPattern(MLIRContext *context, const llvm::StringMap<func::FuncOp> &registry,
                        const llvm::StringSet<llvm::MallocAllocator> &gateSet)
         : OpRewritePattern<MultiRZOp>(context), decompositionRegistry(registry),
-          targetGateSet(gateSet)
-    {
-    }
+          targetGateSet(gateSet) {}
 
-    LogicalResult matchAndRewrite(MultiRZOp op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(MultiRZOp op, PatternRewriter &rewriter) const override {
         std::string gateName = "MultiRZ";
 
         // Only decompose the op if it is not in the target gate set
@@ -156,8 +149,7 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
         if (callOp.getNumResults() == 1 && isa<quantum::QuregType>(callOp.getResult(0).getType())) {
             auto results = analyzer.prepareCallResultForQreg(callOp, rewriter);
             rewriter.replaceOp(op, results);
-        }
-        else {
+        } else {
             rewriter.replaceOp(op, callOp->getResults());
         }
 
@@ -165,10 +157,9 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
     }
 };
 
-void populateDecomposeLoweringPatterns(RewritePatternSet &patterns,
-                                       const llvm::StringMap<func::FuncOp> &decompositionRegistry,
-                                       const llvm::StringSet<llvm::MallocAllocator> &targetGateSet)
-{
+void populateDecomposeLoweringPatterns(
+    RewritePatternSet &patterns, const llvm::StringMap<func::FuncOp> &decompositionRegistry,
+    const llvm::StringSet<llvm::MallocAllocator> &targetGateSet) {
     patterns.add<DLCustomOpPattern>(patterns.getContext(), decompositionRegistry, targetGateSet);
     patterns.add<DLMultiRZOpPattern>(patterns.getContext(), decompositionRegistry, targetGateSet);
 }

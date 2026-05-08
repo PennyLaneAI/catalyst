@@ -45,8 +45,7 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
     inline static const std::unordered_map<std::string, std::string> qpu_map = {
         {"lucy", "qpu:uk:2:d865b5a184"}, {"toshiko", "qpu:jp:3:673b1ad43c"}};
 
-    inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
-    {
+    inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t> {
         std::vector<size_t> res;
         res.reserve(wires.size());
         std::transform(wires.begin(), wires.end(), std::back_inserter(res),
@@ -55,16 +54,14 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
     }
 
   public:
-    explicit OQCDevice(const std::string &kwargs = "{device_type : oqc, backend : default}")
-    {
+    explicit OQCDevice(const std::string &kwargs = "{device_type : oqc, backend : default}") {
         device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
                            : 0;
         if (qpu_map.contains(device_kwargs["backend"])) {
             qpu_id = qpu_map.at(device_kwargs["backend"]);
-        }
-        else {
+        } else {
             std::cout << "Warning: backend not specified on OQC device, falling back to lucy "
                          "simulator.\n";
             qpu_id = qpu_map.at("lucy");

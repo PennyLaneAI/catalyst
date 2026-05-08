@@ -28,8 +28,7 @@ using namespace Catch::Matchers;
 using namespace DecompGraph::Core;
 using namespace DecompGraph::Solver;
 
-TEST_CASE("Test DecompositionGraph construction", "[DecompGraph::Solver]")
-{
+TEST_CASE("Test DecompositionGraph construction", "[DecompGraph::Solver]") {
     const auto h = OperatorNode{"H", 1, 0, false};
     const auto rz = OperatorNode{"RZ", 1, 1, false};
     const auto rx = OperatorNode{"RX", 1, 1, false};
@@ -63,8 +62,7 @@ TEST_CASE("Test DecompositionGraph construction", "[DecompGraph::Solver]")
 }
 
 TEST_CASE("Test DecompositionSolver solve method with incomplete gates in Gateset",
-          "[DecompGraph::Solver]")
-{
+          "[DecompGraph::Solver]") {
     const auto h = OperatorNode{"H", 1, 0, false};
     const auto h_gateset = OperatorNode{"H"};
     const WeightedGateset gateset{{{h_gateset, 1.0}}};
@@ -88,8 +86,7 @@ TEST_CASE("Test DecompositionSolver solve method with incomplete gates in Gatese
     REQUIRE(result_with_h_gateset.at(h).isBasis);
 }
 
-TEST_CASE("Do not solve for target gates", "[DecompGraph::Solver]")
-{
+TEST_CASE("Do not solve for target gates", "[DecompGraph::Solver]") {
     const auto h = OperatorNode{"H", 1, 0, false};
     const auto rz = OperatorNode{"RZ", 1, 1, false};
 
@@ -109,8 +106,7 @@ TEST_CASE("Do not solve for target gates", "[DecompGraph::Solver]")
     REQUIRE(solutions.at(rz).totalCost == 1.0);
 }
 
-TEST_CASE("Test DecompositionGraph copy and move semantics", "[DecompGraph::Solver]")
-{
+TEST_CASE("Test DecompositionGraph copy and move semantics", "[DecompGraph::Solver]") {
     const auto h = OperatorNode{"H", 1, 0, false};
     const auto rz = OperatorNode{"RZ", 1, 1, false};
     const auto rx = OperatorNode{"RX", 1, 1, false};
@@ -152,8 +148,7 @@ TEST_CASE("Test DecompositionGraph copy and move semantics", "[DecompGraph::Solv
     REQUIRE(moveAssignedGraph.getRules()[0].name == copyConstructedGraph.getRules()[0].name);
 }
 
-TEST_CASE("Test DecompositionGraph lookup and counting", "[DecompGraph::Solver]")
-{
+TEST_CASE("Test DecompositionGraph lookup and counting", "[DecompGraph::Solver]") {
     const OperatorNode h{"H", 1, 0, false};
     const OperatorNode rz{"RZ", 1, 1, false};
     const OperatorNode rx{"RX", 1, 1, false};
@@ -182,16 +177,14 @@ TEST_CASE("Test DecompositionGraph lookup and counting", "[DecompGraph::Solver]"
         }
         if (rule.name == "h_to_rz_rx_rz") {
             REQUIRE(totalCost == 1.0 * 2 + 3.0 * 1);
-        }
-        else if (rule.name == "h_to_ry_rx_ry") {
+        } else if (rule.name == "h_to_ry_rx_ry") {
             REQUIRE(totalCost == 2.0 * 2 + 3.0 * 1);
         }
     }
 }
 
 TEST_CASE("Test the graph construction with realistic ops and multiple rules from PennyLane",
-          "[DecompGraph::Solver]")
-{
+          "[DecompGraph::Solver]") {
     const OperatorNode h{"H", 1, 0, false};
     const OperatorNode rz{"RZ", 1, 1, false};
     const OperatorNode rx{"RX", 1, 1, false};
@@ -216,8 +209,7 @@ TEST_CASE("Test the graph construction with realistic ops and multiple rules fro
     REQUIRE(graph.getAllRulesFor(customBellOp).size() == 2);
 }
 
-TEST_CASE("Test DecompositionSolver with one single operator", "[DecompGraph::Solver]")
-{
+TEST_CASE("Test DecompositionSolver with one single operator", "[DecompGraph::Solver]") {
     const OperatorNode h{"H", 1, 0, false};
     const OperatorNode rz{"RZ", 1, 1, false};
     const OperatorNode rx{"RX", 1, 1, false};
@@ -255,8 +247,8 @@ TEST_CASE("Test DecompositionSolver with one single operator", "[DecompGraph::So
     REQUIRE(ry_rule.isBasis);
 }
 
-TEST_CASE("Test the graph solver with intermediate ops and multiple rules", "[DecompGraph::Solver]")
-{
+TEST_CASE("Test the graph solver with intermediate ops and multiple rules",
+          "[DecompGraph::Solver]") {
     const OperatorNode h{"H", 1, 0, false};
     const OperatorNode rz{"RZ", 1, 1, false};
     const OperatorNode rx{"RX", 1, 1, false};
@@ -293,28 +285,23 @@ TEST_CASE("Test the graph solver with intermediate ops and multiple rules", "[De
         if (op == customBellOp) {
             REQUIRE(std::find(expected_rule_names.begin(), expected_rule_names.end(),
                               entry.ruleName) != expected_rule_names.end());
-        }
-        else if (op == h) {
+        } else if (op == h) {
             REQUIRE(std::find(expected_rule_names.begin(), expected_rule_names.end(),
                               entry.ruleName) != expected_rule_names.end());
-        }
-        else if (op == swap) {
+        } else if (op == swap) {
             REQUIRE(std::find(expected_rule_names.begin(), expected_rule_names.end(),
                               entry.ruleName) != expected_rule_names.end());
-        }
-        else if (op == rz || op == rx) {
+        } else if (op == rz || op == rx) {
             REQUIRE(entry.isBasis);
             REQUIRE(entry.ruleName == "BasisRule");
-        }
-        else if (op == ry) {
+        } else if (op == ry) {
             REQUIRE(entry.isBasis);
             REQUIRE(entry.ruleName == "BasisRule");
         }
     }
 }
 
-TEST_CASE("Test GraphSolveError for unsolvable operator", "[DecompGraph::Solver]")
-{
+TEST_CASE("Test GraphSolveError for unsolvable operator", "[DecompGraph::Solver]") {
     const OperatorNode h{"H", 1, 0, false};
     const OperatorNode rz{"RZ", 1, 1, false};
 
@@ -330,8 +317,7 @@ TEST_CASE("Test GraphSolveError for unsolvable operator", "[DecompGraph::Solver]
     REQUIRE_THROWS_AS(solver.solve(), GraphSolverFailedError);
 }
 
-TEST_CASE("Test GraphSolveError for cyclic decomposition", "[DecompGraph::Solver]")
-{
+TEST_CASE("Test GraphSolveError for cyclic decomposition", "[DecompGraph::Solver]") {
     const OperatorNode h{"H", 1, 0, false};
 
     const WeightedGateset gateset{};
@@ -346,8 +332,7 @@ TEST_CASE("Test GraphSolveError for cyclic decomposition", "[DecompGraph::Solver
     REQUIRE_THROWS_AS(solver.solve(), GraphSolverFailedError);
 }
 
-TEST_CASE("Test PauliX -> GlobalPhase(1), RX(1) decomposition", "[DecompGraph::Solver]")
-{
+TEST_CASE("Test PauliX -> GlobalPhase(1), RX(1) decomposition", "[DecompGraph::Solver]") {
     const OperatorNode x{"X"};
     const OperatorNode globalPhase{"GlobalPhase"};
     const OperatorNode rx{"RX"};
@@ -376,8 +361,7 @@ TEST_CASE("Test PauliX -> GlobalPhase(1), RX(1) decomposition", "[DecompGraph::S
 }
 
 TEST_CASE("Test cyclic decomposition with multiple rules for the same operator",
-          "[DecompGraph::Solver]")
-{
+          "[DecompGraph::Solver]") {
     const OperatorNode hadamard{"Hadamard"};
     const OperatorNode globalPhase{"GlobalPhase"};
     const OperatorNode rx{"RX"};
@@ -414,8 +398,7 @@ TEST_CASE("Test cyclic decomposition with multiple rules for the same operator",
     REQUIRE(h_solution2.ruleName == "__builtin__hadamard_to_rz_ry");
 }
 
-TEST_CASE("Test GraphBuilder with fixed decomposition", "[DecompGraph::Solver]")
-{
+TEST_CASE("Test GraphBuilder with fixed decomposition", "[DecompGraph::Solver]") {
     const OperatorNode h{"H"};
     const OperatorNode rz{"RZ"};
     const OperatorNode rx{"RX"};
@@ -436,8 +419,7 @@ TEST_CASE("Test GraphBuilder with fixed decomposition", "[DecompGraph::Solver]")
     REQUIRE(graph.getAllRulesFor(h)[0].name == "h_to_rz_rx_rz");
 }
 
-TEST_CASE("Test GraphBuilder with alternative decomposition", "[DecompGraph::Solver]")
-{
+TEST_CASE("Test GraphBuilder with alternative decomposition", "[DecompGraph::Solver]") {
     const OperatorNode h{"H"};
     const OperatorNode rz{"RZ"};
     const OperatorNode rx{"RX"};
@@ -456,8 +438,7 @@ TEST_CASE("Test GraphBuilder with alternative decomposition", "[DecompGraph::Sol
     REQUIRE(graph.getAllRulesFor(h).size() == 3);
 }
 
-TEST_CASE("Test GraphSolver with fixed decomposition", "[DecompGraph::Solver]")
-{
+TEST_CASE("Test GraphSolver with fixed decomposition", "[DecompGraph::Solver]") {
     const OperatorNode h{"H"};
     const OperatorNode rz{"RZ"};
     const OperatorNode rx{"RX"};
@@ -482,8 +463,7 @@ TEST_CASE("Test GraphSolver with fixed decomposition", "[DecompGraph::Solver]")
     REQUIRE(chosen_rule.ruleName == "h_to_rz_rx_rz");
 }
 
-TEST_CASE("Test GraphSolver with alternative decomposition", "[DecompGraph::Solver]")
-{
+TEST_CASE("Test GraphSolver with alternative decomposition", "[DecompGraph::Solver]") {
     const OperatorNode h{"H"};
     const OperatorNode rz{"RZ"};
     const OperatorNode rx{"RX"};
@@ -507,8 +487,7 @@ TEST_CASE("Test GraphSolver with alternative decomposition", "[DecompGraph::Solv
     REQUIRE(chosen_rule.ruleName == "h_to_rz_rx_rz");
 }
 
-TEST_CASE("Test GraphSolver with MultiRZ decompositions", "[DecompGraph::Solver]")
-{
+TEST_CASE("Test GraphSolver with MultiRZ decompositions", "[DecompGraph::Solver]") {
     const OperatorNode multiRZ3{"MultiRZ3"};
     const OperatorNode multiRZ5{"MultiRZ5"};
     const OperatorNode rz{"RZ"};
@@ -534,8 +513,7 @@ TEST_CASE("Test GraphSolver with MultiRZ decompositions", "[DecompGraph::Solver]
     REQUIRE(chosen_rule_multiRZ5.totalCost == 1.0 * 5);
 }
 
-TEST_CASE("Test GraphSolver with empty decomposition rules", "[DecompGraph::Solver]")
-{
+TEST_CASE("Test GraphSolver with empty decomposition rules", "[DecompGraph::Solver]") {
     const OperatorNode hadamard{"Hadamard"};
     const OperatorNode globalPhase{"GlobalPhase"};
 

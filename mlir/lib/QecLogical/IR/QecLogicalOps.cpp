@@ -36,8 +36,7 @@ using namespace catalyst::qecl;
 // QecLogical op verifiers.
 //===----------------------------------------------------------------------===//
 
-LogicalResult ExtractCodeblockOp::verify()
-{
+LogicalResult ExtractCodeblockOp::verify() {
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected to have a non-null index";
     }
@@ -64,8 +63,7 @@ LogicalResult ExtractCodeblockOp::verify()
     return success();
 }
 
-LogicalResult InsertCodeblockOp::verify()
-{
+LogicalResult InsertCodeblockOp::verify() {
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected to have a non-null index";
     }
@@ -92,8 +90,7 @@ LogicalResult InsertCodeblockOp::verify()
     return success();
 }
 
-template <typename OpTy> static LogicalResult verifySingleQubitLogicalGateOp(OpTy op)
-{
+template <typename OpTy> static LogicalResult verifySingleQubitLogicalGateOp(OpTy op) {
     if (!(op.getIdx() || op.getIdxAttr().has_value())) {
         return op.emitOpError() << "expected to have a non-null index";
     }
@@ -127,8 +124,7 @@ LogicalResult HadamardOp::verify() { return verifySingleQubitLogicalGateOp(*this
 
 LogicalResult SOp::verify() { return verifySingleQubitLogicalGateOp(*this); }
 
-LogicalResult CnotOp::verify()
-{
+LogicalResult CnotOp::verify() {
     if (!(getIdxCtrl() || getIdxCtrlAttr().has_value())) {
         return emitOpError() << "expected to have a non-null ctrl index";
     }
@@ -161,8 +157,7 @@ LogicalResult CnotOp::verify()
     return success();
 }
 
-LogicalResult MeasureOp::verify()
-{
+LogicalResult MeasureOp::verify() {
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected to have a non-null index";
     }
@@ -192,8 +187,7 @@ LogicalResult MeasureOp::verify()
  *
  * Erase alloc op if it has no uses.
  */
-LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter)
-{
+LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter) {
     if (alloc->use_empty()) {
         rewriter.eraseOp(alloc);
         return success();
@@ -207,8 +201,7 @@ LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewrit
  *
  * Erase alloc/dealloc op pairs if allocated hyper-register is immediately deallocated.
  */
-LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter)
-{
+LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter) {
     const auto hyperReg = dealloc.getHyperReg();
     if (auto alloc = dyn_cast_if_present<AllocOp>(hyperReg.getDefiningOp())) {
         if (hyperReg.hasOneUse()) {
@@ -241,8 +234,7 @@ LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &
  *   %b2 = test.op %b0
  */
 LogicalResult ExtractCodeblockOp::canonicalize(ExtractCodeblockOp extract,
-                                               mlir::PatternRewriter &rewriter)
-{
+                                               mlir::PatternRewriter &rewriter) {
     if (auto insert =
             dyn_cast_if_present<InsertCodeblockOp>(extract.getHyperReg().getDefiningOp())) {
         bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
@@ -278,8 +270,7 @@ LogicalResult ExtractCodeblockOp::canonicalize(ExtractCodeblockOp extract,
  *   %r2 = test.op %r0
  */
 LogicalResult InsertCodeblockOp::canonicalize(InsertCodeblockOp insert,
-                                              mlir::PatternRewriter &rewriter)
-{
+                                              mlir::PatternRewriter &rewriter) {
     if (auto extract =
             dyn_cast_if_present<ExtractCodeblockOp>(insert.getCodeblock().getDefiningOp())) {
         bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
@@ -308,8 +299,7 @@ LogicalResult InsertCodeblockOp::canonicalize(InsertCodeblockOp insert,
 /**
  * @brief Prefer using an attribute when the index is constant.
  */
-template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx)
-{
+template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx) {
     bool hasNoIdxAttr = !op.getIdxAttr().has_value();
     bool isConstantIdx = isa_and_nonnull<IntegerAttr>(idx);
     if (hasNoIdxAttr && isConstantIdx) {
@@ -326,8 +316,7 @@ template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp o
 /**
  * @brief Fold method for extract-codeblock op.
  */
-OpFoldResult ExtractCodeblockOp::fold(FoldAdaptor adaptor)
-{
+OpFoldResult ExtractCodeblockOp::fold(FoldAdaptor adaptor) {
     if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
         return getResult();
     }
@@ -338,8 +327,7 @@ OpFoldResult ExtractCodeblockOp::fold(FoldAdaptor adaptor)
 /**
  * @brief Fold method for insert-codeblock op.
  */
-OpFoldResult InsertCodeblockOp::fold(FoldAdaptor adaptor)
-{
+OpFoldResult InsertCodeblockOp::fold(FoldAdaptor adaptor) {
     if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
         return getResult();
     }
