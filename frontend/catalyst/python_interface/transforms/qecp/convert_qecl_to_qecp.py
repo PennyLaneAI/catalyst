@@ -334,6 +334,8 @@ class Transversal2QGateConversion(RewritePattern):
         gate_name = op.name.split(".")[1]
         gate_subroutine = self.gate_subroutines.get(gate_name, None)
 
+        # gates that aren't defined transversally in the QEC code are ignored here
+        # they will need to be handled by a different pattern
         if gate_subroutine is None:
             return
 
