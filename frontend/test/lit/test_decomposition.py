@@ -1093,7 +1093,7 @@ def test_decompose_lowering_pauli_rot_with_ooo_qubits():
     @qp.qnode(qp.device("lightning.qubit", wires=3))
     # CHECK-LABEL: @circuit_pauli_rot_with_ooo_qubits
     def circuit_pauli_rot_with_ooo_qubits():
-        qp.PauliRot(0.123, pauli_word="YYY", wires=[1,0,2])
+        qp.PauliRot(0.123, pauli_word="YYY", wires=[1, 0, 2])
         return qp.expval(qp.Z(0))
 
     # CHECK-NOT: quantum.paulirot
