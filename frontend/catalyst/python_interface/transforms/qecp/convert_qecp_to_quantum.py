@@ -52,9 +52,8 @@ from catalyst.python_interface.dialects.quantum.attributes import QuregType, Qub
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 from catalyst.python_interface.inspection.xdsl_conversion import resolve_constant_params
 
-
-
 # MARK: Type Conversion Pattern
+
 
 @dataclass
 class PhysicalCodeblockTypeConversion(TypeConversionPattern):
@@ -66,6 +65,7 @@ class PhysicalCodeblockTypeConversion(TypeConversionPattern):
 
         return QuregType()
 
+
 @dataclass
 class QecPhysicalQubitTypeConversion(TypeConversionPattern):
     """Codeblock type conversion pattern from qecp.codeblock -> quantum.reg."""
@@ -75,6 +75,7 @@ class QecPhysicalQubitTypeConversion(TypeConversionPattern):
         """Type conversion rewrite pattern for physical qubit types."""
 
         return QubitType()
+
 
 @dataclass
 class AllocationConversion(RewritePattern):
