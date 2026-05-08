@@ -81,6 +81,8 @@ RUNTIME_OPERATIONS = [
     "DoubleExcitation",
     "ISWAP",
     "MultiRZ",
+    "PauliRot",
+    "PauliMeasure",
     "PauliX",
     "PauliY",
     "PauliZ",
@@ -258,6 +260,16 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
         qjit_capabilities.operations.update(
             {
                 "MidCircuitMeasure": OperatorProperties(
+                    invertible=False, controllable=False, differentiable=False
+                )
+            }
+        )
+
+    # Optionally enable runtime-powered Pauli-product mid-circuit measurements
+    if "PauliMeasure" in target_capabilities.operations:
+        qjit_capabilities.operations.update(
+            {
+                "MidCircuitPauliMeasure": OperatorProperties(
                     invertible=False, controllable=False, differentiable=False
                 )
             }

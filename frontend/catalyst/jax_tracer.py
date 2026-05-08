@@ -47,7 +47,7 @@ from pennylane.measurements import (
     VarianceMP,
 )
 from pennylane.operation import Operation, Operator, Wires
-from pennylane.ops import Adjoint, Controlled, ControlledOp
+from pennylane.ops import Adjoint, Controlled, ControlledOp, PauliMeasure
 from pennylane.tape import QuantumTape
 
 import catalyst
@@ -71,6 +71,7 @@ from catalyst.jax_extras import (
     jaxpr_to_mlir,
     make_from_node_data_and_children,
     make_jaxpr2,
+    new_inner_tracer,
     sort_eqns,
     transient_jax_config,
     tree_flatten,
@@ -98,6 +99,8 @@ from catalyst.jax_primitives import (
     hermitian_p,
     namedobs_p,
     num_qubits_p,
+    pauli_measure_p,
+    pauli_rot_p,
     probs_p,
     qalloc_p,
     qdealloc_p,
@@ -528,26 +531,36 @@ class HybridOp(Operator):
         _trace: DynamicJaxprTrace,
         in_expanded_tracers,
         out_expanded_tracers,
+        num_quantum_outs: int = 1,
         **kwargs,
-    ) -> DynamicJaxprTracer:
+    ) -> Union[DynamicJaxprTracer, List[DynamicJaxprTracer]]:
         """Binds the JAX primitive but override the returned classical tracers with the already
         existing output tracers, stored in the operations since the classical tracing stage.
         User-defined transformations might have changed them by the time this function is called.
         The quantum tracer, namely the quantum register is not supposed to be changed so it is kept
         as-is.
+
+        ``num_quantum_outs`` controls how many trailing outvars of the bound primitive are quantum
+        (qubit / qreg) tracers. The default of 1 preserves the historical behaviour for ops like
+        ``measure_p`` and the control-flow primitives, where the last outvar is the quantum
+        tracer. Ops that produce multiple quantum outvars (e.g. ``pauli_measure_p`` returns
+        ``(bool, qubit_0, ..., qubit_{N-1})``) should pass the matching ``N``; in that case the
+        method returns the list of trailing quantum tracers.
         """
         assert self.binder is not None, "HybridOp should set a binder"
+        assert num_quantum_outs >= 1, "num_quantum_outs must be at least 1"
 
         # Here, we are binding any of the possible hybrid ops.
         # which includes: for_loop, while_loop, cond, measure.
         # This will place an equation at the very end of the current list of equations.
-        out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
+        bind_outs = self.binder(*in_expanded_tracers, **kwargs)
+        out_quantum_tracers = list(bind_outs[-num_quantum_outs:])
 
         trace = EvaluationContext.get_current_trace()
         eqn = _get_eqn_from_tracing_eqn(trace.frame.tracing_eqns[-1])
         frame = trace.frame
 
-        assert len(eqn.outvars[:-1]) == len(
+        assert len(eqn.outvars[:-num_quantum_outs]) == len(
             out_expanded_tracers
         ), f"{eqn.outvars=}\n{out_expanded_tracers=}"
 
@@ -618,7 +631,7 @@ class HybridOp(Operator):
         # Now, the output variables can be considered as part of the current frame.
         # This allows us to avoid importing all equations again next time.
         jaxpr_variables.update(eqn.outvars)
-        return out_quantum_tracer
+        return out_quantum_tracers[0] if num_quantum_outs == 1 else out_quantum_tracers
 
     @debug_logger
     def trace_quantum(
@@ -882,6 +895,27 @@ def trace_quantum_operations(
             trace_basis_state(op, qrp)
         elif isinstance(op, qp.Snapshot):
             trace_snapshot_op(op, device, qrp, out_snapshot_tracer)
+        elif isinstance(op, qp.PauliRot):
+            qubits = qrp.extract(op.wires)
+            qubits2 = pauli_rot_p.bind(
+                *qubits,
+                op.parameters[0],
+                pauli_word=op.hyperparameters["pauli_word"],
+                qubits_len=len(qubits),
+                params_len=len(op.parameters),
+                ctrl_len=len(controlled_wires),
+                adjoint=adjoint,
+            )
+            qrp.insert(op.wires, qubits2[: len(qubits)])
+        elif isinstance(op, PauliMeasure):
+            qubits = qrp.extract(op.wires)
+            qubits2 = pauli_measure_p.bind(
+                *qubits,
+                pauli_word=op.hyperparameters["pauli_word"],
+                qubits_len=len(qubits),
+            )
+            _, *out_qubits = qubits2
+            qrp.insert(op.wires, out_qubits)
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
