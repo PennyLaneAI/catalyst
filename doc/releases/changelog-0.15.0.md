@@ -438,9 +438,10 @@
   [(#2497)](https://github.com/PennyLaneAI/catalyst/pull/2497)
   [(#2597)](https://github.com/PennyLaneAI/catalyst/pull/2597)
 
-* The :func:`~.passes.parity_synth` can now be invoked from the ``passes`` module.
+* The :func:`~.passes.parity_synth` pass can now be invoked from the ``passes`` module.
   [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
   [(#2784)](https://github.com/PennyLaneAI/catalyst/pull/2784)
+  [(#2804)](https://github.com/PennyLaneAI/catalyst/pull/2804)
 
   ```python
   import pennylane as qp
@@ -503,7 +504,7 @@
     Currently, preprocessing transforms that do not have a native MLIR or xDSL implementation will
     be replaced with empty transforms.
 
-  - `qp.vjp`  and `qp.jvp`
+  - `qp.vjp` and `qp.jvp`
     [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
     [(#2316)](https://github.com/PennyLaneAI/catalyst/pull/2316)
 
@@ -571,10 +572,10 @@
     [(#2617)](https://github.com/PennyLaneAI/catalyst/pull/2617)
 
   - It has been refactored to follow the conventions for a QNode transform as they are described in
-    ``catalyst.python_interace.transforms.qnode-transform-guide.md``.
+    ``catalyst.python_interface.transforms.qnode-transform-guide.md``.
     [(#2605)](https://github.com/PennyLaneAI/catalyst/pull/2605)
 
-  - A more informative error message is now raised it encounters a program with dyanamic shots.
+  - A more informative error message is now raised it encounters a program with dynamic shots.
     [(#2616)](https://github.com/PennyLaneAI/catalyst/pull/2616)
 
   - It has been extended to support tensor product observables.
@@ -734,7 +735,7 @@
 
 * Fixed the ``catalyst`` CLI tool silently listening to stdin when run without an input file, even
   when given flags like ``--list-passes`` that should override this behaviour.
-  [(2447)](https://github.com/PennyLaneAI/catalyst/pull/2447)
+  [(#2447)](https://github.com/PennyLaneAI/catalyst/pull/2447)
 
 * Fixed a bug with incorrect lowering of PPMs (Pauli product measurements) into CAPI calls when the
   PPM is in the negative basis.
@@ -869,7 +870,7 @@
 * Additional integration tests have been added for the pass-by-pass version of `qp.specs`.
   [(#2690)](https://github.com/PennyLaneAI/catalyst/pull/2690/)
 
-* Removes unnessary registrations for the various gradient primitives in `from_plxpr` when we
+* Unnecessary registrations were removed for the various gradient primitives in `from_plxpr` when we
   are able to just inherit the base behaviour from `PlxprInterpreter`.
   [(#2706)](https://github.com/PennyLaneAI/catalyst/pull/2706)
 
@@ -880,7 +881,7 @@
 * Refactors `draw_graph` implementation to improve maintainability.
   [(#2659)](https://github.com/PennyLaneAI/catalyst/pull/2659)
 
-* Bump `black` version to 26.3.1 to eliminate the vulnerability reported by dependabot.
+* Bumped `black` version to 26.3.1 to eliminate the vulnerability reported by dependabot.
   [(#2650)](https://github.com/PennyLaneAI/catalyst/pull/2650)
 
 * Updated Catalyst's Catch2 dependency to v3.11.0.
@@ -1150,6 +1151,7 @@
 * Docstrings for :func:`~.passes.disentangle_cnot` and :func:`~.passes.disentangle_swap` have been
   improved by using updated features for inspection and by calling them from the PennyLane frontend.
   [(#2546)](https://github.com/PennyLaneAI/catalyst/pull/2546)
+  [(#2804)](https://github.com/PennyLaneAI/catalyst/pull/2804)
 
 * Typos and rendering issues in various docstrings in the :mod:`catalyst.passes` module were fixed.
   [(#2649)](https://github.com/PennyLaneAI/catalyst/pull/2649)
