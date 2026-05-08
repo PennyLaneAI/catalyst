@@ -45,7 +45,7 @@
   [(#2639)](https://github.com/PennyLaneAI/catalyst/pull/2639)
 
   Previously, circuits compiled with these transforms were only inspectable via
-  :func:`qp.specs <pennylane.specs>` and :func:`qp.draw_graph <catalyst.draw_graph>`_. Now, such circuits can be executed.
+  :func:`qp.specs <pennylane.specs>` and :func:`catalyst.draw_graph`. Now, such circuits can be executed.
 
   ```python
   import pennylane as qp
@@ -188,7 +188,7 @@
   {'Rot': 2}
   ```
 
-  * A new implementation of the dynamic-one-shot MCM method is now available. This implementation is
+* A new implementation of the dynamic-one-shot MCM method is now available. This implementation is
   entirely in MLIR, which vastly improves the robustness and performance of Catalyst workflows that
   use this MCM method in addition to being compatible with PennyLane's program capture
   (``@qjit(capture=True)``).
