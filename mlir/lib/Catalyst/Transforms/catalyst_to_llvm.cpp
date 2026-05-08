@@ -323,7 +323,7 @@ Value EncodeDataMemRef(Location loc, PatternRewriter &rewriter, MemRefType memre
     for (int64_t i = 0; i < rankInt; ++i) {
         Value dimSize = desc.size(rewriter, loc, i);
         Value gep = LLVM::GEPOp::create(rewriter, loc, ptr, i64ArrType, sizesAlloca,
-                                        SmallVector<LLVM::GEPArg>{0LL, i});
+                                        SmallVector<LLVM::GEPArg>{0, static_cast<int32_t>(i)});
         LLVM::StoreOp::create(rewriter, loc, dimSize, gep);
     }
     memref = LLVM::InsertValueOp::create(rewriter, loc, memref, sizesAlloca,
