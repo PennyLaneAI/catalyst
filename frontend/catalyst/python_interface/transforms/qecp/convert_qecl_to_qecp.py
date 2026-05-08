@@ -265,8 +265,8 @@ class TransversalGateConversion(RewritePattern):
     def match_and_rewrite(
         self, op: qecl.SingleQubitLogicalGateOp | qecl.CnotOp, rewriter: PatternRewriter
     ):
-        """Rewrite pattern for ``qecl.SingleQubitLogicalGateOp`` ops and `qecl.CnotOp`` ops, if they are defined as
-        transversal in the provided QEC code."""
+        """Rewrite pattern for ``qecl.SingleQubitLogicalGateOp`` ops and `qecl.CnotOp`` ops,
+        if they are defined as transversal in the provided QEC code."""
 
         gate_name = op.name.split(".")[1]  # op.name is "qecl.gate_name"
 
@@ -518,7 +518,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         """Create the subroutines that performs transversal 1-qubit gates on a physical codeblock.
 
         Note that this method does not insert the subroutine into the module op. Instead it returns
-        a dictionary of built func.FuncOp objects that can then be subsequently inserted where desired.
+        a dict of built func.FuncOp objects that can then be subsequently inserted where desired.
         """
         subroutines = {}
         single_qubit_gates = self.qec_code.transversal_1q_gates
@@ -572,7 +572,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         """Create the subroutinew that performs transversal 2-qubit gates on a physical codeblock.
 
         Note that this method does not insert the subroutine into the module op. Instead it returns
-        a dictionary of built func.FuncOp objects that can then be subsequently inserted where desired.
+        a dict of built func.FuncOp objects that can then be subsequently inserted where desired.
         """
         subroutines = {}
 
