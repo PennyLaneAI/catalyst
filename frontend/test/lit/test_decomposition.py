@@ -1047,6 +1047,86 @@ def test_decompose_lowering_pauli_rot():
 test_decompose_lowering_pauli_rot()
 
 
+def test_decompose_lowering_pauli_rot_with_identity():
+    """Test decomposing PauliRot with graph decomposition."""
+
+    qp.decomposition.enable_graph()
+
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qp.qjit(pipelines=pipe, target="mlir", capture=True)
+    @partial(
+        qp.transforms.decompose,
+        gate_set=[qp.RZ, qp.MultiRZ, qp.RX, qp.GlobalPhase],
+    )
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
+    # CHECK-LABEL: @circuit_pauli_rot_with_identity
+    def circuit_pauli_rot_with_identity():
+        qp.PauliRot(0.123, pauli_word="I", wires=[0])
+        return qp.expval(qp.Z(0))
+
+    # CHECK-NOT: quantum.paulirot
+    # CHECK-NOT: quantum.multirz
+    # CHECK-NOT: quantum.custom "RZ"
+    # CHECK-NOT: quantum.custom "RX"
+    # CHECK: quantum.gphase
+    print(circuit_pauli_rot_with_identity.mlir_opt)
+
+    qp.decomposition.disable_graph()
+
+
+test_decompose_lowering_pauli_rot_with_identity()
+
+
+def test_decompose_lowering_pauli_rot_with_ooo_qubits():
+    """Test decomposing PauliRot with out-of-order (ooo) qubits."""
+
+    qp.decomposition.enable_graph()
+
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qp.qjit(pipelines=pipe, target="mlir", capture=True)
+    @partial(
+        qp.transforms.decompose,
+        gate_set=[qp.RZ, qp.MultiRZ, qp.RX, qp.GlobalPhase],
+    )
+    @qp.qnode(qp.device("lightning.qubit", wires=3))
+    # CHECK-LABEL: @circuit_pauli_rot_with_ooo_qubits
+    def circuit_pauli_rot_with_ooo_qubits():
+        qp.PauliRot(0.123, pauli_word="YYY", wires=[1,0,2])
+        return qp.expval(qp.Z(0))
+
+    # CHECK-NOT: quantum.paulirot
+
+    # CHECK: [[CST:%.+]] = arith.constant dense<[1, 0, 2]> : tensor<3xi64>
+    # CHECK: quantum.alloc( 3) : !quantum.reg
+    # CHECK: [[SLICE_1:%.+]] = stablehlo.slice [[CST]] [0:1] : (tensor<3xi64>) -> tensor<1xi64>
+    # CHECK: [[TENSOR_1:%.+]] = stablehlo.reshape [[SLICE_1]] : (tensor<1xi64>) -> tensor<i64>
+    # CHECK: [[SLICE_2:%.+]] = stablehlo.slice [[CST]] [1:2] : (tensor<3xi64>) -> tensor<1xi64>
+    # CHECK: [[TENSOR_2:%.+]] = stablehlo.reshape [[SLICE_2]] : (tensor<1xi64>) -> tensor<i64>
+    # CHECK: [[SLICE_3:%.+]] = stablehlo.slice [[CST]] [2:3] : (tensor<3xi64>) -> tensor<1xi64>
+    # CHECK: [[TENSOR_3:%.+]] = stablehlo.reshape [[SLICE_3]] : (tensor<1xi64>) -> tensor<i64>
+
+    # CHECK: [[EXTRACTED_1:%.+]] = tensor.extract [[TENSOR_1]][] : tensor<i64>
+    # CHECK: [[OUT_QUBITS_1:%.+]] = quantum.extract %0[[[EXTRACTED_1]]] : !quantum.reg -> !quantum.bit
+    # CHECK: [[QUBIT_1:%.+]] = quantum.custom "RX"({{.+}}) [[OUT_QUBITS_1]] : !quantum.bit
+    # CHECK: [[EXTRACTED_2:%.+]] = tensor.extract [[TENSOR_2]][] : tensor<i64>
+    # CHECK: [[OUT_QUBITS_2:%.+]] = quantum.extract %0[[[EXTRACTED_2]]] : !quantum.reg -> !quantum.bit
+    # CHECK: [[QUBIT_0:%.+]] = quantum.custom "RX"({{.+}}) [[OUT_QUBITS_2]] : !quantum.bit
+    # CHECK: [[EXTRACTED_3:%.+]] = tensor.extract [[TENSOR_3]][] : tensor<i64>
+    # CHECK: [[OUT_QUBITS_3:%.+]] = quantum.extract %0[[[EXTRACTED_3]]] : !quantum.reg -> !quantum.bit
+    # CHECK: [[QUBIT_2:%.+]] = quantum.custom "RX"({{.+}}) [[OUT_QUBITS_3]] : !quantum.bit
+
+    # CHECK: quantum.multirz(%cst) [[QUBIT_1]], [[QUBIT_0]], [[QUBIT_2]] : !quantum.bit, !quantum.bit, !quantum.bit
+
+    print(circuit_pauli_rot_with_ooo_qubits.mlir_opt)
+
+    qp.decomposition.disable_graph()
+
+
+test_decompose_lowering_pauli_rot_with_ooo_qubits()
+
+
 def test_decompose_lowering_with_ordered_passes():
     """Test the decompose lowering pass with other passes in a specific order in a pass pipeline."""
 
