@@ -707,7 +707,14 @@ class TestLoweringMeasure:
         """
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
-    def test_measure_with_missing_pauli_z_def_raise(self, run_filecheck):
+    @pytest.mark.parametrize(
+        "gate_data",
+        [
+            (),
+            [("z", (qecp.PauliZOp, []))],
+        ],
+    )
+    def test_measure_with_missing_pauli_z_def_raise(self, run_filecheck, gate_data):
         """Test that running the convert-qecl-to-qecp pass without specifying a logical Z observable
         raise an error when creating the physical-measurement decoding subroutine.
         """
@@ -731,7 +738,7 @@ class TestLoweringMeasure:
             d=3,
             x_tanner=np.eye(7),
             z_tanner=np.eye(7),
-            transversal_1q_gates={},
+            transversal_1q_gates=dict(gate_data),
             transversal_2q_gates={},
         )
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
