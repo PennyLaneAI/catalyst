@@ -532,10 +532,11 @@ def qjit(
 def _collect_runtime_artifacts(mlir_module, compile_options):
     """Walk all nested modules and collect artifact paths into compile_options.
 
-    Looks for catalyst.runtime_artifacts ArrayAttr on all nested modules and aggregates them so 
+    Looks for catalyst.runtime_artifacts ArrayAttr on all nested modules and aggregates them so
     that the linker receives the full set of artifacts.
     """
     from jax._src.lib.mlir import ir as mlir_ir  # pylint: disable=import-outside-toplevel
+
     from catalyst.jax_primitives import (  # pylint: disable=import-outside-toplevel
         _RUNTIME_ARTIFACTS_ATTR,
     )

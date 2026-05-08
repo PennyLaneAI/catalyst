@@ -326,8 +326,8 @@ Value EncodeDataMemRef(Location loc, PatternRewriter &rewriter, MemRefType memre
                                         SmallVector<LLVM::GEPArg>{0, static_cast<int32_t>(i)});
         LLVM::StoreOp::create(rewriter, loc, dimSize, gep);
     }
-    memref = LLVM::InsertValueOp::create(rewriter, loc, memref, sizesAlloca,
-                                         SmallVector<int64_t>{3});
+    memref =
+        LLVM::InsertValueOp::create(rewriter, loc, memref, sizesAlloca, SmallVector<int64_t>{3});
 
     return memref;
 }

@@ -44,7 +44,7 @@ def libxor_ref():
             ["cc", "-shared", "-fPIC", "-o", lib_path, _C_SOURCE],
             capture_output=True,
             text=True,
-            check=True,    
+            check=True,
         )
         yield lib_path
 
