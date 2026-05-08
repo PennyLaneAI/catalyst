@@ -114,6 +114,19 @@ def MemrefCopyToLinalgCopyPass : Pass<"memrefcpy-to-linalgcpy"> {
     ];
 }
 
+def MemSpaceToAddressSpacePass : Pass<"memspace-to-address-space"> {
+    let summary = "Lower Catalyst memory-space attributes to integer address spaces.";
+    let description = [{
+        Rewrites `#catalyst.memspace<domain, addr_space>` attributes to the explicit
+        integer address space.
+    }];
+
+    let dependentDialects = [
+        "catalyst::CatalystDialect",
+        "memref::MemRefDialect"
+    ];
+}
+
 def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"> {
     let summary = "Register `__catalyst_inactive_callback` as inactive with Enzyme";
 

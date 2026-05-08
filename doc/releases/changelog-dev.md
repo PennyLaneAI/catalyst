@@ -12,6 +12,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `-memspace-to-address-space` pass has been added which converts the `catalyst.memspace`
+  attribute on `memref` types to the explicit integer address space.
+  [(#2756)](https://github.com/PennyLaneAI/catalyst/pull/2756)
+
 * Added a generic memory-space attribute in the Catalyst dialect that can be used in the
   `memory_space` slot of `memref` types (or as a discardable attribute) to tag values with
   a logical memory domain plus an optional LLVM-level address space within that domain.

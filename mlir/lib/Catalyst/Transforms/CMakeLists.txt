@@ -17,6 +17,7 @@ file(GLOB SRC
     GEPInboundsPatterns.cpp
     InlineNestedModules.cpp
     mark_entry_point_args_non_writable.cpp
+    MemSpaceToAddressSpacePass.cpp
     MemrefCopyToLinalgCopyPass.cpp
     MemrefCopyToLinalgCopyPatterns.cpp
     qnode_to_async_lowering.cpp
