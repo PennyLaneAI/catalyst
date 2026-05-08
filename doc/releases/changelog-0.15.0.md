@@ -586,6 +586,12 @@
   transforms, enabling full compatibility with :func:`pennylane.CompilePipeline`.
   [(#2722)](https://github.com/PennyLaneAI/catalyst/pull/2722)
 
+* ``catalyst.from_plxpr.register_transforms`` as a way to register MLIR passes from Python has been
+  removed in favour of the new unified transforms API. MLIR passes can be accessed from Python using
+  ``qp.transform(pass_name="some-pass-name")``.
+  [(#2509)](https://github.com/PennyLaneAI/catalyst/pull/2509)
+  [(#2680)](https://github.com/PennyLaneAI/catalyst/pull/2680)
+
 <h3>Breaking changes 💔</h3>
 
 * (Compiler integrators only) The versions of StableHLO/LLVM/Enzyme used by Catalyst have been
@@ -627,12 +633,6 @@
   ``catalyst.python_interface.inspection.generate_mlir_graph`` no longer accept QNodes as the input.
   Now, the input must always be a :class:`~.QJIT` object.
   [(#2542)](https://github.com/PennyLaneAI/catalyst/pull/2542)
-
-* ``catalyst.from_plxpr.register_transforms`` as a way to register MLIR passes from Python has been
-  removed in favour of the new unified transforms API. MLIR passes can be accessed from Python using
-  ``qp.transform(pass_name="some-pass-name")``.
-  [(#2509)](https://github.com/PennyLaneAI/catalyst/pull/2509)
-  [(#2680)](https://github.com/PennyLaneAI/catalyst/pull/2680)
 
 * ``catalyst.jax_primitives.subroutine`` has been moved to ``pennylane.capture.subroutine``.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
