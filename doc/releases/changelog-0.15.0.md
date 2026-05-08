@@ -672,6 +672,11 @@
   the ``quantum.node`` attribute. Downstream, the ``resource-analysis`` pass then misidentified
   the empty wrapper as an additional qnode, causing an empty column in `qp.specs` at MLIR levels.
   [(#2793)](https://github.com/PennyLaneAI/catalyst/pull/2793)
+  
+* Fixed a bug where the `path_to_plugin` never be forwarded in 
+  :func:`~.passes.apply_pass_plugin`. The plugin path is now registered with the compiler during 
+  tracing.
+  [(#2790)](https://github.com/PennyLaneAI/catalyst/pull/2790)
 
 * Fixed a bug where multiple ``quantum.extract`` operations from the same index were being created
   when there are multiple computational basis observables, named observables or Hermitian
@@ -757,6 +762,11 @@
   result was incorrectly replacing the PennyLane measurement primitive, whose measurement
   result is integer type, during plxpr conversion.
   [(#2582)](https://github.com/PennyLaneAI/catalyst/pull/2582)
+
+* Fixed a bug where the xDSL string-output path in `Compiler.run` would emit empty result attributes
+  on void functions, triggering an assertion in MLIR's FuncToLLVM lowering. The empty attributes
+  are now removed in-place so the generic printer omits them.
+  [(#2805)](https://github.com/PennyLaneAI/catalyst/pull/2805)
 
 <h3>Internal changes ⚙️</h3>
 
