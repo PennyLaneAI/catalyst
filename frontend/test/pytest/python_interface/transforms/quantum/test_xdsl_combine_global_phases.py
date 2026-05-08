@@ -69,7 +69,7 @@ class TestCombineGlobalPhasesPass:
                     scf.yield %arg1x2 : f64
                 }
                 // CHECK: [[phi_sum:%.+]] = arith.addf [[ret]], %arg0 : f64
-                // CHECK: quantum.gphase([[phi_sum]]) :
+                // CHECK: quantum.gphase([[phi_sum]])
                 quantum.gphase(%ret) :
                 // CHECK: quantum.custom "PauliX"() [[q0]] : !quantum.bit
                 %2 = quantum.custom "PauliX"() %0 : !quantum.bit
@@ -85,7 +85,7 @@ class TestCombineGlobalPhasesPass:
         Here the control flow is an `if` operation.
         """
         program = """
-            // CHECK: func.func @test_combine_global_phase([[cond:%.+]] : i1, [[arg0:%.+]] : f64, [[arg1:%.+]] : f64)
+            // CHECK: func.func @test_combine_global_phase([[cond:%.+]]: i1, [[arg0:%.+]]: f64, [[arg1:%.+]]: f64)
             func.func @test_combine_global_phase(%cond : i1, %arg0 : f64, %arg1 : f64) {
                 // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
                 %0 = "test.op"() : () -> !quantum.bit
@@ -135,7 +135,7 @@ class TestCombineGlobalPhasesPass:
         Here the control flow is a `for` operation.
         """
         program = """
-            // CHECK: func.func @test_combine_global_phase(%n : index, [[arg0:%.+]] : f64, [[arg1:%.+]] : f64)
+            // CHECK: func.func @test_combine_global_phase(%n: index, [[arg0:%.+]]: f64, [[arg1:%.+]]: f64)
             func.func @test_combine_global_phase(%n : index, %arg0 : f64, %arg1 : f64) {
                 // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
                 // CHECK: [[c0:%.+]] = arith.constant 0 : index
@@ -173,7 +173,7 @@ class TestCombineGlobalPhasesPass:
         Here the control flow is a `while` operation.
         """
         program = """
-            // CHECK: func.func @test_combine_global_phase(%n : i32, [[arg0:%.+]] : f64, [[arg1:%.+]] : f64)
+            // CHECK: func.func @test_combine_global_phase(%n: i32, [[arg0:%.+]]: f64, [[arg1:%.+]]: f64)
             func.func @test_combine_global_phase(%n : i32, %arg0 : f64, %arg1 : f64) {
                 // CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
                 %0 = "test.op"() : () -> !quantum.bit
@@ -198,7 +198,7 @@ class TestCombineGlobalPhasesPass:
                     scf.yield %next_i : i32
                 }
                 // CHECK: [[phi_sum_1:%.+]] = arith.addf [[arg1]], [[arg0]] : f64
-                // CHECK: quantum.gphase([[phi_sum_1]]) :
+                // CHECK: quantum.gphase([[phi_sum_1]])
                 quantum.gphase(%arg0) :
                 quantum.gphase(%arg1) :
                 // CHECK: quantum.custom "PauliX"() [[q0]] : !quantum.bit
