@@ -164,13 +164,12 @@ class TestCreatePassSaveCallback:
 class TestXDSLPassesIntegration:
     """Test the xDSL passes integration."""
 
-    @pytest.mark.usefixtures("use_capture")
     def test_xdsl_passes_integration(self):
         """Test the xDSL passes integration."""
         # pylint: disable-next=import-outside-toplevel
         from catalyst.python_interface.transforms import merge_rotations_pass
 
-        @qjit(keep_intermediate="changed", verbose=True)
+        @qjit(keep_intermediate="changed", verbose=True, capture=True)
         def workflow(x):
             @merge_rotations_pass
             @qp.transforms.cancel_inverses

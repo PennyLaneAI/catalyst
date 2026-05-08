@@ -234,7 +234,6 @@ class TestMergeRotationsPass:
 
 
 # pylint: disable=too-few-public-methods
-@pytest.mark.usefixtures("use_capture")
 class TestMergeRotationsIntegration:
     """Integration tests for the MergeRotationsPass."""
 
@@ -242,7 +241,7 @@ class TestMergeRotationsIntegration:
         """Test that the MergeRotationsPass works correctly with qjit."""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qp.qjit(target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @merge_rotations_pass
         @qp.qnode(dev)
         def circuit(x: float, y: float):

@@ -137,3 +137,21 @@ class QecCode:
             raise KeyError(f"QEC code {name} not found")
 
         return cls(name, *qec_code_params)
+
+    @property
+    def correctable_errors(self) -> int:
+        """Return the number of correctable errors of the QEC code.
+
+        For a code with distance :math:`d`, the number of correctable errors :math:`t` is given by
+
+        .. math::
+
+            t = \\lfloor (d - 1) / 2 \\rfloor
+
+        Example
+        -------
+
+        >>> code = QecCode.get("Steane")
+        >>> code.correctable_errors
+        """
+        return (self.d - 1) // 2
