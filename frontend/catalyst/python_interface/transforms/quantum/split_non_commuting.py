@@ -120,6 +120,14 @@ def _split_func(func_op: func.FuncOp) -> None:
                 Rewriter.erase_op(obs_def)
 
         clone.update_function_type()
+        # Sync res_attrs with the updated result count; update_function_type() does not do this.
+        if clone.res_attrs is not None:
+            kept_attrs = [
+                clone.res_attrs.data[j]
+                for j in range(len(clone_ret_args))
+                if j not in positions_to_remove
+            ]
+            clone.properties["res_attrs"] = builtin.ArrayAttr(kept_attrs) if kept_attrs else None
         Rewriter.insert_op(clone, InsertPoint.after(last_inserted))
         last_inserted = clone
         clones.append((group, clone))
