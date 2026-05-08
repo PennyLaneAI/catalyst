@@ -311,7 +311,7 @@ std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t 
     std::string candidate;
     do {
         candidate = prefix.str() + std::to_string(++counter);
-    } while (!funcResults.contains(candidate));
+    } while (funcResults.contains(candidate));
 
     return candidate;
 }
