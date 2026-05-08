@@ -17,13 +17,13 @@
 """Tests code generation of state prep"""
 
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 
 from catalyst import qjit
 
 
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 def state_prep_example():
     """Test example from
     https://docs.pennylane.ai/en/stable/code/api/pennylane.StatePrep.html
@@ -31,8 +31,8 @@ def state_prep_example():
 
     Modified to use jax.numpy and a non trivial StatePrep
     """
-    qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
-    return qml.state()
+    qp.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
+    return qp.state()
 
 
 # CHECK-LABEL: func.func public @state_prep_example
@@ -41,7 +41,7 @@ print(state_prep_example.mlir)
 
 
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 def basis_state_example():
     """Test example from
     https://docs.pennylane.ai/en/stable/code/api/pennylane.BasisState.html
@@ -49,8 +49,8 @@ def basis_state_example():
 
     Modified to use jax.numpy and a non trivial StatePrep
     """
-    qml.BasisState(jnp.array([1, 1]), wires=range(2))
-    return qml.state()
+    qp.BasisState(jnp.array([1, 1]), wires=range(2))
+    return qp.state()
 
 
 # CHECK-LABEL: func.func public @basis_state_example
@@ -59,14 +59,14 @@ print(basis_state_example.mlir)
 
 
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 def state_prep_example_double():
     """What happens if we have two? It shouldn't be repeated because
     we only skip the first one
     """
-    qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
-    qml.StatePrep(jnp.array([1, 0, 0, 0]), wires=range(2))
-    return qml.state()
+    qp.StatePrep(jnp.array([0, 1, 0, 0]), wires=range(2))
+    qp.StatePrep(jnp.array([1, 0, 0, 0]), wires=range(2))
+    return qp.state()
 
 
 # CHECK-LABEL: func.func public @state_prep_example_double
@@ -76,20 +76,20 @@ print(state_prep_example_double.mlir)
 
 
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 def state_prep_trotter():
     """
     Test state prep used with Trotter Product.
     https://github.com/PennyLaneAI/catalyst/issues/2235
     """
-    H = qml.Hamiltonian([1, 1], [qml.PauliZ(0), qml.PauliZ(1)])
-    qml.StatePrep([0, 0, 0, 1], wires=[0, 1])
-    qml.Hadamard(wires=2)
-    qml.ctrl(
-        qml.TrotterProduct(H, 1, n=3, order=2),
+    H = qp.Hamiltonian([1, 1], [qp.PauliZ(0), qp.PauliZ(1)])
+    qp.StatePrep([0, 0, 0, 1], wires=[0, 1])
+    qp.Hadamard(wires=2)
+    qp.ctrl(
+        qp.TrotterProduct(H, 1, n=3, order=2),
         control=2,
     )
-    return qml.probs(wires=[2])
+    return qp.probs(wires=[2])
 
 
 # CHECK-LABEL: func.func public @state_prep_trotter
@@ -99,20 +99,20 @@ print(state_prep_trotter.mlir)
 
 
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 def basis_state_trotter():
     """
     Test basis state used with Trotter Product.
     https://github.com/PennyLaneAI/catalyst/issues/2235
     """
-    H = qml.Hamiltonian([1, 1], [qml.PauliZ(0), qml.PauliZ(1)])
-    qml.BasisState([1, 1], wires=[0, 1])
-    qml.Hadamard(wires=2)
-    qml.ctrl(
-        qml.TrotterProduct(H, 1, n=3, order=2),
+    H = qp.Hamiltonian([1, 1], [qp.PauliZ(0), qp.PauliZ(1)])
+    qp.BasisState([1, 1], wires=[0, 1])
+    qp.Hadamard(wires=2)
+    qp.ctrl(
+        qp.TrotterProduct(H, 1, n=3, order=2),
         control=2,
     )
-    return qml.probs(wires=[2])
+    return qp.probs(wires=[2])
 
 
 # CHECK-LABEL: func.func public @basis_state_trotter

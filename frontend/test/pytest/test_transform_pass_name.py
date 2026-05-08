@@ -15,7 +15,7 @@
 
 from functools import partial
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst.compiler import CompileError
@@ -42,13 +42,13 @@ from catalyst.compiler import CompileError
 def test_pass_with_options(options, expected_strings, backend):
     """Test the integration for a circuit with a pass that takes in options."""
 
-    my_pass = qml.transform(pass_name="my-pass")
+    my_pass = qp.transform(pass_name="my-pass")
 
-    @qml.qjit(target="mlir")
+    @qp.qjit(target="mlir")
     @partial(my_pass, **options)
-    @qml.qnode(qml.device(backend, wires=1))
+    @qp.qnode(qp.device(backend, wires=1))
     def captured_circuit():
-        return qml.expval(qml.PauliZ(0))
+        return qp.expval(qp.PauliZ(0))
 
     capture_mlir = captured_circuit.mlir
     assert 'transform.apply_registered_pass "my-pass"' in capture_mlir
@@ -67,13 +67,13 @@ def test_pass_with_options(options, expected_strings, backend):
 def test_pass_with_complex_options(options, backend, capture_mode):
     """Tests that complex options like list, dict are supported."""
 
-    my_pass = qml.transform(pass_name="my-pass")
+    my_pass = qp.transform(pass_name="my-pass")
 
-    @qml.qjit(target="mlir", capture=capture_mode)
+    @qp.qjit(target="mlir", capture=capture_mode)
     @partial(my_pass, **options)
-    @qml.qnode(qml.device(backend, wires=1))
+    @qp.qnode(qp.device(backend, wires=1))
     def captured_circuit():
-        return qml.expval(qml.PauliZ(0))
+        return qp.expval(qp.PauliZ(0))
 
     if isinstance(options["option"], list):
         assert 'with options = {"option" = [1 : i64, 2 : i64, "blah"]}' in captured_circuit.mlir
@@ -85,33 +85,33 @@ def test_pass_with_complex_options(options, backend, capture_mode):
 def test_pass_with_unsupported_options(backend):
     """Tests that unsupported option types raise a clear error."""
 
-    my_pass = qml.transform(pass_name="my-pass")
+    my_pass = qp.transform(pass_name="my-pass")
 
     @partial(my_pass, **{"option": None})
-    @qml.qnode(qml.device(backend, wires=1))
+    @qp.qnode(qp.device(backend, wires=1))
     def captured_circuit():
-        return qml.expval(qml.PauliZ(0))
+        return qp.expval(qp.PauliZ(0))
 
     expected_msg = r"Cannot convert Python type <class 'NoneType'> to an MLIR attribute"
     with pytest.raises(CompileError, match=expected_msg):
-        qml.qjit(target="mlir")(captured_circuit)
+        qp.qjit(target="mlir")(captured_circuit)
 
 
 def test_pass_before_tape_transform(backend):
     """Test that provided an mlir-only transform prior to a tape transform raises an error."""
 
-    my_pass = qml.transform(pass_name="my-pass")
+    my_pass = qp.transform(pass_name="my-pass")
 
-    @qml.transform
+    @qp.transform
     def tape_transform(tape):
         return (tape,), lambda x: x[0]
 
-    @qml.qjit
+    @qp.qjit
     @tape_transform
     @my_pass
-    @qml.qnode(qml.device(backend, wires=1))
+    @qp.qnode(qp.device(backend, wires=1))
     def f(x):  # pylint: disable=unused-argument
-        return qml.state()
+        return qp.state()
 
     with pytest.raises(ValueError, match="without a tape definition occurs before tape transform"):
         f(0.5)
@@ -120,20 +120,20 @@ def test_pass_before_tape_transform(backend):
 def test_pass_after_tape_transform(backend):
     """Test that passes can be applied after tape transforms."""
 
-    @qml.transform
+    @qp.transform
     def tape_only_cancel_inverses(tape):
-        return qml.transforms.cancel_inverses(tape)
+        return qp.transforms.cancel_inverses(tape)
 
-    my_pass = qml.transform(pass_name="my-pass")
+    my_pass = qp.transform(pass_name="my-pass")
 
-    @qml.qjit(target="mlir")
+    @qp.qjit(target="mlir")
     @my_pass
     @tape_only_cancel_inverses
-    @qml.qnode(qml.device(backend, wires=1))
+    @qp.qnode(qp.device(backend, wires=1))
     def c():
-        qml.X(0)
-        qml.X(0)
-        return qml.state()
+        qp.X(0)
+        qp.X(0)
+        return qp.state()
 
     # check inverses canceled
     c_mlir = c.mlir
@@ -148,18 +148,17 @@ def op_has_attr(op, attr):
 
 
 @pytest.mark.xdsl
-@pytest.mark.usefixtures("use_both_frontend")
-def test_xdsl_pass_with_qml_transform():
-    """Test that applying xDSL passes using the ``qml.transform`` decorator is able to execute
+def test_xdsl_pass_with_qp_transform(capture_mode):
+    """Test that applying xDSL passes using the ``qp.transform`` decorator is able to execute
     correctly."""
 
-    @qml.qjit
-    @qml.transform(pass_name="xdsl-cancel-inverses")
-    @qml.qnode(qml.device("null.qubit", wires=1))
+    @qp.qjit(capture=capture_mode)
+    @qp.transform(pass_name="xdsl-cancel-inverses")
+    @qp.qnode(qp.device("null.qubit", wires=1))
     def c():
-        qml.X(0)
-        qml.X(0)
-        return qml.state()
+        qp.X(0)
+        qp.X(0)
+        return qp.state()
 
     mod = c.mlir_module.operation
     named_sequence_mod = None
@@ -183,7 +182,7 @@ def test_xdsl_pass_with_qml_transform():
     assert op_has_attr(first_transform_op, "catalyst.xdsl_pass")
     assert first_transform_op.attributes["pass_name"].value == "xdsl-cancel-inverses"
 
-    assert qml.math.allclose(c(), [1, 0])
+    assert qp.math.allclose(c(), [1, 0])
 
 
 if __name__ == "__main__":

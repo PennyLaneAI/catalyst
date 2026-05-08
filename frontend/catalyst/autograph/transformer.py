@@ -26,7 +26,7 @@ import functools
 import inspect
 from contextlib import ContextDecorator
 
-import pennylane as qml
+import pennylane as qp
 from malt.core import ag_ctx, config, converter
 from malt.impl.api import PyToPy
 
@@ -54,7 +54,7 @@ class CatalystTransformer(PyToPy):
         # way to handle these in the future.
         # We may also need to check how this interacts with other common function decorators.
         fn = obj
-        if isinstance(obj, qml.QNode):
+        if isinstance(obj, qp.QNode):
             fn = obj.func
         elif inspect.isfunction(fn) or inspect.ismethod(fn):
             pass
@@ -67,7 +67,7 @@ class CatalystTransformer(PyToPy):
         new_fn, module, source_map = self.transform_function(fn, user_context)
         new_obj = new_fn
 
-        if isinstance(obj, qml.QNode):
+        if isinstance(obj, qp.QNode):
             new_obj = copy.copy(obj)
             new_obj.func = new_fn
 
@@ -204,7 +204,7 @@ def autograph_source(fn):
     # Unwrap known objects to get the function actually transformed by autograph.
     if isinstance(fn, catalyst.QJIT):
         fn = fn.original_function
-    if isinstance(fn, qml.QNode):
+    if isinstance(fn, qp.QNode):
         fn = fn.func
 
     if TRANSFORMER.has_cache(fn):

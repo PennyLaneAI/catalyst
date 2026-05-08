@@ -29,7 +29,7 @@ import pathlib
 import platform
 import shutil
 
-import pennylane as qml
+import pennylane as qp
 from pennylane.devices import NullQubit
 from utils import print_jaxpr
 
@@ -80,12 +80,12 @@ def test_decomposition_lowering():
 
     @qjit(keep_intermediate=True)
     @catalyst.passes.ions_decomposition
-    @qml.qnode(CustomDevice(2))
+    @qp.qnode(CustomDevice(2))
     def test_decomposition_lowering_workflow(x):
-        qml.RX(x, wires=[0])
-        qml.Hadamard(wires=[1])
-        qml.Hadamard(wires=[1])
-        return qml.expval(qml.PauliY(wires=0))
+        qp.RX(x, wires=[0])
+        qp.Hadamard(wires=[1])
+        qp.Hadamard(wires=[1])
+        return qp.expval(qp.PauliY(wires=0))
 
     print_jaxpr(test_decomposition_lowering_workflow, 1.2)
     # CHECK: quantum.custom "RX"

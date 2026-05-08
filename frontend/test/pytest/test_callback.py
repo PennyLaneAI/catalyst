@@ -19,7 +19,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import accelerate, debug, grad, jacobian, pure_callback, qjit
@@ -30,7 +30,6 @@ from catalyst.utils.patching import Patcher
 # pylint: disable=protected-access,too-many-lines
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("arg", [1, 2, 3])
 def test_callback_no_tracing(arg):
     """Test that when there's no tracing the behaviour of identity
@@ -43,7 +42,6 @@ def test_callback_no_tracing(arg):
     assert identity(arg) == arg
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("arg", [1, 2, 3])
 def test_purecallback_no_tracing(arg):
     """Test that when there's no tracing the behaviour of identity
@@ -56,15 +54,14 @@ def test_purecallback_no_tracing(arg):
     assert identity(arg) == arg
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_callback_no_returns_no_params(capsys):
+def test_callback_no_returns_no_params(capsys, capture_mode):
     """Test callback no parameters no returns"""
 
     @base_callback
     def my_callback() -> None:
         print("Hello erick")
 
-    @qjit
+    @qjit(capture=capture_mode)
     def cir():
         my_callback()
         return None
@@ -77,15 +74,14 @@ def test_callback_no_returns_no_params(capsys):
     assert captured.out.strip() == "Hello erick"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_callback_twice(capsys):
+def test_callback_twice(capsys, capture_mode):
     """Test callback no parameters no returns"""
 
     @base_callback
     def my_callback():
         print("Hello erick")
 
-    @qjit
+    @qjit(capture=capture_mode)
     def cir():
         my_callback()
         return None
@@ -97,7 +93,7 @@ def test_callback_twice(capsys):
     captured = capsys.readouterr()
     assert captured.out.strip() == "Hello erick"
 
-    @qjit
+    @qjit(capture=capture_mode)
     def cir2():
         my_callback()
         return None
@@ -110,15 +106,14 @@ def test_callback_twice(capsys):
     assert captured.out.strip() == "Hello erick"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_callback_send_param(capsys):
+def test_callback_send_param(capsys, capture_mode):
     """Test callback with parameters no returns"""
 
     @base_callback
     def my_callback(n) -> None:
         print(n)
 
-    @qjit
+    @qjit(capture=capture_mode)
     def cir(n):
         my_callback(n)
         return None
@@ -128,8 +123,7 @@ def test_callback_send_param(capsys):
     assert captured.out.strip() == "0"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_kwargs(capsys):
+def test_kwargs(capsys, capture_mode):
     """Test kwargs returns"""
 
     @base_callback
@@ -137,7 +131,7 @@ def test_kwargs(capsys):
         for k, v in kwargs.items():
             print(k, v)
 
-    @qjit
+    @qjit(capture=capture_mode)
     def cir(a, b, c):
         my_callback(a=a, b=b, c=c, d=3, e=4)
         return None
@@ -151,27 +145,25 @@ def test_kwargs(capsys):
         assert string in captured.out
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_simple_increment():
+def test_simple_increment(capture_mode):
     """Test increment function"""
 
     @base_callback
     def inc(arg) -> int:
         return arg + 1
 
-    @qjit
+    @qjit(capture=capture_mode)
     def cir(arg):
         return inc(arg)
 
     assert np.allclose(cir(0), 1)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0, 3.14, complex(0.0, 1.0), jnp.array(0), jnp.array([1, 2, 3]), jnp.array([[1, 2], [2, 3]])],
 )
-def test_identity_types(arg):
+def test_identity_types(arg, capture_mode):
     """Test callback with return values"""
 
     @base_callback
@@ -182,14 +174,13 @@ def test_identity_types(arg):
         that you know will be the same type as the return type."""
         return arg
 
-    @qjit
+    @qjit(capture=capture_mode)
     def cir(x):
         return identity(x)
 
     assert np.allclose(cir(arg), arg)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0, 1, 2.0],
@@ -225,38 +216,36 @@ def test_identity_types_cast_shaped_array(arg, dtype):
     assert np.allclose(cir(arg_cast), arg_cast)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0],
 )
-def test_multiple_returns(arg):
+def test_multiple_returns(arg, capture_mode):
     """Test callback with multiple return values."""
 
     @base_callback
     def identity(arg) -> (int, int):
         return arg, arg
 
-    @qjit
+    @qjit(capture=capture_mode)
     def cir(x):
         return identity(x)
 
     assert np.allclose(cir(arg), (arg, arg))
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [jnp.array([0.0, 1.0, 2.0])],
 )
-def test_incorrect_return(arg):
+def test_incorrect_return(arg, capture_mode):
     """Test callback with incorrect return types."""
 
     @base_callback
     def identity(arg) -> int:
         return arg
 
-    @qjit
+    @qjit(capture=capture_mode)
     def cir(x):
         return identity(x)
 
@@ -270,43 +259,40 @@ def test_incorrect_return(arg):
         cir(arg)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_pure_callback():
+def test_pure_callback(capture_mode):
     """Test identity pure callback."""
 
     def identity(a):
         return a
 
-    @qjit
+    @qjit(capture=capture_mode)
     def cir(x):
         return pure_callback(identity, float)(x)
 
     assert np.allclose(cir(0.0), 0.0)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_pure_callback_decorator():
+def test_pure_callback_decorator(capture_mode):
     """Test identity pure callback."""
 
     @pure_callback
     def identity(a) -> float:
         return a
 
-    @qjit
+    @qjit(capture=capture_mode)
     def cir(x):
         return identity(x)
 
     assert np.allclose(cir(0.0), 0.0)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_pure_callback_no_return_value():
+def test_pure_callback_no_return_value(capture_mode):
     """Test identity pure callback no return."""
 
     def identity(a):
         return a
 
-    @qjit
+    @qjit(capture=capture_mode)
     def cir(x):
         return pure_callback(identity)(x)
 
@@ -316,14 +302,13 @@ def test_pure_callback_no_return_value():
         cir(0.0)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_debug_callback(capsys):
+def test_debug_callback(capsys, capture_mode):
     """Test debug callback"""
 
     def my_own_print(a):
         print(a)
 
-    @qjit
+    @qjit(capture=capture_mode)
     def cir(x):
         debug.callback(my_own_print)(x)
         return None
@@ -336,15 +321,14 @@ def test_debug_callback(capsys):
     assert captured.out.strip() == "0"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_debug_callback_decorator(capsys):
+def test_debug_callback_decorator(capsys, capture_mode):
     """Test debug callback"""
 
     @debug.callback
     def my_own_print(a):
         print(a)
 
-    @qjit
+    @qjit(capture=capture_mode)
     def cir(x):
         my_own_print(x)
         return None
@@ -357,15 +341,14 @@ def test_debug_callback_decorator(capsys):
     assert captured.out.strip() == "0"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_debug_callback_returns_something(capsys):
+def test_debug_callback_returns_something(capsys, capture_mode):
     """Test io callback returns something"""
 
     def my_own_print(a):
         print(a)
         return 1
 
-    @qjit
+    @qjit(capture=capture_mode)
     def cir(x):
         debug.callback(my_own_print)(x)
         return None
@@ -385,8 +368,7 @@ def test_debug_callback_returns_something(capsys):
         cir(0)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_io_callback_modify_global(capsys):
+def test_io_callback_modify_global(capsys, capture_mode):
     """Test mutation"""
 
     x = 0
@@ -401,7 +383,7 @@ def test_io_callback_modify_global(capsys):
         nonlocal x
         print(x)
 
-    @qjit
+    @qjit(capture=capture_mode)
     def cir():
         print_x()
         set_x_to(1)
@@ -413,19 +395,18 @@ def test_io_callback_modify_global(capsys):
     assert captured.out.strip() == "0\n1"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1)],
 )
-def test_no_return_list(arg):
+def test_no_return_list(arg, capture_mode):
     """Test that the callback returns a scalar and not a list."""
 
     @pure_callback
     def callback_fn(x) -> float:
         return np.sin(x)
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(x):
         res = callback_fn(x**2)
         assert not isinstance(res, Sequence)
@@ -434,12 +415,11 @@ def test_no_return_list(arg):
     f(arg)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1)],
 )
-def test_dictionary(arg):
+def test_dictionary(arg, capture_mode):
     """Test pytrees. Specifying the type is easier for accelerate since it is
     not needed. But here, we just use the same trick as above where
     we can use any value with the same type as the return to specify
@@ -450,22 +430,21 @@ def test_dictionary(arg):
     def callback_fn(x) -> {"helloworld": arg}:
         return {"helloworld": x}
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(x):
         return callback_fn(x)["helloworld"]
 
     assert np.allclose(f(arg), arg)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_tuple_out():
+def test_tuple_out(capture_mode):
     """Test with multiple tuples."""
 
     @pure_callback
     def callback_fn(x) -> (bool, bool):
         return x > 1.0, x > 2.0
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(x):
         res = callback_fn(x**2)
         assert isinstance(res, tuple) and len(res) == 2
@@ -474,11 +453,10 @@ def test_tuple_out():
     f(0.1)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_numpy_ufuncs():
+def test_numpy_ufuncs(capture_mode):
     """Test with numpy ufuncs."""
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(x):
         y = pure_callback(np.sin, float)(x)
         return y
@@ -486,53 +464,50 @@ def test_numpy_ufuncs():
     assert np.allclose(np.sin(1.0 / 2.0), f(1.0 / 2.0))
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
 )
-def test_accelerate_device(arg):
+def test_accelerate_device(arg, capture_mode):
     """Test with device parameter"""
 
     @accelerate(dev=jax.devices()[0])
     def identity(x):
         return x
 
-    @qjit
+    @qjit(capture=capture_mode)
     def qjitted_fn(x):
         return identity(x)
 
     assert np.allclose(qjitted_fn(arg), arg)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
 )
-def test_accelerate_no_device(arg):
+def test_accelerate_no_device(arg, capture_mode):
     """Test with no device parameter"""
 
     @accelerate
     def identity(x):
         return x
 
-    @qjit
+    @qjit(capture=capture_mode)
     def qjitted_fn(x):
         return identity(x)
 
     assert np.allclose(qjitted_fn(arg), arg)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
 )
-def test_accelerate_no_device_inside(arg):
+def test_accelerate_no_device_inside(arg, capture_mode):
     """Test with no device parameter accelerate is inside qjit"""
 
-    @qjit
+    @qjit(capture=capture_mode)
     def qjitted_fn(x):
         @accelerate
         def identity(x):
@@ -543,31 +518,29 @@ def test_accelerate_no_device_inside(arg):
     assert np.allclose(qjitted_fn(arg), arg)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
 )
-def test_accelerate_no_device_autograph(arg):
+def test_accelerate_no_device_autograph(arg, capture_mode):
     """Test with no device parameter"""
 
     @accelerate
     def identity(x):
         return x
 
-    @qjit(autograph=True)
+    @qjit(autograph=True, capture=capture_mode)
     def qjitted_fn(x):
         return identity(x)
 
     assert np.allclose(qjitted_fn(arg), arg)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
     [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
 )
-def test_accelerate_manual_jax_jit(arg):
+def test_accelerate_manual_jax_jit(arg, capture_mode):
     """Test with no device parameter"""
 
     @accelerate
@@ -575,22 +548,21 @@ def test_accelerate_manual_jax_jit(arg):
     def identity(x):
         return x
 
-    @qjit
+    @qjit(capture=capture_mode)
     def qjitted_fn(x):
         return identity(x)
 
     assert np.allclose(qjitted_fn(arg), arg)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_jax_jit_returns_nothing(capsys):
+def test_jax_jit_returns_nothing(capsys, capture_mode):
     """This is more a question for reviewer"""
 
     @accelerate
     def noop(x):
         jax.debug.print("x={x}", x=x)
 
-    @qjit
+    @qjit(capture=capture_mode)
     def func(x: float):
         noop(x)
         return x
@@ -603,8 +575,7 @@ def test_jax_jit_returns_nothing(capsys):
     assert captured.out.strip() == "x=1.0"
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_non_jax_jittable():
+def test_non_jax_jittable(capture_mode):
     """Test that error is raised when jax-jit fails"""
 
     @accelerate
@@ -616,13 +587,12 @@ def test_non_jax_jittable():
     msg = "Function impossible must be jax.jit-able"
     with pytest.raises(ValueError, match=msg):
 
-        @qjit
+        @qjit(capture=capture_mode)
         def func(x: bool):
             return impossible(x)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_that_jax_jit_is_called():
+def test_that_jax_jit_is_called(capture_mode):
     """Test that jax.jit is called"""
 
     called_jax_jit = False
@@ -640,7 +610,7 @@ def test_that_jax_jit_is_called():
         def identity(x):
             return x
 
-        @qjit
+        @qjit(capture=capture_mode)
         def wrapper(x):
             return identity(x)
 
@@ -649,15 +619,14 @@ def test_that_jax_jit_is_called():
     assert called_jax_jit
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_callback_cache():
+def test_callback_cache(capture_mode):
     """Test callback cache. This test is for coverage."""
 
     @debug.callback
     def hello_world():
         print("hello world")
 
-    @qjit
+    @qjit(capture=capture_mode)
     def wrapper():
         hello_world()
         hello_world()
@@ -870,18 +839,18 @@ def test_active_grad_inside_qjit(backend, scale):
 
     @qjit
     @grad
-    @qml.qnode(qml.device(backend, wires=1))
+    @qp.qnode(qp.device(backend, wires=1))
     def wrapper(x):
         param = scale * identity(x)
-        qml.RX(param, wires=0)
-        return qml.expval(qml.PauliZ(0))
+        qp.RX(param, wires=0)
+        return qp.expval(qp.PauliZ(0))
 
-    @partial(qml.grad, argnums=0)
-    @qml.qnode(qml.device(backend, wires=1))
+    @partial(qp.grad, argnums=0)
+    @qp.qnode(qp.device(backend, wires=1))
     def wrapper_jit(x):
         param = scale * identity(x)
-        qml.RX(param, wires=0)
-        return qml.expval(qml.PauliZ(0))
+        qp.RX(param, wires=0)
+        return qp.expval(qp.PauliZ(0))
 
     assert np.allclose(wrapper_jit(42.0), wrapper(42.0))
 

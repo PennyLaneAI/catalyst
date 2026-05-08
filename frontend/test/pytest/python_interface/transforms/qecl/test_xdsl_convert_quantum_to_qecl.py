@@ -14,7 +14,7 @@
 
 """Test module for the convert-quantum-to-qecl dialect-conversion transform."""
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst.python_interface.transforms.qecl import (
@@ -819,14 +819,13 @@ class TestInvalidInputIR:
 class TestQuantumToQecLogicalPassIntegration:
     """Integration lit tests for the convert-quantum-to-qecl pass"""
 
-    @pytest.mark.usefixtures("use_capture")
     def test_circuit_basic(self, run_filecheck_qjit):
         """Test the convert-quantum-to-qecl pass on the simplest possible, non-trivial circuit."""
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
-        @qml.qjit(target="mlir", keep_intermediate=True)
+        @qp.qjit(capture=True, target="mlir")
         @convert_quantum_to_qecl_pass(k=1)
-        @qml.qnode(dev, shots=1)
+        @qp.qnode(dev, shots=1)
         def circuit():
             # CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
             # CHECK: qecl.extract_block {{%.+}}[0] : !qecl.hyperreg<1 x 1> -> !qecl.codeblock<1>
@@ -841,20 +840,19 @@ class TestQuantumToQecLogicalPassIntegration:
             # CHECK: quantum.sample
             # CHECK: qecl.insert_block
             # CHECK: qecl.dealloc
-            qml.H(0)
-            m0 = qml.measure(0)
-            return qml.sample([m0])
+            qp.H(0)
+            m0 = qp.measure(0)
+            return qp.sample([m0])
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_circuit_ghz(self, run_filecheck_qjit):
         """Test the convert-quantum-to-qecl pass on a GHZ circuit."""
-        dev = qml.device("null.qubit", wires=3)
+        dev = qp.device("null.qubit", wires=3)
 
-        @qml.qjit(target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @convert_quantum_to_qecl_pass(k=1)
-        @qml.qnode(dev, shots=1)
+        @qp.qnode(dev, shots=1)
         def circuit():
             # CHECK: qecl.alloc() : !qecl.hyperreg<3 x 1>
             # CHECK: scf.for {{.*}} {
@@ -879,12 +877,12 @@ class TestQuantumToQecLogicalPassIntegration:
             # CHECK: quantum.sample
             # CHECK: qecl.insert_block
             # CHECK: qecl.dealloc
-            qml.H(0)
-            qml.CNOT([0, 1])
-            qml.CNOT([1, 2])
-            m0 = qml.measure(0)
-            m1 = qml.measure(1)
-            m2 = qml.measure(2)
-            return qml.sample([m0, m1, m2])
+            qp.H(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([1, 2])
+            m0 = qp.measure(0)
+            m1 = qp.measure(1)
+            m2 = qp.measure(2)
+            return qp.sample([m0, m1, m2])
 
         run_filecheck_qjit(circuit)

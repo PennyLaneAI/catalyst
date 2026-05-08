@@ -37,19 +37,19 @@ def mbqc_pipeline() -> PipelineStages:
     .. code-block:: python
 
         import numpy as np
-        import pennylane as qml
+        import pennylane as qp
         from catalyst.ftqc import mbqc_pipeline
 
-        qml.capture.enable()
+        qp.capture.enable()
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
-        @qml.qjit(pipelines=mbqc_pipeline())
-        @qml.qnode(dev, mcm_method="tree-traversal")
+        @qp.qjit(pipelines=mbqc_pipeline())
+        @qp.qnode(dev, mcm_method="tree-traversal")
         def workload():
-            m0 = qml.ftqc.measure_arbitrary_basis(wires=0, angle=np.pi/4, plane="XY")
-            qml.cond(m0, qml.X, qml.I)(0)
-            return qml.expval(qml.Z(0))
+            m0 = qp.ftqc.measure_arbitrary_basis(wires=0, angle=np.pi/4, plane="XY")
+            qp.cond(m0, qp.X, qp.I)(0)
+            return qp.expval(qp.Z(0))
     """
     stages = default_pipeline()
 

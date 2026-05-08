@@ -16,7 +16,7 @@
 import copy
 import functools
 
-import pennylane as qml
+import pennylane as qp
 from jax._src import core, util
 from jax._src.lib.mlir import ir
 from jax.interpreters import mlir
@@ -37,7 +37,7 @@ def _all_expval(call_jaxpr: core.ClosedJaxpr) -> bool:
     return True
 
 
-def _calculate_diff_method(qn: qml.QNode, call_jaxpr: core.ClosedJaxpr):
+def _calculate_diff_method(qn: qp.QNode, call_jaxpr: core.ClosedJaxpr):
     diff_method = str(qn.diff_method)
     if diff_method != "best":
         return diff_method
@@ -78,7 +78,7 @@ def lower_jaxpr(ctx, jaxpr, metadata=None, fn=None):
         FuncOp
     """
 
-    if fn is None or isinstance(fn, qml.QNode):
+    if fn is None or isinstance(fn, qp.QNode):
         equation = get_call_equation(jaxpr)
         call_jaxpr = equation.params["call_jaxpr"]
         pipelines = equation.params.get("pipelines")
@@ -112,7 +112,7 @@ def lower_callable(ctx, callable_, call_jaxpr, pipelines=(), metadata=None):
     """
     if pipelines is None:
         pipelines = tuple()
-    if isinstance(callable_, qml.QNode):
+    if isinstance(callable_, qp.QNode):
         return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipelines, metadata=metadata)
     return get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines, metadata=metadata)
 
@@ -182,7 +182,7 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
 
     func_op = mlir.lower_jaxpr_to_fun(**kwargs)
 
-    if isinstance(callable_, qml.QNode):
+    if isinstance(callable_, qp.QNode):
         func_op.attributes["quantum.node"] = ir.UnitAttr.get()
 
         diff_method = _calculate_diff_method(callable_, call_jaxpr)
@@ -210,7 +210,7 @@ def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipelines, metadata):
 
     Args:
       ctx: LoweringRuleContext
-      callable_: qml.Qnode
+      callable_: qp.Qnode
       call_jaxpr: jaxpr representing callable_
     Returns:
       FuncOp
@@ -236,12 +236,12 @@ def lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines):
 
     Args:
       ctx: LoweringRuleContext
-      callable_: qml.Qnode
+      callable_: qp.Qnode
       call_jaxpr: jaxpr representing callable_
     Returns:
       FuncOp
     """
-    assert isinstance(callable_, qml.QNode), "This function expects qnodes"
+    assert isinstance(callable_, qp.QNode), "This function expects qnodes"
 
     name = "module_" + callable_.__name__
     # pylint: disable-next=no-member

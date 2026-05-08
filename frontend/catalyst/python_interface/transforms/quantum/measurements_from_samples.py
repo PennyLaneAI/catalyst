@@ -21,7 +21,7 @@ Known Limitations
   * The compilation pass assumes a static number of shots.
   * HamiltonianOps (and therefore Sums and SProds) are not supported directly. Applying
     `split-non-commuting` before this pass enables circuits with Sum/SProd observables.
-  * qml.counts() is not supported since the return type/shape is different in PennyLane and
+  * qp.counts() is not supported since the return type/shape is different in PennyLane and
     Catalyst. See
     https://docs.pennylane.ai/projects/catalyst/en/stable/dev/quick_start.html#measurements
     for more information.
@@ -139,15 +139,15 @@ class MeasurementsFromSamplesPattern(RewritePattern):
                 case "quantum.sample":
                     pass
                 case "quantum.counts":
-                    # Currently ``qml.counts()`` is unsupported due to differences in return
+                    # Currently ``qp.counts()`` is unsupported due to differences in return
                     # type/shape in PennyLane and Catalyst. It may be supported at a later time.
                     # It is included for completeness and to notify users that it is unsupported.
-                    raise NotImplementedError("qml.counts() operations are not supported.")
+                    raise NotImplementedError("qp.counts() operations are not supported.")
                 case "quantum.state":
                     # It is not possible to recover a quantum state from samples; this is included
                     # for completeness and to notify users that ``state`` mps are not supported
                     raise CompileError(
-                        "qml.state() operations are not compatible with conversion to samples."
+                        "qp.state() operations are not compatible with conversion to samples."
                     )
 
     @classmethod
@@ -184,7 +184,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         if isinstance(op, quantum.HamiltonianOp):
             raise CompileError(
                 "Encountered a quantum.HamiltonianOp while applying `measurements_from_samples`. "
-                "This is not supported with Catalyst. Apply `qml.transforms.split_non_commuting` "
+                "This is not supported with Catalyst. Apply `qp.transforms.split_non_commuting` "
                 "to split the HamiltonianOp into separate terms."
             )
 

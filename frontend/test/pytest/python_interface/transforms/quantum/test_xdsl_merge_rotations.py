@@ -15,7 +15,7 @@
 
 # pylint: disable=line-too-long
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst.python_interface.transforms import MergeRotationsPass, merge_rotations_pass
@@ -234,24 +234,23 @@ class TestMergeRotationsPass:
 
 
 # pylint: disable=too-few-public-methods
-@pytest.mark.usefixtures("use_capture")
 class TestMergeRotationsIntegration:
     """Integration tests for the MergeRotationsPass."""
 
     def test_qjit(self, run_filecheck_qjit):
         """Test that the MergeRotationsPass works correctly with qjit."""
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
-        @qml.qjit(target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @merge_rotations_pass
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x: float, y: float):
             # CHECK: [[phi:%.+]] = arith.addf
             # CHECK: quantum.custom "RX"([[phi]])
             # CHECK-NOT: quantum.custom
-            qml.RX(x, 0)
-            qml.RX(y, 0)
-            return qml.state()
+            qp.RX(x, 0)
+            qp.RX(y, 0)
+            return qp.state()
 
         run_filecheck_qjit(circuit)
 

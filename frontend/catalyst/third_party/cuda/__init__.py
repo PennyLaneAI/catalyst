@@ -19,7 +19,7 @@ entry point.
 from importlib.metadata import version
 from pathlib import Path
 
-import pennylane as qml
+import pennylane as qp
 
 
 def _check_version_compatibility():
@@ -60,23 +60,24 @@ def cudaqjit(fn=None, **kwargs):
     when the quantum function is executed:
 
     .. code-block:: python
-
-        dev = qml.device("softwareq.qpp", wires=2)
+        import pennylane as qp
+        from catalyst.third_party.cuda import cudaqjit
+        dev = qp.device("softwareq.qpp", wires=2)
 
         @cudaqjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x):
-            qml.RX(x[0], wires=0)
-            qml.RY(x[1], wires=1)
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(qml.PauliY(0))
+            qp.RX(x[0], wires=0)
+            qp.RY(x[1], wires=1)
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.PauliY(0))
 
     >>> circuit(jnp.array([0.5, 1.4]))
     -0.47244976756708373
 
     From PennyLane, this functionality can also be accessed via
 
-    >>> @qml.qjit(compiler="cuda_quantum")
+    >>> @qp.qjit(compiler="cuda_quantum")
 
     Note that CUDA Quantum compilation currently does not have feature parity with Catalyst
     compilation; in particular, AutoGraph, control flow, differentiation, and various measurement
@@ -96,7 +97,7 @@ def cudaqjit(fn=None, **kwargs):
 
 
 # Do we need to reimplement apply for every child?
-class BaseCudaInstructionSet(qml.devices.QubitDevice):
+class BaseCudaInstructionSet(qp.devices.QubitDevice):
     """Base instruction set for CUDA-Quantum devices"""
 
     pennylane_requires = ">=0.34"
@@ -140,7 +141,7 @@ class BaseCudaInstructionSet(qml.devices.QubitDevice):
     def apply(self, operations, **kwargs):
         """Unused"""
         raise NotImplementedError(
-            "This device is only supported with `qml.qjit`."
+            "This device is only supported with `qp.qjit`."
         )  # pragma: no cover
 
 
@@ -162,15 +163,15 @@ class SoftwareQQPP(BaseCudaInstructionSet):
 
     .. code-block:: python
 
-        dev = qml.device("softwareq.qpp", wires=2)
+        dev = qp.device("softwareq.qpp", wires=2)
 
         @catalyst.third_party.cuda.cudaqjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x):
-          qml.RX(x[0], wires=0)
-          qml.RY(x[1], wires=1)
-          qml.CNOT(wires=[0, 1])
-          return qml.expval(qml.PauliY(0))
+          qp.RX(x[0], wires=0)
+          qp.RY(x[1], wires=1)
+          qp.CNOT(wires=[0, 1])
+          return qp.expval(qp.PauliY(0))
 
     >>> circuit(jnp.array([0.5, 1.4]))
     -0.47244976756708373
@@ -202,15 +203,15 @@ class NvidiaCuStateVec(BaseCudaInstructionSet):
 
     .. code-block:: python
 
-        dev = qml.device("nvidia.custatevec", wires=2)
+        dev = qp.device("nvidia.custatevec", wires=2)
 
         @catalyst.third_party.cuda.cudaqjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x):
-          qml.RX(x[0], wires=0)
-          qml.RY(x[1], wires=1)
-          qml.CNOT(wires=[0, 1])
-          return qml.expval(qml.PauliY(0))
+          qp.RX(x[0], wires=0)
+          qp.RY(x[1], wires=1)
+          qp.CNOT(wires=[0, 1])
+          return qp.expval(qp.PauliY(0))
 
     >>> circuit(jnp.array([0.5, 1.4]))
     -0.47244976756708373
@@ -246,15 +247,15 @@ class NvidiaCuTensorNet(BaseCudaInstructionSet):
 
     .. code-block:: python
 
-        dev = qml.device("nvidia.cutensornet", wires=2)
+        dev = qp.device("nvidia.cutensornet", wires=2)
 
         @catalyst.third_party.cuda.cudaqjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x):
-          qml.RX(x[0], wires=0)
-          qml.RY(x[1], wires=1)
-          qml.CNOT(wires=[0, 1])
-          return qml.expval(qml.PauliY(0))
+          qp.RX(x[0], wires=0)
+          qp.RY(x[1], wires=1)
+          qp.CNOT(wires=[0, 1])
+          return qp.expval(qp.PauliY(0))
 
     >>> circuit(jnp.array([0.5, 1.4]))
     -0.47244976756708373

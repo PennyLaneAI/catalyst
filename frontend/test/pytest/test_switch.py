@@ -17,7 +17,7 @@ from re import escape
 
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import qjit
@@ -167,7 +167,7 @@ class TestInterpreted:
     @pytest.mark.usefixtures("use_capture")
     def test_fails_capture(self):
         """Test that a switch raises an exception with program capture enabled."""
-        if not qml.capture.enabled():
+        if not qp.capture.enabled():
             pytest.skip("capture only test")
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
@@ -387,20 +387,19 @@ class TestClassicalCompiled:
         with pytest.raises(TypeError, match=MISSING_ARGUMENT_MESSAGE):
             circuit_3(0)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_fails_capture(self, backend):
         """Test that an exception is raised when program capture is enabled."""
-        if not qml.capture.enabled():
+        if not qp.capture.enabled():
             pytest.skip("capture only test")
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @qjit
-            @qml.qnode(qml.device(backend, wires=1))
+            @qjit(capture=True)
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(i):
                 @switch(i)
                 def my_switch():
-                    qml.X(0)
+                    qp.X(0)
 
                 return my_switch()
 
@@ -440,15 +439,15 @@ class TestQuantum:
         """Test that a single branch is taken as default."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(i):
             @switch(i)
             def my_switch():
-                qml.X(0)
+                qp.X(0)
 
             my_switch()
 
-            return qml.probs()
+            return qp.probs()
 
         assert np.allclose(circuit(0), [0, 1])
         assert np.allclose(circuit(1), [0, 1])
@@ -457,23 +456,23 @@ class TestQuantum:
         """Test that the default branch catches all unassigned cases."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(i):
             @switch(i)
             def my_switch():
-                qml.RX(pi / 2, wires=0)
+                qp.RX(pi / 2, wires=0)
 
             @my_switch.branch(1)
             def branch_1():
-                qml.RX(pi / 4, wires=0)
+                qp.RX(pi / 4, wires=0)
 
             @my_switch.branch(2)
             def branch_2():
-                qml.RX(pi, wires=0)
+                qp.RX(pi, wires=0)
 
             my_switch()
 
-            return qml.probs(wires=0)
+            return qp.probs(wires=0)
 
         assert np.allclose(circuit(0), [0.5, 0.5])
         assert np.allclose(circuit(1), [0.85355339, 0.14644661])
@@ -483,23 +482,23 @@ class TestQuantum:
         """Test that branches can accept arguments."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(i, angle, wire=None):
             @switch(i)
             def my_switch(angle, wire=None):
-                qml.RX(angle, wires=wire)
+                qp.RX(angle, wires=wire)
 
             @my_switch.branch(2)
             def my_branch(angle, wire=None):
-                qml.RY(angle, wires=wire)
+                qp.RY(angle, wires=wire)
 
             @my_switch.branch(0)
             def my_branch2(angle, wire=None):
-                qml.RZ(angle, wires=wire)
+                qp.RZ(angle, wires=wire)
 
             my_switch(angle, wire=wire)
 
-            return qml.probs()
+            return qp.probs()
 
         assert np.allclose(circuit(0, pi, wire=0), [1, 0, 0, 0])
         assert np.allclose(circuit(2, pi / 4, wire=1), [0.85355339, 0.14644661, 0, 0])
@@ -509,27 +508,27 @@ class TestQuantum:
         """Test that cases need not be sequential."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(i):
             @switch(i)
             def my_switch():
-                qml.RX(0, wires=0)
+                qp.RX(0, wires=0)
 
             @my_switch.branch(3)
             def branch_3():
-                qml.RX(pi / 3, wires=0)
+                qp.RX(pi / 3, wires=0)
 
             @my_switch.branch(-2)
             def branch_m2():
-                qml.RX(pi / -2, wires=0)
+                qp.RX(pi / -2, wires=0)
 
             @my_switch.branch(0)
             def my_branch_0():
-                qml.RX(pi, wires=0)
+                qp.RX(pi, wires=0)
 
             my_switch()
 
-            return qml.probs()
+            return qp.probs()
 
         assert np.allclose(circuit(-2), [0.5, 0.5])
         assert np.allclose(circuit(0), [0, 1])
@@ -540,24 +539,24 @@ class TestQuantum:
         """Test that return types are correctly promoted when applicable."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(i):
             @switch(i)
             def my_switch():
-                qml.X(0)
+                qp.X(0)
                 return 1
 
             @my_switch.branch(3)
             def my_branch():
-                qml.RX(pi / 2, wires=0)
+                qp.RX(pi / 2, wires=0)
                 return 1.2
 
             @my_switch.branch(5)
             def my_branch_2():
-                qml.RX(pi / 4, wires=0)
+                qp.RX(pi / 4, wires=0)
                 return complex(1, 2.2)
 
-            return [my_switch(), qml.probs()]
+            return [my_switch(), qp.probs()]
 
         res = circuit(0)
         assert res[0].dtype is jnp.dtype("complex128")  # pylint: disable=no-member
@@ -578,21 +577,21 @@ class TestQuantum:
         """Test that an exception is raised when incompatible return types are present."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(i):
             @switch(i)
             def my_switch():
-                qml.X(0)
+                qp.X(0)
                 return [9.1]
 
             @my_switch.branch(1)
             def my_branch():
-                qml.Y(0)
+                qp.Y(0)
                 return 0
 
             @my_switch.branch(3)
             def my_branch_2():
-                qml.Z(0)
+                qp.Z(0)
                 return (1, 2)
 
             return my_switch()
@@ -604,16 +603,16 @@ class TestQuantum:
         """Test that an exception is raised when parameters are missing."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(i):
             @switch()  # pylint: disable=no-value-for-parameter
             def my_switch():
-                qml.X(0)
+                qp.X(0)
                 return 0
 
             @my_switch.branch(0)
             def my_branch():
-                qml.Y(0)
+                qp.Y(0)
                 return 2
 
             return my_switch()
@@ -625,12 +624,12 @@ class TestQuantum:
         def circuit_2(i):
             @switch(i)
             def my_switch():
-                qml.X(0)
+                qp.X(0)
                 return 0
 
             @my_switch.branch()  # pylint: disable=no-value-for-parameter
             def my_branch():
-                qml.Y(0)
+                qp.Y(0)
                 return 2
 
             return my_switch()
@@ -638,16 +637,15 @@ class TestQuantum:
         with pytest.raises(TypeError, match=MISSING_ARGUMENT_MESSAGE):
             circuit_2(0)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_fails_capture(self, backend):
         """Test that an exception is raised when program capture is enabled."""
-        if not qml.capture.enabled():
+        if not qp.capture.enabled():
             pytest.skip("capture only test")
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @qjit
-            @qml.qnode(qml.device(backend, wires=1))
+            @qjit(capture=True)
+            @qp.qnode(qp.device(backend, wires=1))
             def circuit(i):
                 @switch(i)
                 def my_switch():
@@ -664,18 +662,18 @@ class TestQuantum:
         """Test that switch operations can be accessed in a quantum context."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(i):
             @switch(i)
             def my_switch():
-                qml.X(0)
+                qp.X(0)
 
             my_switch()
 
-            if not qml.capture.enabled():
+            if not qp.capture.enabled():
                 assert isinstance(my_switch.operation, Switch)
 
-            return qml.probs()
+            return qp.probs()
 
         assert np.allclose(circuit(0), [0, 1])
         assert np.allclose(circuit(1), [0, 1])
