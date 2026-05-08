@@ -991,6 +991,32 @@ def test_decompose_lowering_multirz():
 test_decompose_lowering_multirz()
 
 
+def test_decompose_lowering_pauli_rot_rule():
+    """Test that PauliRot decomp rules are lowered for correctly."""
+
+    qp.decomposition.enable_graph()
+
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qp.qjit(pipelines=pipe, target="mlir", capture=True)
+    @partial(
+        qp.transforms.decompose,
+        gate_set=[qp.RZ, qp.MultiRZ, qp.RX, qp.GlobalPhase],
+    )
+    @qp.qnode(qp.device("lightning.qubit", wires=3))
+    # CHECK-LABEL: @_pauli_rot_decomposition_wires_3_XZY{{.*}} attributes {{{.*}} pauli_word = "XZY", target_gate = "PauliRot"}
+    def circuit_pauli_rot():
+        qp.PauliRot(0.123, pauli_word="XZY", wires=[0, 1, 2])
+        return qp.expval(qp.Z(0))
+
+    print(circuit_pauli_rot.mlir)
+
+    qp.decomposition.disable_graph()
+
+
+test_decompose_lowering_pauli_rot_rule()
+
+
 def test_decompose_lowering_pauli_rot():
     """Test decomposing PauliRot with graph decomposition."""
 
