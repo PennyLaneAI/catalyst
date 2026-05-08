@@ -479,6 +479,11 @@
   `"GateName(nWires)"` to `"GateName(nWires,nParams)"`.
   [(#2755)](https://github.com/PennyLaneAI/catalyst/pull/2755)
 
+* Dynamic wire allocation can now be used in circuits whose terminal measurements are not
+  state-based (``StateMP``). This was originally disallowed due to a bug with dynamic wire
+  allocation and terminal measurements.
+  [(#2427)](https://github.com/PennyLaneAI/catalyst/pull/2427)
+
 * A warning is issued when :func:`pennylane.transforms.gridsynth` is called with epsilon smaller
   than ``1e-6`` due to potential precision error.
   [(#2625)](https://github.com/PennyLaneAI/catalyst/pull/2625)
@@ -616,11 +621,6 @@
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.59.0 and `xdsl-jax` 0.5.0.
   [(#2591)](https://github.com/PennyLaneAI/catalyst/pull/2591)
 
-* Dynamic wire allocation can now be used in circuits whose terminal measurements are not
-  state-based (``StateMP``). This was originally disallowed due to a bug with dynamic wire
-  allocation and terminal measurements.
-  [(#2427)](https://github.com/PennyLaneAI/catalyst/pull/2427)
-
 * The ``catalyst.python_interface.transforms.parity_synth_pass`` transform has been renamed to
   ``catalyst.python_interface.transforms.parity_synth``.
   [(#2553)](https://github.com/PennyLaneAI/catalyst/pull/2553)
@@ -672,9 +672,9 @@
   the ``quantum.node`` attribute. Downstream, the ``resource-analysis`` pass then misidentified
   the empty wrapper as an additional qnode, causing an empty column in `qp.specs` at MLIR levels.
   [(#2793)](https://github.com/PennyLaneAI/catalyst/pull/2793)
-  
-* Fixed a bug where the `path_to_plugin` never be forwarded in 
-  :func:`~.passes.apply_pass_plugin`. The plugin path is now registered with the compiler during 
+
+* Fixed a bug where the `path_to_plugin` never be forwarded in
+  :func:`~.passes.apply_pass_plugin`. The plugin path is now registered with the compiler during
   tracing.
   [(#2790)](https://github.com/PennyLaneAI/catalyst/pull/2790)
 
