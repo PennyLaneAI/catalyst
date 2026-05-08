@@ -84,6 +84,7 @@ def _split_func(func_op: func.FuncOp) -> None:
     for g_idx, group in enumerate(groups):
         group_ids = {id(ev) for ev in group}
         clone = func_op.clone()
+        clone.properties["sym_visibility"] = None
         clone.properties["sym_name"] = builtin.StringAttr(f"{func_name}.group.{g_idx}")
 
         clone_expvals = [op for op in clone.body.blocks[0].ops if isinstance(op, ExpvalOp)]
