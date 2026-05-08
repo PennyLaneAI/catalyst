@@ -474,7 +474,7 @@ class TestGraphDecomposition:
             @qp.qnode(qp.device("lightning.qubit", wires=2))
             def circuit(x: float, y: float):
                 qp.PauliRot(0.1, "ZZ", wires=[0, 1])
-                return qml.state()
+                return qp.state()
 
             circuit()
 
