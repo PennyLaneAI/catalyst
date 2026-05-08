@@ -643,10 +643,10 @@
   [(#2588)](https://github.com/PennyLaneAI/catalyst/pull/2588)
 
 * The QEC (Quantum Error Correction) dialect has been renamed to PBC (Pauli-Based Computation)
-  across the entire codebase. This includes the MLIR dialect (`pbc.*` -> `pbc.*`), C++ namespaces
-  (`catalyst::pbc` -> `catalyst::pbc`), Python bindings, compiler passes (e.g.,
-  `lower-pbc-init-ops` -> `lower-pbc-init-ops`, `convert-pbc-to-llvm` -> `convert-pbc-to-llvm`),
-  qubit type (`!quantum.bit<pbc>` -> `!quantum.bit<pbc>`), and all associated file and directory
+  across the entire codebase. This includes the MLIR dialect (`qec.*` -> `pbc.*`), C++ namespaces
+  (`catalyst::qec` -> `catalyst::pbc`), Python bindings, compiler passes (e.g.,
+  `lower-qec-init-ops` -> `lower-pbc-init-ops`, `convert-qec-to-llvm` -> `convert-qec-to-llvm`),
+  qubit type (`!quantum.bit<qec>` -> `!quantum.bit<pbc>`), and all associated file and directory
   names. The rename better reflects the dialect's purpose as a representation for Pauli-Based
   Computation rather than general quantum error correction.
   [(#2482)](https://github.com/PennyLaneAI/catalyst/pull/2482)
@@ -894,7 +894,7 @@
   (set_dataset, transfer_data).
   [(#2577)](https://github.com/PennyLaneAI/catalyst/pull/2577)
 
-* Added a optimized pathway to the xDSL `ApplyTransformSequencePass` so that it can schedule
+* Added an optimized pathway to the xDSL `ApplyTransformSequencePass` so that it can schedule
   consecutive MLIR passes together rather than individually. This minimizes the number of
   round-trips between xDSL and MLIR, improving performance when several consecutive MLIR passes are
   used when there are also xDSL passes in the pipeline.
@@ -1092,8 +1092,8 @@
   [(#2673)](https://github.com/PennyLaneAI/catalyst/pull/2673)
   [(#2768)](https://github.com/PennyLaneAI/catalyst/pull/2768)
 
-* An experimental pass to convert `qecl.noise` operations in the *QEC Logical* layer to subroutine
-  calls in the *QEC Phyiscal* layer.
+* An experimental pass has been added to convert `qecl.noise` operations in the *QEC Logical* layer
+  to subroutine calls in the *QEC Physical* layer.
   [(#2678)](https://github.com/PennyLaneAI/catalyst/pull/2678)
 
 * A new, experimental compiler pass `convert-quantum-to-qecl` has been added to lower operations
