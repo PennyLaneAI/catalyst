@@ -102,6 +102,7 @@
   [(#2711)](https://github.com/PennyLaneAI/catalyst/pull/2711)
   [(#2713)](https://github.com/PennyLaneAI/catalyst/pull/2713)
   [(#2722)](https://github.com/PennyLaneAI/catalyst/pull/2722)
+  [(#2795)](https://github.com/PennyLaneAI/catalyst/pull/2795)
   [(#2749)](https://github.com/PennyLaneAI/catalyst/pull/2749)
   [(#2765)](https://github.com/PennyLaneAI/catalyst/pull/2765)
 
@@ -663,6 +664,12 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where `postselect_mode` was not propagated through higher-order ops and control flow
+  when tracing with :func:`~.qjit`.
+  [(#2787)](https://github.com/PennyLaneAI/catalyst/pull/2787)
+  
+* Fixed a bug where the `path_to_plugin` never be forwarded in :func:`~.passes.apply_pass_plugin`. The plugin path is now registered with the compiler during tracing.
+  [(#2790)](https://github.com/PennyLaneAI/catalyst/pull/2790)
 * Fixed a bug where the ``work_wire_type`` argument of `qp.ctrl` was silently dropped inside `@qjit`
   functions. The parameter is now threaded through `catalyst.ctrl`, `CtrlCallable`, `HybridCtrl`,
   and `ctrl_distribute`, with the default value being `"borrowed"`.
@@ -672,11 +679,6 @@
   the ``quantum.node`` attribute. Downstream, the ``resource-analysis`` pass then misidentified
   the empty wrapper as an additional qnode, causing an empty column in `qp.specs` at MLIR levels.
   [(#2793)](https://github.com/PennyLaneAI/catalyst/pull/2793)
-
-* Fixed a bug where the `path_to_plugin` never be forwarded in
-  :func:`~.passes.apply_pass_plugin`. The plugin path is now registered with the compiler during
-  tracing.
-  [(#2790)](https://github.com/PennyLaneAI/catalyst/pull/2790)
 
 * Fixed a bug where multiple ``quantum.extract`` operations from the same index were being created
   when there are multiple computational basis observables, named observables or Hermitian
