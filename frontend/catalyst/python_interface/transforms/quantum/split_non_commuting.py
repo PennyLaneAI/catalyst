@@ -170,7 +170,8 @@ class SplitNonCommutingPass(passes.ModulePass):
         func_ops = [
             op
             for op in module.body.walk()
-            if isinstance(op, func.FuncOp) and "qnode" in op.attributes
+            if isinstance(op, func.FuncOp)
+            and ("qnode" in op.attributes or "quantum.node" in op.attributes)
         ]
         for func_op in func_ops:
             _split_func(func_op)
