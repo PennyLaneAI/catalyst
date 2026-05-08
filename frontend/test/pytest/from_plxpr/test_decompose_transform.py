@@ -468,6 +468,7 @@ class TestGraphDecomposition:
         """Test that the graph correctly registers non-custom ops."""
 
         with pytest.raises(CompileError):
+
             @qp.qjit
             @graph_decomposition(gate_set={qp.X})
             @qp.qnode(qp.device("lightning.qubit", wires=2))
