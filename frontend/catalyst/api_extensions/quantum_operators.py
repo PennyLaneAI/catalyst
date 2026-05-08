@@ -203,8 +203,7 @@ def pauli_measure(
 
     Args:
         pauli_word (str): The Pauli word (e.g. ``"XZ"``) acting on ``wires``.
-        wires (int or list[int]): Wire(s) the Pauli product acts on; length must match
-            ``len(pauli_word)``.
+        wires (int or list[int]): Wire(s) the Pauli product applies to.
         postselect (Optional[int]): Optional postselection (not yet supported in compilation).
 
     Returns:
@@ -221,16 +220,14 @@ def pauli_measure(
 
     if postselect is not None:
         raise NotImplementedError(
-            "Postselection on catalyst.pauli_measure is not yet supported under qjit."
+            "Postselection on catalyst.pauli_measure is not supported under qjit."
         )
 
     cur_trace = EvaluationContext.get_current_trace()
     wires_list = list(wires) if isinstance(wires, (list, tuple)) else [wires]
     if len(pauli_word) != len(wires_list):
         raise ValueError(
-            "The number of wires must be equal to the length of the Pauli word. "
-            f"Got pauli_word={pauli_word!r} of length {len(pauli_word)} and "
-            f"wires={wires_list} of length {len(wires_list)}."
+            f"The number of wires must be equal to the length of the Pauli word, got {len(wires_list)} and {len(pauli_word)}."
         )
 
     in_classical_tracers = wires_list.copy()

@@ -539,13 +539,6 @@ class HybridOp(Operator):
         User-defined transformations might have changed them by the time this function is called.
         The quantum tracer, namely the quantum register is not supposed to be changed so it is kept
         as-is.
-
-        ``num_quantum_outs`` controls how many trailing outvars of the bound primitive are quantum
-        (qubit / qreg) tracers. The default of 1 preserves the historical behaviour for ops like
-        ``measure_p`` and the control-flow primitives, where the last outvar is the quantum
-        tracer. Ops that produce multiple quantum outvars (e.g. ``pauli_measure_p`` returns
-        ``(bool, qubit_0, ..., qubit_{N-1})``) should pass the matching ``N``; in that case the
-        method returns the list of trailing quantum tracers.
         """
         assert self.binder is not None, "HybridOp should set a binder"
         assert num_quantum_outs >= 1, "num_quantum_outs must be at least 1"
