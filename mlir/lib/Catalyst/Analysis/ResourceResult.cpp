@@ -148,8 +148,7 @@ std::string ResourceResult::toJson(int indent) const
 
     // Variable function calls (dynamic-loop hashes). Emitted as fixed-width
     // hex strings so that the high-bit portion of the 64-bit hash space
-    // round-trips losslessly through JSON (which would otherwise sign-flip
-    // when cast to int64 or lose precision past 2^53 as a double).
+    // round-trips losslessly through JSON.
     llvm::json::Object vfcObj;
     for (const auto &entry : varFunctionCalls) {
         vfcObj[entry.getKey()] = formatv("{0:x16}", entry.getValue()).str();

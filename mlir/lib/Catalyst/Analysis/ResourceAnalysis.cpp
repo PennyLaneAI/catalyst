@@ -308,12 +308,12 @@ std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t 
     // Bump `counter` until the resulting name does not collide with an
     // existing entry. This protects against user functions named e.g.
     // `for_loop_3` shadowing or being shadowed by a lifted body.
-    while (true) {
-        std::string candidate = prefix.str() + std::to_string(++counter);
-        if (!funcResults.contains(candidate)) {
-            return candidate;
-        }
-    }
+    std::string candidate;
+    do {
+        candidate = prefix.str() + std::to_string(++counter);
+    } while (!funcResults.contains(candidate));
+
+    return candidate;
 }
 
 void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint)
