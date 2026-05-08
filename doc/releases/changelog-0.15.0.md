@@ -374,7 +374,7 @@
   }
   ```
 
-* A new `~.CompilationPass` class has been added that abstracts away compiler-level details for
+* A new :class:`~.CompilationPass` class has been added that abstracts away compiler-level details for
   seamless compilation pass creation. Used in tandem with :func:`~.compiler_transform`, compilation
   passes can be created entirely in Python (leveraging xDSL) and used on QNodes within a
   :func:`~.qjit`'d workflow.
