@@ -13,7 +13,7 @@
 # limitations under the License.
 """Unit test module for the outline state evolution transform"""
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 from pennylane.ftqc import RotXZX
 
@@ -30,12 +30,12 @@ from catalyst.python_interface.transforms import (
 pytestmark = pytest.mark.xdsl
 
 
-@qml.while_loop(lambda i: i < 1000)
+@qp.while_loop(lambda i: i < 1000)
 def _while_for(i):
-    qml.H(i)
-    qml.S(i)
+    qp.H(i)
+    qp.S(i)
     RotXZX(0.1, 0.2, 0.3, wires=[i])
-    qml.RZ(phi=0.1, wires=[i])
+    qp.RZ(phi=0.1, wires=[i])
     i = i + 1
     return i
 
@@ -139,46 +139,43 @@ class TestOutlineStateEvolutionPass:
         pipeline = (OutlineStateEvolutionPass(),)
         run_filecheck(program, pipeline)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_no_error(self):
         """Test outline_state_evolution_pass does not raise error for circuit with classical
         operations only."""
 
-        @qml.qjit(target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @outline_state_evolution_pass
         def circuit(x, y):
             return x * y + 5
 
         circuit(1, 4)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_no_terminal_op_error(self):
         """Test outline_state_evolution_pass raises error when no terminal_boundary_op is found in
         circuit with quantum operation."""
         # TODOs: we can resolve this issue if the boundary op is inserted when
         # the program is captured.
-        dev = qml.device("null.qubit", wires=10)
+        dev = qp.device("null.qubit", wires=10)
 
-        @qml.qjit(target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @outline_state_evolution_pass
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
-            return qml.state()
+            return qp.state()
 
         with pytest.raises(
             RuntimeError, match="A terminal_boundary_op op is not found in the circuit."
         ):
             circuit()
 
-    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_pass_only(self, run_filecheck_qjit):
         """Test the outline_state_evolution_pass only."""
-        dev = qml.device("lightning.qubit", wires=1000)
+        dev = qp.device("lightning.qubit", wires=1000)
 
-        @qml.qjit(target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @outline_state_evolution_pass
-        @qml.set_shots(1000)
-        @qml.qnode(dev)
+        @qp.set_shots(1000)
+        @qp.qnode(dev)
         def circuit():
             # CHECK-LABEL: func.func public @circuit()
             # CHECK-NOT: scf.while
@@ -200,23 +197,22 @@ class TestOutlineStateEvolutionPass:
             # CHECK: quantum.custom "RZ"
             # CHECK: quantum.custom "CNOT"
             _while_for(0)
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(qml.Z(wires=0))
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.Z(wires=0))
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_pass_with_convert_to_mbqc_formalism(self, run_filecheck_qjit):
         """Test if the outline_state_evolution_pass works with the convert-to-mbqc-formalism pass
         on lightning.qubit."""
-        dev = qml.device("lightning.qubit", wires=1000)
+        dev = qp.device("lightning.qubit", wires=1000)
 
-        @qml.qjit(target="mlir", pipelines=mbqc_pipeline())
+        @qp.qjit(capture=True, target="mlir", pipelines=mbqc_pipeline())
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
         @outline_state_evolution_pass
-        @qml.set_shots(1000)
-        @qml.qnode(dev)
+        @qp.set_shots(1000)
+        @qp.qnode(dev)
         def circuit():
             # CHECK-LABEL: func.func public @circuit()
             # CHECK-NOT: quantum.custom "Hadamard"()
@@ -242,29 +238,28 @@ class TestOutlineStateEvolutionPass:
             # CHECK: quantum.custom "PauliZ"()
             # CHECK: quantum.dealloc_qb
             _while_for(0)
-            qml.H(0)
-            qml.S(1)
+            qp.H(0)
+            qp.S(1)
             RotXZX(0.1, 0.2, 0.3, wires=[2])
-            qml.RZ(phi=0.1, wires=[3])
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(qml.X(wires=0))
+            qp.RZ(phi=0.1, wires=[3])
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.X(wires=0))
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_pass_with_mbqc_pipeline(self, run_filecheck_qjit):
         """Test if the outline_state_evolution_pass works with all mbqc transform pipeline on
         null.qubit."""
-        dev = qml.device("null.qubit", wires=1000)
+        dev = qp.device("null.qubit", wires=1000)
 
-        @qml.qjit(target="mlir", pipelines=mbqc_pipeline())
+        @qp.qjit(capture=True, target="mlir", pipelines=mbqc_pipeline())
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
         @measurements_from_samples_pass
         @diagonalize_final_measurements_pass
         @outline_state_evolution_pass
-        @qml.set_shots(1000)
-        @qml.qnode(dev)
+        @qp.set_shots(1000)
+        @qp.qnode(dev)
         def circuit():
             # CHECK-LABEL: func.func public @circuit()
             # NOTE: There is scf.if, mbqc.measure_in_basis in the circuit()
@@ -288,81 +283,80 @@ class TestOutlineStateEvolutionPass:
             # CHECK: quantum.custom "PauliZ"()
             # CHECK: quantum.dealloc_qb
             _while_for(0)
-            qml.H(0)
-            qml.S(1)
+            qp.H(0)
+            qp.S(1)
             RotXZX(0.1, 0.2, 0.3, wires=[2])
-            qml.RZ(phi=0.1, wires=[3])
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(qml.X(wires=0))
+            qp.RZ(phi=0.1, wires=[3])
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.X(wires=0))
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_pass_with_mbqc_pipeline_run_on_nullqubit(self):
         """Test if a circuit can be transfored with the outline_state_evolution_pass and all mbqc
         transform pipeline can be executed on null.qubit."""
-        dev = qml.device("null.qubit", wires=1000)
+        dev = qp.device("null.qubit", wires=1000)
 
-        @qml.qjit(target="mlir", pipelines=mbqc_pipeline())
+        @qp.qjit(capture=True, target="mlir", pipelines=mbqc_pipeline())
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
         @measurements_from_samples_pass
         @diagonalize_final_measurements_pass
         @outline_state_evolution_pass
-        @qml.set_shots(1000)
-        @qml.qnode(dev)
+        @qp.set_shots(1000)
+        @qp.qnode(dev)
         def circuit():
             _while_for(0)
-            qml.H(0)
-            qml.S(1)
+            qp.H(0)
+            qp.S(1)
             RotXZX(0.1, 0.2, 0.3, wires=[2])
-            qml.RZ(phi=0.1, wires=[3])
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(qml.X(wires=0))
+            qp.RZ(phi=0.1, wires=[3])
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.X(wires=0))
 
         res = circuit()
         assert res == 1.0
 
-    @pytest.mark.usefixtures("use_capture")
     def test_lightning_execution_with_structure(self):
         """Test that the outline_state_evolution_pass on lightning.qubit for a circuit with program
         structure is executable and returns results as expected."""
-        dev = qml.device("lightning.qubit", wires=10)
+        dev = qp.device("lightning.qubit", wires=10)
 
-        @qml.for_loop(0, 10, 1)
+        @qp.for_loop(0, 10, 1)
         def for_fn(i):
-            qml.H(i)
-            qml.S(i)
-            qml.RZ(phi=0.1, wires=[i])
+            qp.H(i)
+            qp.S(i)
+            qp.RZ(phi=0.1, wires=[i])
 
-        @qml.while_loop(lambda i: i < 10)
+        @qp.while_loop(lambda i: i < 10)
         def while_fn(i):
-            qml.H(i)
-            qml.S(i)
-            qml.RZ(phi=0.1, wires=[i])
+            qp.H(i)
+            qp.S(i)
+            qp.RZ(phi=0.1, wires=[i])
             i = i + 1
             return i
 
-        @qml.qjit(target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @outline_state_evolution_pass
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
             for_fn()  # pylint: disable=no-value-for-parameter
             while_fn(0)
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(qml.prod(qml.X(0), qml.Z(1)))
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.prod(qp.X(0), qp.Z(1)))
 
         res = circuit()
 
-        @qml.qjit(
+        @qp.qjit(
+            capture=True,
             target="mlir",
         )
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit_ref():
             for_fn()  # pylint: disable=no-value-for-parameter
             while_fn(0)
-            qml.CNOT(wires=[0, 1])
-            return qml.expval(qml.prod(qml.X(0), qml.Z(1)))
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.prod(qp.X(0), qp.Z(1)))
 
         res_ref = circuit_ref()
         assert res == res_ref

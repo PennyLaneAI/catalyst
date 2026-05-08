@@ -15,37 +15,35 @@
 """Test cases for the gridsynth discretization/decomposition pass."""
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 
-@pytest.mark.usefixtures("use_capture")
 @pytest.mark.parametrize(
     "param",
     [-11.1, -7.7, -4.4, -2.2, -1.1, -0.3, -0.2, -0.1, 0.0, 0.1, 0.2, 0.3, 1.1, 2.2, 4.4, 7.7, 11.1],
 )
-@pytest.mark.parametrize("op", [qml.RZ, qml.PhaseShift])
+@pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
 @pytest.mark.parametrize("eps", [1e-3, 1e-4, 1e-5, 1e-6, 1e-7])
 def test_PhaseShift_gridsynth(param, op, eps):
     """Test that PhaseShift gates are correctly decomposed using the gridsynth pass."""
 
-    dev = qml.device("lightning.qubit", wires=1)
+    dev = qp.device("lightning.qubit", wires=1)
 
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(x: float):
-        qml.Hadamard(0)
+        qp.Hadamard(0)
         op(x, wires=0)
-        return qml.state()
+        return qp.state()
 
     expected = circuit(param)
-    gridsynthed_circuit = qml.transforms.gridsynth(circuit, epsilon=eps)
-    qjitted_circuit = qml.qjit(gridsynthed_circuit)
+    gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
+    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True)
     result = qjitted_circuit(param)
 
-    assert qml.math.allclose(result, expected, atol=eps)
+    assert qp.math.allclose(result, expected, atol=eps)
 
 
-@pytest.mark.usefixtures("use_capture")
 @pytest.mark.parametrize(
     "param",
     [-7.7, -2.2, -0.1, 0.0, 0.1, 2.2, 7.7],
@@ -54,17 +52,17 @@ def test_PhaseShift_gridsynth(param, op, eps):
 def test_gridsynth_ppr_basis(param, eps):
     """Test that gridsynth with ppr_basis is consistent with the default gridsynth."""
 
-    dev = qml.device("lightning.qubit", wires=1)
+    dev = qp.device("lightning.qubit", wires=1)
 
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(x: float):
-        qml.RZ(x, wires=0)
-        return qml.state()
+        qp.RZ(x, wires=0)
+        return qp.state()
 
-    gridsynthed_circuit = qml.transforms.gridsynth(circuit, epsilon=eps)
-    gridsynthed_circuit_ppr = qml.transforms.gridsynth(circuit, epsilon=eps, ppr_basis=True)
-    qjitted_circuit = qml.qjit(gridsynthed_circuit)
-    qjitted_circuit_with_ppr = qml.qjit(gridsynthed_circuit_ppr)
+    gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
+    gridsynthed_circuit_ppr = qp.transforms.gridsynth(circuit, epsilon=eps, ppr_basis=True)
+    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True)
+    qjitted_circuit_with_ppr = qp.qjit(gridsynthed_circuit_ppr, capture=True)
     result = qjitted_circuit(param)
     result_with_ppr = qjitted_circuit_with_ppr(param)
     assert np.allclose(result, result_with_ppr, atol=eps)
@@ -73,33 +71,31 @@ def test_gridsynth_ppr_basis(param, eps):
 _EPSILON_WARN_FRAGMENT = "For epsilon smaller than 1e-6"
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_epsilon_warning_emitted_for_small_epsilon(capfd):
     """Test that a runtime warning is written to stderr when epsilon < 1e-6."""
-    dev = qml.device("lightning.qubit", wires=1)
+    dev = qp.device("lightning.qubit", wires=1)
 
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(x: float):
-        qml.RZ(x, wires=0)
-        return qml.state()
+        qp.RZ(x, wires=0)
+        return qp.state()
 
-    qml.qjit(qml.transforms.gridsynth(circuit, epsilon=1e-8))(0.5)
+    qp.qjit(qp.transforms.gridsynth(circuit, epsilon=1e-8), capture=True)(0.5)
 
     captured = capfd.readouterr()
     assert _EPSILON_WARN_FRAGMENT in captured.err
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_epsilon_warning_not_emitted_for_safe_epsilon(capfd):
     """Test that no runtime warning is written to stderr when epsilon >= 1e-6."""
-    dev = qml.device("lightning.qubit", wires=1)
+    dev = qp.device("lightning.qubit", wires=1)
 
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(x: float):
-        qml.RZ(x, wires=0)
-        return qml.state()
+        qp.RZ(x, wires=0)
+        return qp.state()
 
-    qml.qjit(qml.transforms.gridsynth(circuit, epsilon=1e-4))(0.5)
+    qp.qjit(qp.transforms.gridsynth(circuit, epsilon=1e-4), capture=True)(0.5)
 
     captured = capfd.readouterr()
     assert _EPSILON_WARN_FRAGMENT not in captured.err

@@ -19,7 +19,7 @@ from typing import Iterable, Sequence
 
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 from jax.tree_util import tree_flatten
 from pennylane import exceptions, measure
@@ -33,7 +33,7 @@ from catalyst import vjp as C_vjp
 from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
 from catalyst.passes import apply_pass
 
-# TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
+# TODO: add tests with other measurement processes (e.g. qp.sample, qp.probs, ...)
 
 # pylint: disable=too-many-lines,too-many-public-methods
 
@@ -56,15 +56,15 @@ class TestMidCircuitMeasurement:
         def circuit():
             return measure(0)
 
-        with pytest.raises(CompileError, match="can only be used from within a qml.qnode"):
+        with pytest.raises(CompileError, match=r"can only be used from within a .*\.qnode"):
             qjit(circuit)()
 
     def test_invalid_arguments(self, backend):
         """Test too many arguments to the wires parameter."""
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit():
-            qml.RX(0.0, wires=0)
+            qp.RX(0.0, wires=0)
             m = measure(wires=[1, 2])
             return m
 
@@ -76,9 +76,9 @@ class TestMidCircuitMeasurement:
     def test_invalid_arguments2(self, backend):
         """Test too large array for the wires parameter."""
 
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit():
-            qml.RX(0.0, wires=0)
+            qp.RX(0.0, wires=0)
             m = measure(wires=jnp.array([1, 2]))
             return m
 
@@ -89,9 +89,9 @@ class TestMidCircuitMeasurement:
         """Test measure (basic)."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
             m = measure(wires=0)
             return m
 
@@ -101,9 +101,9 @@ class TestMidCircuitMeasurement:
         """Test a scalar array wire."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(w):
-            qml.PauliX(0)
+            qp.PauliX(0)
             m = measure(wires=w)
             return m
 
@@ -113,9 +113,9 @@ class TestMidCircuitMeasurement:
         """Test a 1D single-element array wire."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(w):
-            qml.PauliX(0)
+            qp.PauliX(0)
             m = measure(wires=w)
             return m
 
@@ -125,12 +125,12 @@ class TestMidCircuitMeasurement:
         """Test measure (more complex)."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: float):
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
             m1 = measure(wires=0)
             maybe_pi = m1 * jnp.pi
-            qml.RX(maybe_pi, wires=1)
+            qp.RX(maybe_pi, wires=1)
             m2 = measure(wires=1)
             return m2
 
@@ -141,9 +141,9 @@ class TestMidCircuitMeasurement:
         """Test measure (postselect = 0)."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
             m = measure(wires=0, postselect=0)
             return m
 
@@ -153,9 +153,9 @@ class TestMidCircuitMeasurement:
         """Test measure (postselect = 1)."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
             m = measure(wires=0, postselect=1)
             return m
 
@@ -165,9 +165,9 @@ class TestMidCircuitMeasurement:
         """Test measure (reset = False)."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit():
-            qml.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
             m1 = measure(wires=0, reset=False, postselect=1)
             m2 = measure(wires=0)
             return m1 == m2
@@ -178,9 +178,9 @@ class TestMidCircuitMeasurement:
         """Test measure (reset = True)."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit():
-            qml.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
             m1 = measure(wires=0, reset=True, postselect=1)
             m2 = measure(wires=0)
             return m1 != m2
@@ -188,49 +188,49 @@ class TestMidCircuitMeasurement:
         assert circuit()  # measures are different
 
     def test_return_mcm_with_sample_single(self, backend):
-        """Test that a measurement result can be returned with qml.sample and shots."""
+        """Test that a measurement result can be returned with qp.sample and shots."""
 
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
 
         @qjit
-        @qml.set_shots(1)
-        @qml.qnode(dev)
+        @qp.set_shots(1)
+        @qp.qnode(dev)
         def circuit(x):
-            qml.RY(x, wires=0)
+            qp.RY(x, wires=0)
             m = measure(0)
-            qml.PauliX(0)
-            return qml.sample(m)
+            qp.PauliX(0)
+            return qp.sample(m)
 
         assert circuit(0.0) == 0
         assert circuit(jnp.pi) == 1
 
     def test_return_mcm_with_sample_multiple(self, backend):
-        """Test that a measurement result can be returned with qml.sample and shots."""
+        """Test that a measurement result can be returned with qp.sample and shots."""
 
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
 
         @qjit
-        @qml.set_shots(10)
-        @qml.qnode(dev)
+        @qp.set_shots(10)
+        @qp.qnode(dev)
         def circuit(x):
-            qml.RY(x, wires=0)
+            qp.RY(x, wires=0)
             m = measure(0)
-            qml.PauliX(0)
-            return qml.sample(m)
+            qp.PauliX(0)
+            return qp.sample(m)
 
         assert jnp.allclose(circuit(0.0), 0)
         assert jnp.allclose(circuit(jnp.pi), 1)
 
     def test_mcm_method_deferred_error(self, backend):
         """Test that an error is raised if trying to execute with mcm_method="deferred"."""
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
 
         @qjit
-        @qml.qnode(dev, mcm_method="deferred")
+        @qp.qnode(dev, mcm_method="deferred")
         def circuit(x):
-            qml.RX(x, 0)
+            qp.RX(x, 0)
             measure(0)
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         with pytest.raises(
             ValueError, match="mcm_method='deferred' is not supported with Catalyst"
@@ -239,15 +239,15 @@ class TestMidCircuitMeasurement:
 
     def test_mcm_method_one_shot_analytic_error(self, backend):
         """Test that an error is raised if using mcm_method="one-shot" without shots."""
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
 
         @qjit
-        @qml.set_shots(None)
-        @qml.qnode(dev, mcm_method="one-shot")
+        @qp.set_shots(None)
+        @qp.qnode(dev, mcm_method="one-shot")
         def circuit(x):
-            qml.RX(x, 0)
+            qp.RX(x, 0)
             measure(0)
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         with pytest.raises(
             ValueError, match="mcm_method='one-shot' is not supported in analytic shot mode"
@@ -257,15 +257,15 @@ class TestMidCircuitMeasurement:
     def test_single_branch_statistics_hw_like_error(self, backend):
         """Test that an error is raised if using `mcm_method="single-branch-statistics"` and
         `postselect_mode="hw-like"`"""
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
 
         @qjit
-        @qml.set_shots(10)
-        @qml.qnode(dev, mcm_method="single-branch-statistics", postselect_mode="hw-like")
+        @qp.set_shots(10)
+        @qp.qnode(dev, mcm_method="single-branch-statistics", postselect_mode="hw-like")
         def circuit(x):
-            qml.RX(x, 0)
+            qp.RX(x, 0)
             measure(0)
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         with pytest.raises(
             ValueError,
@@ -281,19 +281,19 @@ class TestMidCircuitMeasurement:
         if postselect_mode == "hw-like" and mcm_method == "single-branch-statistics":
             pytest.skip("Invalid MCM configuration")
 
-        dev = qml.device(backend, wires=2)
+        dev = qp.device(backend, wires=2)
 
-        original_config = qml.devices.MCMConfig(
+        original_config = qp.devices.MCMConfig(
             postselect_mode=postselect_mode, mcm_method=mcm_method
         )
 
         @qjit
-        @qml.set_shots(10)
-        @qml.qnode(dev, **asdict(original_config))
+        @qp.set_shots(10)
+        @qp.qnode(dev, **asdict(original_config))
         def circuit(x):
-            qml.RX(x, 0)
+            qp.RX(x, 0)
             measure(0, postselect=1)
-            return qml.expval(qml.PauliZ(0))
+            return qp.expval(qp.PauliZ(0))
 
         _ = circuit(1.8)
         assert circuit.execute_kwargs["postselect_mode"] == original_config.postselect_mode
@@ -302,15 +302,15 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     def test_default_mcm_method(self, backend, postselect_mode, mocker):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
 
         @qjit
-        @qml.set_shots(10)
-        @qml.qnode(dev, mcm_method=None, postselect_mode=postselect_mode)
+        @qp.set_shots(10)
+        @qp.qnode(dev, mcm_method=None, postselect_mode=postselect_mode)
         def circuit(x):
-            qml.RX(x, 0)
+            qp.RX(x, 0)
             measure(0)
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         spy = mocker.spy(catalyst.qfunc, "dynamic_one_shot")
         _ = circuit(1.8)
@@ -324,15 +324,15 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize("mcm_method", [None, "one-shot"])
     def test_mcm_method_with_dict_output(self, backend, postselect_mode, mcm_method):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
 
         @qjit
-        @qml.set_shots(20)
-        @qml.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
+        @qp.set_shots(20)
+        @qp.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
             measure(0, postselect=1)
-            return {"hi": qml.expval(qml.Z(0))}
+            return {"hi": qp.expval(qp.Z(0))}
 
         observed = circuit(0.9)
         expected = {"hi": jnp.array(-1.0, dtype=jnp.float64)}
@@ -342,15 +342,15 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize("mcm_method", ["one-shot"])
     def test_mcm_method_with_count_mesurement(self, backend, postselect_mode, mcm_method):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
 
         @qjit
-        @qml.set_shots(20)
-        @qml.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
+        @qp.set_shots(20)
+        @qp.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
             measure(0, postselect=1)
-            return {"hi": qml.counts()}, {"bye": qml.expval(qml.Z(0))}, {"hi": qml.counts()}
+            return {"hi": qp.counts()}, {"bye": qp.expval(qp.Z(0))}, {"hi": qp.counts()}
 
         observed = circuit(0.9)
         expected = (
@@ -368,19 +368,19 @@ class TestMidCircuitMeasurement:
         self, backend, postselect_mode, mcm_method
     ):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
 
         @qjit
-        @qml.set_shots(5)
-        @qml.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
+        @qp.set_shots(5)
+        @qp.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
             m_0 = measure(0, postselect=1)
             return (
-                {"1": qml.probs(wires=[0])},
-                {"2": qml.probs(wires=[0])},
-                {"3": qml.probs(op=m_0)},
-                {"4": qml.sample(op=m_0)},
+                {"1": qp.probs(wires=[0])},
+                {"2": qp.probs(wires=[0])},
+                {"3": qp.probs(op=m_0)},
+                {"4": qp.sample(op=m_0)},
             )
 
         observed = circuit(0.9)
@@ -401,20 +401,20 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize("mcm_method", [None, "single-branch-statistics", "one-shot"])
     def test_invalid_postselect_error(self, backend, mcm_method):
         """Test that an error is raised if postselecting on an invalid value"""
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
 
         @qjit
-        @qml.set_shots(10)
-        @qml.qnode(dev, mcm_method=mcm_method)
+        @qp.set_shots(10)
+        @qp.qnode(dev, mcm_method=mcm_method)
         def circuit(x):
-            qml.RX(x, 0)
+            qp.RX(x, 0)
             measure(0, postselect=-1)
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         with pytest.raises(TypeError, match="postselect must be '0' or '1'"):
             _ = circuit(1.8)
 
-    @pytest.mark.parametrize("measurement_process", [qml.counts, qml.var, qml.expval, qml.probs])
+    @pytest.mark.parametrize("measurement_process", [qp.counts, qp.var, qp.expval, qp.probs])
     def test_single_branch_statistics_not_implemented_error(self, backend, measurement_process):
         """
         Test that NotImplementedError is raised when using mid-circuit
@@ -425,10 +425,10 @@ class TestMidCircuitMeasurement:
         with pytest.raises(NotImplementedError, match=err):
 
             @qjit
-            @qml.set_shots(5)
-            @qml.qnode(qml.device(backend, wires=2), mcm_method="single-branch-statistics")
+            @qp.set_shots(5)
+            @qp.qnode(qp.device(backend, wires=2), mcm_method="single-branch-statistics")
             def measurement():
-                qml.Hadamard(0)
+                qp.Hadamard(0)
                 m = measure(0)
                 return measurement_process(op=m)
 
@@ -446,12 +446,12 @@ class TestDynamicOneShotIntegration:
 
         @qjit(static_argnums=0)
         def workflow(N):
-            dev = qml.device(backend, wires=N)
+            dev = qp.device(backend, wires=N)
 
-            @qml.set_shots(N)
-            @qml.qnode(dev, mcm_method="one-shot")
+            @qp.set_shots(N)
+            @qp.qnode(dev, mcm_method="one-shot")
             def circ():
-                return qml.probs()
+                return qp.probs()
 
             return circ()
 
@@ -489,38 +489,38 @@ class TestDynamicOneShotIntegration:
                 reason="fill-shots not currently working when postselecting a zero probability state"
             )
 
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
 
         @qjit
-        @qml.set_shots(1)
-        @qml.qnode(dev, mcm_method="one-shot", postselect_mode=postselect_mode)
+        @qp.set_shots(1)
+        @qp.qnode(dev, mcm_method="one-shot", postselect_mode=postselect_mode)
         def circuit(x):
-            qml.RY(x, wires=0)
+            qp.RY(x, wires=0)
             m0 = measure(0, reset=reset, postselect=postselect)
             m1 = measure(0)
-            return qml.sample(m0), qml.sample(m1)
+            return qp.sample(m0), qp.sample(m1)
 
         param = jnp.pi
         res = circuit(param)
         if postselect_mode == "hw-like" and postselect == 0:
-            assert qml.math.allclose(res, fill_in_value)
+            assert qp.math.allclose(res, fill_in_value)
         else:
-            assert qml.math.allclose(res, expected)
+            assert qp.math.allclose(res, expected)
 
     @pytest.mark.parametrize("shots", [1, 10])
     def test_dynamic_one_shot_only_called_once(self, backend, shots, mocker):
         """Test that when using mcm_method="one-shot", dynamic_one_shot does not get
         called multiple times"""
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
         spy = mocker.spy(catalyst.qfunc, "dynamic_one_shot")
 
         @qjit
-        @qml.set_shots(shots)
-        @qml.qnode(dev, mcm_method="one-shot")
+        @qp.set_shots(shots)
+        @qp.qnode(dev, mcm_method="one-shot")
         def circuit(x):
-            qml.RY(x, wires=0)
+            qp.RY(x, wires=0)
             measure(0)
-            return qml.sample(wires=0)
+            return qp.sample(wires=0)
 
         param = jnp.array(0.1)
         _ = circuit(param)
@@ -530,16 +530,16 @@ class TestDynamicOneShotIntegration:
     def test_dynamic_one_shot_unsupported_measurement(self, backend):
         """Test that circuits with unsupported measurements raise an error."""
         shots = 10
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
         param = np.pi / 4
 
         @qjit
-        @qml.set_shots(shots)
-        @qml.qnode(dev, mcm_method="one-shot")
+        @qp.set_shots(shots)
+        @qp.qnode(dev, mcm_method="one-shot")
         def func(x):
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
             _ = measure(0)
-            return qml.classical_shadow(wires=0)
+            return qp.classical_shadow(wires=0)
 
         with pytest.raises(
             NotImplementedError,
@@ -549,7 +549,7 @@ class TestDynamicOneShotIntegration:
 
     def test_dynamic_one_shot_unsupported_none_shots(self, backend):
         """Test that `dynamic_one_shot` raises when used with non-finite shots."""
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
 
         with pytest.raises(
             exceptions.QuantumFunctionError,
@@ -558,28 +558,28 @@ class TestDynamicOneShotIntegration:
 
             @qjit
             @catalyst.qfunc.dynamic_one_shot
-            @qml.set_shots(None)
-            @qml.qnode(dev)
+            @qp.set_shots(None)
+            @qp.qnode(dev)
             def _(x, y):
-                qml.RX(x, wires=0)
+                qp.RX(x, wires=0)
                 _ = measure(0)
-                qml.RX(y, wires=0)
-                return qml.probs(wires=0)
+                qp.RX(y, wires=0)
+                return qp.probs(wires=0)
 
     def test_dynamic_one_shot_unsupported_broadcast(self, backend):
         """Test that `dynamic_one_shot` raises when used with parameter broadcasting."""
         shots = 10
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
         param = np.pi / 4 * jnp.ones(2)
 
         @qjit
-        @qml.set_shots(shots)
-        @qml.qnode(dev, mcm_method="one-shot")
+        @qp.set_shots(shots)
+        @qp.qnode(dev, mcm_method="one-shot")
         def func(x, y):
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
             _ = measure(0)
-            qml.RX(y, wires=0)
-            return qml.probs(wires=0)
+            qp.RX(y, wires=0)
+            return qp.probs(wires=0)
 
         with pytest.raises(
             ValueError,
@@ -589,18 +589,18 @@ class TestDynamicOneShotIntegration:
 
     @pytest.mark.parametrize("param, expected", [(0.0, 0.0), (jnp.pi, 1.0)])
     def test_dynamic_one_shot_with_sample_single(self, backend, param, expected):
-        """Test that a measurement result can be returned with qml.sample and shots."""
+        """Test that a measurement result can be returned with qp.sample and shots."""
         shots = 10
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
 
         @qjit
-        @qml.set_shots(shots)
-        @qml.qnode(dev, mcm_method="one-shot")
+        @qp.set_shots(shots)
+        @qp.qnode(dev, mcm_method="one-shot")
         def circuit(x):
-            qml.RY(x, wires=0)
+            qp.RY(x, wires=0)
             m = measure(0)
-            qml.PauliX(0)
-            return qml.sample(m)
+            qp.PauliX(0)
+            return qp.sample(m)
 
         result = circuit(param)
         assert result.shape == (shots,)
@@ -608,9 +608,9 @@ class TestDynamicOneShotIntegration:
 
     @pytest.mark.parametrize("shots", [10000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
-    @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
+    @pytest.mark.parametrize("measure_f", [qp.counts, qp.expval, qp.probs, qp.sample, qp.var])
     @pytest.mark.parametrize(
-        "meas_obj", [qml.PauliZ(0), qml.Hadamard(0) @ qml.PauliZ(1), [0], [0, 1], "mcm"]
+        "meas_obj", [qp.PauliZ(0), qp.Hadamard(0) @ qp.PauliZ(1), [0], [0, 1], "mcm"]
     )
     @pytest.mark.parametrize("postselect_mode", ["fill-shots", "hw-like"])
     # pylint: disable=too-many-arguments
@@ -619,47 +619,47 @@ class TestDynamicOneShotIntegration:
     ):
         """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
         circuit with a mid-circuit measurement."""
-        if measure_f in (qml.counts, qml.probs, qml.sample) and (
+        if measure_f in (qp.counts, qp.probs, qp.sample) and (
             not isinstance(meas_obj, list) and not meas_obj == "mcm"
         ):
             pytest.skip("Can't use observables with counts, probs or sample")
 
-        if measure_f in (qml.var, qml.expval) and (isinstance(meas_obj, list)):
+        if measure_f in (qp.var, qp.expval) and (isinstance(meas_obj, list)):
             pytest.skip("Can't use wires/mcm lists with var or expval")
 
-        dq = qml.device("default.qubit", seed=8237945)
+        dq = qp.device("default.qubit", seed=8237945)
 
-        @partial(qml.set_shots, shots=shots)
-        @qml.qnode(dq, postselect_mode=postselect_mode, mcm_method="deferred")
+        @partial(qp.set_shots, shots=shots)
+        @qp.qnode(dq, postselect_mode=postselect_mode, mcm_method="deferred")
         def ref_func(x, y):
-            qml.RX(x, 0)
-            m0 = qml.measure(0)
-            qml.RX(0.5 * x, 1)
-            m1 = qml.measure(1, postselect=postselect)
-            qml.cond(m0 & m1, qml.RY)(2.0 * y, 0)
-            m2 = qml.measure(0)
+            qp.RX(x, 0)
+            m0 = qp.measure(0)
+            qp.RX(0.5 * x, 1)
+            m1 = qp.measure(1, postselect=postselect)
+            qp.cond(m0 & m1, qp.RY)(2.0 * y, 0)
+            m2 = qp.measure(0)
 
             meas_key = "wires" if isinstance(meas_obj, list) else "op"
             meas_value = m2 if isinstance(meas_obj, str) else meas_obj
             kwargs = {meas_key: meas_value}
-            if measure_f == qml.counts:
+            if measure_f == qp.counts:
                 kwargs["all_outcomes"] = True
             return measure_f(**kwargs)
 
-        dev = qml.device(backend, wires=2)
+        dev = qp.device(backend, wires=2)
 
         @qjit(seed=123456)
-        @partial(qml.set_shots, shots=shots)
-        @qml.qnode(dev, postselect_mode=postselect_mode, mcm_method="one-shot")
+        @partial(qp.set_shots, shots=shots)
+        @qp.qnode(dev, postselect_mode=postselect_mode, mcm_method="one-shot")
         def func(x, y):
-            qml.RX(x, 0)
+            qp.RX(x, 0)
             m0 = measure(0)
-            qml.RX(0.5 * x, 1)
+            qp.RX(0.5 * x, 1)
             m1 = measure(1, postselect=postselect)
 
             @cond(m0 & m1)
             def cfun0():
-                qml.RY(2.0 * y, 0)
+                qp.RY(2.0 * y, 0)
 
             cfun0()
             m2 = measure(0)
@@ -669,14 +669,14 @@ class TestDynamicOneShotIntegration:
             kwargs = {meas_key: meas_value}
             return measure_f(**kwargs)
 
-        if measure_f in (qml.expval,):
+        if measure_f in (qp.expval,):
             params = jnp.pi / 3 * jnp.ones(2)
         else:
             params = jnp.pi / 2.1 * jnp.ones(2)
 
-        if measure_f == qml.var and not isinstance(meas_obj, str):
+        if measure_f == qp.var and not isinstance(meas_obj, str):
             with pytest.raises(
-                NotImplementedError, match=r"qml.var\(\) cannot be used on observables"
+                NotImplementedError, match=r".*\.var\(\) cannot be used on observables"
             ):
                 func(*params)
             return
@@ -684,16 +684,16 @@ class TestDynamicOneShotIntegration:
         results0 = ref_func(*params)
         results1 = func(*params)
 
-        if measure_f == qml.counts:
+        if measure_f == qp.counts:
 
             def fname(x):
                 return format(x, f"0{len(meas_obj)}b") if isinstance(meas_obj, list) else x
 
             results1 = {fname(int(state)): count for state, count in zip(*results1)}
-        elif measure_f == qml.sample:
+        elif measure_f == qp.sample:
             results0 = sample_to_counts(results0, meas_obj)
             results1 = sample_to_counts(results1, meas_obj)
-            measure_f = qml.counts
+            measure_f = qp.counts
 
         validate_measurements(measure_f, shots, results1, results0)
 
@@ -708,60 +708,60 @@ class TestDynamicOneShotIntegration:
         """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
         circuit with a mid-circuit measurement and several terminal measurements."""
         if backend in ("lightning.kokkos", "lightning.gpu"):
-            obs = qml.PauliZ(0)
+            obs = qp.PauliZ(0)
         else:
-            obs = qml.PauliY(0)
+            obs = qp.PauliY(0)
 
-        dq = qml.device("default.qubit", seed=8237945)
+        dq = qp.device("default.qubit", seed=8237945)
 
-        @qml.set_shots(shots)
-        @qml.qnode(dq, postselect_mode=postselect_mode, mcm_method="deferred")
+        @qp.set_shots(shots)
+        @qp.qnode(dq, postselect_mode=postselect_mode, mcm_method="deferred")
         def ref_func(x, y):
-            qml.RX(x, 0)
-            m0 = qml.measure(0)
-            qml.RX(0.5 * x, 1)
-            m1 = qml.measure(1, reset=reset, postselect=postselect)
-            qml.cond(m0 & m1, qml.RY)(2.0 * y, 0)
-            _ = qml.measure(0)
+            qp.RX(x, 0)
+            m0 = qp.measure(0)
+            qp.RX(0.5 * x, 1)
+            m1 = qp.measure(1, reset=reset, postselect=postselect)
+            qp.cond(m0 & m1, qp.RY)(2.0 * y, 0)
+            _ = qp.measure(0)
 
             return (
-                qml.expval(op=m0),
-                qml.probs(wires=[1]),
-                qml.probs(wires=[0, 1]),
-                qml.probs(op=m0),
-                qml.sample(wires=[1]),
-                qml.sample(wires=[0, 1]),
-                qml.sample(op=m0),
-                qml.expval(obs),
+                qp.expval(op=m0),
+                qp.probs(wires=[1]),
+                qp.probs(wires=[0, 1]),
+                qp.probs(op=m0),
+                qp.sample(wires=[1]),
+                qp.sample(wires=[0, 1]),
+                qp.sample(op=m0),
+                qp.expval(obs),
             )
 
-        dev = qml.device(backend, wires=2)
+        dev = qp.device(backend, wires=2)
 
         @qjit(seed=37)
-        @qml.set_shots(shots)
-        @qml.qnode(dev, mcm_method="one-shot", postselect_mode=postselect_mode)
+        @qp.set_shots(shots)
+        @qp.qnode(dev, mcm_method="one-shot", postselect_mode=postselect_mode)
         def func(x, y):
-            qml.RX(x, 0)
+            qp.RX(x, 0)
             m0 = measure(0)
-            qml.RX(0.5 * x, 1)
+            qp.RX(0.5 * x, 1)
             m1 = measure(1, reset=reset, postselect=postselect)
 
             @cond(m0 & m1)
             def cfun0():
-                qml.RY(2.0 * y, 0)
+                qp.RY(2.0 * y, 0)
 
             cfun0()
             _ = measure(0)
 
             return (
-                qml.expval(op=m0),
-                qml.probs(wires=[1]),
-                qml.probs(wires=[0, 1]),
-                qml.probs(op=m0),
-                qml.sample(wires=[1]),
-                qml.sample(wires=[0, 1]),
-                qml.sample(op=m0),
-                qml.expval(obs),
+                qp.expval(op=m0),
+                qp.probs(wires=[1]),
+                qp.probs(wires=[0, 1]),
+                qp.probs(op=m0),
+                qp.sample(wires=[1]),
+                qp.sample(wires=[0, 1]),
+                qp.sample(op=m0),
+                qp.expval(obs),
             )
 
         meas_args = (
@@ -775,53 +775,53 @@ class TestDynamicOneShotIntegration:
             obs,
         )
         measures = (
-            qml.expval,
-            qml.probs,
-            qml.probs,
-            qml.probs,
-            qml.sample,
-            qml.sample,
-            qml.sample,
-            qml.expval,
+            qp.expval,
+            qp.probs,
+            qp.probs,
+            qp.probs,
+            qp.sample,
+            qp.sample,
+            qp.sample,
+            qp.expval,
         )
 
         params = jnp.pi / 3 * jnp.ones(2)
         results0 = ref_func(*params)
         results1 = func(*params)
         for meas_obj, m, r1, r0 in zip(meas_args, measures, results1, results0):
-            if m == qml.sample:
+            if m == qp.sample:
                 r0 = list(sample_to_counts(r0, meas_obj).values())
                 r1 = list(sample_to_counts(r1, meas_obj).values())
 
-            r1, r0 = qml.math.array(r1).ravel(), qml.math.array(r0).ravel()
-            assert qml.math.allclose(r1, r0, atol=20, rtol=0.2)
+            r1, r0 = qp.math.array(r1).ravel(), qp.math.array(r0).ravel()
+            assert qp.math.allclose(r1, r0, atol=20, rtol=0.2)
 
     def test_dynamic_one_shot_with_no_mcm_iterable_output(self, backend):
         """Test that `dynamic_one_shot` can work when there is no mcm and have iterable output."""
         qubits = 3
         shots = 10
-        dev = qml.device(backend, wires=qubits)
+        dev = qp.device(backend, wires=qubits)
 
         @qjit
-        @qml.set_shots(shots)
-        @qml.qnode(dev, mcm_method="one-shot")
+        @qp.set_shots(shots)
+        @qp.qnode(dev, mcm_method="one-shot")
         def cost():
-            qml.Hadamard(0)
-            qml.CNOT([0, 1])
-            return [qml.expval(qml.Z(i)) for i in range(qubits)]
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            return [qp.expval(qp.Z(i)) for i in range(qubits)]
 
         result = cost()
         assert jnp.array(result).shape == (qubits,)
 
     def test_dynamic_one_shot_mcm_result(self):
         """Test mcm result with one-shot"""
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
-        @qml.set_shots(10)
-        @qml.qnode(dev, mcm_method="one-shot")
+        @qp.set_shots(10)
+        @qp.qnode(dev, mcm_method="one-shot")
         def circuit():
-            qml.Hadamard(0)
+            qp.Hadamard(0)
             return measure(0)
 
         result = circuit()
@@ -831,10 +831,10 @@ class TestDynamicOneShotIntegration:
         """Test classical return value with one-shot"""
 
         @qjit(autograph=True)
-        @qml.set_shots(10)
-        @qml.qnode(qml.device("lightning.qubit", wires=1), mcm_method="one-shot")
+        @qp.set_shots(10)
+        @qp.qnode(qp.device("lightning.qubit", wires=1), mcm_method="one-shot")
         def circuit():
-            qml.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
             if measure(0):
                 return 42
             else:
@@ -845,17 +845,17 @@ class TestDynamicOneShotIntegration:
 
     def test_dynamic_one_shot_with_classical_return_values(self):
         """Test classical return values with one-shot"""
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
-        @qml.set_shots(12)
-        @qml.qnode(dev, mcm_method="one-shot")
+        @qp.set_shots(12)
+        @qp.qnode(dev, mcm_method="one-shot")
         def circuit():
-            qml.Hadamard(0)
+            qp.Hadamard(0)
             return {
-                "first": qml.sample(),
-                "second": [100, qml.sample()],
-                "third": (qml.sample(), qml.sample()),
+                "first": qp.sample(),
+                "second": [100, qp.sample()],
+                "third": (qp.sample(), qp.sample()),
             }
 
         result = circuit()
@@ -872,19 +872,19 @@ class TestDynamicOneShotIntegration:
     def test_mcm_method_with_grad(self, backend):
         """Test that the dynamic_one_shot works with grad."""
 
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
 
-        @qml.set_shots(5)
-        @qml.qnode(dev, diff_method="best", mcm_method="one-shot")
+        @qp.set_shots(5)
+        @qp.qnode(dev, diff_method="best", mcm_method="one-shot")
         def f(x: float):
-            qml.RX(x, wires=0)
-            return qml.expval(qml.PauliZ(wires=0))
+            qp.RX(x, wires=0)
+            return qp.expval(qp.PauliZ(wires=0))
 
-        @qml.set_shots(5)
-        @qml.qnode(dev, diff_method="best")
+        @qp.set_shots(5)
+        @qp.qnode(dev, diff_method="best")
         def g(x: float):
-            qml.RX(x, wires=0)
-            return qml.expval(qml.PauliZ(wires=0))
+            qp.RX(x, wires=0)
+            return qp.expval(qp.PauliZ(wires=0))
 
         @qjit
         def grad_f(x):
@@ -908,23 +908,23 @@ class TestDynamicOneShotIntegration:
 
         @qjit
         def workflow1(x: float):
-            @qml.set_shots(10)
-            @qml.qnode(qml.device("lightning.qubit", wires=3), mcm_method="one-shot")
+            @qp.set_shots(10)
+            @qp.qnode(qp.device("lightning.qubit", wires=3), mcm_method="one-shot")
             def circuit1():
-                qml.CNOT(wires=[0, 1])
-                qml.RX(0, wires=[2])
-                return qml.probs()  # This is [1, 0, 0, ...]
+                qp.CNOT(wires=[0, 1])
+                qp.RX(0, wires=[2])
+                return qp.probs()  # This is [1, 0, 0, ...]
 
             return x * (circuit1()[0])
 
         @qjit
         def workflow2(x: float):
-            @qml.set_shots(10)
-            @qml.qnode(qml.device("lightning.qubit", wires=3))
+            @qp.set_shots(10)
+            @qp.qnode(qp.device("lightning.qubit", wires=3))
             def circuit2():
-                qml.CNOT(wires=[0, 1])
-                qml.RX(0, wires=[2])
-                return qml.probs()  # This is [1, 0, 0, ...]
+                qp.CNOT(wires=[0, 1])
+                qp.RX(0, wires=[2])
+                return qp.probs()  # This is [1, 0, 0, ...]
 
             return x * (circuit2()[0])
 
@@ -939,7 +939,7 @@ class TestDynamicOneShotIntegration:
     )
     def test_mcm_method_with_jvp(self, backend, diff_method):
         """Test that the dynamic_one_shot works with jvp."""
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
         x, t = (
             [-0.1, 0.5],
             [0.1, 0.33],
@@ -947,18 +947,18 @@ class TestDynamicOneShotIntegration:
 
         def circuit_rx(x1, x2):
             """A test quantum function"""
-            qml.RX(x1, wires=0)
-            qml.RX(x2, wires=0)
-            return qml.expval(qml.PauliY(0))
+            qp.RX(x1, wires=0)
+            qp.RX(x2, wires=0)
+            return qp.expval(qp.PauliY(0))
 
         @qjit
         def C_workflow():
-            f = qml.set_shots(qml.QNode(circuit_rx, device=dev, mcm_method="one-shot"), shots=5)
+            f = qp.set_shots(qp.QNode(circuit_rx, device=dev, mcm_method="one-shot"), shots=5)
             return C_jvp(f, x, t, method=diff_method, argnums=list(range(len(x))))
 
         @qjit
         def J_workflow():
-            f = qml.set_shots(qml.QNode(circuit_rx, device=dev), shots=5)
+            f = qp.set_shots(qp.QNode(circuit_rx, device=dev), shots=5)
             return C_jvp(f, x, t, method=diff_method, argnums=list(range(len(x))))
 
         r1 = C_workflow()
@@ -975,13 +975,13 @@ class TestDynamicOneShotIntegration:
     )
     def test_mcm_method_with_vjp(self, backend, diff_method):
         """Test that the dynamic_one_shot works with vjp."""
-        dev = qml.device(backend, wires=1)
+        dev = qp.device(backend, wires=1)
 
         def circuit_rx(x1, x2):
             """A test quantum function"""
-            qml.RX(x1, wires=0)
-            qml.RX(x2, wires=0)
-            return qml.expval(qml.PauliY(0))
+            qp.RX(x1, wires=0)
+            qp.RX(x2, wires=0)
+            return qp.expval(qp.PauliY(0))
 
         x, ct = (
             [-0.1, 0.5],
@@ -990,12 +990,12 @@ class TestDynamicOneShotIntegration:
 
         @qjit
         def C_workflow():
-            f = qml.set_shots(qml.QNode(circuit_rx, device=dev, mcm_method="one-shot"), shots=5)
+            f = qp.set_shots(qp.QNode(circuit_rx, device=dev, mcm_method="one-shot"), shots=5)
             return C_vjp(f, x, ct, method=diff_method, argnums=list(range(len(x))))
 
         @qjit
         def J_workflow():
-            f = qml.set_shots(qml.QNode(circuit_rx, device=dev), shots=5)
+            f = qp.set_shots(qp.QNode(circuit_rx, device=dev), shots=5)
             return C_vjp(f, x, ct, method=diff_method, argnums=list(range(len(x))))
 
         r1 = C_workflow()
@@ -1016,11 +1016,11 @@ class TestDynamicOneShotMLIRPass:
         """
 
         @qjit(capture=True, seed=38)
-        @qml.transform(pass_name="dynamic-one-shot")
-        @qml.qnode(qml.device(backend, wires=2), shots=1000)
+        @qp.transform(pass_name="dynamic-one-shot")
+        @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.X(0))
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.X(0))
 
         res = circuit()
         assert res.dtype == "float64"
@@ -1034,12 +1034,12 @@ class TestDynamicOneShotMLIRPass:
         """
 
         @qjit(capture=True, seed=38)
-        @qml.transform(pass_name="dynamic-one-shot")
-        @qml.qnode(qml.device(backend, wires=2), shots=1000)
+        @qp.transform(pass_name="dynamic-one-shot")
+        @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
-            qml.Hadamard(wires=0)
-            m = qml.measure(0)
-            return qml.expval(m)
+            qp.Hadamard(wires=0)
+            m = qp.measure(0)
+            return qp.expval(m)
 
         res = circuit()
         assert res.dtype == "float64"
@@ -1053,11 +1053,11 @@ class TestDynamicOneShotMLIRPass:
         """
 
         @qjit(capture=True, seed=12345)
-        @qml.transform(pass_name="dynamic-one-shot")
-        @qml.qnode(qml.device(backend, wires=2), shots=1000)
+        @qp.transform(pass_name="dynamic-one-shot")
+        @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
-            qml.Hadamard(wires=0)
-            return qml.probs()  # only has probabilities in |00> and |10>
+            qp.Hadamard(wires=0)
+            return qp.probs()  # only has probabilities in |00> and |10>
 
         res = circuit()
         assert res.dtype == "float64"
@@ -1071,13 +1071,13 @@ class TestDynamicOneShotMLIRPass:
         """
 
         @qjit(capture=True, seed=12345)
-        @qml.transform(pass_name="dynamic-one-shot")
-        @qml.qnode(qml.device(backend, wires=2), shots=1000)
+        @qp.transform(pass_name="dynamic-one-shot")
+        @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
-            qml.Hadamard(wires=0)
-            m0 = qml.measure(0)
-            m1 = qml.measure(1)
-            return qml.probs(op=[m0, m1])
+            qp.Hadamard(wires=0)
+            m0 = qp.measure(0)
+            m1 = qp.measure(1)
+            return qp.probs(op=[m0, m1])
 
         res = circuit()
         assert res.dtype == "float64"
@@ -1091,13 +1091,13 @@ class TestDynamicOneShotMLIRPass:
         """
 
         @qjit(capture=True, seed=38)
-        @qml.transform(pass_name="dynamic-one-shot")
-        @qml.qnode(qml.device(backend, wires=2), shots=1000)
+        @qp.transform(pass_name="dynamic-one-shot")
+        @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
-            qml.Hadamard(wires=0)
-            m_0 = qml.measure(0)
-            m_1 = qml.measure(1)
-            return qml.var(m_0), qml.var(m_1)
+            qp.Hadamard(wires=0)
+            m_0 = qp.measure(0)
+            m_1 = qp.measure(1)
+            return qp.var(m_0), qp.var(m_1)
 
         res = circuit()
         assert np.allclose(res[0], 0.25, atol=0.01, rtol=0.01)
@@ -1110,11 +1110,11 @@ class TestDynamicOneShotMLIRPass:
         """
 
         @qjit(capture=True, seed=12345)
-        @qml.transform(pass_name="dynamic-one-shot")
-        @qml.qnode(qml.device(backend, wires=2), shots=1000)
+        @qp.transform(pass_name="dynamic-one-shot")
+        @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
-            qml.Hadamard(wires=0)
-            return qml.sample()
+            qp.Hadamard(wires=0)
+            return qp.sample()
 
         res = circuit()
         assert res.dtype == "int64"
@@ -1131,13 +1131,13 @@ class TestDynamicOneShotMLIRPass:
         """
 
         @qjit(capture=True, seed=12345)
-        @qml.transform(pass_name="dynamic-one-shot")
-        @qml.qnode(qml.device(backend, wires=2), shots=1000)
+        @qp.transform(pass_name="dynamic-one-shot")
+        @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
-            qml.Hadamard(wires=0)
-            m0 = qml.measure(0)
-            m1 = qml.measure(1)
-            return qml.sample([m0, m1])
+            qp.Hadamard(wires=0)
+            m0 = qp.measure(0)
+            m1 = qp.measure(1)
+            return qp.sample([m0, m1])
 
         res = circuit()
         assert res.dtype == "int64"
@@ -1154,11 +1154,11 @@ class TestDynamicOneShotMLIRPass:
         """
 
         @qjit(capture=True, seed=12345)
-        @qml.transform(pass_name="dynamic-one-shot")
-        @qml.qnode(qml.device(backend, wires=2), shots=1000)
+        @qp.transform(pass_name="dynamic-one-shot")
+        @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
-            qml.Hadamard(wires=0)
-            return qml.counts()
+            qp.Hadamard(wires=0)
+            return qp.counts()
 
         res = circuit()
         eigs, counts = res
@@ -1174,13 +1174,13 @@ class TestDynamicOneShotMLIRPass:
         """
 
         @qjit(capture=True, seed=12345)
-        @qml.transform(pass_name="dynamic-one-shot")
-        @qml.qnode(qml.device(backend, wires=2), shots=1000)
+        @qp.transform(pass_name="dynamic-one-shot")
+        @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
-            qml.Hadamard(wires=0)
-            m_0 = qml.measure(0)
-            m_1 = qml.measure(1)
-            return qml.counts([m_0, m_1])
+            qp.Hadamard(wires=0)
+            m_0 = qp.measure(0)
+            m_1 = qp.measure(1)
+            return qp.counts([m_0, m_1])
 
         res = circuit()
         eigs, counts = res
@@ -1196,11 +1196,11 @@ class TestDynamicOneShotMLIRPass:
         """
 
         @qjit(capture=True, seed=123456)
-        @qml.transform(pass_name="dynamic-one-shot")
-        @qml.qnode(qml.device(backend, wires=2), shots=1000)
+        @qp.transform(pass_name="dynamic-one-shot")
+        @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
-            qml.Hadamard(wires=0)
-            return qml.sample(), qml.counts(), qml.expval(qml.X(0)), qml.probs()
+            qp.Hadamard(wires=0)
+            return qp.sample(), qp.counts(), qp.expval(qp.X(0)), qp.probs()
 
         res = circuit()
         samples, eigs_and_counts, expval, probs = res
@@ -1226,17 +1226,17 @@ class TestDynamicOneShotMLIRPass:
         """
 
         @qjit(capture=True, seed=12345)
-        @qml.transform(pass_name="dynamic-one-shot")
-        @qml.qnode(qml.device(backend, wires=2), shots=1000)
+        @qp.transform(pass_name="dynamic-one-shot")
+        @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
-            qml.Hadamard(wires=0)
-            m_0 = qml.measure(0)
-            m_1 = qml.measure(1)
+            qp.Hadamard(wires=0)
+            m_0 = qp.measure(0)
+            m_1 = qp.measure(1)
             return (
-                qml.sample([m_0, m_1]),
-                qml.expval(m_0),
-                qml.probs(op=[m_0, m_1]),
-                qml.counts([m_0]),
+                qp.sample([m_0, m_1]),
+                qp.expval(m_0),
+                qp.probs(op=[m_0, m_1]),
+                qp.counts([m_0]),
             )
 
         res = circuit()
@@ -1256,19 +1256,44 @@ class TestDynamicOneShotMLIRPass:
         assert counts.shape == (2,)
         assert np.allclose(counts, [500, 500], atol=10)
 
-    def test_mlir_one_shot_pass_dynamic_shots(self, backend):
+    def test_mlir_one_shot_pass_dynamic_shots_sample(self, backend):
         """
         Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with
-        a dynamic number of shots.
+        a dynamic number of shots with sample terminal MP.
         """
 
         @qjit(capture=True, seed=12345)
         def workflow(shots):
-            @qml.transform(pass_name="dynamic-one-shot")
-            @qml.qnode(qml.device(backend, wires=2), shots=shots)
+            @qp.transform(pass_name="dynamic-one-shot")
+            @qp.set_shots(shots)
+            @qp.qnode(qp.device(backend, wires=2))
             def circuit():
-                qml.Hadamard(wires=0)
-                return qml.counts(all_outcomes=True)
+                return qp.sample(), qp.sample(wires=[0])
+
+            return circuit()
+
+        res = workflow(37)
+        assert res[0].shape == (37, 2)
+        assert res[1].shape == (37, 1)
+
+        res = workflow(42)
+        assert res[0].shape == (42, 2)
+        assert res[1].shape == (42, 1)
+
+    def test_mlir_one_shot_pass_dynamic_shots_counts(self, backend):
+        """
+        Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with
+        a dynamic number of shots with counts terminal MP.
+        """
+
+        @qjit(capture=True, seed=12345)
+        def workflow(shots):
+            @qp.transform(pass_name="dynamic-one-shot")
+            @qp.set_shots(shots)
+            @qp.qnode(qp.device(backend, wires=2))
+            def circuit():
+                qp.Hadamard(wires=0)
+                return qp.counts(all_outcomes=True)
 
             return circuit()
 
@@ -1293,11 +1318,11 @@ class TestDynamicOneShotMLIRPass:
         """
 
         @qjit(capture=True, seed=38)
-        @qml.transform(pass_name="dynamic-one-shot")
-        @qml.qnode(qml.device(backend, wires=2), shots=1000)
+        @qp.transform(pass_name="dynamic-one-shot")
+        @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
-            qml.Hadamard(wires=0)
-            e = qml.expval(qml.X(0))
+            qp.Hadamard(wires=0)
+            e = qp.expval(qp.X(0))
             return e, e
 
         results = circuit()
@@ -1317,17 +1342,17 @@ class TestDynamicOneShotMLIRPass:
         Note that the tape-based transform is only available without capture.
         """
 
-        dev = qml.device(backend, wires=3)
+        dev = qp.device(backend, wires=3)
 
         @qjit(capture=False)
         @apply_pass("dynamic-one-shot")
         @partial(tape_transform, device_wires=dev.wires)
-        @qml.qnode(dev, shots=1000)
+        @qp.qnode(dev, shots=1000)
         def circuit():
             return (
-                qml.expval(qml.PauliZ(wires=0) @ qml.PauliZ(wires=1)),
-                qml.var(qml.PauliZ(wires=2)),
-                qml.probs(wires=[0]),
+                qp.expval(qp.PauliZ(wires=0) @ qp.PauliZ(wires=1)),
+                qp.var(qp.PauliZ(wires=2)),
+                qp.probs(wires=[0]),
             )
 
         e, v, p = circuit()
@@ -1339,18 +1364,18 @@ class TestDynamicOneShotMLIRPass:
 def sample_to_counts(results, meas_obj):
     """Helper function to convert samples array to counts dictionary"""
     meas_key = "wires" if isinstance(meas_obj, list) else "op"
-    meas_value = qml.measure(0) if isinstance(meas_obj, str) else meas_obj
+    meas_value = qp.measure(0) if isinstance(meas_obj, str) else meas_obj
     kwargs = {meas_key: meas_value, "all_outcomes": True}
     wires = (
         meas_obj
         if isinstance(meas_obj, list)
-        else (qml.wires.Wires([0]) if isinstance(meas_obj, str) else meas_obj.wires)
+        else (qp.wires.Wires([0]) if isinstance(meas_obj, str) else meas_obj.wires)
     )
     results = (
         results.reshape((-1, 1)) if not isinstance(meas_obj, list) or len(meas_obj) < 2 else results
     )
-    mask = qml.math.logical_not(qml.math.any(results == fill_in_value, axis=1))
-    return qml.counts(**kwargs).process_samples(results[mask, :], wire_order=wires)
+    mask = qp.math.logical_not(qp.math.any(results == fill_in_value, axis=1))
+    return qp.counts(**kwargs).process_samples(results[mask, :], wire_order=wires)
 
 
 def validate_counts(shots, results1, results2, batch_size=None):
@@ -1415,7 +1440,7 @@ def validate_expval(shots, results1, results2, batch_size=None):
 
 def validate_measurements(func, shots, results1, results2, batch_size=None):
     """Calls the correct validation function based on measurement type."""
-    if func is qml.counts:
+    if func is qp.counts:
         validate_counts(shots, results1, results2, batch_size=batch_size)
         return
 

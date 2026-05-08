@@ -18,7 +18,7 @@
 from functools import partial
 
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst.python_interface.inspection import ResourcesResult, mlir_specs
@@ -76,7 +76,6 @@ def make_static_resources(
     return res
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "skip_preprocess",
     [pytest.param(True, id="skip_preprocess"), pytest.param(False, id="preprocess")],
@@ -88,37 +87,41 @@ class TestMLIRSpecs:
     def simple_circuit(self):
         """Fixture for a circuit."""
 
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circ():
-            qml.RX(1, 0)
-            qml.RX(2.0, 0)
-            qml.RZ(3.0, 1)
-            qml.RZ(4.0, 1)
-            qml.Hadamard(0)
-            qml.Hadamard(0)
-            qml.CNOT([0, 1])
-            qml.CNOT([0, 1])
-            return qml.probs()
+            qp.RX(1, 0)
+            qp.RX(2.0, 0)
+            qp.RZ(3.0, 1)
+            qp.RZ(4.0, 1)
+            qp.Hadamard(0)
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([0, 1])
+            return qp.probs()
 
         return circ
 
-    def test_float_in_level_sequence(self, skip_preprocess, simple_circuit):
+    def test_float_in_level_sequence(self, skip_preprocess, simple_circuit, capture_mode):
         """Test that requesting an invalid level type raises an error."""
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
-        simple_circuit = qml.qjit(simple_circuit, skip_preprocess=skip_preprocess)
+        simple_circuit = qp.qjit(
+            simple_circuit, skip_preprocess=skip_preprocess, capture=capture_mode
+        )
 
         with pytest.raises(ValueError, match="All elements in 'level' sequence must be integers."):
             mlir_specs(simple_circuit, level=[0, 1.1, 2])
 
     @pytest.mark.parametrize("level", [3.14, "invalid"])
-    def test_invalid_level_type(self, skip_preprocess, simple_circuit, level):
+    def test_invalid_level_type(self, skip_preprocess, simple_circuit, level, capture_mode):
         """Test that requesting an invalid level type raises an error."""
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
-        simple_circuit = qml.qjit(simple_circuit, skip_preprocess=skip_preprocess)
+        simple_circuit = qp.qjit(
+            simple_circuit, skip_preprocess=skip_preprocess, capture=capture_mode
+        )
 
         with pytest.raises(
             ValueError, match="The 'level' argument must be an int, a tuple/list of ints, or 'all'."
@@ -126,12 +129,14 @@ class TestMLIRSpecs:
             mlir_specs(simple_circuit, level=level)
 
     @pytest.mark.parametrize("level", [10, -1])
-    def test_invalid_int_level(self, skip_preprocess, simple_circuit, level):
+    def test_invalid_int_level(self, skip_preprocess, simple_circuit, level, capture_mode):
         """Test that requesting an invalid level raises an error."""
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
-        simple_circuit = qml.qjit(simple_circuit, skip_preprocess=skip_preprocess)
+        simple_circuit = qp.qjit(
+            simple_circuit, skip_preprocess=skip_preprocess, capture=capture_mode
+        )
 
         with pytest.raises(
             ValueError, match=f"Requested specs level {level} not found in MLIR pass list."
@@ -151,12 +156,15 @@ class TestMLIRSpecs:
             ),
         ],
     )
-    def test_no_passes(self, skip_preprocess, simple_circuit, level, expected):
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
+    def test_no_passes(self, skip_preprocess, simple_circuit, level, expected, capture_mode):
         """Test that if no passes are applied, the circuit resources are the original amount."""
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
-        simple_circuit = qml.qjit(simple_circuit, skip_preprocess=skip_preprocess)
+        simple_circuit = qp.qjit(
+            simple_circuit, skip_preprocess=skip_preprocess, capture=capture_mode
+        )
         res = mlir_specs(simple_circuit, level=level)
         assert resources_equal(res, expected)
 
@@ -189,25 +197,28 @@ class TestMLIRSpecs:
             ),
         ],
     )
-    def test_basic_passes(self, skip_preprocess, simple_circuit, level, expected):
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
+    def test_basic_passes(self, skip_preprocess, simple_circuit, level, expected, capture_mode):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
-        simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
-        simple_circuit = qml.transforms.merge_rotations(simple_circuit)
+        simple_circuit = qp.transforms.cancel_inverses(simple_circuit)
+        simple_circuit = qp.transforms.merge_rotations(simple_circuit)
 
-        simple_circuit = qml.qjit(simple_circuit, skip_preprocess=skip_preprocess)
+        simple_circuit = qp.qjit(
+            simple_circuit, skip_preprocess=skip_preprocess, capture=capture_mode
+        )
         res = mlir_specs(simple_circuit, level=level)
         assert resources_equal(res, expected)
 
-    def test_basic_passes_level_all(self, skip_preprocess, simple_circuit):
+    def test_basic_passes_level_all(self, skip_preprocess, simple_circuit, capture_mode):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
-        simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
-        simple_circuit = qml.transforms.merge_rotations(simple_circuit)
+        simple_circuit = qp.transforms.cancel_inverses(simple_circuit)
+        simple_circuit = qp.transforms.merge_rotations(simple_circuit)
 
         expected = {
             "Before MLIR Passes": make_static_resources(
@@ -226,7 +237,7 @@ class TestMLIRSpecs:
                 num_allocs=2,
             ),
         }
-        if qml.capture.enabled() and not skip_preprocess:
+        if capture_mode and not skip_preprocess:
             # Dummy pass to replace verify_operations
             expected["empty"] = make_static_resources(
                 operations={"RX": {1: 1}, "RZ": {1: 1}},
@@ -246,7 +257,9 @@ class TestMLIRSpecs:
                 num_allocs=2,
             )
 
-        simple_circuit = qml.qjit(simple_circuit, skip_preprocess=skip_preprocess)
+        simple_circuit = qp.qjit(
+            simple_circuit, skip_preprocess=skip_preprocess, capture=capture_mode
+        )
         res = mlir_specs(simple_circuit, level="all")
 
         assert isinstance(res, dict)
@@ -256,13 +269,13 @@ class TestMLIRSpecs:
             assert lvl in res.keys()
             assert resources_equal(res[lvl], expected_res)
 
-    def test_basic_passes_multi_level(self, skip_preprocess, simple_circuit):
+    def test_basic_passes_multi_level(self, skip_preprocess, simple_circuit, capture_mode):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
-        simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
-        simple_circuit = qml.transforms.merge_rotations(simple_circuit)
+        simple_circuit = qp.transforms.cancel_inverses(simple_circuit)
+        simple_circuit = qp.transforms.merge_rotations(simple_circuit)
 
         expected = {
             "Before MLIR Passes": make_static_resources(
@@ -277,7 +290,9 @@ class TestMLIRSpecs:
             ),
         }
 
-        simple_circuit = qml.qjit(simple_circuit, skip_preprocess=skip_preprocess)
+        simple_circuit = qp.qjit(
+            simple_circuit, skip_preprocess=skip_preprocess, capture=capture_mode
+        )
         res = mlir_specs(simple_circuit, level=[0, 2])
 
         assert isinstance(res, dict)
@@ -292,17 +307,17 @@ class TestMLIRSpecs:
         ):
             mlir_specs(simple_circuit, level=[0, 20])
 
-    def test_splitting_pass(self, skip_preprocess):
+    def test_splitting_pass(self, skip_preprocess, capture_mode):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
 
-        @qml.qjit(skip_preprocess=skip_preprocess)
-        @qml.transforms.cancel_inverses
-        @qml.transform(pass_name="split-non-commuting")
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qp.qjit(skip_preprocess=skip_preprocess, capture=capture_mode)
+        @qp.transforms.cancel_inverses
+        @qp.transform(pass_name="split-non-commuting")
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit():
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            return qml.expval(qml.PauliX(0)), qml.expval(qml.PauliY(0)), qml.expval(qml.PauliZ(0))
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.PauliX(0)), qp.expval(qp.PauliY(0)), qp.expval(qp.PauliZ(0))
 
         expected = {
             "split-non-commuting": [
@@ -363,18 +378,18 @@ class TestMLIRSpecs:
         ):
             mlir_specs(not_a_qnode, level=0)
 
-    def test_malformed_qnode(self, skip_preprocess):
+    def test_malformed_qnode(self, skip_preprocess, capture_mode):
         """Test that a QNode without measurements can still be collected."""
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
-        @qml.qjit(skip_preprocess=skip_preprocess)
-        @qml.qnode(dev)
+        @qp.qjit(skip_preprocess=skip_preprocess, capture=capture_mode)
+        @qp.qnode(dev)
         def circ(wire):
-            qml.X(0)
-            qml.X(wire)
+            qp.X(0)
+            qp.X(wire)
 
         res = mlir_specs(circ, 0, 1)
         expected = make_static_resources(
@@ -394,30 +409,31 @@ class TestMLIRSpecs:
             (False, 10, True),
         ],
     )
-    def test_fixed_loop(self, skip_preprocess, pl_ctrl_flow, iters, autograph):
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
+    def test_fixed_loop(self, skip_preprocess, pl_ctrl_flow, iters, autograph, capture_mode):
         """Test that loop resources are counted correctly."""
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
         if pl_ctrl_flow:
 
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            @qp.qnode(qp.device("lightning.qubit", wires=2))
             def circ():
-                @qml.for_loop(iters)
+                @qp.for_loop(iters)
                 def loop_body(i):
-                    qml.X(i % 2)
+                    qp.X(i % 2)
 
                 loop_body()
 
-                return qml.state()
+                return qp.state()
 
         else:
 
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            @qp.qnode(qp.device("lightning.qubit", wires=2))
             def circ():
                 for i in range(iters):
-                    qml.X(i % 2)
-                return qml.state()
+                    qp.X(i % 2)
+                return qp.state()
 
         expected = make_static_resources(
             operations={"PauliX": {1: iters}},
@@ -425,7 +441,9 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        circ = qml.qjit(circ, autograph=autograph, skip_preprocess=skip_preprocess)
+        circ = qp.qjit(
+            circ, autograph=autograph, skip_preprocess=skip_preprocess, capture=capture_mode
+        )
         res = mlir_specs(circ, level=0)
         assert resources_equal(res, expected)
 
@@ -436,30 +454,30 @@ class TestMLIRSpecs:
             (False, 2),
         ],
     )
-    def test_dynamic_for_loop(self, skip_preprocess, pl_ctrl_flow, iters):
+    def test_dynamic_for_loop(self, skip_preprocess, pl_ctrl_flow, iters, capture_mode):
         """Test that dynamic for loops emit a warning."""
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
         if pl_ctrl_flow:
 
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            @qp.qnode(qp.device("lightning.qubit", wires=2))
             def circ(n):
-                @qml.for_loop(n)
+                @qp.for_loop(n)
                 def loop_body(i):
-                    qml.X(i % 2)
+                    qp.X(i % 2)
 
                 loop_body()
 
-                return qml.state()
+                return qp.state()
 
         else:
 
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            @qp.qnode(qp.device("lightning.qubit", wires=2))
             def circ(n):
                 for i in range(n):
-                    qml.X(i % 2)
-                return qml.state()
+                    qp.X(i % 2)
+                return qp.state()
 
         expected = make_static_resources(
             operations={"PauliX": {1: 1}},
@@ -467,7 +485,7 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        circ = qml.qjit(circ, autograph=True, skip_preprocess=skip_preprocess)
+        circ = qp.qjit(circ, autograph=True, skip_preprocess=skip_preprocess, capture=capture_mode)
 
         with pytest.warns(
             UserWarning,
@@ -485,36 +503,36 @@ class TestMLIRSpecs:
             (False, 2),
         ],
     )
-    def test_while_loop(self, skip_preprocess, pl_ctrl_flow, iters):
+    def test_while_loop(self, skip_preprocess, pl_ctrl_flow, iters, capture_mode):
         """Test that dynamic while loops emit a warning."""
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
         if pl_ctrl_flow:
 
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            @qp.qnode(qp.device("lightning.qubit", wires=2))
             def circ(n):
                 def loop_cond(i):
                     return i < n
 
-                @qml.while_loop(loop_cond)
+                @qp.while_loop(loop_cond)
                 def loop_body(i):
-                    qml.X(i % 2)
+                    qp.X(i % 2)
                     return i + 1
 
                 loop_body(0)
 
-                return qml.state()
+                return qp.state()
 
         else:
 
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            @qp.qnode(qp.device("lightning.qubit", wires=2))
             def circ(n):
                 i = 0
                 while i < n:
-                    qml.X(i % 2)
+                    qp.X(i % 2)
                     i += 1
-                return qml.state()
+                return qp.state()
 
         expected = make_static_resources(
             operations={"PauliX": {1: 1}},
@@ -522,7 +540,7 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        circ = qml.qjit(circ, autograph=True, skip_preprocess=skip_preprocess)
+        circ = qp.qjit(circ, autograph=True, skip_preprocess=skip_preprocess, capture=capture_mode)
 
         with pytest.warns(
             UserWarning,
@@ -540,28 +558,28 @@ class TestMLIRSpecs:
             (False),
         ],
     )
-    def test_cond(self, skip_preprocess, pl_ctrl_flow):
+    def test_cond(self, skip_preprocess, pl_ctrl_flow, capture_mode):
         """Test that conditions emit a warning."""
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
         if pl_ctrl_flow:
 
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            @qp.qnode(qp.device("lightning.qubit", wires=2))
             def circ(n):
-                qml.cond(n > 0, qml.X, qml.Z)(0)
+                qp.cond(n > 0, qp.X, qp.Z)(0)
 
-                return qml.state()
+                return qp.state()
 
         else:
 
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            @qp.qnode(qp.device("lightning.qubit", wires=2))
             def circ(n):
                 if n > 0:
-                    qml.X(0)
+                    qp.X(0)
                 else:
-                    qml.Z(0)
-                return qml.state()
+                    qp.Z(0)
+                return qp.state()
 
         expected = make_static_resources(
             operations={"PauliX": {1: 1}, "PauliZ": {1: 1}},
@@ -569,7 +587,7 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        circ = qml.qjit(circ, autograph=True, skip_preprocess=skip_preprocess)
+        circ = qp.qjit(circ, autograph=True, skip_preprocess=skip_preprocess, capture=capture_mode)
 
         with pytest.warns(
             UserWarning,
@@ -580,21 +598,21 @@ class TestMLIRSpecs:
             res = mlir_specs(circ, 0, n)
             assert resources_equal(res, expected)
 
-    def test_tape_transforms(self, skip_preprocess):
+    def test_tape_transforms(self, skip_preprocess, capture_mode):
         """Test that tape transforms are handled correctly."""
-        if qml.capture.enabled():
+        if capture_mode:
             pytest.xfail("Currently broken with plxpr enabled.")
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circ():
-            qml.GlobalPhase(0.5)
-            qml.GlobalPhase(1.0)
-            return qml.expval(qml.PauliZ(0))
+            qp.GlobalPhase(0.5)
+            qp.GlobalPhase(1.0)
+            return qp.expval(qp.PauliZ(0))
 
-        circ = qml.transforms.combine_global_phases(circ)
-        circ = qml.qjit(circ, skip_preprocess=skip_preprocess)
+        circ = qp.transforms.combine_global_phases(circ)
+        circ = qp.qjit(circ, skip_preprocess=skip_preprocess, capture=capture_mode)
 
         expected = make_static_resources(
             operations={"GlobalPhase": {0: 1}},
@@ -605,18 +623,18 @@ class TestMLIRSpecs:
         res = mlir_specs(circ, level=0)
         assert resources_equal(res, expected)
 
-    def test_stateprep(self, skip_preprocess):
+    def test_stateprep(self, skip_preprocess, capture_mode):
         """Test that StatePrep operations are handled correctly."""
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
-        @qml.qjit(skip_preprocess=skip_preprocess)
-        @qml.qnode(qml.device("lightning.qubit", wires=3), shots=10)
+        @qp.qjit(skip_preprocess=skip_preprocess, capture=capture_mode)
+        @qp.qnode(qp.device("lightning.qubit", wires=3), shots=10)
         def circ():
-            qml.StatePrep(jnp.array([1, 0, 0, 0]), wires=[0, 1])
-            qml.Hadamard(wires=1)
-            qml.Hadamard(wires=2)
-            return qml.sample()
+            qp.StatePrep(jnp.array([1, 0, 0, 0]), wires=[0, 1])
+            qp.Hadamard(wires=1)
+            qp.Hadamard(wires=2)
+            return qp.sample()
 
         expected = make_static_resources(
             operations={"StatePrep": {2: 1}, "Hadamard": {1: 2}},
@@ -627,23 +645,23 @@ class TestMLIRSpecs:
         res = mlir_specs(circ, level=0)
         assert resources_equal(res, expected)
 
-    def test_adjoint(self, skip_preprocess):
+    def test_adjoint(self, skip_preprocess, capture_mode):
         """Test that adjoint operations are handled correctly."""
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circ():
             def subroutine():
-                qml.Hadamard(wires=0)
-                qml.CNOT(wires=[0, 1])
-                qml.RZ(0.789, wires=1)
-                qml.adjoint(qml.T)(wires=1)
+                qp.Hadamard(wires=0)
+                qp.CNOT(wires=[0, 1])
+                qp.RZ(0.789, wires=1)
+                qp.adjoint(qp.T)(wires=1)
 
-            qml.adjoint(subroutine)()
-            return qml.probs()
+            qp.adjoint(subroutine)()
+            return qp.probs()
 
-        circ = qml.qjit(circ, skip_preprocess=skip_preprocess)
+        circ = qp.qjit(circ, skip_preprocess=skip_preprocess, capture=capture_mode)
 
         expected = make_static_resources(
             operations={
@@ -659,21 +677,21 @@ class TestMLIRSpecs:
         res = mlir_specs(circ, level=0)
         assert resources_equal(res, expected)
 
-    def test_hamiltonian(self, skip_preprocess):
+    def test_hamiltonian(self, skip_preprocess, capture_mode):
         """Test that Hamiltonian observables are handled correctly."""
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
-        @qml.qjit(skip_preprocess=skip_preprocess)
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qjit(skip_preprocess=skip_preprocess, capture=capture_mode)
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circ(i: int):
 
             coeffs = [0.2, -0.543]
-            obs = [qml.X(0) @ qml.Z(1), qml.Z(i) @ qml.Hadamard(2)]
-            ham1 = qml.Hamiltonian([1.0], [qml.Z(0) @ qml.Z(1)])
-            ham2 = qml.ops.LinearCombination(coeffs, obs)
+            obs = [qp.X(0) @ qp.Z(1), qp.Z(i) @ qp.Hadamard(2)]
+            ham1 = qp.Hamiltonian([1.0], [qp.Z(0) @ qp.Z(1)])
+            ham2 = qp.ops.LinearCombination(coeffs, obs)
 
-            return qml.expval(ham1), qml.expval(ham2)
+            return qp.expval(ham1), qp.expval(ham2)
 
         expected = make_static_resources(
             operations={},
@@ -687,22 +705,24 @@ class TestMLIRSpecs:
         res = mlir_specs(circ, level=0, args=(0,))
         assert resources_equal(res, expected)
 
-    def test_ppr(self, skip_preprocess):
+    def test_ppr(self, skip_preprocess, capture_mode):
         """Test that PPRs are handled correctly."""
-        if not qml.capture.enabled():
+        if not capture_mode:
             pytest.xfail("to_ppr requires plxpr to be enabled to lower PauliRot")
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
         pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
-        @qml.qjit(pipelines=pipeline, target="mlir", skip_preprocess=skip_preprocess)
-        @qml.transform(pass_name="to-ppr")
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qp.qjit(
+            pipelines=pipeline, target="mlir", skip_preprocess=skip_preprocess, capture=capture_mode
+        )
+        @qp.transform(pass_name="to-ppr")
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def circ():
-            qml.H(0)
-            qml.T(0)
-            qml.PauliRot(0.1234, pauli_word="Z", wires=0)
+            qp.H(0)
+            qp.T(0)
+            qp.PauliRot(0.1234, pauli_word="Z", wires=0)
 
         expected = make_static_resources(
             operations={
@@ -718,22 +738,22 @@ class TestMLIRSpecs:
         res = mlir_specs(circ, level=1)
         assert resources_equal(res, expected)
 
-    def test_subroutine(self, skip_preprocess):
+    def test_subroutine(self, skip_preprocess, capture_mode):
         """Test that subroutines are handled correctly."""
-        if not qml.capture.enabled():
+        if not capture_mode:
             pytest.xfail("Subroutine requires plxpr to be enabled.")
-        if not qml.capture.enabled() and skip_preprocess:
+        if not capture_mode and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
-        @qml.capture.subroutine
+        @qp.capture.subroutine
         def extra_function():
-            qml.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
 
-        @qml.qjit(autograph=True, skip_preprocess=skip_preprocess)
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qp.qjit(autograph=True, skip_preprocess=skip_preprocess, capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def circ():
             extra_function()
-            return qml.probs()
+            return qp.probs()
 
         expected = make_static_resources(
             operations={"Hadamard": {1: 1}},
@@ -748,26 +768,26 @@ class TestMLIRSpecs:
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_graph_decomp(self, skip_preprocess):
         """Test that graph decomposition is handled correctly."""
-        if not qml.capture.enabled() and skip_preprocess:
+        if not qp.capture.enabled() and skip_preprocess:
             pytest.skip(reason="skip_preprocess ignored without program capture.")
 
-        @qml.register_resources({qml.H: 2, qml.CZ: 1})
+        @qp.register_resources({qp.H: 2, qp.CZ: 1})
         def my_cnot(wires):
-            qml.H(wires=wires[1])
-            qml.CZ(wires=wires)
-            qml.H(wires=wires[1])
+            qp.H(wires=wires[1])
+            qp.CZ(wires=wires)
+            qp.H(wires=wires[1])
 
-        @qml.qjit(skip_preprocess=skip_preprocess)
+        @qp.qjit(skip_preprocess=skip_preprocess)
         @partial(
-            qml.transforms.decompose,
+            qp.transforms.decompose,
             gate_set={"H", "CZ", "GlobalPhase"},
-            alt_decomps={qml.CNOT: [my_cnot]},
+            alt_decomps={qp.CNOT: [my_cnot]},
         )
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
-            qml.H(0)
-            qml.CNOT(wires=[0, 1])
-            return qml.state()
+            qp.H(0)
+            qp.CNOT(wires=[0, 1])
+            return qp.state()
 
         expected_resources = {"CZ": {2: 1}, "Hadamard": {1: 3}}
         resources = mlir_specs(circuit, level=1)

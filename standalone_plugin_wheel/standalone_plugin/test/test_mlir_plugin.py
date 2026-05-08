@@ -17,7 +17,7 @@ The Standalone plugin may be found here:
 https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone
 """
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import pipeline
@@ -40,11 +40,11 @@ def test_standalone_plugin():
     for more information as to why that is the case."""
 
     @apply_pass("standalone-switch-bar-foo")
-    @qml.qnode(qml.device("lightning.qubit", wires=0))
+    @qp.qnode(qp.device("lightning.qubit", wires=0))
     def qnode():
-        return qml.state()
+        return qp.state()
 
-    @qml.qjit(pass_plugins={plugin}, dialect_plugins={plugin}, target="mlir")
+    @qp.qjit(pass_plugins={plugin}, dialect_plugins={plugin}, target="mlir")
     def module():
         return qnode()
 
@@ -58,13 +58,33 @@ def test_standalone_plugin_no_preregistration():
     plugin ahead of time in the qjit decorator"""
 
     @apply_pass_plugin(plugin, "standalone-switch-bar-foo")
-    @qml.qnode(qml.device("lightning.qubit", wires=0))
+    @qp.qnode(qp.device("lightning.qubit", wires=0))
     def qnode():
-        return qml.state()
+        return qp.state()
 
-    @qml.qjit(target="mlir")
+    @qp.qjit(target="mlir")
     def module():
         return qnode()
+
+    # It would be nice if we were able to combine lit tests with
+    # pytest
+    assert "standalone-switch-bar-foo" in module.mlir
+
+
+@pytest.mark.skipif(not have_standalone_plugin, reason="Standalone Plugin is not installed")
+def test_standalone_plugin_no_preregistration_run():
+    """Execute the standalone plugin"""
+
+    @apply_pass_plugin(plugin, "standalone-switch-bar-foo")
+    @qp.qnode(qp.device("lightning.qubit", wires=0))
+    def qnode():
+        return qp.state()
+
+    @qp.qjit
+    def module():
+        return qnode()
+
+    module()
 
     # It would be nice if we were able to combine lit tests with
     # pytest
@@ -76,11 +96,11 @@ def test_standalone_entry_point():
     """Generate MLIR for the standalone plugin via entry-point"""
 
     @apply_pass("standalone.standalone-switch-bar-foo")
-    @qml.qnode(qml.device("lightning.qubit", wires=0))
+    @qp.qnode(qp.device("lightning.qubit", wires=0))
     def qnode():
-        return qml.state()
+        return qp.state()
 
-    @qml.qjit(target="mlir")
+    @qp.qjit(target="mlir")
     def module():
         return qnode()
 
@@ -94,11 +114,11 @@ def test_standalone_dictionary():
     """Generate MLIR for the standalone plugin via entry-point"""
 
     @pipeline({"standalone.standalone-switch-bar-foo": {}})
-    @qml.qnode(qml.device("lightning.qubit", wires=0))
+    @qp.qnode(qp.device("lightning.qubit", wires=0))
     def qnode():
-        return qml.state()
+        return qp.state()
 
-    @qml.qjit(target="mlir")
+    @qp.qjit(target="mlir")
     def module():
         return qnode()
 
@@ -112,11 +132,11 @@ def test_standalone_plugin_decorator():
     """Generate MLIR for the standalone plugin"""
 
     @SwitchBarToFoo
-    @qml.qnode(qml.device("lightning.qubit", wires=0))
+    @qp.qnode(qp.device("lightning.qubit", wires=0))
     def qnode():
-        return qml.state()
+        return qp.state()
 
-    @qml.qjit(target="mlir")
+    @qp.qjit(target="mlir")
     def module():
         return qnode()
 

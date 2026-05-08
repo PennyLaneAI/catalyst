@@ -260,7 +260,7 @@ def BufferDeallocationPass : Pass<"buffer-deallocation", "func::FuncOp"> {
   }];
 }
 
-def ResourceTrackerPass : Pass<"resource-tracker"> {
+def ResourceAnalysisPass : Pass<"resource-analysis"> {
     let summary = "Track and report resource usage.";
     let description = [{
         This pass computes comprehensive resource metrics, including gate counts,
@@ -269,12 +269,12 @@ def ResourceTrackerPass : Pass<"resource-tracker"> {
         It leverages `ResourceAnalysis` to retrieve cached results and integrates directly
         with the MLIR Pass Statistics mechanism for reporting.
 
-        Optionally, it can output the results as JSON to stdout for
+        Optionally, it can output the results as JSON to stdout or a file for
         consumption by the PennyLane frontend.
 
         Usage:
-            quantum-opt input.mlir -resource-tracker -mlir-pass-statistics
-            quantum-opt input.mlir -resource-tracker -resource-tracker-output-json=true
+            quantum-opt input.mlir -resource-analysis -mlir-pass-statistics
+            quantum-opt input.mlir -resource-analysis -resource-analysis-output-json=true
     }];
 
     let options = [
@@ -283,7 +283,14 @@ def ResourceTrackerPass : Pass<"resource-tracker"> {
             /*CLI arg name=*/"output-json",
             /*type=*/"bool",
             /*default=*/"false",
-            /*description=*/"Print resource counts as JSON to stdout"
+            /*description=*/"Output resource counts as JSON. Prints to stdout unless output-fname is set"
+        >,
+        Option<
+            /*C++ var name=*/"outputFname",
+            /*CLI arg name=*/"output-fname",
+            /*type=*/"std::string",
+            /*default=*/"",
+            /*description=*/"The filename to save the output JSON to (only when output-json is true)"
         >
     ];
 }
@@ -292,7 +299,7 @@ def ResourceTrackerPass : Pass<"resource-tracker"> {
 def RegisterDecompRuleResourcePass : Pass<"register-decomp-rule-resource"> {
     let summary = "Compute and register the resources of decomposition rules.";
     let description = [{
-        This pass uses `ResourceTrackerPass` to compute resource metrics of
+        This pass uses `ResourceAnalysisPass` to compute resource metrics of
         functions marked with the `target_gate` attribute, effectively
         filtering for decomposition rules.
 

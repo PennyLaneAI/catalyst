@@ -27,7 +27,6 @@ from typing import ClassVar, TypeAlias
 
 from xdsl.dialects.builtin import (
     I64,
-    ContainerOf,
     ContainerType,
     Float64Type,
     IndexType,
@@ -55,11 +54,13 @@ from xdsl.irdl import (
     IRDLOperation,
     TypeAttributeInvT,
     VarConstraint,
+    base,
     irdl_attr_definition,
     irdl_op_definition,
     operand_def,
     opt_operand_def,
     opt_prop_def,
+    opt_result_def,
     result_def,
 )
 from xdsl.parser import AttrParser
@@ -242,10 +243,6 @@ PhysicalCodeBlockSSAValue: TypeAlias = SSAValue[PhysicalCodeblockType]
 PhysicalHyperRegisterSSAValue: TypeAlias = SSAValue[PhysicalHyperRegisterType]
 TannerGraphSSAValue: TypeAlias = SSAValue[TannerGraphType]
 
-anyPhysicalQubit = ContainerOf(QecPhysicalQubitType)
-anyPhysicalCodeblock = ContainerOf(PhysicalCodeblockType)
-anyPhysicalHyperRegister = ContainerOf(PhysicalHyperRegisterType)
-
 
 def _get_type_from_ssa_value_or_operation(
     arg: SSAValue | Operation, expected_type: TypeAttributeInvT
@@ -414,7 +411,7 @@ class ExtractCodeblockOp(IRDLOperation):
 class InsertCodeblockOp(IRDLOperation):
     """Update the physical codeblock value of a hyper-register."""
 
-    T: ClassVar = VarConstraint("T", anyPhysicalHyperRegister)
+    T: ClassVar = VarConstraint("T", base(PhysicalHyperRegisterType))
 
     name = "qecp.insert_block"
 
@@ -511,7 +508,7 @@ class InsertQubitOp(IRDLOperation):
     inserted into a physical codeblock.
     """
 
-    T: ClassVar = VarConstraint("T", anyPhysicalCodeblock)
+    T: ClassVar = VarConstraint("T", base(PhysicalCodeblockType))
 
     name = "qecp.insert"
 
@@ -572,7 +569,7 @@ class SingleQubitPhysicalGateOp(IRDLOperation):
     %1 = qecp.s %0 adj : !qecp.qubit<data>
     """
 
-    T: ClassVar = VarConstraint("T", anyPhysicalQubit)
+    T: ClassVar = VarConstraint("T", base(QecPhysicalQubitType))
 
     assembly_format = """
             $in_qubit (`adj` $adjoint^)? attr-dict `:` type($out_qubit)
@@ -657,8 +654,8 @@ class SOp(SingleQubitPhysicalGateOp):
 class CnotOp(IRDLOperation):
     """A physical CNOT gate operation."""
 
-    T_CTRL: ClassVar = VarConstraint("T_CTRL", anyPhysicalQubit)
-    T_TRGT: ClassVar = VarConstraint("T_TRGT", anyPhysicalQubit)
+    T_CTRL: ClassVar = VarConstraint("T_CTRL", base(QecPhysicalQubitType))
+    T_TRGT: ClassVar = VarConstraint("T_TRGT", base(QecPhysicalQubitType))
 
     name = "qecp.cnot"
 
@@ -698,7 +695,7 @@ class RotOp(IRDLOperation):
     NOTE: This operation is for physical noise injection only.
     """
 
-    T: ClassVar = VarConstraint("T", anyPhysicalQubit)
+    T: ClassVar = VarConstraint("T", base(QecPhysicalQubitType))
 
     name = "qecp.rot"
 
@@ -740,7 +737,7 @@ class RotOp(IRDLOperation):
 class MeasureOp(IRDLOperation):
     """A physical single-qubit projective measurement in the computational basis."""
 
-    T: ClassVar = VarConstraint("T", anyPhysicalQubit)
+    T: ClassVar = VarConstraint("T", base(QecPhysicalQubitType))
 
     name = "qecp.measure"
 
@@ -795,13 +792,21 @@ class AssembleTannerGraphOp(IRDLOperation):
 class DecodeEsmCssOp(IRDLOperation):
     """
     Decode an ESM for a CSS code and return the index (indices) in the codeblock where the error(s)
-    occurred."
+    occurred.
+
+    .. note::
+
+        The ``err_idx_in`` field is not supported in the Python interface to Catalyst as it is
+        needed only after bufferization. It is included in the op definition here for completeness
+        and for compatibility with the MLIR op definition.
     """
 
     name = "qecp.decode_esm_css"
 
     assembly_format = """
-            `(` $tanner_graph `:` type($tanner_graph) `)` $esm attr-dict `:` type($esm) `->` type($err_idx)
+            `(` $tanner_graph `:` type($tanner_graph) `)` $esm
+            ( `in` `(` $err_idx_in^ `:` type($err_idx_in) `)` )?
+            attr-dict `:` type($esm) ( `->` type($err_idx)^ )?
         """
 
     esm = operand_def(
@@ -811,7 +816,9 @@ class DecodeEsmCssOp(IRDLOperation):
 
     tanner_graph = operand_def(TannerGraphType)
 
-    err_idx = result_def(TensorConstraint(element_type=IndexType(), rank=1))
+    err_idx_in = opt_operand_def(MemRefConstraint(element_type=IndexType(), rank=1))
+
+    err_idx = opt_result_def(TensorConstraint(element_type=IndexType(), rank=1))
 
     def __init__(
         self,
@@ -819,7 +826,7 @@ class DecodeEsmCssOp(IRDLOperation):
         esm: SSAValue[TensorType] | Operation,
         err_idx_type: TensorType,
     ):
-        operands = (tanner_graph, esm)
+        operands = (tanner_graph, esm, None)
         super().__init__(operands=operands, result_types=(err_idx_type,))
 
 
@@ -833,12 +840,20 @@ class DecodePhysicalMeasurementOp(IRDLOperation):
     computational basis. The logical measurement results are returned as a one-dimensional
     tensor with shape=(k,), where k is the number of QEC logical qubits encoded by the physical
     codeblock.
+
+    .. note::
+
+        The ``logical_measurements_in`` field is not supported in the Python interface to Catalyst
+        as it is needed only after bufferization. It is included in the op definition here for
+        completeness and for compatibility with the MLIR op definition.
     """
 
     name = "qecp.decode_physical_meas"
 
     assembly_format = """
-            $physical_measurements attr-dict `:` type($physical_measurements) `->` type($logical_measurements)
+            $physical_measurements
+            ( `in` `(` $logical_measurements_in^ `:` type($logical_measurements_in) `)` )?
+            attr-dict `:` type($physical_measurements) ( `->` type($logical_measurements)^ )?
         """
 
     physical_measurements = operand_def(
@@ -846,7 +861,9 @@ class DecodePhysicalMeasurementOp(IRDLOperation):
         | (MemRefConstraint(element_type=IntegerType(1), rank=1))
     )
 
-    logical_measurements = result_def(TensorConstraint(element_type=IntegerType(1), rank=1))
+    logical_measurements_in = opt_operand_def(MemRefConstraint(element_type=IntegerType(1), rank=1))
+
+    logical_measurements = opt_result_def(TensorConstraint(element_type=IntegerType(1), rank=1))
 
     def __init__(
         self,
@@ -854,7 +871,7 @@ class DecodePhysicalMeasurementOp(IRDLOperation):
         logical_measurements_type: TensorType,
     ):
         super().__init__(
-            operands=(physical_measurements,), result_types=(logical_measurements_type,)
+            operands=(physical_measurements, None), result_types=(logical_measurements_type,)
         )
 
 

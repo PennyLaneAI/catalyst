@@ -31,7 +31,7 @@ What this practically means for this test is that if we were to write
 something like the following:
 
   ```python
-  import pennylane as qml
+  import pennylane as qp
   from catalyst import qjit
   from pathlib import Path
 
@@ -40,9 +40,9 @@ something like the following:
   plugin = Path("./mlir/standalone/build/lib/StandalonePlugin.so")
 
   @apply_pass("standalone-switch-bar-foo")
-  @qml.qnode(qml.device("lightning.qubit", wires=1))
+  @qp.qnode(qp.device("lightning.qubit", wires=1))
   def bar():
-    return qml.state()
+    return qp.state()
 
   @qjit(keep_intermediate=True, verbose=True, pass_plugins=[plugin], dialect_plugins=[plugin])
   def module():
@@ -64,7 +64,7 @@ APIs, like the Compiler and options.
 import platform
 from pathlib import Path
 
-import pennylane as qml
+import pennylane as qp
 
 import catalyst
 from catalyst import qjit
@@ -108,9 +108,9 @@ def test_pass_options():
     @qjit(target="mlir")
     # CHECK: options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
     @catalyst.passes.apply_pass("some-pass", "an-option", maxValue=1, multi_word_option=1)
-    @qml.qnode(qml.device("null.qubit", wires=1))
+    @qp.qnode(qp.device("null.qubit", wires=1))
     def example():
-        return qml.state()
+        return qp.state()
 
     print(example.mlir)
 

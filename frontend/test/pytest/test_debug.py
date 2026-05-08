@@ -18,7 +18,7 @@ import textwrap
 
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 from jax.tree_util import register_pytree_node_class
 from pennylane import for_loop
@@ -30,7 +30,6 @@ from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestDebugPrint:
     """Test suite for the runtime print functionality."""
 
@@ -50,10 +49,10 @@ class TestDebugPrint:
             jnp.array([[3, 4], [5, 6], [7, 8]]),
         ],
     )
-    def test_function_arguments(self, capfd, arg):
+    def test_function_arguments(self, capfd, arg, capture_mode):
         """Test printing of arbitrary JAX tracer values."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         def test(x):
             debug.print(x)
 
@@ -79,10 +78,10 @@ class TestDebugPrint:
         assert err == ""
         assert out == "2\n"
 
-    def test_optional_descriptor(self, capfd):
+    def test_optional_descriptor(self, capfd, capture_mode):
         """Test the optional memref descriptor functionality."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         def test(x):
             debug.print_memref(x)
 
@@ -104,10 +103,10 @@ class TestDebugPrint:
         assert err == ""
         assert regex.match(out)
 
-    def test_bad_argument(self):
+    def test_bad_argument(self, capture_mode):
         """Test bad argument."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         def test(_x):
             debug.print_memref("foo")
 
@@ -123,10 +122,10 @@ class TestDebugPrint:
             (6, "0\n1\n2\n3\n4\n5\n"),
         ],
     )
-    def test_intermediate_values(self, capfd, arg, expected):
+    def test_intermediate_values(self, capfd, arg, expected, capture_mode):
         """Test printing of arbitrary JAX tracer values."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         def test(n):
             @for_loop(0, n, 1)
             def loop(i):
@@ -162,12 +161,12 @@ class TestDebugPrint:
             return cls(*aux_data)
 
     @pytest.mark.parametrize(("arg"), [3, "hi", MyObject("hello")])
-    def test_compile_time_values(self, capfd, arg):
+    def test_compile_time_values(self, capfd, arg, capture_mode):
         """Test printing of arbitrary Python objects, including strings."""
 
         expected = str(arg)
 
-        @qjit
+        @qjit(capture=capture_mode)
         def test():
             debug.print(arg)
 
@@ -206,15 +205,15 @@ class TestDebugPrint:
         assert err == ""
         assert out == expected
 
-    def test_multiple_prints(self, capfd):
+    def test_multiple_prints(self, capfd, capture_mode):
         "Test printing strings in multiple prints"
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def func1():
             debug.print("hello")
-            return qml.state()
+            return qp.state()
 
-        @qjit
+        @qjit(capture=capture_mode)
         def func2():
             func1()
             debug.print("goodbye")
@@ -225,10 +224,10 @@ class TestDebugPrint:
         assert err == ""
         assert out == "hello\ngoodbye\n"
 
-    def test_fstring_print(self, capsys):
+    def test_fstring_print(self, capsys, capture_mode):
         """Test fstring like function."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         def cir(a, b, c):
             debug.print("{c} {b} {a}", a=a, b=b, c=c)
 
@@ -238,14 +237,13 @@ class TestDebugPrint:
         assert expected == out.strip()
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestPrintStage:
     """Test that compilation pipeline results can be printed."""
 
-    def test_hlo_lowering_stage(self, capsys):
+    def test_hlo_lowering_stage(self, capsys, capture_mode):
         """Test that the IR can be printed after the HLO lowering pipeline."""
 
-        @qjit(keep_intermediate=True)
+        @qjit(keep_intermediate=True, capture=capture_mode)
         def func(x):
             return x
 
@@ -276,14 +274,14 @@ class TestCProgramGeneration:
 
     def test_program_generation(self):
         """Test C Program generation"""
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def f(x: float):
             """Returns two states."""
-            qml.RX(x, wires=1)
-            return qml.state(), qml.state()
+            qp.RX(x, wires=1)
+            return qp.state(), qp.state()
 
         template = get_cmain(f, 4.0)
         assert "main" in template

@@ -39,7 +39,7 @@ from catalyst.python_interface.dialects.quantum import (
     VarianceOp,
 )
 
-from .xdsl_conversion import dispatch_wires_extract, xdsl_to_qml_measurement, xdsl_to_qml_op
+from .xdsl_conversion import dispatch_wires_extract, xdsl_to_qp_measurement, xdsl_to_qp_op
 
 
 class QMLCollector:
@@ -66,7 +66,7 @@ class QMLCollector:
 
     @handle.register
     def _(self, xdsl_meas: StateOp) -> MeasurementProcess:
-        return xdsl_to_qml_measurement(xdsl_meas)
+        return xdsl_to_qp_measurement(xdsl_meas)
 
     @handle.register
     def _(self, xdsl_meas_op: ExpvalOp | VarianceOp | ProbsOp | SampleOp) -> MeasurementProcess:
@@ -75,14 +75,14 @@ class QMLCollector:
         if isinstance(xdsl_meas_op, (ProbsOp, SampleOp)):
             # TODO: This doesn't logically make sense, but quantum.compbasis
             # is obs_op and function below just pulls out the static wires
-            wires = xdsl_to_qml_measurement(obs_op)
-            return xdsl_to_qml_measurement(xdsl_meas_op, wires=None if wires == [] else wires)
+            wires = xdsl_to_qp_measurement(obs_op)
+            return xdsl_to_qp_measurement(xdsl_meas_op, wires=None if wires == [] else wires)
 
-        return xdsl_to_qml_measurement(xdsl_meas_op, xdsl_to_qml_measurement(obs_op))
+        return xdsl_to_qp_measurement(xdsl_meas_op, xdsl_to_qp_measurement(obs_op))
 
     @handle.register
     def _(self, xdsl_measure: MeasureOp) -> MeasurementProcess:
-        return xdsl_to_qml_measurement(xdsl_measure)
+        return xdsl_to_qp_measurement(xdsl_measure)
 
     ############################################################
     ### Operators
@@ -99,7 +99,7 @@ class QMLCollector:
             raise ValueError("Quantum register (AllocOp) not found.")
         if not self.wire_to_ssa_qubits:
             raise NotImplementedError("No wires extracted from the register found.")
-        return xdsl_to_qml_op(xdsl_op)
+        return xdsl_to_qp_op(xdsl_op)
 
     ############################################################
     ### Internal Methods

@@ -18,7 +18,7 @@ Test suite for device preprocessing with program capture.
 from functools import partial
 
 import jax
-import pennylane as qml
+import pennylane as qp
 import pytest
 from pennylane.devices import NullQubit
 from pennylane.devices.capabilities import (
@@ -82,14 +82,14 @@ class TestGeneralPreprocessing:
     @pytest.mark.parametrize("skip_preprocess", [True, False])
     def test_skip_preprocess(self, skip_preprocess):
         """Test that skip_preprocess=True causes device preprocessing to be skipped."""
-        dev = qml.device("null.qubit", wires=4)
+        dev = qp.device("null.qubit", wires=4)
 
         # mcm_method="one-shot" should trigger at least one device preprocessing transform,
-        # which is qml.transform(pass_name="dynamic-one-shot")
-        @qml.qnode(dev, shots=1, mcm_method="one-shot")
+        # which is qp.transform(pass_name="dynamic-one-shot")
+        @qp.qnode(dev, shots=1, mcm_method="one-shot")
         def f():
-            _ = qml.measure(0)
-            return qml.expval(qml.Z(0))
+            _ = qp.measure(0)
+            return qp.expval(qp.Z(0))
 
         pipelines = get_pipelines(f, skip_preprocess=skip_preprocess)
 
@@ -114,9 +114,9 @@ class TestGeneralPreprocessing:
             },
         )
 
-        @qml.qnode(dev, shots=None)
+        @qp.qnode(dev, shots=None)
         def f():
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         jaxpr = jax.make_jaxpr(f)()
         interpreter = from_plxpr_no_warn(jaxpr, skip_preprocess=False)
@@ -127,12 +127,12 @@ class TestGeneralPreprocessing:
     def test_unimplemented_transforms_warning(self):
         """Test that a warning is raised if device preprocessing requires transforms that
         are not yet available as MLIR/xDSL transforms."""
-        dev = qml.device("null.qubit", wires=4)
+        dev = qp.device("null.qubit", wires=4)
 
         # Adjoint will cause an unsupported transform to be added to device preprocessing
-        @qml.qnode(dev, diff_method="adjoint")
+        @qp.qnode(dev, diff_method="adjoint")
         def f():
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         jaxpr = jax.make_jaxpr(f)()
         interpreter = from_plxpr(jaxpr, skip_preprocess=False)
@@ -151,12 +151,12 @@ class TestMCMPreprocessing:
         """Test than an error is raised if trying to use mcm_method="one-shot"
         with shots=None."""
 
-        dev = qml.device("null.qubit", wires=4)
+        dev = qp.device("null.qubit", wires=4)
 
-        @qml.qnode(dev, shots=None, mcm_method="one-shot")
+        @qp.qnode(dev, shots=None, mcm_method="one-shot")
         def f():
-            _ = qml.measure(0)
-            return qml.expval(qml.Z(0))
+            _ = qp.measure(0)
+            return qp.expval(qp.Z(0))
 
         jaxpr = jax.make_jaxpr(f)()
         interpreter = from_plxpr_no_warn(jaxpr, skip_preprocess=False)
@@ -170,12 +170,12 @@ class TestMCMPreprocessing:
     def test_unusupported_mcm_method_error(self, mcm_method):
         """Test that an error is raised if an unsupported mcm_method is used."""
 
-        dev = qml.device("null.qubit", wires=4)
+        dev = qp.device("null.qubit", wires=4)
 
-        @qml.qnode(dev, shots=None, mcm_method=mcm_method)
+        @qp.qnode(dev, shots=None, mcm_method=mcm_method)
         def f():
-            _ = qml.measure(0)
-            return qml.expval(qml.Z(0))
+            _ = qp.measure(0)
+            return qp.expval(qp.Z(0))
 
         jaxpr = jax.make_jaxpr(f)()
         interpreter = from_plxpr_no_warn(jaxpr, skip_preprocess=False)
@@ -189,12 +189,12 @@ class TestMCMPreprocessing:
         """Test that an error is raised if postselect_mode other than "fill-shots" or
         None is used."""
 
-        dev = qml.device("null.qubit", wires=4)
+        dev = qp.device("null.qubit", wires=4)
 
-        @qml.qnode(dev, shots=1, mcm_method=mcm_method, postselect_mode=postselect_mode)
+        @qp.qnode(dev, shots=1, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def f():
-            _ = qml.measure(0)
-            return qml.expval(qml.Z(0))
+            _ = qp.measure(0)
+            return qp.expval(qp.Z(0))
 
         jaxpr = jax.make_jaxpr(f)()
         interpreter = from_plxpr_no_warn(jaxpr, skip_preprocess=False)
@@ -208,12 +208,12 @@ class TestMCMPreprocessing:
         """Test that the MLIR dynamic-one-shot transform is added to the pipeline if
         mcm_method="one-shot"."""
 
-        dev = qml.device("null.qubit", wires=4)
+        dev = qp.device("null.qubit", wires=4)
 
-        @qml.qnode(dev, shots=1, mcm_method="one-shot")
+        @qp.qnode(dev, shots=1, mcm_method="one-shot")
         def f():
-            _ = qml.measure(0)
-            return qml.expval(qml.Z(0))
+            _ = qp.measure(0)
+            return qp.expval(qp.Z(0))
 
         pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
@@ -304,15 +304,15 @@ class TestMeasurementPreprocessing:
         dev = CapabilitiesDevice(wires=4)
         dev.capabilities = capabilities
 
-        @qml.qnode(dev, shots=1)
+        @qp.qnode(dev, shots=1)
         def f():
-            qml.expval(qml.Z(0))
+            qp.expval(qp.Z(0))
 
         pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
         self.assert_transform_presence(
             device_pipeline,
-            transform=qml.transforms.split_non_commuting,
+            transform=qp.transforms.split_non_commuting,
             transform_needed=needs_split_non_commuting,
             is_empty_transform=True,
         )
@@ -341,15 +341,15 @@ class TestMeasurementPreprocessing:
             measurement_processes={"ExpectationMP": [], "SampleMP": [], "CountsMP": []},
         )
 
-        @qml.qnode(dev, shots=1)
+        @qp.qnode(dev, shots=1)
         def f():
-            qml.expval(qml.Z(0))
+            qp.expval(qp.Z(0))
 
         pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
         self.assert_transform_presence(
             device_pipeline,
-            transform=qml.transforms.split_to_single_terms,
+            transform=qp.transforms.split_to_single_terms,
             transform_needed=needs_split_to_single_terms,
             is_empty_transform=False,
         )
@@ -372,9 +372,9 @@ class TestMeasurementPreprocessing:
             measurement_processes=measurements,
         )
 
-        @qml.qnode(dev, shots=1)
+        @qp.qnode(dev, shots=1)
         def f():
-            qml.expval(qml.Z(0))
+            qp.expval(qp.Z(0))
 
         pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
@@ -403,9 +403,9 @@ class TestMeasurementPreprocessing:
             measurement_processes=measurements,
         )
 
-        @qml.qnode(dev, shots=1)
+        @qp.qnode(dev, shots=1)
         def f():
-            qml.expval(qml.Z(0))
+            qp.expval(qp.Z(0))
 
         pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
@@ -423,9 +423,9 @@ class TestMeasurementPreprocessing:
         dev = CapabilitiesDevice(wires=4)
         dev.capabilities = DeviceCapabilities(observables={}, measurement_processes={})
 
-        @qml.qnode(dev, shots=1)
+        @qp.qnode(dev, shots=1)
         def f():
-            qml.expval(qml.Z(0))
+            qp.expval(qp.Z(0))
 
         jaxpr = jax.make_jaxpr(f)()
         interpreter = from_plxpr_no_warn(jaxpr, skip_preprocess=False)
@@ -451,15 +451,15 @@ class TestMeasurementPreprocessing:
             measurement_processes={"ExpectationMP": [], "SampleMP": []},
         )
 
-        @qml.qnode(dev, shots=1)
+        @qp.qnode(dev, shots=1)
         def f():
-            qml.expval(qml.Z(0))
+            qp.expval(qp.Z(0))
 
         pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
         self.assert_transform_presence(
             device_pipeline,
-            transform=qml.transforms.diagonalize_measurements,
+            transform=qp.transforms.diagonalize_measurements,
             transform_needed=needs_diagonalize_measurements,
             is_empty_transform=True,
         )
@@ -471,11 +471,11 @@ class TestOperationPreprocessing:
     def test_validation_transforms(self):
         """Test that transforms for validating operations and measurements are
         added to the pipeline."""
-        dev = qml.device("null.qubit", wires=4)
+        dev = qp.device("null.qubit", wires=4)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def f():
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
@@ -496,11 +496,11 @@ class TestGradientPreprocessing:
     def test_gradient_obs_validation(self, diff_method):
         """Test that a transform for validating return types is added to the pipeline
         if gradients are requested."""
-        dev = qml.device("lightning.qubit", wires=4)
+        dev = qp.device("lightning.qubit", wires=4)
 
-        @qml.qnode(dev, diff_method=diff_method)
+        @qp.qnode(dev, diff_method=diff_method)
         def f():
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
@@ -519,11 +519,11 @@ class TestGradientPreprocessing:
     @pytest.mark.parametrize("diff_method", ["adjoint", "parameter-shift", None])
     def test_adjoint_with_shots_error(self, diff_method):
         """Test that an error is raised if diff_method="adjoint" with finite shots."""
-        dev = qml.device("lightning.qubit", wires=4)
+        dev = qp.device("lightning.qubit", wires=4)
 
-        @qml.qnode(dev, diff_method=diff_method, shots=1)
+        @qp.qnode(dev, diff_method=diff_method, shots=1)
         def f():
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         jaxpr = jax.make_jaxpr(f)()
         interpreter = from_plxpr_no_warn(jaxpr, skip_preprocess=False)
@@ -540,11 +540,11 @@ class TestGradientPreprocessing:
     def test_parameter_shift_validation(self, diff_method):
         """Test that a transform for validating observables is added to the pipeline
         if diff_method="parameter-shift"."""
-        dev = qml.device("lightning.qubit", wires=4)
+        dev = qp.device("lightning.qubit", wires=4)
 
-        @qml.qnode(dev, diff_method=diff_method)
+        @qp.qnode(dev, diff_method=diff_method)
         def f():
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
@@ -564,11 +564,11 @@ class TestGradientPreprocessing:
     def test_adjoint_validation(self, diff_method):
         """Test that a transform for validating observables is added to the pipeline
         if diff_method="adjoint"."""
-        dev = qml.device("lightning.qubit", wires=4)
+        dev = qp.device("lightning.qubit", wires=4)
 
-        @qml.qnode(dev, diff_method=diff_method)
+        @qp.qnode(dev, diff_method=diff_method)
         def f():
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
         pipelines = get_pipelines(f, skip_preprocess=False)
         device_pipeline = pipelines[1][1]
@@ -595,20 +595,20 @@ class TestIntegration:
         if skip_preprocess is not None:
             qjit_args["skip_preprocess"] = skip_preprocess
 
-        dev = qml.device("null.qubit", wires=4)
+        dev = qp.device("null.qubit", wires=4)
 
-        @qml.transforms.merge_rotations
-        @qml.qnode(dev, shots=1, mcm_method="one-shot", diff_method="parameter-shift")
+        @qp.transforms.merge_rotations
+        @qp.qnode(dev, shots=1, mcm_method="one-shot", diff_method="parameter-shift")
         def f1():
-            _ = qml.measure(0)
-            return qml.expval(qml.Z(0))
+            _ = qp.measure(0)
+            return qp.expval(qp.Z(0))
 
-        @qml.transforms.cancel_inverses
-        @qml.qnode(dev, shots=None, diff_method="adjoint")
+        @qp.transforms.cancel_inverses
+        @qp.qnode(dev, shots=None, diff_method="adjoint")
         def f2():
-            return qml.expval(qml.Z(0))
+            return qp.expval(qp.Z(0))
 
-        @qml.qjit(**qjit_args)
+        @qp.qjit(**qjit_args)
         def workflow():
             return f1() + f2()
 

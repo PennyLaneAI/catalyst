@@ -17,7 +17,7 @@ from collections import namedtuple
 from itertools import product
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 from numpy.testing import assert_allclose, assert_equal
 from pennylane.transforms.intermediate_reps import phase_polynomial
@@ -180,7 +180,7 @@ class TestParityNetworkSynth:
 
         np.random.seed(seed)  # todo: proper seeding
         # Make all cnot ops
-        all_cnots = [qml.CNOT((i, j)) for i, j in product(range(n), repeat=2) if i != j]
+        all_cnots = [qp.CNOT((i, j)) for i, j in product(range(n), repeat=2) if i != j]
         # Sample random CNOTs (by index into above list) and rotation angles
         cnots = [
             np.random.choice(len(all_cnots), size=n, replace=True) for _ in range(num_parities)
@@ -189,28 +189,28 @@ class TestParityNetworkSynth:
         # Make PL circuit
         circuit = sum(
             (
-                [all_cnots[i] for i in sub_circuit] + [qml.RZ(x, j % n)]
+                [all_cnots[i] for i in sub_circuit] + [qp.RZ(x, j % n)]
                 for j, (sub_circuit, x) in enumerate(zip(cnots, thetas, strict=True))
             ),
             start=[],
         )
         # Compute IR
-        _, P, angles = phase_polynomial(qml.tape.QuantumScript(circuit), wire_order=range(n))
+        _, P, angles = phase_polynomial(qp.tape.QuantumScript(circuit), wire_order=range(n))
 
         angles_ = list(angles)
         # Synthesize parity network and compute new PL circuit from it
         new_circuit, inv_parity_matrix = _parity_network_synth(P)
         new_circuit = sum(
             (
-                [qml.CNOT(_cnot) for _cnot in sub_circuit]
-                + [qml.RZ(angles_.pop(angle_idx), qubit_idx)]
+                [qp.CNOT(_cnot) for _cnot in sub_circuit]
+                + [qp.RZ(angles_.pop(angle_idx), qubit_idx)]
                 for angle_idx, qubit_idx, sub_circuit in new_circuit
             ),
             start=[],
         )
         # Compute IR of new PL circuit
         new_parity_matrix, new_P, new_angles = phase_polynomial(
-            qml.tape.QuantumScript(new_circuit), wire_order=range(n)
+            qp.tape.QuantumScript(new_circuit), wire_order=range(n)
         )
         # Compare phase parities and make sure that the inv_parity_matrix is valid
         assert_allclose(new_P @ new_angles, P @ angles)
@@ -485,15 +485,14 @@ class TestParitySynthPass:
 
 
 # pylint: disable=too-few-public-methods
-@pytest.mark.usefixtures("use_capture")
 class TestParitySynthIntegration:
     """Integration tests for the ParitySynthPass."""
 
     def test_qjit(self, run_filecheck_qjit):
         """Test that the ParitySynthPass works correctly with qjit."""
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x: float, y: float, z: float):
             # CHECK: [[phi:%.+]] = tensor.extract %arg0
             # CHECK: quantum.custom "CNOT"()
@@ -504,17 +503,17 @@ class TestParitySynthIntegration:
             # CHECK: [[theta:%.+]] = tensor.extract %arg2
             # CHECK: quantum.custom "RZ"([[theta]])
             # CHECK-NOT: quantum.custom
-            qml.CNOT((0, 1))
-            qml.RZ(x, 1)
-            qml.CNOT((0, 1))
-            qml.RX(y, 1)
-            qml.CNOT((1, 0))
-            qml.RZ(z, 1)
-            qml.CNOT((1, 0))
-            return qml.state()
+            qp.CNOT((0, 1))
+            qp.RZ(x, 1)
+            qp.CNOT((0, 1))
+            qp.RX(y, 1)
+            qp.CNOT((1, 0))
+            qp.RZ(z, 1)
+            qp.CNOT((1, 0))
+            return qp.state()
 
-        raw_circuit = qml.qjit(circuit)
-        compiled_circuit = qml.qjit(parity_synth_pass(circuit))
+        raw_circuit = qp.qjit(circuit, capture=True)
+        compiled_circuit = qp.qjit(parity_synth_pass(circuit), capture=True)
 
         run_filecheck_qjit(compiled_circuit)
         args = (0.6, 0.2, -1.8)
@@ -523,29 +522,29 @@ class TestParitySynthIntegration:
     def test_qjit_with_dynamic_allocation(self, run_filecheck_qjit):
         """Test that the ParitySynthPass works correctly with qjit and dynamic wires but can
         not simplify across dynamic wires."""
-        dev = qml.device("lightning.qubit", wires=4)
+        dev = qp.device("lightning.qubit", wires=4)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x: float, y: float, z: float, w0: int, w1: int):
             # Can simplify this first triple due to static wires
             # CHECK: [[phi:%.+]] = tensor.extract %arg0
             # CHECK: quantum.custom "RZ"([[phi]])
-            qml.CNOT((0, 1))
-            qml.RZ(x, 0)
-            qml.CNOT((0, 1))
+            qp.CNOT((0, 1))
+            qp.RZ(x, 0)
+            qp.CNOT((0, 1))
 
             # CHECK: [[omega:%.+]] = tensor.extract %arg1
             # CHECK: quantum.custom "RX"([[omega]])
-            qml.RX(y, w0)
+            qp.RX(y, w0)
 
             # Can not simplify this second triple due to dynamic wires
             # CHECK: quantum.custom "CNOT"()
             # CHECK: [[theta:%.+]] = tensor.extract %arg2
             # CHECK: quantum.custom "RZ"([[theta]])
             # CHECK: quantum.custom "CNOT"()
-            qml.CNOT((w1, 0))
-            qml.RZ(z, w1)
-            qml.CNOT((w1, 0))
+            qp.CNOT((w1, 0))
+            qp.RZ(z, w1)
+            qp.CNOT((w1, 0))
 
             # Purely static wire section
             # Note how the classical processing is in original order
@@ -566,42 +565,42 @@ class TestParitySynthIntegration:
             # CHECK: quantum.custom "CNOT"()
             # This last CNOT is inserted by rowcol
             # CHECK: quantum.custom "CNOT"()
-            qml.RZ(x, 0)
-            qml.RZ(x, 1)
-            qml.CNOT([0, 1])
-            qml.CNOT([1, 2])
-            qml.RZ(x, 2)
-            qml.CNOT([1, 2])
-            qml.CNOT([0, 1])
-            qml.RZ(y, 0)
-            qml.RZ(y, 1)
+            qp.RZ(x, 0)
+            qp.RZ(x, 1)
+            qp.CNOT([0, 1])
+            qp.CNOT([1, 2])
+            qp.RZ(x, 2)
+            qp.CNOT([1, 2])
+            qp.CNOT([0, 1])
+            qp.RZ(y, 0)
+            qp.RZ(y, 1)
 
             # Purely dynamic wire section
             # CHECK: [[phi_4:%.+]] = tensor.extract %arg0
             # CHECK: quantum.custom "RZ"([[phi_4]])
-            qml.RZ(x, w0)
+            qp.RZ(x, w0)
             # CHECK: [[phi_5:%.+]] = tensor.extract %arg0
             # CHECK: quantum.custom "RZ"([[phi_5]])
             # CHECK: quantum.custom "CNOT"()
-            qml.RZ(x, w1)
-            qml.CNOT([w0, w1])
+            qp.RZ(x, w1)
+            qp.CNOT([w0, w1])
             # CHECK: [[theta_1:%.+]] = tensor.extract %arg2
             # CHECK: quantum.custom "RZ"([[theta_1]])
             # CHECK: quantum.custom "CNOT"()
-            qml.RZ(z, w0)
-            qml.CNOT([w0, w1])
+            qp.RZ(z, w0)
+            qp.CNOT([w0, w1])
             # CHECK: [[omega_3:%.+]] = tensor.extract %arg1
             # CHECK: quantum.custom "RZ"([[omega_3]])
-            qml.RZ(y, w0)
+            qp.RZ(y, w0)
             # CHECK: [[omega_4:%.+]] = tensor.extract %arg1
             # CHECK: quantum.custom "RZ"([[omega_4]])
-            qml.RZ(y, w1)
+            qp.RZ(y, w1)
             # CHECK-NOT: quantum.custom
 
-            return qml.state()
+            return qp.state()
 
-        raw_circuit = qml.qjit(circuit)
-        compiled_circuit = qml.qjit(parity_synth_pass(circuit))
+        raw_circuit = qp.qjit(circuit, capture=True)
+        compiled_circuit = qp.qjit(parity_synth_pass(circuit), capture=True)
 
         run_filecheck_qjit(compiled_circuit)
         args = (0.6, 0.2, -1.8)
@@ -610,9 +609,9 @@ class TestParitySynthIntegration:
 
     def test_qjit_with_control_flow(self, run_filecheck_qjit):
         """Test that ParitySynth works correctly with qjit when there is control flow."""
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qp.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x: float):
             # Phase tensor
             # CHECK: func.func public @circuit([[FLOAT_ARG:%.+]]: tensor<f64>)
@@ -631,12 +630,12 @@ class TestParitySynthIntegration:
             # CHECK-NOT: quantum.custom "CNOT"
             # CHECK: quantum.custom "RZ"([[PHI]]) [[Q0]]
             # CHECK-NOT: quantum.custom
-            qml.CNOT((0, 1))
-            qml.RZ(x, 0)
-            qml.CNOT((0, 1))
+            qp.CNOT((0, 1))
+            qp.RZ(x, 0)
+            qp.CNOT((0, 1))
 
             # CHECK: scf.for
-            @qml.for_loop(4)
+            @qp.for_loop(4)
             def loop_fn(_i):
                 # Qubit extraction for wire 0
                 # CHECK: [[ZERO_LOOP:%.+]] = stablehlo.constant dense<0> : tensor<i64>
@@ -650,12 +649,12 @@ class TestParitySynthIntegration:
                 # CHECK-NOT: quantum.custom "CNOT"
                 # CHECK: quantum.custom "RZ"([[PHI_LOOP]]) [[Q0_LOOP]]
                 # CHECK-NOT: quantum.custom
-                qml.CNOT((0, 1))
-                qml.RZ(x, 0)
-                qml.CNOT((0, 1))
+                qp.CNOT((0, 1))
+                qp.RZ(x, 0)
+                qp.CNOT((0, 1))
 
                 # CHECK: scf.if
-                @qml.cond(x > 2.5)
+                @qp.cond(x > 2.5)
                 def cond_fn():
                     # Qubit extraction for wire 0
                     # CHECK: [[ZERO_IF:%.+]] = stablehlo.constant dense<0> : tensor<i64>
@@ -669,9 +668,9 @@ class TestParitySynthIntegration:
                     # CHECK-NOT: quantum.custom "CNOT"
                     # CHECK: quantum.custom "RZ"([[PHI_IF]]) [[Q0_IF]]
                     # CHECK-NOT: quantum.custom
-                    qml.CNOT((0, 1))
-                    qml.RZ(x, 0)
-                    qml.CNOT((0, 1))
+                    qp.CNOT((0, 1))
+                    qp.RZ(x, 0)
+                    qp.CNOT((0, 1))
                     # CHECK: scf.yield
 
                 cond_fn()
@@ -680,10 +679,10 @@ class TestParitySynthIntegration:
             loop_fn()
             # CHECK-NOT: quantum.custom
 
-            return qml.state()
+            return qp.state()
 
-        raw_circuit = qml.qjit(circuit)
-        compiled_circuit = qml.qjit(parity_synth_pass(circuit))
+        raw_circuit = qp.qjit(circuit, capture=True)
+        compiled_circuit = qp.qjit(parity_synth_pass(circuit), capture=True)
 
         run_filecheck_qjit(compiled_circuit)
         for x in [0.5, 1.5, 2.5, 3.5]:
