@@ -485,7 +485,6 @@ class TestParitySynthPass:
 
 
 # pylint: disable=too-few-public-methods
-@pytest.mark.usefixtures("use_capture")
 class TestParitySynthIntegration:
     """Integration tests for the ParitySynthPass."""
 
@@ -513,8 +512,8 @@ class TestParitySynthIntegration:
             qp.CNOT((1, 0))
             return qp.state()
 
-        raw_circuit = qp.qjit(circuit)
-        compiled_circuit = qp.qjit(parity_synth_pass(circuit))
+        raw_circuit = qp.qjit(circuit, capture=True)
+        compiled_circuit = qp.qjit(parity_synth_pass(circuit), capture=True)
 
         run_filecheck_qjit(compiled_circuit)
         args = (0.6, 0.2, -1.8)
@@ -600,8 +599,8 @@ class TestParitySynthIntegration:
 
             return qp.state()
 
-        raw_circuit = qp.qjit(circuit)
-        compiled_circuit = qp.qjit(parity_synth_pass(circuit))
+        raw_circuit = qp.qjit(circuit, capture=True)
+        compiled_circuit = qp.qjit(parity_synth_pass(circuit), capture=True)
 
         run_filecheck_qjit(compiled_circuit)
         args = (0.6, 0.2, -1.8)
@@ -682,8 +681,8 @@ class TestParitySynthIntegration:
 
             return qp.state()
 
-        raw_circuit = qp.qjit(circuit)
-        compiled_circuit = qp.qjit(parity_synth_pass(circuit))
+        raw_circuit = qp.qjit(circuit, capture=True)
+        compiled_circuit = qp.qjit(parity_synth_pass(circuit), capture=True)
 
         run_filecheck_qjit(compiled_circuit)
         for x in [0.5, 1.5, 2.5, 3.5]:

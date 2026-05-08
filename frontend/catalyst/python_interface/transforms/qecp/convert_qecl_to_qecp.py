@@ -663,9 +663,9 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         The generated subroutine assumes a CSS QEC code and performs separate X and Z corrections,
         as defined by the input X and Z Tanner graphs, `tanner_x` and `tanner_z`. Recall that
-        X-Tanner graphs define the X stabilizer components of the code, which are used to perform Z
-        corrections, and conversely Z-Tanner graphs define the Z stabilizer components of the code,
-        which are used to perform X corrections.
+        X-Tanner graphs define the X stabilizer components of the code, which are used to identify Z
+        errors, and conversely Z-Tanner graphs define the Z stabilizer components of the code, which
+        are used to identify X errors.
 
         For each of the X and Z components of the QEC protocol, the subroutine allocates auxiliary
         qubits for error-syndrome measurement (ESM) based on the number of rows in the respective
