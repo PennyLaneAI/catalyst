@@ -434,6 +434,49 @@ class TestMidCircuitMeasurement:
 
             measurement()
 
+    @pytest.mark.parametrize("postselect_method", ["hw-like", "fill-shots"])
+    def test_mcm_config_propagation_cond(self, postselect_method):
+        """Test that the mcm_config is propagated when tracing nested ops."""
+
+        @qjit
+        @qp.qnode(
+            qp.device("lightning.qubit", wires=1),
+            shots=10,
+            mcm_method="one-shot",
+            postselect_mode=postselect_method,
+        )
+        def circuit(b: bool):
+            qp.H(0)
+
+            @cond(b)
+            def nested():
+                measure(0, postselect=1)
+
+            nested()
+
+        assert ("postselect" in circuit.mlir) == (postselect_method == "fill-shots")
+
+    @pytest.mark.parametrize("postselect_method", ["hw-like", "fill-shots"])
+    def test_mcm_config_propagation_for_loop(self, postselect_method):
+        """Test that the mcm_config is propagated when tracing nested ops."""
+
+        @qjit
+        @qp.qnode(
+            qp.device("lightning.qubit", wires=1),
+            shots=10,
+            mcm_method="one-shot",
+            postselect_mode=postselect_method,
+        )
+        def circuit(b: bool):
+            qp.H(0)
+
+            def nested(i):
+                measure(0, postselect=1)
+
+            catalyst.for_loop(0, 10, 1)(nested)()
+
+        assert ("postselect" in circuit.mlir) == (postselect_method == "fill-shots")
+
 
 class TestDynamicOneShotIntegration:
     """Integration tests for QNodes using mcm_method="one-shot"/dynamic_one_shot."""
