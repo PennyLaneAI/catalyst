@@ -38,7 +38,7 @@ from xdsl.pattern_rewriter import (
 )
 
 from catalyst.python_interface.dialects import qecp
-from catalyst.python_interface.dialects.quantum.attributes import QuregType, QubitType
+from catalyst.python_interface.dialects.quantum.attributes import QuregType
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 
 
@@ -47,22 +47,11 @@ from catalyst.python_interface.pass_api.compiler_transform import compiler_trans
 
 @dataclass
 class PhysicalCodeblockTypeConversion(TypeConversionPattern):
-    """Codeblock type conversion pattern from qecp.codeblock -> quantum.qubit."""
+    """Codeblock type conversion pattern from qecp.codeblock -> quantum.reg."""
 
     @attr_type_rewrite_pattern
-    def convert_type(self, typ: qecp.PhysicalCodeblockType) -> list[QubitType]:
+    def convert_type(self, typ: qecp.PhysicalCodeblockType) -> QuregType:
         """Type conversion rewrite pattern for physical codeblock types."""
-
-        return [QubitType()] * typ.n.value.data
-
-
-@dataclass
-class PhysicalHyperRegisterTypeConversion(TypeConversionPattern):
-    """Hyper-register type conversion pattern from qecp.hyperreg -> quantum.qreg."""
-
-    @attr_type_rewrite_pattern
-    def convert_type(self, typ: qecp.PhysicalHyperRegisterType) -> QuregType:
-        """Type conversion rewrite pattern for physical hyperregister types."""
 
         return QuregType()
 
@@ -83,7 +72,6 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
             GreedyRewritePatternApplier(
                 [
                     PhysicalCodeblockTypeConversion(),
-                    PhysicalHyperRegisterTypeConversion(),
                 ]
             )
         ).rewrite_module(op)
