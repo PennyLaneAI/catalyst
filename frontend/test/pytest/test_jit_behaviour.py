@@ -930,6 +930,9 @@ class TestDefaultAvailableIR:
             qp.H(0)
             return qp.state()
 
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        circuit.use_cwd_for_workspace = False
+
         _ = circuit.mlir_opt
 
         workspace_files = os.listdir(str(circuit.workspace))
