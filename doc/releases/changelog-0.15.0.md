@@ -45,7 +45,7 @@
   [(#2639)](https://github.com/PennyLaneAI/catalyst/pull/2639)
 
   Previously, circuits compiled with these transforms were only inspectable via
-  :func:`pennylane.specs` and :func:`pennylane.draw_graph`. Now, such circuits can be executed.
+  :func:`qp.specs <pennylane.specs>` and :func:`qp.draw_graph <catalyst.draw_graph>`_. Now, such circuits can be executed.
 
   ```python
   import pennylane as qp
@@ -628,7 +628,7 @@
   Now, the input must always be a :class:`~.QJIT` object.
   [(#2542)](https://github.com/PennyLaneAI/catalyst/pull/2542)
 
-* ``catalyst.from_plxpr.register_transforms`` as a way to access MLIR passes from Python has been
+* ``catalyst.from_plxpr.register_transforms`` as a way to register MLIR passes from Python has been
   removed in favour of the new unified transforms API. MLIR passes can be accessed from Python using
   ``qp.transform(pass_name="some-pass-name")``.
   [(#2509)](https://github.com/PennyLaneAI/catalyst/pull/2509)
