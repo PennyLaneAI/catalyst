@@ -24,8 +24,6 @@
 #include "QecPhysical/IR/QecPhysicalOps.h"
 #include "QecPhysical/Transforms/Patterns.h"
 
-#include <mlir/IR/BuiltinOps.h>
-
 using namespace mlir;
 
 namespace {
@@ -77,8 +75,9 @@ struct DecodeEsmCssOpPattern : public OpConversionPattern<DecodeEsmCssOp> {
 
         const TypeConverter *conv = getTypeConverter();
 
-        if (!op.isBufferized())
+        if (!op.isBufferized()) {
             return op.emitOpError("op must be bufferized before lowering to LLVM");
+        }
 
         Type esmVectorType, errIdxVectorType;
         esmVectorType = conv->convertType(MemRefType::get(
@@ -88,9 +87,6 @@ struct DecodeEsmCssOpPattern : public OpConversionPattern<DecodeEsmCssOp> {
             {llvm::dyn_cast<mlir::ShapedType>(op.getErrIdxIn().getType()).getDimSize(0)}, i64));
 
         auto tannerStructType = conv->convertType(op.getTannerGraph().getType());
-        auto convertedTannerStruct =
-            UnrealizedConversionCastOp::create(rewriter, loc, tannerStructType, op.getTannerGraph())
-                .getResult(0);
 
         Value esmAlloca = catalyst::getStaticAlloca(loc, rewriter, esmVectorType, 1);
         Value errIdxAlloca = catalyst::getStaticAlloca(loc, rewriter, errIdxVectorType, 1);
@@ -98,7 +94,7 @@ struct DecodeEsmCssOpPattern : public OpConversionPattern<DecodeEsmCssOp> {
 
         LLVM::StoreOp::create(rewriter, loc, adaptor.getEsm(), esmAlloca);
         LLVM::StoreOp::create(rewriter, loc, adaptor.getErrIdxIn(), errIdxAlloca);
-        LLVM::StoreOp::create(rewriter, loc, convertedTannerStruct, tannerStructAlloca);
+        LLVM::StoreOp::create(rewriter, loc, adaptor.getTannerGraph(), tannerStructAlloca);
 
         // Define function signature
         StringRef fnName = "__catalyst__qecp__lut_decoder";
