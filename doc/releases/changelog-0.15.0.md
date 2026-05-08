@@ -102,6 +102,7 @@
   [(#2711)](https://github.com/PennyLaneAI/catalyst/pull/2711)
   [(#2713)](https://github.com/PennyLaneAI/catalyst/pull/2713)
   [(#2722)](https://github.com/PennyLaneAI/catalyst/pull/2722)
+  [(#2795)](https://github.com/PennyLaneAI/catalyst/pull/2795)
   [(#2749)](https://github.com/PennyLaneAI/catalyst/pull/2749)
   [(#2765)](https://github.com/PennyLaneAI/catalyst/pull/2765)
 
