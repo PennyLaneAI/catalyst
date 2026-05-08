@@ -650,8 +650,8 @@ class TestQecCycleLowering:
 class TestLoweringMeasure:
     """Unit tests for the `measure` pattern of the convert-qecl-to-qecp pass."""
 
-    def test_measure(self, run_filecheck, qecl_to_qecp_steane_pipeline):
-        """Test the lowering pattern for `qecl.measure` ops."""
+    def test_measure_steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
+        """Test the lowering pattern for `qecl.measure` ops with the Steane code."""
         program = """
         builtin.module {
         // CHECK-LABEL: test_program
@@ -706,6 +706,62 @@ class TestLoweringMeasure:
         }
         """
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
+
+    def test_measure_toy_code(self, run_filecheck):
+        """Test the lowering pattern for `qecl.measure` ops with a toy QEQ code.
+
+        Note that the transversal-measurement subroutine is essentially the same as the Steane code
+        test above, so we don't test it again here. The main purpose of this test is to check that
+        the physical-measurement decoding subroutine works for different values of n and Pauli Z
+        observables.
+        """
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_program
+        func.func @test_program() {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 5>
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+
+            // CHECK: [[mresp:%.+]], [[cb1:%.+]] = func.call @measure_transversal_TestCode([[cb0]]) : ({{.*}}) -> (tensor<5xi1>, !qecp.codeblock<1 x 5>)
+            // CHECK: [[mresl:%.+]] = func.call @decode_physical_measurements_TestCode([[mresp]]) : (tensor<5xi1>) -> tensor<1xi1>
+            // CHECK: [[zero:%.+]] = arith.constant 0 : index
+            // CHECK: [[mres0:%.+]] = tensor.extract [[mresl]][[[zero]]] : tensor<1xi1>
+            %mres0, %1 = qecl.measure %0[0] : i1, !qecl.codeblock<1>
+
+            // CHECK: [[mres1:%.+]] = "test.op"([[mres0]]) : (i1) -> i1
+            %mres1 = "test.op"(%mres0) : (i1) -> i1  // To prevent DCE
+            %2 = "test.op"(%1) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>  // To prevent DCE
+            return
+        }
+        // CHECK-LABEL: func.func private @measure_transversal_TestCode
+
+        // CHECK-LABEL: func.func private @decode_physical_measurements_TestCode
+        //  CHECK-SAME:     [[in_mres_t:%.+]]: tensor<5xi1>) -> tensor<1xi1> {
+        //       CHECK:   [[c0:%.+]] = arith.constant 0 : index
+        //       CHECK:   [[m0:%.+]] = tensor.extract [[in_mres_t]][[[c0]]] : tensor<5xi1>
+        //       CHECK:   [[c2:%.+]] = arith.constant 2 : index
+        //       CHECK:   [[m2:%.+]] = tensor.extract [[in_mres_t]][[[c2]]] : tensor<5xi1>
+        //       CHECK:   [[xor0:%.+]] = arith.xori [[m0]], [[m2]] : i1
+        //       CHECK:   [[out_mres_t0:%.+]] = tensor.empty() : tensor<1xi1>
+        //       CHECK:   [[c0:%.+]] = arith.constant 0 : index
+        //       CHECK:   [[out_mres_t1:%.+]] = tensor.insert [[xor0]] into [[out_mres_t0]][[[c0]]] : tensor<1xi1>
+        //       CHECK:   func.return [[out_mres_t1]] : tensor<1xi1>
+        //       CHECK: }
+        }
+        """
+        qec_code = QecCode(
+            "TestCode",
+            n=5,
+            k=1,
+            d=3,
+            x_tanner=np.eye(5),
+            z_tanner=np.eye(5),
+            transversal_1q_gates={"z": (qecp.PauliZOp, [0, 2])},
+            transversal_2q_gates={},
+        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
+
+        run_filecheck(program, pipeline)
 
     @pytest.mark.parametrize(
         "gate_data",
