@@ -14,13 +14,14 @@
 
 """Tests for kernel.declare and kernel.runtime_call."""
 
+# pylint: disable=redefined-outer-name
+
 import itertools
 import os
 import platform
 import subprocess
 import tempfile
 
-import jax
 import jax.numpy as jnp
 import pytest
 from jax import ShapeDtypeStruct
@@ -51,6 +52,7 @@ def libxor_ref():
 
 @pytest.fixture(scope="module")
 def xor_reduce(libxor_ref):
+    """Declare the xor_reduce kernel against the compiled shared library."""
     return kernel.declare(
         "xor_reduce",
         artifact=libxor_ref,
@@ -59,13 +61,17 @@ def xor_reduce(libxor_ref):
 
 
 class TestKernelDeclare:
+    """Unit tests for kernel.declare error paths and descriptor properties."""
+
     def test_basic(self, xor_reduce, libxor_ref):
+        """KernelDescriptor fields are set correctly."""
         assert isinstance(xor_reduce, KernelDescriptor)
         assert xor_reduce.name == "xor_reduce"
         assert xor_reduce.artifact == libxor_ref
         assert xor_reduce.output_spec == (((1,), "int32"),)
 
     def test_missing_artifact(self):
+        """declare raises FileNotFoundError for a non-existent artifact."""
         with pytest.raises(FileNotFoundError, match="artifact not found"):
             kernel.declare(
                 "xor_reduce",
@@ -74,6 +80,7 @@ class TestKernelDeclare:
             )
 
     def test_dynamic_shape_rejected(self, libxor_ref):
+        """declare raises ValueError when output shapes contain None dimensions."""
         with pytest.raises(ValueError, match="dynamic shapes unsupported"):
             kernel.declare(
                 "xor_reduce",
@@ -82,9 +89,11 @@ class TestKernelDeclare:
             )
 
     def test_descriptor_is_hashable(self, xor_reduce):
+        """KernelDescriptor can be used as a dict key."""
         assert {xor_reduce: 1}[xor_reduce] == 1
 
     def test_multiple_outputs(self, libxor_ref):
+        """declare accepts a tuple of ShapeDtypeStructs for multiple outputs."""
         desc = kernel.declare(
             "xor_reduce",
             artifact=libxor_ref,
@@ -94,13 +103,15 @@ class TestKernelDeclare:
 
 
 class TestRuntimeCallIntegration:
+    """End-to-end tests: compile, link, and execute a kernel via runtime_call."""
+
     def test_xor_truth_table(self, xor_reduce):
+        """runtime_call produces correct XOR reduction for all 3-bit inputs."""
+
         @qjit
         def circuit(x):
             (result,) = kernel.runtime_call(xor_reduce, x)
             return result
-
-        import itertools  # pylint: disable=import-outside-toplevel
 
         for bits in itertools.product([0, 1], repeat=3):
             x = jnp.array(bits, dtype=jnp.int8)
