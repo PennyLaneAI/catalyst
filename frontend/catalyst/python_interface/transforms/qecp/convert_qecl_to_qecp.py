@@ -23,6 +23,8 @@ Known Limitations
 The convert-qecl-to-qecp pass does not support the following cases:
 
   * QEC codes where the number of logical qubits per codeblock, k, is greater than 1.
+  * Only logical Pauli Z observables (computational basis) are supported for lowering `qecl.measure`
+    operations.
 """
 
 from collections.abc import Callable, Iterable
@@ -232,9 +234,12 @@ class MeasureOpConversion(RewritePattern):
     on the physical codeblock.
 
     In order to make the corresponding logical measurement outcome(s) of the `qecl.measure` op
-    available for subsequent use, this pattern also inserted a `qecp.decode_physical_meas` op that
-    acts on the results of the transversal measurements and returns the corresponding k logical
-    measurements outcomes.
+    available for subsequent use, this pattern also inserts operations that perform physical-
+    measurement decoding on the results of the transversal measurements, which return the
+    corresponding k logical measurement outcomes. The method to perform this decoding is to compute
+    the parity of the physical measurement results that correspond to the qubits acted on by the
+    logical Pauli observable. Currently, only logical Pauli Z observables (computational basis) are
+    supported.
 
     While this rewrite pattern may appear as though it supports arbitrary values of k, it is
     important to note that as implemented, it does not consider the `idx` attribute/operand of the
@@ -247,6 +252,7 @@ class MeasureOpConversion(RewritePattern):
     qec_code: QecCode
 
     measure_subroutine: func.FuncOp
+    physical_meas_decode_subroutine: func.FuncOp
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecl.MeasureOp, rewriter: PatternRewriter):
@@ -263,24 +269,23 @@ class MeasureOpConversion(RewritePattern):
         )
 
         ops_to_insert = (
-            subroutine_call_op := func.CallOp(
+            measure_call_op := func.CallOp(
                 callee=SymbolRefAttr(self.measure_subroutine.sym_name),
                 arguments=(op.in_codeblock,),
                 return_types=(builtin.TensorType(i1, shape=(n,)), op.in_codeblock.type),
             ),
-            decode_op := qecp.DecodePhysicalMeasurementOp(
-                physical_measurements=cast(
-                    OpResult[builtin.TensorType], subroutine_call_op.results[0]
-                ),
-                logical_measurements_type=builtin.TensorType(i1, shape=(k,)),
+            decode_call_op := func.CallOp(
+                callee=SymbolRefAttr(self.physical_meas_decode_subroutine.sym_name),
+                arguments=(measure_call_op.results[0],),
+                return_types=(builtin.TensorType(i1, shape=(k,)),),
             ),
             extract_idx_op := arith.ConstantOp.from_int_and_width(0, IndexType()),
             tensor_extract_op := tensor.ExtractOp(
-                decode_op.logical_measurements, indices=extract_idx_op.result, result_type=i1
+                decode_call_op.results[0], indices=extract_idx_op.result, result_type=i1
             ),
         )
 
-        new_results = (tensor_extract_op.result, subroutine_call_op.results[1])
+        new_results = (tensor_extract_op.result, measure_call_op.results[1])
 
         rewriter.replace_op(op, ops_to_insert, new_results=new_results)
 
@@ -406,6 +411,9 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         measure_subroutine = self.create_measure_subroutine()
         module_block.add_op(measure_subroutine)
 
+        physical_meas_decode_subroutine = self.create_physical_meas_decode_subroutine()
+        module_block.add_op(physical_meas_decode_subroutine)
+
         transversal_gate_subroutines = (
             self.create_transversal_1Qgate_subroutines()
             | self.create_transversal_2Qgate_subroutines()
@@ -429,6 +437,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                     MeasureOpConversion(
                         qec_code=self.qec_code,
                         measure_subroutine=measure_subroutine,
+                        physical_meas_decode_subroutine=physical_meas_decode_subroutine,
                     ),
                     TransversalGateConversion(
                         qec_code=self.qec_code,
@@ -588,6 +597,77 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         )
 
         return measure_subroutine
+
+    def create_physical_meas_decode_subroutine(self) -> func.FuncOp:
+        """Create the subroutine that performs the physical-measurement decoding of a transversal
+        measurement and returns the corresponding k logical measurement outcomes.
+
+        Note that this method does not insert the subroutine into the module op. Instead it returns
+        the built func.FuncOp object that can then be subsequently inserted where desired.
+        """
+        in_tensor_type = TensorType(i1, shape=(self.qec_code.n,))
+        out_tensor_type = TensorType(i1, shape=(self.qec_code.k,))
+        block = Block(arg_types=(in_tensor_type,))
+
+        pauli_z_gate_data = self.qec_code.transversal_1q_gates.get("z")
+
+        err_msg = (
+            f"Failed to create physical-measurement decoding subroutine: the QEC code "
+            f"'{self.qec_code}' does not specify a logical Pauli Z operation"
+        )
+
+        if pauli_z_gate_data is None:
+            raise CompileError(err_msg)
+
+        _, pauli_z_indices = pauli_z_gate_data
+
+        if len(pauli_z_indices) == 0:
+            raise CompileError(err_msg)
+
+        with ImplicitBuilder(block):
+            in_phys_meas_tensor = cast(BlockArgument[TensorType[I1]], block.args[0])
+
+            phys_meas_values: list[OpResult] = []
+            for idx in pauli_z_indices:
+                extract_idx_op = arith.ConstantOp.from_int_and_width(idx, IndexType())
+                extract_op = tensor.ExtractOp(
+                    in_phys_meas_tensor, indices=extract_idx_op.result, result_type=i1
+                )
+                phys_meas_values.append(extract_op.result)
+
+            # TODO: When we support codes with k > 1, we will need to update how we compute the
+            # multiple logical measurement results and how we pack them into the output tensor
+
+            if len(phys_meas_values) == 1:
+                result = phys_meas_values[0]
+
+            else:
+                current_xor = phys_meas_values[0]
+                for i in range(1, len(phys_meas_values)):
+                    current_xor = arith.XOrIOp(current_xor, phys_meas_values[i])
+                    result = current_xor.result
+
+            out_logi_meas_tensor_op = tensor.EmptyOp([], out_tensor_type)
+            insert_idx_op = arith.ConstantOp.from_int_and_width(0, IndexType())
+            out_logi_meas_tensor_op = tensor.InsertOp(
+                result,
+                dest=out_logi_meas_tensor_op.tensor,
+                indices=insert_idx_op.result,
+            )
+
+            func.ReturnOp(out_logi_meas_tensor_op.result)
+
+        physical_meas_decode_subroutine = func.FuncOp(
+            name=f"decode_physical_measurements_{self.qec_code.name}",
+            function_type=(
+                (in_tensor_type,),
+                (out_tensor_type,),
+            ),
+            region=Region(block),
+            visibility="private",  # so that the `-symbol-dce` pass can remove if unused
+        )
+
+        return physical_meas_decode_subroutine
 
     def create_encode_subroutine(self) -> func.FuncOp:
         """Create a subroutine that takes in a codeblock, encodes it in the zero state for

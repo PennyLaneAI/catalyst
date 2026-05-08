@@ -80,7 +80,7 @@ class TestTypeConversionPattern:
                     3,
                     np.eye(n),
                     np.eye(n),
-                    transversal_1q_gates={},
+                    transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
                     transversal_2q_gates={},
                 )
             ),
@@ -118,7 +118,7 @@ class TestTypeConversionPattern:
                     3,
                     np.eye(n),
                     np.eye(n),
-                    transversal_1q_gates={},
+                    transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
                     transversal_2q_gates={},
                 )
             ),
@@ -147,7 +147,7 @@ class TestTypeConversionPattern:
                     3,
                     np.eye(7),
                     np.eye(7),
-                    transversal_1q_gates={},
+                    transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
                     transversal_2q_gates={},
                 )
             ),
@@ -178,7 +178,7 @@ class TestTypeConversionPattern:
                     3,
                     np.eye(7),
                     np.eye(7),
-                    transversal_1q_gates={},
+                    transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
                     transversal_2q_gates={},
                 )
             ),
@@ -223,7 +223,7 @@ class TestAllocAndDeallocConversionPatterns:
                     3,
                     np.eye(n),
                     np.eye(n),
-                    transversal_1q_gates={},
+                    transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
                     transversal_2q_gates={},
                 )
             ),
@@ -260,7 +260,7 @@ class TestAllocAndDeallocConversionPatterns:
                     3,
                     np.eye(n),
                     np.eye(n),
-                    transversal_1q_gates={},
+                    transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
                     transversal_2q_gates={},
                 )
             ),
@@ -307,7 +307,7 @@ class TestInsertExtractConversionPatterns:
                     3,
                     np.eye(n),
                     np.eye(n),
-                    transversal_1q_gates={},
+                    transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
                     transversal_2q_gates={},
                 )
             ),
@@ -347,7 +347,7 @@ class TestInsertExtractConversionPatterns:
                     3,
                     np.eye(n),
                     np.eye(n),
-                    transversal_1q_gates={},
+                    transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
                     transversal_2q_gates={},
                 )
             ),
@@ -378,7 +378,7 @@ class TestLoweringEncode:
             d=1,
             x_tanner=np.eye(n),
             z_tanner=np.eye(n),
-            transversal_1q_gates={},
+            transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
             transversal_2q_gates={},
         )
 
@@ -660,7 +660,7 @@ class TestLoweringMeasure:
             %0 = "test.op"() : () -> !qecl.codeblock<1>
 
             // CHECK: [[mresp:%.+]], [[cb1:%.+]] = func.call @measure_transversal_Steane([[cb0]]) : ({{.*}}) -> (tensor<7xi1>, !qecp.codeblock<1 x 7>)
-            // CHECK: [[mresl:%.+]] = qecp.decode_physical_meas [[mresp]] : tensor<7xi1> -> tensor<1xi1>
+            // CHECK: [[mresl:%.+]] = func.call @decode_physical_measurements_Steane([[mresp]]) : (tensor<7xi1>) -> tensor<1xi1>
             // CHECK: [[zero:%.+]] = arith.constant 0 : index
             // CHECK: [[mres0:%.+]] = tensor.extract [[mresl]][[[zero]]] : tensor<1xi1>
             %mres0, %1 = qecl.measure %0[0] : i1, !qecl.codeblock<1>
@@ -671,25 +671,75 @@ class TestLoweringMeasure:
             return
         }
         // CHECK-LABEL: func.func private @measure_transversal_Steane
-        // CHECK-SAME: ([[cb_in:%.+]]: !qecp.codeblock<1 x 7>) -> (tensor<7xi1>, !qecp.codeblock<1 x 7>) {
-        // CHECK: [[mres_t:%.+]] = tensor.empty() : tensor<7xi1>
-        // CHECK: [[c0:%.+]] = arith.constant 0 : index
-        // CHECK: [[c7:%.+]] = arith.constant 7 : index
-        // CHECK: [[c1:%.+]] = arith.constant 1 : index
-        // CHECK: [[mres_t_out:%.+]], [[cb_out:%.+]] = scf.for [[idx:%.+]] = [[c0]] to [[c7]] step [[c1]]
-        // CHECK-SAME: iter_args([[mres_t_arg:%.+]] = [[mres_t]], [[cb_arg:%.+]] = [[cb_in]])
-        // CHECK-SAME: -> (tensor<7xi1>, !qecp.codeblock<1 x 7>) {
-        // CHECK:   [[q0:%.+]] = qecp.extract [[cb_arg]][[[idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-        // CHECK:   [[mres0:%.+]], [[q1:%.+]] = qecp.measure [[q0]] : i1, !qecp.qubit<data>
-        // CHECK:   [[cb2:%.+]] = qecp.insert [[cb_arg]][[[idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
-        // CHECK:   [[mres_t_1:%.+]] = tensor.insert [[mres0]] into [[mres_t_arg]][[[idx]]] : tensor<7xi1>
-        // CHECK:   scf.yield [[mres_t_1]], [[cb2]] : tensor<7xi1>, !qecp.codeblock<1 x 7>
-        // CHECK: }
-        // CHECK: func.return [[mres_t_out]], [[cb_out]] : tensor<7xi1>, !qecp.codeblock<1 x 7>
-        // CHECK: }
+        //  CHECK-SAME:     ([[cb_in:%.+]]: !qecp.codeblock<1 x 7>) -> (tensor<7xi1>, !qecp.codeblock<1 x 7>) {
+        //       CHECK:   [[mres_t:%.+]] = tensor.empty() : tensor<7xi1>
+        //       CHECK:   [[c0:%.+]] = arith.constant 0 : index
+        //       CHECK:   [[c7:%.+]] = arith.constant 7 : index
+        //       CHECK:   [[c1:%.+]] = arith.constant 1 : index
+        //       CHECK:   [[mres_t_out:%.+]], [[cb_out:%.+]] = scf.for [[idx:%.+]] = [[c0]] to [[c7]] step [[c1]]
+        //  CHECK-SAME:       iter_args([[mres_t_arg:%.+]] = [[mres_t]], [[cb_arg:%.+]] = [[cb_in]])
+        //  CHECK-SAME:       -> (tensor<7xi1>, !qecp.codeblock<1 x 7>) {
+        //       CHECK:     [[q0:%.+]] = qecp.extract [[cb_arg]][[[idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+        //       CHECK:     [[mres0:%.+]], [[q1:%.+]] = qecp.measure [[q0]] : i1, !qecp.qubit<data>
+        //       CHECK:     [[cb2:%.+]] = qecp.insert [[cb_arg]][[[idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        //       CHECK:     [[mres_t_1:%.+]] = tensor.insert [[mres0]] into [[mres_t_arg]][[[idx]]] : tensor<7xi1>
+        //       CHECK:     scf.yield [[mres_t_1]], [[cb2]] : tensor<7xi1>, !qecp.codeblock<1 x 7>
+        //       CHECK:   }
+        //       CHECK:   func.return [[mres_t_out]], [[cb_out]] : tensor<7xi1>, !qecp.codeblock<1 x 7>
+        //       CHECK: }
+
+        // CHECK-LABEL: func.func private @decode_physical_measurements_Steane
+        //  CHECK-SAME:     [[in_mres_t:%.+]]: tensor<7xi1>) -> tensor<1xi1> {
+        //       CHECK:   [[c4:%.+]] = arith.constant 4 : index
+        //       CHECK:   [[m4:%.+]] = tensor.extract [[in_mres_t]][[[c4]]] : tensor<7xi1>
+        //       CHECK:   [[c5:%.+]] = arith.constant 5 : index
+        //       CHECK:   [[m5:%.+]] = tensor.extract [[in_mres_t]][[[c5]]] : tensor<7xi1>
+        //       CHECK:   [[c6:%.+]] = arith.constant 6 : index
+        //       CHECK:   [[m6:%.+]] = tensor.extract [[in_mres_t]][[[c6]]] : tensor<7xi1>
+        //       CHECK:   [[xor0:%.+]] = arith.xori [[m4]], [[m5]] : i1
+        //       CHECK:   [[xor1:%.+]] = arith.xori [[xor0]], [[m6]] : i1
+        //       CHECK:   [[out_mres_t0:%.+]] = tensor.empty() : tensor<1xi1>
+        //       CHECK:   [[c0:%.+]] = arith.constant 0 : index
+        //       CHECK:   [[out_mres_t1:%.+]] = tensor.insert [[xor1]] into [[out_mres_t0]][[[c0]]] : tensor<1xi1>
+        //       CHECK:   func.return [[out_mres_t1]] : tensor<1xi1>
+        //       CHECK: }
         }
         """
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
+
+    def test_measure_with_missing_pauli_z_def_raise(self, run_filecheck):
+        """Test that running the convert-qecl-to-qecp pass without specifying a logical Z observable
+        raise an error when creating the physical-measurement decoding subroutine.
+        """
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_program
+        func.func @test_program() {
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %mres0, %1 = qecl.measure %0[0] : i1, !qecl.codeblock<1>
+            %mres1 = "test.op"(%mres0) : (i1) -> i1  // To prevent DCE
+            %2 = "test.op"(%1) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>  // To prevent DCE
+            return
+        }
+        }
+        """
+
+        qec_code = QecCode(
+            "TestCode",
+            n=7,
+            k=1,
+            d=3,
+            x_tanner=np.eye(7),
+            z_tanner=np.eye(7),
+            transversal_1q_gates={},
+            transversal_2q_gates={},
+        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
+
+        with pytest.raises(
+            CompileError, match="Failed to create physical-measurement decoding subroutine"
+        ):
+            run_filecheck(program, pipeline)
 
 
 # MARK: TransversalGates
@@ -712,7 +762,7 @@ class TestLoweringTransversalGates:
             d=1,
             x_tanner=np.eye(n),
             z_tanner=np.eye(n),
-            transversal_1q_gates={"x": (qecp.PauliXOp, [0, 2])},
+            transversal_1q_gates={"x": (qecp.PauliXOp, [0, 2]), "z": (qecp.PauliZOp, [0, 2])},
             transversal_2q_gates={},
         )
 
@@ -757,7 +807,7 @@ class TestLoweringTransversalGates:
             d=1,
             x_tanner=np.eye(n),
             z_tanner=np.eye(n),
-            transversal_1q_gates={},
+            transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
             transversal_2q_gates={"cnot": qecp.CnotOp},
         )
 
@@ -953,7 +1003,7 @@ class TestLoweringTransversalGates:
             d=1,
             x_tanner=np.eye(n),
             z_tanner=np.eye(n),
-            transversal_1q_gates={"x": (qecp.PauliXOp, [0, 1])},
+            transversal_1q_gates={"x": (qecp.PauliXOp, [0, 1]), "z": (qecp.PauliZOp, [0, 1])},
             transversal_2q_gates={},
         )
 
