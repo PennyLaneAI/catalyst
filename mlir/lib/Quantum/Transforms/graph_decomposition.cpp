@@ -279,8 +279,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             if (auto customOp = llvm::dyn_cast<quantum::CustomOp>(op.getOperation())) {
                 node.name = customOp.getGateName().str();
-            }
-            else {
+            } else {
                 std::string name = op->getName().stripDialect().str();
                 if (name == "gphase") {
                     name = "GlobalPhase";
@@ -291,8 +290,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             if (auto paramOp =
                     llvm::dyn_cast<catalyst::quantum::ParametrizedGate>(op.getOperation())) {
                 node.numParams = paramOp.getAllParams().size();
-            }
-            else {
+            } else {
                 node.numParams = 0;
             }
 
