@@ -14,7 +14,6 @@
 
 """This module contains a library of QEC codes."""
 
-import math
 from dataclasses import dataclass, fields
 from typing import Any, Self
 
