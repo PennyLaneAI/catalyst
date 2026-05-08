@@ -276,6 +276,9 @@ def _create_decomposition_rule(
             with a variable number of wires (e.g., MultiRZ, GlobalPhase).
     """
 
+    if op_name == "PauliRot":
+        raise NotImplementedError("Decomposition of PauliRot is not supported in Catalyst.")
+
     sig_func = inspect.signature(func)
     type_hints = get_type_hints(func)
 
