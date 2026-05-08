@@ -247,7 +247,7 @@ class MeasureOpConversion(RewritePattern):
 
 
 @dataclass(frozen=True)
-class Transversal1QGateConversion(RewritePattern):
+class TransversalGateConversion(RewritePattern):
     """Converts transversal single-qubit `qecl` gate ops specified in the QEC code definition to
     a call to a subroutine that performs the transversal gate on the physical codeblock.
 
@@ -259,14 +259,31 @@ class Transversal1QGateConversion(RewritePattern):
 
     qec_code: QecCode
 
-    gate_subroutines: dict[str, func.FuncOp]
+    gate_subroutines_1q: dict[str, func.FuncOp]
+
+    gate_subroutines_2q: dict[str, func.FuncOp]
 
     @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: qecl.SingleQubitLogicalGateOp, rewriter: PatternRewriter):
-        """Rewrite pattern for `qecl.SingleQubitLogicalGateOp` ops, if they are defined as
+    def match_and_rewrite(
+        self, op: qecl.SingleQubitLogicalGateOp | qecl.CnotOp, rewriter: PatternRewriter
+    ):
+        """Rewrite pattern for ``qecl.SingleQubitLogicalGateOp`` ops and `qecl.CnotOp`` ops, if they are defined as
         transversal in the provided QEC code."""
 
-        k = op.out_codeblock.type.k.value.data
+        gate_name = op.name.split(".")[1]
+
+        if gate_name in self.gate_subroutines_2q:
+            gate_subroutine = self.gate_subroutines_2q[gate_name]
+            op_codeblocks = (op.in_ctrl_codeblock, op.in_trgt_codeblock)
+        elif gate_name in self.gate_subroutines_1q:
+            gate_subroutine = self.gate_subroutines_1q[gate_name]
+            op_codeblocks = (op.in_codeblock,)
+        else:
+            # gates that aren't defined transversally in the QEC code are ignored here
+            # they will need to be handled by a different pattern
+            return
+
+        k = op_codeblocks[0].type.k.value.data
 
         # The type-converter should already raise a CompileError if the values of k don't agree;
         # assert just in case.
@@ -280,69 +297,10 @@ class Transversal1QGateConversion(RewritePattern):
                 "Lowering logical gates to the `qecp` dialect is not implemented for k > 1 codes"
             )
 
-        gate_name = op.name.strip("qecl.")
-        gate_subroutine = self.gate_subroutines.get(gate_name, None)
-
-        if gate_subroutine is None:
-            return
-
         subroutine_call_op = func.CallOp(
             callee=SymbolRefAttr(gate_subroutine.sym_name),
-            arguments=(op.in_codeblock,),
-            return_types=(op.in_codeblock.type,),
-        )
-
-        rewriter.replace_op(op, subroutine_call_op)
-
-
-@dataclass(frozen=True)
-class Transversal2QGateConversion(RewritePattern):
-    """Converts transversal two-qubit `qecl` gate ops specified in the QEC code definition to
-    a call to a subroutine that performs the transversal gate on the physical codeblock. Note that
-    this is currently limited to the `qecl.cnot` gate, so the pattern as implemented matches to
-    that rather than a generalised `qecl.TwoQubitLogicalGateOp`.
-
-    As implemented, this pattern does not use the `idx` attribute/operand of the logical gate
-    op, which indicates the position of the logical qubit within the codeblock to act on. The
-    current implementation for specifying gates also doesn't allow for specifying different patterns
-    for different qubits within a codeblock. We assume `k = 1` and therefore `idx = 0`.
-    """
-
-    qec_code: QecCode
-
-    gate_subroutines: dict[str, func.FuncOp]
-
-    @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: qecl.CnotOp, rewriter: PatternRewriter):
-        """Rewrite pattern for `qecl` two-qubit ops (currently limited to `qecl.cnot`), if
-        it are defined as transversal in the provided QEC code."""
-
-        k = op.out_ctrl_codeblock.type.k.value.data
-
-        # The type-converter should already raise a CompileError if the values of k don't agree;
-        # assert just in case.
-        assert k == self.qec_code.k, (
-            f"Value mismatch: codeblock {op.out_ctrl_codeblock} has k = {k} but QEC code has "
-            f"k = {self.qec_code.k}"
-        )
-
-        if k > 1:
-            raise NotImplementedError(
-                "Lowering logical gates to the `qecp` dialect is not implemented for k > 1 codes."
-            )
-
-        gate_name = op.name.split(".")[1]
-        gate_subroutine = self.gate_subroutines.get(gate_name, None)
-
-        # gates that aren't defined transversally in the QEC code are ignored here
-        # they will need to be handled by a different pattern
-        if gate_subroutine is None:
-            return
-
-        subroutine_call_op = func.CallOp(
-            callee=SymbolRefAttr(gate_subroutine.sym_name),
-            arguments=(op.in_ctrl_codeblock, op.in_trgt_codeblock),
-            return_types=(op.in_ctrl_codeblock.type, op.in_trgt_codeblock.type),
+            arguments=op_codeblocks,
+            return_types=tuple(cb.type for cb in op_codeblocks),
         )
 
         rewriter.replace_op(op, subroutine_call_op)
@@ -423,13 +381,10 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                         qec_code=self.qec_code,
                         measure_subroutine=measure_subroutine,
                     ),
-                    Transversal1QGateConversion(
+                    TransversalGateConversion(
                         qec_code=self.qec_code,
-                        gate_subroutines=transversal_1Qgate_subroutines,
-                    ),
-                    Transversal2QGateConversion(
-                        qec_code=self.qec_code,
-                        gate_subroutines=transversal_2Qgate_subroutines,
+                        gate_subroutines_1q=transversal_1Qgate_subroutines,
+                        gate_subroutines_2q=transversal_2Qgate_subroutines,
                     ),
                 ]
             )
