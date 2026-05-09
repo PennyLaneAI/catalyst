@@ -38,6 +38,8 @@ set(LIBS
     MLIRCatalystTest
     MLIRCatalystUtils
     MLIRTestDialect
+    MLIROpenQASM
+    MlirToQasm3Translation
 )
 
 add_mlir_tool(quantum-opt quantum-opt.cpp DEPENDS ${LIBS} SUPPORT_PLUGINS)

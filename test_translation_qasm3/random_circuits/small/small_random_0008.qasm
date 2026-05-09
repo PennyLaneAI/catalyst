@@ -1,0 +1,20 @@
+OPENQASM 2.0;
+include "qelib1.inc";
+gate csdg q0,q1 { p(-pi/4) q0; cx q0,q1; p(pi/4) q1; cx q0,q1; p(-pi/4) q1; }
+qreg q[3];
+creg c[3];
+u(4.064739245181262,0.40857085438648955,3.490797055112974) q[0];
+csdg q[2],q[1];
+swap q[2],q[0];
+sdg q[1];
+rz(5.605183088360339) q[1];
+swap q[0],q[2];
+sxdg q[1];
+sdg q[0];
+z q[2];
+p(2.083960732236384) q[0];
+p(4.849023907288484) q[1];
+t q[2];
+measure q[0] -> c[0];
+measure q[1] -> c[1];
+measure q[2] -> c[2];

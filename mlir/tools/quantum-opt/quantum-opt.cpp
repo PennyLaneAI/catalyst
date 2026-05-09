@@ -12,14 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <filesystem> // path
-#include <fstream>    // ifstream
-#include <regex>      //regex
-
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Func/Extensions/AllExtensions.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
@@ -27,7 +22,6 @@
 #include "stablehlo/dialect/Register.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/integrations/c/StablehloPasses.h"
-#include "stablehlo/transforms/Passes.h"
 #include "stablehlo/transforms/optimization/Passes.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
@@ -49,6 +43,8 @@
 #include "RTIO/IR/RTIODialect.h"
 
 #include "RegisterAllPasses.h"
+
+#include "OpenQASM/OpenQASM.h"
 
 namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
@@ -80,6 +76,7 @@ int main(int argc, char **argv)
     registry.insert<catalyst::qecl::QecLogicalDialect>();
     registry.insert<catalyst::qecp::QecPhysicalDialect>();
     registry.insert<mlir::stablehlo::StablehloDialect>();
+    registry.insert<catalyst::openqasm::OpenQASMDialect>();
 
     catalyst::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::gradient::registerBufferizableOpInterfaceExternalModels(registry);

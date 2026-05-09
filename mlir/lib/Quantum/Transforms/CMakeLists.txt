@@ -43,6 +43,7 @@ file(GLOB SRC
     AggregateMinLoweringPass.cpp
     NoiseModelPreservationPass.cpp
     DepthCheckPass.cpp
+    MergeUnitaryGates.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

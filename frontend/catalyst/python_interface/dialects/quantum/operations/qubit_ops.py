@@ -35,12 +35,7 @@ from xdsl.irdl import (
 )
 from xdsl.traits import NoMemoryEffect
 
-from ..attributes import (
-    QubitSSAValue,
-    QubitType,
-    QuregSSAValue,
-    QuregType,
-)
+from ..attributes import QubitSSAValue, QubitType, QuregSSAValue, QuregType
 
 
 @irdl_op_definition

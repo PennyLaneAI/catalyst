@@ -50,10 +50,7 @@ from catalyst.utils.patching import Patcher
 
 from .device_utils import create_device_preprocessing_pipeline
 from .qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
-from .qubit_handler import (
-    QubitHandler,
-    QubitIndexRecorder,
-)
+from .qubit_handler import QubitHandler, QubitIndexRecorder
 
 # dummy hop (higher order primitive) is used to just return a jaxpr
 # produced inside of a another jaxpr
