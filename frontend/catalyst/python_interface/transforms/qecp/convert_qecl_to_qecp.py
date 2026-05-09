@@ -56,6 +56,7 @@ from catalyst.utils.exceptions import CompileError
 
 from .convert_qecl_noise_to_qec_noise import ConvertQECLNoiseOpToQECPNoisePass
 from .qec_code_lib import QecCode
+from ..qecl.convert_quantum_to_qecl import _get_idx_value_or_attr_from_extract_or_insert_op
 
 
 class CheckType(StrEnum):
@@ -137,7 +138,8 @@ class ExtractBlockConversion(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecl.ExtractCodeblockOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
-        rewriter.replace_op(op, qecp.ExtractCodeblockOp(op.hyper_reg, op.idx_attr))
+        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
+        rewriter.replace_op(op, qecp.ExtractCodeblockOp(op.hyper_reg, idx))
 
 
 @dataclass
@@ -147,7 +149,8 @@ class InsertBlockConversion(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecl.InsertCodeblockOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
-        rewriter.replace_op(op, qecp.InsertCodeblockOp(op.in_hyper_reg, op.idx_attr, op.codeblock))
+        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
+        rewriter.replace_op(op, qecp.InsertCodeblockOp(op.in_hyper_reg, idx, op.codeblock))
 
 
 # MARK: Encode Op Pattern
