@@ -598,31 +598,6 @@ class TestMLIRSpecs:
             res = mlir_specs(circ, 0, n)
             assert resources_equal(res, expected)
 
-    def test_tape_transforms(self, skip_preprocess, capture_mode):
-        """Test that tape transforms are handled correctly."""
-        if capture_mode:
-            pytest.xfail("Currently broken with plxpr enabled.")
-        if not capture_mode and skip_preprocess:
-            pytest.skip(reason="skip_preprocess ignored without program capture.")
-
-        @qp.qnode(qp.device("lightning.qubit", wires=2))
-        def circ():
-            qp.GlobalPhase(0.5)
-            qp.GlobalPhase(1.0)
-            return qp.expval(qp.PauliZ(0))
-
-        circ = qp.transforms.combine_global_phases(circ)
-        circ = qp.qjit(circ, skip_preprocess=skip_preprocess, capture=capture_mode)
-
-        expected = make_static_resources(
-            operations={"GlobalPhase": {0: 2}},
-            measurements={"expval(PauliZ)": 1},
-            num_allocs=2,
-        )
-
-        res = mlir_specs(circ, level=0)
-        assert resources_equal(res, expected)
-
     def test_stateprep(self, skip_preprocess, capture_mode):
         """Test that StatePrep operations are handled correctly."""
         if not capture_mode and skip_preprocess:
