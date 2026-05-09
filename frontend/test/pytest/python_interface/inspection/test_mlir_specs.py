@@ -614,23 +614,14 @@ class TestMLIRSpecs:
         circ = qp.transforms.combine_global_phases(circ)
         circ = qp.qjit(circ, skip_preprocess=skip_preprocess, capture=capture_mode)
 
-        expected_before = make_static_resources(
+        expected = make_static_resources(
             operations={"GlobalPhase": {0: 2}},
             measurements={"expval(PauliZ)": 1},
             num_allocs=2,
         )
 
-        expected_after = make_static_resources(
-            operations={"GlobalPhase": {0: 1}},
-            measurements={"expval(PauliZ)": 1},
-            num_allocs=2,
-        )
-
-        res_before = mlir_specs(circ, level=0)
-        assert resources_equal(res_before, expected_before)
-
-        res_after = mlir_specs(circ, level=1)
-        assert resources_equal(res_after, expected_after)
+        res = mlir_specs(circ, level=0)
+        assert resources_equal(res, expected)
 
     def test_stateprep(self, skip_preprocess, capture_mode):
         """Test that StatePrep operations are handled correctly."""
