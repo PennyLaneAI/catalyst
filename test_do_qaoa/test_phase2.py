@@ -26,8 +26,8 @@ from scipy.stats import pearsonr
 # Paths
 # ──────────────────────────────────────────────────────────────────────────────
 
-ROOT = pathlib.Path(__file__).parent
-QUANTUM_OPT = ROOT / "catalyst/mlir/build/bin/quantum-opt"
+ROOT = pathlib.Path(__file__).parent.parent
+QUANTUM_OPT = ROOT / "mlir/build/bin/quantum-opt"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Graph helpers

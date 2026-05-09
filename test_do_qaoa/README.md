@@ -16,13 +16,10 @@
 All commands from the repo root (`do-qaoa/`).
 
 ```bash
-# Run everything (phases 3, 4 + acceptance criteria; skips phases needing quantum-opt)
+# Run phases 3, 4 + acceptance criteria (no build required)
 python test_do_qaoa/test_all.py --skip-mlir
 
-# Run everything including MLIR phases (requires quantum-opt on PATH)
-python test_do_qaoa/test_all.py
-
-# Skip slow acceptance tests (C3, C4, C5, C10)
+# Skip slow acceptance tests too (C3, C4, C5, C10)
 python test_do_qaoa/test_all.py --skip-mlir --fast
 
 # Run a single phase
@@ -31,4 +28,35 @@ python test_do_qaoa/test_phase4.py
 
 # Run acceptance criteria only
 python test_do_qaoa/test_acceptance_criteria.py
+```
+
+## Running Phase 1 and Phase 2 (requires quantum-opt)
+
+Phase 1 and 2 test the MLIR compiler backend and need `quantum-opt` to be built first.
+
+**Step 1 — Initialize submodules**
+```bash
+git submodule update --init --recursive
+```
+
+**Step 2 — Build LLVM/MLIR**
+```bash
+make -C mlir llvm
+```
+
+**Step 3 — Build dependencies**
+```bash
+make -C mlir stablehlo enzyme
+```
+
+**Step 4 — Build quantum-opt**
+```bash
+make -C mlir dialects
+```
+
+The binary will be at `mlir/build/bin/quantum-opt`. This takes 3–5 hours on first build.
+
+**Step 5 — Run all tests including phase 1 and 2**
+```bash
+python test_do_qaoa/test_all.py
 ```
