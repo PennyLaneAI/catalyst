@@ -17,6 +17,7 @@ configure_lit_site_cfg(
 set(DIALECT_TESTS_DEPEND
     FileCheck
     quantum-opt
+    quantum-translate
     catalyst-cli
 )
 

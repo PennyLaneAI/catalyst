@@ -247,6 +247,10 @@ def BufferDeallocationPass : Pass<"buffer-deallocation", "func::FuncOp"> {
   }];
 }
 
+def MyHelloWorldPass : Pass<"my-hello-world"> {
+    let summary = "An empty pass boilerplate that prints out hello world.";
+}
+
 def ResourceAnalysisPass : Pass<"resource-analysis"> {
     let summary = "Track and report resource usage.";
     let description = [{
@@ -347,5 +351,4 @@ def EmptyPass : Pass<"empty"> {
         >
     ];
 }
-
 #endif // CATALYST_PASSES

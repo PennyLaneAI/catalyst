@@ -22,10 +22,7 @@ import pytest
 from numpy.testing import assert_allclose, assert_equal
 from pennylane.transforms.intermediate_reps import phase_polynomial
 
-from catalyst.python_interface.transforms import (
-    ParitySynthPass,
-    parity_synth_pass,
-)
+from catalyst.python_interface.transforms import ParitySynthPass, parity_synth_pass
 from catalyst.python_interface.transforms.quantum.parity_synth import _parity_network_synth
 
 pytestmark = pytest.mark.xdsl

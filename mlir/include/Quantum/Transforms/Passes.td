@@ -195,6 +195,13 @@ def LoopBoundaryOptimizationPass : Pass<"loop-boundary"> {
     let summary = "Perform loop boundary optimization to eliminate the redundancy of operations on loop boundary.";
 }
 
+
+def MergeUnitaryGatesPass : Pass<"merge-unitary-gates"> {
+    let summary = "Perform merging of chained unitary gates.";
+
+    // let constructor = "catalyst::createMergeUnitaryGatesPass()";
+}
+
 def DynamicOneShotPass : Pass<"dynamic-one-shot", "mlir::ModuleOp"> {
     let summary = "Apply the dynamic one-shot transform.";
 
@@ -209,6 +216,7 @@ def DynamicOneShotPass : Pass<"dynamic-one-shot", "mlir::ModuleOp"> {
 def CombineGlobalPhasesPass : Pass<"combine-global-phases", "mlir::ModuleOp"> {
     let summary = "Scope-wise merging of global phase operators (safe).";
 }
+
 
 // ----- Quantum circuit transformation passes end ----- //
 

@@ -40,14 +40,7 @@ from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
 from jax._src.source_info_util import current as current_source_info
 from jax._src.util import safe_map, unzip2, wraps
 from jax.api_util import flatten_fun
-from jax.core import (
-    AbstractValue,
-    DShapedArray,
-    ShapedArray,
-    eval_jaxpr,
-    find_top_trace,
-    gensym,
-)
+from jax.core import AbstractValue, DShapedArray, ShapedArray, eval_jaxpr, find_top_trace, gensym
 from jax.extend.core import ClosedJaxpr, Jaxpr, JaxprEqn
 from jax.extend.core import Primitive as JaxprPrimitive
 from jax.extend.core import Var

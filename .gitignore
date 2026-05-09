@@ -1,3 +1,6 @@
+# Local testing files
+CLAUDE.md
+
 # Build directories
 build
 __pycache__
