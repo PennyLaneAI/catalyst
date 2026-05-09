@@ -130,15 +130,6 @@ LogicalResult QuantumDialect::verifyOperationAttribute(Operation *op, NamedAttri
         return op->emitOpError() << "attribute '" << attrName << "' must be a unit attribute";
     }
 
-    // Cannot enforce this yet as Catalyst allows QNodes without MPs.
-    // auto funcOp = cast<func::FuncOp>(op);
-    // auto measurement = funcOp.walk([&](MeasurementProcess) { return WalkResult::interrupt(); });
-    // if (!measurement.wasInterrupted()) {
-    //     return op->emitOpError()
-    //            << "attribute '" << attrName
-    //            << "' requires at least one measurement process operation in the function body";
-    // }
-
     return success();
 }
 

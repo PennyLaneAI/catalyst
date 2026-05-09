@@ -568,3 +568,34 @@ LogicalResult AdjointOp::verify()
 
     return success();
 }
+
+//===----------------------------------------------------------------------===//
+// DO-QAOA op verifiers.
+//===----------------------------------------------------------------------===//
+
+LogicalResult FreezePartitionOp::verify()
+{
+    auto partType = mlir::cast<PartitionType>(getPartition().getType());
+    int32_t hotspotCount = getHotspotCount();
+    auto hotspotIndices = getHotspotIndices();
+
+    if (hotspotCount != static_cast<int32_t>(hotspotIndices.size())) {
+        return emitOpError() << "hotspot_count (" << hotspotCount
+                             << ") must equal the number of entries in hotspot_indices ("
+                             << hotspotIndices.size() << ")";
+    }
+
+    if (hotspotCount > static_cast<int32_t>(partType.getNumQubits())) {
+        return emitOpError() << "hotspot_count (" << hotspotCount
+                             << ") must not exceed the circuit qubit count ("
+                             << partType.getNumQubits() << ")";
+    }
+
+    if (static_cast<unsigned>(hotspotCount) != partType.getM()) {
+        return emitOpError() << "hotspot_count (" << hotspotCount
+                             << ") must equal the partition type parameter m (" << partType.getM()
+                             << ")";
+    }
+
+    return success();
+}

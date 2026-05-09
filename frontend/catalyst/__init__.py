@@ -68,6 +68,23 @@ if not INSTALLED:
 sys.modules["mlir_quantum.ir"] = __import__("jaxlib.mlir.ir").mlir.ir
 sys.modules["mlir_quantum._mlir_libs"] = __import__("jaxlib.mlir._mlir_libs").mlir._mlir_libs
 
+from catalyst.utils.precompile_decomposition_rules import (
+    BYTECODE_FILE_PATH,
+    precompile_decomp_rules,
+)
+
+# we ONLY want to compile on init for dev installs, where the caching should work correctly
+if (
+    not (
+        INSTALLED  # do not recompile on user installations
+        or os.getenv("DOCUTILSCONFIG")  # do not run for docs
+        or os.getenv("READTHEDOCS_CANONICAL_URL")  # do not run for RTD
+        or os.getenv("CI")  # do not run in CI
+    )
+    and not BYTECODE_FILE_PATH.exists()
+):  # pragma: no cover
+    precompile_decomp_rules()  # pragma: no cover
+
 from catalyst import debug, logging, passes
 from catalyst.api_extensions import *
 from catalyst.api_extensions import __all__ as _api_extension_list

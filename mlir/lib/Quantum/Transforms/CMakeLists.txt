@@ -30,6 +30,19 @@ file(GLOB SRC
     IonsDecompositionPatterns.cpp
     loop_boundary_optimization.cpp
     LoopBoundaryOptimizationPatterns.cpp
+    split_non_commuting.cpp
+    dynamic_one_shot.cpp
+    EnergyEval.cpp
+    LandscapeOverlapAnalysis.cpp
+    BiasShiftAnalysis.cpp
+    RepresentativeSelectionPass.cpp
+    TrainingScheduleRewriterPass.cpp
+    SharedParameterBuffer.cpp
+    WarmStartSchedulerPass.cpp
+    DirectTransferPass.cpp
+    AggregateMinLoweringPass.cpp
+    NoiseModelPreservationPass.cpp
+    DepthCheckPass.cpp
     MergeUnitaryGates.cpp
 )
 

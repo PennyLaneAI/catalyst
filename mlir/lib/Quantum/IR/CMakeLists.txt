@@ -1,4 +1,5 @@
 add_mlir_library(MLIRQuantum
+    QuantumAttrs.cpp
     QuantumDialect.cpp
     QuantumInterfaces.cpp
     QuantumOps.cpp

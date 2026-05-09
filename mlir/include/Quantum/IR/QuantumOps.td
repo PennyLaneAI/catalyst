@@ -1320,4 +1320,127 @@ def StateOp : Measurement_Op<"state", [AttrSizedOperandSegments]> {
 }
 
 
+//===----------------------------------------------------------------------===//
+// DO-QAOA operations (Section 2.2 of implementation plan).
+//===----------------------------------------------------------------------===//
+
+def FreezePartitionOp : Quantum_Op<"freeze_partition", [Pure]> {
+    let summary = "Annotate a QNode with frozen qubit indices for DO-QAOA.";
+    let description = [{
+        Marks the m highest-degree nodes as frozen via degree centrality,
+        generating 2^m sub-problems for divide-and-conquer QAOA.
+        The hotspot_indices attribute lists the frozen qubit positions;
+        hotspot_count must equal the length of hotspot_indices.
+
+        Example:
+        ```mlir
+        %part = quantum.freeze_partition
+                    {hotspot_count = 2 : i32,
+                     hotspot_indices = array<i32: 0, 3>}
+                    : !quantum.partition<4, 2>
+        ```
+    }];
+    let arguments = (ins
+        I32Attr:$hotspot_count,
+        DenseI32ArrayAttr:$hotspot_indices
+    );
+    let results = (outs PartitionType:$partition);
+    let assemblyFormat = [{ attr-dict `:` type($partition) }];
+    let hasVerifier = 1;
+}
+
+def LandscapeClusterOp : Quantum_Op<"landscape_cluster", [Pure]> {
+    let summary = "Group 2^m DO-QAOA sub-problems into K landscape clusters.";
+    let description = [{
+        Given a partition descriptor, samples E(gamma, beta) on a coarse
+        grid for each sub-problem, computes pairwise cosine similarity
+        S_kl, and assigns each sub-problem to one of K clusters.
+        Default K=1 for sparse graphs with s > sc ~= 0.6.
+
+        Example:
+        ```mlir
+        %cmap = quantum.landscape_cluster(%part : !quantum.partition<4, 2>)
+                    {k = 1 : i32} : !quantum.cluster_map<1>
+        ```
+    }];
+    let arguments = (ins
+        PartitionType:$partition,
+        I32Attr:$k
+    );
+    let results = (outs ClusterMapType:$cluster_map);
+    let assemblyFormat = [{
+        `(` $partition `:` type($partition) `)` attr-dict `:` type($cluster_map)
+    }];
+}
+
+def SelectRepresentativeOp : Quantum_Op<"select_representative", [Pure]> {
+    let summary = "Return the representative sub-circuit index per cluster.";
+    let description = [{
+        For each landscape cluster, selects one sub-problem as the
+        representative on which full variational optimisation is performed.
+        All other sub-problems reuse transferred parameters.
+
+        Example:
+        ```mlir
+        %ref = quantum.select_representative(%cmap : !quantum.cluster_map<1>)
+                   : !quantum.circuit_ref
+        ```
+    }];
+    let arguments = (ins ClusterMapType:$cluster_map);
+    let results = (outs CircuitRefType:$circuit_ref);
+    let assemblyFormat = [{
+        `(` $cluster_map `:` type($cluster_map) `)` attr-dict `:` type($circuit_ref)
+    }];
+}
+
+def BiasTransferOp : Quantum_Op<"bias_transfer", [Pure]> {
+    let summary = "Apply the Bias-Aware Transfer Rule for DO-QAOA parameter reuse.";
+    let description = [{
+        Computes delta_B = |B_target - B_rep|. If delta_B < threshold,
+        copies the representative parameters directly (zero training cost).
+        Otherwise initialises a warm-start from the representative parameters
+        and runs up to warmstart_epochs epochs of Adam optimisation.
+
+        Example:
+        ```mlir
+        %p_out = quantum.bias_transfer(%p_rep : !quantum.params)
+                     {B_rep = 0.25 : f64, B_target = 0.28 : f64,
+                      threshold = 0.3 : f64} : !quantum.params
+        ```
+    }];
+    let arguments = (ins
+        ParamsType:$params_rep,
+        F64Attr:$B_rep,
+        F64Attr:$B_target,
+        F64Attr:$threshold
+    );
+    let results = (outs ParamsType:$params_out);
+    let assemblyFormat = [{
+        `(` $params_rep `:` type($params_rep) `)` attr-dict `:` type($params_out)
+    }];
+}
+
+def AggregateMinOp : Quantum_Op<"aggregate_min", [Pure]> {
+    let summary = "Select the sub-circuit with minimum expectation value.";
+    let description = [{
+        Collects expectation values from all 2^m sub-circuit executions and
+        returns the bitstring corresponding to the sub-circuit with the
+        minimum (most negative) expectation value, giving the best
+        approximate solution to the combinatorial optimisation problem.
+
+        Example:
+        ```mlir
+        %best = quantum.aggregate_min(%r0, %r1, %r2, %r3
+                    : !quantum.params, !quantum.params,
+                      !quantum.params, !quantum.params)
+                    : !quantum.bitstring
+        ```
+    }];
+    let arguments = (ins Variadic<ParamsType>:$results);
+    let results = (outs BitstringType:$bitstring);
+    let assemblyFormat = [{
+        `(` $results `:` type($results) `)` attr-dict `:` type($bitstring)
+    }];
+}
+
 #endif // QUANTUM_OPS

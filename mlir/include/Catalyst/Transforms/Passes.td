@@ -286,7 +286,6 @@ def ResourceAnalysisPass : Pass<"resource-analysis"> {
     ];
 }
 
-
 def RegisterDecompRuleResourcePass : Pass<"register-decomp-rule-resource"> {
     let summary = "Compute and register the resources of decomposition rules.";
     let description = [{
