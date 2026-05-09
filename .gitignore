@@ -1,5 +1,6 @@
 # Local testing files
 CLAUDE.md
+test_do_qaoa/MaxCut4QubitMilestone.mlir
 
 # Build directories
 build
