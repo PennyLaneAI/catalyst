@@ -458,7 +458,9 @@ try:
         bbox=dict(boxstyle="round,pad=0.4", facecolor="white", edgecolor=badge_color, linewidth=2),
     )
 
-    out_png = ROOT / "phase2_milestone.png"
+    out_dir = pathlib.Path(__file__).parent / "benchmark_results"
+    out_dir.mkdir(exist_ok=True)
+    out_png = out_dir / "phase2_milestone.png"
     fig.savefig(out_png, dpi=150, bbox_inches="tight")
     print(f"\n  Saved → {out_png}")
 
