@@ -582,7 +582,7 @@ int invoke_kernel(RemoteSession *s, uint64_t entry_addr, size_t num_inputs,
 
         // Layout (av):
         // av (argument) is a struct whose Nth field is a pointer to the Nth input memref
-        // descriptor. So av_remote = [N x uintptr_t] (array of remote descriptor addresses).
+        // descriptor. So av = [N x uintptr_t] (array of remote descriptor addresses).
         //
         // av ──►┌───────────┐     ┌──────────────────────┐   ┌──────┐
         //       │slot0 (ptr)┼────►│memref      .allocated┼┬─►│buffer│
