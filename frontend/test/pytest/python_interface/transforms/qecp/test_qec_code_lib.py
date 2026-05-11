@@ -19,8 +19,8 @@ import re
 import numpy as np
 import pytest
 
-from catalyst.python_interface.transforms.qecp.qec_code_lib import QecCode
 from catalyst.python_interface.dialects import qecp
+from catalyst.python_interface.transforms.qecp.qec_code_lib import QecCode
 
 SUPPORTED_CODES = ["Steane"]
 
