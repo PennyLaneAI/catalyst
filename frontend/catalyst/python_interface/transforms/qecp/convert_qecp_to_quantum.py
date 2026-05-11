@@ -30,11 +30,10 @@ from xdsl.pattern_rewriter import (
 )
 
 from catalyst.python_interface.dialects import qecp
-from catalyst.python_interface.dialects.quantum.attributes import QuregType, QubitType
+from catalyst.python_interface.dialects.quantum.attributes import QubitType
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 
 # MARK: Type Conversion Pattern
-
 
 
 @dataclass

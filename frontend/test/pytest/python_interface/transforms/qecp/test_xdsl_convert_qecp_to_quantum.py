@@ -23,6 +23,7 @@ from catalyst.python_interface.transforms.qecp.convert_qecp_to_quantum import (
 
 pytestmark = pytest.mark.xdsl
 
+
 class TestConvertQecPhysicalToQuantumPass:
     """Unit tests for ConvertQecPhysicalToQuantumPass."""
 
