@@ -41,7 +41,9 @@ class PhysicalCodeblockTypeConversion(TypeConversionPattern):
     """Codeblock type conversion pattern from qecp.codeblock -> quantum.reg."""
 
     @attr_type_rewrite_pattern
-    def convert_type(self, typ: qecp.PhysicalCodeblockType) -> QuregType:
+    def convert_type(
+        self, typ: qecp.PhysicalCodeblockType
+    ) -> QuregType:  # pylint: disable=unused-argument
         """Type conversion rewrite pattern for physical codeblock types."""
 
         return QuregType()
@@ -52,7 +54,9 @@ class QecPhysicalQubitTypeConversion(TypeConversionPattern):
     """Qubit type conversion pattern from qecp.qubit -> quantum.bit."""
 
     @attr_type_rewrite_pattern
-    def convert_type(self, typ: qecp.QecPhysicalQubitType) -> QubitType:
+    def convert_type(
+        self, typ: qecp.QecPhysicalQubitType
+    ) -> QubitType:  # pylint: disable=unused-argument
         """Type conversion rewrite pattern for QEC physical qubit types."""
 
         return QubitType()
