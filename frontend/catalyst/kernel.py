@@ -56,7 +56,7 @@ def declare(name: str, artifact: str, outputs) -> KernelDescriptor:
     """Declare a pre-compiled external kernel for use with :func:`kernel.runtime_call`.
 
     Args:
-        name:     C symbol exported by the artifact (e.g. ``"decode"``).
+        name:     C symbol exported by the artifact (e.g. ``"my_func"``).
         artifact: Path to the shared library. Resolved relative to ``os.getcwd()``
                   if not absolute. The file must exist at declare time.
         outputs:  :class:`jax.ShapeDtypeStruct` or tuple of them describing each
@@ -87,7 +87,7 @@ def runtime_call(kernel_descriptor, *args):
     Returns:
         tuple: Output tensors. For a single output, unpack explicitly::
 
-            (result,) = kernel.runtime_call(decode, syndrome)
+            (result,) = kernel.runtime_call(my_kernel, data)
 
     Raises:
         NotImplementedError: On use under ``jax.grad`` or ``jax.vmap``.
