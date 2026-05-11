@@ -800,10 +800,10 @@ def parse_args() -> argparse.Namespace:
             "Examples:\n"
             "  python qcc_simulator.py circuit.qasm\n"
             "  python qcc_simulator.py circuit.py --lang pennylane\n"
-            "  python qcc_simulator.py --batch test_translation_qasm3/qasm3_circuits/\n"
-            "  python qcc_simulator.py --batch circuits/ --simulation\n"
-            "  python qcc_simulator.py --batch circuits/ --verbose\n"
-            "  python qcc_simulator.py --batch circuits/ --report report.txt\n"
+            "  python qcc_simulator.py --batch test_qcc_feature/qasm3/qasm3_circuits/\n"
+            "  python qcc_simulator.py --batch circuits_folder/ --simulation\n"
+            "  python qcc_simulator.py --batch circuits_folder/ --verbose\n"
+            "  python qcc_simulator.py --batch circuits_folder/ --report report.txt\n"
         ),
     )
     parser.add_argument(

@@ -26,7 +26,7 @@ from scipy.stats import pearsonr
 # Paths
 # ──────────────────────────────────────────────────────────────────────────────
 
-ROOT = pathlib.Path(__file__).parent.parent
+ROOT = pathlib.Path(__file__).parent.parent.parent
 QUANTUM_OPT = ROOT / "mlir/build/bin/quantum-opt"
 
 # ──────────────────────────────────────────────────────────────────────────────

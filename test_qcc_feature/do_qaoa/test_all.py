@@ -12,9 +12,9 @@ Test files:
     test_phase5.py  — Phase 5: acceptance criteria C1–C11 + benchmark figures (Tasks 1–5)
 
 Run:
-    python test_do_qaoa/test_all.py
-    python test_do_qaoa/test_all.py -v
-    python test_do_qaoa/test_all.py --skip-mlir  # skip phases needing quantum-opt
+    python test_qcc_feature/do_qaoa/test_all.py
+    python test_qcc_feature/do_qaoa/test_all.py -v
+    python test_qcc_feature/do_qaoa/test_all.py --skip-mlir  # skip phases needing quantum-opt
 """
 
 import argparse
@@ -23,7 +23,7 @@ import sys
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
+ROOT = os.path.dirname(os.path.dirname(HERE))
 
 # Phase 1 and 2 require quantum-opt for their MLIR steps
 MLIR_PHASES = {"test_phase1.py", "test_phase2.py"}

@@ -18,15 +18,15 @@ All commands from the repo root (`do-qaoa/`).
 
 ```bash
 # Run phases 3, 4, 5 (no build required — skips MLIR phases 1 and 2)
-python test_do_qaoa/test_all.py --skip-mlir
+python test_qcc_feature/do_qaoa/test_all.py --skip-mlir
 
 # Run a single phase
-python test_do_qaoa/test_phase3.py
-python test_do_qaoa/test_phase4.py
-python test_do_qaoa/test_phase5.py
+python test_qcc_feature/do_qaoa/test_phase3.py
+python test_qcc_feature/do_qaoa/test_phase4.py
+python test_qcc_feature/do_qaoa/test_phase5.py
 
 # Run acceptance criteria only (no figures)
-python test_do_qaoa/test_acceptance_criteria.py
+python test_qcc_feature/do_qaoa/test_acceptance_criteria.py
 ```
 
 ## Running Phase 1 and Phase 2 (requires quantum-opt)
@@ -57,5 +57,5 @@ The binary will be at `mlir/build/bin/quantum-opt`. This takes 3–5 hours on fi
 
 **Step 5 — Run all tests including phase 1 and 2**
 ```bash
-python test_do_qaoa/test_all.py
+python test_qcc_feature/do_qaoa/test_all.py
 ```

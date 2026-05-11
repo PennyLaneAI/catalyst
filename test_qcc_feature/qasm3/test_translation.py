@@ -9,7 +9,7 @@ from qiskit import QuantumCircuit, transpile
 
 # Setup environment to find mlir_core without setting PYTHONPATH manually
 script_dir = Path(__file__).parent.resolve()
-root_dir = script_dir.parent
+root_dir = script_dir.parent.parent
 sys.path.append(str(root_dir))  # For qiskit_importer_standalone
 
 # Helper to find mlir_core location similar to test_quantum_translate.py

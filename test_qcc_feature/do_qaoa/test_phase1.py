@@ -26,7 +26,7 @@ sys.modules["catalyst"] = cat_stub
 sys.modules["catalyst.api_extensions"] = cat_stub.api_extensions
 
 spec = importlib.util.spec_from_file_location(
-    "doqaoa", pathlib.Path(__file__).parent.parent / "frontend/catalyst/api_extensions/doqaoa.py"
+    "doqaoa", pathlib.Path(__file__).parent.parent.parent / "frontend/catalyst/api_extensions/doqaoa.py"
 )
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
@@ -153,7 +153,7 @@ module {{
 """
 
 # ── 5. Write to temp file and round-trip through quantum-opt ─────────────────
-_REPO_ROOT = pathlib.Path(__file__).parent.parent
+_REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 QUANTUM_OPT = _REPO_ROOT / "mlir/build/bin/quantum-opt"
 
 out_path = pathlib.Path(__file__).parent / "MaxCut4QubitMilestone.mlir"
@@ -190,7 +190,7 @@ def generate_figure(out_dir):
     _cat.api_extensions = _types.ModuleType("catalyst.api_extensions")
     _sys.modules.setdefault("catalyst", _cat)
     _sys.modules.setdefault("catalyst.api_extensions", _cat.api_extensions)
-    _spec = _ilu.spec_from_file_location("doqaoa_fig", pathlib.Path(__file__).parent.parent / "frontend/catalyst/api_extensions/doqaoa.py")
+    _spec = _ilu.spec_from_file_location("doqaoa_fig", pathlib.Path(__file__).parent.parent.parent / "frontend/catalyst/api_extensions/doqaoa.py")
     _m = _ilu.module_from_spec(_spec)
     _spec.loader.exec_module(_m)
 

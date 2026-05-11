@@ -10,6 +10,7 @@ Run as:
 
 import importlib.util
 import math
+import pathlib
 import platform
 import sys
 import time
@@ -22,7 +23,7 @@ from pennylane import Hamiltonian
 
 # ── Load DO-QAOA module ───────────────────────────────────────────────────────
 spec = importlib.util.spec_from_file_location(
-    "doqaoa", "frontend/catalyst/api_extensions/doqaoa.py"
+    "doqaoa", pathlib.Path(__file__).parent.parent.parent / "frontend/catalyst/api_extensions/doqaoa.py"
 )
 _mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(_mod)

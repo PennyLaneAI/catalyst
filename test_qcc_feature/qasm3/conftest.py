@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 # Setup paths
-ROOT_DIR = Path(__file__).parent.parent.resolve()
+ROOT_DIR = Path(__file__).parent.parent.parent.resolve()
 sys.path.append(str(ROOT_DIR))
 
 # Setup MLIR path

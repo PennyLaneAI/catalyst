@@ -36,7 +36,7 @@ import numpy as np
 import pennylane as qml
 
 spec = importlib.util.spec_from_file_location(
-    "doqaoa", "frontend/catalyst/api_extensions/doqaoa.py"
+    "doqaoa", pathlib.Path(__file__).parent.parent.parent / "frontend/catalyst/api_extensions/doqaoa.py"
 )
 _mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(_mod)

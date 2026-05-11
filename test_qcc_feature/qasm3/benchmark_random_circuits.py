@@ -23,7 +23,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 # Add parent directory to path for imports
 script_dir = Path(__file__).parent.resolve()
-root_dir = script_dir.parent
+root_dir = script_dir.parent.parent
+sys.path.insert(0, str(script_dir))
 sys.path.append(str(root_dir))
 
 # Setup MLIR paths

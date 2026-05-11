@@ -2,7 +2,7 @@
 """Phase 5 — Acceptance criteria C1–C11 + benchmark figure generation.
 
 Run from the repo root:
-    python test_do_qaoa/test_phase5.py
+    python test_qcc_feature/do_qaoa/test_phase5.py
 """
 
 import pathlib
@@ -10,7 +10,7 @@ import sys
 import unittest
 
 HERE = pathlib.Path(__file__).parent
-ROOT = HERE.parent
+ROOT = HERE.parent.parent
 sys.path.insert(0, str(HERE))
 
 # ── Run acceptance criteria C1–C11 ────────────────────────────────────────────

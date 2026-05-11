@@ -15,7 +15,8 @@ import pytest
 
 # Setup paths
 script_dir = Path(__file__).parent.resolve()
-root_dir = script_dir.parent
+root_dir = script_dir.parent.parent
+sys.path.insert(0, str(script_dir))
 sys.path.append(str(root_dir))
 
 mlir_core_path = (

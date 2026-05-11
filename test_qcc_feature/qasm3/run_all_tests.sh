@@ -18,7 +18,7 @@ echo ""
 
 # Get script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # Setup environment
 export PYTHONPATH="${ROOT_DIR}/mlir/llvm-project/build/tools/mlir/python_packages/mlir_core:${PYTHONPATH}"
@@ -68,7 +68,7 @@ case "$MODE" in
     "legacy")
         echo -e "${YELLOW}Running Legacy Test Suite...${NC}"
         cd "$ROOT_DIR"
-        python test_translation_qasm3/test_translation.py
+        python test_qcc_feature/qasm3/test_translation.py
         ;;
 
     "pytest")
@@ -81,7 +81,7 @@ case "$MODE" in
             exit 1
         fi
 
-        pytest test_translation_qasm3/test_qasm3_translation_pytest.py -v
+        pytest test_qcc_feature/qasm3/test_qasm3_translation_pytest.py -v
         ;;
 
     "pytest-parallel")
@@ -95,9 +95,9 @@ case "$MODE" in
 
         if ! python -c "import xdist" 2>/dev/null; then
             echo -e "${YELLOW}⚠ pytest-xdist not available, running sequentially${NC}"
-            pytest test_translation_qasm3/test_qasm3_translation_pytest.py -v
+            pytest test_qcc_feature/qasm3/test_qasm3_translation_pytest.py -v
         else
-            pytest test_translation_qasm3/test_qasm3_translation_pytest.py -v -n auto
+            pytest test_qcc_feature/qasm3/test_qasm3_translation_pytest.py -v -n auto
         fi
         ;;
 
@@ -111,7 +111,7 @@ case "$MODE" in
             exit 1
         fi
 
-        pytest test_translation_qasm3/test_qasm3_translation_pytest.py -v --cov=test_translation_qasm3 --cov-report=html --cov-report=term
+        pytest test_qcc_feature/qasm3/test_qasm3_translation_pytest.py -v --cov=test_translation_qasm3 --cov-report=html --cov-report=term
         echo ""
         echo -e "${GREEN}Coverage report generated in htmlcov/index.html${NC}"
         ;;
@@ -122,13 +122,13 @@ case "$MODE" in
 
         echo "=== Legacy Test Suite ==="
         cd "$ROOT_DIR"
-        python test_translation_qasm3/test_translation.py
+        python test_qcc_feature/qasm3/test_translation.py
         LEGACY_STATUS=$?
         echo ""
 
         if python -c "import pytest" 2>/dev/null; then
             echo "=== Pytest Suite ==="
-            pytest test_translation_qasm3/test_qasm3_translation_pytest.py -v
+            pytest test_qcc_feature/qasm3/test_qasm3_translation_pytest.py -v
             PYTEST_STATUS=$?
             echo ""
 
