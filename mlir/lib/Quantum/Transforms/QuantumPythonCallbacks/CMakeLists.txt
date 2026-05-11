@@ -4,9 +4,11 @@ execute_process(
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-set(Python3_USE_STATIC_LIBS ON)
+if (STATIC_LINK_PYTHON)
+    set(Python3_USE_STATIC_LIBS ON) # needed for manylinux wheels
+endif()
 find_package(pybind11 REQUIRED)
-find_package(Python3 COMPONENTS Development REQUIRED)
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Embed)
 
 add_mlir_library(QuantumPythonCallbacks STATIC
     PythonFunction.cpp

@@ -23,6 +23,7 @@ ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pyproject.toml')
 ENABLE_FLAKY ?= OFF
 XDSL_TESTS ?= ON
+STATIC_LINK_PYTHON ?= OFF
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
