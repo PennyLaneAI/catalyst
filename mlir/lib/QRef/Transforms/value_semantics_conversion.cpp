@@ -1778,10 +1778,11 @@ struct ValueSemanticsConversionPass
         IRRewriter builder(ctx);
 
         WalkResult getOpVerification = mod->walk([&](qref::GetOp getOp) {
-            if (!llvm::all_of(getOp->getUsers(),
-                              llvm::IsaPred<qref::QuantumOperation, qref::MeasureOp,
-                                            qref::ComputationalBasisOp, qref::NamedObsOp,
-                                            qref::HermitianOp, qref::MeasureInBasisOp>)) {
+            if (!llvm::all_of(
+                    getOp->getUsers(),
+                    llvm::IsaPred<qref::QuantumOperation, qref::MeasureOp,
+                                  qref::ComputationalBasisOp, qref::NamedObsOp, qref::HermitianOp,
+                                  qref::MeasureInBasisOp, func::CallOp>)) {
                 getOp.emitOpError(
                     "qref.get operations can only be used by qref dialect gate operations");
                 return WalkResult::interrupt();
