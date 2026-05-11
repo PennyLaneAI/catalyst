@@ -2,6 +2,10 @@
 
 <h3>New features since last release</h3>
 
+* A new, experimental compiler pass `convert-qecp-to-quantum` has been added to lower operations
+  from the QEC Physical (`qecp`) dialect into the Quantum (`quantum`) dialect.
+  [(#2822)](https://github.com/PennyLaneAI/catalyst/pull/2822)
+
 <h3>Improvements 🛠</h3>
 
 <h3>Breaking changes 💔</h3>
@@ -27,3 +31,4 @@
 This release contains contributions from (in alphabetical order):
 
 Lillian Frederiksen,
+Shuli Shu,
