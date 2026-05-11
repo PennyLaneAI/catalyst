@@ -33,4 +33,3 @@ class TestConvertQecPhysicalToQuantumPass:
     def test_compiler_transform_wrapper(self):
         """The compiler_transform wrapper is defined and callable."""
         assert callable(convert_qecp_to_quantum_pass)
-
