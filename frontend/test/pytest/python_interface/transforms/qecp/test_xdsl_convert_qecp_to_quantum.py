@@ -16,9 +16,21 @@
 
 import pytest
 
-# from catalyst.python_interface.transforms.qecp.convert_qecp_to_quantum import (
-#     ConvertQecPhysicalToQuantumPass,
-#     convert_qecp_to_quantum_pass,
-# )
+from catalyst.python_interface.transforms.qecp.convert_qecp_to_quantum import (
+    ConvertQecPhysicalToQuantumPass,
+    convert_qecp_to_quantum_pass,
+)
 
 pytestmark = pytest.mark.xdsl
+
+class TestConvertQecPhysicalToQuantumPass:
+    """Unit tests for ConvertQecPhysicalToQuantumPass."""
+
+    def test_pass_name(self):
+        """The module pass reports a stable pipeline name."""
+        assert ConvertQecPhysicalToQuantumPass.name == "convert-qecp-to-quantum"
+
+    def test_compiler_transform_wrapper(self):
+        """The compiler_transform wrapper is defined and callable."""
+        assert callable(convert_qecp_to_quantum_pass)
+
