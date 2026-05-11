@@ -54,9 +54,9 @@ from catalyst.python_interface.transforms.qecp.tanner_graph_lib import (
 )
 from catalyst.utils.exceptions import CompileError
 
+from ..qecl.convert_quantum_to_qecl import _get_idx_value_or_attr_from_extract_or_insert_op
 from .convert_qecl_noise_to_qec_noise import ConvertQECLNoiseOpToQECPNoisePass
 from .qec_code_lib import QecCode
-from ..qecl.convert_quantum_to_qecl import _get_idx_value_or_attr_from_extract_or_insert_op
 
 
 class CheckType(StrEnum):
