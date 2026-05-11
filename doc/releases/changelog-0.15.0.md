@@ -27,7 +27,7 @@
   {'GlobalPhase': 1}
   ```
 
-  Additionally, here was a previous implementation of this pass using xDSL but it has been removed.
+  Additionally, there was a previous implementation of this pass using xDSL but it has been removed.
 
 * Executing circuits that are compiled with :func:`pennylane.transforms.to_ppr`,
   :func:`pennylane.transforms.commute_ppr`, :func:`pennylane.transforms.ppr_to_ppm`,
