@@ -30,6 +30,9 @@ void close(RemoteSession *s);
 // Load an object file into the remote JIT. Returns 0 on success, -1 on error.
 int load_object_path(RemoteSession *s, const char *path);
 
+// Load an asset file into the remote JIT. Returns 0 on success, -1 on error.
+int load_asset_path(RemoteSession *s, const char *path);
+
 // Look up a symbol address on the remote. Returns 0 on error.
 uint64_t lookup(RemoteSession *s, const char *name);
 

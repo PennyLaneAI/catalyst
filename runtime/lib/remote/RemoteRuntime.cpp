@@ -146,6 +146,9 @@ int __catalyst__remote__send_binary(const char *addr, const char *path, uint32_t
     case 0:
         rc = catalyst::remote::load_object_path(entry->session, path);
         break;
+    case 1:
+        rc = catalyst::remote::load_asset_path(entry->session, path);
+        break;
     default:
         std::string msg = "unknown binary format tag ";
         msg += std::to_string(format);

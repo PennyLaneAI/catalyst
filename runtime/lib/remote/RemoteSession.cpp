@@ -194,6 +194,7 @@ struct RemoteSession {
     ExecutorAddr alloc_fn{0};
     ExecutorAddr free_fn{0};
     ExecutorAddr invoke_fn{0};
+    ExecutorAddr store_asset_fn{0};
 
     RemoteSession(std::unique_ptr<ExecutionSession> es, DataLayout dl)
         : ES(std::move(es)), DL(std::move(dl)), Mangle(*this->ES, this->DL), ObjectLayer(*this->ES),
@@ -384,7 +385,8 @@ RemoteSession *open(const char *remote_addr)
         auto s = unwrap(RemoteSession::Create(remote_addr), "open(" + Twine(remote_addr) + ")");
         check(s->getEPC().getBootstrapSymbols({{s->alloc_fn, "catalyst_remote_alloc"},
                                                {s->free_fn, "catalyst_remote_free"},
-                                               {s->invoke_fn, "catalyst_remote_invoke"}}),
+                                               {s->invoke_fn, "catalyst_remote_invoke"},
+                                               {s->store_asset_fn, "catalyst_remote_store_asset"}}),
               "getBootstrapSymbols");
         return s.release();
     }
@@ -415,6 +417,36 @@ int load_object_path(RemoteSession *s, const char *path)
     try {
         auto buf = unwrap(getFile(path), "getFile(" + Twine(path) + ")");
         check(s->addObjectFile(std::move(buf)), "addObjectFile");
+        return 0;
+    }
+    catch (const std::exception &e) {
+        set_error(e.what());
+        return -1;
+    }
+}
+
+/**
+ * @brief Load an asset file into the remote JIT.
+ *
+ * @param s the session object
+ * @param path the path to the asset file
+ * @return int 0 on success, -1 on error
+ */
+int load_asset_path(RemoteSession *s, const char *path)
+{
+    clear_error();
+    try {
+        auto buf = unwrap(getFile(path), "getFile(" + Twine(path) + ")");
+        ArrayRef<char> bytes(buf->getBufferStart(), buf->getBufferSize());
+
+        int32_t rc = 0;
+        check(s->getEPC().callSPSWrapper<int32_t(shared::SPSSequence<char>, shared::SPSString)>(
+                  s->store_asset_fn, rc, bytes, std::string(path)),
+              "store_asset");
+        if (rc != 0) {
+            throw std::runtime_error("Got non-zero status from store_asset(" + std::string(path) +
+                                     "): " + std::to_string(rc));
+        }
         return 0;
     }
     catch (const std::exception &e) {
