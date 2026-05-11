@@ -54,6 +54,7 @@ from catalyst.python_interface.transforms.qecp.tanner_graph_lib import (
 )
 from catalyst.utils.exceptions import CompileError
 
+from ..qecl.convert_quantum_to_qecl import _get_idx_value_or_attr_from_extract_or_insert_op
 from .convert_qecl_noise_to_qec_noise import ConvertQECLNoiseOpToQECPNoisePass
 from .qec_code_lib import QecCode
 
@@ -137,7 +138,8 @@ class ExtractBlockConversion(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecl.ExtractCodeblockOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
-        rewriter.replace_op(op, qecp.ExtractCodeblockOp(op.hyper_reg, op.idx_attr))
+        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
+        rewriter.replace_op(op, qecp.ExtractCodeblockOp(op.hyper_reg, idx))
 
 
 @dataclass
@@ -147,7 +149,8 @@ class InsertBlockConversion(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecl.InsertCodeblockOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
-        rewriter.replace_op(op, qecp.InsertCodeblockOp(op.in_hyper_reg, op.idx_attr, op.codeblock))
+        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
+        rewriter.replace_op(op, qecp.InsertCodeblockOp(op.in_hyper_reg, idx, op.codeblock))
 
 
 # MARK: Encode Op Pattern
@@ -282,6 +285,69 @@ class MeasureOpConversion(RewritePattern):
         rewriter.replace_op(op, ops_to_insert, new_results=new_results)
 
 
+# MARK: Transversal Gate Patterns
+
+
+@dataclass(frozen=True)
+class TransversalGateConversion(RewritePattern):
+    """Converts transversal single-qubit `qecl` gate ops specified in the QEC code definition to
+    a call to a subroutine that performs the transversal gate on the physical codeblock.
+
+    As implemented, this pattern does not use the `idx` attribute/operand of the logical gate
+    op, which indicates the position of the logical qubit within the codeblock to act on. The
+    current implementation for specifying gates also doesn't allow for specifying different patterns
+    for different qubits within a codeblock. We assume `k=1` and therefore `idx=0`.
+    """
+
+    qec_code: QecCode
+
+    gate_subroutines: dict[str, func.FuncOp]
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(
+        self, op: qecl.SingleQubitLogicalGateOp | qecl.CnotOp, rewriter: PatternRewriter
+    ):
+        """Rewrite pattern for ``qecl.SingleQubitLogicalGateOp`` ops and `qecl.CnotOp`` ops,
+        if they are defined as transversal in the provided QEC code."""
+
+        gate_name = op.name.split(".")[1]  # op.name is "qecl.gate_name"
+
+        op_codeblocks = (
+            (op.in_ctrl_codeblock, op.in_trgt_codeblock)
+            if gate_name in self.qec_code.transversal_2q_gates
+            else (op.in_codeblock,)
+        )
+
+        k = op_codeblocks[0].type.k.value.data
+
+        # The type-converter should already raise a CompileError if the values of k don't agree;
+        # assert just in case.
+        assert k == self.qec_code.k, (
+            f"Value mismatch: codeblock {op.out_codeblock} has k = {k} but QEC code has "
+            f"k = {self.qec_code.k}"
+        )
+
+        if k > 1:
+            raise NotImplementedError(
+                "Lowering logical gates to the `qecp` dialect is not implemented for k > 1 codes"
+            )
+
+        gate_subroutine = self.gate_subroutines.get(gate_name, None)
+
+        if gate_subroutine is None:
+            # gates that aren't defined transversally in the QEC code are ignored here
+            # they will need to be handled by a different pattern
+            return
+
+        subroutine_call_op = func.CallOp(
+            callee=SymbolRefAttr(gate_subroutine.sym_name),
+            arguments=op_codeblocks,
+            return_types=tuple(cb.type for cb in op_codeblocks),
+        )
+
+        rewriter.replace_op(op, subroutine_call_op)
+
+
 # MARK: Conversion Pass
 
 
@@ -340,6 +406,13 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         measure_subroutine = self.create_measure_subroutine()
         module_block.add_op(measure_subroutine)
 
+        transversal_gate_subroutines = (
+            self.create_transversal_1Qgate_subroutines()
+            | self.create_transversal_2Qgate_subroutines()
+        )
+        for subroutine in transversal_gate_subroutines.values():
+            module_block.add_op(subroutine)
+
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [
@@ -356,6 +429,10 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                     MeasureOpConversion(
                         qec_code=self.qec_code,
                         measure_subroutine=measure_subroutine,
+                    ),
+                    TransversalGateConversion(
+                        qec_code=self.qec_code,
+                        gate_subroutines=transversal_gate_subroutines,
                     ),
                 ]
             )
@@ -558,6 +635,122 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         )
 
         return funcOp
+
+    def create_transversal_1Qgate_subroutines(self) -> dict[str, func.FuncOp]:
+        """Create the subroutines that performs transversal 1-qubit gates on a physical codeblock.
+
+        Note that this method does not insert the subroutine into the module op. Instead it returns
+        a dict of built func.FuncOp objects that can then be subsequently inserted where desired.
+        """
+        subroutines = {}
+        single_qubit_gates = self.qec_code.transversal_1q_gates
+        if "identity" not in single_qubit_gates:
+            # for identity, no need to add any non-Identity gates
+            single_qubit_gates["identity"] = (None, [])
+
+        codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
+        input_types = (codeblock_type,)
+        output_types = (codeblock_type,)
+
+        for gate_name, gate_info in single_qubit_gates.items():
+            gate_op, gate_indices = gate_info
+
+            block = Block(arg_types=input_types)
+
+            with ImplicitBuilder(block):
+                (in_codeblock,) = block.args
+
+                # extract qubits
+                extract_ops = [qecp.ExtractQubitOp(in_codeblock, i) for i in range(self.qec_code.n)]
+                qubits = [ext_op.results[0] for ext_op in extract_ops]
+
+                transversal_gate = [
+                    gate_op(qb) if idx in gate_indices else qecp.IdentityOp(qb)
+                    for idx, qb in enumerate(qubits)
+                ]
+
+                qubits_out = [op.results[0] for op in transversal_gate]
+
+                codeblock = in_codeblock
+                for i in range(self.qec_code.n):
+                    insert_op = qecp.InsertQubitOp(codeblock, i, qubits_out[i])
+                    codeblock = insert_op.results[0]
+
+                # return the encoded codeblock
+                func.ReturnOp(codeblock)
+
+            funcOp = func.FuncOp(
+                name=f"{gate_name}_{self.qec_code.name}",
+                function_type=(input_types, output_types),
+                visibility="private",
+                region=Region([block]),
+            )
+
+            subroutines[gate_name] = funcOp
+
+        return subroutines
+
+    def create_transversal_2Qgate_subroutines(self) -> dict[str, func.FuncOp]:
+        """Create the subroutinew that performs transversal 2-qubit gates on a physical codeblock.
+
+        Note that this method does not insert the subroutine into the module op. Instead it returns
+        a dict of built func.FuncOp objects that can then be subsequently inserted where desired.
+        """
+        subroutines = {}
+
+        codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
+        input_types = (codeblock_type, codeblock_type)
+        output_types = (codeblock_type, codeblock_type)
+
+        for gate_name, gate_op in self.qec_code.transversal_2q_gates.items():
+
+            block = Block(arg_types=input_types)
+
+            with ImplicitBuilder(block):
+                ctrl_codeblock_in, trgt_codeblock_in = block.args
+
+                # extract all the qubits in both ctrl and target blocks
+                ctrl_extract_ops = [
+                    qecp.ExtractQubitOp(ctrl_codeblock_in, i) for i in range(self.qec_code.n)
+                ]
+                trgt_extract_ops = [
+                    qecp.ExtractQubitOp(trgt_codeblock_in, i) for i in range(self.qec_code.n)
+                ]
+                ctrl_qubits = [ext_op.results[0] for ext_op in ctrl_extract_ops]
+                trgt_qubits = [ext_op.results[0] for ext_op in trgt_extract_ops]
+
+                # apply the gate to each pair of qubits
+                transversal_gate = [
+                    gate_op(ctrl_qb, trgt_qb) for ctrl_qb, trgt_qb in zip(ctrl_qubits, trgt_qubits)
+                ]
+
+                ctrl_qbs_out = [op.results[0] for op in transversal_gate]
+                trgt_qbs_out = [op.results[1] for op in transversal_gate]
+
+                # insert the qubits in their respective blocks
+                ctrl_cb = ctrl_codeblock_in
+                for i in range(self.qec_code.n):
+                    ctrl_insert = qecp.InsertQubitOp(ctrl_cb, i, ctrl_qbs_out[i])
+                    ctrl_cb = ctrl_insert.results[0]
+
+                trgt_cb = trgt_codeblock_in
+                for i in range(self.qec_code.n):
+                    trgt_insert = qecp.InsertQubitOp(trgt_cb, i, trgt_qbs_out[i])
+                    trgt_cb = trgt_insert.results[0]
+
+                # return the codeblocks
+                func.ReturnOp(ctrl_cb, trgt_cb)
+
+            funcOp = func.FuncOp(
+                name=f"{gate_name}_{self.qec_code.name}",
+                function_type=(input_types, output_types),
+                visibility="private",
+                region=Region([block]),
+            )
+
+            subroutines[gate_name] = funcOp
+
+        return subroutines
 
     def check_pattern(
         self,
