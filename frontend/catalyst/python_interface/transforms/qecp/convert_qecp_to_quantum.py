@@ -15,7 +15,6 @@
 """QEC Physical to Quantum dialect conversion.
 
 This module contains the implementation of the xDSL convert-qecp-to-quantum dialect-conversion pass.
-
 """
 
 from dataclasses import dataclass
