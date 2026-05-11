@@ -14,6 +14,8 @@
 
 """Test module for the convert-qecl-to-qecp dialect-conversion transform."""
 
+from functools import partial
+
 import numpy as np
 import pennylane as qp
 import pytest
@@ -44,6 +46,33 @@ def fixture_qecl_to_qecp_steane_pipeline():
     return (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
 
 
+@pytest.fixture(name="get_generic_qec_code", scope="module")
+def fixture_get_generic_qec_code():
+    """Fixture factory that returns a function to create `QecCode` objects for generic QEC codes."""
+
+    def _make_qec_code(n: int, k: int, d: int, name: str = "ToyCode", n_aux: int = 3) -> QecCode:
+        rng = np.random.default_rng(seed=42)
+
+        return QecCode(
+            name=name,
+            n=n,
+            k=k,
+            d=d,
+            x_tanner=rng.integers(low=0, high=1, size=(n_aux, n)),
+            z_tanner=rng.integers(low=0, high=1, size=(n_aux, n)),
+            transversal_1q_gates={
+                "x": (qecp.PauliXOp, list(range(n))),
+                "y": (qecp.PauliXOp, list(range(n))),
+                "z": (qecp.PauliXOp, list(range(n))),
+                "hadamard": (qecp.HadamardOp, list(range(n))),
+                "s": (partial(qecp.SOp, adjoint=True), list(range(n))),
+            },
+            transversal_2q_gates={"cnot": qecp.CnotOp},
+        )
+
+    return _make_qec_code
+
+
 # MARK: TestTypeConversion
 
 
@@ -54,7 +83,7 @@ class TestTypeConversionPattern:
     @pytest.mark.parametrize(
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
-    def test_codeblock_conversion(self, run_filecheck, n, k):
+    def test_codeblock_conversion(self, n, k, run_filecheck, get_generic_qec_code):
         """Test the type conversion pattern from !qecl.codeblock -> !qecp.codeblock for a few values
         of n and k.
         """
@@ -71,20 +100,7 @@ class TestTypeConversionPattern:
         }}
         }}
         """
-        pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(
-                qec_code=QecCode(
-                    "",
-                    n,
-                    k,
-                    3,
-                    np.eye(n),
-                    np.eye(n),
-                    transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
-                    transversal_2q_gates={},
-                )
-            ),
-        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=get_generic_qec_code(n, k, d=3)),)
         run_filecheck(program, pipeline)
 
     @pytest.mark.parametrize("width", [1, 2, 3])
@@ -92,7 +108,7 @@ class TestTypeConversionPattern:
     @pytest.mark.parametrize(
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
-    def test_hyperreg_conversion(self, run_filecheck, width, n, k):
+    def test_hyperreg_conversion(self, width, n, k, run_filecheck, get_generic_qec_code):
         """Test the type conversion pattern from !qecl.codeblock -> !qecp.codeblock for a few values
         of n and k.
         """
@@ -109,23 +125,10 @@ class TestTypeConversionPattern:
         }}
         }}
         """
-        pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(
-                qec_code=QecCode(
-                    "",
-                    n,
-                    k,
-                    3,
-                    np.eye(n),
-                    np.eye(n),
-                    transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
-                    transversal_2q_gates={},
-                )
-            ),
-        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=get_generic_qec_code(n, k, d=3)),)
         run_filecheck(program, pipeline)
 
-    def test_codeblock_conversion_with_k_mismatch(self, run_filecheck):
+    def test_codeblock_conversion_with_k_mismatch(self, run_filecheck, get_generic_qec_code):
         """Test that attempting to convert a codeblock type with a value of k different than the
         value of k given in the QEC code raise a CompileError.
         """
@@ -138,25 +141,12 @@ class TestTypeConversionPattern:
         }
         }
         """
-        pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(
-                qec_code=QecCode(
-                    "",
-                    7,
-                    1,
-                    3,
-                    np.eye(7),
-                    np.eye(7),
-                    transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
-                    transversal_2q_gates={},
-                )
-            ),
-        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=get_generic_qec_code(7, 1, 3)),)
 
         with pytest.raises(CompileError, match="Failed to convert type"):
             run_filecheck(program, pipeline)
 
-    def test_hyperreg_conversion_with_k_mismatch(self, run_filecheck):
+    def test_hyperreg_conversion_with_k_mismatch(self, run_filecheck, get_generic_qec_code):
         """Test that attempting to convert a hyper-register type with a value of k different than
         the value of k given in the QEC code raise a CompileError.
         """
@@ -169,20 +159,7 @@ class TestTypeConversionPattern:
         }
         }
         """
-        pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(
-                qec_code=QecCode(
-                    "",
-                    7,
-                    1,
-                    3,
-                    np.eye(7),
-                    np.eye(7),
-                    transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
-                    transversal_2q_gates={},
-                )
-            ),
-        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=get_generic_qec_code(7, 1, 3)),)
 
         with pytest.raises(CompileError, match="Failed to convert type"):
             run_filecheck(program, pipeline)
@@ -200,7 +177,7 @@ class TestAllocAndDeallocConversionPatterns:
     @pytest.mark.parametrize(
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
-    def test_allocate_is_lowered(self, width, n, k, run_filecheck):
+    def test_allocate_is_lowered(self, width, n, k, run_filecheck, get_generic_qec_code):
         """Test that a qecl.allocate operation is lowered as expected"""
 
         program = f"""
@@ -214,20 +191,7 @@ class TestAllocAndDeallocConversionPatterns:
         }}
         """
 
-        pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(
-                qec_code=QecCode(
-                    "",
-                    n,
-                    k,
-                    3,
-                    np.eye(n),
-                    np.eye(n),
-                    transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
-                    transversal_2q_gates={},
-                )
-            ),
-        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=get_generic_qec_code(n, k, 3)),)
         run_filecheck(program, pipeline)
 
     @pytest.mark.parametrize("width", [1, 2, 3])
@@ -235,7 +199,7 @@ class TestAllocAndDeallocConversionPatterns:
     @pytest.mark.parametrize(
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
-    def test_deallocate_is_lowered(self, width, n, k, run_filecheck):
+    def test_deallocate_is_lowered(self, width, n, k, run_filecheck, get_generic_qec_code):
         """Test that a qecl.deallocate operation is lowered as expected"""
 
         program = f"""
@@ -251,20 +215,7 @@ class TestAllocAndDeallocConversionPatterns:
         }}
         """
 
-        pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(
-                qec_code=QecCode(
-                    "",
-                    n,
-                    k,
-                    3,
-                    np.eye(n),
-                    np.eye(n),
-                    transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
-                    transversal_2q_gates={},
-                )
-            ),
-        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=get_generic_qec_code(n, k, 3)),)
         run_filecheck(program, pipeline)
 
 
@@ -282,7 +233,7 @@ class TestInsertExtractConversionPatterns:
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
     @pytest.mark.parametrize("idx", [0, 3, 6])
-    def test_extract_block_is_lowered(self, width, k, n, idx, run_filecheck):
+    def test_extract_block_is_lowered(self, width, k, n, idx, run_filecheck, get_generic_qec_code):
         """Test that a qecl.extract_block operation is lowered as expected"""
 
         program = f"""
@@ -298,20 +249,7 @@ class TestInsertExtractConversionPatterns:
         }}
         """
 
-        pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(
-                qec_code=QecCode(
-                    "",
-                    n,
-                    k,
-                    3,
-                    np.eye(n),
-                    np.eye(n),
-                    transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
-                    transversal_2q_gates={},
-                )
-            ),
-        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=get_generic_qec_code(n, k, 3)),)
         run_filecheck(program, pipeline)
 
     @pytest.mark.parametrize("width", [1, 2, 3])
@@ -320,7 +258,7 @@ class TestInsertExtractConversionPatterns:
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
     @pytest.mark.parametrize("idx", [0, 3, 6])
-    def test_insert_block_is_lowered(self, width, k, n, idx, run_filecheck):
+    def test_insert_block_is_lowered(self, width, k, n, idx, run_filecheck, get_generic_qec_code):
         """Test that a qecl.insert_block operation is lowered as expected"""
 
         program = f"""
@@ -338,20 +276,7 @@ class TestInsertExtractConversionPatterns:
         }}
         """
 
-        pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(
-                qec_code=QecCode(
-                    "",
-                    n,
-                    k,
-                    3,
-                    np.eye(n),
-                    np.eye(n),
-                    transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
-                    transversal_2q_gates={},
-                )
-            ),
-        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=get_generic_qec_code(n, k, 3)),)
         run_filecheck(program, pipeline)
 
 
@@ -415,7 +340,7 @@ class TestLoweringEncode:
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
         run_filecheck(program, pipeline)
 
-    def test_single_encode_with_Steane(self, run_filecheck):
+    def test_single_encode_with_Steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
         """Test that a single qecl.encode operation is lowered to a call to the encoding
         subroutine using the Steane code"""
 
@@ -474,10 +399,9 @@ class TestLoweringEncode:
             }
             """
 
-        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
-        run_filecheck(program, pipeline)
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
-    def test_multiple_encodes_with_Steane(self, run_filecheck):
+    def test_multiple_encodes_with_Steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
         """Test that a qecl.encode operation raises an error if we are not encoding to zero"""
 
         program = """
@@ -497,8 +421,7 @@ class TestLoweringEncode:
             }
             """
 
-        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
-        run_filecheck(program, pipeline)
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
 
 # MARK: Tanner graphs
@@ -507,7 +430,7 @@ class TestLoweringEncode:
 class TestTannerGraphInsertion:
     """Unit tests for the insertion of Tanner graph ops."""
 
-    def test_tanner_graph_insertion_steane(self, run_filecheck):
+    def test_tanner_graph_insertion_steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
         """Test that Tanner graph ops for the Steane code are correctly inserted at the beginning of
         the module.
         """
@@ -531,8 +454,7 @@ class TestTannerGraphInsertion:
         }
         }
         """
-        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
-        run_filecheck(program, pipeline)
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
 
 # MARK: QEC Cycle
@@ -541,7 +463,7 @@ class TestTannerGraphInsertion:
 class TestQecCycleLowering:
     """Unit tests for the `qecl.qec` conversion pattern of the convert-qecl-to-qecp pass."""
 
-    def test_single_qec_cycle_Steane(self, run_filecheck):
+    def test_single_qec_cycle_Steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
         """Test that a `qecl.qec` op is lowered to a call to the QEC-cycle subroutine for the Steane
         code.
         """
@@ -640,8 +562,7 @@ class TestQecCycleLowering:
         // CHECK: }
         }
         """
-        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
-        run_filecheck(program, pipeline)
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
 
 # MARK: TestLoweringMeasure
