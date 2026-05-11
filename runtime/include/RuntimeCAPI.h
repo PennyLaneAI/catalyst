@@ -119,6 +119,9 @@ RESULT *__catalyst__mbqc__measure_in_basis(QUBIT *, uint32_t, double, int32_t);
 // Async runtime error
 void __catalyst__host__rt__unrecoverable_error();
 
+// Allocate a host buffer of `size` bytes and register it with the runtime's memory manager
+void *__catalyst__rt__alloc_managed(size_t size);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

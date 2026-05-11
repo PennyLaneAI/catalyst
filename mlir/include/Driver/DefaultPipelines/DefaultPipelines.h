@@ -163,7 +163,7 @@ const PipelineList pipelineList{
       "register-inactive-callback"}}};
 // clang-format on
 
-PipelineNames getPipelineNames()
+inline PipelineNames getPipelineNames()
 {
     static std::vector<std::string> names =
         std::accumulate(driver::pipelineList.begin(), driver::pipelineList.end(),
@@ -174,7 +174,7 @@ PipelineNames getPipelineNames()
     return names;
 }
 
-PassNames getQuantumCompilationStage(bool disableAssertion = true)
+inline PassNames getQuantumCompilationStage(bool disableAssertion = true)
 {
     auto &&ret =
         pipelineList[0].passNames | std::views::filter([&disableAssertion](const auto &passName) {
@@ -183,11 +183,11 @@ PassNames getQuantumCompilationStage(bool disableAssertion = true)
     return PassNames{ret.begin(), ret.end()};
 }
 
-PassNames getHLOLoweringStage() { return pipelineList[1].passNames; }
+inline PassNames getHLOLoweringStage() { return pipelineList[1].passNames; }
 
-PassNames getGradientLoweringStage() { return pipelineList[2].passNames; }
+inline PassNames getGradientLoweringStage() { return pipelineList[2].passNames; }
 
-PassNames getBufferizationStage(bool asyncQNodes = false)
+inline PassNames getBufferizationStage(bool asyncQNodes = false)
 {
     const std::string bufferizationOptions =
         std::string("{bufferize-function-boundaries ") + "allow-return-allocs-from-loops " +
@@ -204,7 +204,7 @@ PassNames getBufferizationStage(bool asyncQNodes = false)
     return PassNames{ret.begin(), ret.end()};
 }
 
-PassNames getLLVMDialectLoweringStage(bool asyncQNodes = false)
+inline PassNames getLLVMDialectLoweringStage(bool asyncQNodes = false)
 {
     auto &&ret =
         pipelineList[4].passNames | std::views::filter([&asyncQNodes](const auto &passName) {

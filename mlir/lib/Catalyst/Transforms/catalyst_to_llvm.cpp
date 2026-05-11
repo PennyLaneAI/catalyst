@@ -53,6 +53,81 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
                                ArrayRef<LLVM::GEPArg>{0, 0}, LLVM::GEPNoWrapFlags::inbounds);
 }
 
+// Get or create a `internal constant !llvm.array<N x i64>` global.
+// And return a `!llvm.ptr` to its first element.
+//
+// llvm.mlir.global internal constant @<key>(dense<[v0, v1, ...]> : tensor<NxI64>)
+//     : !llvm.array<N x i64>
+//
+// Call site:
+//
+// %addr = llvm.mlir.addressof @<key> : !llvm.ptr
+// %ptr  = llvm.getelementptr inbounds %addr[0, 0]
+//             : (!llvm.ptr) -> !llvm.ptr, !llvm.array<N x i64>
+//
+Value getGlobalI64Array(Location loc, OpBuilder &rewriter, StringRef key, ArrayRef<int64_t> values,
+                        ModuleOp mod)
+{
+    Type ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
+    // Skip and return a null pointer if the array is empty.
+    if (values.empty()) {
+        return LLVM::ZeroOp::create(rewriter, loc, ptrTy);
+    }
+    Type i64Ty = rewriter.getI64Type();
+    auto arrTy = LLVM::LLVMArrayType::get(i64Ty, values.size());
+    LLVM::GlobalOp glb = mod.lookupSymbol<LLVM::GlobalOp>(key);
+    // Create a new global if it doesn't exist.
+    if (!glb) {
+        auto tensorTy = RankedTensorType::get({static_cast<int64_t>(values.size())}, i64Ty);
+        auto valuesAttr = DenseElementsAttr::get(tensorTy, values);
+        OpBuilder::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(mod.getBody());
+        glb = LLVM::GlobalOp::create(rewriter, loc, arrTy, /*isConstant=*/true,
+                                     LLVM::Linkage::Internal, key, valuesAttr);
+    }
+    return LLVM::GEPOp::create(rewriter, loc, ptrTy, arrTy,
+                               LLVM::AddressOfOp::create(rewriter, loc, glb),
+                               ArrayRef<LLVM::GEPArg>{0, 0}, LLVM::GEPNoWrapFlags::inbounds);
+}
+
+// Allocate a stack buffer of `!llvm.array<N x ptr>`.
+//
+// Outputs:
+//
+//   %slot = llvm.alloca ... : !llvm.array<N x ptr>
+//   %a0   = llvm.undef : !llvm.array<N x ptr>
+//   %a1   = llvm.insertvalue %ptr0, %a0[0] : !llvm.array<N x ptr>
+//   %a2   = llvm.insertvalue %ptr1, %a1[1] : !llvm.array<N x ptr>
+//   ...
+//   llvm.store %aN, %slot : !llvm.array<N x ptr>, !llvm.ptr
+//
+Value buildStackPtrArray(Location loc, RewriterBase &rewriter, ArrayRef<Value> ptrs)
+{
+    Type ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
+    if (ptrs.empty()) {
+        return LLVM::ZeroOp::create(rewriter, loc, ptrTy);
+    }
+    auto arrTy = LLVM::LLVMArrayType::get(ptrTy, ptrs.size());
+    Value alloca = getStaticAlloca(loc, rewriter, arrTy, 1);
+    Value arr = LLVM::UndefOp::create(rewriter, loc, arrTy);
+    for (auto [i, p] : llvm::enumerate(ptrs)) {
+        arr = LLVM::InsertValueOp::create(rewriter, loc, arr, p, SmallVector<int64_t>{(int64_t)i});
+    }
+    LLVM::StoreOp::create(rewriter, loc, arr, alloca);
+    return alloca;
+}
+
+// Calculate the byte size of one memref element.
+// For complex<T>, the size is 2 * sizeof(T). 1 for real, 1 for imaginary.
+int64_t memrefElemSizeBytes(MemRefType ty)
+{
+    Type elem = ty.getElementType();
+    if (auto cplx = dyn_cast<ComplexType>(elem)) {
+        return 2 * ((cplx.getElementType().getIntOrFloatBitWidth() + 7) / 8);
+    }
+    return (elem.getIntOrFloatBitWidth() + 7) / 8;
+}
+
 enum NumericType : int8_t {
     index = 0,
     i1,
@@ -324,6 +399,10 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
     LogicalResult matchAndRewrite(CustomCallOp op, CustomCallOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
+        // Remote-dispatch custom_calls are lowered by RemoteCustomCallOpPattern below.
+        if (op.getCallTargetName() == "remote_call") {
+            return failure();
+        }
         MLIRContext *ctx = op.getContext();
         Location loc = op.getLoc();
         // Create function
@@ -431,6 +510,141 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         SmallVector<Value> callArgs{encodedArguments, encodedResults};
         LLVM::CallOp::create(rewriter, loc, customCallFnOp, callArgs);
         rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+// Rewrite `catalyst.custom_call fn("remote_call") -> ...`
+// to three runtime calls:
+//
+//   __catalyst__remote__open(addr)
+//   __catalyst__remote__send_binary(addr,p)
+//   __catalyst__remote__launch(addr, "_catalyst_pyface_<callee>",
+//                              num_in,  in_descs,  in_ranks,  in_sizes,
+//                              num_out, out_descs, out_ranks, out_sizes);
+//
+struct RemoteCustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(CustomCallOp op, CustomCallOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        if (op.getCallTargetName() != "remote_call") {
+            return failure();
+        }
+
+        auto addrAttr = op->getAttrOfType<StringAttr>("catalyst.remote_address");
+        auto pathAttr = op->getAttrOfType<StringAttr>("catalyst.remote_kernel_path");
+        auto calleeAttr = op->getAttrOfType<StringAttr>("catalyst.remote_kernel_callee");
+        if (!addrAttr) {
+            llvm::errs() << "remote_call custom_call is missing `catalyst.remote_address`\n";
+            return failure();
+        }
+        if (!pathAttr) {
+            llvm::errs() << "remote_call custom_call is missing `catalyst.remote_kernel_path`\n";
+            return failure();
+        }
+        if (!calleeAttr) {
+            llvm::errs() << "remote_call custom_call is missing `catalyst.remote_kernel_callee`\n";
+            return failure();
+        }
+
+        Location loc = op.getLoc();
+        MLIRContext *ctx = rewriter.getContext();
+        Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+        Type i64Ty = rewriter.getI64Type();
+        Type voidTy = LLVM::LLVMVoidType::get(ctx);
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+
+        // Declare extern runtime entry points
+        Type openSig = LLVM::LLVMFunctionType::get(i64Ty, {ptrTy});
+        LLVM::LLVMFuncOp openFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__remote__open", openSig);
+
+        Type i32Ty = rewriter.getI32Type();
+        Type sendBinSig = LLVM::LLVMFunctionType::get(i64Ty, {ptrTy, ptrTy, i32Ty});
+        LLVM::LLVMFuncOp sendBinFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__remote__send_binary", sendBinSig);
+
+        Type launchSig = LLVM::LLVMFunctionType::get(
+            voidTy, {ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy});
+        LLVM::LLVMFuncOp launchFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__remote__launch", launchSig);
+
+        // Open + send_binary
+        std::string callee = calleeAttr.getValue().str();
+        std::string addrKey = "remote_addr_" + callee;
+        std::string pathKey = "remote_path_" + callee;
+        Value addrPtr =
+            getGlobalString(loc, rewriter, addrKey, addrAttr.getValue().str() + '\0', mod);
+        Value pathPtr =
+            getGlobalString(loc, rewriter, pathKey, pathAttr.getValue().str() + '\0', mod);
+        
+        Value formatTag = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI32IntegerAttr(0));
+        LLVM::CallOp::create(rewriter, loc, openFn, ValueRange{addrPtr});
+        LLVM::CallOp::create(rewriter, loc, sendBinFn, ValueRange{addrPtr, pathPtr, formatTag});
+
+        // Get a global string for the symbol name "_catalyst_pyface_<callee>"
+        std::string symbolName = "_catalyst_pyface_" + callee;
+        std::string symbolKey = "remote_sym_" + callee;
+        Value symbolPtr = getGlobalString(loc, rewriter, symbolKey, symbolName + '\0', mod);
+
+        // Spill input descriptor structs to stack allocas
+        SmallVector<Value> inputDescPtrs;
+        SmallVector<int64_t> inputRanks, inputElemSizes;
+        for (auto [origInput, llvmInput] : llvm::zip(op.getOperands(), adaptor.getOperands())) {
+            auto memrefTy = cast<MemRefType>(origInput.getType());
+            inputRanks.push_back(memrefTy.getRank());
+            inputElemSizes.push_back(memrefElemSizeBytes(memrefTy));
+            Value alloca = getStaticAlloca(loc, rewriter, llvmInput.getType(), 1);
+            LLVM::StoreOp::create(rewriter, loc, llvmInput, alloca);
+            inputDescPtrs.push_back(alloca);
+        }
+
+        // Allocate stack buffers holding input/output descriptor pointers.
+        SmallVector<Value> outputDescPtrs;
+        SmallVector<int64_t> outputRanks, outputElemSizes;
+        for (Type resultTy : op.getResultTypes()) {
+            auto memrefTy = cast<MemRefType>(resultTy);
+            outputRanks.push_back(memrefTy.getRank());
+            outputElemSizes.push_back(memrefElemSizeBytes(memrefTy));
+            Type llvmDescTy = getTypeConverter()->convertType(resultTy);
+            Value alloca = getStaticAlloca(loc, rewriter, llvmDescTy, 1);
+            outputDescPtrs.push_back(alloca);
+        }
+
+        Value inputDescsArr = buildStackPtrArray(loc, rewriter, inputDescPtrs);
+        Value outputDescsArr = buildStackPtrArray(loc, rewriter, outputDescPtrs);
+
+        // Get global arrays for ranks / elem-sizes.
+        Value inputRanksArr =
+            getGlobalI64Array(loc, rewriter, "remote_in_ranks_" + callee, inputRanks, mod);
+        Value inputSizesArr =
+            getGlobalI64Array(loc, rewriter, "remote_in_sizes_" + callee, inputElemSizes, mod);
+        Value outputRanksArr =
+            getGlobalI64Array(loc, rewriter, "remote_out_ranks_" + callee, outputRanks, mod);
+        Value outputSizesArr =
+            getGlobalI64Array(loc, rewriter, "remote_out_sizes_" + callee, outputElemSizes, mod);
+
+        Value numInputs = LLVM::ConstantOp::create(
+            rewriter, loc, rewriter.getI64IntegerAttr(inputDescPtrs.size()));
+        Value numOutputs = LLVM::ConstantOp::create(
+            rewriter, loc, rewriter.getI64IntegerAttr(outputDescPtrs.size()));
+
+        LLVM::CallOp::create(rewriter, loc, launchFn,
+                             ValueRange{addrPtr, symbolPtr, numInputs, inputDescsArr, inputRanksArr,
+                                        inputSizesArr, numOutputs, outputDescsArr, outputRanksArr,
+                                        outputSizesArr});
+
+        // Load the runtime-filled output descriptors and replace the op with them.
+        SmallVector<Value> results;
+        for (auto [descPtr, resultTy] : llvm::zip(outputDescPtrs, op.getResultTypes())) {
+            Type llvmDescTy = getTypeConverter()->convertType(resultTy);
+            Value loaded = LLVM::LoadOp::create(rewriter, loc, llvmDescTy, descPtr);
+            results.push_back(loaded);
+        }
+
+        rewriter.replaceOp(op, results);
         return success();
     }
 };
@@ -587,6 +801,7 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
 
         RewritePatternSet patterns(context);
         patterns.add<CustomCallOpPattern>(typeConverter, context);
+        patterns.add<RemoteCustomCallOpPattern>(typeConverter, context);
         patterns.add<PrintOpPattern>(typeConverter, context);
         patterns.add<AssertionOpPattern>(typeConverter, context);
         patterns.add<DefineCallbackOpPattern>(typeConverter, context);
