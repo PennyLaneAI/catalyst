@@ -780,6 +780,7 @@
   [(#2720)](https://github.com/PennyLaneAI/catalyst/pull/2720)
   [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
   [(#2757)](https://github.com/PennyLaneAI/catalyst/pull/2757)
+  [(#2781)](https://github.com/PennyLaneAI/catalyst/pull/2781)
 
 * Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
   Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
@@ -1032,6 +1033,7 @@
   [(#2574)](https://github.com/PennyLaneAI/catalyst/pull/2574)
   [(#2576)](https://github.com/PennyLaneAI/catalyst/pull/2576)
   [(#2673)](https://github.com/PennyLaneAI/catalyst/pull/2673)
+  [(#2768)](https://github.com/PennyLaneAI/catalyst/pull/2768)
 
 * An experimental pass to convert `qecl.noise` operations in the *QEC Logical* layer to subroutine calls in the *QEC Phyiscal* layer.
   [(#2678)](https://github.com/PennyLaneAI/catalyst/pull/2678)
