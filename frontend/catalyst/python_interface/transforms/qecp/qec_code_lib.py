@@ -106,15 +106,15 @@ class QecCode:
         -------
 
         >>> QecCode.from_dict({
-        >>>    'name': "Steane",
-        >>>    'n': 7,
-        >>>    'k': 1,
-        >>>    'd': 3,
-        >>>    "x_tanner": np.eye(7),
-        >>>    "z_tanner": np.eye(7),
-        >>>    "transversal_1q_gates": {},
-        >>>    "transversal_2q_gates": {},
-        >>>    })
+        ...    'name': "Steane",
+        ...    'n': 7,
+        ...    'k': 1,
+        ...    'd': 3,
+        ...    "x_tanner": np.eye(7),
+        ...    "z_tanner": np.eye(7),
+        ...    "transversal_1q_gates": {},
+        ...    "transversal_2q_gates": {},
+        ...    })
         QecCode(name='Steane', n=7, k=1, d=3)
         """
         # Filter dictionary to keep only keys that are fields of this dataclass
