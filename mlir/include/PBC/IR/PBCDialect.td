@@ -49,4 +49,6 @@ def PBCDialect : Dialect {
     let useDefaultAttributePrinterParser = 1;
 }
 
+class PBC_Op<string mnemonic, list<Trait> traits = []> : Op<PBCDialect, mnemonic, traits>;
+
 #endif // PBC_DIALECT

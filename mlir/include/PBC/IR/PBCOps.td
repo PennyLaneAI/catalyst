@@ -30,7 +30,7 @@ include "PBC/IR/PBCOpInterfaces.td"
 // PBC dialect operations.
 //===----------------------------------------------------------------------===//
 
-class PBC_Op<string mnemonic, list<Trait> traits = []> : Op<PBCDialect, mnemonic, traits>;
+include "PBC/IR/PBCRefOps.td"
 
 def PrepareStateOp : PBC_Op<"prepare"> {
     let summary = "Prepare auxiliary qubits in a given state.";

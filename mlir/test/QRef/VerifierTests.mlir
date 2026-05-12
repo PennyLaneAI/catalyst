@@ -241,11 +241,3 @@ func.func @test_mbqc_graph_state_prep_invalid_size() {
     %graph_reg = qref.mbqc.graph_state_prep (%adj_matrix : tensor<1xi1>) [init "Hadamard", entangle "CZ"] : !qref.reg<4>
     func.return
 }
-
-// -----
-
-func.func @test_pbc_ppm_size_mismatch(%q: !qref.bit) {
-    // expected-error@below {{Number of qubits must match number of pauli operators}}
-    %m = qref.pbc.ppm ["Z", "X"] %q : i1
-    return
-}

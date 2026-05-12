@@ -1062,7 +1062,7 @@ void handleMeasureInBasis(IRRewriter &builder, qref::MeasureInBasisOp rMeasureIn
     builder.eraseOp(rMeasureInBasisOp);
 }
 
-void handlePPM(IRRewriter &builder, qref::PPMeasurementOp rPPMOp, QubitValueTracker &tracker)
+void handlePPM(IRRewriter &builder, pbc::RefPPMeasurementOp rPPMOp, QubitValueTracker &tracker)
 {
     OpBuilder::InsertionGuard guard(builder);
     MLIRContext *ctx = rPPMOp.getContext();
@@ -1727,7 +1727,7 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
         else if (auto rMeasureInBasisOp = dyn_cast<qref::MeasureInBasisOp>(op)) {
             handleMeasureInBasis(builder, rMeasureInBasisOp, tracker);
         }
-        else if (auto rPPMOp = dyn_cast<qref::PPMeasurementOp>(op)) {
+        else if (auto rPPMOp = dyn_cast<pbc::RefPPMeasurementOp>(op)) {
             handlePPM(builder, rPPMOp, tracker);
         }
         else if (auto adjointOp = dyn_cast<qref::AdjointOp>(op)) {
@@ -1803,7 +1803,7 @@ struct ValueSemanticsConversionPass
                     getOp->getUsers(),
                     llvm::IsaPred<qref::QuantumOperation, qref::MeasureOp,
                                   qref::ComputationalBasisOp, qref::NamedObsOp, qref::HermitianOp,
-                                  qref::MeasureInBasisOp, qref::PPMeasurementOp>)) {
+                                  qref::MeasureInBasisOp, pbc::RefPPMeasurementOp>)) {
                 getOp.emitOpError(
                     "qref.get operations can only be used by qref dialect gate operations");
                 return WalkResult::interrupt();

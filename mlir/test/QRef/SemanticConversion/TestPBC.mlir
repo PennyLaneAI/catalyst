@@ -29,17 +29,17 @@ func.func @test_PPM_op(%angle: f64) -> (i1, i1, i1) attributes {quantum.node} {
 
     // CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[m0:%.+]], [[m0_out_qubit:%.+]] = pbc.ppm ["Z"] [[q0]] : i1, !quantum.bit
-    %m0 = qref.pbc.ppm ["Z"] %q0 : i1
+    %m0 = pbc.ref.ppm ["Z"] %q0 : i1
 
     // CHECK: [[q1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
     // CHECK: [[m1:%.+]], [[m1_out_qubits:%.+]]:2 = pbc.ppm ["Z", "Y"] [[m0_out_qubit]], [[q1]] : i1, !quantum.bit, !quantum.bit
-    %m1 = qref.pbc.ppm ["Z", "Y"] %q0, %q1 : i1
+    %m1 = pbc.ref.ppm ["Z", "Y"] %q0, %q1 : i1
     // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[m1_out_qubits]]#0 : !quantum.reg, !quantum.bit
     // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[m1_out_qubits]]#1 : !quantum.reg, !quantum.bit
 
     // CHECK: [[q0:%.+]] = quantum.extract [[insert1]][ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[m2:%.+]], [[m2_out_qubits:%.+]]:2 = pbc.ppm ["X", "Z"] [[q0]], [[qb]] : i1, !quantum.bit, !quantum.bit
-    %m2 = qref.pbc.ppm ["X", "Z"] %q0, %qb : i1
+    %m2 = pbc.ref.ppm ["X", "Z"] %q0, %qb : i1
     // CHECK: [[insert2:%.+]] = quantum.insert [[insert1]][ 0], [[m2_out_qubits]]#0 : !quantum.reg, !quantum.bit
 
     // CHECK: quantum.dealloc [[insert2]] : !quantum.reg

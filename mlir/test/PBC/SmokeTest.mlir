@@ -117,3 +117,19 @@ func.func @baz_error(%q1 : !quantum.bit, %q2 : !quantum.bit) {
     %0, %1 = pbc.ppr ["X", "Z"](16) %q1, %q2 : !quantum.bit, !quantum.bit
     func.return
 }
+
+// -----
+
+func.func @test_ref_ppm(%q0: !qref.bit, %q1: !qref.bit) {
+    %m0 = pbc.ref.ppm ["Z"] %q0 : i1
+    %m1 = pbc.ref.ppm ["X", "Y"] %q0, %q1 : i1
+    return
+}
+
+// -----
+
+func.func @test_ref_ppm_size_mismatch(%q: !qref.bit) {
+    // expected-error@below {{Number of qubits must match number of pauli operators}}
+    %m = pbc.ref.ppm ["Z", "X"] %q : i1
+    return
+}
