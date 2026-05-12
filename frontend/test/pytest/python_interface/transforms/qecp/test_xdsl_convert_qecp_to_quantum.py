@@ -159,3 +159,60 @@ class TestQecPhysicalQubitTypeConversionPatternUnit:
         data = p.convert_type(qecp.QecPhysicalQubitType("data"))
         aux = p.convert_type(qecp.QecPhysicalQubitType("aux"))
         assert data == aux
+
+
+class TestAuxAllocDeallocConversion:
+    """Lowering of qecp.alloc_aux / qecp.dealloc_aux to quantum.alloc_qb / quantum.dealloc_qb."""
+
+    def test_alloc_aux_then_dealloc_aux(self, run_filecheck):
+        """Auxiliary qubit allocation and deallocation map to quantum single-qubit ops."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_aux_alloc_dealloc
+        func.func @test_aux_alloc_dealloc() {
+            // CHECK: [[Q:%.+]] = quantum.alloc_qb
+            %0 = qecp.alloc_aux : !qecp.qubit<aux>
+            // CHECK: quantum.dealloc_qb [[Q]]
+            qecp.dealloc_aux %0 : !qecp.qubit<aux>
+            // CHECK-NOT: qecp.alloc_aux
+            // CHECK-NOT: qecp.dealloc_aux
+            return
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_alloc_aux_only(self, run_filecheck):
+        """Standalone alloc_aux lowers without a matching dealloc."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_alloc_aux_only
+        func.func @test_alloc_aux_only() {
+            // CHECK: quantum.alloc_qb
+            // CHECK-NOT: qecp.alloc_aux
+            %0 = qecp.alloc_aux : !qecp.qubit<aux>
+            return
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_two_alloc_aux_values(self, run_filecheck):
+        """Multiple auxiliary allocations each become quantum.alloc_qb."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_two_aux
+        func.func @test_two_aux() {
+            // CHECK-COUNT-2: quantum.alloc_qb
+            // CHECK-NOT: qecp.alloc_aux
+            %a = qecp.alloc_aux : !qecp.qubit<aux>
+            %b = qecp.alloc_aux : !qecp.qubit<aux>
+            // CHECK-NOT: qecp.qubit<aux>
+            // CHECK: "test.op"({{%.+}}, {{%.+}}) : (!quantum.bit, !quantum.bit) -> ()
+            "test.op"(%a, %b) : (!qecp.qubit<aux>, !qecp.qubit<aux>) -> ()
+            return
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+

@@ -24,12 +24,16 @@ from xdsl.dialects import builtin
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
+    PatternRewriter,
     PatternRewriteWalker,
+    RewritePattern,
+    op_type_rewrite_pattern,
     TypeConversionPattern,
     attr_type_rewrite_pattern,
 )
+from xdsl.rewriter import InsertPoint
 
-from catalyst.python_interface.dialects import qecp
+from catalyst.python_interface.dialects import qecp, quantum
 from catalyst.python_interface.dialects.quantum.attributes import QubitType, QuregType
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 
@@ -62,6 +66,27 @@ class QecPhysicalQubitTypeConversion(TypeConversionPattern):
         return QubitType()
 
 
+# MARK: Auxiliary qubit Alloc/Dealloc Patterns
+
+@dataclass(frozen=True)
+class AllocAuxQubitConversion(RewritePattern):
+    """Op conversion pattern from qecp.alloc_aux -> quantum.alloc_qb."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecp.AllocAuxQubitOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering ops that allocate an auxiliary qubit."""
+        rewriter.replace_op(op, quantum.AllocQubitOp())
+
+@dataclass(frozen=True)
+class DeallocAuxQubitConversion(RewritePattern):
+    """Op conversion pattern from qecp.dealloc_aux -> quantum.dealloc_qb."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecp.DeallocAuxQubitOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering ops that deallocate an auxiliary qubit."""
+        rewriter.replace_op(op, quantum.DeallocQubitOp(op.qubit))
+
+
 @dataclass(frozen=True)
 class ConvertQecPhysicalToQuantumPass(ModulePass):
     """
@@ -79,6 +104,8 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                 [
                     PhysicalCodeblockTypeConversion(),
                     QecPhysicalQubitTypeConversion(),
+                    AllocAuxQubitConversion(),
+                    DeallocAuxQubitConversion(),
                 ]
             )
         ).rewrite_module(op)
