@@ -20,7 +20,6 @@ include "mlir/IR/OpBase.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
-include "MBQC/IR/MBQCAttrDefs.td"
 include "Quantum/IR/QuantumAttrDefs.td"
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumTypes.td"
