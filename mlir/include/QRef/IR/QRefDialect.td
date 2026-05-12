@@ -67,7 +67,6 @@ def QRefDialect : Dialect {
     let dependentDialects = [
         "quantum::QuantumDialect",
         "mbqc::MBQCDialect",
-        "pbc::PBCDialect"
     ];
 
     let useDefaultTypePrinterParser = 1;

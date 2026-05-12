@@ -25,7 +25,6 @@
 #include "mlir/Support/LogicalResult.h"
 
 #include "MBQC/IR/MBQCDialect.h"
-#include "PBC/IR/PBCDialect.h"
 #include "QRef/IR/QRefDialect.h"
 #include "QRef/IR/QRefInterfaces.h"
 #include "Quantum/IR/QuantumDialect.h"
