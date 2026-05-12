@@ -16,11 +16,11 @@
 
 <h3>Internal changes ⚙️</h3>
 
-- Update RC nightly builds to read version number from the `_version.py` file 
+* Update RC nightly builds to read version number from the `_version.py` file
   [(#2797)](https://github.com/PennyLaneAI/catalyst/pull/2797)
 
-* The experimental compiler pass `convert-qecl-to-qecp` has been extended to lower 
-  transversal gate operations from the QEC Logical (`qecl`) dialect into the QEC 
+* The experimental compiler pass `convert-qecl-to-qecp` has been extended to lower
+  transversal gate operations from the QEC Logical (`qecl`) dialect into the QEC
   Physical (`qecp`) dialect.
   [(#2776)](https://github.com/PennyLaneAI/catalyst/pull/2776)
 
