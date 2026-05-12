@@ -233,7 +233,7 @@ class TestExtractInsertQubitConversion:
             // CHECK-NOT: qecp.extract
             // CHECK: [[q1:%.+]] = quantum.custom "PauliX"() [[q0:%.+]] : !quantum.bit
             %q1 = qecp.x %q : !qecp.qubit<data>
-            // CHECK: [[mres:%.+]], [[q2:%.+]] = qecp.measure [[q1:%.+]] : i1, !quantum.bit
+            // CHECK: [[mres:%.+]], [[q2:%.+]] = quantum.measure [[q1:%.+]] : i1, !quantum.bit
             %mres, %q2 = qecp.measure %q1 : i1, !qecp.qubit<data>
             return
         }
@@ -253,7 +253,7 @@ class TestExtractInsertQubitConversion:
             %q1 = qecp.extract %cb[1] : !qecp.codeblock<1 x 2> -> !qecp.qubit<data>
             // CHECK: [[q2:%.+]] = quantum.custom "Hadamard"() [[q1:%.+]] : !quantum.bit
             %q2 = qecp.hadamard %q1 : !qecp.qubit<data>
-            // CHECK: [[mres:%.+]], [[q3:%.+]] = qecp.measure [[q2:%.+]] : i1, !quantum.bit
+            // CHECK: [[mres:%.+]], [[q3:%.+]] = quantum.measure [[q2:%.+]] : i1, !quantum.bit
             %mres, %q3 = qecp.measure %q2 : i1, !qecp.qubit<data>
             // CHECK: [[CB2:%.+]] = quantum.insert {{%.+}}[0], [[q3:%.+]] : !quantum.reg, !quantum.bit
             %cb2 = qecp.insert %cb[0], %q3 : !qecp.codeblock<1 x 2>, !qecp.qubit<data>
@@ -262,6 +262,7 @@ class TestExtractInsertQubitConversion:
         }
         """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
 
 class TestGateConversion:
     """Lowering of gate operations in qecp to quantum."""
@@ -281,7 +282,7 @@ class TestGateConversion:
         }
         """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
-    
+
     def test_paulix_lowering(self, run_filecheck):
         """qecp.x lowers to quantum.custom "PauliX"."""
         program = """
@@ -313,7 +314,7 @@ class TestGateConversion:
         }
         """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
-    
+
     def test_pauliz_lowering(self, run_filecheck):
         """qecp.z lowers to quantum.custom "PauliZ"."""
         program = """
@@ -329,7 +330,7 @@ class TestGateConversion:
         }
         """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
-    
+
     def test_identity_lowering(self, run_filecheck):
         """qecp.i lowers to quantum.custom "Identity"."""
         program = """
@@ -345,7 +346,7 @@ class TestGateConversion:
         }
         """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
-    
+
     def test_s_lowering(self, run_filecheck):
         """qecp.s lowers to quantum.custom "S"."""
         program = """
@@ -361,7 +362,7 @@ class TestGateConversion:
         }
         """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
-    
+
     def test_cnot_lowering(self, run_filecheck):
         """qecp.cnot lowers to quantum.custom "CNOT"."""
         program = """
@@ -376,9 +377,9 @@ class TestGateConversion:
             return %q2 : !qecp.qubit<data>
         }
         }
-        """        
+        """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
-    
+
     def test_rot_conversion(self, run_filecheck):
         """qecp.rot lowers to quantum.custom "NoiseRot"."""
         program = """
@@ -395,5 +396,5 @@ class TestGateConversion:
             return %q1 : !qecp.qubit<data>
         }
         }
-        """        
+        """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))

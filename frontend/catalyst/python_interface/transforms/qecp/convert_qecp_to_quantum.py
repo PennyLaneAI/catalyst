@@ -165,7 +165,7 @@ class InsertQubitConversion(RewritePattern):
 
 
 @dataclass(frozen=True)
-class QecpGateConversion(RewritePattern):
+class GateConversion(RewritePattern):
     """Op conversion pattern from qecp.gate -> quantum.gate."""
 
     @op_type_rewrite_pattern
@@ -182,7 +182,7 @@ class QecpGateConversion(RewritePattern):
 
 
 @dataclass(frozen=True)
-class QecpNoiseRotConversion(RewritePattern):
+class NoiseRotConversion(RewritePattern):
     """Op conversion pattern from qecp.noise_rot_c -> quantum.noise_rot_c."""
 
     @op_type_rewrite_pattern
@@ -194,6 +194,17 @@ class QecpNoiseRotConversion(RewritePattern):
             gate_name=gate_name, params=params, in_qubits=(op.in_qubit,), adjoint=False
         )
         rewriter.replace_op(op, gate_op)
+
+
+@dataclass(frozen=True)
+class MeasureConversion(RewritePattern):
+    """Op conversion pattern from qecp.measure -> quantum.measure."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecp.MeasureOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering measurement ops to quantum.measure ops."""
+        measure_op = quantum.MeasureOp(in_qubit=op.operands[0])
+        rewriter.replace_op(op, measure_op)
 
 
 @dataclass(frozen=True)
@@ -217,8 +228,9 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                     DeallocAuxQubitConversion(),
                     InsertQubitConversion(),
                     ExtractQubitConversion(),
-                    QecpGateConversion(),
-                    QecpNoiseRotConversion(),
+                    GateConversion(),
+                    NoiseRotConversion(),
+                    MeasureConversion(),
                 ]
             )
         ).rewrite_module(op)
