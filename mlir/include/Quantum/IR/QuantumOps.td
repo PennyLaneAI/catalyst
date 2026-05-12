@@ -769,11 +769,13 @@ def CtrlOp : Region_Op<"ctrl", [SingleBlockImplicitTerminator<"YieldOp">, SameVa
 
     let arguments = (ins
         Variadic<QubitType>:$in_ctrl_qubits,
-        Variadic<I1>:$in_ctrl_values
+        Variadic<I1>:$in_ctrl_values,
+        Variadic<AnyTypeOf<[QuregType, QubitType]>>:$args
     );
 
     let results = (outs
-        Variadic<QubitType>:$out_ctrl_qubits
+        Variadic<QubitType>:$out_ctrl_qubits,
+        Variadic<AnyTypeOf<[QuregType, QubitType]>>:$results
     );
 
     let assemblyFormat = [{
