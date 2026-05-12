@@ -1588,8 +1588,8 @@ class Cond(HybridOp):
 
         return qp.adjoint(lambda: qp.apply(self) and None)()
 
-    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        return trace_quantum_branches(self, ctx, device, trace, qrp)
+    def trace_quantum(self, ctx, device, trace, qrp, **kwargs) -> QRegPromise:
+        return trace_quantum_branches(self, ctx, device, trace, qrp, **kwargs)
 
 
 class ForLoop(HybridOp):
@@ -1604,7 +1604,7 @@ class ForLoop(HybridOp):
 
         return qp.adjoint(lambda: qp.apply(self) and None)()
 
-    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
+    def trace_quantum(self, ctx, device, trace, qrp, **kwargs) -> QRegPromise:
         op = self
         inner_trace = op.regions[0].trace
         inner_tape = op.regions[0].quantum_tape
@@ -1615,7 +1615,9 @@ class ForLoop(HybridOp):
             qreg_in = _input_type_to_tracers(
                 partial(inner_trace.new_arg, source_info=current_source_info()), [new_qreg]
             )[0]
-            qrp_out = trace_quantum_operations(inner_tape, device, qreg_in, ctx, inner_trace)
+            qrp_out = trace_quantum_operations(
+                inner_tape, device, qreg_in, ctx, inner_trace, **kwargs
+            )
             qreg_out = qrp_out.actualize()
 
             region = self.regions[0]
@@ -1683,8 +1685,8 @@ class Switch(HybridOp):
 
         return qp.adjoint(lambda: qp.apply(self) and None)()
 
-    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        return trace_quantum_branches(self, ctx, device, trace, qrp)
+    def trace_quantum(self, ctx, device, trace, qrp, **kwargs) -> QRegPromise:
+        return trace_quantum_branches(self, ctx, device, trace, qrp, **kwargs)
 
 
 class WhileLoop(HybridOp):
@@ -1699,7 +1701,7 @@ class WhileLoop(HybridOp):
 
         return qp.adjoint(lambda: qp.apply(self) and None)()
 
-    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
+    def trace_quantum(self, ctx, device, trace, qrp, **kwargs) -> QRegPromise:
         cond_trace = self.regions[0].trace
         expansion_strategy = self.expansion_strategy
         with EvaluationContext.frame_tracing_context(cond_trace):
@@ -1736,7 +1738,9 @@ class WhileLoop(HybridOp):
             qreg_in = _input_type_to_tracers(
                 partial(body_trace.new_arg, source_info=current_source_info()), [AbstractQreg()]
             )[0]
-            qrp_out = trace_quantum_operations(body_tape, device, qreg_in, ctx, body_trace)
+            qrp_out = trace_quantum_operations(
+                body_tape, device, qreg_in, ctx, body_trace, **kwargs
+            )
             qreg_out = qrp_out.actualize()
             arg_expanded_tracers = expand_args(
                 region.arg_classical_tracers + [qreg_in],
@@ -1860,7 +1864,7 @@ def _make_argless_function(fn, args, kwargs):
     return argless_fn
 
 
-def trace_quantum_branches(op, ctx, device, trace, qrp) -> QRegPromise:
+def trace_quantum_branches(op, ctx, device, trace, qrp, **kwargs) -> QRegPromise:
     jaxprs, consts, num_implicit_outputs = [], [], []
     for region in op.regions:
         with EvaluationContext.frame_tracing_context(region.trace):
@@ -1869,7 +1873,7 @@ def trace_quantum_branches(op, ctx, device, trace, qrp) -> QRegPromise:
                 partial(region.trace.new_arg, source_info=current_source_info()), [new_qreg]
             )[0]
             qreg_out = trace_quantum_operations(
-                region.quantum_tape, device, qreg_in, ctx, region.trace
+                region.quantum_tape, device, qreg_in, ctx, region.trace, **kwargs
             ).actualize()
 
             constants = []
