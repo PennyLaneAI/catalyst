@@ -15,12 +15,56 @@
 #pragma once
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Matchers.h"
 
 #include "RTIO/IR/RTIOOps.h"
 
 namespace catalyst {
 namespace rtio {
+
+/// Helpers for reading nested keys from module rtio.config (device_db JSON).
+namespace device_db_detail {
+
+/// Descend one level in nested DictionaryAttr / ConfigAttr.
+inline mlir::Attribute descendByKey(mlir::Attribute parent, llvm::StringRef key)
+{
+    if (!parent) {
+        return {};
+    }
+    if (auto dict = mlir::dyn_cast<mlir::DictionaryAttr>(parent)) {
+        return dict.get(key);
+    }
+    if (auto cfg = mlir::dyn_cast<ConfigAttr>(parent)) {
+        return cfg.get(key);
+    }
+    return {};
+}
+
+/// Follow a chain of keys from root. Returns null if any step is missing or not a container.
+inline mlir::Attribute walkAttrPath(mlir::Attribute root, llvm::ArrayRef<llvm::StringRef> path)
+{
+    mlir::Attribute current = root;
+    for (llvm::StringRef key : path) {
+        current = descendByKey(current, key);
+        if (!current) {
+            return {};
+        }
+    }
+    return current;
+}
+
+/// Integer at path
+inline int64_t intAtPath(mlir::Attribute root, llvm::ArrayRef<llvm::StringRef> path)
+{
+    mlir::Attribute leaf = walkAttrPath(root, path);
+    if (auto intAttr = mlir::dyn_cast_or_null<mlir::IntegerAttr>(leaf)) {
+        return intAttr.getInt();
+    }
+    return 0;
+}
+
+} // namespace device_db_detail
 
 /// Extract the static channel ID from an RTIO channel type.
 inline int32_t extractChannelId(mlir::Value channelValue)
@@ -40,17 +84,10 @@ inline mlir::Value computeChannelDeviceAddr(mlir::OpBuilder &builder, mlir::Oper
     auto configAttr = mod->getAttrOfType<ConfigAttr>(ConfigAttr::getModuleAttrName());
     assert(configAttr && "configAttr not found");
 
-    // Get base channel from config
-    mlir::Attribute current = configAttr;
-    for (llvm::StringRef key : {"device_db", "ttl_urukul0_sw0", "arguments", "channel"}) {
-        if (auto dict = mlir::dyn_cast<mlir::DictionaryAttr>(current)) {
-            current = dict.get(key);
-        }
-        else if (auto cfg = mlir::dyn_cast<ConfigAttr>(current)) {
-            current = cfg.get(key);
-        }
-    }
-    int64_t channelBase = mlir::cast<mlir::IntegerAttr>(current).getInt();
+    mlir::Attribute leaf = device_db_detail::walkAttrPath(
+        configAttr, {"device_db", "ttl_urukul0_sw0", "arguments", "channel"});
+    assert(leaf && "device_db.ttl_urukul0_sw0.arguments.channel missing");
+    int64_t channelBase = mlir::cast<mlir::IntegerAttr>(leaf).getInt();
 
     llvm::APInt channelIdAPInt;
     assert(mlir::matchPattern(channelValue, mlir::m_ConstantInt(&channelIdAPInt)) &&
