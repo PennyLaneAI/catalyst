@@ -182,6 +182,21 @@ class QecpGateConversion(RewritePattern):
 
 
 @dataclass(frozen=True)
+class QecpNoiseRotConversion(RewritePattern):
+    """Op conversion pattern from qecp.noise_rot_c -> quantum.noise_rot_c."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecp.RotOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering noise rotation ops to quantum.custom "Rot" ops."""
+        gate_name = "Rot"
+        params = (op.phi, op.theta, op.omega)
+        gate_op = quantum.CustomOp(
+            gate_name=gate_name, params=params, in_qubits=(op.in_qubit,), adjoint=False
+        )
+        rewriter.replace_op(op, gate_op)
+
+
+@dataclass(frozen=True)
 class ConvertQecPhysicalToQuantumPass(ModulePass):
     """
     Convert QEC physical instructions to Quantum instructions.
@@ -203,6 +218,7 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                     InsertQubitConversion(),
                     ExtractQubitConversion(),
                     QecpGateConversion(),
+                    QecpNoiseRotConversion(),
                 ]
             )
         ).rewrite_module(op)
