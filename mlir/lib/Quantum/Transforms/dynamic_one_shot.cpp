@@ -88,12 +88,9 @@ void getMPDynamicNumQubitsSizeValues(func::FuncOp qnodeFunc, llvm::SmallPtrSet<V
 
     qnodeFunc->walk([&](quantum::SampleOp sampleOp) {
         ArrayRef<int64_t> shape = cast<ShapedType>(sampleOp.getSamples().getType()).getShape();
-        if ((shape.size() == 2) && ShapedType::isDynamic(shape[1])) {
-            if (ShapedType::isDynamic(shape[0])) {
-                vals.insert(sampleOp.getDynamicShape()[1]);
-            }
-            else {
-                vals.insert(sampleOp.getDynamicShape()[0]);
+        for (auto [i, dim] : llvm::enumerate(shape)) {
+            if (ShapedType::isDynamic(dim)) {
+                vals.insert(sampleOp.getDynamicShape()[i]);
             }
         }
     });
