@@ -2,6 +2,10 @@
 
 <h3>New features since last release</h3>
 
+* A new, experimental compiler pass `convert-qecp-to-quantum` has been added to lower operations
+  from the QEC Physical (`qecp`) dialect into the Quantum (`quantum`) dialect.
+  [(#2822)](https://github.com/PennyLaneAI/catalyst/pull/2822)
+
 <h3>Improvements 🛠</h3>
 
 <h3>Breaking changes 💔</h3>
@@ -19,10 +23,17 @@
   `std::views::filter`/`std::views::transform` with `std::copy_if`/`std::transform`
   [(#2801)](https://github.com/PennyLaneAI/catalyst/pull/2801)
 
+* The experimental compiler pass `convert-qecl-to-qecp` has been extended to lower 
+  transversal gate operations from the QEC Logical (`qecl`) dialect into the QEC 
+  Physical (`qecp`) dialect.
+  [(#2776)](https://github.com/PennyLaneAI/catalyst/pull/2776)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Lillian Frederiksen,
 Mehrdad Malekmohammadi,
+Shuli Shu,

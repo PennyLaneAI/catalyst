@@ -1821,8 +1821,10 @@ def graph_decomposition_setup_inputs(
         fn (QNode): the QNode to apply the graph decomposition compiler pass to.
         gate_set (Iterable[type | str] | dict[type | str, float]): the set of gates that are
             permissable after decomposition.
-        fixed_decomps (dict | None): map ops to decomps that will be forcibly applied.
-        alt_decomps (dict | None): map ops to lists of decomps that the graph system will consider.
+        fixed_decomps (dict | None): map operators to specific decomposition rules that will be applied if the
+                                     operators need to be decomposed (i.e. when they're not
+                                     in the target gate set).
+       alt_decomps (dict | None): map operators to lists of decomposition rules that the graph system will consider as alternative rules for operators.
 
     Returns:
         ~.QNode:
