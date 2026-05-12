@@ -467,10 +467,10 @@ class TestMidCircuitMeasurement:
             mcm_method="one-shot",
             postselect_mode=postselect_method,
         )
-        def circuit(b: bool):
+        def circuit(b: bool):  # pylint: disable=unused-argument
             qp.H(0)
 
-            def nested(i):
+            def nested(i):  # pylint: disable=unused-argument
                 measure(0, postselect=1)
 
             catalyst.for_loop(0, 10, 1)(nested)()
