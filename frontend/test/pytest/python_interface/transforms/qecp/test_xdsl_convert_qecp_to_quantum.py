@@ -216,3 +216,47 @@ class TestAuxAllocDeallocConversion:
         """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
 
+
+class TestExtractInsertQubitConversion:
+    """Lowering of qecp.extract / qecp.insert with static indices to quantum.extract / quantum.insert."""
+
+    def test_extract_lowering(self, run_filecheck):
+        """Each static index lowers to quantum.extract with the same index."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_extract
+        func.func @test_extract() {
+            // CHECK: [[REG:%.+]] = "test.op"() : () -> !quantum.reg
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 4>
+            // CHECK: [[q0:%.+]] = quantum.extract{{.*}}[0] : !quantum.reg -> !quantum.bit
+            %q = qecp.extract %cb[0] : !qecp.codeblock<1 x 4> -> !qecp.qubit<data>
+            // CHECK-NOT: qecp.extract
+            // CHECK: [[q1:%.+]] = qecp.hadamard [[q0:%.+]] : !quantum.bit
+            %q1 = qecp.hadamard %q : !qecp.qubit<data>
+            return
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_insert_lowering(self, run_filecheck):
+        """Insert at index 0 lowers to quantum.insert(...)[0]."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_insert_lowering
+        func.func @test_insert_lowering() {
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 2>
+            %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 2> -> !qecp.qubit<data>
+            %q1 = qecp.extract %cb[1] : !qecp.codeblock<1 x 2> -> !qecp.qubit<data>
+            %q2 = qecp.hadamard %q1 : !qecp.qubit<data>
+            // CHECK: quantum.insert{{.+}}[1]
+            %cb2 = qecp.insert %cb[1], %q2 : !qecp.codeblock<1 x 2>, !qecp.qubit<data>
+            %q3 = qecp.extract %cb2[1] : !qecp.codeblock<1 x 2> -> !qecp.qubit<data>
+            %q4 = qecp.hadamard %q3 : !qecp.qubit<data>
+            return
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+
