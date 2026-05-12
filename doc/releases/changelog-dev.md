@@ -16,7 +16,12 @@
 
 <h3>Internal changes ⚙️</h3>
 
-- Update RC nightly builds to read version number from the `_version.py` file 
+* Added a generic memory-space attribute in the Catalyst dialect that can be used in the
+  `memory_space` slot of `memref` types (or as a discardable attribute) to tag values with
+  a logical memory domain plus an optional LLVM-level address space within that domain.
+  [(#2750)](https://github.com/PennyLaneAI/catalyst/pull/2750)
+
+* Update RC nightly builds to read version number from the `_version.py` file 
   [(#2797)](https://github.com/PennyLaneAI/catalyst/pull/2797)
 
 * The experimental compiler pass `convert-qecl-to-qecp` has been extended to lower 
