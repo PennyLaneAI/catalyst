@@ -312,4 +312,5 @@ LogicalResult GraphStatePrepOp::verify()
 
     return success();
 }
+
 } // namespace catalyst::qref

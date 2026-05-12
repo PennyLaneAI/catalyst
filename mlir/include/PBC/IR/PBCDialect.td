@@ -49,32 +49,6 @@ def PBCDialect : Dialect {
     let useDefaultAttributePrinterParser = 1;
 }
 
-
-//===----------------------------------------------------------------------===//
-// PBC dialect enums.
-//===----------------------------------------------------------------------===//
-
-def LogicalInitKind : I32EnumAttr<"LogicalInitKind",
-    "The initial state of a logical qubit such as |0⟩, |1⟩, |+⟩, |−⟩, |Y⟩, |-Y⟩, |m⟩, or |m̅⟩.",
-    [
-        I32EnumAttrCase<"zero",     0>,     // |0⟩ Non-magic state
-        I32EnumAttrCase<"one",      1>,     // |1⟩ Non-magic state
-        I32EnumAttrCase<"plus",     2>,     // |+⟩  = (|0⟩ + |1⟩) / sqrt(2)  Non-magic state
-        I32EnumAttrCase<"minus",    3>,     // |-⟩  = (|0⟩ - |1⟩) / sqrt(2)  Non-magic state
-        I32EnumAttrCase<"plus_i",   4>,     // |Y⟩  = (|0⟩ + i|1⟩) / sqrt(2) Non-magic / Magic state
-        I32EnumAttrCase<"minus_i",  5>,     // |-Y⟩ = (|0⟩ - i|1⟩) / sqrt(2) Non-magic / Magic state
-        I32EnumAttrCase<"magic",    6>,     // |m⟩  = |0⟩ + e^{iπ/4}|1⟩      Magic state
-        I32EnumAttrCase<"magic_conj", 7>,   // |m̅⟩  = |0⟩ + e^{-iπ/4}|1⟩     Magic state
-    ]> {
-    let cppNamespace = "::catalyst::pbc";
-    let genSpecializedAttr = 0;
-}
-
-//===----------------------------------------------------------------------===//
-// PBC dialect attributes.
-//===----------------------------------------------------------------------===//
-
-def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word.">;
-def LogicalInit : EnumAttr<PBCDialect, LogicalInitKind, "enum">;
+class PBC_Op<string mnemonic, list<Trait> traits = []> : Op<PBCDialect, mnemonic, traits>;
 
 #endif // PBC_DIALECT
