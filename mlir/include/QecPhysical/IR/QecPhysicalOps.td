@@ -338,6 +338,13 @@ def AssembleTannerGraphOp : QecPhysical_Op<"assemble_tanner"> {
         $row_idx `,` $col_ptr attr-dict `:` type($row_idx) `,` type($col_ptr) `->` qualified(type($tanner_graph))
     }];
 
+    let extraClassDeclaration = [{
+        bool isBufferized() {
+            return mlir::isa<mlir::MemRefType>(getRowIdx().getType()) &&
+                   mlir::isa<mlir::MemRefType>(getColPtr().getType());
+        }
+    }];
+
     let hasVerifier = 1;
 }
 
@@ -374,19 +381,32 @@ def DecodeEsmCssOp : QecPhysical_Op<"decode_esm_css"> {
         // Decode ESM, return single index in codeblock where error occurred
         %err_idx = qecp.decode_esm_css(%tannerX : !qecp.tanner_graph<8, 6, i32>) %esm : tensor<2xi1> -> tensor<1xindex>
         ```
+
+        .. note::
+
+            The ``err_idx_in`` field is needed only after bufferization.
     }];
 
     let arguments = (ins
         AnyTypeOf<[1DTensorOf<[I1]>, MemRefRankOf<[I1], [1]>]>:$esm,
-        TannerGraphType:$tanner_graph
+        TannerGraphType:$tanner_graph,
+        Optional<MemRefRankOf<[Index], [1]>>:$err_idx_in
     );
 
     let results = (outs
-        1DTensorOf<[Index]>:$err_idx
+        Optional<1DTensorOf<[Index]>>:$err_idx
     );
 
+    let extraClassDeclaration = [{
+        bool isBufferized() {
+            return mlir::isa<mlir::MemRefType>(getEsm().getType()) && getResultTypes().empty();
+        }
+    }];
+
     let assemblyFormat = [{
-        `(` $tanner_graph `:` qualified(type($tanner_graph)) `)` $esm attr-dict `:` type($esm) `->` type($err_idx)
+        `(` $tanner_graph `:` qualified(type($tanner_graph)) `)` $esm
+        ( `in` `(` $err_idx_in^ `:` type($err_idx_in) `)` )?
+        attr-dict `:` type($esm) ( `->` type($err_idx)^ )?
     }];
 }
 
@@ -401,18 +421,32 @@ def DecodePhysicalMeasurementOp : QecPhysical_Op<"decode_physical_meas"> {
         computational basis. The logical measurement results are returned as a one-dimensional
         tensor with shape=(k,), where k is the number of QEC logical qubits encoded by the physical
         codeblock.
+
+        .. note::
+
+            The ``logical_measurements_in`` field is needed only after bufferization.
     }];
 
     let arguments = (ins
-        AnyTypeOf<[1DTensorOf<[I1]>, MemRefRankOf<[I1], [1]>]>:$physical_measurements
+        AnyTypeOf<[1DTensorOf<[I1]>, MemRefRankOf<[I1], [1]>]>:$physical_measurements,
+        Optional<MemRefRankOf<[I1], [1]>>:$logical_measurements_in
     );
 
     let results = (outs
-        1DTensorOf<[I1]>:$logical_measurements
+        Optional<1DTensorOf<[I1]>>:$logical_measurements
     );
 
+    let extraClassDeclaration = [{
+        bool isBufferized() {
+            return mlir::isa<mlir::MemRefType>(getPhysicalMeasurements().getType()) &&
+                   getResultTypes().empty();
+        }
+    }];
+
     let assemblyFormat = [{
-        $physical_measurements attr-dict `:` type($physical_measurements) `->` type($logical_measurements)
+        $physical_measurements
+        ( `in` `(` $logical_measurements_in^ `:` type($logical_measurements_in) `)` )?
+        attr-dict `:` type($physical_measurements) ( `->` type($logical_measurements)^ )?
     }];
 }
 

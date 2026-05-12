@@ -19,6 +19,7 @@ import re
 import numpy as np
 import pytest
 
+from catalyst.python_interface.dialects import qecp
 from catalyst.python_interface.transforms.qecp.qec_code_lib import QecCode
 
 SUPPORTED_CODES = ["Steane"]
@@ -32,7 +33,16 @@ class TestQecCode:
     )
     def test_constructor(self, name: str, n: int, k: int, d: int):
         """Test the constructor of the `QecCode` class for various QEC codes."""
-        qec_code = QecCode(name, n, k, d, np.eye(n), np.array([1] * n))
+        qec_code = QecCode(
+            name,
+            n,
+            k,
+            d,
+            np.eye(n),
+            np.array([1] * n),
+            transversal_1q_gates={"x": (qecp.PauliXOp, [0, 1, 2])},
+            transversal_2q_gates={"cnot": qecp.CnotOp},
+        )
 
         assert qec_code.name == name
         assert qec_code.n == n
@@ -40,13 +50,15 @@ class TestQecCode:
         assert qec_code.d == d
         assert np.all(qec_code.x_tanner == np.eye(n))
         assert np.all(qec_code.z_tanner == np.array([1] * n))
+        assert qec_code.transversal_1q_gates == {"x": (qecp.PauliXOp, [0, 1, 2])}
+        assert qec_code.transversal_2q_gates == {"cnot": qecp.CnotOp}
 
     @pytest.mark.parametrize(
         "inputs, expected_str",
         [
-            (("Steane", 7, 1, 3, np.eye(7), np.eye(7)), "[[7, 1, 3]] Steane"),
-            (("", 7, 1, 3, np.eye(7), np.eye(7)), "[[7, 1, 3]] <unknown>"),
-            (("  ", 7, 1, 3, np.eye(7), np.eye(7)), "[[7, 1, 3]] <unknown>"),
+            (("Steane", 7, 1, 3, np.eye(7), np.eye(7), {}, {}), "[[7, 1, 3]] Steane"),
+            (("", 7, 1, 3, np.eye(7), np.eye(7), {}, {}), "[[7, 1, 3]] <unknown>"),
+            (("  ", 7, 1, 3, np.eye(7), np.eye(7), {}, {}), "[[7, 1, 3]] <unknown>"),
         ],
     )
     def test_str_representation(self, inputs, expected_str):
@@ -64,6 +76,8 @@ class TestQecCode:
                 "d": 3,
                 "x_tanner": np.eye(7),
                 "z_tanner": np.array([[0, 0, 1, 1, 0, 1, 1]]),
+                "transversal_1q_gates": {"x": (qecp.PauliXOp, [0, 1, 2])},
+                "transversal_2q_gates": {},
             },
             {
                 "name": "Shor",
@@ -72,6 +86,11 @@ class TestQecCode:
                 "d": 3,
                 "x_tanner": np.eye(9),
                 "z_tanner": np.array([[0, 0, 1, 1, 0, 1, 1, 0, 1]]),
+                "transversal_1q_gates": {
+                    "y": (qecp.PauliYOp, [0, 1]),
+                    "hadamdar": (qecp.HadamardOp, [2, 4]),
+                },
+                "transversal_2q_gates": {"cnot": qecp.CnotOp},
             },
             {
                 "name": "Unknown",
@@ -81,6 +100,8 @@ class TestQecCode:
                 "x_tanner": np.eye(7),
                 "z_tanner": np.array([[0, 0, 1, 1, 0, 1, 1]]),
                 "extra-field": 42,
+                "transversal_1q_gates": {"z": (qecp.PauliZOp, [4, 5, 6])},
+                "transversal_2q_gates": {"cnot": qecp.CnotOp},
             },
         ],
     )
@@ -94,6 +115,8 @@ class TestQecCode:
         assert qec_code.d == data["d"]
         assert np.all(qec_code.x_tanner == data["x_tanner"])
         assert np.all(qec_code.z_tanner == data["z_tanner"])
+        assert qec_code.transversal_1q_gates == data["transversal_1q_gates"]
+        assert qec_code.transversal_2q_gates == data["transversal_2q_gates"]
 
     @pytest.mark.parametrize(
         "data",
@@ -105,6 +128,8 @@ class TestQecCode:
                 "d": 3,
                 "x_tanner": np.eye(7),
                 "z_tanner": np.array([[0, 0, 1, 1, 0, 1, 1]]),
+                "transversal_1q_gates": {"x": (qecp.PauliXOp, [0, 1, 2])},
+                "transversal_2q_gates": {"cnot": qecp.CnotOp},
             },
             {
                 "name": "Shor",
@@ -113,6 +138,8 @@ class TestQecCode:
                 "d": 3,
                 "x_tanner": np.eye(9),
                 "z_tanner": np.array([[0, 0, 1, 1, 0, 1, 1, 0, 1]]),
+                "transversal_1q_gates": {"x": (qecp.PauliXOp, [0, 1, 2])},
+                "transversal_2q_gates": {},
             },
         ],
     )
@@ -132,6 +159,19 @@ class TestQecCode:
         assert qec_code.d == data["d"]
         assert np.all(qec_code.x_tanner == data["x_tanner"])
         assert np.all(qec_code.z_tanner == data["z_tanner"])
+        assert qec_code.transversal_1q_gates == data["transversal_1q_gates"]
+        assert qec_code.transversal_2q_gates == data["transversal_2q_gates"]
+
+    @pytest.mark.parametrize("d, expected_t", [(1, 0), (2, 0), (3, 1), (4, 1), (5, 2), (6, 2)])
+    def test_correctable_errors_property(self, d: int, expected_t: int):
+        """Test the `correctable_errors` property of `QecCode`, which returns the number of
+        correctable errors of the code, t = floor((d - 1) / 2).
+        """
+        qec_code = QecCode(
+            "", 1, 1, d, np.array([]), np.array([]), {}, {}
+        )  # only value of d matters
+
+        assert qec_code.correctable_errors == expected_t
 
     @pytest.mark.parametrize("name", SUPPORTED_CODES)
     def test_get(self, name: str):

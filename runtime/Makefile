@@ -40,8 +40,8 @@ ifeq ($(ENABLE_ASAN), ON)
 ASAN_COMMAND = $(ASAN_FLAGS)
 endif
 
-BUILD_TARGETS := rt_capi rtd_null_qubit rt_rsdecomp
-TEST_TARGETS := runner_tests_qir_runtime runner_tests_mbqc_runtime runner_tests_rsdecomp_runtime
+BUILD_TARGETS := rt_capi rtd_null_qubit rt_rsdecomp rt_decoder
+TEST_TARGETS := runner_tests_qir_runtime runner_tests_mbqc_runtime runner_tests_rsdecomp_runtime runner_tests_decoder_runtime
 
 ifeq ($(ENABLE_OPENQASM), ON)
 	BUILD_TARGETS += rtd_openqasm
@@ -101,6 +101,8 @@ test: test_runner
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_mbqc_runtime
 	@echo "Catalyst RSDecomp runtime test suite"
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_rsdecomp_runtime
+	@echo "Catalyst Decoder runtime test suite"
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_decoder_runtime
 ifeq ($(ENABLE_OPENQASM), ON)
 	# Test the OpenQasm devices C++ tests
 	$(ASAN_COMMAND) $(PY_ASAN_OPTIONS) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
@@ -122,6 +124,7 @@ coverage: test_runner
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_mbqc_runtime
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_rsdecomp_runtime
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_decoder_runtime
 ifeq ($(ENABLE_OPENQASM), ON)
 	$(ASAN_COMMAND) $(PY_ASAN_OPTIONS) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
 endif
@@ -139,6 +142,7 @@ else
 		$(RT_BUILD_DIR)/tests/runner_tests_qir_runtime \
 		$(RT_BUILD_DIR)/tests/runner_tests_mbqc_runtime \
 		$(RT_BUILD_DIR)/tests/runner_tests_rsdecomp_runtime \
+		$(RT_BUILD_DIR)/tests/runner_tests_decoder_runtime \
 		-format=html -output-dir=$(RT_BUILD_DIR)/coverage_html \
 		$(MK_DIR)/include $(MK_DIR)/lib $(MK_DIR)/tests
 endif

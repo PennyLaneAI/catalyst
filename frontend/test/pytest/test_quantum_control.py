@@ -45,17 +45,17 @@ from catalyst.jax_tracer import HybridOpRegion
 
 
 def verify_catalyst_ctrl_against_pennylane(
-    quantum_func: Callable, device, *args, with_adjoint_arg=False
+    quantum_func: Callable, device, *args, with_adjoint_arg=False, capture_mode="global"
 ):
     """
     A helper function for verifying Catalyst's native quantum control against the behaviour of
     PennyLane's quantum control function.
     """
 
-    @qjit
+    @qjit(capture=capture_mode)
     @qp.qnode(device)
     def catalyst_workflow(*args):
-        if qp.capture.enabled():
+        if capture_mode is True:
             if with_adjoint_arg:
                 return quantum_func(*args, ctrl_fn=PL_ctrl, adjoint_fn=PL_adjoint)
             else:
@@ -84,11 +84,10 @@ def verify_catalyst_ctrl_against_pennylane(
     assert_allclose(catalyst_workflow(*args), compare, atol=1e-7)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestControlled:
     """Integration tests for Catalyst ctrl functionality."""
 
-    def test_qctrl_op_object(self, backend):
+    def test_qctrl_op_object(self, backend, capture_mode):
         """Test the quantum control application to an operation object"""
 
         def circuit(theta, w, cw, ctrl_fn):
@@ -96,18 +95,22 @@ class TestControlled:
             ctrl_fn(qp.RX, control=[cw], control_values=[False])(theta, wires=[w])
             return qp.state()
 
-        verify_catalyst_ctrl_against_pennylane(circuit, qp.device(backend, wires=3), 0.1, 0, 1)
+        verify_catalyst_ctrl_against_pennylane(
+            circuit, qp.device(backend, wires=3), 0.1, 0, 1, capture_mode=capture_mode
+        )
 
-    def test_qctrl_op_class(self, backend):
+    def test_qctrl_op_class(self, backend, capture_mode):
         """Test the quantum control application to a single operation class"""
 
         def circuit(theta, w, cw, ctrl_fn):
             ctrl_fn(qp.RX, control=[w], control_values=[True])(theta, wires=[cw])
             return qp.state()
 
-        verify_catalyst_ctrl_against_pennylane(circuit, qp.device(backend, wires=3), 0.1, 0, 1)
+        verify_catalyst_ctrl_against_pennylane(
+            circuit, qp.device(backend, wires=3), 0.1, 0, 1, capture_mode=capture_mode
+        )
 
-    def test_qctrl_adjoint_func_simple(self, backend):
+    def test_qctrl_adjoint_func_simple(self, backend, capture_mode):
         """Test the quantum control distribution over the group of operations"""
 
         def circuit(arg, ctrl_fn, adjoint_fn):
@@ -119,10 +122,14 @@ class TestControlled:
             return qp.state()
 
         verify_catalyst_ctrl_against_pennylane(
-            circuit, qp.device(backend, wires=3), 0.1, with_adjoint_arg=True
+            circuit,
+            qp.device(backend, wires=3),
+            0.1,
+            with_adjoint_arg=True,
+            capture_mode=capture_mode,
         )
 
-    def test_adjoint_qctrl_func_simple(self, backend):
+    def test_adjoint_qctrl_func_simple(self, backend, capture_mode):
         """Test the quantum control distribution over the group of operations"""
 
         def circuit(arg, ctrl_fn, adjoint_fn):
@@ -134,10 +141,14 @@ class TestControlled:
             return qp.state()
 
         verify_catalyst_ctrl_against_pennylane(
-            circuit, qp.device(backend, wires=3), 0.1, with_adjoint_arg=True
+            circuit,
+            qp.device(backend, wires=3),
+            0.1,
+            with_adjoint_arg=True,
+            capture_mode=capture_mode,
         )
 
-    def test_qctrl_adjoint_hybrid(self, backend):
+    def test_qctrl_adjoint_hybrid(self, backend, capture_mode):
         """Test the quantum control distribution over the group of operations"""
 
         def circuit(theta, w2, cw, ctrl_fn, adjoint_fn):
@@ -153,10 +164,16 @@ class TestControlled:
             return qp.state()
 
         verify_catalyst_ctrl_against_pennylane(
-            circuit, qp.device(backend, wires=3), 0.1, 2, 2, with_adjoint_arg=True
+            circuit,
+            qp.device(backend, wires=3),
+            0.1,
+            2,
+            2,
+            with_adjoint_arg=True,
+            capture_mode=capture_mode,
         )
 
-    def test_qctrl_func_simple(self, backend):
+    def test_qctrl_func_simple(self, backend, capture_mode):
         """Test the quantum control distribution over the group of operations"""
 
         def circuit(arg, ctrl_fn):
@@ -167,9 +184,11 @@ class TestControlled:
             ctrl_fn(_func, control=[1], control_values=[True])(arg)
             return qp.state()
 
-        verify_catalyst_ctrl_against_pennylane(circuit, qp.device(backend, wires=3), 0.1)
+        verify_catalyst_ctrl_against_pennylane(
+            circuit, qp.device(backend, wires=3), 0.1, capture_mode=capture_mode
+        )
 
-    def test_qctrl_func_hybrid(self, backend):
+    def test_qctrl_func_hybrid(self, backend, capture_mode):
         """Test the quantum control distribution over the Catalyst hybrid operation"""
 
         def circuit(theta, w1, w2, cw, ctrl_fn):
@@ -209,9 +228,11 @@ class TestControlled:
             ctrl_fn(_func, control=[cw], control_values=[True])()
             return qp.state()
 
-        verify_catalyst_ctrl_against_pennylane(circuit, qp.device(backend, wires=3), 0.1, 0, 2, 2)
+        verify_catalyst_ctrl_against_pennylane(
+            circuit, qp.device(backend, wires=3), 0.1, 0, 2, 2, capture_mode=capture_mode
+        )
 
-    def test_qctrl_func_nested(self, backend):
+    def test_qctrl_func_nested(self, backend, capture_mode):
         """Test the quantum control distribution over the nested control operations"""
 
         def circuit(theta, w1, w2, cw1, cw2, ctrl_fn):
@@ -229,10 +250,17 @@ class TestControlled:
             return qp.state()
 
         verify_catalyst_ctrl_against_pennylane(
-            circuit, qp.device(backend, wires=4), 0.1, 0, 1, 2, 3
+            circuit,
+            qp.device(backend, wires=4),
+            0.1,
+            0,
+            1,
+            2,
+            3,
+            capture_mode=capture_mode,
         )
 
-    def test_qctrl_func_work_wires(self, backend):
+    def test_qctrl_func_work_wires(self, backend, capture_mode):
         """Test the quantum control distribution over the nested control operations"""
 
         def circuit(theta, ctrl_fn):
@@ -249,9 +277,11 @@ class TestControlled:
             ctrl_fn(_func1, control=[1], work_wires=[2])()
             return qp.state()
 
-        verify_catalyst_ctrl_against_pennylane(circuit, qp.device(backend, wires=5), 0.1)
+        verify_catalyst_ctrl_against_pennylane(
+            circuit, qp.device(backend, wires=5), 0.1, capture_mode=capture_mode
+        )
 
-    def test_qctrl_valid_input_types(self, backend):
+    def test_qctrl_valid_input_types(self, backend, capture_mode):
         """Test the quantum control input types"""
 
         def circuit(theta, w, cw, ctrl_fn):
@@ -264,9 +294,11 @@ class TestControlled:
             # ctrl_fn(qp.RX(theta, wires=[0]), control=[1], work_wires=[2])
             return qp.state()
 
-        verify_catalyst_ctrl_against_pennylane(circuit, qp.device(backend, wires=3), 0.1, 0, 1)
+        verify_catalyst_ctrl_against_pennylane(
+            circuit, qp.device(backend, wires=3), 0.1, 0, 1, capture_mode=capture_mode
+        )
 
-    def test_native_controlled_custom(self):
+    def test_native_controlled_custom(self, capture_mode):
         """Test native control of a custom operation."""
         dev = qp.device("lightning.qubit", wires=4)
 
@@ -275,13 +307,13 @@ class TestControlled:
             qp.ctrl(qp.PauliZ(wires=[0]), control=[1, 2, 3])
             return qp.state()
 
-        compiled = qjit(native_controlled)
+        compiled = qjit(native_controlled, capture=capture_mode)
         assert all(sign in compiled.mlir for sign in ["ctrls", "ctrlvals"])
         result = compiled()
         expected = native_controlled()
         assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
 
-    def test_native_controlled_unitary(self):
+    def test_native_controlled_unitary(self, capture_mode):
         """Test native control of a custom operation."""
         dev = qp.device("lightning.qubit", wires=4)
 
@@ -302,7 +334,7 @@ class TestControlled:
             )
             return qp.state()
 
-        compiled = qjit(native_controlled)
+        compiled = qjit(native_controlled, capture=capture_mode)
         result = compiled()
         expected = native_controlled()
         assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
