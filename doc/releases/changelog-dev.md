@@ -14,7 +14,7 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Fixed a bug where keep_intermediate=True isused with target="mlir" resulted in an emptyworkspace
+* Fixed a bug where using `keep_intermediate=True` with `target="mlir"` resulted in an empty workspace
   folder being created and the files printed outside in the main directory.
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
 
