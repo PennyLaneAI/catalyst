@@ -30,9 +30,9 @@ func.func @test_mbqc_measure_in_basis_op(%angle: f64) -> (i1, i1, i1) attributes
     // CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[mres1:%.+]], [[q0_0:%.+]] = mbqc.measure_in_basis[ YZ, %arg0] [[q0]] : i1, !quantum.bit
     // CHECK: [[mres2:%.+]], [[q0_1:%.+]] = mbqc.measure_in_basis[ ZX, %arg0] [[q0_0]] : i1, !quantum.bit
-    %mres0 = qref.mbqc.measure_in_basis [XY, %angle] %qb : i1
-    %mres1 = qref.mbqc.measure_in_basis [YZ, %angle] %q0 : i1
-    %mres2 = qref.mbqc.measure_in_basis [ZX, %angle] %q0 : i1
+    %mres0 = mbqc.ref.measure_in_basis [XY, %angle] %qb : i1
+    %mres1 = mbqc.ref.measure_in_basis [YZ, %angle] %q0 : i1
+    %mres2 = mbqc.ref.measure_in_basis [ZX, %angle] %q0 : i1
 
     // CHECK: [[insert:%.+]] = quantum.insert [[qreg]][ 0], [[q0_1]] : !quantum.reg, !quantum.bit
     // CHECK: quantum.dealloc [[insert]] : !quantum.reg
@@ -52,7 +52,7 @@ func.func @test_mbqc_measure_in_basis_op(%angle: f64) -> (i1, i1, i1) attributes
 func.func @test_mbqc_graph_state_prep(%arg0: tensor<6xi1>) attributes {quantum.node} {
 
     // CHECK: [[qreg:%.+]] = mbqc.graph_state_prep(%arg0 : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !quantum.reg
-    %graph_reg = qref.mbqc.graph_state_prep (%arg0 : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !qref.reg<4>
+    %graph_reg = mbqc.ref.graph_state_prep (%arg0 : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !qref.reg<4>
     return
 }
 
@@ -66,12 +66,12 @@ func.func @test_mbqc_circuit(%reg: !qref.reg<1>) {
     %angle = arith.constant 37.42 : f64
 
     // CHECK: [[graph_reg:%.+]] = mbqc.graph_state_prep({{%.+}} : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !quantum.reg
-    %graph_reg = qref.mbqc.graph_state_prep (%adj_matrix : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !qref.reg<4>
+    %graph_reg = mbqc.ref.graph_state_prep (%adj_matrix : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !qref.reg<4>
     %q0 = qref.get %graph_reg[0] : !qref.reg<4> -> !qref.bit
 
     // CHECK: [[q0:%.+]] = quantum.extract [[graph_reg]][ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[mres:%.+]], [[m_XY:%.+]] = mbqc.measure_in_basis[ XY, {{%.+}}] [[q0]] : i1, !quantum.bit
-    %mres0 = qref.mbqc.measure_in_basis [XY, %angle] %q0 : i1
+    %mres0 = mbqc.ref.measure_in_basis [XY, %angle] %q0 : i1
 
     // CHECK: [[ifOut:%.+]]:2 = scf.if [[mres]] -> (!quantum.bit, !quantum.bit) {
     // CHECK:   [[CZ:%.+]]:2 = quantum.custom "CZ"() [[m_XY]], %arg0 : !quantum.bit, !quantum.bit

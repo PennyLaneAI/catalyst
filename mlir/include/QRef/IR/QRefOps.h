@@ -24,7 +24,6 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 
-#include "MBQC/IR/MBQCDialect.h"
 #include "QRef/IR/QRefDialect.h"
 #include "QRef/IR/QRefInterfaces.h"
 #include "Quantum/IR/QuantumDialect.h"

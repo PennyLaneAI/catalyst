@@ -96,3 +96,39 @@ func.func @test_graph_state_prep() {
     %graph_reg = mbqc.graph_state_prep (%adj_matrix : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !quantum.reg
     func.return
 }
+
+// -----
+
+func.func @test_ref_measure_in_basis(%q : !qref.bit, %angle: f64) {
+    %0 = mbqc.ref.measure_in_basis [XY, %angle] %q : i1
+    %1 = mbqc.ref.measure_in_basis [YZ, %angle] %q : i1
+    %2 = mbqc.ref.measure_in_basis [ZX, %angle] %q : i1
+    func.return
+}
+
+// -----
+
+func.func @test_ref_graph_state_prep() {
+    %adj_matrix = arith.constant dense<[1, 0, 1, 0, 0, 1]> : tensor<6xi1>
+    %graph_reg = mbqc.ref.graph_state_prep (%adj_matrix : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !qref.reg<4>
+    func.return
+}
+
+// -----
+
+func.func @test_ref_measure_in_basis_invalid_plane(%q : !qref.bit) {
+    %angle = arith.constant 3.141592653589793 : f64
+    // expected-error@below {{expected catalyst::mbqc::MeasurementPlane to be one of: XY, YZ, ZX}}
+    // expected-error@below {{failed to parse MeasurementPlaneAttr parameter}}
+    %res = mbqc.ref.measure_in_basis [YX, %angle] %q : i1
+    func.return
+}
+
+// -----
+
+func.func @test_ref_graph_state_prep_invalid_size() {
+    %adj_matrix = arith.constant dense<[1]> : tensor<1xi1>
+    // expected-error@below {{mismatch between allocation size and size of densely packed adjacency matrix. For an allocation size of 4, the densely packed adjacency matrix size is expected to be 6}}
+    %graph_reg = mbqc.ref.graph_state_prep (%adj_matrix : tensor<1xi1>) [init "Hadamard", entangle "CZ"] : !qref.reg<4>
+    func.return
+}

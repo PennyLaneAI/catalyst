@@ -17,6 +17,7 @@
 #include "mlir/IR/Builders.h"
 
 #include "MBQC/IR/MBQCDialect.h"
+#include "QRef/IR/QRefDialect.h"
 
 using namespace mlir;
 using namespace catalyst::mbqc;
@@ -29,3 +30,33 @@ using namespace catalyst::mbqc;
 
 #define GET_OP_CLASSES
 #include "MBQC/IR/MBQCOps.cpp.inc"
+
+namespace catalyst::mbqc {
+
+//===----------------------------------------------------------------------===//
+// MBQC op verifiers.
+//===----------------------------------------------------------------------===//
+
+LogicalResult RefGraphStatePrepOp::verify()
+{
+    ShapedType adjMatrixType = cast<ShapedType>(getAdjMatrix().getType());
+    size_t adjMatrixSize = adjMatrixType.getShape()[0];
+
+    qref::QuregType qregType = getQreg().getType();
+    if (qregType.isDynamic()) {
+        return emitOpError() << "expected static allocation size";
+    }
+
+    size_t qregSize = qregType.getSize().getInt();
+    size_t expectedAdjMatrixSize = qregSize * (qregSize - 1) / 2;
+    if (adjMatrixSize != expectedAdjMatrixSize) {
+        return emitOpError()
+               << "mismatch between allocation size and size of densely packed adjacency "
+                  "matrix. For an allocation size of "
+               << qregSize << ", the densely packed adjacency matrix size is expected to be "
+               << expectedAdjMatrixSize;
+    }
+
+    return success();
+}
+} // namespace catalyst::mbqc
