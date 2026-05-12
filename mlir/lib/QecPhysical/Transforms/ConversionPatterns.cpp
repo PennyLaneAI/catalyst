@@ -48,9 +48,9 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
         Value tannerStructValue = LLVM::UndefOp::create(rewriter, loc, tannerStructType);
 
         tannerStructValue = LLVM::InsertValueOp::create(
-            rewriter, loc, tannerStructValue, adaptor.getRowIdx(), SmallVector<int64_t>{0});
+            rewriter, loc, tannerStructValue, adaptor.getRowIdx(), ArrayRef<int64_t>{0});
         tannerStructValue = LLVM::InsertValueOp::create(
-            rewriter, loc, tannerStructValue, adaptor.getColPtr(), SmallVector<int64_t>{1});
+            rewriter, loc, tannerStructValue, adaptor.getColPtr(), ArrayRef<int64_t>{1});
 
         rewriter.replaceOp(op, tannerStructValue);
 
