@@ -445,7 +445,8 @@ def handle_subroutine(self, *args, **kwargs):
     Transform the subroutine from PLxPR into JAXPR with quantum primitives.
     """
     plxpr = kwargs["jaxpr"]
-    transformed = self.subroutine_cache.get(plxpr)
+
+    transformed = self.subroutine_cache.get(hash(str(plxpr)))
 
     if not transformed:
         f = partial(
@@ -454,7 +455,7 @@ def handle_subroutine(self, *args, **kwargs):
             plxpr,
         )
         converted_closed_jaxpr_branch = jax.make_jaxpr(f)(self.init_qreg, *args)
-        self.subroutine_cache[plxpr] = converted_closed_jaxpr_branch
+        self.subroutine_cache[hash(str(plxpr))] = converted_closed_jaxpr_branch
     else:
         converted_closed_jaxpr_branch = transformed
 
