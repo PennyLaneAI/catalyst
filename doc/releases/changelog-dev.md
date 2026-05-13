@@ -8,6 +8,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
+  argument is at an arbitrary position in the argument list.
+  [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
@@ -46,3 +50,4 @@ Joey Carter,
 Lillian Frederiksen,
 Mehrdad Malekmohammadi,
 Shuli Shu,
+Paul Haochen Wang.
