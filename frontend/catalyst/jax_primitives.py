@@ -3132,6 +3132,26 @@ def _cos_lowering2(ctx, x, accuracy):
     return _nary_lower_hlo(hlo.cosine, ctx, x, accuracy=accuracy)
 
 
+def subroutine_lowering(*args, **kwargs):
+    """This is just a method that forwards arguments to _pjit_lowering
+
+    Even though we could register the `pjit_p` lowering directly, this makes the code origin
+    apparent in stack traces and similar use cases.
+    """
+    try:
+        retval = _pjit_lowering(*args, **kwargs)
+    except NotImplementedError as e:
+        if "MLIR translation rule for primitive" in str(e):
+            msg = str(e) + """
+                This error sometimes occurs when using quantum operations
+                inside subroutines but calling them outside a qnode
+            """
+            raise NotImplementedError(msg) from e
+        raise e
+
+    return retval
+
+
 CUSTOM_LOWERING_RULES = (
     (zne_p, _zne_lowering),
     (device_init_p, _device_init_lowering),
@@ -3185,7 +3205,7 @@ CUSTOM_LOWERING_RULES = (
     (sin_p, _sin_lowering2),
     (cos_p, _cos_lowering2),
     (quantum_kernel_p, _quantum_kernel_lowering),
-    (quantum_subroutine_prim, _pjit_lowering),
+    (quantum_subroutine_prim, subroutine_lowering),
     (measure_in_basis_p, _measure_in_basis_lowering),
     (decomprule_p, _decomposition_rule_lowering),
 )
