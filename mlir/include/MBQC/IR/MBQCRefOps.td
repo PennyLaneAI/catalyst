@@ -39,7 +39,7 @@ def RefMeasureInBasisOp : MBQC_Op<"ref.measure_in_basis"> {
 def RefGraphStatePrepOp : MBQC_Op<"ref.graph_state_prep"> {
     let summary = "Allocate resources for a new graph state.";
     let description = [{
-        Identical to mbqc.graph_state_prep operation, except in reference semantics.
+        Identical to the `mbqc.graph_state_prep` operation, except in reference semantics.
     }];
 
     let arguments = (ins
