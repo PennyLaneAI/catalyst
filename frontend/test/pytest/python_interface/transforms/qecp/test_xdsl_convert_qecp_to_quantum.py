@@ -152,6 +152,8 @@ class TestQecPhysicalQubitTypeConversionPatternUnit:
         out = pattern.convert_type(qecp.QecPhysicalQubitType(role))
         assert isinstance(out, QubitType)
         assert out == QubitType()
+
+
 class TestAuxAllocDeallocConversion:
     """Lowering of qecp.alloc_aux / qecp.dealloc_aux to quantum.alloc_qb / quantum.dealloc_qb."""
 

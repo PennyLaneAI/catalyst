@@ -33,6 +33,7 @@
   transversal gate operations from the QEC Logical (`qecl`) dialect into the QEC 
   Physical (`qecp`) dialect.
   [(#2776)](https://github.com/PennyLaneAI/catalyst/pull/2776)
+  [(#2824)](https://github.com/PennyLaneAI/catalyst/pull/2824)
 
 <h3>Documentation 📝</h3>
 
