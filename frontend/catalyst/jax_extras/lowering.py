@@ -208,10 +208,14 @@ def get_mlir_attribute_from_pyval(value):
             elif 0 <= value < 18446744073709551616:  # = 2**64
                 attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64), value)
             else:
-                raise CompileError(textwrap.dedent("""
+                raise CompileError(
+                    textwrap.dedent(
+                        """
                     Large integer attributes currently not supported in MLIR,
                     see https://github.com/llvm/llvm-project/issues/128072
-                    """))
+                    """
+                    )
+                )
 
         case float():
             attr = ir.FloatAttr.get(ir.F64Type.get(), value)

@@ -25,7 +25,7 @@ import jax.numpy as jnp
 import pennylane as qp
 from jax._src.sharding_impls import UNSPECIFIED
 from jax._src.tree_util import tree_flatten
-from jax.extend.core import ClosedJaxpr
+from jax.extend.core import ClosedJaxpr, JaxprEqn
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
 from pennylane.capture import PlxprInterpreter, pause
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
@@ -35,6 +35,7 @@ from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measu
 from pennylane.capture.primitives import quantum_subroutine_prim, transform_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
+from pennylane.operation2 import Operator2
 
 from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import (
@@ -63,6 +64,7 @@ from catalyst.jax_primitives import (
     set_basis_state_p,
     set_state_p,
     state_p,
+    template_p,
     tensorobs_p,
     unitary_p,
     var_p,
@@ -128,6 +130,44 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         self.has_dynamic_allocation = False
 
         super().__init__()
+
+    def interpret_operation_eqn(self, eqn):
+        """Interpret an equation corresponding to an operator."""
+        if getattr(eqn.primitive, "prototype_op", False) is True:
+            return self.interpret_operation2_eqn(eqn)
+
+        return super().interpret_operation_eqn(eqn)
+
+    def interpret_operation2_eqn(self, eqn: JaxprEqn):
+        """Interpret Operator2."""
+        if not isinstance(eqn.outvars[0], jax.core.DropVar):
+            return eqn.outvars[0].aval.create_op()
+
+        op: Operator2 = eqn.outvars[0].aval.create_op()
+
+        self.init_qreg.insert_all_dangling_qubits()
+        invals = tuple(self.read(invar) for invar in eqn.invars)
+
+        ctrl = False
+        ctrl_wires = None
+        ctrl_vals = None
+
+        static_args = {k: op._bound_args.arguments[k] for k in op.static_argnames}
+        dyn_argnames = op.dyn_argnames
+        wire_argnames = op.wire_argnames
+
+        template_params = {
+            "template_name": op.name,
+            "dyn_argnames": dyn_argnames,
+            "wire_argnames": wire_argnames,
+            "ctrl": ctrl,
+            "adjoint": False,
+            **static_args,
+        }
+
+        out = template_p.bind(*invals, self.init_qreg.get(), **template_params)
+        self.init_qreg.set(out)
+        return out
 
     def interpret_operation(self, op, is_adjoint=False, control_values=(), control_wires=()):
         """Re-bind a pennylane operation as a catalyst instruction.
@@ -231,16 +271,24 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         """Check some constraints regarding dynamic allocation."""
         if self.has_dynamic_allocation:
             if len(measurement.wires) == 0 and not isinstance(measurement, qp.measurements.StateMP):
-                raise CompileError(textwrap.dedent("""
+                raise CompileError(
+                    textwrap.dedent(
+                        """
                         Terminal measurements must take in an explicit list of wires when
                         dynamically allocated wires are present in the program.
-                        """))
+                        """
+                    )
+                )
 
             if any(is_dynamically_allocated_wire(w) for w in measurement.wires):
-                raise CompileError(textwrap.dedent("""
+                raise CompileError(
+                    textwrap.dedent(
+                        """
                         Terminal measurements cannot take in dynamically allocated wires
                         since they must be temporary.
-                        """))
+                        """
+                    )
+                )
 
     # pylint: disable=too-many-branches
     def interpret_measurement(self, measurement):
@@ -449,6 +497,7 @@ def _subroutine_kernel(
     outer_dynqreg_handlers=(),
     wire_label_arg_to_tracer_arg_index=(),
     wire_to_owner_qreg=(),
+    op_args=(),
 ):
     global_qreg, *dynqregs_plus_args = qregs_plus_args
     num_dynamic_alloced_qregs = len(outer_dynqreg_handlers)
@@ -525,12 +574,15 @@ def handle_subroutine(self, *args, **kwargs):
     # Convert global wire indices into local indices
     new_args = ()
     wire_label_arg_to_tracer_arg_index = {}
+    op_args = ()
     for i, arg in enumerate(args):
         if arg in dynalloced_wire_global_indices:
             wire_label_arg_to_tracer_arg_index[arg] = i
             new_args += (self.qubit_index_recorder[arg].global_index_to_local_index(arg),)
         else:
             new_args += (arg,)
+            if isinstance(arg, Operator2):
+                op_args += (i,)
 
     if not transformed:
         f = partial(
@@ -540,6 +592,7 @@ def handle_subroutine(self, *args, **kwargs):
             outer_dynqreg_handlers=dynalloced_qregs,
             wire_label_arg_to_tracer_arg_index=wire_label_arg_to_tracer_arg_index,
             wire_to_owner_qreg=wire_to_owner_qreg,
+            op_args=op_args,
         )
         converted_closed_jaxpr_branch = jax.make_jaxpr(f)(
             self.init_qreg.get(), *[dyn_qreg.get() for dyn_qreg in dynalloced_qregs], *args
