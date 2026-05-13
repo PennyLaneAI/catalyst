@@ -30,8 +30,7 @@
 #include "Quantum/IR/QuantumDialect.h"
 #include "RTIO/IR/RTIODialect.h"
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     mlir::DialectRegistry registry;
     mlir::registerAllDialects(registry);
     registry.insert<catalyst::CatalystDialect>();

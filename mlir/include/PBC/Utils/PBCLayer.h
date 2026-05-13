@@ -80,8 +80,7 @@ class PBCLayer {
     ~PBCLayer() = default;
 
     PBCLayer(PBCLayerContext *ctx) : context(ctx) {}
-    PBCLayer(PBCLayerContext *ctx, const std::vector<PBCOpInterface> &initialOps) : context(ctx)
-    {
+    PBCLayer(PBCLayerContext *ctx, const std::vector<PBCOpInterface> &initialOps) : context(ctx) {
         // Initialize the cached index set for existing ops
         std::for_each(initialOps.begin(), initialOps.end(),
                       [this](PBCOpInterface op) { insertToLayer(op); });

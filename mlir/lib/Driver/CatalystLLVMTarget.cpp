@@ -32,8 +32,7 @@
 
 using namespace mlir;
 
-void catalyst::driver::registerLLVMTranslations(DialectRegistry &registry)
-{
+void catalyst::driver::registerLLVMTranslations(DialectRegistry &registry) {
     registerLLVMDialectTranslation(registry);
     registerBuiltinDialectTranslation(registry);
 }
@@ -41,8 +40,7 @@ void catalyst::driver::registerLLVMTranslations(DialectRegistry &registry)
 LogicalResult catalyst::driver::compileObjectFile(const CompilerOptions &options,
                                                   std::shared_ptr<llvm::Module> llvmModule,
                                                   llvm::TargetMachine *targetMachine,
-                                                  StringRef filename)
-{
+                                                  StringRef filename) {
     using namespace llvm;
 
     std::error_code errCode;

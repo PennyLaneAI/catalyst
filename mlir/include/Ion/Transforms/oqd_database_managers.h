@@ -29,8 +29,7 @@ namespace ion {
 class OQDDatabaseManager {
   public:
     OQDDatabaseManager(const std::string &DeviceTomlLoc, const std::string &QubitTomlLoc,
-                       const std::string &Gate2PulseDecompTomlLoc, size_t n_qubits)
-    {
+                       const std::string &Gate2PulseDecompTomlLoc, size_t n_qubits) {
         sourceTomlDevice = toml::parse_file(DeviceTomlLoc);
         sourceTomlQubit = toml::parse_file(QubitTomlLoc);
         sourceTomlGateDecomposition = toml::parse_file(Gate2PulseDecompTomlLoc);
@@ -77,16 +76,14 @@ class OQDDatabaseManager {
     void loadBeams1Params() { loadBeamsParamsImpl("beams1", beams1); }
     void loadBeams2Params() { loadBeamsParamsImpl("beams2", beams2); }
 
-    void loadMeasurementDuration()
-    {
+    void loadMeasurementDuration() {
         toml::node_view<toml::node> val = sourceTomlGateDecomposition["measurement_duration"];
         if (val && val.is_floating_point()) {
             measurementDuration = val.as_floating_point()->get();
         }
     }
 
-    static int parseTransitionIndex(const std::string &transition)
-    {
+    static int parseTransitionIndex(const std::string &transition) {
         if (transition == "downstate_estate")
             return 0;
         if (transition == "downstate_estate2")
@@ -98,8 +95,7 @@ class OQDDatabaseManager {
         return -1;
     }
 
-    static double getTomlDouble(toml::node_view<toml::node> node)
-    {
+    static double getTomlDouble(toml::node_view<toml::node> node) {
         if (auto fp = node.as_floating_point())
             return fp->get();
         if (auto i = node.as_integer())
@@ -107,8 +103,7 @@ class OQDDatabaseManager {
         return 0.0;
     }
 
-    void loadDetectionBeamParams()
-    {
+    void loadDetectionBeamParams() {
         toml::node_view<toml::node> beamsToml = sourceTomlGateDecomposition["detection_beam"];
         if (!beamsToml || !beamsToml.is_array()) {
             return;
@@ -131,8 +126,7 @@ class OQDDatabaseManager {
         }
     }
 
-    void loadBeamsParamsImpl(const std::string &mode, std::vector<Beam> &collector)
-    {
+    void loadBeamsParamsImpl(const std::string &mode, std::vector<Beam> &collector) {
         // Read in the gate decomposition beam parameters from toml file.
         // The toml contains a list of beams, where each beam has the following fields:
         //   rabi = 4.4
@@ -159,8 +153,7 @@ class OQDDatabaseManager {
         }
     }
 
-    void loadPhononParams(size_t n_qubits)
-    {
+    void loadPhononParams(size_t n_qubits) {
         // TODO: The fact that loading phonons depend on the number of qubits is a bit of a hack.
         // This is not ideal since we want to support dynamic number of qubits in the future.
         // We should find a better way to handle this in the database.
@@ -181,8 +174,7 @@ class OQDDatabaseManager {
         }
     }
 
-    void loadIonParams()
-    {
+    void loadIonParams() {
         toml::node_view<toml::node> ionsToml = sourceTomlQubit["ions"];
 
         auto parseSingleLevel = [](auto level) {

@@ -28,8 +28,7 @@ using RSDecomp::CliffordData::GateType;
     Clifford operator, followed by any number of syllables of the form HT or SHT, followed by an
     optional syllable T arXiv:1312.6584.
  */
-inline std::pair<std::vector<GateType>, double> ma_normal_form(const SO3Matrix &op)
-{
+inline std::pair<std::vector<GateType>, double> ma_normal_form(const SO3Matrix &op) {
     ZOmega a{0, 0, 0, 1};
     ZOmega c{0, 0, 0, 0};
     INT_TYPE k = 0;
@@ -50,16 +49,14 @@ inline std::pair<std::vector<GateType>, double> ma_normal_form(const SO3Matrix &
         if (parity_vec == std::array<int, 3>{2, 2, 0}) {
             // T
             c = c * ZOmega(0, 0, 1, 0);
-        }
-        else if (parity_vec == std::array<int, 3>{0, 2, 2}) {
+        } else if (parity_vec == std::array<int, 3>{0, 2, 2}) {
             // HT
             auto a_temp = ZOmega(0, -1, 0, 0) * (a + c);
             auto c_temp = ZOmega(-1, 0, 0, 0) * (a - c);
             a = a_temp;
             c = c_temp;
             k += 1;
-        }
-        else {
+        } else {
             // SHT
             ZOmega ic = ZOmega(0, 1, 0, 0) * c;
             auto a_temp = ZOmega(0, 0, -1, 0) * (a + ic);

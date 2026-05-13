@@ -37,8 +37,7 @@ namespace gradient {
 /// Store the given iteration variables in the selector vector.
 static void updateSelectorVector(PatternRewriter &rewriter, Location loc,
                                  std::vector<std::pair<scf::ForOp, int64_t>> &selectorsToStore,
-                                 Value selectorBuffer)
-{
+                                 Value selectorBuffer) {
     PatternRewriter::InsertionGuard insertGuard(rewriter);
 
     for (auto &[forOp, idx] : selectorsToStore) {
@@ -55,8 +54,7 @@ static void updateSelectorVector(PatternRewriter &rewriter, Location loc,
 static std::vector<Value> computePartialDerivative(PatternRewriter &rewriter, Location loc,
                                                    int64_t numShifts, int64_t currentShift,
                                                    Value selectorBuffer, func::FuncOp shiftedFn,
-                                                   std::vector<Value> callArgs)
-{
+                                                   std::vector<Value> callArgs) {
     constexpr double shift = llvm::numbers::pi / 2;
     ShapedType shiftVectorType = RankedTensorType::get({numShifts}, rewriter.getF64Type());
     Value selectorVector = bufferization::ToTensorOp::create(
@@ -104,8 +102,7 @@ static std::vector<Value> computePartialDerivative(PatternRewriter &rewriter, Lo
 /// Store a partial derivative in the gradient buffer at the next index.
 static void storePartialDerivative(PatternRewriter &rewriter, Location loc,
                                    ValueRange gradientBuffers, Value gradientsProcessed,
-                                   ValueRange derivatives)
-{
+                                   ValueRange derivatives) {
     Value gradIdx = memref::LoadOp::create(rewriter, loc, gradientsProcessed);
 
     for (size_t i = 0; i < gradientBuffers.size(); i++) {
@@ -163,12 +160,10 @@ static void storePartialDerivative(PatternRewriter &rewriter, Location loc,
             auto materializeOp = bufferization::MaterializeInDestinationOp::create(
                 rewriter, loc, derivative, gradientSubview);
             materializeOp.setWritable(true);
-        }
-        else if (isDerivativeScalarTensor) {
+        } else if (isDerivativeScalarTensor) {
             Value extracted = tensor::ExtractOp::create(rewriter, loc, derivative);
             memref::StoreOp::create(rewriter, loc, extracted, gradientBuffer, gradIdx);
-        }
-        else {
+        } else {
             memref::StoreOp::create(rewriter, loc, derivative, gradientBuffer, gradIdx);
         }
     }
@@ -181,8 +176,7 @@ static void storePartialDerivative(PatternRewriter &rewriter, Location loc,
 func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter, Location loc,
                                                       func::FuncOp callee, func::FuncOp shiftedFn,
                                                       const int64_t numShifts,
-                                                      const int64_t loopDepth)
-{
+                                                      const int64_t loopDepth) {
     // Define the properties of the quantum gradient function. The shape of the returned
     // gradient is unknown as the number of gate parameters in the unrolled circuit is only
     // determined at run time. The dynamic size is an input to the gradient function.
@@ -253,8 +247,7 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
             if (auto forOp = dyn_cast<scf::ForOp>(op)) {
                 selectorsToStore.push_back({forOp, loopLevel});
                 loopLevel++;
-            }
-            else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
+            } else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
                 rewriter.setInsertionPoint(gate);
 
@@ -270,8 +263,7 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
                                                derivatives);
                     }
                 }
-            }
-            else if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {
+            } else if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {
                 // In case there were no gate parameters in this for loop we need to pop the
                 // current iteration variable so it's not written to memory at the next gate.
                 scf::ForOp forOp = cast<scf::ForOp>(op->getParentOp());
@@ -279,8 +271,7 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
                     selectorsToStore.pop_back();
                 }
                 loopLevel--;
-            }
-            else if (isa<func::ReturnOp>(op)) {
+            } else if (isa<func::ReturnOp>(op)) {
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
                 rewriter.setInsertionPoint(op);
 
@@ -300,19 +291,15 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
         gradientFn.walk([&](Operation *op) {
             if (isa<quantum::DeviceInitOp>(op)) {
                 rewriter.eraseOp(op);
-            }
-            else if (auto gate = dyn_cast<quantum::QuantumOperation>(op)) {
+            } else if (auto gate = dyn_cast<quantum::QuantumOperation>(op)) {
                 // We are undoing the def-use chains of this gate's return values
                 // so that we can safely delete it (all quantum ops must be eliminated).
                 rewriter.replaceOp(gate, gate.getQubitOperands());
-            }
-            else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(op)) {
+            } else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(op)) {
                 rewriter.replaceOp(op, adjointOp.getArgs());
-            }
-            else if (isa<quantum::DeallocOp>(op)) {
+            } else if (isa<quantum::DeallocOp>(op)) {
                 rewriter.eraseOp(op);
-            }
-            else if (isa<quantum::DeviceReleaseOp>(op)) {
+            } else if (isa<quantum::DeviceReleaseOp>(op)) {
                 rewriter.eraseOp(op);
             }
         });

@@ -53,8 +53,7 @@ template <typename T, size_t R> class DataView {
         iterator(const DataView<T, R> &_view, int64_t begin_idx) : view(_view), loc(begin_idx) {}
         pointer operator->() const { return &view.data_aligned[loc]; }
         reference operator*() const { return view.data_aligned[loc]; }
-        iterator &operator++()
-        {
+        iterator &operator++() {
             int64_t next_axis = -1;
             for (int64_t axis = R - 1; axis >= 0; axis--) {
                 if (++indices[axis] < view.sizes[axis]) {
@@ -70,8 +69,7 @@ template <typename T, size_t R> class DataView {
             loc = next_axis == -1 ? -1 : loc + view.strides[next_axis];
             return *this;
         }
-        iterator operator++(int)
-        {
+        iterator operator++(int) {
             auto cached_iter = *this;
             int64_t next_axis = -1;
             for (int64_t axis = R - 1; axis >= 0; axis--) {
@@ -86,15 +84,13 @@ template <typename T, size_t R> class DataView {
             loc = next_axis == -1 ? -1 : loc + view.strides[next_axis];
             return cached_iter;
         }
-        bool operator==(const iterator &other) const
-        {
+        bool operator==(const iterator &other) const {
             return (loc == other.loc && view.data_aligned == other.view.data_aligned);
         }
         bool operator!=(const iterator &other) const { return !(*this == other); }
     };
 
-    explicit DataView(std::vector<T> &buffer) : data_aligned(buffer.data()), offset(0)
-    {
+    explicit DataView(std::vector<T> &buffer) : data_aligned(buffer.data()), offset(0) {
         static_assert(R == 1, "[Class: DataView] Assertion: R == 1");
         sizes[0] = buffer.size();
         strides[0] = 1;
@@ -102,8 +98,7 @@ template <typename T, size_t R> class DataView {
 
     explicit DataView(T *_data_aligned, size_t _offset, const size_t *_sizes,
                       const size_t *_strides)
-        : data_aligned(_data_aligned), offset(_offset)
-    {
+        : data_aligned(_data_aligned), offset(_offset) {
         static_assert(R > 0, "[Class: DataView] Assertion: R > 0");
         if (_sizes != nullptr && _strides != nullptr) {
             for (size_t i = 0; i < R; i++) {
@@ -113,8 +108,7 @@ template <typename T, size_t R> class DataView {
         } // else sizes = {0}, strides = {0}
     }
 
-    [[nodiscard]] auto size() const -> size_t
-    {
+    [[nodiscard]] auto size() const -> size_t {
         if (!data_aligned) {
             return 0;
         }
@@ -126,8 +120,7 @@ template <typename T, size_t R> class DataView {
         return tsize;
     }
 
-    template <typename... I> T &operator()(I... idxs) const
-    {
+    template <typename... I> T &operator()(I... idxs) const {
         static_assert(sizeof...(idxs) == R,
                       "[Class: DataView] Error in Catalyst Runtime: Wrong number of indices");
         size_t indices[] = {static_cast<size_t>(idxs)...};
@@ -139,8 +132,7 @@ template <typename T, size_t R> class DataView {
         return data_aligned[loc];
     }
 
-    iterator begin()
-    {
+    iterator begin() {
         return iterator{*this, (*this).size() == 0 ? -1 : static_cast<int64_t>(offset)};
     }
 

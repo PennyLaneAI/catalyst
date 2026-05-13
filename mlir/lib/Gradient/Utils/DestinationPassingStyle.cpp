@@ -19,8 +19,7 @@
 
 using namespace mlir;
 
-LogicalResult catalyst::convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &builder)
-{
+LogicalResult catalyst::convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &builder) {
     if (callee.getNumResults() == 0) {
         // Callee is already in destination-passing style
         return success();
@@ -35,8 +34,7 @@ LogicalResult catalyst::convertToDestinationPassingStyle(func::FuncOp callee, Op
         if (isa<MemRefType>(resultType)) {
             memRefReturnTypes.push_back(resultType);
             outputIndices.push_back(idx);
-        }
-        else {
+        } else {
             nonMemRefReturns.push_back(resultType);
         }
     }
@@ -78,8 +76,7 @@ LogicalResult catalyst::convertToDestinationPassingStyle(func::FuncOp callee, Op
                 // type information at the LLVM level for Enzyme.
                 linalg::CopyOp::create(builder, returnOp.getLoc(), operand, output);
                 idx++;
-            }
-            else {
+            } else {
                 nonMemRefReturns.push_back(operand);
             }
         }

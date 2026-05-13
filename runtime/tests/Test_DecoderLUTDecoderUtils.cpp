@@ -25,8 +25,8 @@
 
 using namespace Catalyst::Runtime::QEC;
 
-TEST_CASE("Test convert_sydrome_res_to_bitstr", "[LUTDecoderUtils::convert_syndrome_res_to_bitstr]")
-{
+TEST_CASE("Test convert_sydrome_res_to_bitstr",
+          "[LUTDecoderUtils::convert_syndrome_res_to_bitstr]") {
     std::vector<size_t> bad_syndrome_inputs = {1, 2, 3};
     DataView<size_t, 1> bad_syndrome_inputs_dv(bad_syndrome_inputs);
     REQUIRE_THROWS_WITH(convert_syndrome_res_to_bitstr<size_t>(bad_syndrome_inputs_dv),
@@ -44,8 +44,7 @@ TEST_CASE("Test convert_sydrome_res_to_bitstr", "[LUTDecoderUtils::convert_syndr
     REQUIRE(syndrome_str_int8_t == expected_syndrome_str);
 }
 
-TEST_CASE("Test get_error_indices", "[LUTDecoderUtils::get_error_indices]")
-{
+TEST_CASE("Test get_error_indices", "[LUTDecoderUtils::get_error_indices]") {
     std::vector<int8_t> error_vector = {0, 1, 0, 1, 0, 0, 0};
     std::vector<int64_t> expected_indices = {1, 3};
 
@@ -54,8 +53,7 @@ TEST_CASE("Test get_error_indices", "[LUTDecoderUtils::get_error_indices]")
     REQUIRE(error_indices == expected_indices);
 }
 
-TEST_CASE("Test get_parity_check_matrix", "[LUTDecoderUtils::get_parity_check_matrix]")
-{
+TEST_CASE("Test get_parity_check_matrix", "[LUTDecoderUtils::get_parity_check_matrix]") {
     tanner_graph_steane<int64_t> tanner_graph;
 
     std::vector<size_t> aux_cols = {7, 8, 9};
@@ -69,8 +67,7 @@ TEST_CASE("Test get_parity_check_matrix", "[LUTDecoderUtils::get_parity_check_ma
     REQUIRE(parity_mat_csc.second == tanner_graph.col_ptr_parity_matrix_transpose);
 }
 
-TEST_CASE("Test get_syndrome_from_errors", "[LUTDecoderUtils::get_syndrome_from_errors]")
-{
+TEST_CASE("Test get_syndrome_from_errors", "[LUTDecoderUtils::get_syndrome_from_errors]") {
     tanner_graph_steane<int64_t> tanner_graph;
 
     std::vector<size_t> aux_cols = {7, 8, 9};
@@ -92,8 +89,7 @@ TEST_CASE("Test get_syndrome_from_errors", "[LUTDecoderUtils::get_syndrome_from_
     }
 }
 
-TEST_CASE("Test generate_lookup_table", "[LUTDecoderUtils::generate_lookup_table]")
-{
+TEST_CASE("Test generate_lookup_table", "[LUTDecoderUtils::generate_lookup_table]") {
     tanner_graph_steane<int64_t> tanner_graph;
     auto lut = generate_lookup_table(tanner_graph.row_idx_parity_matrix_transpose,
                                      tanner_graph.col_ptr_parity_matrix_transpose,

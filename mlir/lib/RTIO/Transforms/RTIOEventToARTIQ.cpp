@@ -60,12 +60,9 @@ using GroupingPredicate =
 class PulseScheduler {
   public:
     PulseScheduler(func::FuncOp funcOp, OpBuilder &builder, GroupingPredicate predicate)
-        : funcOp(funcOp), builder(builder), groupingPredicate(std::move(predicate))
-    {
-    }
+        : funcOp(funcOp), builder(builder), groupingPredicate(std::move(predicate)) {}
 
-    ScheduleGroupsMap schedule()
-    {
+    ScheduleGroupsMap schedule() {
         // Collect all pulses
         funcOp.walk([&](rtio::RTIOPulseOp pulse) { allPulses.push_back(pulse); });
 
@@ -92,8 +89,7 @@ class PulseScheduler {
     ScheduleGroupsMap groups;
     int nextGroupId = 0;
 
-    SmallVector<rtio::RTIOPulseOp> getEventConsumers(Value event)
-    {
+    SmallVector<rtio::RTIOPulseOp> getEventConsumers(Value event) {
         SmallVector<rtio::RTIOPulseOp> consumers;
         for (Operation *user : event.getUsers()) {
             auto pulse = dyn_cast<rtio::RTIOPulseOp>(user);
@@ -105,8 +101,7 @@ class PulseScheduler {
         return consumers;
     }
 
-    void processFromEmptyOps()
-    {
+    void processFromEmptyOps() {
         std::deque<Value> worklist;
         funcOp.walk([&](rtio::RTIOEmptyOp emptyOp) { worklist.push_back(emptyOp.getResult()); });
 
@@ -126,8 +121,7 @@ class PulseScheduler {
     }
 
     // return the next events to process
-    SmallVector<Value> processEvent(Value event)
-    {
+    SmallVector<Value> processEvent(Value event) {
         SmallVector<Value> nextEvents;
         auto consumers = getEventConsumers(event);
         if (consumers.empty()) {
@@ -150,8 +144,7 @@ class PulseScheduler {
             if (canJoinGroup(pulse, channelPulses)) {
                 channelPulses[channel].push_back(pulse);
                 channelLastPulse[channel] = pulse;
-            }
-            else {
+            } else {
                 if (!channelBoundary.count(channel)) {
                     channelBoundary[channel] = pulse;
                 }
@@ -175,8 +168,7 @@ class PulseScheduler {
     }
 
     bool canJoinGroup(rtio::RTIOPulseOp cand,
-                      const DenseMap<int32_t, SmallVector<rtio::RTIOPulseOp>> &channelPulses)
-    {
+                      const DenseMap<int32_t, SmallVector<rtio::RTIOPulseOp>> &channelPulses) {
         for (auto &[ch, pulses] : channelPulses) {
             if (!llvm::all_of(pulses, [&](auto pulse) { return groupingPredicate(pulse, cand); })) {
                 return false;
@@ -187,8 +179,7 @@ class PulseScheduler {
 
     void extendChannelChains(DenseMap<int32_t, SmallVector<rtio::RTIOPulseOp>> &channelPulses,
                              DenseMap<int32_t, rtio::RTIOPulseOp> &channelLastPulse,
-                             DenseMap<int32_t, rtio::RTIOPulseOp> &channelBoundary)
-    {
+                             DenseMap<int32_t, rtio::RTIOPulseOp> &channelBoundary) {
         DenseSet<int32_t> stopped;
 
         while (stopped.size() < channelPulses.size()) {
@@ -210,8 +201,7 @@ class PulseScheduler {
                     if (groupingPredicate(currentPulse, user)) {
                         channelPulses[channel].push_back(user);
                         channelLastPulse[channel] = user;
-                    }
-                    else {
+                    } else {
                         channelBoundary[channel] = user;
                         stopped.insert(channel);
                     }
@@ -226,8 +216,7 @@ class PulseScheduler {
         }
     }
 
-    void recordGroup(const DenseMap<int32_t, SmallVector<rtio::RTIOPulseOp>> &channelPulses)
-    {
+    void recordGroup(const DenseMap<int32_t, SmallVector<rtio::RTIOPulseOp>> &channelPulses) {
         int groupId = nextGroupId++;
         auto &groupOps = groups[groupId];
         for (auto &[_, pulses] : channelPulses) {
@@ -241,8 +230,7 @@ class PulseScheduler {
     createSyncAndUpdateDeps(const DenseMap<int32_t, SmallVector<rtio::RTIOPulseOp>> &channelPulses,
                             DenseMap<int32_t, rtio::RTIOPulseOp> &channelLastPulse,
                             DenseMap<int32_t, rtio::RTIOPulseOp> &channelBoundary,
-                            SmallVector<rtio::RTIOPulseOp> &boundaryConsumers)
-    {
+                            SmallVector<rtio::RTIOPulseOp> &boundaryConsumers) {
         if (channelPulses.size() > 1 && !channelBoundary.empty()) {
             return createSyncEvent(channelLastPulse, channelBoundary, boundaryConsumers);
         }
@@ -251,8 +239,7 @@ class PulseScheduler {
 
     SmallVector<Value> createSyncEvent(DenseMap<int32_t, rtio::RTIOPulseOp> &channelLastPulse,
                                        DenseMap<int32_t, rtio::RTIOPulseOp> &channelBoundary,
-                                       SmallVector<rtio::RTIOPulseOp> &boundaryConsumers)
-    {
+                                       SmallVector<rtio::RTIOPulseOp> &boundaryConsumers) {
         // Collect events to sync
         SmallVector<Value> eventsToSync;
         for (auto &entry : channelLastPulse) {
@@ -291,8 +278,7 @@ class PulseScheduler {
 
     SmallVector<Value> collectNextEvents(DenseMap<int32_t, rtio::RTIOPulseOp> &channelLastPulse,
                                          DenseMap<int32_t, rtio::RTIOPulseOp> &channelBoundary,
-                                         SmallVector<rtio::RTIOPulseOp> &boundaryConsumers)
-    {
+                                         SmallVector<rtio::RTIOPulseOp> &boundaryConsumers) {
         SmallVector<Value> nextEvents;
 
         for (auto &entry : channelBoundary) {
@@ -324,8 +310,7 @@ class PulseScheduler {
 // Frequency Decomposition
 //===----------------------------------------------------------------------===//
 
-void decomposeFrequencyPulses(ScheduleGroupsMap &pulseGroups)
-{
+void decomposeFrequencyPulses(ScheduleGroupsMap &pulseGroups) {
     if (pulseGroups.empty()) {
         return;
     }
@@ -445,8 +430,7 @@ struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToA
     // id -> callee name mapping
     llvm::ArrayRef<std::pair<int32_t, std::string>> getRPCIdMap() const { return rpcIdMap; }
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         ModuleOp module = getOperation();
         MLIRContext *ctx = &getContext();
         OpBuilder builder(ctx);
@@ -504,16 +488,14 @@ struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToA
     /// Populated by assignRPCIds(); maps service_id -> callee name.
     llvm::SmallVector<std::pair<int32_t, std::string>> rpcIdMap;
 
-    static bool sameChannelSameFrequency(RTIOPulseOp ref, RTIOPulseOp candidate)
-    {
+    static bool sameChannelSameFrequency(RTIOPulseOp ref, RTIOPulseOp candidate) {
         if (ref.getChannel() == candidate.getChannel()) {
             return ref.getFrequency() == candidate.getFrequency();
         }
         return true;
     }
 
-    static void sortAllBlocks(ModuleOp module)
-    {
+    static void sortAllBlocks(ModuleOp module) {
         module.walk([](func::FuncOp funcOp) {
             for (auto &block : funcOp.getBody()) {
                 sortTopologically(&block);
@@ -521,8 +503,7 @@ struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToA
         });
     }
 
-    LogicalResult setupKernelDevice(ModuleOp module, OpBuilder &builder)
-    {
+    LogicalResult setupKernelDevice(ModuleOp module, OpBuilder &builder) {
         auto kernelFunc = module.lookupSymbol<func::FuncOp>(ARTIQFuncNames::kernel);
         if (!kernelFunc) {
             module.emitError("Cannot find ") << ARTIQFuncNames::kernel << " function";
@@ -558,8 +539,7 @@ struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToA
 
     // Walk every rtio.rpc in the module, assign a unique service ID to each distinct callee symbol,
     // and attach it as an IntegerAttr named "rpc_id".
-    static llvm::SmallVector<std::pair<int32_t, std::string>> assignRPCIds(ModuleOp module)
-    {
+    static llvm::SmallVector<std::pair<int32_t, std::string>> assignRPCIds(ModuleOp module) {
         llvm::DenseMap<mlir::StringAttr, int32_t> calleeToId;
         llvm::SmallVector<std::pair<int32_t, std::string>> idMap;
         int32_t nextId = 1;
@@ -581,8 +561,7 @@ struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToA
         return idMap;
     }
 
-    LogicalResult lowerToLLVM(ModuleOp module)
-    {
+    LogicalResult lowerToLLVM(ModuleOp module) {
         MLIRContext *ctx = &getContext();
         LLVMTypeConverter typeConverter(ctx);
 

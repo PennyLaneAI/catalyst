@@ -34,8 +34,7 @@
 namespace Catalyst::Runtime::Devices {
 
 // Classify a PauliRot angle into its rotation kind.
-static std::string classifyPauliRotAngle(double angle, const double tolerance = 1e-12)
-{
+static std::string classifyPauliRotAngle(double angle, const double tolerance = 1e-12) {
     constexpr double PI = M_PI;
 
     double modAngle = std::fmod(angle, 2 * PI);
@@ -89,8 +88,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @param kwargs non-nested JSON-like string containing device configuration parameters
      */
-    NullQubit(const std::string &kwargs = "{}")
-    {
+    NullQubit(const std::string &kwargs = "{}") {
         this->device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
         if (device_kwargs.contains("track_resources")) {
             this->track_resources_ = device_kwargs["track_resources"] == "True";
@@ -102,8 +100,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
             this->resource_tracker_.SetComputeDepth(device_kwargs["compute_depth"] == "True");
         }
     }
-    ~NullQubit()
-    {
+    ~NullQubit() {
         // We always want to gather resources that were used for an *entire* execution end-to-end
         // A device is guaranteed to live as long as its ExecutionContext, so its destructor is a
         // safe place to write out resource tracking data
@@ -130,8 +127,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @return QubitIdType The qubit ID of the newly allocated qubit
      */
-    auto AllocateQubit() -> QubitIdType
-    {
+    auto AllocateQubit() -> QubitIdType {
         QubitIdType new_qubit = this->qubit_manager.Allocate(num_qubits_);
         if (this->track_resources_) {
             this->resource_tracker_.AllocateQubit(new_qubit);
@@ -146,8 +142,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param num_qubits The number of qubits to allocate
      * @return std::vector<QubitIdType> Vector containing qubit IDs of the newly allocated qubits
      */
-    auto AllocateQubits(std::size_t num_qubits) -> std::vector<QubitIdType>
-    {
+    auto AllocateQubits(std::size_t num_qubits) -> std::vector<QubitIdType> {
         if (!num_qubits) {
             return {};
         }
@@ -163,8 +158,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @param q The qubit ID of the qubit to release
      */
-    void ReleaseQubit(QubitIdType q)
-    {
+    void ReleaseQubit(QubitIdType q) {
         if (num_qubits_) {
             num_qubits_--;
             this->qubit_manager.Release(q);
@@ -182,8 +176,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @param qubits A vector of the qubit IDs of the qubits to release
      */
-    void ReleaseQubits(const std::vector<QubitIdType> &qubits)
-    {
+    void ReleaseQubits(const std::vector<QubitIdType> &qubits) {
         for (auto q : qubits) {
             this->ReleaseQubit(q);
         }
@@ -247,8 +240,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param state The state vector data (ignored)
      * @param wires The qubits to prepare (ignored)
      */
-    void SetState(DataView<std::complex<double>, 1> &, std::vector<QubitIdType> &wires)
-    {
+    void SetState(DataView<std::complex<double>, 1> &, std::vector<QubitIdType> &wires) {
         if (this->track_resources_) {
             this->resource_tracker_.SetState(wires);
         }
@@ -263,8 +255,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param basis_state The computational basis state (ignored)
      * @param wires The qubits to prepare (ignored)
      */
-    void SetBasisState(DataView<int8_t, 1> &, std::vector<QubitIdType> &wires)
-    {
+    void SetBasisState(DataView<int8_t, 1> &, std::vector<QubitIdType> &wires) {
         if (this->track_resources_) {
             this->resource_tracker_.SetBasisState(wires);
         }
@@ -287,8 +278,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
                         const std::vector<QubitIdType> &wires, bool inverse,
                         const std::vector<QubitIdType> &controlled_wires = {},
                         [[maybe_unused]] const std::vector<bool> &controlled_values = {},
-                        [[maybe_unused]] const std::vector<std::string> &optional_params = {})
-    {
+                        [[maybe_unused]] const std::vector<std::string> &optional_params = {}) {
         if (this->track_resources_) {
             std::string tracked_name = name;
             if (name == "PauliRot" && !params.empty()) {
@@ -314,8 +304,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void MatrixOperation([[maybe_unused]] const std::vector<std::complex<double>> &matrix,
                          const std::vector<QubitIdType> &wires, bool inverse,
                          const std::vector<QubitIdType> &controlled_wires = {},
-                         const std::vector<bool> &controlled_values = {})
-    {
+                         const std::vector<bool> &controlled_values = {}) {
         if (this->track_resources_) {
             this->resource_tracker_.MatrixOperation(inverse, wires, controlled_wires);
         }
@@ -335,8 +324,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @return ObsIdType A dummy identifier for the created observable
      */
     auto Observable(ObsId obs_id, const std::vector<std::complex<double>> &,
-                    const std::vector<QubitIdType> &) -> ObsIdType
-    {
+                    const std::vector<QubitIdType> &) -> ObsIdType {
         if (this->track_resources_) {
             return this->resource_tracker_.Observable(obs_id);
         }
@@ -353,8 +341,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param obs_ids Vector of observable identifiers to combine
      * @return ObsIdType A dummy identifier for the created observable
      */
-    auto TensorObservable(const std::vector<ObsIdType> &obs_ids) -> ObsIdType
-    {
+    auto TensorObservable(const std::vector<ObsIdType> &obs_ids) -> ObsIdType {
         if (this->track_resources_) {
             return this->resource_tracker_.CombinedObservable("Prod", obs_ids.size());
         }
@@ -373,8 +360,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @return ObsIdType A dummy identifier for the created observable
      */
     auto HamiltonianObservable(const std::vector<double> &, const std::vector<ObsIdType> &obs_ids)
-        -> ObsIdType
-    {
+        -> ObsIdType {
         if (this->track_resources_) {
             return this->resource_tracker_.CombinedObservable("Hamiltonian", obs_ids.size());
         }
@@ -390,8 +376,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param obs_id The observable identifier
      * @return double Always returns 0
      */
-    auto Expval(ObsIdType obs_id) -> double
-    {
+    auto Expval(ObsIdType obs_id) -> double {
         if (this->track_resources_) {
             this->resource_tracker_.ObsMeasurement("expval", obs_id);
         }
@@ -408,8 +393,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param obs_id The observable identifier
      * @return double Always returns 0
      */
-    auto Var(ObsIdType obs_id) -> double
-    {
+    auto Var(ObsIdType obs_id) -> double {
         if (this->track_resources_) {
             this->resource_tracker_.ObsMeasurement("var", obs_id);
         }
@@ -426,8 +410,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @param state The state vector to fill with ground state values
      */
-    void State(DataView<std::complex<double>, 1> &state)
-    {
+    void State(DataView<std::complex<double>, 1> &state) {
         if (this->track_resources_) {
             this->resource_tracker_.AnalyticalMeasurement("state", "all");
         }
@@ -449,8 +432,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @param probs The probability array to fill
      */
-    void Probs(DataView<double, 1> &probs)
-    {
+    void Probs(DataView<double, 1> &probs) {
         if (this->track_resources_) {
             this->resource_tracker_.AnalyticalMeasurement("probs", "all");
         }
@@ -467,8 +449,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param probs The probability array to fill
      * @param wires The subset of qubits to compute probabilities for
      */
-    void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires)
-    {
+    void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires) {
         if (this->track_resources_) {
             this->resource_tracker_.AnalyticalMeasurement("probs", std::to_string(wires.size()));
         }
@@ -484,8 +465,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @param samples The 2D sample array to fill (shape: shots × num_qubits)
      */
-    void Sample(DataView<double, 2> &samples)
-    {
+    void Sample(DataView<double, 2> &samples) {
         if (this->track_resources_) {
             this->resource_tracker_.AnalyticalMeasurement("sample", "all");
         }
@@ -502,8 +482,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param samples The 2D sample array to fill (shape: shots × num_target_wires)
      * @param wires The subset of qubits to sample from
      */
-    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires)
-    {
+    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires) {
         if (this->track_resources_) {
             this->resource_tracker_.AnalyticalMeasurement("sample", std::to_string(wires.size()));
         }
@@ -522,8 +501,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * - 1, inclusive)
      * @param counts Array to fill with count statistics (all shots in position 0)
      */
-    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts)
-    {
+    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts) {
         if (this->track_resources_) {
             this->resource_tracker_.AnalyticalMeasurement("counts", "all");
         }
@@ -542,8 +520,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param wires The subset of qubits to measure
      */
     void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                       const std::vector<QubitIdType> &wires)
-    {
+                       const std::vector<QubitIdType> &wires) {
         if (this->track_resources_) {
             this->resource_tracker_.AnalyticalMeasurement("counts", std::to_string(wires.size()));
         }
@@ -561,8 +538,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param postselect Optional postselection value (ignored)
      * @return Result Always returns a reference to the global false constant
      */
-    auto Measure(QubitIdType, std::optional<int32_t>) -> Result
-    {
+    auto Measure(QubitIdType, std::optional<int32_t>) -> Result {
         if (this->track_resources_) {
             this->resource_tracker_.MidMeasurement();
         }
@@ -575,8 +551,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param pauli_word The Pauli word to measure (ignored)
      * @param wires The qubits to measure
      */
-    auto PauliMeasure(const std::string &, const std::vector<QubitIdType> &wires) -> Result
-    {
+    auto PauliMeasure(const std::string &, const std::vector<QubitIdType> &wires) -> Result {
         if (this->track_resources_) {
             this->resource_tracker_.PauliMeasure("PauliMeasure-w" + std::to_string(wires.size()),
                                                  wires);
@@ -603,8 +578,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @return Tuple containing cache statistics (all zeros/empty)
      */
     auto CacheManagerInfo() -> std::tuple<std::size_t, std::size_t, std::size_t,
-                                          std::vector<std::string>, std::vector<ObsIdType>>
-    {
+                                          std::vector<std::string>, std::vector<ObsIdType>> {
         return {0, 0, 0, {}, {}};
     }
 
@@ -616,8 +590,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @return std::string The resource tracking output filename
      */
-    auto GetResourcesFilename() const -> std::string
-    {
+    auto GetResourcesFilename() const -> std::string {
         return this->resource_tracker_.GetFilename();
     }
 
@@ -629,8 +602,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     auto IsTrackingResources() const -> bool { return track_resources_; }
 
   private:
-    void MakeProbsDummyReturn(DataView<double, 1> &probs)
-    {
+    void MakeProbsDummyReturn(DataView<double, 1> &probs) {
         auto iter = probs.begin();
         *iter = 1.0;
         if (num_qubits_ > 0) {
@@ -639,16 +611,14 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         }
     }
 
-    void MakeSampleDummyReturn(DataView<double, 2> &samples)
-    {
+    void MakeSampleDummyReturn(DataView<double, 2> &samples) {
         // If num_qubits == 0, the samples array is unallocated (shape=(shots, 0)), so don't fill
         if (num_qubits_ > 0) {
             std::fill(samples.begin(), samples.end(), 0.0);
         }
     }
 
-    void MakeCountsDummyReturn(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts)
-    {
+    void MakeCountsDummyReturn(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts) {
         auto iter_eigvals = eigvals.begin();
         *iter_eigvals = 0.0;
         ++iter_eigvals;

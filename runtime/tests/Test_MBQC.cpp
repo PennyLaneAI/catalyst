@@ -20,8 +20,7 @@
 // MBQC Runtime Tests
 // -------------------------------------------------------------------------- //
 
-TEST_CASE("Test __catalyst__mbqc__measure_in_basis, device=null.qubit", "[MBQC]")
-{
+TEST_CASE("Test __catalyst__mbqc__measure_in_basis, device=null.qubit", "[MBQC]") {
     __catalyst__rt__initialize(nullptr);
 
     const std::string rtd_name{"null.qubit"};

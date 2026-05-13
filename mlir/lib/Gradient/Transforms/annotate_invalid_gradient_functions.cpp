@@ -32,19 +32,16 @@ using namespace catalyst::gradient;
 
 namespace {
 
-bool isAnnotated(FunctionOpInterface op, const char *attr)
-{
+bool isAnnotated(FunctionOpInterface op, const char *attr) {
     return (bool)(op->getAttrOfType<UnitAttr>(attr));
 }
 
-bool invalidGradientOperation(FunctionOpInterface op)
-{
+bool invalidGradientOperation(FunctionOpInterface op) {
     ModuleOp mod = op->getParentOfType<ModuleOp>();
     auto res = op.walk([&](Operation *o) {
         if (isa<catalyst::quantum::MeasureOp>(o) || isa<catalyst::CustomCallOp>(o)) {
             return WalkResult::interrupt();
-        }
-        else if (auto callbackCall = dyn_cast<catalyst::CallbackCallOp>(o)) {
+        } else if (auto callbackCall = dyn_cast<catalyst::CallbackCallOp>(o)) {
             bool hasCustomDerivative = false;
             auto callee = callbackCall.getCalleeAttr();
             auto callback =
@@ -71,13 +68,11 @@ bool invalidGradientOperation(FunctionOpInterface op)
     return res.wasInterrupted();
 }
 
-bool successfulMatchLeaf(FunctionOpInterface op)
-{
+bool successfulMatchLeaf(FunctionOpInterface op) {
     return !isAnnotated(op, hasInvalidGradientOp) && invalidGradientOperation(op);
 }
 
-void annotate(FunctionOpInterface op, PatternRewriter &rewriter, const char *attr)
-{
+void annotate(FunctionOpInterface op, PatternRewriter &rewriter, const char *attr) {
     op->setAttr(attr, rewriter.getUnitAttr());
 }
 
@@ -88,8 +83,7 @@ struct AnnotateFunctionPattern : public OpInterfaceRewritePattern<FunctionOpInte
 };
 
 LogicalResult AnnotateFunctionPattern::matchAndRewrite(FunctionOpInterface op,
-                                                       PatternRewriter &rewriter) const
-{
+                                                       PatternRewriter &rewriter) const {
     if (!successfulMatchLeaf(op)) {
         return failure();
     }
@@ -98,8 +92,7 @@ LogicalResult AnnotateFunctionPattern::matchAndRewrite(FunctionOpInterface op,
     return success();
 }
 
-std::optional<FunctionOpInterface> getFuncOp(const CallGraphNode *node, CallGraph &cg)
-{
+std::optional<FunctionOpInterface> getFuncOp(const CallGraphNode *node, CallGraph &cg) {
     std::optional<FunctionOpInterface> funcOp = std::nullopt;
     if (node == cg.getExternalCallerNode())
         // if we don't know who called us, return nullopt
@@ -112,14 +105,12 @@ std::optional<FunctionOpInterface> getFuncOp(const CallGraphNode *node, CallGrap
     return funcOp;
 }
 
-std::optional<FunctionOpInterface> getCallee(CallGraphNode::Edge edge, CallGraph &cg)
-{
+std::optional<FunctionOpInterface> getCallee(CallGraphNode::Edge edge, CallGraph &cg) {
     CallGraphNode *callee = edge.getTarget();
     return getFuncOp(callee, cg);
 }
 
-bool anyCalleeIsAnnotated(FunctionOpInterface op, const char *attr, CallGraph &cg)
-{
+bool anyCalleeIsAnnotated(FunctionOpInterface op, const char *attr, CallGraph &cg) {
     if (!op.getCallableRegion()) {
         // No need to annotate if the func has no callable regions
         return false;
@@ -153,16 +144,13 @@ bool anyCalleeIsAnnotated(FunctionOpInterface op, const char *attr, CallGraph &c
     return false;
 }
 
-bool successfulMatchNode(FunctionOpInterface op, const char *attr, CallGraph &cg)
-{
+bool successfulMatchNode(FunctionOpInterface op, const char *attr, CallGraph &cg) {
     return !isAnnotated(op, attr) && anyCalleeIsAnnotated(op, attr, cg);
 }
 
 struct PropagateAnnotationPattern : public OpInterfaceRewritePattern<FunctionOpInterface> {
     PropagateAnnotationPattern(MLIRContext *ctx, CallGraph &cg)
-        : OpInterfaceRewritePattern<FunctionOpInterface>(ctx), callgraph(cg)
-    {
-    }
+        : OpInterfaceRewritePattern<FunctionOpInterface>(ctx), callgraph(cg) {}
 
     LogicalResult matchAndRewrite(FunctionOpInterface op, PatternRewriter &rewriter) const override;
 
@@ -171,8 +159,7 @@ struct PropagateAnnotationPattern : public OpInterfaceRewritePattern<FunctionOpI
 };
 
 LogicalResult PropagateAnnotationPattern::matchAndRewrite(FunctionOpInterface op,
-                                                          PatternRewriter &rewriter) const
-{
+                                                          PatternRewriter &rewriter) const {
     if (!successfulMatchNode(op, hasInvalidGradientOp, callgraph)) {
         return failure();
     }
@@ -191,8 +178,7 @@ namespace gradient {
 
 struct AnnotateInvalidGradientFunctionsPassVerified
     : public PassWrapper<AnnotateInvalidGradientFunctionsPassVerified, OperationPass<>> {
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
         CallGraph &cg = getAnalysis<CallGraph>();
@@ -209,8 +195,7 @@ struct AnnotateInvalidGradientFunctionsPass
     : impl::AnnotateInvalidGradientFunctionsPassBase<AnnotateInvalidGradientFunctionsPass> {
     using AnnotateInvalidGradientFunctionsPassBase::AnnotateInvalidGradientFunctionsPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         MLIRContext *ctx = &getContext();
         auto pm = mlir::PassManager::on<mlir::ModuleOp>(ctx);
         pm.addPass(std::make_unique<AnnotateInvalidGradientFunctionsPassVerified>());

@@ -46,8 +46,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
 
     LogicalResult
     countLogicalQubit(Operation *op,
-                      llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> &PPMSpecs)
-    {
+                      llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> &PPMSpecs) {
         uint64_t numQubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(0);
 
         if (numQubits == 0) {
@@ -60,8 +59,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
     }
 
     LogicalResult countPPM(pbc::PPMeasurementOp op,
-                           llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> &PPMSpecs)
-    {
+                           llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> &PPMSpecs) {
         if (isOpInIfOp(op) || isOpInWhileOp(op)) {
             return op->emitOpError(
                 "PPM statistics is not available when there are conditionals or while loops.");
@@ -84,8 +82,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
 
     LogicalResult countPPR(pbc::PPRotationOp op,
                            llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> &PPMSpecs,
-                           llvm::BumpPtrAllocator &stringAllocator)
-    {
+                           llvm::BumpPtrAllocator &stringAllocator) {
         if (isOpInIfOp(op) || isOpInWhileOp(op)) {
             return op->emitOpError(
                 "PPM statistics is not available when there are conditionals or while loops.");
@@ -118,8 +115,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         return success();
     }
 
-    bool commuteToLayer(PBCOpInterface rhsOp, PBCLayer &lhsLayer)
-    {
+    bool commuteToLayer(PBCOpInterface rhsOp, PBCLayer &lhsLayer) {
         for (auto lhsOp : lhsLayer.getOps()) {
             if (!commutes(rhsOp, lhsOp)) {
                 return false;
@@ -132,14 +128,12 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
     bool isPPM(PBCOpInterface op) { return isa<pbc::PPMeasurementOp>(op); }
 
     // Check if two ops have the same rotation kind.
-    bool equalTypes(PBCOpInterface lhsOp, PBCOpInterface rhsOp)
-    {
+    bool equalTypes(PBCOpInterface lhsOp, PBCOpInterface rhsOp) {
         return (isPPR(lhsOp) == isPPR(rhsOp) || isPPM(lhsOp) == isPPM(rhsOp));
     }
 
     // Add op to current layer if it commutes with the last op in the layer and has the same type.
-    bool canAddToCurrentLayer(PBCOpInterface op, PBCLayer &currentLayer)
-    {
+    bool canAddToCurrentLayer(PBCOpInterface op, PBCLayer &currentLayer) {
         if (currentLayer.empty())
             return true;
 
@@ -149,8 +143,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
 
     void countDepths(std::vector<PBCLayer> &layers,
                      llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> &PPMSpecs,
-                     llvm::BumpPtrAllocator &stringAllocator)
-    {
+                     llvm::BumpPtrAllocator &stringAllocator) {
         for (auto &layer : layers) {
             assert(!layer.empty() && "Layer is empty");
 
@@ -163,8 +156,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             if (auto pprOp = dyn_cast<PPRotationOp>(op.getOperation())) {
                 key = saver.save("depth_pi" + std::to_string(std::abs(pprOp.getRotationKind())) +
                                  "_ppr");
-            }
-            else {
+            } else {
                 key = saver.save("depth_ppm");
             }
 
@@ -172,8 +164,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         }
     }
 
-    LogicalResult printSpecs()
-    {
+    LogicalResult printSpecs() {
         llvm::BumpPtrAllocator stringAllocator;
         llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> PPMSpecs;
 
@@ -239,8 +230,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         return success();
     }
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         if (failed(printSpecs())) {
             signalPassFailure();
         }

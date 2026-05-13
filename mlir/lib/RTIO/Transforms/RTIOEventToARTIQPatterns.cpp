@@ -37,8 +37,7 @@ struct PulseOpLowering : public OpConversionPattern<RTIOPulseOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(RTIOPulseOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         ARTIQRuntimeBuilder artiq(rewriter, op);
 
         // Set timeline position
@@ -46,8 +45,7 @@ struct PulseOpLowering : public OpConversionPattern<RTIOPulseOp> {
 
         if (op->hasAttr("_control")) {
             return lowerControlPulse(op, adaptor, rewriter, artiq);
-        }
-        else if (op->hasAttr("_slack")) {
+        } else if (op->hasAttr("_slack")) {
             return lowerSlackPulse(op, rewriter, artiq);
         }
         return lowerTTLPulse(op, adaptor, rewriter, artiq);
@@ -56,8 +54,7 @@ struct PulseOpLowering : public OpConversionPattern<RTIOPulseOp> {
   private:
     LogicalResult lowerControlPulse(RTIOPulseOp op, OpAdaptor adaptor,
                                     ConversionPatternRewriter &rewriter,
-                                    ARTIQRuntimeBuilder &artiq) const
-    {
+                                    ARTIQRuntimeBuilder &artiq) const {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         auto setFreqFunc = mod.lookupSymbol<LLVM::LLVMFuncOp>(ARTIQFuncNames::setFrequency);
         if (!setFreqFunc) {
@@ -75,8 +72,7 @@ struct PulseOpLowering : public OpConversionPattern<RTIOPulseOp> {
     }
 
     LogicalResult lowerSlackPulse(RTIOPulseOp op, ConversionPatternRewriter &rewriter,
-                                  ARTIQRuntimeBuilder &artiq) const
-    {
+                                  ARTIQRuntimeBuilder &artiq) const {
         artiq.delayMu(artiq.constI64(ARTIQHardwareConfig::freqSetSlackDelay));
         Value newTime = artiq.nowMu();
         rewriter.replaceOp(op, newTime);
@@ -85,8 +81,7 @@ struct PulseOpLowering : public OpConversionPattern<RTIOPulseOp> {
 
     LogicalResult lowerTTLPulse(RTIOPulseOp op, OpAdaptor adaptor,
                                 ConversionPatternRewriter &rewriter,
-                                ARTIQRuntimeBuilder &artiq) const
-    {
+                                ARTIQRuntimeBuilder &artiq) const {
         Value channelAddr = computeChannelDeviceAddr(rewriter, op, adaptor.getChannel());
         Value durationMu = artiq.secToMu(adaptor.getDuration());
 
@@ -108,8 +103,7 @@ struct SyncOpLowering : public OpConversionPattern<RTIOSyncOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(RTIOSyncOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         ValueRange events = adaptor.getEvents();
 
         if (events.size() == 1) {
@@ -134,8 +128,7 @@ struct EmptyOpLowering : public OpConversionPattern<RTIOEmptyOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(RTIOEmptyOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         ARTIQRuntimeBuilder artiq(rewriter, op);
         rewriter.replaceOp(op, artiq.nowMu());
         return success();
@@ -146,8 +139,7 @@ struct ChannelOpLowering : public OpConversionPattern<RTIOChannelOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(RTIOChannelOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         int32_t channelId = extractChannelId(op.getChannel());
         Type resultType = getTypeConverter()->convertType(op.getChannel().getType());
         Value result = arith::ConstantOp::create(rewriter, op.getLoc(),
@@ -165,8 +157,7 @@ struct ChannelOpLowering : public OpConversionPattern<RTIOChannelOp> {
 struct DecomposePulsePattern : public OpRewritePattern<RTIOPulseOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(RTIOPulseOp op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(RTIOPulseOp op, PatternRewriter &rewriter) const override {
         if (!op->hasAttr("_frequency")) {
             return failure();
         }
@@ -196,8 +187,7 @@ struct DecomposePulsePattern : public OpRewritePattern<RTIOPulseOp> {
 struct SimplifySyncPattern : public OpRewritePattern<RTIOSyncOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(RTIOSyncOp op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(RTIOSyncOp op, PatternRewriter &rewriter) const override {
         auto events = op.getEvents();
         if (events.size() <= 1) {
             return failure();
@@ -223,8 +213,7 @@ struct SimplifySyncPattern : public OpRewritePattern<RTIOSyncOp> {
 
         if (requiredEvents.size() == 1) {
             rewriter.replaceOp(op, requiredEvents[0]);
-        }
-        else {
+        } else {
             rewriter.replaceOpWithNewOp<RTIOSyncOp>(op, op.getType(), requiredEvents);
         }
         return success();
@@ -232,8 +221,7 @@ struct SimplifySyncPattern : public OpRewritePattern<RTIOSyncOp> {
 
   private:
     // Check if target is reachable from 'from' by traversing event dependencies.
-    static bool canReach(Value target, Value from)
-    {
+    static bool canReach(Value target, Value from) {
         if (target == from) {
             return true;
         }
@@ -260,8 +248,7 @@ struct SimplifySyncPattern : public OpRewritePattern<RTIOSyncOp> {
 
             if (auto pulse = dyn_cast<RTIOPulseOp>(defOp)) {
                 queue.push_back(pulse.getWait());
-            }
-            else if (auto sync = dyn_cast<RTIOSyncOp>(defOp)) {
+            } else if (auto sync = dyn_cast<RTIOSyncOp>(defOp)) {
                 for (Value ev : sync.getEvents()) {
                     queue.push_back(ev);
                 }
@@ -281,24 +268,20 @@ namespace catalyst {
 namespace rtio {
 
 void populateRTIOToARTIQConversionPatterns(LLVMTypeConverter &typeConverter,
-                                           RewritePatternSet &patterns)
-{
+                                           RewritePatternSet &patterns) {
     patterns.add<SyncOpLowering, EmptyOpLowering, ChannelOpLowering, PulseOpLowering>(
         typeConverter, patterns.getContext());
 }
 
-void populateRTIORewritePatterns(RewritePatternSet &patterns)
-{
+void populateRTIORewritePatterns(RewritePatternSet &patterns) {
     patterns.add<DecomposePulsePattern, SimplifySyncPattern>(patterns.getContext());
 }
 
-void populateRTIOSyncSimplifyPatterns(RewritePatternSet &patterns)
-{
+void populateRTIOSyncSimplifyPatterns(RewritePatternSet &patterns) {
     patterns.add<SimplifySyncPattern>(patterns.getContext());
 }
 
-void populateRTIOPulseDecomposePatterns(RewritePatternSet &patterns)
-{
+void populateRTIOPulseDecomposePatterns(RewritePatternSet &patterns) {
     patterns.add<DecomposePulsePattern>(patterns.getContext());
 }
 

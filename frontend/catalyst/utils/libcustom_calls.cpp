@@ -32,8 +32,7 @@ struct EncodedMemref {
 
 #define DEFINE_LAPACK_FUNC(FUNC_NAME, DATA_SIZE, OUT_SIZE, KERNEL)                                 \
     extern "C" {                                                                                   \
-    void FUNC_NAME(void **dataEncoded, void **resultsEncoded)                                      \
-    {                                                                                              \
+    void FUNC_NAME(void **dataEncoded, void **resultsEncoded) {                                    \
         DEBUG_MSG(#FUNC_NAME);                                                                     \
         void *data[DATA_SIZE];                                                                     \
         for (size_t i = 0; i < DATA_SIZE; ++i) {                                                   \
@@ -48,8 +47,7 @@ struct EncodedMemref {
                 out[i] = encodedMemref.data_aligned;                                               \
             }                                                                                      \
             KERNEL::Kernel(out, data, nullptr);                                                    \
-        }                                                                                          \
-        else {                                                                                     \
+        } else {                                                                                   \
             auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(resultsEncoded[0]));          \
             KERNEL::Kernel(encodedMemref.data_aligned, data, nullptr);                             \
         }                                                                                          \

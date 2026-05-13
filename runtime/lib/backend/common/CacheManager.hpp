@@ -60,8 +60,7 @@ template <typename ComplexT = std::complex<double>> class CacheManager {
     /**
      * Reset cached gates
      */
-    void Reset()
-    {
+    void Reset() {
         ops_names_.clear();
         ops_params_.clear();
         ops_wires_.clear();
@@ -91,8 +90,7 @@ template <typename ComplexT = std::complex<double>> class CacheManager {
                       const std::vector<size_t> &wires, bool inverse,
                       const std::vector<ComplexT> &matrix = {},
                       const std::vector<size_t> &controlled_wires = {},
-                      const std::vector<bool> &controlled_values = {})
-    {
+                      const std::vector<bool> &controlled_values = {}) {
         ops_names_.push_back(name);
         ops_params_.push_back(params);
         ops_wires_.push_back(wires);
@@ -110,8 +108,7 @@ template <typename ComplexT = std::complex<double>> class CacheManager {
      * @param id The observable key created by LObsManager()
      * @param callee The measurement operation
      */
-    void addObservable(const ObsIdType id, const MeasurementsT &callee = MeasurementsT::None)
-    {
+    void addObservable(const ObsIdType id, const MeasurementsT &callee = MeasurementsT::None) {
         obs_keys_.push_back(id);
         obs_callees_.push_back(callee);
     }
@@ -134,8 +131,7 @@ template <typename ComplexT = std::complex<double>> class CacheManager {
     /**
      * @brief Get a reference to operations parameters.
      */
-    auto getOperationsParameters() -> const std::vector<std::vector<double>> &
-    {
+    auto getOperationsParameters() -> const std::vector<std::vector<double>> & {
         return ops_params_;
     }
 
@@ -147,16 +143,14 @@ template <typename ComplexT = std::complex<double>> class CacheManager {
     /**
      * @brief Get a reference to operation controlled wires.
      */
-    auto getOperationsControlledWires() -> const std::vector<std::vector<size_t>> &
-    {
+    auto getOperationsControlledWires() -> const std::vector<std::vector<size_t>> & {
         return this->ops_controlled_wires_;
     }
 
     /**
      * @brief Get a reference to operation controlled values.
      */
-    auto getOperationsControlledValues() -> const std::vector<std::vector<bool>> &
-    {
+    auto getOperationsControlledValues() -> const std::vector<std::vector<bool>> & {
         return this->ops_controlled_values_;
     }
 
@@ -168,16 +162,14 @@ template <typename ComplexT = std::complex<double>> class CacheManager {
     /**
      * @brief Get a reference to operations matrices.
      */
-    auto getOperationsMatrices() -> const std::vector<std::vector<ComplexT>> &
-    {
+    auto getOperationsMatrices() -> const std::vector<std::vector<ComplexT>> & {
         return ops_matrixs_;
     }
 
     /**
      * @brief Get total number of cached gates.
      */
-    [[nodiscard]] auto getNumGates() const -> size_t
-    {
+    [[nodiscard]] auto getNumGates() const -> size_t {
         return ops_names_.size() + obs_keys_.size();
     }
 

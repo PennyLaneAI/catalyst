@@ -95,8 +95,7 @@ namespace cl = llvm::cl;
 
 namespace {
 
-std::string joinPasses(const llvm::SmallVector<std::string> &passes)
-{
+std::string joinPasses(const llvm::SmallVector<std::string> &passes) {
     std::string joined;
     llvm::raw_string_ostream stream{joined};
     llvm::interleaveComma(passes, stream);
@@ -108,12 +107,10 @@ struct CatalystIRPrinterConfig : public PassManager::IRPrinterConfig {
     PrintHandler printHandler;
 
     CatalystIRPrinterConfig(PrintHandler printHandler)
-        : IRPrinterConfig(/*printModuleScope=*/true), printHandler(printHandler)
-    {
-    }
+        : IRPrinterConfig(/*printModuleScope=*/true), printHandler(printHandler) {}
 
-    void printAfterIfEnabled(Pass *pass, Operation *operation, PrintCallbackFn printCallback) final
-    {
+    void printAfterIfEnabled(Pass *pass, Operation *operation,
+                             PrintCallbackFn printCallback) final {
         if (failed(printHandler(pass, printCallback))) {
             operation->emitError("IR printing failed");
         }
@@ -132,8 +129,7 @@ void registerTestDialect(mlir::DialectRegistry &);
 namespace catalyst::driver {
 /// Parse an MLIR module given in textual ASM representation. Any errors during parsing will be
 /// output to diagnosticStream.
-OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const llvm::SourceMgr &sourceMgr)
-{
+OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const llvm::SourceMgr &sourceMgr) {
     FallbackAsmResourceMap fallbackResourceMap;
     ParserConfig parserConfig{ctx, /*verifyAfterParse=*/true, &fallbackResourceMap};
 
@@ -141,8 +137,7 @@ OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const llvm::SourceMgr &s
 }
 
 /// Detect whether Enzyme differentiation is needed for the module.
-bool containsGradients(const llvm::Module &llvmModule)
-{
+bool containsGradients(const llvm::Module &llvmModule) {
     // This will match both declarations and definitions
     for (const llvm::Function &func : llvmModule.functions()) {
         if (func.getName().starts_with("__enzyme_autodiff")) {
@@ -155,15 +150,13 @@ bool containsGradients(const llvm::Module &llvmModule)
 /// Parse an LLVM module given in textual representation. Any parse errors will be output to
 /// the provided SMDiagnostic.
 std::shared_ptr<llvm::Module> parseLLVMSource(llvm::LLVMContext &context, StringRef source,
-                                              StringRef moduleName, llvm::SMDiagnostic &err)
-{
+                                              StringRef moduleName, llvm::SMDiagnostic &err) {
     auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(source, moduleName);
     return llvm::parseIR(llvm::MemoryBufferRef(*moduleBuffer), err, context);
 }
 
 /// Register all dialects required by the Catalyst compiler.
-void registerAllCatalystDialects(DialectRegistry &registry)
-{
+void registerAllCatalystDialects(DialectRegistry &registry) {
     // MLIR Core dialects
     registerAllDialects(registry);
     registerAllExtensions(registry);
@@ -189,8 +182,7 @@ void registerAllCatalystDialects(DialectRegistry &registry)
 
 // Determines if the compilation stage should be executed if a checkpointStage is given
 bool catalyst::driver::shouldRunStage(const CompilerOptions &options, CompilerOutput &output,
-                                      const std::string &stageName)
-{
+                                      const std::string &stageName) {
     if (options.checkpointStage.empty()) {
         return true;
     }
@@ -203,8 +195,7 @@ bool catalyst::driver::shouldRunStage(const CompilerOptions &options, CompilerOu
 
 llvm::LogicalResult catalyst::driver::runCoroLLVMPasses(const CompilerOptions &options,
                                                         std::shared_ptr<llvm::Module> llvmModule,
-                                                        CompilerOutput &output)
-{
+                                                        CompilerOutput &output) {
     if (!catalyst::driver::shouldRunStage(options, output, "CoroOpt")) {
         return success();
     }
@@ -248,8 +239,7 @@ llvm::LogicalResult catalyst::driver::runCoroLLVMPasses(const CompilerOptions &o
 
 llvm::LogicalResult catalyst::driver::runO2LLVMPasses(const CompilerOptions &options,
                                                       std::shared_ptr<llvm::Module> llvmModule,
-                                                      CompilerOutput &output)
-{
+                                                      CompilerOutput &output) {
     // opt -O2
     // As seen here:
     // https://llvm.org/docs/NewPassManager.html#just-tell-me-how-to-run-the-default-optimization-pipeline-with-the-new-pass-manager
@@ -302,8 +292,7 @@ llvm::LogicalResult catalyst::driver::runO2LLVMPasses(const CompilerOptions &opt
 
 llvm::LogicalResult catalyst::driver::runEnzymePasses(const CompilerOptions &options,
                                                       std::shared_ptr<llvm::Module> llvmModule,
-                                                      CompilerOutput &output)
-{
+                                                      CompilerOutput &output) {
     if (!catalyst::driver::shouldRunStage(options, output, "Enzyme")) {
         return success();
     }
@@ -350,8 +339,7 @@ llvm::LogicalResult catalyst::driver::runEnzymePasses(const CompilerOptions &opt
     return success();
 }
 
-std::string catalyst::driver::readInputFile(const std::string &filename)
-{
+std::string catalyst::driver::readInputFile(const std::string &filename) {
     if (filename == "-") {
         if (llvm::errs().is_displayed()) {
             llvm::errs() << "(processing input from stdin now, hit ctrl-c/ctrl-d to interrupt)\n";
@@ -373,8 +361,7 @@ std::string catalyst::driver::readInputFile(const std::string &filename)
 [[nodiscard]] llvm::LogicalResult
 catalyst::driver::preparePassManager(PassManager &pm, const CompilerOptions &options,
                                      CompilerOutput &output, catalyst::utils::Timer<> &timer,
-                                     TimingScope &timing)
-{
+                                     TimingScope &timing) {
     MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
     pm.enableVerifier(config.shouldVerifyPasses());
     if (failed(applyPassManagerCLOptions(pm)))
@@ -390,8 +377,7 @@ catalyst::driver::preparePassManager(PassManager &pm, const CompilerOptions &opt
 
 [[nodiscard]] llvm::LogicalResult
 catalyst::driver::configurePipeline(PassManager &pm, const CompilerOptions &options,
-                                    Pipeline &pipeline, bool clHasManualPipeline)
-{
+                                    Pipeline &pipeline, bool clHasManualPipeline) {
     pm.clear();
     if (!clHasManualPipeline && failed(pipeline.addPipeline(pm))) {
         llvm::errs() << "Pipeline creation function not found: " << pipeline.getName() << "\n";
@@ -410,8 +396,7 @@ catalyst::driver::configurePipeline(PassManager &pm, const CompilerOptions &opti
 
 llvm::LogicalResult catalyst::driver::runPipeline(PassManager &pm, const CompilerOptions &options,
                                                   CompilerOutput &output, Pipeline &pipeline,
-                                                  bool clHasManualPipeline, ModuleOp moduleOp)
-{
+                                                  bool clHasManualPipeline, ModuleOp moduleOp) {
     if (!catalyst::driver::shouldRunStage(options, output, pipeline.getName()) ||
         pipeline.getPasses().size() == 0) {
         return success();
@@ -436,10 +421,9 @@ llvm::LogicalResult catalyst::driver::runPipeline(PassManager &pm, const Compile
     return success();
 }
 
-[[nodiscard]] llvm::LogicalResult catalyst::driver::runLowering(const CompilerOptions &options,
-                                                                MLIRContext *ctx, ModuleOp moduleOp,
-                                                                CompilerOutput &output,
-                                                                TimingScope &timing)
+[[nodiscard]] llvm::LogicalResult
+catalyst::driver::runLowering(const CompilerOptions &options, MLIRContext *ctx, ModuleOp moduleOp,
+                              CompilerOutput &output, TimingScope &timing)
 
 {
     catalyst::utils::Timer<> timer{};
@@ -483,8 +467,7 @@ llvm::LogicalResult catalyst::driver::runPipeline(PassManager &pm, const Compile
 }
 
 llvm::LogicalResult catalyst::driver::verifyInputType(const CompilerOptions &options,
-                                                      InputType inType)
-{
+                                                      InputType inType) {
     if (inType == InputType::OTHER) {
         CO_MSG(options, Verbosity::Urgent, "Wrong or unsupported input\n");
         return failure();
@@ -500,14 +483,12 @@ llvm::LogicalResult catalyst::driver::verifyInputType(const CompilerOptions &opt
     return success();
 }
 
-size_t catalyst::driver::findMatchingClosingParen(llvm::StringRef str, size_t openParenPos)
-{
+size_t catalyst::driver::findMatchingClosingParen(llvm::StringRef str, size_t openParenPos) {
     int parenCount = 1;
     for (size_t pos = openParenPos + 1; pos < str.size(); pos++) {
         if (str[pos] == '(') {
             parenCount++;
-        }
-        else if (str[pos] == ')') {
+        } else if (str[pos] == ')') {
             parenCount--;
             if (parenCount == 0) {
                 return pos;
@@ -518,8 +499,7 @@ size_t catalyst::driver::findMatchingClosingParen(llvm::StringRef str, size_t op
 }
 
 std::vector<Pipeline>
-catalyst::driver::parsePipelines(const cl::list<std::string> &catalystPipeline)
-{
+catalyst::driver::parsePipelines(const cl::list<std::string> &catalystPipeline) {
     std::vector<Pipeline> allPipelines;
     for (const auto &pipelineStr : catalystPipeline) {
         llvm::StringRef pipelineRef = llvm::StringRef(pipelineStr).trim();
@@ -556,30 +536,26 @@ catalyst::driver::parsePipelines(const cl::list<std::string> &catalystPipeline)
     return allPipelines;
 }
 
-std::string CompilerOptions::getObjectFile() const
-{
+std::string CompilerOptions::getObjectFile() const {
     using path = std::filesystem::path;
     return path(workspace.str()) / path(moduleName.str() + ".o");
 }
 
 std::string CompilerOutput::nextPassDumpFilename(const std::string &pipelineName,
-                                                 const std::string &ext)
-{
+                                                 const std::string &ext) {
     return std::filesystem::path(currentStage) /
            std::filesystem::path(std::to_string(this->passCounter++) + "_" + pipelineName)
                .replace_extension(ext);
 }
 
 std::string CompilerOutput::nextPipelineSummaryFilename(const std::string &pipelineName,
-                                                        const std::string &ext)
-{
+                                                        const std::string &ext) {
     return std::filesystem::path(std::to_string(this->globalPipelineCounter) + "_After" +
                                  pipelineName)
         .replace_extension(ext);
 }
 
-void CompilerOutput::setStage(const std::string &stageName)
-{
+void CompilerOutput::setStage(const std::string &stageName) {
     ++globalPipelineCounter;
     currentStage = std::to_string(globalPipelineCounter) + "_" + stageName;
     passCounter = 1;

@@ -28,12 +28,9 @@ namespace catalyst {
 CatalystPassInstrumentation::CatalystPassInstrumentation(const driver::CompilerOptions &options,
                                                          driver::CompilerOutput &output,
                                                          catalyst::utils::Timer<> &timer)
-    : options(options), output(output), timer(timer)
-{
-}
+    : options(options), output(output), timer(timer) {}
 
-void CatalystPassInstrumentation::runBeforePass(mlir::Pass *pass, mlir::Operation *operation)
-{
+void CatalystPassInstrumentation::runBeforePass(mlir::Pass *pass, mlir::Operation *operation) {
     if (this->options.verbosity >= driver::Verbosity::Debug && !this->timer.is_active()) {
         this->timer.start();
     }
@@ -42,8 +39,7 @@ void CatalystPassInstrumentation::runBeforePass(mlir::Pass *pass, mlir::Operatio
     }
 }
 
-void CatalystPassInstrumentation::runAfterPass(mlir::Pass *pass, mlir::Operation *operation)
-{
+void CatalystPassInstrumentation::runAfterPass(mlir::Pass *pass, mlir::Operation *operation) {
     // Handle verbosity logging
     if (this->options.verbosity >= driver::Verbosity::Debug) {
         auto pipelineName = pass->getName();
@@ -55,16 +51,14 @@ void CatalystPassInstrumentation::runAfterPass(mlir::Pass *pass, mlir::Operation
 
     if (this->options.keepIntermediate == driver::SaveTemps::AfterPass) {
         shouldDump = true;
-    }
-    else if (this->options.keepIntermediate == driver::SaveTemps::AfterPassChanged) {
+    } else if (this->options.keepIntermediate == driver::SaveTemps::AfterPassChanged) {
         // If change detection is enabled, only dump if IR is changed
         auto it = this->beforePassFingerprints.find(pass);
         if (it != this->beforePassFingerprints.end() && it->second.has_value()) {
             mlir::OperationFingerPrint afterFingerprint(operation);
             shouldDump = (afterFingerprint != it->second.value());
             this->beforePassFingerprints.erase(it);
-        }
-        else {
+        } else {
             // Fingerprint not found: default to dumping to be safe
             shouldDump = true;
         }
@@ -75,8 +69,7 @@ void CatalystPassInstrumentation::runAfterPass(mlir::Pass *pass, mlir::Operation
     }
 }
 
-void CatalystPassInstrumentation::runAfterPassFailed(mlir::Pass *pass, mlir::Operation *operation)
-{
+void CatalystPassInstrumentation::runAfterPassFailed(mlir::Pass *pass, mlir::Operation *operation) {
     // Always dump on failure for debugging
     this->options.diagnosticStream << "While processing '" << pass->getName().str() << "' pass ";
     std::string tmp;
@@ -94,8 +87,7 @@ void CatalystPassInstrumentation::runAfterPassFailed(mlir::Pass *pass, mlir::Ope
     }
 }
 
-void CatalystPassInstrumentation::dumpIRAfterPass(mlir::Pass *pass, mlir::Operation *op)
-{
+void CatalystPassInstrumentation::dumpIRAfterPass(mlir::Pass *pass, mlir::Operation *op) {
     auto pipelineName = pass->getName();
 
     // Save IR after pass
@@ -105,8 +97,7 @@ void CatalystPassInstrumentation::dumpIRAfterPass(mlir::Pass *pass, mlir::Operat
         mlir::ModuleOp mod = isa<mlir::ModuleOp>(op) ? cast<mlir::ModuleOp>(op)
                                                      : op->getParentOfType<mlir::ModuleOp>();
         s << mod;
-    }
-    else {
+    } else {
         s << *op;
     }
     std::string fileName;

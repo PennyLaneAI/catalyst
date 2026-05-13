@@ -29,8 +29,7 @@ using MemRefT_Tanner = MemRefT_int32_1d;
 using MemRefT_Err_Idx = MemRefT_int64_1d;
 using MemRefT_Syndrome = MemRefT_int8_1d;
 
-TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
-{
+TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]") {
     tanner_graph_steane<TANNER_GRAPH_INT> tanner_graph;
 
     std::vector<TANNER_GRAPH_INT> row_idx_tanner = tanner_graph.row_idx;
@@ -55,8 +54,7 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
     MemRefT_Err_Idx err_idx_memref = {
         buffer_err_idx_memref, buffer_err_idx_memref, 0, {err_idx.size()}, {1}};
 
-    SECTION("Syndrome results that can be decoded.")
-    {
+    SECTION("Syndrome results that can be decoded.") {
         for (auto it = tanner_graph.lookup_table_error_idx_to_syndrome.begin();
              it != tanner_graph.lookup_table_error_idx_to_syndrome.end(); ++it) {
             ERR_IDX_INT expected_res = it->first;
@@ -77,8 +75,7 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
         }
     }
 
-    SECTION("Error raised for bad syndrome res.")
-    {
+    SECTION("Error raised for bad syndrome res.") {
         std::vector<SYNDROME_INT> bad_syndrome_res = {1, 1};
 
         SYNDROME_INT *buffer_bad_syndrome_res_memref = bad_syndrome_res.data();
@@ -93,8 +90,7 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[LUTDecoder][lut_decoder]")
             Catch::Matchers::ContainsSubstring("Bad syndrome result input."));
     }
 
-    SECTION("Error raised for bad err_idx input.")
-    {
+    SECTION("Error raised for bad err_idx input.") {
         std::vector<ERR_IDX_INT> bad_err_idx =
             std::vector<ERR_IDX_INT>((tanner_graph.code_distance - 1), -1);
         ERR_IDX_INT *buffer_bad_err_idx_memref = bad_err_idx.data();

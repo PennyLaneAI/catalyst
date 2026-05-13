@@ -20,8 +20,7 @@
 namespace catalyst {
 namespace pbc {
 
-std::pair<mlir::StringRef, bool> determinePauliAndSignOfMeasurement(bool avoidPauliYMeasure)
-{
+std::pair<mlir::StringRef, bool> determinePauliAndSignOfMeasurement(bool avoidPauliYMeasure) {
     if (avoidPauliYMeasure) {
         return std::make_pair("Z", 0);
     }
@@ -29,8 +28,7 @@ std::pair<mlir::StringRef, bool> determinePauliAndSignOfMeasurement(bool avoidPa
 }
 
 mlir::OpResult initializeZeroOrPlusI(bool avoidPauliYMeasure, mlir::Location loc,
-                                     mlir::PatternRewriter &rewriter)
-{
+                                     mlir::PatternRewriter &rewriter) {
     if (avoidPauliYMeasure) {
         // Fabricate |Y⟩
         auto plusIOp = FabricateOp::create(rewriter, loc, LogicalInitKind::plus_i);

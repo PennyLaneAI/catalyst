@@ -25,8 +25,7 @@ using namespace catalyst::pbc;
 namespace catalyst {
 namespace pbc {
 
-void PBCLayer::insertToLayer(PBCOpInterface op)
-{
+void PBCLayer::insertToLayer(PBCOpInterface op) {
     ops.emplace_back(op);
     updateResultAndOperand(op);
 
@@ -37,8 +36,7 @@ void PBCLayer::insertToLayer(PBCOpInterface op)
 
 void PBCLayer::eraseOp(PBCOpInterface op) { llvm::erase(ops, op); }
 
-void PBCLayer::updateResultAndOperand(PBCOpInterface op)
-{
+void PBCLayer::updateResultAndOperand(PBCOpInterface op) {
     // Ensure layer operand set contains canonical origins for any input qubits
     ValueRange inQubits = op.getInQubits();
     ValueRange outQubits = op.getOutQubits();
@@ -74,8 +72,7 @@ void PBCLayer::updateResultAndOperand(PBCOpInterface op)
     }
 }
 
-std::vector<Value> PBCLayer::getEntryQubitsFrom(PBCOpInterface op)
-{
+std::vector<Value> PBCLayer::getEntryQubitsFrom(PBCOpInterface op) {
     std::vector<Value> entryQubits;
     entryQubits.reserve(op.getInQubits().size());
 
@@ -95,8 +92,7 @@ std::vector<Value> PBCLayer::getEntryQubitsFrom(PBCOpInterface op)
     return entryQubits;
 }
 
-std::vector<Value> PBCLayer::getEntryQubitsFrom(YieldOp yieldOp)
-{
+std::vector<Value> PBCLayer::getEntryQubitsFrom(YieldOp yieldOp) {
     std::vector<Value> entries;
     entries.reserve(yieldOp->getNumOperands());
     for (Value yOperand : yieldOp->getOperands()) {
@@ -106,8 +102,7 @@ std::vector<Value> PBCLayer::getEntryQubitsFrom(YieldOp yieldOp)
         Value entry = yOperand;
         if (localQubitToEntry.contains(yOperand)) {
             entry = localQubitToEntry[yOperand];
-        }
-        else if (resultToOperand.contains(yOperand)) {
+        } else if (resultToOperand.contains(yOperand)) {
             entry = resultToOperand[yOperand];
         }
         entries.push_back(entry);
@@ -115,16 +110,14 @@ std::vector<Value> PBCLayer::getEntryQubitsFrom(YieldOp yieldOp)
     return entries;
 }
 
-bool PBCLayer::actOnDisjointQubits(PBCOpInterface op)
-{
+bool PBCLayer::actOnDisjointQubits(PBCOpInterface op) {
     // Check for overlap with cached index set
     return llvm::none_of(getEntryQubitsFrom(op),
                          [&](const auto &q) { return layerEntryQubits.contains(q); });
 }
 
 // Commute two ops if they act on the same qubits based on qubit indexes on that layer
-bool PBCLayer::commute(PBCOpInterface src, PBCOpInterface dst)
-{
+bool PBCLayer::commute(PBCOpInterface src, PBCOpInterface dst) {
     auto srcEntryQubits = getEntryQubitsFrom(src);
     auto dstEntryQubits = getEntryQubitsFrom(dst);
 
@@ -134,21 +127,18 @@ bool PBCLayer::commute(PBCOpInterface src, PBCOpInterface dst)
 }
 
 // Commute an op to all the ops in the layer
-bool PBCLayer::commuteToLayer(PBCOpInterface op)
-{
+bool PBCLayer::commuteToLayer(PBCOpInterface op) {
     return llvm::all_of(ops, [&](auto existingOp) { return commute(op, existingOp); });
 }
 
-bool PBCLayer::isSameBlock(PBCOpInterface op) const
-{
+bool PBCLayer::isSameBlock(PBCOpInterface op) const {
     if (ops.empty())
         return true;
     return op->getBlock() == ops.back()->getBlock();
 }
 
 // Check if the op has extract op that must be occurred before the operations in layers
-bool PBCLayer::extractsAreBeforeExistingOps(PBCOpInterface op) const
-{
+bool PBCLayer::extractsAreBeforeExistingOps(PBCOpInterface op) const {
     for (auto existingOp : ops) {
         for (auto operand : op->getOperands()) {
             auto defOp = operand.getDefiningOp();
@@ -165,8 +155,7 @@ bool PBCLayer::extractsAreBeforeExistingOps(PBCOpInterface op) const
 }
 
 // Ensure the new op does not have insert op before existing ops
-bool PBCLayer::insertsAreAfterExistingOps(PBCOpInterface op) const
-{
+bool PBCLayer::insertsAreAfterExistingOps(PBCOpInterface op) const {
     for (auto existingOp : ops) {
         for (auto result : op->getResults()) {
             for (auto user : result.getUsers()) {
@@ -182,8 +171,7 @@ bool PBCLayer::insertsAreAfterExistingOps(PBCOpInterface op) const
     return true;
 }
 
-bool PBCLayer::insert(PBCOpInterface op)
-{
+bool PBCLayer::insert(PBCOpInterface op) {
     if (empty()) {
         insertToLayer(op);
         return true;
@@ -210,8 +198,7 @@ bool PBCLayer::insert(PBCOpInterface op)
     return false;
 }
 
-llvm::SmallVector<mlir::Value> PBCLayer::getResultsOrderedByTypeThenOperand() const
-{
+llvm::SmallVector<mlir::Value> PBCLayer::getResultsOrderedByTypeThenOperand() const {
     llvm::SmallVector<mlir::Value> ordered;
 
     // 1. Collect classical first in program order

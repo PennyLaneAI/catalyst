@@ -55,8 +55,7 @@ std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trials = MAX
  * @param n The number to test for primality.
  * @return true if n is likely prime, false otherwise.
  */
-inline bool primality_test(INT_TYPE n)
-{
+inline bool primality_test(INT_TYPE n) {
     static lru_cache<INT_TYPE, bool, FACTORING_CACHE_SIZE> cache;
     if (auto val_opt = cache.get(n); val_opt) {
         return *val_opt;
@@ -66,8 +65,7 @@ inline bool primality_test(INT_TYPE n)
     if (boost::multiprecision::miller_rabin_test(n, 25)) {
         cache.put(n, true);
         return true;
-    }
-    else {
+    } else {
         cache.put(n, false);
         return false;
     }
@@ -83,8 +81,7 @@ inline bool primality_test(INT_TYPE n)
  * @param p The prime number.
  * @return The Legendre symbol of a modulo p.
  */
-inline INT_TYPE legendre_symbol(INT_TYPE a, INT_TYPE p)
-{
+inline INT_TYPE legendre_symbol(INT_TYPE a, INT_TYPE p) {
     static lru_cache<std::pair<INT_TYPE, INT_TYPE>, INT_TYPE, FACTORING_CACHE_SIZE> cache;
     auto key = std::make_pair(a, p);
 
@@ -110,8 +107,7 @@ inline INT_TYPE legendre_symbol(INT_TYPE a, INT_TYPE p)
  * @param p The odd prime modulus.
  * @return The square root of n under modulo p, or std::nullopt if it does not exist.
  */
-inline std::optional<INT_TYPE> sqrt_modulo_p(INT_TYPE n, INT_TYPE p)
-{
+inline std::optional<INT_TYPE> sqrt_modulo_p(INT_TYPE n, INT_TYPE p) {
     // Trivial cases
     INT_TYPE a = n % p;
     if (a < 0)
@@ -186,8 +182,7 @@ inline std::optional<INT_TYPE> sqrt_modulo_p(INT_TYPE n, INT_TYPE p)
  * @param max_trials The maximum number of attempts to find a factor.
  * @return An integer factor of n, or std::nullopt if no factors are found.
  */
-inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_trials)
-{
+inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_trials) {
     static lru_cache<std::pair<INT_TYPE, int>, std::optional<INT_TYPE>, FACTORING_CACHE_SIZE> cache;
     auto cache_key = std::make_pair(n, max_trials);
 
@@ -277,8 +272,7 @@ inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_trials)
  * @return A vector of sorted prime factors, or std::nullopt.
  */
 inline std::optional<std::vector<INT_TYPE>> prime_factorize(INT_TYPE n, int max_trials,
-                                                            bool z_sqrt_two)
-{
+                                                            bool z_sqrt_two) {
     static lru_cache<std::tuple<INT_TYPE, int, bool>, std::optional<std::vector<INT_TYPE>>,
                      FACTORING_CACHE_SIZE>
         cache;
@@ -348,8 +342,7 @@ inline std::optional<std::vector<INT_TYPE>> prime_factorize(INT_TYPE n, int max_
  * @param p A prime integer.
  * @return A vector of factors in Z[sqrt(2)], or std::nullopt if factorization fails.
  */
-inline std::optional<std::vector<ZSqrtTwo>> factorize_prime_zsqrt_two(INT_TYPE p)
-{
+inline std::optional<std::vector<ZSqrtTwo>> factorize_prime_zsqrt_two(INT_TYPE p) {
     // Lemma C.8: ±2 = (0 + 1√2)(0 ± 1√2)
     if (abs_val(p) == INT_TYPE(2)) {
         return std::vector<ZSqrtTwo>{ZSqrtTwo(0, 1), ZSqrtTwo(0, (p < 0) ? -1 : 1)};
@@ -384,8 +377,7 @@ inline std::optional<std::vector<ZSqrtTwo>> factorize_prime_zsqrt_two(INT_TYPE p
  * @param p A prime integer.
  * @return A factor in Z[omega], or std::nullopt if factorization fails
  */
-inline std::optional<ZOmega> factorize_prime_zomega(const ZSqrtTwo &x, INT_TYPE p)
-{
+inline std::optional<ZOmega> factorize_prime_zomega(const ZSqrtTwo &x, INT_TYPE p) {
     // Basic cases
     if (p == 2)
         return ZOmega(0, 0, 1, 1);
@@ -422,8 +414,7 @@ inline std::optional<ZOmega> factorize_prime_zomega(const ZSqrtTwo &x, INT_TYPE 
  * @param max_trials Maximum attempts for factorization.
  * @return An element of Z[omega] satisfying the equation, or std::nullopt.
  */
-inline std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trials)
-{
+inline std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trials) {
     if (xi.a == 0 && xi.b == 0)
         return ZOmega(0, 0, 0, 0);
 

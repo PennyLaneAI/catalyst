@@ -44,8 +44,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     using impl::SplitMultipleTapesPassBase<SplitMultipleTapesPass>::SplitMultipleTapesPassBase;
     template <typename T> using SmallSet = llvm::SmallSet<T, 8>;
 
-    unsigned int countTapes(const func::FuncOp &func)
-    {
+    unsigned int countTapes(const func::FuncOp &func) {
         // Count the number of quantum.device operations in a function
         unsigned int count = 0;
         func->walk([&](catalyst::quantum::DeviceInitOp op) { count++; });
@@ -53,8 +52,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     } // countTapes()
 
     void collectOperationsForEachTape(const func::FuncOp &func,
-                                      SmallVector<std::vector<Operation *>> &OpsEachTape)
-    {
+                                      SmallVector<std::vector<Operation *>> &OpsEachTape) {
         // During tracing, each tape starts with a qdevice_p primitive
         // This means each tape starts with a quantum.device
         // and ends with a quantum.device_release
@@ -99,8 +97,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
 
     void collectNecessaryValuesFromEarlierTapes(
         const std::vector<Operation *> &TapeOps,
-        SmallSet<std::pair<Operation *, unsigned int>> &NecessaryValuesFromEarlierTapes)
-    {
+        SmallSet<std::pair<Operation *, unsigned int>> &NecessaryValuesFromEarlierTapes) {
         // Go through a list of operations and collect all the necessary operand values
         // not defined in this list itself, and add them to NecessaryValuesFromEarlierTapes
         // Record the Value as pair<defining op, result index number>
@@ -136,8 +133,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
 
     void getNecessaryTapeReturns(
         SmallVector<Value> &RetValues, const std::vector<Operation *> &TapeOps,
-        SmallSet<std::pair<Operation *, unsigned int>> &NecessaryValuesFromEarlierTapes)
-    {
+        SmallSet<std::pair<Operation *, unsigned int>> &NecessaryValuesFromEarlierTapes) {
         for (auto pair : NecessaryValuesFromEarlierTapes) {
             if (std::find(TapeOps.begin(), TapeOps.end(), pair.first) != TapeOps.end()) {
                 // This Value needed for PP is in this tape!
@@ -157,8 +153,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
 
     std::pair<scf::ExecuteRegionOp, scf::YieldOp> wrapTapeOpsInSCFRegion(
         const std::vector<Operation *> &TapeOps, const SmallVector<Value> &RetValues,
-        const SmallVector<mlir::Type> &RetTypes, IRRewriter &builder, Location loc)
-    {
+        const SmallVector<mlir::Type> &RetTypes, IRRewriter &builder, Location loc) {
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPoint(TapeOps.front());
         scf::ExecuteRegionOp executeRegionOp =
@@ -179,8 +174,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     void propagateSCFRetValsDownstream(const scf::ExecuteRegionOp &executeRegionOp,
                                        const scf::YieldOp &SCFRegionYieldOp,
                                        const std::vector<Operation *> &TapeOps,
-                                       SmallVector<Value> &RetValues)
-    {
+                                       SmallVector<Value> &RetValues) {
         SmallPtrSet<Operation *, 8> exceptions;
         exceptions.insert(SCFRegionYieldOp);
         for (auto op : TapeOps) {
@@ -192,8 +186,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         }
     } // propagateSCFRetValsDownstream()
 
-    void renameToUnique(std::string &name, const SymbolTable &table)
-    {
+    void renameToUnique(std::string &name, const SymbolTable &table) {
         while (table.lookup(name)) {
             name += "_0";
         }
@@ -203,8 +196,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         const std::vector<Operation *> &TapeOps,
         SmallSet<std::pair<Operation *, unsigned int>> &NecessaryValuesFromEarlierTapes,
         IRRewriter &builder, const unsigned int &tapeNumber, func::FuncOp &OriginalMultitapeFunc,
-        SmallVector<FailureOr<func::FuncOp>> &OutlinedFuncs)
-    {
+        SmallVector<FailureOr<func::FuncOp>> &OutlinedFuncs) {
         // 1. Identify the necessary return values
         SmallVector<Value> RetValues;
         SmallVector<mlir::Type> RetTypes;
@@ -251,8 +243,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         return success();
     } // createTapeFunction()
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         Operation *module = getOperation();
         mlir::IRRewriter builder(module->getContext());
 

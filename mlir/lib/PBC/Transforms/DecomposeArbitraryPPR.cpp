@@ -46,8 +46,8 @@ namespace {
 /// |+⟩──| Z |───| X(π/2)|──| Z(phi)|──| X |
 ///      └───┘   └───────┘  └───────┘  └───┘
 /// PZ, and X are PPMs, while X(phi), Z(phi), and P(pi/2) are PPRs.
-LogicalResult convertArbitraryPPRToArbitraryZ(PPRotationArbitraryOp &op, PatternRewriter &rewriter)
-{
+LogicalResult convertArbitraryPPRToArbitraryZ(PPRotationArbitraryOp &op,
+                                              PatternRewriter &rewriter) {
     auto loc = op.getLoc();
 
     /// |+⟩──
@@ -107,8 +107,7 @@ struct DecomposeArbitraryPPR : public OpRewritePattern<PPRotationArbitraryOp> {
     using OpRewritePattern<PPRotationArbitraryOp>::OpRewritePattern;
 
     LogicalResult matchAndRewrite(PPRotationArbitraryOp op,
-                                  PatternRewriter &rewriter) const override
-    {
+                                  PatternRewriter &rewriter) const override {
         if (op.getPauliProduct() == rewriter.getStrArrayAttr({"Z"})) {
             return failure();
         }
@@ -121,8 +120,7 @@ struct DecomposeArbitraryPPR : public OpRewritePattern<PPRotationArbitraryOp> {
 namespace catalyst {
 namespace pbc {
 
-void populateDecomposeArbitraryPPRPatterns(RewritePatternSet &patterns)
-{
+void populateDecomposeArbitraryPPRPatterns(RewritePatternSet &patterns) {
     patterns.add<DecomposeArbitraryPPR>(patterns.getContext());
 }
 

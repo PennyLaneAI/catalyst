@@ -54,8 +54,7 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
     using mlir::OpRewritePattern<ForwardOp>::OpRewritePattern;
 
     mlir::LogicalResult matchAndRewrite(ForwardOp op,
-                                        mlir::PatternRewriter &rewriter) const override
-    {
+                                        mlir::PatternRewriter &rewriter) const override {
         // Check if the numbers of args and returns match Enzyme's format.
         auto argc = op.getArgc();
         auto resc = op.getResc();
@@ -90,8 +89,7 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
                 bufferArgs.push_back(ty);
                 newArgResTypes.push_back(ty);
                 newArgResTypes.push_back(ty);
-            }
-            else {
+            } else {
                 bufferRets.push_back(ty);
             }
         }
@@ -129,8 +127,7 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
                     BlockArgument output = op.getArgument(idx * 2 + argc * 2);
                     memref::CopyOp::create(rewriter, returnOp.getLoc(), operand, output);
                     idx++;
-                }
-                else {
+                } else {
                     tapeReturns.push_back(operand);
                 }
             }
@@ -144,8 +141,7 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
     using OpRewritePattern<ReverseOp>::OpRewritePattern;
 
     mlir::LogicalResult matchAndRewrite(ReverseOp op,
-                                        mlir::PatternRewriter &rewriter) const override
-    {
+                                        mlir::PatternRewriter &rewriter) const override {
         // Check if the numbers of args and returns match Enzyme's format.
         auto forwardArgc = op.getArgc();
         auto forwardResc = op.getResc();
@@ -182,8 +178,7 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
                 bufferArgs.push_back(ty);
                 bufferArgs.push_back(ty);
                 newArgInTypes.push_back(ty);
-            }
-            else {
+            } else {
                 bufferArgs.push_back(ty);
             }
         }
@@ -235,8 +230,7 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
 namespace catalyst {
 namespace gradient {
 
-void populatePostprocessingPatterns(RewritePatternSet &patterns)
-{
+void populatePostprocessingPatterns(RewritePatternSet &patterns) {
     patterns.add<PostprocessForwardOp>(patterns.getContext());
     patterns.add<PostprocessReverseOp>(patterns.getContext());
 }

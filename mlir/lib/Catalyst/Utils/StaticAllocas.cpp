@@ -20,8 +20,7 @@ using namespace mlir;
 
 namespace catalyst {
 
-LLVM::AllocaOp getStaticAlloca(Location &loc, RewriterBase &rewriter, Type ty, int value)
-{
+LLVM::AllocaOp getStaticAlloca(Location &loc, RewriterBase &rewriter, Type ty, int value) {
     // create an llvm.alloca operation at the beginning of the entry block of the current function.
     Block *insertionBlock = rewriter.getInsertionBlock();
     Region *parentRegion = insertionBlock->getParent();
@@ -35,8 +34,7 @@ LLVM::AllocaOp getStaticAlloca(Location &loc, RewriterBase &rewriter, Type ty, i
 }
 
 mlir::memref::AllocaOp getStaticMemrefAlloca(Location &loc, RewriterBase &rewriter,
-                                             MemRefType paramCountType)
-{
+                                             MemRefType paramCountType) {
     // Same as above but for memref.alloca instead of llvm.alloca
     Block *insertionBlock = rewriter.getInsertionBlock();
     Region *parentRegion = insertionBlock->getParent();

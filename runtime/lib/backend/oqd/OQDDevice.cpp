@@ -20,8 +20,7 @@
 
 namespace Catalyst::Runtime::Device {
 
-auto OQDDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
-{
+auto OQDDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> {
     for (size_t i = 0; i < num_qubits; i++) {
         __catalyst__oqd__ion(this->ion_specs);
     }
@@ -38,8 +37,7 @@ auto OQDDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
     return result;
 }
 
-void OQDDevice::ReleaseQubits(const std::vector<QubitIdType> &qubits)
-{
+void OQDDevice::ReleaseQubits(const std::vector<QubitIdType> &qubits) {
     std::set<QubitIdType> dealloc_Ids(qubits.begin(), qubits.end());
     RT_FAIL_IF(this->initial_allocated_QubitIds != dealloc_Ids,
                "OQD device does not support dynamic qubit allocation. Please ensure the "
@@ -61,14 +59,12 @@ auto OQDDevice::GetDeviceShots() const -> size_t { return device_shots; }
 void OQDDevice::NamedOperation(const std::string &, const std::vector<double> &,
                                const std::vector<QubitIdType> &, bool,
                                const std::vector<QubitIdType> &, const std::vector<bool> &,
-                               const std::vector<std::string> &)
-{
+                               const std::vector<std::string> &) {
     RT_FAIL("NamedOperation unsupported by device");
 }
 
 void OQDDevice::PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
-                              const std::vector<QubitIdType> &)
-{
+                              const std::vector<QubitIdType> &) {
     // Note that we do not support this in OQD device.
     // This is a just a fake readout method for testing purposes.
     // TODO: change this back to unsupported functionality once null measurements
@@ -76,8 +72,7 @@ void OQDDevice::PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
     return;
 }
 
-auto OQDDevice::Measure(QubitIdType, std::optional<int32_t>) -> Result
-{
+auto OQDDevice::Measure(QubitIdType, std::optional<int32_t>) -> Result {
     // Mid-circuit measurements are recorded into the OpenAPL JSON as MeasurePulse
     // entries (via __catalyst__oqd__measure_pulse).
     // The classical result returned here is a placeholder; actual measurement outcomes

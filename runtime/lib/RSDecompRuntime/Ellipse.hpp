@@ -52,8 +52,7 @@ struct GridOp {
     GridOp(const std::array<INT_TYPE, 2> &a_val, const std::array<INT_TYPE, 2> &b_val,
            const std::array<INT_TYPE, 2> &c_val, const std::array<INT_TYPE, 2> &d_val,
            bool check_valid = true)
-        : a(a_val), b(b_val), c(c_val), d(d_val)
-    {
+        : a(a_val), b(b_val), c(c_val), d(d_val) {
         if (check_valid) {
             RT_FAIL_IF((a[0] + b[0] + c[0] + d[0]) % 2 != 0,
                        "sum of a_0, b_0, c_0, d_0 must be even");
@@ -66,8 +65,7 @@ struct GridOp {
 
     GridOp() : a({1, 0}), b({0, 0}), c({0, 0}), d({1, 0}) {}
 
-    bool operator==(const GridOp &other) const
-    {
+    bool operator==(const GridOp &other) const {
         return a == other.a && b == other.b && c == other.c && d == other.d;
     }
 
@@ -78,8 +76,7 @@ struct GridOp {
      * @param other The other GridOp to multiply with.
      * @return The resulting GridOp after multiplication.
      */
-    GridOp operator*(const GridOp &other) const
-    {
+    GridOp operator*(const GridOp &other) const {
         return GridOp(
             {a[0] * other.a[0] + b[0] * other.c[0] + (a[1] * other.a[1] + b[1] * other.c[1]) / 2,
              a[0] * other.a[1] + a[1] * other.a[0] + b[0] * other.c[1] + b[1] * other.c[0]},
@@ -96,8 +93,7 @@ struct GridOp {
      * @param other The ZOmega element to multiply with.
      * @return The resulting ZOmega after multiplication.
      */
-    ZOmega operator*(const ZOmega &other) const
-    {
+    ZOmega operator*(const ZOmega &other) const {
         INT_TYPE x1 = other.d, y1 = other.b;
         INT_TYPE x2 = other.c - other.a, y2 = other.c + other.a;
         INT_TYPE a_ = a[0] * x2 + a[1] * x1 + b[0] * y2 + b[1] * y1;
@@ -111,8 +107,7 @@ struct GridOp {
      * @brief Computes the determinant of the GridOp.
      * @return The determinant a = A[0] + A[1]/sqrt(2)
      */
-    std::array<INT_TYPE, 2> determinant() const
-    {
+    std::array<INT_TYPE, 2> determinant() const {
         return {a[0] * d[0] - b[0] * c[0] + (a[1] * d[1] - b[1] * c[1]) / 2,
                 a[0] * d[1] - b[0] * c[1] + a[1] * d[0] - b[1] * c[0]};
     }
@@ -121,8 +116,7 @@ struct GridOp {
     /**
      * @brief Checks if the GridOp is a special grid operator. (Prop 5.13, arXiv:1403.2975)
      */
-    bool is_special() const
-    {
+    bool is_special() const {
         auto det = determinant();
         return det[1] == 0 && (det[0] == 1 || det[0] == -1);
     }
@@ -130,8 +124,7 @@ struct GridOp {
     /**
      * @brief Flattens the GridOp into a vector of doubles. (Lemma 5.11, arXiv:1403.2975)
      */
-    std::array<double, 4> flatten() const
-    {
+    std::array<double, 4> flatten() const {
         return {static_cast<double>(a[0]) + static_cast<double>(a[1]) / M_SQRT2,
                 static_cast<double>(b[0]) + static_cast<double>(b[1]) / M_SQRT2,
                 static_cast<double>(c[0]) + static_cast<double>(c[1]) / M_SQRT2,
@@ -141,8 +134,7 @@ struct GridOp {
     /**
      * @brief Computes the inverse of the GridOp.
      */
-    GridOp inverse() const
-    {
+    GridOp inverse() const {
         auto det = determinant();
         INT_TYPE det1 = det[0];
 
@@ -161,16 +153,14 @@ struct GridOp {
     /**
      * @brief Compute the sqrt(2)-conjugate of the grid operation.
      */
-    GridOp adj2() const
-    {
+    GridOp adj2() const {
         return GridOp({a[0], -a[1]}, {b[0], -b[1]}, {c[0], -c[1]}, {d[0], -d[1]});
     }
 
     /**
      * @brief Apply a shift operator to the grid operation based on (Lemma A.9, arXiv:1403.2975).
      */
-    GridOp apply_shift_op(INT_TYPE k) const
-    {
+    GridOp apply_shift_op(INT_TYPE k) const {
         INT_TYPE sign = (k < 0) ? -1 : 1;
         INT_TYPE k_abs = abs_val(k);
         auto s = ZSqrtTwo(1, 1).pow(k_abs);
@@ -190,8 +180,7 @@ struct GridOp {
  * @param s Supported string are: "I", "R", "A", "B", "K", "X", "Z". (Fig 6, arXiv:1403.2975).
  * @return The corresponding GridOp.
  */
-inline GridOp GridOp::from_string(std::string_view s)
-{
+inline GridOp GridOp::from_string(std::string_view s) {
     if (s.empty()) {
         return GridOp({1, 0}, {0, 0}, {0, 0}, {1, 0}); // Default I
     }
@@ -223,8 +212,7 @@ inline GridOp GridOp::from_string(std::string_view s)
  * @param n The exponent to raise the GridOp to.
  * @return The resulting GridOp after exponentiation.
  */
-inline GridOp GridOp::pow(INT_TYPE n) const
-{
+inline GridOp GridOp::pow(INT_TYPE n) const {
     if (*this == from_string("I") || n == 0) {
         return from_string("I");
     }
@@ -278,8 +266,7 @@ struct Ellipse {
      */
     Ellipse(const std::array<double, 3> &D = {1.0, 0.0, 1.0},
             const std::array<double, 2> &p_val = {0.0, 0.0})
-        : p(p_val)
-    {
+        : p(p_val) {
         a = D[0];
         b = D[1];
         d = D[2];
@@ -287,8 +274,7 @@ struct Ellipse {
         e = std::sqrt(a * d);
     }
 
-    bool operator==(const Ellipse &other) const
-    {
+    bool operator==(const Ellipse &other) const {
         return a == other.a && b == other.b && d == other.d && p == other.p;
     }
 
@@ -296,8 +282,7 @@ struct Ellipse {
      * @brief Create an ellipse that bounds the region u such that u.z >= 1 - ε^2 / 2,
         with u ∈ 1/√2^k * Z[ω]` and z = e^{-i*theta / 2}`. (Eq 14, arXiv:1403.2975)
      */
-    static Ellipse from_region(double theta, double epsilon, int k = 0)
-    {
+    static Ellipse from_region(double theta, double epsilon, int k = 0) {
         double t = epsilon * epsilon / 2.0;
         double scale = std::pow(2.0, static_cast<double>(k) / 2.0);
         double a_val = scale * t;
@@ -339,8 +324,7 @@ struct Ellipse {
     /**
      * @brief alculate the b value of the ellipse from its uprightness (Eq. 33, arXiv:1403.2975).
      */
-    static double b_from_uprightness(double up)
-    {
+    static double b_from_uprightness(double up) {
         double temp = M_PI / (4.0 * up);
         return std::sqrt(temp * temp - 1.0);
     }
@@ -348,8 +332,7 @@ struct Ellipse {
     /**
      * @brief Check if the point (x, y) is inside the ellipse.
      */
-    bool contains(double x, double y) const
-    {
+    bool contains(double x, double y) const {
         double x_ = x - p[0];
         double y_ = y - p[1];
         return (a * x_ * x_ + 2 * b * x_ * y_ + d * y_ * y_) <= 1.0;
@@ -358,8 +341,7 @@ struct Ellipse {
     /**
      * @brief Normalize the ellipse so that its determinant is 1.
      */
-    std::pair<Ellipse, double> normalize() const
-    {
+    std::pair<Ellipse, double> normalize() const {
         double s_val = 1.0 / std::sqrt(determinant());
         return {scale(s_val), s_val};
     }
@@ -367,8 +349,7 @@ struct Ellipse {
     /**
      * @brief Scale the ellipse by a factor of scale.
      */
-    Ellipse scale(double scale_factor) const
-    {
+    Ellipse scale(double scale_factor) const {
         std::array<double, 3> D = {a * scale_factor, b * scale_factor, d * scale_factor};
         return Ellipse(D, p);
     }
@@ -376,8 +357,7 @@ struct Ellipse {
     /**
      * @brief Compute the x-points of the ellipse for a given y-value.
      */
-    std::pair<double, double> x_points(double y) const
-    {
+    std::pair<double, double> x_points(double y) const {
         double y_shifted = y - p[1];
         double discriminant = y_shifted * y_shifted * (b * b - a * d) + a;
 
@@ -403,8 +383,7 @@ struct Ellipse {
     /**
      * @brief Compute the y-points of the ellipse for a given x-value.
      */
-    std::pair<double, double> y_points(double x) const
-    {
+    std::pair<double, double> y_points(double x) const {
         double x_shifted = x - p[0];
         double discriminant =
             (b * x_shifted) * (b * x_shifted) - d * (a * x_shifted * x_shifted - 1.0);
@@ -430,8 +409,7 @@ struct Ellipse {
     /**
      * @brief Compute the bounding box of the ellipse as {x_min, x_max, y_min, y_max}.
      */
-    std::array<double, 4> bounding_box() const
-    {
+    std::array<double, 4> bounding_box() const {
         double denom = determinant();
         double x_dim = std::sqrt(d / denom);
         double y_dim = std::sqrt(a / denom);
@@ -441,8 +419,7 @@ struct Ellipse {
     /**
      * @brief Return the ellipse shifted by the offset.
      */
-    Ellipse offset(double offset_val) const
-    {
+    Ellipse offset(double offset_val) const {
         std::array<double, 2> p_offset = {p[0] + offset_val, p[1] + offset_val};
         return Ellipse({a, b, d}, p_offset);
     }
@@ -450,8 +427,7 @@ struct Ellipse {
     /**
      * @brief Apply a grid operation G to the ellipse E as (G^T E G).
      */
-    Ellipse apply_grid_op(const GridOp &grid_op) const
-    {
+    Ellipse apply_grid_op(const GridOp &grid_op) const {
         const auto [ga, gb, gc, gd] = grid_op.flatten();
 
         std::array<double, 3> D = {ga * ga * a + 2 * ga * gc * b + d * gc * gc,
@@ -500,8 +476,7 @@ struct EllipseState {
      * @brief Calculate the special grid operation for the state for reducing the skew
      * (Lemma A.5 (Step Lemma), arXiv:1403.2975).
      */
-    GridOp skew_grid_op()
-    {
+    GridOp skew_grid_op() {
         GridOp grid_op = GridOp::from_string("I");
         EllipseState state = *this;
         double current_skew = state.skew();
@@ -521,8 +496,7 @@ struct EllipseState {
     /**
      * @brief Apply a shift operator to the state. (Definition A.6 and Lemma A.8 , arXiv:1403.2975).
      */
-    std::pair<EllipseState, INT_TYPE> apply_shift_op() const
-    {
+    std::pair<EllipseState, INT_TYPE> apply_shift_op() const {
         double k = std::floor((1.0 - bias()) / 2.0);
         double pk_pow = std::pow(LAMBDA_D, k);
         double nk_pow = std::pow(LAMBDA_D, -k);
@@ -543,8 +517,7 @@ struct EllipseState {
     /**
      * @brief Phase 1 for reduce_skew (Remark A.20, arXiv:1403.2975).
      */
-    GridOp reduce_skew_apply_symmetry_and_coarse_bias() const
-    {
+    GridOp reduce_skew_apply_symmetry_and_coarse_bias() const {
         GridOp op = GridOp::from_string("I");
         double sign = 1.0;
 
@@ -572,8 +545,7 @@ struct EllipseState {
      * - The GridOp applied (Z or X).
      * - The integer shift amount `k` (needed to adjust the final operator).
      */
-    std::pair<GridOp, INT_TYPE> reduce_skew_apply_shift_lemma(EllipseState &state) const
-    {
+    std::pair<GridOp, INT_TYPE> reduce_skew_apply_shift_lemma(EllipseState &state) const {
         INT_TYPE k = 0;
         GridOp op = GridOp::from_string("I");
 
@@ -603,8 +575,7 @@ struct EllipseState {
      *
      * Selects the specific grid operator (R, K, A, or B) to reduce the skew
      */
-    static GridOp reduce_skew_select_operator(const Ellipse &e1, const Ellipse &e2)
-    {
+    static GridOp reduce_skew_select_operator(const Ellipse &e1, const Ellipse &e2) {
         if (-0.8 <= e1.z && e1.z <= 0.8 && -0.8 <= e2.z && e2.z <= 0.8) {
             return GridOp::from_string("R");
         }
@@ -642,8 +613,7 @@ struct EllipseState {
      * 2. Applying the Shift Lemma.
      * 3. Applying the specific Geometric Lemma (R, K, A, B).
      */
-    std::pair<GridOp, EllipseState> reduce_skew()
-    {
+    std::pair<GridOp, EllipseState> reduce_skew() {
         RT_FAIL_IF(!e1.positive_semi_definite() || !e2.positive_semi_definite(),
                    "Ellipse is not positive semi-definite.");
 
@@ -672,24 +642,21 @@ struct EllipseState {
 /**
  * @brief Apply the grid operator to an ellipse (Lemma A.4, arXiv:1403.2975).
  */
-inline Ellipse GridOp::apply_to_ellipse(const Ellipse &ellipse) const
-{
+inline Ellipse GridOp::apply_to_ellipse(const Ellipse &ellipse) const {
     return ellipse.apply_grid_op(*this);
 }
 
 /**
  * @brief Apply the grid operator to a state (Lemma A.3, arXiv:1403.2975).
  */
-inline EllipseState GridOp::apply_to_state(const EllipseState &state) const
-{
+inline EllipseState GridOp::apply_to_state(const EllipseState &state) const {
     return state.apply_grid_op(*this);
 }
 
 /**
  * @brief Apply a grid operation G to the state (Definition A.3, arXiv:1403.2975).
  */
-inline EllipseState EllipseState::apply_grid_op(const GridOp &grid_op) const
-{
+inline EllipseState EllipseState::apply_grid_op(const GridOp &grid_op) const {
     return EllipseState(e1.apply_grid_op(grid_op), e2.apply_grid_op(grid_op.adj2()));
 }
 

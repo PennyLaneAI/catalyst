@@ -37,8 +37,7 @@ struct UnrollConditionalPPRPPMPass
     : impl::UnrollConditionalPPRPPMPassBase<UnrollConditionalPPRPPMPass> {
     using UnrollConditionalPPRPPMPassBase::UnrollConditionalPPRPPMPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         auto ctx = &getContext();
         auto module = getOperation();
 

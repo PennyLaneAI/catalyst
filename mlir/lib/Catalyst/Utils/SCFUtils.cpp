@@ -22,21 +22,18 @@ using namespace mlir;
 
 namespace catalyst {
 
-static int64_t getNumIterations(double lowerBound, double upperBound, double step)
-{
+static int64_t getNumIterations(double lowerBound, double upperBound, double step) {
     assert(upperBound >= lowerBound && step > 0);
     return std::ceil((upperBound - lowerBound) / step);
 }
 
-static int64_t getIntFromArithConstantOp(arith::ConstantOp op)
-{
+static int64_t getIntFromArithConstantOp(arith::ConstantOp op) {
     // The magical incantation to get a cpp integer from an arith.constant op
     assert(isa<IntegerAttr>(op.getValue()));
     return cast<IntegerAttr>(op.getValue()).getValue().getSExtValue();
 }
 
-template <typename OpTy> static bool hasAncestorOfType(Operation *op)
-{
+template <typename OpTy> static bool hasAncestorOfType(Operation *op) {
     return op->getParentOfType<OpTy>() != nullptr;
 }
 
@@ -52,8 +49,7 @@ bool isOpInWhileOp(Operation *op) { return hasAncestorOfType<scf::WhileOp>(op); 
 //
 // Note: if the input op is not inside any for loop operations,
 // this method returns 1, since there would be just one "iteration".
-int64_t countStaticForloopIterations(Operation *op)
-{
+int64_t countStaticForloopIterations(Operation *op) {
     assert(!isa<scf::ForOp>(op));
 
     int64_t count = 1;

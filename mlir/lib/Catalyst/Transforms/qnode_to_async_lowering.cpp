@@ -38,8 +38,7 @@ namespace catalyst {
 struct QnodeToAsyncLoweringPass : impl::QnodeToAsyncLoweringPassBase<QnodeToAsyncLoweringPass> {
     using QnodeToAsyncLoweringPassBase::QnodeToAsyncLoweringPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         LLVM_DEBUG(dbgs() << "qnode to async lowering pass"
                           << "\n");
 

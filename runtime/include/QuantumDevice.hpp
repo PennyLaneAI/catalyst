@@ -27,8 +27,7 @@
 // calling <CONSTRUCTOR>(kwargs). Check the Custom Devices guideline for details:
 // https://docs.pennylane.ai/projects/catalyst/en/stable/dev/custom_devices.html
 #define GENERATE_DEVICE_FACTORY(IDENTIFIER, CONSTRUCTOR)                                           \
-    extern "C" Catalyst::Runtime::QuantumDevice *IDENTIFIER##Factory(const char *kwargs)           \
-    {                                                                                              \
+    extern "C" Catalyst::Runtime::QuantumDevice *IDENTIFIER##Factory(const char *kwargs) {         \
         return new CONSTRUCTOR(std::string(kwargs));                                               \
     }
 
@@ -119,8 +118,7 @@ struct QuantumDevice {
      *
      * @return `QubitIdType` Qubit ID.
      */
-    virtual auto AllocateQubit() -> QubitIdType
-    {
+    virtual auto AllocateQubit() -> QubitIdType {
         RT_FAIL("Dynamic qubit allocation is unsupported by device");
     }
 
@@ -142,8 +140,7 @@ struct QuantumDevice {
      *
      * @param qubit ID of the qubit to release.
      */
-    virtual void ReleaseQubit(QubitIdType qubit)
-    {
+    virtual void ReleaseQubit(QubitIdType qubit) {
         RT_FAIL("Dynamic qubit release is unsupported by device");
     }
 
@@ -252,8 +249,7 @@ struct QuantumDevice {
     virtual void MatrixOperation(const std::vector<std::complex<double>> &matrix,
                                  const std::vector<QubitIdType> &wires, bool inverse = false,
                                  const std::vector<QubitIdType> &controlled_wires = {},
-                                 const std::vector<bool> &controlled_values = {})
-    {
+                                 const std::vector<bool> &controlled_values = {}) {
         RT_FAIL("MatrixOperation is unsupported by device");
     }
 
@@ -270,8 +266,7 @@ struct QuantumDevice {
      * @param n Bitstring representation of the basis state |n>, stored as a Byte-array.
      * @param wires The qubits to initialize.
      */
-    virtual void SetBasisState(DataView<int8_t, 1> &n, std::vector<QubitIdType> &wires)
-    {
+    virtual void SetBasisState(DataView<int8_t, 1> &n, std::vector<QubitIdType> &wires) {
         RT_FAIL("SetBasisState is unsupported by device");
     }
 
@@ -285,8 +280,8 @@ struct QuantumDevice {
      * @param state Quantum state vector of size 2^len(wires).
      * @param wires The qubits to initialize.
      */
-    virtual void SetState(DataView<std::complex<double>, 1> &state, std::vector<QubitIdType> &wires)
-    {
+    virtual void SetState(DataView<std::complex<double>, 1> &state,
+                          std::vector<QubitIdType> &wires) {
         RT_FAIL("SetState is unsupported by device");
     }
 
@@ -319,8 +314,7 @@ struct QuantumDevice {
      * @return `ObsIdType` ID of the constructed observable.
      */
     virtual auto Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
-                            const std::vector<QubitIdType> &wires) -> ObsIdType
-    {
+                            const std::vector<QubitIdType> &wires) -> ObsIdType {
         RT_FAIL("Observable is unsupported by device");
     }
 
@@ -337,8 +331,7 @@ struct QuantumDevice {
      *
      * @return `ObsIdType` ID of the constructed observable.
      */
-    virtual auto TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType
-    {
+    virtual auto TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType {
         RT_FAIL("TensorObservable is unsupported by device");
     }
 
@@ -357,8 +350,7 @@ struct QuantumDevice {
      * @return `ObsIdType` ID of the constructed observable.
      */
     virtual auto HamiltonianObservable(const std::vector<double> &coeffs,
-                                       const std::vector<ObsIdType> &obs) -> ObsIdType
-    {
+                                       const std::vector<ObsIdType> &obs) -> ObsIdType {
         RT_FAIL("HamiltonianObservable is unsupported by device");
     }
 
@@ -388,8 +380,7 @@ struct QuantumDevice {
      *
      * @param samples The pre-allocated buffer for the measurement samples.
      */
-    virtual void Sample(DataView<double, 2> &samples)
-    {
+    virtual void Sample(DataView<double, 2> &samples) {
         RT_FAIL("Sample is unsupported by device");
     }
 
@@ -401,8 +392,8 @@ struct QuantumDevice {
      * @param samples The pre-allocated buffer for the measurement samples.
      * @param wires Qubits to compute samples for.
      */
-    virtual void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires)
-    {
+    virtual void PartialSample(DataView<double, 2> &samples,
+                               const std::vector<QubitIdType> &wires) {
         RT_FAIL("PartialSample is unsupported by device");
     }
 
@@ -438,8 +429,7 @@ struct QuantumDevice {
      * @param eigvals The pre-allocated buffer for all measured states.
      * @param counts The pre-allocated buffer for all measured counts.
      */
-    virtual void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts)
-    {
+    virtual void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts) {
         RT_FAIL("Counts is unsupported by device");
     }
 
@@ -453,8 +443,7 @@ struct QuantumDevice {
      * @param wires Qubits to compute sample counts for.
      */
     virtual void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                               const std::vector<QubitIdType> &wires)
-    {
+                               const std::vector<QubitIdType> &wires) {
         RT_FAIL("PartialCounts is unsupported by device");
     }
 
@@ -479,8 +468,7 @@ struct QuantumDevice {
      * @param probs The pre-allocated buffer for the probabilities.
      * @param wires Qubits to compute probabilities for.
      */
-    virtual void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires)
-    {
+    virtual void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires) {
         RT_FAIL("PartialProbs is unsupported by device");
     }
     /**
@@ -526,8 +514,7 @@ struct QuantumDevice {
      *
      * @param state Pre-allocated buffer for the quantum state.
      */
-    virtual void State(DataView<std::complex<double>, 1> &state)
-    {
+    virtual void State(DataView<std::complex<double>, 1> &state) {
         RT_FAIL("State is unsupported by device");
     }
 
@@ -541,8 +528,7 @@ struct QuantumDevice {
      * @param wires The qubits to measure.
      */
     virtual auto PauliMeasure(const std::string &pauli_word, const std::vector<QubitIdType> &wires)
-        -> Result
-    {
+        -> Result {
         RT_FAIL("PauliMeasure is unsupported by device");
     }
 
@@ -575,8 +561,7 @@ struct QuantumDevice {
      *                    would be assumed trainable.
      */
     virtual void Gradient(std::vector<DataView<double, 1>> &gradients,
-                          const std::vector<size_t> &trainParams)
-    {
+                          const std::vector<size_t> &trainParams) {
         RT_FAIL("Differentiation is unsupported by device");
     }
 
