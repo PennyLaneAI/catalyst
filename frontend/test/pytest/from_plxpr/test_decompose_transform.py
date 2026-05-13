@@ -472,7 +472,7 @@ class TestGraphDecomposition:
             @qp.qjit
             @graph_decomposition(gate_set={qp.X})
             @qp.qnode(qp.device("lightning.qubit", wires=2))
-            def circuit(x: float, y: float):
+            def circuit(x: float, y: float):  # pylint: disable=unused-argument
                 qp.PauliRot(0.1, "ZZ", wires=[0, 1])
                 return qp.state()
 

@@ -764,10 +764,12 @@ class CondCallable:
         @property for CondCallable.operation
         """
         if self._operation is None:
-            raise AttributeError("""
+            raise AttributeError(
+                """
                 The cond() was not called (or has not been called) in a quantum context,
                 and thus has no associated quantum operation.
-                """)
+                """
+            )
         return self._operation
 
     def else_if(self, pred):
@@ -1011,10 +1013,12 @@ class ForLoopCallable:
         @property for ForLoopCallable.operation
         """
         if self._operation is None:
-            raise AttributeError("""
+            raise AttributeError(
+                """
                 The for_loop() was not called (or has not been called) in a quantum context,
                 and thus has no associated quantum operation.
-                """)
+                """
+            )
         return self._operation
 
     def _call_with_quantum_ctx(self, *init_state):
@@ -1419,10 +1423,12 @@ class WhileLoopCallable:
         @property for WhileLoopCallable.operation
         """
         if self._operation is None:
-            raise AttributeError("""
+            raise AttributeError(
+                """
                 The while_loop() was not called (or has not been called) in a quantum context,
                 and thus has no associated quantum operation.
-                """)
+                """
+            )
         return self._operation
 
     def _call_with_quantum_ctx(self, *init_state):
