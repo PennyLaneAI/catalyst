@@ -17,7 +17,7 @@
 
 include "mlir/Pass/PassBase.td"
 
-def QecPhysicalConversionPass : Pass<"convert-qecp-to-llvm"> {
+def QecPhysicalConversionPass : Pass<"convert-qecp-to-llvm", "mlir::ModuleOp"> {
     let summary = "Perform a dialect conversion from QecPhysical to LLVM.";
 
     let dependentDialects = [
