@@ -36,12 +36,17 @@
   Physical (`qecp`) dialect.
   [(#2776)](https://github.com/PennyLaneAI/catalyst/pull/2776)
 
+* Part of the new, experimental QEC pipeline, the `convert-qecp-to-llvm` compiler pass has been
+  added to lower operations and types in the QEC physical dialect to the LLVM dialect.
+  [(#2780)](https://github.com/PennyLaneAI/catalyst/pull/2780)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Joey Carter,
 Lillian Frederiksen,
 Mehrdad Malekmohammadi,
 Shuli Shu,
