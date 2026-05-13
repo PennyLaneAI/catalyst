@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import random
 import warnings
 from functools import partial
@@ -918,6 +919,26 @@ class TestDefaultAvailableIR:
         mlir_opt = f.mlir_opt
         assert mlir_opt
         assert not "__catalyst__qis__Hadamard" in mlir_opt
+
+    def test_mlir_opt_with_keep_intermediate(self, backend):
+        """Test that keep_intermediate with target='mlir' writes the initial IR and
+        pipeline output files into the workspace when mlir_opt is accessed."""
+
+        @qjit(target="mlir", keep_intermediate=True)
+        @qp.qnode(qp.device(backend, wires=1))
+        def circuit():
+            qp.H(0)
+            return qp.state()
+
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        circuit.use_cwd_for_workspace = False
+
+        _ = circuit.mlir_opt
+
+        workspace_files = os.listdir(str(circuit.workspace))
+        assert any(f.startswith("0_") and f.endswith(".mlir") for f in workspace_files)
+        assert any("After" in f and f.endswith(".mlir") for f in workspace_files)
+        circuit.workspace.cleanup()
 
     def test_jaxpr_target(self, backend):
         """Test no mlir is generated for jaxpr target."""
