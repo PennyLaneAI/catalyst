@@ -361,7 +361,6 @@ def compile_mlir(mlir_source, *, func_name, result_types, **options):
             The function must be annotated with ``{llvm.emit_c_interface}``.
         result_types (Sequence[jax.ShapeDtypeStruct]): Output tensor types, in order.
             Each element must have ``.shape`` (tuple of ints) and ``.dtype`` (numpy dtype).
-            Defaults to ``()`` for functions with no return values.
         **options: Any :class:`~catalyst.CompileOptions` keyword argument
 
     Returns:
