@@ -15,6 +15,7 @@
 #include <algorithm> // std::move_backward
 #include <variant>
 
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -25,8 +26,6 @@
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
-
-#include <llvm/ADT/SmallVector.h>
 
 using namespace mlir;
 using namespace catalyst::quantum;
