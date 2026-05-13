@@ -30,8 +30,8 @@ from xdsl.pattern_rewriter import (
     TypeConversionPattern,
     attr_type_rewrite_pattern,
 )
-from xdsl.ir import SSAValue
-from xdsl.dialects import arith, builtin
+from xdsl.ir import SSAValue, Attribute
+from xdsl.dialects import arith, builtin, func
 from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType
 from catalyst.python_interface.dialects import qecp, quantum
 from catalyst.python_interface.dialects.quantum.attributes import QubitType, QuregType
@@ -81,6 +81,14 @@ def _get_idx_value_or_attr_from_extract_or_insert_op(
         assert False, f"Both idx and idx_attr of op '{op}' are None"
 
     return idx
+
+
+def _convert_qecp_type(typ: Attribute) -> Attribute:
+    if isinstance(typ, qecp.PhysicalCodeblockType):
+        return quantum.QuregType()
+    if isinstance(typ, qecp.QecPhysicalQubitType):
+        return quantum.QubitType()
+    return typ
 
 
 # MARK: Type Conversion Pattern
@@ -209,6 +217,48 @@ class MeasureConversion(RewritePattern):
         rewriter.replace_op(op, measure_op)
 
 
+# MARK: Subroutine conversion patterns for encoder, decoder, qeccycle, and logical operations.
+# These patterns convert the signatures of subroutines and their call sites to replace
+# qecp.codeblock and qecp.qubit types with quantum.reg and quantum.bit types, respectively.
+
+
+@dataclass(frozen=True)
+class SubroutineSignatureConversion(RewritePattern):
+    """Op conversion pattern from subroutines with qecp.codeblock/qecp.qubit types."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: func.FuncOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering subroutines with qecp.codeblock/qecp.qubit types in their signatures."""
+        old_inputs = tuple(op.function_type.inputs.data)
+        old_outputs = tuple(op.function_type.outputs.data)
+        new_inputs = tuple(_convert_qecp_type(t) for t in old_inputs)
+        new_outputs = tuple(_convert_qecp_type(t) for t in old_outputs)
+        if new_inputs == old_inputs and new_outputs == old_outputs:
+            return
+        op.function_type = builtin.FunctionType.from_lists(
+            list(new_inputs),
+            list(new_outputs),
+        )
+
+        rewriter.notify_op_modified(op)
+
+
+@dataclass(frozen=True)
+class SubroutineCallOpSignatureConversion(RewritePattern):
+    """Op conversion pattern for calls to subroutines with qecp.codeblock/qecp.qubit types."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: func.CallOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering call ops with qecp.codeblock/qecp.qubit types in their operands or results."""
+
+        old_results = tuple(op.result_types)
+        new_results = tuple(_convert_qecp_type(t) for t in old_results)
+        if new_results == old_results:
+            return
+        new_call = func.CallOp(op.callee, op.arguments, new_results)
+        rewriter.replace_op(op, new_call)
+
+
 @dataclass(frozen=True)
 class ConvertQecPhysicalToQuantumPass(ModulePass):
     """
@@ -233,6 +283,8 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                     CliffordGateConversion(),
                     NoiseRotConversion(),
                     MeasureConversion(),
+                    SubroutineSignatureConversion(),
+                    SubroutineCallOpSignatureConversion(),
                 ]
             )
         ).rewrite_module(op)

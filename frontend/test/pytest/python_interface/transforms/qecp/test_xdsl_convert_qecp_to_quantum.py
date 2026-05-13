@@ -398,3 +398,65 @@ class TestGateConversion:
         }
         """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+
+class TestSubroutineConversion:
+    """Lowering of subroutine funcOp and call ops with qecp types to quantum types."""
+
+    def test_subroutine_qecp_codeblock_conversion(self, run_filecheck):
+        """A subroutine with qecp.codeblock types in its signature lowers to a quantum.reg type."""
+        program = """
+        builtin.module {
+        // CHECK-NOT: !qecp.codeblock
+        // CHECK-NOT: !qecp.qubit
+        // CHECK-LABEL: test_subroutine(%cb: !quantum.reg) -> !quantum.reg
+        func.func @test_subroutine(%cb: !qecp.codeblock<1 x 1>) -> !qecp.codeblock<1 x 1> {
+            // CHECK: [[q0:%.+]] = quantum.extract {{%.+}}[0] : !quantum.reg -> !quantum.bit
+            %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 1> -> !qecp.qubit<data>
+            // CHECK-NEXT: [[q1:%.+]] = quantum.custom "Hadamard"() [[q0:%.+]] : !quantum.bit
+            %q1 = qecp.hadamard %q0 : !qecp.qubit<data>
+            // CHECK-NEXT: [[cb1:%.+]] = quantum.insert {{%.+}}[0], [[q1:%.+]] : !quantum.reg, !quantum.bit
+            %cb1 = qecp.insert %cb[0], %q1 : !qecp.codeblock<1 x 1>, !qecp.qubit<data>
+            // CHECK-NEXT: [[cb1:%.+]] : !quantum.reg
+            return %cb1 : !qecp.codeblock<1 x 1>
+        }
+
+        // CHECK-LABEL: test_caller() -> !quantum.reg
+        func.func @test_caller() -> !qecp.codeblock<1 x 1> {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !quantum.reg
+            %cb0 = "test.op"() : () -> !qecp.codeblock<1 x 1>
+            // CHECK: [[cb1:%.+]] = func.call @test_subroutine([[cb0:%.+]]) : (!quantum.reg) -> !quantum.reg
+            %cb1 = func.call @test_subroutine(%cb0) : (!qecp.codeblock<1 x 1>) -> !qecp.codeblock<1 x 1>
+            return %cb1 : !qecp.codeblock<1 x 1>
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_subroutine_qecp_qubit_conversion(self, run_filecheck):
+        """A subroutine with qecp.qubit types in its signature lowers to quantum.bit types."""
+        program = """
+        builtin.module {
+        // CHECK-NOT: !qecp.codeblock
+        // CHECK-NOT: !qecp.qubit
+        // CHECK-LABEL: test_subroutine(%q: !quantum.bit) -> !quantum.bit
+        func.func @test_subroutine(%q: !qecp.qubit<data>) -> !qecp.qubit<data> {
+            // CHECK: [[q1:%.+]] = quantum.custom "Hadamard"() [[q:%.+]] : !quantum.bit
+            %q1 = qecp.hadamard %q : !qecp.qubit<data>
+            // CHECK-NEXT: [[q1:%.+]] : !quantum.bit
+            return %q1 : !qecp.qubit<data>
+        }
+        // CHECK-LABEL: test_caller() -> !quantum.bit
+        func.func @test_caller() -> !qecp.qubit<data> {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !quantum.reg
+            %cb0 = "test.op"() : () -> !qecp.codeblock<1 x 1>
+            // CHECK: [[q0:%.+]] = quantum.extract [[cb0:%.+]][0] : !quantum.reg -> !quantum.bit
+            %q0 = qecp.extract %cb0[0] : !qecp.codeblock<1 x 1> -> !qecp.qubit<data>
+            // CHECK: [[q1:%.+]] = func.call @test_subroutine([[q0:%.+]]) : (!quantum.bit) -> !quantum.bit
+            %q1 = func.call @test_subroutine(%q0) : (!qecp.qubit<data>) -> !qecp.qubit<data>
+            // CHECK-NEXT: [[q1:%.+]] : !quantum.bit
+            return %q1 : !qecp.qubit<data>
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
