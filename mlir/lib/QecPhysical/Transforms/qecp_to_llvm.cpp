@@ -34,7 +34,6 @@ using namespace catalyst::qecp;
 namespace catalyst {
 namespace qecp {
 
-#define GEN_PASS_DECL_QECPHYSICALCONVERSIONPASS
 #define GEN_PASS_DEF_QECPHYSICALCONVERSIONPASS
 #include "QecPhysical/Transforms/Passes.h.inc"
 

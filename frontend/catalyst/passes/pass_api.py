@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from copy import copy
+from functools import wraps
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import TypeAlias
@@ -190,7 +191,15 @@ def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valu
         raise FileNotFoundError(f"File '{path_to_plugin}' does not exist.")
 
     def decorator(obj):
-        return transform(pass_name=pass_name)(obj, *flags, **valued_options)
+        transformed = transform(pass_name=pass_name)(obj, *flags, **valued_options)
+
+        @wraps(transformed)
+        def wrapper(*args, **kwargs):
+            if EvaluationContext.is_tracing():
+                EvaluationContext.add_plugin(path_to_plugin)
+            return transformed(*args, **kwargs)
+
+        return wrapper
 
     return decorator
 

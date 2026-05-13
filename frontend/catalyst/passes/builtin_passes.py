@@ -268,7 +268,12 @@ diagonalize_measurements = qp.transform(
 
 
 def disentangle_cnot_setup_inputs():
-    r"""A peephole optimization for replacing ``CNOT`` gates with single-qubit gates.
+    r"""A relaxed peephole optimization for replacing ``CNOT`` gates with single-qubit gates.
+
+    The optimizations that this pass performs are found in
+    `arXiv:2012.07711 <https://arxiv.org/pdf/2012.07711>`_, specifically TABLE I. The patterns
+    therein represent functional equivalencies to applying a ``CNOT`` gate on certain two-qubit
+    input states.
 
     .. note::
 
@@ -327,8 +332,12 @@ disentangle_cnot = qp.transform(
 
 
 def disentangle_swap_setup_inputs():
-    r"""A peephole optimization for replacing ``SWAP`` gates with simpler gates (``PauliX`` and
-    ``CNOT``).
+    r"""A relaxed peephole optimization for replacing ``SWAP`` gates with single-qubit gates.
+
+    The optimizations that this pass performs are found in
+    `arXiv:2012.07711 <https://arxiv.org/pdf/2012.07711>`_, specifically TABLE VI. The patterns
+    therein represent functional equivalencies to applying a ``SWAP`` gate on certain two-qubit
+    input states.
 
     .. note::
 
@@ -505,13 +514,11 @@ def parity_synth_setup_inputs():
     .. code-block:: python
 
         import pennylane as qp
-        from catalyst.python_interface import Compiler
-        import catalyst
 
         dev = qp.device("lightning.qubit", wires=2)
 
         @qp.qjit(capture=True)
-        @catalyst.passes.parity_synth
+        @qp.transforms.parity_synth
         @qp.qnode(dev)
         def circuit(x: float, y: float, z: float):
             qp.CNOT((0, 1))
@@ -1821,8 +1828,10 @@ def graph_decomposition_setup_inputs(
         fn (QNode): the QNode to apply the graph decomposition compiler pass to.
         gate_set (Iterable[type | str] | dict[type | str, float]): the set of gates that are
             permissable after decomposition.
-        fixed_decomps (dict | None): map ops to decomps that will be forcibly applied.
-        alt_decomps (dict | None): map ops to lists of decomps that the graph system will consider.
+        fixed_decomps (dict | None): map operators to specific decomposition rules that will be applied if the
+                                     operators need to be decomposed (i.e. when they're not
+                                     in the target gate set).
+       alt_decomps (dict | None): map operators to lists of decomposition rules that the graph system will consider as alternative rules for operators.
 
     Returns:
         ~.QNode:
