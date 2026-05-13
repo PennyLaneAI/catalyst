@@ -128,7 +128,6 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         # post-processing calls will be injected at the same point for all MPs
         # adding calls starting with the final MP ensures call order matches MP order
         for mp_op in measurement_processes[::-1]:
-            print(mp_op.name)
             match mp_op.name:
                 case "quantum.expval":
                     self.expval_and_var_to_samples(mp_op, rewriter)
