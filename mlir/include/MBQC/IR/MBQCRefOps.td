@@ -17,7 +17,7 @@ include "QRef/IR/QRefTypes.td"
 def RefMeasureInBasisOp : MBQC_Op<"ref.measure_in_basis"> {
     let summary = "A parametric single-qubit projective measurement in an arbitrary basis.";
     let description = [{
-        Identical to mbqc.measure_in_basis operation, except in reference semantics.
+        Identical to the `mbqc.measure_in_basis` operation, except in reference semantics.
     }];
 
     let arguments = (ins
