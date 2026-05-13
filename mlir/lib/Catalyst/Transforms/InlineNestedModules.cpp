@@ -289,8 +289,8 @@ struct InlineNestedModule : public RewritePattern {
     LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) const override
     {
         bool isSymbolTable = op->hasTrait<OpTrait::SymbolTable>();
-        // TODO: isQnode
-        bool mustInline = isSymbolTable;
+        // Modules annotated with catalyst.target are compiled separately; skip inlining.
+        bool mustInline = isSymbolTable && !op->hasAttr("catalyst.target");
         if (!mustInline) {
             return failure();
         }
@@ -417,7 +417,8 @@ struct CleanupPattern : public RewritePattern {
     {
         bool hasQualifiedName = op->hasAttr(fullyQualifiedNameAttr);
         bool hasQNodeAttr = op->hasAttr(quantumNodeAttr);
-        if (!hasQualifiedName && !hasQNodeAttr) {
+        bool hasBeenRenamed = op->hasAttr(hasBeenRenamedAttrName);
+        if (!hasQualifiedName && !hasQNodeAttr && !hasBeenRenamed) {
             return failure();
         }
 
@@ -428,6 +429,9 @@ struct CleanupPattern : public RewritePattern {
             }
             if (hasQualifiedName) {
                 op->removeAttr(fullyQualifiedNameAttr);
+            }
+            if (hasBeenRenamed) {
+                op->removeAttr(hasBeenRenamedAttrName);
             }
         });
 
@@ -513,21 +517,49 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         }
 
         mlir::DenseMap<SymbolRefAttr, SymbolRefAttr> old_to_new;
-        for (auto &region : symbolTable->getRegions()) {
-            for (auto &block : region.getBlocks()) {
-                for (auto &op : block) {
-                    if (!isa<SymbolOpInterface>(op))
-                        continue;
-                    auto hasQualifiedName = op.hasAttr(fullyQualifiedNameAttr);
-                    if (!hasQualifiedName)
-                        continue;
-
-                    SymbolRefAttr old = op.getAttrOfType<SymbolRefAttr>(fullyQualifiedNameAttr);
-                    auto symbol = cast<SymbolOpInterface>(op);
-                    SymbolRefAttr _new = SymbolRefAttr::get(symbol);
-                    old_to_new.insert({old, _new});
-                }
+        bool emitDecls = _stopAfterStep >= 4 || _stopAfterStep == 0;
+        SmallVector<func::FuncOp> targetDeclarations;
+        llvm::SmallSet<StringRef, 8> rootSymbols;
+        if (emitDecls) {
+            for (Operation &rootOp : symbolTable->getRegion(0).front()) {
+                if (auto symbol = dyn_cast<SymbolOpInterface>(rootOp))
+                    rootSymbols.insert(symbol.getName());
             }
+        }
+
+        symbolTable->walk<WalkOrder::PreOrder>([&](Operation *nested) {
+            if (nested == symbolTable)
+                return WalkResult::advance();
+            // Recurse into target modules (not inlined); skip other nested modules (inlined).
+            if (auto mod = dyn_cast<ModuleOp>(nested))
+                return mod->hasAttr("catalyst.target") ? WalkResult::advance() : WalkResult::skip();
+            if (!isa<SymbolOpInterface>(nested) || !nested->hasAttr(fullyQualifiedNameAttr))
+                return WalkResult::advance();
+            SymbolRefAttr old = nested->getAttrOfType<SymbolRefAttr>(fullyQualifiedNameAttr);
+            SymbolRefAttr _new = SymbolRefAttr::get(cast<SymbolOpInterface>(nested));
+            old_to_new.insert({old, _new});
+            // For functions remaining inside a target module, emit an external declaration in
+            // the root so the flat call inserted by NestedToFlatCallPattern is visible.
+            if (emitDecls && isa<func::FuncOp>(nested) && nested->getParentOp() != symbolTable) {
+                auto func = cast<func::FuncOp>(nested);
+                StringRef name = func.getName();
+                if (!rootSymbols.insert(name).second)
+                    return WalkResult::advance();
+
+                auto decl = cast<func::FuncOp>(func->clone());
+                decl.eraseBody();
+                decl->removeAttr(fullyQualifiedNameAttr);
+                decl.setPrivate();
+                targetDeclarations.push_back(decl);
+            }
+            return WalkResult::advance();
+        });
+
+        if (!targetDeclarations.empty()) {
+            OpBuilder declBuilder(&symbolTable->getRegion(0).front(),
+                                  symbolTable->getRegion(0).front().begin());
+            for (func::FuncOp decl : targetDeclarations)
+                declBuilder.insert(decl);
         }
 
         RewritePatternSet nestedToFlat(context);
