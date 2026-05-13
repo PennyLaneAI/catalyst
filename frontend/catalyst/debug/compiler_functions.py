@@ -337,7 +337,7 @@ class CompiledMLIR:
 
 
 @debug_logger
-def compile_mlir(mlir_source, *, func_name, result_types=(), **options):
+def compile_mlir(mlir_source, *, func_name, result_types, **options):
     r"""Compile a standalone MLIR module and return a callable.
 
     Reads an MLIR module from a file path or a raw string, runs it through the full
