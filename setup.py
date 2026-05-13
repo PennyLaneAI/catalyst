@@ -107,7 +107,7 @@ jax_version = dep_versions.get("jax")
 pl_version = dep_versions.get("pennylane")
 lq_version = dep_versions.get("lightning")
 
-pl_min_release = "0.43.0"
+pl_min_release = "0.45.0"
 lq_min_release = pl_min_release
 
 if pl_version is not None:
@@ -128,7 +128,7 @@ requirements = [
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "numpy>2.0.0",
-    "scipy-openblas32>=0.3.26",  # symbol and library name
+    "scipy-openblas32>=0.3.26,!=0.3.33",  # symbol and library name
     "diastatic-malt==2.15.3",
     "xdsl==0.59.0",
     "xdsl-jax==0.5.0",
@@ -162,6 +162,7 @@ entry_points = {
         "decompose_arbitrary_ppr = catalyst.passes:decompose_arbitrary_ppr",
         "disentangle_swap = catalyst.passes:disentangle_swap",
         "disentangle_cnot = catalyst.passes:disentangle_cnot",
+        "parity_synth = catalyst.passes:parity_synth",
     ],
     "pennylane.drawer": [
         "draw_graph = catalyst:draw_graph",
