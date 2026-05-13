@@ -18,16 +18,23 @@ This module contains debug functions to interact with the compiler and compiled 
 
 import logging
 import os
+import pathlib
 import platform
 import re
 import shutil
 import subprocess
 
+from jax._src.lib.mlir import ir
+
 import catalyst
-from catalyst.compiler import LinkerDriver
+from catalyst.compiled_functions import CompiledFunction
+from catalyst.compiler import Compiler, LinkerDriver
 from catalyst.logging import debug_logger
+from catalyst.pipelines import CompileOptions
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args, promote_arguments
+from catalyst.utils.filesystem import WorkspaceManager
+from catalyst.utils.types import convert_numpy_dtype_to_mlir
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -55,16 +62,17 @@ def get_compilation_stage(fn, stage):
     .. note::
 
         In order to use this function, ``keep_intermediate=True`` must be
-        set in the :func:`~.qjit` decorator of the input function.
+        set in the :func:`~.qjit` decorator of the input function, or
+        passed to :func:`~.compile_mlir`.
 
     Args:
-        fn (QJIT): a qjit-decorated function
+        fn (QJIT | CompiledMLIR): a qjit-decorated function or a :func:`~.compile_mlir` result
         stage (str): string corresponding with the name of the stage to be printed
 
     Returns:
         str: output ir from the target compiler stage
 
-    .. seealso:: :doc:`/dev/debugging`, :func:`~.replace_ir`.
+    .. seealso:: :doc:`/dev/debugging`, :func:`~.replace_ir`, :func:`~.compile_mlir`.
 
     **Example**
 
@@ -92,8 +100,11 @@ def get_compilation_stage(fn, stage):
     """
     EvaluationContext.check_is_not_tracing("C interface cannot be generated from tracing context.")
 
-    if not isinstance(fn, catalyst.QJIT):
-        raise TypeError(f"First argument needs to be a 'QJIT' object, got a {type(fn)}.")
+    if not (hasattr(fn, "compiler") and hasattr(fn, "workspace")):
+        raise TypeError(
+            f"First argument needs to be a 'QJIT' object or 'CompiledMLIR' instance,"
+            f" got a {type(fn)}."
+        )
 
     return fn.compiler.get_output_of(stage, fn.workspace)
 
@@ -307,3 +318,93 @@ def compile_executable(fn, *args):
             )
 
     return output_file
+
+
+class CompiledMLIR:
+    """Thin wrapper around a compiled shared object returned by :func:`~.compile_mlir`.
+
+    Call it like a regular Python function to execute the compiled code.
+    Pass it to :func:`~.get_compilation_stage` to inspect intermediate IR.
+    """
+
+    def __init__(self, compiled_function, compiler, workspace):
+        self.compiled_function = compiled_function
+        self.compiler = compiler
+        self.workspace = workspace
+
+    def __call__(self, *args):
+        return self.compiled_function(*args)
+
+
+@debug_logger
+def compile_mlir(mlir_source, *, func_name, result_types=(), **options):
+    r"""Compile a standalone MLIR module and return a callable.
+
+    Reads an MLIR module from a file path or a raw string, runs it through the full
+    Catalyst compilation pipeline (``catalyst-cli``), and returns a :class:`CompiledMLIR`
+    object that can be called like a regular Python function.
+
+    Note that the MLIR module structure should adhere to the Catalyst runtime conventions.
+    Therefore the module must contain ``func.func @setup()`` and ``func.func @teardown()`` lifecycle
+    hooks that call ``quantum.init`` / ``quantum.finalize`` (required by the Catalyst runtime
+    even when no quantum device is used).
+
+    .. warning::
+
+        Input argument shapes and dtypes are not validated before compilation. Passing arguments
+        that do not match the compiled function's signature could produce incorrect results
+        or undefined behavior.
+
+    Args:
+        mlir_source (str | pathlib.Path): Path to a ``.mlir`` file, or the raw MLIR text.
+        func_name (str): Name of the entry-point function (without ``@``), e.g. ``"jit_my_func"``.
+            The function must be annotated with ``{llvm.emit_c_interface}``.
+        result_types (Sequence[jax.ShapeDtypeStruct]): Output tensor types, in order.
+            Each element must have ``.shape`` (tuple of ints) and ``.dtype`` (numpy dtype).
+            Defaults to ``()`` for functions with no return values.
+        **options: Any :class:`~catalyst.CompileOptions` keyword argument
+
+    Returns:
+        CompiledMLIR: A callable that accepts the same arguments as the compiled function
+
+    **Example**
+
+    .. code-block:: python
+
+        import numpy as np
+        import jax
+        from catalyst.debug import compile_mlir, get_compilation_stage
+
+        fn = compile_mlir(
+            "my_module.mlir",
+            func_name="jit_my_func",
+            result_types=[jax.ShapeDtypeStruct((), np.float64)],
+            keep_intermediate=True,
+        )
+
+        result = fn(np.float64(3.14))
+
+        print(get_compilation_stage(fn, "QuantumCompilationStage"))
+    """
+    if isinstance(mlir_source, pathlib.Path):
+        ir_text = mlir_source.read_text(encoding="utf-8")
+    else:
+        ir_text = mlir_source
+
+    compile_options = CompileOptions(**options)
+    keep = compile_options.keep_intermediate
+    preferred_dir = os.getcwd() if keep else None
+    workspace = WorkspaceManager.get_or_create_workspace(func_name, preferred_dir)
+
+    compiler = Compiler(options=compile_options)
+    shared_object, _ = compiler.run_from_ir(ir_text, func_name, workspace)
+
+    ctx = ir.Context()
+    with ctx, ir.Location.unknown():
+        restype = [
+            ir.RankedTensorType.get(list(s.shape), convert_numpy_dtype_to_mlir(s.dtype))
+            for s in result_types
+        ]
+
+    compiled_fn = CompiledFunction(shared_object, func_name, restype, None, compile_options)
+    return CompiledMLIR(compiled_fn, compiler, workspace)
