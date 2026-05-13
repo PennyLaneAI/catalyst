@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm> // std::move_backward
 #include <variant>
 
 #include "llvm/ADT/StringMap.h"
@@ -23,6 +24,9 @@
 #include "mlir/IR/ValueRange.h"
 
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/IR/QuantumTypes.h"
+
+#include <llvm/ADT/SmallVector.h>
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -175,65 +179,72 @@ class BaseSignatureAnalyzer {
         auto funcType = decompFunc.getFunctionType();
         auto funcInputs = funcType.getInputs();
 
+        SmallVector<Type> funcInputsNoQreg;
+        for (auto t : funcInputs) {
+            if (!isa<quantum::QuregType>(t)) {
+                funcInputsNoQreg.push_back(t);
+            }
+        }
+
         SmallVector<Value> operands(funcInputs.size());
 
+        auto qregIt = llvm::find_if(decompFunc.getFunctionType().getInputs(),
+                                    [](mlir::Type t) { return isa<quantum::QuregType>(t); });
+        int qregIdx = std::distance(decompFunc.getFunctionType().getInputs().begin(), qregIt);
+        bool hasQreg = (qregIt != decompFunc.getFunctionType().getInputs().end());
+
         int operandIdx = 0;
-        if (isa<quantum::QuregType>(funcInputs[0])) {
+        if (!signature.params.empty()) {
+            auto [startIdx, endIdx] =
+                findParamTypeRange(funcInputsNoQreg, signature.params.size(), operandIdx);
+            ArrayRef<Type> paramsTypes =
+                ArrayRef<Type>(funcInputsNoQreg).slice(startIdx, endIdx - startIdx);
+            auto updatedParams = generateParams(signature.params, paramsTypes, rewriter, loc);
+            for (Value param : updatedParams) {
+                operands[operandIdx++] = param;
+            }
+        }
+
+        if (hasQreg) {
+            for (const auto &indices : {signature.inWireIndices, signature.inCtrlWireIndices}) {
+                if (!indices.empty()) {
+                    operands[operandIdx] =
+                        fromTensorOrAsIs(indices, funcInputsNoQreg[operandIdx], rewriter, loc);
+                    operandIdx++;
+                }
+            }
+        }
+        else {
+            for (auto inQubit : signature.inQubits) {
+                operands[operandIdx] =
+                    fromTensorOrAsIs(inQubit, funcInputsNoQreg[operandIdx], rewriter, loc);
+                operandIdx++;
+            }
+
+            for (auto inCtrlQubit : signature.inCtrlQubits) {
+                operands[operandIdx] =
+                    fromTensorOrAsIs(inCtrlQubit, funcInputsNoQreg[operandIdx], rewriter, loc);
+                operandIdx++;
+            }
+        }
+
+        if (!signature.inCtrlValues.empty()) {
+            operands[operandIdx] = fromTensorOrAsIs(signature.inCtrlValues,
+                                                    funcInputsNoQreg[operandIdx], rewriter, loc);
+            operandIdx++;
+        }
+
+        if (hasQreg) {
             Value updatedQreg = getUpdatedQreg(rewriter, loc);
+
             for (auto [i, qubit] : llvm::enumerate(signature.inQubits)) {
                 const QubitIndex &index = signature.inWireIndices[i];
                 updatedQreg =
                     quantum::InsertOp::create(rewriter, loc, updatedQreg.getType(), updatedQreg,
                                               index.getValue(), index.getAttr(), qubit);
             }
-            operands[operandIdx++] = updatedQreg;
-
-            if (!signature.params.empty()) {
-                auto [startIdx, endIdx] =
-                    findParamTypeRange(funcInputs, signature.params.size(), operandIdx);
-                ArrayRef<Type> paramsTypes = funcInputs.slice(startIdx, endIdx - startIdx);
-                auto updatedParams = generateParams(signature.params, paramsTypes, rewriter, loc);
-                for (Value param : updatedParams) {
-                    operands[operandIdx++] = param;
-                }
-            }
-
-            for (const auto &indices : {signature.inWireIndices, signature.inCtrlWireIndices}) {
-                if (!indices.empty()) {
-                    operands[operandIdx] =
-                        fromTensorOrAsIs(indices, funcInputs[operandIdx], rewriter, loc);
-                    operandIdx++;
-                }
-            }
-        }
-        else {
-            if (!signature.params.empty()) {
-                auto [startIdx, endIdx] =
-                    findParamTypeRange(funcInputs, signature.params.size(), operandIdx);
-                ArrayRef<Type> paramsTypes = funcInputs.slice(startIdx, endIdx - startIdx);
-                auto updatedParams = generateParams(signature.params, paramsTypes, rewriter, loc);
-                for (Value param : updatedParams) {
-                    operands[operandIdx++] = param;
-                }
-            }
-
-            for (auto inQubit : signature.inQubits) {
-                operands[operandIdx] =
-                    fromTensorOrAsIs(inQubit, funcInputs[operandIdx], rewriter, loc);
-                operandIdx++;
-            }
-
-            for (auto inCtrlQubit : signature.inCtrlQubits) {
-                operands[operandIdx] =
-                    fromTensorOrAsIs(inCtrlQubit, funcInputs[operandIdx], rewriter, loc);
-                operandIdx++;
-            }
-        }
-
-        if (!signature.inCtrlValues.empty()) {
-            operands[operandIdx] =
-                fromTensorOrAsIs(signature.inCtrlValues, funcInputs[operandIdx], rewriter, loc);
-            operandIdx++;
+            std::move_backward(operands.begin() + qregIdx, operands.end() - 1, operands.end());
+            operands[qregIdx] = updatedQreg;
         }
 
         return operands;
@@ -346,8 +357,9 @@ class BaseSignatureAnalyzer {
 
     void initializeQregMode(mlir::Operation *op, bool enableQregMode)
     {
-        if (!enableQregMode || !op)
+        if (!enableQregMode || !op) {
             return;
+        }
 
         // input wire indices
         for (mlir::Value qubit : signature.inQubits) {

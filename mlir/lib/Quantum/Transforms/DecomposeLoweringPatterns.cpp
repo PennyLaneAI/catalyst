@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Quantum/IR/QuantumTypes.h"
 #define DEBUG_TYPE "decompose-lowering"
 
 #include "llvm/ADT/StringMap.h"
@@ -69,7 +70,8 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
 
         rewriter.setInsertionPointAfter(op);
 
-        auto enableQreg = isa<quantum::QuregType>(decompFunc.getFunctionType().getInput(0));
+        auto enableQreg = llvm::any_of(decompFunc.getFunctionType().getInputs(),
+                                       [](mlir::Type t) { return isa<quantum::QuregType>(t); });
         auto analyzer = CustomOpSignatureAnalyzer(op, enableQreg);
         assert(analyzer && "Analyzer should be valid");
 
@@ -132,7 +134,8 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
 
         rewriter.setInsertionPointAfter(op);
 
-        auto enableQreg = isa<quantum::QuregType>(decompFunc.getFunctionType().getInput(0));
+        auto enableQreg = llvm::any_of(decompFunc.getFunctionType().getInputs(),
+                                       [](mlir::Type t) { return isa<quantum::QuregType>(t); });
         auto numQbitsAttr = decompFunc->getAttrOfType<IntegerAttr>("num_wires");
         if (!numQbitsAttr) {
             op.emitError("Decomposition function missing 'num_wires' attribute");
