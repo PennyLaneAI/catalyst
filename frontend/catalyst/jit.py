@@ -664,8 +664,16 @@ class QJIT(CatalystCallable):
             print_generic_op_form=using_python_compiler,
             enable_debug_info=self.compile_options.use_nameloc,
         )
+        if self.compile_options.keep_intermediate and self.workspace:
+            module_name = str(self.mlir_module.operation.attributes["sym_name"]).replace('"', "")
+            initial_ir_file = os.path.join(str(self.workspace), f"0_{module_name}.mlir")
+            with open(initial_ir_file, "w", encoding="utf-8") as f:
+                f.write(self.mlir)
         return to_mlir_opt(
-            stdin=stdin, options=self.compile_options, using_python_compiler=using_python_compiler
+            stdin=stdin,
+            options=self.compile_options,
+            using_python_compiler=using_python_compiler,
+            workspace=self.workspace,
         )
 
     @debug_logger
