@@ -53,10 +53,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     {
         ModuleOp module = getOperation();
 
-        PassManager pm1(&getContext());
+        OpPassManager pm1("builtin.module");
         pm1.addPass(createInstantiateDecompRulesPass());
 
-        if (failed(pm1.run(module))) {
+        if (failed(runPipeline(pm1, module))) {
             return signalPassFailure();
         }
 
@@ -128,10 +128,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 4: Run decompose-lowering to apply the decomposition rules
-        PassManager pm2(&getContext());
+        OpPassManager pm2("builtin.module");
         pm2.addPass(createDecomposeLoweringPass());
 
-        if (failed(pm2.run(module))) {
+        if (failed(runPipeline(pm2, module))) {
             return signalPassFailure();
         }
 
