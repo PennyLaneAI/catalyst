@@ -30,7 +30,6 @@ from xdsl.pattern_rewriter import (
     TypeConversionPattern,
     attr_type_rewrite_pattern,
 )
-from xdsl.rewriter import InsertPoint
 from xdsl.ir import SSAValue
 from xdsl.dialects import arith, builtin
 from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType
@@ -137,6 +136,8 @@ class DeallocAuxQubitConversion(RewritePattern):
 
 
 # MARK: Data qubit extract and insertion patterns
+
+
 @dataclass(frozen=True)
 class ExtractQubitConversion(RewritePattern):
     """Op conversion pattern from qecp.extract -> quantum.extract."""
