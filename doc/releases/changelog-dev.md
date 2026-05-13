@@ -8,6 +8,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
+  argument is at an arbitrary position in the argument list.
+  [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
@@ -20,17 +24,21 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Update RC nightly builds to read version number from the `_version.py` file 
+* Update RC nightly builds to read version number from the `_version.py` file
   [(#2797)](https://github.com/PennyLaneAI/catalyst/pull/2797)
 
 * Fix build failures when using clang with GCC ≤ 13 libstdc++ by replacing
   `std::views::filter`/`std::views::transform` with `std::copy_if`/`std::transform`
   [(#2801)](https://github.com/PennyLaneAI/catalyst/pull/2801)
 
-* The experimental compiler pass `convert-qecl-to-qecp` has been extended to lower 
-  transversal gate operations from the QEC Logical (`qecl`) dialect into the QEC 
+* The experimental compiler pass `convert-qecl-to-qecp` has been extended to lower
+  transversal gate operations from the QEC Logical (`qecl`) dialect into the QEC
   Physical (`qecp`) dialect.
   [(#2776)](https://github.com/PennyLaneAI/catalyst/pull/2776)
+
+* Part of the new, experimental QEC pipeline, the `convert-qecp-to-llvm` compiler pass has been
+  added to lower operations and types in the QEC physical dialect to the LLVM dialect.
+  [(#2780)](https://github.com/PennyLaneAI/catalyst/pull/2780)
 
 <h3>Documentation 📝</h3>
 
@@ -38,6 +46,8 @@
 
 This release contains contributions from (in alphabetical order):
 
+Joey Carter,
 Lillian Frederiksen,
 Mehrdad Malekmohammadi,
 Shuli Shu,
+Paul Haochen Wang.
