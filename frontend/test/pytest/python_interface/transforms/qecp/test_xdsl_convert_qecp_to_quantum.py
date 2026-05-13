@@ -152,4 +152,3 @@ class TestQecPhysicalQubitTypeConversionPatternUnit:
         out = pattern.convert_type(qecp.QecPhysicalQubitType(role))
         assert isinstance(out, QubitType)
         assert out == QubitType()
-
