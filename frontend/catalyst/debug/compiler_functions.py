@@ -100,7 +100,7 @@ def get_compilation_stage(fn, stage):
     """
     EvaluationContext.check_is_not_tracing("C interface cannot be generated from tracing context.")
 
-    if not (hasattr(fn, "compiler") and hasattr(fn, "workspace")):
+    if not isinstance(fn, (catalyst.QJIT, CompiledMLIR)):
         raise TypeError(
             f"First argument needs to be a 'QJIT' object or 'CompiledMLIR' instance,"
             f" got a {type(fn)}."
