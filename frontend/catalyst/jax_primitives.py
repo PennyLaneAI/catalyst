@@ -75,6 +75,7 @@ with Patcher(
         AssertionOp,
         CallbackCallOp,
         CallbackOp,
+        CustomCallOp,
         PrintOp,
     )
     from mlir_quantum.dialects.gradient import (
@@ -356,6 +357,8 @@ measure_in_basis_p = Primitive("measure_in_basis")
 measure_in_basis_p.multiple_results = True
 decomprule_p = core.Primitive("decomposition_rule")
 decomprule_p.multiple_results = True
+runtime_call_p = Primitive("runtime_call")
+runtime_call_p.multiple_results = True
 
 
 def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None, op_type=None):
@@ -551,6 +554,52 @@ def _python_callback_lowering(
         CustomGradOp(symbol_attr, fwd_sym_attr, rev_sym_attr)
 
     return retval
+
+
+#
+# runtime_call
+#
+@runtime_call_p.def_abstract_eval
+def _runtime_call_abstract_eval(*avals, kernel_descriptor):
+    """Infer output shapes/dtypes from the kernel descriptor."""
+    return tuple(
+        core.ShapedArray(shape, np.dtype(dtype_str))
+        for shape, dtype_str in kernel_descriptor.output_spec
+    )
+
+
+@runtime_call_p.def_impl
+def _runtime_call_impl(*args, **kwargs):  # pragma: no cover
+    raise NotImplementedError()
+
+
+_RUNTIME_ARTIFACTS_ATTR = "catalyst.runtime_artifacts"
+
+
+def _record_runtime_artifact(module_op, artifact_path):
+    """Append `artifact_path` to the module's `catalyst.runtime_artifacts` attr."""
+    attrs = module_op.attributes
+    existing = (
+        [ir.StringAttr(a).value for a in attrs[_RUNTIME_ARTIFACTS_ATTR]]
+        if _RUNTIME_ARTIFACTS_ATTR in attrs
+        else []
+    )
+    if artifact_path in existing:
+        return
+    existing.append(artifact_path)
+    attrs[_RUNTIME_ARTIFACTS_ATTR] = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in existing])
+
+
+def _runtime_call_lowering(jax_ctx: mlir.LoweringRuleContext, *args, kernel_descriptor):
+    """Lower runtime_call to catalyst.custom_call and record the artifact on the enclosing module.
+    The artifact path is written as a catalyst.runtime_artifacts ArrayAttr on calling module.
+    """
+    results_ty = list(convert_shaped_arrays_to_tensors(jax_ctx.avals_out))
+    call_op = CustomCallOp(results_ty, list(args), kernel_descriptor.name)
+
+    _record_runtime_artifact(jax_ctx.module_context.module.operation, kernel_descriptor.artifact)
+
+    return call_op.results
 
 
 #
@@ -3100,6 +3149,7 @@ CUSTOM_LOWERING_RULES = (
     (print_p, _print_lowering),
     (assert_p, _assert_lowering),
     (python_callback_p, _python_callback_lowering),
+    (runtime_call_p, _runtime_call_lowering),
     (value_and_grad_p, _value_and_grad_lowering),
     (set_state_p, _set_state_lowering),
     (set_basis_state_p, _set_basis_state_lowering),
