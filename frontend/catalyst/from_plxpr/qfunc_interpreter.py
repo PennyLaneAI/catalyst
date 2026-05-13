@@ -51,7 +51,6 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_unitary_p,
 )
 from catalyst.jax_primitives import (
-    AbstractQbit,
     MeasurementPlane,
     counts_p,
     decomprule_p,
@@ -69,8 +68,6 @@ from catalyst.jax_primitives import (
 from catalyst.utils.exceptions import CompileError
 
 from .qubit_handler import (
-    QubitHandler,
-    QubitIndexRecorder,
     get_in_qubit_values,
 )
 
@@ -487,49 +484,24 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
     Transform a quantum decomposition rule from PLxPR into JAXPR with quantum primitives.
     """
     if is_qreg:
-        self.init_qreg.insert_all_dangling_qubits()
 
-        def wrapper(qreg, *args):
-            # Launch a new interpreter for the new subroutine region
-            # A new interpreter's root qreg value needs a new recorder
+        def wrapper(global_qreg, *args):
             converter = copy(self)
-            converter.qubit_index_recorder = QubitIndexRecorder()
-            init_qreg = QubitHandler(qreg, converter.qubit_index_recorder)
-            converter.init_qreg = init_qreg
-
+            converter.init_qreg = global_qreg
             converter(func_jaxpr, *args)
-            converter.init_qreg.insert_all_dangling_qubits()
-            return converter.init_qreg.get()
 
         converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(
-            self.init_qreg.get(), *func_jaxpr.in_avals
+            self.init_qreg, *func_jaxpr.in_avals
         )
     else:
 
         def wrapper(*args):
-            # Launch a new interpreter for the new subroutine region
-            # A new interpreter's root qreg value needs a new recorder
-
-            # TODO: it is a bit messy that the qubit mode of decompositions,
-            # which just needs to keep track of a list of explicit qubit's latest SSA values,
-            # is going through the entire qreg value mapping infra.
-            # Two bitter things here are that:
-            #   - qubit lists do not need a recorder (they don't need to remember which qubits
-            #     belong to which qregs)
-            #   - the qubit list object needs to piggy-back off the `init_qreg` attribute of the
-            #     interpreter, which is a wrong name for this case
-            # We should refactor the QubitHandler object into a qubit mode object and a qreg
-            # mode object.
-
             converter = copy(self)
-            qubit_handler = QubitHandler(args[num_params:], recorder=None)
-            converter.init_qreg = qubit_handler
-
+            converter.init_qreg = self.init_qreg
             converter(func_jaxpr, *args)
-            return converter.init_qreg.get()
 
         new_in_avals = func_jaxpr.in_avals[:num_params] + [
-            AbstractQbit() for _ in func_jaxpr.in_avals[num_params:]
+            QrefQubit() for _ in func_jaxpr.in_avals[num_params:]
         ]
         converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(*new_in_avals)
 
