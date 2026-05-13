@@ -8,6 +8,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* A new `catalyst.debug.compile_mlir` function has been added, allowing standalone MLIR files to be
+  compiled through the full Catalyst pipeline and returned as a callable Python object.
+  [(#2832)](https://github.com/PennyLaneAI/catalyst/pull/2832)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
@@ -31,4 +35,5 @@
 This release contains contributions from (in alphabetical order):
 
 Lillian Frederiksen,
+Mehrdad Malekmohammadi,
 Shuli Shu,
