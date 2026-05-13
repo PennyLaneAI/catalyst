@@ -691,7 +691,7 @@ class TestCompileMLIR:
           func.func @teardown() { quantum.finalize return }
         }
         """
-        fn = compile_mlir(no_return_mlir, func_name="jit_noop")
+        fn = compile_mlir(no_return_mlir, func_name="jit_noop", result_types=())
         fn()
 
     def test_ranked_tensor(self):
