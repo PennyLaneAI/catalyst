@@ -156,7 +156,7 @@ class InsertQubitConversion(RewritePattern):
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecp.InsertQubitOp, rewriter: PatternRewriter):
-        """Op conversion rewrite pattern for lowering ops that insert a data qubit into a quantum.reg."""
+        """Op conversion rewrite pattern for lowering ops for data qubit insertion."""
         idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
         insert_op = quantum.InsertOp(op.in_codeblock, idx=idx, qubit=op.qubit)
         rewriter.replace_op(op, insert_op)
@@ -166,7 +166,7 @@ class InsertQubitConversion(RewritePattern):
 
 
 @dataclass(frozen=True)
-class GateConversion(RewritePattern):
+class CliffordGateConversion(RewritePattern):
     """Op conversion pattern from qecp.gate -> quantum.gate."""
 
     @op_type_rewrite_pattern
@@ -184,7 +184,8 @@ class GateConversion(RewritePattern):
 
 @dataclass(frozen=True)
 class NoiseRotConversion(RewritePattern):
-    """Op conversion pattern from qecp.noise_rot_c -> quantum.noise_rot_c."""
+    """Op conversion pattern from qecp.rot -> quantum.custom. Note that this pattern is for validation purposes
+    only and is separated from the general GateConversion pattern."""
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecp.RotOp, rewriter: PatternRewriter):
@@ -229,7 +230,7 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                     DeallocAuxQubitConversion(),
                     InsertQubitConversion(),
                     ExtractQubitConversion(),
-                    GateConversion(),
+                    CliffordGateConversion(),
                     NoiseRotConversion(),
                     MeasureConversion(),
                 ]
