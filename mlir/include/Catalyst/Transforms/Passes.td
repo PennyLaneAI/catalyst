@@ -143,6 +143,49 @@ def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
     let summary = "Apply the passes scheduled with the transform dialect.";
 }
 
+def CrossCompileRemoteKernelsPass : Pass<"cross-compile-remote-kernels", "mlir::ModuleOp"> {
+    let summary = "Cross-compile each `qnode` to a `.o` and stash the path on the host call sites.";
+    let description = [{
+        For every `func.func` in the host module carrying the `qnode` attribute, this pass:
+        1. Clones the func into a standalone module.
+        2. Sanitizes it for lowering to LLVM IR and emits the `.o` to `<workspace>/<name>.o`.
+        3. Marks every `func.call` targeting the qnode with `catalyst.remote_kernel_path`
+           holding the absolute path of the produced `.o`.
+    }];
+
+    let dependentDialects = [
+        "mlir::LLVM::LLVMDialect",
+        "mlir::func::FuncDialect",
+    ];
+
+    let options = [
+        Option<
+            /*C++ var name=*/"workspace",
+            /*CLI arg name=*/"workspace",
+            /*type=*/"std::string",
+            /*default=*/"\"\"",
+            /*description=*/
+            "Filesystem directory to write cross-compiled `.o` files into."
+        >,
+        Option<
+            /*C++ var name=*/"target",
+            /*CLI arg name=*/"target",
+            /*type=*/"std::string",
+            /*default=*/"\"x86_64\"",
+            /*description=*/
+            "LLVM target triple used for object emission."
+        >,
+        Option<
+            /*C++ var name=*/"address",
+            /*CLI arg name=*/"address",
+            /*type=*/"std::string",
+            /*default=*/"\"\"",
+            /*description=*/
+            "Executor's TCP `host:port` address for remote dispatch."
+        >
+    ];
+}
+
 def InlineNestedModulePass : Pass<"inline-nested-module"> {
     let summary = "Inline nested modules with qnode attribute.";
 
