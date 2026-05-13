@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Quantum/IR/QuantumTypes.h"
 #define DEBUG_TYPE "decompose-lowering"
 
 #include "llvm/ADT/StringMap.h"
@@ -23,6 +22,7 @@
 
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/IR/QuantumTypes.h"
 
 #include "DecomposeLoweringImpl.hpp"
 
