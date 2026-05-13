@@ -14,6 +14,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where using `keep_intermediate=True` with `target="mlir"` resulted in an empty workspace
+  folder being created and the files printed outside in the main directory.
+  [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
+
 <h3>Internal changes ⚙️</h3>
 
 * Update RC nightly builds to read version number from the `_version.py` file 
