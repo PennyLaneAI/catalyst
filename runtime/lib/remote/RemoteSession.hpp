@@ -33,6 +33,10 @@ int load_object_path(RemoteSession *s, const char *path);
 // Load an asset file into the remote JIT. Returns 0 on success, -1 on error.
 int load_asset_path(RemoteSession *s, const char *path);
 
+// Generic ORC wrapper-function call by symbol name. Returns 0 on success, -1 on error.
+int call_wrapper_raw(RemoteSession *s, const char *sym, const char *args_buf, size_t args_size,
+                     char **out_buf, size_t *out_size);
+
 // Look up a symbol address on the remote. Returns 0 on error.
 uint64_t lookup(RemoteSession *s, const char *name);
 

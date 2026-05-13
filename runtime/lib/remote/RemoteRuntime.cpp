@@ -164,6 +164,66 @@ int __catalyst__remote__send_binary(const char *addr, const char *path, uint32_t
     return 0;
 }
 
+/**
+ * @brief Generic ORC wrapper-function call by symbol name. Returns 0 on success, -1 on error.
+ * 
+ * @param addr The address of the remote session.
+ * @param symbol The symbol of the function to call.
+ * @param args_buf The buffer of the arguments.
+ * @param args_size The size of the arguments.
+ * @param out_buf The buffer of the result.
+ * @param out_size The size of the result.
+ * @return int 0 on success, -1 on error.
+ */
+int __catalyst__remote__call_wrapper(const char *addr, const char *symbol, const char *args_buf,
+                                     size_t args_size, void **out_buf, size_t *out_size)
+{
+    if (out_buf) {
+        *out_buf = nullptr;
+    }
+    if (out_size) {
+        *out_size = 0;
+    }
+    RemoteEntry *entry = find_or_create_entry(addr, /*create_if_missing=*/false);
+    if (!entry) {
+        set_remote_runtime_error("No session found, call __catalyst__remote__open first.");
+        return -1;
+    }
+    std::lock_guard<std::mutex> lock(entry->mu);
+    if (!entry->session) {
+        set_remote_runtime_error("Session is closed");
+        return -1;
+    }
+    if (!symbol || !*symbol) {
+        set_remote_runtime_error("Empty symbol passed to __catalyst__remote__call_wrapper");
+        return -1;
+    }
+    if (remote_verbose()) {
+        std::fprintf(stderr, "[remote] call_wrapper(addr=%s, sym=%s, in_size=%zu)\n", addr, symbol,
+                     args_size);
+    }
+    char *buf = nullptr;
+    size_t n = 0;
+    int rc = catalyst::remote::call_wrapper_raw(entry->session, symbol, args_buf, args_size, &buf,
+                                                &n);
+    if (rc != 0) {
+        set_remote_runtime_error(catalyst::remote::last_error());
+        return -1;
+    }
+    if (out_buf) {
+        *out_buf = buf;
+    }
+    else {
+        std::free(buf); // caller didn't want the bytes back
+    }
+    if (out_size) {
+        *out_size = n;
+    }
+    return 0;
+}
+
+void __catalyst__remote__free_result(void *buf) { std::free(buf); }
+
 int __catalyst__remote__close()
 {
     std::lock_guard<std::mutex> mapLock(g_map_mu);

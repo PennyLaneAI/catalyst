@@ -399,8 +399,10 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
     LogicalResult matchAndRewrite(CustomCallOp op, CustomCallOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        // Remote-dispatch custom_calls are lowered by RemoteCustomCallOpPattern below.
-        if (op.getCallTargetName() == "remote_call") {
+        // Remote-dispatch custom_calls are lowered by their own dedicated patterns below.
+        StringRef name = op.getCallTargetName();
+        if (name == "remote_call" || name == "remote_lib_call" || name == "remote_open" ||
+            name == "remote_send_binary") {
             return failure();
         }
         MLIRContext *ctx = op.getContext();
@@ -534,14 +536,9 @@ struct RemoteCustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         }
 
         auto addrAttr = op->getAttrOfType<StringAttr>("catalyst.remote_address");
-        auto pathAttr = op->getAttrOfType<StringAttr>("catalyst.remote_kernel_path");
         auto calleeAttr = op->getAttrOfType<StringAttr>("catalyst.remote_kernel_callee");
         if (!addrAttr) {
             llvm::errs() << "remote_call custom_call is missing `catalyst.remote_address`\n";
-            return failure();
-        }
-        if (!pathAttr) {
-            llvm::errs() << "remote_call custom_call is missing `catalyst.remote_kernel_path`\n";
             return failure();
         }
         if (!calleeAttr) {
@@ -556,33 +553,16 @@ struct RemoteCustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         Type voidTy = LLVM::LLVMVoidType::get(ctx);
         ModuleOp mod = op->getParentOfType<ModuleOp>();
 
-        // Declare extern runtime entry points
-        Type openSig = LLVM::LLVMFunctionType::get(i64Ty, {ptrTy});
-        LLVM::LLVMFuncOp openFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
-            rewriter, op, "__catalyst__remote__open", openSig);
-
-        Type i32Ty = rewriter.getI32Type();
-        Type sendBinSig = LLVM::LLVMFunctionType::get(i64Ty, {ptrTy, ptrTy, i32Ty});
-        LLVM::LLVMFuncOp sendBinFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
-            rewriter, op, "__catalyst__remote__send_binary", sendBinSig);
-
+        // Declare extern runtime entry points.
         Type launchSig = LLVM::LLVMFunctionType::get(
             voidTy, {ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy});
         LLVM::LLVMFuncOp launchFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, "__catalyst__remote__launch", launchSig);
 
-        // Open + send_binary
+        // We need the address string globally so the launch knows which session to dispatch to.
         std::string callee = calleeAttr.getValue().str();
-        std::string addrKey = "remote_addr_" + callee;
-        std::string pathKey = "remote_path_" + callee;
-        Value addrPtr =
-            getGlobalString(loc, rewriter, addrKey, addrAttr.getValue().str() + '\0', mod);
-        Value pathPtr =
-            getGlobalString(loc, rewriter, pathKey, pathAttr.getValue().str() + '\0', mod);
-        
-        Value formatTag = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI32IntegerAttr(0));
-        LLVM::CallOp::create(rewriter, loc, openFn, ValueRange{addrPtr});
-        LLVM::CallOp::create(rewriter, loc, sendBinFn, ValueRange{addrPtr, pathPtr, formatTag});
+        Value addrPtr = getGlobalString(loc, rewriter, "remote_addr_" + callee,
+                                        addrAttr.getValue().str() + '\0', mod);
 
         // Get a global string for the symbol name "_catalyst_pyface_<callee>"
         std::string symbolName = "_catalyst_pyface_" + callee;
@@ -646,6 +626,219 @@ struct RemoteCustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
 
         rewriter.replaceOp(op, results);
         return success();
+    }
+};
+
+// Rewrite the `catalyst.custom_call fn("remote_open")` op to `__catalyst__remote__open(addr)`.
+struct RemoteOpenOpPattern : public OpConversionPattern<CustomCallOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(CustomCallOp op, CustomCallOpAdaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        if (op.getCallTargetName() != "remote_open") {
+            return failure();
+        }
+        auto addrAttr = op->getAttrOfType<StringAttr>("catalyst.remote_address");
+        if (!addrAttr) {
+            return op->emitOpError("remote_open call is missing `catalyst.remote_address`");
+        }
+
+        Location loc = op.getLoc();
+        MLIRContext *ctx = rewriter.getContext();
+        Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+        Type i64Ty = rewriter.getI64Type();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+
+        Type openSig = LLVM::LLVMFunctionType::get(i64Ty, {ptrTy});
+        LLVM::LLVMFuncOp openFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__remote__open", openSig);
+
+        Value addrPtr = getGlobalString(loc, rewriter, "remote_setup_addr",
+                                        addrAttr.getValue().str() + '\0', mod);
+
+        LLVM::CallOp::create(rewriter, loc, openFn, ValueRange{addrPtr});
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+// Rewrite the `catalyst.custom_call fn("remote_send_binary")` op to
+// `__catalyst__remote__send_binary(addr, path)`.
+struct RemoteSendBinaryOpPattern : public OpConversionPattern<CustomCallOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(CustomCallOp op, CustomCallOpAdaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        if (op.getCallTargetName() != "remote_send_binary") {
+            return failure();
+        }
+        auto addrAttr = op->getAttrOfType<StringAttr>("catalyst.remote_address");
+        auto pathAttr = op->getAttrOfType<StringAttr>("catalyst.remote_kernel_path");
+        auto calleeAttr = op->getAttrOfType<StringAttr>("catalyst.remote_kernel_callee");
+        if (!addrAttr) {
+            return op->emitOpError("remote_send_binary call is missing `catalyst.remote_address`");
+        }
+        if (!pathAttr) {
+            return op->emitOpError(
+                "remote_send_binary call is missing `catalyst.remote_kernel_path`");
+        }
+        if (!calleeAttr) {
+            return op->emitOpError(
+                "remote_send_binary call is missing `catalyst.remote_kernel_callee`");
+        }
+
+        Location loc = op.getLoc();
+        MLIRContext *ctx = rewriter.getContext();
+        Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+        Type i32Ty = rewriter.getI32Type();
+        Type i64Ty = rewriter.getI64Type();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+
+        Type sendBinSig = LLVM::LLVMFunctionType::get(i64Ty, {ptrTy, ptrTy, i32Ty});
+        LLVM::LLVMFuncOp sendBinFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__remote__send_binary", sendBinSig);
+
+        std::string callee = calleeAttr.getValue().str();
+        Value addrPtr = getGlobalString(loc, rewriter, "remote_addr_" + callee,
+                                        addrAttr.getValue().str() + '\0', mod);
+        Value pathPtr = getGlobalString(loc, rewriter, "remote_path_" + callee,
+                                        pathAttr.getValue().str() + '\0', mod);
+
+        // TODO: Hardcoded format tag for now. (0 as object)
+        Value formatTag = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI32IntegerAttr(0));
+
+        LLVM::CallOp::create(rewriter, loc, sendBinFn, ValueRange{addrPtr, pathPtr, formatTag});
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+// Rewrite the `catalyst.custom_call fn("remote_lib_call")` op to
+// `__catalyst__remote__call_wrapper(addr, sym, args_buf, args_size, &out, &out_size)`.
+struct RemoteLibCallOpPattern : public OpConversionPattern<CustomCallOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(CustomCallOp op, CustomCallOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        if (op.getCallTargetName() != "remote_lib_call") {
+            return failure();
+        }
+
+        auto addrAttr = op->getAttrOfType<StringAttr>("catalyst.remote_address");
+        auto symAttr = op->getAttrOfType<StringAttr>("catalyst.remote_lib_symbol");
+        if (!addrAttr) {
+            return op->emitOpError("remote_lib_call is missing `catalyst.remote_address`");
+        }
+        if (!symAttr) {
+            return op->emitOpError("remote_lib_call is missing `catalyst.remote_lib_symbol`");
+        }
+        std::string sym = symAttr.getValue().str();
+
+        Location loc = op.getLoc();
+        MLIRContext *ctx = rewriter.getContext();
+        Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+        Type i32Ty = rewriter.getI32Type();
+        Type i64Ty = rewriter.getI64Type();
+        Type voidTy = LLVM::LLVMVoidType::get(ctx);
+        Type i8Ty = rewriter.getI8Type();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+
+        // Declare extern runtime entry points.
+        Type callSig =
+            LLVM::LLVMFunctionType::get(i32Ty, {ptrTy, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy});
+        LLVM::LLVMFuncOp callFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__remote__call_wrapper", callSig);
+        Type freeSig = LLVM::LLVMFunctionType::get(voidTy, {ptrTy});
+        LLVM::LLVMFuncOp freeFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__remote__free_result", freeSig);
+
+        SmallVector<int64_t> offsets;
+        int64_t totalSize = 0;
+        for (Type ty : op.getOperandTypes()) {
+            int64_t n = primitiveByteSize(ty);
+            if (n < 0) {
+                return op->emitOpError("unsupported arg type for remote_lib_call: ")
+                       << ty << " (supports int/float/index/complex only)";
+            }
+            offsets.push_back(totalSize);
+            totalSize += n;
+        }
+
+        Type bufTy = LLVM::LLVMArrayType::get(i8Ty, totalSize > 0 ? totalSize : 1);
+
+        // Symbols
+        Value addrPtr = getGlobalString(loc, rewriter, "remote_lib_addr_" + sym,
+                                        addrAttr.getValue().str() + '\0', mod);
+        Value symPtr = getGlobalString(loc, rewriter, "remote_lib_sym_" + sym, sym + '\0', mod);
+
+        // Alloca args buffer + store each arg.
+        Value argsBuf = getStaticAlloca(loc, rewriter, bufTy, 1);
+        for (auto [llvmVal, off] : llvm::zip(adaptor.getOperands(), offsets)) {
+            Value slot = LLVM::GEPOp::create(rewriter, loc, ptrTy, bufTy, argsBuf,
+                                             ArrayRef<LLVM::GEPArg>{0, static_cast<int32_t>(off)},
+                                             LLVM::GEPNoWrapFlags::inbounds);
+            LLVM::StoreOp::create(rewriter, loc, llvmVal, slot);
+        }
+        Value argsSize =
+            LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(totalSize));
+
+        // Alloca result buffer + size.
+        Value outBufSlot = getStaticAlloca(loc, rewriter, ptrTy, 1);
+        Value outSizeSlot = getStaticAlloca(loc, rewriter, i64Ty, 1);
+
+        // Call the runtime.
+        LLVM::CallOp::create(
+            rewriter, loc, callFn,
+            ValueRange{addrPtr, symPtr, argsBuf, argsSize, outBufSlot, outSizeSlot});
+
+        // Decode return value (if any).
+        SmallVector<Value> returns;
+        Value outBuf;
+        if (!op.getResultTypes().empty()) {
+            if (op.getResultTypes().size() != 1) {
+                return op->emitOpError("remote_lib_call supports at most one result");
+            }
+            Type retTy = op.getResultTypes().front();
+            if (primitiveByteSize(retTy) < 0) {
+                return op->emitOpError("unsupported return type for remote_lib_call: ") << retTy;
+            }
+            Type retLLVMTy = getTypeConverter()->convertType(retTy);
+            outBuf = LLVM::LoadOp::create(rewriter, loc, ptrTy, outBufSlot);
+            Value rv = LLVM::LoadOp::create(rewriter, loc, retLLVMTy, outBuf);
+            returns.push_back(rv);
+        }
+        else {
+            outBuf = LLVM::LoadOp::create(rewriter, loc, ptrTy, outBufSlot);
+        }
+
+        // Release the runtime-allocated result buffer.
+        LLVM::CallOp::create(rewriter, loc, freeFn, ValueRange{outBuf});
+
+        rewriter.replaceOp(op, returns);
+        return success();
+    }
+
+  private:
+    // Supported scalar byte sizes. Returns -1 for unsupported types.
+    static int64_t primitiveByteSize(Type ty)
+    {
+        if (auto i = dyn_cast<IntegerType>(ty)) {
+            return (i.getWidth() + 7) / 8;
+        }
+        if (auto f = dyn_cast<FloatType>(ty)) {
+            return (f.getWidth() + 7) / 8;
+        }
+        if (isa<IndexType>(ty)) {
+            return 8;
+        }
+        if (auto c = dyn_cast<ComplexType>(ty)) {
+            int64_t inner = primitiveByteSize(c.getElementType());
+            return inner < 0 ? -1 : 2 * inner;
+        }
+        return -1;
     }
 };
 
@@ -802,6 +995,9 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
         RewritePatternSet patterns(context);
         patterns.add<CustomCallOpPattern>(typeConverter, context);
         patterns.add<RemoteCustomCallOpPattern>(typeConverter, context);
+        patterns.add<RemoteOpenOpPattern>(typeConverter, context);
+        patterns.add<RemoteSendBinaryOpPattern>(typeConverter, context);
+        patterns.add<RemoteLibCallOpPattern>(typeConverter, context);
         patterns.add<PrintOpPattern>(typeConverter, context);
         patterns.add<AssertionOpPattern>(typeConverter, context);
         patterns.add<DefineCallbackOpPattern>(typeConverter, context);

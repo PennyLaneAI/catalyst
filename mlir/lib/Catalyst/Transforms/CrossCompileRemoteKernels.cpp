@@ -111,11 +111,71 @@ struct CrossCompileRemoteKernelsPass
         llvm::InitializeAllAsmParsers();
         llvm::InitializeAllAsmPrinters();
 
+        injectRemoteOpenIntoSetup(host);
+
         for (auto qnode : qnodes) {
             if (failed(compileQNode(host, qnode))) {
                 return signalPassFailure();
             }
         }
+
+        attachAddressToPluginCalls(host);
+    }
+
+    // For each `catalyst.custom_call fn("remote_lib_call")`,
+    // attach the executor's `catalyst.remote_address` for remote library calls.
+    void attachAddressToPluginCalls(ModuleOp host)
+    {
+        auto addressAttr = StringAttr::get(&getContext(), address);
+        host.walk([&](catalyst::CustomCallOp call) {
+            if (call.getCallTargetName() == "remote_lib_call") {
+                call->setAttr("catalyst.remote_address", addressAttr);
+            }
+        });
+    }
+
+    // Insert `__catalyst__remote__open(addr)` into the host's `setup` function exactly once.
+    void injectRemoteOpenIntoSetup(ModuleOp host)
+    {
+        auto setupFn = host.lookupSymbol<func::FuncOp>("setup");
+        if (!setupFn || setupFn.getBody().empty()) {
+            return;
+        }
+        Block &setupBody = setupFn.getBody().front();
+        Operation *terminator = setupBody.getTerminator();
+        if (!terminator) {
+            return;
+        }
+        OpBuilder b(terminator);
+        Location loc = setupFn.getLoc();
+        auto openOp = catalyst::CustomCallOp::create(
+            b, loc, /*resultTypes=*/TypeRange{}, /*inputs=*/ValueRange{},
+            /*call_target_name=*/"remote_open", /*number_original_arg=*/nullptr);
+        openOp->setAttr("catalyst.remote_address", StringAttr::get(&getContext(), address));
+    }
+
+    // Insert `__catalyst__remote__send_binary(addr, path)` into the host's `setup` function.
+    void injectRemoteSendBinaryIntoSetup(ModuleOp host, StringAttr addressAttr, StringAttr pathAttr,
+                                         StringAttr calleeAttr)
+    {
+        auto setupFn = host.lookupSymbol<func::FuncOp>("setup");
+        if (!setupFn || setupFn.getBody().empty()) {
+            return;
+        }
+        Block &setupBody = setupFn.getBody().front();
+        Operation *terminator = setupBody.getTerminator();
+        if (!terminator) {
+            return;
+        }
+        OpBuilder b(terminator);
+        Location loc = setupFn.getLoc();
+        auto sendOp = catalyst::CustomCallOp::create(b, loc, /*resultTypes=*/TypeRange{},
+                                                     /*inputs=*/ValueRange{},
+                                                     /*call_target_name=*/"remote_send_binary",
+                                                     /*number_original_arg=*/nullptr);
+        sendOp->setAttr("catalyst.remote_address", addressAttr);
+        sendOp->setAttr("catalyst.remote_kernel_path", pathAttr);
+        sendOp->setAttr("catalyst.remote_kernel_callee", calleeAttr);
     }
 
     /**
@@ -276,6 +336,9 @@ struct CrossCompileRemoteKernelsPass
             call.replaceAllUsesWith(custom.getResults());
             call.erase();
         }
+
+        // Inject binary send into setup function.
+        injectRemoteSendBinaryIntoSetup(host, addressAttr, pathAttr, calleeAttr);
 
         qnode.erase();
         return success();

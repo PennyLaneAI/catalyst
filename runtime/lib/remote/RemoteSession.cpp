@@ -456,6 +456,50 @@ int load_asset_path(RemoteSession *s, const char *path)
 }
 
 /**
+ * @brief Generic raw ORC wrapper-function call. Looks `sym` up on the executor, invokes its wrapper
+ * with `(args_buf, args_size)`, and copies the resulting byte buffer into a `out_buf` with the size
+ * of `out_size`. The caller is responsible for `free()` the result buffer.
+ *
+ * @param s The session object.
+ * @param sym The symbol of the function to call.
+ * @param args_buf The buffer of the arguments.
+ * @param args_size The size of the arguments.
+ * @param out_buf The buffer of the result.
+ * @param out_size The size of the result.
+ * @return int 0 on success, -1 on error.
+ */
+int call_wrapper_raw(RemoteSession *s, const char *sym, const char *args_buf, size_t args_size,
+                     char **out_buf, size_t *out_size)
+{
+    clear_error();
+    *out_buf = nullptr;
+    *out_size = 0;
+    try {
+        ExecutorAddr fn = s->lookupSym(sym);
+        if (!fn) {
+            throw std::runtime_error(std::string("symbol not found: ") + sym);
+        }
+        auto result = s->getEPC().callWrapper(fn, ArrayRef<char>(args_buf, args_size));
+        size_t n = result.size();
+        char *buf = nullptr;
+        if (n > 0) {
+            buf = static_cast<char *>(std::malloc(n));
+            if (!buf) {
+                throw std::runtime_error("malloc failed for wrapper result");
+            }
+            std::memcpy(buf, result.data(), n);
+        }
+        *out_buf = buf;
+        *out_size = n;
+        return 0;
+    }
+    catch (const std::exception &e) {
+        set_error(e.what());
+        return -1;
+    }
+}
+
+/**
  * @brief Lookup the address of a symbol in the remote device.
  *
  * @param s the session object

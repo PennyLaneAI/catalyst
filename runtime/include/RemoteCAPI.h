@@ -17,6 +17,7 @@
 #define REMOTECAPI_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,6 +33,10 @@ void __catalyst__remote__launch(const char *addr, const char *entry_symbol, size
                                 const size_t *input_elem_sizes, size_t num_outputs,
                                 void *const *output_descs, const size_t *output_ranks,
                                 const size_t *output_elem_sizes);
+int __catalyst__remote__call_wrapper(const char *addr, const char *symbol, const char *args_buf,
+                                     size_t args_size, void **out_buf, size_t *out_size);
+void __catalyst__remote__free_result(void *buf);
+
 int __catalyst__remote__close();
 const char *__catalyst__remote__last_error();
 
