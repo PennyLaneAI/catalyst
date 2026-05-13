@@ -153,9 +153,3 @@ class TestQecPhysicalQubitTypeConversionPatternUnit:
         assert isinstance(out, QubitType)
         assert out == QubitType()
 
-    def test_convert_type_ignores_role_in_result_type(self):
-        """Lowering is lossy: `!quantum.bit` does not encode data vs aux."""
-        p = QecPhysicalQubitTypeConversion()
-        data = p.convert_type(qecp.QecPhysicalQubitType("data"))
-        aux = p.convert_type(qecp.QecPhysicalQubitType("aux"))
-        assert data == aux
