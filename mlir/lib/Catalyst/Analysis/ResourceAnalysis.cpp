@@ -559,9 +559,6 @@ const ResourceResult *ResourceAnalysis::getFlattenedResource(StringRef funcName)
     flat.deviceName = r.deviceName;
     flat.isQnode = r.isQnode;
 
-    // Any var_function_calls implies a dynamic loop with no static count.
-    flat.hasDynLoop = flat.hasDynLoop || !r.varFunctionCalls.empty();
-
     // Pull in each direct callee's flattened counts, × how often we call it.
     for (const auto &fc : r.functionCalls) {
         const ResourceResult *child = getFlattenedResource(fc.getKey());
