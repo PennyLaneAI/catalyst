@@ -20,24 +20,24 @@ This module contains the implementation of the xDSL convert-qecp-to-quantum dial
 from dataclasses import dataclass
 
 from xdsl.context import Context
+from xdsl.dialects import builtin, func
+from xdsl.ir import Attribute
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
     PatternRewriter,
     PatternRewriteWalker,
     RewritePattern,
-    op_type_rewrite_pattern,
     TypeConversionPattern,
     attr_type_rewrite_pattern,
+    op_type_rewrite_pattern,
 )
-from xdsl.ir import SSAValue, Attribute
-from xdsl.dialects import arith, builtin, func
-from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType
+
 from catalyst.python_interface.dialects import qecp, quantum
 from catalyst.python_interface.dialects.quantum.attributes import QubitType, QuregType
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 
-from typing import cast
+from ..qecl.convert_quantum_to_qecl import _get_idx_value_or_attr_from_extract_or_insert_op
 
 _QECP_GATENAMES_TO_QUANTUM_OPS = {
     "qecp.hadamard": "Hadamard",
@@ -50,41 +50,8 @@ _QECP_GATENAMES_TO_QUANTUM_OPS = {
 }
 
 
-def _get_idx_value_or_attr_from_extract_or_insert_op(
-    op: quantum.ExtractOp | quantum.InsertOp, rewriter: PatternRewriter
-) -> IntegerAttr | SSAValue[IndexType]:
-    """TODO: We need to move this helper function to a utility module
-    Helper function to get the index value 'idx' or attribute 'idx_attr' from a `quantum.extract`
-    or `quantum.insert` op.
-
-    If the index value has type IntegerType, an `arith.cast_index` op is inserted to cast it to type
-    IndexType. We must cast such values because `qecl.extract_block` ops expect an idx operand of
-    type IndexType.
-    """
-    if op.idx is not None:
-        if isinstance(op.idx.type, IndexType):
-            idx = cast(SSAValue[IndexType], op.idx)
-        elif isinstance(op.idx.type, IntegerType):
-            # Insert cast operation integer -> index
-            index_cast_op = arith.IndexCastOp(op.idx, IndexType())
-            rewriter.insert_op(index_cast_op)
-            idx = cast(SSAValue[IndexType], index_cast_op.result)
-        else:
-            assert False, (
-                f"Expected idx value '{op.idx}' to have type 'IndexType' or 'IntegerType', "
-                f"but got {op.idx.type}"
-            )
-
-    elif op.idx_attr is not None:
-        idx = op.idx_attr
-
-    else:
-        assert False, f"Both idx and idx_attr of op '{op}' are None"
-
-    return idx
-
-
 def _convert_qecp_type(typ: Attribute) -> Attribute:
+    """Helper function to convert qecp types to quantum types."""
     if isinstance(typ, qecp.PhysicalCodeblockType):
         return quantum.QuregType()
     if isinstance(typ, qecp.QecPhysicalQubitType):
@@ -94,10 +61,9 @@ def _convert_qecp_type(typ: Attribute) -> Attribute:
 
 # MARK: Type Conversion Pattern
 
-
 @dataclass
 class PhysicalCodeblockTypeConversion(TypeConversionPattern):
-    """Codeblock type conversion pattern from qecp.codeblock -> quantum.reg."""
+    """Codeblock type conversion pattern from qecp.codeblock to quantum.reg."""
 
     @attr_type_rewrite_pattern
     def convert_type(
@@ -110,7 +76,7 @@ class PhysicalCodeblockTypeConversion(TypeConversionPattern):
 
 @dataclass
 class QecPhysicalQubitTypeConversion(TypeConversionPattern):
-    """Qubit type conversion pattern from qecp.qubit -> quantum.bit."""
+    """Qubit type conversion pattern from qecp.qubit to quantum.bit."""
 
     @attr_type_rewrite_pattern
     def convert_type(
@@ -153,7 +119,8 @@ class ExtractQubitConversion(RewritePattern):
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecp.ExtractQubitOp, rewriter: PatternRewriter):
-        """Op conversion rewrite pattern for lowering ops that extract a data qubit from a quantum.reg."""
+        """Op conversion rewrite pattern for lowering ops that extract a data qubit from a
+        quantum.reg."""
         idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
 
         rewriter.replace_op(op, quantum.ExtractOp(op.codeblock, idx=idx))
@@ -193,12 +160,13 @@ class CliffordGateConversion(RewritePattern):
 
 @dataclass(frozen=True)
 class NoiseRotConversion(RewritePattern):
-    """Op conversion pattern from qecp.rot to quantum.custom. Note that this pattern is for validation purposes
-    only and is separated from the general GateConversion pattern."""
+    """Op conversion pattern from qecp.rot to quantum.custom. Note that this pattern is for
+    validation purposes only and is separated from the general GateConversion pattern."""
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecp.RotOp, rewriter: PatternRewriter):
-        """Op conversion rewrite pattern for lowering noise rotation ops to quantum.custom "Rot" ops."""
+        """Op conversion rewrite pattern for lowering noise rotation ops to quantum.custom
+        "Rot" ops."""
         gate_name = "Rot"
         params = (op.phi, op.theta, op.omega)
         gate_op = quantum.CustomOp(
@@ -213,7 +181,8 @@ class MeasureConversion(RewritePattern):
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecp.MeasureOp, rewriter: PatternRewriter):
-        """Op conversion rewrite pattern for lowering measurement ops in qecp to quantum.measure ops."""
+        """Op conversion rewrite pattern for lowering measurement ops in qecp to
+        quantum.measure ops."""
         measure_op = quantum.MeasureOp(in_qubit=op.operands[0])
         rewriter.replace_op(op, measure_op)
 
