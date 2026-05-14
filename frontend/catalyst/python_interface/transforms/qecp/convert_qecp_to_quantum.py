@@ -18,12 +18,9 @@ This module contains the implementation of the xDSL convert-qecp-to-quantum dial
 """
 
 from dataclasses import dataclass
-from typing import cast
 
 from xdsl.context import Context
-from xdsl.dialects import arith, builtin
-from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType
-from xdsl.ir import SSAValue
+from xdsl.dialects import builtin
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
@@ -39,6 +36,8 @@ from catalyst.python_interface.dialects import qecp, quantum
 from catalyst.python_interface.dialects.quantum.attributes import QubitType, QuregType
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 
+from ..qecl.convert_quantum_to_qecl import _get_idx_value_or_attr_from_extract_or_insert_op
+
 _QECP_GATENAMES_TO_QUANTUM_OPS = {
     "qecp.hadamard": "Hadamard",
     "qecp.identity": "Identity",
@@ -48,40 +47,6 @@ _QECP_GATENAMES_TO_QUANTUM_OPS = {
     "qecp.z": "PauliZ",
     "qecp.cnot": "CNOT",
 }
-
-
-def _get_idx_value_or_attr_from_extract_or_insert_op(
-    op: quantum.ExtractOp | quantum.InsertOp, rewriter: PatternRewriter
-) -> IntegerAttr | SSAValue[IndexType]:
-    """TODO: We need to move this helper function to a utility module
-    Helper function to get the index value 'idx' or attribute 'idx_attr' from a `quantum.extract`
-    or `quantum.insert` op.
-
-    If the index value has type IntegerType, an `arith.cast_index` op is inserted to cast it to type
-    IndexType. We must cast such values because `qecl.extract_block` ops expect an idx operand of
-    type IndexType.
-    """
-    if op.idx is not None:
-        if isinstance(op.idx.type, IndexType):
-            idx = cast(SSAValue[IndexType], op.idx)
-        elif isinstance(op.idx.type, IntegerType):
-            # Insert cast operation integer -> index
-            index_cast_op = arith.IndexCastOp(op.idx, IndexType())
-            rewriter.insert_op(index_cast_op)
-            idx = cast(SSAValue[IndexType], index_cast_op.result)
-        else:
-            assert False, (
-                f"Expected idx value '{op.idx}' to have type 'IndexType' or 'IntegerType', "
-                f"but got {op.idx.type}"
-            )
-
-    elif op.idx_attr is not None:
-        idx = op.idx_attr
-
-    else:
-        assert False, f"Both idx and idx_attr of op '{op}' are None"
-
-    return idx
 
 
 # MARK: Type Conversion Pattern
