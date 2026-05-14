@@ -268,7 +268,12 @@ diagonalize_measurements = qp.transform(
 
 
 def disentangle_cnot_setup_inputs():
-    r"""A peephole optimization for replacing ``CNOT`` gates with single-qubit gates.
+    r"""A relaxed peephole optimization for replacing ``CNOT`` gates with single-qubit gates.
+
+    The optimizations that this pass performs are found in
+    `arXiv:2012.07711 <https://arxiv.org/pdf/2012.07711>`_, specifically TABLE I. The patterns
+    therein represent functional equivalencies to applying a ``CNOT`` gate on certain two-qubit
+    input states.
 
     .. note::
 
@@ -327,8 +332,12 @@ disentangle_cnot = qp.transform(
 
 
 def disentangle_swap_setup_inputs():
-    r"""A peephole optimization for replacing ``SWAP`` gates with simpler gates (``PauliX`` and
-    ``CNOT``).
+    r"""A relaxed peephole optimization for replacing ``SWAP`` gates with single-qubit gates.
+
+    The optimizations that this pass performs are found in
+    `arXiv:2012.07711 <https://arxiv.org/pdf/2012.07711>`_, specifically TABLE VI. The patterns
+    therein represent functional equivalencies to applying a ``SWAP`` gate on certain two-qubit
+    input states.
 
     .. note::
 
@@ -505,13 +514,11 @@ def parity_synth_setup_inputs():
     .. code-block:: python
 
         import pennylane as qp
-        from catalyst.python_interface import Compiler
-        import catalyst
 
         dev = qp.device("lightning.qubit", wires=2)
 
         @qp.qjit(capture=True)
-        @catalyst.passes.parity_synth
+        @qp.transforms.parity_synth
         @qp.qnode(dev)
         def circuit(x: float, y: float, z: float):
             qp.CNOT((0, 1))
