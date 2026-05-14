@@ -187,11 +187,10 @@ generate_lookup_table(const std::vector<TANNER_GRAPH_INT> &parity_mat_row_idx,
     RT_ASSERT(num_aux_qubits == (code_size - 1) >> 1);
     RT_ASSERT(nnz > 0);
     RT_ASSERT(num_data_qubits == code_size);
+    RT_ASSERT(code_distance > 2);
 
     // Get number of errors can be detected from code distance
     const size_t num_errors = (code_distance - 1) / 2;
-
-    RT_ASSERT(num_data_qubits >= num_errors + 1)
 
     // Traverse all possible quantum error combinations
     for (size_t i = 0; i <= num_errors; i++) {
@@ -200,7 +199,6 @@ generate_lookup_table(const std::vector<TANNER_GRAPH_INT> &parity_mat_row_idx,
         if (i > 0 && static_cast<size_t>(i) <= err_vector.size()) {
             std::fill(err_vector.end() - i, err_vector.end(), 1);
         }
-        RT_ASSERT(num_data_qubits <= 30)
 
         do {
             std::string syndrome_str = get_syndrome_from_errors<TANNER_GRAPH_INT>(
@@ -209,7 +207,7 @@ generate_lookup_table(const std::vector<TANNER_GRAPH_INT> &parity_mat_row_idx,
             std::vector<ERR_IDX_INT> error_indices =
                 get_error_indices<ERR_IDX_INT>(err_vector, num_errors);
             // We assume that 1:1 mapping for the syndrome and err_vector
-            lut.try_emplace(syndrome_str, error_indices);
+            lut.try_emplace(syndrome_str, std::move(error_indices));
         } while (std::next_permutation(err_vector.begin(), err_vector.end()));
     }
 
