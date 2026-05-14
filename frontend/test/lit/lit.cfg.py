@@ -116,6 +116,8 @@ except AttributeError:
 
     if os.path.exists(quantum_bin_dir):
         llvm_config.with_environment("PATH", quantum_bin_dir, append_path=True)
+        llvm_config.add_tool_substitutions(["quantum-opt"], [quantum_bin_dir])
+        llvm_config.add_tool_substitutions(["catalyst"], [quantum_bin_dir])
 
     llvm_config.with_system_environment("PYTHONPATH")
     llvm_config.with_system_environment("RUNTIME_LIB_DIR")
