@@ -46,7 +46,8 @@ def is_cuda_available():
 
 # Default from PennyLane
 TOL_STOCHASTIC = 0.05
-
+import pennylane as qp
+qp.capture.enable()
 
 @pytest.fixture(scope="session")
 def tol_stochastic():

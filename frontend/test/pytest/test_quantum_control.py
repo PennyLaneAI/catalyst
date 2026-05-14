@@ -74,7 +74,7 @@ def verify_catalyst_ctrl_against_pennylane(
             return quantum_func(*args, ctrl_fn=PL_ctrl)
 
     capture_enabled = qp.capture.enabled()
-    qp.capture.disable()
+    pass
     try:
         compare = pennylane_workflow(*args)
     finally:

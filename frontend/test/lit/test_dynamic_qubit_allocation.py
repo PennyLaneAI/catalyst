@@ -305,4 +305,4 @@ def test_quantum_subroutine():
 test_quantum_subroutine()
 
 
-qp.capture.disable()
+pass

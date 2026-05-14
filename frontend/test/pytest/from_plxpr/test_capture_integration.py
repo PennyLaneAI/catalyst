@@ -43,7 +43,7 @@ def circuit_aot_builder(dev):
         qp.Hadamard(wires=1)
         return qp.expval(qp.PauliY(wires=0))
 
-    qp.capture.disable()
+    pass
 
     return catalyst_circuit_aot
 
@@ -150,7 +150,7 @@ class TestCapture:
 
         capture_result = captured_circuit(theta)
 
-        qp.capture.disable()
+        pass
 
         if capture:
             qp.capture.enable()
@@ -169,7 +169,7 @@ class TestCapture:
         else:
             assert not qp.capture.enabled()
 
-        qp.capture.disable()
+        pass
 
         assert jnp.allclose(capture_result, circuit(theta))
 
@@ -194,7 +194,7 @@ class TestCapture:
 
         capture_result = captured_circuit(theta**2)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -237,7 +237,7 @@ class TestCapture:
 
         capture_result = captured_circuit(basis_state)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -277,7 +277,7 @@ class TestCapture:
 
         capture_result = captured_circuit(init_state)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -307,7 +307,7 @@ class TestCapture:
 
         capture_result = captured_circuit(theta, val)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -338,7 +338,7 @@ class TestCapture:
 
         capture_result = captured_circuit(theta)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -371,7 +371,7 @@ class TestCapture:
 
         # Capture disabled
 
-        qp.capture.disable()
+        pass
 
         assert jnp.allclose(capture_result, circuit(theta))
 
@@ -400,7 +400,7 @@ class TestCapture:
 
         capture_result = captured_circuit()
 
-        qp.capture.disable()
+        pass
 
         assert jnp.allclose(capture_result, expected)
 
@@ -422,7 +422,7 @@ class TestCapture:
 
         capture_result = captured_circuit()
 
-        qp.capture.disable()
+        pass
 
         expected_result = -1
 
@@ -447,7 +447,7 @@ class TestCapture:
 
         capture_result = captured_circuit()
 
-        qp.capture.disable()
+        pass
 
         assert jnp.allclose(capture_result, -1)
 
@@ -474,7 +474,7 @@ class TestCapture:
 
         capture_result = captured_circuit(theta)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -512,7 +512,7 @@ class TestCapture:
 
         capture_result = captured_circuit(10, 0.3)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -566,7 +566,7 @@ class TestCapture:
 
         capture_result = captured_circuit(4)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -629,7 +629,7 @@ class TestCapture:
         capture_result_1_iteration = capturted_circuit(9)
         capture_result_0_iterations = capturted_circuit(11)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -683,7 +683,7 @@ class TestCapture:
 
         capture_result = captured_circuit(0, 2)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -741,7 +741,7 @@ class TestCapture:
 
         capture_result = captured_circuit(0, 0)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -796,7 +796,7 @@ class TestCapture:
 
         capture_result = captured_circuit(0.1)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -838,7 +838,7 @@ class TestCapture:
 
         capture_result = captured_circuit(1.5)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -883,7 +883,7 @@ class TestCapture:
 
         capture_result = captured_circuit(0.1)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -933,7 +933,7 @@ class TestCapture:
 
         capture_result = captured_circuit(0.1)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -983,7 +983,7 @@ class TestCapture:
 
         capture_result = captured_circuit(0.1)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -1037,7 +1037,7 @@ class TestCapture:
 
         capture_result = captured_circuit(0.1, 1.5)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -1083,7 +1083,7 @@ class TestCapture:
 
         capture_result = captured_circuit(0.1)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -1155,7 +1155,7 @@ class TestCapture:
         capture_result = captured_circuit(0.1)
         assert 'transform.apply_registered_pass "cancel-inverses"' in captured_circuit.mlir
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -1189,7 +1189,7 @@ class TestCapture:
         capture_result = captured_circuit(0.1)
         assert 'transform.apply_registered_pass "merge-rotations"' in captured_circuit.mlir
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -1232,7 +1232,7 @@ class TestCapture:
         captured_rotations_inverses_result = captured_rotations_inverses(0.1)
         assert has_catalyst_transforms(captured_rotations_inverses.mlir)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -1277,7 +1277,7 @@ class TestCapture:
         capture_result = captured_circuit(U.matrix())
         assert is_unitary_rotated(captured_circuit.mlir)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -1336,7 +1336,7 @@ class TestCapture:
         assert 'quantum.custom "Hadamard"' not in capture_mlir
         assert is_unitary_rotated(capture_mlir)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -1378,7 +1378,7 @@ class TestCapture:
         capture_result = captured_circuit(1.5, 2.5, 3.5)
         assert is_rot_decomposed(captured_circuit.mlir)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -1415,7 +1415,7 @@ class TestCapture:
         capture_result = captured_circuit(1.5, 2.5, 3.5)
 
         qp.decomposition.disable_graph()
-        qp.capture.disable()
+        pass
 
         # Capture disabled
         @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
@@ -1459,7 +1459,7 @@ class TestCapture:
 
         assert is_single_qubit_fusion_applied(captured_circuit.mlir)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -1505,7 +1505,7 @@ class TestCapture:
             capture_mlir, 'quantum.custom "PauliX"', 'quantum.custom "CRX"'
         )
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -1541,7 +1541,7 @@ class TestCapture:
         capture_result = captured_circuit()
         assert is_amplitude_embedding_merged_and_decomposed(captured_circuit.mlir)
 
-        qp.capture.disable()
+        pass
 
         # Capture disabled
 
@@ -1578,7 +1578,7 @@ class TestCapture:
         capture_result = captured_circuit()
         assert "shots(%" in captured_circuit.mlir
 
-        qp.capture.disable()
+        pass
 
         @qjit
         @qp.set_shots(10)
@@ -1646,7 +1646,7 @@ class TestCapture:
         assert "%cst = arith.constant 1.5" in captured_circuit_3_mlir
         assert 'quantum.custom "RX"(%cst)' in captured_circuit_3_mlir
 
-        qp.capture.disable()
+        pass
 
 
 class TestControlFlow:

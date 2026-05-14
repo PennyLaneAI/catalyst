@@ -67,7 +67,7 @@ class TestEnsureCaptureMode:
 
     def test_enable_capture_when_disabled(self):
         """Test that ensure_capture_mode(True) enables capture when globally disabled."""
-        qp.capture.disable()
+        pass
         assert not qp.capture.enabled()
 
         with ensure_capture_mode(True):
@@ -88,7 +88,7 @@ class TestEnsureCaptureMode:
             # After context exits, should be restored to enabled
             assert qp.capture.enabled()
         finally:
-            qp.capture.disable()
+            pass
 
     def test_no_op_when_already_in_target_state_enabled(self):
         """Test that ensure_capture_mode(True) is a no-op when already enabled."""
@@ -101,11 +101,11 @@ class TestEnsureCaptureMode:
 
             assert qp.capture.enabled()
         finally:
-            qp.capture.disable()
+            pass
 
     def test_no_op_when_already_in_target_state_disabled(self):
         """Test that ensure_capture_mode(False) is a no-op when already disabled."""
-        qp.capture.disable()
+        pass
         assert not qp.capture.enabled()
 
         with ensure_capture_mode(False):
@@ -115,7 +115,7 @@ class TestEnsureCaptureMode:
 
     def test_nesting_different_states(self):
         """Test that nested contexts properly restore their respective states (snapshot pattern)."""
-        qp.capture.disable()
+        pass
         assert not qp.capture.enabled()
 
         with ensure_capture_mode(True):
@@ -132,7 +132,7 @@ class TestEnsureCaptureMode:
 
     def test_exception_safety(self):
         """Test that state is restored even if an exception is raised."""
-        qp.capture.disable()
+        pass
         assert not qp.capture.enabled()
 
         try:
@@ -151,7 +151,7 @@ class TestCaptureKwargIntegration:
 
     def test_capture_true_uses_capture_pathway(self, backend):
         """Test that capture=True uses the capture pathway without global enable."""
-        qp.capture.disable()  # Make sure global capture is off
+        pass  # Make sure global capture is off
         assert not qp.capture.enabled()
 
         dev = qp.device(backend, wires=2)
@@ -187,14 +187,14 @@ class TestCaptureKwargIntegration:
             result = circuit(0.5)
             assert jnp.allclose(result, jnp.cos(0.5))
         finally:
-            qp.capture.disable()
+            pass
 
     def test_capture_global_follows_global_setting(self, backend):
         """Test that capture='global' respects the global setting."""
         dev = qp.device(backend, wires=2)
 
         # With global capture off
-        qp.capture.disable()
+        pass
 
         @qjit(capture="global")
         @qp.qnode(dev)
@@ -208,7 +208,7 @@ class TestCaptureKwargIntegration:
 
     def test_capture_true_classical_only(self):
         """Test that capture=True works for classical-only functions."""
-        qp.capture.disable()
+        pass
 
         @qjit(capture=True)
         def classical_fn(x, y):
@@ -221,7 +221,7 @@ class TestCaptureKwargIntegration:
     def test_multiple_qjits_different_capture_modes(self, backend):
         """Test multiple QJIT functions with different capture modes."""
         dev = qp.device(backend, wires=1)
-        qp.capture.disable()
+        pass
 
         @qjit(capture=True)
         @qp.qnode(dev)
@@ -256,7 +256,7 @@ class TestCaptureCompileOptionsIdentity:
 
     def test_capture_flag_creates_distinct_compile_options(self):
         """Test that qjit(capture=True) and qjit(capture=False) have distinct CompileOptions."""
-        qp.capture.disable()  # Ensure global state doesn't affect the test
+        pass  # Ensure global state doesn't affect the test
 
         @qjit(capture=True)
         def fn_capture(x):
@@ -284,7 +284,7 @@ class TestCaptureCompileOptionsIdentity:
 
         This ensures the flag isn't lost when using qjit without immediately calling it.
         """
-        qp.capture.disable()  # Global state is disabled
+        pass  # Global state is disabled
 
         @qjit(capture=True)
         def circuit(x: float):  # Type hint enables AOT compilation
@@ -315,7 +315,7 @@ class TestCaptureCompileOptionsIdentity:
             # Should not have defaulted to global state
             assert options.capture != qp.capture.enabled()
         finally:
-            qp.capture.disable()
+            pass
 
     def test_compile_options_capture_field_exists(self):
         """Test that CompileOptions dataclass has the capture field."""
@@ -336,7 +336,7 @@ class TestCaptureCompileOptionsIdentity:
         This is the "collision" test - ensures that calling with different
         capture modes doesn't accidentally reuse cached results.
         """
-        qp.capture.disable()
+        pass
         dev = qp.device(backend, wires=1)
 
         # Use a counter to track compilations

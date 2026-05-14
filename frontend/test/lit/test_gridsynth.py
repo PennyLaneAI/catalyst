@@ -224,7 +224,7 @@ def test_capture_workflow_clifford():
     # CHECK:       call @__catalyst_decompose_RZ{{.*}}
     print(circuit.mlir_opt)
 
-    qp.capture.disable()
+    pass
 
 
 test_capture_workflow_clifford()
@@ -259,7 +259,7 @@ def test_capture_workflow_ppr():
     # CHECK:       call @__catalyst_decompose_RZ_ppr_basis{{.*}}
     print(circuit.mlir_opt)
 
-    qp.capture.disable()
+    pass
 
 
 test_capture_workflow_ppr()

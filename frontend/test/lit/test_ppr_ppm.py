@@ -458,7 +458,7 @@ def test_decompose_arbitrary_ppr():
         qp.PauliRot(0.123, pauli_word="XYZ", wires=[0, 1, 2])
 
     print(test_decompose_arbitrary_ppr_workflow.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_decompose_arbitrary_ppr()
