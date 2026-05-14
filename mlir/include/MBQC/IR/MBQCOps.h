@@ -15,6 +15,7 @@
 #pragma once
 
 #include "MBQC/IR/MBQCDialect.h"
+#include "QRef/IR/QRefDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 
 //===----------------------------------------------------------------------===//

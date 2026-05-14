@@ -24,6 +24,7 @@
 #include "mlir/IR/TypeRange.h"
 #include "mlir/IR/Value.h"
 
+#include "MBQC/IR/MBQCOps.h"
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
 
@@ -52,7 +53,7 @@ void handleDeallocQubit(IRRewriter &builder, qref::DeallocQubitOp rDeallocQbOp,
                         QubitValueTracker &tracker);
 void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, QubitValueTracker &tracker);
 void handleMeasure(IRRewriter &builder, qref::MeasureOp rMeasureOp, QubitValueTracker &tracker);
-void handleMeasureInBasis(IRRewriter &builder, qref::MeasureInBasisOp rMeasureInBasisOp,
+void handleMeasureInBasis(IRRewriter &builder, mbqc::RefMeasureInBasisOp rMeasureInBasisOp,
                           QubitValueTracker &tracker);
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker);
 void handleCompbasis(IRRewriter &builder, qref::ComputationalBasisOp rCompbasisOp,
@@ -60,7 +61,7 @@ void handleCompbasis(IRRewriter &builder, qref::ComputationalBasisOp rCompbasisO
 void handleNamedObs(IRRewriter &builder, qref::NamedObsOp rNamedObsOp, QubitValueTracker &tracker);
 void handleHermitian(IRRewriter &builder, qref::HermitianOp rHermitianOp,
                      QubitValueTracker &tracker);
-void handleGraphStatePrep(IRRewriter &builder, qref::GraphStatePrepOp rGraphStatePrepOp,
+void handleGraphStatePrep(IRRewriter &builder, mbqc::RefGraphStatePrepOp rGraphStatePrepOp,
                           QubitValueTracker &tracker);
 void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTracker &tracker);
 void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker);
