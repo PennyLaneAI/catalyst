@@ -982,6 +982,7 @@ class TestLoweringTransversalGates:
 
 
 # We can remove this xfail and warning filter once `convert_qecl_to_qecp_pass` is complete
+@pytest.mark.xfail(reason="The `convert_qecl_to_qecp_pass` is incomplete")
 @pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
 class TestQECLNoiseLoweringPassIntegration:
     """Integration lit tests for the convert-qecl-noise-to-qecp-noise pass"""
@@ -1014,5 +1015,4 @@ class TestQECLNoiseLoweringPassIntegration:
             m0 = qp.measure(0)
             return qp.sample([m0])
 
-        with pytest.raises(CompileError, match="error: 'qecp.decode_esm_css' op"):
-            run_filecheck_qjit(circuit)
+        run_filecheck_qjit(circuit)

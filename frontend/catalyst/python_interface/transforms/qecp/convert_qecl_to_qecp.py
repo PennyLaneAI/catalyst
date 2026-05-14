@@ -359,7 +359,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     name = "convert-qecl-to-qecp"
 
-    qec_code: QecCode | str
+    qec_code: QecCode
 
     # To specify the number of errors to be injected in the noise subroutine,
     # which is needed for the convert-qecl-noise-to-qecp-noise pass.
