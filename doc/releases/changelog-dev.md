@@ -35,6 +35,7 @@
   [(#2717)](https://github.com/PennyLaneAI/catalyst/pull/2717)
   [(#2720)](https://github.com/PennyLaneAI/catalyst/pull/2720)
   [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
+  [(#2757)](https://github.com/PennyLaneAI/catalyst/pull/2757)
   [(#2781)](https://github.com/PennyLaneAI/catalyst/pull/2781)
 
 * Update RC nightly builds to read version number from the `_version.py` file
