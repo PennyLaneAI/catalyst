@@ -124,5 +124,6 @@ except AttributeError:
     llvm_config.with_system_environment("CATALYST_LIB_DIR")
     llvm_config.with_system_environment("ENZYME_LIB_DIR")
 
-    if os.path.exists(os.getenv("CATALYST_BIN_DIR", "")):
+    catalyst_bin_dir = os.getenv("CATALYST_BIN_DIR", "")
+    if os.path.exists(catalyst_bin_dir):
         llvm_config.add_tool_substitutions(["quantum-opt", "catalyst"], [catalyst_bin_dir])
