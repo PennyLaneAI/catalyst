@@ -191,6 +191,8 @@ generate_lookup_table(const std::vector<TANNER_GRAPH_INT> &parity_mat_row_idx,
     // Get number of errors can be detected from code distance
     const size_t num_errors = (code_distance - 1) / 2;
 
+    RT_ASSERT(num_data_qubits >= num_errors + 1)
+
     // Traverse all possible quantum error combinations
     for (size_t i = 0; i <= num_errors; i++) {
         // create a base error vector
