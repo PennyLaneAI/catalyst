@@ -225,9 +225,7 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp)
             }
         }
 
-        // TODO: deprecate `qnode` once it is fully deprecated.
-        result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node") ||
-                         funcOp->hasAttrOfType<UnitAttr>("qnode");
+        result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node");
         funcResults[funcOp.getName()] = std::move(result);
 
         // main/entry function is the first function with no declaration
