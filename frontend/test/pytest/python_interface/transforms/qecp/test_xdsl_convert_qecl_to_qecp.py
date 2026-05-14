@@ -638,6 +638,7 @@ class TestQecCycleLowering:
         // CHECK:   }
         // CHECK: scf.yield [[cond_out_cb]] : !qecp.codeblock<1 x 7>
         // CHECK: }
+        // CHECK: func.return [[cb_x_out]] : !qecp.codeblock<1 x 7>
         }
         """
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
