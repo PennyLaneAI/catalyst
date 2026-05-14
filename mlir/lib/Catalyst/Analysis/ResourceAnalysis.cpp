@@ -568,7 +568,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
  *
  * @param flat The ResourceResult to accumulate counts into.
  * @param child The ResourceResult to merge.
- * @param count The scalar to multiply the counts by.
+ * @param count A scalar to multiply the child's counts by.
  */
 static void accumulateScaled(ResourceResult &flat, const ResourceResult &child, int64_t count)
 {
