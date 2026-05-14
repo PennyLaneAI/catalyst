@@ -19,7 +19,7 @@
 
 // CHECK-LABEL: module @host
 module @host {
-  // CHECK: func.func private @ghz_0()
+  // CHECK: func.func private @ghz_0() attributes {catalyst.target = {backend = "accel"}}
   // CHECK: func.func public @jit_main
   func.func public @jit_main() attributes {llvm.emit_c_interface} {
     // CHECK-NOT: catalyst.launch_kernel
@@ -44,7 +44,7 @@ module @host {
 // -----
 
 // CHECK-LABEL: module @mixed
-// CHECK: func.func private @kernel_0()
+// CHECK: func.func private @kernel_0() attributes {catalyst.target = {backend = "accel"}}
 // CHECK: func.func public @jit_run
 // CHECK: call @work_0()
 // CHECK: call @kernel_0()
@@ -78,8 +78,8 @@ module @mixed {
 // -----
 
 // CHECK-LABEL: module @duplicate_target_names
-// CHECK-DAG: func.func private @kernel_1() attributes {attr = "value"}
-// CHECK-DAG: func.func private @kernel_0()
+// CHECK-DAG: func.func private @kernel_1() attributes {attr = "value", catalyst.target = {backend = "accel"}}
+// CHECK-DAG: func.func private @kernel_0() attributes {catalyst.target = {backend = "accel"}}
 // CHECK: func.func public @jit_run
 // CHECK: call @kernel_1()
 // CHECK: call @kernel_0()

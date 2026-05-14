@@ -550,6 +550,8 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
                 decl.eraseBody();
                 decl->removeAttr(fullyQualifiedNameAttr);
                 decl.setPrivate();
+                if (auto targetAttr = nested->getParentOp()->getAttr("catalyst.target"))
+                    decl->setAttr("catalyst.target", targetAttr);
                 targetDeclarations.push_back(decl);
             }
             return WalkResult::advance();
