@@ -9,8 +9,8 @@
 <h3>Improvements 🛠</h3>
 
 * The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
-  instead of folding their gate counts into the caller. Static loops appear as `for_loop_<N>`
-  with their trip count, input-driven dynamic loops appear as `dyn_for_loop_<N>` with a stable
+  instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
+  with their trip count. Loops with dynamic bounds appear as `dyn_for_loop_<N>` with a stable
   identifier, and totals across the call graph are computed on demand.
   [(#2782)](https://github.com/PennyLaneAI/catalyst/pull/2782)
 
