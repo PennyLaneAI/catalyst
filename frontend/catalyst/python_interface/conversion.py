@@ -29,7 +29,7 @@ from xdsl.ir import Dialect as xDialect
 from xdsl.traits import SymbolOpInterface
 from xdsl.traits import SymbolTable as xSymbolTable
 
-from catalyst import QJIT
+from catalyst.jit import QJIT
 from catalyst.python_interface.inspection.xdsl_conversion import _quantum_opt_stderr
 from catalyst.python_interface.parser import QuantumParser
 

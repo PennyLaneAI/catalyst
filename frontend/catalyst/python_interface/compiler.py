@@ -21,7 +21,8 @@ from jaxlib.mlir.ir import Context as jaxContext
 from jaxlib.mlir.ir import Module as jaxModule
 from pennylane.typing import Callable
 from xdsl.context import Context as xContext
-from xdsl.dialects.builtin import ModuleOp
+from xdsl.dialects.builtin import ArrayAttr, ModuleOp
+from xdsl.dialects.func import FuncOp
 from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
 
@@ -76,7 +77,16 @@ class Compiler:
         pipeline = PassPipeline((ApplyTransformSequencePass(callback=callback),))
         pipeline.apply(ctx, xmod)
 
-        # Convert back to string
+        # JAX serialises void func.func ops with `res_attrs = []` in generic form
+        # triggering an assertion in FuncToLLVM lowering.
+        # Remove empty arrays in-place so the generic printer omits them.
+        for op in xmod.walk():
+            if not isinstance(op, FuncOp):
+                continue
+            for key in ("res_attrs", "arg_attrs"):
+                val = op.properties.get(key)
+                if isinstance(val, ArrayAttr) and len(val) == 0:
+                    del op.properties[key]
         buffer = io.StringIO()
         Printer(stream=buffer, print_generic_format=True).print_op(xmod)
 

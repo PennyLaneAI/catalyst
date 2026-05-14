@@ -59,32 +59,32 @@ def has_catalyst_transforms(mlir):
 def is_unitary_rotated(mlir):
     """Check in the MLIR if a unitary was rotated"""
     return (
-        "quantum.unitary" not in mlir
-        and mlir.count('quantum.custom "RZ"') == 2
-        and mlir.count('quantum.custom "RY"') == 1
+        "qref.unitary" not in mlir
+        and mlir.count('qref.custom "RZ"') == 2
+        and mlir.count('qref.custom "RY"') == 1
     )
 
 
 def is_rot_decomposed(mlir):
     """Check in the MLIR if a rot was decomposed"""
     return (
-        'quantum.custom "Rot"' not in mlir
-        and mlir.count('quantum.custom "RZ"') == 2
-        and mlir.count('quantum.custom "RY"') == 1
+        'qref.custom "Rot"' not in mlir
+        and mlir.count('qref.custom "RZ"') == 2
+        and mlir.count('qref.custom "RY"') == 1
     )
 
 
 def is_wire_mapped(mlir):
     """Check in the MLIR if a wire was mapped"""
-    return "quantum.extract %0[ 0]" not in mlir and "quantum.extract %0[ 1]" in mlir
+    return "qref.extract %0[ 0]" not in mlir and "qref.extract %0[ 1]" in mlir
 
 
 def is_single_qubit_fusion_applied(mlir):
     """Check in the MLIR if 'single_qubit_fusion' was applied"""
     return (
-        mlir.count('quantum.custom "Rot"') == 1
-        and 'quantum.custom "Hadamard"' not in mlir
-        and 'quantum.custom "RZ"' not in mlir
+        mlir.count('qref.custom "Rot"') == 1
+        and 'qref.custom "Hadamard"' not in mlir
+        and 'qref.custom "RZ"' not in mlir
     )
 
 
@@ -101,8 +101,8 @@ def is_amplitude_embedding_merged_and_decomposed(mlir):
     """Check in the MLIR if the amplitude embeddings got merged and decomposed"""
     return (
         "AmplitudeEmbedding" not in mlir
-        and mlir.count('quantum.custom "RY"') == 3
-        and mlir.count('quantum.custom "CNOT"') == 2
+        and mlir.count('qref.custom "RY"') == 3
+        and mlir.count('qref.custom "CNOT"') == 2
     )
 
 
@@ -1333,7 +1333,7 @@ class TestCapture:
         # scheduled
         capture_mlir = captured_unitary_inverses.mlir
         assert 'transform.apply_registered_pass "cancel-inverses"' not in capture_mlir
-        assert 'quantum.custom "Hadamard"' not in capture_mlir
+        assert 'qref.custom "Hadamard"' not in capture_mlir
         assert is_unitary_rotated(capture_mlir)
 
         qp.capture.disable()
@@ -1498,12 +1498,8 @@ class TestCapture:
         capture_result = captured_circuit()
 
         capture_mlir = captured_circuit.mlir
-        assert is_controlled_pushed_back(
-            capture_mlir, 'quantum.custom "RX"', 'quantum.custom "CNOT"'
-        )
-        assert is_controlled_pushed_back(
-            capture_mlir, 'quantum.custom "PauliX"', 'quantum.custom "CRX"'
-        )
+        assert is_controlled_pushed_back(capture_mlir, 'qref.custom "RX"', 'qref.custom "CNOT"')
+        assert is_controlled_pushed_back(capture_mlir, 'qref.custom "PauliX"', 'qref.custom "CRX"')
 
         qp.capture.disable()
 
@@ -1611,7 +1607,7 @@ class TestCapture:
         result_1 = captured_circuit_1(1.5, 2.0)
         captured_circuit_1_mlir = captured_circuit_1.mlir
         assert "%cst = arith.constant 1.5" in captured_circuit_1_mlir
-        assert 'quantum.custom "RX"(%cst)' in captured_circuit_1_mlir
+        assert 'qref.custom "RX"(%cst)' in captured_circuit_1_mlir
         assert "%cst = arith.constant 2.0" not in captured_circuit_1_mlir
 
         # Test that qjit static_argnums takes precedence over the one on the qnode
@@ -1625,7 +1621,7 @@ class TestCapture:
         result_2 = captured_circuit_2(1.5, 2.0)
         captured_circuit_2_mlir = captured_circuit_2.mlir
         assert "%cst = arith.constant 2.0" in captured_circuit_2_mlir
-        assert 'quantum.custom "RY"(%cst)' in captured_circuit_2_mlir
+        assert 'qref.custom "RY"(%cst)' in captured_circuit_2_mlir
         assert "%cst = arith.constant 1.5" not in captured_circuit_2_mlir
 
         assert jnp.allclose(result_1, result_2)
@@ -1644,7 +1640,7 @@ class TestCapture:
         _ = workflow(1.5, 2.0)
         captured_circuit_3_mlir = workflow.mlir
         assert "%cst = arith.constant 1.5" in captured_circuit_3_mlir
-        assert 'quantum.custom "RX"(%cst)' in captured_circuit_3_mlir
+        assert 'qref.custom "RX"(%cst)' in captured_circuit_3_mlir
 
         qp.capture.disable()
 

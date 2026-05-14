@@ -493,7 +493,6 @@ def test_merge_rotation_arbitrary_angle_ppr():
     assert ir_opt.count('pbc.ppr.arbitrary ["Z", "Y"]') == 1
 
 
-@pytest.mark.xfail(reason="PPM execution with ppr-to-ppm pass is not fully supported yet.")
 def test_clifford_to_ppm():
 
     @qp.qnode(qp.device("lightning.qubit", wires=6))
@@ -523,9 +522,9 @@ def test_clifford_to_ppm():
 
     baseline_cir = cir()
 
-    np.allclose(auto_qjit_cir(), baseline_cir)
-    np.allclose(clifford_qjit_cir(), baseline_cir)
-    np.allclose(pauli_qjit_cir(), baseline_cir)
+    assert np.allclose(auto_qjit_cir(), baseline_cir)
+    assert np.allclose(clifford_qjit_cir(), baseline_cir)
+    assert np.allclose(pauli_qjit_cir(), baseline_cir)
 
 
 def test_decompose_arbitrary_ppr():

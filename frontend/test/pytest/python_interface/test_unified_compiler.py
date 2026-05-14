@@ -139,6 +139,24 @@ def test_generic_catalyst_program(as_mod):
     assert isinstance(retval, expected_type)
 
 
+def test_empty_res_attrs_on_void_func_is_omitted():
+    """Empty res_attrs on a void func.func must not reach the C++ driver."""
+
+    program = """
+        builtin.module {
+          "func.func"() <{function_type = () -> (), sym_name = "void_fn", res_attrs = []}> ({
+            "func.return"() : () -> ()
+          }) : () -> ()
+        }
+        """
+
+    out = Compiler.run(program)
+
+    assert isinstance(out, str)
+    assert "res_attrs = []" not in out
+    assert "arg_attrs = []" not in out
+
+
 def test_raises_error_when_pass_does_not_exists():
     """Attempts to run pass "this-pass-does-not-exists" on an empty module.
 
