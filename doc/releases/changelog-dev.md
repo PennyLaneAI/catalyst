@@ -31,6 +31,10 @@
 * Update RC nightly builds to read version number from the `_version.py` file
   [(#2797)](https://github.com/PennyLaneAI/catalyst/pull/2797)
 
+* The `-memspace-to-address-space` pass has been added which converts the `catalyst.memspace`
+  attribute on `memref` types to the explicit integer address space.
+  [(#2756)](https://github.com/PennyLaneAI/catalyst/pull/2756)
+
 * Fix build failures when using clang with GCC ≤ 13 libstdc++ by replacing
   `std::views::filter`/`std::views::transform` with `std::copy_if`/`std::transform`
   [(#2801)](https://github.com/PennyLaneAI/catalyst/pull/2801)
