@@ -25,6 +25,12 @@ execute_process(
 )
 find_package(nanobind CONFIG REQUIRED)
 
+if(DEFINED ENV{MLIR_LIB_DIR})
+    set(LLVM_DIR "$ENV{MLIR_LIB_DIR}/cmake/llvm" CACHE PATH "" FORCE)
+    set(MLIR_DIR "$ENV{MLIR_LIB_DIR}/cmake/mlir" CACHE PATH "" FORCE)
+endif()
+find_package(LLVM CONFIG REQUIRED)
+
 # Source file list for `wrapper` module
 set(WRAPPER_SRC_FILES
     wrapper.cpp
@@ -41,3 +47,19 @@ target_include_directories(wrapper PRIVATE ${Python_NumPy_INCLUDE_DIRS})
 # Use suffix ".so" rather than ".abi3.so" for library file using Stable ABI
 # This is necessary for compatibility with setuptools build extensions
 set_target_properties(wrapper PROPERTIES SUFFIX ".so")
+
+llvm_map_components_to_libnames(_driver_libs
+    core support orcjit jitlink object passes
+    ${LLVM_TARGETS_TO_BUILD}
+)
+
+find_package(MLIR CONFIG REQUIRED)
+nanobind_add_module(remote_driver STABLE_ABI remote_driver.cpp)
+target_include_directories(remote_driver SYSTEM PRIVATE
+    ${LLVM_INCLUDE_DIRS}
+    ${MLIR_INCLUDE_DIRS}
+)
+target_link_libraries(remote_driver PRIVATE ${_driver_libs} pthread ${CMAKE_DL_LIBS})
+target_compile_options(remote_driver PRIVATE -Wshadow)
+
+set_target_properties(remote_driver PROPERTIES SUFFIX ".so")

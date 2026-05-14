@@ -33,10 +33,11 @@ from catalyst.tracing.type_signatures import (
     get_decomposed_signature,
     typecheck_signatures,
 )
-from catalyst.utils import wrapper
+from catalyst.utils import remote_driver, wrapper
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.jnp_to_memref import get_ranked_memref_descriptor
+from catalyst.remote_compiled_function import RemoteSharedObjectManager
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -135,7 +136,12 @@ class CompiledFunction:
     def __init__(
         self, shared_object_file, func_name, restype, out_type, compile_options
     ):  # pylint: disable=too-many-arguments
-        self.shared_object = SharedObjectManager(shared_object_file, func_name)
+        if compile_options.remote:
+            self.shared_object = RemoteSharedObjectManager(
+                shared_object_file, func_name, compile_options.remote
+            )
+        else:
+            self.shared_object = SharedObjectManager(shared_object_file, func_name)
         self.compile_options = compile_options
         self.return_type_c_abi = None
         self.func_name = func_name
@@ -159,7 +165,22 @@ class CompiledFunction:
 
         with shared_object as lib:
             result_desc = type(args[0].contents) if has_return else None
-            retval = wrapper.wrap(lib.function, args, result_desc, lib.mem_transfer, numpy_dict)
+            if isinstance(shared_object, RemoteSharedObjectManager):
+                av_class = type(args[1].contents)
+                func, state = remote_driver.make_remote_callable(
+                    lib.function, av_class, result_desc
+                )
+                try:
+                    retval = wrapper.wrap(func, args, result_desc, None, {})
+                except Exception as e:
+                    if state.had_error:
+                        raise RuntimeError(f"remote invoke: {state.error_msg}") from e
+                    raise
+                if state.had_error:
+                    raise RuntimeError(f"remote invoke: {state.error_msg}")
+                return retval
+            else:
+                retval = wrapper.wrap(lib.function, args, result_desc, lib.mem_transfer, numpy_dict)
 
         if out_type is not None:
             keep_outputs = [k for _, k in out_type]
@@ -288,6 +309,9 @@ class CompiledFunction:
             return_value_pointer = self.restype_to_memref_descs(restype)
 
         c_abi_args = []
+        args_ranks = []
+        args_etypes = []
+        args_sizes = []
 
         args_data, args_shape = tree_flatten((args, kwargs))
 
@@ -296,6 +320,9 @@ class CompiledFunction:
             numpy_arg_buffer.append(numpy_arg)
             c_abi_ptr = ctypes.pointer(get_ranked_memref_descriptor(numpy_arg))
             c_abi_args.append(c_abi_ptr)
+            args_ranks.append(numpy_arg.ndim)
+            args_etypes.append(numpy_arg.dtype)
+            args_sizes.append(numpy_arg.itemsize)
 
         args = tree_unflatten(args_shape, c_abi_args)
 
@@ -303,6 +330,9 @@ class CompiledFunction:
             """Programmatically create a structure which holds tensors of varying base types."""
 
             _fields_ = [("f" + str(i), type(t)) for i, t in enumerate(c_abi_args)]
+            _ranks_ = args_ranks
+            _etypes_ = args_etypes
+            _sizes_ = args_sizes
 
             def __init__(self, c_abi_args):
                 for ft_tuple, c_abi_arg in zip(CompiledFunctionArgValue._fields_, c_abi_args):
