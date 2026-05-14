@@ -285,7 +285,7 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
         return;
     }
 
-    // Loop trip count comes from the user's inputs. Record the body under dyn_for_loop_<N>
+    // Loop trip count is dynamic. Record the body under dyn_for_loop_<N>
     // and store a fixed number (hash) so each such loop has its own id in the output.
     std::string name = makeUniqueSyntheticName("dyn_for_loop_", dynForLoopCounter);
     funcResults[name] = std::move(bodyResult);
@@ -495,7 +495,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
  *
  * @param dest The ResourceResult to accumulate counts into (modified).
  * @param source The ResourceResult to merge into `dest` (unmodified).
- * @param count A scalar to multiply the child's counts by (defaults to 1).
+ * @param count A scalar to multiply the `source`'s counts by (defaults to 1).
  */
 static void accumulateScaled(ResourceResult &dest, const ResourceResult &source, int64_t count = 1)
 {
