@@ -19,6 +19,7 @@ from .convert_qecl_noise_to_qec_noise import (
     convert_qecl_noise_to_qecp_noise_pass,
 )
 from .convert_qecl_to_qecp import ConvertQecLogicalToQecPhysicalPass, convert_qecl_to_qecp_pass
+from .convert_qecp_to_quantum import ConvertQecPhysicalToQuantumPass, convert_qecp_to_quantum_pass
 
 __all__ = [
     # Passes
@@ -26,4 +27,6 @@ __all__ = [
     "convert_qecl_to_qecp_pass",
     "ConvertQECLNoiseOpToQECPNoisePass",
     "convert_qecl_noise_to_qecp_noise_pass",
+    "ConvertQecPhysicalToQuantumPass",
+    "convert_qecp_to_quantum_pass",
 ]

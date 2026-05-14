@@ -22,6 +22,7 @@
 
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/IR/QuantumTypes.h"
 
 #include "DecomposeLoweringImpl.hpp"
 
@@ -69,7 +70,8 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
 
         rewriter.setInsertionPointAfter(op);
 
-        auto enableQreg = isa<quantum::QuregType>(decompFunc.getFunctionType().getInput(0));
+        auto enableQreg = llvm::any_of(decompFunc.getFunctionType().getInputs(),
+                                       [](mlir::Type t) { return isa<quantum::QuregType>(t); });
         auto analyzer = CustomOpSignatureAnalyzer(op, enableQreg);
         assert(analyzer && "Analyzer should be valid");
 
@@ -220,7 +222,8 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
 
         rewriter.setInsertionPointAfter(op);
 
-        auto enableQreg = isa<quantum::QuregType>(decompFunc.getFunctionType().getInput(0));
+        auto enableQreg = llvm::any_of(decompFunc.getFunctionType().getInputs(),
+                                       [](mlir::Type t) { return isa<quantum::QuregType>(t); });
         auto numQbitsAttr = decompFunc->getAttrOfType<IntegerAttr>("num_wires");
         if (!numQbitsAttr) {
             op.emitError("Decomposition function missing 'num_wires' attribute");
