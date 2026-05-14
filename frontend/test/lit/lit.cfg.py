@@ -22,8 +22,8 @@ config.name = "Frontend Tests"
 config.test_format = lit.formats.ShTest(True)
 
 # Define the file extensions to treat as test files (with the exception of this file).
-config.suffixes = [".py"]
-config.excludes = ["lit.cfg.py", "utils.py"]
+config.suffixes = [".py", ".mlir"]
+config.excludes = ["lit.cfg.py", "utils.py", "test_rules.mlir"]
 
 # Define the root path of where to look for tests.
 config.test_source_root = os.path.dirname(__file__)
@@ -68,6 +68,10 @@ if os.environ.get("ENABLE_LIT_COVERAGE", "0") == "1":
     )
 
 config.substitutions.append(("%PYTHON", python_executable))
+
+# allow virtual env for embedded interpreter
+config.environment["VIRTUAL_ENV"] = os.getenv("VIRTUAL_ENV", "")
+config.substitutions.append(("%BYTECODE_PATH", config.bytecode_path))
 
 # Define PATH when running frontend tests from an mlir build target.
 try:

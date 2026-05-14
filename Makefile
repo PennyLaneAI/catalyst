@@ -293,6 +293,7 @@ clean:
 	rm -rf $(MK_DIR)/frontend/catalyst/_revision.py
 	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/lib $(MK_DIR)/frontend/catalyst/bin
 	rm -rf $(MK_DIR)/frontend/catalyst/resources
+	rm -rf $(MK_DIR)/frontend/test/lit/GraphDecomposition/test_rules.mlirbc
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 	rm -rf .benchmarks
