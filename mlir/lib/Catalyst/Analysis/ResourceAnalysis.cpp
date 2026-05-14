@@ -39,68 +39,6 @@ using namespace llvm;
 namespace catalyst {
 
 //===----------------------------------------------------------------------===//
-// Dynamic for-loop classification
-//===----------------------------------------------------------------------===//
-
-// Walks `val` backward through the op set understood by `resolveConstantInt`,
-// recursing into each operand of a pass-through op. Returns true iff every
-// terminating value reached by the walk is either a compile-time constant or
-// a `func::FuncOp` entry-block argument. `visited` guards against cycles
-// within this single walk (a fresh set per top-level call avoids cross-walk
-// false negatives).
-static bool allLeavesAreStaticOrFuncArg(Value val, llvm::DenseSet<Value> &visited)
-{
-    if (!val) {
-        return false;
-    }
-    if (resolveConstantInt(val).has_value()) {
-        return true; // leaf is a constant
-    }
-    if (auto blockArg = dyn_cast<BlockArgument>(val)) {
-        auto funcOp = dyn_cast_or_null<func::FuncOp>(blockArg.getOwner()->getParentOp());
-        return funcOp && blockArg.getOwner() == &funcOp.getBody().front();
-    }
-    if (!visited.insert(val).second) {
-        return false; // cycle guard
-    }
-
-    Operation *op = val.getDefiningOp();
-    if (!op) {
-        return false;
-    }
-
-    StringRef opName = op->getName().getStringRef();
-    bool isPassThrough =
-        isa<arith::ConstantOp, arith::IndexCastOp, arith::IndexCastUIOp, arith::AddIOp,
-            arith::SubIOp, arith::MulIOp, tensor::ExtractOp, tensor::FromElementsOp>(op) ||
-        opName == "stablehlo.constant" || opName == "stablehlo.convert" ||
-        opName == "stablehlo.broadcast_in_dim" || opName == "stablehlo.add" ||
-        opName == "stablehlo.subtract";
-
-    if (!isPassThrough) {
-        return false;
-    }
-
-    return llvm::all_of(op->getOperands(), [&](Value operand) {
-        return allLeavesAreStaticOrFuncArg(operand, visited);
-    });
-}
-
-// `scf.for` is input-driven if `lb`, `ub`, and `step` all trace back to
-// `func::FuncOp` arguments or compile-time constants. The caller has already
-// ruled out fully-static loops, so at least one bound is guaranteed
-// non-constant.
-static bool hasInputDrivenBounds(scf::ForOp forOp)
-{
-    auto traces = [](Value v) {
-        llvm::DenseSet<Value> visited;
-        return allLeavesAreStaticOrFuncArg(v, visited);
-    };
-    return traces(forOp.getLowerBound()) && traces(forOp.getUpperBound()) &&
-           traces(forOp.getStep());
-}
-
-//===----------------------------------------------------------------------===//
 // Skipped operations set (mirrors Python _SKIPPED_OPS)
 //===----------------------------------------------------------------------===//
 
@@ -348,22 +286,13 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
         result.functionCalls[name] = tripCount.value();
         return;
     }
-
-    if (hasInputDrivenBounds(forOp)) {
-        // Loop trip count comes from the user's inputs. Record the body under dyn_for_loop_<N>
-        // and store a fixed number (hash) so each such loop has its own id in the output.
-        std::string name = makeUniqueSyntheticName("dyn_for_loop_", dynForLoopCounter);
-        funcResults[name] = std::move(bodyResult);
-        result.varFunctionCalls[name] =
-            static_cast<uint64_t>(llvm::hash_value(forOp.getOperation()));
-        result.hasDynLoop = true;
-        return;
-    }
-
-    // Fallback: trip count is unknown and the loop is not input-driven.
-    // Count the body once and flag the function as containing a dyn loop.
+    
+    // Loop trip count comes from the user's inputs. Record the body under dyn_for_loop_<N>
+    // and store a fixed number (hash) so each such loop has its own id in the output.
+    std::string name = makeUniqueSyntheticName("dyn_for_loop_", dynForLoopCounter);
+    funcResults[name] = std::move(bodyResult);
+    result.varFunctionCalls[name] = static_cast<uint64_t>(llvm::hash_value(forOp.getOperation()));
     result.hasDynLoop = true;
-    result.mergeWith(bodyResult);
 }
 
 void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result,
