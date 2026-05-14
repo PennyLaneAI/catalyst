@@ -671,8 +671,8 @@ class TestDrawGraph:
         @qp.qnode(qp.device("null.qubit", wires=3))
         def circuit():
             qp.H(0)
-            qp.T(1)
             qp.H(0)
+            qp.T(1)
             qp.RX(0.1, wires=0)
             qp.RX(0.2, wires=0)
             return qp.expval(qp.X(0))
@@ -741,8 +741,8 @@ class TestDrawGraph:
         @qp.qnode(qp.device("null.qubit", wires=3))
         def circuit():
             qp.H(0)
-            qp.T(1)
             qp.H(0)
+            qp.T(1)
             qp.RX(0.1, wires=0)
             qp.RX(0.2, wires=0)
             return qp.expval(qp.X(0))
