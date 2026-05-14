@@ -119,7 +119,7 @@ Will print out something close to the following:
             -Wl,-rpath,mlir/llvm-project/build/lib -Lmlir/llvm-project/build/lib \
             -Wl,-rpath,frontend/catalyst/utils/../../../runtime/build/lib -Lfrontend/catalyst/utils/../../../runtime/build/lib \
             -Wl,-rpath,frontend/catalyst/utils -Lfrontend/catalyst/utils \
-            -lrt_capi -lpthread -lmlir_c_runner_utils -llapacke.3 -lcustom_calls -lmlir_async_runtime -lrt_rsdecomp -lrt_OQD_capi \
+            -lrt_capi -lpthread -lmlir_c_runner_utils -llapacke.3 -lcustom_calls -lmlir_async_runtime -lrt_rsdecomp -lrt_decoder -lrt_OQD_capi \
             circuit.o -o circuit.so
 
 Pass Pipelines

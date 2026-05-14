@@ -5,6 +5,8 @@ This page contains the release notes for Catalyst.
 
 .. mdinclude:: ../releases/changelog-dev.md
 
+.. mdinclude:: ../releases/changelog-0.15.0.md
+
 .. mdinclude:: ../releases/changelog-0.14.1.md
 
 .. mdinclude:: ../releases/changelog-0.14.0.md

@@ -173,6 +173,7 @@ class LinkerDriver:
             "-lcustom_calls",
             "-lmlir_async_runtime",
             "-lrt_rsdecomp",
+            "-lrt_decoder",
         ]
 
         # If OQD runtime capi is built, link to it as well
@@ -387,7 +388,11 @@ def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
 
 
 def to_mlir_opt(
-    *args, stdin=None, options: Optional[CompileOptions] = None, using_python_compiler=False
+    *args,
+    stdin=None,
+    options: Optional[CompileOptions] = None,
+    using_python_compiler=False,
+    workspace=None,
 ):
     """echo ${input} | catalyst --tool=opt *args *opts -"""
     # Check if we need to use the Python interface for xDSL passes
@@ -404,6 +409,8 @@ def to_mlir_opt(
         return _quantum_opt(*args, stdin=stdin)
 
     opts = _options_to_cli_flags(options)
+    if workspace is not None:
+        opts += [("--workspace", str(workspace))]
     return _quantum_opt(*opts, *args, stdin=stdin)
 
 

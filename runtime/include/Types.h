@@ -125,7 +125,16 @@ struct MemRefT_int64_1d {
     std::size_t strides[1];
 };
 
-// MemRefT<int64_t, dimension=1> type
+// MemRefT<int32_t, dimension=1> type
+struct MemRefT_int32_1d {
+    int32_t *data_allocated;
+    int32_t *data_aligned;
+    std::size_t offset;
+    std::size_t sizes[1];
+    std::size_t strides[1];
+};
+
+// MemRefT<int8_t, dimension=1> type
 struct MemRefT_int8_1d {
     int8_t *data_allocated;
     int8_t *data_aligned;
@@ -138,6 +147,12 @@ struct MemRefT_int8_1d {
 struct PairT_MemRefT_double_int64_1d {
     struct MemRefT_double_1d first;
     struct MemRefT_int64_1d second;
+};
+
+// CSC Tanner graph int32 type
+struct TannerGraph_CSC_int32 {
+    struct MemRefT_int32_1d row_idx;
+    struct MemRefT_int32_1d col_ptr;
 };
 
 // Quantum operation modifiers
@@ -154,7 +169,9 @@ using MemRefT_CplxT_double_2d = struct MemRefT_CplxT_double_2d;
 using MemRefT_double_1d = struct MemRefT_double_1d;
 using MemRefT_double_2d = struct MemRefT_double_2d;
 using MemRefT_int64_1d = struct MemRefT_int64_1d;
+using MemRefT_int32_1d = struct MemRefT_int32_1d;
 using PairT_MemRefT_double_int64_1d = struct PairT_MemRefT_double_int64_1d;
+using TannerGraph_CSC_int32 = struct TannerGraph_CSC_int32;
 using Modifiers = struct Modifiers;
 
 #ifdef __cplusplus

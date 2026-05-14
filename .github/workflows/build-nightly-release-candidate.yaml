@@ -20,9 +20,9 @@ jobs:
     - name: Check for RC branch
       id: check_rc
       run: |
-        VERSION=$(python setup.py --version)
-        IFS=. read MAJ MIN PAT <<< "${VERSION%.dev[0-9]*}"
-        RC_BRANCH="v${MAJ}.$((MIN-1)).${PAT}-rc0"
+        VERSION=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' frontend/catalyst/_version.py)
+        IFS=. read MAJ MIN PAT <<< "${VERSION%[-.]dev[0-9]*}"
+        RC_BRANCH="v${MAJ}.$((MIN-1)).${PAT}-rc"
         if git ls-remote --exit-code origin "refs/heads/$RC_BRANCH"; then
           echo "branch_exists=true" >> $GITHUB_OUTPUT
           echo "rc_branch=$RC_BRANCH" >> $GITHUB_OUTPUT 
@@ -107,6 +107,7 @@ jobs:
 
   trigger-pennylane-rc-release:
     name: Trigger PennyLane RC release workflow
+    if: ${{ always() && !cancelled() }}
     needs: [upload]
     runs-on: ubuntu-24.04
 
