@@ -514,6 +514,9 @@ static void accumulateScaled(ResourceResult &dest, const ResourceResult &source,
     for (const auto &fc : source.functionCalls) {
         dest.functionCalls[fc.getKey()] += fc.getValue() * count;
     }
+    for (const auto &fc : source.varFunctionCalls) {
+        dest.varFunctionCalls[fc.getKey()] = fc.getValue();
+    }
     dest.numAllocQubits += source.numAllocQubits * count;
     dest.hasBranches = dest.hasBranches || source.hasBranches;
     dest.hasDynLoop = dest.hasDynLoop || source.hasDynLoop;
