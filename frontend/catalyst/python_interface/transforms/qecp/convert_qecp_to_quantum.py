@@ -19,7 +19,6 @@ This module contains the implementation of the xDSL convert-qecp-to-quantum dial
 
 from dataclasses import dataclass
 
-
 from xdsl import pattern_rewriter
 from xdsl.context import Context
 from xdsl.dialects import builtin, func, scf
@@ -235,55 +234,41 @@ class SubroutineCallOpSignatureConversion(RewritePattern):
 
 
 @dataclass(frozen=True)
-class RemoveEncodeLoop(RewritePattern):
-    """Op conversion pattern for lowering hyperregister-related qecp ops to quantum ops. This includes
-    qecp.create_hyperregister and qecp.hyperregister_extract/insert ops."""
+class UnrollEncodeLoop(RewritePattern):
+    """Op conversion pattern for removing scf.ForOp with encode operations."""
 
-    def _is_exact_encode_zero_steane_loop(self, for_op: scf.ForOp) -> bool:
+    def _is_exact_encode_zero_steane_loop(self, for_op: scf.ForOp) -> tuple[bool, str | None]:
         """Return true iff `for_op` is exactly the qecp encode loop shape."""
+        # 1. Validate structural constraints of the loop
         if len(for_op.iter_args) != 1 or len(for_op.results) != 1:
-            return False
+            return False, None
+
         block = for_op.body.block
-        if len(block.args) != 2:
-            return False
-        iv = block.args[0]
-        carried_hreg = block.args[1]
-        body_ops = list(block.ops)
-        if len(body_ops) != 4:
-            return False
-        extract_op, call_op, insert_op, yield_op = body_ops
-        if not isinstance(extract_op, qecp.ExtractCodeblockOp):
-            return False
-        if not isinstance(call_op, func.CallOp):
-            return False
-        if not isinstance(insert_op, qecp.InsertCodeblockOp):
-            return False
-        if not isinstance(yield_op, scf.YieldOp):
-            return False
-        if call_op.callee.string_value().find("encode_zero_") == -1:
-            return False
-        if extract_op.hyper_reg is not carried_hreg:
-            return False
-        if extract_op.idx is not iv:
-            return False
-        if tuple(call_op.arguments) != (extract_op.codeblock,):
-            return False
-        if len(call_op.results) != 1:
-            return False
-        if insert_op.in_hyper_reg is not carried_hreg:
-            return False
-        if insert_op.idx is not iv:
-            return False
-        if insert_op.codeblock is not call_op.results[0]:
-            return False
-        if tuple(yield_op.operands) != (insert_op.out_hyper_reg,):
-            return False
-        return call_op.callee.string_value()
+        if len(block.args) != 2 or len(block.ops) != 4:
+            return False, None
+
+        # 2. Unpack and validate the sequence of operation types
+        expected_types = (
+            qecp.ExtractCodeblockOp,
+            func.CallOp,
+            qecp.InsertCodeblockOp,
+            scf.YieldOp,
+        )
+
+        if not all(isinstance(op, t) for op, t in zip(block.ops, expected_types)):
+            return False, None
+
+        # 3. Verify the callee target name
+        call_op = block.ops[1]
+        if "encode_zero_" not in call_op.callee.string_value():
+            return False, None
+
+        return True, call_op.callee.string_value()
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: scf.ForOp | qecp.ExtractCodeblockOp, rewriter: PatternRewriter):
-        """Op conversion rewrite pattern for lowering hyperregister-related qecp ops to quantum ops."""
-        if isinstance(op, scf.ForOp) and self._is_exact_encode_zero_steane_loop(op):
+        """Op conversion rewrite pattern for unrolling encode loops."""
+        if isinstance(op, scf.ForOp) and self._is_exact_encode_zero_steane_loop(op)[0]:
             init_hreg = op.iter_args[0]
             if isinstance(init_hreg.owner, qecp.AllocOp):
                 op.results[0].replace_all_uses_with(init_hreg)
@@ -295,7 +280,7 @@ class RemoveEncodeLoop(RewritePattern):
                     reg = quantum.AllocOp(num_qubits)
                     rewriter.insert_op(reg)
 
-                    encode_subroutine_symbol = self._is_exact_encode_zero_steane_loop(op)
+                    encode_subroutine_symbol = self._is_exact_encode_zero_steane_loop(op)[1]
                     args = (reg.results[0],)
                     call_op = func.CallOp(
                         builtin.SymbolRefAttr(encode_subroutine_symbol),
@@ -317,15 +302,23 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
 
     def _apply_experimental_hyperregister_lowering(self, ctx: Context, op: builtin.ModuleOp):
         """Apply a separate pattern rewrite for lowering hyperregister-related qecp ops to quantum ops.
-        NOTE:
+        NOTE: This is an experimental rewriting for the hyperregister related operations and types.
+        1. Each codeblock allocated by qecp.alloc is replaced with a qecp.hyperreg allocation.
+        2. The encoding loop operation is unrolled.
+        3. `qecp.extract_codeblock` operations are removed from the IR by replacing the uses with the
+        corresponding quantum.reg SSA value.
+        4. `qecp.insert_codeblock` operations are replaced with `quantum.dealloc` operation.
+        NOTE: The current implementation only targets the 3-logical qubit GHZ circuit. The implementation
+        is based on the IR structure of the specific circuit.
         """
-
+        # Step 1: Unroll encoding loops and ensure the quantum.node op body contains no nested regions.
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
-                [RemoveEncodeLoop()],
+                [UnrollEncodeLoop()],
             )
         ).rewrite_module(op)
 
+        # Step 2: Walk the quantum.node func to update the hyperregister related operations.
         module_op = op
         for op_ in module_op.walk():
             if isinstance(op_, func.FuncOp) and "quantum.node" in op_.attributes:
@@ -340,7 +333,7 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                         qecp_ops_to_remove.append(quantum_op)
                     if (
                         isinstance(quantum_op, func.CallOp)
-                        and quantum_op.callee.string_value() == "encode_zero_Steane"
+                        and "encode_zero_" in quantum_op.callee.string_value()
                     ):
                         regs.append(quantum_op.results[0])
                     if isinstance(quantum_op, qecp.ExtractCodeblockOp):
@@ -361,7 +354,7 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                 for quantum_op in reversed(qecp_ops_to_remove):
                     rewriter = pattern_rewriter.PatternRewriter(quantum_op)
                     rewriter.erase_op(quantum_op)
-
+                # Remove dead code
                 DeadCodeElimination().apply(ctx, op_)
 
     # pylint: disable=unused-argument
