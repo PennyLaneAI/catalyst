@@ -130,7 +130,7 @@ requirements = [
     "numpy>2.0.0",
     "scipy-openblas32>=0.3.26,!=0.3.33",  # symbol and library name
     "diastatic-malt==2.15.3",
-    "xdsl==0.59.0",
+    "xdsl==0.63.0",
     "xdsl-jax==0.5.2",
 ]
 
