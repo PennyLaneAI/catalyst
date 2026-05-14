@@ -58,7 +58,7 @@ _cache_store: dict[Callable, dict[int, tuple[str, str]]] = {}
 
 
 class StopCompilation(Exception):
-    """Custom exception to stop compilation early when the desired specs level is reached."""
+    """Custom exception to stop compilation early when the desired level is reached."""
 
 
 def draw(qnode: QNode, *, level: int | None = None) -> Callable:
