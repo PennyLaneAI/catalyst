@@ -274,7 +274,7 @@ class RemoveEncodeLoop(RewritePattern):
             return False
         if not isinstance(yield_op, scf.YieldOp):
             return False
-        if call_op.callee.string_value() != "encode_zero_Steane":
+        if call_op.callee.string_value().find("encode_zero_") == -1:
             return False
         if extract_op.hyper_reg is not carried_hreg:
             return False
@@ -352,35 +352,39 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
             )
         ).rewrite_module(op)
 
-        qecp_alloc_op = None
-        regs = []
-        reg_idx = 0
-        qecp_ops_to_remove = []
-        for op_ in op.walk():
-            if isinstance(op_, qecp.AllocOp):
-                qecp_alloc_op = op_
-                qecp_ops_to_remove.append(op_)
-            if isinstance(op_, func.CallOp) and op_.callee.string_value() == "encode_zero_Steane":
-                regs.append(op_.results[0])
-            if isinstance(op_, qecp.ExtractCodeblockOp):
-                qecp_ops_to_remove.append(op_)
-                op_.codeblock.replace_all_uses_with(regs[reg_idx])
-                reg_idx += 1
-            if isinstance(op_, qecp.InsertCodeblockOp):
-                qecp_ops_to_remove.append(op_)
-                rewriter = pattern_rewriter.PatternRewriter(op_)
-                idx = resolve_constant_params(op_.idx)
-                dealloc = quantum.DeallocOp(regs[idx])
-                rewriter.insert_op(dealloc)
-                op_.results[0].replace_all_uses_with(qecp_alloc_op.results[0])
-            if isinstance(op_, qecp.DeallocOp):
-                rewriter = pattern_rewriter.PatternRewriter(op_)
-                rewriter.erase_op(op_)
+        module_op = op
+        for op_ in module_op.walk():
+            if isinstance(op_, func.FuncOp) and "quantum.node" in op_.attributes:
+                qecp_alloc_op = None
+                regs = []
+                reg_idx = 0
+                qecp_ops_to_remove = []
 
-        for op_ in reversed(qecp_ops_to_remove):
-            rewriter = pattern_rewriter.PatternRewriter(op_)
-            rewriter.erase_op(op_)
-        print(op)
+                for quantum_op in op_.walk():
+                    if isinstance(quantum_op, qecp.AllocOp):
+                        qecp_alloc_op = quantum_op
+                        qecp_ops_to_remove.append(quantum_op)
+                    if isinstance(quantum_op, func.CallOp) and quantum_op.callee.string_value() == "encode_zero_Steane":
+                        regs.append(quantum_op.results[0])
+                    if isinstance(quantum_op, qecp.ExtractCodeblockOp):
+                        qecp_ops_to_remove.append(quantum_op)
+                        quantum_op.codeblock.replace_all_uses_with(regs[reg_idx])
+                        reg_idx += 1
+                    if isinstance(quantum_op, qecp.InsertCodeblockOp):
+                        qecp_ops_to_remove.append(quantum_op)
+                        rewriter = pattern_rewriter.PatternRewriter(quantum_op)
+                        idx = resolve_constant_params(quantum_op.idx)
+                        dealloc = quantum.DeallocOp(regs[idx])
+                        rewriter.insert_op(dealloc)
+                        quantum_op.results[0].replace_all_uses_with(qecp_alloc_op.results[0])
+                    if isinstance(quantum_op, qecp.DeallocOp):
+                        rewriter = pattern_rewriter.PatternRewriter(quantum_op)
+                        rewriter.erase_op(quantum_op)
+                for quantum_op in reversed(qecp_ops_to_remove):
+                    rewriter = pattern_rewriter.PatternRewriter(quantum_op)
+                    rewriter.erase_op(quantum_op)
+                
+                print(op_)
 
 
 convert_qecp_to_quantum_pass = compiler_transform(ConvertQecPhysicalToQuantumPass)
