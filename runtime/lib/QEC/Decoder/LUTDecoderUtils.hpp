@@ -197,9 +197,8 @@ generate_lookup_table(const std::vector<TANNER_GRAPH_INT> &parity_mat_row_idx,
     for (size_t i = 0; i <= num_errors; i++) {
         // create a base error vector
         std::vector<int8_t> err_vector(num_data_qubits, 0);
-        //std::fill(err_vector.end() - i, err_vector.end(), 1);
-        for(int i0 = num_data_qubits - i; i0 < num_data_qubits; i0++){
-            err_vector[i0] = 1;
+        if (i > 0 && static_cast<size_t>(i) <= err_vector.size()) {
+            std::fill(err_vector.end() - i, err_vector.end(), 1);
         }
         RT_ASSERT(num_data_qubits <= 30)
 
