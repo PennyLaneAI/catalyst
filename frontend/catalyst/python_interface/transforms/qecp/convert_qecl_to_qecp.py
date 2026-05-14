@@ -360,7 +360,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     name = "convert-qecl-to-qecp"
 
-    qec_code: QecCode | str
+    qec_code: QecCode
 
     # To specify the number of errors to be injected in the noise subroutine,
     # which is needed for the convert-qecl-noise-to-qecp-noise pass.
@@ -376,10 +376,6 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             # Because the class is frozen, we cannot assign to self.qec_code directly.
             # We use object.__setattr__ to bypass the frozen restriction.
             new_code = QecCode.from_dict(self.qec_code)
-            object.__setattr__(self, "qec_code", new_code)
-        elif isinstance(self.qec_code, str):
-            # If qec_code is a string, we assume it's a valid QEC code name
-            new_code = QecCode.get(self.qec_code)
             object.__setattr__(self, "qec_code", new_code)
 
     # pylint: disable=unused-argument
