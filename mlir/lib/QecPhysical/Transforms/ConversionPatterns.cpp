@@ -106,9 +106,7 @@ struct DecodeEsmCssOpPattern : public OpConversionPattern<DecodeEsmCssOp> {
 
         SmallVector<Value> args = {tannerStructAlloca, esmAlloca, errIdxAlloca};
 
-        LLVM::CallOp::create(rewriter, loc, fnDecl, args);
-
-        rewriter.eraseOp(op);
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, args);
 
         return success();
     }
