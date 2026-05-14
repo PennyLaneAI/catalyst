@@ -27,6 +27,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Fixed ``KeyError`` in autograph when using ``qp.prod`` as a decorator with PennyLane >= 0.45.
+  [(#2844)](https://github.com/PennyLaneAI/catalyst/pull/2844)
+
 * Update RC nightly builds to read version number from the `_version.py` file
   [(#2797)](https://github.com/PennyLaneAI/catalyst/pull/2797)
 
@@ -51,6 +54,7 @@
 This release contains contributions from (in alphabetical order):
 
 Joey Carter,
+Yushao Chen,
 Lillian Frederiksen,
 Mehrdad Malekmohammadi,
 Shuli Shu,
