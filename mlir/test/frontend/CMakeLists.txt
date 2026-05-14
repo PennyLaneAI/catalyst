@@ -1,9 +1,13 @@
-set(BYTECODE_PATH "${CMAKE_SOURCE_DIR}/../frontend/test/lit/GraphDecomposition/test_rules.mlirbc")
+set(BYTECODE_PATH "${CMAKE_SOURCE_DIR}/../frontend/test/lit/GraphDecomposition/test_rules.mlir" CACHE PATH "Path to bytecode file for testing")
+
+add_custom_command(
+    OUTPUT "${BYTECODEPATH}"
+    COMMAND quantum-opt --emit-bytecode --register-decomp-rule-resource ${CMAKE_SOURCE_DIR}/../frontend/test/lit/GraphDecomposition/test_rules.mlir -o ${BYTECODE_PATH}
+    DEPENDS quantum-opt
+)
 
 add_custom_target(create_test_bytecode
-    quantum-opt --emit-bytecode --register-decomp-rule-resource ${CMAKE_SOURCE_DIR}/../frontend/test/lit/GraphDecomposition/test_rules.mlir -o ${BYTECODE_PATH}
     DEPENDS quantum-opt
-    BYPRODUCTS ${BYTECODE_PATH}
 )
 
 configure_lit_site_cfg(

@@ -24,6 +24,7 @@ TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pypro
 ENABLE_FLAKY ?= OFF
 XDSL_TESTS ?= ON
 STATIC_LINK_PYTHON ?= OFF
+BYTECODE_PATH ?= $(MK_DIR)/frontend/test/lit/GraphDecomposition/test_rules.mlirbc
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
@@ -181,6 +182,7 @@ ifneq ($(findstring clang,$(C_COMPILER)),clang)
 endif
 endif
 	@echo "check the Catalyst lit test suite"
+	cmake -G Ninja -S mlir -B $(DIALECTS_BUILD_DIR) -DBYTECODE_PATH=$(BYTECODE_PATH)
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-frontend
 
 pytest:
@@ -335,7 +337,7 @@ coverage: coverage-frontend coverage-runtime
 
 lit-coverage:
 	@echo "Running lit tests with coverage"
-	ENABLE_LIT_COVERAGE=1 COVERAGE_FILE=$(MK_DIR)/.coverage.lit cmake --build $(DIALECTS_BUILD_DIR) --target check-frontend
+	BYTECODE_PATH=$(BYTECODE_PATH) ENABLE_LIT_COVERAGE=1 COVERAGE_FILE=$(MK_DIR)/.coverage.lit $(PYTHON) $(LLVM_BUILD_DIR)/bin/llvm-lit -sv frontend/test/lit -j$(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
 
 coverage-frontend:
 ifeq ($(ENABLE_ASAN),ON)
