@@ -20,8 +20,7 @@
 extern "C" {
 #endif
 
-void __catalyst__qecp__lut_decoder(MemRefT_int32_1d *row_idx_tanner,
-                                   MemRefT_int32_1d *col_ptr_tanner, MemRefT_int8_1d *syndrome_res,
+void __catalyst__qecp__lut_decoder(TannerGraph_CSC_int32 *tanner, MemRefT_int8_1d *syndrome_res,
                                    MemRefT_int64_1d *err_idx);
 #ifdef __cplusplus
 } // extern "C"
