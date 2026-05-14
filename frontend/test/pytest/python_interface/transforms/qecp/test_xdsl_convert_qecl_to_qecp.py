@@ -980,6 +980,8 @@ class TestLoweringTransversalGates:
 # MARK: Integration Tests with Noise
 
 
+# We can remove this xfail and warning filter once `convert_qecl_to_qecp_pass` is complete
+@pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
 class TestQECLNoiseLoweringPassIntegration:
     """Integration lit tests for the convert-qecl-noise-to-qecp-noise pass"""
 
@@ -987,7 +989,7 @@ class TestQECLNoiseLoweringPassIntegration:
     def test_convert_qecl_noise_to_qecp_noise_pass_integration(self, run_filecheck_qjit):
         """Test the convert-qecl-noise-to-qecp-noise pass on the simplest possible, non-trivial circuit."""
         dev = qp.device("null.qubit", wires=1)
-    
+
         @qp.qjit(target="mlir", capture=True)
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
