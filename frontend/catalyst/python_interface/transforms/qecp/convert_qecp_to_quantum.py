@@ -31,11 +31,12 @@ from xdsl.pattern_rewriter import (
     attr_type_rewrite_pattern,
 )
 from xdsl.ir import SSAValue, Attribute
-from xdsl.dialects import arith, builtin, func
+from xdsl.dialects import arith, builtin, func, scf
 from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType
 from catalyst.python_interface.dialects import qecp, quantum
 from catalyst.python_interface.dialects.quantum.attributes import QubitType, QuregType
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
+from catalyst.python_interface.inspection.xdsl_conversion import resolve_constant_params
 
 from typing import cast
 
@@ -51,37 +52,23 @@ _QECP_GATENAMES_TO_QUANTUM_OPS = {
 
 
 def _get_idx_value_or_attr_from_extract_or_insert_op(
-    op: quantum.ExtractOp | quantum.InsertOp, rewriter: PatternRewriter
-) -> IntegerAttr | SSAValue[IndexType]:
-    """TODO: We need to move this helper function to a utility module
-    Helper function to get the index value 'idx' or attribute 'idx_attr' from a `quantum.extract`
-    or `quantum.insert` op.
-
-    If the index value has type IntegerType, an `arith.cast_index` op is inserted to cast it to type
-    IndexType. We must cast such values because `qecl.extract_block` ops expect an idx operand of
-    type IndexType.
-    """
+    op: qecp.ExtractQubitOp | qecp.InsertQubitOp,
+    rewriter: PatternRewriter,
+) -> IntegerAttr | SSAValue:
+    """Get an i64 index value/attr for quantum.extract/insert from a qecp extract/insert op."""
     if op.idx is not None:
+        if isinstance(op.idx.type, IntegerType) and op.idx.type.width.data == 64:
+            return op.idx
         if isinstance(op.idx.type, IndexType):
-            idx = cast(SSAValue[IndexType], op.idx)
-        elif isinstance(op.idx.type, IntegerType):
-            # Insert cast operation integer -> index
-            index_cast_op = arith.IndexCastOp(op.idx, IndexType())
+            index_cast_op = arith.IndexCastOp(op.idx, builtin.i64)
             rewriter.insert_op(index_cast_op)
-            idx = cast(SSAValue[IndexType], index_cast_op.result)
-        else:
-            assert False, (
-                f"Expected idx value '{op.idx}' to have type 'IndexType' or 'IntegerType', "
-                f"but got {op.idx.type}"
-            )
-
-    elif op.idx_attr is not None:
-        idx = op.idx_attr
-
-    else:
-        assert False, f"Both idx and idx_attr of op '{op}' are None"
-
-    return idx
+            return index_cast_op.result
+        raise TypeError(
+            f"Expected idx value '{op.idx}' to have type IndexType or i64, got {op.idx.type}"
+        )
+    if op.idx_attr is not None:
+        return IntegerAttr(op.idx_attr.value.data, 64)
+    raise ValueError(f"Both idx and idx_attr of op '{op}' are None")
 
 
 def _convert_qecp_type(typ: Attribute) -> Attribute:
@@ -260,6 +247,68 @@ class SubroutineCallOpSignatureConversion(RewritePattern):
         rewriter.replace_op(op, new_call)
 
 
+@dataclass
+class RemoveEncodeLoop(RewritePattern):
+    """Op conversion pattern for lowering hyperregister-related qecp ops to quantum ops. This includes
+    qecp.create_hyperregister and qecp.hyperregister_extract/insert ops."""
+
+    def __init__(self):
+        self.alloc = None
+        self.regs: list[quantum.QuregType] = []
+
+    def _is_exact_encode_zero_steane_loop(self, for_op: scf.ForOp) -> bool:
+        """Return true iff `for_op` is exactly the qecp encode loop shape."""
+        if len(for_op.iter_args) != 1 or len(for_op.results) != 1:
+            return False
+        block = for_op.body.block
+        if len(block.args) != 2:
+            return False
+        iv = block.args[0]
+        carried_hreg = block.args[1]
+        body_ops = list(block.ops)
+        if len(body_ops) != 4:
+            return False
+        extract_op, call_op, insert_op, yield_op = body_ops
+        if not isinstance(extract_op, qecp.ExtractCodeblockOp):
+            return False
+        if not isinstance(call_op, func.CallOp):
+            return False
+        if not isinstance(insert_op, qecp.InsertCodeblockOp):
+            return False
+        if not isinstance(yield_op, scf.YieldOp):
+            return False
+        if call_op.callee.string_value() != "encode_zero_Steane":
+            return False
+        if extract_op.hyper_reg is not carried_hreg:
+            return False
+        if extract_op.idx is not iv:
+            return False
+        if tuple(call_op.arguments) != (extract_op.codeblock,):
+            return False
+        if len(call_op.results) != 1:
+            return False
+        if insert_op.in_hyper_reg is not carried_hreg:
+            return False
+        if insert_op.idx is not iv:
+            return False
+        if insert_op.codeblock is not call_op.results[0]:
+            return False
+        if tuple(yield_op.operands) != (insert_op.out_hyper_reg,):
+            return False
+        return call_op.callee.string_value()
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: scf.ForOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering hyperregister-related qecp ops to quantum ops."""
+        if self._is_exact_encode_zero_steane_loop(op):
+            init_hreg = op.iter_args[0]
+            if isinstance(init_hreg.owner, qecp.AllocOp):
+                op.results[0].replace_all_uses_with(init_hreg)
+                rewriter.erase_op(op)
+            return
+
+
+
 @dataclass(frozen=True)
 class ConvertQecPhysicalToQuantumPass(ModulePass):
     """
@@ -286,9 +335,12 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                     MeasureConversion(),
                     SubroutineSignatureConversion(),
                     SubroutineCallOpSignatureConversion(),
+                    RemoveEncodeLoop(),
                 ]
             )
         ).rewrite_module(op)
+
+        print(op)
 
 
 convert_qecp_to_quantum_pass = compiler_transform(ConvertQecPhysicalToQuantumPass)
