@@ -29,7 +29,6 @@ from catalyst.jit import QJIT
 from catalyst.python_interface.compiler import Compiler
 
 from .collector import QMLCollector
-from .specs import StopCompilation
 from .xdsl_conversion import get_mlir_module
 
 HAS_MATPLOTLIB = True
@@ -56,6 +55,10 @@ from .pydot_dag_builder import PyDotDAGBuilder
 # TODO: This caching mechanism should be improved,
 # because now it relies on a mutable global state
 _cache_store: dict[Callable, dict[int, tuple[str, str]]] = {}
+
+
+class StopCompilation(Exception):
+    """Custom exception to stop compilation early when the desired specs level is reached."""
 
 
 def draw(qnode: QNode, *, level: int | None = None) -> Callable:
