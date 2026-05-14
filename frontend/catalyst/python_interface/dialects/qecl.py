@@ -251,7 +251,7 @@ class ExtractCodeblockOp(IRDLOperation):
 
         if isinstance(idx, IntegerAttr):
             operands = (hyper_reg, None)
-            properties = {"idx_attr": idx}
+            properties = {"idx_attr": IntegerAttr(idx.value.data, IndexType())}
         else:
             operands = (hyper_reg, idx)
             properties = {}
@@ -299,7 +299,7 @@ class InsertCodeblockOp(IRDLOperation):
 
         if isinstance(idx, IntegerAttr):
             operands = (in_hyper_reg, None, codeblock)
-            properties = {"idx_attr": idx}
+            properties = {"idx_attr": IntegerAttr(idx.value.data, IndexType())}
         else:
             operands = (in_hyper_reg, idx, codeblock)
             properties = {}
@@ -454,7 +454,7 @@ class SingleQubitLogicalGateOp(IRDLOperation):
 
         if isinstance(idx, IntegerAttr):
             operands = (in_codeblock, None)
-            properties["idx_attr"] = idx
+            properties["idx_attr"] = IntegerAttr(idx.value.data, IndexType())
 
         else:
             operands = (in_codeblock, idx)
@@ -725,7 +725,7 @@ class MeasureOp(IRDLOperation):
 
         if isinstance(idx, IntegerAttr):
             operands = (in_codeblock, None)
-            properties = {"idx_attr": idx}
+            properties = {"idx_attr": IntegerAttr(idx.value.data, IndexType())}
         else:
             operands = (in_codeblock, idx)
 
