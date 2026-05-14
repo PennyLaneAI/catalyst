@@ -19,6 +19,8 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "Catalyst/Utils/EnsureFunctionDeclaration.h"
+#include "Catalyst/Utils/StaticAllocas.h"
 #include "QecPhysical/IR/QecPhysicalOps.h"
 #include "QecPhysical/Transforms/Patterns.h"
 
@@ -58,6 +60,58 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
     }
 };
 
+struct DecodeEsmCssOpPattern : public OpConversionPattern<DecodeEsmCssOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(DecodeEsmCssOp op, DecodeEsmCssOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = getContext();
+        auto i1 = IntegerType::get(ctx, 1);
+        auto i64 = IntegerType::get(ctx, 64);
+        auto voidTy = LLVM::LLVMVoidType::get(ctx);
+        auto ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
+
+        const TypeConverter *conv = getTypeConverter();
+
+        if (!op.isBufferized()) {
+            return op.emitOpError("op must be bufferized before lowering to LLVM");
+        }
+
+        Type esmVectorType, errIdxVectorType;
+        esmVectorType = conv->convertType(MemRefType::get(
+            {llvm::dyn_cast<mlir::ShapedType>(op.getEsm().getType()).getDimSize(0)}, i1));
+
+        errIdxVectorType = conv->convertType(MemRefType::get(
+            {llvm::dyn_cast<mlir::ShapedType>(op.getErrIdxIn().getType()).getDimSize(0)}, i64));
+
+        auto tannerStructType = conv->convertType(op.getTannerGraph().getType());
+
+        Value esmAlloca = catalyst::getStaticAlloca(loc, rewriter, esmVectorType, 1);
+        Value errIdxAlloca = catalyst::getStaticAlloca(loc, rewriter, errIdxVectorType, 1);
+        Value tannerStructAlloca = catalyst::getStaticAlloca(loc, rewriter, tannerStructType, 1);
+
+        LLVM::StoreOp::create(rewriter, loc, adaptor.getEsm(), esmAlloca);
+        LLVM::StoreOp::create(rewriter, loc, adaptor.getErrIdxIn(), errIdxAlloca);
+        LLVM::StoreOp::create(rewriter, loc, adaptor.getTannerGraph(), tannerStructAlloca);
+
+        // Define function signature
+        StringRef fnName = "__catalyst__qecp__lut_decoder";
+
+        Type fnSignature = LLVM::LLVMFunctionType::get(
+            voidTy, {tannerStructAlloca.getType(), ptrTy, ptrTy}, false);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, fnName, fnSignature);
+
+        SmallVector<Value> args = {tannerStructAlloca, esmAlloca, errIdxAlloca};
+
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, args);
+
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -67,6 +121,7 @@ void populateQecPhysicalConversionPatterns(LLVMTypeConverter &typeConverter,
                                            RewritePatternSet &patterns)
 {
     patterns.add<AssembleTannerGraphOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<DecodeEsmCssOpPattern>(typeConverter, patterns.getContext());
 }
 
 } // namespace qecp
