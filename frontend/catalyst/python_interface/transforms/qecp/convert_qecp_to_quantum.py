@@ -15,6 +15,12 @@
 """QEC Physical to Quantum dialect conversion.
 
 This module contains the implementation of the xDSL convert-qecp-to-quantum dialect-conversion pass.
+
+Known Limitations:
+* The hyperregister related lowering is experimental and the target is for circuits with 1 more logical
+codeblocks, where there is a loop for encoding each logical codeblocks. It's sufficient for the GHZ circuit.
+We might have to come back to this later.
+
 """
 
 from dataclasses import dataclass
@@ -329,6 +335,8 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
         4. `qecp.insert_codeblock` operations are replaced with `quantum.dealloc` operation.
         NOTE: The current implementation only targets the 3-logical qubit GHZ circuit. The implementation
         is based on the IR structure of the specific circuit.
+        TODO: We might come back to update the logic below to support 1-logical qubit circuits, where there
+        is no ForOp encoding loop in the IR.
         """
         # Step 1: Unroll encoding loops and ensure the quantum.node op body contains no nested regions.
         PatternRewriteWalker(
