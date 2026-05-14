@@ -286,7 +286,7 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
         result.functionCalls[name] = tripCount.value();
         return;
     }
-    
+
     // Loop trip count comes from the user's inputs. Record the body under dyn_for_loop_<N>
     // and store a fixed number (hash) so each such loop has its own id in the output.
     std::string name = makeUniqueSyntheticName("dyn_for_loop_", dynForLoopCounter);
