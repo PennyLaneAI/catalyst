@@ -26,9 +26,12 @@
 
 <h3>Documentation 📝</h3>
 
+* `Transform` documentation is now handled by `doc/conf.py` instead of during `Transform.__new__`.
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Lillian Frederiksen,
+Christina Lee,
 Shuli Shu,

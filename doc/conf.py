@@ -18,6 +18,8 @@ import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
+from sphinx.ext.autodoc import FunctionDocumenter
+from pennylane.transforms.core import Transform
 
 from MLIRLexer import MLIRLexer
 from sphinx.highlighting import lexers
@@ -333,7 +335,24 @@ def add_noindex_to_cpp_pages(
         metatags = context.get("metatags", "")
         context["metatags"] = metatags + '<meta name="robots" content="noindex, nofollow" />\n'
 
+class TransformDocumenter(FunctionDocumenter):
+    """
+    Forces automodule to document callable instances as functions.
+    """
+    objtype = 'transform'
+    directivetype = 'function' # this is what tells sphinx to render it as a function
+    
+    # Priority must be higher than DataDocumenter (which is 10)
+    priority = 20 
+
+    @classmethod
+    def can_document_member(cls, member, membername, isattr, parent):
+        """Determine if this documenter should handle the given member."""
+        return isinstance(member, Transform)
+
+
 
 def setup(app):
     """Sphinx application setup hook."""
     app.connect("html-page-context", add_noindex_to_cpp_pages)
+    app.add_autodocumenter(TransformDocumenter)
