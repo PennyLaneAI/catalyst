@@ -497,9 +497,9 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
  *
  * @param flat The ResourceResult to accumulate counts into.
  * @param child The ResourceResult to merge.
- * @param count A scalar to multiply the child's counts by.
+ * @param count A scalar to multiply the child's counts by (defaults to 1).
  */
-static void accumulateScaled(ResourceResult &flat, const ResourceResult &child, int64_t count)
+static void accumulateScaled(ResourceResult &flat, const ResourceResult &child, int64_t count = 1)
 {
     for (const auto &opEntry : child.operations) {
         auto &innerDst = flat.operations[opEntry.getKey()];
@@ -553,7 +553,7 @@ const ResourceResult *ResourceAnalysis::getFlattenedResource(StringRef funcName)
     ResourceResult &flat = flattenedCache[funcName];
 
     // Self-contributions (no scaling).
-    accumulateScaled(flat, r, /*count=*/1);
+    accumulateScaled(flat, r);
     flat.numArgQubits = r.numArgQubits; // own arg qubits only
     flat.deviceName = r.deviceName;
     flat.isQnode = r.isQnode;
