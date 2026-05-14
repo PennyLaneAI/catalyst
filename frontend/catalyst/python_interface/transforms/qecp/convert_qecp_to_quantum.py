@@ -21,8 +21,9 @@ from dataclasses import dataclass
 
 from xdsl import pattern_rewriter
 from xdsl.context import Context
-from xdsl.dialects import builtin, func, scf
-from xdsl.ir import Attribute
+from xdsl.dialects import arith, builtin, func, scf
+from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType
+from xdsl.ir import Attribute, SSAValue
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
@@ -40,7 +41,6 @@ from catalyst.python_interface.dialects.quantum.attributes import QubitType, Qur
 from catalyst.python_interface.inspection.xdsl_conversion import resolve_constant_params
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 
-from ..qecl.convert_quantum_to_qecl import _get_idx_value_or_attr_from_extract_or_insert_op
 
 _QECP_GATENAMES_TO_QUANTUM_OPS = {
     "qecp.hadamard": "Hadamard",
@@ -51,6 +51,26 @@ _QECP_GATENAMES_TO_QUANTUM_OPS = {
     "qecp.z": "PauliZ",
     "qecp.cnot": "CNOT",
 }
+
+
+def _get_i64_idx_value_or_attr_from_extract_or_insert_op(
+    op: qecp.ExtractQubitOp | qecp.InsertQubitOp,
+    rewriter: PatternRewriter,
+) -> IntegerAttr | SSAValue:
+    """Get an i64 index value/attr for quantum.extract/insert from a qecp extract/insert op."""
+    if op.idx is not None:
+        if isinstance(op.idx.type, IntegerType) and op.idx.type.width.data == 64:
+            return op.idx
+        if isinstance(op.idx.type, IndexType):
+            index_cast_op = arith.IndexCastOp(op.idx, builtin.i64)
+            rewriter.insert_op(index_cast_op)
+            return index_cast_op.result
+        raise TypeError(
+            f"Expected idx value '{op.idx}' to have type IndexType or i64, got {op.idx.type}"
+        )
+    if op.idx_attr is not None:
+        return IntegerAttr(op.idx_attr.value.data, 64)
+    raise ValueError(f"Both idx and idx_attr of op '{op}' are None")
 
 
 def _convert_qecp_type(typ: Attribute) -> Attribute:
@@ -125,7 +145,7 @@ class ExtractQubitConversion(RewritePattern):
     def match_and_rewrite(self, op: qecp.ExtractQubitOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that extract a data qubit from a
         quantum.reg."""
-        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
+        idx = _get_i64_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
 
         rewriter.replace_op(op, quantum.ExtractOp(op.codeblock, idx=idx))
 
@@ -137,7 +157,7 @@ class InsertQubitConversion(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecp.InsertQubitOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops for data qubit insertion."""
-        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
+        idx = _get_i64_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
         insert_op = quantum.InsertOp(op.in_codeblock, idx=idx, qubit=op.qubit)
         rewriter.replace_op(op, insert_op)
 
@@ -238,7 +258,7 @@ class UnrollEncodeLoop(RewritePattern):
     """Op conversion pattern for removing scf.ForOp with encode operations."""
 
     def _is_exact_encode_zero_steane_loop(self, for_op: scf.ForOp) -> tuple[bool, str | None]:
-        """Return true iff `for_op` is exactly the qecp encode loop shape."""
+        """Return true and encoder subroutine symbol iff `for_op` is exactly the qecp encode loop shape."""
         # 1. Validate structural constraints of the loop
         if len(for_op.iter_args) != 1 or len(for_op.results) != 1:
             return False, None
@@ -259,7 +279,7 @@ class UnrollEncodeLoop(RewritePattern):
             return False, None
 
         # 3. Verify the callee target name
-        call_op = block.ops[1]
+        _, call_op, _, _ = block.ops
         if "encode_zero_" not in call_op.callee.string_value():
             return False, None
 
