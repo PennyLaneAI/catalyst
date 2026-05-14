@@ -489,34 +489,34 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 }
 
 /**
- * @brief Merge `child`'s quantum content, classical content, and transitive
- * call counts into `flat`, scaled by `count`. Used to fold callee/loop-body
+ * @brief Merge `source`'s quantum content, classical content, and transitive
+ * call counts into `dest`, scaled by `count`. Used to fold callee/loop-body
  * contributions into a flattened view.
  *
- * @param flat The ResourceResult to accumulate counts into.
- * @param child The ResourceResult to merge.
+ * @param dest The ResourceResult to accumulate counts into (modified).
+ * @param source The ResourceResult to merge into `dest` (unmodified).
  * @param count A scalar to multiply the child's counts by (defaults to 1).
  */
-static void accumulateScaled(ResourceResult &flat, const ResourceResult &child, int64_t count = 1)
+static void accumulateScaled(ResourceResult &dest, const ResourceResult &source, int64_t count = 1)
 {
-    for (const auto &opEntry : child.operations) {
-        auto &innerDst = flat.operations[opEntry.getKey()];
+    for (const auto &opEntry : source.operations) {
+        auto &innerDst = dest.operations[opEntry.getKey()];
         for (const auto &sizeEntry : opEntry.getValue()) {
             innerDst[sizeEntry.first] += sizeEntry.second * count;
         }
     }
-    for (const auto &m : child.measurements) {
-        flat.measurements[m.getKey()] += m.getValue() * count;
+    for (const auto &m : source.measurements) {
+        dest.measurements[m.getKey()] += m.getValue() * count;
     }
-    for (const auto &ci : child.classicalInstructions) {
-        flat.classicalInstructions[ci.getKey()] += ci.getValue() * count;
+    for (const auto &ci : source.classicalInstructions) {
+        dest.classicalInstructions[ci.getKey()] += ci.getValue() * count;
     }
-    for (const auto &fc : child.functionCalls) {
-        flat.functionCalls[fc.getKey()] += fc.getValue() * count;
+    for (const auto &fc : source.functionCalls) {
+        dest.functionCalls[fc.getKey()] += fc.getValue() * count;
     }
-    flat.numAllocQubits += child.numAllocQubits * count;
-    flat.hasBranches = flat.hasBranches || child.hasBranches;
-    flat.hasDynLoop = flat.hasDynLoop || child.hasDynLoop;
+    dest.numAllocQubits += source.numAllocQubits * count;
+    dest.hasBranches = dest.hasBranches || source.hasBranches;
+    dest.hasDynLoop = dest.hasDynLoop || source.hasDynLoop;
 }
 
 /**
