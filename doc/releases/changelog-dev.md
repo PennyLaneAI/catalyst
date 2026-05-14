@@ -14,6 +14,9 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
+  [(#2840)](https://github.com/PennyLaneAI/catalyst/pull/2840)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
@@ -39,6 +42,7 @@
 * Part of the new, experimental QEC pipeline, the `convert-qecp-to-llvm` compiler pass has been
   added to lower operations and types in the QEC physical dialect to the LLVM dialect.
   [(#2780)](https://github.com/PennyLaneAI/catalyst/pull/2780)
+  [(#2772)](https://github.com/PennyLaneAI/catalyst/pull/2772)
 
 * Resolved a bug in the `qeccycle` subroutine within the `convert_qecl_to_qecp_pass` where the `SSA` values
   of `scf.YieldOp` were incorrectly returned instead of `scf.ForOp` results. Ensure the pass access QEC information with its name in `str` to ensure the compatibility with the compiler infrastructure.
