@@ -224,6 +224,9 @@ def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
 
     bytecode = _quantum_opt(
         "--emit-bytecode",
+        "--canonicalize",
+        "--convert-to-value-semantics",
+        "--canonicalize",
         "--register-decomp-rule-resource",
         stdin=mlir_rules.encode("utf-8"),
         text=None,
@@ -234,5 +237,4 @@ def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
 
 
 if __name__ == "__main__":  # pragma: no cover
-    pass
-    # precompile_decomp_rules()  # pragma: no cover
+    precompile_decomp_rules()  # pragma: no cover
