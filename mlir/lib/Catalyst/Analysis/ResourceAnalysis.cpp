@@ -470,6 +470,13 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     // Function calls
     if (auto callOp = dyn_cast<func::CallOp>(op)) {
         result.functionCalls[callOp.getCallee()] += 1;
+        if (auto parentFunc = op->getParentOfType<func::FuncOp>();
+            parentFunc && callOp.getCallee() == parentFunc.getName()) {
+            callOp.emitWarning() << "ResourceAnalysis encountered recursive call to '"
+                                 << callOp.getCallee()
+                                 << "'. Recursive calls are not flattened, so resource counts may "
+                                    "be incomplete.";
+        }
         return;
     }
 
