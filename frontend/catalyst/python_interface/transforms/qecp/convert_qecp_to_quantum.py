@@ -41,7 +41,6 @@ from catalyst.python_interface.dialects.quantum.attributes import QubitType, Qur
 from catalyst.python_interface.inspection.xdsl_conversion import resolve_constant_params
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 
-
 _QECP_GATENAMES_TO_QUANTUM_OPS = {
     "qecp.hadamard": "Hadamard",
     "qecp.identity": "Identity",
