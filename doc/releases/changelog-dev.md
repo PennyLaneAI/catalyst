@@ -22,6 +22,10 @@
   folder being created and the files printed outside in the main directory.
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
 
+* Resolved a bug in the `qeccycle` subroutine within the `convert_qecl_to_qecp_pass` where the `SSA` values
+  of `scf.YieldOp` were incorrectly returned instead of `scf.ForOp` results.
+  [(#2837)](https://github.com/PennyLaneAI/catalyst/pull/2837)
+
 <h3>Internal changes ⚙️</h3>
 
 * Update RC nightly builds to read version number from the `_version.py` file
@@ -39,6 +43,10 @@
 * Part of the new, experimental QEC pipeline, the `convert-qecp-to-llvm` compiler pass has been
   added to lower operations and types in the QEC physical dialect to the LLVM dialect.
   [(#2780)](https://github.com/PennyLaneAI/catalyst/pull/2780)
+
+* Ensure the pass access QEC information with its name in `str` to ensure the compatibility with 
+  the compiler infrastructure.
+  [(#2837)](https://github.com/PennyLaneAI/catalyst/pull/2837)
 
 <h3>Documentation 📝</h3>
 
