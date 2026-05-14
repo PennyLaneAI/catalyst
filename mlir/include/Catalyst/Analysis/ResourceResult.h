@@ -39,7 +39,7 @@ struct ResourceResult {
     llvm::StringMap<int64_t> functionCalls;
 
     // `dyn_for_loop_<N>` -> stable hash id for that loop op (not a trip count).
-    // Ignored by `multiplyByScalar`; `mergeWith` keeps the existing value per key.
+    // Ignored by `multiplyByScalar`; `mergeWith` mints a fresh id on key conflicts.
     llvm::StringMap<uint64_t> varFunctionCalls;
 
     // qubits from quantum.alloc / quantum.alloc_qubit ops

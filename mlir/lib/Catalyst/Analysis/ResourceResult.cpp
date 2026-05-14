@@ -16,6 +16,7 @@
 
 #include <algorithm>
 
+#include "llvm/ADT/Hashing.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/JSON.h"
 
@@ -62,13 +63,15 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
     mergeStringMap(classicalInstructions, other.classicalInstructions, method);
     mergeStringMap(functionCalls, other.functionCalls, method);
 
-    // varFunctionCalls hold SSA-derived hashes; first writer wins on
-    // conflict. The `method` parameter is intentionally ignored — Sum/Max/Min
-    // are not meaningful on identifiers, and keys are minted uniquely by
-    // `ResourceAnalysis::makeUniqueSyntheticName` so collisions don't occur
-    // in practice.
+    // varFunctionCalls hold identifiers for unknown dynamic counts. If the
+    // same key appears twice, the merge result represents a new unknown value
+    // such as Sum/Max/Min(lhs, rhs), not either input identifier.
     for (const auto &entry : other.varFunctionCalls) {
-        varFunctionCalls.try_emplace(entry.getKey(), entry.getValue());
+        auto [it, inserted] = varFunctionCalls.try_emplace(entry.getKey(), entry.getValue());
+        if (!inserted) {
+            it->second = static_cast<size_t>(hash_combine(
+                entry.getKey(), it->second, entry.getValue(), static_cast<int>(method)));
+        }
     }
 
     if (deviceName.empty() && !other.deviceName.empty()) {

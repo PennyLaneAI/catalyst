@@ -54,7 +54,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
 
     void runOnOperation() final
     {
-        auto &analysis = getAnalysis<ResourceAnalysis>();
+        auto &analysis = getAnalysis<ResourceAnalysis, ModuleOp>();
         const auto &results = analysis.getResults();
 
         // Populate statistics from the entry function. The flattened view

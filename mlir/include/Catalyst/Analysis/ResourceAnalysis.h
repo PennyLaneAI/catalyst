@@ -28,7 +28,7 @@ namespace catalyst {
 class ResourceAnalysis {
   public:
     // walk all func::FuncOps within the operation.
-    explicit ResourceAnalysis(mlir::Operation *op);
+    explicit ResourceAnalysis(ModuleOp moduleOp);
 
     const llvm::StringMap<ResourceResult> &getResults() const { return funcResults; }
 

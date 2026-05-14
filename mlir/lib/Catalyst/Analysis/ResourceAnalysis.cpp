@@ -190,22 +190,22 @@ static std::string getMeasurementName(Operation *op)
 // ResourceAnalysis implementation
 //===----------------------------------------------------------------------===//
 
-ResourceAnalysis::ResourceAnalysis(Operation *op)
+ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp)
 {
-    LLVM_DEBUG(dbgs() << "ResourceAnalysis: analyzing operation " << op->getName() << "\n");
+    LLVM_DEBUG(dbgs() << "ResourceAnalysis: analyzing operation " << moduleOp->getName() << "\n");
 
     // Reserve every user function's name in `funcResults`. This
     // ensures `makeUniqueSyntheticName` will skip past names like
     // `for_loop_3` that the user already chose, regardless of walk order.
-    op->walk<WalkOrder::PreOrder>([&](func::FuncOp funcOp) {
+    for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
         if (funcOp.isDeclaration()) {
             return;
         }
         funcResults.try_emplace(funcOp.getName());
-    });
+    };
 
     StringRef entryFunc;
-    op->walk<WalkOrder::PreOrder>([&](func::FuncOp funcOp) {
+    for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
         if (funcOp.isDeclaration()) {
             return;
         }
@@ -234,7 +234,7 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
         if (entryFunc.empty()) {
             entryFunc = funcOp.getName();
         }
-    });
+    };
 
     assert(!entryFunc.empty() && "expected at least one non-declaration function");
 
