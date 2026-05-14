@@ -41,12 +41,7 @@
   [(#2780)](https://github.com/PennyLaneAI/catalyst/pull/2780)
 
 * Resolved a bug in the `qeccycle` subroutine within the `convert_qecl_to_qecp_pass` where the `SSA` values
-  of `scf.YieldOp` were incorrectly returned instead of `scf.ForOp` results.
-  [(#2837)](https://github.com/PennyLaneAI/catalyst/pull/2837)
-
-
-* Ensure the pass access QEC information with its name in `str` to ensure the compatibility with 
-  the compiler infrastructure.
+  of `scf.YieldOp` were incorrectly returned instead of `scf.ForOp` results. Ensure the pass access QEC information with its name in `str` to ensure the compatibility with the compiler infrastructure.
   [(#2837)](https://github.com/PennyLaneAI/catalyst/pull/2837)
 
 <h3>Documentation 📝</h3>
