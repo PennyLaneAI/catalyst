@@ -47,6 +47,12 @@
   [(#2780)](https://github.com/PennyLaneAI/catalyst/pull/2780)
   [(#2772)](https://github.com/PennyLaneAI/catalyst/pull/2772)
 
+* The constructors of xDSL ops that accept index attributes have been updated to ensure that the
+  resulting attribute has the correct type. These ops include `quantum.{extract, insert}`,
+  `qecl.{extract_block, insert_block, measure, <gates>}`, and
+  `qecp.{extract_block, insert_block, extract, insert}`.
+  [(#2846)](https://github.com/PennyLaneAI/catalyst/pull/2846)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
