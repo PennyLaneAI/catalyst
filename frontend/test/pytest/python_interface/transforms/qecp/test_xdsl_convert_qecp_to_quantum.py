@@ -504,6 +504,9 @@ class TestHyperRegisterLowering:
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
 
 
+@pytest.mark.filterwarnings(
+    "ignore:Unable to remove cast UnrealizedConversionCastOp. Until,qecp.decode_physical_meas is in"
+)
 class TestQECPassIntegration:
     """Integration lit tests for the all qec-related pass"""
 
