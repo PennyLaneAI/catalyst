@@ -8,6 +8,12 @@
 
 <h3>Improvements 🛠</h3>
 
+* The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
+  instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
+  with their trip count. Loops with dynamic bounds appear as `dyn_for_loop_<N>` with a stable
+  identifier, and totals across the call graph are computed on demand.
+  [(#2782)](https://github.com/PennyLaneAI/catalyst/pull/2782)
+
 * The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
   argument is at an arbitrary position in the argument list.
   [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)

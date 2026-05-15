@@ -28,7 +28,7 @@ namespace catalyst {
 class ResourceAnalysis {
   public:
     // walk all func::FuncOps within the operation.
-    explicit ResourceAnalysis(mlir::Operation *op);
+    explicit ResourceAnalysis(ModuleOp moduleOp);
 
     const llvm::StringMap<ResourceResult> &getResults() const { return funcResults; }
 
@@ -45,12 +45,25 @@ class ResourceAnalysis {
     // returns empty string if no entry function was found
     llvm::StringRef getEntryFunc() const { return entryFuncName; }
 
+    const ResourceResult *getFlattenedResource(llvm::StringRef funcName) const;
+
   private:
     // per-function resource counts
     llvm::StringMap<ResourceResult> funcResults;
 
+    // Flattened totals per function; filled on first `getFlattenedResource` call.
+    mutable llvm::StringMap<ResourceResult> flattenedCache;
+
     // name of the entry function (first function pass detects), empty if none
     std::string entryFuncName;
+
+    // Counters for lifted-loop names (`for_loop_<N>` vs `dyn_for_loop_<N>`),
+    // so each prefix gets its own numbering sequence.
+    int64_t forLoopCounter = 0;
+    int64_t dynForLoopCounter = 0;
+
+    // `prefix` + counter; advance counter until the name is free in `funcResults`
+    std::string makeUniqueSyntheticName(llvm::StringRef prefix, int64_t &counter);
 
     // analyze a region and accumulate results
     void analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint);
@@ -63,9 +76,6 @@ class ResourceAnalysis {
 
     // categorize and count a single operation
     void collectOperation(Operation *op, ResourceResult &result, bool isAdjoint);
-
-    // resolve function calls: inline callee resources into caller
-    void resolveFunctionCalls(llvm::StringRef funcName);
 };
 
 } // namespace catalyst

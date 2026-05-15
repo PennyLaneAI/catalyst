@@ -38,8 +38,9 @@ struct ResourceResult {
 
     llvm::StringMap<int64_t> functionCalls;
 
-    // unresolved function calls (to be inlined later)
-    llvm::StringMap<int64_t> unresolvedFunctionCalls;
+    // `dyn_for_loop_<N>` -> stable hash id for that loop op (not a trip count).
+    // Ignored by `multiplyByScalar`; `mergeWith` mints a fresh id on key conflicts.
+    llvm::StringMap<uint64_t> varFunctionCalls;
 
     // qubits from quantum.alloc / quantum.alloc_qubit ops
     int64_t numAllocQubits = 0;
