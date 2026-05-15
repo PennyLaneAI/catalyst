@@ -44,6 +44,7 @@ set(LIBS
     ${conversion_libs}
     ${translation_libs}
     catalyst-analysis
+    ExternalStablehloLib
 )
 
 set(DEPENDS

@@ -478,6 +478,25 @@ llvm::LogicalResult catalyst::driver::runPipeline(PassManager &pm, const Compile
             return failure();
         }
         catalyst::utils::LinesCount::call(moduleOp);
+
+        // After bufferization, cross-compile catalyst.target nested modules via ORC JIT.
+        // Must run before MLIRToLLVMDialectConversion so that injected catalyst.custom_call
+        // ops are lowered by convert-catalyst-to-llvm in stage 5.
+        if (pipeline.getName() == "BufferizationStage" && !options.workspace.empty()) {
+            Pipeline ccrkPipeline;
+            ccrkPipeline.setName("CrossCompileRemoteKernels");
+            std::string ccrkPassStr =
+                "cross-compile-remote-kernels{workspace=" + options.workspace.str() +
+                " target=" + llvm::sys::getDefaultTargetTriple() + "}";
+            ccrkPipeline.setPasses({ccrkPassStr});
+            if (failed(catalyst::utils::Timer<>::timer(
+                    catalyst::driver::runPipeline, ccrkPipeline.getName(),
+                    /* add_endl */ false, pm, options, output, ccrkPipeline,
+                    /* clHasManualPipeline */ true, moduleOp))) {
+                return failure();
+            }
+            catalyst::utils::LinesCount::call(moduleOp);
+        }
     }
     return success();
 }
