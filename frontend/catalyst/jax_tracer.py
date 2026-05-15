@@ -890,9 +890,12 @@ def trace_quantum_operations(
             trace_snapshot_op(op, device, qrp, out_snapshot_tracer)
         elif isinstance(op, qp.PauliRot):
             qubits = qrp.extract(op.wires)
+            controlled_qubits = qrp.extract(controlled_wires)
             qubits2 = pauli_rot_p.bind(
                 *qubits,
-                op.parameters[0],
+                *op.parameters,
+                *controlled_qubits,
+                *controlled_values,
                 pauli_word=op.hyperparameters["pauli_word"],
                 qubits_len=len(qubits),
                 params_len=len(op.parameters),
@@ -900,15 +903,7 @@ def trace_quantum_operations(
                 adjoint=adjoint,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
-        elif isinstance(op, PauliMeasure):
-            qubits = qrp.extract(op.wires)
-            qubits2 = pauli_measure_p.bind(
-                *qubits,
-                pauli_word=op.hyperparameters["pauli_word"],
-                qubits_len=len(qubits),
-            )
-            _, *out_qubits = qubits2
-            qrp.insert(op.wires, out_qubits)
+            qrp.insert(controlled_wires, qubits2[len(qubits) :])
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
