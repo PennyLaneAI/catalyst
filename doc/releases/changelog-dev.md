@@ -8,6 +8,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* A new `catalyst.debug.compile_mlir` function has been added, allowing standalone MLIR files to be
+  compiled through the full Catalyst pipeline and returned as a callable Python object.
+  [(#2832)](https://github.com/PennyLaneAI/catalyst/pull/2832)
+  
 * The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
   argument is at an arbitrary position in the argument list.
   [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
