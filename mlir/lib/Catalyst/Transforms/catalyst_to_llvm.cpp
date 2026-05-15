@@ -278,18 +278,19 @@ struct AssertionOpPattern : public OpConversionPattern<AssertionOp> {
 // {
 //    i64 rank,
 //    void* data,
-//    i8 type_encoding
+//    i8 type_encoding,
+//    int64_t* sizes
 // }
 Value EncodeDataMemRef(Location loc, PatternRewriter &rewriter, MemRefType memrefType,
                        Type llvmMemrefType, Value memrefLlvm)
 {
     auto ctx = rewriter.getContext();
 
-    // Encoded memref type: !llvm.struct<(i64, ptr<i8>, i8)>.
+    // Encoded memref type: !llvm.struct<(i64, ptr, i8, ptr)>.
     Type i8 = rewriter.getI8Type();
     Type i64 = rewriter.getI64Type();
     Type ptr = LLVM::LLVMPointerType::get(ctx);
-    auto type = LLVM::LLVMStructType::getLiteral(ctx, {i64, ptr, i8});
+    auto type = LLVM::LLVMStructType::getLiteral(ctx, {i64, ptr, i8, ptr});
 
     std::optional<int8_t> elementDtype = encodeNumericType(memrefType.getElementType());
 
@@ -314,6 +315,19 @@ Value EncodeDataMemRef(Location loc, PatternRewriter &rewriter, MemRefType memre
 
     // Dtype
     memref = LLVM::InsertValueOp::create(rewriter, loc, memref, dtype, SmallVector<int64_t>{2});
+
+    // Sizes
+    int64_t rankInt = memrefType.getRank();
+    Type i64ArrType = LLVM::LLVMArrayType::get(i64, rankInt);
+    Value sizesAlloca = getStaticAlloca(loc, rewriter, i64ArrType, 1);
+    for (int64_t i = 0; i < rankInt; ++i) {
+        Value dimSize = desc.size(rewriter, loc, i);
+        Value gep = LLVM::GEPOp::create(rewriter, loc, ptr, i64ArrType, sizesAlloca,
+                                        SmallVector<LLVM::GEPArg>{0, static_cast<int32_t>(i)});
+        LLVM::StoreOp::create(rewriter, loc, dimSize, gep);
+    }
+    memref =
+        LLVM::InsertValueOp::create(rewriter, loc, memref, sizesAlloca, SmallVector<int64_t>{3});
 
     return memref;
 }

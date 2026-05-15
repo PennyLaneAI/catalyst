@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import textwrap
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
@@ -25,9 +26,33 @@ from pennylane import for_loop
 
 from catalyst import debug, qjit, value_and_grad
 from catalyst.compiler import _options_to_cli_flags, to_llvmir, to_mlir_opt
-from catalyst.debug import compile_executable, get_cmain, get_compilation_stage, replace_ir
+from catalyst.debug import (
+    compile_executable,
+    compile_mlir,
+    get_cmain,
+    get_compilation_stage,
+    replace_ir,
+)
 from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
+
+_IDENTITY_MLIR = """
+module @identity {
+  func.func public @jit_identity(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
+    return %arg0 : tensor<f64>
+  }
+  func.func @setup() {
+    quantum.init
+    return
+  }
+  func.func @teardown() {
+    quantum.finalize
+    return
+  }
+}
+"""
+
+_IDENTITY_RESULT_TYPES = [jax.ShapeDtypeStruct((), np.float64)]
 
 
 class TestDebugPrint:
@@ -630,6 +655,101 @@ class TestOptionsToCliFlags:
         msg = "custom op 'This'"
         with pytest.raises(CompileError, match=msg):
             to_mlir_opt(stdin=mlir)
+
+
+class TestCompileMLIR:
+    """Tests for compile_mlir tocompile and run a standalone MLIR module."""
+
+    def test_compile_from_string(self):
+        """compile_mlir accepts a raw MLIR string and returns a callable."""
+        fn = compile_mlir(
+            _IDENTITY_MLIR, func_name="jit_identity", result_types=_IDENTITY_RESULT_TYPES
+        )
+        result = fn(np.float64(1.5))
+        np.testing.assert_allclose(result[0], 1.5)
+
+    def test_get_compilation_stage(self):
+        """get_compilation_stage works on a CompiledMLIR object."""
+        fn = compile_mlir(
+            _IDENTITY_MLIR,
+            func_name="jit_identity",
+            result_types=_IDENTITY_RESULT_TYPES,
+            keep_intermediate=True,
+        )
+        ir = get_compilation_stage(fn, "HLOLoweringStage")
+        assert "@jit_identity" in ir
+        fn.workspace.cleanup()
+
+    def test_no_outputs(self):
+        """compile_mlir handles functions with no return values."""
+        no_return_mlir = """
+        module @noop {
+          func.func public @jit_noop() attributes {llvm.emit_c_interface} {
+            return
+          }
+          func.func @setup() { quantum.init return }
+          func.func @teardown() { quantum.finalize return }
+        }
+        """
+        fn = compile_mlir(no_return_mlir, func_name="jit_noop", result_types=())
+        fn()
+
+    def test_ranked_tensor(self):
+        """compile_mlir handles ranked tensor inputs and outputs."""
+        ranked_mlir = """
+        module @ranked {
+          func.func public @jit_ranked(%arg0: tensor<3xf64>) -> tensor<3xf64>
+              attributes {llvm.emit_c_interface} {
+            return %arg0 : tensor<3xf64>
+          }
+          func.func @setup() { quantum.init return }
+          func.func @teardown() { quantum.finalize return }
+        }
+        """
+        fn = compile_mlir(
+            ranked_mlir,
+            func_name="jit_ranked",
+            result_types=[jax.ShapeDtypeStruct((3,), np.float64)],
+        )
+        result = fn(np.array([1.0, 2.0, 3.0]))
+        np.testing.assert_allclose(result[0], [1.0, 2.0, 3.0])
+
+    def test_multiple_inputs_outputs(self):
+        """compile_mlir handles multiple inputs and outputs (returns them swapped)."""
+        multi_mlir = """
+        module @multi {
+          func.func public @jit_multi(%arg0: tensor<f64>, %arg1: tensor<f64>)
+              -> (tensor<f64>, tensor<f64>) attributes {llvm.emit_c_interface} {
+            return %arg1, %arg0 : tensor<f64>, tensor<f64>
+          }
+          func.func @setup() { quantum.init return }
+          func.func @teardown() { quantum.finalize return }
+        }
+        """
+        fn = compile_mlir(
+            multi_mlir,
+            func_name="jit_multi",
+            result_types=[
+                jax.ShapeDtypeStruct((), np.float64),
+                jax.ShapeDtypeStruct((), np.float64),
+            ],
+        )
+        result = fn(np.float64(1.0), np.float64(2.0))
+        np.testing.assert_allclose(result[0], 2.0)
+        np.testing.assert_allclose(result[1], 1.0)
+
+    def test_compile_from_pathlib(self, tmp_path):
+        """compile_mlir accepts a pathlib.Path without needing a pre-existing fixture file."""
+        mlir_file = tmp_path / "identity.mlir"
+        mlir_file.write_text(_IDENTITY_MLIR, encoding="utf-8")
+        fn = compile_mlir(mlir_file, func_name="jit_identity", result_types=_IDENTITY_RESULT_TYPES)
+        result = fn(np.float64(4.0))
+        np.testing.assert_allclose(result[0], 4.0)
+
+    def test_bad_ir_raises(self):
+        """compile_mlir raises on invalid MLIR."""
+        with pytest.raises(Exception):
+            compile_mlir("this is not valid mlir", func_name="jit_foo")
 
 
 if __name__ == "__main__":

@@ -12,6 +12,10 @@
   argument is at an arbitrary position in the argument list.
   [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
 
+* A new `catalyst.debug.compile_mlir` function has been added, allowing standalone MLIR files to be
+  compiled through the full Catalyst pipeline and returned as a callable Python object.
+  [(#2832)](https://github.com/PennyLaneAI/catalyst/pull/2832)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
