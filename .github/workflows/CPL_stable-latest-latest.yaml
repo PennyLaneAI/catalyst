@@ -5,6 +5,9 @@ on:
     - cron: "20 10 * * 1-5"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build-config:
     name: CPL stable/latest/latest

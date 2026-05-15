@@ -27,6 +27,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Added permissions to all GitHub Actions workflows.
+  [(#2778)](https://github.com/PennyLaneAI/catalyst/pull/2778)
+
 * Fixed ``KeyError`` in autograph when using ``qp.prod`` as a decorator with PennyLane >= 0.45.
   [(#2844)](https://github.com/PennyLaneAI/catalyst/pull/2844)
 

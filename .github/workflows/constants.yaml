@@ -1,5 +1,8 @@
 name: Set constants
 
+permissions:
+  contents: read
+
 on:
   workflow_call:
     inputs:

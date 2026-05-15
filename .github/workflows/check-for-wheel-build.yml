@@ -6,6 +6,8 @@ on:
         description: Indicate whether wheels should be built for the current workflow run
         value: ${{ jobs.check_if_required.outputs.build-wheels }}
 
+permissions:
+  contents: read
 
 jobs:
   check_if_required:
