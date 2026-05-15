@@ -51,6 +51,15 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
     void runOnOperation() final
     {
+        ModuleOp module = getOperation();
+
+        OpPassManager pm1("builtin.module");
+        pm1.addPass(createInstantiateDecompRulesPass());
+
+        if (failed(runPipeline(pm1, module))) {
+            return signalPassFailure();
+        }
+
         // Debugging output for command-line options
         LLVM_DEBUG(llvm::dbgs() << "Running GraphDecompositionPass with options:\n");
         LLVM_DEBUG({
@@ -75,7 +84,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 1: Gather inputs for graph
-        ModuleOp module = getOperation();
         std::vector<OperatorNode> setOfOps;
         std::vector<RuleNode> setOfRules;
         llvm::StringMap<mlir::OwningOpRef<func::FuncOp>> ruleNameToFuncOp;
@@ -120,10 +128,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 4: Run decompose-lowering to apply the decomposition rules
-        PassManager pm(&getContext());
-        pm.addPass(createDecomposeLoweringPass());
+        OpPassManager pm2("builtin.module");
+        pm2.addPass(createDecomposeLoweringPass());
 
-        if (failed(pm.run(module))) {
+        if (failed(runPipeline(pm2, module))) {
             return signalPassFailure();
         }
 
@@ -132,9 +140,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         for (auto &rule : allUserRules) {
             module.getBody()->push_back(rule.release());
         }
-
-        // TODO: insert a "clean-up" pass after the last graph-decomposition pass to remove user
-        // functions
     }
 
   private:

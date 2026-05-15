@@ -12,12 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: not --crash quantum-opt --split-input-file --pass-pipeline='builtin.module( graph-decomposition{gate-set=PauliX=1.0 bytecode-rules="%BYTECODE_PATH"})' %s 2>&1 | FileCheck %s
+#pragma once
 
-func.func @circuit(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) {
-    %pi = arith.constant 3.14 : f64
-    %out:3 = quantum.paulirot ["X", "Z", "Y"](%pi) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
-    // CHECK: GraphSolverFailedError
-    // CHECK: Decomposition rule not found for operator 'paulirot
-    return
-}
+#include <string>
+#include <vector>
+
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/OwningOpRef.h"
+
+namespace QuantumPythonCallbacks {
+
+using PyWires = std::vector<int>;
+
+mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotDecomp(mlir::ModuleOp module, double theta,
+                                                          std::string pauliWord, PyWires wires);
+} // namespace QuantumPythonCallbacks

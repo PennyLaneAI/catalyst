@@ -13,8 +13,10 @@ config.host_os = "@HOST_OS@"
 config.host_arch = "@HOST_ARCH@"
 config.host_cxx = "@HOST_CXX@"
 config.llvm_use_sanitizer = "@LLVM_USE_SANITIZER@"
+config.bytecode_path = "@BYTECODE_PATH@"
 
 import lit.llvm
+
 lit.llvm.initialize(lit_config, config)
 
 # Let the main config do the real work.

@@ -22,8 +22,8 @@ config.name = "Frontend Tests"
 config.test_format = lit.formats.ShTest(True)
 
 # Define the file extensions to treat as test files (with the exception of this file).
-config.suffixes = [".py"]
-config.excludes = ["lit.cfg.py", "utils.py"]
+config.suffixes = [".py", ".mlir"]
+config.excludes = ["lit.cfg.py", "utils.py", "test_rules.mlir"]
 
 # Define the root path of where to look for tests.
 config.test_source_root = os.path.dirname(__file__)
@@ -69,6 +69,13 @@ if os.environ.get("ENABLE_LIT_COVERAGE", "0") == "1":
 
 config.substitutions.append(("%PYTHON", python_executable))
 
+# allow virtual env for embedded interpreter
+config.environment["VIRTUAL_ENV"] = os.getenv("VIRTUAL_ENV", "")
+bytecode_path = getattr(config, "bytecode_path", "")
+if not bytecode_path:
+    bytecode_path = os.getenv("BYTECODE_PATH", "")
+config.substitutions.append(("%BYTECODE_PATH", bytecode_path))
+
 # Define PATH when running frontend tests from an mlir build target.
 try:
     # Access to FileCheck
@@ -96,7 +103,7 @@ except AttributeError:
     from lit.llvm.config import LLVMConfig  # fmt:skip
     llvm_config = LLVMConfig(lit_config, config)
 
-    # When running outside CMake context (e.g., make lit-coverage),
+    # When running outside CMake context (e.g., make lit-coverage)
     # we need to manually set up the LLVM tools path
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
     llvm_tools_dir = os.path.join(project_root, "mlir", "llvm-project", "build", "bin")
@@ -116,3 +123,7 @@ except AttributeError:
     llvm_config.with_system_environment("CATALYST_BIN_DIR")
     llvm_config.with_system_environment("CATALYST_LIB_DIR")
     llvm_config.with_system_environment("ENZYME_LIB_DIR")
+
+    catalyst_bin_dir = os.getenv("CATALYST_BIN_DIR", "")
+    if os.path.exists(catalyst_bin_dir):
+        llvm_config.add_tool_substitutions(["quantum-opt", "catalyst"], [catalyst_bin_dir])
