@@ -655,13 +655,16 @@ class CnotOp(IRDLOperation):
 
         if isinstance(idx_ctrl, IntegerAttr) and isinstance(idx_trgt, IntegerAttr):
             operands = (in_ctrl_codeblock, None, in_trgt_codeblock, None)
-            properties = {"idx_ctrl_attr": idx_ctrl, "idx_trgt_attr": idx_trgt}
+            properties = {
+                "idx_ctrl_attr": IntegerAttr(idx_ctrl.value.data, IndexType()),
+                "idx_trgt_attr": IntegerAttr(idx_trgt.value.data, IndexType()),
+            }
         elif isinstance(idx_ctrl, IntegerAttr):
             operands = (in_ctrl_codeblock, None, in_trgt_codeblock, idx_trgt)
-            properties = {"idx_ctrl_attr": idx_ctrl}
+            properties = {"idx_ctrl_attr": IntegerAttr(idx_ctrl.value.data, IndexType())}
         elif isinstance(idx_trgt, IntegerAttr):
             operands = (in_ctrl_codeblock, idx_ctrl, in_trgt_codeblock, None)
-            properties = {"idx_trgt_attr": idx_trgt}
+            properties = {"idx_trgt_attr": IntegerAttr(idx_trgt.value.data, IndexType())}
         else:
             operands = (in_ctrl_codeblock, idx_ctrl, in_trgt_codeblock, idx_trgt)
             properties = {}
