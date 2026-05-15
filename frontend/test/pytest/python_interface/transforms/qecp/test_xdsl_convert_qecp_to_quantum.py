@@ -506,8 +506,6 @@ class TestHyperRegisterLowering:
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
 
 
-@pytest.mark.xfail(reason="The 'qecp.decode_esm_css' op using value defined outside the region ")
-@pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
 class TestQECPassIntegration:
     """Integration lit tests for the all qec-related pass"""
 
