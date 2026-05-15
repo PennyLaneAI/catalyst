@@ -15,8 +15,6 @@
 """Tests for the convert-qecp-to-quantum xDSL dialect-conversion pass."""
 
 import pennylane as qp
-
-
 import pytest
 
 from catalyst.python_interface.dialects import qecp
