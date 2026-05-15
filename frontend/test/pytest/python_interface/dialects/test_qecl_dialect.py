@@ -18,12 +18,32 @@ from typing import cast
 
 import pytest
 from xdsl.dialects import test
-from xdsl.dialects.builtin import I64, IndexType, IntegerAttr, IntegerType, UnitAttr
-from xdsl.ir import AttributeCovT, OpResult
+from xdsl.dialects.builtin import I64, IndexType, IntegerAttr, IntegerType, UnitAttr, i64
+from xdsl.ir import AttributeCovT, Operation, OpResult, SSAValue
 
 from catalyst.python_interface.dialects import qecl
 
 pytestmark = pytest.mark.xdsl
+
+
+@pytest.fixture(scope="module", name="assert_valid_idx_attr")
+def fixture_assert_valid_idx_attr():
+    """Fixture factory that returns a function to validate the `idx_attr` attribute of an xDSL
+    operation.
+    """
+
+    def _validate_idx(op: Operation, idx: int | IntegerAttr | SSAValue):
+        idx_attr = op.properties.get("idx_attr")
+        if isinstance(idx, (int, IntegerAttr)):
+            assert idx_attr is not None
+            if isinstance(idx, int):
+                assert idx_attr == IntegerAttr(idx, IndexType())
+            elif isinstance(idx, IntegerAttr):
+                assert idx_attr == IntegerAttr(idx.value.data, IndexType())
+        else:
+            assert idx_attr is None
+
+    return _validate_idx
 
 
 # Test function taken from xdsl/utils/test_value.py
@@ -139,17 +159,31 @@ class TestQecLogicalOps:
         dealloc_op = qecl.DeallocOp(self._get_hyper_reg_value())
         assert len(dealloc_op.result_types) == 0
 
-    @pytest.mark.parametrize("idx", [0, IntegerAttr(0, IndexType()), create_ssa_value(IndexType())])
-    def test_qecl_op_constructor_extract_block(self, idx):
-        """Test the constructor of the qecl.extract_block op."""
+    @pytest.mark.parametrize(
+        "idx", [0, IntegerAttr(0, IndexType()), IntegerAttr(0, i64), create_ssa_value(IndexType())]
+    )
+    def test_qecl_op_constructor_extract_block(self, idx, assert_valid_idx_attr):
+        """Test the constructor of the qecl.extract_block op.
+
+        Also check that when the `idx` input is static that the `idx_attr` of the op always has type
+        `index`.
+        """
         extract_block_op = qecl.ExtractCodeblockOp(hyper_reg=self._get_hyper_reg_value(), idx=idx)
         assert len(extract_block_op.result_types) == 1
         assert isinstance(extract_block_op.result_types[0], qecl.LogicalCodeblockType)
         assert extract_block_op.result_types[0].k == self.k
 
-    @pytest.mark.parametrize("idx", [0, IntegerAttr(0, IndexType()), create_ssa_value(IndexType())])
-    def test_qecl_op_constructor_insert_block(self, idx):
-        """Test the constructor of the qecl.insert_block op."""
+        assert_valid_idx_attr(extract_block_op, idx)
+
+    @pytest.mark.parametrize(
+        "idx", [0, IntegerAttr(0, IndexType()), IntegerAttr(0, i64), create_ssa_value(IndexType())]
+    )
+    def test_qecl_op_constructor_insert_block(self, idx, assert_valid_idx_attr):
+        """Test the constructor of the qecl.insert_block op.
+
+        Also check that when the `idx` input is static that the `idx_attr` of the op always has type
+        `index`.
+        """
         insert_block_op = qecl.InsertCodeblockOp(
             in_hyper_reg=self._get_hyper_reg_value(), idx=idx, codeblock=self._get_codeblock_value()
         )
@@ -157,6 +191,8 @@ class TestQecLogicalOps:
         assert isinstance(insert_block_op.result_types[0], qecl.LogicalHyperRegisterType)
         assert insert_block_op.result_types[0].width == self.width
         assert insert_block_op.result_types[0].k == self.k
+
+        assert_valid_idx_attr(insert_block_op, idx)
 
     @pytest.mark.parametrize("init_state", ["zero", qecl.LogicalCodeblockInitStateAttr("zero")])
     def test_qecl_op_constructor_encode(self, init_state):
@@ -302,12 +338,12 @@ def test_assembly_format(run_filecheck, pretty_print):
     // CHECK: [[block11:%.+]], [[block12:%.+]] = qecl.cnot [[block_ctrl]][{{\s*}}0], [[block10]][{{\s*}}0]
     %block_ctrl = "test.op"() : () -> !qecl.codeblock<1>
     %block11, %block12 = qecl.cnot %block_ctrl[0], %block10[0] : !qecl.codeblock<1>, !qecl.codeblock<1>
-    
+
     // CHECK: [[block13:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
     // CHECK: [[block14:%.+]] = qecl.noise [[block13:%.+]] : !qecl.codeblock<1>
     %block13 = "test.op"() : () -> !qecl.codeblock<1>
     %block14 = qecl.noise %block13 : !qecl.codeblock<1>
-    
+
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
