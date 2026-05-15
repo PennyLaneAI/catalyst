@@ -517,7 +517,7 @@ class TestQECPassIntegration:
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
         @convert_quantum_to_qecl_pass(k=1)
-        @qp.qnode(dev, shots=1)
+        @qp.qnode(dev, shots=1, mcm_method="one-shot")
         def ghz():
             # CHECK-NOT: qecp.alloc
             # CHECK-NOT: qecp.dealloc
