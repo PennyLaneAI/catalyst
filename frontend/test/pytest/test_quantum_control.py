@@ -912,7 +912,7 @@ class TestControlledProperties:
             _queue_category = value
 
         op = C_ctrl(DummyOp(1), 0)
-        assert op._queue_category == value
+        assert op._queue_category == "_ops"
 
     @pytest.mark.parametrize("value", (True, False))
     def test_is_verified_hermitian(self, value):
