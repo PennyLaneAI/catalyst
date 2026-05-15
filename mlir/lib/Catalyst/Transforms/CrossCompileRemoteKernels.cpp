@@ -231,10 +231,14 @@ struct CrossCompileRemoteKernelsPass
      * @param llvmModule The LLVM module to emit.
      * @param qnodeName The name of the qnode.
      * @param target The target triple to emit the object file for.
+     * @param cpu The CPU model to tune codegen for (`generic` for baseline,
+     *        `cortex-a72` for Versal Premium APU, etc.).
+     * @param features Comma-separated `+feat`/`-feat` tokens, or empty to let
+     *        the CPU pick its own feature set.
      * @return std::string The path to the emitted object file.
      */
     std::string emitObjectFile(std::unique_ptr<llvm::Module> &&llvmModule, StringRef qnodeName,
-                               StringRef target)
+                               StringRef target, StringRef cpu, StringRef features)
     {
         std::string objPath;
 
@@ -249,9 +253,10 @@ struct CrossCompileRemoteKernelsPass
         }
         llvm::TargetOptions opt;
         std::unique_ptr<llvm::TargetMachine> targetMachine(llvmTarget->createTargetMachine(
-            parsedTriple, /*cpu=*/"generic", /*features=*/"", opt, llvm::Reloc::Model::PIC_));
+            parsedTriple, cpu, features, opt, llvm::Reloc::Model::PIC_));
         if (!targetMachine) {
-            llvm::errs() << "Could not create TargetMachine for triple '" << target << "'" << "\n";
+            llvm::errs() << "Could not create TargetMachine for triple '" << target
+                         << "' cpu='" << cpu << "' features='" << features << "'\n";
             return "";
         }
 
@@ -303,7 +308,8 @@ struct CrossCompileRemoteKernelsPass
         }
 
         // Build a TargetMachine + object emission.
-        std::string objPath = emitObjectFile(std::move(llvmModule), qnodeName, target);
+        std::string objPath =
+            emitObjectFile(std::move(llvmModule), qnodeName, target, cpu, features);
         if (objPath.empty()) {
             return failure();
         }
