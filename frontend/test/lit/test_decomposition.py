@@ -35,28 +35,6 @@ from catalyst.passes import graph_decomposition
 # pylint: disable=too-many-lines
 
 
-# Helper to skip tests that fail due to PauliRot type annotation issue
-# TODO: Remove this once PennyLane fixes the PauliRot decomposition type annotations
-def skip_if_pauli_rot_issue(test_func):
-    """Wrapper to skip tests that fail due to PauliRot type annotation issues."""
-
-    def wrapper():
-        try:
-            test_func()
-        except (ValueError, IndexError) as e:
-            error_msg = str(e)
-            if (
-                "Unsupported type annotation None for parameter pauli_word" in error_msg
-                or "Unsupported type annotation <class 'str'> for parameter pauli_word" in error_msg
-                or "index is out of bounds for axis" in error_msg
-            ):
-                print(f"# SKIPPED {test_func.__name__}: PauliRot type annotation issue")
-            else:
-                raise
-
-    return wrapper
-
-
 TEST_PATH = os.path.dirname(__file__)
 CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")
 
@@ -825,7 +803,7 @@ def test_decomposition_rule_name_update_multi_qubits():
     qp.decomposition.disable_graph()
 
 
-skip_if_pauli_rot_issue(test_decomposition_rule_name_update_multi_qubits)()
+test_decomposition_rule_name_update_multi_qubits()
 
 
 def test_decomposition_rule_name_adjoint():
@@ -862,7 +840,7 @@ def test_decomposition_rule_name_adjoint():
     qp.decomposition.disable_graph()
 
 
-skip_if_pauli_rot_issue(test_decomposition_rule_name_adjoint)()
+test_decomposition_rule_name_adjoint()
 
 
 # TODO: Reenable this once the underlying non-determinism issue is resolved
@@ -895,7 +873,7 @@ def test_decomposition_rule_name_ctrl():
     qp.decomposition.disable_graph()
 
 
-skip_if_pauli_rot_issue(test_decomposition_rule_name_ctrl)()
+test_decomposition_rule_name_ctrl()
 
 
 # TODO: Reenable this once the underlying non-determinism issue is resolved
@@ -929,7 +907,7 @@ def test_qft_decomposition():
     qp.decomposition.disable_graph()
 
 
-skip_if_pauli_rot_issue(test_qft_decomposition)()
+test_qft_decomposition()
 
 
 def test_decompose_lowering_with_other_passes():
@@ -971,7 +949,7 @@ def test_decompose_lowering_with_other_passes():
     qp.decomposition.disable_graph()
 
 
-skip_if_pauli_rot_issue(test_decompose_lowering_with_other_passes)()
+test_decompose_lowering_with_other_passes()
 
 
 def test_decompose_lowering_multirz():
@@ -1011,6 +989,142 @@ def test_decompose_lowering_multirz():
 
 
 test_decompose_lowering_multirz()
+
+
+def test_decompose_lowering_pauli_rot_rule():
+    """Test that PauliRot decomp rules are lowered for correctly."""
+
+    qp.decomposition.enable_graph()
+
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qp.qjit(pipelines=pipe, target="mlir", capture=True)
+    @partial(
+        qp.transforms.decompose,
+        gate_set=[qp.RZ, qp.MultiRZ, qp.RX, qp.GlobalPhase],
+    )
+    @qp.qnode(qp.device("lightning.qubit", wires=3))
+    # CHECK-LABEL: @_pauli_rot_decomposition_wires_3_XZY{{.*}} attributes {{{.*}} pauli_word = "XZY", target_gate = "PauliRot"}
+    def circuit_pauli_rot():
+        qp.PauliRot(0.123, pauli_word="XZY", wires=[0, 1, 2])
+        return qp.expval(qp.Z(0))
+
+    print(circuit_pauli_rot.mlir)
+
+    qp.decomposition.disable_graph()
+
+
+test_decompose_lowering_pauli_rot_rule()
+
+
+def test_decompose_lowering_pauli_rot():
+    """Test decomposing PauliRot with graph decomposition."""
+
+    qp.decomposition.enable_graph()
+
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qp.qjit(pipelines=pipe, target="mlir", capture=True)
+    @partial(
+        qp.transforms.decompose,
+        gate_set=[qp.RZ, qp.MultiRZ, qp.RX, qp.GlobalPhase],
+    )
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
+    # CHECK-LABEL: @circuit_pauli_rot
+    def circuit_pauli_rot():
+        qp.PauliRot(0.123, pauli_word="X", wires=[0])
+        return qp.expval(qp.Z(0))
+
+    # CHECK-NOT: quantum.paulirot
+    # CHECK-DAG: quantum.multirz
+    # CHECK-DAG: quantum.custom "RZ"
+    # CHECK-DAG: quantum.custom "RX"
+    print(circuit_pauli_rot.mlir_opt)
+
+    qp.decomposition.disable_graph()
+
+
+test_decompose_lowering_pauli_rot()
+
+
+def test_decompose_lowering_pauli_rot_with_identity():
+    """Test decomposing PauliRot with graph decomposition."""
+
+    qp.decomposition.enable_graph()
+
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qp.qjit(pipelines=pipe, target="mlir", capture=True)
+    @partial(
+        qp.transforms.decompose,
+        gate_set=[qp.RZ, qp.MultiRZ, qp.RX, qp.GlobalPhase],
+    )
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
+    # CHECK-LABEL: @circuit_pauli_rot_with_identity
+    def circuit_pauli_rot_with_identity():
+        qp.PauliRot(0.123, pauli_word="I", wires=[0])
+        return qp.expval(qp.Z(0))
+
+    # CHECK-NOT: quantum.paulirot
+    # CHECK-NOT: quantum.multirz
+    # CHECK-NOT: quantum.custom "RZ"
+    # CHECK-NOT: quantum.custom "RX"
+    # CHECK: quantum.gphase
+    print(circuit_pauli_rot_with_identity.mlir_opt)
+
+    qp.decomposition.disable_graph()
+
+
+test_decompose_lowering_pauli_rot_with_identity()
+
+
+def test_decompose_lowering_pauli_rot_with_ooo_qubits():
+    """Test decomposing PauliRot with out-of-order (ooo) qubits."""
+
+    qp.decomposition.enable_graph()
+
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qp.qjit(pipelines=pipe, target="mlir", capture=True)
+    @partial(
+        qp.transforms.decompose,
+        gate_set=[qp.RZ, qp.MultiRZ, qp.RX, qp.GlobalPhase],
+    )
+    @qp.qnode(qp.device("lightning.qubit", wires=3))
+    # CHECK-LABEL: @circuit_pauli_rot_with_ooo_qubits
+    def circuit_pauli_rot_with_ooo_qubits():
+        qp.PauliRot(0.123, pauli_word="YYY", wires=[1, 0, 2])
+        return qp.expval(qp.Z(0))
+
+    # CHECK-NOT: quantum.paulirot
+
+    # CHECK: [[CST:%.+]] = arith.constant dense<[1, 0, 2]> : tensor<3xi64>
+    # CHECK: quantum.alloc( 3) : !quantum.reg
+    # CHECK: [[SLICE_1:%.+]] = stablehlo.slice [[CST]] [0:1] : (tensor<3xi64>) -> tensor<1xi64>
+    # CHECK: [[TENSOR_1:%.+]] = stablehlo.reshape [[SLICE_1]] : (tensor<1xi64>) -> tensor<i64>
+    # CHECK: [[SLICE_2:%.+]] = stablehlo.slice [[CST]] [1:2] : (tensor<3xi64>) -> tensor<1xi64>
+    # CHECK: [[TENSOR_2:%.+]] = stablehlo.reshape [[SLICE_2]] : (tensor<1xi64>) -> tensor<i64>
+    # CHECK: [[SLICE_3:%.+]] = stablehlo.slice [[CST]] [2:3] : (tensor<3xi64>) -> tensor<1xi64>
+    # CHECK: [[TENSOR_3:%.+]] = stablehlo.reshape [[SLICE_3]] : (tensor<1xi64>) -> tensor<i64>
+
+    # CHECK: [[EXTRACTED_1:%.+]] = tensor.extract [[TENSOR_1]][] : tensor<i64>
+    # CHECK: [[OUT_QUBITS_1:%.+]] = quantum.extract %0[[[EXTRACTED_1]]] : !quantum.reg -> !quantum.bit
+    # CHECK: [[QUBIT_1:%.+]] = quantum.custom "RX"({{.+}}) [[OUT_QUBITS_1]] : !quantum.bit
+    # CHECK: [[EXTRACTED_2:%.+]] = tensor.extract [[TENSOR_2]][] : tensor<i64>
+    # CHECK: [[OUT_QUBITS_2:%.+]] = quantum.extract %0[[[EXTRACTED_2]]] : !quantum.reg -> !quantum.bit
+    # CHECK: [[QUBIT_0:%.+]] = quantum.custom "RX"({{.+}}) [[OUT_QUBITS_2]] : !quantum.bit
+    # CHECK: [[EXTRACTED_3:%.+]] = tensor.extract [[TENSOR_3]][] : tensor<i64>
+    # CHECK: [[OUT_QUBITS_3:%.+]] = quantum.extract %0[[[EXTRACTED_3]]] : !quantum.reg -> !quantum.bit
+    # CHECK: [[QUBIT_2:%.+]] = quantum.custom "RX"({{.+}}) [[OUT_QUBITS_3]] : !quantum.bit
+
+    # CHECK: quantum.multirz(%cst) [[QUBIT_1]], [[QUBIT_0]], [[QUBIT_2]] : !quantum.bit, !quantum.bit, !quantum.bit
+
+    print(circuit_pauli_rot_with_ooo_qubits.mlir_opt)
+
+    qp.decomposition.disable_graph()
+
+
+test_decompose_lowering_pauli_rot_with_ooo_qubits()
 
 
 def test_decompose_lowering_with_ordered_passes():
@@ -1055,7 +1169,7 @@ def test_decompose_lowering_with_ordered_passes():
     qp.decomposition.disable_graph()
 
 
-skip_if_pauli_rot_issue(test_decompose_lowering_with_ordered_passes)()
+test_decompose_lowering_with_ordered_passes()
 
 
 def test_decompose_lowering_with_gphase():
@@ -1087,7 +1201,7 @@ def test_decompose_lowering_with_gphase():
     qp.decomposition.disable_graph()
 
 
-skip_if_pauli_rot_issue(test_decompose_lowering_with_gphase)()
+test_decompose_lowering_with_gphase()
 
 
 def test_decompose_lowering_alt_decomps():
@@ -1159,7 +1273,7 @@ def test_decompose_lowering_with_tensorlike():
     qp.decomposition.disable_graph()
 
 
-skip_if_pauli_rot_issue(test_decompose_lowering_with_tensorlike)()
+test_decompose_lowering_with_tensorlike()
 
 
 def test_decompose_lowering_fallback():

@@ -441,7 +441,13 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None
         )
 
     if pauli_word is not None:
+        target_gate = getattr(func, "target_gate", None)
+        num_wires = getattr(func, "num_wires", None)
         func = functools.partial(func, pauli_word=pauli_word)
+        # Setting the func attributes here because partial hides the original function attributes
+        setattr(func, "target_gate", target_gate)
+        setattr(func, "num_wires", num_wires)
+        setattr(func, "pauli_word", pauli_word)
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):

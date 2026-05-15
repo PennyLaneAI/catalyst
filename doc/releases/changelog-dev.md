@@ -8,6 +8,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Added support for decomposing PauliRot when using `decompose-lowering`
+  [(#2803)](https://github.com/PennyLaneAI/catalyst/pull/2803)
+
 * The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
   argument is at an arbitrary position in the argument list.
   [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
