@@ -442,3 +442,55 @@ class TestSubroutineConversion:
         }
         """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+
+class TestHyperRegisterLowering:
+
+    def test_hyperregister_lowering(self, run_filecheck):
+        program = """
+            builtin.module {
+            // CHECK-LABEL: @circuit()
+                func.func public @circuit() -> () attributes {quantum.node} {
+                    // CHECK-NOT: qecp
+                    // CHECK: [[reg0:%.+]] = quantum.alloc(7) : !quantum.reg
+                    // CHECK-NEXT: [[reg0:%.+]] = func.call @encode_zero_Steane([[reg0:%.+]]) : (!quantum.reg) -> !quantum.reg
+                    // CHECK-NEXT: [[reg1:%.+]] = quantum.alloc(7) : !quantum.reg
+                    // CHECK-NEXT: [[reg1:%.+]] = func.call @encode_zero_Steane([[reg0:%.+]]) : (!quantum.reg) -> !quantum.reg
+                    // CHECK: [[reg0:%.+]] = func.call @noise_subroutine_code_1x7x1([[reg0:%.+]]
+                    // CHECK-NEXT: [[reg0:%.+]] = func.call @qec_cycle_Steane([[reg0:%.+]]) : (!quantum.reg) -> !quantum.reg
+                    // CHECK-NEXT: [[reg0:%.+]] = func.call @hadamard_Steane([[reg0:%.+]]) : (!quantum.reg) -> !quantum.reg
+                    // CHECK-NEXT: [[reg1:%.+]] = func.call @hadamard_Steane([[reg1:%.+]]) : (!quantum.reg) -> !quantum.reg
+                    // CHECK-NEXT: quantum.dealloc [[reg0:%.+]] : !quantum.reg
+                    // CHECK-NEXT: quantum.dealloc [[reg1:%.+]] : !quantum.reg
+                    // CHECK-NEXT: quantum.device_release
+                    %0 = qecp.alloc() : !qecp.hyperreg<2 x 1 x 7>
+                    %1 = arith.constant 0 : index
+                    %2 = arith.constant 2 : index
+                    %3 = arith.constant 1 : index
+                    %4 = scf.for %5 = %1 to %2 step %3 iter_args(%6 = %0) -> (!qecp.hyperreg<2 x 1 x 7>) {
+                    %7 = qecp.extract_block %6[%5] : !qecp.hyperreg<2 x 1 x 7> -> !qecp.codeblock<1 x 7>
+                    %8 = func.call @encode_zero_Steane(%7) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                    %9 = qecp.insert_block %6[%5], %8 : !qecp.hyperreg<2 x 1 x 7>, !qecp.codeblock<1 x 7>
+                    scf.yield %9 : !qecp.hyperreg<2 x 1 x 7>
+                    }
+                    %10 = qecp.extract_block %4[%1] : !qecp.hyperreg<2 x 1 x 7> -> !qecp.codeblock<1 x 7>
+                    %11 = arith.constant dense<3> : tensor<1xi64>
+                    %12 = arith.constant dense<[[0.43044512331253226, 5.1170870161571145, 1.9497439782412309]]> : tensor<1x3xf64>
+                    %13 = func.call @noise_subroutine_code_1x7x1(%10, %11, %12) : (!qecp.codeblock<1 x 7>, tensor<1xi64>, tensor<1x3xf64>) -> !qecp.codeblock<1 x 7>
+                    %14 = func.call @qec_cycle_Steane(%13) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                    %15 = func.call @hadamard_Steane(%14) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                    %16 = qecp.extract_block %4[%3] : !qecp.hyperreg<2 x 1 x 7> -> !qecp.codeblock<1 x 7>
+                    %17 = func.call @hadamard_Steane(%16) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                    %18 = qecp.insert_block %4[%1], %15 : !qecp.hyperreg<2 x 1 x 7>, !qecp.codeblock<1 x 7>
+                    %19 = qecp.insert_block %4[%3], %17 : !qecp.hyperreg<2 x 1 x 7>, !qecp.codeblock<1 x 7>
+                    qecp.dealloc %19 : !qecp.hyperreg<2 x 1 x 7>
+                    quantum.device_release
+                    func.return
+                }
+            }
+            func.func private @encode_zero_Steane(%6: !qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+            func.func private @noise_subroutine_code_1x7x1(%6: !qecp.codeblock<1 x 7>, %7: tensor<1xi64>, %8: tensor<1x3xf64>) -> !qecp.codeblock<1 x 7>
+            func.func private @qec_cycle_Steane(%6: !qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+            func.func private @hadamard_Steane(%6: !qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
