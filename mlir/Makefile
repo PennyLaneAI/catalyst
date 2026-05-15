@@ -58,6 +58,10 @@ all: llvm stablehlo enzyme dialects dialect-docs plugin
 
 .PHONY: llvm
 llvm:
+	@if cd llvm-project; git apply --check $(MK_DIR)/patches/llvm*.patch; then \
+		git apply $(MK_DIR)/patches/llvm*.patch; \
+	fi
+
 	@echo "build LLVM and MLIR enabling Python bindings"
 
 	# Patch mlir one shot bufferization segfault
