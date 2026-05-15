@@ -505,7 +505,7 @@ class TestHyperRegisterLowering:
 
 
 @pytest.mark.filterwarnings(
-    "ignore:Unable to remove cast UnrealizedConversionCastOp. Until,qecp.decode_physical_meas is in"
+    "ignore:Unable to remove cast UnrealizedConversionCastOp"
 )
 class TestQECPassIntegration:
     """Integration lit tests for the all qec-related pass"""
@@ -523,6 +523,7 @@ class TestQECPassIntegration:
         def ghz():
             # CHECK: [[reg0:%.+]] = quantum.alloc(7)
             # CHECK-NEXT: [[reg0:%.+]] = func.call @encode_zero_Steane([[reg0:%.+]]) : (!quantum.reg) -> !quantum.reg
+            # CHECK: qecp.decode_physical_meas
             qp.Hadamard(0)
             qp.CNOT([0, 1])
             qp.CNOT([1, 2])
