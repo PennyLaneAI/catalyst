@@ -149,7 +149,7 @@ class ExtractOp(IRDLOperation):
 
         if isinstance(idx, IntegerAttr):
             operands = (qreg, None)
-            properties = {"idx_attr": idx}
+            properties = {"idx_attr": IntegerAttr(idx.value.data, i64)}
         else:
             operands = (qreg, idx)
             properties = {}
@@ -194,7 +194,7 @@ class InsertOp(IRDLOperation):
 
         if isinstance(idx, IntegerAttr):
             operands = (in_qreg, None, qubit)
-            properties = {"idx_attr": idx}
+            properties = {"idx_attr": IntegerAttr(idx.value.data, i64)}
         else:
             operands = (in_qreg, idx, qubit)
             properties = {}
