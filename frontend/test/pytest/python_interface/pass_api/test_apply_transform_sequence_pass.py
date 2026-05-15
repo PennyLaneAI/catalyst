@@ -445,15 +445,14 @@ class TestApplyTransformSequencePass:
         # Should be 1 call for init pass
         assert num_calls == 1
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_qjit_with_passes_interpreted_correctly(self):
+    def test_qjit_with_passes_interpreted_correctly(self, capture_mode):
         """Test that applying the ApplyTransformSequencePass to a qjitted qnode's
         module correctly transforms it."""
 
         dev = qp.device("null.qubit", wires=4)
 
         @xdsl_from_qjit
-        @qjit
+        @qjit(capture=capture_mode)
         # merge_rotations_pass dispatches to an xDSL pass
         @merge_rotations_pass
         # qp.transforms.cancel_inverses dispatches to an MLIR pass

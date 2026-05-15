@@ -442,13 +442,12 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
     assert ppm_specs_output["g_0"]["max_weight_pi8"] == 1
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_merge_rotation_ppr():
     """Test that the merge_rotation pass correctly merges PPRs."""
 
     my_pipeline = [("pipe", ["quantum-compilation-stage"])]
 
-    @qp.qjit(pipelines=my_pipeline, target="mlir")
+    @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True)
     def test_merge_rotation_ppr_workflow():
         @qp.transforms.merge_rotations  # have to use qp to be capture-compatible
         @qp_to_ppr
@@ -467,13 +466,12 @@ def test_merge_rotation_ppr():
     assert 'pbc.ppr ["X", "Y", "Z"](2)' in ir_opt
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_merge_rotation_arbitrary_angle_ppr():
     """Test that the merge_rotation pass correctly merges arbtirary angle PPRs."""
 
     my_pipeline = [("pipe", ["quantum-compilation-stage"])]
 
-    @qp.qjit(pipelines=my_pipeline, target="mlir")
+    @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True)
     def test_merge_rotation_ppr_workflow():
         @qp.transforms.merge_rotations
         @qp_to_ppr
@@ -495,8 +493,6 @@ def test_merge_rotation_arbitrary_angle_ppr():
     assert ir_opt.count('pbc.ppr.arbitrary ["Z", "Y"]') == 1
 
 
-@pytest.mark.xfail(reason="PPM execution with ppr-to-ppm pass is not fully supported yet.")
-@pytest.mark.usefixtures("use_capture")
 def test_clifford_to_ppm():
 
     @qp.qnode(qp.device("lightning.qubit", wires=6))
@@ -520,18 +516,17 @@ def test_clifford_to_ppm():
 
     pauli_corrected_cir = ppr_to_ppm_transform(decompose_method="pauli-corrected")(to_ppr_cir)
 
-    auto_qjit_cir = qp.qjit(auto_corrected_cir)
-    clifford_qjit_cir = qp.qjit(clifford_corrected_cir)
-    pauli_qjit_cir = qp.qjit(pauli_corrected_cir)
+    auto_qjit_cir = qp.qjit(auto_corrected_cir, capture=True)
+    clifford_qjit_cir = qp.qjit(clifford_corrected_cir, capture=True)
+    pauli_qjit_cir = qp.qjit(pauli_corrected_cir, capture=True)
 
     baseline_cir = cir()
 
-    np.allclose(auto_qjit_cir(), baseline_cir)
-    np.allclose(clifford_qjit_cir(), baseline_cir)
-    np.allclose(pauli_qjit_cir(), baseline_cir)
+    assert np.allclose(auto_qjit_cir(), baseline_cir)
+    assert np.allclose(clifford_qjit_cir(), baseline_cir)
+    assert np.allclose(pauli_qjit_cir(), baseline_cir)
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_decompose_arbitrary_ppr():
     """
     Test the `decompose_arbitrary_ppr` pass.
@@ -539,7 +534,7 @@ def test_decompose_arbitrary_ppr():
 
     my_pipeline = [("pipe", ["quantum-compilation-stage"])]
 
-    @qp.qjit(pipelines=my_pipeline, target="mlir")
+    @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True)
     def test_decompose_arbitrary_ppr_workflow():
         @qp.transform(pass_name="decompose-arbitrary-ppr")
         @qp.transform(pass_name="to-ppr")
@@ -561,7 +556,6 @@ def test_decompose_arbitrary_ppr():
     assert 'pbc.ppr ["X", "Y", "Z"](2)' in ir_opt
 
 
-@pytest.mark.usefixtures("use_capture")
 class TestLowerPBCInitOps:
     """Test that the lower-pbc-init-ops pass correctly lowers fabricate/prepare ops to gates."""
 
@@ -593,9 +587,9 @@ class TestLowerPBCInitOps:
         to_ppr_circuit = qp.transform(pass_name="to-ppr")(baseline_circuit)
         lowered_circuit = qp.transform(pass_name="ppr-to-ppm")(to_ppr_circuit)
 
-        baseline_circuit = qp.qjit(baseline_circuit)
-        to_ppr_circuit = qp.qjit(to_ppr_circuit)
-        lowered_circuit = qp.qjit(lowered_circuit)
+        baseline_circuit = qp.qjit(baseline_circuit, capture=True)
+        to_ppr_circuit = qp.qjit(to_ppr_circuit, capture=True)
+        lowered_circuit = qp.qjit(lowered_circuit, capture=True)
 
         baseline_result = baseline_circuit()
         to_ppr_result = to_ppr_circuit()

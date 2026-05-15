@@ -148,12 +148,11 @@ def op_has_attr(op, attr):
 
 
 @pytest.mark.xdsl
-@pytest.mark.usefixtures("use_both_frontend")
-def test_xdsl_pass_with_qp_transform():
+def test_xdsl_pass_with_qp_transform(capture_mode):
     """Test that applying xDSL passes using the ``qp.transform`` decorator is able to execute
     correctly."""
 
-    @qp.qjit
+    @qp.qjit(capture=capture_mode)
     @qp.transform(pass_name="xdsl-cancel-inverses")
     @qp.qnode(qp.device("null.qubit", wires=1))
     def c():

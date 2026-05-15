@@ -31,6 +31,7 @@ from pennylane_lightning.lightning_qubit.lightning_qubit import (
     stopping_condition as lightning_stopping_condition,
 )
 
+from catalyst import CompileError
 from catalyst.jax_primitives import decomposition_rule
 from catalyst.passes import graph_decomposition
 
@@ -52,6 +53,27 @@ def _normalize_gate_types(gate_types):
 
 class TestGraphDecomposition:
     """Test the graph-decomposition built-in transform."""
+
+    @pytest.mark.parametrize("weight", [1, 1.0], ids=["int", "float"])
+    def test_gateset_with_weights(self, weight):
+        """Tests that a gate_set with weights works correctly.
+
+        Regression test for https://github.com/PennyLaneAI/catalyst/issues/2766."""
+
+        @qp.qjit(capture=True)
+        @graph_decomposition(gate_set={qp.RX: weight, qp.RY: weight, qp.RZ: weight})
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit(x, y, z):
+            qp.Rot(x, y, z, wires=0)
+            return qp.expval(qp.Z(0))
+
+        x, y, z = 0.0, qp.numpy.pi, 0.0
+
+        assert qp.math.allclose([-1], circuit(x, y, z))
+
+        expected_resources = {"RY": 1, "RZ": 2}
+        resources = qp.specs(circuit, level="device")(x, y, z)["resources"].gate_types
+        assert resources == expected_resources
 
     def test_with_precompiled_rule(self):
         """Test graph-decomposition with precompiled rules are handled correctly."""
@@ -442,6 +464,20 @@ class TestGraphDecomposition:
             qp.CRX(-7.2, wires=[0, 1])
             return qp.state()
 
+    def test_non_custom_op(self):
+        """Test that the graph correctly registers non-custom ops."""
+
+        with pytest.raises(CompileError):
+
+            @qp.qjit
+            @graph_decomposition(gate_set={qp.X})
+            @qp.qnode(qp.device("lightning.qubit", wires=2))
+            def circuit(x: float, y: float):  # pylint: disable=unused-argument
+                qp.PauliRot(0.1, "ZZ", wires=[0, 1])
+                return qp.state()
+
+            circuit()
+
 
 class TestPlxPRDecomposition:
     """Test the PLxPR-based graph-based decomposition integration with from_plxpr."""
@@ -489,9 +525,9 @@ class TestPlxPRDecomposition:
                     with pytest.warns(UserWarning, match="Operator RZ does not define"):
                         circuit(0)
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_decompose_lowering_on_empty_circuit(self):
         """Test that the decompose lowering pass works on an empty circuit."""
+        qp.decomposition.enable_graph()
 
         @partial(
             qp.transforms.decompose,
@@ -502,17 +538,19 @@ class TestPlxPRDecomposition:
             return qp.expval(qp.X(0))
 
         without_qjit = circuit()
-        with_qjit = qp.qjit(circuit)
+
+        with_qjit = qp.qjit(circuit, capture=True)
 
         assert qp.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
         resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
+        qp.decomposition.disable_graph()
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_alt_decomps(self):
         """Test the conversion of a circuit with a custom decomposition."""
+        qp.decomposition.enable_graph()
 
         @qp.register_resources({qp.H: 2, qp.CZ: 1})
         def my_cnot(wires):
@@ -531,7 +569,7 @@ class TestPlxPRDecomposition:
             qp.CNOT(wires=[0, 1])
             return qp.state()
 
-        qjited_circuit = qp.qjit(circuit)
+        qjited_circuit = qp.qjit(circuit, capture=True)
 
         expected = np.array([1, 0, 0, 1]) / np.sqrt(2)
         assert qp.math.allclose(qjited_circuit(), expected)
@@ -539,10 +577,11 @@ class TestPlxPRDecomposition:
         expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
         resources = qp.specs(qjited_circuit, level="device")()["resources"].gate_types
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
+        qp.decomposition.disable_graph()
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_fixed_rules(self):
         """Test the decompose lowering pass with custom decomposition rules."""
+        qp.decomposition.enable_graph()
 
         @qp.register_resources({qp.RZ: 2, qp.RX: 1})
         def rz_rx(phi, wires: WiresLike, **__):
@@ -564,8 +603,6 @@ class TestPlxPRDecomposition:
             qp.RY(np.pi, wires=wires)
             qp.GlobalPhase(-np.pi / 2, wires=wires)
 
-        qp.decomposition.enable_graph()
-
         @partial(
             qp.transforms.decompose,
             gate_set={"RX", "RZ", "GlobalPhase"},
@@ -586,17 +623,19 @@ class TestPlxPRDecomposition:
             return qp.expval(qp.Z(0))
 
         without_qjit = circuit()
-        with_qjit = qp.qjit(circuit)
+
+        with_qjit = qp.qjit(circuit, capture=True)
 
         assert qp.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
         resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
+        qp.decomposition.disable_graph()
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_tensorlike(self):
         """Test that TensorLike parameters are handled correctly in rules."""
+        qp.decomposition.enable_graph()
 
         @qp.register_resources({qp.RZ: 1, qp.CNOT: 4})
         def custom_multirz(params: TensorLike, wires: WiresLike, **__):
@@ -620,16 +659,19 @@ class TestPlxPRDecomposition:
         y = 0.3
 
         without_qjit = circuit(x, y)
-        with_qjit = qp.qjit(circuit)
+
+        with_qjit = qp.qjit(circuit, capture=True)
 
         assert qp.math.allclose(without_qjit, with_qjit(x, y))
         expected_resources = qp.specs(circuit, level="device")(x, y)["resources"].gate_types
         resources = qp.specs(with_qjit, level="device")(x, y)["resources"].gate_types
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
+        qp.decomposition.disable_graph()
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_inordered_params(self):
         """Test that unordered parameters in rules are handled correctly."""
+
+        qp.decomposition.enable_graph()
 
         @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
         @qp.qnode(qp.device("lightning.qubit", wires=1))
@@ -642,15 +684,16 @@ class TestPlxPRDecomposition:
         z = 0.2
 
         without_qjit = circuit(x, y, z)
-        with_qjit = qp.qjit(circuit)
+
+        with_qjit = qp.qjit(circuit, capture=True)
 
         assert qp.math.allclose(without_qjit, with_qjit(x, y, z))
 
         expected_resources = qp.specs(circuit, level="device")(x, y, z)["resources"].gate_types
         resources = qp.specs(with_qjit, level="device")(x, y, z)["resources"].gate_types
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
+        qp.decomposition.disable_graph()
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_decompose_with_stopping_condition(self):
         """Test that decompose with stopping_condition uses plxpr decomposition correctly.
 
@@ -658,6 +701,7 @@ class TestPlxPRDecomposition:
         the plxpr decompose path (no graph), passing stopping_condition to the transform.
         This test ensures that path compiles and produces correct results.
         """
+        qp.decomposition.enable_graph()
 
         def stopping_condition(op):
             return op.name == "MultiRZ"
@@ -675,7 +719,8 @@ class TestPlxPRDecomposition:
 
         x, y, z = 0.5, 0.3, 0.2
         without_qjit = circuit(x, y, z)
-        with_qjit = qp.qjit(circuit)
+
+        with_qjit = qp.qjit(circuit, capture=True)
         assert qp.math.allclose(without_qjit, with_qjit(x, y, z))
 
         expected_resources = qp.specs(circuit, level="device")(x, y, z)["resources"].gate_types
@@ -683,12 +728,12 @@ class TestPlxPRDecomposition:
         assert "MultiRZ" in resources
         assert "MultiRZ" in expected_resources
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
+        qp.decomposition.disable_graph()
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_decompose_with_lightning_stopping_condition(self):
         """Test that decompose with stopping_condition using Lightning's stopping condition."""
-
-        device = qp.device("lightning.qubit", wires=4)
+        qp.decomposition.enable_graph()
+        device = qp.device("null.qubit", wires=4)
 
         @partial(
             qp.transforms.decompose,
@@ -703,7 +748,8 @@ class TestPlxPRDecomposition:
 
         x = 0.5
         without_qjit = circuit(x)
-        with_qjit = qp.qjit(circuit)
+
+        with_qjit = qp.qjit(circuit, capture=True)
         assert qp.math.allclose(without_qjit, with_qjit(x))
 
         expected_resources = qp.specs(circuit, level="device")(x)["resources"].gate_types
@@ -713,19 +759,20 @@ class TestPlxPRDecomposition:
         assert not any(k.startswith("StatePrep") for k in expected_resources)
         assert not any(k.startswith("StatePrep") for k in resources)
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
+        qp.decomposition.disable_graph()
 
     @pytest.mark.skip(
         reason="inconsistent type and error msg across gcc/clang on arm/x86 for undefined symbols"
     )
-    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_gateset_with_rotxzx(self):
         """Test the runtime raises an error if RotXZX is not decomposed."""
+        qp.decomposition.enable_graph()
 
         @partial(
             qp.transforms.decompose,
             gate_set={qp.ftqc.RotXZX},
         )
-        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit():
             qp.ftqc.RotXZX(0.5, 0.3, 0.7, wires=0)
             return qp.expval(qp.X(0))
@@ -734,41 +781,44 @@ class TestPlxPRDecomposition:
             OSError,
             match="undefined symbol",  # ___catalyst__qis__RotXZX
         ):
-            qp.qjit(circuit)()
+            qp.qjit(circuit, capture=True)()
+        qp.decomposition.disable_graph()
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_ftqc_rotxzx(self):
         """Test that FTQC RotXZX decomposition works with from_plxpr."""
+        qp.decomposition.enable_graph()
 
         @partial(
             qp.transforms.decompose,
             gate_set={"CNOT", "GlobalPhase", "RX", "RZ", "PauliRot"},
         )
-        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit():
             qp.ftqc.RotXZX(0.5, 0.3, 0.7, wires=0)
             qp.ctrl(qp.ftqc.RotXZX(0.4, 0.2, 0.6, wires=1), control=0)
             return qp.expval(qp.X(0))
 
         without_qjit = circuit()
-        with_qjit = qp.qjit(circuit)
+
+        with_qjit = qp.qjit(circuit, capture=True)
 
         assert qp.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
         resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
+        qp.decomposition.disable_graph()
 
     @pytest.mark.xfail(reason="unstable global phase numbers", strict=False)
-    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_multirz(self):
         """Test that multirz decomposition works with from_plxpr."""
+        qp.decomposition.enable_graph()
 
         @partial(
             qp.transforms.decompose,
             gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "Rot", "GlobalPhase"},
         )
-        @qp.qnode(qp.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("null.qubit", wires=4))
         def circuit():
             qp.Hadamard(0)
             qp.ctrl(qp.MultiRZ(0.345, wires=[1, 2]), control=0)
@@ -778,7 +828,8 @@ class TestPlxPRDecomposition:
             qp.MultiRZ(0.5, wires=[0, 1, 3])
             return qp.expval(qp.X(0))
 
-        with_qjit = qp.qjit(circuit)
+        with_qjit = qp.qjit(circuit, capture=True)
+
         result_with_qjit = with_qjit()
         resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
 
@@ -788,16 +839,17 @@ class TestPlxPRDecomposition:
 
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         assert qp.math.allclose(result_without_qjit, result_with_qjit)
+        qp.decomposition.disable_graph()
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_gphase(self):
         """Test that the decompose lowering pass works with GlobalPhase."""
+        qp.decomposition.enable_graph()
 
         @partial(
             qp.transforms.decompose,
             gate_set={"RX", "RY", "GlobalPhase"},
         )
-        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("null.qubit", wires=1))
         def circuit():
             qp.GlobalPhase(0.5)
             qp.ctrl(qp.GlobalPhase, control=0)(0.3)
@@ -805,23 +857,24 @@ class TestPlxPRDecomposition:
             return qp.expval(qp.Z(0))
 
         without_qjit = circuit()
-        with_qjit = qp.qjit(circuit)
+        with_qjit = qp.qjit(circuit, capture=True)
 
         assert qp.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
         resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
+        qp.decomposition.disable_graph()
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_multi_qubits(self):
         """Test that the decompose lowering pass works with multi-qubit gates."""
+        qp.decomposition.enable_graph()
 
         @partial(
             qp.transforms.decompose,
             gate_set={"RY", "RX", "CNOT", "Hadamard", "GlobalPhase"},
         )
-        @qp.qnode(qp.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("null.qubit", wires=4))
         def circuit():
             qp.SingleExcitation(0.5, wires=[0, 1])
             qp.SingleExcitationPlus(0.5, wires=[0, 1])
@@ -830,22 +883,24 @@ class TestPlxPRDecomposition:
             return qp.expval(qp.Z(0))
 
         without_qjit = circuit()
-        with_qjit = qp.qjit(circuit)
+
+        with_qjit = qp.qjit(circuit, capture=True)
         assert qp.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
         resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
+        qp.decomposition.disable_graph()
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_adjoint(self):
         """Test the decompose lowering pass with adjoint operations."""
+        qp.decomposition.enable_graph()
 
         @partial(
             qp.transforms.decompose,
             gate_set={"RY", "RX", "CZ", "GlobalPhase"},
         )
-        @qp.qnode(qp.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("null.qubit", wires=4))
         def circuit():
             qp.adjoint(qp.Hadamard(wires=2))
             qp.adjoint(qp.CNOT(wires=[0, 1]))
@@ -854,23 +909,25 @@ class TestPlxPRDecomposition:
             return qp.expval(qp.Z(0))
 
         without_qjit = circuit()
-        with_qjit = qp.qjit(circuit)
+
+        with_qjit = qp.qjit(circuit, capture=True)
 
         assert qp.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
         resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
+        qp.decomposition.disable_graph()
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_ctrl(self):
         """Test the decompose lowering pass with controlled operations."""
+        qp.decomposition.enable_graph()
 
         @partial(
             qp.transforms.decompose,
             gate_set={"RX", "RZ", "H", "CZ", "PauliRot"},
         )
-        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit():
             qp.ctrl(qp.Hadamard(wires=1), 0)
             qp.ctrl(qp.RY, control=0)(0.5, 1)
@@ -878,28 +935,30 @@ class TestPlxPRDecomposition:
             return qp.expval(qp.Z(0))
 
         without_qjit = circuit()
-        with_qjit = qp.qjit(circuit)
+
+        with_qjit = qp.qjit(circuit, capture=True)
 
         assert qp.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
         resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
+        qp.decomposition.disable_graph()
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_template_qft(self):
         """Test the decompose lowering pass with the QFT template."""
+        qp.decomposition.enable_graph()
 
         @partial(
             qp.transforms.decompose,
             gate_set={"RX", "RY", "CNOT", "GlobalPhase", "PauliRot"},
         )
-        @qp.qnode(qp.device("lightning.qubit", wires=4))
+        @qp.qnode(qp.device("null.qubit", wires=4))
         def circuit():
             qp.QFT(wires=[0, 1, 2, 3])
             return qp.expval(qp.Z(0))
 
-        with_qjit = qp.qjit(circuit)
+        with_qjit = qp.qjit(circuit, capture=True)
         result_with_qjit = with_qjit()
         resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
 
@@ -908,10 +967,11 @@ class TestPlxPRDecomposition:
 
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         assert qp.math.allclose(result_without_qjit, result_with_qjit)
+        qp.decomposition.disable_graph()
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_multi_passes(self):
         """Test the decompose lowering pass with multiple passes."""
+        qp.decomposition.enable_graph()
 
         @qp.transforms.merge_rotations
         @qp.transforms.cancel_inverses
@@ -919,7 +979,7 @@ class TestPlxPRDecomposition:
             qp.transforms.decompose,
             gate_set=frozenset({"RZ", "RY", "CNOT", "GlobalPhase"}),
         )
-        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("null.qubit", wires=1))
         def circuit():
             qp.PauliX(0)
             qp.PauliX(0)
@@ -927,15 +987,16 @@ class TestPlxPRDecomposition:
             return qp.expval(qp.PauliX(0))
 
         without_qjit = circuit()
-        with_qjit = qp.qjit(circuit)
+
+        with_qjit = qp.qjit(circuit, capture=True)
 
         assert qp.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
         resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
+        qp.decomposition.disable_graph()
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
     @pytest.mark.parametrize(
         "num_work_wires,expectation",
         [
@@ -950,6 +1011,7 @@ class TestPlxPRDecomposition:
         Test that graph decomposition raises the correct exception when given an insufficient
         number of work wires, and passes otherwise.
         """
+        qp.decomposition.enable_graph()
 
         @qp.register_resources(
             {qp.CNOT: 3, qp.H: 1, qp.X: 1, qp.ops.op_math.Conditional: 2},
@@ -984,22 +1046,23 @@ class TestPlxPRDecomposition:
 
         with expectation:
 
-            @qp.qjit
+            @qp.qjit(capture=True)
             @partial(
                 qp.transforms.decompose,
                 gate_set={qp.CNOT, qp.H, qp.X, "Conditional", "MidMeasure"},
                 fixed_decomps={qp.CRX: my_decomp},
                 num_work_wires=num_work_wires,
             )
-            @qp.qnode(qp.device("lightning.qubit", wires=9))
+            @qp.qnode(qp.device("null.qubit", wires=9))
             def circuit():
                 qp.CRX(1.7, wires=[0, 1])
                 qp.CRX(-7.2, wires=[0, 1])
                 return qp.state()
 
+        qp.decomposition.disable_graph()
+
     def test_decomp_inside_subroutine(self):
         """Test that decompositions can happen inside subroutines."""
-
         qp.decomposition.enable_graph()
 
         @qp.templates.Subroutine
@@ -1020,7 +1083,6 @@ class TestPlxPRDecomposition:
         r1, r2 = c()
         assert qp.math.allclose(r1, np.cos(0.5))
         assert qp.math.allclose(r2, np.cos(1.2))
-
         qp.decomposition.disable_graph()
 
 
