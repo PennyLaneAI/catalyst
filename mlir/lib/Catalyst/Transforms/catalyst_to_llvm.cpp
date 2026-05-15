@@ -416,7 +416,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         // Remote-dispatch custom_calls are lowered by their own dedicated patterns below.
         StringRef name = op.getCallTargetName();
         if (name == "remote_call" || name == "remote_lib_call" || name == "remote_open" ||
-            name == "remote_send_binary") {
+            name == "remote_send_binary" || name == "remote_close") {
             return failure();
         }
         MLIRContext *ctx = op.getContext();
@@ -729,6 +729,28 @@ struct RemoteSendBinaryOpPattern : public OpConversionPattern<CustomCallOp> {
     }
 };
 
+// Rewrite the `catalyst.custom_call fn("remote_close")` op to `__catalyst__remote__close()`.
+// The runtime's close function tears down all open sessions; it takes no address argument.
+struct RemoteCloseOpPattern : public OpConversionPattern<CustomCallOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(CustomCallOp op, CustomCallOpAdaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        if (op.getCallTargetName() != "remote_close") {
+            return failure();
+        }
+        Location loc = op.getLoc();
+        Type i64Ty = rewriter.getI64Type();
+        Type closeSig = LLVM::LLVMFunctionType::get(i64Ty, {});
+        LLVM::LLVMFuncOp closeFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__remote__close", closeSig);
+        LLVM::CallOp::create(rewriter, loc, closeFn, ValueRange{});
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
 // Rewrite the `catalyst.custom_call fn("remote_lib_call")` op to
 // `__catalyst__remote__call_wrapper(addr, sym, args_buf, args_size, &out, &out_size)`.
 struct RemoteLibCallOpPattern : public OpConversionPattern<CustomCallOp> {
@@ -1011,6 +1033,7 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
         patterns.add<RemoteCustomCallOpPattern>(typeConverter, context);
         patterns.add<RemoteOpenOpPattern>(typeConverter, context);
         patterns.add<RemoteSendBinaryOpPattern>(typeConverter, context);
+        patterns.add<RemoteCloseOpPattern>(typeConverter, context);
         patterns.add<RemoteLibCallOpPattern>(typeConverter, context);
         patterns.add<PrintOpPattern>(typeConverter, context);
         patterns.add<AssertionOpPattern>(typeConverter, context);
