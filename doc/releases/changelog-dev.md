@@ -32,6 +32,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Fixed ``KeyError`` in autograph when using ``qp.prod`` as a decorator with PennyLane >= 0.45.
+  [(#2844)](https://github.com/PennyLaneAI/catalyst/pull/2844)
+
 * Update RC nightly builds to read version number from the `_version.py` file
   [(#2797)](https://github.com/PennyLaneAI/catalyst/pull/2797)
 
@@ -49,6 +52,12 @@
   [(#2780)](https://github.com/PennyLaneAI/catalyst/pull/2780)
   [(#2772)](https://github.com/PennyLaneAI/catalyst/pull/2772)
 
+* The constructors of xDSL ops that accept index attributes have been updated to ensure that the
+  resulting attribute has the correct type. These ops include `quantum.{extract, insert}`,
+  `qecl.{extract_block, insert_block, measure, <gates>}`, and
+  `qecp.{extract_block, insert_block, extract, insert}`.
+  [(#2846)](https://github.com/PennyLaneAI/catalyst/pull/2846)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
@@ -56,6 +65,7 @@
 This release contains contributions from (in alphabetical order):
 
 Joey Carter,
+Yushao Chen,
 Lillian Frederiksen,
 Mehrdad Malekmohammadi,
 Shuli Shu,
