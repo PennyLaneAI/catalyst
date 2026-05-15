@@ -36,24 +36,23 @@ from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
+from catalyst.device.qjit_device import is_dynamic_wires
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
+from catalyst.from_plxpr.qref_jax_primitives import (
+    qref_alloc_p,
+    qref_dealloc_p,
+)
 from catalyst.jax_extras import deduce_avals, make_jaxpr2, transient_jax_config
 from catalyst.jax_extras.patches import get_jax_patches
 from catalyst.jax_primitives import (
     device_init_p,
     device_release_p,
-    qalloc_p,
-    qdealloc_p,
     quantum_kernel_p,
 )
 from catalyst.utils.patching import Patcher
 
 from .device_utils import create_device_preprocessing_pipeline
 from .qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
-from .qubit_handler import (
-    QubitHandler,
-    QubitIndexRecorder,
-)
 
 # dummy hop (higher order primitive) is used to just return a jaxpr
 # produced inside of a another jaxpr
@@ -260,9 +259,6 @@ def handle_qnode(
     self, *args, qnode, device, shots_len, execution_config, qfunc_jaxpr, n_consts, batch_dims=None
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
-
-    self.qubit_index_recorder = QubitIndexRecorder()
-
     if shots_len > 1:
         raise NotImplementedError("shot vectors are not yet supported for catalyst conversion.")
 
@@ -327,14 +323,17 @@ def handle_qnode(
             auto_qubit_management=(device.wires is None),
             **_get_device_kwargs(device),
         )
-        qreg = qalloc_p.bind(len(device.wires))
-        self.init_qreg = QubitHandler(qreg, self.qubit_index_recorder)
-        converter = PLxPRToQuantumJaxprInterpreter(
-            device, shots, self.init_qreg, {}, self.qubit_index_recorder
-        )
+
+        # https://github.com/PennyLaneAI/pennylane/pull/9248
+        assert not is_dynamic_wires(
+            device.wires
+        ), "plxpr does not support dynamic number of wires on the device yet"
+        qreg = qref_alloc_p.bind(static_num_qubits=len(device.wires))
+        self.init_qreg = qreg
+
+        converter = PLxPRToQuantumJaxprInterpreter(device, shots, self.init_qreg, {})
         retvals = converter(closed_jaxpr, *args)
-        self.init_qreg.insert_all_dangling_qubits()
-        qdealloc_p.bind(self.init_qreg.get())
+        qref_dealloc_p.bind(self.init_qreg)
         device_release_p.bind()
         return retvals
 

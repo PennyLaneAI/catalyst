@@ -234,4 +234,5 @@ def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
 
 
 if __name__ == "__main__":  # pragma: no cover
-    precompile_decomp_rules()  # pragma: no cover
+    pass
+    # precompile_decomp_rules()  # pragma: no cover

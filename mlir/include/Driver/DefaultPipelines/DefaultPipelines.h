@@ -33,7 +33,11 @@ using PipelineList = std::vector<PipelineInfo>;
 // clang-format off
 const PipelineList pipelineList{
     {"quantum-compilation-pipeline",
-     {// We want the invariant that transforms that generate multiple
+     {"canonicalize",
+      "verify-no-quantum-use-after-free",
+      "convert-to-value-semantics",
+      "canonicalize",
+      // We want the invariant that transforms that generate multiple
       // tapes will generate multiple qnodes. One for each tape.
       // Split multiple tapes enforces that invariant.
       "split-multiple-tapes",
