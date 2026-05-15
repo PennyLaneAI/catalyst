@@ -173,7 +173,7 @@ class LinkerDriver:
             "-lcustom_calls",
             "-lmlir_async_runtime",
             "-lrt_rsdecomp",
-            "-lrt_decoder",
+            # "-lrt_decoder",  TODO: Re-enable when stringop-overflow warning on arm64 is resolved
         ]
 
         # If OQD runtime capi is built, link to it as well
