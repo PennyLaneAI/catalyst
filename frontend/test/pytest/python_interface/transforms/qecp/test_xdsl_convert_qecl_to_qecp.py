@@ -594,7 +594,7 @@ class TestQecCycleLowering:
         // CHECK:   [[cond_out_cb:%.+]] = scf.if [[cond]]
         // CHECK:     [[q0:%.+]] = qecp.extract [[cb_arg]][[[err_idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
         // CHECK:     [[q1:%.+]] = qecp.z [[q0]] : !qecp.qubit<data>
-        // CHECK:     [[cb_arg_1:%.+]] = qecp.insert [[cb0]][[[err_idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK:     [[cb_arg_1:%.+]] = qecp.insert [[cb_arg]][[[err_idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
         // CHECK:     scf.yield [[cb_arg_1]] : !qecp.codeblock<1 x 7>
         // CHECK:   } else {
         // CHECK:     scf.yield [[cb_arg]] : !qecp.codeblock<1 x 7>
@@ -631,7 +631,7 @@ class TestQecCycleLowering:
         // CHECK:   [[cond_out_cb:%.+]] = scf.if [[cond]]
         // CHECK:     [[q0:%.+]] = qecp.extract [[cb_arg]][[[err_idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
         // CHECK:     [[q1:%.+]] = qecp.x [[q0]] : !qecp.qubit<data>
-        // CHECK:     [[cb_arg_1:%.+]] = qecp.insert [[cb0]][[[err_idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK:     [[cb_arg_1:%.+]] = qecp.insert [[cb_arg]][[[err_idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
         // CHECK:     scf.yield [[cb_arg_1]] : !qecp.codeblock<1 x 7>
         // CHECK:   } else {
         // CHECK:     scf.yield [[cb_arg]] : !qecp.codeblock<1 x 7>
