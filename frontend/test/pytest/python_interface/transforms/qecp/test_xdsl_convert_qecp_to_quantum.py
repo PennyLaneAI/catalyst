@@ -152,3 +152,249 @@ class TestQecPhysicalQubitTypeConversionPatternUnit:
         out = pattern.convert_type(qecp.QecPhysicalQubitType(role))
         assert isinstance(out, QubitType)
         assert out == QubitType()
+
+
+class TestAuxAllocDeallocConversion:
+    """Lowering of qecp.alloc_aux / qecp.dealloc_aux to quantum.alloc_qb / quantum.dealloc_qb."""
+
+    def test_aux_alloc_dealloc(self, run_filecheck):
+        """Auxiliary qubit allocation and deallocation map to quantum alloc_qb/dealloc_qb ops."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_aux_alloc_dealloc
+        func.func @test_aux_alloc_dealloc() {
+            // CHECK: [[q0:%.+]] = quantum.alloc_qb
+            %0 = qecp.alloc_aux : !qecp.qubit<aux>
+            // CHECK: quantum.dealloc_qb [[q0]]
+            qecp.dealloc_aux %0 : !qecp.qubit<aux>
+            // CHECK-NOT: qecp.alloc_aux
+            // CHECK-NOT: qecp.dealloc_aux
+            return
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_convert_aux_operands(self, run_filecheck):
+        """Multiple qcp.qubit<aux> types as operands are converted to quantum.bit."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_two_aux
+        func.func @test_two_aux() {
+            // CHECK-COUNT-2: quantum.alloc_qb
+            // CHECK-NOT: qecp.alloc_aux
+            %a = qecp.alloc_aux : !qecp.qubit<aux>
+            %b = qecp.alloc_aux : !qecp.qubit<aux>
+            // CHECK-NOT: qecp.qubit<aux>
+            // CHECK: "test.op"({{%.+}}, {{%.+}}) : (!quantum.bit, !quantum.bit) -> ()
+            "test.op"(%a, %b) : (!qecp.qubit<aux>, !qecp.qubit<aux>) -> ()
+            return
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+
+class TestExtractInsertQubitConversion:
+    """Lowering of qecp.extract / qecp.insert to quantum.extract / quantum.insert."""
+
+    def test_extract_lowering(self, run_filecheck):
+        """A qecp.extract lowers to quantum.extract."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_extract
+        func.func @test_extract() {
+            // CHECK: [[REG:%.+]] = "test.op"() : () -> !quantum.reg
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 4>
+            // CHECK: [[q0:%.+]] = quantum.extract{{.*}}[0] : !quantum.reg -> !quantum.bit
+            %q = qecp.extract %cb[0] : !qecp.codeblock<1 x 4> -> !qecp.qubit<data>
+            // CHECK-NOT: qecp.extract
+            // CHECK: [[q1:%.+]] = quantum.custom "PauliX"() [[q0:%.+]] : !quantum.bit
+            %q1 = qecp.x %q : !qecp.qubit<data>
+            // CHECK: [[mres:%.+]], [[q2:%.+]] = quantum.measure [[q1:%.+]] : i1, !quantum.bit
+            %mres, %q2 = qecp.measure %q1 : i1, !qecp.qubit<data>
+            return
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_insert_lowering(self, run_filecheck):
+        """A qecp.insert lowers to quantum.insert."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_insert_lowering
+        func.func @test_insert_lowering() {
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 2>
+            %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 2> -> !qecp.qubit<data>
+            // CHECK: [[q1:%.+]] = quantum.extract {{%.+}}[1]
+            %q1 = qecp.extract %cb[1] : !qecp.codeblock<1 x 2> -> !qecp.qubit<data>
+            // CHECK: [[q2:%.+]] = quantum.custom "Hadamard"() [[q1:%.+]] : !quantum.bit
+            %q2 = qecp.hadamard %q1 : !qecp.qubit<data>
+            // CHECK: [[mres:%.+]], [[q3:%.+]] = quantum.measure [[q2:%.+]] : i1, !quantum.bit
+            %mres, %q3 = qecp.measure %q2 : i1, !qecp.qubit<data>
+            // CHECK: [[CB2:%.+]] = quantum.insert {{%.+}}[0], [[q3:%.+]] : !quantum.reg, !quantum.bit
+            %cb2 = qecp.insert %cb[0], %q3 : !qecp.codeblock<1 x 2>, !qecp.qubit<data>
+            return %cb2 : !qecp.codeblock<1 x 2>
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+
+class TestGateMeasureConversion:
+    """Lowering of gate and measurement operations in qecp to quantum."""
+
+    def test_hadamard_lowering(self, run_filecheck):
+        """qecp.hadamard lowers to quantum.custom "Hadamard"."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_hadamard
+        func.func @test_hadamard() {
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 1>
+            %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 1> -> !qecp.qubit<data>
+            // CHECK: [[q1:%.+]] = quantum.custom "Hadamard"() [[q0:%.+]] : !quantum.bit
+            %q1 = qecp.hadamard %q0 : !qecp.qubit<data>
+            return %q1 : !qecp.qubit<data>
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_paulix_lowering(self, run_filecheck):
+        """qecp.x lowers to quantum.custom "PauliX"."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_pauli_x
+        func.func @test_pauli_x() {
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 1>
+            %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 1> -> !qecp.qubit<data>
+            // CHECK: [[q1:%.+]] = quantum.custom "PauliX"() [[q0:%.+]] : !quantum.bit
+            %q1 = qecp.x %q0 : !qecp.qubit<data>
+            return %q1 : !qecp.qubit<data>
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_pauliy_lowering(self, run_filecheck):
+        """qecp.y lowers to quantum.custom "PauliY"."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_pauli_y
+        func.func @test_pauli_y() {
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 1>
+            %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 1> -> !qecp.qubit<data>
+            // CHECK: [[q1:%.+]] = quantum.custom "PauliY"() [[q0:%.+]] : !quantum.bit
+            %q1 = qecp.y %q0 : !qecp.qubit<data>
+            return %q1 : !qecp.qubit<data>
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_pauliz_lowering(self, run_filecheck):
+        """qecp.z lowers to quantum.custom "PauliZ"."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_pauli_z
+        func.func @test_pauli_z() {
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 1>
+            %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 1> -> !qecp.qubit<data>
+            // CHECK: [[q1:%.+]] = quantum.custom "PauliZ"() [[q0:%.+]] : !quantum.bit
+            %q1 = qecp.z %q0 : !qecp.qubit<data>
+            return %q1 : !qecp.qubit<data>
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_identity_lowering(self, run_filecheck):
+        """qecp.i lowers to quantum.custom "Identity"."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_identity
+        func.func @test_identity() {
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 1>
+            %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 1> -> !qecp.qubit<data>
+            // CHECK: [[q1:%.+]] = quantum.custom "Identity"() [[q0:%.+]] : !quantum.bit
+            %q1 = qecp.identity %q0 : !qecp.qubit<data>
+            return %q1 : !qecp.qubit<data>
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_s_lowering(self, run_filecheck):
+        """qecp.s lowers to quantum.custom "S"."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_s
+        func.func @test_s() {
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 1>
+            %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 1> -> !qecp.qubit<data>
+            // CHECK: [[q1:%.+]] = quantum.custom "S"() [[q0:%.+]] : !quantum.bit
+            %q1 = qecp.s %q0 : !qecp.qubit<data>
+            return %q1 : !qecp.qubit<data>
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_cnot_lowering(self, run_filecheck):
+        """qecp.cnot lowers to quantum.custom "CNOT"."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_cnot
+        func.func @test_cnot() {
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 2>
+            %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 2> -> !qecp.qubit<data>
+            %q1 = qecp.extract %cb[1] : !qecp.codeblock<1 x 2> -> !qecp.qubit<data>
+            // CHECK: [[q2:%.+]], [[q3:%.+]] = quantum.custom "CNOT"() [[q0:%.+]], [[q1:%.+]] : !quantum.bit, !quantum.bit
+            %q2, %q3 = qecp.cnot %q0, %q1 : !qecp.qubit<data>, !qecp.qubit<data>
+            // CHECK-NEXT: return [[q2:%.+]] : !quantum.bit
+            return %q2 : !qecp.qubit<data>
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_rot_conversion(self, run_filecheck):
+        """qecp.rot lowers to quantum.custom "Rot"."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_noise_rot
+        func.func @test_noise_rot() {
+            // CHECK: [[reg:%.+]] = "test.op"() : () -> !quantum.reg
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 1>
+            %phi = "test.op"() : () -> f64
+            %theta = "test.op"() : () -> f64
+            %omega = "test.op"() : () -> f64
+            // CHECK: [[q0:%.+]] = quantum.extract [[reg:%.+]][0] : !quantum.reg -> !quantum.bit
+            %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 1> -> !qecp.qubit<data>
+            // CHECK-NEXT: [[q1:%.+]] = quantum.custom "Rot"({{.*}}, {{.*}}, {{.*}}) [[q0:%.+]] : !quantum.bit
+            %q1 = qecp.rot(%phi, %theta, %omega) %q0 : !qecp.qubit<data>
+            // CHECK-NEXT: return [[q1:%.+]] : !quantum.bit
+            return %q1 : !qecp.qubit<data>
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_measure_lowering(self, run_filecheck):
+        """qecp.measure lowers to quantum.measure."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_measure
+        func.func @test_measure() {
+            // CHECK: [[reg:%.+]] = "test.op"() : () -> !quantum.reg
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 1>
+            // CHECK: [[q0:%.+]] = quantum.extract [[reg:%.+]][0] : !quantum.reg -> !quantum.bit
+            %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 1> -> !qecp.qubit<data>
+            // CHECK: [[mres:%.+]], [[q1:%.+]] = quantum.measure [[q0:%.+]] : i1, !quantum.bit
+            %mres, %q1 = qecp.measure %q0 : i1, !qecp.qubit<data>
+            return %mres : i1
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))

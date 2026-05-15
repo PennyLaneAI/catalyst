@@ -24,21 +24,37 @@ from xdsl.dialects import builtin
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
+    PatternRewriter,
     PatternRewriteWalker,
+    RewritePattern,
     TypeConversionPattern,
     attr_type_rewrite_pattern,
+    op_type_rewrite_pattern,
 )
 
-from catalyst.python_interface.dialects import qecp
+from catalyst.python_interface.dialects import qecp, quantum
 from catalyst.python_interface.dialects.quantum.attributes import QubitType, QuregType
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
+
+from ..qecl.convert_quantum_to_qecl import _get_idx_value_or_attr_from_extract_or_insert_op
+
+_QECP_GATENAMES_TO_QUANTUM_OPS = {
+    "qecp.hadamard": "Hadamard",
+    "qecp.identity": "Identity",
+    "qecp.s": "S",
+    "qecp.x": "PauliX",
+    "qecp.y": "PauliY",
+    "qecp.z": "PauliZ",
+    "qecp.cnot": "CNOT",
+}
+
 
 # MARK: Type Conversion Pattern
 
 
 @dataclass
 class PhysicalCodeblockTypeConversion(TypeConversionPattern):
-    """Codeblock type conversion pattern from qecp.codeblock -> quantum.reg."""
+    """Codeblock type conversion pattern from qecp.codeblock to quantum.reg."""
 
     @attr_type_rewrite_pattern
     def convert_type(
@@ -51,7 +67,7 @@ class PhysicalCodeblockTypeConversion(TypeConversionPattern):
 
 @dataclass
 class QecPhysicalQubitTypeConversion(TypeConversionPattern):
-    """Qubit type conversion pattern from qecp.qubit -> quantum.bit."""
+    """Qubit type conversion pattern from qecp.qubit to quantum.bit."""
 
     @attr_type_rewrite_pattern
     def convert_type(
@@ -60,6 +76,106 @@ class QecPhysicalQubitTypeConversion(TypeConversionPattern):
         """Type conversion rewrite pattern for QEC physical qubit types."""
 
         return QubitType()
+
+
+# MARK: Auxiliary qubit Alloc/Dealloc Patterns
+
+
+@dataclass(frozen=True)
+class AllocAuxQubitConversion(RewritePattern):
+    """Op conversion pattern from qecp.alloc_aux to quantum.alloc_qb."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecp.AllocAuxQubitOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering ops that allocate an auxiliary qubit."""
+        rewriter.replace_op(op, quantum.AllocQubitOp())
+
+
+@dataclass(frozen=True)
+class DeallocAuxQubitConversion(RewritePattern):
+    """Op conversion pattern from qecp.dealloc_aux to quantum.dealloc_qb."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecp.DeallocAuxQubitOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering ops that deallocate an auxiliary qubit."""
+        rewriter.replace_op(op, quantum.DeallocQubitOp(op.qubit))
+
+
+# MARK: Data qubit extract and insertion patterns
+
+
+@dataclass(frozen=True)
+class ExtractQubitConversion(RewritePattern):
+    """Op conversion pattern from qecp.extract to quantum.extract."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecp.ExtractQubitOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering ops that extract a data qubit from a
+        quantum.reg."""
+        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
+
+        rewriter.replace_op(op, quantum.ExtractOp(op.codeblock, idx=idx))
+
+
+@dataclass(frozen=True)
+class InsertQubitConversion(RewritePattern):
+    """Op conversion pattern from qecp.insert to quantum.insert."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecp.InsertQubitOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering ops for data qubit insertion."""
+        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
+        insert_op = quantum.InsertOp(op.in_codeblock, idx=idx, qubit=op.qubit)
+        rewriter.replace_op(op, insert_op)
+
+
+# MARK: Gate/Measurement conversion patterns
+
+
+@dataclass(frozen=True)
+class CliffordGateConversion(RewritePattern):
+    """Op conversion pattern from gates in qecp to quantum.custom."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(
+        self, op: qecp.SingleQubitPhysicalGateOp | qecp.CnotOp, rewriter: PatternRewriter
+    ):
+        """Op conversion rewrite pattern for lowering gate ops in the qecp to quantum.custom ops."""
+        gate_name = _QECP_GATENAMES_TO_QUANTUM_OPS.get(op.name)
+
+        adjoint = op.properties.get("adjoint", False)
+
+        gate_op = quantum.CustomOp(gate_name=gate_name, in_qubits=op.operands, adjoint=adjoint)
+        rewriter.replace_op(op, gate_op)
+
+
+@dataclass(frozen=True)
+class NoiseRotConversion(RewritePattern):
+    """Op conversion pattern from qecp.rot to quantum.custom. Note that this pattern is for
+    validation purposes only and is separated from the general GateConversion pattern."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecp.RotOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering noise rotation ops to quantum.custom
+        "Rot" ops."""
+        gate_name = "Rot"
+        params = (op.phi, op.theta, op.omega)
+        gate_op = quantum.CustomOp(
+            gate_name=gate_name, params=params, in_qubits=(op.in_qubit,), adjoint=False
+        )
+        rewriter.replace_op(op, gate_op)
+
+
+@dataclass(frozen=True)
+class MeasureConversion(RewritePattern):
+    """Op conversion pattern from qecp.measure to quantum.measure."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecp.MeasureOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering measurement ops in qecp to
+        quantum.measure ops."""
+        measure_op = quantum.MeasureOp(in_qubit=op.operands[0])
+        rewriter.replace_op(op, measure_op)
 
 
 @dataclass(frozen=True)
@@ -79,6 +195,13 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                 [
                     PhysicalCodeblockTypeConversion(),
                     QecPhysicalQubitTypeConversion(),
+                    AllocAuxQubitConversion(),
+                    DeallocAuxQubitConversion(),
+                    InsertQubitConversion(),
+                    ExtractQubitConversion(),
+                    CliffordGateConversion(),
+                    NoiseRotConversion(),
+                    MeasureConversion(),
                 ]
             )
         ).rewrite_module(op)

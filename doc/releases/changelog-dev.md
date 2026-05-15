@@ -6,6 +6,7 @@
   from the QEC Physical (`qecp`) dialect into the Quantum (`quantum`) dialect.
   [(#2822)](https://github.com/PennyLaneAI/catalyst/pull/2822)
   [(#2809)](https://github.com/PennyLaneAI/catalyst/pull/2809)
+  [(#2824)](https://github.com/PennyLaneAI/catalyst/pull/2824)
 
 
 <h3>Improvements 🛠</h3>
