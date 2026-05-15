@@ -34,6 +34,7 @@ from catalyst.pipelines import CompileOptions
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args, promote_arguments
 from catalyst.utils.filesystem import WorkspaceManager
+from catalyst.utils.runtime_artifacts import collect_runtime_artifacts_from_text
 from catalyst.utils.types import convert_numpy_dtype_to_mlir
 
 logger = logging.getLogger(__name__)
@@ -391,6 +392,10 @@ def compile_mlir(mlir_source, *, func_name, result_types, **options):
         ir_text = mlir_source
 
     compile_options = CompileOptions(**options)
+
+    if not compile_options.runtime_artifacts:
+        collect_runtime_artifacts_from_text(ir_text, compile_options)
+
     keep = compile_options.keep_intermediate
     preferred_dir = os.getcwd() if keep else None
     workspace = WorkspaceManager.get_or_create_workspace(func_name, preferred_dir)

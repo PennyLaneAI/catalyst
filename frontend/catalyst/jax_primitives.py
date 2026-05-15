@@ -59,6 +59,7 @@ from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 # pylint: disable=ungrouped-imports
 from catalyst.jax_extras.patches import mock_attributes
 from catalyst.utils.patching import Patcher
+from catalyst.utils.runtime_artifacts import record_runtime_artifact
 
 with Patcher(
     (
@@ -573,23 +574,6 @@ def _runtime_call_impl(*args, **kwargs):  # pragma: no cover
     raise NotImplementedError()
 
 
-_RUNTIME_ARTIFACTS_ATTR = "catalyst.runtime_artifacts"
-
-
-def _record_runtime_artifact(module_op, artifact_path):
-    """Append `artifact_path` to the module's `catalyst.runtime_artifacts` attr."""
-    attrs = module_op.attributes
-    existing = (
-        [ir.StringAttr(a).value for a in attrs[_RUNTIME_ARTIFACTS_ATTR]]
-        if _RUNTIME_ARTIFACTS_ATTR in attrs
-        else []
-    )
-    if artifact_path in existing:
-        return
-    existing.append(artifact_path)
-    attrs[_RUNTIME_ARTIFACTS_ATTR] = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in existing])
-
-
 def _runtime_call_lowering(jax_ctx: mlir.LoweringRuleContext, *args, kernel_descriptor):
     """Lower runtime_call to catalyst.custom_call and record the artifact on the enclosing module.
     The artifact path is written as a catalyst.runtime_artifacts ArrayAttr on calling module.
@@ -597,7 +581,7 @@ def _runtime_call_lowering(jax_ctx: mlir.LoweringRuleContext, *args, kernel_desc
     results_ty = list(convert_shaped_arrays_to_tensors(jax_ctx.avals_out))
     call_op = CustomCallOp(results_ty, list(args), kernel_descriptor.name)
 
-    _record_runtime_artifact(jax_ctx.module_context.module.operation, kernel_descriptor.artifact)
+    record_runtime_artifact(jax_ctx.module_context.module.operation, kernel_descriptor.artifact)
 
     return call_op.results
 
