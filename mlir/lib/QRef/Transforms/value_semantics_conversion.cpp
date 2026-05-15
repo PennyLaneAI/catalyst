@@ -1286,67 +1286,7 @@ void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTr
 
 void handleCtrl(IRRewriter &builder, qref::CtrlOp rCtrlOp, QubitValueTracker &tracker)
 {
-    OpBuilder::InsertionGuard guard(builder);
-    builder.setInsertionPoint(rCtrlOp);
-    Location loc = rCtrlOp->getLoc();
-
-    SetVector<Value> rValuesUsedByRegion;
-    collectNecessaryRegionRValues(rCtrlOp.getRegion(), rValuesUsedByRegion);
-
-    quantum::CtrlOp vCtrlOp;
-    {
-        // 1. Send in the vValues from above as arguments
-        // This handles the flow from outside the vCtrlOp into the vCtrlOp
-        // i.e. the extract op results are sent in as operands to the vCtrlOp
-        SmallVector<Value> regionOperands;
-        regionOperands.append(rValuesUsedByRegion.begin(), rValuesUsedByRegion.end());
-        TransientQubitExtractor extractor(tracker, builder, rCtrlOp, regionOperands);
-        SmallVector<Value> vCtrlOperands;
-
-        for (Value rValue : rValuesUsedByRegion) {
-            if (isa<qref::QubitType>(rValue.getType()) && tracker.isRootRQubit(rValue)) {
-                vCtrlOperands.push_back(tracker.getCurrentVQubit(rValue));
-            }
-            else if (isa<qref::QuregType>(rValue.getType())) {
-                vCtrlOperands.push_back(tracker.getCurrentVQreg(rValue));
-            }
-            else {
-                // To be replaced with extracted vQubits
-                vCtrlOperands.push_back(rValue);
-            }
-        }
-        for (auto [vQubit, idx] : llvm::zip_equal(extractor.getExtractedVQubits(),
-                                                  extractor.getNonRootQubitOperandIndices())) {
-            vCtrlOperands[idx] = vQubit;
-        }
-
-        vCtrlOp =
-            quantum::CtrlOp::create(builder, loc, TypeRange(vCtrlOperands), vCtrlOperands);
-
-        // 2. Move operations from old body to new body
-        builder.inlineRegionBefore(rCtrlOp.getRegion(), vCtrlOp.getRegion(),
-                                   vCtrlOp.getRegion().end());
-        builder.setInsertionPointToEnd(&vCtrlOp.getRegion().front());
-        quantum::YieldOp::create(builder, loc, {});
-
-        // 3. Create new args with quantum.bit/reg types and set them as root for the new region
-        addVArgsToRegionAndHandle(builder, rValuesUsedByRegion, vCtrlOp.getRegion());
-
-        // Update tracker with results
-        for (auto [i, j] :
-             llvm::zip_equal(extractor.getQRegOperandIndices(), extractor.getQRegResultIndices())) {
-            tracker.setCurrentVQreg(rValuesUsedByRegion[i], vCtrlOp->getResult(j));
-        }
-
-        for (auto [i, j] : llvm::zip_equal(extractor.getRootQubitOperandIndices(),
-                                           extractor.getRootQubitResultIndices())) {
-            tracker.setCurrentVQubit(rValuesUsedByRegion[i], vCtrlOp->getResult(j));
-        }
-
-        extractor.setVOp(vCtrlOp);
-    }
-
-    builder.eraseOp(rCtrlOp);
+     // TODO
 }
 
 
