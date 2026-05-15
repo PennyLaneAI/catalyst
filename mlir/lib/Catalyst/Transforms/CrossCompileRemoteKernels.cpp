@@ -275,8 +275,21 @@ struct CrossCompileRemoteKernelsPass
             mod.print(os, nullptr);
     }
 
+    /**
+     * @brief Emit a `.o` file from an LLVM module for the given target.
+     *
+     * @param llvmModule The LLVM module to emit.
+     * @param name The name used as the object file's basename.
+     * @param triple The target triple to emit the object file for.
+     * @param dir The directory to write the object file into.
+     * @param cpu The CPU model to tune codegen for (`generic` for baseline,
+     *        `cortex-a72` for Versal Premium APU, etc.).
+     * @param features Comma-separated `+feat`/`-feat` tokens, or empty to let
+     *        the CPU pick its own feature set.
+     * @return std::string The path to the emitted object file.
+     */
     std::string emitObjectFile(std::unique_ptr<llvm::Module> &&llvmModule, StringRef name,
-                               StringRef triple, StringRef dir)
+                               StringRef triple, StringRef dir, StringRef cpu, StringRef features)
     {
         llvm::Triple parsedTriple{triple};
         std::string err;
@@ -288,9 +301,10 @@ struct CrossCompileRemoteKernelsPass
         }
         llvm::TargetOptions opt;
         std::unique_ptr<llvm::TargetMachine> targetMachine(llvmTarget->createTargetMachine(
-            parsedTriple, "generic", "", opt, llvm::Reloc::Model::PIC_));
+            parsedTriple, cpu, features, opt, llvm::Reloc::Model::PIC_));
         if (!targetMachine) {
-            llvm::errs() << "Could not create TargetMachine for triple '" << triple << "'\n";
+            llvm::errs() << "Could not create TargetMachine for triple '" << triple
+                         << "' cpu='" << cpu << "' features='" << features << "'\n";
             return "";
         }
         targetMachine->setOptLevel(llvm::CodeGenOptLevel::Aggressive);
@@ -393,7 +407,8 @@ struct CrossCompileRemoteKernelsPass
             return failure();
         }
         dumpLLVMIR(*llvmModule, kernelDir, name.str() + ".ll");
-        std::string objPath = emitObjectFile(std::move(llvmModule), name, moduleTarget, kernelDir);
+        std::string objPath =
+            emitObjectFile(std::move(llvmModule), name, moduleTarget, kernelDir, cpu, features);
         if (objPath.empty()) {
             nested.emitError("failed to emit object file for target module: " + name.str());
             return failure();

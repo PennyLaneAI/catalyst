@@ -220,6 +220,26 @@ def CrossCompileRemoteKernelsPass : Pass<"cross-compile-remote-kernels", "mlir::
             /*description=*/
             "LLVM target triple used for object emission."
         >,
+        Option<
+            /*C++ var name=*/"cpu",
+            /*CLI arg name=*/"cpu",
+            /*type=*/"std::string",
+            /*default=*/"\"generic\"",
+            /*description=*/
+            "LLVM CPU model fed to `createTargetMachine` (e.g. `cortex-a72` for "
+            "Versal Premium). Defaults to `generic`, which emits baseline code "
+            "for the triple."
+        >,
+        Option<
+            /*C++ var name=*/"features",
+            /*CLI arg name=*/"features",
+            /*type=*/"std::string",
+            /*default=*/"\"\"",
+            /*description=*/
+            "Comma-separated subtarget features fed to `createTargetMachine` "
+            "(each token must be `+feat` or `-feat`, e.g. `+crc,+aes,+sha2`). "
+            "Empty (default) lets the CPU choose its own feature set."
+        >,
     ];
 }
 
