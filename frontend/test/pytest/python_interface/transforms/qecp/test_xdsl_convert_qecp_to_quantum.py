@@ -14,14 +14,24 @@
 
 """Tests for the convert-qecp-to-quantum xDSL dialect-conversion pass."""
 
+import pennylane as qp
+
+
 import pytest
 
 from catalyst.python_interface.dialects import qecp
 from catalyst.python_interface.dialects.quantum.attributes import QubitType
+from catalyst.python_interface.transforms.qecl import (
+    convert_quantum_to_qecl_pass,
+    inject_noise_to_qecl_pass,
+)
+from catalyst.python_interface.transforms.qecp import (
+    convert_qecl_to_qecp_pass,
+    convert_qecp_to_quantum_pass,
+)
 from catalyst.python_interface.transforms.qecp.convert_qecp_to_quantum import (
     ConvertQecPhysicalToQuantumPass,
     QecPhysicalQubitTypeConversion,
-    convert_qecp_to_quantum_pass,
 )
 
 # pylint: disable=line-too-long
@@ -494,3 +504,32 @@ class TestHyperRegisterLowering:
             func.func private @hadamard_Steane(%6: !qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
         """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+
+@pytest.mark.xfail(reason="The 'qecp.decode_esm_css' op using value defined outside the region ")
+@pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
+class TestQECPassIntegration:
+    """Integration lit tests for the all qec-related pass"""
+
+    # pylint: disable=line-too-long
+    def test_qec_pass_ghz_integration(self, run_filecheck_qjit):
+        dev = qp.device("null.qubit", wires=3)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_qecp_to_quantum_pass
+        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
+        @inject_noise_to_qecl_pass
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=1)
+        def ghz():
+            # CHECK: [[reg0:%.+]] = quantum.alloc(7)
+            # CHECK-NEXT: [[reg0:%.+]] = func.call @encode_zero_Steane([[reg0:%.+]]) : (!quantum.reg) -> !quantum.reg
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([1, 2])
+            m0 = qp.measure(0)
+            m1 = qp.measure(1)
+            m2 = qp.measure(2)
+            return qp.sample([m0, m1, m2])
+
+        run_filecheck_qjit(ghz)
