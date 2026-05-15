@@ -504,7 +504,6 @@ class TestHyperRegisterLowering:
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
 
 
-@pytest.mark.xfail(reason="The 'qecp.decode_esm_css' op using value defined outside the region ")
 @pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
 class TestQECPassIntegration:
     """Integration lit tests for the all qec-related pass"""
@@ -518,10 +517,36 @@ class TestQECPassIntegration:
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
         @convert_quantum_to_qecl_pass(k=1)
-        @qp.qnode(dev, shots=1)
+        @qp.qnode(dev, shots=1, mcm_method="one-shot")
         def ghz():
-            # CHECK: [[reg0:%.+]] = quantum.alloc(7)
-            # CHECK-NEXT: [[reg0:%.+]] = func.call @encode_zero_Steane([[reg0:%.+]]) : (!quantum.reg) -> !quantum.reg
+            # CHECK-NOT: qecp.alloc
+            # CHECK-NOT: qecp.dealloc
+            # CHECK-NOT: qecp.alloc_aux
+            # CHECK-NOT: qecp.dealloc_aux
+            # CHECK-NOT: qecp.extract_block
+            # CHECK-NOT: qecp.insert_block
+            # CHECK-NOT: qecp.insert
+            # CHECK-NOT: qecp.extract
+            # CHECK-NOT: qecp.measure
+            # CHECK-NOT: qecp.identity
+            # CHECK-NOT: qecp.x
+            # CHECK-NOT: qecp.y
+            # CHECK-NOT: qecp.z
+            # CHECK-NOT: qecp.rot
+            # CHECK-NOT: qecp.hadamard
+            # CHECK-NOT: qecp.s
+            # CHECK-NOT: qecp.cnot
+            # CHECK: quantum.alloc
+            # CHECK: qecp.decode_physical_meas
+            # CHECK: quantum.dealloc
+            # CHECK: quantum.extract
+            # CHECK: quantum.insert
+            # CHECK: quantum.bit
+            # CHECK: quantum.reg
+            # CHECK: qecp.assemble_tanner
+            # CHECK: qecp.decode_esm_css
+            # CHECK: quantum.custom "Hadamard"
+            # CHECK: quantum.custom "CNOT"
             qp.Hadamard(0)
             qp.CNOT([0, 1])
             qp.CNOT([1, 2])

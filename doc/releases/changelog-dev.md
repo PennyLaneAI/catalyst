@@ -9,6 +9,7 @@
   [(#2824)](https://github.com/PennyLaneAI/catalyst/pull/2824)
   [(#2835)](https://github.com/PennyLaneAI/catalyst/pull/2835)
   [(#2839)](https://github.com/PennyLaneAI/catalyst/pull/2839)
+  [(#2849)](https://github.com/PennyLaneAI/catalyst/pull/2849)
 
 
 <h3>Improvements 🛠</h3>

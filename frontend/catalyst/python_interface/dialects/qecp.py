@@ -826,7 +826,7 @@ class DecodeEsmCssOp(IRDLOperation):
         esm: SSAValue[TensorType] | Operation,
         err_idx_type: TensorType,
     ):
-        operands = (tanner_graph, esm, None)
+        operands = (esm, tanner_graph, None)
         super().__init__(operands=operands, result_types=(err_idx_type,))
 
 

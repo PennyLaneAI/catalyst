@@ -398,13 +398,11 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         module_block = op.regions[0].blocks.first
         assert module_block is not None, "Module has no block"
 
-        tanner_x, tanner_z = self.insert_tanner_graph_ops_into_block(module_block)
-
         # Insert subroutines that implement the QEC protocols
         encode_funcop = self.create_encode_subroutine()
         module_block.add_op(encode_funcop)
 
-        qec_cycle_funcop = self.create_qec_cycle_subroutine(tanner_x=tanner_x, tanner_z=tanner_z)
+        qec_cycle_funcop = self.create_qec_cycle_subroutine()
         module_block.add_op(qec_cycle_funcop)
 
         measure_subroutine = self.create_measure_subroutine()
@@ -854,14 +852,12 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         return tanner_graph, cnot_fn
 
-    def create_qec_cycle_subroutine(
-        self, tanner_x: qecp.TannerGraphSSAValue, tanner_z: qecp.TannerGraphSSAValue
-    ) -> func.FuncOp:
+    def create_qec_cycle_subroutine(self) -> func.FuncOp:
         """Create a subroutine that performs a cycle of QEC on an input physical codeblock.
 
         The generated subroutine assumes a CSS QEC code and performs separate X and Z corrections,
-        as defined by the input X and Z Tanner graphs, `tanner_x` and `tanner_z`. Recall that
-        X-Tanner graphs define the X stabilizer components of the code, which are used to identify Z
+        as defined by this pass's X and Z Tanner graph data for the code. Recall that X-Tanner
+        graphs define the X stabilizer components of the code, which are used to identify Z
         errors, and conversely Z-Tanner graphs define the Z stabilizer components of the code, which
         are used to identify X errors.
 
@@ -872,6 +868,10 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         the detected error(s) occurred. It then iterates over these codeblock indices, applies the
         respective correction, and finally returns the updated physical codeblock SSA value.
 
+        Tanner graph SSA values are produced by ``qecp.assemble_tanner`` at the start of this
+        function's entry block so the subroutine body remains isolated from the enclosing module
+        (MLIR functions are isolated from above).
+
         Note that this method does not insert the subroutine into the module op. Instead it returns
         the built func.FuncOp object that can then be subsequently inserted where desired.
         """
@@ -881,6 +881,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         output_types = (codeblock_type,)
 
         block = Block(arg_types=input_types)
+        tanner_x, tanner_z = self.insert_tanner_graph_ops_into_block(block)
 
         with ImplicitBuilder(block):
             in_codeblock = cast(BlockArgument[qecp.PhysicalCodeblockType], block.args[0])
@@ -1013,7 +1014,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                         assert False, f"Unknown CheckType: '{check_type}'"
 
                 insert_err_qubit_op = qecp.InsertQubitOp(
-                    in_codeblock=post_check_codeblock, idx=err_idx, qubit=corr_qubit_op.out_qubit
+                    in_codeblock=codeblock, idx=err_idx, qubit=corr_qubit_op.out_qubit
                 )
 
                 scf.YieldOp(insert_err_qubit_op.out_codeblock)
@@ -1026,7 +1027,6 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
             scf.YieldOp(out_codeblock)
 
-        # Return updated codeblock SSA value
         return for_each_err_idx_op.results[0]
 
 
