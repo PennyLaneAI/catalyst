@@ -26,8 +26,12 @@ from catalyst.python_interface.dialects import qecl
 pytestmark = pytest.mark.xdsl
 
 
-@pytest.fixture
-def assert_valid_idx_attr(scope="module"):
+@pytest.fixture(scope="module", name="assert_valid_idx_attr")
+def fixture_assert_valid_idx_attr():
+    """Fixture factory that returns a function to validate the `idx_attr` attribute of an xDSL
+    operation.
+    """
+
     def _validate_idx(op: Operation, idx: int | IntegerAttr | SSAValue):
         idx_attr = op.properties.get("idx_attr")
         if isinstance(idx, (int, IntegerAttr)):
