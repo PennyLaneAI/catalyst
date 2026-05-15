@@ -56,7 +56,7 @@ class TestCatalyst:
             return qp.state()
 
         capture_enabled = qp.capture.enabled()
-        qp.capture.disable()
+        pass
         try:
             pl_res = pennylane_workflow(*args)
         finally:

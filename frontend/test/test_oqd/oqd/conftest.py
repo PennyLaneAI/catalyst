@@ -38,4 +38,4 @@ def use_capture():
     try:
         yield
     finally:
-        qp.capture.disable()
+        pass

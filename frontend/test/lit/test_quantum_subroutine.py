@@ -46,7 +46,7 @@ def test_subroutine_classical():
         return add_one(0)
 
     print(main.mlir)
-    qp.capture.disable()
+    pass
 
 
 test_subroutine_classical()
@@ -78,7 +78,7 @@ def test_quantum_subroutine_identity_restore_wires():
     # CHECK-NEXT: return [[REG]] : !quantum.reg
 
     print(main.mlir)
-    qp.capture.disable()
+    pass
 
 
 test_quantum_subroutine_identity_restore_wires()
@@ -106,7 +106,7 @@ def test_quantum_subroutine_identity():
     # CHECK-NEXT: return [[REG]] : !quantum.reg
 
     print(main.mlir)
-    qp.capture.disable()
+    pass
 
 
 test_quantum_subroutine_identity()
@@ -142,7 +142,7 @@ def test_quantum_subroutine_wire_param():
 
     print(subroutine_test.mlir)
 
-    qp.capture.disable()
+    pass
 
 
 test_quantum_subroutine_wire_param()
@@ -176,7 +176,7 @@ def test_quantum_subroutine_gate_param_param():
     # CHECK-NEXT: return [[REG_1]] : !quantum.reg
     print(subroutine_test_2.mlir)
 
-    qp.capture.disable()
+    pass
 
 
 test_quantum_subroutine_gate_param_param()
@@ -222,7 +222,7 @@ def test_quantum_subroutine_with_control_flow():
     # CHECK:            scf.yield [[QREG]] : !quantum.reg
     # CHECK:      return [[RETVAL]]
     print(subroutine_test_3.mlir)
-    qp.capture.disable()
+    pass
 
 
 test_quantum_subroutine_with_control_flow()
@@ -261,7 +261,7 @@ def test_nested_subroutine_call():
     # CHECK-NEXT: [[QREG_1:%.+]] = quantum.insert [[QREG]][ 0], [[QUBIT_1]] : !quantum.reg, !quantum.bit
     # CHECK-NEXT: return [[QREG_1]] : !quantum.reg
     print(subroutine_test_4.mlir)
-    qp.capture.disable()
+    pass
 
 
 test_nested_subroutine_call()
@@ -284,7 +284,7 @@ def test_two_callsites():
 
     # CHECK-NOT: func.func private @identity_0()
     print(subroutine_test_5.mlir)
-    qp.capture.disable()
+    pass
 
 
 test_two_callsites()
@@ -313,7 +313,7 @@ def test_two_callsites_quantum():
 
     # CHECK-NOT: func.func private @identity_0
     print(subroutine_test_6.mlir)
-    qp.capture.disable()
+    pass
 
 
 test_two_callsites_quantum()
@@ -355,7 +355,7 @@ def test_two_qnodes_one_subroutine():
 
     print(main.mlir)
 
-    qp.capture.disable()
+    pass
 
 
 test_two_qnodes_one_subroutine()
@@ -381,7 +381,7 @@ def test_with_constant():
 
     print(circ.mlir)
 
-    qp.capture.disable()
+    pass
 
 
 test_with_constant()

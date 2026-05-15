@@ -58,7 +58,7 @@ def test_xdsl_pass_with_attribute():
     print(circuit_with_xdsl_pass.mlir)
     # CHECK: catalyst.uses_xdsl_passes
     # CHECK: catalyst.xdsl_pass
-    qp.capture.disable()
+    pass
 
 
 test_xdsl_pass_with_attribute()
@@ -80,7 +80,7 @@ def test_mixed_passes_with_attribute():
     print(circuit_with_mixed_passes.mlir)
     # CHECK: catalyst.uses_xdsl_passes
     # CHECK: catalyst.xdsl_pass
-    qp.capture.disable()
+    pass
 
 
 test_mixed_passes_with_attribute()

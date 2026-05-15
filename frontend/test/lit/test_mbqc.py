@@ -49,7 +49,7 @@ def test_measure_x():
         _ = plft.measure_x(0)
         return qp.expval(qp.Z(0))
 
-    qp.capture.disable()
+    pass
 
     print(workload_measure_x.mlir)
 
@@ -78,7 +78,7 @@ def test_measure_y():
         _ = plft.measure_y(0)
         return qp.expval(qp.Z(0))
 
-    qp.capture.disable()
+    pass
 
     print(workload_measure_y.mlir)
 
@@ -110,7 +110,7 @@ def test_measure_z():
         _ = plft.measure_z(0)
         return qp.expval(qp.Z(0))
 
-    qp.capture.disable()
+    pass
 
     print(workload_measure_z.mlir)
 
@@ -139,7 +139,7 @@ def test_measure_arbitrary_basis(angle, plane):
         _ = plft.measure_arbitrary_basis(wires=0, angle=angle, plane=plane)
         return qp.expval(qp.Z(0))
 
-    qp.capture.disable()
+    pass
 
     print(workload_measure_arbitrary_basis.mlir)
 
@@ -193,7 +193,7 @@ def test_measure_arbitrary_basis_dyn_angle(plane):
         _ = plft.measure_arbitrary_basis(wires=0, angle=_angle, plane=plane)
         return qp.expval(qp.Z(0))
 
-    qp.capture.disable()
+    pass
 
     print(workload_measure_arbitrary_basis_dyn_angle.mlir)
 
@@ -271,7 +271,7 @@ def test_pseudo_mbqc_workload():
         # CHECK: quantum.expval [[obs]] : f64
         return qp.expval(qp.Z(2))
 
-    qp.capture.disable()
+    pass
 
     print(workload_pseudo_mbqc.mlir)
 

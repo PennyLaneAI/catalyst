@@ -193,7 +193,7 @@ class TestCatalystCompareJaxpr:
         qp.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(x)
         converted = from_plxpr(plxpr)(x)
-        qp.capture.disable()
+        pass
 
         catalyst_res = catalyst_execute_jaxpr(converted)(x)
         assert len(catalyst_res) == 1
@@ -220,7 +220,7 @@ class TestCatalystCompareJaxpr:
         qp.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(phi)
         converted = from_plxpr(plxpr)(phi)
-        qp.capture.disable()
+        pass
         catalyst_res = catalyst_execute_jaxpr(converted)(phi)
         assert qp.math.allclose(catalyst_res, np.exp(-0.5j) * np.array([1.0, 0.0]))
 
@@ -244,7 +244,7 @@ class TestCatalystCompareJaxpr:
         qp.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(0.5)
         converted = from_plxpr(plxpr)(0.5)
-        qp.capture.disable()
+        pass
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -275,7 +275,7 @@ class TestCatalystCompareJaxpr:
         plxpr = jax.make_jaxpr(circuit)(0.5)
 
         converted = from_plxpr(plxpr)(0.5)
-        qp.capture.disable()
+        pass
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -310,7 +310,7 @@ class TestCatalystCompareJaxpr:
         plxpr = jax.make_jaxpr(circuit)(phi)
 
         converted = from_plxpr(plxpr)(phi)
-        qp.capture.disable()
+        pass
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -349,7 +349,7 @@ class TestCatalystCompareJaxpr:
         plxpr = jax.make_jaxpr(circuit)(x)
 
         converted = from_plxpr(plxpr)(np.array(0.724))
-        qp.capture.disable()
+        pass
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -382,7 +382,7 @@ class TestCatalystCompareJaxpr:
         plxpr = jax.make_jaxpr(circuit)()
 
         converted = from_plxpr(plxpr)()
-        qp.capture.disable()
+        pass
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -416,7 +416,7 @@ class TestCatalystCompareJaxpr:
         plxpr = jax.make_jaxpr(circuit)()
 
         converted = from_plxpr(plxpr)()
-        qp.capture.disable()
+        pass
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -448,7 +448,7 @@ class TestCatalystCompareJaxpr:
         qp.capture.enable()
         plxpr = jax.make_jaxpr(circuit)()
         converted = from_plxpr(plxpr)()
-        qp.capture.disable()
+        pass
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -483,7 +483,7 @@ class TestCatalystCompareJaxpr:
         qp.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(basis_state)
         converted = from_plxpr(plxpr)(basis_state)
-        qp.capture.disable()
+        pass
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -517,7 +517,7 @@ class TestCatalystCompareJaxpr:
         qp.capture.enable()
         plxpr = jax.make_jaxpr(circuit)(init_state)
         converted = from_plxpr(plxpr)(init_state)
-        qp.capture.disable()
+        pass
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -551,7 +551,7 @@ class TestCatalystCompareJaxpr:
         plxpr = jax.make_jaxpr(circuit)(x, y, z)
 
         converted = from_plxpr(plxpr)(x, y, z)
-        qp.capture.disable()
+        pass
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
         assert converted.eqns[0].params["qnode"] is circuit
@@ -594,7 +594,7 @@ class TestCatalystCompareJaxpr:
         jaxpr = jax.make_jaxpr(f)()
 
         converted = from_plxpr(jaxpr)()
-        qp.capture.disable()
+        pass
 
         assert converted.out_avals[0].shape == (100, 1)
         [samples] = catalyst_execute_jaxpr(converted)()
@@ -914,7 +914,7 @@ class TestHybridPrograms:
         plxpr = jax.make_jaxpr(workflow)(0.5)
 
         converted = from_plxpr(plxpr)(0.5)
-        qp.capture.disable()
+        pass
 
         res = catalyst_execute_jaxpr(converted)(0.5)
 
@@ -955,7 +955,7 @@ class TestHybridPrograms:
         qp.capture.enable()
         jaxpr = jax.make_jaxpr(workflow)(0.5, 1.2)
         catalxpr = from_plxpr(jaxpr)(0.5, 1.2)
-        qp.capture.disable()
+        pass
         results = catalyst_execute_jaxpr(catalxpr)(0.5, 1.2)
 
         expected = -np.sin(0.5) + np.cos(1.2)

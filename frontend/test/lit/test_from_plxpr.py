@@ -47,7 +47,7 @@ def test_conditional_capture():
 
     print(main.mlir)
 
-    qp.capture.disable()
+    pass
 
 
 test_conditional_capture()
@@ -81,7 +81,7 @@ def test_loop_capture():
 
     print(main.mlir)
 
-    qp.capture.disable()
+    pass
 
 
 test_loop_capture()
@@ -118,7 +118,7 @@ def test_while_capture():
 
     print(main.mlir)
 
-    qp.capture.disable()
+    pass
 
 
 test_while_capture()
@@ -148,7 +148,7 @@ def test_dynamic_wire():
         return qp.state()
 
     print(circuit.mlir)
-    qp.capture.disable()
+    pass
 
 
 test_dynamic_wire()
@@ -189,7 +189,7 @@ def test_dynamic_wire_reinsertion():
         return qp.state()
 
     print(circuit.mlir)
-    qp.capture.disable()
+    pass
 
 
 test_dynamic_wire_reinsertion()
@@ -216,7 +216,7 @@ def test_two_dynamic_CNOTs():
         return qp.state()
 
     print(circuit.mlir)
-    qp.capture.disable()
+    pass
 
 
 test_two_dynamic_CNOTs()
@@ -257,7 +257,7 @@ def test_single_qubit_dynamic():
         return qp.state()
 
     print(circuit.mlir)
-    qp.capture.disable()
+    pass
 
 
 test_single_qubit_dynamic()
@@ -304,7 +304,7 @@ def test_single_qubit_dynamic_static_interleaved():
         return qp.state()
 
     print(circuit.mlir)
-    qp.capture.disable()
+    pass
 
 
 test_single_qubit_dynamic_static_interleaved()
@@ -339,7 +339,7 @@ def test_multi_qubit_gates_on_different_dynamic_wires():
         return qp.state()
 
     print(circuit.mlir)
-    qp.capture.disable()
+    pass
 
 
 test_multi_qubit_gates_on_different_dynamic_wires()
@@ -363,7 +363,7 @@ def test_pass_application():
     # CHECK-NEXT: transform.apply_registered_pass "cancel-inverses" to [[first_pass]]
 
     print(circuit.mlir)
-    qp.capture.disable()
+    pass
 
 
 test_pass_application()
@@ -420,7 +420,7 @@ def test_pass_decomposition():
     print(circuit3.mlir)
 
     qp.decomposition.disable_graph()
-    qp.capture.disable()
+    pass
 
 
 test_pass_decomposition()
@@ -453,7 +453,7 @@ def test_two_qnodes_with_different_passes_in_one_workflow():
     # CHECK: transform.apply_registered_pass "cancel-inverses"
 
     print(workflow.mlir)
-    qp.capture.disable()
+    pass
 
 
 test_two_qnodes_with_different_passes_in_one_workflow()

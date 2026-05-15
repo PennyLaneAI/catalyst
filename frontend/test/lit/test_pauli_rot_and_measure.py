@@ -46,7 +46,7 @@ def test_pauli_rot_lowering():
     # CHECK: [[cst:%.+]]  = arith.constant 0.78539816339744828
     # CHECK: quantum.paulirot ["X"]([[cst]])
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_pauli_rot_lowering()
@@ -71,7 +71,7 @@ def test_single_qubit_pauli_rotations():
     # CHECK: [[q1:%.+]] = pbc.ppr ["Y"](4) [[q0]]
     # CHECK: [[q2:%.+]] = pbc.ppr ["Z"](2) [[q1]]
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_single_qubit_pauli_rotations()
@@ -93,7 +93,7 @@ def test_arbitrary_angle_pauli_rotations():
     # CHECK: [[cst:%.+]] = arith.constant 2.100000e-01 : f64
     # CHECK: [[q0:%.+]] = pbc.ppr.arbitrary ["X"]([[cst]])
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_arbitrary_angle_pauli_rotations()
@@ -115,7 +115,7 @@ def test_arbitrary_negative_angle_pauli_rotations():
     # CHECK: [[cst:%.+]] = arith.constant -2.100000e-01 : f64
     # CHECK: [[q0:%.+]] = pbc.ppr.arbitrary ["X"]([[cst]])
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_arbitrary_negative_angle_pauli_rotations()
@@ -139,7 +139,7 @@ def test_dynamic_angle_pauli_rotations():
     # CHECK: [[div:%.+]] = arith.divf [[extracted]], [[cst]] : f64
     # CHECK: [[q0:%.+]] = pbc.ppr.arbitrary ["X"]([[div]])
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_dynamic_angle_pauli_rotations()
@@ -166,7 +166,7 @@ def test_multi_qubit_pauli_rotations():
     # CHECK: [[q2:%.+]]:2 = pbc.ppr ["Z", "X"](2) [[q0]]#0, [[q1]]#1
     # CHECK: [[q3:%.+]]:3 = pbc.ppr ["X", "Y", "Z"](8) [[q2]]#0, [[q1]]#0, [[q2]]#1
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_multi_qubit_pauli_rotations()
@@ -191,7 +191,7 @@ def test_arbitrary_angle_multi_qubit_pauli_rotations():
     # CHECK: [[q0:%.+]]:2 = pbc.ppr.arbitrary ["X", "Z"]([[cst_1]])
     # CHECK: [[q1:%.+]]:2 = pbc.ppr.arbitrary ["Y", "X"]([[cst]]) [[q0]]#0, [[q0]]#1
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_arbitrary_angle_multi_qubit_pauli_rotations()
@@ -219,7 +219,7 @@ def test_dynamic_angle_multi_qubit_pauli_rotations():
     # CHECK: [[div_1:%.+]] = arith.divf [[extracted_1]], [[cst]] : f64
     # CHECK: [[q1:%.+]]:2 = pbc.ppr.arbitrary ["Y", "X"]([[div_1]]) [[q0]]#0, [[q0]]#1
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_dynamic_angle_multi_qubit_pauli_rotations()
@@ -244,7 +244,7 @@ def test_single_qubit_pauli_measurements():
     # CHECK: [[m1:%.+]], [[q1:%.+]] = pbc.ppm ["Y"] [[q0]]
     # CHECK: [[m2:%.+]], [[q2:%.+]] = pbc.ppm ["Z"] [[q1]]
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_single_qubit_pauli_measurements()
@@ -269,7 +269,7 @@ def test_multi_qubit_pauli_measurements():
     # CHECK: [[m1:%.+]], [[q1:%.+]]:2 = pbc.ppm ["Z", "X"] [[q0]]#1, [[q0]]#2
     # CHECK: [[m2:%.+]], [[q2:%.+]]:3 = pbc.ppm ["X", "Y", "Z"] [[q0]]#0, [[q1]]#0, [[q1]]#1
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_multi_qubit_pauli_measurements()
@@ -300,7 +300,7 @@ def test_pauli_rot_and_measure_combined():
     # CHECK: pbc.ppm ["Y"]
     # CHECK: pbc.ppm ["X", "Y"]
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_pauli_rot_and_measure_combined()
@@ -331,7 +331,7 @@ def test_clifford_t_ppr_ppm_combined():
     # CHECK: pbc.ppr ["Y", "Z"](4)
     # CHECK: pbc.ppm ["Y", "Z"]
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_clifford_t_ppr_ppm_combined()
@@ -358,7 +358,7 @@ def test_commute_ppr():
     # CHECK: pbc.ppr ["Z"](4)
     # CHECK: pbc.ppr ["Z"](4)
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_commute_ppr()
@@ -381,7 +381,7 @@ def test_merge_ppr_ppm():
 
     # CHECK: pbc.ppm ["Y"](-)
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_merge_ppr_ppm()
@@ -410,7 +410,7 @@ def test_ppr_to_ppm():
     # CHECK-NOT: pbc.ppr ["Y"](8)
     # CHECK:     pbc.ppm ["X"]
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_ppr_to_ppm()
@@ -439,7 +439,7 @@ def test_ppm_compilation():
     # CHECK: pbc.ppm ["Y", "Z"]
     # CHECK-NOT: pbc.ppr ["Z"](8)
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_ppm_compilation()
@@ -468,7 +468,7 @@ def test_pauli_rot_and_measure_with_cond():
     # CHECK: else
     # CHECK: scf.yield
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_pauli_rot_and_measure_with_cond()
@@ -494,7 +494,7 @@ def test_pauli_rot_with_adjoint_region():
     # CHECK: pbc.ppr ["Y", "X"](4)
     # CHECK: pbc.ppr ["X", "Z"](-8)
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_pauli_rot_with_adjoint_region()
@@ -515,7 +515,7 @@ def test_pauli_rot_with_adjoint_single_gate():
 
     # CHECK: pbc.ppr ["X", "Z"](-4)
     print(circuit.mlir_opt)
-    qp.capture.disable()
+    pass
 
 
 test_pauli_rot_with_adjoint_single_gate()

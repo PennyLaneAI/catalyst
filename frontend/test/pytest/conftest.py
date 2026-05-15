@@ -44,7 +44,7 @@ def disable_capture():
         yield
     finally:
         if qp.capture.enabled():
-            qp.capture.disable()
+            pass
 
 
 @pytest.fixture(scope="function")
@@ -54,7 +54,7 @@ def use_capture():
     try:
         yield
     finally:
-        qp.capture.disable()
+        pass
 
 
 @pytest.fixture(scope="function")
@@ -66,7 +66,7 @@ def use_capture_dgraph():
         yield
     finally:
         qp.decomposition.disable_graph()
-        qp.capture.disable()
+        pass
 
 
 @pytest.fixture(params=["capture", "no_capture"], scope="function")
@@ -79,7 +79,7 @@ def use_both_frontend(request):
         try:
             yield
         finally:
-            qp.capture.disable()
+            pass
     else:
         yield
 
