@@ -46,7 +46,7 @@ from catalyst.jax_extras import (
     deduce_avals,
     new_inner_tracer,
 )
-from catalyst.jax_primitives import AbstractQreg, adjoint_p, measure_p
+from catalyst.jax_primitives import AbstractQreg, adjoint_p, measure_p, pauli_measure_p
 from catalyst.jax_tracer import (
     HybridOp,
     HybridOpRegion,
@@ -186,6 +186,59 @@ def measure(
 
         reset_fn()
 
+    return m
+
+
+def pauli_measure(
+    pauli_word: str,
+    wires,
+    postselect: Optional[int] = None,
+) -> DynamicJaxprTracer:
+    r"""A :func:`qjit` compatible Pauli-product mid-circuit measurement for PennyLane/Catalyst.
+
+    .. important::
+
+        The :func:`qp.pauli_measure() <pennylane.pauli_measure>` function is **not** QJIT
+        compatible under the legacy tracing pathway; use :func:`catalyst.pauli_measure` instead.
+
+    Args:
+        pauli_word (str): The Pauli word (e.g. ``"XZ"``) acting on ``wires``.
+        wires (int or list[int]): Wire(s) the Pauli product applies to.
+        postselect (Optional[int]): Optional postselection (not yet supported in compilation).
+
+    Returns:
+        A JAX tracer for the classical measurement outcome (boolean).
+
+    Raises:
+        NotImplementedError: If ``postselect`` is set (not yet plumbed through MLIR).
+        ValueError: If the number of wires does not match the Pauli word length.
+    """
+    EvaluationContext.check_is_tracing("catalyst.pauli_measure can only be used from within @qjit.")
+    EvaluationContext.check_is_quantum_tracing(
+        "catalyst.pauli_measure can only be used from within a qp.qnode."
+    )
+
+    if postselect is not None:
+        raise NotImplementedError(
+            "Postselection on catalyst.pauli_measure is not supported under qjit."
+        )
+
+    cur_trace = EvaluationContext.get_current_trace()
+    wires_list = list(wires) if isinstance(wires, (list, tuple)) else [wires]
+    if len(pauli_word) != len(wires_list):
+        raise ValueError(
+            f"The number of wires must be equal to the length of the Pauli word, got {len(wires_list)} and {len(pauli_word)}."
+        )
+
+    in_classical_tracers = wires_list.copy()
+    m = new_inner_tracer(cur_trace, get_aval(True))
+    MidCircuitPauliMeasure(
+        in_classical_tracers=in_classical_tracers,
+        out_classical_tracers=[m],
+        regions=[],
+        pauli_word=pauli_word,
+        postselect=postselect,
+    )
     return m
 
 
@@ -378,6 +431,46 @@ class MidCircuitMeasure(HybridOp):
                 postselect=self.postselect,
             )
         qrp.insert(self.wires, [qubit2])
+        return qrp
+
+    def __hash__(self):
+        hsh = super().__hash__()
+        return hash(hsh + hash(self.out_classical_tracers[0]))
+
+
+class MidCircuitPauliMeasure(HybridOp):
+    """Operation representing a Pauli-product measurement."""
+
+    binder = pauli_measure_p.bind
+
+    # pylint: disable=too-many-arguments
+    def __init__(
+        self,
+        in_classical_tracers,
+        out_classical_tracers,
+        regions: List[HybridOpRegion],
+        pauli_word: str,
+        postselect: Optional[int] = None,
+    ):
+        HybridOp.__init__(self, in_classical_tracers, out_classical_tracers, regions)
+        self._wires = qp.wires.Wires(in_classical_tracers)
+        self.pauli_word = pauli_word
+        self.postselect = postselect
+
+    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
+        qubits = qrp.extract(self.wires)
+        out_qubits = self.bind_overwrite_classical_tracers(
+            trace,
+            in_expanded_tracers=qubits,
+            out_expanded_tracers=self.out_classical_tracers,
+            num_quantum_outs=len(qubits),
+            pauli_word=self.pauli_word,
+            qubits_len=len(qubits),
+        )
+        # Normalize to a list: bind_overwrite_classical_tracers returns a single tracer when
+        # num_quantum_outs == 1 (for backwards compatibility) and a list otherwise.
+        out_qubits_list = [out_qubits] if len(qubits) == 1 else list(out_qubits)
+        qrp.insert(self.wires, out_qubits_list)
         return qrp
 
     def __hash__(self):
@@ -796,7 +889,7 @@ def _check_no_measurements(tape: QuantumTape) -> None:
             for r in [r for r in op.regions if r.quantum_tape is not None]:
                 _check_no_measurements(r.quantum_tape)
         else:
-            if isinstance(op, MidCircuitMeasure):
+            if isinstance(op, (MidCircuitMeasure, MidCircuitPauliMeasure)):
                 raise ValueError(
                     "Mid-circuit measurements cannot be used "
                     "within an adjoint() or ctrl() region."

@@ -183,3 +183,86 @@ def test_controlled_pauli_rot_failure():
 
     with pytest.raises(RuntimeError, match="Controlled PauliRot is not supported"):
         workflow()
+
+
+def test_legacy_pauli_rot_lowering():
+    """Test that Pauli rotation is lowered to quantum.paulirot."""
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qjit(pipelines=pipe, target="mlir", capture=False)
+    def test_legacy_pauli_rot_lowering_workflow():
+
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def f():
+            qp.PauliRot(pauli_word="Z", wires=[0], theta=np.pi)
+            return qp.probs()
+
+        return f()
+
+    optimized_ir = test_legacy_pauli_rot_lowering_workflow.mlir_opt
+    assert "quantum.paulirot" in optimized_ir
+
+
+def test_legacy_controlled_pauli_rot_lowering():
+    """Test that controlled Pauli rotation is lowered to quantum.paulirot."""
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qjit(pipelines=pipe, target="mlir", capture=False)
+    def test_legacy_controlled_pauli_rot_lowering_workflow():
+
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def f():
+            qp.ctrl(qp.PauliRot(pauli_word="Z", wires=[0], theta=np.pi), control=1)
+            return qp.state()
+
+        return f()
+
+    optimized_ir = test_legacy_controlled_pauli_rot_lowering_workflow.mlir_opt
+    assert "quantum.paulirot" in optimized_ir
+    assert "ctrls" in optimized_ir
+
+
+def test_legacy_pauli_measure_lowering():
+    """Test that Pauli measurement is lowered to pbc.ppm."""
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qjit(pipelines=pipe, target="mlir", capture=False)
+    def test_legacy_pauli_measure_lowering_workflow():
+        import catalyst
+
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def f():
+            catalyst.pauli_measure(wires=[0], pauli_word="X")
+            return qp.state()
+
+        return f()
+
+    optimized_ir = test_legacy_pauli_measure_lowering_workflow.mlir_opt
+    assert "pbc.ppm" in optimized_ir
+
+
+def test_legacy_cond_pauli_measure_result():
+    """Test conditional on Pauli measurement result is lowered properly."""
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qjit(pipelines=pipe, target="mlir", autograph=True, capture=False)
+    def test_legacy_cond_pauli_measure_result_workflow():
+        import catalyst
+
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def f():
+            m = catalyst.pauli_measure(wires=[0], pauli_word="X")
+            if m:
+                qp.PauliRot(np.pi / 4, "XX", wires=[0, 1])
+            else:
+                qp.PauliRot(np.pi / 4, "YY", wires=[0, 1])
+            return qp.probs()
+
+        return f()
+
+    optimized_ir = test_legacy_cond_pauli_measure_result_workflow.mlir_opt
+    assert "pbc.ppm" in optimized_ir
+    assert "scf.if" in optimized_ir
+    assert 'quantum.paulirot ["X", "X"]' in optimized_ir
+    assert "else" in optimized_ir
+    assert 'quantum.paulirot ["Y", "Y"]' in optimized_ir

@@ -12,6 +12,9 @@
   argument is at an arbitrary position in the argument list.
   [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
 
+* PPRs and PPMs can now be lowered properly into MLIR directly in the non-capture workflow.
+  [(#2816)](https://github.com/PennyLaneAI/catalyst/pull/2816)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
