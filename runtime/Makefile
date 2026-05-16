@@ -13,6 +13,7 @@ CODE_COVERAGE ?= OFF
 BUILD_TYPE ?= RelWithDebInfo
 ENABLE_OPENQASM ?= ON
 ENABLE_OQD ?= OFF
+ENABLE_REMOTE ?= OFF
 ENABLE_ASAN ?= OFF
 STRICT_WARNINGS ?= ON
 LLVM_DIR ?= $(MK_DIR)/../mlir/llvm-project/
@@ -53,6 +54,10 @@ ifeq ($(ENABLE_OQD), ON)
 	TEST_TARGETS += runner_tests_oqd
 endif
 
+ifeq ($(ENABLE_REMOTE), ON)
+	BUILD_TARGETS += rt_remote
+endif
+
 .PHONY: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
@@ -78,6 +83,7 @@ configure:
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
 		-DENABLE_OQD=$(ENABLE_OQD) \
+		-DENABLE_REMOTE=$(ENABLE_REMOTE) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		-DPython_EXECUTABLE=$(PYTHON) \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
