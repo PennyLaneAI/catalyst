@@ -945,7 +945,7 @@ def trace_quantum_operations(
             kwargs = (
                 {"postselect_mode": mcm_config.postselect_mode}
                 if isinstance(op, catalyst.api_extensions.quantum_operators.MidCircuitMeasure)
-                else {}
+                else {"mcm_config": mcm_config}  # propagate
             )
             qrp2 = op.trace_quantum(ctx, device, trace, qrp, **kwargs)
         elif isinstance(op, MeasurementProcess):

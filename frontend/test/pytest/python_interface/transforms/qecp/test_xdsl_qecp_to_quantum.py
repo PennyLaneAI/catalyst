@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2026 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Version information.
-Version number (major.minor.patch[-label])
-"""
+"""Tests for the convert-qecp-to-quantum xDSL dialect-conversion pass."""
 
-__version__ = "0.16.0-dev8"
+import pytest
+
+# from catalyst.python_interface.transforms.qecp.convert_qecp_to_quantum import (
+#     ConvertQecPhysicalToQuantumPass,
+#     convert_qecp_to_quantum_pass,
+# )
+
+pytestmark = pytest.mark.xdsl
