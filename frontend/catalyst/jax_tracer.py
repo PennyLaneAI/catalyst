@@ -942,11 +942,12 @@ def trace_quantum_operations(
     for op in ops:
         qrp2 = None
         if isinstance(op, HybridOp):
-            kwargs = (
-                {"postselect_mode": mcm_config.postselect_mode}
-                if isinstance(op, catalyst.api_extensions.quantum_operators.MidCircuitMeasure)
-                else {"mcm_config": mcm_config}  # propagate
-            )
+            if isinstance(op, catalyst.api_extensions.quantum_operators.MidCircuitMeasure):
+                kwargs = {"postselect_mode": mcm_config.postselect_mode}
+            elif isinstance(op, catalyst.api_extensions.quantum_operators.MidCircuitPauliMeasure):
+                kwargs = {}
+            else:
+                kwargs = {"mcm_config": mcm_config} # propagate
             qrp2 = op.trace_quantum(ctx, device, trace, qrp, **kwargs)
         elif isinstance(op, MeasurementProcess):
             qrp2 = qrp
