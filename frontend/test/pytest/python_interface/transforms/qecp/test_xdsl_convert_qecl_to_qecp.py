@@ -558,8 +558,8 @@ class TestQecCycleLowering:
             return
         }
         // CHECK-LABEL: qec_cycle_Steane([[cb0:%.+]]: !qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
-        //      CHECK: [[tanner_x:%.+]] = qecp.assemble_tanner {{.+}} -> !qecp.tanner_graph<24, 11, i32>
-        //      CHECK: [[tanner_z:%.+]] = qecp.assemble_tanner {{.+}} -> !qecp.tanner_graph<24, 11, i32>
+        // CHECK: [[tanner_x:%.+]] = qecp.assemble_tanner {{.+}}, {{.+}} : tensor<24xi32>, tensor<11xi32> -> !qecp.tanner_graph<24, 11, i32>
+        // CHECK: [[tanner_z:%.+]] = qecp.assemble_tanner {{.+}}, {{.+}} : tensor<24xi32>, tensor<11xi32> -> !qecp.tanner_graph<24, 11, i32>
 
         // COM: The block below takes results of X checks and performs Z corrections
         // CHECK: qecp.alloc_aux : !qecp.qubit<aux>
@@ -582,7 +582,7 @@ class TestQecCycleLowering:
         // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
         // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
         // CHECK: [[esm:%.+]] = tensor.from_elements [[m0]], [[m1]], [[m2]] : tensor<3xi1>
-        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[esm]] : tensor<3xi1>) [[tanner_x]] : !qecp.tanner_graph<24, 11, i32> -> tensor<1xindex>
+        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[tanner_x]] : !qecp.tanner_graph<24, 11, i32>) [[esm]] : tensor<3xi1> -> tensor<1xindex>
         // CHECK: [[lb:%.+]] = arith.constant 0 : index
         // CHECK: [[ub:%.+]] = arith.constant 1 : index
         // CHECK: [[st:%.+]] = arith.constant 1 : index
@@ -619,7 +619,7 @@ class TestQecCycleLowering:
         // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
         // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
         // CHECK: [[esm:%.+]] = tensor.from_elements [[m0]], [[m1]], [[m2]] : tensor<3xi1>
-        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[esm]] : tensor<3xi1>) [[tanner_z]] : !qecp.tanner_graph<24, 11, i32> -> tensor<1xindex>
+        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[tanner_z]] : !qecp.tanner_graph<24, 11, i32>) [[esm]] : tensor<3xi1>  -> tensor<1xindex>
         // CHECK: [[lb:%.+]] = arith.constant 0 : index
         // CHECK: [[ub:%.+]] = arith.constant 1 : index
         // CHECK: [[st:%.+]] = arith.constant 1 : index
