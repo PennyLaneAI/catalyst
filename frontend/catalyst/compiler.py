@@ -176,6 +176,10 @@ class LinkerDriver:
             # "-lrt_decoder",  TODO: Re-enable when stringop-overflow warning on arm64 is resolved
         ]
 
+        rt_remote_so = "librt_remote" + file_extension
+        if os.path.isfile(os.path.join(rt_lib_path, rt_remote_so)):
+            default_flags.append("-lrt_remote")
+
         # If OQD runtime capi is built, link to it as well
         # TODO: This is not ideal and should be replaced when the compiler is device aware
         if os.path.isfile(os.path.join(rt_lib_path, "librt_OQD_capi" + file_extension)):
