@@ -31,6 +31,7 @@ from catalyst.python_interface.transforms.qecp.convert_qecp_to_quantum import (
     ConvertQecPhysicalToQuantumPass,
     QecPhysicalQubitTypeConversion,
 )
+from catalyst.ftqc import qec_pipeline
 
 # pylint: disable=line-too-long
 
@@ -512,12 +513,13 @@ class TestQECPassIntegration:
     def test_qec_pass_ghz_integration(self, run_filecheck_qjit):
         dev = qp.device("null.qubit", wires=3)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, pipelines=qec_pipeline())
         @convert_qecp_to_quantum_pass
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
         @convert_quantum_to_qecl_pass(k=1)
-        @qp.qnode(dev, shots=1)
+        @qp.set_shots(1)
+        @qp.qnode(dev, mcm_method="one-shot")
         def ghz():
             # CHECK-NOT: qecp.alloc
             # CHECK-NOT: qecp.dealloc
@@ -556,3 +558,4 @@ class TestQECPassIntegration:
             return qp.sample([m0, m1, m2])
 
         run_filecheck_qjit(ghz)
+        ghz()

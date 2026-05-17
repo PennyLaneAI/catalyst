@@ -83,6 +83,7 @@ def mbqc_pipeline() -> PipelineStages:
 
     return stages
 
+
 def qec_pipeline() -> PipelineStages:
     """Return the pipeline stages for QEC workloads.
 
