@@ -17,6 +17,7 @@
 import pennylane as qp
 import pytest
 
+from catalyst.ftqc import qec_pipeline
 from catalyst.python_interface.dialects import qecp
 from catalyst.python_interface.dialects.quantum.attributes import QubitType
 from catalyst.python_interface.transforms.qecl import (
@@ -31,7 +32,6 @@ from catalyst.python_interface.transforms.qecp.convert_qecp_to_quantum import (
     ConvertQecPhysicalToQuantumPass,
     QecPhysicalQubitTypeConversion,
 )
-from catalyst.ftqc import qec_pipeline
 
 # pylint: disable=line-too-long
 
