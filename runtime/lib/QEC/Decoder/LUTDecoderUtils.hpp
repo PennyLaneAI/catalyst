@@ -196,7 +196,7 @@ generate_lookup_table(const std::vector<TANNER_GRAPH_INT> &parity_mat_row_idx,
     // Traverse all possible quantum error combinations
     size_t i = 0;
     // Add i <= num_data_qubits here to pass static analysis check
-    while (i <= num_errors && i <= num_data_qubits) {
+    while (i <= num_errors && num_errors <= num_data_qubits) {
         // create a base error vector
         std::vector<int8_t> err_vector(num_data_qubits, 0);
         std::fill(err_vector.begin(), err_vector.begin() + i, 1);
