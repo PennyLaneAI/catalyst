@@ -191,14 +191,13 @@ generate_lookup_table(const std::vector<TANNER_GRAPH_INT> &parity_mat_row_idx,
     // Get number of errors can be detected from code distance
     const size_t num_errors = (code_distance - 1) / 2;
 
-    RT_ASSERT(num_errors <= num_data_qubits);
+    RT_ASSERT(num_errors < num_data_qubits);
 
     // Traverse all possible quantum error combinations
-    size_t i = 0;
-    // Add i <= num_data_qubits here to pass static analysis check
-    while (i <= num_errors && num_errors <= num_data_qubits) {
+    for (size_t i = 0; i <= num_errors; i++) {
         // create a base error vector
-        std::vector<int8_t> err_vector(num_data_qubits, 0);
+        const size_t err_vec_size = std::max(num_errors, num_data_qubits);
+        std::vector<int8_t> err_vector(err_vec_size, 0);
         std::fill(err_vector.begin(), err_vector.begin() + i, 1);
         std::reverse(err_vector.begin(), err_vector.end());
 
@@ -211,7 +210,6 @@ generate_lookup_table(const std::vector<TANNER_GRAPH_INT> &parity_mat_row_idx,
             // We assume that 1:1 mapping for the syndrome and err_vector
             lut.try_emplace(syndrome_str, std::move(error_indices));
         } while (std::next_permutation(err_vector.begin(), err_vector.end()));
-        i++;
     }
 
     return lut;
