@@ -430,7 +430,7 @@ class TestLoweringEncode:
 class TestTannerGraphInsertion:
     """Unit tests for the insertion of Tanner graph ops."""
 
-    def test_tanner_graph_insertion_steane(self, run_filecheck):
+    def test_tanner_graph_insertion_steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
         """Test that Tanner graph ops for the Steane code are emitted inside ``qec_cycle_Steane`` (not
         at module scope), so decoded SSAs respect MLIR function isolation.
         """

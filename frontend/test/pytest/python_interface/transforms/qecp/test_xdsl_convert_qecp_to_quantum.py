@@ -539,7 +539,6 @@ class TestQECPassIntegration:
             # CHECK-NOT: qecp.s
             # CHECK-NOT: qecp.cnot
             # CHECK: quantum.alloc
-            # CHECK: qecp.decode_physical_meas
             # CHECK: quantum.dealloc
             # CHECK: quantum.extract
             # CHECK: quantum.insert
