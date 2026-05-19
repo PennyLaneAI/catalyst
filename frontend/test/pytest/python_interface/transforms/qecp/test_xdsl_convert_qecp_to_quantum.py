@@ -234,15 +234,14 @@ class TestExtractInsertQubitConversion:
         // CHECK-LABEL: test_insert_lowering
         func.func @test_insert_lowering() {
             %cb = "test.op"() : () -> !qecp.codeblock<1 x 2>
-            %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 2> -> !qecp.qubit<data>
             // CHECK: [[q1:%.+]] = quantum.extract {{%.+}}[1]
             %q1 = qecp.extract %cb[1] : !qecp.codeblock<1 x 2> -> !qecp.qubit<data>
             // CHECK: [[q2:%.+]] = quantum.custom "Hadamard"() [[q1:%.+]] : !quantum.bit
             %q2 = qecp.hadamard %q1 : !qecp.qubit<data>
             // CHECK: [[mres:%.+]], [[q3:%.+]] = quantum.measure [[q2:%.+]] : i1, !quantum.bit
             %mres, %q3 = qecp.measure %q2 : i1, !qecp.qubit<data>
-            // CHECK: [[CB2:%.+]] = quantum.insert {{%.+}}[0], [[q3:%.+]] : !quantum.reg, !quantum.bit
-            %cb2 = qecp.insert %cb[0], %q3 : !qecp.codeblock<1 x 2>, !qecp.qubit<data>
+            // CHECK: [[CB2:%.+]] = quantum.insert {{%.+}}[1], [[q3:%.+]] : !quantum.reg, !quantum.bit
+            %cb2 = qecp.insert %cb[1], %q3 : !qecp.codeblock<1 x 2>, !qecp.qubit<data>
             return %cb2 : !qecp.codeblock<1 x 2>
         }
         }
@@ -343,7 +342,9 @@ class TestGateMeasureConversion:
             %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 1> -> !qecp.qubit<data>
             // CHECK: [[q1:%.+]] = quantum.custom "S"() [[q0:%.+]] : !quantum.bit
             %q1 = qecp.s %q0 : !qecp.qubit<data>
-            return %q1 : !qecp.qubit<data>
+            // CHECK: [[q2:%.+]] = quantum.custom "S"() [[q1:%.+]] adj : !quantum.bit
+            %q2 = qecp.s %q1 adj : !qecp.qubit<data>
+            return %q2 : !qecp.qubit<data>
         }
         }
         """
