@@ -235,10 +235,10 @@ class TestExtractInsertQubitConversion:
         func.func @test_extract() {
             // CHECK: [[REG:%.+]] = "test.op"() : () -> !quantum.reg
             %cb = "test.op"() : () -> !qecp.codeblock<1 x 4>
-            // CHECK: [[q0:%.+]] = quantum.extract[[REG]][0] : !quantum.reg -> !quantum.bit
+            // CHECK: [[q0:%.+]] = quantum.extract [[REG]][0] : !quantum.reg -> !quantum.bit
             %q = qecp.extract %cb[0] : !qecp.codeblock<1 x 4> -> !qecp.qubit<data>
             // CHECK-NOT: qecp.extract
-            // CHECK: return [[q0]]
+            // CHECK: return [[q0]] : !quantum.bit
             return %q : !qecp.qubit<data>
         }
         }
