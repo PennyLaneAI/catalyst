@@ -24,6 +24,7 @@ We might have to come back to this later.
 """
 
 from dataclasses import dataclass
+from typing import cast
 
 from xdsl import pattern_rewriter
 from xdsl.context import Context
@@ -57,6 +58,37 @@ _QECP_GATENAMES_TO_QUANTUM_OPS = {
     "qecp.cnot": "CNOT",
 }
 
+def _get_idx_value_or_attr_from_extract_or_insert_op(
+    op: qecp.ExtractQubitOp | qecp.InsertQubitOp, rewriter: PatternRewriter
+) -> IntegerAttr | SSAValue[IntegerAttr[I64]]:
+    """Helper function to get the index value 'idx' or attribute 'idx_attr' from a `qecp.extract`
+    or `qecp.insert` op.
+
+    If the index value has type `index`, an `arith.cast_index` op is inserted to cast it to type
+    `i64`. We must cast such values because `quantum.extract` and `quantum.insert` ops expect an idx
+    operand of type `i64`.
+    """
+    if op.idx is not None:
+        if isinstance(op.idx.type, IntegerAttr):
+            idx = cast(SSAValue[IntegerAttr[I64]], op.idx)
+        elif isinstance(op.idx.type, IndexType):
+            # Insert cast operation index -> i64
+            index_cast_op = arith.IndexCastOp(op.idx, i64)
+            rewriter.insert_op(index_cast_op)
+            idx = cast(SSAValue[IntegerAttr[I64]], index_cast_op.result)
+        else:
+            assert False, (
+                f"Expected idx value '{op.idx}' to have type 'IndexType' or 'IntegerType', "
+                f"but got {op.idx.type}"
+            )
+
+    elif op.idx_attr is not None:
+        idx = op.idx_attr
+
+    else:
+        assert False, f"Both idx and idx_attr of op '{op}' are None"
+
+    return idx
 
 def _get_i64_idx_value_or_attr_from_extract_or_insert_op(
     op: qecp.ExtractQubitOp | qecp.InsertQubitOp,

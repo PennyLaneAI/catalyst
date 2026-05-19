@@ -206,6 +206,27 @@ class TestAuxAllocDeallocConversion:
 class TestExtractInsertQubitConversion:
     """Lowering of qecp.extract / qecp.insert to quantum.extract / quantum.insert."""
 
+    def test_extract_lowering_dyn_idx(self, run_filecheck):
+        """A qecp.extract lowers to quantum.extract (with dynamic index)."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_extract
+        func.func @test_extract() {
+            // CHECK: [[REG:%.+]] = "test.op"() : () -> !quantum.reg
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 4>
+            // CHECK: [[idx:%.+]] = "test.op"() : () -> index
+            // CHECK: [[idx_i64:%.+]] = arith.index_cast [[idx]] : index to i64
+            %idx = "test.op"() : () -> index
+            // CHECK: [[q0:%.+]] = quantum.extract [[REG]][[[idx_i64]]] : !quantum.reg -> !quantum.bit
+            %q0 = qecp.extract %cb[%idx] : !qecp.codeblock<1 x 4> -> !qecp.qubit<data>
+            // CHECK-NOT: qecp.extract
+            %q1 = "test.op"(%q0) : (!qecp.qubit<data>) -> !qecp.qubit<data>
+            return
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
     def test_extract_lowering(self, run_filecheck):
         """A qecp.extract lowers to quantum.extract."""
         program = """
