@@ -91,34 +91,6 @@ def _get_idx_value_or_attr_from_extract_or_insert_op(
 
     return idx
 
-def _get_i64_idx_value_or_attr_from_extract_or_insert_op(
-    op: qecp.ExtractQubitOp | qecp.InsertQubitOp,
-    rewriter: PatternRewriter,
-) -> IntegerAttr | SSAValue:
-    """Get an i64 index value/attr for quantum.extract/insert from a qecp extract/insert op."""
-    if op.idx is not None:
-        if isinstance(op.idx.type, IntegerType) and op.idx.type.width.data == 64:
-            return op.idx
-        if isinstance(op.idx.type, IndexType):
-            index_cast_op = arith.IndexCastOp(op.idx, builtin.i64)
-            rewriter.insert_op(index_cast_op)
-            return index_cast_op.result
-        raise TypeError(
-            f"Expected idx value '{op.idx}' to have type IndexType or i64, got {op.idx.type}"
-        )
-    if op.idx_attr is not None:
-        return IntegerAttr(op.idx_attr.value.data, 64)
-    raise ValueError(f"Both idx and idx_attr of op '{op}' are None")
-
-
-def _convert_qecp_type(typ: Attribute) -> Attribute:
-    """Helper function to convert qecp types to quantum types."""
-    if isinstance(typ, qecp.PhysicalCodeblockType):
-        return quantum.QuregType()
-    if isinstance(typ, qecp.QecPhysicalQubitType):
-        return quantum.QubitType()
-    return typ
-
 
 # MARK: Type Conversion Pattern
 
@@ -183,7 +155,7 @@ class ExtractQubitConversion(RewritePattern):
     def match_and_rewrite(self, op: qecp.ExtractQubitOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that extract a data qubit from a
         quantum.reg."""
-        idx = _get_i64_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
+        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
 
         rewriter.replace_op(op, quantum.ExtractOp(op.codeblock, idx=idx))
 
@@ -195,7 +167,7 @@ class InsertQubitConversion(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecp.InsertQubitOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops for data qubit insertion."""
-        idx = _get_i64_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
+        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
         insert_op = quantum.InsertOp(op.in_codeblock, idx=idx, qubit=op.qubit)
         rewriter.replace_op(op, insert_op)
 
