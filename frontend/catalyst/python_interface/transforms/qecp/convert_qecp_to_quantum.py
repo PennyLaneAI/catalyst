@@ -49,6 +49,7 @@ _QECP_GATENAMES_TO_QUANTUM_OPS = {
     "qecp.cnot": "CNOT",
 }
 
+
 def _get_idx_value_or_attr_from_extract_or_insert_op(
     op: qecp.ExtractQubitOp | qecp.InsertQubitOp, rewriter: PatternRewriter
 ) -> IntegerAttr | SSAValue[IntegerAttr[I64]]:
@@ -80,6 +81,7 @@ def _get_idx_value_or_attr_from_extract_or_insert_op(
         assert False, f"Both idx and idx_attr of op '{op}' are None"
 
     return idx
+
 
 # MARK: Type Conversion Pattern
 
