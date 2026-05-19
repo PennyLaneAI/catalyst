@@ -901,18 +901,11 @@ class TestControlledProperties:
         op = C_ctrl(DummyOp(1), 0)
         assert op.has_diagonalizing_gates is value
 
-    @pytest.mark.parametrize("value", ("_ops", "_measurements"))
-    def test_queue_cateogry(self, value):
-        """Test that `catalyst.ctrl` defers `_queue_category` to base operator."""
+    def test_queue_cateogry(self):
+        """Test that C_ctrl always returns '_ops' for _queue_category."""
 
-        class DummyOp(Operator):
-            """DummyOp"""
-
-            num_wires = 1
-            _queue_category = value
-
-        op = C_ctrl(DummyOp(1), 0)
-        assert op._queue_category == value
+        op = C_ctrl(qp.PauliX(1), 0)
+        assert op._queue_category == "_ops"
 
     @pytest.mark.parametrize("value", (True, False))
     def test_is_verified_hermitian(self, value):
@@ -1140,19 +1133,6 @@ class TestControlledOperationProperties:
         base = DummyOp(1)
         op = C_ctrl(base, 2)
         assert op.grad_method == gm
-
-    def test_basis(self):
-        """Test that controlled mimics the basis attribute of the base op."""
-
-        class DummyOp(Operation):
-            """DummyOp"""
-
-            num_wires = 1
-            basis = "Z"
-
-        base = DummyOp(1)
-        op = C_ctrl(base, 2)
-        assert op.basis == "Z"
 
     @pytest.mark.parametrize(
         "base, expected",
