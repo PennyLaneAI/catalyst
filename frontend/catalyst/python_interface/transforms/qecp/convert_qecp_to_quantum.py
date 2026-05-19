@@ -50,7 +50,6 @@ _QECP_GATENAMES_TO_QUANTUM_OPS = {
 }
 
 
-
 def _get_idx_value_or_attr_from_extract_or_insert_op(
     op: qecp.ExtractQubitOp | qecp.InsertQubitOp, rewriter: PatternRewriter
 ) -> IntegerAttr | SSAValue[IntegerAttr[I64]]:
@@ -211,8 +210,6 @@ class MeasureConversion(RewritePattern):
         quantum.measure ops."""
         measure_op = quantum.MeasureOp(in_qubit=op.operands[0])
         rewriter.replace_op(op, measure_op)
-
-
 
 
 @dataclass(frozen=True)
