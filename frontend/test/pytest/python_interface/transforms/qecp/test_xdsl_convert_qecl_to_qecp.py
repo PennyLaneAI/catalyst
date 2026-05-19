@@ -638,6 +638,7 @@ class TestQecCycleLowering:
         // CHECK:   }
         // CHECK: scf.yield [[cond_out_cb]] : !qecp.codeblock<1 x 7>
         // CHECK: }
+        // CHECK: func.return [[cb_x_out]] : !qecp.codeblock<1 x 7>
         }
         """
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
@@ -991,8 +992,8 @@ class TestQECLNoiseLoweringPassIntegration:
         """Test the convert-qecl-noise-to-qecp-noise pass on the simplest possible, non-trivial circuit."""
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(target="mlir", keep_intermediate=True, capture=True)
-        @convert_qecl_to_qecp_pass(qec_code=QecCode.get("Steane"), number_errors=1)
+        @qp.qjit(target="mlir", capture=True)
+        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)
