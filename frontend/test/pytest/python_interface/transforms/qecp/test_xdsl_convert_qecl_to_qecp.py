@@ -108,6 +108,7 @@ class TestTypeConversionPattern:
     @pytest.mark.parametrize(
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
+    # pylint: disable=too-many-positional-arguments, too-many-arguments
     def test_hyperreg_conversion(self, width, n, k, run_filecheck, get_generic_qec_code):
         """Test the type conversion pattern from !qecl.codeblock -> !qecp.codeblock for a few values
         of n and k.
@@ -177,6 +178,7 @@ class TestAllocAndDeallocConversionPatterns:
     @pytest.mark.parametrize(
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
+    # pylint: disable=too-many-positional-arguments, too-many-arguments
     def test_allocate_is_lowered(self, width, n, k, run_filecheck, get_generic_qec_code):
         """Test that a qecl.allocate operation is lowered as expected"""
 
@@ -199,6 +201,7 @@ class TestAllocAndDeallocConversionPatterns:
     @pytest.mark.parametrize(
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
+    # pylint: disable=too-many-positional-arguments, too-many-arguments
     def test_deallocate_is_lowered(self, width, n, k, run_filecheck, get_generic_qec_code):
         """Test that a qecl.deallocate operation is lowered as expected"""
 
