@@ -249,8 +249,6 @@ class MeasureConversion(RewritePattern):
         rewriter.replace_op(op, measure_op)
 
 
-
-
 @dataclass(frozen=True)
 class UnrollEncodeLoop(RewritePattern):
     """Op conversion pattern for removing scf.ForOp with encode operations."""
