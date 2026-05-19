@@ -651,3 +651,27 @@ module @qreg_at_not_first_arg {
     return %7 : !quantum.reg
   }
 }
+
+// -----
+
+module @null_decomp_rule{
+  func.func public @test_null_decomp_rule() attributes {quantum.node} {
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1)
+    // CHECK: [[q0:%.+]] = quantum.extract [[reg]][ 0]
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+    // CHECK-NOT: PauliX
+    // CHECK: quantum.custom "Hadamard"() [[q0]] : !quantum.bit
+    %2 = quantum.custom "PauliX"() %1 : !quantum.bit
+    %3 = quantum.custom "Hadamard"() %2 : !quantum.bit
+    %4 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
+    quantum.dealloc %4 : !quantum.reg
+    return
+  }
+
+  // CHECK-NOT: func.func private @null_decomp
+  func.func private @null_decomp() attributes {target_gate = "PauliX"} {
+    return
+  }
+}
