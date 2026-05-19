@@ -224,12 +224,13 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
     # pylint: disable=unused-argument
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         """Apply the convert-qecp-to-quantum pass."""
+        # pylint: disable = unexpected-keyword-arg
 
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [
-                    PhysicalCodeblockTypeConversion(),
-                    QecPhysicalQubitTypeConversion(),
+                    PhysicalCodeblockTypeConversion(recursive=True),
+                    QecPhysicalQubitTypeConversion(recursive=True),
                     AllocAuxQubitConversion(),
                     DeallocAuxQubitConversion(),
                     InsertQubitConversion(),
