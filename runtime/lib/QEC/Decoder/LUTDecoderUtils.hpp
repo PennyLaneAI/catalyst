@@ -193,9 +193,12 @@ generate_lookup_table(const std::vector<TANNER_GRAPH_INT> &parity_mat_row_idx,
 
     // Traverse all possible quantum error combinations
     for (size_t i = 0; i <= num_errors; i++) {
-        // create a base error vector
-        std::vector<int8_t> err_vector(num_data_qubits, 0);
-        std::fill(err_vector.end() - i, err_vector.end(), 1);
+        // TODOs: The following line is a temporal fix, intending to silent Linux
+        // arm wheel building errors.
+        const size_t err_size = std::max(num_errors, num_data_qubits);
+        std::vector<int8_t> err_vector(err_size, 0);
+        std::fill(err_vector.begin(), err_vector.begin() + i, 1);
+        std::reverse(err_vector.begin(), err_vector.end());
 
         do {
             std::string syndrome_str = get_syndrome_from_errors<TANNER_GRAPH_INT>(
@@ -204,7 +207,7 @@ generate_lookup_table(const std::vector<TANNER_GRAPH_INT> &parity_mat_row_idx,
             std::vector<ERR_IDX_INT> error_indices =
                 get_error_indices<ERR_IDX_INT>(err_vector, num_errors);
             // We assume that 1:1 mapping for the syndrome and err_vector
-            lut.try_emplace(syndrome_str, error_indices);
+            lut.try_emplace(syndrome_str, std::move(error_indices));
         } while (std::next_permutation(err_vector.begin(), err_vector.end()));
     }
 
