@@ -47,7 +47,7 @@ from pennylane.measurements import (
     VarianceMP,
 )
 from pennylane.operation import Operation, Operator, Wires
-from pennylane.ops import Adjoint, Controlled, ControlledOp, PauliMeasure
+from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
 
 import catalyst
@@ -71,7 +71,6 @@ from catalyst.jax_extras import (
     jaxpr_to_mlir,
     make_from_node_data_and_children,
     make_jaxpr2,
-    new_inner_tracer,
     sort_eqns,
     transient_jax_config,
     tree_flatten,
@@ -99,7 +98,6 @@ from catalyst.jax_primitives import (
     hermitian_p,
     namedobs_p,
     num_qubits_p,
-    pauli_measure_p,
     pauli_rot_p,
     probs_p,
     qalloc_p,

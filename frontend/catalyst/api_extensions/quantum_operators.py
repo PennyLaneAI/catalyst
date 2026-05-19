@@ -227,7 +227,8 @@ def pauli_measure(
     wires_list = list(wires) if isinstance(wires, (list, tuple)) else [wires]
     if len(pauli_word) != len(wires_list):
         raise ValueError(
-            f"The number of wires must be equal to the length of the Pauli word, got {len(wires_list)} and {len(pauli_word)}."
+            "The number of wires must be equal to the length of the Pauli word, "
+            f"got {len(wires_list)} and {len(pauli_word)}."
         )
 
     in_classical_tracers = wires_list.copy()
@@ -443,7 +444,7 @@ class MidCircuitPauliMeasure(HybridOp):
 
     binder = pauli_measure_p.bind
 
-    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-positional-arguments
     def __init__(
         self,
         in_classical_tracers,
