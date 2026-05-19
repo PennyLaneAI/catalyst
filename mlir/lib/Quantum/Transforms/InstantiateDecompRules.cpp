@@ -17,7 +17,10 @@
 #include "mlir/Pass/Pass.h"
 
 #include "Quantum/IR/QuantumOps.h"
+#include "QuantumPythonCallbacks/PythonDriverUtils.hpp"
 #include "QuantumPythonCallbacks/PythonFunction.hpp"
+
+using namespace mlir;
 
 namespace QPC = QuantumPythonCallbacks;
 
@@ -30,6 +33,12 @@ namespace quantum {
 struct InstantiateDecompRulesPass
     : public impl::InstantiateDecompRulesPassBase<InstantiateDecompRulesPass> {
     using InstantiateDecompRulesPassBase::InstantiateDecompRulesPassBase;
+
+    LogicalResult initialize([[maybe_unused]] MLIRContext *context) override
+    {
+        QPC::PyInterpreterGuard::ensure();
+        return success();
+    }
 
     void runOnOperation() override
     {

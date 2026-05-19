@@ -15,25 +15,34 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace QuantumPythonCallbacks {
 
-class PyInterpreterWrapper {
-  public:
-    PyInterpreterWrapper();
-    ~PyInterpreterWrapper();
+// class PyInterpreterWrapper {
+//   public:
+//     PyInterpreterWrapper();
+//     ~PyInterpreterWrapper();
 
-    PyInterpreterWrapper(const PyInterpreterWrapper &) = delete;
-    PyInterpreterWrapper &operator=(const PyInterpreterWrapper &) = delete;
+//     PyInterpreterWrapper(const PyInterpreterWrapper &) = delete;
+//     PyInterpreterWrapper &operator=(const PyInterpreterWrapper &) = delete;
+
+class PyInterpreterGuard {
+  public:
+    static PyInterpreterGuard &ensure();
 
   private:
+    PyInterpreterGuard();
+    ~PyInterpreterGuard() = default;
+
     struct Impl;
     std::unique_ptr<Impl> impl;
-
-    void extracted();
-    void syncSitePackages();
 };
+
+//     void extracted();
+//     void syncSitePackages();
+// };
 
 class QPCError : public std::runtime_error {
   public:

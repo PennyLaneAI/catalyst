@@ -14,6 +14,8 @@
 
 #include "PythonDriverUtils.hpp"
 
+#include <optional>
+
 #include "pybind11/embed.h"
 
 constexpr const char *sitePackagesScript = R"(
@@ -34,18 +36,17 @@ namespace py = pybind11;
 
 namespace QuantumPythonCallbacks {
 
-struct __attribute__((visibility("hidden"))) PyInterpreterWrapper::Impl {
-    py::scoped_interpreter interpreter;
+struct PyInterpreterGuard::Impl {
+    std::optional<py::scoped_interpreter> owned;
+    std::optional<py::gil_scoped_release> release;
+    bool ownsInterpreter = false;
 };
 
-PyInterpreterWrapper::PyInterpreterWrapper() : impl(std::make_unique<Impl>())
-{
-    syncSitePackages();
-}
-
-PyInterpreterWrapper::~PyInterpreterWrapper() = default;
-
-void PyInterpreterWrapper::syncSitePackages()
+/**
+ * @brief Execute a function while holding the GIL,
+ * ensuring the interpreter is initialized.
+ */
+void syncSitePackages()
 {
     py::gil_scoped_acquire acquire;
 
@@ -56,4 +57,35 @@ void PyInterpreterWrapper::syncSitePackages()
         return;
     }
 }
+
+/**
+ * @brief Construct a PyInterpreterGuard, initializing the Python interpreter if it is not already
+ * initialized and releasing the GIL if it owns the interpreter.
+ */
+PyInterpreterGuard::PyInterpreterGuard() : impl(std::make_unique<Impl>())
+{
+    if (!Py_IsInitialized()) {
+        impl->owned.emplace();
+        impl->ownsInterpreter = true;
+        syncSitePackages();
+        impl->release.emplace();
+    }
+    // else the interpreter is already initialized (e.g. by qjit),
+    // so we do not take ownership or release the GIL
+}
+
+/**
+ * @brief Ensure the Python interpreter is initialized and the GIL is released,
+ * returning a guard object that manages their lifetimes.
+ *
+ * If the interpreter is already initialized (e.g. by qjit),
+ * this will simply return a guard that does not own the interpreter
+ * and does not release the GIL.
+ */
+PyInterpreterGuard &PyInterpreterGuard::ensure()
+{
+    static PyInterpreterGuard inst;
+    return inst;
+}
+
 } // namespace QuantumPythonCallbacks
