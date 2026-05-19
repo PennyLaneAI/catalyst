@@ -5,6 +5,8 @@
 * A new, experimental compiler pass `convert-qecp-to-quantum` has been added to lower operations
   from the QEC Physical (`qecp`) dialect into the Quantum (`quantum`) dialect.
   [(#2822)](https://github.com/PennyLaneAI/catalyst/pull/2822)
+  [(#2809)](https://github.com/PennyLaneAI/catalyst/pull/2809)
+
 
 <h3>Improvements 🛠</h3>
 
@@ -12,10 +14,18 @@
   argument is at an arbitrary position in the argument list.
   [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
 
+* The `--decompose-lowering` pass can now handle null decomposition rules, which are rule functions
+  that do not have any quantum values as arguments or results. Gates with null decomposition rules
+  are simply removed.
+  [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
   [(#2840)](https://github.com/PennyLaneAI/catalyst/pull/2840)
+
+* Removes support for `Transform.plxpr_transform` from the `qp.qjit(capture=True)` capture pipeline.
+  All transforms must now have a MLIR or XDSL implementation and a corresponding `pass_name`.
 
 <h3>Deprecations 👋</h3>
 
@@ -57,6 +67,12 @@
   [(#2780)](https://github.com/PennyLaneAI/catalyst/pull/2780)
   [(#2772)](https://github.com/PennyLaneAI/catalyst/pull/2772)
 
+* Resolved a bug in the QEC-cycle subroutine within the `convert-qecl-to-qecp` pass where the SSA
+  values of the `scf.yield` op were incorrectly returned instead of the `scf.for` op results. Also,
+  the `qec_code` pass option is now given as a `str` rather than a `QecCode` object to ensure
+  compatibility with Catalyst's compiler infrastructure.
+  [(#2837)](https://github.com/PennyLaneAI/catalyst/pull/2837)
+
 * The constructors of xDSL ops that accept index attributes have been updated to ensure that the
   resulting attribute has the correct type. These ops include `quantum.{extract, insert}`,
   `qecl.{extract_block, insert_block, measure, <gates>}`, and
@@ -72,6 +88,7 @@ This release contains contributions from (in alphabetical order):
 Joey Carter,
 Yushao Chen,
 Lillian Frederiksen,
+Christina Lee,
 Mehrdad Malekmohammadi,
 Shuli Shu,
 Paul Haochen Wang.
