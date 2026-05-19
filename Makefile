@@ -221,7 +221,6 @@ wheel:
 	cp $(RT_BUILD_DIR)/lib/liblapacke.* $(MK_DIR)/frontend/catalyst/lib || true  # optional
 	cp $(RT_BUILD_DIR)/lib/librt_capi.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/librt_rsdecomp.* $(MK_DIR)/frontend/catalyst/lib
-	cp $(RT_BUILD_DIR)/lib/librt_decoder.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/backend/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(OQC_BUILD_DIR)/librtd_oqc* $(MK_DIR)/frontend/catalyst/lib
 	cp $(OQC_BUILD_DIR)/oqc_python_module.so $(MK_DIR)/frontend/catalyst/lib
