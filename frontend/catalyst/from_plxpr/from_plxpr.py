@@ -367,20 +367,6 @@ def handle_qnode(
     )
 
 
-# The map below describes the parity between PL transforms and Catalyst passes.
-# PL transforms having a Catalyst pass counterpart will have a name as value,
-# otherwise their value will be None. The second value indicates if the transform
-# requires decomposition to be supported by Catalyst.
-transforms_to_passes = {
-    pl_commute_controlled: (None, False),
-    pl_decompose: (None, False),
-    pl_merge_amplitude_embedding: (None, True),
-    pl_single_qubit_fusion: (None, False),
-    pl_unitary_to_rot: (None, False),
-    pl_gridsynth: ("gridsynth", False),
-}
-
-
 def _set_decompose_lowering_state(self):
     """Set requires_decompose_lowering and decompose_tkwargs; raise if already set."""
     if not self.requires_decompose_lowering:
@@ -457,31 +443,13 @@ def handle_transform(
             self, inner_jaxpr, consts, non_const_args, pl_tkwargs, use_graph
         )
 
-    catalyst_pass_name = transform.pass_name
-    if catalyst_pass_name is None:
-        catalyst_pass_name = transforms_to_passes.get(transform, (None,))[0]
-    if catalyst_pass_name is None:
-        # Use PL's ExpandTransformsInterpreter to expand this and any embedded
-        # transform according to PL rules. It works by overriding the primitive
-        # registration, making all embedded transforms follow the PL rules
-        # from now on, hence ignoring the Catalyst pass conversion
-        def wrapper(*args):
-            return ExpandTransformsInterpreter().eval(inner_jaxpr, consts, *args)
-
-        unravelled_jaxpr = jax.make_jaxpr(wrapper)(*non_const_args)
-        final_jaxpr = transform._plxpr_transform(
-            unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, pl_tkwargs, *non_const_args
-        )
-        if transforms_to_passes[transform][1]:
-            final_jaxpr = pl_decompose._plxpr_transform(
-                final_jaxpr.jaxpr, final_jaxpr.consts, targs, pl_tkwargs, *non_const_args
-            )
-
-        return copy(self).eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
+    if transform.pass_name is None:
+        raise ValueError(f"{transform} does not have a pass_name and is not supported with the "
+                         "capture frontend. Set capture=False to apply tape-only transforms with qjit.")
 
     # Apply the corresponding Catalyst pass counterpart
     next_eval = copy(self)
-    t = qp.transform(pass_name=catalyst_pass_name)
+    t = qp.transform(pass_name=transform.pass_name)
     bound_pass = qp.transforms.core.BoundTransform(t, args=targs, kwargs=pl_tkwargs)
     next_eval._pass_pipeline.insert(0, bound_pass)
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
