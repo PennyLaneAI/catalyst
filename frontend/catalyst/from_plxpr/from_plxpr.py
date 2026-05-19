@@ -26,14 +26,8 @@ import jax
 import pennylane as qp
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
-from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import transform_prim
-from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
-from pennylane.transforms import gridsynth as pl_gridsynth
-from pennylane.transforms import merge_amplitude_embedding as pl_merge_amplitude_embedding
-from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
-from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
@@ -436,8 +430,7 @@ def handle_transform(
 
     # If the transform is a decomposition transform
     # and the graph-based decomposition is enabled
-    transform_name = getattr(transform._plxpr_transform, "__name__", None)
-    if transform_name == "decompose_plxpr_to_plxpr":
+    if transform == pl_decompose:
         use_graph = qp.decomposition.enabled_graph()
         return _handle_decompose_transform(
             self, inner_jaxpr, consts, non_const_args, pl_tkwargs, use_graph
