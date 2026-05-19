@@ -22,6 +22,7 @@ from jaxlib.mlir.ir import Module as jaxModule
 from pennylane.typing import Callable
 from xdsl.context import Context as xContext
 from xdsl.dialects.builtin import ArrayAttr, ModuleOp
+from xdsl.dialects.func import FuncOp
 from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
 
@@ -70,8 +71,6 @@ class Compiler:
         # JAX serialises void func.func ops with `res_attrs = []` in generic form
         # triggering an assertion in FuncToLLVM lowering.
         # Remove empty arrays in-place so the generic printer omits them.
-        from xdsl.dialects.func import FuncOp
-
         for op in xmod.walk():
             if not isinstance(op, FuncOp):
                 continue

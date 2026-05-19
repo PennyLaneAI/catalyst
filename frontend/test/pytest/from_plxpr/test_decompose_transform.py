@@ -31,6 +31,7 @@ from pennylane_lightning.lightning_qubit.lightning_qubit import (
     stopping_condition as lightning_stopping_condition,
 )
 
+from catalyst import CompileError
 from catalyst.jax_primitives import decomposition_rule
 from catalyst.passes import graph_decomposition
 
@@ -462,6 +463,20 @@ class TestGraphDecomposition:
             qp.CRX(1.7, wires=[0, 1])
             qp.CRX(-7.2, wires=[0, 1])
             return qp.state()
+
+    def test_non_custom_op(self):
+        """Test that the graph correctly registers non-custom ops."""
+
+        with pytest.raises(CompileError):
+
+            @qp.qjit
+            @graph_decomposition(gate_set={qp.X})
+            @qp.qnode(qp.device("lightning.qubit", wires=2))
+            def circuit(x: float, y: float):  # pylint: disable=unused-argument
+                qp.PauliRot(0.1, "ZZ", wires=[0, 1])
+                return qp.state()
+
+            circuit()
 
 
 class TestPlxPRDecomposition:
