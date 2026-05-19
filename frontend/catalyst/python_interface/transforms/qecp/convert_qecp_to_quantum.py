@@ -176,6 +176,7 @@ class GateConversion(RewritePattern):
     ):
         """Op conversion rewrite pattern for lowering gate ops in the qecp to quantum.custom ops."""
         gate_name = _QECP_GATENAMES_TO_QUANTUM_OPS.get(op.name)
+        assert gate_name is not None, f"Unknown gate {op.name}"
 
         adjoint = op.properties.get("adjoint", False)
 
