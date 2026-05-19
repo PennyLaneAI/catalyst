@@ -19,8 +19,8 @@ import pennylane as qp
 import pytest
 from pennylane.transforms import to_ppr
 
-from catalyst import qjit
 import catalyst
+from catalyst import qjit
 
 
 def test_pauli_rot_lowering():
