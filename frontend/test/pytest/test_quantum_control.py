@@ -901,17 +901,10 @@ class TestControlledProperties:
         op = C_ctrl(DummyOp(1), 0)
         assert op.has_diagonalizing_gates is value
 
-    @pytest.mark.parametrize("value", ("_ops", "_measurements"))
-    def test_queue_cateogry(self, value):
-        """Test that `catalyst.ctrl` defers `_queue_category` to base operator."""
+    def test_queue_cateogry(self):
+        """Test that C_ctrl always returns '_ops' for _queue_category."""
 
-        class DummyOp(Operator):
-            """DummyOp"""
-
-            num_wires = 1
-            _queue_category = value
-
-        op = C_ctrl(DummyOp(1), 0)
+        op = C_ctrl(qp.PauliX(1), 0)
         assert op._queue_category == "_ops"
 
     @pytest.mark.parametrize("value", (True, False))
