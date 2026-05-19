@@ -436,7 +436,6 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                         qec_code=self.qec_code,
                         gate_subroutines=transversal_gate_subroutines,
                     ),
-                    ReconcileUnrealizedCastsPattern(),
                 ]
             )
         ).rewrite_module(op)
