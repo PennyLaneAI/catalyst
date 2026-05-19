@@ -14,11 +14,16 @@
   argument is at an arbitrary position in the argument list.
   [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
 
+* The `--decompose-lowering` pass can now handle null decomposition rules, which are rule functions
+  that do not have any quantum values as arguments or results. Gates with null decomposition rules
+  are simply removed.
+  [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
   [(#2840)](https://github.com/PennyLaneAI/catalyst/pull/2840)
-  
+
 * Removes support for `Transform.plxpr_transform` from the `qp.qjit(capture=True)` capture pipeline.
   All transforms must now have a MLIR or XDSL implementation and a corresponding `pass_name`.
 
