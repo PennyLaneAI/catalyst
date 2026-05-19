@@ -99,7 +99,6 @@ def qec_pipeline() -> PipelineStages:
 
     .. code-block:: python
 
-        import numpy as np
         import pennylane as qp
         from catalyst.ftqc import qec_pipeline
 
@@ -110,7 +109,7 @@ def qec_pipeline() -> PipelineStages:
         @qp.qjit(pipelines=qec_pipeline())
         @qp.qnode(dev, mcm_method="one-shot")
         def workload():
-            qp.cond(m0, qp.X, qp.I)(0)
+            qp.Hadamard(0)
             return qp.expval(qp.Z(0))
     """
     stages = default_pipeline()
@@ -133,7 +132,7 @@ def qec_pipeline() -> PipelineStages:
         f"The pipeline for this stage is: {pipeline}"
     )
 
-    # Insert (in-place) the "convert-mbqc-to-llvm" pass immediately before the
+    # Insert (in-place) the "convert-qecp-to-llvm" pass immediately before the
     # "convert-quantum-to-llvm" pass in the MLIRToLLVMDialectConversion pipeline
     insert_pass_before(
         pipeline, ref_pass="convert-quantum-to-llvm", new_pass="convert-qecp-to-llvm"
