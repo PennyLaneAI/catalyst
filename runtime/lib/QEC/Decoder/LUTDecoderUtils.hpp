@@ -194,12 +194,11 @@ generate_lookup_table(const std::vector<TANNER_GRAPH_INT> &parity_mat_row_idx,
     // Traverse all possible quantum error combinations
     for (size_t i = 0; i <= num_errors; i++) {
         // create a base error vector
-        // TODOs: The following line is a temporal fix, intending to silent Linux
-        // arm wheel building errors.
-        const size_t err_size = std::max(num_errors, num_data_qubits);
-        std::vector<int8_t> err_vector(err_size, 0);
-        std::fill(err_vector.begin(), err_vector.begin() + i, 1);
-        std::reverse(err_vector.begin(), err_vector.end());
+        std::vector<int8_t> err_vector(num_data_qubits, 0);
+        if (i > num_data_qubits) {
+            __builtin_unreachable();
+        }
+        std::fill(err_vector.end() - i, err_vector.end(), 1);
 
         do {
             std::string syndrome_str = get_syndrome_from_errors<TANNER_GRAPH_INT>(
