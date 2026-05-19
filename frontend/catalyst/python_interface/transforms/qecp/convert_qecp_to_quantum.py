@@ -24,11 +24,12 @@ We might have to come back to this later.
 """
 
 from dataclasses import dataclass
+from typing import cast
 
 from xdsl import pattern_rewriter
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, func, scf
-from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType
+from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType, I64, i64
 from xdsl.ir import Attribute, SSAValue
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
@@ -58,33 +59,37 @@ _QECP_GATENAMES_TO_QUANTUM_OPS = {
 }
 
 
-def _get_i64_idx_value_or_attr_from_extract_or_insert_op(
-    op: qecp.ExtractQubitOp | qecp.InsertQubitOp,
-    rewriter: PatternRewriter,
-) -> IntegerAttr | SSAValue:
-    """Get an i64 index value/attr for quantum.extract/insert from a qecp extract/insert op."""
+def _get_idx_value_or_attr_from_extract_or_insert_op(
+    op: qecp.ExtractQubitOp | qecp.InsertQubitOp, rewriter: PatternRewriter
+) -> IntegerAttr | SSAValue[IntegerAttr[I64]]:
+    """Helper function to get the index value 'idx' or attribute 'idx_attr' from a `qecp.extract`
+    or `qecp.insert` op.
+
+    If the index value has type `index`, an `arith.cast_index` op is inserted to cast it to type
+    `i64`. We must cast such values because `quantum.extract` and `quantum.insert` ops expect an idx
+    operand of type `i64`.
+    """
     if op.idx is not None:
-        if isinstance(op.idx.type, IntegerType) and op.idx.type.width.data == 64:
-            return op.idx
-        if isinstance(op.idx.type, IndexType):
-            index_cast_op = arith.IndexCastOp(op.idx, builtin.i64)
+        if isinstance(op.idx.type, IntegerAttr):
+            idx = cast(SSAValue[IntegerAttr[I64]], op.idx)
+        elif isinstance(op.idx.type, IndexType):
+            # Insert cast operation index -> i64
+            index_cast_op = arith.IndexCastOp(op.idx, i64)
             rewriter.insert_op(index_cast_op)
-            return index_cast_op.result
-        raise TypeError(
-            f"Expected idx value '{op.idx}' to have type IndexType or i64, got {op.idx.type}"
-        )
-    if op.idx_attr is not None:
-        return IntegerAttr(op.idx_attr.value.data, 64)
-    raise ValueError(f"Both idx and idx_attr of op '{op}' are None")
+            idx = cast(SSAValue[IntegerAttr[I64]], index_cast_op.result)
+        else:
+            assert False, (
+                f"Expected idx value '{op.idx}' to have type 'IndexType' or 'IntegerType', "
+                f"but got {op.idx.type}"
+            )
 
+    elif op.idx_attr is not None:
+        idx = op.idx_attr
 
-def _convert_qecp_type(typ: Attribute) -> Attribute:
-    """Helper function to convert qecp types to quantum types."""
-    if isinstance(typ, qecp.PhysicalCodeblockType):
-        return quantum.QuregType()
-    if isinstance(typ, qecp.QecPhysicalQubitType):
-        return quantum.QubitType()
-    return typ
+    else:
+        assert False, f"Both idx and idx_attr of op '{op}' are None"
+
+    return idx
 
 
 # MARK: Type Conversion Pattern
@@ -150,7 +155,7 @@ class ExtractQubitConversion(RewritePattern):
     def match_and_rewrite(self, op: qecp.ExtractQubitOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that extract a data qubit from a
         quantum.reg."""
-        idx = _get_i64_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
+        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
 
         rewriter.replace_op(op, quantum.ExtractOp(op.codeblock, idx=idx))
 
@@ -162,7 +167,7 @@ class InsertQubitConversion(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecp.InsertQubitOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops for data qubit insertion."""
-        idx = _get_i64_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
+        idx = _get_idx_value_or_attr_from_extract_or_insert_op(op, rewriter)
         insert_op = quantum.InsertOp(op.in_codeblock, idx=idx, qubit=op.qubit)
         rewriter.replace_op(op, insert_op)
 
@@ -171,7 +176,7 @@ class InsertQubitConversion(RewritePattern):
 
 
 @dataclass(frozen=True)
-class CliffordGateConversion(RewritePattern):
+class GateConversion(RewritePattern):
     """Op conversion pattern from gates in qecp to quantum.custom."""
 
     @op_type_rewrite_pattern
@@ -214,48 +219,6 @@ class MeasureConversion(RewritePattern):
         quantum.measure ops."""
         measure_op = quantum.MeasureOp(in_qubit=op.operands[0])
         rewriter.replace_op(op, measure_op)
-
-
-# MARK: Subroutine conversion patterns for encoder, decoder, qeccycle, and logical operations.
-# These patterns convert the signatures of subroutines and their call sites to replace
-# qecp.codeblock and qecp.qubit types with quantum.reg and quantum.bit types, respectively.
-
-
-@dataclass(frozen=True)
-class SubroutineSignatureConversion(RewritePattern):
-    """Op conversion pattern from subroutines with qecp.codeblock/qecp.qubit types."""
-
-    @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: func.FuncOp, rewriter: PatternRewriter):
-        """Op conversion rewrite pattern for lowering subroutines with qecp.codeblock/qecp.qubit types in their signatures."""
-        old_inputs = tuple(op.function_type.inputs.data)
-        old_outputs = tuple(op.function_type.outputs.data)
-        new_inputs = tuple(_convert_qecp_type(t) for t in old_inputs)
-        new_outputs = tuple(_convert_qecp_type(t) for t in old_outputs)
-        if new_inputs == old_inputs and new_outputs == old_outputs:
-            return
-        op.function_type = builtin.FunctionType.from_lists(
-            list(new_inputs),
-            list(new_outputs),
-        )
-
-        rewriter.notify_op_modified(op)
-
-
-@dataclass(frozen=True)
-class SubroutineCallOpSignatureConversion(RewritePattern):
-    """Op conversion pattern for calls to subroutines with qecp.codeblock/qecp.qubit types."""
-
-    @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: func.CallOp, rewriter: PatternRewriter):
-        """Op conversion rewrite pattern for lowering call ops with qecp.codeblock/qecp.qubit types in their operands or results."""
-
-        old_results = tuple(op.result_types)
-        new_results = tuple(_convert_qecp_type(t) for t in old_results)
-        if new_results == old_results:
-            return
-        new_call = func.CallOp(op.callee, op.arguments, new_results)
-        rewriter.replace_op(op, new_call)
 
 
 @dataclass(frozen=True)
@@ -387,22 +350,21 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
     # pylint: disable=unused-argument
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         """Apply the convert-qecp-to-quantum pass."""
+        # pylint: disable = unexpected-keyword-arg
 
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [
-                    PhysicalCodeblockTypeConversion(),
-                    QecPhysicalQubitTypeConversion(),
+                    PhysicalCodeblockTypeConversion(recursive=True),
+                    QecPhysicalQubitTypeConversion(recursive=True),
                     AllocAuxQubitConversion(),
                     DeallocAuxQubitConversion(),
                     InsertQubitConversion(),
                     ExtractQubitConversion(),
-                    CliffordGateConversion(),
+                    GateConversion(),
                     NoiseRotConversion(),
                     MeasureConversion(),
-                    SubroutineSignatureConversion(),
-                    SubroutineCallOpSignatureConversion(),
-                ],
+                ]
             )
         ).rewrite_module(op)
 
