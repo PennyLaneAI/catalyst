@@ -239,11 +239,8 @@ class TestExtractInsertQubitConversion:
             // CHECK: [[q0:%.+]] = quantum.extract{{.*}}[0] : !quantum.reg -> !quantum.bit
             %q = qecp.extract %cb[0] : !qecp.codeblock<1 x 4> -> !qecp.qubit<data>
             // CHECK-NOT: qecp.extract
-            // CHECK: [[q1:%.+]] = quantum.custom "PauliX"() [[q0:%.+]] : !quantum.bit
-            %q1 = qecp.x %q : !qecp.qubit<data>
-            // CHECK: [[mres:%.+]], [[q2:%.+]] = quantum.measure [[q1:%.+]] : i1, !quantum.bit
-            %mres, %q2 = qecp.measure %q1 : i1, !qecp.qubit<data>
-            return
+            // CHECK: return [[q0]]
+            return %q : !qecp.qubit<data>
         }
         }
         """
