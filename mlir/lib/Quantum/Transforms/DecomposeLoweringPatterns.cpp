@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/ADT/STLExtras.h>
 #define DEBUG_TYPE "decompose-lowering"
 
 #include "llvm/ADT/StringMap.h"
