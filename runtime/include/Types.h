@@ -149,6 +149,12 @@ struct PairT_MemRefT_double_int64_1d {
     struct MemRefT_int64_1d second;
 };
 
+// CSC Tanner graph int32 type
+struct TannerGraph_CSC_int32 {
+    struct MemRefT_int32_1d row_idx;
+    struct MemRefT_int32_1d col_ptr;
+};
+
 // Quantum operation modifiers
 struct Modifiers {
     bool adjoint;
@@ -165,6 +171,7 @@ using MemRefT_double_2d = struct MemRefT_double_2d;
 using MemRefT_int64_1d = struct MemRefT_int64_1d;
 using MemRefT_int32_1d = struct MemRefT_int32_1d;
 using PairT_MemRefT_double_int64_1d = struct PairT_MemRefT_double_int64_1d;
+using TannerGraph_CSC_int32 = struct TannerGraph_CSC_int32;
 using Modifiers = struct Modifiers;
 
 #ifdef __cplusplus
