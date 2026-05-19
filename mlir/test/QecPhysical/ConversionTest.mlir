@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // RUN: quantum-opt %s \
+// RUN:   -convert-arith-to-llvm \
+// RUN:   --convert-scf-to-cf \
 // RUN:   --finalize-memref-to-llvm \
 // RUN:   --convert-qecp-to-llvm \
 // RUN:   --reconcile-unrealized-casts \
@@ -82,5 +84,165 @@ module {
 
         // CHECK: llvm.return [[tg2]] : !llvm.struct<"TannerGraph"
         func.return %tanner : !qecp.tanner_graph<8, 6, i32>
+    }
+}
+
+// -----
+
+module {
+    // CHECK: llvm.func @__catalyst__qecp__lut_decoder(!llvm.ptr, !llvm.ptr, !llvm.ptr) 
+    memref.global "private" constant @__constant_3xi1 : memref<3xi1> = dense<[1, 1, 0]> {alignment = 64 : i64}
+    memref.global "private" constant @__constant_8xi32 : memref<8xi32> = dense<[3, 3, 4, 4, 0, 1, 1, 2]> {alignment = 64 : i64}
+    memref.global "private" constant @__constant_6xi32 : memref<6xi32> = dense<[0, 1, 3, 4, 6, 8]> {alignment = 64 : i64}
+    // CHECK-LABEL: llvm.func @test_pseudo_qec_cycle()
+    func.func @test_pseudo_qec_cycle() {
+        %row_idx = memref.get_global @__constant_8xi32 : memref<8xi32>
+        %col_ptr = memref.get_global @__constant_6xi32 : memref<6xi32>
+
+        //      CHECK: [[TG0:%.+]] = llvm.mlir.undef : !llvm.struct<"TannerGraph", (
+        // CHECK-SAME:     struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>,
+        // CHECK-SAME:     struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>)>
+        %tanner = qecp.assemble_tanner %row_idx, %col_ptr : memref<8xi32>, memref<6xi32> -> !qecp.tanner_graph<8, 6, i32>
+
+        %esm = memref.get_global @__constant_3xi1 : memref<3xi1>
+
+        %err_buf = memref.alloc() : memref<2xindex>
+        // CHECK-NOT: builtin.unrealized_conversion_cast
+        // CHECK: llvm.store {{.+}}, [[tanner:%.+]] : !llvm.struct<"TannerGraph",
+        // CHECK: llvm.call @__catalyst__qecp__lut_decoder([[tanner:%.+]], {{.+}}, {{.+}}) : (!llvm.ptr, !llvm.ptr, !llvm.ptr) -> ()
+        qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm in(%err_buf : memref<2xindex>) : memref<3xi1>
+        memref.dealloc %err_buf : memref<2xindex>
+
+        func.return
+    }
+
+}
+
+// -----
+
+module {
+    // CHECK: llvm.func @__catalyst__qecp__lut_decoder(!llvm.ptr, !llvm.ptr, !llvm.ptr)
+    memref.global "private" constant @__constant_3xi1 : memref<3xi1> = dense<[1, 1, 0]> {alignment = 64 : i64}
+    func.func @test_pseudo_qec_cycle(%tanner : !qecp.tanner_graph<8, 6, i32>) {
+        %esm = memref.get_global @__constant_3xi1 : memref<3xi1>
+        %err_buf = memref.alloc() : memref<2xindex>
+        // CHECK: llvm.store {{.+}}, {{.+}} : !llvm.struct<"TannerGraph"
+        // CHECK-NEXT: llvm.call @__catalyst__qecp__lut_decoder({{.+}}, {{.+}}, {{.+}}) : (!llvm.ptr, !llvm.ptr, !llvm.ptr) -> ()
+        qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm in(%err_buf : memref<2xindex>) : memref<3xi1>
+        func.return
+    }
+}
+
+// -----
+
+module{
+    // CHECK: llvm.func @__catalyst__qecp__lut_decoder(!llvm.ptr, !llvm.ptr, !llvm.ptr)
+    // CHECK-LABEL: llvm.func @get_tanner_graph() -> !llvm.struct<"TannerGraph"
+    memref.global "private" constant @__constant_3xi1 : memref<3xi1> = dense<[1, 1, 0]> {alignment = 64 : i64}
+    memref.global "private" constant @__constant_11xi32 : memref<11xi32> = dense<[0, 1, 3, 6, 8, 9, 11, 12, 16, 20, 24]> {alignment = 64 : i64}
+    memref.global "private" constant @__constant_24xi32 : memref<24xi32> = dense<[7, 7, 8, 7, 8, 9, 7, 9, 8, 8, 9, 9, 0, 1, 2, 3, 1, 2, 4, 5, 2, 3, 5, 6]> {alignment = 64 : i64}
+    func.func private @get_tanner_graph()->!qecp.tanner_graph<24, 11, i32>{
+        %row_idx = memref.get_global @__constant_24xi32 : memref<24xi32>
+        %col_ptr = memref.get_global @__constant_11xi32 : memref<11xi32>
+
+        %tanner = qecp.assemble_tanner %row_idx, %col_ptr : memref<24xi32>, memref<11xi32> -> !qecp.tanner_graph<24, 11, i32>
+        func.return %tanner : !qecp.tanner_graph<24, 11, i32>
+    }
+    // CHECK-LABEL: llvm.func @test_outline_tanner_decode_integration() {
+    func.func @test_outline_tanner_decode_integration(){
+        // CHECK: [[tanner_value: %.+]] = llvm.call @get_tanner_graph() : () -> !llvm.struct<"TannerGraph"
+        // CHECK: [[tanner_ptr: %.+]] = llvm.alloca {{.+}} x !llvm.struct<"TannerGraph"
+        %tanner = func.call @get_tanner_graph():() -> !qecp.tanner_graph<24, 11, i32>
+        %esm = memref.get_global @__constant_3xi1 : memref<3xi1>
+
+        %err_buf = memref.alloc() : memref<2xindex>
+        // CHECK: lvm.store [[tanner_value:%.+]], [[tanner_ptr:%.+]] : !llvm.struct<"TannerGraph"
+        // CHECK: llvm.call @__catalyst__qecp__lut_decoder([[tanner_ptr:%.+]], {{.+}}, {{.+}}) : (!llvm.ptr, !llvm.ptr, !llvm.ptr) -> ()
+        qecp.decode_esm_css(%tanner : !qecp.tanner_graph<24, 11, i32>) %esm in(%err_buf : memref<2xindex>) : memref<3xi1>
+
+        func.return
+    }
+}
+
+// -----
+
+module{
+    // CHECK: llvm.func @__catalyst__qecp__lut_decoder(!llvm.ptr, !llvm.ptr, !llvm.ptr)
+    memref.global "private" constant @__constant_3xi1 : memref<3xi1> = dense<[1, 1, 0]> {alignment = 64 : i64}
+    memref.global "private" constant @__constant_11xi32 : memref<11xi32> = dense<[0, 1, 3, 6, 8, 9, 11, 12, 16, 20, 24]> {alignment = 64 : i64}
+    memref.global "private" constant @__constant_24xi32 : memref<24xi32> = dense<[7, 7, 8, 7, 8, 9, 7, 9, 8, 8, 9, 9, 0, 1, 2, 3, 1, 2, 4, 5, 2, 3, 5, 6]> {alignment = 64 : i64}
+    // CHECK-LABEL: llvm.func @get_tanner_graph() -> !llvm.struct<"TannerGraph"
+    func.func private @get_tanner_graph()->!qecp.tanner_graph<24, 11, i32>{
+        %row_idx = memref.get_global @__constant_24xi32 : memref<24xi32>
+        %col_ptr = memref.get_global @__constant_11xi32 : memref<11xi32>
+
+        %tanner = qecp.assemble_tanner %row_idx, %col_ptr : memref<24xi32>, memref<11xi32> -> !qecp.tanner_graph<24, 11, i32>
+        func.return %tanner : !qecp.tanner_graph<24, 11, i32>
+    }
+    // CHECK-LABEL: llvm.func @test_decode_with_tanner_from_arg(%arg0: !llvm.struct<"TannerGraph",
+    func.func private @test_decode_with_tanner_from_arg(%tanner:!qecp.tanner_graph<24, 11, i32>){
+        %esm = memref.get_global @__constant_3xi1 : memref<3xi1>
+
+        %err_buf = memref.alloc() : memref<2xindex>
+        // CHECK: lvm.store [[tanner_value:%.+]], [[tanner_ptr:%.+]] : !llvm.struct<"TannerGraph"
+        // CHECK: llvm.call @__catalyst__qecp__lut_decoder([[tanner_ptr:%.+]], {{.+}}, {{.+}}) : (!llvm.ptr, !llvm.ptr, !llvm.ptr) -> ()
+        qecp.decode_esm_css(%tanner : !qecp.tanner_graph<24, 11, i32>) %esm in(%err_buf : memref<2xindex>) : memref<3xi1>
+
+        func.return
+    }
+
+    // CHECK-LABEL: llvm.func @test_pseudo_qec() {
+    func.func @test_pseudo_qec(){
+        // CHECK: [[tanner:%.+]] = llvm.call @get_tanner_graph() : () -> !llvm.struct<"TannerGraph",
+        %tanner = func.call @get_tanner_graph():() -> !qecp.tanner_graph<24, 11, i32>
+        // CHECK-NEXT: llvm.call @test_decode_with_tanner_from_arg([[tanner:%.+]]) : (!llvm.struct<"TannerGraph"
+        func.call @test_decode_with_tanner_from_arg(%tanner):(!qecp.tanner_graph<24, 11, i32>)->()
+        func.return
+    }
+}
+
+// -----
+
+module{
+    // CHECK: llvm.func @__catalyst__qecp__lut_decoder(!llvm.ptr, !llvm.ptr, !llvm.ptr)
+    memref.global "private" constant @__constant_3xi1 : memref<3xi1> = dense<[1, 1, 0]> {alignment = 64 : i64}
+    memref.global "private" constant @__constant_11xi32 : memref<11xi32> = dense<[0, 1, 3, 6, 8, 9, 11, 12, 16, 20, 24]> {alignment = 64 : i64}
+    memref.global "private" constant @__constant_24xi32 : memref<24xi32> = dense<[7, 7, 8, 7, 8, 9, 7, 9, 8, 8, 9, 9, 0, 1, 2, 3, 1, 2, 4, 5, 2, 3, 5, 6]> {alignment = 64 : i64}
+    // CHECK-LABEL: llvm.func @get_tanner_graph() -> !llvm.struct<"TannerGraph"
+    func.func private @get_tanner_graph()->!qecp.tanner_graph<24, 11, i32>{
+        %row_idx = memref.get_global @__constant_24xi32 : memref<24xi32>
+        %col_ptr = memref.get_global @__constant_11xi32 : memref<11xi32>
+
+        %tanner = qecp.assemble_tanner %row_idx, %col_ptr : memref<24xi32>, memref<11xi32> -> !qecp.tanner_graph<24, 11, i32>
+        func.return %tanner : !qecp.tanner_graph<24, 11, i32>
+    }
+    // CHECK-LABEL: llvm.func @test_decode_with_tanner_from_arg(%arg0: !llvm.struct<"TannerGraph",
+    func.func private @test_decode_with_tanner_from_arg(%tanner:!qecp.tanner_graph<24, 11, i32>){
+        %esm = memref.get_global @__constant_3xi1 : memref<3xi1>
+
+        %err_buf = memref.alloc() : memref<2xindex>
+        // CHECK: lvm.store [[tanner_value:%.+]], [[tanner_ptr:%.+]] : !llvm.struct<"TannerGraph"
+        // CHECK: llvm.call @__catalyst__qecp__lut_decoder([[tanner_ptr:%.+]], {{.+}}, {{.+}}) : (!llvm.ptr, !llvm.ptr, !llvm.ptr) -> ()
+        qecp.decode_esm_css(%tanner : !qecp.tanner_graph<24, 11, i32>) %esm in(%err_buf : memref<2xindex>) : memref<3xi1>
+
+        func.return
+    }
+
+    // CHECK-LABEL: llvm.func @test_pseudo_qec_with_cf() {
+    func.func @test_pseudo_qec_with_cf(){
+        // CHECK: [[tanner:%.+]] = llvm.call @get_tanner_graph() : () -> !llvm.struct<"TannerGraph",
+        %tanner = func.call @get_tanner_graph():() -> !qecp.tanner_graph<24, 11, i32>
+
+        %c0 = arith.constant 0 : index
+        %c10 = arith.constant 10 : index
+        %c1 = arith.constant 1 : index
+        // CHECK-NOT: qecp.tanner_graph
+        %tanner_out = scf.for %i = %c0 to %c10 step %c1 iter_args(%tg = %tanner) -> (!qecp.tanner_graph<24, 11, i32>) {
+            // CHECK: llvm.call @test_decode_with_tanner_from_arg([[tanner:%.+]]) : (!llvm.struct<"TannerGraph"
+            func.call @test_decode_with_tanner_from_arg(%tg):(!qecp.tanner_graph<24, 11, i32>)->()
+            scf.yield %tg : !qecp.tanner_graph<24, 11, i32>
+        }
+
+        func.return
     }
 }
