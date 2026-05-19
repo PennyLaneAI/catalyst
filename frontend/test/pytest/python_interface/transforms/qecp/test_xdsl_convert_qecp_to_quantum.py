@@ -428,7 +428,7 @@ class TestSubroutineConversion:
         builtin.module {
         // CHECK-NOT: !qecp.codeblock
         // CHECK-NOT: !qecp.qubit
-        // CHECK-LABEL: test_subroutine(%cb: !quantum.reg) -> !quantum.reg
+        // CHECK-LABEL: test_subroutine({{.+}}: !quantum.reg) -> !quantum.reg
         func.func @test_subroutine(%cb: !qecp.codeblock<1 x 1>) -> !qecp.codeblock<1 x 1> {
             // CHECK: [[q0:%.+]] = quantum.extract {{%.+}}[0] : !quantum.reg -> !quantum.bit
             %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 1> -> !qecp.qubit<data>
