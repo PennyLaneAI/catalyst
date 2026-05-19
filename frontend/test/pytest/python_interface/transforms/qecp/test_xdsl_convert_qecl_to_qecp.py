@@ -508,13 +508,17 @@ class TestTannerGraphInsertion:
     """Unit tests for the insertion of Tanner graph ops."""
 
     def test_tanner_graph_insertion_steane(self, run_filecheck):
-        """Test that Tanner graph ops for the Steane code are correctly inserted at the beginning of
-        the module.
+        """Test that Tanner graph ops for the Steane code are emitted inside ``qec_cycle_Steane`` (not
+        at module scope), so decoded SSAs respect MLIR function isolation.
         """
 
         program = """
         // CHECK-LABEL: test_module
         builtin.module @test_module {
+        func.func @test_program()  {
+            return
+        }
+        // CHECK-LABEL: func.func private @qec_cycle_Steane
         //      CHECK: [[row_idx_x:%.+]] = arith.constant
         // CHECK-SAME:   dense<[7, 7, 8, 7, 8, 9, 7, 9, 8, 8, 9, 9, 0, 1, 2, 3, 1, 2, 4, 5, 2, 3, 5, 6]> : tensor<24xi32>
         //      CHECK: [[col_ptr_x:%.+]] = arith.constant dense<[0, 1, 3, 6, 8, 9, 11, 12, 16, 20, 24]> : tensor<11xi32>
@@ -525,10 +529,6 @@ class TestTannerGraphInsertion:
         //      CHECK: [[col_ptr_z:%.+]] = arith.constant dense<[0, 1, 3, 6, 8, 9, 11, 12, 16, 20, 24]> : tensor<11xi32>
         //      CHECK: [[tanner_z:%.+]] = qecp.assemble_tanner [[row_idx_z]], [[col_ptr_z]] :
         // CHECK-SAME:   tensor<24xi32>, tensor<11xi32> -> !qecp.tanner_graph<24, 11, i32>
-        // CHECK-LABEL: test_program
-        func.func @test_program()  {
-            return
-        }
         }
         """
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
@@ -548,8 +548,6 @@ class TestQecCycleLowering:
         program = """
         // CHECK-LABEL: test_module
         builtin.module @test_module {
-        // CHECK: [[tanner_x:%.+]] = qecp.assemble_tanner {{.+}} -> !qecp.tanner_graph<24, 11, i32>
-        // CHECK: [[tanner_z:%.+]] = qecp.assemble_tanner {{.+}} -> !qecp.tanner_graph<24, 11, i32>
         // CHECK-LABEL: test_program
         func.func @test_program()  {
             // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
@@ -560,6 +558,8 @@ class TestQecCycleLowering:
             return
         }
         // CHECK-LABEL: qec_cycle_Steane([[cb0:%.+]]: !qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+        // CHECK: [[tanner_x:%.+]] = qecp.assemble_tanner {{.+}}, {{.+}} : tensor<24xi32>, tensor<11xi32> -> !qecp.tanner_graph<24, 11, i32>
+        // CHECK: [[tanner_z:%.+]] = qecp.assemble_tanner {{.+}}, {{.+}} : tensor<24xi32>, tensor<11xi32> -> !qecp.tanner_graph<24, 11, i32>
 
         // COM: The block below takes results of X checks and performs Z corrections
         // CHECK: qecp.alloc_aux : !qecp.qubit<aux>
@@ -582,7 +582,7 @@ class TestQecCycleLowering:
         // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
         // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
         // CHECK: [[esm:%.+]] = tensor.from_elements [[m0]], [[m1]], [[m2]] : tensor<3xi1>
-        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[esm]] : tensor<3xi1>) [[tanner_x]] : !qecp.tanner_graph<24, 11, i32> -> tensor<1xindex>
+        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[tanner_x]] : !qecp.tanner_graph<24, 11, i32>) [[esm]] : tensor<3xi1> -> tensor<1xindex>
         // CHECK: [[lb:%.+]] = arith.constant 0 : index
         // CHECK: [[ub:%.+]] = arith.constant 1 : index
         // CHECK: [[st:%.+]] = arith.constant 1 : index
@@ -594,7 +594,7 @@ class TestQecCycleLowering:
         // CHECK:   [[cond_out_cb:%.+]] = scf.if [[cond]]
         // CHECK:     [[q0:%.+]] = qecp.extract [[cb_arg]][[[err_idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
         // CHECK:     [[q1:%.+]] = qecp.z [[q0]] : !qecp.qubit<data>
-        // CHECK:     [[cb_arg_1:%.+]] = qecp.insert [[cb0]][[[err_idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK:     [[cb_arg_1:%.+]] = qecp.insert [[cb_arg]][[[err_idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
         // CHECK:     scf.yield [[cb_arg_1]] : !qecp.codeblock<1 x 7>
         // CHECK:   } else {
         // CHECK:     scf.yield [[cb_arg]] : !qecp.codeblock<1 x 7>
@@ -619,7 +619,7 @@ class TestQecCycleLowering:
         // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
         // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
         // CHECK: [[esm:%.+]] = tensor.from_elements [[m0]], [[m1]], [[m2]] : tensor<3xi1>
-        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[esm]] : tensor<3xi1>) [[tanner_z]] : !qecp.tanner_graph<24, 11, i32> -> tensor<1xindex>
+        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[tanner_z]] : !qecp.tanner_graph<24, 11, i32>) [[esm]] : tensor<3xi1>  -> tensor<1xindex>
         // CHECK: [[lb:%.+]] = arith.constant 0 : index
         // CHECK: [[ub:%.+]] = arith.constant 1 : index
         // CHECK: [[st:%.+]] = arith.constant 1 : index
@@ -631,7 +631,7 @@ class TestQecCycleLowering:
         // CHECK:   [[cond_out_cb:%.+]] = scf.if [[cond]]
         // CHECK:     [[q0:%.+]] = qecp.extract [[cb_arg]][[[err_idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
         // CHECK:     [[q1:%.+]] = qecp.x [[q0]] : !qecp.qubit<data>
-        // CHECK:     [[cb_arg_1:%.+]] = qecp.insert [[cb0]][[[err_idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK:     [[cb_arg_1:%.+]] = qecp.insert [[cb_arg]][[[err_idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
         // CHECK:     scf.yield [[cb_arg_1]] : !qecp.codeblock<1 x 7>
         // CHECK:   } else {
         // CHECK:     scf.yield [[cb_arg]] : !qecp.codeblock<1 x 7>
