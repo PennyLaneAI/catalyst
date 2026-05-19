@@ -20,6 +20,7 @@ import pytest
 from pennylane.transforms import to_ppr
 
 from catalyst import qjit
+import catalyst
 
 
 def test_pauli_rot_lowering():
@@ -228,7 +229,6 @@ def test_legacy_pauli_measure_lowering():
 
     @qjit(pipelines=pipe, target="mlir", capture=False)
     def test_legacy_pauli_measure_lowering_workflow():
-        import catalyst
 
         @qp.qnode(qp.device("null.qubit", wires=2))
         def f():
@@ -247,7 +247,6 @@ def test_legacy_cond_pauli_measure_result():
 
     @qjit(pipelines=pipe, target="mlir", autograph=True, capture=False)
     def test_legacy_cond_pauli_measure_result_workflow():
-        import catalyst
 
         @qp.qnode(qp.device("null.qubit", wires=3))
         def f():
