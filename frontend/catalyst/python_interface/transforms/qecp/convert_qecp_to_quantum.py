@@ -29,7 +29,7 @@ from typing import cast
 from xdsl import pattern_rewriter
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, func, scf
-from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType, I64, i64
+from xdsl.dialects.builtin import I64, IndexType, IntegerAttr, IntegerType, i64
 from xdsl.ir import Attribute, SSAValue
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
