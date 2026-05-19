@@ -198,6 +198,27 @@ class TestAuxAllocDeallocConversion:
 class TestExtractInsertQubitConversion:
     """Lowering of qecp.extract / qecp.insert to quantum.extract / quantum.insert."""
 
+    def test_extract_lowering_dyn_idx(self, run_filecheck):
+        """A qecp.extract lowers to quantum.extract (with dynamic index)."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_extract
+        func.func @test_extract() {
+            // CHECK: [[REG:%.+]] = "test.op"() : () -> !quantum.reg
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 4>
+            // CHECK: [[idx:%.+]] = "test.op"() : () -> index
+            // CHECK: [[idx_i64:%.+]] = arith.index_cast [[idx]] : index to i64
+            %idx = "test.op"() : () -> index
+            // CHECK: [[q0:%.+]] = quantum.extract [[REG]][[[idx_i64]]] : !quantum.reg -> !quantum.bit
+            %q0 = qecp.extract %cb[%idx] : !qecp.codeblock<1 x 4> -> !qecp.qubit<data>
+            // CHECK-NOT: qecp.extract
+            %q1 = "test.op"(%q0) : (!qecp.qubit<data>) -> !qecp.qubit<data>
+            return
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
     def test_extract_lowering(self, run_filecheck):
         """A qecp.extract lowers to quantum.extract."""
         program = """
@@ -209,11 +230,8 @@ class TestExtractInsertQubitConversion:
             // CHECK: [[q0:%.+]] = quantum.extract{{.*}}[0] : !quantum.reg -> !quantum.bit
             %q = qecp.extract %cb[0] : !qecp.codeblock<1 x 4> -> !qecp.qubit<data>
             // CHECK-NOT: qecp.extract
-            // CHECK: [[q1:%.+]] = quantum.custom "PauliX"() [[q0:%.+]] : !quantum.bit
-            %q1 = qecp.x %q : !qecp.qubit<data>
-            // CHECK: [[mres:%.+]], [[q2:%.+]] = quantum.measure [[q1:%.+]] : i1, !quantum.bit
-            %mres, %q2 = qecp.measure %q1 : i1, !qecp.qubit<data>
-            return
+            // CHECK: return [[q0]]
+            return %q : !qecp.qubit<data>
         }
         }
         """
