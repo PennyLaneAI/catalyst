@@ -22,6 +22,9 @@
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
   [(#2840)](https://github.com/PennyLaneAI/catalyst/pull/2840)
+  
+* Removes support for `Transform.plxpr_transform` from the `qp.qjit(capture=True)` capture pipeline.
+  All transforms must now have a MLIR or XDSL implementation and a corresponding `pass_name`.
 
 <h3>Deprecations 👋</h3>
 
@@ -74,6 +77,7 @@ This release contains contributions from (in alphabetical order):
 Joey Carter,
 Yushao Chen,
 Lillian Frederiksen,
+Christina Lee,
 Mehrdad Malekmohammadi,
 Shuli Shu,
 Paul Haochen Wang.

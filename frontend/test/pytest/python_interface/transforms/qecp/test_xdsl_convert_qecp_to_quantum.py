@@ -206,6 +206,27 @@ class TestAuxAllocDeallocConversion:
 class TestExtractInsertQubitConversion:
     """Lowering of qecp.extract / qecp.insert to quantum.extract / quantum.insert."""
 
+    def test_extract_lowering_dyn_idx(self, run_filecheck):
+        """A qecp.extract lowers to quantum.extract (with dynamic index)."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_extract
+        func.func @test_extract() {
+            // CHECK: [[REG:%.+]] = "test.op"() : () -> !quantum.reg
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 4>
+            // CHECK: [[idx:%.+]] = "test.op"() : () -> index
+            // CHECK: [[idx_i64:%.+]] = arith.index_cast [[idx]] : index to i64
+            %idx = "test.op"() : () -> index
+            // CHECK: [[q0:%.+]] = quantum.extract [[REG]][[[idx_i64]]] : !quantum.reg -> !quantum.bit
+            %q0 = qecp.extract %cb[%idx] : !qecp.codeblock<1 x 4> -> !qecp.qubit<data>
+            // CHECK-NOT: qecp.extract
+            %q1 = "test.op"(%q0) : (!qecp.qubit<data>) -> !qecp.qubit<data>
+            return
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
     def test_extract_lowering(self, run_filecheck):
         """A qecp.extract lowers to quantum.extract."""
         program = """
@@ -385,6 +406,24 @@ class TestGateMeasureConversion:
             %q1 = qecp.rot(%phi, %theta, %omega) %q0 : !qecp.qubit<data>
             // CHECK-NEXT: return [[q1:%.+]] : !quantum.bit
             return %q1 : !qecp.qubit<data>
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_measure_lowering(self, run_filecheck):
+        """qecp.measure lowers to quantum.measure."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_measure
+        func.func @test_measure() {
+            // CHECK: [[reg:%.+]] = "test.op"() : () -> !quantum.reg
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 1>
+            // CHECK: [[q0:%.+]] = quantum.extract [[reg:%.+]][0] : !quantum.reg -> !quantum.bit
+            %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 1> -> !qecp.qubit<data>
+            // CHECK: [[mres:%.+]], [[q1:%.+]] = quantum.measure [[q0:%.+]] : i1, !quantum.bit
+            %mres, %q1 = qecp.measure %q0 : i1, !qecp.qubit<data>
+            return %mres : i1
         }
         }
         """
