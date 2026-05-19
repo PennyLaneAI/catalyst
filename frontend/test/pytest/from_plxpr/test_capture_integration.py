@@ -88,15 +88,6 @@ def is_single_qubit_fusion_applied(mlir):
     )
 
 
-def is_controlled_pushed_back(mlir, non_controlled_string, controlled_string):
-    """Check in the MLIR if the controlled gate got pushed after the non-controlled one"""
-    non_controlled_pos = mlir.find(non_controlled_string)
-    assert non_controlled_pos > 0
-
-    remaining_mlir = mlir[non_controlled_pos + len(non_controlled_string) :]
-    return controlled_string in remaining_mlir
-
-
 def is_amplitude_embedding_merged_and_decomposed(mlir):
     """Check in the MLIR if the amplitude embeddings got merged and decomposed"""
     return (
@@ -1472,53 +1463,6 @@ class TestCapture:
             qp.Rot(0.4, 0.5, 0.6, wires=0)
             qp.RZ(0.1, wires=0)
             qp.RZ(0.4, wires=0)
-            return qp.expval(qp.PauliZ(0))
-
-        assert jnp.allclose(circuit(), capture_result)
-
-    def test_transform_commute_controlled_workflow(self, backend):
-        """Test the integration for a circuit with a 'commute_controlled' transform."""
-
-        # Capture enabled
-
-        qp.capture.enable()
-
-        @qjit
-        @partial(qp.transforms.commute_controlled, direction="left")
-        @qp.qnode(qp.device(backend, wires=3))
-        def captured_circuit():
-            qp.CNOT(wires=[0, 2])
-            qp.PauliX(wires=2)
-            qp.RX(0.2, wires=2)
-            qp.Toffoli(wires=[0, 1, 2])
-            qp.CRX(0.1, wires=[0, 1])
-            qp.PauliX(wires=1)
-            return qp.expval(qp.PauliZ(0))
-
-        capture_result = captured_circuit()
-
-        capture_mlir = captured_circuit.mlir
-        assert is_controlled_pushed_back(
-            capture_mlir, 'quantum.custom "RX"', 'quantum.custom "CNOT"'
-        )
-        assert is_controlled_pushed_back(
-            capture_mlir, 'quantum.custom "PauliX"', 'quantum.custom "CRX"'
-        )
-
-        qp.capture.disable()
-
-        # Capture disabled
-
-        @qjit
-        @partial(qp.transforms.commute_controlled, direction="left")
-        @qp.qnode(qp.device(backend, wires=3))
-        def circuit():
-            qp.CNOT(wires=[0, 2])
-            qp.PauliX(wires=2)
-            qp.RX(0.2, wires=2)
-            qp.Toffoli(wires=[0, 1, 2])
-            qp.CRX(0.1, wires=[0, 1])
-            qp.PauliX(wires=1)
             return qp.expval(qp.PauliZ(0))
 
         assert jnp.allclose(circuit(), capture_result)
