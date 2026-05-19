@@ -947,7 +947,7 @@ def trace_quantum_operations(
             elif isinstance(op, catalyst.api_extensions.quantum_operators.MidCircuitPauliMeasure):
                 kwargs = {}
             else:
-                kwargs = {"mcm_config": mcm_config} # propagate
+                kwargs = {"mcm_config": mcm_config}  # propagate
             qrp2 = op.trace_quantum(ctx, device, trace, qrp, **kwargs)
         elif isinstance(op, MeasurementProcess):
             qrp2 = qrp
