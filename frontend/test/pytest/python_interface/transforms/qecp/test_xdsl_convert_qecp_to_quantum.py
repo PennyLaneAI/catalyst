@@ -411,6 +411,24 @@ class TestGateMeasureConversion:
         """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
 
+    def test_measure_lowering(self, run_filecheck):
+        """qecp.measure lowers to quantum.measure."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_measure
+        func.func @test_measure() {
+            // CHECK: [[reg:%.+]] = "test.op"() : () -> !quantum.reg
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 1>
+            // CHECK: [[q0:%.+]] = quantum.extract [[reg:%.+]][0] : !quantum.reg -> !quantum.bit
+            %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 1> -> !qecp.qubit<data>
+            // CHECK: [[mres:%.+]], [[q1:%.+]] = quantum.measure [[q0:%.+]] : i1, !quantum.bit
+            %mres, %q1 = qecp.measure %q0 : i1, !qecp.qubit<data>
+            return %mres : i1
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
 
 class TestSubroutineConversion:
     """Lowering of subroutine funcOp and call ops with qecp types to quantum types."""
