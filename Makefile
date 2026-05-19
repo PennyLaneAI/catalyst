@@ -182,7 +182,6 @@ ifneq ($(findstring clang,$(C_COMPILER)),clang)
 endif
 endif
 	@echo "check the Catalyst lit test suite"
-	cmake -G Ninja -S mlir -B $(DIALECTS_BUILD_DIR) -DBYTECODE_PATH=$(BYTECODE_PATH)
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-frontend
 
 pytest:

@@ -510,7 +510,8 @@ jobs:
         echo "OQD_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
-        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
+        chmod +x $(pwd)/quantum-build/bin/catalyst     # artifact upload does not preserve permissions
+        chmod +x $(pwd)/quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Install Deps
       run: |
@@ -597,7 +598,8 @@ jobs:
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
-        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
+        chmod +x $(pwd)/quantum-build/bin/catalyst     # artifact upload does not preserve permissions
+        chmod +x $(pwd)/quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Install Deps
       run: |
@@ -661,7 +663,8 @@ jobs:
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
-        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
+        chmod +x $(pwd)/quantum-build/bin/catalyst     # artifact upload does not preserve permissions
+        chmod +x $(pwd)/quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Install Deps
       run: |
