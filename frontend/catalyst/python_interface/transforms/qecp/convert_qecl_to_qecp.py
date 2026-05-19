@@ -376,6 +376,9 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             # We use object.__setattr__ to bypass the frozen restriction.
             new_code = QecCode.from_dict(self.qec_code)
             object.__setattr__(self, "qec_code", new_code)
+        elif isinstance(self.qec_code, str):
+            new_code = QecCode.get(self.qec_code)
+            object.__setattr__(self, "qec_code", new_code)
 
     # pylint: disable=unused-argument
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
@@ -1022,7 +1025,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             scf.YieldOp(out_codeblock)
 
         # Return updated codeblock SSA value
-        return out_codeblock
+        return for_each_err_idx_op.results[0]
 
 
 convert_qecl_to_qecp_pass = compiler_transform(ConvertQecLogicalToQecPhysicalPass)

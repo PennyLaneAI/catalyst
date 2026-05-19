@@ -20,7 +20,6 @@ from functools import partial
 import jax.numpy as jnp
 import pennylane as qp
 import pytest
-from jax.core import ShapedArray
 
 import catalyst
 from catalyst import qjit
@@ -56,15 +55,6 @@ def has_catalyst_transforms(mlir):
     )
 
 
-def is_unitary_rotated(mlir):
-    """Check in the MLIR if a unitary was rotated"""
-    return (
-        "quantum.unitary" not in mlir
-        and mlir.count('quantum.custom "RZ"') == 2
-        and mlir.count('quantum.custom "RY"') == 1
-    )
-
-
 def is_rot_decomposed(mlir):
     """Check in the MLIR if a rot was decomposed"""
     return (
@@ -74,27 +64,20 @@ def is_rot_decomposed(mlir):
     )
 
 
-def is_wire_mapped(mlir):
-    """Check in the MLIR if a wire was mapped"""
-    return "quantum.extract %0[ 0]" not in mlir and "quantum.extract %0[ 1]" in mlir
+def test_transforms_must_have_pass_name():
+    """Test that an error is raised if a transform does not have a pass_name."""
 
+    @qp.transform
+    def some_transform(tape):
+        return (tape,), lambda res: res[0]
 
-def is_single_qubit_fusion_applied(mlir):
-    """Check in the MLIR if 'single_qubit_fusion' was applied"""
-    return (
-        mlir.count('quantum.custom "Rot"') == 1
-        and 'quantum.custom "Hadamard"' not in mlir
-        and 'quantum.custom "RZ"' not in mlir
-    )
+    @some_transform
+    @qp.qnode(qp.device("null.qubit", wires=1))
+    def c():
+        return qp.state()
 
-
-def is_amplitude_embedding_merged_and_decomposed(mlir):
-    """Check in the MLIR if the amplitude embeddings got merged and decomposed"""
-    return (
-        "AmplitudeEmbedding" not in mlir
-        and mlir.count('quantum.custom "RY"') == 3
-        and mlir.count('quantum.custom "CNOT"') == 2
-    )
+    with pytest.raises(ValueError, match="<transform: some_transform> does not have a pass_name"):
+        qp.qjit(c, capture=True)()
 
 
 # pylint: disable=too-many-public-methods
@@ -1249,109 +1232,6 @@ class TestCapture:
             == captured_rotations_inverses_result
         )
 
-    def test_transform_unitary_to_rot_workflow(self, backend):
-        """Test the integration for a circuit with a 'unitary_to_rot' transform."""
-
-        U = qp.Rot(1.0, 2.0, 3.0, wires=0)
-
-        # Capture enabled
-
-        qp.capture.enable()
-
-        @qjit
-        @qp.transforms.unitary_to_rot
-        @qp.qnode(qp.device(backend, wires=1))
-        def captured_circuit(U: ShapedArray([2, 2], complex)):
-            qp.QubitUnitary(U, 0)
-            return qp.expval(qp.Z(0))
-
-        capture_result = captured_circuit(U.matrix())
-        assert is_unitary_rotated(captured_circuit.mlir)
-
-        qp.capture.disable()
-
-        # Capture disabled
-
-        @qjit
-        @qp.transforms.unitary_to_rot
-        @qp.qnode(qp.device(backend, wires=1))
-        def circuit(U: ShapedArray([2, 2], complex)):
-            qp.QubitUnitary(U, 0)
-            return qp.expval(qp.Z(0))
-
-        assert jnp.allclose(circuit(U.matrix()), capture_result)
-
-    def test_mixed_transforms_workflow(self, backend):
-        """Test the integration for a circuit with a combination of 'unitary_to_rot'
-        and 'cancel_inverses' transforms."""
-
-        U = qp.Rot(1.0, 2.0, 3.0, wires=0)
-
-        # Capture enabled
-
-        qp.capture.enable()
-
-        @qp.qnode(qp.device(backend, wires=1))
-        def captured_circuit(U: ShapedArray([2, 2], complex)):
-            qp.QubitUnitary(U, 0)
-            qp.Hadamard(wires=0)
-            qp.Hadamard(wires=0)
-            return qp.expval(qp.PauliZ(0))
-
-        # Case 1: During plxpr interpretation, first comes the PL transform
-        # with Catalyst counterpart, second comes the PL transform without it
-
-        captured_inverses_unitary = qjit(
-            qp.transforms.cancel_inverses(qp.transforms.unitary_to_rot(captured_circuit)),
-        )
-        captured_inverses_unitary_result = captured_inverses_unitary(U.matrix())
-
-        # Catalyst 'cancel_inverses' should have been scheduled as a pass
-        # whereas PL 'unitary_to_rot' should have been expanded
-        capture_mlir = captured_inverses_unitary.mlir
-        assert 'transform.apply_registered_pass "cancel-inverses"' in capture_mlir
-        assert is_unitary_rotated(capture_mlir)
-
-        # Case 2: During plxpr interpretation, first comes the PL transform
-        # without Catalyst counterpart, second comes the PL transform with it
-
-        captured_unitary_inverses = qjit(
-            qp.transforms.unitary_to_rot(qp.transforms.cancel_inverses(captured_circuit)),
-        )
-        captured_unitary_inverses_result = captured_unitary_inverses(U.matrix())
-
-        # Both PL transforms should have been expaned and no Catalyst pass should have been
-        # scheduled
-        capture_mlir = captured_unitary_inverses.mlir
-        assert 'transform.apply_registered_pass "cancel-inverses"' not in capture_mlir
-        assert 'quantum.custom "Hadamard"' not in capture_mlir
-        assert is_unitary_rotated(capture_mlir)
-
-        qp.capture.disable()
-
-        # Capture disabled
-
-        @qp.qnode(qp.device(backend, wires=1))
-        def circuit(U: ShapedArray([2, 2], complex)):
-            qp.QubitUnitary(U, 0)
-            qp.Hadamard(wires=0)
-            qp.Hadamard(wires=0)
-            return qp.expval(qp.PauliZ(0))
-
-        inverses_unitary_result = qjit(
-            qp.transforms.cancel_inverses(qp.transforms.unitary_to_rot(circuit))
-        )(U.matrix())
-        unitary_inverses_result = qjit(
-            qp.transforms.unitary_to_rot(qp.transforms.cancel_inverses(circuit))
-        )(U.matrix())
-
-        assert (
-            inverses_unitary_result
-            == unitary_inverses_result
-            == captured_inverses_unitary_result
-            == captured_unitary_inverses_result
-        )
-
     def test_transform_decompose_workflow(self, backend):
         """Test the integration for a circuit with a 'decompose' transform."""
 
@@ -1427,77 +1307,6 @@ class TestCapture:
                 non_capture_result = qjit(circuit)(1.5, 2.5, 3.5)
 
         assert jnp.allclose(non_capture_result, capture_result)
-
-    def test_transform_single_qubit_fusion_workflow(self, backend):
-        """Test the integration for a circuit with a 'single_qubit_fusion' transform."""
-
-        # Capture enabled
-
-        qp.capture.enable()
-
-        @qjit
-        @qp.transforms.single_qubit_fusion
-        @qp.qnode(qp.device(backend, wires=1))
-        def captured_circuit():
-            qp.Hadamard(wires=0)
-            qp.Rot(0.1, 0.2, 0.3, wires=0)
-            qp.Rot(0.4, 0.5, 0.6, wires=0)
-            qp.RZ(0.1, wires=0)
-            qp.RZ(0.4, wires=0)
-            return qp.expval(qp.PauliZ(0))
-
-        capture_result = captured_circuit()
-
-        assert is_single_qubit_fusion_applied(captured_circuit.mlir)
-
-        qp.capture.disable()
-
-        # Capture disabled
-
-        @qjit
-        @qp.transforms.single_qubit_fusion
-        @qp.qnode(qp.device(backend, wires=1))
-        def circuit():
-            qp.Hadamard(wires=0)
-            qp.Rot(0.1, 0.2, 0.3, wires=0)
-            qp.Rot(0.4, 0.5, 0.6, wires=0)
-            qp.RZ(0.1, wires=0)
-            qp.RZ(0.4, wires=0)
-            return qp.expval(qp.PauliZ(0))
-
-        assert jnp.allclose(circuit(), capture_result)
-
-    def test_transform_merge_amplitude_embedding_workflow(self, backend):
-        """Test the integration for a circuit with a 'merge_amplitude_embedding' transform."""
-
-        # Capture enabled
-
-        qp.capture.enable()
-
-        @qjit
-        @qp.transforms.merge_amplitude_embedding
-        @qp.qnode(qp.device(backend, wires=2))
-        def captured_circuit():
-            qp.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=0)
-            qp.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=1)
-            return qp.expval(qp.PauliZ(0))
-
-        capture_result = captured_circuit()
-        assert is_amplitude_embedding_merged_and_decomposed(captured_circuit.mlir)
-
-        qp.capture.disable()
-
-        # Capture disabled
-
-        @qjit
-        @qp.transforms.merge_amplitude_embedding
-        @qp.qnode(qp.device(backend, wires=2))
-        def circuit():
-            qp.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=0)
-            qp.AmplitudeEmbedding(jnp.array([0.0, 1.0]), wires=1)
-            return qp.expval(qp.PauliZ(0))
-
-        assert jnp.allclose(circuit(), capture_result)
 
     def test_shots_usage(self, backend):
         """Test the integration for a circuit using shots explicitly."""
