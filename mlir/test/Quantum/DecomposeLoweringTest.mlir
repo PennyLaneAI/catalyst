@@ -670,7 +670,7 @@ module @null_decomp_rule{
     return
   }
 
-  // CHECK-NOT: func.func private @my_cnot
+  // CHECK-NOT: func.func private @null_decomp
   func.func private @null_decomp() attributes {target_gate = "PauliX"} {
     return
   }
