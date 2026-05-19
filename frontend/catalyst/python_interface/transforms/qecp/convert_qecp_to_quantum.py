@@ -133,7 +133,7 @@ class InsertQubitConversion(RewritePattern):
 
 
 @dataclass(frozen=True)
-class CliffordGateConversion(RewritePattern):
+class GateConversion(RewritePattern):
     """Op conversion pattern from gates in qecp to quantum.custom."""
 
     @op_type_rewrite_pattern
@@ -199,7 +199,7 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                     DeallocAuxQubitConversion(),
                     InsertQubitConversion(),
                     ExtractQubitConversion(),
-                    CliffordGateConversion(),
+                    GateConversion(),
                     NoiseRotConversion(),
                     MeasureConversion(),
                 ]
