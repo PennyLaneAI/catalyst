@@ -5,6 +5,8 @@
 * A new, experimental compiler pass `convert-qecp-to-quantum` has been added to lower operations
   from the QEC Physical (`qecp`) dialect into the Quantum (`quantum`) dialect.
   [(#2822)](https://github.com/PennyLaneAI/catalyst/pull/2822)
+  [(#2809)](https://github.com/PennyLaneAI/catalyst/pull/2809)
+
 
 <h3>Improvements 🛠</h3>
 
