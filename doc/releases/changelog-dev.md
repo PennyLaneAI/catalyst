@@ -50,6 +50,12 @@
   [(#2780)](https://github.com/PennyLaneAI/catalyst/pull/2780)
   [(#2772)](https://github.com/PennyLaneAI/catalyst/pull/2772)
 
+* Resolved a bug in the QEC-cycle subroutine within the `convert-qecl-to-qecp` pass where the SSA
+  values of the `scf.yield` op were incorrectly returned instead of the `scf.for` op results. Also,
+  the `qec_code` pass option is now given as a `str` rather than a `QecCode` object to ensure
+  compatibility with Catalyst's compiler infrastructure.
+  [(#2837)](https://github.com/PennyLaneAI/catalyst/pull/2837)
+
 * The constructors of xDSL ops that accept index attributes have been updated to ensure that the
   resulting attribute has the correct type. These ops include `quantum.{extract, insert}`,
   `qecl.{extract_block, insert_block, measure, <gates>}`, and
