@@ -89,7 +89,8 @@ struct QecPhysicalConversionPass : impl::QecPhysicalConversionPassBase<QecPhysic
         populateQecPhysicalConversionPatterns(typeConverter, patterns);
 
         LLVMConversionTarget target(*context);
-        target.addIllegalOp<catalyst::qecp::AssembleTannerGraphOp>();
+        target
+            .addIllegalOp<catalyst::qecp::AssembleTannerGraphOp, catalyst::qecp::DecodeEsmCssOp>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
