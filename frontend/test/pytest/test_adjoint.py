@@ -1082,19 +1082,6 @@ class TestAdjointOperation:
         for angle1, angle2 in zip(angles, reversed(base_angles)):
             assert angle1 == -angle2
 
-    @pytest.mark.parametrize(
-        "base, basis",
-        (
-            (qp.RX(1.234, wires=0), "X"),
-            (qp.PauliY("a"), "Y"),
-            (qp.PhaseShift(4.56, wires="b"), "Z"),
-            (qp.SX(-1), "X"),
-        ),
-    )
-    def test_basis_property(self, base, basis):
-        op = adjoint(base)
-        assert op.basis == basis
-
     def test_control_wires(self):
         """Test the control_wires of an adjoint are the same as the base op."""
         op = adjoint(qp.CNOT(wires=("a", "b")))

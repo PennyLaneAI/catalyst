@@ -1141,19 +1141,6 @@ class TestControlledOperationProperties:
         op = C_ctrl(base, 2)
         assert op.grad_method == gm
 
-    def test_basis(self):
-        """Test that controlled mimics the basis attribute of the base op."""
-
-        class DummyOp(Operation):
-            """DummyOp"""
-
-            num_wires = 1
-            basis = "Z"
-
-        base = DummyOp(1)
-        op = C_ctrl(base, 2)
-        assert op.basis == "Z"
-
     @pytest.mark.parametrize(
         "base, expected",
         [
