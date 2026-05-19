@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <llvm/ADT/STLExtras.h>
 #define DEBUG_TYPE "decompose-lowering"
 
 #include "llvm/ADT/StringMap.h"
@@ -60,6 +61,21 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
             return failure();
         }
         func::FuncOp decompFunc = it->second;
+
+        // For null decomp rules, the signature will not have any quantum values
+        // This is a deviation from the standard decomp func signature, so we deal with it
+        // separately
+        if (!llvm::any_of(llvm::concat<const Type>(decompFunc.getFunctionType().getInputs(),
+                                                   decompFunc.getFunctionType().getResults()),
+                          [](const mlir::Type t) {
+                              return isa<quantum::QuregType, quantum::QubitType>(t);
+                          })) {
+            for (auto [inQubit, outQubit] :
+                 llvm::zip_equal(op.getQubitOperands(), op.getQubitResults())) {
+                rewriter.replaceAllUsesWith(outQubit, inQubit);
+            }
+            return success();
+        }
 
         // Here is the assumption that the decomposition function must have at least one input and
         // one result
