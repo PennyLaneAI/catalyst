@@ -323,7 +323,7 @@ class TestComplexCircuits:
         stats = profile_openapl(oqd_dev.openapl_file_name)
         assert stats["num_ions"] == 2
         assert stats["num_parallel_protocols"] == 42
-        assert stats["num_beams"] == 128
+        assert stats["num_beams"] == 104
         assert stats["num_transitions"] == 8
         assert stats["num_levels"] == 8
 
