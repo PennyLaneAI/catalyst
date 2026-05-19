@@ -16,6 +16,7 @@
 
 #include <cstdio>
 #include <dlfcn.h>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <random>
@@ -88,6 +89,15 @@ class SharedLibraryManager final {
 #endif
 
         _handler = dlopen(filename.c_str(), rtld_flags);
+        if (!_handler) {
+            // Fall back to the base name of the library if the full path is not found.
+            std::string stem = std::filesystem::path(filename).stem().string();
+            for (const char *ext : {".so", ".dylib", ".dll"}) {
+                if ((_handler = dlopen((stem + ext).c_str(), rtld_flags))) {
+                    break;
+                }
+            }
+        }
         RT_FAIL_IF(!_handler, dlerror());
     }
 

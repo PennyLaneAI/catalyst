@@ -22,6 +22,8 @@
 
 #include "numpy/ndarrayobject.h"
 
+#include "Exception.hpp"
+
 namespace nb = nanobind;
 
 struct memref_beginning_t {
@@ -233,6 +235,23 @@ nb::list wrap(nb::object func, nb::tuple py_args, nb::object result_desc, nb::ob
 NB_MODULE(wrapper, m)
 {
     m.doc() = "wrapper module";
+
+    nb::register_exception_translator([](const std::exception_ptr &p, void * /*payload*/) {
+        try {
+            std::rethrow_exception(p);
+        }
+        catch (const Catalyst::Runtime::RuntimeException &e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        }
+        catch (const std::exception &e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        }
+        catch (...) {
+            PyErr_SetString(PyExc_RuntimeError,
+                            "unknown C++ exception caught by wrapper translator");
+        }
+    });
+
     // We have to annotate all the arguments to `wrap` to allow `result_desc` to be None
     // See https://nanobind.readthedocs.io/en/latest/functions.html#none-arguments
     m.def("wrap", &wrap, "A wrapper function.", nb::arg("func"), nb::arg("py_args"),

@@ -114,6 +114,19 @@ def MemrefCopyToLinalgCopyPass : Pass<"memrefcpy-to-linalgcpy"> {
     ];
 }
 
+def MemSpaceToAddressSpacePass : Pass<"memspace-to-address-space"> {
+    let summary = "Lower Catalyst memory-space attributes to integer address spaces.";
+    let description = [{
+        Rewrites `#catalyst.memspace<domain, addr_space>` attributes to the explicit
+        integer address space.
+    }];
+
+    let dependentDialects = [
+        "catalyst::CatalystDialect",
+        "memref::MemRefDialect"
+    ];
+}
+
 def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"> {
     let summary = "Register `__catalyst_inactive_callback` as inactive with Enzyme";
 
@@ -141,6 +154,73 @@ def MarkEntryPointArgsNonWritablePass : Pass<"mark-entry-point-args-non-writable
 
 def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
     let summary = "Apply the passes scheduled with the transform dialect.";
+}
+
+def CrossCompileRemoteKernelsPass : Pass<"cross-compile-remote-kernels", "mlir::ModuleOp"> {
+    let summary = "Cross-compile catalyst.target nested modules to `.o` files for ORC JIT dispatch.";
+    let description = [{
+        For every `builtin.module` carrying a `catalyst.target` attribute, this pass:
+
+        1. Extracts the module body into a standalone root module.
+        2. Runs bufferization + LLVM-dialect lowering on it (the main pipeline's
+           one-shot-bufferize skips nested modules, so they arrive here in tensor form).
+        3. Translates to LLVM IR and emits `<workspace>/<moduleName>/<moduleName>.o`.
+        4. Injects `remote_open` + `remote_send_binary` into `setup()` (once per unique
+           address) and `remote_close` into `teardown()`.
+        5. Replaces every host-side `func.call` to the module's functions with a
+           `catalyst.custom_call fn("remote_call")` carrying the path, address, and callee.
+        6. Erases the bodyless external decls and the nested module from the host.
+
+        The pass is a no-op when no `catalyst.target` modules are present, so it is safe to
+        include in the default pipeline unconditionally.
+
+        The executor address is read from the `address` key of the `catalyst.target` dict attr
+        on each nested module. An empty or absent address is a hard error.
+    }];
+
+    let dependentDialects = [
+        // Core dialects used directly by this pass:
+        "mlir::LLVM::LLVMDialect",
+        "mlir::func::FuncDialect",
+        "catalyst::CatalystDialect",
+        // Dialects needed by the LLVM lowering sub-pipeline run inside runOnOperation.
+        // These must all be pre-loaded before the pass runs so that the nested PassManager
+        // can call getDependentDialects() without triggering the multi-threaded load guard.
+        "mlir::affine::AffineDialect",
+        "mlir::arith::ArithDialect",
+        "mlir::bufferization::BufferizationDialect",
+        "mlir::cf::ControlFlowDialect",
+        "mlir::complex::ComplexDialect",
+        "mlir::index::IndexDialect",
+        "mlir::linalg::LinalgDialect",
+        "mlir::math::MathDialect",
+        "mlir::memref::MemRefDialect",
+        "mlir::scf::SCFDialect",
+        "mlir::tensor::TensorDialect",
+        "mlir::vector::VectorDialect",
+        "mlir::stablehlo::StablehloDialect",
+        "catalyst::quantum::QuantumDialect",
+        "catalyst::pbc::PBCDialect",
+    ];
+
+    let options = [
+        Option<
+            /*C++ var name=*/"workspace",
+            /*CLI arg name=*/"workspace",
+            /*type=*/"std::string",
+            /*default=*/"\"\"",
+            /*description=*/
+            "Filesystem directory to write cross-compiled `.o` files into."
+        >,
+        Option<
+            /*C++ var name=*/"target",
+            /*CLI arg name=*/"target",
+            /*type=*/"std::string",
+            /*default=*/"\"x86_64\"",
+            /*description=*/
+            "LLVM target triple used for object emission."
+        >,
+    ];
 }
 
 def InlineNestedModulePass : Pass<"inline-nested-module"> {

@@ -28,6 +28,9 @@ using namespace catalyst;
 
 #include "Catalyst/IR/CatalystOpsDialect.cpp.inc"
 
+#define GET_ATTRDEF_CLASSES
+#include "Catalyst/IR/CatalystAttributes.cpp.inc"
+
 //===----------------------------------------------------------------------===//
 // Catalyst dialect.
 //===----------------------------------------------------------------------===//
@@ -39,6 +42,11 @@ void CatalystDialect::initialize()
 #include "Catalyst/IR/CatalystOpsTypes.cpp.inc"
         >();
 
+    addAttributes<
+#define GET_ATTRDEF_LIST
+#include "Catalyst/IR/CatalystAttributes.cpp.inc"
+        >();
+
     addOperations<
 #define GET_OP_LIST
 #include "Catalyst/IR/CatalystOps.cpp.inc"
@@ -46,6 +54,30 @@ void CatalystDialect::initialize()
 
     declarePromisedInterfaces<bufferization::BufferizableOpInterface, PrintOp, CustomCallOp,
                               CallbackCallOp, CallbackOp>();
+}
+
+//===----------------------------------------------------------------------===//
+// MemSpaceAttr
+//===----------------------------------------------------------------------===//
+
+LogicalResult MemSpaceAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                                   llvm::StringRef domain, IntegerAttr addrSpace)
+{
+    if (domain.empty()) {
+        return emitError() << "catalyst.memspace: `domain` must be non-empty";
+    }
+
+    if (addrSpace) {
+        if (!addrSpace.getType().isSignlessInteger()) {
+            return emitError()
+                   << "catalyst.memspace: addr_space must be a signless integer attribute";
+        }
+        if (addrSpace.getValue().isNegative()) {
+            return emitError() << "catalyst.memspace: addr_space must be non-negative";
+        }
+    }
+
+    return success();
 }
 
 //===----------------------------------------------------------------------===//

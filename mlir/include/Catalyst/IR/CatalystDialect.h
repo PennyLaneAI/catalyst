@@ -15,6 +15,7 @@
 #pragma once
 
 #include "mlir/Bytecode/BytecodeOpInterface.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
@@ -30,3 +31,10 @@
 
 #define GET_TYPEDEF_CLASSES
 #include "Catalyst/IR/CatalystOpsTypes.h.inc"
+
+//===----------------------------------------------------------------------===//
+// Catalyst attribute declarations.
+//===----------------------------------------------------------------------===//
+
+#define GET_ATTRDEF_CLASSES
+#include "Catalyst/IR/CatalystAttributes.h.inc"
