@@ -56,7 +56,6 @@ def has_catalyst_transforms(mlir):
     )
 
 
-
 def is_rot_decomposed(mlir):
     """Check in the MLIR if a rot was decomposed"""
     return (
@@ -65,20 +64,22 @@ def is_rot_decomposed(mlir):
         and mlir.count('quantum.custom "RY"') == 1
     )
 
+
 def test_transforms_must_have_pass_name():
     """Test that an error is raised if a transform does not have a pass_name."""
 
     @qp.transform
     def some_transform(tape):
-        return (tape, ), lambda res: res[0]
-    
+        return (tape,), lambda res: res[0]
+
     @some_transform
-    @qp.qnode(qp.device('null.qubit', wires=1))
+    @qp.qnode(qp.device("null.qubit", wires=1))
     def c():
         return qp.state()
-    
+
     with pytest.raises(ValueError, match="<transform: some_transform> does not have a pass_name"):
         qp.qjit(c, capture=True)()
+
 
 # pylint: disable=too-many-public-methods
 class TestCapture:

@@ -444,8 +444,10 @@ def handle_transform(
         )
 
     if transform.pass_name is None:
-        raise ValueError(f"{transform} does not have a pass_name and is not supported with the "
-                         "capture frontend. Set capture=False to apply tape-only transforms with qjit.")
+        raise ValueError(
+            f"{transform} does not have a pass_name and is not supported with the "
+            "capture frontend. Set capture=False to apply tape-only transforms with qjit."
+        )
 
     # Apply the corresponding Catalyst pass counterpart
     next_eval = copy(self)
