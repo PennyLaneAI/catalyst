@@ -458,7 +458,7 @@ class TestSubroutineConversion:
         builtin.module {
         // CHECK-NOT: !qecp.codeblock
         // CHECK-NOT: !qecp.qubit
-        // CHECK-LABEL: test_subroutine(%q: !quantum.bit) -> !quantum.bit
+        // CHECK-LABEL: test_subroutine({{.+}}: !quantum.bit) -> !quantum.bit
         func.func @test_subroutine(%q: !qecp.qubit<data>) -> !qecp.qubit<data> {
             // CHECK: [[q1:%.+]] = quantum.custom "Hadamard"() [[q:%.+]] : !quantum.bit
             %q1 = qecp.hadamard %q : !qecp.qubit<data>
