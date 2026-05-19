@@ -58,9 +58,6 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
 {
     using timer = catalyst::utils::Timer<>;
 
-    // TODO: only initialize when a python callback pass is used
-    // QuantumPythonCallbacks::PyInterpreterWrapper pythonInterpreter;
-
     mlir::OpPrintingFlags opPrintingFlags{};
     if (options.useNameLocAsPrefix) {
         opPrintingFlags.printNameLocAsPrefix();
