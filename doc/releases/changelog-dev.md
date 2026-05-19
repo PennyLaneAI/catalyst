@@ -17,7 +17,7 @@
 * The `--decompose-lowering` pass can now handle null decomposition rules, which are rule functions
   that do not have any quantum values as arguments or results. Gates with null decomposition rules
   are simply removed.
-  [(#????)](https://github.com/PennyLaneAI/catalyst/pull/????)
+  [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
 
 <h3>Breaking changes 💔</h3>
 
