@@ -624,9 +624,28 @@ func.func @mixed_ops() {
 // CHECK: "num_qubits": 2
 // CHECK: "operations"
 // CHECK-DAG: "CNOT(2)": 1
-func.func @multi_qubit_args(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+func.func @multi_qubit_args(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {llvm.emit_c_interface} {
     %0:2 = quantum.custom "CNOT"() %q0, %q1 : !quantum.bit, !quantum.bit
     return %0#0, %0#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Entry function is `llvm.emit_c_interface`, not the first function in the module.
+
+// CHECK-LABEL: "helper_with_qubit_args": {
+// CHECK: "num_arg_qubits": 0
+
+// CHECK-LABEL: "jit_entry_with_qubit_args": {
+// CHECK: "num_arg_qubits": 1
+func.func private @helper_with_qubit_args(%q0: !quantum.bit, %q1: !quantum.bit) -> !quantum.bit {
+    %out = quantum.custom "Hadamard"() %q0 : !quantum.bit
+    return %out : !quantum.bit
+}
+
+func.func @jit_entry_with_qubit_args(%q0: !quantum.bit) -> !quantum.bit attributes {llvm.emit_c_interface} {
+    %r = func.call @helper_with_qubit_args(%q0, %q0) : (!quantum.bit, !quantum.bit) -> !quantum.bit
+    return %r : !quantum.bit
 }
 
 // -----
@@ -640,7 +659,7 @@ func.func @multi_qubit_args(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.b
 // CHECK: "operations"
 // CHECK-DAG: "Hadamard(1)": 1
 // CHECK-DAG: "CNOT(2)": 1
-func.func @mixed_alloc_and_arg_qubits(%q0: !quantum.bit) -> !quantum.bit {
+func.func @mixed_alloc_and_arg_qubits(%q0: !quantum.bit) -> !quantum.bit attributes {llvm.emit_c_interface} {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -677,8 +696,7 @@ func.func @stats_test() {
 
 // -----
 
-// Multiple qnode functions: the first qnode is the entry function.
-// Stats walk the structural call graph: 4 gates total =
+// Stats use the `llvm.emit_c_interface` entry and its flattened call graph:
 //   first_qnode (0) +
 //     2 * shared_helper (1 H) +
 //     1 * second_qnode (1 PauliX + 1 * shared_helper (1 H)) = 4.
@@ -689,7 +707,7 @@ func.func @stats_test() {
 // STATS: 4 total-function-calls
 // STATS: 4 total-gates
 // STATS: 1 total-qubits
-func.func @first_qnode(%arg0: !quantum.bit) -> !quantum.bit {
+func.func @first_qnode(%arg0: !quantum.bit) -> !quantum.bit attributes {llvm.emit_c_interface} {
     %r1 = func.call @shared_helper(%arg0) : (!quantum.bit) -> !quantum.bit
     %r2 = func.call @shared_helper(%r1) : (!quantum.bit) -> !quantum.bit
     %r3 = func.call @second_qnode(%r2) : (!quantum.bit) -> !quantum.bit

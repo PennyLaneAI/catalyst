@@ -194,30 +194,46 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp)
 {
     LLVM_DEBUG(dbgs() << "ResourceAnalysis: analyzing operation " << moduleOp->getName() << "\n");
 
+    SmallVector<func::FuncOp> definedFuncOps;
+    for (func::FuncOp funcOp : moduleOp.getOps<func::FuncOp>()) {
+        if (!funcOp.isDeclaration()) {
+            definedFuncOps.push_back(funcOp);
+        }
+    }
+
     // Reserve every user function's name in `funcResults`. This
     // ensures `makeUniqueSyntheticName` will skip past names like
     // `for_loop_3` that the user already chose, regardless of walk order.
-    for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
-        if (funcOp.isDeclaration()) {
-            return;
-        }
+    for (auto funcOp : definedFuncOps) {
         funcResults.try_emplace(funcOp.getName());
-    };
+    }
 
+    // An entry function is tagged with `llvm.emit_c_interface`.
     StringRef entryFunc;
-    for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
-        if (funcOp.isDeclaration()) {
-            return;
+    for (auto funcOp : definedFuncOps) {
+        if (funcOp->hasAttr("llvm.emit_c_interface")) {
+            entryFunc = funcOp.getName();
+            break;
         }
+    }
 
+    // Fallback: use the first definition as entry function
+    if (entryFunc.empty()) {
+        for (auto funcOp : definedFuncOps) {
+            entryFunc = funcOp.getName();
+            break;
+        }
+    }
+
+    entryFuncName = entryFunc.str();
+
+    for (auto funcOp : definedFuncOps) {
         ResourceResult result;
         for (auto &region : funcOp->getRegions()) {
             analyzeRegion(region, result, /*isAdjoint=*/false);
         }
 
-        // count qubit arguments only for the entry function (first non-declaration)
-        // to avoid double-counting when callees are folded into a flattened view.
-        if (entryFunc.empty()) {
+        if (funcOp.getName() == entryFunc) {
             for (auto argType : funcOp.getArgumentTypes()) {
                 if (isa<quantum::QubitType>(argType)) {
                     result.numArgQubits += 1;
@@ -227,16 +243,7 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp)
 
         result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node");
         funcResults[funcOp.getName()] = std::move(result);
-
-        // main/entry function is the first function with no declaration
-        if (entryFunc.empty()) {
-            entryFunc = funcOp.getName();
-        }
-    };
-
-    assert(!entryFunc.empty() && "expected at least one non-declaration function");
-
-    entryFuncName = entryFunc.str();
+    }
 }
 
 std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t &counter)

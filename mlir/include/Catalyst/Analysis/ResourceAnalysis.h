@@ -41,8 +41,7 @@ class ResourceAnalysis {
         return &it->second;
     }
 
-    // get the entry function name (first function the pass detects)
-    // returns empty string if no entry function was found
+    // get the JIT entry function name (`llvm.emit_c_interface`), or first function
     llvm::StringRef getEntryFunc() const { return entryFuncName; }
 
     const ResourceResult *getFlattenedResource(llvm::StringRef funcName) const;
@@ -54,7 +53,7 @@ class ResourceAnalysis {
     // Flattened totals per function; filled on first `getFlattenedResource` call.
     mutable llvm::StringMap<ResourceResult> flattenedCache;
 
-    // name of the entry function (first function pass detects), empty if none
+    // name of the entry function
     std::string entryFuncName;
 
     // Counters for lifted-loop names (`for_loop_<N>` vs `dyn_for_loop_<N>`),
