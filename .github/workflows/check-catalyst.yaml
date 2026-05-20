@@ -526,6 +526,7 @@ jobs:
         # Install graphviz for testing the mlir-op-graph integration
         sudo apt-get install -y graphviz
         make frontend
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@deprecate-rot-angles
 
     - name: Verify Graphviz installation
       run: |
