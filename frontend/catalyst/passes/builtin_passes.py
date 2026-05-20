@@ -16,6 +16,7 @@
 
 import copy
 import json
+import os
 from pathlib import Path
 from typing import Iterable
 
@@ -1423,7 +1424,7 @@ ppm_compilation = qp.transform(
 )
 
 
-def ppm_specs(fn):
+def ppm_specs(fn, *, only_disjoint_qubit: bool = False):
     r"""This function returns following Pauli product rotation (PPR) and Pauli product measurement (PPM)
     specs in a dictionary:
 
@@ -1447,6 +1448,10 @@ def ppm_specs(fn):
 
     Args:
         fn (QJIT): qjit-decorated function for which ``ppm_specs`` need to be printed.
+        only_disjoint_qubit (bool): If ``True``, depth is computed using disjoint-qubit layering
+            (``depth_type`` 1). If ``False`` (default), commuting ops on overlapping qubits may
+            share a layer (``depth_type`` 0). Passed to the ``ppm-specs`` MLIR pass as
+            ``disjoint-qubit``.
 
     Returns:
         dict: A Python dictionary containing PPM specs of all functions in ``fn``.
@@ -1498,28 +1503,33 @@ def ppm_specs(fn):
     """
 
     if fn.mlir_module is not None:
-        # aot mode
+        # aot mode: e.g: setting target="mlir", pipeline="..."
         new_options = copy.copy(fn.compile_options)
         if new_options.pipelines is None:
-            raise CompileError("No pipeline found")
+            new_options.pipelines = [
+                (name, list(passes)) for name, passes in new_options.get_pipelines()
+            ]
 
         # add ppm-spec pass at the end to existing pipeline
         _, pass_list = new_options.pipelines[0]  # first pipeline runs the user passes
         # check if ppm-specs is already in the pass list
-        if "ppm-specs" not in pass_list:  # pragma: nocover
-            pass_list.append("ppm-specs")
+        ppm_specs_pass = (
+            "ppm-specs{disjoint-qubit=true}" if only_disjoint_qubit else "ppm-specs"
+        )
+        pass_list[:] = [p for p in pass_list if not p.startswith("ppm-specs")]
+        if ppm_specs_pass not in pass_list:  # pragma: nocover
+            pass_list.append(ppm_specs_pass)
 
         new_options = _options_to_cli_flags(new_options)
-        raw_result = _quantum_opt(*new_options, [], stdin=str(fn.mlir_module))
+        # redirect output to devnull to avoid printing the MLIR
+        raw_result = _quantum_opt(*new_options, "-o", os.devnull, stdin=str(fn.mlir_module))
 
         try:
-            return json.loads(
-                raw_result[: raw_result.index("module")]
-            )  # remove MLIR starting with substring "module..."
-        except Exception as e:  # pragma: nocover
+            return json.loads(raw_result)  # validate before returning
+        except (json.JSONDecodeError, ValueError) as e:  # pragma: nocover
             raise CompileError(
                 "Invalid json format encountered in ppm_specs. "
-                f"Expected valid JSON but got {raw_result[: raw_result.index('module')]}"
+                f"Expected valid JSON but got {raw_result}"
             ) from e
 
     else:

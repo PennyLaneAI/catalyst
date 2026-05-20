@@ -13,6 +13,7 @@
 // limitations under the License.
 
 // RUN: quantum-opt --ppm-specs --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --ppm-specs=disjoint-qubit --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-DISJOINT
 
 //CHECK: {
 //CHECK:     "test_no_ppr_ppm": {
@@ -448,13 +449,13 @@ func.func public @while_error(%arg0: !quantum.bit, %b: i1) {
 
 // -----
 
+// CHECK: "game_of_surface_code_t_layers": {
+// CHECK:     "depth": 4,
+// CHECK:     "depth_type": 0,
+// CHECK:     "max_weight_pi8": 4,
+// CHECK:     "pi8_ppr": 6
+// CHECK: }
 func.func public @game_of_surface_code_t_layers(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit, %qr3 : !quantum.bit) {
-
-    // CHECK: "game_of_surface_code_t_layers": {
-    // CHECK:     "depth_pi8_ppr": 4,
-    // CHECK:     "max_weight_pi8": 4,
-    // CHECK:     "pi8_ppr": 6
-    // CHECK: }
 
     // layer 1
     %0:4 = pbc.ppr ["I", "Z", "I", "I"](-8) %qr0, %qr1, %qr2, %qr3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
@@ -475,13 +476,13 @@ func.func public @game_of_surface_code_t_layers(%qr0 : !quantum.bit, %qr1 : !qua
 
 // -----
 
+// CHECK: "game_of_surface_code_t_layers_no_identity": {
+// CHECK:     "depth": 4,
+// CHECK:     "depth_type": 0,
+// CHECK:     "max_weight_pi8": 4,
+// CHECK:     "pi8_ppr": 6
+// CHECK: }
 func.func public @game_of_surface_code_t_layers_no_identity(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit, %qr3 : !quantum.bit) {
-
-    // CHECK: "game_of_surface_code_t_layers_no_identity": {
-    // CHECK:     "depth_pi8_ppr": 4,
-    // CHECK:     "max_weight_pi8": 4,
-    // CHECK:     "pi8_ppr": 6
-    // CHECK: }
 
     // layer 1
     %0 = pbc.ppr ["Z"](-8) %qr1 : !quantum.bit
@@ -502,14 +503,13 @@ func.func public @game_of_surface_code_t_layers_no_identity(%qr0 : !quantum.bit,
 
 // -----
 
-
+// CHECK: "game_of_surface_code_t_layers_opt": {
+// CHECK:     "depth": 2,
+// CHECK:     "depth_type": 0,
+// CHECK:     "max_weight_pi8": 4,
+// CHECK:     "pi8_ppr": 6
+// CHECK: }
 func.func public @game_of_surface_code_t_layers_opt(%arg0: !quantum.bit, %arg1: !quantum.bit, %arg2: !quantum.bit, %arg3: !quantum.bit) {
-
-    // CHECK: "game_of_surface_code_t_layers_opt": {
-    // CHECK:     "depth_pi8_ppr": 2,
-    // CHECK:     "max_weight_pi8": 4,
-    // CHECK:     "pi8_ppr": 6
-    // CHECK: }
 
     %0:4 = pbc.ppr ["I", "Z", "I", "I"](-8) %arg0, %arg1, %arg2, %arg3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
     %1:4 = pbc.ppr ["X", "I", "Y", "Z"](8) %0#0, %0#1, %0#2, %0#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
@@ -518,4 +518,35 @@ func.func public @game_of_surface_code_t_layers_opt(%arg0: !quantum.bit, %arg1: 
     %4:4 = pbc.ppr ["X", "Z", "I", "X"](-8) %3#0, %3#1, %3#2, %3#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
     %5:4 = pbc.ppr ["Y", "I", "Y", "Y"](8) %4#0, %4#1, %4#2, %4#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
     return
+}
+
+// ----- 
+
+// CHECK: "test_disjoint_qubit_specs": {
+// CHECK:     "depth": 2,
+// CHECK:     "depth_type": 0,
+// CHECK:     "num_of_ppm": 5
+// CHECK: }
+
+// CHECK-DISJOINT: "test_disjoint_qubit_specs": {
+// CHECK-DISJOINT:     "depth": 4,
+// CHECK-DISJOINT:     "depth_type": 1,
+// CHECK-DISJOINT:     "num_of_ppm": 5
+// CHECK-DISJOINT: }
+func.func @test_disjoint_qubit_specs(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit, %qr3 : !quantum.bit, %qr4 : !quantum.bit, %qr5 : !quantum.bit) {
+    // CHECK: func.func @test_disjoint_qubit_specs([[qr0:%.+]]: !quantum.bit, [[qr1:%.+]]: !quantum.bit, [[qr2:%.+]]: !quantum.bit, [[qr3:%.+]]: !quantum.bit, [[qr4:%.+]]: !quantum.bit, [[qr5:%.+]]: !quantum.bit)
+
+    // PPM(["X", "X", "Y"]) Q0, Q1 ,Q2
+    // PPM(["Y"]) Q4
+    // PPM(["Y", "Z"]) Q0, Q1
+    // PPM(["Y", "X", "Y"]) Q2, Q3, Q4
+    // PPM(["Z", "X", "Y", "Y", "Y"]) Q0, Q1, Q2, Q3, Q4
+
+    %m0, %0:3 = pbc.ppm ["X", "X", "Y"] %qr0, %qr1, %qr2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    %m2, %2:2 = pbc.ppm ["Y", "Z"] %0#0, %0#1 : i1, !quantum.bit, !quantum.bit
+    %m3, %3:3 = pbc.ppm ["Y", "X", "Y"] %0#2, %qr3, %qr4 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    %m1, %1 = pbc.ppm ["Y"] %3#2 : i1, !quantum.bit
+    %m4, %4:5 = pbc.ppm ["Z", "X", "Y", "Y", "Y"] %2#0, %2#1, %3#0, %3#1, %1 : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+
+    func.return
 }
