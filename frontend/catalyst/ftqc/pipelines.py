@@ -140,8 +140,4 @@ def qec_pipeline() -> PipelineStages:
         pipeline, ref_pass="convert-quantum-to-llvm", new_pass="convert-qecp-to-llvm"
     )
 
-    # Enable array-backed registers via the "convert-quantum-to-llvm" pass
-    quantum_to_llvm_pass = pipeline.index("convert-quantum-to-llvm")
-    pipeline[quantum_to_llvm_pass] = "convert-quantum-to-llvm{use-array-backed-registers=true}"
-
     return stages
