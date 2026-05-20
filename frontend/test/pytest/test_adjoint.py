@@ -1076,8 +1076,8 @@ class TestAdjointOperation:
         base = qp.RX(param, wires=0)
         op = adjoint(base)
 
-        base_angles = base.single_qubit_rot_angles()
-        angles = op.single_qubit_rot_angles()
+        base_angles = qp.single_qubit_zyz_angles(base)
+        angles = qp.single_qubit_zyz_angles(op)
 
         for angle1, angle2 in zip(angles, reversed(base_angles)):
             assert angle1 == -angle2
