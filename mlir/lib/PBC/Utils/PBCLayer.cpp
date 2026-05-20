@@ -21,8 +21,6 @@
 #include "PBC/Utils/PauliStringWrapper.h"
 #include "Quantum/IR/QuantumOps.h" // for quantum.extract op
 
-#include <mlir/Support/WalkResult.h>
-
 using namespace catalyst::pbc;
 
 namespace catalyst {
@@ -252,6 +250,7 @@ bool PBCLayer::insert(PBCOpInterface op, bool onlyDisjointQubit)
         insertToLayer(op);
         return true;
     }
+
     return false;
 }
 
