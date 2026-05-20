@@ -24,7 +24,7 @@
 * The `--decompose-lowering` pass can now handle cases where the decomposed gate act on qubit values
   extracted from different quantum register SSA values, as long as all these quantum register values
   trace back to the same allocation.
-  [(#????)](https://github.com/PennyLaneAI/catalyst/pull/????)
+  [(#2861)](https://github.com/PennyLaneAI/catalyst/pull/2861)
 
 <h3>Breaking changes 💔</h3>
 
