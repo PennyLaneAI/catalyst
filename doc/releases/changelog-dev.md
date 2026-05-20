@@ -21,6 +21,11 @@
   are simply removed.
   [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
 
+* The ``--partition-layers`` pass now supports a ``disjoint-qubit`` option to group PBC ops
+  into the same layer only when they act on disjoint qubits. By default, commuting ops on
+  overlapping qubits may still be merged into one layer.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
@@ -80,6 +85,7 @@ This release contains contributions from (in alphabetical order):
 Joey Carter,
 Yushao Chen,
 Lillian Frederiksen,
+Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
 Shuli Shu,
