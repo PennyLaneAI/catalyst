@@ -14,6 +14,7 @@
 
 """Tests for the convert-qecp-to-quantum xDSL dialect-conversion pass."""
 
+import numpy as np
 import pennylane as qp
 import pytest
 
@@ -596,4 +597,6 @@ class TestQECPassIntegration:
             return qp.sample([m0, m1, m2])
 
         run_filecheck_qjit(ghz)
-        ghz()
+        results = ghz()
+        target_res_set = [np.array([0, 0, 0]), np.array([1, 1, 1])]
+        assert np.all(res in target_res_set for res in results)
