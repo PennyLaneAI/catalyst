@@ -107,10 +107,12 @@ def qec_pipeline() -> PipelineStages:
         dev = qp.device("null.qubit", wires=1)
 
         @qp.qjit(pipelines=qec_pipeline())
+        @qp.set_shots(1)
         @qp.qnode(dev, mcm_method="one-shot")
         def workload():
             qp.Hadamard(0)
-            return qp.expval(qp.Z(0))
+            m0 = qp.measure(0)
+            return qp.sample([m0])
     """
     stages = default_pipeline()
 
