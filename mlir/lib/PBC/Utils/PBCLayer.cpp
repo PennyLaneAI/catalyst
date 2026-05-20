@@ -239,14 +239,14 @@ bool PBCLayer::insert(PBCOpInterface op, bool onlyDisjointQubit)
     if (!isSameBlock(op) || !extractsAreBeforeExistingOps(op) || !insertsAreAfterExistingOps(op)) {
         return false;
     }
-    
+
     // 3. It acts on disjoint qubits
     // 4. Or it commutes with all the ops in the layer
     if (actOnDisjointQubits(op)) {
         insertToLayer(op);
         return true;
     }
-    
+
     // If onlyOnDisjointQubit is true, we only check the disjoint qubit condition
     if (commuteToLayer(op) && !onlyDisjointQubit) {
         insertToLayer(op);

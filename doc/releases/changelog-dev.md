@@ -24,7 +24,7 @@
 * The ``--partition-layers`` pass now supports a ``disjoint-qubit`` option to group PBC ops
   into the same layer only when they act on disjoint qubits. By default, commuting ops on
   overlapping qubits may still be merged into one layer.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#2858)](https://github.com/PennyLaneAI/catalyst/pull/2858)
 
 <h3>Breaking changes 💔</h3>
 
