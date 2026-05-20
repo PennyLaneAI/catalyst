@@ -11,6 +11,9 @@
   [(#2839)](https://github.com/PennyLaneAI/catalyst/pull/2839)
   [(#2849)](https://github.com/PennyLaneAI/catalyst/pull/2849)
 
+* A new, experimental compiler pipeline `qec_pipeline` has been added to the `ftqc.pipelines` module.
+  [(#2852)](https://github.com/PennyLaneAI/catalyst/pull/2852)
+
 
 <h3>Improvements 🛠</h3>
 
