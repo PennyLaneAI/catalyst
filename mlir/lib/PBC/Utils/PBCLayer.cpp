@@ -57,7 +57,10 @@ PBCLayerContext::groupLayers(mlir::Operation *root, bool onlyOnDisjointQubit)
             return WalkResult::skip();
         }
 
-        groups.emplace_back(layer.getOps());
+        // insert() can fail on an empty layer (e.g. block ordering); do not push [].
+        if (!layer.empty()) {
+            groups.emplace_back(layer.getOps());
+        }
         layer = PBCLayer(this);
         layer.insert(op);
 
