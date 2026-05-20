@@ -490,8 +490,10 @@ class TestSubroutineConversion:
 
 
 class TestHyperRegisterLowering:
+    """Unit test for hyperreg related type and operations lowering."""
 
     def test_hyperregister_lowering(self, run_filecheck):
+        """Test for hyperreg related type and operations lowering."""
         program = """
             builtin.module {
             // CHECK-LABEL: @circuit()
@@ -546,6 +548,7 @@ class TestQECPassIntegration:
 
     # pylint: disable=line-too-long
     def test_qec_pass_ghz_integration(self, run_filecheck_qjit):
+        """Integration tests for lowering a 3-logical qubit GHZ circuit."""
         dev = qp.device("null.qubit", wires=3)
 
         @qp.qjit(capture=True, target="mlir")
