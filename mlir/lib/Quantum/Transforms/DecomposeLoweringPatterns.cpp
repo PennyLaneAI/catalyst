@@ -22,6 +22,7 @@
 
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/IR/QuantumTypes.h"
 
 #include "DecomposeLoweringImpl.hpp"
 
@@ -60,6 +61,21 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
         }
         func::FuncOp decompFunc = it->second;
 
+        // For null decomp rules, the signature will not have any quantum values
+        // This is a deviation from the standard decomp func signature, so we deal with it
+        // separately
+        if (!llvm::any_of(llvm::concat<const Type>(decompFunc.getFunctionType().getInputs(),
+                                                   decompFunc.getFunctionType().getResults()),
+                          [](const mlir::Type t) {
+                              return isa<quantum::QuregType, quantum::QubitType>(t);
+                          })) {
+            for (auto [inQubit, outQubit] :
+                 llvm::zip_equal(op.getQubitOperands(), op.getQubitResults())) {
+                rewriter.replaceAllUsesWith(outQubit, inQubit);
+            }
+            return success();
+        }
+
         // Here is the assumption that the decomposition function must have at least one input and
         // one result
         assert(decompFunc.getFunctionType().getNumInputs() > 0 &&
@@ -69,7 +85,8 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
 
         rewriter.setInsertionPointAfter(op);
 
-        auto enableQreg = isa<quantum::QuregType>(decompFunc.getFunctionType().getInput(0));
+        auto enableQreg = llvm::any_of(decompFunc.getFunctionType().getInputs(),
+                                       [](mlir::Type t) { return isa<quantum::QuregType>(t); });
         auto analyzer = CustomOpSignatureAnalyzer(op, enableQreg);
         assert(analyzer && "Analyzer should be valid");
 
@@ -132,7 +149,8 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
 
         rewriter.setInsertionPointAfter(op);
 
-        auto enableQreg = isa<quantum::QuregType>(decompFunc.getFunctionType().getInput(0));
+        auto enableQreg = llvm::any_of(decompFunc.getFunctionType().getInputs(),
+                                       [](mlir::Type t) { return isa<quantum::QuregType>(t); });
         auto numQbitsAttr = decompFunc->getAttrOfType<IntegerAttr>("num_wires");
         if (!numQbitsAttr) {
             op.emitError("Decomposition function missing 'num_wires' attribute");

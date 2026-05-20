@@ -14,8 +14,8 @@
 
 #pragma once
 
+#include <algorithm>
 #include <numeric>
-#include <ranges>
 #include <string>
 #include <vector>
 
@@ -176,11 +176,12 @@ PipelineNames getPipelineNames()
 
 PassNames getQuantumCompilationStage(bool disableAssertion = true)
 {
-    auto &&ret =
-        pipelineList[0].passNames | std::views::filter([&disableAssertion](const auto &passName) {
-            return (!disableAssertion && (passName == "disable-assertion")) ? false : true;
-        });
-    return PassNames{ret.begin(), ret.end()};
+    PassNames ret;
+    std::copy_if(pipelineList[0].passNames.begin(), pipelineList[0].passNames.end(),
+                 std::back_inserter(ret), [&disableAssertion](const auto &passName) {
+                     return !(!disableAssertion && (passName == "disable-assertion"));
+                 });
+    return ret;
 }
 
 PassNames getHLOLoweringStage() { return pipelineList[1].passNames; }
@@ -194,29 +195,29 @@ PassNames getBufferizationStage(bool asyncQNodes = false)
         "function-boundary-type-conversion=identity-layout-map " +
         "unknown-type-conversion=identity-layout-map" + (asyncQNodes ? " copy-before-write" : "") +
         "}";
-    auto &&ret = pipelineList[3].passNames |
-                 std::views::transform([&bufferizationOptions](const auto &passName) {
-                     if (passName == "one-shot-bufferize") {
-                         return passName + bufferizationOptions;
-                     }
-                     return passName;
-                 });
-    return PassNames{ret.begin(), ret.end()};
+    PassNames ret;
+    std::transform(pipelineList[3].passNames.begin(), pipelineList[3].passNames.end(),
+                   std::back_inserter(ret), [&bufferizationOptions](const auto &passName) {
+                       if (passName == "one-shot-bufferize") {
+                           return passName + bufferizationOptions;
+                       }
+                       return passName;
+                   });
+    return ret;
 }
 
 PassNames getLLVMDialectLoweringStage(bool asyncQNodes = false)
 {
-    auto &&ret =
-        pipelineList[4].passNames | std::views::filter([&asyncQNodes](const auto &passName) {
-            return (!asyncQNodes &&
-                    (passName == "qnode-to-async-lowering" ||
-                     passName == "async-func-to-async-runtime" ||
-                     passName == "async-to-async-runtime" || passName == "convert-async-to-llvm" ||
-                     passName == "add-exception-handling"))
-                       ? false
-                       : true;
-        });
-    return PassNames{ret.begin(), ret.end()};
+    PassNames ret;
+    std::copy_if(pipelineList[4].passNames.begin(), pipelineList[4].passNames.end(),
+                 std::back_inserter(ret), [&asyncQNodes](const auto &passName) {
+                     return asyncQNodes || (passName != "qnode-to-async-lowering" &&
+                                            passName != "async-func-to-async-runtime" &&
+                                            passName != "async-to-async-runtime" &&
+                                            passName != "convert-async-to-llvm" &&
+                                            passName != "add-exception-handling");
+                 });
+    return ret;
 }
 
 } // namespace driver

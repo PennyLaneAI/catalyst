@@ -323,6 +323,11 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
                 outlinedfunc->moveAfter(func);
                 outlinedfunc->setAttrs(OutlinedFuncAttrs);
             }
+
+            // The caller function is now a classical wrapper calling the outlined
+            // tape functions, so it must drop `quantum.node`
+            // (matches split_non_commuting and split_to_single_terms).
+            func->removeAttr("quantum.node");
         }
     } // runOnOperation()
 };

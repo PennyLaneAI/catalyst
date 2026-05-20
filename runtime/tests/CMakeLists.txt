@@ -134,6 +134,20 @@ target_link_libraries(runner_tests_mbqc_runtime PRIVATE
 
 catch_discover_tests(runner_tests_mbqc_runtime)
 
+# Decoder test suite
+add_executable(runner_tests_decoder_runtime)
+target_sources(runner_tests_decoder_runtime PRIVATE
+    Test_DecoderLUTDecoderUtils.cpp
+    Test_DecoderLUTDecoder.cpp
+)
+target_link_libraries(runner_tests_decoder_runtime PRIVATE
+    Catch2WithMain
+    catalyst_runtime_testing
+    rt_decoder
+)
+
+catch_discover_tests(runner_tests_decoder_runtime)
+
 # RS Decomposition test suite
 add_executable(runner_tests_rsdecomp_runtime)
 target_sources(runner_tests_rsdecomp_runtime PRIVATE

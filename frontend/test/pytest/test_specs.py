@@ -265,21 +265,21 @@ class TestPassByPassSpecs:
 
         no_passes = qjit(simple_circuit, capture=capture_mode)
         with pytest.raises(
-            check=ValueError,
+            ValueError,
             match=r"The 'level' argument to .*\.specs for QJIT'd QNodes is out of "
             "bounds, got -5.",
         ):
             qp.specs(no_passes, level=-5)()
 
         with pytest.raises(
-            check=ValueError,
+            ValueError,
             match=r"The 'level' argument to .*\.specs for QJIT'd "
             "QNodes is out of bounds, got 10.",
         ):
             qp.specs(no_passes, level=10)()
 
         with pytest.raises(
-            check=ValueError,
+            ValueError,
             match=r"The 'level' argument to .*\.specs for QJIT'd "
             "QNodes is out of bounds, got 10.",
         ):

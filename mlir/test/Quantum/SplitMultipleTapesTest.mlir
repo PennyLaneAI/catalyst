@@ -46,11 +46,12 @@ module @circuit_twotapes_module {
 }
 
 // CHECK: module @circuit_twotapes_module {
-// CHECK: func.func private @circuit_twotapes
+// CHECK: func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>} {
 // CHECK: func.call @circuit_twotapes_tape_0(%arg1, %cst_0)
 // CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, %cst)
 // CHECK: {{%.+}} = stablehlo.subtract {{%.+}}, {{%.+}} : tensor<f64>
 
+// Outlined tape functions MUST keep the `quantum.node` attribute.
 // CHECK: func.func private @circuit_twotapes_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node}
 // CHECK: quantum.device
 // CHECK: {{%.+}} = stablehlo.add %arg0, %arg1 : tensor<f64>
@@ -121,7 +122,7 @@ module @circuit_twotapes_module {
 }
 
 // CHECK: module @circuit_twotapes_module {
-// CHECK: func.func private @circuit_twotapes
+// CHECK: func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>} {
 // CHECK: func.call @circuit_twotapes_tape_0(%arg1, %cst_0)
 // CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, %cst)
 // CHECK: {{%.+}} = stablehlo.subtract {{%.+}}, {{%.+}} : tensor<f64>
@@ -141,7 +142,7 @@ module @circuit_twotapes_module {
 // CHECK-DAG: return [[retMult]] : tensor<f64>
 // CHECK-DAG: }
 
-// CHECK: func.func private @circuit_twotapes_doppleganger
+// CHECK: func.func private @circuit_twotapes_doppleganger(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>} {
 // CHECK: func.call @circuit_twotapes_doppleganger_tape_0(%arg1, %cst_0)
 // CHECK: func.call @circuit_twotapes_doppleganger_tape_1(%arg1, %arg0, %cst)
 // CHECK: {{%.+}} = stablehlo.subtract {{%.+}}, {{%.+}} : tensor<f64>
@@ -199,7 +200,7 @@ module @circuit_twotapes_module {
 }
 
 // CHECK: module @circuit_twotapes_module {
-// CHECK: func.func private @circuit_twotapes
+// CHECK: func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>} {
 // CHECK: func.call @circuit_twotapes_tape_0_0(%arg1, %cst_0)
 // CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, %cst)
 // CHECK: {{%.+}} = stablehlo.subtract {{%.+}}, {{%.+}} : tensor<f64>
@@ -266,7 +267,7 @@ module @circuit_twotapes_module {
 }
 
 // CHECK: module @circuit_twotapes_module {
-// CHECK: func.func private @circuit_twotapes
+// CHECK: func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>} {
 // CHECK: func.call @circuit_twotapes_tape_0(%arg1, %cst_0)
 // CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, %cst)
 // CHECK: {{%.+}} = scf.execute_region
@@ -323,7 +324,7 @@ module @circuit_twotapes_module {
 }
 
 // CHECK: module @circuit_twotapes_module {
-// CHECK: func.func private @circuit_twotapes
+// CHECK: func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>} {
 // CHECK: func.call @circuit_twotapes_tape_0(%arg1, %cst_0)
 // CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, %cst, {{%.+}})
 // CHECK: {{%.+}} = stablehlo.subtract {{%.+}}, {{%.+}} : tensor<f64>
@@ -380,7 +381,8 @@ module @circuit_twotapes_module {
 }
 
 // CHECK: module @circuit_twotapes_module {
-// CHECK: func.func private @circuit_twotapes
+// Wrapper must lose `quantum.node`; outlined tape functions keep it.
+// CHECK: func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>} {
 // CHECK: {{%.+}}:2 = func.call @circuit_twotapes_tape_0(%arg1, %cst)
 // CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, {{%.+}}#1)
 // CHECK: {{%.+}} = stablehlo.subtract {{%.+}}#0, {{%.+}} : tensor<f64>

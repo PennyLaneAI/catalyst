@@ -14,10 +14,13 @@
 
 """Test module for the convert-qecl-to-qecp dialect-conversion transform."""
 
+from functools import partial
+
 import numpy as np
 import pennylane as qp
 import pytest
 
+from catalyst.python_interface.dialects import qecp
 from catalyst.python_interface.transforms.qecl import (
     convert_quantum_to_qecl_pass,
     inject_noise_to_qecl_pass,
@@ -43,6 +46,33 @@ def fixture_qecl_to_qecp_steane_pipeline():
     return (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
 
 
+@pytest.fixture(name="get_generic_qec_code", scope="module")
+def fixture_get_generic_qec_code():
+    """Fixture factory that returns a function to create `QecCode` objects for generic QEC codes."""
+
+    def _make_qec_code(n: int, k: int, d: int, name: str = "ToyCode", n_aux: int = 3) -> QecCode:
+        rng = np.random.default_rng(seed=42)
+
+        return QecCode(
+            name=name,
+            n=n,
+            k=k,
+            d=d,
+            x_tanner=rng.integers(low=0, high=1, size=(n_aux, n)),
+            z_tanner=rng.integers(low=0, high=1, size=(n_aux, n)),
+            transversal_1q_gates={
+                "x": (qecp.PauliXOp, list(range(n))),
+                "y": (qecp.PauliXOp, list(range(n))),
+                "z": (qecp.PauliXOp, list(range(n))),
+                "hadamard": (qecp.HadamardOp, list(range(n))),
+                "s": (partial(qecp.SOp, adjoint=True), list(range(n))),
+            },
+            transversal_2q_gates={"cnot": qecp.CnotOp},
+        )
+
+    return _make_qec_code
+
+
 # MARK: TestTypeConversion
 
 
@@ -53,7 +83,7 @@ class TestTypeConversionPattern:
     @pytest.mark.parametrize(
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
-    def test_codeblock_conversion(self, run_filecheck, n, k):
+    def test_codeblock_conversion(self, n, k, run_filecheck, get_generic_qec_code):
         """Test the type conversion pattern from !qecl.codeblock -> !qecp.codeblock for a few values
         of n and k.
         """
@@ -70,18 +100,7 @@ class TestTypeConversionPattern:
         }}
         }}
         """
-        pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(
-                qec_code=QecCode(
-                    "",
-                    n,
-                    k,
-                    3,
-                    np.eye(n),
-                    np.eye(n),
-                )
-            ),
-        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=get_generic_qec_code(n, k, d=3)),)
         run_filecheck(program, pipeline)
 
     @pytest.mark.parametrize("width", [1, 2, 3])
@@ -89,7 +108,8 @@ class TestTypeConversionPattern:
     @pytest.mark.parametrize(
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
-    def test_hyperreg_conversion(self, run_filecheck, width, n, k):
+    # pylint: disable=too-many-positional-arguments, too-many-arguments
+    def test_hyperreg_conversion(self, width, n, k, run_filecheck, get_generic_qec_code):
         """Test the type conversion pattern from !qecl.codeblock -> !qecp.codeblock for a few values
         of n and k.
         """
@@ -106,12 +126,10 @@ class TestTypeConversionPattern:
         }}
         }}
         """
-        pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))),
-        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=get_generic_qec_code(n, k, d=3)),)
         run_filecheck(program, pipeline)
 
-    def test_codeblock_conversion_with_k_mismatch(self, run_filecheck):
+    def test_codeblock_conversion_with_k_mismatch(self, run_filecheck, get_generic_qec_code):
         """Test that attempting to convert a codeblock type with a value of k different than the
         value of k given in the QEC code raise a CompileError.
         """
@@ -124,14 +142,12 @@ class TestTypeConversionPattern:
         }
         }
         """
-        pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", 7, 1, 3, np.eye(7), np.eye(7))),
-        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=get_generic_qec_code(7, 1, 3)),)
 
         with pytest.raises(CompileError, match="Failed to convert type"):
             run_filecheck(program, pipeline)
 
-    def test_hyperreg_conversion_with_k_mismatch(self, run_filecheck):
+    def test_hyperreg_conversion_with_k_mismatch(self, run_filecheck, get_generic_qec_code):
         """Test that attempting to convert a hyper-register type with a value of k different than
         the value of k given in the QEC code raise a CompileError.
         """
@@ -144,15 +160,13 @@ class TestTypeConversionPattern:
         }
         }
         """
-        pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", 7, 1, 3, np.eye(7), np.eye(7))),
-        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=get_generic_qec_code(7, 1, 3)),)
 
         with pytest.raises(CompileError, match="Failed to convert type"):
             run_filecheck(program, pipeline)
 
 
-# MARK: TestAllocAndDealloc
+# MARK: Alloc/Dealloc
 
 
 class TestAllocAndDeallocConversionPatterns:
@@ -164,7 +178,8 @@ class TestAllocAndDeallocConversionPatterns:
     @pytest.mark.parametrize(
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
-    def test_allocate_is_lowered(self, width, n, k, run_filecheck):
+    # pylint: disable=too-many-positional-arguments, too-many-arguments
+    def test_allocate_is_lowered(self, width, n, k, run_filecheck, get_generic_qec_code):
         """Test that a qecl.allocate operation is lowered as expected"""
 
         program = f"""
@@ -178,9 +193,7 @@ class TestAllocAndDeallocConversionPatterns:
         }}
         """
 
-        pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))),
-        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=get_generic_qec_code(n, k, 3)),)
         run_filecheck(program, pipeline)
 
     @pytest.mark.parametrize("width", [1, 2, 3])
@@ -188,7 +201,8 @@ class TestAllocAndDeallocConversionPatterns:
     @pytest.mark.parametrize(
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
-    def test_deallocate_is_lowered(self, width, n, k, run_filecheck):
+    # pylint: disable=too-many-positional-arguments, too-many-arguments
+    def test_deallocate_is_lowered(self, width, n, k, run_filecheck, get_generic_qec_code):
         """Test that a qecl.deallocate operation is lowered as expected"""
 
         program = f"""
@@ -204,13 +218,11 @@ class TestAllocAndDeallocConversionPatterns:
         }}
         """
 
-        pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))),
-        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=get_generic_qec_code(n, k, 3)),)
         run_filecheck(program, pipeline)
 
 
-# MARK: TestLoweringEncode
+# MARK: Insert/Extract
 
 
 class TestInsertExtractConversionPatterns:
@@ -224,7 +236,7 @@ class TestInsertExtractConversionPatterns:
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
     @pytest.mark.parametrize("idx", [0, 3, 6])
-    def test_extract_block_is_lowered(self, width, k, n, idx, run_filecheck):
+    def test_extract_block_is_lowered(self, width, k, n, idx, run_filecheck, get_generic_qec_code):
         """Test that a qecl.extract_block operation is lowered as expected"""
 
         program = f"""
@@ -240,9 +252,7 @@ class TestInsertExtractConversionPatterns:
         }}
         """
 
-        pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))),
-        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=get_generic_qec_code(n, k, 3)),)
         run_filecheck(program, pipeline)
 
     @pytest.mark.parametrize("width", [1, 2, 3])
@@ -251,7 +261,7 @@ class TestInsertExtractConversionPatterns:
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
     @pytest.mark.parametrize("idx", [0, 3, 6])
-    def test_insert_block_is_lowered(self, width, k, n, idx, run_filecheck):
+    def test_insert_block_is_lowered(self, width, k, n, idx, run_filecheck, get_generic_qec_code):
         """Test that a qecl.insert_block operation is lowered as expected"""
 
         program = f"""
@@ -269,10 +279,11 @@ class TestInsertExtractConversionPatterns:
         }}
         """
 
-        pipeline = (
-            ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode("", n, k, 3, np.eye(n), np.eye(n))),
-        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=get_generic_qec_code(n, k, 3)),)
         run_filecheck(program, pipeline)
+
+
+# MARK: Encode
 
 
 class TestLoweringEncode:
@@ -288,7 +299,16 @@ class TestLoweringEncode:
         two auxiliary qubits (set by the number of rows in the z_tanner graph)"""
 
         n = 2
-        qec_code = QecCode(code_name, n=n, k=k, d=1, x_tanner=np.eye(n), z_tanner=np.eye(n))
+        qec_code = QecCode(
+            code_name,
+            n=n,
+            k=k,
+            d=1,
+            x_tanner=np.eye(n),
+            z_tanner=np.eye(n),
+            transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
+            transversal_2q_gates={},
+        )
 
         program = f"""
         builtin.module @module_circuit {{
@@ -323,7 +343,7 @@ class TestLoweringEncode:
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
         run_filecheck(program, pipeline)
 
-    def test_single_encode_with_Steane(self, run_filecheck):
+    def test_single_encode_with_Steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
         """Test that a single qecl.encode operation is lowered to a call to the encoding
         subroutine using the Steane code"""
 
@@ -382,10 +402,9 @@ class TestLoweringEncode:
             }
             """
 
-        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
-        run_filecheck(program, pipeline)
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
-    def test_multiple_encodes_with_Steane(self, run_filecheck):
+    def test_multiple_encodes_with_Steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
         """Test that a qecl.encode operation raises an error if we are not encoding to zero"""
 
         program = """
@@ -405,8 +424,149 @@ class TestLoweringEncode:
             }
             """
 
-        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
-        run_filecheck(program, pipeline)
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
+
+
+# MARK: Tanner graphs
+
+
+class TestTannerGraphInsertion:
+    """Unit tests for the insertion of Tanner graph ops."""
+
+    def test_tanner_graph_insertion_steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
+        """Test that Tanner graph ops for the Steane code are correctly inserted at the beginning of
+        the module.
+        """
+
+        program = """
+        // CHECK-LABEL: test_module
+        builtin.module @test_module {
+        //      CHECK: [[row_idx_x:%.+]] = arith.constant
+        // CHECK-SAME:   dense<[7, 7, 8, 7, 8, 9, 7, 9, 8, 8, 9, 9, 0, 1, 2, 3, 1, 2, 4, 5, 2, 3, 5, 6]> : tensor<24xi32>
+        //      CHECK: [[col_ptr_x:%.+]] = arith.constant dense<[0, 1, 3, 6, 8, 9, 11, 12, 16, 20, 24]> : tensor<11xi32>
+        //      CHECK: [[tanner_x:%.+]] = qecp.assemble_tanner [[row_idx_x]], [[col_ptr_x]] :
+        // CHECK-SAME:   tensor<24xi32>, tensor<11xi32> -> !qecp.tanner_graph<24, 11, i32>
+        //      CHECK: [[row_idx_z:%.+]] = arith.constant
+        // CHECK-SAME:   dense<[7, 7, 8, 7, 8, 9, 7, 9, 8, 8, 9, 9, 0, 1, 2, 3, 1, 2, 4, 5, 2, 3, 5, 6]> : tensor<24xi32>
+        //      CHECK: [[col_ptr_z:%.+]] = arith.constant dense<[0, 1, 3, 6, 8, 9, 11, 12, 16, 20, 24]> : tensor<11xi32>
+        //      CHECK: [[tanner_z:%.+]] = qecp.assemble_tanner [[row_idx_z]], [[col_ptr_z]] :
+        // CHECK-SAME:   tensor<24xi32>, tensor<11xi32> -> !qecp.tanner_graph<24, 11, i32>
+        // CHECK-LABEL: test_program
+        func.func @test_program()  {
+            return
+        }
+        }
+        """
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
+
+
+# MARK: QEC Cycle
+
+
+class TestQecCycleLowering:
+    """Unit tests for the `qecl.qec` conversion pattern of the convert-qecl-to-qecp pass."""
+
+    def test_single_qec_cycle_Steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
+        """Test that a `qecl.qec` op is lowered to a call to the QEC-cycle subroutine for the Steane
+        code.
+        """
+        program = """
+        // CHECK-LABEL: test_module
+        builtin.module @test_module {
+        // CHECK: [[tanner_x:%.+]] = qecp.assemble_tanner {{.+}} -> !qecp.tanner_graph<24, 11, i32>
+        // CHECK: [[tanner_z:%.+]] = qecp.assemble_tanner {{.+}} -> !qecp.tanner_graph<24, 11, i32>
+        // CHECK-LABEL: test_program
+        func.func @test_program()  {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+
+            // CHECK: [[cb1:%.+]] = func.call @qec_cycle_Steane([[cb0]]) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+            %1 = qecl.qec %0 : !qecl.codeblock<1>
+            return
+        }
+        // CHECK-LABEL: qec_cycle_Steane([[cb0:%.+]]: !qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+
+        // COM: The block below takes results of X checks and performs Z corrections
+        // CHECK: qecp.alloc_aux : !qecp.qubit<aux>
+        // CHECK: qecp.alloc_aux : !qecp.qubit<aux>
+        // CHECK: qecp.alloc_aux : !qecp.qubit<aux>
+        // CHECK: qecp.hadamard {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.hadamard {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.hadamard {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.extract {{.*}} : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+        // CHECK: qecp.cnot {{.*}} : !qecp.qubit<aux>, !qecp.qubit<data>
+        // CHECK: qecp.insert {{.*}} : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK: [[cb0:%.+]] = qecp.insert {{.*}}[6], {{.*}} : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK: qecp.hadamard {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.hadamard {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.hadamard {{.*}} : !qecp.qubit<aux>
+        // CHECK: [[m0:%.+]], {{.*}} = qecp.measure {{.*}} : i1, !qecp.qubit<aux>
+        // CHECK: [[m1:%.+]], {{.*}} = qecp.measure {{.*}} : i1, !qecp.qubit<aux>
+        // CHECK: [[m2:%.+]], {{.*}} = qecp.measure {{.*}} : i1, !qecp.qubit<aux>
+        // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
+        // CHECK: [[esm:%.+]] = tensor.from_elements [[m0]], [[m1]], [[m2]] : tensor<3xi1>
+        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[esm]] : tensor<3xi1>) [[tanner_x]] : !qecp.tanner_graph<24, 11, i32> -> tensor<1xindex>
+        // CHECK: [[lb:%.+]] = arith.constant 0 : index
+        // CHECK: [[ub:%.+]] = arith.constant 1 : index
+        // CHECK: [[st:%.+]] = arith.constant 1 : index
+        // CHECK: [[cb_x_out:%.+]] = scf.for [[i:%.+]] = [[lb]] to [[ub]] step [[st]] iter_args([[cb_arg:%.+]] = {{%.+}})
+        // CHECK:   [[err_idx:%.+]] = tensor.extract [[idx_t]][[[i]]] : tensor<1xindex>
+        // CHECK:   [[err_i64:%.+]] = arith.index_cast [[err_idx]] : index to i64
+        // CHECK:   [[minus1:%.+]] = arith.constant -1 : i64
+        // CHECK:   [[cond:%.+]] = arith.cmpi ne, [[err_i64]], [[minus1]] : i64
+        // CHECK:   [[cond_out_cb:%.+]] = scf.if [[cond]]
+        // CHECK:     [[q0:%.+]] = qecp.extract [[cb_arg]][[[err_idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+        // CHECK:     [[q1:%.+]] = qecp.z [[q0]] : !qecp.qubit<data>
+        // CHECK:     [[cb_arg_1:%.+]] = qecp.insert [[cb0]][[[err_idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK:     scf.yield [[cb_arg_1]] : !qecp.codeblock<1 x 7>
+        // CHECK:   } else {
+        // CHECK:     scf.yield [[cb_arg]] : !qecp.codeblock<1 x 7>
+        // CHECK:   }
+        // CHECK: scf.yield [[cond_out_cb]] : !qecp.codeblock<1 x 7>
+        // CHECK: }
+
+        // COM: The block below takes results of X checks and performs Z corrections
+        // CHECK: qecp.alloc_aux : !qecp.qubit<aux>
+        // CHECK: qecp.alloc_aux : !qecp.qubit<aux>
+        // CHECK: qecp.alloc_aux : !qecp.qubit<aux>
+        // CHECK-NOT: qecp.hadamard
+        // CHECK: qecp.extract {{.*}} : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+        // CHECK: qecp.cnot {{.*}} : !qecp.qubit<data>, !qecp.qubit<aux>
+        // CHECK: qecp.insert {{.*}} : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK: [[cb0:%.+]] = qecp.insert {{.*}}[6], {{.*}} : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK-NOT: qecp.hadamard
+        // CHECK: [[m0:%.+]], {{.*}} = qecp.measure {{.*}} : i1, !qecp.qubit<aux>
+        // CHECK: [[m1:%.+]], {{.*}} = qecp.measure {{.*}} : i1, !qecp.qubit<aux>
+        // CHECK: [[m2:%.+]], {{.*}} = qecp.measure {{.*}} : i1, !qecp.qubit<aux>
+        // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
+        // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
+        // CHECK: [[esm:%.+]] = tensor.from_elements [[m0]], [[m1]], [[m2]] : tensor<3xi1>
+        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[esm]] : tensor<3xi1>) [[tanner_z]] : !qecp.tanner_graph<24, 11, i32> -> tensor<1xindex>
+        // CHECK: [[lb:%.+]] = arith.constant 0 : index
+        // CHECK: [[ub:%.+]] = arith.constant 1 : index
+        // CHECK: [[st:%.+]] = arith.constant 1 : index
+        // CHECK: [[cb_x_out:%.+]] = scf.for [[i:%.+]] = [[lb]] to [[ub]] step [[st]] iter_args([[cb_arg:%.+]] = {{%.+}})
+        // CHECK:   [[err_idx:%.+]] = tensor.extract [[idx_t]][[[i]]] : tensor<1xindex>
+        // CHECK:   [[err_i64:%.+]] = arith.index_cast [[err_idx]] : index to i64
+        // CHECK:   [[minus1:%.+]] = arith.constant -1 : i64
+        // CHECK:   [[cond:%.+]] = arith.cmpi ne, [[err_i64]], [[minus1]] : i64
+        // CHECK:   [[cond_out_cb:%.+]] = scf.if [[cond]]
+        // CHECK:     [[q0:%.+]] = qecp.extract [[cb_arg]][[[err_idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+        // CHECK:     [[q1:%.+]] = qecp.x [[q0]] : !qecp.qubit<data>
+        // CHECK:     [[cb_arg_1:%.+]] = qecp.insert [[cb0]][[[err_idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK:     scf.yield [[cb_arg_1]] : !qecp.codeblock<1 x 7>
+        // CHECK:   } else {
+        // CHECK:     scf.yield [[cb_arg]] : !qecp.codeblock<1 x 7>
+        // CHECK:   }
+        // CHECK: scf.yield [[cond_out_cb]] : !qecp.codeblock<1 x 7>
+        // CHECK: }
+        // CHECK: func.return [[cb_x_out]] : !qecp.codeblock<1 x 7>
+        }
+        """
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
 
 # MARK: TestLoweringMeasure
@@ -415,8 +575,8 @@ class TestLoweringEncode:
 class TestLoweringMeasure:
     """Unit tests for the `measure` pattern of the convert-qecl-to-qecp pass."""
 
-    def test_measure(self, run_filecheck, qecl_to_qecp_steane_pipeline):
-        """Test the lowering pattern for `qecl.measure` ops."""
+    def test_measure_steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
+        """Test the lowering pattern for `qecl.measure` ops with the Steane code."""
         program = """
         builtin.module {
         // CHECK-LABEL: test_program
@@ -425,7 +585,7 @@ class TestLoweringMeasure:
             %0 = "test.op"() : () -> !qecl.codeblock<1>
 
             // CHECK: [[mresp:%.+]], [[cb1:%.+]] = func.call @measure_transversal_Steane([[cb0]]) : ({{.*}}) -> (tensor<7xi1>, !qecp.codeblock<1 x 7>)
-            // CHECK: [[mresl:%.+]] = qecp.decode_physical_meas [[mresp]] : tensor<7xi1> -> tensor<1xi1>
+            // CHECK: [[mresl:%.+]] = func.call @decode_physical_measurements_Steane([[mresp]]) : (tensor<7xi1>) -> tensor<1xi1>
             // CHECK: [[zero:%.+]] = arith.constant 0 : index
             // CHECK: [[mres0:%.+]] = tensor.extract [[mresl]][[[zero]]] : tensor<1xi1>
             %mres0, %1 = qecl.measure %0[0] : i1, !qecl.codeblock<1>
@@ -436,28 +596,426 @@ class TestLoweringMeasure:
             return
         }
         // CHECK-LABEL: func.func private @measure_transversal_Steane
-        // CHECK-SAME: ([[cb_in:%.+]]: !qecp.codeblock<1 x 7>) -> (tensor<7xi1>, !qecp.codeblock<1 x 7>) {
-        // CHECK: [[mres_t:%.+]] = tensor.empty() : tensor<7xi1>
-        // CHECK: [[c0:%.+]] = arith.constant 0 : index
-        // CHECK: [[c7:%.+]] = arith.constant 7 : index
-        // CHECK: [[c1:%.+]] = arith.constant 1 : index
-        // CHECK: [[mres_t_out:%.+]], [[cb_out:%.+]] = scf.for [[idx:%.+]] = [[c0]] to [[c7]] step [[c1]]
-        // CHECK-SAME: iter_args([[mres_t_arg:%.+]] = [[mres_t]], [[cb_arg:%.+]] = [[cb_in]])
-        // CHECK-SAME: -> (tensor<7xi1>, !qecp.codeblock<1 x 7>) {
-        // CHECK:   [[q0:%.+]] = qecp.extract [[cb_arg]][[[idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-        // CHECK:   [[mres0:%.+]], [[q1:%.+]] = qecp.measure [[q0]] : i1, !qecp.qubit<data>
-        // CHECK:   [[cb2:%.+]] = qecp.insert [[cb_arg]][[[idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
-        // CHECK:   [[mres_t_1:%.+]] = tensor.insert [[mres0]] into [[mres_t_arg]][[[idx]]] : tensor<7xi1>
-        // CHECK:   scf.yield [[mres_t_1]], [[cb2]] : tensor<7xi1>, !qecp.codeblock<1 x 7>
-        // CHECK: }
-        // CHECK: func.return [[mres_t_out]], [[cb_out]] : tensor<7xi1>, !qecp.codeblock<1 x 7>
-        // CHECK: }
+        //  CHECK-SAME:     ([[cb_in:%.+]]: !qecp.codeblock<1 x 7>) -> (tensor<7xi1>, !qecp.codeblock<1 x 7>) {
+        //       CHECK:   [[mres_t:%.+]] = tensor.empty() : tensor<7xi1>
+        //       CHECK:   [[c0:%.+]] = arith.constant 0 : index
+        //       CHECK:   [[c7:%.+]] = arith.constant 7 : index
+        //       CHECK:   [[c1:%.+]] = arith.constant 1 : index
+        //       CHECK:   [[mres_t_out:%.+]], [[cb_out:%.+]] = scf.for [[idx:%.+]] = [[c0]] to [[c7]] step [[c1]]
+        //  CHECK-SAME:       iter_args([[mres_t_arg:%.+]] = [[mres_t]], [[cb_arg:%.+]] = [[cb_in]])
+        //  CHECK-SAME:       -> (tensor<7xi1>, !qecp.codeblock<1 x 7>) {
+        //       CHECK:     [[q0:%.+]] = qecp.extract [[cb_arg]][[[idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+        //       CHECK:     [[mres0:%.+]], [[q1:%.+]] = qecp.measure [[q0]] : i1, !qecp.qubit<data>
+        //       CHECK:     [[cb2:%.+]] = qecp.insert [[cb_arg]][[[idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        //       CHECK:     [[mres_t_1:%.+]] = tensor.insert [[mres0]] into [[mres_t_arg]][[[idx]]] : tensor<7xi1>
+        //       CHECK:     scf.yield [[mres_t_1]], [[cb2]] : tensor<7xi1>, !qecp.codeblock<1 x 7>
+        //       CHECK:   }
+        //       CHECK:   func.return [[mres_t_out]], [[cb_out]] : tensor<7xi1>, !qecp.codeblock<1 x 7>
+        //       CHECK: }
+
+        // CHECK-LABEL: func.func private @decode_physical_measurements_Steane
+        //  CHECK-SAME:     [[in_mres_t:%.+]]: tensor<7xi1>) -> tensor<1xi1> {
+        //       CHECK:   [[c4:%.+]] = arith.constant 4 : index
+        //       CHECK:   [[m4:%.+]] = tensor.extract [[in_mres_t]][[[c4]]] : tensor<7xi1>
+        //       CHECK:   [[c5:%.+]] = arith.constant 5 : index
+        //       CHECK:   [[m5:%.+]] = tensor.extract [[in_mres_t]][[[c5]]] : tensor<7xi1>
+        //       CHECK:   [[c6:%.+]] = arith.constant 6 : index
+        //       CHECK:   [[m6:%.+]] = tensor.extract [[in_mres_t]][[[c6]]] : tensor<7xi1>
+        //       CHECK:   [[xor0:%.+]] = arith.xori [[m4]], [[m5]] : i1
+        //       CHECK:   [[xor1:%.+]] = arith.xori [[xor0]], [[m6]] : i1
+        //       CHECK:   [[out_mres_t0:%.+]] = tensor.empty() : tensor<1xi1>
+        //       CHECK:   [[c0:%.+]] = arith.constant 0 : index
+        //       CHECK:   [[out_mres_t1:%.+]] = tensor.insert [[xor1]] into [[out_mres_t0]][[[c0]]] : tensor<1xi1>
+        //       CHECK:   func.return [[out_mres_t1]] : tensor<1xi1>
+        //       CHECK: }
         }
         """
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
+    def test_measure_toy_code(self, run_filecheck):
+        """Test the lowering pattern for `qecl.measure` ops with a toy QEC code.
 
-# MARK: TestQECLNoiseLoweringPassIntegration
+        Note that the transversal-measurement subroutine is essentially the same as the Steane code
+        test above, so we don't test it again here. The main purpose of this test is to check that
+        the physical-measurement decoding subroutine works for different values of n and Pauli Z
+        observables.
+        """
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_program
+        func.func @test_program() {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 5>
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+
+            // CHECK: [[mresp:%.+]], [[cb1:%.+]] = func.call @measure_transversal_TestCode([[cb0]]) : ({{.*}}) -> (tensor<5xi1>, !qecp.codeblock<1 x 5>)
+            // CHECK: [[mresl:%.+]] = func.call @decode_physical_measurements_TestCode([[mresp]]) : (tensor<5xi1>) -> tensor<1xi1>
+            // CHECK: [[zero:%.+]] = arith.constant 0 : index
+            // CHECK: [[mres0:%.+]] = tensor.extract [[mresl]][[[zero]]] : tensor<1xi1>
+            %mres0, %1 = qecl.measure %0[0] : i1, !qecl.codeblock<1>
+
+            // CHECK: [[mres1:%.+]] = "test.op"([[mres0]]) : (i1) -> i1
+            %mres1 = "test.op"(%mres0) : (i1) -> i1  // To prevent DCE
+            %2 = "test.op"(%1) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>  // To prevent DCE
+            return
+        }
+        // CHECK-LABEL: func.func private @measure_transversal_TestCode
+
+        // CHECK-LABEL: func.func private @decode_physical_measurements_TestCode
+        //  CHECK-SAME:     [[in_mres_t:%.+]]: tensor<5xi1>) -> tensor<1xi1> {
+        //       CHECK:   [[c0:%.+]] = arith.constant 0 : index
+        //       CHECK:   [[m0:%.+]] = tensor.extract [[in_mres_t]][[[c0]]] : tensor<5xi1>
+        //       CHECK:   [[c2:%.+]] = arith.constant 2 : index
+        //       CHECK:   [[m2:%.+]] = tensor.extract [[in_mres_t]][[[c2]]] : tensor<5xi1>
+        //       CHECK:   [[xor0:%.+]] = arith.xori [[m0]], [[m2]] : i1
+        //       CHECK:   [[out_mres_t0:%.+]] = tensor.empty() : tensor<1xi1>
+        //       CHECK:   [[c0:%.+]] = arith.constant 0 : index
+        //       CHECK:   [[out_mres_t1:%.+]] = tensor.insert [[xor0]] into [[out_mres_t0]][[[c0]]] : tensor<1xi1>
+        //       CHECK:   func.return [[out_mres_t1]] : tensor<1xi1>
+        //       CHECK: }
+        }
+        """
+        qec_code = QecCode(
+            "TestCode",
+            n=5,
+            k=1,
+            d=3,
+            x_tanner=np.eye(5),
+            z_tanner=np.eye(5),
+            transversal_1q_gates={"z": (qecp.PauliZOp, [0, 2])},
+            transversal_2q_gates={},
+        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
+
+        run_filecheck(program, pipeline)
+
+    @pytest.mark.parametrize(
+        "gate_data",
+        [
+            (),
+            [("z", (qecp.PauliZOp, []))],
+        ],
+    )
+    def test_measure_with_missing_pauli_z_def_raise(self, run_filecheck, gate_data):
+        """Test that running the convert-qecl-to-qecp pass without specifying a logical Z observable
+        raise an error when creating the physical-measurement decoding subroutine.
+        """
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_program
+        func.func @test_program() {
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %mres0, %1 = qecl.measure %0[0] : i1, !qecl.codeblock<1>
+            %mres1 = "test.op"(%mres0) : (i1) -> i1  // To prevent DCE
+            %2 = "test.op"(%1) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>  // To prevent DCE
+            return
+        }
+        }
+        """
+
+        qec_code = QecCode(
+            "TestCode",
+            n=7,
+            k=1,
+            d=3,
+            x_tanner=np.eye(7),
+            z_tanner=np.eye(7),
+            transversal_1q_gates=dict(gate_data),
+            transversal_2q_gates={},
+        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
+
+        with pytest.raises(
+            CompileError, match="Failed to create physical-measurement decoding subroutine"
+        ):
+            run_filecheck(program, pipeline)
+
+
+# MARK: TransversalGates
+
+
+class TestLoweringTransversalGates:
+    """Unit tests for lowering transversal gates in the convert-qecl-to-qecp pass."""
+
+    def test_single_qubit_op_lowering_generic(self, run_filecheck):
+        """Test that a generic QEC code lowers ops as instructed. In this case (n=3,
+        x is transversal and applied on indicies 0 and 2), we expect to extract 3
+        qubits, apply the pattern XIX on them, and re-insert them."""
+
+        n, k = (3, 1)
+
+        qec_code = QecCode(
+            "TestCode",
+            n=n,
+            k=k,
+            d=1,
+            x_tanner=np.eye(n),
+            z_tanner=np.eye(n),
+            transversal_1q_gates={"x": (qecp.PauliXOp, [0, 2]), "z": (qecp.PauliZOp, [0, 2])},
+            transversal_2q_gates={},
+        )
+
+        program = f"""
+        builtin.module @module_circuit {{
+                func.func @test_func() attributes {{quantum.node}} {{
+                    // CHECK: [[codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<{k} x {n}>
+                    // CHECK-NEXT: [[codeblock2:%.+]] = func.call @x_TestCode([[codeblock]]) : (!qecp.codeblock<{k} x {n}>) -> !qecp.codeblock<{k} x {n}>
+                    // CHECK-NOT: qecl.x
+                    %0 = "test.op"() : () -> !qecl.codeblock<{k}>
+                    %1 = qecl.x %0[0] : !qecl.codeblock<{k}>
+                    return
+                }}
+                // CHECK: func.func private @x_TestCode([[codeblock_in:%.+]]: !qecp.codeblock<{k} x {n}>)
+                // CHECK-NEXT: [[q0:%.+]] = qecp.extract [[codeblock_in]][0] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q1:%.+]] = qecp.extract [[codeblock_in]][1] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q2:%.+]] = qecp.extract [[codeblock_in]][2] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
+                // CHECK: [[q0_1:%.+]] = qecp.x [[q0]] : !qecp.qubit<data>
+                // CHECK: [[q1_1:%.+]] = qecp.identity [[q1]] : !qecp.qubit<data>
+                // CHECK: [[q2_1:%.+]] = qecp.x [[q2]] : !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in1:%.+]] = qecp.insert [[codeblock_in]][0], [[q0_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in2:%.+]] = qecp.insert [[codeblock_in1]][1], [[q1_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_out:%.+]] = qecp.insert [[codeblock_in2]][2], [[q2_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
+                // CHECK-NEXT: func.return [[codeblock_out]]
+            }}
+            """
+
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
+        run_filecheck(program, pipeline)
+
+    def test_two_qubit_op_lowering_generic(self, run_filecheck):
+        """Test that a generic QEC code lowers ops as instructed. In this case (n=3,
+        x is transversal and applied on indicies 0 and 2), we expect to extract 3
+        qubits, apply the pattern XIX on them, and re-insert them."""
+
+        n, k = (3, 1)
+
+        qec_code = QecCode(
+            "TestCode",
+            n=n,
+            k=k,
+            d=1,
+            x_tanner=np.eye(n),
+            z_tanner=np.eye(n),
+            transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
+            transversal_2q_gates={"cnot": qecp.CnotOp},
+        )
+
+        program = f"""
+        builtin.module @module_circuit {{
+                func.func @test_func() attributes {{quantum.node}} {{
+                    // CHECK: [[ctrl_codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<{k} x {n}>
+                    // CHECK-NEXT: [[trgt_codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<{k} x {n}>
+                    // CHECK-NEXT: [[ctrl_codeblock_out:%.+]], [[trgt_codeblock_out:%.+]] = func.call @cnot_TestCode([[ctrl_codeblock]], [[trgt_codeblock]])  : (!qecp.codeblock<{k} x {n}>, !qecp.codeblock<{k} x {n}>) -> (!qecp.codeblock<{k} x {n}>, !qecp.codeblock<{k} x {n}>)
+                    // CHECK-NOT: qecl.cnot
+                    %0 = "test.op"() : () -> !qecl.codeblock<{k}>
+                    %1 = "test.op"() : () -> !qecl.codeblock<{k}>
+                    %2, %3 = qecl.cnot %0[0], %1[0] : !qecl.codeblock<{k}>, !qecl.codeblock<{k}>
+                    return
+                }}
+                // CHECK: func.func private @cnot_TestCode([[ctrl_cb_in:%.+]]: !qecp.codeblock<{k} x {n}>, [[trgt_cb_in:%.+]]: !qecp.codeblock<{k} x {n}>)
+                // CHECK-NEXT: [[ctrl_q0:%.+]] = qecp.extract [[ctrl_cb_in]][0] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_q1:%.+]] = qecp.extract [[ctrl_cb_in]][1] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_q2:%.+]] = qecp.extract [[ctrl_cb_in]][2] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[trgt_q0:%.+]] = qecp.extract [[trgt_cb_in]][0] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[trgt_q1:%.+]] = qecp.extract [[trgt_cb_in]][1] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[trgt_q2:%.+]] = qecp.extract [[trgt_cb_in]][2] : !qecp.codeblock<{k} x {n}> -> !qecp.qubit<data>
+                // CHECK: [[ctrl_q0_1:%.+]], [[trgt_q0_1:%.+]] = qecp.cnot [[ctrl_q0]], [[trgt_q0]] : !qecp.qubit<data>
+                // CHECK: [[ctrl_q1_1:%.+]], [[trgt_q1_1:%.+]] = qecp.cnot [[ctrl_q1]], [[trgt_q1]] : !qecp.qubit<data>
+                // CHECK: [[ctrl_q2_1:%.+]], [[trgt_q2_1:%.+]] = qecp.cnot [[ctrl_q2]], [[trgt_q2]] : !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_cb_in1:%.+]] = qecp.insert [[ctrl_cb_in]][0], [[ctrl_q0_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_cb_in2:%.+]] = qecp.insert [[ctrl_cb_in1]][1], [[ctrl_q1_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_cb_out:%.+]] = qecp.insert [[ctrl_cb_in2]][2], [[ctrl_q2_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
+                // CHECK-NEXT: [[trgt_cb_in1:%.+]] = qecp.insert [[trgt_cb_in]][0], [[trgt_q0_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
+                // CHECK-NEXT: [[trgt_cb_in2:%.+]] = qecp.insert [[trgt_cb_in1]][1], [[trgt_q1_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
+                // CHECK-NEXT: [[trgt_cb_out:%.+]] = qecp.insert [[trgt_cb_in2]][2], [[trgt_q2_1]] : !qecp.codeblock<{k} x {n}>, !qecp.qubit<data>
+                // CHECK-NEXT: func.return [[ctrl_cb_out]], [[trgt_cb_out]]
+            }}
+            """
+
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
+        run_filecheck(program, pipeline)
+
+    @pytest.mark.parametrize("gate", ("x", "y", "z"))
+    def test_pauli_lowering_Steane(self, gate, run_filecheck, qecl_to_qecp_steane_pipeline):
+        """Test that using the Steane code lowers Pauli ops as expected. These ops are applied
+        on the last 3 qubits in the codeblock, and identity is applied to the rest."""
+
+        program = f"""
+        builtin.module @module_circuit {{
+                func.func @test_func() attributes {{quantum.node}} {{
+                    // CHECK: [[codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
+                    // CHECK-NEXT: [[codeblock2:%.+]] = func.call @{gate}_Steane([[codeblock]]) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                    // CHECK-NOT: qecl.{gate}
+                    %0 = "test.op"() : () -> !qecl.codeblock<1>
+                    %1 = qecl.{gate} %0[0] : !qecl.codeblock<1>
+                    return
+                }}
+                // CHECK: func.func private @{gate}_Steane([[codeblock_in:%.+]]: !qecp.codeblock<1 x 7>)
+                // CHECK-NEXT: [[q0:%.+]] = qecp.extract [[codeblock_in]][0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q1:%.+]] = qecp.extract [[codeblock_in]][1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q2:%.+]] = qecp.extract [[codeblock_in]][2] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q3:%.+]] = qecp.extract [[codeblock_in]][3] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q4:%.+]] = qecp.extract [[codeblock_in]][4] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q5:%.+]] = qecp.extract [[codeblock_in]][5] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q6:%.+]] = qecp.extract [[codeblock_in]][6] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK: [[q0_1:%.+]] = qecp.identity [[q0]] : !qecp.qubit<data>
+                // CHECK: [[q1_1:%.+]] = qecp.identity [[q1]] : !qecp.qubit<data>
+                // CHECK: [[q2_1:%.+]] = qecp.identity [[q2]] : !qecp.qubit<data>
+                // CHECK: [[q3_1:%.+]] = qecp.identity [[q3]] : !qecp.qubit<data>
+                // CHECK: [[q4_1:%.+]] = qecp.{gate} [[q4]] : !qecp.qubit<data>
+                // CHECK: [[q5_1:%.+]] = qecp.{gate} [[q5]] : !qecp.qubit<data>
+                // CHECK: [[q6_1:%.+]] = qecp.{gate} [[q6]] : !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in1:%.+]] = qecp.insert [[codeblock_in]][0], [[q0_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in2:%.+]] = qecp.insert [[codeblock_in1]][1], [[q1_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in3:%.+]] = qecp.insert [[codeblock_in2]][2], [[q2_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in4:%.+]] = qecp.insert [[codeblock_in3]][3], [[q3_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in5:%.+]] = qecp.insert [[codeblock_in4]][4], [[q4_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in6:%.+]] = qecp.insert [[codeblock_in5]][5], [[q5_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_out:%.+]] = qecp.insert [[codeblock_in6]][6], [[q6_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: func.return [[codeblock_out]]
+            }}
+            """
+
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
+
+    @pytest.mark.parametrize("gate, adj", [("s", "adj"), ("hadamard", ""), ("identity", "")])
+    def test_single_qubit_gate_lowering_Steane(
+        self, gate, adj, run_filecheck, qecl_to_qecp_steane_pipeline
+    ):
+        """Test that using the Steane code lowers Hadamard, Identity and S ops as expected. These ops
+        are applied on all qubits in the codeblock. For the S operator, the adjoint is applied."""
+
+        program = f"""
+        builtin.module @module_circuit {{
+                func.func @test_func() attributes {{quantum.node}} {{
+                    // CHECK: [[codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
+                    // CHECK-NEXT: [[codeblock2:%.+]] = func.call @{gate}_Steane([[codeblock]]) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                    // CHECK-NOT: qecl.{gate}
+                    %0 = "test.op"() : () -> !qecl.codeblock<1>
+                    %1 = qecl.{gate} %0[0] : !qecl.codeblock<1>
+                    return
+                }}
+                // CHECK: func.func private @{gate}_Steane([[codeblock_in:%.+]]: !qecp.codeblock<1 x 7>)
+                // CHECK-NEXT: [[q0:%.+]] = qecp.extract [[codeblock_in]][0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q1:%.+]] = qecp.extract [[codeblock_in]][1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q2:%.+]] = qecp.extract [[codeblock_in]][2] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q3:%.+]] = qecp.extract [[codeblock_in]][3] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q4:%.+]] = qecp.extract [[codeblock_in]][4] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q5:%.+]] = qecp.extract [[codeblock_in]][5] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q6:%.+]] = qecp.extract [[codeblock_in]][6] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK: [[q0_1:%.+]] = qecp.{gate} [[q0]] {adj} : !qecp.qubit<data>
+                // CHECK: [[q1_1:%.+]] = qecp.{gate} [[q1]] {adj} : !qecp.qubit<data>
+                // CHECK: [[q2_1:%.+]] = qecp.{gate} [[q2]] {adj} : !qecp.qubit<data>
+                // CHECK: [[q3_1:%.+]] = qecp.{gate} [[q3]] {adj} : !qecp.qubit<data>
+                // CHECK: [[q4_1:%.+]] = qecp.{gate} [[q4]] {adj} : !qecp.qubit<data>
+                // CHECK: [[q5_1:%.+]] = qecp.{gate} [[q5]] {adj} : !qecp.qubit<data>
+                // CHECK: [[q6_1:%.+]] = qecp.{gate} [[q6]] {adj} : !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in1:%.+]] = qecp.insert [[codeblock_in]][0], [[q0_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in2:%.+]] = qecp.insert [[codeblock_in1]][1], [[q1_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in3:%.+]] = qecp.insert [[codeblock_in2]][2], [[q2_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in4:%.+]] = qecp.insert [[codeblock_in3]][3], [[q3_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in5:%.+]] = qecp.insert [[codeblock_in4]][4], [[q4_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in6:%.+]] = qecp.insert [[codeblock_in5]][5], [[q5_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_out:%.+]] = qecp.insert [[codeblock_in6]][6], [[q6_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: func.return [[codeblock_out]]
+            }}
+            """
+
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
+
+    def test_cnot_lowering_Steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
+        """Test that using the Steane code lowers ops as expected"""
+
+        program = """
+        builtin.module @module_circuit {
+                func.func @test_func() attributes {quantum.node} {
+                    // CHECK: [[ctrl_codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
+                    // CHECK: [[trgt_codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
+                    // CHECK-NEXT: [[ctrl_codeblock_out:%.+]], [[trgt_codeblock_out:%.+]] = func.call @cnot_Steane([[ctrl_codeblock]], [[trgt_codeblock]]) : (!qecp.codeblock<1 x 7>, !qecp.codeblock<1 x 7>) -> (!qecp.codeblock<1 x 7>, !qecp.codeblock<1 x 7>)
+                    // CHECK-NOT: qecl.cnot
+                    %0 = "test.op"() : () -> !qecl.codeblock<1>
+                    %1 = "test.op"() : () -> !qecl.codeblock<1>
+                    %2, %3 = qecl.cnot %0[0], %1[0] : !qecl.codeblock<1>, !qecl.codeblock<1>
+                    return
+                }
+                // CHECK: func.func private @cnot_Steane([[ctrl_cb_in:%.+]]: !qecp.codeblock<1 x 7>, [[tgt_cb_in:%.+]]: !qecp.codeblock<1 x 7>)
+                // CHECK-NEXT: [[ctrl_q0:%.+]] = qecp.extract [[ctrl_cb_in]][0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_q1:%.+]] = qecp.extract [[ctrl_cb_in]][1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_q2:%.+]] = qecp.extract [[ctrl_cb_in]][2] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_q3:%.+]] = qecp.extract [[ctrl_cb_in]][3] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_q4:%.+]] = qecp.extract [[ctrl_cb_in]][4] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_q5:%.+]] = qecp.extract [[ctrl_cb_in]][5] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_q6:%.+]] = qecp.extract [[ctrl_cb_in]][6] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[tgt_q0:%.+]] = qecp.extract [[tgt_cb_in]][0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[tgt_q1:%.+]] = qecp.extract [[tgt_cb_in]][1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[tgt_q2:%.+]] = qecp.extract [[tgt_cb_in]][2] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[tgt_q3:%.+]] = qecp.extract [[tgt_cb_in]][3] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[tgt_q4:%.+]] = qecp.extract [[tgt_cb_in]][4] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[tgt_q5:%.+]] = qecp.extract [[tgt_cb_in]][5] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[tgt_q6:%.+]] = qecp.extract [[tgt_cb_in]][6] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK: [[ctrl_q0_1:%.+]], [[tgt_q0_1:%.+]] = qecp.cnot [[ctrl_q0]], [[tgt_q0]] : !qecp.qubit<data>, !qecp.qubit<data>
+                // CHECK: [[ctrl_q1_1:%.+]], [[tgt_q1_1:%.+]] = qecp.cnot [[ctrl_q1]], [[tgt_q1]] : !qecp.qubit<data>, !qecp.qubit<data>
+                // CHECK: [[ctrl_q2_1:%.+]], [[tgt_q2_1:%.+]] = qecp.cnot [[ctrl_q2]], [[tgt_q2]] : !qecp.qubit<data>, !qecp.qubit<data
+                // CHECK: [[ctrl_q3_1:%.+]], [[tgt_q3_1:%.+]] = qecp.cnot [[ctrl_q3]], [[tgt_q3]] : !qecp.qubit<data>, !qecp.qubit<data
+                // CHECK: [[ctrl_q4_1:%.+]], [[tgt_q4_1:%.+]] = qecp.cnot [[ctrl_q4]], [[tgt_q4]] : !qecp.qubit<data>, !qecp.qubit<data
+                // CHECK: [[ctrl_q5_1:%.+]], [[tgt_q5_1:%.+]] = qecp.cnot [[ctrl_q5]], [[tgt_q5]] : !qecp.qubit<data>, !qecp.qubit<data
+                // CHECK: [[ctrl_q6_1:%.+]], [[tgt_q6_1:%.+]] = qecp.cnot [[ctrl_q6]], [[tgt_q6]] : !qecp.qubit<data>, !qecp.qubit<data
+                // CHECK-NEXT: [[ctrl_cb_in1:%.+]] = qecp.insert [[ctrl_cb_in]][0], [[ctrl_q0_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_cb_in2:%.+]] = qecp.insert [[ctrl_cb_in1]][1], [[ctrl_q1_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_cb_in3:%.+]] = qecp.insert [[ctrl_cb_in2]][2], [[ctrl_q2_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_cb_in4:%.+]] = qecp.insert [[ctrl_cb_in3]][3], [[ctrl_q3_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_cb_in5:%.+]] = qecp.insert [[ctrl_cb_in4]][4], [[ctrl_q4_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_cb_in6:%.+]] = qecp.insert [[ctrl_cb_in5]][5], [[ctrl_q5_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[ctrl_cb_out:%.+]] = qecp.insert [[ctrl_cb_in6]][6], [[ctrl_q6_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[tgt_cb_in1:%.+]] = qecp.insert [[tgt_cb_in]][0], [[tgt_q0_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[tgt_cb_in2:%.+]] = qecp.insert [[tgt_cb_in1]][1], [[tgt_q1_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[tgt_cb_in3:%.+]] = qecp.insert [[tgt_cb_in2]][2], [[tgt_q2_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[tgt_cb_in4:%.+]] = qecp.insert [[tgt_cb_in3]][3], [[tgt_q3_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[tgt_cb_in5:%.+]] = qecp.insert [[tgt_cb_in4]][4], [[tgt_q4_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[tgt_cb_in6:%.+]] = qecp.insert [[tgt_cb_in5]][5], [[tgt_q5_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[tgt_cb_out:%.+]] = qecp.insert [[tgt_cb_in6]][6], [[tgt_q6_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: func.return [[ctrl_cb_out]], [[tgt_cb_out]]
+            }
+            """
+
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
+
+    def test_nontransveral_ops_ignored(self, run_filecheck):
+        """Test that a generic QEC code lowers ops as instructed"""
+
+        n, k = (3, 1)
+
+        qec_code = QecCode(
+            "TestCode",
+            n=n,
+            k=k,
+            d=1,
+            x_tanner=np.eye(n),
+            z_tanner=np.eye(n),
+            transversal_1q_gates={"x": (qecp.PauliXOp, [0, 1]), "z": (qecp.PauliZOp, [0, 1])},
+            transversal_2q_gates={},
+        )
+
+        program = f"""
+        builtin.module @module_circuit {{
+                func.func @test_func() attributes {{quantum.node}} {{
+                    // CHECK: [[codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<{k} x {n}>
+                    // CHECK-NEXT: [[codeblock2:%.+]] = func.call @x_TestCode([[codeblock]]) : (!qecp.codeblock<{k} x {n}>) -> !qecp.codeblock<{k} x {n}>
+                    // CHECK-NOT: qecl.x
+                    // CHECK: qecl.y
+                    %0 = "test.op"() : () -> !qecl.codeblock<{k}>
+                    %1 = qecl.x %0[0] : !qecl.codeblock<{k}>
+                    %2 = qecl.y %1[0] : !qecl.codeblock<{k}>
+                    return
+                }}
+                // CHECK: func.func private @x_TestCode([[codeblock_in:%.+]]: !qecp.codeblock<{k} x {n}>)
+            }}
+            """
+
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
+        run_filecheck(program, pipeline)
+
+
+# MARK: Integration Tests with Noise
 
 
 # We can remove this xfail and warning filter once `convert_qecl_to_qecp_pass` is complete
@@ -471,8 +1029,8 @@ class TestQECLNoiseLoweringPassIntegration:
         """Test the convert-qecl-noise-to-qecp-noise pass on the simplest possible, non-trivial circuit."""
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(target="mlir", keep_intermediate=True, capture=True)
-        @convert_qecl_to_qecp_pass(qec_code=QecCode.get("Steane"), number_errors=1)
+        @qp.qjit(target="mlir", capture=True)
+        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)
