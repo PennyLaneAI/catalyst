@@ -61,6 +61,11 @@
   [(#2780)](https://github.com/PennyLaneAI/catalyst/pull/2780)
   [(#2772)](https://github.com/PennyLaneAI/catalyst/pull/2772)
 
+* The strategy to decode physical measurements in the `convert-qecl-to-qecp` pass has been updated
+  to perform the decoding directly in the IR rather than offloading to a pre-compiled runtime
+  function.
+  [(#2813)](https://github.com/PennyLaneAI/catalyst/pull/2813)
+
 * Resolved a bug in the QEC-cycle subroutine within the `convert-qecl-to-qecp` pass where the SSA
   values of the `scf.yield` op were incorrectly returned instead of the `scf.for` op results. Also,
   the `qec_code` pass option is now given as a `str` rather than a `QecCode` object to ensure
