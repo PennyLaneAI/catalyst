@@ -248,7 +248,7 @@ bool PBCLayer::insert(PBCOpInterface op, bool onlyDisjointQubit)
     }
 
     // If onlyOnDisjointQubit is true, we only check the disjoint qubit condition
-    if (commuteToLayer(op) && !onlyDisjointQubit) {
+    if (!onlyDisjointQubit && commuteToLayer(op)) {
         insertToLayer(op);
         return true;
     }
