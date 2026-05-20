@@ -88,6 +88,7 @@
 This release contains contributions from (in alphabetical order):
 
 Joey Carter,
+Yushao Chen,
 Lillian Frederiksen,
 Christina Lee,
 Mehrdad Malekmohammadi,
