@@ -154,21 +154,21 @@ func.func @test_partition_layers_4(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr
     // CHECK: func.func @test_partition_layers_4([[qr0:%.+]]: !quantum.bit, [[qr1:%.+]]: !quantum.bit, [[qr2:%.+]]: !quantum.bit, [[qr3:%.+]]: !quantum.bit, [[qr4:%.+]]: !quantum.bit, [[qr5:%.+]]: !quantum.bit)
     // CHECK-DISJOINT: func.func @test_partition_layers_4([[qr0:%.+]]: !quantum.bit, [[qr1:%.+]]: !quantum.bit, [[qr2:%.+]]: !quantum.bit, [[qr3:%.+]]: !quantum.bit, [[qr4:%.+]]: !quantum.bit, [[qr5:%.+]]: !quantum.bit)
 
-    // PPM(["X", "X", "Y"]) Q0, Q1, Q2
-    // PPM(["Y"]) Q4
-    // PPM(["Y", "Z"]) Q0, Q1
-    // PPM(["Y", "X", "Y"]) Q2, Q3, Q4
-    // PPM(["Z", "X", "Y", "Y", "Y"]) Q0, Q1, Q2, Q3, Q4
+    // PPM(["X", "X", "Y"]) %qr0, %qr1, %qr2
+    // PPM(["Y"]) %qr4
+    // PPM(["Y", "Z"]) %0#0, %0#1
+    // PPM(["Y", "X", "Y"]) %0#2, %qr3, %1
+    // PPM(["Z", "X", "Y", "Y", "Y"]) %2#0, %2#1, %3#0, %3#1, %3#2
 
     // Default: first four PPMs commute and merge into one layer.
-    // CHECK: [[Q0:%.+]]:13 = pbc.layer([[A0:%.+]] = [[qr0]], [[A1:%.+]] = [[qr1]], [[A2:%.+]] = [[qr2]], [[A3:%.+]] = [[qr4]], [[A4:%.+]] = [[qr3]])
+    // CHECK: [[Q0:%.+]]:9 = pbc.layer([[A0:%.+]] = [[qr0]], [[A1:%.+]] = [[qr1]], [[A2:%.+]] = [[qr2]], [[A3:%.+]] = [[qr4]], [[A4:%.+]] = [[qr3]])
     // CHECK:   [[M0:%.+]], [[QL0:%.+]]:3 = pbc.ppm ["X", "X", "Y"] [[A0]], [[A1]], [[A2]]
     // CHECK:   [[M1:%.+]], [[QL1:%.+]] = pbc.ppm ["Y"] [[A3]]
-    // CHECK:   [[M2:%.+]], [[QL2:%.+]]:2 = pbc.ppm ["Y", "Z"] [[A0]], [[A1]]
-    // CHECK:   [[M3:%.+]], [[QL3:%.+]]:3 = pbc.ppm ["Y", "X", "Y"] [[A2]], [[A4]], [[A3]]
-    // CHECK:   pbc.yield [[M0]], [[M1]], [[M2]], [[M3]], [[QL0]]#0, [[QL2]]#0, [[QL0]]#1, [[QL2]]#1, [[QL0]]#2, [[QL3]]#0, [[QL1]], [[QL3]]#2, [[QL3]]#1
+    // CHECK:   [[M2:%.+]], [[QL2:%.+]]:2 = pbc.ppm ["Y", "Z"] [[QL0]]#0, [[QL0]]#1
+    // CHECK:   [[M3:%.+]], [[QL3:%.+]]:3 = pbc.ppm ["Y", "X", "Y"] [[QL0]]#2, [[A4]], [[QL1]]
+    // CHECK:   pbc.yield [[M0]], [[M1]], [[M2]], [[M3]], [[QL2]]#0, [[QL2]]#1, [[QL3]]#0, [[QL3]]#2, [[QL3]]#1
 
-    // CHECK: [[Q1:%.+]]:6 = pbc.layer([[A0:%.+]] = [[qr0]], [[A1:%.+]] = [[qr1]], [[A2:%.+]] = [[qr2]], [[A3:%.+]] = [[qr3]], [[A4:%.+]] = [[qr4]])
+    // CHECK: [[Q1:%.+]]:6 = pbc.layer([[A0:%.+]] = [[Q0]]#4, [[A1:%.+]] = [[Q0]]#5, [[A2:%.+]] = [[Q0]]#6, [[A3:%.+]] = [[Q0]]#8, [[A4:%.+]] = [[Q0]]#7)
     // CHECK:   [[M4:%.+]], [[QL4:%.+]]:5 = pbc.ppm ["Z", "X", "Y", "Y", "Y"] [[A0]], [[A1]], [[A2]], [[A3]], [[A4]]
     // CHECK:   pbc.yield [[M4]], [[QL4]]#0, [[QL4]]#1, [[QL4]]#2, [[QL4]]#3, [[QL4]]#4
 
@@ -178,20 +178,20 @@ func.func @test_partition_layers_4(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr
     // CHECK-DISJOINT:   [[M1:%.+]], [[QL1:%.+]] = pbc.ppm ["Y"] [[A3]]
     // CHECK-DISJOINT:   pbc.yield [[M0]], [[M1]], [[QL0]]#0, [[QL0]]#1, [[QL0]]#2, [[QL1]]
 
-    // CHECK-DISJOINT: [[DQ1:%.+]]:7 = pbc.layer([[A0:%.+]] = [[qr0]], [[A1:%.+]] = [[qr1]], [[A2:%.+]] = [[qr2]], [[A3:%.+]] = [[qr3]], [[A4:%.+]] = [[qr4]])
+    // CHECK-DISJOINT: [[DQ1:%.+]]:7 = pbc.layer([[A0:%.+]] = [[DQ0]]#2, [[A1:%.+]] = [[DQ0]]#3, [[A2:%.+]] = [[DQ0]]#4, [[A3:%.+]] = [[qr3]], [[A4:%.+]] = [[DQ0]]#5)
     // CHECK-DISJOINT:   [[M2:%.+]], [[QL2:%.+]]:2 = pbc.ppm ["Y", "Z"] [[A0]], [[A1]]
     // CHECK-DISJOINT:   [[M3:%.+]], [[QL3:%.+]]:3 = pbc.ppm ["Y", "X", "Y"] [[A2]], [[A3]], [[A4]]
     // CHECK-DISJOINT:   pbc.yield [[M2]], [[M3]], [[QL2]]#0, [[QL2]]#1, [[QL3]]#0, [[QL3]]#1, [[QL3]]#2
 
-    // CHECK-DISJOINT: [[DQ2:%.+]]:6 = pbc.layer([[A0:%.+]] = [[qr0]], [[A1:%.+]] = [[qr1]], [[A2:%.+]] = [[qr2]], [[A3:%.+]] = [[qr3]], [[A4:%.+]] = [[qr4]])
+    // CHECK-DISJOINT: [[DQ2:%.+]]:6 = pbc.layer([[A0:%.+]] = [[DQ1]]#2, [[A1:%.+]] = [[DQ1]]#3, [[A2:%.+]] = [[DQ1]]#4, [[A3:%.+]] = [[DQ1]]#5, [[A4:%.+]] = [[DQ1]]#6)
     // CHECK-DISJOINT:   [[M4:%.+]], [[QL4:%.+]]:5 = pbc.ppm ["Z", "X", "Y", "Y", "Y"] [[A0]], [[A1]], [[A2]], [[A3]], [[A4]]
     // CHECK-DISJOINT:   pbc.yield [[M4]], [[QL4]]#0, [[QL4]]#1, [[QL4]]#2, [[QL4]]#3, [[QL4]]#4
 
     %m0, %0:3 = pbc.ppm ["X", "X", "Y"] %qr0, %qr1, %qr2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
     %m1, %1 = pbc.ppm ["Y"] %qr4 : i1, !quantum.bit
-    %m2, %2:2 = pbc.ppm ["Y", "Z"] %qr0, %qr1 : i1, !quantum.bit, !quantum.bit
-    %m3, %3:3 = pbc.ppm ["Y", "X", "Y"] %qr2, %qr3, %qr4 : i1, !quantum.bit, !quantum.bit, !quantum.bit
-    %m4, %4:5 = pbc.ppm ["Z", "X", "Y", "Y", "Y"] %qr0, %qr1, %qr2, %qr3, %qr4 : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %m2, %2:2 = pbc.ppm ["Y", "Z"] %0#0, %0#1 : i1, !quantum.bit, !quantum.bit
+    %m3, %3:3 = pbc.ppm ["Y", "X", "Y"] %0#2, %qr3, %1 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    %m4, %4:5 = pbc.ppm ["Z", "X", "Y", "Y", "Y"] %2#0, %2#1, %3#0, %3#1, %3#2 : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
 
     func.return
 }
