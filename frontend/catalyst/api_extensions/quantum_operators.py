@@ -444,7 +444,7 @@ class MidCircuitPauliMeasure(HybridOp):
 
     binder = pauli_measure_p.bind
 
-    # pylint: disable=too-many-positional-arguments
+    # pylint: disable=too-many-positional-arguments too-many-arguments
     def __init__(
         self,
         in_classical_tracers,
