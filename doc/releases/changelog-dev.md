@@ -78,6 +78,9 @@
   `qecp.{extract_block, insert_block, extract, insert}`.
   [(#2846)](https://github.com/PennyLaneAI/catalyst/pull/2846)
 
+* A new, experimental compiler pipeline `qec_pipeline` has been added to the `ftqc.pipelines` module.
+  [(#2852)](https://github.com/PennyLaneAI/catalyst/pull/2852)
+
 * The reference semantics MBQC operations have been moved from the `qref` dialect to the `mbqc`
   dialect. They are now accessible as `mbqc.ref.measure_in_basis` and `mbqc.ref.graph_state_prep`.
   [(#2829)](https://github.com/PennyLaneAI/catalyst/pull/2829)

@@ -14,9 +14,11 @@
 
 """Tests for the convert-qecp-to-quantum xDSL dialect-conversion pass."""
 
+import numpy as np
 import pennylane as qp
 import pytest
 
+from catalyst.ftqc import qec_pipeline
 from catalyst.python_interface.dialects import qecp
 from catalyst.python_interface.dialects.quantum.attributes import QubitType
 from catalyst.python_interface.transforms.qecl import (
@@ -543,20 +545,22 @@ class TestHyperRegisterLowering:
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
 
 
+@pytest.mark.slow
 class TestQECPassIntegration:
     """Integration lit tests for the all qec-related pass"""
 
     # pylint: disable=line-too-long
-    def test_qec_pass_ghz_integration(self, run_filecheck_qjit):
-        """Integration tests for lowering a 3-logical qubit GHZ circuit."""
-        dev = qp.device("null.qubit", wires=3)
+    def test_qec_pass_ghz_lightning_integration(self, run_filecheck_qjit):
+        """Integration tests for lowering a 3-logical qubit GHZ circuit on lightning.qubit."""
+        dev = qp.device("lightning.qubit", wires=3)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, pipelines=qec_pipeline())
         @convert_qecp_to_quantum_pass
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
         @convert_quantum_to_qecl_pass(k=1)
-        @qp.qnode(dev, shots=1, mcm_method="one-shot")
+        @qp.set_shots(1)
+        @qp.qnode(dev, mcm_method="one-shot")
         def ghz():
             # CHECK-NOT: qecp.alloc
             # CHECK-NOT: qecp.dealloc
@@ -594,3 +598,29 @@ class TestQECPassIntegration:
             return qp.sample([m0, m1, m2])
 
         run_filecheck_qjit(ghz)
+        samples = np.atleast_2d(np.asarray(ghz()))
+        allowed_outcomes = ([0, 0, 0], [1, 1, 1])
+        for sample in samples:
+            assert any(np.array_equal(sample, allowed) for allowed in allowed_outcomes)
+
+    def test_qec_pass_ghz_nullqubit_integration(self):
+        """Integration tests for lowering a 3-logical qubit GHZ circuit on null.qubit."""
+        dev = qp.device("null.qubit", wires=3)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @convert_qecp_to_quantum_pass
+        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
+        @inject_noise_to_qecl_pass
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.set_shots(10)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def ghz():
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([1, 2])
+            m0 = qp.measure(0)
+            m1 = qp.measure(1)
+            m2 = qp.measure(2)
+            return qp.sample([m0, m1, m2])
+
+        ghz()
