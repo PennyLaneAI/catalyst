@@ -1096,23 +1096,23 @@ class TestControlledMiscMethods:
         # different control wires
         op1 = C_ctrl(base, (1, 2), [0, 1])
         op2 = C_ctrl(base, (2, 1), [0, 1])
-        assert op1.hash != op2.hash
+        assert hash(op1) != hash(op2)
 
         # different control values
         op3 = C_ctrl(base, (1, 2), [1, 0])
-        assert op1.hash != op3.hash
-        assert op2.hash != op3.hash
+        assert hash(op1) != hash(op3)
+        assert hash(op2) != hash(op3)
 
         # all variations on default control_values
         op4 = C_ctrl(base, (1, 2))
         op5 = C_ctrl(base, (1, 2), [True, True])
         op6 = C_ctrl(base, (1, 2), [1, 1])
-        assert op4.hash == op5.hash
-        assert op4.hash == op6.hash
+        assert hash(op4) == hash(op5)
+        assert hash(op4) == hash(op6)
 
         # work wires
         op7 = C_ctrl(base, (1, 2), [0, 1], work_wires="aux")
-        assert op7.hash != op1.hash
+        assert hash(op7) != hash(op1)
 
 
 class TestControlledOperationProperties:
