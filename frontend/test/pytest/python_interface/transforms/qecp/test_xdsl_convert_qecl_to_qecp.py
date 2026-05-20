@@ -108,6 +108,7 @@ class TestTypeConversionPattern:
     @pytest.mark.parametrize(
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
+    # pylint: disable=too-many-positional-arguments, too-many-arguments
     def test_hyperreg_conversion(self, width, n, k, run_filecheck, get_generic_qec_code):
         """Test the type conversion pattern from !qecl.codeblock -> !qecp.codeblock for a few values
         of n and k.
@@ -177,6 +178,7 @@ class TestAllocAndDeallocConversionPatterns:
     @pytest.mark.parametrize(
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
+    # pylint: disable=too-many-positional-arguments, too-many-arguments
     def test_allocate_is_lowered(self, width, n, k, run_filecheck, get_generic_qec_code):
         """Test that a qecl.allocate operation is lowered as expected"""
 
@@ -199,6 +201,7 @@ class TestAllocAndDeallocConversionPatterns:
     @pytest.mark.parametrize(
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
+    # pylint: disable=too-many-positional-arguments, too-many-arguments
     def test_deallocate_is_lowered(self, width, n, k, run_filecheck, get_generic_qec_code):
         """Test that a qecl.deallocate operation is lowered as expected"""
 
@@ -431,8 +434,8 @@ class TestTannerGraphInsertion:
     """Unit tests for the insertion of Tanner graph ops."""
 
     def test_tanner_graph_insertion_steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
-        """Test that Tanner graph ops for the Steane code are emitted inside ``qec_cycle_Steane`` (not
-        at module scope), so decoded SSAs respect MLIR function isolation.
+        """Test that Tanner graph ops for the Steane code are correctly inserted at the beginning of
+        the module.
         """
 
         program = """
@@ -630,7 +633,7 @@ class TestLoweringMeasure:
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
     def test_measure_toy_code(self, run_filecheck):
-        """Test the lowering pattern for `qecl.measure` ops with a toy QEQ code.
+        """Test the lowering pattern for `qecl.measure` ops with a toy QEC code.
 
         Note that the transversal-measurement subroutine is essentially the same as the Steane code
         test above, so we don't test it again here. The main purpose of this test is to check that
