@@ -64,7 +64,9 @@ PBCLayerContext::groupLayers(mlir::Operation *root, bool onlyOnDisjointQubit)
         return WalkResult::advance();
     });
 
-    groups.emplace_back(layer.getOps());
+    if (!layer.empty()) {
+        groups.emplace_back(layer.getOps());
+    }
     return groups;
 }
 
