@@ -25,7 +25,6 @@ from xdsl.dialects import arith, builtin, func, scf, tensor
 from xdsl.dialects.builtin import IndexType
 from xdsl.ir import Block, Region
 from xdsl.rewriter import InsertPoint
-from xdsl.transforms.reconcile_unrealized_casts import ReconcileUnrealizedCastsPass
 
 from catalyst.python_interface.dialects import qecl, qecp
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
@@ -265,9 +264,6 @@ class ConvertQECLNoiseOpToQECPNoisePass(passes.ModulePass):
             ConvertQECLNoiseOpToQECPNoisePattern(noise_subroutine, self.n, self.number_errors),
             apply_recursively=False,
         ).rewrite_module(op)
-
-        # Pass to reconcile unrealized casts after the conversion.
-        ReconcileUnrealizedCastsPass().apply(_ctx, op)
 
 
 # TODOs: Add integration tests for the following line once the quantum-to-qecl pass is in.

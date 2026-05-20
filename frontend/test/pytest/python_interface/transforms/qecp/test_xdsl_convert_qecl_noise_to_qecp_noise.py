@@ -24,7 +24,6 @@ from catalyst.python_interface.transforms.qecp import (
 pytestmark = pytest.mark.xdsl
 
 
-@pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
 class TestConvertQECLNoiseOpToQECPNoisePass:
     """Unit tests for the convert-qecl-noise-to-qecp-noise pass."""
 

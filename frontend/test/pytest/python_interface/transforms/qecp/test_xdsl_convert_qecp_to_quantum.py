@@ -517,10 +517,10 @@ class TestHyperRegisterLowering:
                     %2 = arith.constant 2 : index
                     %3 = arith.constant 1 : index
                     %4 = scf.for %5 = %1 to %2 step %3 iter_args(%6 = %0) -> (!qecp.hyperreg<2 x 1 x 7>) {
-                    %7 = qecp.extract_block %6[%5] : !qecp.hyperreg<2 x 1 x 7> -> !qecp.codeblock<1 x 7>
-                    %8 = func.call @encode_zero_Steane(%7) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
-                    %9 = qecp.insert_block %6[%5], %8 : !qecp.hyperreg<2 x 1 x 7>, !qecp.codeblock<1 x 7>
-                    scf.yield %9 : !qecp.hyperreg<2 x 1 x 7>
+                        %7 = qecp.extract_block %6[%5] : !qecp.hyperreg<2 x 1 x 7> -> !qecp.codeblock<1 x 7>
+                        %8 = func.call @encode_zero_Steane(%7) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                        %9 = qecp.insert_block %6[%5], %8 : !qecp.hyperreg<2 x 1 x 7>, !qecp.codeblock<1 x 7>
+                        scf.yield %9 : !qecp.hyperreg<2 x 1 x 7>
                     }
                     %10 = qecp.extract_block %4[%1] : !qecp.hyperreg<2 x 1 x 7> -> !qecp.codeblock<1 x 7>
                     %11 = arith.constant dense<3> : tensor<1xi64>
