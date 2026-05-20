@@ -291,7 +291,7 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
 
     name = "convert-qecp-to-quantum"
 
-    def _apply_experimental_hyperregister_lowering(self, ctx: Context, op: builtin.ModuleOp):
+    def _apply_experimental_hyperregister_lowering(self, op: builtin.ModuleOp):
         """Apply a separate pattern rewrite for lowering hyperregister-related qecp ops to quantum
         ops.
         NOTE: This is an experimental rewriting for the hyperregister related operations and types.
@@ -370,7 +370,7 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
             )
         ).rewrite_module(op)
 
-        self._apply_experimental_hyperregister_lowering(ctx, op)
+        self._apply_experimental_hyperregister_lowering(op)
 
 
 convert_qecp_to_quantum_pass = compiler_transform(ConvertQecPhysicalToQuantumPass)
