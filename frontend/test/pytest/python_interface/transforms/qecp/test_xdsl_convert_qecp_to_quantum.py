@@ -599,4 +599,4 @@ class TestQECPassIntegration:
         run_filecheck_qjit(ghz)
         results = ghz()
         target_res_set = [np.array([0, 0, 0]), np.array([1, 1, 1])]
-        assert np.all(res in target_res_set for res in results)
+        assert all(any(np.array_equal(res, target) for target in target_res_set) for res in results)
