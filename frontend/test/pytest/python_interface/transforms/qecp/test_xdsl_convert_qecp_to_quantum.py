@@ -551,7 +551,7 @@ class TestQECPassIntegration:
     # pylint: disable=line-too-long
     def test_qec_pass_ghz_integration(self, run_filecheck_qjit):
         """Integration tests for lowering a 3-logical qubit GHZ circuit."""
-        dev = qp.device("null.qubit", wires=3)
+        dev = qp.device("lightning.qubit", wires=3)
 
         @qp.qjit(capture=True, pipelines=qec_pipeline())
         @convert_qecp_to_quantum_pass
