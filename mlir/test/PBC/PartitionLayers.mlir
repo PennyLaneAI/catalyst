@@ -13,6 +13,7 @@
 // limitations under the License.
 
 // RUN: quantum-opt --partition-layers --split-input-file --verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --partition-layers=disjoint-qubit --split-input-file --verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-DISJOINT
 
 func.func @test_partition_layers_0(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit) -> i1 {
 
@@ -143,6 +144,54 @@ func.func @test_partition_layers_3(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr
     // CHECK:   [[QL5:%.+]]:4 = pbc.ppr ["Y", "I", "Y", "Y"](8) [[A0]], [[A1]], [[A2]], [[A3]]
     // CHECK:   pbc.yield [[QL5]]#0, [[QL5]]#1, [[QL5]]#2, [[QL5]]#3
     %5:4 = pbc.ppr ["Y", "I", "Y", "Y"] (8) %4#0, %4#1, %4#2, %4#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+
+    func.return
+}
+
+// -----
+
+func.func @test_partition_layers_4(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit, %qr3 : !quantum.bit, %qr4 : !quantum.bit, %qr5 : !quantum.bit) {
+    // CHECK: func.func @test_partition_layers_4([[qr0:%.+]]: !quantum.bit, [[qr1:%.+]]: !quantum.bit, [[qr2:%.+]]: !quantum.bit, [[qr3:%.+]]: !quantum.bit, [[qr4:%.+]]: !quantum.bit, [[qr5:%.+]]: !quantum.bit)
+    // CHECK-DISJOINT: func.func @test_partition_layers_4([[qr0:%.+]]: !quantum.bit, [[qr1:%.+]]: !quantum.bit, [[qr2:%.+]]: !quantum.bit, [[qr3:%.+]]: !quantum.bit, [[qr4:%.+]]: !quantum.bit, [[qr5:%.+]]: !quantum.bit)
+
+    // PPM(["X", "X", "Y"]) Q0, Q1, Q2
+    // PPM(["Y"]) Q4
+    // PPM(["Y", "Z"]) Q0, Q1
+    // PPM(["Y", "X", "Y"]) Q2, Q3, Q4
+    // PPM(["Z", "X", "Y", "Y", "Y"]) Q0, Q1, Q2, Q3, Q4
+
+    // Default: first four PPMs commute and merge into one layer.
+    // CHECK: [[Q0:%.+]]:13 = pbc.layer([[A0:%.+]] = [[qr0]], [[A1:%.+]] = [[qr1]], [[A2:%.+]] = [[qr2]], [[A3:%.+]] = [[qr4]], [[A4:%.+]] = [[qr3]])
+    // CHECK:   [[M0:%.+]], [[QL0:%.+]]:3 = pbc.ppm ["X", "X", "Y"] [[A0]], [[A1]], [[A2]]
+    // CHECK:   [[M1:%.+]], [[QL1:%.+]] = pbc.ppm ["Y"] [[A3]]
+    // CHECK:   [[M2:%.+]], [[QL2:%.+]]:2 = pbc.ppm ["Y", "Z"] [[A0]], [[A1]]
+    // CHECK:   [[M3:%.+]], [[QL3:%.+]]:3 = pbc.ppm ["Y", "X", "Y"] [[A2]], [[A4]], [[A3]]
+    // CHECK:   pbc.yield [[M0]], [[M1]], [[M2]], [[M3]], [[QL0]]#0, [[QL2]]#0, [[QL0]]#1, [[QL2]]#1, [[QL0]]#2, [[QL3]]#0, [[QL1]], [[QL3]]#2, [[QL3]]#1
+
+    // CHECK: [[Q1:%.+]]:6 = pbc.layer([[A0:%.+]] = [[qr0]], [[A1:%.+]] = [[qr1]], [[A2:%.+]] = [[qr2]], [[A3:%.+]] = [[qr3]], [[A4:%.+]] = [[qr4]])
+    // CHECK:   [[M4:%.+]], [[QL4:%.+]]:5 = pbc.ppm ["Z", "X", "Y", "Y", "Y"] [[A0]], [[A1]], [[A2]], [[A3]], [[A4]]
+    // CHECK:   pbc.yield [[M4]], [[QL4]]#0, [[QL4]]#1, [[QL4]]#2, [[QL4]]#3, [[QL4]]#4
+
+    // Disjoint-qubit: only merge ops that act on disjoint qubits (3 layers).
+    // CHECK-DISJOINT: [[DQ0:%.+]]:6 = pbc.layer([[A0:%.+]] = [[qr0]], [[A1:%.+]] = [[qr1]], [[A2:%.+]] = [[qr2]], [[A3:%.+]] = [[qr4]])
+    // CHECK-DISJOINT:   [[M0:%.+]], [[QL0:%.+]]:3 = pbc.ppm ["X", "X", "Y"] [[A0]], [[A1]], [[A2]]
+    // CHECK-DISJOINT:   [[M1:%.+]], [[QL1:%.+]] = pbc.ppm ["Y"] [[A3]]
+    // CHECK-DISJOINT:   pbc.yield [[M0]], [[M1]], [[QL0]]#0, [[QL0]]#1, [[QL0]]#2, [[QL1]]
+
+    // CHECK-DISJOINT: [[DQ1:%.+]]:7 = pbc.layer([[A0:%.+]] = [[qr0]], [[A1:%.+]] = [[qr1]], [[A2:%.+]] = [[qr2]], [[A3:%.+]] = [[qr3]], [[A4:%.+]] = [[qr4]])
+    // CHECK-DISJOINT:   [[M2:%.+]], [[QL2:%.+]]:2 = pbc.ppm ["Y", "Z"] [[A0]], [[A1]]
+    // CHECK-DISJOINT:   [[M3:%.+]], [[QL3:%.+]]:3 = pbc.ppm ["Y", "X", "Y"] [[A2]], [[A3]], [[A4]]
+    // CHECK-DISJOINT:   pbc.yield [[M2]], [[M3]], [[QL2]]#0, [[QL2]]#1, [[QL3]]#0, [[QL3]]#1, [[QL3]]#2
+
+    // CHECK-DISJOINT: [[DQ2:%.+]]:6 = pbc.layer([[A0:%.+]] = [[qr0]], [[A1:%.+]] = [[qr1]], [[A2:%.+]] = [[qr2]], [[A3:%.+]] = [[qr3]], [[A4:%.+]] = [[qr4]])
+    // CHECK-DISJOINT:   [[M4:%.+]], [[QL4:%.+]]:5 = pbc.ppm ["Z", "X", "Y", "Y", "Y"] [[A0]], [[A1]], [[A2]], [[A3]], [[A4]]
+    // CHECK-DISJOINT:   pbc.yield [[M4]], [[QL4]]#0, [[QL4]]#1, [[QL4]]#2, [[QL4]]#3, [[QL4]]#4
+
+    %m0, %0:3 = pbc.ppm ["X", "X", "Y"] %qr0, %qr1, %qr2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    %m1, %1 = pbc.ppm ["Y"] %qr4 : i1, !quantum.bit
+    %m2, %2:2 = pbc.ppm ["Y", "Z"] %qr0, %qr1 : i1, !quantum.bit, !quantum.bit
+    %m3, %3:3 = pbc.ppm ["Y", "X", "Y"] %qr2, %qr3, %qr4 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    %m4, %4:5 = pbc.ppm ["Z", "X", "Y", "Y", "Y"] %qr0, %qr1, %qr2, %qr3, %qr4 : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
 
     func.return
 }
