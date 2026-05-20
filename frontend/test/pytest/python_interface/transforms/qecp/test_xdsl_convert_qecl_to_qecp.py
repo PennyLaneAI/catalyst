@@ -632,7 +632,7 @@ class TestLoweringMeasure:
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
     def test_measure_toy_code(self, run_filecheck):
-        """Test the lowering pattern for `qecl.measure` ops with a toy QEQ code.
+        """Test the lowering pattern for `qecl.measure` ops with a toy QEC code.
 
         Note that the transversal-measurement subroutine is essentially the same as the Steane code
         test above, so we don't test it again here. The main purpose of this test is to check that
