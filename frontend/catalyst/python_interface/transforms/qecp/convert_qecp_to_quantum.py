@@ -295,7 +295,7 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
         """Apply a separate pattern rewrite for lowering hyperregister-related qecp ops to quantum
         ops.
         NOTE: This is an experimental rewriting for the hyperregister related operations and types.
-        1. Each codeblock allocated by qecp.alloc is replaced with a qecp.hyperreg allocation.
+        1. Each codeblock allocated by qecp.alloc is replaced with a quantum.reg allocation.
         2. The encoding loop operation is unrolled.
         3. `qecp.extract_codeblock` operations are removed from the IR by replacing the uses with
         the corresponding quantum.reg SSA value.
@@ -322,28 +322,26 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                 qecp_ops_to_remove = []
 
                 for quantum_op in op_.walk():
-                    if isinstance(quantum_op, qecp.AllocOp):
-                        qecp_alloc_op = quantum_op
-                        qecp_ops_to_remove.append(quantum_op)
-                    if (
-                        isinstance(quantum_op, func.CallOp)
-                        and "encode_zero_" in quantum_op.callee.string_value()
-                    ):
-                        regs.append(quantum_op.results[0])
-                    if isinstance(quantum_op, qecp.ExtractCodeblockOp):
-                        qecp_ops_to_remove.append(quantum_op)
-                        quantum_op.codeblock.replace_all_uses_with(regs[reg_idx])
-                        reg_idx += 1
-                    if isinstance(quantum_op, qecp.InsertCodeblockOp):
-                        qecp_ops_to_remove.append(quantum_op)
-                        rewriter = pattern_rewriter.PatternRewriter(quantum_op)
-                        idx = resolve_constant_params(quantum_op.idx)
-                        dealloc = quantum.DeallocOp(regs[idx])
-                        rewriter.insert_op(dealloc)
-                        quantum_op.results[0].replace_all_uses_with(qecp_alloc_op.results[0])
-                    if isinstance(quantum_op, qecp.DeallocOp):
-                        rewriter = pattern_rewriter.PatternRewriter(quantum_op)
-                        rewriter.erase_op(quantum_op)
+                    match quantum_op:
+                        case qecp.AllocOp():
+                            qecp_alloc_op = quantum_op
+                            qecp_ops_to_remove.append(quantum_op)
+                        case func.CallOp() if "encode_zero_" in quantum_op.callee.string_value():
+                            regs.append(quantum_op.results[0])
+                        case qecp.ExtractCodeblockOp():
+                            qecp_ops_to_remove.append(quantum_op)
+                            quantum_op.codeblock.replace_all_uses_with(regs[reg_idx])
+                            reg_idx += 1
+                        case qecp.InsertCodeblockOp():
+                            qecp_ops_to_remove.append(quantum_op)
+                            rewriter = pattern_rewriter.PatternRewriter(quantum_op)
+                            idx = resolve_constant_params(quantum_op.idx)
+                            dealloc = quantum.DeallocOp(regs[idx])
+                            rewriter.insert_op(dealloc)
+                            quantum_op.results[0].replace_all_uses_with(qecp_alloc_op.results[0])
+                        case qecp.DeallocOp():
+                            rewriter = pattern_rewriter.PatternRewriter(quantum_op)
+                            rewriter.erase_op(quantum_op)
 
                 for quantum_op in reversed(qecp_ops_to_remove):
                     rewriter = pattern_rewriter.PatternRewriter(quantum_op)
