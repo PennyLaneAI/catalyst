@@ -42,7 +42,7 @@ from xdsl.pattern_rewriter import (
     attr_type_rewrite_pattern,
     op_type_rewrite_pattern,
 )
-from xdsl.transforms.dead_code_elimination import DeadCodeElimination
+from xdsl.transforms.dead_code_elimination import region_dce
 
 from catalyst.python_interface.dialects import qecp, quantum
 from catalyst.python_interface.dialects.quantum.attributes import QubitType, QuregType
@@ -257,9 +257,10 @@ class UnrollEncodeLoop(RewritePattern):
         return True, call_op.callee.string_value()
 
     @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: scf.ForOp | qecp.ExtractCodeblockOp, rewriter: PatternRewriter):
+    def match_and_rewrite(self, op: scf.ForOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for unrolling encode loops."""
-        if isinstance(op, scf.ForOp) and self._is_exact_encode_zero_steane_loop(op)[0]:
+        is_encode_zero_loop, encode_subroutine_symbol = self._is_exact_encode_zero_steane_loop(op)
+        if isinstance(op, scf.ForOp) and is_encode_zero_loop:
             init_hreg = op.iter_args[0]
             if isinstance(init_hreg.owner, qecp.AllocOp):
                 op.results[0].replace_all_uses_with(init_hreg)
@@ -271,7 +272,6 @@ class UnrollEncodeLoop(RewritePattern):
                     reg = quantum.AllocOp(num_qubits)
                     rewriter.insert_op(reg)
 
-                    encode_subroutine_symbol = self._is_exact_encode_zero_steane_loop(op)[1]
                     args = (reg.results[0],)
                     call_op = func.CallOp(
                         builtin.SymbolRefAttr(encode_subroutine_symbol),
@@ -349,7 +349,7 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                     rewriter = pattern_rewriter.PatternRewriter(quantum_op)
                     rewriter.erase_op(quantum_op)
                 # Remove dead code
-                DeadCodeElimination().apply(ctx, op_)
+                region_dce(op_.body)
 
     # pylint: disable=unused-argument
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:

@@ -266,9 +266,6 @@ class ConvertQECLNoiseOpToQECPNoisePass(passes.ModulePass):
             apply_recursively=False,
         ).rewrite_module(op)
 
-        # Pass to reconcile unrealized casts after the conversion.
-        ReconcileUnrealizedCastsPass().apply(_ctx, op)
-
 
 # TODOs: Add integration tests for the following line once the quantum-to-qecl pass is in.
 convert_qecl_noise_to_qecp_noise_pass = compiler_transform(
